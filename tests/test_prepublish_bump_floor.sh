@@ -15,6 +15,15 @@
 #   4. Runs the hook with a git-push payload from inside the clone.
 #   5. Asserts stdout (nodecision = empty) and stderr (WARN present/absent).
 #
+# Universal-path model: the guard enforces ONE invariant on ANY branch that
+# touches a distributed asset (agents/|skills/|hooks/) — all three version
+# sites (.claude-plugin/plugin.json, .claude-plugin/marketplace.json,
+# CLAUDE.md §3) must be bumped vs origin/main and mutually matching, then the
+# mechanical SemVer floor applies. There is no branch-name discriminator, no
+# release-cut marker/trailer, and no changelog.d/version.d fragment escape
+# hatch — fixtures below use ordinary `feat/*` branch names (or no branch at
+# all) to demonstrate the branch name carries no meaning.
+#
 # Version pins (AC-9 floor pattern — never exact ==):
 #   Both manifests must have version >= (2, 108, 0) after the implementer's
 #   MINOR bump (2.108.1 on feat/prepublish-bump-floor at time of authoring).
@@ -286,11 +295,14 @@ fi
 # ---------------------------------------------------------------------------
 # AC-1: ADD agents/foo.md + PATCH delta → under-bump MINOR WARN; nodecision
 #
-# Under the release-time model, version bumps only happen on release/vX.Y.Z branches.
-# This test uses a release branch so the bump-floor sub-stage runs.
+# Universal path: any branch touching a shipped asset must bump all version
+# sites vs origin/main. This fixture bumps both plugin.json and
+# marketplace.json (CLAUDE.md is absent from the fixture entirely, so the
+# third site is fail-open/exempt) to a PATCH delta while ADDing a new file —
+# under the mechanical floor an ADD warrants MINOR, so a WARN is expected.
 # ---------------------------------------------------------------------------
 echo
-echo "--- AC-1: release/v2.107.1 + ADD agents/foo.md + PATCH delta → MINOR WARN ---"
+echo "--- AC-1: feat branch + ADD agents/foo.md + PATCH delta (both sites bumped+matching) → MINOR WARN ---"
 
 _bare1=$(_new_tmp)
 _clone1=$(_new_tmp)
@@ -300,20 +312,19 @@ _make_repo "$_bare1" "$_clone1" "2.107.0"
     cd "$_clone1"
     git config user.email "test@test.com"
     git config user.name "Test"
-    # Switch to release branch before making the release commit
-    git checkout -b release/v2.107.1 -q 2>/dev/null
+    git checkout -b feat/ac1-under-bump -q 2>/dev/null
     mkdir -p agents
     echo "# new agent" > agents/foo.md
     # PATCH bump (2.107.0 → 2.107.1) — under-bump for ADD (minor floor)
     _write_plugin_json "2.107.1" .claude-plugin/plugin.json
     _write_market_json "2.107.1" .claude-plugin/marketplace.json
     git add .
-    git commit -m "release: v2.107.1 — add agents/foo.md (patch bump, under-bump for ADD)" -q 2>/dev/null
+    git commit -m "feat: add agents/foo.md (patch bump, under-bump for ADD)" -q 2>/dev/null
 )
 
 _run_hook "$_clone1"
 
-assert_nodecision "AC-1: release/v2.107.1 + ADD agents/foo.md + PATCH delta — stdout empty"
+assert_nodecision "AC-1: feat branch + ADD agents/foo.md + PATCH delta — stdout empty"
 assert_stderr_contains "AC-1: MINOR WARN present in stderr" "WARN"
 assert_stderr_contains "AC-1: MINOR WARN mentions MINOR" "MINOR"
 assert_stderr_contains "AC-1: advisory note present" "advisory"
@@ -321,9 +332,11 @@ assert_stderr_contains "AC-1: advisory note present" "advisory"
 # ---------------------------------------------------------------------------
 # AC-2: docs/ only touched + MINOR delta → over-bump WARN IS emitted; nodecision
 #
-# The hook now reads .claude-plugin/plugin.json at both origin/main and HEAD
-# on the no-shipped-asset early-exit path and emits an advisory WARN when the
+# The hook reads .claude-plugin/plugin.json at both origin/main and HEAD on
+# the no-shipped-asset early-exit path and emits an advisory WARN when the
 # version bump is >= MINOR. Push is not blocked (nodecision, stdout empty).
+# This path is unaffected by the universal-invariant collapse — it is a
+# pure early-exit that runs before the version-site check.
 # ---------------------------------------------------------------------------
 echo
 echo "--- AC-2: docs/ only + MINOR delta → over-bump WARN in stderr; nodecision ---"
@@ -349,7 +362,7 @@ _run_hook "$_clone2"
 
 # No shipped asset → early exit → nodecision (stdout empty, push not blocked).
 assert_nodecision "AC-2: docs/ only + MINOR delta — nodecision (push proceeds)"
-# Over-bump WARN IS now emitted on the no-shipped-asset path (moved from dead code).
+# Over-bump WARN IS emitted on the no-shipped-asset path.
 assert_stderr_contains "AC-2: over-bump WARN present in stderr" "WARN"
 assert_stderr_contains "AC-2: WARN mentions MINOR or higher" "MINOR"
 
@@ -399,13 +412,15 @@ assert_nodecision "AC-2 fail-open: plugin.json absent at origin — nodecision"
 assert_stderr_not_contains "AC-2 fail-open: no over-bump WARN when origin file absent" "WARN"
 
 # ---------------------------------------------------------------------------
-# AC-3 (new model): MODIFY agents/bar.md + NO version bump + NO fragment/marker → DENY
+# AC-3 (universal model): MODIFY agents/bar.md + NO version bump anywhere → DENY
 #
-# Under the release-time model the deny reason changed: "no bump" → "no fragment or marker".
-# The test still expects a deny (the direction is the same).
+# Under the universal-path model, any branch touching a shipped asset must
+# bump all three version sites — the deny reason names the three-site bump
+# requirement, not a changelog.d/version.d fragment (that escape hatch is
+# retired).
 # ---------------------------------------------------------------------------
 echo
-echo "--- AC-3: MODIFY agents/bar.md + NO bump + NO fragment/marker → DENY ---"
+echo "--- AC-3: MODIFY agents/bar.md + NO bump anywhere → DENY (three-site bump required) ---"
 
 _bare3=$(_new_tmp)
 _clone3=$(_new_tmp)
@@ -420,26 +435,28 @@ _make_repo "$_bare3" "$_clone3" "2.107.0"
     git add agents/bar.md
     git commit -m "base: add agents/bar.md" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Modify shipped asset without a bump AND without a changelog.d/ or version.d/ marker
+    # Modify shipped asset without bumping any version site
     echo "# existing agent — modified" > agents/bar.md
     git add agents/bar.md
-    git commit -m "modify agents/bar.md (no bump, no fragment)" -q 2>/dev/null
+    git commit -m "modify agents/bar.md (no bump anywhere)" -q 2>/dev/null
 )
 
 _run_hook "$_clone3"
 
-assert_deny "AC-3: MODIFY without bump and without fragment/marker → deny"
-assert_stderr_not_contains "AC-3: no WARN on feature-path deny" "WARN"
+assert_deny "AC-3: MODIFY without any version bump → deny"
+assert_deny_reason_contains "AC-3: deny reason names the three-site bump requirement" "all three version sites"
+assert_stderr_not_contains "AC-3: no WARN alongside the deny" "WARN"
 
 # ---------------------------------------------------------------------------
-# AC-5 (new): MODIFY agents + changelog.d/ fragment + NO bump → nodecision (ALLOW)
-#
-# Feature push that touches shipped assets AND carries a changelog.d/ fragment
-# but does NOT bump any version site → guard must allow (nodecision).
-# This is the primary new positive case introduced by the release-time model.
+# AC-2/AC-3 regression (inverted): a changelog.d/ fragment no longer bypasses
+# the guard. Under the retired feature-path model, MODIFY + fragment + NO
+# bump was ALLOWED (nodecision). Under the universal model the fragment
+# carries no special meaning — the push is DENIED for missing the mandatory
+# three-site bump. This is a deliberate verdict inversion (see Work Plan
+# Notes, Task-1 §6).
 # ---------------------------------------------------------------------------
 echo
-echo "--- AC-5 (new model): MODIFY agents + changelog.d/ fragment + NO bump → nodecision ---"
+echo "--- (inverted) MODIFY agents + changelog.d/ fragment + NO bump → now DENY (fragment retired) ---"
 
 _bare_ac5=$(_new_tmp)
 _clone_ac5=$(_new_tmp)
@@ -454,25 +471,25 @@ _make_repo "$_bare_ac5" "$_clone_ac5" "2.107.0"
     git add agents/feature.md
     git commit -m "base: add agents/feature.md" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Modify shipped asset, write a changelog.d/ fragment, do NOT bump version
+    # Modify shipped asset, write a changelog.d/ fragment, do NOT bump version.
+    # The fragment is a fossil of the retired escape hatch — it must no
+    # longer suppress the deny.
     echo "# feature agent — updated" > agents/feature.md
     mkdir -p changelog.d
     printf '### Changed\n- Updated feature agent behavior\n' > changelog.d/feat-feature-agent.md
     git add agents/feature.md changelog.d/feat-feature-agent.md
-    git commit -m "feat: update feature agent (deferred bump via changelog.d/)" -q 2>/dev/null
+    git commit -m "feat: update feature agent (changelog.d/ fragment, no bump)" -q 2>/dev/null
 )
 
 _run_hook "$_clone_ac5"
 
-assert_nodecision "AC-5: MODIFY + changelog.d/ fragment + no bump → nodecision (feature-mode allow)"
+assert_deny "(inverted) MODIFY + changelog.d/ fragment + no bump → deny (fragment does not bypass the guard)"
 
 # ---------------------------------------------------------------------------
-# AC-5 variant: MODIFY agents + version.d/ marker + NO bump → nodecision (ALLOW)
-#
-# Feature push with a version.d/ marker (for internal bumps with no changelog entry).
+# (inverted variant): MODIFY agents + version.d/ marker + NO bump → now DENY
 # ---------------------------------------------------------------------------
 echo
-echo "--- AC-5 variant: MODIFY agents + version.d/ marker + NO bump → nodecision ---"
+echo "--- (inverted) MODIFY agents + version.d/ marker + NO bump → now DENY (marker retired) ---"
 
 _bare_ac5m=$(_new_tmp)
 _clone_ac5m=$(_new_tmp)
@@ -487,26 +504,29 @@ _make_repo "$_bare_ac5m" "$_clone_ac5m" "2.107.0"
     git add agents/internal.md
     git commit -m "base: add agents/internal.md" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Internal refactor: shipped asset touched, version.d/ marker written, no changelog.d/
+    # Internal refactor: shipped asset touched, version.d/ marker written
+    # (fossil of the retired escape hatch), no version bump.
     echo "# internal agent — refactored" > agents/internal.md
     mkdir -p version.d
     printf 'patch\n' > version.d/refactor-internal-agent.bump
     git add agents/internal.md version.d/refactor-internal-agent.bump
-    git commit -m "refactor: internal agent (version.d/ marker; no changelog)" -q 2>/dev/null
+    git commit -m "refactor: internal agent (version.d/ marker, no bump)" -q 2>/dev/null
 )
 
 _run_hook "$_clone_ac5m"
 
-assert_nodecision "AC-5 variant: MODIFY + version.d/ marker + no bump → nodecision (feature-mode allow)"
+assert_deny "(inverted) MODIFY + version.d/ marker + no bump → deny (marker does not bypass the guard)"
 
 # ---------------------------------------------------------------------------
-# AC-6 (stray-bump deny): feature branch + shipped asset + stray bump → DENY
+# AC-3 (mutual-mismatch deny): feature branch + both sites bumped but to
+# DIFFERENT values → DENY naming the mutual-match requirement.
 #
-# A feature branch must NOT bump any version site (single-bump invariant).
-# Stray bump detected → deny regardless of fragment presence.
+# Without a branch-name discriminator, mismatch between the version sites
+# must be checked directly (plugin.json vs marketplace.json), not
+# transitively via a release/vX.Y.Z branch name.
 # ---------------------------------------------------------------------------
 echo
-echo "--- AC-6 (stray-bump deny): feature branch + stray bump → DENY ---"
+echo "--- AC-3 (mutual-mismatch deny): feature branch + plugin/marketplace bumped to DIFFERENT values → DENY ---"
 
 _bare_ac6s=$(_new_tmp)
 _clone_ac6s=$(_new_tmp)
@@ -516,33 +536,30 @@ _make_repo "$_bare_ac6s" "$_clone_ac6s" "2.107.0"
     cd "$_clone_ac6s"
     git config user.email "test@test.com"
     git config user.name "Test"
+    git checkout -b feat/ac3-mismatch -q 2>/dev/null
     mkdir -p agents
     echo "# stray agent" > agents/stray.md
-    git add agents/stray.md
-    git commit -m "base: add agents/stray.md" -q 2>/dev/null
-    git push origin HEAD:main -q 2>/dev/null
-    # Feature branch: modify shipped asset AND stray-bump (single-bump invariant violation)
-    echo "# stray agent — modified" > agents/stray.md
-    mkdir -p changelog.d
-    printf '### Changed\n- Updated stray agent\n' > changelog.d/feat-stray.md
+    # Both sites bumped (neither stale) but to DIFFERENT values — the
+    # mutual-match check must catch this independently of the bump-floor.
     _write_plugin_json "2.108.0" .claude-plugin/plugin.json
-    _write_market_json "2.108.0" .claude-plugin/marketplace.json
+    _write_market_json "2.109.0" .claude-plugin/marketplace.json
     git add .
-    git commit -m "feat: stray-bump on feature branch (should be denied)" -q 2>/dev/null
+    git commit -m "feat: add agents/stray.md with mismatched version sites" -q 2>/dev/null
 )
 
 _run_hook "$_clone_ac6s"
 
-assert_deny "AC-6 stray-bump: feature branch with version bump → deny (single-bump invariant)"
+assert_deny "AC-3: plugin.json and marketplace.json bumped to different values → deny (mutual-match)"
+assert_deny_reason_contains "AC-3: deny reason names the mismatch" "do not match"
 
 # ---------------------------------------------------------------------------
-# AC-7 (release path positive): release/vX.Y.Z branch + all-three bumped + matching → nodecision
+# AC-1 (positive): feature branch + all-three sites bumped+matching → nodecision
 #
-# A release branch with all three version sites bumped and matching the branch
-# version must be allowed (nodecision) on the release path.
+# A feature branch with all three version sites bumped and mutually matching
+# must be allowed (nodecision) — the branch name carries no meaning.
 # ---------------------------------------------------------------------------
 echo
-echo "--- AC-7 (release path positive): release/v2.108.0 + all-three bumped → nodecision ---"
+echo "--- AC-1 (positive): feat/ac-positive + all-three bumped+matching → nodecision ---"
 
 _bare_ac7p=$(_new_tmp)
 _clone_ac7p=$(_new_tmp)
@@ -557,31 +574,31 @@ _make_repo "$_bare_ac7p" "$_clone_ac7p" "2.107.0"
     git add agents/release.md
     git commit -m "base: add agents/release.md" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Switch to a release branch and bump all three sites to 2.108.0
-    git checkout -b release/v2.108.0 -q 2>/dev/null
+    # Ordinary feature branch, bump all three sites to a matching X.Y.Z.
+    git checkout -b feat/ac-positive -q 2>/dev/null
     _write_plugin_json "2.108.0" .claude-plugin/plugin.json
     _write_market_json "2.108.0" .claude-plugin/marketplace.json
     # CLAUDE.md §3 simulation: create a minimal CLAUDE.md with a version line
     printf '**Current version:** `2.108.0`\n' > CLAUDE.md
     git add .
-    git commit -m "release: v2.108.0 — bump all three version sites" -q 2>/dev/null
+    git commit -m "feat: bump all three version sites" -q 2>/dev/null
 )
 
 _run_hook "$_clone_ac7p"
 
-assert_nodecision "AC-7 release-positive: release/v2.108.0 + all-three bumped → nodecision"
+assert_nodecision "AC-1 positive: feat/ac-positive + all-three bumped → nodecision"
 
 # ---------------------------------------------------------------------------
-# AC-7 (partial-bump deny): release/vX.Y.Z branch + only plugin.json bumped → DENY
+# AC-4 (partial-bump deny): feature branch + only plugin.json bumped → DENY
 # ---------------------------------------------------------------------------
 echo
-echo "--- AC-7 (partial-bump deny): release/v2.108.0 + only plugin.json bumped → DENY ---"
+echo "--- AC-4 (partial-bump deny): feat/ac4-partial + only plugin.json bumped → DENY ---"
 
 _bare_ac7d=$(_new_tmp)
 _clone_ac7d=$(_new_tmp)
-# Seed agents/partial.md in origin/main so the release branch can MODIFY it
+# Seed agents/partial.md in origin/main so the feature branch can MODIFY it
 # (a file pushed to origin/main before branching does not appear in origin/main...HEAD
-# unless it is changed on the branch — the fixture must modify it on the release branch).
+# unless it is changed on the branch — the fixture must modify it on the branch).
 git init --bare "$_bare_ac7d" -q 2>/dev/null
 git clone "$_bare_ac7d" "$_clone_ac7d" -q 2>/dev/null
 (
@@ -595,62 +612,24 @@ git clone "$_bare_ac7d" "$_clone_ac7d" -q 2>/dev/null
     git add .
     git commit -m "initial: version 2.107.0 + partial agent" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Release branch: MODIFY the shipped asset, bump plugin.json but NOT marketplace.json
-    git checkout -b release/v2.108.0 -q 2>/dev/null
-    echo "# partial agent — modified on release branch" > agents/partial.md
+    # Feature branch: MODIFY the shipped asset, bump plugin.json but NOT marketplace.json
+    git checkout -b feat/ac4-partial -q 2>/dev/null
+    echo "# partial agent — modified on feature branch" > agents/partial.md
     _write_plugin_json "2.108.0" .claude-plugin/plugin.json
     # marketplace.json stays at 2.107.0 (partial bump — should deny)
     git add agents/partial.md .claude-plugin/plugin.json
-    git commit -m "release: v2.108.0 — only plugin.json bumped (partial, should deny)" -q 2>/dev/null
+    git commit -m "feat: only plugin.json bumped (partial, should deny)" -q 2>/dev/null
 )
 
 _run_hook "$_clone_ac7d"
 
-assert_deny "AC-7 partial-bump: release branch with only plugin.json bumped → deny"
-
-# ---------------------------------------------------------------------------
-# AC-7 (version-mismatch deny): release/v2.109.0 branch + bumped to 2.108.0 → DENY
-# ---------------------------------------------------------------------------
-echo
-echo "--- AC-7 (version-mismatch deny): release/v2.109.0 branch + version 2.108.0 → DENY ---"
-
-_bare_ac7mm=$(_new_tmp)
-_clone_ac7mm=$(_new_tmp)
-# Seed agents/mismatch.md in origin/main alongside version files, then MODIFY on branch.
-git init --bare "$_bare_ac7mm" -q 2>/dev/null
-git clone "$_bare_ac7mm" "$_clone_ac7mm" -q 2>/dev/null
-(
-    cd "$_clone_ac7mm"
-    git config user.email "test@test.com"
-    git config user.name "Test"
-    mkdir -p .claude-plugin agents
-    _write_plugin_json "2.107.0" .claude-plugin/plugin.json
-    _write_market_json "2.107.0" .claude-plugin/marketplace.json
-    echo "# mismatch agent" > agents/mismatch.md
-    git add .
-    git commit -m "initial: version 2.107.0 + mismatch agent" -q 2>/dev/null
-    git push origin HEAD:main -q 2>/dev/null
-    # Release branch v2.109.0: MODIFY shipped asset AND bump both sites, but to 2.108.0 not 2.109.0
-    git checkout -b release/v2.109.0 -q 2>/dev/null
-    echo "# mismatch agent — modified on release branch" > agents/mismatch.md
-    _write_plugin_json "2.108.0" .claude-plugin/plugin.json
-    _write_market_json "2.108.0" .claude-plugin/marketplace.json
-    git add .
-    git commit -m "release: mismatched version (branch v2.109.0 but files 2.108.0)" -q 2>/dev/null
-)
-
-_run_hook "$_clone_ac7mm"
-
-assert_deny "AC-7 version-mismatch: release branch version != file versions → deny"
+assert_deny "AC-4: feature branch with only plugin.json bumped → deny (partial three-site bump)"
 
 # ---------------------------------------------------------------------------
 # AC-4: DELETE skills/baz/SKILL.md + MINOR delta → MAJOR-candidate WARN; nodecision
-#
-# Uses a release branch so the bump-floor sub-stage runs (version bumps are
-# only allowed on release/vX.Y.Z branches in the release-time model).
 # ---------------------------------------------------------------------------
 echo
-echo "--- AC-4: release/v2.108.0 + DELETE skills/baz/SKILL.md + MINOR delta → MAJOR-candidate WARN ---"
+echo "--- AC-4: feat branch + DELETE skills/baz/SKILL.md + MINOR delta → MAJOR-candidate WARN ---"
 
 _bare4=$(_new_tmp)
 _clone4=$(_new_tmp)
@@ -665,18 +644,18 @@ _make_repo "$_bare4" "$_clone4" "2.107.0"
     git add skills/baz/
     git commit -m "base: add skills/baz/SKILL.md" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Release branch: delete the skill + MINOR bump (under-bump for DELETE, major floor)
-    git checkout -b release/v2.108.0 -q 2>/dev/null
+    # Feature branch: delete the skill + MINOR bump (under-bump for DELETE, major floor)
+    git checkout -b feat/ac4-delete -q 2>/dev/null
     git rm skills/baz/SKILL.md -q 2>/dev/null
     _write_plugin_json "2.108.0" .claude-plugin/plugin.json
     _write_market_json "2.108.0" .claude-plugin/marketplace.json
     git add .claude-plugin/
-    git commit -m "release: v2.108.0 — delete skills/baz/SKILL.md (minor bump — under-bump for DELETE)" -q 2>/dev/null
+    git commit -m "feat: delete skills/baz/SKILL.md (minor bump — under-bump for DELETE)" -q 2>/dev/null
 )
 
 _run_hook "$_clone4"
 
-assert_nodecision "AC-4: release/v2.108.0 + DELETE + MINOR delta — stdout empty"
+assert_nodecision "AC-4: feat branch + DELETE + MINOR delta — stdout empty"
 assert_stderr_contains "AC-4: MAJOR-candidate WARN present" "WARN"
 assert_stderr_contains "AC-4: mentions MAJOR" "MAJOR"
 assert_stderr_contains "AC-4: advisory note present" "advisory"
@@ -692,7 +671,7 @@ assert_stderr_contains "AC-4: advisory note present" "advisory"
 # the source side of the rename is also evaluated.
 # ---------------------------------------------------------------------------
 echo
-echo "--- AC-4b (#6): release/v2.108.0 + RENAME agents/rn.md -> docs/rn.md + MINOR delta → MAJOR-candidate WARN ---"
+echo "--- AC-4b (#6): feat branch + RENAME agents/rn.md -> docs/rn.md + MINOR delta → MAJOR-candidate WARN ---"
 
 _bare4b=$(_new_tmp)
 _clone4b=$(_new_tmp)
@@ -707,33 +686,29 @@ _make_repo "$_bare4b" "$_clone4b" "2.107.0"
     git add agents/rn.md
     git commit -m "base: add agents/rn.md" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Release branch: rename the shipped asset OUT of agents/ into docs/
+    # Feature branch: rename the shipped asset OUT of agents/ into docs/
     # (non-shipped) + MINOR bump (under-bump for a removed public surface).
-    git checkout -b release/v2.108.0 -q 2>/dev/null
+    git checkout -b feat/ac4b-rename -q 2>/dev/null
     mkdir -p docs
     git mv agents/rn.md docs/rn.md
     _write_plugin_json "2.108.0" .claude-plugin/plugin.json
     _write_market_json "2.108.0" .claude-plugin/marketplace.json
     git add .claude-plugin/
-    git commit -m "release: v2.108.0 — rename agents/rn.md to docs/rn.md (minor bump — under-bump for RENAME-OUT)" -q 2>/dev/null
+    git commit -m "feat: rename agents/rn.md to docs/rn.md (minor bump — under-bump for RENAME-OUT)" -q 2>/dev/null
 )
 
 _run_hook "$_clone4b"
 
-assert_nodecision "AC-4b: release/v2.108.0 + RENAME shipped->non-shipped + MINOR delta — stdout empty"
+assert_nodecision "AC-4b: feat branch + RENAME shipped->non-shipped + MINOR delta — stdout empty"
 assert_stderr_contains "AC-4b: MAJOR-candidate WARN present" "WARN"
 assert_stderr_contains "AC-4b: mentions MAJOR" "MAJOR"
 assert_stderr_contains "AC-4b: advisory note present" "advisory"
 
 # ---------------------------------------------------------------------------
 # Suite 15 AC-5: MODIFY hooks/x.sh (M only) + PATCH delta → NO WARN; nodecision
-#
-# Uses a release branch — version bumps only on release/vX.Y.Z in the new model.
-# Note: this is Suite 15 AC-5 (hooks modify, patch bump); the new feature-mode
-# positive case for "no bump + fragment → nodecision" is AC-5 (new model) above.
 # ---------------------------------------------------------------------------
 echo
-echo "--- Suite15/AC-5: release/v2.107.1 + MODIFY hooks/x.sh + PATCH delta → NO WARN ---"
+echo "--- Suite15/AC-5: feat branch + MODIFY hooks/x.sh + PATCH delta → NO WARN ---"
 
 _bare5=$(_new_tmp)
 _clone5=$(_new_tmp)
@@ -748,31 +723,29 @@ _make_repo "$_bare5" "$_clone5" "2.107.0"
     git add hooks/x.sh
     git commit -m "base: add hooks/x.sh" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Release branch: modify only — PATCH bump (meets floor)
-    git checkout -b release/v2.107.1 -q 2>/dev/null
+    # Feature branch: modify only — PATCH bump (meets floor)
+    git checkout -b feat/ac5-patch -q 2>/dev/null
     echo "#!/bin/bash" > hooks/x.sh
     echo "# updated" >> hooks/x.sh
     _write_plugin_json "2.107.1" .claude-plugin/plugin.json
     _write_market_json "2.107.1" .claude-plugin/marketplace.json
     git add .
-    git commit -m "release: v2.107.1 — modify hooks/x.sh (patch bump)" -q 2>/dev/null
+    git commit -m "feat: modify hooks/x.sh (patch bump)" -q 2>/dev/null
 )
 
 _run_hook "$_clone5"
 
-assert_nodecision "Suite15/AC-5: release/v2.107.1 + MODIFY hooks + PATCH delta — stdout empty"
+assert_nodecision "Suite15/AC-5: feat branch + MODIFY hooks + PATCH delta — stdout empty"
 assert_stderr_not_contains "Suite15/AC-5: no WARN when actual meets floor" "WARN"
 
 # ---------------------------------------------------------------------------
-# Suite15/AC-7: release path + OLD version was non-X.Y.Z → semver_delta unknown → fail-open
+# Suite15/AC-7: old version was non-X.Y.Z → semver_delta unknown → fail-open
 #
-# semver_delta(non-X.Y.Z-old, X.Y.Z-new) returns "unknown" → bump-floor compare
-# is skipped → nodecision (fail-open). Uses a release branch where the HEAD
-# version matches the branch name (passes the version-mismatch check) but the
-# OLD version at origin/main was non-standard.
+# semver_delta(non-X.Y.Z-old, X.Y.Z-new) returns "unknown" → bump-floor
+# compare is skipped → nodecision (fail-open).
 # ---------------------------------------------------------------------------
 echo
-echo "--- Suite15/AC-7: release/v2.108.0 + old version non-X.Y.Z at origin → fail-open, skip note ---"
+echo "--- Suite15/AC-7: feat branch + old version non-X.Y.Z at origin → fail-open, skip note ---"
 
 _bare7=$(_new_tmp)
 _clone7=$(_new_tmp)
@@ -795,27 +768,25 @@ git clone "$_bare7" "$_clone7" -q 2>/dev/null
     git commit -m "initial: version 1.0.0-beta (non-X.Y.Z)" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
 
-    # Release branch: bump to X.Y.Z (matches branch name)
-    git checkout -b release/v2.108.0 -q 2>/dev/null
+    # Feature branch: bump to X.Y.Z
+    git checkout -b feat/ac7-nonsemver -q 2>/dev/null
     echo "# agent — updated" > agents/new.md
     _write_plugin_json "2.108.0" .claude-plugin/plugin.json
     _write_market_json "2.108.0" .claude-plugin/marketplace.json
     git add .
-    git commit -m "release: v2.108.0 — old version was non-X.Y.Z" -q 2>/dev/null
+    git commit -m "feat: bump — old version was non-X.Y.Z" -q 2>/dev/null
 )
 
 _run_hook "$_clone7"
 
-assert_nodecision "Suite15/AC-7: release path + old-version non-X.Y.Z → semver_delta=unknown → nodecision (fail-open)"
+assert_nodecision "Suite15/AC-7: old-version non-X.Y.Z → semver_delta=unknown → nodecision (fail-open)"
 assert_stderr_contains "Suite15/AC-7: skip note in stderr mentions version" "skipping bump-floor check"
 
 # ---------------------------------------------------------------------------
-# Correct case: release/v2.108.0 + ADD agents/new.md + MINOR delta → NO WARN
-#
-# Release-path correct case: ADD a new agent with MINOR bump (meets floor).
+# Correct case: ADD agents/new.md + MINOR delta → NO WARN
 # ---------------------------------------------------------------------------
 echo
-echo "--- Correct case: release/v2.108.0 + ADD agents/new.md + MINOR delta → NO WARN ---"
+echo "--- Correct case: feat branch + ADD agents/new.md + MINOR delta → NO WARN ---"
 
 _barec=$(_new_tmp)
 _clonec=$(_new_tmp)
@@ -825,24 +796,23 @@ _make_repo "$_barec" "$_clonec" "2.107.0"
     cd "$_clonec"
     git config user.email "test@test.com"
     git config user.name "Test"
-    # Release branch
-    git checkout -b release/v2.108.0 -q 2>/dev/null
+    git checkout -b feat/ac-correct -q 2>/dev/null
     mkdir -p agents
     echo "# new agent" > agents/new.md
     _write_plugin_json "2.108.0" .claude-plugin/plugin.json
     _write_market_json "2.108.0" .claude-plugin/marketplace.json
     git add .
-    git commit -m "release: v2.108.0 — add agents/new.md (minor bump)" -q 2>/dev/null
+    git commit -m "feat: add agents/new.md (minor bump)" -q 2>/dev/null
 )
 
 _run_hook "$_clonec"
 
-assert_nodecision "correct: release/v2.108.0 + ADD + MINOR delta — stdout empty"
+assert_nodecision "correct: feat branch + ADD + MINOR delta — stdout empty"
 assert_stderr_not_contains "correct: no WARN when actual meets floor" "WARN"
 
 # ---------------------------------------------------------------------------
 # Over-bump-not-fired control: docs/ only + PATCH → NO over-bump WARN
-# (no-shipped-asset early-exit path; unaffected by the release-time model)
+# (no-shipped-asset early-exit path; unaffected by the universal-path model)
 # ---------------------------------------------------------------------------
 echo
 echo "--- Control: docs/ only + PATCH → NO over-bump WARN ---"
@@ -870,9 +840,8 @@ assert_nodecision "control: docs/ + PATCH — stdout empty"
 assert_stderr_not_contains "control: no over-bump WARN for PATCH" "WARN"
 
 # ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
-# Suite 16 (new cases) — over-bump hard-deny + bump-override escape-hatch
-# Functional tests for AC-1..AC-3 (#383 over-bump governance).
+# Suite 16 (over-bump hard-deny + bump-override escape-hatch)
+# Functional tests for the #383 over-bump governance sub-stage.
 #
 # Token injection: the hook reads the override token from:
 #   1. GIT_COMMIT_MSG environment variable (commit trailer)
@@ -880,12 +849,10 @@ assert_stderr_not_contains "control: no over-bump WARN for PATCH" "WARN"
 # Both sources are tested below via env-var injection in the run_hook helper.
 # ---------------------------------------------------------------------------
 echo
-echo "--- Suite 16 (AC-1/#383): over-bump DENY — release path + MINOR applied on M-only/PATCH-floor diff, no override ---"
+echo "--- Suite 16 (AC-1/#383): over-bump DENY — MINOR applied on M-only/PATCH-floor diff, no override ---"
 
-# Scenario: release/v2.108.0 branch, MODIFY agents/existing.md only (M-only) → PATCH floor.
+# Scenario: feat branch, MODIFY agents/existing.md only (M-only) → PATCH floor.
 # Applied bump: MINOR (2.107.0 → 2.108.0) → exceeds floor → deny (no bump-override token).
-# Note: on a feature branch this would deny because of stray-bump; on a release branch
-# it reaches the bump-floor sub-stage and denies because of over-bump.
 _bare_a1=$(_new_tmp)
 _clone_a1=$(_new_tmp)
 _make_repo "$_bare_a1" "$_clone_a1" "2.107.0"
@@ -899,21 +866,20 @@ _make_repo "$_bare_a1" "$_clone_a1" "2.107.0"
     git add agents/existing.md
     git commit -m "base: add agents/existing.md" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Release branch: Modify only (M-only → PATCH floor) but apply MINOR bump (over-bump)
-    git checkout -b release/v2.108.0 -q 2>/dev/null
+    # Feature branch: Modify only (M-only → PATCH floor) but apply MINOR bump (over-bump)
+    git checkout -b feat/s16-ac1 -q 2>/dev/null
     echo "# existing agent — updated" > agents/existing.md
     _write_plugin_json "2.108.0" .claude-plugin/plugin.json
     _write_market_json "2.108.0" .claude-plugin/marketplace.json
     git add .
-    git commit -m "release: v2.108.0 — modify agents/existing.md (minor bump — over-bump, no override)" -q 2>/dev/null
+    git commit -m "feat: modify agents/existing.md (minor bump — over-bump, no override)" -q 2>/dev/null
 )
 
 _run_hook "$_clone_a1"
-assert_deny "Suite16/AC-1: release-path MINOR applied on M-only (PATCH floor) without override → deny"
+assert_deny "Suite16/AC-1: MINOR applied on M-only (PATCH floor) without override → deny"
 
 echo
-echo "--- Suite 16 (AC-2/#383): over-bump ALLOWED on release path — valid bump-override token via GIT_COMMIT_MSG ---"
-echo "    (bump-override is only evaluated on the release/vX.Y.Z path; feature branches deny on stray-bump)"
+echo "--- Suite 16 (AC-2/#383): over-bump ALLOWED — valid bump-override token via GIT_COMMIT_MSG ---"
 
 _bare_a2=$(_new_tmp)
 _clone_a2=$(_new_tmp)
@@ -928,14 +894,14 @@ _make_repo "$_bare_a2" "$_clone_a2" "2.107.0"
     git add agents/two.md
     git commit -m "base: add agents/two.md" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Release branch: M-only → PATCH floor, apply MINOR (over-bump on release path),
-    # bump-override token will suppress the over-bump deny on the release path.
-    git checkout -b release/v2.108.0 -q 2>/dev/null
+    # M-only → PATCH floor, apply MINOR (over-bump); bump-override token will
+    # suppress the over-bump deny.
+    git checkout -b feat/s16-ac2a -q 2>/dev/null
     echo "# agent two — updated" > agents/two.md
     _write_plugin_json "2.108.0" .claude-plugin/plugin.json
     _write_market_json "2.108.0" .claude-plugin/marketplace.json
     git add .
-    git commit -m "release: v2.108.0 — modify agents/two.md (minor bump on M-only/PATCH floor)" -q 2>/dev/null
+    git commit -m "feat: modify agents/two.md (minor bump on M-only/PATCH floor)" -q 2>/dev/null
 )
 
 # Inject the valid override token via GIT_COMMIT_MSG
@@ -947,10 +913,10 @@ _tmperr_a2=$(mktemp)
 _HOOK_STDOUT=$(cat "$_tmpout_a2")
 _HOOK_STDERR=$(cat "$_tmperr_a2")
 rm -f "$_tmpout_a2" "$_tmperr_a2"
-assert_nodecision "Suite16/AC-2a: release-path over-bump WITH valid bump-override (GIT_COMMIT_MSG) → nodecision"
+assert_nodecision "Suite16/AC-2a: over-bump WITH valid bump-override (GIT_COMMIT_MSG) → nodecision"
 
 echo
-echo "--- Suite 16 (AC-2/#383): over-bump ALLOWED on release path — valid bump-override token via GIT_PUSH_OPTION_* ---"
+echo "--- Suite 16 (AC-2/#383): over-bump ALLOWED — valid bump-override token via GIT_PUSH_OPTION_* ---"
 
 _bare_a2p=$(_new_tmp)
 _clone_a2p=$(_new_tmp)
@@ -965,13 +931,13 @@ _make_repo "$_bare_a2p" "$_clone_a2p" "2.107.0"
     git add hooks/myhook.sh
     git commit -m "base: add hooks/myhook.sh" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Release branch: M-only → PATCH floor, apply MINOR (over-bump), provide override via push option
-    git checkout -b release/v2.108.0 -q 2>/dev/null
+    # M-only → PATCH floor, apply MINOR (over-bump), provide override via push option
+    git checkout -b feat/s16-ac2b -q 2>/dev/null
     echo "#!/bin/bash # updated" > hooks/myhook.sh
     _write_plugin_json "2.108.0" .claude-plugin/plugin.json
     _write_market_json "2.108.0" .claude-plugin/marketplace.json
     git add .
-    git commit -m "release: v2.108.0 — modify hooks/myhook.sh (minor bump on M-only/PATCH floor)" -q 2>/dev/null
+    git commit -m "feat: modify hooks/myhook.sh (minor bump on M-only/PATCH floor)" -q 2>/dev/null
 )
 
 # Inject the valid override token via GIT_PUSH_OPTION_*
@@ -981,15 +947,15 @@ _tmpout_a2p=$(mktemp)
 _tmperr_a2p=$(mktemp)
 (cd "$_clone_a2p" && _push_payload \
     | GIT_PUSH_OPTION_COUNT=1 \
-      GIT_PUSH_OPTION_0="bump-override: minor — hotfix + new hook surface in same release PR" \
+      GIT_PUSH_OPTION_0="bump-override: minor — hotfix + new hook surface in same PR" \
       _exec_hook >"$_tmpout_a2p" 2>"$_tmperr_a2p") || true
 _HOOK_STDOUT=$(cat "$_tmpout_a2p")
 _HOOK_STDERR=$(cat "$_tmperr_a2p")
 rm -f "$_tmpout_a2p" "$_tmperr_a2p"
-assert_nodecision "Suite16/AC-2b: release-path over-bump WITH valid bump-override (GIT_PUSH_OPTION_0) → nodecision"
+assert_nodecision "Suite16/AC-2b: over-bump WITH valid bump-override (GIT_PUSH_OPTION_0) → nodecision"
 
 echo
-echo "--- Suite 16 (AC-2/#383 guard): release path + control-char override token → rejected → deny ---"
+echo "--- Suite 16 (AC-2/#383 guard): control-char override token → rejected → deny ---"
 
 _bare_a2c=$(_new_tmp)
 _clone_a2c=$(_new_tmp)
@@ -1004,13 +970,13 @@ _make_repo "$_bare_a2c" "$_clone_a2c" "2.107.0"
     git add agents/ctrl.md
     git commit -m "base: add agents/ctrl.md" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Release branch: M-only → PATCH floor, apply MINOR (over-bump); control-char token is rejected
-    git checkout -b release/v2.108.0 -q 2>/dev/null
+    # M-only → PATCH floor, apply MINOR (over-bump); control-char token is rejected
+    git checkout -b feat/s16-ac2c -q 2>/dev/null
     echo "# ctrl agent — updated" > agents/ctrl.md
     _write_plugin_json "2.108.0" .claude-plugin/plugin.json
     _write_market_json "2.108.0" .claude-plugin/marketplace.json
     git add .
-    git commit -m "release: v2.108.0 — modify agents/ctrl.md (minor bump, over-bump)" -q 2>/dev/null
+    git commit -m "feat: modify agents/ctrl.md (minor bump, over-bump)" -q 2>/dev/null
 )
 
 # Inject an override token containing a control character (tab = \x09).
@@ -1025,14 +991,14 @@ _ctrl_token=$(printf 'bump-override: minor \t— malicious payload')
 _HOOK_STDOUT=$(cat "$_tmpout_a2c")
 _HOOK_STDERR=$(cat "$_tmperr_a2c")
 rm -f "$_tmpout_a2c" "$_tmperr_a2c"
-assert_deny "Suite16/AC-2c: release-path control-char override token rejected → falls through to over-bump deny"
+assert_deny "Suite16/AC-2c: control-char override token rejected → falls through to over-bump deny"
 
 echo
-echo "--- Suite 16 (AC-3/#383 regression): under-bump WARN still emitted (release path); feature-path deny still fires ---"
+echo "--- Suite 16 (AC-3/#383 regression): under-bump WARN still emitted; hard-block still fires ---"
 
-# AC-3 regression (a): on the release path, ADD agents/new.md + PATCH delta → MINOR WARN still present.
-# Release branch (release/vX.Y.Z) with all-three bumped and matching, but ADD (minor floor) with PATCH
-# applied → UNDER-BUMP WARN emitted. Verifies the bump-floor sub-stage still runs on the release path.
+# AC-3 regression (a): ADD agents/new.md + PATCH delta → MINOR WARN still present.
+# All-three sites bumped and matching, but ADD (minor floor) with PATCH
+# applied → UNDER-BUMP WARN emitted. Verifies the bump-floor sub-stage still runs.
 _bare_a3w=$(_new_tmp)
 _clone_a3w=$(_new_tmp)
 _make_repo "$_bare_a3w" "$_clone_a3w" "2.107.0"
@@ -1046,22 +1012,20 @@ _make_repo "$_bare_a3w" "$_clone_a3w" "2.107.0"
     git add agents/rg.md
     git commit -m "base: add agents/rg.md" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Release branch: ADD a new agent with only PATCH bump → under-bump WARN expected
-    git checkout -b release/v2.107.1 -q 2>/dev/null
+    # Feature branch: ADD a new agent with only PATCH bump → under-bump WARN expected
+    git checkout -b feat/s16-ac3a -q 2>/dev/null
     echo "# new regression-guard agent" > agents/rg2.md
     _write_plugin_json "2.107.1" .claude-plugin/plugin.json
     _write_market_json "2.107.1" .claude-plugin/marketplace.json
     git add agents/rg2.md .claude-plugin/
-    git commit -m "release: v2.107.1 — ADD rg2 with PATCH bump (under-bump regression)" -q 2>/dev/null
+    git commit -m "feat: ADD rg2 with PATCH bump (under-bump regression)" -q 2>/dev/null
 )
 
 _run_hook "$_clone_a3w"
-assert_nodecision "Suite16/AC-3a: release-path under-bump WARN (ADD + PATCH) → still nodecision (no block)"
-assert_stderr_contains "Suite16/AC-3a: under-bump WARN still emitted in stderr (release path)" "WARN"
+assert_nodecision "Suite16/AC-3a: under-bump WARN (ADD + PATCH) → still nodecision (no block)"
+assert_stderr_contains "Suite16/AC-3a: under-bump WARN still emitted in stderr" "WARN"
 
-# AC-3b regression: MODIFY agent + NO bump + NO fragment/marker → hard-block still fires (feature path).
-# Under the new model the deny fires because of missing fragment/marker (not missing bump).
-# The test still asserts deny — the direction is the same. Guard is not toothless.
+# AC-3b regression: MODIFY agent + NO bump anywhere → hard-block still fires.
 _bare_a3d=$(_new_tmp)
 _clone_a3d=$(_new_tmp)
 _make_repo "$_bare_a3d" "$_clone_a3d" "2.107.0"
@@ -1077,36 +1041,77 @@ _make_repo "$_bare_a3d" "$_clone_a3d" "2.107.0"
     git push origin HEAD:main -q 2>/dev/null
     echo "# block agent — modified" > agents/blk.md
     git add agents/blk.md
-    git commit -m "modify agents/blk.md (no bump, no fragment — regression guard)" -q 2>/dev/null
+    git commit -m "modify agents/blk.md (no bump anywhere — regression guard)" -q 2>/dev/null
 )
 
 _run_hook "$_clone_a3d"
-assert_deny "Suite16/AC-3b: no fragment + no marker hard-block still fires (regression guard — guard is not toothless)"
+assert_deny "Suite16/AC-3b: no bump anywhere → hard-block still fires (regression guard — guard is not toothless)"
+
+# ---------------------------------------------------------------------------
+# AC-12: worst-case under-bump — DELETE a distributed asset (MAJOR floor) with
+# only a PATCH bump → still WARN, NEVER deny.
+#
+# This locks in the under-bump advisory-only contract as an explicit, tested
+# case rather than an untested implicit gap: the widest possible floor/actual
+# gap (MAJOR floor vs PATCH applied) must still resolve to nodecision with a
+# WARN-level signal, on an ordinary feature branch. The bump-floor sub-stage
+# (runBumpFloorSubstage) never denies on under-bump — only over-bump governance
+# (Suite 16 above) can deny. See the accepted residual documented in
+# 01-plan.md § Security Assessment (under-bump exposure) and § Adversarial
+# Findings Remediation (A2): the level check stays advisory by design.
+# ---------------------------------------------------------------------------
+echo
+echo "--- AC-12: feat branch + DELETE skills/qux/SKILL.md (MAJOR floor) + PATCH-only bump → WARN, never deny ---"
+
+_bare_ac12=$(_new_tmp)
+_clone_ac12=$(_new_tmp)
+_make_repo "$_bare_ac12" "$_clone_ac12" "2.107.0"
+
+(
+    cd "$_clone_ac12"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p skills/qux
+    echo "# SKILL" > skills/qux/SKILL.md
+    git add skills/qux/
+    git commit -m "base: add skills/qux/SKILL.md" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+    # Feature branch: DELETE the distributed asset (MAJOR floor via
+    # sawRemovedOrRenamed) but bump only PATCH — the widest possible
+    # under-bump gap.
+    git checkout -b feat/ac12-worst-under-bump -q 2>/dev/null
+    git rm skills/qux/SKILL.md -q 2>/dev/null
+    _write_plugin_json "2.107.1" .claude-plugin/plugin.json
+    _write_market_json "2.107.1" .claude-plugin/marketplace.json
+    git add .claude-plugin/
+    git commit -m "feat: delete skills/qux/SKILL.md (patch-only bump — worst-case under-bump)" -q 2>/dev/null
+)
+
+_run_hook "$_clone_ac12"
+
+assert_nodecision "AC-12: DELETE (MAJOR floor) + PATCH-only bump → nodecision (never deny)"
+assert_stderr_contains "AC-12: WARN present for worst-case under-bump" "WARN"
+assert_stderr_contains "AC-12: WARN names MAJOR floor" "MAJOR"
+assert_stderr_contains "AC-12: advisory note present" "advisory"
 
 # ---------------------------------------------------------------------------
 # Suite 17: SEC-001 closure — third-site (CLAUDE.md §3) enforcement
 #
-# These cases were missing before SEC-001 was fixed. They close the gap between
-# the guard's declared contract (three sites) and its prior two-site reality.
-#
-# Fixture discipline: origin/main must carry CLAUDE.md with the old version so
-# that the guard can read _claude_origin and detect divergence. The release-path
-# cases also commit agents/ + manifests together in origin/main before branching
-# (following the AC-7 partial/mismatch pattern established by the tester).
+# These cases close the gap between the guard's declared contract (three
+# sites) and a two-site reality. Fixture discipline: origin/main must carry
+# CLAUDE.md with the old version so that the guard can read _claude_origin
+# and detect divergence.
 # ---------------------------------------------------------------------------
 
 echo
 echo "=== Suite 17: SEC-001 — CLAUDE.md §3 third-site enforcement ==="
 
 # ---------------------------------------------------------------------------
-# SEC-001-A: feature branch that stray-bumps ONLY CLAUDE.md §3 → DENY
-#
-# plugin.json and marketplace.json are unchanged vs origin/main.
-# Only CLAUDE.md §3 is bumped on the feature branch.
-# The single-bump invariant must catch this → deny.
+# SEC-001-A: feature branch bumps ONLY CLAUDE.md §3, leaves plugin.json and
+# marketplace.json stale → DENY (missing mandatory three-site bump)
 # ---------------------------------------------------------------------------
 echo
-echo "--- SEC-001-A: feature branch + stray-bump ONLY on CLAUDE.md §3 → DENY ---"
+echo "--- SEC-001-A: feature branch + bump ONLY CLAUDE.md §3, plugin/market stale → DENY ---"
 
 _bare_s17a=$(_new_tmp)
 _clone_s17a=$(_new_tmp)
@@ -1127,25 +1132,23 @@ git clone "$_bare_s17a" "$_clone_s17a" -q 2>/dev/null
     git add .
     git commit -m "initial: version 2.107.0" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Feature branch: modify shipped asset + carry a changelog.d/ fragment,
-    # but stray-bump ONLY CLAUDE.md §3 (plugin.json + marketplace.json unchanged).
+    # Feature branch: modify shipped asset, bump ONLY CLAUDE.md §3
+    # (plugin.json + marketplace.json unchanged — mandatory bump missing).
     echo "# base agent — updated" > agents/sec001.md
-    mkdir -p changelog.d
-    printf '### Changed\n- Updated sec001 agent\n' > changelog.d/feat-sec001.md
     printf '**Current version:** `2.108.0`\n' > CLAUDE.md
-    git add agents/sec001.md changelog.d/feat-sec001.md CLAUDE.md
-    git commit -m "feat: stray-bump only CLAUDE.md §3 on feature branch (should deny)" -q 2>/dev/null
+    git add agents/sec001.md CLAUDE.md
+    git commit -m "feat: bump only CLAUDE.md §3, leaving plugin/market stale (should deny)" -q 2>/dev/null
 )
 
 _run_hook "$_clone_s17a"
-assert_deny "SEC-001-A: feature branch stray-bump only CLAUDE.md §3 → deny (single-bump invariant)"
+assert_deny "SEC-001-A: bump only CLAUDE.md §3, plugin.json/marketplace.json stale → deny"
 
 # ---------------------------------------------------------------------------
-# SEC-001-B: release branch with plugin.json + marketplace.json bumped+matching
+# SEC-001-B: feature branch with plugin.json + marketplace.json bumped+matching
 # but CLAUDE.md §3 left stale (partial-bump) → DENY
 # ---------------------------------------------------------------------------
 echo
-echo "--- SEC-001-B: release/v2.108.0 + plugin.json + marketplace.json bumped but CLAUDE.md §3 stale → DENY ---"
+echo "--- SEC-001-B: feat branch + plugin.json + marketplace.json bumped but CLAUDE.md §3 stale → DENY ---"
 
 _bare_s17b=$(_new_tmp)
 _clone_s17b=$(_new_tmp)
@@ -1166,35 +1169,34 @@ git clone "$_bare_s17b" "$_clone_s17b" -q 2>/dev/null
     git add .
     git commit -m "initial: version 2.107.0" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Release branch: bump plugin.json + marketplace.json to 2.108.0,
+    # Feature branch: bump plugin.json + marketplace.json to 2.108.0,
     # MODIFY shipped asset, but leave CLAUDE.md §3 stale at 2.107.0.
-    git checkout -b release/v2.108.0 -q 2>/dev/null
-    echo "# release agent — updated on release branch" > agents/sec001b.md
+    git checkout -b feat/sec001b -q 2>/dev/null
+    echo "# release agent — updated" > agents/sec001b.md
     _write_plugin_json "2.108.0" .claude-plugin/plugin.json
     _write_market_json "2.108.0" .claude-plugin/marketplace.json
     # CLAUDE.md stays at 2.107.0 — stale, partial-bump should deny
     git add agents/sec001b.md .claude-plugin/plugin.json .claude-plugin/marketplace.json
-    git commit -m "release: v2.108.0 — partial-bump (CLAUDE.md §3 stale)" -q 2>/dev/null
+    git commit -m "feat: partial-bump (CLAUDE.md §3 stale)" -q 2>/dev/null
 )
 
 _run_hook "$_clone_s17b"
-assert_deny "SEC-001-B: release branch partial-bump (CLAUDE.md §3 stale) → deny"
+assert_deny "SEC-001-B: feature branch partial-bump (CLAUDE.md §3 stale) → deny"
 
 # ---------------------------------------------------------------------------
-# SEC-001-C: release branch with all THREE sites bumped+matching → nodecision (ALLOW)
+# SEC-001-C: feature branch with all THREE sites bumped+matching → nodecision (ALLOW)
 #
 # This is the true three-site positive case: plugin.json, marketplace.json,
-# AND CLAUDE.md §3 all set to 2.108.0 on a release/v2.108.0 branch.
-# The existing AC-7 positive case also passes but its CLAUDE.md was added fresh
-# (no origin/main counterpart); this fixture seeds CLAUDE.md at origin/main
-# to exercise the full three-site compare path.
+# AND CLAUDE.md §3 all set to 2.107.1 on an ordinary feature branch. This
+# fixture seeds CLAUDE.md at origin/main to exercise the full three-site
+# compare path (the AC-1-positive fixture above creates CLAUDE.md fresh, with
+# no origin/main counterpart).
 # ---------------------------------------------------------------------------
 echo
-echo "--- SEC-001-C: release/v2.107.1 + all THREE sites bumped+matching → nodecision ---"
+echo "--- SEC-001-C: feat branch + all THREE sites bumped+matching → nodecision ---"
 
 # Use a PATCH bump (2.107.0 → 2.107.1) to stay within the M-only (PATCH) floor
-# and avoid the over-bump hard-deny. This case verifies that the guard reaches
-# nodecision when all three sites are bumped, matching, and not over-bumped.
+# and avoid the over-bump hard-deny.
 _bare_s17c=$(_new_tmp)
 _clone_s17c=$(_new_tmp)
 
@@ -1214,27 +1216,46 @@ git clone "$_bare_s17c" "$_clone_s17c" -q 2>/dev/null
     git add .
     git commit -m "initial: version 2.107.0" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Release branch: MODIFY shipped asset (M-only → PATCH floor) and bump ALL
+    # Feature branch: MODIFY shipped asset (M-only → PATCH floor) and bump ALL
     # THREE sites to 2.107.1 (PATCH bump = meets floor, no over-bump deny).
-    git checkout -b release/v2.107.1 -q 2>/dev/null
-    echo "# release agent — updated on release branch" > agents/sec001c.md
+    git checkout -b feat/sec001c -q 2>/dev/null
+    echo "# release agent — updated on feature branch" > agents/sec001c.md
     _write_plugin_json "2.107.1" .claude-plugin/plugin.json
     _write_market_json "2.107.1" .claude-plugin/marketplace.json
     printf '**Current version:** `2.107.1`\n' > CLAUDE.md
     git add .
-    git commit -m "release: v2.107.1 — bump all three version sites (PATCH)" -q 2>/dev/null
+    git commit -m "feat: bump all three version sites (PATCH)" -q 2>/dev/null
 )
 
 _run_hook "$_clone_s17c"
-assert_nodecision "SEC-001-C: release/v2.107.1 + all three sites bumped+matching → nodecision (ALLOW)"
+assert_nodecision "SEC-001-C: feat/sec001c + all three sites bumped+matching → nodecision (ALLOW)"
 
-# AC-8 structural check: --name-status in the git invocation; every git show
+# ---------------------------------------------------------------------------
+# AC-7 structural check: --name-status in the git invocation; every git show
 # call carries the MSYS_NO_PATHCONV Windows git-bash guard. Checked against
 # the TS entry (hooks/ts/entry/prepublish-guard.cc.ts) — the single source of
 # these invariants post-cutover; the retired Bash source these checks used to
-# grep no longer exists.
+# grep no longer exists. Also verifies the retired symbols/methods are gone.
 # ---------------------------------------------------------------------------
 _TS_ENTRY="$REPO_ROOT/hooks/ts/entry/prepublish-guard.cc.ts"
+_TS_OPENCODE_ENTRY="$REPO_ROOT/hooks/ts/entry/prepublish-guard.opencode.ts"
+_TS_BODY="$REPO_ROOT/hooks/ts/bodies/prepublish-guard.ts"
+
+echo
+echo "--- AC-7: retired symbols/methods are gone from the source (not commented out) ---"
+
+_retired_pattern='RELEASE_BRANCH_RE|resolveBranch|BranchInfo|RELEASE_CUT_|resolveReleaseCut|ReleaseCutSignal|FRAGMENT_RE|MARKER_RE|hasFragmentOrMarker|runFeaturePath'
+if grep -Eq "$_retired_pattern" "$_TS_BODY" 2>/dev/null; then
+    fail "AC-7: retired symbols" "one or more retired symbols still present in $_TS_BODY"
+else
+    pass "AC-7: no retired branch/marker/trailer symbols in the body"
+fi
+
+if grep -q 'gitCurrentBranch' "$_TS_BODY" "$_TS_ENTRY" "$_TS_OPENCODE_ENTRY" 2>/dev/null; then
+    fail "AC-7: gitCurrentBranch" "gitCurrentBranch still present in body or entry modules"
+else
+    pass "AC-7: gitCurrentBranch removed from body and both entry modules"
+fi
 
 echo
 echo "--- AC-8: --name-status and MSYS_NO_PATHCONV structural guard ---"
@@ -1247,7 +1268,7 @@ fi
 
 # Every git show/diff invocation must set MSYS_NO_PATHCONV=1 (Windows git-bash
 # guard). The TS entry sets it once via execFileSync's env option per call —
-# assert the token appears once per git invocation site.
+# assert the token appears at least once per git invocation site.
 _git_calls=$(grep -c 'execFileSync("git"' "$_TS_ENTRY" 2>/dev/null || echo 0)
 _msys_guards=$(grep -c 'MSYS_NO_PATHCONV' "$_TS_ENTRY" 2>/dev/null || echo 0)
 if [ "$_msys_guards" -ge "$_git_calls" ] && [ "$_git_calls" -gt 0 ]; then
@@ -1256,9 +1277,8 @@ else
     fail "AC-8: MSYS guard" "found $_git_calls git invocation(s) but only $_msys_guards MSYS_NO_PATHCONV guard(s)"
 fi
 
-# AC-6 structural: no 'ask' token anywhere in the TS body or entry — the
+# AC-6/AC-8 structural: no 'ask' token anywhere in the TS body or entry — the
 # block-on-condition / open-on-fault contract never emits ask.
-_TS_BODY="$REPO_ROOT/hooks/ts/bodies/prepublish-guard.ts"
 _ask_in_floor=$(grep -h '"ask"' "$_TS_BODY" "$_TS_ENTRY" 2>/dev/null || true)
 if [ -z "$_ask_in_floor" ]; then
     pass "AC-6/AC-8: no 'ask' permissionDecision anywhere in the TS source"
@@ -1274,9 +1294,9 @@ fi
 # but the payload carries cwd pointing at A. After the fix the guard must
 # evaluate A, not B.
 #
-# NEW-1: clean worktree A passes even when B strays a shipped-asset with no fragment
-# NEW-2: clean worktree A passes even when B strays a version-site bump
-# NEW-3: a real bump-floor violation IN A (release path) still denies — floor not weakened
+# NEW-1: clean worktree A passes even when B strays a shipped-asset with no bump
+# NEW-2: clean worktree A passes even when B strays a mismatched version bump
+# NEW-3: a real bump-floor violation IN A (universal path) still denies — floor not weakened
 # NEW-4: empty/omitted cwd → backward-compat (falls back to process CWD)
 # NEW-5: control-char cwd → SEC-DR-A reject, fail-open, no deny
 # NEW-6: non-existent cwd dir → fail-open, no deny
@@ -1286,13 +1306,13 @@ echo "=== Suite 18: worktree-scope (guard reads payload cwd, not process CWD) ==
 
 # ---------------------------------------------------------------------------
 # NEW-1: clean worktree A passes even when session-root B is dirty
-#         (shipped asset changed in B but no changelog.d/ fragment)
+#         (shipped asset changed in B but no version bump anywhere)
 #
-# Without the fix: hook inspects B → sees shipped-asset change with no fragment
+# Without the fix: hook inspects B → sees shipped-asset change with no bump
 # → deny. With the fix: hook inspects A → no shipped-asset change → nodecision.
 # ---------------------------------------------------------------------------
 echo
-echo "--- NEW-1: clean worktree A passes even when B strays shipped-asset with no fragment ---"
+echo "--- NEW-1: clean worktree A passes even when B strays shipped-asset with no bump ---"
 
 # Build A: clean worktree — no shipped-asset changes vs origin/main
 _bare_n1a=$(_new_tmp)
@@ -1309,7 +1329,7 @@ _make_repo "$_bare_n1a" "$_clone_n1a" "2.107.0"
     git commit -m "docs: add notes.md (no asset, no bump)" -q 2>/dev/null
 )
 
-# Build B: session root — DIRTY: strays a shipped-asset change with no fragment
+# Build B: session root — DIRTY: strays a shipped-asset change with no bump
 _bare_n1b=$(_new_tmp)
 _clone_n1b=$(_new_tmp)
 _make_repo "$_bare_n1b" "$_clone_n1b" "2.107.0"
@@ -1322,10 +1342,10 @@ _make_repo "$_bare_n1b" "$_clone_n1b" "2.107.0"
     git add agents/dirty.md
     git commit -m "base: add agents/dirty.md" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Stray shipped-asset change with no fragment/marker → would deny if evaluated
+    # Stray shipped-asset change with no version bump → would deny if evaluated
     echo "# dirty agent — modified" > agents/dirty.md
     git add agents/dirty.md
-    git commit -m "feat: dirty shipped-asset change, no fragment (should be bypassed by cwd)" -q 2>/dev/null
+    git commit -m "feat: dirty shipped-asset change, no bump (should be bypassed by cwd)" -q 2>/dev/null
 )
 
 # Run: process CWD = B (dirty), payload cwd = A (clean)
@@ -1333,15 +1353,19 @@ _run_hook_from "$_clone_n1b" "$_clone_n1a"
 assert_nodecision "NEW-1: process-CWD=B(dirty) payload-cwd=A(clean) → evaluates A → nodecision"
 
 # ---------------------------------------------------------------------------
-# NEW-2: clean worktree A passes even when session-root B strays a version bump
+# NEW-2: clean worktree A passes even when session-root B strays a mismatched
+#        version bump
 #
-# Without the fix: hook inspects B → sees version-site bump on a feature branch
-# → stray-bump deny. With the fix: hook inspects A → no bump → nodecision.
+# Without the fix: hook inspects B → sees plugin.json/marketplace.json bumped
+# to DIFFERENT values on a shipped-asset change → mutual-mismatch deny. With
+# the fix: hook inspects A → shipped asset change with all three sites
+# bumped and matching → nodecision.
 # ---------------------------------------------------------------------------
 echo
-echo "--- NEW-2: clean worktree A passes even when B strays a version-site bump ---"
+echo "--- NEW-2: clean worktree A passes even when B strays a mismatched version bump ---"
 
-# Build A: clean feature branch — ships a changelog.d/ fragment, no bump
+# Build A: clean feature branch — shipped-asset change with a valid,
+# matching three-site bump (well-formed universal-path push).
 _bare_n2a=$(_new_tmp)
 _clone_n2a=$(_new_tmp)
 _make_repo "$_bare_n2a" "$_clone_n2a" "2.107.0"
@@ -1349,14 +1373,21 @@ _make_repo "$_bare_n2a" "$_clone_n2a" "2.107.0"
     cd "$_clone_n2a"
     git config user.email "test@test.com"
     git config user.name "Test"
-    mkdir -p agents changelog.d
-    echo "# n2 agent" > agents/n2.md
-    printf '### Changed\n- n2 update\n' > changelog.d/feat-n2.md
-    git add agents/n2.md changelog.d/feat-n2.md
-    git commit -m "feat: n2 agent with fragment, no bump (clean feature branch)" -q 2>/dev/null
+    mkdir -p agents
+    echo "# n2 base agent" > agents/n2.md
+    git add agents/n2.md
+    git commit -m "base: add agents/n2.md" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+    git checkout -b feat/new2-clean -q 2>/dev/null
+    echo "# n2 agent — updated" > agents/n2.md
+    _write_plugin_json "2.107.1" .claude-plugin/plugin.json
+    _write_market_json "2.107.1" .claude-plugin/marketplace.json
+    git add .
+    git commit -m "feat: n2 agent update, all three sites bumped+matching (patch)" -q 2>/dev/null
 )
 
-# Build B: session root — DIRTY: stray version-site bump on a feature branch
+# Build B: session root — DIRTY: shipped-asset change with plugin/market
+# bumped to MISMATCHED values (would deny if evaluated).
 _bare_n2b=$(_new_tmp)
 _clone_n2b=$(_new_tmp)
 _make_repo "$_bare_n2b" "$_clone_n2b" "2.107.0"
@@ -1365,31 +1396,32 @@ _make_repo "$_bare_n2b" "$_clone_n2b" "2.107.0"
     git config user.email "test@test.com"
     git config user.name "Test"
     mkdir -p agents
-    echo "# b2 agent" > agents/b2.md
+    echo "# b2 base agent" > agents/b2.md
     git add agents/b2.md
     git commit -m "base: add agents/b2.md" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Stray version bump + no shipped-asset change → stray-bump deny if evaluated
+    # Shipped-asset change + mismatched version bump → mutual-mismatch deny if evaluated
+    echo "# b2 agent — modified" > agents/b2.md
     _write_plugin_json "2.108.0" .claude-plugin/plugin.json
-    _write_market_json "2.108.0" .claude-plugin/marketplace.json
-    git add .claude-plugin/
-    git commit -m "feat: stray version-site bump on session-root B (should be bypassed by cwd)" -q 2>/dev/null
+    _write_market_json "2.109.0" .claude-plugin/marketplace.json
+    git add .
+    git commit -m "feat: b2 agent update, mismatched version sites (should be bypassed by cwd)" -q 2>/dev/null
 )
 
-# Run: process CWD = B (stray-bump), payload cwd = A (clean)
+# Run: process CWD = B (mismatched bump), payload cwd = A (clean)
 _run_hook_from "$_clone_n2b" "$_clone_n2a"
-assert_nodecision "NEW-2: process-CWD=B(stray-bump) payload-cwd=A(clean) → evaluates A → nodecision"
+assert_nodecision "NEW-2: process-CWD=B(mismatch) payload-cwd=A(clean) → evaluates A → nodecision"
 
 # ---------------------------------------------------------------------------
 # NEW-3: real bump-floor violation IN worktree A still denies — floor not weakened
 #
-# Payload cwd = A, and A itself has a release-path over-bump violation.
+# Payload cwd = A, and A itself has a universal-path over-bump violation.
 # The guard must still deny → the floor is re-targeted, not bypassed.
 # ---------------------------------------------------------------------------
 echo
 echo "--- NEW-3: real bump-floor violation in worktree A still denies (floor not weakened) ---"
 
-# Build A: release branch with MINOR bump on a M-only (PATCH floor) diff → over-bump deny
+# Build A: feature branch with MINOR bump on a M-only (PATCH floor) diff → over-bump deny
 _bare_n3a=$(_new_tmp)
 _clone_n3a=$(_new_tmp)
 _make_repo "$_bare_n3a" "$_clone_n3a" "2.107.0"
@@ -1402,13 +1434,13 @@ _make_repo "$_bare_n3a" "$_clone_n3a" "2.107.0"
     git add agents/n3.md
     git commit -m "base: add agents/n3.md" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    git checkout -b release/v2.108.0 -q 2>/dev/null
+    git checkout -b feat/new3-violation -q 2>/dev/null
     # Modify only (M-only → PATCH floor) but apply MINOR bump (over-bump)
     echo "# n3 agent — updated" > agents/n3.md
     _write_plugin_json "2.108.0" .claude-plugin/plugin.json
     _write_market_json "2.108.0" .claude-plugin/marketplace.json
     git add .
-    git commit -m "release: v2.108.0 — modify agents/n3.md (minor bump on M-only — over-bump)" -q 2>/dev/null
+    git commit -m "feat: modify agents/n3.md (minor bump on M-only — over-bump)" -q 2>/dev/null
 )
 
 # Build B: clean unrelated repo (process CWD should not matter here)
@@ -1508,23 +1540,18 @@ assert_nodecision "NEW-6: non-existent cwd → skipped, no deny (fail-open)"
 assert_stderr_contains "NEW-6: non-existent-dir warning in stderr" "does not exist"
 
 # ---------------------------------------------------------------------------
-# Suite 19: release-cut marker/trailer recognition
-#
-# A feature branch (non-release/vX.Y.Z) carrying a version.d/.release-cut
-# marker (or a release-cut: commit trailer) is routed to the SAME
-# runReleasePath check a release/vX.Y.Z branch uses — the marker authorizes
-# RUNNING that check, never bypassing it.
+# Suite 19 (retired-mechanism regression guard): the release-cut marker
+# (version.d/.release-cut) and the release-cut: commit trailer carried no
+# meaning after the universal-path collapse — the guard no longer reads
+# either signal. This is the deliberate inversion of the old Suite 19: under
+# the retired model a malformed marker/trailer would hard-deny even when all
+# three version sites were bumped and matching; under the universal model
+# only the version sites and the bump floor matter, so the same push is
+# nodecision.
 # ---------------------------------------------------------------------------
 
 echo
-echo "=== Suite 19: release-cut marker/trailer recognition ==="
-
-# ---------------------------------------------------------------------------
-# feature branch + marker (v2.107.1) + all-three sites bumped+matching
-# → nodecision (release-path applied, not denied)
-# ---------------------------------------------------------------------------
-echo
-echo "--- feature branch + marker + all-three bumped+matching → nodecision ---"
+echo "=== Suite 19 (retired-mechanism regression guard): marker/trailer are inert ==="
 
 _bare_m1=$(_new_tmp)
 _clone_m1=$(_new_tmp)
@@ -1544,235 +1571,34 @@ git clone "$_bare_m1" "$_clone_m1" -q 2>/dev/null
     git add .
     git commit -m "initial: version 2.107.0" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Feature branch (NOT release/vX.Y.Z): modify shipped asset, bump all
-    # three sites, and write the release-cut marker.
-    git checkout -b feat/marker-positive -q 2>/dev/null
+    # Feature branch: modify shipped asset, bump all three sites, and write a
+    # version.d/.release-cut file with MALFORMED (non-semver) content — under
+    # the retired model this would have hard-denied regardless of the valid
+    # three-site bump. The universal model never reads this file.
+    git checkout -b feat/s19-retired-marker -q 2>/dev/null
     echo "# marker agent — updated" > agents/marker-a.md
-    _write_plugin_json "2.107.1" .claude-plugin/plugin.json
-    _write_market_json "2.107.1" .claude-plugin/marketplace.json
-    printf '**Current version:** `2.107.1`\n' > CLAUDE.md
-    mkdir -p version.d
-    printf 'v2.107.1\n' > version.d/.release-cut
-    git add .
-    git commit -m "feat: marker-positive — release-cut marker with all three sites bumped" -q 2>/dev/null
-)
-
-_run_hook "$_clone_m1"
-assert_nodecision "feature branch + marker + all-three bumped+matching → nodecision (release-path applied)"
-
-# ---------------------------------------------------------------------------
-# feature branch + marker + a version site left stale → DENY
-# ---------------------------------------------------------------------------
-echo
-echo "--- feature branch + marker + marketplace.json/CLAUDE.md stale → DENY ---"
-
-_bare_m2=$(_new_tmp)
-_clone_m2=$(_new_tmp)
-
-git init --bare "$_bare_m2" -q 2>/dev/null
-git clone "$_bare_m2" "$_clone_m2" -q 2>/dev/null
-
-(
-    cd "$_clone_m2"
-    git config user.email "test@test.com"
-    git config user.name "Test"
-    mkdir -p .claude-plugin agents
-    _write_plugin_json "2.107.0" .claude-plugin/plugin.json
-    _write_market_json "2.107.0" .claude-plugin/marketplace.json
-    printf '**Current version:** `2.107.0`\n' > CLAUDE.md
-    echo "# marker agent b" > agents/marker-b.md
-    git add .
-    git commit -m "initial: version 2.107.0" -q 2>/dev/null
-    git push origin HEAD:main -q 2>/dev/null
-    # Feature branch: only plugin.json bumped — marketplace.json and CLAUDE.md
-    # stay stale at 2.107.0 (the marker must not paper over a missing site).
-    git checkout -b feat/marker-missing-site -q 2>/dev/null
-    echo "# marker agent b — updated" > agents/marker-b.md
-    _write_plugin_json "2.107.1" .claude-plugin/plugin.json
-    mkdir -p version.d
-    printf 'v2.107.1\n' > version.d/.release-cut
-    git add agents/marker-b.md .claude-plugin/plugin.json version.d/.release-cut
-    git commit -m "feat: marker-missing-site — marker present but only plugin.json bumped" -q 2>/dev/null
-)
-
-_run_hook "$_clone_m2"
-assert_deny "feature branch + marker + missing site (marketplace.json/CLAUDE.md stale) → deny"
-
-# ---------------------------------------------------------------------------
-# feature branch + NO marker + stray all-three-site bump → DENY
-# (confirms the marker-recognition branch is not accidentally reached without
-# the marker; behavior is unchanged from the pre-existing feature path)
-# ---------------------------------------------------------------------------
-echo
-echo "--- feature branch + NO marker + stray bump → DENY (feature-path unchanged) ---"
-
-_bare_m3=$(_new_tmp)
-_clone_m3=$(_new_tmp)
-
-git init --bare "$_bare_m3" -q 2>/dev/null
-git clone "$_bare_m3" "$_clone_m3" -q 2>/dev/null
-
-(
-    cd "$_clone_m3"
-    git config user.email "test@test.com"
-    git config user.name "Test"
-    mkdir -p .claude-plugin agents
-    _write_plugin_json "2.107.0" .claude-plugin/plugin.json
-    _write_market_json "2.107.0" .claude-plugin/marketplace.json
-    printf '**Current version:** `2.107.0`\n' > CLAUDE.md
-    echo "# marker agent c" > agents/marker-c.md
-    git add .
-    git commit -m "initial: version 2.107.0" -q 2>/dev/null
-    git push origin HEAD:main -q 2>/dev/null
-    # Feature branch: modify shipped asset + bump all three sites (matching),
-    # but write NO release-cut marker and NO trailer.
-    git checkout -b feat/marker-absent-stray-bump -q 2>/dev/null
-    echo "# marker agent c — updated" > agents/marker-c.md
-    _write_plugin_json "2.107.1" .claude-plugin/plugin.json
-    _write_market_json "2.107.1" .claude-plugin/marketplace.json
-    printf '**Current version:** `2.107.1`\n' > CLAUDE.md
-    git add .
-    git commit -m "feat: marker-absent-stray-bump — no marker, no trailer" -q 2>/dev/null
-)
-
-_run_hook "$_clone_m3"
-assert_deny "feature branch + no marker + stray bump → deny (single-bump invariant, feature-path unchanged)"
-
-# ---------------------------------------------------------------------------
-# feature branch + marker present but NOT strict SemVer → DENY
-# (never falls to feature-path, never skips the version-match checks — even
-# though all three sites are bumped and matching, a well-formed release-path
-# push from this same diff would otherwise be nodecision)
-# ---------------------------------------------------------------------------
-echo
-echo "--- feature branch + non-semver marker content → DENY ---"
-
-_bare_m4=$(_new_tmp)
-_clone_m4=$(_new_tmp)
-
-git init --bare "$_bare_m4" -q 2>/dev/null
-git clone "$_bare_m4" "$_clone_m4" -q 2>/dev/null
-
-(
-    cd "$_clone_m4"
-    git config user.email "test@test.com"
-    git config user.name "Test"
-    mkdir -p .claude-plugin agents
-    _write_plugin_json "2.107.0" .claude-plugin/plugin.json
-    _write_market_json "2.107.0" .claude-plugin/marketplace.json
-    printf '**Current version:** `2.107.0`\n' > CLAUDE.md
-    echo "# marker agent d" > agents/marker-d.md
-    git add .
-    git commit -m "initial: version 2.107.0" -q 2>/dev/null
-    git push origin HEAD:main -q 2>/dev/null
-    # Feature branch: all three sites bumped+matching (would be nodecision
-    # under a well-formed marker), but the marker content is not semver.
-    git checkout -b feat/marker-malformed -q 2>/dev/null
-    echo "# marker agent d — updated" > agents/marker-d.md
     _write_plugin_json "2.107.1" .claude-plugin/plugin.json
     _write_market_json "2.107.1" .claude-plugin/marketplace.json
     printf '**Current version:** `2.107.1`\n' > CLAUDE.md
     mkdir -p version.d
     printf 'not-a-version\n' > version.d/.release-cut
     git add .
-    git commit -m "feat: marker-malformed — release-cut marker is not strict semver" -q 2>/dev/null
+    git commit -m "feat: marker present with malformed content (should be inert now)" -q 2>/dev/null
 )
 
-_run_hook "$_clone_m4"
-assert_deny "feature branch + non-semver marker → deny (malformed signal never authorizes allow)"
-assert_deny_reason_contains "deny reason names the strict-SemVer requirement" "does not parse as strict SemVer"
-
-# ---------------------------------------------------------------------------
-# (trailer variant): feature branch + release-cut: trailer (SECONDARY
-# signal, no marker file) + all-three bumped+matching → nodecision
-# ---------------------------------------------------------------------------
-echo
-echo "--- (trailer variant): feature branch + release-cut: trailer, no marker file → nodecision ---"
-
-_bare_m5=$(_new_tmp)
-_clone_m5=$(_new_tmp)
-
-git init --bare "$_bare_m5" -q 2>/dev/null
-git clone "$_bare_m5" "$_clone_m5" -q 2>/dev/null
-
-(
-    cd "$_clone_m5"
-    git config user.email "test@test.com"
-    git config user.name "Test"
-    mkdir -p .claude-plugin agents
-    _write_plugin_json "2.107.0" .claude-plugin/plugin.json
-    _write_market_json "2.107.0" .claude-plugin/marketplace.json
-    printf '**Current version:** `2.107.0`\n' > CLAUDE.md
-    echo "# marker agent e" > agents/marker-e.md
-    git add .
-    git commit -m "initial: version 2.107.0" -q 2>/dev/null
-    git push origin HEAD:main -q 2>/dev/null
-    # Feature branch: modify shipped asset, bump all three sites, no marker
-    # file — the release-cut signal arrives only via the commit-trailer.
-    git checkout -b feat/marker-trailer -q 2>/dev/null
-    echo "# marker agent e — updated" > agents/marker-e.md
-    _write_plugin_json "2.107.1" .claude-plugin/plugin.json
-    _write_market_json "2.107.1" .claude-plugin/marketplace.json
-    printf '**Current version:** `2.107.1`\n' > CLAUDE.md
-    git add .
-    git commit -m "feat: marker-trailer — release-cut signalled via commit trailer only" -q 2>/dev/null
-)
-
+# Also inject a malformed release-cut: trailer alongside the marker to prove
+# both retired signals are inert.
 _HOOK_STDOUT=""
 _HOOK_STDERR=""
-_tmpout_m5=$(mktemp)
-_tmperr_m5=$(mktemp)
-(cd "$_clone_m5" && _push_payload \
-    | GIT_COMMIT_MSG="release-cut: v2.107.1" _exec_hook >"$_tmpout_m5" 2>"$_tmperr_m5") || true
-_HOOK_STDOUT=$(cat "$_tmpout_m5")
-_HOOK_STDERR=$(cat "$_tmperr_m5")
-rm -f "$_tmpout_m5" "$_tmperr_m5"
-assert_nodecision "trailer variant: feature branch + release-cut: trailer (no marker file) → nodecision"
+_tmpout_m1=$(mktemp)
+_tmperr_m1=$(mktemp)
+(cd "$_clone_m1" && _push_payload \
+    | GIT_COMMIT_MSG="release-cut: not-a-version" _exec_hook >"$_tmpout_m1" 2>"$_tmperr_m1") || true
+_HOOK_STDOUT=$(cat "$_tmpout_m1")
+_HOOK_STDERR=$(cat "$_tmperr_m1")
+rm -f "$_tmpout_m1" "$_tmperr_m1"
 
-# ---------------------------------------------------------------------------
-# feature branch + DELETED release-cut marker (status D) → nodecision
-#
-# A deletion of version.d/.release-cut is not a release-cut declaration — the
-# file going away carries no version content to read. Per the delivery
-# contract ("added or modified vs origin/main"), a delete must fall through
-# to the ordinary feature path instead of being read (and, since the deleted
-# file's content is gone, misread as malformed).
-# ---------------------------------------------------------------------------
-echo
-echo "--- feature branch + DELETED release-cut marker + changelog fragment, no bump → nodecision ---"
-
-_bare_m6=$(_new_tmp)
-_clone_m6=$(_new_tmp)
-
-git init --bare "$_bare_m6" -q 2>/dev/null
-git clone "$_bare_m6" "$_clone_m6" -q 2>/dev/null
-
-(
-    cd "$_clone_m6"
-    git config user.email "test@test.com"
-    git config user.name "Test"
-    mkdir -p .claude-plugin agents version.d
-    _write_plugin_json "2.107.0" .claude-plugin/plugin.json
-    _write_market_json "2.107.0" .claude-plugin/marketplace.json
-    printf '**Current version:** `2.107.0`\n' > CLAUDE.md
-    echo "# marker agent f" > agents/marker-f.md
-    printf 'v2.106.0\n' > version.d/.release-cut
-    git add .
-    git commit -m "initial: version 2.107.0 with stale release-cut marker" -q 2>/dev/null
-    git push origin HEAD:main -q 2>/dev/null
-    # Feature branch: modify a shipped asset, delete the stale marker, and
-    # supply a changelog.d/ fragment instead — no version bump anywhere.
-    git checkout -b feat/marker-deleted -q 2>/dev/null
-    echo "# marker agent f — updated" > agents/marker-f.md
-    git rm -q version.d/.release-cut
-    mkdir -p changelog.d
-    printf '### Changed\n- Updated marker agent f behavior\n' > changelog.d/feat-marker-agent-f.md
-    git add agents/marker-f.md changelog.d/feat-marker-agent-f.md
-    git commit -m "feat: marker-deleted — release-cut marker removed, not a release signal" -q 2>/dev/null
-)
-
-_run_hook "$_clone_m6"
-assert_nodecision "feature branch + DELETED release-cut marker + changelog fragment, no bump → nodecision (deletion never a release-cut signal, never a malformed deny)"
+assert_nodecision "Suite19 (retired): malformed marker + malformed trailer + valid three-site bump → nodecision (both signals inert)"
 
 # ---------------------------------------------------------------------------
 # Summary

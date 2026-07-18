@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "component": "orchestrator-agent",
+  "component": "leader-agent",
   "module": "core-agents",
   "kind": "agent",
-  "source": "agents/orchestrator.md",
+  "source": "agents/leader.md",
   "cost": "high",
   "stability": "stable",
   "defaultInstall": true,
   "emits": {
-    "files": ["{config_root}/agents/orchestrator.md"],
+    "files": ["{config_root}/agents/leader.md"],
     "configKeys": ["logs-mode", "logs-path"]
   }
 }

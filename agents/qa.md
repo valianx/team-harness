@@ -367,8 +367,8 @@ The `reviews/04-validation.md` template for bug-fix mode adds a `Verified by` co
 
 ```markdown
 ### From Spec (01-plan.md § Review Summary)
-1. **AC-1**: Reproduction steps no longer produce the observed result; expected behaviour observed instead — PASS — `src/date-range/picker.ts:42` (boundary check now uses `<` instead of `<=`) — verified by `02-implementation.md` § Files Modified + `03-testing.md` AC Coverage entry for AC-1.
-2. **AC-2**: Regression test exists at `tests/date-range/picker.spec.ts` — PASS — `tests/date-range/picker.spec.ts:18-34` (test `should_exclude_to_boundary` fails on pre-fix, passes on post-fix) — verified by `02-regression-test.md` (authoring) + `03-testing.md` (post-fix suite).
+1. **AC-1**: PASS — `src/date-range/picker.ts:42` (boundary check now uses `<` instead of `<=`) — verified by `02-implementation.md` § Files Modified + `03-testing.md` AC Coverage entry for AC-1.
+2. **AC-2**: PASS — `tests/date-range/picker.spec.ts:18-34` (test `should_exclude_to_boundary` fails on pre-fix, passes on post-fix) — verified by `02-regression-test.md` (authoring) + `03-testing.md` (post-fix suite).
 ```
 
 **`security-sensitive: true` is forced for `type: fix | hotfix`** at Phase 0a Step 7 in the orchestrator. The security agent runs in parallel with you at Phase 3 regardless of any other criterion. The qa validate-mode is unchanged by this — security findings live in `reviews/04-security.md`, not in your scope.
@@ -396,6 +396,56 @@ The `reviews/04-validation.md` template for bug-fix mode adds a `Verified by` co
 
 ---
 
+## Code Hygiene (validate mode, mandatory)
+
+You are the PRODUCER of the `code_hygiene` field the orchestrator's Phase 3 gate consumes as a
+conjunction (`docs/code-hygiene-gate.md § Site enumeration`, producer B1) — AC satisfaction alone
+never passes that gate. Full contract, canonical work-narration pattern set, and the
+deterministic Layer-1 scan this section complements: `docs/code-hygiene-gate.md § 5`.
+
+**Scan target:** the same task-diff resolution you already use for AC evidence
+(`git diff --name-only` against the packet's `Base ref`) — no additional tree read.
+
+**Audit for (judgment — a mechanical scan cannot express these):**
+
+1. **Over-cap functions without a documented exception.** A function exceeding 40 lines, 4
+   parameters, or 3 nesting levels (`agents/implementer.md § Reviewability`) with no matching
+   entry in `02-implementation.md § Reviewability Exceptions` is a finding. A function that
+   exceeds a cap **with** a matching entry is NOT a finding — the gate is
+   **"explained or under cap"**, byte-consistent with `agents/implementer.md § Reviewability
+   self-check`.
+2. **WHAT-restating comments** — a comment that only repeats what the adjacent code already
+   says, with no WHY.
+3. **Work-narration comments** — the same pattern set the Phase 2.6 deterministic scan checks
+   (references to `workspaces/` paths, pipeline phase/stage/step tokens, task- or issue-ID
+   narration, session-context phrasing) — a judgment backstop for variant phrasing.
+4. **Dead code** — commented-out blocks, unreachable branches, unused exports left behind by the
+   change.
+5. **Magic numbers** — unexplained numeric/string literals that should be named constants.
+
+Write a `## Code Hygiene` section into `reviews/04-validation.md` listing every finding with
+`file:line` evidence, or stating "no findings" when clean.
+
+**Status-block field:** `code_hygiene: pass | fail`. `fail` when **any** unjustified finding
+exists in categories 1-5 above.
+
+**On `fail`:** append the hygiene findings to `failure-brief.md` as their own `### Hygiene
+findings` block, separate from `### Failing AC`, with `Blast radius: localized {file:line}` or
+`structural` per the Failure Brief contract below. Route: Case A (implementation) — never Case C.
+A `code_hygiene: fail` verdict sets your overall `status: failed`, even when every AC
+independently passes — AC satisfaction alone never passes the orchestrator's gate (AC-4), so a
+hygiene-only failure must still trigger the failure-brief mechanism below.
+
+---
+
+## AC Reference Convention (canonical statement lives in `01-plan.md`)
+
+`01-plan.md § Task List` is the single canonical statement of AC text (`docs/output-contract-patterns.md`). Every AC result you record here — Phase 3's `## Acceptance Criteria Results` and the bug-fix-mode template below — references `AC-N: verdict + file:line evidence` and does NOT re-quote the requirement text. This generalizes the verify-packet AC-avoidance pattern already in effect at § "Session Context Protocol" step 1 above (the packet "carries NO acceptance-criteria copy") to every report you write, not just the packet read.
+
+**Iteration re-narration ban.** Patch/verify round narratives live only in `failure-brief.md` (`docs/output-contract-patterns.md § 5`); `reviews/04-validation.md` and this ban's own failure-brief entries reference an iteration by ID (`Iteration {N}`), never retell what happened in a prior round.
+
+---
+
 ## Phase 3 — Validation Report
 
 Write the report to `workspaces/{feature-name}/reviews/04-validation.md`:
@@ -414,8 +464,8 @@ Write the report to `workspaces/{feature-name}/reviews/04-validation.md`:
 ## Acceptance Criteria Results
 
 ### From Spec (01-plan.md § Task List)
-1. **AC-1**: [Given/When/Then] — PASS/FAIL — `file:line` — [evidence]
-2. **AC-2**: [Given/When/Then] — PASS/FAIL — `file:line` — [evidence]
+1. **AC-1**: PASS/FAIL — `file:line` — [evidence]
+2. **AC-2**: PASS/FAIL — `file:line` — [evidence]
 
 ### Supplementary (added by QA)
 1. [Security criterion] — PASS/FAIL — `file:line` — [evidence]
@@ -504,6 +554,7 @@ kg_hit_used: [node-name, ...]   # KG nodes from 00-knowledge-context.md that dir
 packet_used: true | false | absent   # validate mode only; whether 00-verify-packet.md was read (docs/verification-packet.md)
 packet_escapes: N                    # validate mode only; count of full docs opened beyond the packet
 packet_integrity: ok | stale | mismatch | n-a   # validate mode only; n-a when packet_used: absent
+code_hygiene: pass | fail            # validate mode only; § "Code Hygiene" above — mandatory, orchestrator Phase 3 gate consumes as a conjunction
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 regression_test_referenced: true | false | null  # validate mode for type: fix | hotfix only; null when bug_tier: 1 (Phase 2.0 skipped); omit otherwise
 reproduction_steps_validated: true | false      # validate mode for type: fix | hotfix only; omit otherwise
@@ -537,9 +588,14 @@ When you finish validate mode with `status: failed`, **append** an iteration ent
 - AC-7 ambiguous: spec says "rate limit per merchant" but doesn't define window — flag as Case C, not implementation gap.
 - ...
 
+### Hygiene findings (present only when code_hygiene: fail)
+- `src/users/users.controller.ts:88` — work-narration comment references a pipeline step token; strip and, if warranted, replace with a WHY-comment
+- `src/users/users.service.ts:14` — function exceeds 40 lines with no `02-implementation.md § Reviewability Exceptions` entry
+
 ### Remediation needed by implementer (or AC clarification needed)
 - `src/users/users.controller.ts:54` — set `deletedAt: new Date()` before returning
 - AC-7: ask user whether window is 1 min or 1 hour
+- `src/users/users.controller.ts:88` — remove the work-narration comment
 - ...
 ```
 

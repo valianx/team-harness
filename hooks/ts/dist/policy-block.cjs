@@ -179,6 +179,86 @@ function askReason(reason) {
 function none() {
   return { decision: "none", reason: "", mutations: null };
 }
+function escapeRegExpLiteral(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function normalizeLexicalNoise(cmd) {
+  let out = "";
+  let inSingleQuote = false;
+  let i = 0;
+  while (i < cmd.length) {
+    const ch = cmd[i];
+    if (inSingleQuote) {
+      if (ch === "'") {
+        inSingleQuote = false;
+      } else {
+        out += ch;
+      }
+      i++;
+      continue;
+    }
+    if (ch === "'") {
+      inSingleQuote = true;
+      i++;
+      continue;
+    }
+    if (ch === '"') {
+      i++;
+      continue;
+    }
+    if (ch === "\\" && i + 1 < cmd.length) {
+      out += cmd[i + 1];
+      i += 2;
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
+}
+function buildClaudeSkipPermissionsRouterRegex() {
+  const pathQualifierPrefix = String.raw`(?:[^\s|;&<>()\x60$]*/)?`;
+  const flagLiteral = escapeRegExpLiteral("--dangerously-skip-permissions");
+  return new RegExp(
+    String.raw`(^|[\s|;&<>()\x60])${pathQualifierPrefix}claude\b[\s\S]*?${flagLiteral}\b`,
+    "i"
+  );
+}
+var CLAUDE_SKIP_PERMISSIONS_RE = buildClaudeSkipPermissionsRouterRegex();
+function groupRepeatedPlaceholder(escapedText, token, firstGroup, laterGroup) {
+  const parts = escapedText.split(token);
+  if (parts.length === 1) return escapedText;
+  let result = parts[0];
+  for (let i = 1; i < parts.length; i++) {
+    result += (i === 1 ? firstGroup : laterGroup) + parts[i];
+  }
+  return result;
+}
+var LEGACY_TMUX_SPAWN_RAW = 'claude --worktree {task-name} --tmux --dangerously-skip-permissions \\\n  --settings \'{\n    "hooks": {\n      "Stop": [{"hooks": [{"type": "command", "command": "STATE=$(cat workspaces/*/00-state.md 2>/dev/null); STATUS=$(echo \\"$STATE\\" | grep -oP \\"status: \\\\K\\\\w+\\" | head -1); SUMMARY=$(echo \\"$STATE\\" | grep -A1 \\"^## Agent Results\\" | tail -1 | head -c 200); printf \\"%s|%s|%s\\\\n\\" \\"{task-name}\\" \\"${STATUS:-unknown}\\" \\"${SUMMARY:-no summary}\\" > /tmp/batch-results/{task-name}.done; echo $(date +%s) {task-name} DONE >> /tmp/batch-results/events.log"}]}],\n      "PostToolUse": [{"hooks": [{"type": "command", "command": "if echo \\"$TOOL_INPUT\\" | grep -q 00-state.md; then PHASE=$(grep -oP \\"phase: \\\\K[\\\\w.]+\\" workspaces/*/00-state.md 2>/dev/null | head -1); printf \\"%s|%s\\\\n\\" \\"{task-name}\\" \\"${PHASE:-unknown}\\" > /tmp/batch-results/{task-name}.progress; echo $(date +%s) {task-name} PROGRESS >> /tmp/batch-results/events.log; fi"}]}]\n    }\n  }\' \\\n  -p "/th:issue #{number} --skip-delivery"';
+function buildLegacyTmuxSpawnExemptionRegex() {
+  const escaped = escapeRegExpLiteral(LEGACY_TMUX_SPAWN_RAW);
+  const withTaskName = groupRepeatedPlaceholder(
+    escaped,
+    escapeRegExpLiteral("{task-name}"),
+    "([A-Za-z0-9._-]{1,80})",
+    "\\1"
+  );
+  const withNumber = groupRepeatedPlaceholder(
+    withTaskName,
+    escapeRegExpLiteral("{number}"),
+    "([0-9]{1,10})",
+    "\\2"
+  );
+  return new RegExp(`^${withNumber}$`);
+}
+var LEGACY_TMUX_SPAWN_EXEMPTION_RE = buildLegacyTmuxSpawnExemptionRegex();
+function evaluateClaudeSkipPermissionsSpawn(cmd) {
+  if (!CLAUDE_SKIP_PERMISSIONS_RE.test(normalizeLexicalNoise(cmd))) return null;
+  if (LEGACY_TMUX_SPAWN_EXEMPTION_RE.test(cmd)) return null;
+  return deny(
+    "spawning `claude` with --dangerously-skip-permissions bypasses every downstream hook at whatever depth the spawned process runs (SEC-DR-B). This is a best-effort text heuristic, not a security boundary \u2014 it cannot see runtime shell evaluation (variable indirection, command substitution, wrapper scripts). The hard guarantee against this bypass is AC-6.4 (native Task-tool spawn in the split path, where no Bash `claude` invocation exists to evade). The only exemption here is the exact-match legacy top-level tmux batch-spawn template, see docs/dev-mode.md \xA7 Outward-Action Gate"
+  );
+}
 var DENIED_BASH = [
   [/\brm\s+\S*[rR]\S*[fF]\S*\s+(?:--\s+)?(\/|~|\$\{?HOME\}?)(\s|$)/i, "rm -rf targeting / ~ or HOME"],
   [/\brm\s+\S*[fF]\S*[rR]\S*\s+(?:--\s+)?(\/|~|\$\{?HOME\}?)(\s|$)/i, "rm -fr targeting / ~ or HOME"],
@@ -417,6 +497,8 @@ function evaluate(input) {
   if (toolName === "Bash") {
     const cmd = typeof toolInput["command"] === "string" ? toolInput["command"] : "";
     if (!cmd) return none();
+    const skipPermissionsDecision = evaluateClaudeSkipPermissionsSpawn(cmd);
+    if (skipPermissionsDecision) return skipPermissionsDecision;
     for (const [pattern, label] of DENIED_BASH) {
       if (pattern.test(cmd)) return deny(label);
     }

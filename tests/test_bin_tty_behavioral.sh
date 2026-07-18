@@ -1,9 +1,9 @@
 #!/bin/bash
 # tests/test_bin_tty_behavioral.sh
 #
-# Suite 152 — bin-tty-guard-behavioral (#473 follow-up)
+# Suite 159 — bin-tty-guard-behavioral (#473 follow-up)
 #
-# Behavioral companion to Suite 151 (tests/test_bin_tty_execbit.py). Suite 151
+# Behavioral companion to Suite 158 (tests/test_bin_tty_execbit.py). Suite 158
 # is STATIC: it checks the git-tracked file mode and greps `bin/*.sh` source
 # text for the presence/absence of specific guard idioms. It cannot catch a
 # case where an idiom is textually present but behaves wrong at RUNTIME under
@@ -58,7 +58,7 @@ set -u
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BIN_DIR="$REPO_ROOT/bin"
 
-echo "=== Suite 152: bin-tty-guard-behavioral ==="
+echo "=== Suite 159: bin-tty-guard-behavioral ==="
 echo
 
 MISSING=""
@@ -207,7 +207,7 @@ assert_site_pty "update-opencode.sh" "$BIN_DIR/update-opencode.sh" 1
 echo
 echo "--- Canary (negative control — proves this harness discriminates) ---"
 # The forbidden `{ : < /dev/tty; }` special-builtin form is NEVER present in
-# bin/*.sh (Suite 151 asserts this statically). It is reproduced here only as
+# bin/*.sh (Suite 158 asserts this statically). It is reproduced here only as
 # a negative control: under dash, a redirection error on `:` (a POSIX special
 # builtin) terminates the non-interactive shell — silently, before reaching
 # the fallback branch or any statement after the `fi`. If this canary ever

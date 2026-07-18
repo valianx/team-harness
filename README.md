@@ -1,6 +1,6 @@
 # Team Harness — Claude Code Agent Orchestration System
 
-> Team Harness is a multi-agent orchestration system for **Claude Code**: an orchestrator dispatches specialized architect, implementer, tester, QA, security, and delivery agents through a Spec-Driven Development (SDD) pipeline with mandatory human gates.
+> Team Harness is a multi-agent orchestration system for **Claude Code**: the top-level coordinator **`th:leader`** frames each request and spawns a **`th:orchestrator`** per task, which dispatches specialized architect, implementer, tester, QA, security, and delivery agents through a Spec-Driven Development (SDD) pipeline with mandatory human gates.
 >
 > Every pipeline stage is captured as files on disk, so any session can resume from where the last one stopped.
 
@@ -133,17 +133,17 @@ Alternatively, type `/th-update` inside opencode. The command instructs the agen
 
 ## Quick start
 
-After install, open Claude Code. The entry points are:
+After install, open Claude Code. The top-level session agent is **`th:leader`** — the operator's single point of contact. You drive the pipeline by talking to it directly (no `@mention` needed); `th:leader` frames the request and spawns a `th:orchestrator` per task to run the gated execution pipeline. The entry points are:
 
-- `/th:orchestrator` — the front door to the whole pipeline (or use `@th:orchestrator` in chat)
+- `th:leader` — the top-level session agent; just describe what you want
 - `/th:setup` — configure logs-mode, vault path, and verify MCP connectivity
 - `/th:update` — update to the latest release
 
 ```
-@th:orchestrator give me the work plan for this task: <description>
-@th:orchestrator implement it
-@th:orchestrator open the PR
-@th:orchestrator recover <feature>
+give me the work plan for this task: <description>
+implement it
+open the PR
+recover <feature>
 ```
 
 Learn mode (explain a codebase, library, or concept with a layered teaching pack):
@@ -154,13 +154,13 @@ Learn mode (explain a codebase, library, or concept with a layered teaching pack
 /th:learn how does the LLM work in this ADK project --resume
 ```
 
-> **The orchestrator is the canonical entry point.** Skills like `/th:design`, `/th:deliver`, `/th:recover` are optional shortcuts that route to the same agent under the hood.
+> **`th:leader` is the canonical entry point.** Skills like `/th:design`, `/th:deliver`, `/th:recover` are optional shortcuts that route through the same coordination flow under the hood. See [`docs/agent-tree.md`](./docs/agent-tree.md) for how `th:leader`, `th:orchestrator`, and the leaf specialists relate at runtime.
 
 ---
 
 ## Orchestrator disposition
 
-The top-level agent IS the orchestrator — no marker file or activation command required. Development tasks route through the full pipeline automatically (architect → implementer → tester/qa/security → delivery). A deterministic gate (`hooks/dev-guard.sh`) fires unconditionally on every outward, irreversible action and gates by destination: pushing to a non-default branch on `origin` (no force, no default-branch destination) proceeds without a prompt, while pushing to the default branch, tag pushes, force pushes, `gh pr create`/`merge`/`review`/`comment`, `gh issue create`/`edit`/`comment`, ClickUp outward writes, and GitHub API writes still require explicit operator approval at the point of execution.
+The top-level session agent is **`th:leader`** — no marker file or activation command required. It frames each request and spawns a `th:orchestrator` per task; that orchestrator runs the full pipeline automatically (architect → implementer → tester/qa/security → delivery) and welds all three stage gates inside its own transcript. A deterministic gate (`hooks/dev-guard.sh`) fires unconditionally on every outward, irreversible action and gates by destination: pushing to a non-default branch on `origin` (no force, no default-branch destination) proceeds without a prompt, while pushing to the default branch, tag pushes, force pushes, `gh pr create`/`merge`/`review`/`comment`, `gh issue create`/`edit`/`comment`, ClickUp outward writes, and GitHub API writes still require explicit operator approval at the point of execution.
 
 Full contract: docs/dev-mode.md.
 
@@ -189,7 +189,9 @@ Full contract: docs/dev-mode.md.
 | [Pipelines reference](./docs/pipelines.md) | All 8+ pipelines, tier classification, phase tables, gate semantics |
 | [Migration guide](./docs/plugin-migration.md) | Migrating from the Go installer to the plugin |
 | [Agents reference](./agents/README.md) | Full agent roster, model/effort matrix, low-cost mode |
+| [Agent tree](./docs/agent-tree.md) | How `th:leader`, `th:orchestrator`, and the leaf specialists relate at runtime |
 | [Configuration reference](./CLAUDE.md) | Architectural conventions, working agreements, subagent routing |
+| [Knowledge base](./docs/knowledge.md) | Decisions, patterns, stack notes, and constraints accumulated across features |
 | [Integration guide](./docs/integration.md) | context-harness-mcp setup, mcpServers config, 16-tool contract, troubleshooting |
 | [Troubleshooting](./docs/troubleshooting.md) | SSH/HTTPS errors, duplicate agents, missing dispatch rule |
 | [Changelog](./CHANGELOG.md) | Release history |

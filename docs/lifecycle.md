@@ -35,7 +35,7 @@ Before the tag-sync workflow existed, a maintainer had to remember to create and
 
 The current flow is one event, not two:
 
-1. A release PR bumps `.claude-plugin/plugin.json` `version` and merges to `main`.
+1. A PR bumps `.claude-plugin/plugin.json` `version` (per team-harness's per-PR bump model — `CLAUDE.md §6.3`) and merges to `main`.
 2. `tag-sync.yml` (triggered by that push, path-filtered to `plugin.json`) reads the new version, creates and pushes the `vX.Y.Z` tag if it does not already exist, and dispatches `release.yml` via `workflow_dispatch` with that tag as input. The explicit dispatch is required — a tag pushed under `GITHUB_TOKEN` does not itself chain to other workflows.
 3. `release.yml` builds and publishes every runtime artifact from that single tagged commit: 5 cross-compiled opencode binaries + `SHA256SUMS` + a bare-semver `VERSION` asset, all attached to one GitHub Release.
 4. `release.yml` triggers `pages.yml`, which republishes the bootstrap scripts (`install.sh`/`.ps1`/`.cmd`) that serve the new version.
@@ -46,7 +46,7 @@ One tag, one release event, N runtime artifacts, one version namespace. Re-runni
 
 ## Installer identity
 
-The Go installer (`cmd/install/`) is the **opencode packager and installer**. It does not install Claude Code, has no CC install path reachable from a bare invocation, and its low-cost frontmatter-rewrite mode (`modes.go::lowCostMatrix`) is unreferenced code from the retired CC path — not a live capability of any runtime this binary currently serves. `cmd/install/` therefore stays frozen for fleet model-allocation changes: there is no live low-cost consumer left to keep in sync.
+The Go installer (`cmd/install/`) is the **opencode packager and installer**. It does not install Claude Code, has no CC install path reachable from a bare invocation, and its low-cost frontmatter-rewrite mode (`modes.go::lowCostMatrix`) is unreferenced code from the retired CC path — not a live capability of any runtime this binary currently serves. `cmd/install/` therefore stays frozen for fleet model-allocation changes: there is no live low-cost consumer left to keep in sync. The `standard`/`low-cost` split is driven by the `INSTALL_MODE` env var and is not wired into the opencode manifest engine (`install apply --runtime opencode`).
 
 The marketplace plugin (`/plugin marketplace add valianx/team-harness`) is the only Claude Code install channel. The Go binary (`install apply|update|uninstall --runtime opencode`) is the only opencode install channel. Neither channel serves the other runtime.
 

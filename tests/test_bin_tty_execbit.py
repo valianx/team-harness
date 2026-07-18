@@ -2,7 +2,7 @@
 """
 tests/test_bin_tty_execbit.py
 
-Suite 151 — bin-tty-openability-execbit
+Suite 158 — bin-tty-openability-execbit
 
 Regression coverage for GitHub issue #473: two defects in the `bin/*.sh`
 bootstrap scripts.
@@ -106,7 +106,7 @@ def git_tracked_mode(path: Path) -> str | None:
     return line.split()[0]
 
 
-print("=== Suite 151: bin-tty-openability-execbit ===")
+print("=== Suite 158: bin-tty-openability-execbit ===")
 print()
 
 missing = [p for p in TARGET_SCRIPTS if not p.exists()]
@@ -124,7 +124,7 @@ if missing:
 for p in TARGET_SCRIPTS:
     mode = git_tracked_mode(p)
     check(
-        f"suite151(execbit): {p.relative_to(REPO_ROOT)} is git-tracked as mode 100755",
+        f"suite158(execbit): {p.relative_to(REPO_ROOT)} is git-tracked as mode 100755",
         mode == "100755",
         f"git-tracked mode is {mode!r} (expected '100755') — run "
         f"'git update-index --chmod=+x {p.relative_to(REPO_ROOT)}'",
@@ -137,7 +137,7 @@ for p in TARGET_SCRIPTS:
     src = read(p)
     hits = EXISTENCE_GUARD_RE.findall(src)
     check(
-        f"suite151(no-existence-guard): {p.relative_to(REPO_ROOT)} has no "
+        f"suite158(no-existence-guard): {p.relative_to(REPO_ROOT)} has no "
         "'[ -e /dev/tty ]' existence-only guard",
         len(hits) == 0,
         f"found {len(hits)} existence-only guard(s) — replace with an "
@@ -154,7 +154,7 @@ for p in TARGET_SCRIPTS:
     hits = APPROVED_IDIOM_RE.findall(src)
     expected = EXPECTED_GUARD_SITES[p.name]
     check(
-        f"suite151(approved-idiom): {p.relative_to(REPO_ROOT)} uses the "
+        f"suite158(approved-idiom): {p.relative_to(REPO_ROOT)} uses the "
         f"approved openability idiom at all {expected} guard site(s)",
         len(hits) >= expected,
         f"found {len(hits)} approved-idiom occurrence(s), expected >= {expected} "
@@ -168,7 +168,7 @@ for p in TARGET_SCRIPTS:
         special_builtin_hits.append(str(p.relative_to(REPO_ROOT)))
 
 check(
-    "suite151(no-special-builtin-guard): no '{ : < /dev/tty; }' special-builtin "
+    "suite158(no-special-builtin-guard): no '{ : < /dev/tty; }' special-builtin "
     "guard form appears anywhere in bin/*.sh",
     len(special_builtin_hits) == 0,
     f"fatal special-builtin guard form found in: {special_builtin_hits} — "

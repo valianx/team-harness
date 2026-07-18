@@ -1,4 +1,0 @@
-### Fixed
-
-- `bin/install.sh`, `bin/install-opencode.sh`, and `bin/update-opencode.sh` are now git-tracked as executable (`100755`) — the documented invocation `./bin/update-opencode.sh` no longer fails with "Permission denied" (#473).
-- The `/dev/tty` guard in all four redirect sites across the three bootstrap scripts (`bin/install.sh:72`, `bin/install-opencode.sh:144` and `:151`, `bin/update-opencode.sh:186`) now tests openability (`(exec < /dev/tty) 2>/dev/null`) instead of mere existence (`[ -e /dev/tty ]`) — a shell without a controlling terminal (agentic Bash, CI, cron) where `/dev/tty` exists but cannot be opened no longer fails with "No such device or address" after the download and checksum verification already completed; it falls through to the existing no-redirect branch instead. The originally-reported site was `update-opencode.sh` only; the fix extends to the three sibling sites sharing the same defect.

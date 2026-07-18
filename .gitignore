@@ -21,6 +21,9 @@ knowledge-graph/server.log
 # Match only the root-level binary (leading slash); do NOT match the `cmd/install/` source dir.
 /install
 /install.exe
+# Installer binary when built in place via `go build ./cmd/install` from cmd/install/.
+/cmd/install/install
+/cmd/install/install.exe
 
 # User-local tool manager config (mise/asdf) — not project state
 mise.toml

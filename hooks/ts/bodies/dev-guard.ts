@@ -32,10 +32,17 @@
 //            newline backtick `<` `>`) — if the command carries quoting or
 //            expansion, the token this recognizer inspects is not reliably
 //            the value bash executes.
-//   Step 1 — hard reject on tree/directory redirection (`-C`, `--git-dir`,
+//   Step 1 — hard reject on tree/directory redirection (`--git-dir`,
 //            `--work-tree`, glue-agnostic) or an env-var prefix (`GIT_*=`) —
 //            these decouple the tree git operates on from the payload cwd
-//            the reader evaluates.
+//            the reader evaluates. EXCEPTION (Task-6, AC-6.1): a single,
+//            spaced `-C {dir}` immediately after `git` and before `push` is
+//            recognized as a TARGET, not rejected — the recognizer resolves
+//            Steps 3-7 against that directory instead of the payload cwd
+//            (see extractExactCDirPushTail). Any other `-C` shape (glued
+//            `-C/path`, a second `-C`, `-C` mixed with another redirect, or
+//            `-C` not immediately preceding `push`) still hard-rejects here,
+//            unchanged.
 //   Step 2 — the ENTIRE command must be exactly a single, bare `git push ...`
 //            invocation: nothing precedes `git`, nothing but `push` follows
 //            it as the subcommand.
@@ -60,6 +67,18 @@
 //            (closes a triangular `branch.<n>.merge` config).
 //
 // The default/no-covered path stays `none()` — it never becomes `allow`.
+//
+// gh --repo/-R target-awareness (Task-6, AC-6.1): gh's `--repo`/`-R` global
+// flag may be interspersed ANYWHERE before the mutating subcommand+verb
+// (Cobra parses persistent flags regardless of position), e.g.
+// `gh --repo owner/repo pr create`. Every mutating-gh router below tolerates
+// one such flag occurrence between `gh` and the verb, closing a real
+// coverage gap: the prior routers only matched `gh\s+pr\s+create` etc.
+// literally, so a leading `--repo` defeated detection entirely (the command
+// fell through to none() — the normal, non-hardened permission flow). The
+// resolved target repo (when present) is surfaced in the `ask` reason for
+// operator transparency; the underlying decision (ask, or allow only for a
+// clean autogated `gh pr create`) is unchanged by which repo is targeted.
 
 import type { NormalizedInput, NormalizedDecision } from "../shim/normalized-v1.js";
 
@@ -71,13 +90,18 @@ import type { NormalizedInput, NormalizedDecision } from "../shim/normalized-v1.
 // ---------------------------------------------------------------------------
 
 export interface DevGuardReader {
-  /** git rev-parse --abbrev-ref HEAD (payload cwd); null on any error. */
-  gitCurrentBranch(): string | null;
+  /** git rev-parse --abbrev-ref HEAD; null on any error. When `dir` is given
+   *  (Task-6, AC-6.1 — the `git -C {dir} push` closed form), resolves the
+   *  current branch OF THAT DIRECTORY, not the payload cwd; absent `dir`
+   *  resolves against the payload cwd exactly as before (backward-compat). */
+  gitCurrentBranch(dir?: string): string | null;
   /** Resolve the repo's default branch name via git (e.g. origin/HEAD symref);
    *  null on any error. A null here means the default cannot be POSITIVELY
    *  resolved — the recognizer never falls back to permissively allowing a
-   *  name simply because it isn't literally main/master (see Step 6). */
-  resolveDefaultBranch(): string | null;
+   *  name simply because it isn't literally main/master (see Step 6). When
+   *  `dir` is given (AC-6.1), resolves the default branch OF THAT DIRECTORY;
+   *  absent `dir` resolves against the payload cwd (backward-compat). */
+  resolveDefaultBranch(dir?: string): string | null;
   /** Resolve the EFFECTIVE push destination for the current branch as a
    *  `<remote>/<ref>` symbolic name (git's own `@{push}` resolution — honors
    *  `branch.<n>.pushRemote` → `remote.pushDefault` → `branch.<n>.remote`,
@@ -90,8 +114,16 @@ export interface DevGuardReader {
    *  `origin/HEAD` can also mislead Step 6's default-branch resolution — see
    *  docs/permission-provisioning.md § Documented residuals for the accepted
    *  residual and its scope (non-standard-default repos only; the
-   *  `{main, master}` floor is unconditional and unaffected). */
-  resolveEffectivePushRemoteRef(): string | null;
+   *  `{main, master}` floor is unconditional and unaffected). The bare
+   *  `-C {dir} push` form (no refspec) ALSO uses this method, scoped to
+   *  `dir` (see evaluateBarePushAt) — an earlier revision resolved the `-C`
+   *  bare-push destination via `gitCurrentBranch(dir)` alone and never
+   *  checked the effective remote for that directory; a `branch.<n>.
+   *  pushRemote`/`remote.pushDefault` pointing at a non-origin remote then
+   *  passed silently (SEC-DR-B remediation, Round 1). Both the plain and the
+   *  `-C {dir}` bare-push forms now resolve `@{push}` and apply the same
+   *  origin-by-name check before evaluating the destination branch. */
+  resolveEffectivePushRemoteRef(dir?: string): string | null;
   /** Read ~/.claude/.team-harness.json; null on any error. */
   readConfig(): Record<string, unknown> | null;
 }
@@ -137,9 +169,10 @@ const CLICKUP_WRITE_RE =
 // ([\s|;&<>()`]) and trailing ([;&|<>()`"'$]) — so a metacharacter fused to
 // the verb with no space on EITHER side (`(git push origin main)`,
 // `true&&git push`, `git push>/dev/null`, `git push$(evil)`, `( git push)`)
-// still routes into the recognizer, where rejectUnparsableOrRedirected or the
-// exact-form check ask on it. Without both, a narrower boundary would miss the
-// glued form, evaluate() would return none(), and bash would still run the
+// still routes into the recognizer, where rejectShellQuotingOrComposition /
+// rejectTreeOrEnvRedirect or the exact-form check ask on it. Without both, a
+// narrower boundary would miss the glued form, evaluate() would return
+// none(), and bash would still run the
 // `<verb> <args>` (and any $()-substituted command) ungated. The classes cover
 // the bash word-separators that leave the verb a complete token (\n is already
 // covered by \s), so every glued form the router now admits is one the
@@ -147,18 +180,35 @@ const CLICKUP_WRITE_RE =
 const GIT_PUSH_RE =
   /(^|[\s|;&<>()`])git(\s+-C\s+\S+|\s+--git-dir(?:=\S+|\s+\S+)|\s+--work-tree(?:=\S+|\s+\S+)|\s+-\S*|\s+\S+=\S+)*\s+push(\s|$|[;&|<>()`"'$])/i;
 
+// gh --repo/-R target-awareness (Task-6, AC-6.1 — see module header). gh's
+// `--repo`/`-R` persistent flag may sit BEFORE the subcommand+verb
+// (`gh --repo owner/repo pr create`), which the prior routers missed
+// entirely (no match -> none(), the un-hardened default). Every router below
+// tolerates exactly one such flag occurrence between `gh` and the verb via
+// the inlined `(?:(?:--repo|-R)(?:=\S+|\s+\S+)\s+)?` fragment — the
+// `--repo owner/repo` FORM after the verb was already covered (the flag
+// simply trails the matched substring). Kept as literal slash-delimited
+// regex declarations, not a string-built `new RegExp(...)` call, so
+// tests/test_permission_disjointness.py's source-level pattern extraction
+// still discovers and samples these routers — string-built construction
+// would silently drop them from that coupling floor.
+
 // 2b. gh pr create (mutating verb only — read-only gh pr view/list/status stay ungated)
 // Case-insensitive router — see GIT_PUSH_RE comment above.
-const GH_PR_CREATE_RE = /(^|[\s|;&<>()`])gh\s+pr\s+create(\s|$|[;&|<>()`"'$])/i;
+const GH_PR_CREATE_RE =
+  /(^|[\s|;&<>()`])gh\s+(?:(?:--repo|-R)(?:=\S+|\s+\S+)\s+)?pr\s+create(\s|$|[;&|<>()`"'$])/i;
 
 // 2c. gh pr merge (case-insensitive router)
-const GH_PR_MERGE_RE = /(^|[\s|;&<>()`])gh\s+pr\s+merge(\s|$|[;&|<>()`"'$])/i;
+const GH_PR_MERGE_RE =
+  /(^|[\s|;&<>()`])gh\s+(?:(?:--repo|-R)(?:=\S+|\s+\S+)\s+)?pr\s+merge(\s|$|[;&|<>()`"'$])/i;
 
 // 2c. gh pr review (including --dismiss) (case-insensitive router)
-const GH_PR_REVIEW_RE = /(^|[\s|;&<>()`])gh\s+pr\s+review(\s|$|[;&|<>()`"'$])/i;
+const GH_PR_REVIEW_RE =
+  /(^|[\s|;&<>()`])gh\s+(?:(?:--repo|-R)(?:=\S+|\s+\S+)\s+)?pr\s+review(\s|$|[;&|<>()`"'$])/i;
 
 // 2d. gh pr comment (case-insensitive router)
-const GH_PR_COMMENT_RE = /(^|[\s|;&<>()`])gh\s+pr\s+comment(\s|$|[;&|<>()`"'$])/i;
+const GH_PR_COMMENT_RE =
+  /(^|[\s|;&<>()`])gh\s+(?:(?:--repo|-R)(?:=\S+|\s+\S+)\s+)?pr\s+comment(\s|$|[;&|<>()`"'$])/i;
 
 // 2e. gh api -X PUT|POST|PATCH|DELETE ... /pulls
 const GH_API_REST_PR_RE =
@@ -172,8 +222,23 @@ const GRAPHQL_PR_MUTATIONS_RE =
 
 // 2e-ter. gh issue mutating writes (create, edit, comment).
 // Read-only gh issue list / gh issue view stay ungated (no outward side-effect).
-// Case-insensitive router — see GIT_PUSH_RE comment above.
-const GH_ISSUE_WRITE_RE = /(^|[\s|;&<>()`])gh\s+issue\s+(create|edit|comment)(\s|$|[;&|<>()`"'$])/i;
+// Case-insensitive router — see GIT_PUSH_RE comment above. --repo/-R tolerant
+// (AC-6.1), same rationale and literal-regex-declaration constraint as the
+// pr-* routers above.
+const GH_ISSUE_WRITE_RE =
+  /(^|[\s|;&<>()`])gh\s+(?:(?:--repo|-R)(?:=\S+|\s+\S+)\s+)?issue\s+(create|edit|comment)(\s|$|[;&|<>()`"'$])/i;
+
+// Extracts the `--repo`/`-R` target value from a gh command, if present, for
+// inclusion in the ask reason (AC-6.1 transparency: the operator sees which
+// repo the action targets, not just the payload cwd). Returns null when
+// absent. Read-only — never changes the decision, which stays ask (or the
+// existing autogate allow for a clean `gh pr create`) regardless of target.
+const GH_REPO_FLAG_VALUE_RE = /(?:--repo|-R)(?:=(\S+)|\s+(\S+))/;
+function extractGhRepoTarget(cmdStr: string): string | null {
+  const m = GH_REPO_FLAG_VALUE_RE.exec(cmdStr);
+  if (!m) return null;
+  return m[1] ?? m[2] ?? null;
+}
 
 // 2f. curl/wget mutating method to api.github.com (both forms from dev-guard.sh)
 const CURL_WGET_MUTATING_RE =
@@ -216,13 +281,29 @@ const TREE_OR_ENV_REDIRECT_RE = /((^|\s)-C(?=[\s/=]|$)|--git-dir\b|--work-tree\b
 // exactly this: nothing precedes `git`, nothing but `push` follows it.
 const GIT_PUSH_EXACT_RE = /^git\s+push(\s|$)/;
 
+// Step 1 exception (Task-6, AC-6.1) — the ONE tree-redirection shape the
+// recognizer resolves against a real target instead of hard-rejecting: a
+// single, SPACED `-C {dir}` immediately after `git`, with nothing but `push`
+// as the next token. Deliberately narrow: the glued form (`-C/tmp/o`, no
+// space) is NOT matched here and continues to hard-reject via
+// TREE_OR_ENV_REDIRECT_RE (unchanged, conservative default for a shape this
+// recognizer does not parse). `dir` is captured as `\S+` — Step 0 (shell
+// quoting/composition reject) has already run on the full command by the
+// time this is tested, so `dir` cannot itself carry a quoting/expansion/
+// composition character.
+const GIT_C_DIR_PUSH_EXACT_RE = /^git\s+-C\s+(\S+)\s+push(\s|$)/;
+
 // The case-insensitive GH_PR_CREATE_RE router only ROUTES a payload into the
 // autogate branch; the autogate `allow` itself requires this exact, case-
 // sensitive, single-invocation form (mirrors GIT_PUSH_EXACT_RE). A mixed-case
 // (`GH pr create`) or shell-composed (`gh pr create && …`) form matches the
 // router but not this recognizer, so it falls through to ask instead of
-// auto-allowing the whole Bash call.
-const GH_PR_CREATE_EXACT_RE = /^gh\s+pr\s+create(\s|$)/;
+// auto-allowing the whole Bash call. --repo/-R tolerant (AC-6.1) via the same
+// inlined fragment as the router — a leading --repo does not change the
+// decision, only which repo the allowed pr-create targets. Literal
+// declaration (not `new RegExp(...)`) for the same extraction-coupling
+// reason as the router regexes above.
+const GH_PR_CREATE_EXACT_RE = /^gh\s+(?:(?:--repo|-R)(?:=\S+|\s+\S+)\s+)?pr\s+create(\s|$)/;
 
 // Step 3 — the ONLY flags that do not disqualify the safe form. Deliberately
 // minimal: `-u`/`--set-upstream` is the primary first-push-of-a-feature-
@@ -259,21 +340,27 @@ const DEFAULT_BRANCH_FLOOR = new Set(["main", "master"]);
 
 const GATE_DOC_POINTER = "see docs/dev-mode.md § Outward-Action Gate";
 
-// Steps 0-1 — hard rejects that must clear before any parsing is attempted.
-// Returns the `ask` decision, or null to continue into Step 2.
-function rejectUnparsableOrRedirected(cmdStr: string): NormalizedDecision | null {
+// Step 0 — hard reject that must clear before any parsing is attempted.
+// Returns the `ask` decision, or null to continue into Step 1.
+function rejectShellQuotingOrComposition(cmdStr: string): NormalizedDecision | null {
   if (SHELL_QUOTING_OR_EXPANSION_RE.test(cmdStr) || SHELL_COMPOSITION_RE.test(cmdStr)) {
     return ask(
       `outward action 'git push' contains a shell quoting/escaping/expansion/composition character — the inspected token cannot be trusted to equal the value bash actually runs; fail-closed (dev-guard.ts); ${GATE_DOC_POINTER}`
     );
   }
+  return null;
+}
 
+// Step 1 — hard reject on any tree/env redirection OTHER than the single,
+// spaced `-C {dir}` exact shape (which the caller resolves separately — see
+// extractExactCDirPushTail / evaluateGitPush, AC-6.1). Returns the `ask`
+// decision, or null to continue into Step 2.
+function rejectTreeOrEnvRedirect(cmdStr: string): NormalizedDecision | null {
   if (TREE_OR_ENV_REDIRECT_RE.test(cmdStr)) {
     return ask(
-      `outward action 'git push' combined with a tree/directory redirection (-C, --git-dir, --work-tree, or a GIT_*= environment prefix) requires explicit operator approval — the payload-cwd reader would evaluate a different tree than the one git operates on (dev-guard.ts); ${GATE_DOC_POINTER}`
+      `outward action 'git push' combined with a tree/directory redirection (--git-dir, --work-tree, a GIT_*= environment prefix, a glued/second/misplaced -C) requires explicit operator approval — the payload-cwd reader would evaluate a different tree than the one git operates on; only the single, spaced 'git -C {dir} push ...' shape is resolved against a real target (dev-guard.ts); ${GATE_DOC_POINTER}`
     );
   }
-
   return null;
 }
 
@@ -284,6 +371,16 @@ function rejectUnparsableOrRedirected(cmdStr: string): NormalizedDecision | null
 function extractExactPushTail(trimmedCmd: string): string | null {
   const m = GIT_PUSH_EXACT_RE.exec(trimmedCmd);
   return m ? trimmedCmd.slice(m[0].length).trim() : null;
+}
+
+// Step 1 exception (AC-6.1) — extracts `{dir, tail}` from the exact
+// `git -C {dir} push ...` shape, or null when the command does not match
+// this shape at all (falls through to the unconditional tree/env-redirect
+// reject in evaluateGitPush).
+function extractExactCDirPushTail(trimmedCmd: string): { dir: string; tail: string } | null {
+  const m = GIT_C_DIR_PUSH_EXACT_RE.exec(trimmedCmd);
+  if (!m) return null;
+  return { dir: m[1], tail: trimmedCmd.slice(m[0].length).trim() };
 }
 
 // Step 5 — a destination is a "plain branch name" ONLY when its full shape
@@ -308,29 +405,32 @@ function isPlainBranchDestination(dst: string): boolean {
 function evaluateDestinationBranch(
   dst: string,
   reader: DevGuardReader,
-  allowContext: string
+  allowContext: string,
+  dir?: string
 ): NormalizedDecision {
+  const targetNote = dir !== undefined ? ` (target '-C ${dir}')` : "";
+
   if (DEFAULT_BRANCH_FLOOR.has(dst.toLowerCase())) {
     return ask(
-      `outward action 'git push' to '${dst}' — the static {main, master} floor always requires explicit operator approval, never allow (dev-guard.ts); ${GATE_DOC_POINTER}`
+      `outward action 'git push' to '${dst}'${targetNote} — the static {main, master} floor always requires explicit operator approval, never allow (dev-guard.ts); ${GATE_DOC_POINTER}`
     );
   }
 
-  const resolvedDefault = reader.resolveDefaultBranch();
+  const resolvedDefault = dir !== undefined ? reader.resolveDefaultBranch(dir) : reader.resolveDefaultBranch();
   if (!resolvedDefault) {
     return ask(
-      `outward action 'git push' to '${dst}' — the repository's real default branch could not be positively resolved (requires origin/HEAD); fail-closed rather than assume '${dst}' is non-default (dev-guard.ts); ${GATE_DOC_POINTER}`
+      `outward action 'git push' to '${dst}'${targetNote} — the target repository's real default branch could not be positively resolved (requires origin/HEAD); fail-closed rather than assume '${dst}' is non-default (dev-guard.ts); ${GATE_DOC_POINTER}`
     );
   }
 
   if (dst.toLowerCase() === resolvedDefault.toLowerCase()) {
     return ask(
-      `outward action 'git push' to the default branch '${dst}' requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
+      `outward action 'git push' to the default branch '${dst}'${targetNote} requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
     );
   }
 
   return allow(
-    `${allowContext} — destination '${dst}' positively confirmed non-default via origin/HEAD (dev-guard.ts); ${GATE_DOC_POINTER}`
+    `${allowContext} — destination '${dst}'${targetNote} positively confirmed non-default via origin/HEAD (dev-guard.ts); ${GATE_DOC_POINTER}`
   );
 }
 
@@ -340,7 +440,55 @@ function evaluateDestinationBranch(
 // be positively non-default. Checking the destination branch — not the
 // branch currently checked out — closes a triangular `branch.<n>.merge`
 // config, where `@{push}` can resolve to a different branch than HEAD.
-function evaluateBarePush(reader: DevGuardReader): NormalizedDecision {
+// AC-6.1, remediated (SEC-DR-B Round 1) — for the `-C {dir}` form, an absent
+// refspec resolves via the directory's effective push destination
+// (reader.resolveEffectivePushRemoteRef(dir), git's own `@{push}`
+// resolution — honors `branch.<n>.pushRemote` → `remote.pushDefault` →
+// `branch.<n>.remote` for THAT directory), mirroring evaluateBarePush's
+// plain-form logic exactly instead of the earlier `gitCurrentBranch(dir)`
+// shortcut. The earlier shortcut only inspected the current branch name and
+// never checked which remote a bare push would actually resolve to for that
+// directory — a `branch.<n>.pushRemote`/`remote.pushDefault` pointing at a
+// non-origin remote silently passed. Resolving `@{push}` closes that gap:
+// the remote name is checked with the same `remote !== "origin"` rule as
+// the non-`-C` path, so a non-origin effective remote asks instead of
+// silently allowing, and an unresolvable push target (no upstream
+// configured for that directory) fails closed to ask rather than falling
+// back to a remote-blind branch check.
+function evaluateBarePushAt(dir: string, reader: DevGuardReader): NormalizedDecision {
+  const pushRef = reader.resolveEffectivePushRemoteRef(dir);
+  if (pushRef === null) {
+    return ask(
+      `outward action 'git -C ${dir} push' (no refspec) — the effective push destination could not be resolved for the target directory (no configured upstream/push target); fail-closed (dev-guard.ts); ${GATE_DOC_POINTER}`
+    );
+  }
+
+  const slashIdx = pushRef.indexOf("/");
+  const remote = slashIdx >= 0 ? pushRef.slice(0, slashIdx) : pushRef;
+  const destBranch = slashIdx >= 0 ? pushRef.slice(slashIdx + 1) : "";
+
+  if (remote !== "origin") {
+    return ask(
+      `outward action 'git -C ${dir} push' (no refspec) — the effective push-remote for the target directory resolves to '${remote}', not 'origin' by name (branch.<n>.pushRemote/remote.pushDefault honored); fail-closed (dev-guard.ts); ${GATE_DOC_POINTER}`
+    );
+  }
+  if (!destBranch || !isPlainBranchDestination(destBranch)) {
+    return ask(
+      `outward action 'git -C ${dir} push' (no refspec) — the effective push destination branch could not be extracted from '${pushRef}' as a plain branch name; fail-closed (dev-guard.ts); ${GATE_DOC_POINTER}`
+    );
+  }
+
+  return evaluateDestinationBranch(
+    destBranch,
+    reader,
+    `bare 'git -C ${dir} push' resolved to non-default branch '${destBranch}' with effective remote 'origin' (target directory)`,
+    dir
+  );
+}
+
+function evaluateBarePush(reader: DevGuardReader, dir?: string): NormalizedDecision {
+  if (dir !== undefined) return evaluateBarePushAt(dir, reader);
+
   const pushRef = reader.resolveEffectivePushRemoteRef();
   if (pushRef === null) {
     return ask(
@@ -386,16 +534,19 @@ function extractRawDestination(refspec: string): string | null {
 // `HEAD`/`@` resolve to the current branch via the reader (null if
 // resolution fails); any other `@`-prefixed shorthand is not attempted and
 // fails closed (returns null); anything else passes through unchanged.
-function resolveSymbolicDestination(rawDst: string, reader: DevGuardReader): string | null {
+function resolveSymbolicDestination(rawDst: string, reader: DevGuardReader, dir?: string): string | null {
   if (rawDst === "HEAD" || rawDst === "@") {
-    return reader.gitCurrentBranch();
+    return dir !== undefined ? reader.gitCurrentBranch(dir) : reader.gitCurrentBranch();
   }
   if (rawDst.startsWith("@")) return null;
   return rawDst;
 }
 
-// Step 5 — single explicit refspec (`git push origin <refspec>`).
-function evaluateSingleRefspec(refspec: string, reader: DevGuardReader): NormalizedDecision {
+// Step 5 — single explicit refspec (`git push origin <refspec>`, or
+// `git -C {dir} push origin <refspec>` — AC-6.1 threads `dir` through so
+// HEAD/@ resolution and the default-branch comparison both target the same
+// directory named by `-C`, never the payload cwd).
+function evaluateSingleRefspec(refspec: string, reader: DevGuardReader, dir?: string): NormalizedDecision {
   if (refspec.startsWith("+")) {
     return ask(
       `outward action 'git push' with a '+' force-prefixed refspec requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
@@ -415,7 +566,7 @@ function evaluateSingleRefspec(refspec: string, reader: DevGuardReader): Normali
     );
   }
 
-  const dst = resolveSymbolicDestination(rawDst, reader);
+  const dst = resolveSymbolicDestination(rawDst, reader, dir);
   if (dst === null) {
     return ask(
       `outward action 'git push' with an unresolved symbolic destination ('${rawDst}') requires explicit operator approval — resolution is attempted only for bare HEAD/@; fail-closed on any other shorthand or resolution fault (dev-guard.ts); ${GATE_DOC_POINTER}`
@@ -431,24 +582,16 @@ function evaluateSingleRefspec(refspec: string, reader: DevGuardReader): Normali
   return evaluateDestinationBranch(
     dst,
     reader,
-    `single refspec push to non-default branch '${dst}' on 'origin' recognized as the closed safe form`
+    `single refspec push to non-default branch '${dst}' on 'origin' recognized as the closed safe form`,
+    dir
   );
 }
 
-// Steps 2-4 dispatcher: exact-invocation shape, flag allowlist, remote name,
-// refspec count. Steps 5-7 are delegated to evaluateSingleRefspec/
-// evaluateBarePush.
-function evaluateGitPush(cmdStr: string, reader: DevGuardReader): NormalizedDecision {
-  const hardRejectAsk = rejectUnparsableOrRedirected(cmdStr);
-  if (hardRejectAsk) return hardRejectAsk;
-
-  const trimmed = cmdStr.trim();
-  const tail = extractExactPushTail(trimmed);
-  if (tail === null) {
-    return ask(
-      `outward action 'git push' is not expressed as a single, bare 'git push ...' invocation with nothing preceding it — fail-closed on any other structure (dev-guard.ts); ${GATE_DOC_POINTER}`
-    );
-  }
+// Steps 2-4 dispatcher (shared by the plain and `-C {dir}` forms): flag
+// allowlist, remote name, refspec count. Steps 5-7 are delegated to
+// evaluateSingleRefspec/evaluateBarePush, both `dir`-aware (AC-6.1).
+function evaluatePushArgs(tail: string, reader: DevGuardReader, dir?: string): NormalizedDecision {
+  const targetLabel = dir !== undefined ? `'git -C ${dir} push'` : "'git push'";
 
   const tokens = tail.length > 0 ? tail.split(/\s+/).filter(Boolean) : [];
   const flagTokens = tokens.filter((t) => t.startsWith("-"));
@@ -457,32 +600,64 @@ function evaluateGitPush(cmdStr: string, reader: DevGuardReader): NormalizedDeci
   const disqualifyingFlags = flagTokens.filter((t) => !BENIGN_PUSH_FLAG_RE.test(t));
   if (disqualifyingFlags.length > 0) {
     return ask(
-      `outward action 'git push' with disqualifying flag(s) (${disqualifyingFlags.join(", ")}) requires explicit operator approval — only -u/--set-upstream/-v/--verbose/--progress are on the benign allowlist (dev-guard.ts); ${GATE_DOC_POINTER}`
+      `outward action ${targetLabel} with disqualifying flag(s) (${disqualifyingFlags.join(", ")}) requires explicit operator approval — only -u/--set-upstream/-v/--verbose/--progress are on the benign allowlist (dev-guard.ts); ${GATE_DOC_POINTER}`
     );
   }
 
   if (positional.length === 0) {
-    return evaluateBarePush(reader);
+    return evaluateBarePush(reader, dir);
   }
 
   const remoteToken = positional[0];
   if (remoteToken !== "origin") {
     return ask(
-      `outward action 'git push' to a remote other than 'origin' (resolved by NAME) requires explicit operator approval — origin-URL integrity is a model assumption, and 'git remote set-url|add|rename|set-head' stay outside this allowlist (dev-guard.ts); ${GATE_DOC_POINTER}`
+      `outward action ${targetLabel} to a remote other than 'origin' (resolved by NAME) requires explicit operator approval — origin-URL integrity is a model assumption, and 'git remote set-url|add|rename|set-head' stay outside this allowlist (dev-guard.ts); ${GATE_DOC_POINTER}`
     );
   }
 
   if (positional.length === 1) {
-    return evaluateBarePush(reader);
+    return evaluateBarePush(reader, dir);
   }
 
   if (positional.length > 2) {
     return ask(
-      `outward action 'git push' with more than one refspec requires explicit operator approval — the recognizer allows exclusively a single simple refspec (dev-guard.ts); ${GATE_DOC_POINTER}`
+      `outward action ${targetLabel} with more than one refspec requires explicit operator approval — the recognizer allows exclusively a single simple refspec (dev-guard.ts); ${GATE_DOC_POINTER}`
     );
   }
 
-  return evaluateSingleRefspec(positional[1], reader);
+  return evaluateSingleRefspec(positional[1], reader, dir);
+}
+
+// Steps 1-4 dispatcher: resolves the `-C {dir}` exact form first (AC-6.1) —
+// unresolvable/ambiguous target dirs still ask (never a silent allow, since
+// evaluatePushArgs/evaluateBarePush/evaluateSingleRefspec all fail closed to
+// ask on a null reader result), so an absent or non-git target directory
+// degrades to the same conservative outcome the unconditional hard-reject
+// used to produce. Any other tree/env-redirect shape, or the absence of any
+// redirect at all, falls through to the plain exact-invocation shape
+// unchanged.
+function evaluateGitPush(cmdStr: string, reader: DevGuardReader): NormalizedDecision {
+  const quotingReject = rejectShellQuotingOrComposition(cmdStr);
+  if (quotingReject) return quotingReject;
+
+  const trimmed = cmdStr.trim();
+
+  const cDirForm = extractExactCDirPushTail(trimmed);
+  if (cDirForm) {
+    return evaluatePushArgs(cDirForm.tail, reader, cDirForm.dir);
+  }
+
+  const redirectReject = rejectTreeOrEnvRedirect(cmdStr);
+  if (redirectReject) return redirectReject;
+
+  const tail = extractExactPushTail(trimmed);
+  if (tail === null) {
+    return ask(
+      `outward action 'git push' is not expressed as a single, bare 'git push ...' invocation with nothing preceding it — fail-closed on any other structure (dev-guard.ts); ${GATE_DOC_POINTER}`
+    );
+  }
+
+  return evaluatePushArgs(tail, reader);
 }
 
 // ---------------------------------------------------------------------------
@@ -546,6 +721,12 @@ export function evaluate(input: NormalizedInput, reader: DevGuardReader): Normal
     return evaluateGitPush(cmdStr, reader);
   }
 
+  // AC-6.1 — resolved once per cmdStr; surfaced in the ask reason of every
+  // gh branch below so the operator sees which repo is targeted even when
+  // --repo/-R precedes the subcommand.
+  const ghTargetRepo = extractGhRepoTarget(cmdStr);
+  const ghTargetNote = ghTargetRepo ? ` (target repo: '${ghTargetRepo}')` : "";
+
   // 2b. gh pr create — autogate opt-in, default ask. The autogate `allow`
   // requires a clean, exactly-cased, single `gh pr create` invocation: the
   // case-insensitive router only routes here, and a mixed-case or shell-
@@ -556,32 +737,32 @@ export function evaluate(input: NormalizedInput, reader: DevGuardReader): Normal
       GH_PR_CREATE_EXACT_RE.test(cmdStr.trim());
     if (cleanAutogateForm && isPrCreateAutogateEnabled(reader)) {
       return allow(
-        `outward action 'gh pr create' auto-allowed by opt-in config autogate.pr_create=true (dev-guard.ts); the prepublish-guard tests-before-PR floor still applies independently (deny > allow); ${GATE_DOC_POINTER}`
+        `outward action 'gh pr create'${ghTargetNote} auto-allowed by opt-in config autogate.pr_create=true (dev-guard.ts); the prepublish-guard tests-before-PR floor still applies independently (deny > allow); ${GATE_DOC_POINTER}`
       );
     }
     return ask(
-      "outward action 'gh pr create' requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate"
+      `outward action 'gh pr create'${ghTargetNote} requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate`
     );
   }
 
   // 2c. gh pr merge
   if (GH_PR_MERGE_RE.test(cmdStr)) {
     return ask(
-      "outward action 'gh pr merge' requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate"
+      `outward action 'gh pr merge'${ghTargetNote} requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate`
     );
   }
 
   // 2c. gh pr review
   if (GH_PR_REVIEW_RE.test(cmdStr)) {
     return ask(
-      "outward action 'gh pr review' requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate"
+      `outward action 'gh pr review'${ghTargetNote} requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate`
     );
   }
 
   // 2d. gh pr comment
   if (GH_PR_COMMENT_RE.test(cmdStr)) {
     return ask(
-      "outward action 'gh pr comment' requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate"
+      `outward action 'gh pr comment'${ghTargetNote} requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate`
     );
   }
 
@@ -602,7 +783,7 @@ export function evaluate(input: NormalizedInput, reader: DevGuardReader): Normal
   // 2e-ter. gh issue mutating writes (create, edit, comment)
   if (GH_ISSUE_WRITE_RE.test(cmdStr)) {
     return ask(
-      "outward action 'gh issue write' requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate"
+      `outward action 'gh issue write'${ghTargetNote} requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate`
     );
   }
 

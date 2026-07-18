@@ -166,6 +166,15 @@ function inboundCC(raw) {
 }
 
 // bodies/subagent-start.ts
+var PROJECT_KEY_RE = /^[a-z0-9-]{1,60}$/;
+var TH_LANE_MARKER_RE = /^TH-LANE:\s*(\S+)/;
+function extractProjectKey(prompt) {
+  const firstLine = prompt.split("\n", 1)[0] ?? "";
+  const match = TH_LANE_MARKER_RE.exec(firstLine);
+  if (match === null) return null;
+  const candidate = match[1] ?? "";
+  return PROJECT_KEY_RE.test(candidate) ? candidate : null;
+}
 var TRACE_FILENAME = "00-subagent-trace.jsonl";
 function isTHAgent(subagentType) {
   return subagentType.startsWith("th:");
@@ -184,6 +193,11 @@ function writeStart(input, writer) {
     event: "subagent.start",
     agent_type: subagentType
   };
+  const prompt = typeof input.tool?.input?.["prompt"] === "string" ? input.tool.input["prompt"] : "";
+  const projectKey = extractProjectKey(prompt);
+  if (projectKey !== null) {
+    record["project"] = projectKey;
+  }
   const jsonLine = JSON.stringify(record);
   return writer.appendLine(workspace, TRACE_FILENAME + "\0" + jsonLine);
 }

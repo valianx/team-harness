@@ -86,6 +86,22 @@ bearer credentials, or other sensitive values. Use mechanical context only
 (e.g., `"detail": "config file path: ~/.claude/.team-harness.json"`). The same
 KG content policy that governs knowledge-graph nodes applies here.
 
+### Free-text field bound (`bounded` intensity level)
+
+Every free-text field carried by any event in `00-execution-events.*` — this
+section's own `detail`/`error`/`suggestion`, `kg_write.writes[].detail`
+(§ "kg_write event" below), and `plan_structure.extra.detail`
+(§ "Additional pipeline event types" below) — is bounded to the `bounded`
+intensity level defined in `docs/output-contract-patterns.md § 2`: ONE compact
+clause — a short phrase or single sentence fragment, ≤120 chars — never
+multi-sentence narrative prose. This is a FORMAT bound only: it never reduces
+the one-JSON-object-per-line invariant, and it never removes an event —
+every `phase.*`/`gate.*` event this schema requires still fires unchanged,
+regardless of how compact its optional free-text fields are (see "Tier 0
+carve-out" below for the sole exemption from the observability floor itself).
+Canonical source: `agents/orchestrator.md § "Free-text field bound"`; the two
+sites must not diverge.
+
 ## Placement in 00-execution-events
 
 `operation.*` events are written as additional JSONL lines within the existing
@@ -137,6 +153,15 @@ per-phase context. The orchestrator's `phase.end` events in `00-execution-events
 remain the authoritative rich observability record. The SubagentStop payload
 simply does not carry that data.
 
+**`project` key — stop-side residual (permanent, not a TODO).** Unlike the
+start-side breadcrumb below, `subagent.stop` lines never carry a `project`
+key. The SubagentStop payload exposes `agent_type`/`agent_id`/`stop_reason`
+only — there is no prompt to read a `TH-LANE: {project-key}` marker from at
+stop time. Readers that need the authoritative per-agent project/timing
+record for a lane-scoped run should use the orchestrator's `phase.end` event
+(which does carry `project`), not this breadcrumb. See "subagent.start" below
+for how pairing is redefined when `project` is present on the start side.
+
 **Non-suppressible breadcrumb.** The existence breadcrumb (the `subagent.stop`
 write) runs unconditionally — `TH_HOOK_PROFILE=minimal` does NOT suppress it.
 Only the scope guard (non-`th:` agent → silent exit) and the base-path check
@@ -180,13 +205,45 @@ derivable from a single file.
 
 Line schema:
 ```json
-{"ts":"<ISO>","event":"subagent.start","agent_type":"th:<agent>"}
+{"ts":"<ISO>","event":"subagent.start","agent_type":"th:<agent>","project":"<optional — bounded [a-z0-9-]{1,60}>"}
 ```
 
 `agent_id` is intentionally absent — at PreToolUse time the runtime has not
 yet assigned one (it only becomes observable on the corresponding
 `SubagentStop` payload). Readers pair a `subagent.start` line with the next
 `subagent.stop` line carrying the same `agent_type` in file order.
+
+**`project` key (lane-scoped dispatch, bounded).** When the dispatching
+agent's prompt carries a `TH-LANE: {project-key}` line, this hook stamps a
+`project` field on the `subagent.start` record with that key. The value is
+charset/length-bounded (`[a-z0-9-]{1,60}`) before it ever reaches the JSONL
+sink — a marker present but out of that shape is treated as absent (`project`
+omitted), never written unbounded. When the marker is absent altogether,
+`project` is omitted and pairing falls back to the plain `agent_type`
+file-order rule above (backward-compat — byte-identical to pre-lane behavior).
+
+**Pairing redefinition within `project` (AC-5.2).** When one or more
+`subagent.start` lines in the trace carry a `project` key, same-agent-type
+pairing is scoped WITHIN that key: a `subagent.stop` line is matched to the
+oldest pending `subagent.start` line sharing the same `agent_type` **and**
+the same `project`, not merely the same `agent_type` file-order-wide. This
+matters once two or more orchestrator lanes dispatch the same specialist
+type (e.g. two lanes each dispatching `th:implementer`) into a shared trace
+file — plain `agent_type` FIFO pairing would cross-wire lane A's start with
+lane B's stop. Lines with no `project` key continue to pair against each
+other under the original agent_type-only FIFO rule (backward-compat).
+
+**Stop-side residual — cannot be enforced by the writer, only by the
+reader.** `subagent.stop` lines never carry `project` (see "00-subagent-trace.jsonl"
+above) — the SubagentStop payload has no prompt to read `TH-LANE` from. A
+reader implementing the pairing rule above therefore cannot join on `project`
+at the stop-line level; it must derive the pairing from the `project`-tagged
+`subagent.start` side only (e.g., scope each pending-starts queue by
+`(agent_type, project)`, and let ungrouped/legacy `subagent.start` lines with
+no `project` share one `agent_type`-only queue). The authoritative per-agent,
+per-lane timing record remains the orchestrator's `phase.end` event, which
+does carry `project` end-to-end — this breadcrumb pairing rule is a
+best-effort backstop, not a replacement.
 
 **Complements, never replaces, `phase.end`.** Same relationship as the stop
 breadcrumb: this file proves a `th:*` boundary occurred and, paired with the
@@ -266,10 +323,10 @@ suggestion on failure — without event persistence.
 
 ## overview.md — initiative parent index (NOT an events file)
 
-When the `initiative` field in `00-state.md` is set, the orchestrator also
+When the `initiative` field in `00-state.md` is set, the leader also
 maintains a parent-level `overview.md` at the initiative root. This file is
 **not an events file** and does not contain pipeline observability data. It is
-a living index — one row per project, updated by the orchestrator at intake and
+a living index — one row per project, updated by the leader at intake and
 by the delivery agent at Step 11.7.
 
 **What it is:**
@@ -291,17 +348,17 @@ by the delivery agent at Step 11.7.
 - Obsidian: `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/overview.md`
 - Local: `{common-parent-of-sibling-repos}/{YYYY-MM-DD}_{initiative}/overview.md`
 
-Full template and section-ownership map: `agents/orchestrator.md § overview.md Template`.
+Full template and section-ownership map: `agents/leader.md § overview.md Template`.
 
 ## Initiative-level fan-out trace (parallel multi-project dispatch)
 
-When the orchestrator fans out 2+ projects concurrently (see `agents/orchestrator.md § Parallel Multi-Project Dispatch`), an **initiative-level** `00-execution-events` file is written in addition to each project's per-project trace. This file is separate from `overview.md` (which is NOT an events file) and from the per-project `00-execution-events.*` (which remain per-project, unchanged).
+When the leader fans out 2+ projects concurrently (see `agents/leader.md § Parallel Multi-Project Dispatch`), an **initiative-level** `00-execution-events` file is written in addition to each project's per-project trace. This file is separate from `overview.md` (which is NOT an events file) and from the per-project `00-execution-events.*` (which remain per-project, unchanged).
 
 **Location:**
 - Obsidian: `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/00-execution-events.md`
 - Local: `{common-parent-of-sibling-repos}/{YYYY-MM-DD}_{initiative}/00-execution-events.jsonl`
 
-**Fan-out lifecycle events** (written by the orchestrator into the initiative-level file):
+**Fan-out lifecycle events** (written by the leader into the initiative-level file):
 
 | Event | Fields | When emitted |
 |-------|--------|--------------|
@@ -314,13 +371,43 @@ Each event carries a `project` key so `/trace` can group events by lane and rend
 
 **Per-project traces are unchanged.** Each project continues writing its own `{project}/00-execution-events.*` file with its per-phase `phase.start` / `phase.end` / `gate.*` events exactly as today. The initiative-level file is additive — it carries only fan-out lifecycle events, not per-phase detail.
 
-**`/th:pipelines` rendering:** when an initiative has a live fan-out, `/th:pipelines` shows the initiative as a parent row with each concurrent project as a child lane row (Stage / Phase columns per lane). This reuses the Stage/Phase surfacing exception already documented for `/th:pipelines`.
+**`/th:pipelines` rendering:** when a `00-leader-roster.md` is present, `/th:pipelines` renders the leader→orchestrator tree grouped by project — the initiative as a parent row, each orchestrator as a child lane row with `Stage` / `Phase` / `Status`, the advisory `pending_gate` (from the roster), and a per-lane cost (summed from that lane's own `phase.end` tokens). When a live fan-out is also present, the `fanout.*` events overlay running/closed liveness onto the tree. This reuses the Stage/Phase surfacing exception already documented for `/th:pipelines`.
 
-**`/trace` rendering:** `/trace` reads the initiative-level fan-out events to render the parallel region (lanes side-by-side with start/end timestamps) and can drill into any lane's per-project trace. The `--cost` rollup sums token counts across all lanes for an initiative-level cost figure.
+**`/trace` rendering:** `/trace` reads the initiative-level fan-out events to render the parallel region (lanes side-by-side with start/end timestamps), shows each lane's advisory `pending_gate` from the roster when present, and can drill into any lane's per-project trace. The `--cost` rollup sums token counts across all lanes for an initiative-level cost figure (reader-only — see "Reader-only initiative rollup" below).
 
 **Mandatory + additive, not mandatory for single-project runs.** The initiative-level `00-execution-events` file is only written when a fan-out is actually dispatched. Single-project runs (`initiative: null`) and serial multi-project runs do not produce this file. The file is mandatory for any run where `fanout.start` fires — a fan-out that emits no initiative-level trace violates the observability contract.
 
-**Implementation status.** Both renderers documented above are implemented: `skills/pipelines/SKILL.md § Initiative fan-out — parent/child lane rows` and `skills/trace/SKILL.md § Parallel region rendering (fan-out)`.
+**Implementation status.** Both renderers documented above are implemented: `skills/pipelines/SKILL.md § Leader → orchestrator tree (roster-sourced, grouped by project)` and `skills/trace/SKILL.md § Parallel region rendering (fan-out)`.
+
+### 00-leader-roster.md — the leader's index (leader→orchestrator tree source)
+
+`00-leader-roster.md` is the leader's durable tracking file — the authoritative enumeration of every `th:orchestrator` the leader has spawned. It is **not an events file** (no JSONL, no `phase.*`/`operation.*`/`fanout.*` events) and it is distinct from `overview.md` (which carries the cross-project narrative, not the per-orchestrator tracking rows). The **leader is the sole writer**; every observability reader (`/th:pipelines`, `/trace`, `/th:recover`) treats it as read-only.
+
+**Location (mode-independent path shape):** `{initiative-root}/00-leader-roster.md` when `initiative` is set (N > 1 projects); `{feature-root}/00-leader-roster.md` for a single-task run (N = 1). Full contract: `agents/leader.md § 00-leader-roster.md`.
+
+**Columns:** `Task/Project`, `State ref (docs_root)`, `Agent` (always `th:orchestrator`), `Phase`, `Status`, `pending_gate`. `Phase`/`Status` are the coarse fields the leader reads from each orchestrator's `00-state.md § Current State` (never a gate-release field). This is what makes the roster the leader→orchestrator **tree source**: it names each orchestrator, points at its `docs_root` (the `State ref`), and carries its coarse position.
+
+**`pending_gate` is ADVISORY.** The `pending_gate` column is a leader-maintained hint of which STAGE-GATE a lane is paused at, used only to drive the leader's gate-presentation/routing behaviour. It is **never a gate-clear signal** and nothing downstream treats a roster row as authoritative for gate status — the leader that writes it never reads or writes any orchestrator's `gate1_release`/`gate2_release_last`/`gate3_release` field or any `stage.gate.release` event; it presents each gate to the operator inline and relays the decision back, but never records a gate-release. Renderers surface `pending_gate` verbatim and must never infer a gate-clear from it.
+
+### Reader-only initiative rollup
+
+The initiative view that `/th:pipelines` and `/trace --cost` present — and that the leader itself builds to summarize an initiative — is a **reader-only aggregation**. It joins, by the roster's `State ref`, each orchestrator's OWN `00-execution-events.{jsonl|md}` (`phase.end` `tokens`/`status`) and coarse `00-state.md § Current State` fields into one per-initiative cost + status view.
+
+**The leader is aggregator/reader, never writer of any orchestrator's stream.** Building this rollup, the leader never writes to any orchestrator's `00-execution-events.*` or `00-state.md` — those files stay exclusively the owning orchestrator's. The rollup **never touches the gate seam**: it reads coarse phase/status and `phase.end` token counts only, never a gate-release field or a `stage.gate.release` event. Its inputs are each orchestrator's own per-lane trace plus the roster; its output is a read, added additively to the tree render. The initiative-level `fanout.*` file (which the leader DOES write — see above) is the one initiative-scoped stream the leader authors, and it carries fan-out lifecycle events only, never per-phase detail lifted out of a lane's trace.
+
+### leader-recover vs orchestrator-recover (two-tier recovery)
+
+Recovery is split along the same present-and-relay vs. prepare-and-record seam. `/th:recover` reads state and routes; it presents no gate and records no release itself.
+
+| | **leader-recover** | **orchestrator-recover** |
+|---|---|---|
+| Owner | `th:leader` (top-level) | the pipeline's own `th:orchestrator` |
+| Rebuilds from | `00-leader-roster.md` + each orchestrator's coarse `phase`/`status`/`next_action` (+ `overview.md` if an initiative) | that orchestrator's OWN `00-state.md § Current State` dual-record + its `{events_file}` |
+| Answers | "which orchestrators exist and roughly where are they" | "is this STAGE-GATE cleared, and what runs next" |
+| Gate behaviour | **presenter/relayer, never recorder** — never reads or writes a gate-release field; re-presents inline any `gate_pending` an orchestrator returns on resume and relays the operator's decision back | **preparer/recorder** — re-reads its own dual-record (structural: `stage.gate.release` event present AND per-gate release field in the clear-allowlist) and returns a `gate_pending` to `th:leader` for any un-cleared STAGE-GATE, per its Recover safety contract |
+| Contract | `agents/leader.md § leader-recover` | `agents/orchestrator.md § orchestrator-recover` |
+
+`/th:recover` itself is read-only: it runs the structural gate-cleared check only to surface which gate is un-cleared and route to the right orchestrator — it never records a release. The leader rebuilds coarse tracking (never reading or writing any gate-release record) and re-spawns the relevant orchestrator; that orchestrator, on boot, re-reads its own dual-record and returns a `gate_pending` for any un-cleared STAGE-GATE, which the leader re-presents to the operator inline. This is why an un-cleared gate can never be silently bypassed on recovery: cleared-status derives ONLY from the structural dual-record check the owning orchestrator runs — never from prose and never from the advisory roster — so the leader's coarse tracking can never mark a gate cleared, and the re-presentation flows leader-mediated from the orchestrator's `gate_pending`.
 
 ## Additional pipeline event types
 
@@ -331,8 +418,12 @@ The following event types appear in `00-execution-events` in addition to the cor
 | `gate` | When a human-checkpoint gate is reached (DOC-GATE, STAGE-GATE approval prompt) | `gate` (name), `action` (`stop`/`approved`) |
 | `research.lane.skipped` | When a research fan-out lane returns no findings (fail-open) | `lane`, `angle`, `reason` |
 | `artifact.missing` | When an expected agent output file is absent after dispatch | `expected_file`, `agent`, `action` (`retry`/`escalate`) |
+| `stage2.hygiene` | When the Phase 2.6 code-hygiene scan completes (deterministic, orchestrator-run — see `docs/code-hygiene-gate.md § Layer 1`) | `verdict` (`pass`/`fail`), `extra.files` (int, on `fail`), `extra.count` (int, on `fail`) |
+| `plan_structure` | When the Phase 1.5a deterministic plan-structure scan completes, before any `qa-plan` dispatch (deterministic, orchestrator-run — see `docs/plan-structure-gate.md § 2`) | `verdict` (`pass`/`fail`), `extra.check`/`extra.detail` (on `fail`, the specific mechanical failure) |
 
 Note: `gate` (human checkpoint) is distinct from `gate.pass` / `gate.fail` (automated agent-to-agent gates). The latter fire when the orchestrator evaluates a plan-review or acceptance-gate result without pausing for human input; the former fires when execution is suspended pending operator approval.
+
+Note: the `lane` field on `research.lane.skipped` names a **research fan-out lane** (one angle of a `/th:research-code` fan-out) — an unrelated homonym of the pipeline **execution lane** (`inline`/`express`/`full`) documented in "Active-lane observability surface" below. The two never appear on the same event.
 
 ## kg_write event
 
@@ -385,6 +476,89 @@ Note: `gate` (human checkpoint) is distinct from `gate.pass` / `gate.fail` (auto
 | `skipped:policy-filtered` | The content-policy filter or an MCP `policy/*` return discarded the write. | Content-policy drop, MCP `policy/<code>` response |
 
 **Why a sibling event, not `operation.end`:** `operation.*` models one discrete operation with three states (`started` / `success` / `failed`) and no counters. A Phase 6 batch may write up to 5 nodes, with some `ok` and others `skipped:policy-filtered` in the same run. Forcing that into `operation.end` would require either one event per node (multiplies noise) or adding counters to `operation.*` (breaks its single-operation schema for every non-KG use). A sibling event `kg_write` with `attempted` / `succeeded` / `writes[]` expresses the batch in one line without contaminating `operation.*`. This does NOT violate the "no parallel KG-namespaced events" rule in the orchestrator — that rule prohibits a **family** with state suffixes (`kg.started` / `kg.success` / `kg.failed`); `kg_write` is a **single event type** with no suffixes. See the orchestrator's "Emitting kg_write events" subsection for the full rationale and the explicit exception.
+
+## 00-state.md bounded snapshot (`§ Agent Results` + `§ Hot Context`)
+
+`00-state.md § Agent Results` and `§ Hot Context` are **bounded, replaceable
+snapshots** (`docs/output-contract-patterns.md § 2` `bounded` intensity
+level) — current-state-only, never an accumulating append-log. All historical
+detail (what happened at each phase, over time) lives exclusively in
+`{events_file}`; `00-state.md` shows only where the pipeline is now.
+
+**`§ Agent Results` — keyed upsert, not append.** Each row is keyed by
+`(agent, phase)`. A re-dispatch of the same `(agent, phase)` key across
+iterations (e.g. `implementer` re-run after a Phase-3 iteration) overwrites
+that row in place — it never adds a second row for the same key. A distinct
+`(agent, phase)` key is always a distinct row: `security` and `adversary`
+both dispatch at Phase 3 (`3-verify`) but are different agents, so each keeps
+its own current-verdict row — including `adversary`'s
+`incomplete_on_changed_control` field — never collapsed into a single
+last-writer-wins value. In-place replacement happens **between iterations**
+(the same lens re-running), never **between lenses of the same phase** (two
+different lenses are always two rows).
+
+**`§ Hot Context` — overwrite in place, not append.** Rewritten at every phase
+transition to reflect only the current open insight/constraint; a new entry
+on the same topic replaces the prior one rather than appending beside it.
+
+**Iteration re-narration ban applies to both sections.** Neither section
+re-tells what happened in a past iteration — each references the iteration by
+ID only (`Iteration {N}`), per `docs/output-contract-patterns.md § 5`. The
+narrative for a given round lives exclusively in `failure-brief.md`.
+
+**Does not weaken the observability floor.** This is a FORMAT bound on two
+`00-state.md` sections; it does not touch `{events_file}`'s mandatory
+`phase.*`/`gate.*` emission (§ "Tier 0 carve-out" below is the only
+exemption from that floor) and it does not change what `00-pipeline-summary.md`
+derives from the trace.
+
+Canonical source: `agents/orchestrator.md § "Phase Transition Protocol"` (the
+upsert mechanic) and `§ "Agent Results"` / `§ "Hot Context"` (the schema
+templates); the two sites must not diverge.
+
+## Active-lane observability surface
+
+The three-lane execution model (`inline`/`express`/`full`, canonical contract: `docs/pipeline-lanes.md`) is a dispatch-time classification, not a new enforcement layer. This section documents where the running lane is visible across the observability surfaces this file defines, and states plainly what this contract deliberately does NOT add.
+
+### `lane` field — `00-state.md` + status-block/STOP-header echo
+
+`lane` is a `00-state.md § Current State` field (`inline | express | full`), copied verbatim by the orchestrator from the leader's spawn payload — `--fast`, `[TIER: N]`, and Simple-Mode keywords all resolve to a lane value upstream, at the leader, so the orchestrator never re-derives lane from a legacy flag itself. The orchestrator echoes `Lane: {lane}` as the first line of every phase-transition status block and every STAGE-GATE / express-combined-gate STOP block header (`agents/orchestrator.md § "Lane: line"`, canonical visibility contract at `docs/pipeline-lanes.md § 8`).
+
+**Honest scope — not (yet) a discrete `phase.end` JSONL key.** `lane` lives in the state file and in the human-facing status-block/STOP-block text; the `phase.end` schema (§ "Execution Events JSONL" above) does not currently stamp its own `lane` key. A reader who needs the running lane for a given phase reads `00-state.md` alongside `{events_file}`, the same way `stage`/`phase` are already cross-read together with the trace.
+
+**Naming note.** This execution-lane `lane` is unrelated to the `lane` field on `research.lane.skipped` (§ "Additional pipeline event types" above), which names one angle of a `/th:research-code` fan-out. The two homonyms never appear on the same event.
+
+### `operator-inline-security-waiver` audit marker
+
+`inline` on a security-sensitive path requires a fresh, live, per-invocation operator confirm to the risk statement defined in `docs/pipeline-lanes.md § 5`. When granted, the leader writes a distinct audit marker — `operator-inline-security-waiver` — to `00-execution-events` (when a workspace exists) or the leader's own session tracking (inline runs with no orchestrator). The marker is deliberately distinct from `leader-relayed-operator` (the mechanism that authorizes STAGE-GATE decisions elsewhere in this file): it records the sensitive path(s) that triggered the floor, the exact risk string shown, the operator's literal reply, and a timestamp. Full mechanism, the fail-closed rules, and the non-persistence guarantee (no config key — including `lane_autoselect` — makes the waiver sticky or default) live in `docs/pipeline-lanes.md § 5`.
+
+### No `budget` config key, no `budget_pending` event
+
+An earlier design iteration proposed a hard token-budget config key (`budget`) with a budget-driven STOP (constraint C). It was evaluated and removed before this contract shipped — a budget-STOP that could recommend `inline` on a sensitive path was identified as a fail-open security vector (a pre-flight budget check reaching a security recommendation before the security-relevant classification ran); see `docs/pipeline-lanes.md § 9 "Historical note — constraint C removed"` for the full rationale. This observability contract documents the trace and config surface exactly as shipped: **no `budget` key exists in `~/.claude/.team-harness.json`, and no `budget_pending` (or equivalent) event exists in the `event` enum** (§ "Execution Events JSONL" § Schema above). The only cost-visibility surface remains the existing read-only `## Cost` rollup (§ "Cost rollup" below) — a render of `phase.end` tokens, never a gate, never a STOP.
+
+### Security floor unaffected by lane
+
+`security_floor_applies` — the single shared Phase-3 predicate that dispatches `security` + `adversary` on a sensitive path — is computed from `security_sensitive` alone; no lane, trim, flag, or env var changes its evaluation (`agents/orchestrator.md § "Preserves the 'unless sensitive' guard..."`). This is a trace-observable invariant: a sensitive-path run's `phase.end` events show the same `security`/`adversary` phase entries on `lane: express` as on `lane: full`, and the express combined-gate STOP block surfaces the same verdicts inline rather than omitting them (`docs/pipeline-lanes.md § 7 "Two-lens floor"`).
+
+## Stage-1 selective panel re-firing — observability surface
+
+Stage-1 selective panel re-firing (canonical contract: `docs/patch-mode.md § Stage-1 Selective Panel Re-Firing`) reduces cost on plan-review re-dispatches after an operator correction. Like the active-lane surface above, everything documented here is a read-only trace/audit addition over the existing Phase 1.5/1.6 gate model — no new enforcement key, no new verdict value, no change to what "pass" means at STAGE-GATE-1.
+
+### `plan_structure` event (Phase 1.5a, deterministic)
+
+Documented in the "Additional pipeline event types" table above. Emitted by the orchestrator itself (never a subagent dispatch) at Phase 1.5a, before any `qa-plan` ratify-plan dispatch, for every plan that does not take the self-authored-plan carve-out. Same shape as `stage2.hygiene`: a structural trace event carrying a `verdict`, never operator-facing prose on the clean path. `verdict: pass` proceeds to `qa-plan`; `verdict: fail` bounces to `architect` under the BOUNDED-PATCH contract with `extra.check`/`extra.detail` naming the specific mechanical failure. The four Layer-1 checks (AC-count-vs-summary reconciliation, dangling `T{n}-AC-{m}` cross-references, DAG acyclicity, cross-task file-disjointness) are defined canonically in `docs/plan-structure-gate.md § 2` — this file does not re-derive or paraphrase that check set.
+
+### Correction-classification + routing record (`reviews/01-plan-review.md § Panel Rounds`)
+
+When a corrected plan re-enters Phase 1.5/1.6, the orchestrator classifies the correction into one of 5 buckets (broad-structural, security-relevant surface, non-security coverage change, editorial/operator-decided reduction, shape/consistency-only — `docs/patch-mode.md § "The correction classifier"`) and routes only the lens(es) that bucket requires. This classification and routing decision is recorded as a `§ Panel Rounds` row in `reviews/01-plan-review.md` — a workspace document, not a new event-file field — naming the bucket, which lens(es) fired, and which sub-verdicts were carried forward. The record is read-only audit detail for a decision already made deterministically by the ordered, first-match-wins classification rules; it does not itself gate anything.
+
+### Carried-forward sub-verdict labeling
+
+When fewer than all lenses re-fire, each non-firing lens's most recent sub-verdict and its open-findings ledger are carried forward into `reviews/01-plan-review.md` and explicitly labelled `(carried forward from round N — surface unchanged this round)` — never silently presented as fresh. The combined verdict is recomputed as worst-of over {fresh sub-verdicts} ∪ {carried-forward sub-verdicts}, preserving each lens's own severity→verdict mapping. A `security` sub-verdict is never carried forward when the correction touched the security-relevant surface (bucket 2 always forces a fresh `security` run) — the Stage-1 analog of the existing Phase-3 security-verdict staleness re-gate (`agents/orchestrator.md § "If any agent fails → ITERATE"`). Full mechanism: `docs/patch-mode.md § "Carried-forward sub-verdicts + combined-verdict recomputation"`.
+
+### No new enforcement key
+
+This entire surface is additive trace/audit detail over an existing enforcement model: `plan_structure: pass/fail` is a structural gate that already existed in shape (mirrors `stage2.hygiene`, itself already documented above); the correction-bucket routing changes WHICH lens re-fires, never WHETHER Phase 1.5/1.6 must reach a combined verdict before STAGE-GATE-1; and the combined-verdict recomputation rule (worst-of over fresh ∪ carried-forward) preserves the existing `pass`/`concerns`/`fail` semantics — it introduces no new verdict value and no new config key.
 
 ## Cost rollup
 
@@ -510,7 +684,7 @@ Sanity Check, step 6).
      these agents as `opus` regardless of any other assumption:
      `architect`, `security`, `adversary`, `qa-plan`, `ux-reviewer`, `reviewer`,
      `reviewer-consolidator`, `agent-builder`, `mentor`, `gcp-infra`, `gcp-cost-analyzer`,
-     `orchestrator`. This is the canonical static list — `skills/trace/SKILL.md` reads the
+     `leader`, `orchestrator`. This is the canonical static list — `skills/trace/SKILL.md` reads the
      same enumeration and MUST NOT diverge from it.
    - **No "all others → sonnet" default.** When none of the three paths above resolve a
      classification, classify as `sonnet` and mark the row with `(?)` to signal that the

@@ -10,7 +10,7 @@ itself lives only here (multi-site invariant, `01-plan.md`).
 86K/run) because each verifier re-read the same workspace narrative independently, with no
 shared-read mechanism across separate agent contexts. The packet applies the same
 build-once-read-many shape already used for `00-knowledge-context.md`
-(`agents/orchestrator.md § Phase 0a Step 2`) to the Stage-2 verify block.
+(`agents/leader.md § Phase 0a`) to the Stage-2 verify block.
 
 ---
 

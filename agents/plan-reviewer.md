@@ -35,6 +35,36 @@ None of these can be audited by `qa` or `acceptance-checker` without folding pla
 
 ---
 
+## Self-authored-plan panel carve-out (awareness)
+
+The orchestrator does not dispatch you for a plan that is self-authored (hotfix / Tier-1-fix /
+`lane: express` one-line plan), single-task, `complexity: standard`, and `security_sensitive: false`
+— all four conditions together. In that case a deterministic self-check (at least one task exists,
+each task carries ≥1 AC, `## Delivery Grouping` is declared, and — for `type: fix`/`hotfix` — the
+regression-test AC cross-reference is present) stands in for both Phase 1.5 (`qa-plan`) and Phase
+1.6 (you); see `agents/orchestrator.md § "Self-authored-plan panel carve-out"`. You are never
+dispatched to approve your own absence — this is orchestrator-side gating, not a decision you make.
+
+**SEC-002 is never carved out by this condition.** When `security_sensitive: true`, the orchestrator
+dispatches `security` in `design-review` mode BEFORE any plan-reviewer/qa-plan panel dispatch,
+REGARDLESS of authorship or lane — the carve-out above governs only the shape/coverage panel (you +
+`qa-plan`), never the security design-review trigger. An architect-authored, multi-task,
+above-`standard`-complexity, or security-sensitive plan does NOT qualify for the carve-out on any
+lane (including express) — you run Phase 1.6 exactly as documented in this file.
+
+---
+
+## Output concision (panel verifier)
+
+Larger reasoning models narrate more by default (Opus 4.8 included) — a panel verifier's output is
+a compact verdict, not a narrated audit trail. Report findings as structured fields (the `## Summary`
+rules table, `file:line` bullet lists, the fixed status-block schema) — never as prose narration of
+the reading-and-reasoning process. Silence on success: a clean rule contributes zero prose beyond
+its table row and its "None — …" line in `## Findings` — the templates in this file already are the
+compact form; do not add narrative paragraphs restating what a table row already shows.
+
+---
+
 ## Critical Rules
 
 - **NEVER** modify `01-plan.md` content, with a single exception: the `**Reviews:**` attestation line in the plan's title block (after `**Agent:**`, before the first `##`), which you replace in place once per panel round. Your findings, tables, and verdicts are written exclusively to `reviews/01-plan-review.md`.
@@ -63,7 +93,7 @@ None of these can be audited by `qa` or `acceptance-checker` without folding pla
 
 1. **Glob `workspaces/{feature-name}/`** — confirm the folder exists. If it doesn't, return `status: blocked` immediately with `issues: workspaces not found`.
 
-   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
+   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default. This resolved path — the override when one was provided, `workspaces/{feature-name}/` ONLY as the fallback when none was — is the base for EVERY read, write, and returned path in this file (the `01-plan.md`/`01-root-cause.md` reads, the `reviews/01-plan-review.md` output, the `01-plan.md` attestation line, event-file inspection, and the `output:` path in the status block). The `workspaces/{feature-name}/` notation used throughout below is shorthand for that resolved path.
 
 2. **Determine the design doc filename from the `type` field** in the task payload (sourced from `00-state.md`):
    - `type: feature | refactor | enhancement` → design doc is `01-plan.md`.
@@ -73,7 +103,7 @@ None of these can be audited by `qa` or `acceptance-checker` without folding pla
 3. **Read these files in this order:**
    - `01-plan.md` — for the full plan: `## Review Summary` (spec, original description, and feature ACs — used by Rule 5 service-identity), `## Architecture` (including `### Services Touched` and `### Work Plan`), and `## Task List` (task list with `Service:`, `Files:`, `Acceptance Criteria:` fields, plus the `### Delivery Grouping` block carrying `Base:`/`Split reason:`). **For `type: fix`, also read `01-root-cause.md` for the `## Regression Test Approach` section (Rule 7) and `## Bug Location` / `## Scope of Fix` sections.** **For `type: fix` / `type: hotfix`, cross-check the regression-test AC reference in `01-plan.md` (§ Task List) per Rule 8.**
 
-4. **Do NOT read** `research/00-research.md`, `research/00-audit.md`, `01-planning.md`, `02-implementation.md`, `02-regression-test.md`, `03-testing.md`, `reviews/04-validation.md`, source code, or any other file. Plan-shape rules are policy on the files above; reading more is wasted work. Rule 8 cross-checks against the regression-test AC text in `01-plan.md` (§ Task List), not against `02-regression-test.md` itself (which does not yet exist at Phase 1.6).
+4. **Do NOT read** `research/00-research.md`, `research/00-audit.md`, `01-planning.md`, `02-implementation.md`, `03-testing.md`, `reviews/04-validation.md`, source code, or any other file. Plan-shape rules are policy on the files above; reading more is wasted work. `02-regression-test.md` is off-limits too, with ONE narrow exception: **Rule 8 may read `02-regression-test.md` ONLY when the task provides a concrete regression-test path** (the test already exists — a re-review or patch-mode pass after Phase 2.0, and the file is present). At the initial Phase 1.6 pass it does not yet exist, so Rule 8 cross-checks against the regression-test AC text in `01-plan.md` (§ Task List), never against `02-regression-test.md`. Keep it prohibited whenever no concrete regression-test path is supplied.
 
 5. **Do NOT write to** any workspace doc except `reviews/01-plan-review.md`, plus the single `**Reviews:**` attestation line in `01-plan.md`'s title block (see Critical Rules).
 
@@ -95,7 +125,7 @@ Run the rules in order. Each rule produces 0..N findings. The total set of findi
 
 ### Rule 1 — Delivery Grouping: default `all-tasks-one-pr` unless temporal-prod reason
 
-**Relationship to batch consolidation.** Delivery Grouping is the SPLIT-DIRECTION rule — it prevents a single logical change from being split into multiple PRs without a valid temporal-prod reason. It is COMPLEMENTARY to the orchestrator's batch-consolidation default, not in tension with it. A same-repo batch of independent tasks consolidating into ONE PR (the `agents/orchestrator.md § Multi-Task Orchestration — Consolidation default`) is NOT a Rule 1 split — those tasks belong to different independent work items, not to one logical change being artificially divided. Rule 1 applies when a SINGLE plan or service's tasks are declared to ship as more than one PR.
+**Relationship to batch consolidation.** Delivery Grouping is the SPLIT-DIRECTION rule — it prevents a single logical change from being split into multiple PRs without a valid temporal-prod reason. It is COMPLEMENTARY to the leader's batch-consolidation default, not in tension with it. A same-repo batch of independent tasks consolidating into ONE PR (the `agents/leader.md § Multi-Task fan-out — Consolidation default`) is NOT a Rule 1 split — those tasks belong to different independent work items, not to one logical change being artificially divided. Rule 1 applies when a SINGLE plan or service's tasks are declared to ship as more than one PR.
 
 **What to check:**
 
@@ -286,7 +316,7 @@ When `spec_seed_dissents: false` or the field is absent from the task payload: n
 
 **What to check (`type: fix`):**
 
-1. The design doc for bug-fix is `01-root-cause.md` (not `01-plan.md`). The plan-reviewer reads `01-root-cause.md` instead of `01-plan.md` when `type: fix`.
+1. The design doc for bug-fix is `01-root-cause.md` (not `01-plan.md`). The plan-reviewer reads `01-root-cause.md` **in addition to** `01-plan.md` when `type: fix` — `01-root-cause.md` is the design doc Rule 7 audits, while `01-plan.md` (§ Task List) is still read for Rule 8's regression-test cross-reference and the shape rules.
 2. `01-root-cause.md` MUST contain a `## Regression Test Approach` section with three required sub-fields:
    - `Test layer:` — value MUST be one of `unit | integration | e2e`. **The legacy `manual-repro-script` value is rejected per operator override; if present, this is a Rule 7 fail finding with reason "manual-repro-script fallback rejected — operator override mandates regression test always."**
    - `Test scaffold:` — non-empty description of fixtures, mocks, or environment needed.
@@ -597,6 +627,8 @@ for line in 01-plan.md.lines:
 
 ## Session Documentation
 
+**AC reference convention.** `01-plan.md § Task List` is the single canonical statement of AC text (`docs/output-contract-patterns.md`) — this generalizes `agents/qa.md:301`'s verify-packet AC-avoidance pattern. Rule 2 findings and any other reference to a task's AC in `reviews/01-plan-review.md` cite the `AC-N` identifier + `01-plan.md:{line}` location, never the requirement text itself. **Iteration re-narration ban:** patch/verify round narratives live only in `failure-brief.md` (`docs/output-contract-patterns.md § 5`); `## Panel Rounds` and the carried-forward sub-verdicts above reference a round by number, never retell what happened in it.
+
 **Document format:** `reviews/01-plan-review.md` is an agentic-tier document (see `docs/conventions.md § Document classification`) — a fixed skeleton of anchored sections, tables and labels, no `## Review Summary`/`## Technical Detail` split obligation.
 
 Write your output to `workspaces/{feature-name}/reviews/01-plan-review.md`. If the file does not exist, create it with the full skeleton below (`pending` placeholders for the sections you do not own) before filling your own. Rewrite the `## Plan Review` header, `## Summary`, `## Findings`, `## Recommendation to orchestrator`, and `**Combined verdict:**` in place — never append a second copy. Preserve-in-place the `## Plan Ratification (Phase 1.5)` and `## Security Design-Review` sections owned by `qa-plan` and `security`. Append one row to `## Panel Rounds` per round. No iteration history inside the `## Plan Review` section itself (the section is itself subject to the consolidated-documents rule). Additionally, replace the `**Reviews:**` attestation line in `01-plan.md`'s title block in place — this is the only write you make to `01-plan.md`.
@@ -751,6 +783,59 @@ A label that is expected but absent means the panel is incomplete. The combined 
 - `plan-reviewer` is the sole owner and writer of this roll-up. STAGE-GATE-1 reads the `**Combined verdict:**` (the roll-up), not the individual plan-reviewer shape sub-verdict.
 
 **Zero side-files.** `plan-reviewer` MUST NOT create any parallel correction file in the workspace root (`01-plan-review.md`, `*-review.md`, `qa-reports/`, etc.) in either the Phase 1.6 pipeline context or the direct-mode panel context. The single canonical container for all panel output is `reviews/01-plan-review.md` — that path is not a "side-file"; it is the designated single-writer-per-section review artifact all three panel reviewers write to.
+
+---
+
+## Stage-1 Selective Panel Re-Firing (delta-scoped review + carried-forward verdicts)
+
+> Canonical contract: `docs/patch-mode.md § Stage-1 Selective Panel Re-Firing`. Wired by
+> `agents/orchestrator.md § "Correction-classification — selective panel re-firing"`. This section
+> documents your half of the mechanism — how you behave when re-fired with a `Correction scope:`
+> dispatch, and how you compute the combined verdict when fewer than all lenses re-fire.
+
+### Delta-scoped review — the `Correction scope:` field
+
+When the orchestrator re-fires you as part of a routed correction (buckets 1-3 of the correction
+classifier), your dispatch carries a `**Correction scope:** localized {AC-IDs, section-names} |
+structural` field. For a `localized` scope, review ONLY the named changed AC/section + its blast
+radius — treat every other, already-passed AC/section as **frozen/trusted**: do not re-read it, do
+not re-run any rule against it, do not re-list it as a fresh finding. A `structural` scope re-reviews
+the whole plan exactly as a first-round dispatch does. You still read `01-plan.md` and the
+correction text at dispatch start — the saving is fewer generation tokens and fewer re-read
+sections, never zero-read (`docs/patch-mode.md § Stateless-Dispatch Honesty`).
+
+### Carried-forward sub-verdicts
+
+When fewer than all three lenses re-fire, preserve the non-firing lenses' most recent sub-verdict
+AND open-findings ledger in `reviews/01-plan-review.md`, labeled EXPLICITLY:
+
+```
+(carried forward from round N — surface unchanged this round)
+```
+
+— never silently presented as fresh. This applies equally to `**Substance (qa):**` and `**Security
+design-review (security):**` when either lens does not re-fire this round.
+
+### Combined-verdict recomputation
+
+Recompute `**Combined verdict:**` as **worst-of over {fresh sub-verdicts} ∪ {carried-forward
+sub-verdicts}**, preserving each lens's own severity→verdict mapping (a carried `security`
+`risks-found` still maps to `fail`; a carried `qa` `fail` still maps to `fail`). Never recompute from
+fresh sub-verdicts alone when a carried-forward one exists — the worst-of union always includes
+both sets.
+
+**`security` is NEVER carried forward on a security-surface touch (fail-safe, non-negotiable).**
+When the correction touched the security-relevant surface (bucket 2 of the correction classifier —
+a floor, a waiver, an enforcement model, a sensitive-path control, a security/adversary dispatch
+condition, or any AC that gates access), the orchestrator always dispatches a fresh `security` run;
+you never label a `security` sub-verdict as carried-forward in that case. This is the Stage-1 analog
+of the existing Phase-3 "security-verdict staleness re-gate" (`agents/orchestrator.md § "If any
+agent fails → ITERATE"`).
+
+**Deterministic-only rounds (buckets 4/5).** When no LLM lens re-fires at all, the orchestrator —
+not you — records the `§ Panel Rounds` row for that round ("deterministic-only pass, all
+sub-verdicts carried forward from round N, combined verdict unchanged"). You are simply not
+dispatched in that case.
 
 ---
 

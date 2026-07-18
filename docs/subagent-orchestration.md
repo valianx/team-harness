@@ -89,7 +89,8 @@ Inviolable gates (annotate `dispatch_handoff.type` to determine which items appl
 - **STAGE-GATE-1** — mandatory human approval before implementation begins. `[all types]`
 - **Phase 1.6 plan-review** — inviolable plan review (`reviews/01-plan-review.md` with `**Combined verdict:**`). `[all types]` — **Note:** the orchestrator does NOT self-execute the plan-review panel inline in nested context. If the `plan-reviewer` Task invocation fails with a nesting refusal, the orchestrator emits a `dispatch_handoff` directed at `th:plan-reviewer`; top-level Claude dispatches the real subagent. The inline-fallback that previously existed in `agents/orchestrator.md` was retired (v2.48+): it pre-dated this protocol, contradicted Dispatch invariant #2 ("no degraded mode"), and could silently skip the security design-review. The same applies to Phase 1.7 (`ux-reviewer`): no inline self-execution — always dispatch_handoff.
 - **Phase 2.0 regression-test-first** — tester authors a failing test before any source change. `[fix/hotfix only]` (Tier 2-4; Tier 1 conditional skip). Read `agents/ref-special-flows.md § Bug-fix Flow` for the full tier system.
-- **Phase 3 verify** — `tester` + `qa` run in parallel. `[all types]`. Security agent also runs (`security-always`): `[fix/hotfix Tier 3+]` (Tier 2 skips unless path-pattern auto-escalation applies). Read `agents/ref-special-flows.md § Tier System` when `type: fix/hotfix`. **When `type` is null in a boot handoff, classify first (see step 4); security defaults to RUN until type is resolved.**
+- **Phase 2.6 code-hygiene scan** — deterministic `git diff` + `grep -E` scan against the canonical pattern set, run before Phase 2.7. `[all types]`. Never skip this gate on the takeover path — see `docs/code-hygiene-gate.md § Layer 1` for the pinned command and the bounded-patch re-dispatch contract on violations.
+- **Phase 3 verify** — `tester` + `qa` run in parallel. `[all types]`. Security agent also runs (`security-always`): `[fix/hotfix Tier 3+]` (Tier 2 skips unless path-pattern auto-escalation applies). Read `agents/ref-special-flows.md § Tier System` when `type: fix/hotfix`. **When `type` is null in a boot handoff, classify first (see step 4); security defaults to RUN until type is resolved.** `qa`'s `code_hygiene: pass | fail` field (`docs/code-hygiene-gate.md § Layer 2`) is a conjunction of the Phase 3 pass condition — a `fail` bounces back to `implementer` even when every AC passes.
 - **Observability** — `00-execution-events.{jsonl|md}` + `00-pipeline-summary.md` + `00-state.md` updated at every phase transition. `[all types]`. Every `phase.end` event MUST include a `tokens` field (integer total). In takeover, `Task()` does not expose `total_tokens` in its result — apply the heuristic (`duration_min × 1500` for opus-heavy phases, `× 800` for sonnet-heavy) and emit `tokens_estimated: true`. The escape `"tokens": 0` is forbidden. Top-level Claude inherits this same fallback from the orchestrator's Phase Transition Protocol (see step 6 below and `agents/orchestrator.md § Phase Transition Protocol`).
 - **Phase 3.5 Acceptance Gate + Phase 3.6 Acceptance Check** — acceptance-checker appends to `reviews/04-validation.md § Drift Analysis`. `[all types]`
 - **STAGE-GATE-3** — mandatory human approval before push; autonomy never covers this gate. `[all types]`
@@ -115,7 +116,7 @@ This rule applies to **every** entry mode: `@th:orchestrator` mention, skill rou
 
 ## Session-Scoped Config Override Protocol
 
-The orchestrator supports per-session overrides of a closed whitelist of config keys. The operator states the override in chat; the orchestrator applies it for that pipeline run only.
+th:leader supports per-session overrides of a closed whitelist of config keys. The operator states the override in chat; th:leader applies it for that pipeline run only.
 
 ### Step order (load-bearing)
 
@@ -144,7 +145,7 @@ Follows `agents/_shared/output-template.md`: silent on success (events file only
 
 ### `/recover` behavior
 
-On recovery, the resolved config is re-read from `00-state.md` § Current State — the chat is not re-parsed. The orchestrator logs `operation.success` with detail `override re-applied from 00-state.md`. If the operator re-states an override during recovery, it is treated as a new session override for the resumed run.
+On recovery, the resolved config is re-read from `00-state.md` § Current State — the chat is not re-parsed. th:leader logs `operation.success` with detail `override re-applied from 00-state.md`. If the operator re-states an override during recovery, it is treated as a new session override for the resumed run.
 
 ### Collision guarantee
 
@@ -171,8 +172,8 @@ On recovery, the resolved config is re-read from `00-state.md` § Current State 
 - Touching `bin/install.sh`, `bin/install.ps1`, or any file under `cmd/install/` → route to `architect` first (installer contract with `~/.claude/` and `~/.claude.json` is load-bearing).
 - Adding/removing an agent → route to `architect` + `agent-builder`; also update `README.md` agent roster and the system diagram.
 - Hook changes or MCP server changes → flag for `security` review (both execute with the user's privileges).
-- Changing the orchestrator pipeline → architecture review mandatory; update `agents/orchestrator.md` + `agents/ref-direct-modes.md` + `agents/ref-special-flows.md` atomically.
+- Changing the orchestrator pipeline → architecture review mandatory; update `agents/leader.md` + `agents/orchestrator.md` + `agents/ref-direct-modes.md` + `agents/ref-special-flows.md` atomically.
 
 ## `blocked-manual-push` Handling
 
-When the `delivery` agent returns `status: blocked-manual-push`, the orchestrator emits a STOP block with the compare URL and `workspaces/{feature}/inputs/pr-body.md` path. The operator opens the PR manually, then replies `pr opened #N`. The orchestrator records the PR number in `00-state.md` and continues to Phase 5. This is distinct from `blocked-no-dispatch`: no auto-takeover, just a manual-action pause. See `agents/_shared/gh-fallback.md` § "`status: blocked-manual-push`" for the full protocol.
+When the `delivery` agent returns `status: blocked-manual-push`, th:orchestrator emits a STOP block with the compare URL and `workspaces/{feature}/inputs/pr-body.md` path. The operator opens the PR manually, then replies `pr opened #N`. th:orchestrator records the PR number in `00-state.md` and continues to Phase 5. This is distinct from `blocked-no-dispatch`: no auto-takeover, just a manual-action pause. See `agents/_shared/gh-fallback.md` § "`status: blocked-manual-push`" for the full protocol.

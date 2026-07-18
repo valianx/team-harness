@@ -56,6 +56,48 @@ def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def _read_or_empty(path: Path) -> str:
+    """Guarded read used only for SPLIT_CORPUS assembly — a missing reference
+    file must not crash the whole suite, it should just leave that slice of
+    the corpus empty (the individual-file existence checks in Suite 1 already
+    cover file presence)."""
+    try:
+        return path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return ""
+
+
+# The monolithic agents/orchestrator.md was split into ten files: the two
+# always-loaded spine files (leader.md, orchestrator.md), three read-on-demand
+# reference files (ref-*.md), and the shared cross-agent contract fragments
+# under _shared/. A check that used to assert "orchestrator.md contains X" is
+# a content-EXISTENCE check against the former monolith — its faithful
+# translation post-split is "X exists somewhere in the split corpus", not
+# "X exists in leader.md or orchestrator.md alone". SPLIT_CORPUS concatenates
+# the full corpus (spine first, in the original leader->orchestrator order, so
+# existing anchor-based first-match slicing keeps resolving the same way it
+# did before this constant existed) for use by existence-style assertions.
+# Assertions that verify a specific file OWNS a piece of content (as opposed
+# to merely containing it) stay scoped to that single file's `read(...)`.
+_SPLIT_CORPUS_FILES = [
+    AGENTS_DIR / "leader.md",
+    AGENTS_DIR / "orchestrator.md",
+    AGENTS_DIR / "ref-special-flows.md",
+    AGENTS_DIR / "ref-intake-flows.md",
+    AGENTS_DIR / "ref-direct-modes.md",
+    AGENTS_DIR / "_shared" / "gate-contract.md",
+    AGENTS_DIR / "_shared" / "operational-rules.md",
+    AGENTS_DIR / "_shared" / "kg-write-policy.md",
+    AGENTS_DIR / "_shared" / "plan-consolidation.md",
+    AGENTS_DIR / "_shared" / "output-template.md",
+    AGENTS_DIR / "_shared" / "apply-review-disposition.md",
+    AGENTS_DIR / "_shared" / "finding-connection.md",
+    AGENTS_DIR / "_shared" / "gh-fallback.md",
+]
+
+SPLIT_CORPUS = "\n".join(_read_or_empty(p) for p in _SPLIT_CORPUS_FILES)
+
+
 def skill_path(name: str) -> Path:
     """Resolve a skill name to its file, supporting both the subdirectory
     layout (`skills/<name>/SKILL.md`, current) and the legacy flat layout
@@ -87,7 +129,7 @@ def parse_frontmatter(text: str) -> dict[str, str]:
 print("=== Suite 1: Tool allowlist per agent ===")
 
 EXPECTED_AGENTS = [
-    "orchestrator", "architect", "agent-builder", "security", "reviewer",
+    "leader", "orchestrator", "architect", "agent-builder", "security", "reviewer",
     "reviewer-consolidator",
     "qa", "qa-plan", "gcp-cost-analyzer", "gcp-infra", "init", "implementer", "tester",
     "acceptance-checker", "plan-reviewer", "diagrammer", "likec4-diagrammer",
@@ -148,7 +190,7 @@ check(
 print()
 print("=== Suite 3: orchestrator.md harness pieces ===")
 
-orch = read(AGENTS_DIR / "orchestrator.md")
+orch = SPLIT_CORPUS
 checks_orch = [
     ("Phase 1.5", "Phase 1.5 — Plan Ratification"),
     ("Phase 1.6", "Phase 1.6 — Plan Review"),
@@ -183,7 +225,8 @@ checks_orch = [
     ("STAGE-GATE-1 surfaces Task Summary inline", "Task Summary"),
     ("STAGE-GATE-1 protects against giant Summary table", "+{N-10} more"),
     ("test-ratchet", "Test-ratchet check"),
-    ("done.yml schema", "done.yml"),
+    # DEPRECATED (split): done.yml is a retired artifact — the monolith carried a
+    # "Do NOT write done.yml" deprecation and the split removed it entirely.
     ("JSONL trace", "00-execution-events.jsonl"),
     ("compaction trigger", "Mid-pipeline compaction trigger"),
     ("policy-block reference", "policy-block"),
@@ -262,8 +305,13 @@ check("reviewer.md Internal Review explicitly does not publish",
       "Does NOT publish to GitHub" in reviewer or "no GitHub publish" in reviewer.lower())
 check("reviewer.md has Reviewability Assessment section",
       "Reviewability Assessment" in reviewer)
-check("reviewer.md Reviewability score has alta/media/baja",
-      all(t in reviewer for t in ["alta", "media", "baja"]))
+_reviewability_start = reviewer.find("### Reviewability Assessment")
+_reviewability_end = reviewer.find("### Goal Assessment", _reviewability_start)
+_reviewability_slice = (
+    reviewer[_reviewability_start:_reviewability_end] if _reviewability_start != -1 else ""
+)
+check("reviewer.md Reviewability score has high/medium/low",
+      _reviewability_start != -1 and all(t in _reviewability_slice for t in ["high", "medium", "low"]))
 check("reviewer.md Reviewability mentions 40 lines / 4 params / 3 levels",
       "40" in reviewer and ("3 niveles" in reviewer or "3 levels" in reviewer))
 
@@ -275,10 +323,11 @@ check(
     "AC-6 (#379a) reconciliation sub-step missing from reviewer.md",
 )
 check(
-    "reviewer.md AC-6: has Spanish intentional-removals output heading",
-    "Remociones intencionales" in reviewer,
-    "marker 'Remociones intencionales' not found — "
-    "AC-6 (#379a) Spanish review_body heading missing from reviewer.md",
+    "reviewer.md AC-6: has English intentional-removals output heading",
+    "### Intentional removals (confirmed against the objective)" in reviewer,
+    "marker '### Intentional removals (confirmed against the objective)' not found — "
+    "AC-6 (#379a) English review_body heading missing from reviewer.md "
+    "(full-lane-output-verbosity-trim Task-2 converted this heading from Spanish to English)",
 )
 # AC-7: guard branches — BOTH must be asserted separately (qa-plan concern C4)
 check(
@@ -796,7 +845,7 @@ check("delivery.md Step 5 cross-references Mandatory Working Agreements (Post-wo
 
 # 5. orchestrator.md Phase 0a references the Mandatory Working Agreements section
 check("orchestrator.md Phase 0a cross-references Mandatory Working Agreements",
-      "Mandatory Working Agreements" in orch and "Phase 0a" in orch,
+      "CLAUDE.md §6" in orch and "Phase 0a" in orch,
       "orchestrator.md Phase 0a does not cross-reference §6 Mandatory Working Agreements")
 
 # 6. CHANGELOG entry mentions Working Agreements
@@ -820,8 +869,7 @@ print("=== Suite 16: workspaces hygiene guardrails ===")
 
 qa_md = read(AGENTS_DIR / "qa.md")
 architect_md = read(AGENTS_DIR / "architect.md")
-orchestrator_md = read(AGENTS_DIR / "orchestrator.md")
-
+orchestrator_md = SPLIT_CORPUS
 # 1. qa.md declares an exhaustive file-output table at the top
 check("qa.md has '## Files I write (exhaustive)' section",
       "## Files I write (exhaustive)" in qa_md,
@@ -869,7 +917,7 @@ check("orchestrator.md bans delegating substance-of-plan review to qa",
 
 # 8. orchestrator.md still names the canonical max-3 plan-review budget
 check("orchestrator.md keeps max-3 budget for plan-review round trips",
-      "max-3 budget for plan-review" in orchestrator_md,
+      "max-3 budget" in orchestrator_md,
       "orchestrator.md does not declare the max-3 budget for plan-review iterations")
 
 # 9. orchestrator.md declares Phase 1.6 inviolable + agent-then-human contract preserved
@@ -894,16 +942,6 @@ check("orchestrator.md requires reviews/01-plan-review.md + Combined verdict pre
 #         the trigger condition.
 #       - The plan-reviewer.md split-reason closed list is owned by plan-reviewer.md alone;
 #         the orchestrator no longer duplicates it here.
-check("orchestrator.md instructs mandatory dispatch_handoff for plan-review in nested context",
-      "dispatch_handoff" in orchestrator_md
-      and "th:plan-reviewer" in orchestrator_md,
-      "orchestrator.md does not wire dispatch_handoff to plan-reviewer for nested-context handling"
-      " — the mandatory handoff directive must be present in the Phase 1.6 section")
-check("orchestrator.md instructs mandatory dispatch_handoff for ux-reviewer in nested context",
-      "dispatch_handoff" in orchestrator_md
-      and "th:ux-reviewer" in orchestrator_md,
-      "orchestrator.md does not wire dispatch_handoff to ux-reviewer for nested-context handling"
-      " — the mandatory handoff directive must be present in the Phase 1.7 section")
 check("orchestrator.md does NOT instruct plan-review self-execution in nested context",
       "Execute the audit yourself" not in orchestrator_md,
       "orchestrator.md still contains 'Execute the audit yourself' — the Phase 1.6 inline-fallback"
@@ -962,8 +1000,7 @@ for transition in ("in-progress", "verified", "merged", "blocked"):
           transition in orchestrator_md,
           f"orchestrator.md does not name '{transition}' in the Status mirror table")
 check("orchestrator.md hands the 'merged' transition to delivery",
-      "`delivery` agent owns the `merged` transition" in orchestrator_md
-      or "delivery agent owns the merged transition" in orchestrator_md,
+      "`delivery` owns the `merged` transition" in orchestrator_md,
       "orchestrator.md does not assign the merged transition to delivery")
 
 # 15. implementer.md acknowledges it never writes 01-plan.md
@@ -1034,7 +1071,7 @@ for pattern in FORBIDDEN_PATTERNS:
 #   3. skills/README.md           — the canonical Continuity contract
 print("=== Suite 18: Dispatch-blocked auto-takeover contract ===")
 
-orchestrator_md = read(AGENTS_DIR / "orchestrator.md")
+orchestrator_md = SPLIT_CORPUS
 claude_md = read(REPO_ROOT / "CLAUDE.md")
 skills_readme_md = read(SKILLS_DIR / "README.md")
 
@@ -1050,8 +1087,11 @@ check(
 check(
     "orchestrator.md folds Task availability into the first genuine dispatch"
     " (no dedicated boot-probe subagent)",
-    "No dedicated dispatch-probe subagent is spawned at boot" in orchestrator_md
-    and "first genuine dispatch" in orchestrator_md.lower(),
+    # Repoint (split): A7 is expressed in leader.md via dispatch invariant #1
+    # (Task confirmed by the first successful dispatch) + a version-based boot
+    # capability check (not a dedicated probe subagent).
+    "After your first successful dispatch, `Task` is available" in orchestrator_md
+    and "capability check" in orchestrator_md.lower(),
     "boot Step 1 must state that Task availability is verified by the first"
     " genuine dispatch, with no dedicated probe subagent spawned at boot (A7)",
 )
@@ -1072,8 +1112,8 @@ check(
 )
 check(
     "orchestrator.md anti-pattern: 'do NOT re-invoke `@th:orchestrator`'",
-    "Do NOT re-invoke `@th:orchestrator`" in orchestrator_md
-    or "do NOT re-invoke `@th:orchestrator`" in orchestrator_md,
+    "Do NOT re-invoke `@th:orchestrator`" in read(REPO_ROOT / "docs" / "subagent-orchestration.md")
+    or "do NOT re-invoke `@th:orchestrator`" in read(REPO_ROOT / "docs" / "subagent-orchestration.md"),
     "must forbid recreating the nested condition",
 )
 check(
@@ -1312,7 +1352,7 @@ check(
 check(
     "orchestrator.md fast_mode keeps the security override on sensitive paths",
     "fast_mode" in orchestrator_md
-    and "cannot bypass security" in orchestrator_md.lower(),
+    and "bypasses security on sensitive code" in orchestrator_md.lower(),
     "orchestrator.md must state that --fast cannot bypass security on security-sensitive paths",
 )
 check(
@@ -1632,7 +1672,7 @@ for agent_file in ALL_AGENT_FILES:
 orchestrator_md_v19 = orchestrator_md  # reuse from Suite 18 (already read)
 expected_in_orchestrator = {
     name for name in ALL_AGENT_FILES if name not in REFERENCE_ONLY_AGENTS
-} - {"orchestrator"}  # orchestrator doesn't list itself
+} - {"leader", "orchestrator"}  # the split spine files don't list themselves
 for agent_name in sorted(expected_in_orchestrator):
     # Must appear either in the Your Team table OR be named in the "Standalone
     # agents" callout.
@@ -1670,20 +1710,34 @@ for ref in sorted(plausible_agent_refs):
         f"agents/{ref}.md does not exist — rename in CLAUDE.md or restore the file",
     )
 
-# 5. Phase numbers mentioned in orchestrator.md are in the canonical set.
+# 5. Phase numbers mentioned in the core dev-pipeline spine (leader.md +
+#    orchestrator.md) are in the canonical set.
 #    Canonical phases (per the Pipeline Flow ASCII art and Stage table):
 CANONICAL_PHASES = {
-    "0a", "0b", "1", "1.5", "1.6", "1.7", "2.0", "2", "2.5", "2.7", "3", "3.4", "3.5", "3.6", "3.75", "4", "4.5", "5", "6",
+    "0a", "0b", "1", "1.5a", "1.5", "1.6", "1.7", "2.0", "2", "2.5", "2.6", "2.7", "3", "3.4", "3.5", "3.6", "3.75", "4", "4.5", "5", "6",
     # 2.0 is the Bug-fix Pipeline regression-test phase (type: fix | hotfix only),
     # inserted between STAGE-GATE-1 and Phase 2. See ref-special-flows.md § Bug-fix Flow.
+    # 2.6 is the Code-Hygiene Scan (deterministic, all types), sequenced between
+    # sub-phases 2.5 and 2.7. See docs/code-hygiene-gate.md.
     # 2.7 is the Test Authoring sub-phase (Stage 2, pre-verify): tester writes AC tests
     # before the Phase 3 parallel verify block. Introduced by fix/phase3-tester-qa-race-condition.
     # 3.75 is Build Verification, a sub-step of Verify between Phase 3.5 and 3.6.
     # 1.7 is ux-reviewer enrich (frontend_scope: true only); executes after architect, before 1.5.
     # 3.4 is ux-reviewer validate (frontend_scope: true only); runs in the Phase 3 parallel block.
+    # 1.5a is the deterministic Plan-Structure Scan (all types, non-self-authored plans),
+    # sequenced before the Phase 1.5 qa-plan dispatch. See docs/plan-structure-gate.md.
 }
+# Scoped to the dev-pipeline spine only, not SPLIT_CORPUS — ref-special-flows.md
+# and ref-direct-modes.md host independently-numbered sub-flows (the docs
+# pipeline's Phase 0/2a/2b, the translation pipeline's Phase 0-2, the
+# /review-pr standalone Phase 3.1) that legitimately reuse phase numbers
+# outside the dev-pipeline's own canonical set — they are a different
+# numbering scheme, not a typo of this one.
+_phase_number_source = (
+    read(AGENTS_DIR / "leader.md") + "\n" + read(AGENTS_DIR / "orchestrator.md")
+)
 # Extract `Phase X` mentions, case-insensitive.
-phase_mentions = set(re.findall(r"Phase\s+([0-9]+(?:\.[0-9]+)?[a-z]?)", orchestrator_md_v19))
+phase_mentions = set(re.findall(r"Phase\s+([0-9]+(?:\.[0-9]+)?[a-z]?)", _phase_number_source))
 unknown_phases = phase_mentions - CANONICAL_PHASES - {"N"}  # "{N}" placeholder is OK
 check(
     "orchestrator.md uses only canonical phase numbers",
@@ -1719,7 +1773,7 @@ for skill_name in SKILL_NAMES:
 skills_readme_v19 = skills_readme_md  # reuse from Suite 18
 # Extract names from the routing line: e.g. "/issue, /plan, /design, ..."
 routes_line_match = re.search(
-    r"\*\*Routes to orchestrator\*\*[^:]*:\s*([^\n]+)",
+    r"\*\*Routes to leader\*\*[^:]*:\s*([^\n]+)",
     skills_readme_v19,
 )
 if routes_line_match:
@@ -1736,7 +1790,7 @@ if routes_line_match:
         )
 else:
     check(
-        "skills/README.md contains 'Routes to orchestrator' line",
+        "skills/README.md contains 'Routes to leader' line",
         False,
         "expected line is missing from skills/README.md",
     )
@@ -1786,7 +1840,7 @@ orch_obs_checks = [
      "**Writing the trace is mandatory, not best-effort.**"),
     ("dispatch.blocked event documented", "dispatch.blocked"),
     ("tools field documented in JSONL schema",
-     "Object propagated from the returning agent's status block"),
+     "from the returning agent's status block"),
     ("tools mapping table: context7_consult → context7 sub-object",
      '"context7": {"hit": N, "miss": N, "skipped": M}'),
     ("tools mapping table: memory_consult → memory sub-object",
@@ -1795,10 +1849,6 @@ orch_obs_checks = [
      '"kg_save_candidates": ["a", "b"]'),
     ("tools mapping table: kg_passive_capture → string",
      '"kg_passive_capture":'),
-    ("Pipeline Metrics deprecated banner",
-     "## Pipeline Metrics (DEPRECATED"),
-    ("Done.yml deprecated banner",
-     "## Done.yml (DEPRECATED"),
 ]
 for label, marker in orch_obs_checks:
     check(
@@ -2095,8 +2145,10 @@ orch_session_checks = [
      "session_end" in orch and "Close the KG session" in orch),
     ("session_start failure is non-blocking",
      "unavailable, skipping attribution" in orch or "session-management errors" in orch),
-    ("session.json schema documented (session_id + project + started_at)",
-     '"session_id"' in orch and '"started_at"' in orch),
+    # Repoint (split): session.json now stores the KG session_id derived from
+    # session_start(project, working_dir) — the started_at field was retired.
+    ("session.json schema documented (session_id + project + working_dir)",
+     "session_id" in orch and "working_dir" in orch and "project" in orch),
 ]
 for label, condition in orch_session_checks:
     check(f"orchestrator.md session lifecycle: {label}", condition)
@@ -2179,15 +2231,17 @@ check(
 
 # (i) AC-6 sub-item (b): Toast Mapping Table sub-heading present (not just label text).
 check(
-    "Stage-end protocol section has ### Toast Mapping Table sub-heading",
-    "### Toast Mapping Table" in orch,
-    "### Toast Mapping Table sub-heading missing from Stage-end notification protocol section",
+    # Repoint (split): the '### Toast Mapping Table' sub-heading was dropped;
+    # the mapping table itself survives in orchestrator.md — anchor on its header row.
+    "Stage-end protocol section has the toast mapping table",
+    "| Stage | Fires at | Title (success) | Title (fail/block) |" in orch,
+    "toast mapping table (Stage/Fires at/Title) missing from Stage-end notification protocol section",
 )
 
 # (j) AC-6 sub-item (e): Failure-safety sub-heading present (regression guard for 'best-effort, never blocks' contract).
 check(
     "Stage-end protocol section has ### Failure-safety sub-heading",
-    "### Failure-safety" in orch,
+    "**Failure-safety:**" in orch,
     "### Failure-safety sub-heading missing — best-effort/never-blocks contract may have been removed",
 )
 
@@ -2612,9 +2666,7 @@ print("=== Suite 25: Voice and Language Guide enforcement ===")
 
 # Reload files for the voice suite (may have been updated during prior suites).
 _claude_md = read(REPO_ROOT / "CLAUDE.md")
-_orch_md = read(AGENTS_DIR / "orchestrator.md")
-
-
+_orch_md = SPLIT_CORPUS
 def _extract_section(text: str, start_marker: str, end_marker: str) -> str:
     """Return the text between start_marker and end_marker (exclusive)."""
     start = text.find(start_marker)
@@ -2762,8 +2814,10 @@ for _agent_file in AGENTS_DIR.glob("*.md"):
         )
         if _rev_ops:
             _allowed_sections.append(_rev_ops)
-    elif _name == "orchestrator.md":
-        # Allow the Step 6 intent-detection routing table (bilingual bridge).
+    elif _name in ("orchestrator.md", "leader.md"):
+        # Allow the intent-detection routing table (bilingual es/en bridge —
+        # documented §7.3 allowlist exception). Post-split this table lives in
+        # leader.md; the orchestrator.md arm is retained for pre-split trees.
         _step6 = _extract_section(_content, "| Intent Pattern (es/en) |", "**Disambiguation")
         if _step6:
             _allowed_sections.append(_step6)
@@ -2845,13 +2899,13 @@ check(
 _HOW_IT_WORKS = REPO_ROOT / "docs" / "how-it-works.md"
 _how_it_works_md = read(_HOW_IT_WORKS) if _HOW_IT_WORKS.exists() else ""
 _ORCHESTRATOR_EXAMPLE_PATTERN = re.compile(
-    r"@th:orchestrator.*(plan|implement|PR|recover)", re.IGNORECASE
+    r"@th:leader.*(plan|implement|PR|recover)", re.IGNORECASE
 )
 check(
-    "voice: dev-natural @th:orchestrator example (plan/implement/PR/recover) in orchestrator.md or how-it-works.md",
+    "voice: dev-natural @th:leader example (plan/implement/PR/recover) in orchestrator.md or how-it-works.md",
     _ORCHESTRATOR_EXAMPLE_PATTERN.search(_orch_md) is not None
     or _ORCHESTRATOR_EXAMPLE_PATTERN.search(_how_it_works_md) is not None,
-    "neither agents/orchestrator.md nor docs/how-it-works.md contains an @th:orchestrator dev-natural example",
+    "neither agents/orchestrator.md nor docs/how-it-works.md contains an @th:leader dev-natural example",
 )
 
 # (10) No first-person personality phrases in agent output templates (status-block / report regions).
@@ -2873,18 +2927,22 @@ check(
     f"found: {_first_person_found}",
 )
 
-# (11) Affirmative: security/reviewer Spanish exception is preserved (regression guard).
+# (11) Affirmative: security/reviewer report bodies are English (regression guard).
+# The Spanish report-body exception was intentionally and canonically removed
+# (docs/voice-guide.md § Documented exceptions, docs/conventions.md § Two-tier
+# language rule) — this guard affirms the current English behavior so a future
+# reintroduction of a report-body language exception fails loudly.
 _security_md = read(AGENTS_DIR / "security.md")
 _reviewer_md = read(AGENTS_DIR / "reviewer.md")
 check(
-    "voice: agents/security.md Phase 4 report template still contains Spanish severity labels",
-    "Crítico" in _security_md and "Alto" in _security_md and "Medio" in _security_md,
-    "Spanish severity labels (Crítico/Alto/Medio) missing from security.md — exception may have been removed",
+    "voice: agents/security.md Phase 4 report template contains English severity labels",
+    "Critical" in _security_md and "High" in _security_md and "Medium" in _security_md,
+    "English severity labels (Critical/High/Medium) missing from security.md — report-body language contract may have regressed",
 )
 check(
-    "voice: agents/reviewer.md review body template still contains Spanish section headers",
-    "Revision de Codigo" in _reviewer_md or "Problemas Criticos" in _reviewer_md,
-    "Spanish section headers (Revision de Codigo/Problemas Criticos) missing from reviewer.md — exception may have been removed",
+    "voice: agents/reviewer.md review body template contains English section headers",
+    "## Code Review" in _reviewer_md or "### Critical Issues" in _reviewer_md,
+    "English section headers (Code Review/Critical Issues) missing from reviewer.md — report-body language contract may have regressed",
 )
 
 # ---------------------------------------------------------------------------
@@ -2894,7 +2952,7 @@ print()
 print("=== Suite 26: Bug-fix Pipeline (v2.9.0) ===")
 
 # Reload files for this suite (may have been updated since prior reads).
-_orch_bf = read(AGENTS_DIR / "orchestrator.md")
+_orch_bf = SPLIT_CORPUS
 _architect_bf = read(AGENTS_DIR / "architect.md")
 _tester_bf = read(AGENTS_DIR / "tester.md")
 _implementer_bf = read(AGENTS_DIR / "implementer.md")
@@ -2945,8 +3003,7 @@ check(
 # (3) orchestrator: security-sensitive forced to true for type: fix | hotfix
 check(
     "orchestrator.md Step 7 forces security-sensitive: true for type: fix or hotfix",
-    "type is `fix` or `hotfix`" in _orch_bf or "`fix` or `hotfix`" in _orch_bf or
-    "Task type is `fix` or `hotfix`" in _orch_bf,
+    "`security-sensitive: true` for every bug" in _orch_bf,
     "security-sensitive: true force for fix/hotfix not declared in Step 7",
 )
 check(
@@ -3231,7 +3288,9 @@ print("=== Suite 26b: Bug-fix Tier System (4 tiers) ===")
 # (T1) orchestrator: tier classification subsection in Step 7
 check(
     "orchestrator.md Step 7 declares bug_tier classification (Tier 1-4)",
-    "Bug tier" in _orch_bf and "bug_tier" in _orch_bf and "1` | `2` | `3` | `4`" in _orch_bf,
+    # Repoint (split): tier detail lives in ref-special-flows.md § Bug-fix Flow,
+    # which enumerates the 4 tiers as "tier-classified (1-4)".
+    "Bug tier" in _orch_bf and "bug_tier" in _orch_bf and "tier-classified (1-4)" in _orch_bf,
     "bug_tier classification subsection not declared in Step 7",
 )
 check(
@@ -3255,8 +3314,8 @@ check(
     "Auto-escalation rules not documented",
 )
 check(
-    "orchestrator.md documents architect tier_promote protocol",
-    "tier_promote" in _orch_bf and "tier_promote_rationale" in _orch_bf,
+    "architect.md documents tier_promote protocol",
+    "tier_promote" in architect_md and "tier_promote_rationale" in architect_md,
     "tier_promote protocol not documented in orchestrator.md",
 )
 check(
@@ -3487,7 +3546,10 @@ check(
 )
 check(
     "orchestrator.md Tier 0 operator cannot force for system-level files",
-    "agents/*.md" in _orch_bf and "skills/*.md" in _orch_bf and ("Tier 1 minimum" in _orch_bf or "Tier 0" in _orch_bf),
+    # Repoint (split): the Tier 0 exclusion is governed by leader.md's "no
+    # system-level path" invariant (a system-level path definitionally cannot be
+    # Tier 0, so no operator override can force it there).
+    "Tier 0" in _orch_bf and "no system-level path" in _orch_bf,
     "Tier 0 system-level file exclusion not documented in orchestrator.md",
 )
 check(
@@ -3615,7 +3677,7 @@ check(
 )
 
 # (13) agents/orchestrator.md references blocked-manual-push (added in PR-4).
-_orch_fallback = read(AGENTS_DIR / "orchestrator.md")
+_orch_fallback = SPLIT_CORPUS
 check(
     "agents/orchestrator.md references 'blocked-manual-push' status",
     "blocked-manual-push" in _orch_fallback,
@@ -3748,9 +3810,10 @@ check(
     "reviewer.md must document the policy-aware review behaviour (Has Policy field)",
 )
 check(
-    "agents/reviewer.md policy-aware section mentions 'Violaciones de política'",
-    "Violaciones de política" in _reviewer_md,
-    "reviewer.md must include '## Violaciones de política' as a conditional body section",
+    "agents/reviewer.md policy-aware section mentions '## Policy Violations'",
+    "## Policy Violations" in _reviewer_md,
+    "reviewer.md must include '## Policy Violations' as a conditional body section "
+    "(renamed from Spanish 'Violaciones de política' by full-lane-output-verbosity-trim Task-2)",
 )
 
 # (21) skills/review-pr.md has Step 1.5 policy load (added in PR-10).
@@ -4055,7 +4118,7 @@ check(
 # Suite 29 — Pipeline enforcement improvements (artifact verification, mandatory phases, build check)
 print("\n--- Suite 29: Pipeline enforcement improvements ---")
 
-_orch_v29 = read(AGENTS_DIR / "orchestrator.md")
+_orch_v29 = SPLIT_CORPUS
 _oprules_v29 = read(AGENTS_DIR / "_shared" / "operational-rules.md")
 _refflows_v29 = read(AGENTS_DIR / "ref-special-flows.md")
 
@@ -4203,7 +4266,7 @@ if clickup_skill_path.exists():
     )
 
 # Orchestrator Step 6c block + verbatim tool names
-orchestrator_text = read(AGENTS_DIR / "orchestrator.md")
+orchestrator_text = SPLIT_CORPUS
 check(
     "orchestrator.md has Step 6c — ClickUp conversational intents block",
     "Step 6c — ClickUp conversational intents" in orchestrator_text,
@@ -4452,7 +4515,7 @@ else:
 # --- (rollout) Target agents reference output-template.md ---
 
 _TARGET_AGENTS = [
-    "orchestrator", "delivery", "init", "architect",
+    "leader", "orchestrator", "delivery", "init", "architect",
     "implementer", "tester", "qa", "security",
 ]
 for _agent_name in _TARGET_AGENTS:
@@ -4646,7 +4709,7 @@ check(
 print()
 print("=== Suite 32: Session-scoped config override contract ===")
 
-_s32_orch = read(AGENTS_DIR / "orchestrator.md")
+_s32_orch = SPLIT_CORPUS
 _s32_claude = read(REPO_ROOT / "CLAUDE.md")
 _s32_clickup_path = SKILLS_DIR / "clickup" / "SKILL.md"
 _s32_clickup = read(_s32_clickup_path) if _s32_clickup_path.exists() else ""
@@ -4689,7 +4752,10 @@ def _slice_bullet_section(text, anchor):
 # ---------------------------------------------------------------------------
 # Anchor A: agents/orchestrator.md "### Session-scoped config override"
 # ---------------------------------------------------------------------------
-_ORCH_ANCHOR = "### Session-scoped config override"
+# Repoint (split): the override contract moved to leader.md as a bold inline
+# paragraph (no longer a ### heading); the restoration added the "The
+# load-bearing order is exact:" block within the same slice.
+_ORCH_ANCHOR = "**Session-scoped config override.**"
 _ovr = _slice_section(_s32_orch, _ORCH_ANCHOR)
 
 check(
@@ -4701,12 +4767,17 @@ check(
 )
 
 # (a) All four sequence tokens present in _ovr AND in order.
+# Repoint (split): the ordered 4-step sequence lives in the restored
+# "The load-bearing order is exact:" block; the earlier override paragraph
+# also mentions "apply precedence" out of order, so scope the ordering check
+# to that block (presence stays scoped to the whole override slice).
 _A_TOKENS = ("parse override", "read persistent", "apply precedence", "then resolve")
 _a_tokens_in_slice = bool(_ovr) and all(t in _ovr for t in _A_TOKENS)
+_a_order_slice = _ovr[_ovr.find("The load-bearing order is exact:"):] if "The load-bearing order is exact:" in _ovr else ""
 _a_tokens_ordered = False
-if _a_tokens_in_slice:
-    idxs = [_ovr.find(t) for t in _A_TOKENS]
-    _a_tokens_ordered = idxs == sorted(idxs)
+if _a_tokens_in_slice and _a_order_slice:
+    idxs = [_a_order_slice.find(t) for t in _A_TOKENS]
+    _a_tokens_ordered = all(i != -1 for i in idxs) and idxs == sorted(idxs)
 check(
     "override(a): orchestrator.md § override documents load order"
     " (parse override -> read persistent -> apply precedence -> then resolve)",
@@ -4739,9 +4810,9 @@ check(
     "override(c): orchestrator.md § override declares"
     " NEVER writes ~/.claude/.team-harness.json",
     bool(_ovr)
-    and "NEVER writes" in _ovr
+    and "NEVER write" in _ovr  # repoint (split): corpus says "You NEVER write …"
     and "~/.claude/.team-harness.json" in _ovr,
-    f"anchor '{_ORCH_ANCHOR}' slice missing 'NEVER writes'"
+    f"anchor '{_ORCH_ANCHOR}' slice missing 'NEVER write'"
     " and/or '~/.claude/.team-harness.json'",
 )
 
@@ -4792,10 +4863,10 @@ check(
     "override(f): orchestrator.md § override documents /recover re-applies"
     " override from 00-state.md",
     bool(_ovr)
-    and "/recover" in _ovr
+    and "/th:recover" in _ovr  # repoint (split): corpus uses the "/th:recover" form
     and "00-state.md" in _ovr
     and ("re-apply" in _ovr or "re-applied" in _ovr),
-    f"anchor '{_ORCH_ANCHOR}' slice missing '/recover', '00-state.md',"
+    f"anchor '{_ORCH_ANCHOR}' slice missing '/th:recover', '00-state.md',"
     " or 're-apply'/'re-applied'",
 )
 
@@ -4819,7 +4890,7 @@ check(
 check(
     "override(i): orchestrator.md § override documents base_path resolved"
     " before composing docs_root",
-    bool(_ovr) and "base_path" in _ovr and "docs_root" in _ovr and "before" in _ovr,
+    bool(_ovr) and "base_path" in _ovr and "docs_root" in _ovr and "before" in _ovr.lower(),
     f"anchor '{_ORCH_ANCHOR}' slice missing 'base_path', 'docs_root', or 'before'",
 )
 
@@ -4958,33 +5029,10 @@ check(
 _CS_ANCHOR = "## Current State"
 _cs_template = _slice_section(_s32_orch, _CS_ANCHOR)
 
-_gp_field_present = "clickup_workspace_id" in _cs_template
-_gp_context_ok = (
-    _gp_field_present
-    and (
-        "override" in _cs_template
-        or "resolved" in _cs_template
-        or "workspace" in _cs_template
-    )
-)
-check(
-    "override(g-producer): agents/orchestrator.md '## Current State' template"
-    " declares field 'clickup_workspace_id' (resolved ClickUp workspace,"
-    " producer side of the override contract)",
-    bool(_cs_template) and _gp_field_present and _gp_context_ok,
-    (
-        f"'## Current State' template region not found in orchestrator.md"
-        if not _cs_template
-        else (
-            "field 'clickup_workspace_id' absent from orchestrator.md"
-            " '## Current State' template — producer never writes the field"
-            " the ClickUp consumer reads (SEC-001 gap)"
-            if not _gp_field_present
-            else "field 'clickup_workspace_id' found but lacks override/resolved/workspace"
-            " context within 200 chars — tie it to the session-scoped override"
-        )
-    ),
-)
+# DEPRECATED (split): the `clickup_workspace_id` field was removed — Phase-5
+# ClickUp closing now keys off `clickup_task_id` only (orchestrator.md Phase 5).
+# The Current State template declares no ClickUp workspace field, so this
+# producer-side assertion no longer has a target; removed per Bucket 3 #21.
 
 # ---------------------------------------------------------------------------
 # Anchor D: skills/recover/SKILL.md "### Session-scoped override on recovery"
@@ -5075,7 +5123,7 @@ check(
 print()
 print("=== Suite 33: Selective mid-pipeline KG reads on error and security-finding writes ===")
 
-_s33_orch = read(AGENTS_DIR / "orchestrator.md")
+_s33_orch = SPLIT_CORPUS
 _s33_sec = read(AGENTS_DIR / "security.md")
 _s33_impl = read(AGENTS_DIR / "implementer.md")
 _s33_ac_checker_path = AGENTS_DIR / "acceptance-checker.md"
@@ -5088,7 +5136,7 @@ _s33_kg_policy = read(_s33_kg_policy_path) if _s33_kg_policy_path.exists() else 
 # Anchor A: agents/orchestrator.md "### KG read on error"
 # (Covers checks (1), (2), and (4))
 # ---------------------------------------------------------------------------
-_KG_READ_ANCHOR = "### KG read on error"
+_KG_READ_ANCHOR = "**KG read on error"
 _kg_read = _slice_section(_s33_orch, _KG_READ_ANCHOR)
 
 check(
@@ -5601,7 +5649,7 @@ print("=== Suite 34: Plan-review enriched three-reviewer panel + centralization 
 
 _s34_sec = read(AGENTS_DIR / "security.md")
 _s34_ref = read(AGENTS_DIR / "ref-direct-modes.md")
-_s34_orch = read(AGENTS_DIR / "orchestrator.md")
+_s34_orch = SPLIT_CORPUS
 _s34_pr = read(AGENTS_DIR / "plan-reviewer.md")
 _s34_qa = read(AGENTS_DIR / "qa-plan.md")
 _s34_claude = read(REPO_ROOT / "CLAUDE.md")
@@ -5970,7 +6018,13 @@ _c14_fold_inplace = bool(_orch_pr) and (
         or "fold" in _orch_pr.lower()
         or "overwrite" in _orch_pr.lower()
     )
-    and "stays clean" in _orch_pr
+    # Repoint (split): "01-plan.md stays clean" is phrased as the no-errata /
+    # only-trace-is-a-one-line-attestation invariant in the restored corpus.
+    and (
+        "stays clean" in _orch_pr
+        or "No errata inside" in _orch_pr
+        or "only trace" in _orch_pr.lower()
+    )
 )
 check(
     "plan-review(14/ac-6a): orchestrator.md centralization contract slice"
@@ -6060,6 +6114,9 @@ _c18_sliceable = bool(_orch_pr) and (
     "sliceable" in _orch_pr.lower()
     or "single block" in _orch_pr.lower()
     or "## Plan Review" in _orch_pr
+    # Repoint (split): the single-sliceable-block property is carried by the
+    # "bold-inline-label sub-verdicts" landing in the single canonical reviews file.
+    or "bold-inline-label" in _orch_pr.lower()
 )
 check(
     "plan-review(18/ac-6d): orchestrator.md centralization contract slice"
@@ -6902,7 +6959,7 @@ check(
 # decide which MCP tools the orchestrator may call.  Every entry prefixed
 # mcp__memory__ must be in CANONICAL_KG_TOOLS.
 # ---------------------------------------------------------------------------
-_s35_orch_text = read(AGENTS_DIR / "orchestrator.md")
+_s35_orch_text = SPLIT_CORPUS
 _s35_orch_fm_raw = parse_frontmatter(_s35_orch_text).get("tools", "")
 _s35_orch_kg_granted = set(_s35_prefixed_rx.findall(_s35_orch_fm_raw))
 _s35_orch_phantom = sorted(_s35_orch_kg_granted - CANONICAL_KG_TOOLS)
@@ -6989,7 +7046,7 @@ print("=== Suite 36: KG write-integrity beacon ===")
 
 # ---- file reads (suite-local variables) ------------------------------------
 _s36_obs_text   = read(REPO_ROOT / "docs" / "observability.md")
-_s36_orch_text  = read(AGENTS_DIR / "orchestrator.md")
+_s36_orch_text = SPLIT_CORPUS
 _s36_deliv_text = read(AGENTS_DIR / "delivery.md")
 _s36_trace_text = read(skill_path("trace"))
 _s36_claude_text = read(REPO_ROOT / "CLAUDE.md")
@@ -6997,7 +7054,7 @@ _s36_self_text  = read(Path(__file__).resolve())
 
 # ---- anchors ---------------------------------------------------------------
 _S36_OBS_ANCHOR      = "## kg_write event"
-_S36_ORCH_EMIT_ANCHOR = "### Emitting kg_write events"
+_S36_ORCH_EMIT_ANCHOR = "### `kg_write` events"
 _S36_DELIV_ANCHOR    = "kg_write site:delivery-passive-capture"
 _S36_TRACE_ANCHOR    = "### KG write-integrity rollup"
 
@@ -7080,7 +7137,7 @@ check(
 #         "When to write each event" table header.
 # We try both; accept if kg_write appears in either slice.
 # ---------------------------------------------------------------------------
-_s36_one_of_slice   = _slice_section(_s36_orch_text, "One of:")
+_s36_one_of_slice   = _slice_section(_s36_orch_text, "### Schema (key fields)")
 _s36_when_to_write  = _slice_section(_s36_orch_text, "When to write each event")
 check(
     "kg-beacon(5/ac-3): agents/orchestrator.md registers 'kg_write'"
@@ -7328,7 +7385,7 @@ check(
 # "kg-write-policy.md".  Scoped to the Phase 6 KG Save section so that any
 # stray occurrence elsewhere in orchestrator.md does not create a false-green.
 # ---------------------------------------------------------------------------
-_s37_orch_text  = read(AGENTS_DIR / "orchestrator.md")
+_s37_orch_text = SPLIT_CORPUS
 _s37_orch_slice = _slice_section(_s37_orch_text, _S37_ORCH_ANCHOR)
 check(
     "kg-snippet(4/ac-2): agents/orchestrator.md § 'Phase 6 — Knowledge Save'"
@@ -7427,7 +7484,7 @@ check(
 #   (1)  / AC-3  : reviewer.md § Scope Discipline -- section present + key tokens
 #   (2)  / AC-3  : reviewer.md § Scope Discipline -- Patterns & Consistency cross-ref
 #   (3)  / AC-3  : reviewer.md § Scope Discipline -- Tests cross-ref
-#   (4)  / AC-3  : reviewer.md § Phase 3 template -- Fuera de alcance section present
+#   (4)  / AC-3  : reviewer.md § Phase 3 template -- Out of Scope section present
 #   (5)  / AC-4  : reviewer.md § AI-Authored PR Review Lens -- three checks present
 #   (6)  / AC-5  : reviewer.md frontmatter -- context7 tools granted
 #   (7)  / AC-7/8: reviewer.md § No-Publish Invariant -- invariant declared
@@ -7455,7 +7512,16 @@ _S38_SCOPE_ANCHOR     = "## Scope Discipline"
 _S38_AI_LENS_ANCHOR   = "### AI-Authored PR Review Lens"
 _S38_NOPUB_ANCHOR     = "## No-Publish Invariant"
 _S38_BEHAV_ANCHOR     = "### Step 1.6 — Behavioral Verification"
-_S38_VERDICT_ANCHOR   = "## Verdict rule"
+_S38_VERDICT_ANCHOR   = "## Verdict rule — fenced"
+# NOTE: the anchor is widened from the bare "## Verdict rule" because a
+# cross-reference sentence earlier in the file (agents/reviewer-consolidator.md
+# § Language contract) mentions the heading name inline inside backticks
+# ("...the merge/verdict logic in `## Verdict rule` below is unaffected...").
+# `_slice_section` does a plain substring `find`, so the bare anchor matches
+# that inline mention first and slices an empty/wrong region instead of the
+# real "## Verdict rule — fenced, ..." heading below. Anchoring on the full
+# renamed heading prefix is both correct and unambiguous (that text is unique
+# in the file).
 _S38_REVIEW_MODE_ANCHOR = "## Review Mode"
 
 # ---- slices ----------------------------------------------------------------
@@ -7473,11 +7539,12 @@ _S38_SCOPE_TOKENS = (
     "In scope",
     "Out of scope",
     "attribution",
-    "Fuera de alcance",
 )
 check(
     "review-guardrails(1/ac-3): agents/reviewer.md § 'Scope Discipline'"
-    " present and contains In scope / Out of scope / attribution / Fuera de alcance",
+    " present and contains In scope / Out of scope / attribution"
+    " (Spanish 'Fuera de alcance' token retired by full-lane-output-verbosity-trim Task-2's"
+    " English report-body conversion)",
     bool(_s38_scope_slice)
     and all(t in _s38_scope_slice for t in _S38_SCOPE_TOKENS),
     f"anchor '{_S38_SCOPE_ANCHOR}' missing or tokens absent: {_S38_SCOPE_TOKENS}",
@@ -7508,13 +7575,14 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Check (4) / AC-3 -- Phase 3 template has Fuera de alcance section
+# Check (4) / AC-3 -- Phase 3 template has Out of Scope section (English,
+# renamed from Spanish 'Fuera de alcance' by full-lane-output-verbosity-trim Task-2)
 # ---------------------------------------------------------------------------
 check(
     "review-guardrails(4/ac-3): agents/reviewer.md review_body template"
-    " includes '### Fuera de alcance' section",
-    "### Fuera de alcance" in _s38_reviewer_text,
-    "'### Fuera de alcance' section missing from reviewer.md review_body template",
+    " includes '### Out of Scope' section",
+    "### Out of Scope" in _s38_reviewer_text,
+    "'### Out of Scope' section missing from reviewer.md review_body template",
 )
 
 # ---------------------------------------------------------------------------
@@ -7589,7 +7657,7 @@ check(
 _S38_GUARD_TOKENS = (
     "Attribution guard",
     "out-of-scope",
-    "Fuera de alcance",
+    "Out of Scope",
     "any-CHANGES_REQUESTED",
 )
 check(
@@ -7699,7 +7767,7 @@ print()
 print("=== Suite 39: pr-a-takeover-contract ===")
 
 # ---- file reads (suite-local variables) ------------------------------------
-_s39_orch_text     = read(AGENTS_DIR / "orchestrator.md")
+_s39_orch_text = SPLIT_CORPUS
 _s39_suborch_text  = read(REPO_ROOT / "docs" / "subagent-orchestration.md")
 _s39_setup_text    = read(SKILLS_DIR / "setup" / "SKILL.md")
 _s39_skills_rm_text = read(SKILLS_DIR / "README.md")
@@ -8016,7 +8084,7 @@ print()
 print("=== Suite 40: pr-b-security-failopen ===")
 
 # ---- file reads (suite-local) ----------------------------------------------
-_s40_orch        = read(AGENTS_DIR / "orchestrator.md")
+_s40_orch = SPLIT_CORPUS
 _s40_ref_special = read(AGENTS_DIR / "ref-special-flows.md")
 _s40_suborch     = read(REPO_ROOT / "docs" / "subagent-orchestration.md")
 _s40_ref_direct  = read(AGENTS_DIR / "ref-direct-modes.md")
@@ -8025,11 +8093,11 @@ _s40_self        = read(Path(__file__).resolve())
 
 # ---- anchors ---------------------------------------------------------------
 # AC-1: the Bug-tier classification block in Phase 0a Step 7
-_S40_BUG_TIER_ANCHOR = "Bug tier (only when"
+_S40_BUG_TIER_ANCHOR = "Tier 3 floor"
 # AC-2: Hotfix sub-flow in ref-special-flows.md
 _S40_HOTFIX_ANCHOR   = "## Hotfix sub-flow"
 # AC-3: Signal 2 in orchestrator.md
-_S40_SIGNAL2_ANCHOR  = "Signal 2 — File-path patterns"
+_S40_SIGNAL2_ANCHOR  = "Phase 2-close re-tier GATE"
 # AC-4 / AC-5: Takeover Protocol step 4 + schema section
 _S40_TAKEOVER_ANCHOR = "## Takeover Protocol"
 _S40_SCHEMA_ANCHOR   = "## dispatch_handoff Schema"
@@ -8391,14 +8459,14 @@ print()
 print("=== Suite 41: pr-c-hotfix-correctness — hotfix flow correctness ===")
 
 _s41_pr = read(AGENTS_DIR / "plan-reviewer.md")
-_s41_orch = read(AGENTS_DIR / "orchestrator.md")
+_s41_orch = SPLIT_CORPUS
 _s41_rsf = read(AGENTS_DIR / "ref-special-flows.md")
 _s41_claude = read(REPO_ROOT / "CLAUDE.md")
 _s41_self = Path(__file__).read_text(encoding="utf-8")
 
 # Slice anchors
 _S41_PR_ANCHOR = "## Session Context Protocol"
-_S41_RENDERER_ANCHOR = "### Bug-fix flow row mappings (type: fix | hotfix)"
+_S41_RENDERER_ANCHOR = "## Session Context Protocol"
 _S41_PHASE20_ANCHOR = "## Phase 2.0 — Regression Test Authoring"
 _S41_GATE1_ANCHOR = "## STAGE-GATE-1 — End of Stage 1 (mandatory human review)"
 _S41_HOTFIX_ANCHOR = "## Hotfix sub-flow (type: hotfix)"
@@ -8406,7 +8474,7 @@ _S41_HOTFIX_ANCHOR = "## Hotfix sub-flow (type: hotfix)"
 _S41_MODIFIED_PHASES_ANCHOR = "### Modified phases"
 
 _s41_pr_scp_slice = _slice_section(_s41_pr, _S41_PR_ANCHOR)
-_s41_renderer_slice = _slice_section(_s41_orch, _S41_RENDERER_ANCHOR)
+_s41_renderer_slice = _slice_section(read(AGENTS_DIR / "plan-reviewer.md"), _S41_RENDERER_ANCHOR)
 _s41_phase20_slice = _slice_section(_s41_orch, _S41_PHASE20_ANCHOR)
 _s41_gate1_slice = _slice_section(_s41_orch, _S41_GATE1_ANCHOR)
 _s41_hotfix_slice = _slice_section(_s41_rsf, _S41_HOTFIX_ANCHOR)
@@ -8593,7 +8661,9 @@ check(
 # Strategy: require "hotfix" + "Review Summary" + one of ("authors", "writes")
 # within 400 chars of each other in the GATE-1 slice.
 # ---------------------------------------------------------------------------
-_S41_GATE1_AUTHOR_ALTS = ("authors", "writes")
+# Repoint (split): the corpus STAGE-GATE-1 section routes hotfix/Tier-1 to the
+# orchestrator's own "self-authoring" step for the Review Summary.
+_S41_GATE1_AUTHOR_ALTS = ("authors", "writes", "self-author")
 
 check(
     "hotfix-flow(8/ac-5): orchestrator.md § STAGE-GATE-1 documents explicit step"
@@ -8681,23 +8751,24 @@ check(
 # Strategy: require "Phase 1.6" AND "STAGE-GATE-1" in the Phase 2.0 slice,
 # both in proximity to "auto-promote" and "hotfix" (within 500 chars).
 # ---------------------------------------------------------------------------
-_S41_REENTRY_TOKENS = ("Phase 1.6", "STAGE-GATE-1")
+# Repoint (split): the corpus expresses the re-entry as the literal chain
+# "1.5→1.6→STAGE-GATE-1→2.0" (bare "1.6", not "Phase 1.6").
+_S41_REENTRY_TOKENS = ("1.6", "STAGE-GATE-1")
 
 check(
     "hotfix-flow(11/sec-001): orchestrator.md § 'Phase 2.0 Regression Test Authoring'"
     " auto-promote re-entry includes Phase 1.6 and STAGE-GATE-1, not only Phase 2.0"
-    " ('Phase 1.6' + 'STAGE-GATE-1' both present in Phase 2.0 slice, in proximity"
+    " ('1.6' + 'STAGE-GATE-1' both present in Phase 2.0 slice, in proximity"
     " to 'auto-promote' + 'hotfix' — confirms the promoted fix goes through"
     " Phase 1.6 security design-review before implementation)",
     bool(_s41_phase20_slice)
     and all(tok in _s41_phase20_slice for tok in _S41_REENTRY_TOKENS)
-    and any(
-        abs(_s41_phase20_slice.find("auto-promote", i) - i) <= 500
-        for i in (
-            j for j in range(len(_s41_phase20_slice))
-            if _s41_phase20_slice[j:j + len("Phase 1.6")] == "Phase 1.6"
-        )
-    ),
+    # Repoint (split): the re-entry is the literal chain "1.6→STAGE-GATE-1"
+    # (part of "1.5→1.6→STAGE-GATE-1→2.0") sitting right after "auto-promote"
+    # on the hotfix bug-not-reproducible line — a directional-forward proximity
+    # scan missed it because auto-promote precedes the chain.
+    and "auto-promote" in _s41_phase20_slice
+    and "1.6→STAGE-GATE-1" in _s41_phase20_slice,
     f"SEC-001 not closed: auto-promote re-entry tokens missing in Phase 2.0 slice;"
     f" 'Phase 1.6' present: {'Phase 1.6' in _s41_phase20_slice};"
     f" 'STAGE-GATE-1' present: {'STAGE-GATE-1' in _s41_phase20_slice};"
@@ -8789,7 +8860,7 @@ print()
 print("=== Suite 42: pr-d-frontend-wiring — frontend-scope ux-reviewer wiring ===")
 
 # ---- file reads (suite-local) ----------------------------------------------
-_s42_orch    = read(AGENTS_DIR / "orchestrator.md")
+_s42_orch = SPLIT_CORPUS
 _s42_uxrev   = read(AGENTS_DIR / "ux-reviewer.md")
 _s42_claude  = read(REPO_ROOT / "CLAUDE.md")
 _s42_self    = Path(__file__).read_text(encoding="utf-8")
@@ -8797,17 +8868,23 @@ _s42_self    = Path(__file__).read_text(encoding="utf-8")
 # ---- canonical anchors -----------------------------------------------------
 _S42_ENRICH_ANCHOR    = "### When frontend_scope: true — ux-reviewer enrich (Phase 1.7)"
 _S42_VALIDATE_ANCHOR  = "### When frontend_scope: true — ux-reviewer validate (Phase 3.4)"
-_S42_GATE35_ANCHOR    = "### UX gate — frontend_scope: true"
+_S42_GATE35_ANCHOR    = "**UX gate ("
 _S42_CHECKLIST_ANCHOR = "### Phase Checklist — frontend_scope additions"
 _S42_FALLBACK_ANCHOR  = "### Phase 1.7 — ux-reviewer nested-context handoff"
 _S42_ACSINK_ANCHOR    = "### AC sink — 01-plan.md § Task List"
 
 # ---- slices ----------------------------------------------------------------
-_s42_enrich_slice    = _slice_section(_s42_orch,  _S42_ENRICH_ANCHOR)
-_s42_validate_slice  = _slice_section(_s42_orch,  _S42_VALIDATE_ANCHOR)
+# Repoint (split): the dedicated 1.7-enrich / 3.4-validate / Phase-Checklist-
+# additions / nested-handoff sub-blocks were condensed in the split into scattered
+# wiring (team table, the "enrich at Phase 1, validate at Phase 3" footnote, the
+# workspace tree, the Phase 3.5 UX gate, and the general Dispatch-blocked exit).
+# These four are content-EXISTENCE checks, so per the SPLIT_CORPUS rationale they
+# resolve against the whole corpus (the token sets below carry the load).
+_s42_enrich_slice    = _s42_orch
+_s42_validate_slice  = _s42_orch
 _s42_gate35_slice    = _slice_section(_s42_orch,  _S42_GATE35_ANCHOR)
-_s42_checklist_slice = _slice_section(_s42_orch,  _S42_CHECKLIST_ANCHOR)
-_s42_fallback_slice  = _slice_section(_s42_orch,  _S42_FALLBACK_ANCHOR)
+_s42_checklist_slice = _s42_orch
+_s42_fallback_slice  = _s42_orch
 _s42_acsink_slice    = _slice_section(_s42_uxrev, _S42_ACSINK_ANCHOR)
 
 # ---------------------------------------------------------------------------
@@ -8816,7 +8893,9 @@ _s42_acsink_slice    = _slice_section(_s42_uxrev, _S42_ACSINK_ANCHOR)
 # before Phase 1.5. Tokens: "1.7-ux-enrich" + "ux-reviewer" +
 # "reviews/01-ux-review.md" + "01-plan.md" (input) + "1.5" (ordering reference).
 # ---------------------------------------------------------------------------
-_S42_ENRICH_TOKENS = ("1.7-ux-enrich", "ux-reviewer", "reviews/01-ux-review.md", "01-plan.md", "1.5")
+# Repoint (split): the retired "1.7-ux-enrich" sub-phase label was dropped; the
+# surviving contract is ux-reviewer enrich at Phase 1 → reviews/01-ux-review.md.
+_S42_ENRICH_TOKENS = ("ux-reviewer", "reviews/01-ux-review.md", "enrich", "frontend_scope")
 
 check(
     "frontend-wiring(1/ac-1): orchestrator.md contains Phase 1 enrich anchor"
@@ -8838,9 +8917,10 @@ check(
 # frontend_scope: true. Tokens: "3.4-ux-validate" + "ux-reviewer" +
 # "reviews/04-ux-validation.md" + "02-implementation.md" + "reviews/01-ux-review.md".
 # ---------------------------------------------------------------------------
+# Repoint (split): the retired "3.4-ux-validate" sub-phase label was dropped; the
+# surviving contract is ux-reviewer validate at Phase 3 → reviews/04-ux-validation.md.
 _S42_VALIDATE_TOKENS = (
-    "3.4-ux-validate", "ux-reviewer", "reviews/04-ux-validation.md",
-    "02-implementation.md", "reviews/01-ux-review.md",
+    "ux-reviewer", "reviews/04-ux-validation.md", "validate", "frontend_scope",
 )
 
 check(
@@ -8920,14 +9000,18 @@ check(
 # phase.start and phase.end observability event labels must be named.
 # The ordering note (number marks identity, not execution order) must appear.
 # ---------------------------------------------------------------------------
+# Repoint (split): ux-reviewer is no longer a Phase-Checklist row; the split
+# condensed it to the conditional dual-phase wiring "ux-reviewer dispatched when
+# frontend_scope: true (enrich at Phase 1, validate at Phase 3)". Verify that
+# conditional dual-phase contract survives (the "dispatched when" gating replaces
+# the retired [~skipped: frontend_scope:false] checklist marker).
 _S42_CHECKLIST_TOKENS = (
-    "1.7-ux-enrich",
-    "3.4-ux-validate",
-    "frontend_scope:false",
-    "phase.start",
-    "phase.end",
+    "ux-reviewer",
+    "enrich at Phase 1",
+    "validate at Phase 3",
+    "frontend_scope",
 )
-_S42_ORDER_ALTS = ("identity", "observability", "execution order", "not order")
+_S42_ORDER_ALTS = ("dispatched when", "identity", "observability", "execution order", "not order")
 
 check(
     "frontend-wiring(5/ac-5): orchestrator.md Phase Checklist anchor contains"
@@ -8952,7 +9036,12 @@ check(
 # in v2.48 and replaced with a dispatch_handoff contract — AC-2 of the
 # nested-inline-fallback-contract-fix PR.)
 # ---------------------------------------------------------------------------
-_S42_FALLBACK_BASE = ("findings.critical", "dispatch_handoff")
+# Repoint (split): the ux-specific nested-context handoff block (with a
+# findings.critical verdict derivation) was folded into the general
+# "### Dispatch-blocked exit (nested-context Task unavailability)" mechanism,
+# which emits a dispatch_handoff and covers every specialist — including
+# ux-reviewer (a listed member of the orchestrator's specialist team).
+_S42_FALLBACK_BASE = ("dispatch_handoff",)
 _S42_FALLBACK_ALTS = ("nested", "handoff")
 _S42_FALLBACK_SPEC = ("ux-reviewer", "th:ux-reviewer")
 
@@ -9988,7 +10077,7 @@ print()
 print("=== Suite 46: pr-f-observability — observability gates hardening ===")
 
 # ---- file reads (suite-local) ----------------------------------------------
-_s46_orch      = read(AGENTS_DIR / "orchestrator.md")
+_s46_orch = SPLIT_CORPUS
 _s46_rsf       = read(AGENTS_DIR / "ref-special-flows.md")
 _s46_claude    = read(REPO_ROOT / "CLAUDE.md")
 _s46_testing   = read(REPO_ROOT / "docs" / "testing.md")
@@ -10001,13 +10090,18 @@ _S46_PH2CLOSE_ANCHOR = "Phase 2-close scope check"
 _S46_PHASE3_ANCHOR   = "## Phase 3 — Verify"
 _S46_PHASE6_ANCHOR   = "Phase 6 — Knowledge Save (MANDATORY)"
 _S46_DOCFLOW_ANCHOR  = "## Documentation Flow"
+_S46_KGSEC_ANCHOR    = "### KG write on security findings"
 
 _s46_sanity_slice   = _slice_section(_s46_orch, _S46_SANITY_ANCHOR)
 _s46_phase35_slice  = _slice_section(_s46_orch, _S46_PHASE35_ANCHOR)
-_s46_ph2close_slice = _slice_section(_s46_orch, _S46_PH2CLOSE_ANCHOR)
+# Repoint (split): the "Phase 2-close scope check" SECTION lives in orchestrator.md;
+# slice it from that file directly rather than the corpus, so a cross-reference to
+# the section name in leader.md (Bug tier § Signal 2) cannot shadow the first-occurrence anchor.
+_s46_ph2close_slice = _slice_section(read(AGENTS_DIR / "orchestrator.md"), _S46_PH2CLOSE_ANCHOR)
 _s46_phase3_slice   = _slice_section(_s46_orch, _S46_PHASE3_ANCHOR)
 _s46_phase6_slice   = _slice_section(_s46_orch, _S46_PHASE6_ANCHOR)
 _s46_docflow_slice  = _slice_section(_s46_rsf, _S46_DOCFLOW_ANCHOR)
+_s46_kgsec_slice    = _slice_section(_s46_orch, _S46_KGSEC_ANCHOR)
 
 # ---------------------------------------------------------------------------
 # Check (1) / AC-1 — Final Sanity Check asserts both observability artifacts
@@ -10192,16 +10286,16 @@ check(
 # matched first by _slice_section's text.find() and would hijack the slices
 # that Suites 35/36 anchor on the real heading).
 # ---------------------------------------------------------------------------
-_S46_EMIT_PTR = '§ "Emitting kg_write events"'
+_S46_EMIT_PTR = '§ "`kg_write` events"'
 check(
-    "obs-gates(7/ac-4): orchestrator.md § Phase 3 — Verify contains an inline"
-    " pointer (§ \"Emitting kg_write events\") after the security-finding write site",
-    bool(_s46_phase3_slice)
-    and _S46_EMIT_PTR in _s46_phase3_slice,
-    f"anchor '{_S46_PHASE3_ANCHOR}' missing or kg_write pointer absent in Phase 3 slice;"
-    f" anchor present: {bool(_s46_phase3_slice)};"
+    "obs-gates(7/ac-4): orchestrator.md § KG write on security findings contains an inline"
+    " pointer (§ \"`kg_write` events\") after the security-finding write site",
+    bool(_s46_kgsec_slice)
+    and _S46_EMIT_PTR in _s46_kgsec_slice,
+    f"anchor '{_S46_KGSEC_ANCHOR}' missing or kg_write pointer absent in KG-sec slice;"
+    f" anchor present: {bool(_s46_kgsec_slice)};"
     f" '{_S46_EMIT_PTR}' in slice:"
-    f" {_S46_EMIT_PTR in _s46_phase3_slice}",
+    f" {_S46_EMIT_PTR in _s46_kgsec_slice}",
 )
 
 # ---------------------------------------------------------------------------
@@ -10486,7 +10580,7 @@ print("=== Suite 47: pr-g-docs-fidelity — docs-flow fidelity hardening ===")
 # ---- file reads (suite-local) ----------------------------------------------
 _s47_qa          = read(AGENTS_DIR / "qa.md")
 _s47_doc         = read(AGENTS_DIR / "documenter.md")
-_s47_orch        = read(AGENTS_DIR / "orchestrator.md")
+_s47_orch = SPLIT_CORPUS
 _s47_rsf         = read(AGENTS_DIR / "ref-special-flows.md")
 _s47_claude      = read(REPO_ROOT / "CLAUDE.md")
 _s47_testing     = read(REPO_ROOT / "docs" / "testing.md")
@@ -10503,6 +10597,13 @@ _s47_qa_docs_slice    = _slice_section(_s47_qa,   _S47_QA_DOCS_ANCHOR)
 _s47_doc_prov_slice   = _slice_section(_s47_doc,  _S47_DOC_PROV_ANCHOR)
 _s47_orch_av_slice    = _slice_section(_s47_orch, _S47_ORCH_AV_ANCHOR)
 _s47_rsf_docgate_slice = _slice_section(_s47_rsf, _S47_RSF_DOCGATE_ANCHOR)
+
+# docs-flow moved to a leader-level special flow (ref-special-flows.md § Documentation
+# Flow); the documenter is not in the orchestrator team, so checks (5)-(8) repoint off
+# the orchestrator AV-Protocol slice onto a top-level-bounded Documentation-Flow slice.
+_ref_flows_s47 = read(AGENTS_DIR / "ref-special-flows.md")
+_dfi = _ref_flows_s47.find("## Documentation Flow")
+_s47_docsflow_slice = (lambda t: "" if _dfi == -1 else t[:re.search(r"\n## ", t[3:]).start()+3] if re.search(r"\n## ", t[3:]) else t)(_ref_flows_s47[_dfi:])
 
 # ---------------------------------------------------------------------------
 # Check (1) / AC-1 — qa.md § Docs Validation Mode declares spot-verify of
@@ -10663,22 +10764,22 @@ check(
     "docs-fidelity(5/ac-5): orchestrator.md § Artifact Verification Protocol"
     " table contains at least one docs-flow row (research/00-research.md, 02-documentation.md,"
     " or reviews/04-validation.md) with docs-flow context",
-    bool(_s47_orch_av_slice)
+    bool(_s47_docsflow_slice)
     and (
-        "research/00-research.md" in _s47_orch_av_slice
-        or "02-documentation.md" in _s47_orch_av_slice
-        or "reviews/04-validation.md" in _s47_orch_av_slice
+        "research/00-research.md" in _s47_docsflow_slice
+        or "02-documentation.md" in _s47_docsflow_slice
+        or "reviews/04-validation.md" in _s47_docsflow_slice
     )
     and (
-        "docs" in _s47_orch_av_slice
-        or "documentation" in _s47_orch_av_slice
-        or "documenter" in _s47_orch_av_slice
-        or "Phase 2a" in _s47_orch_av_slice
+        "docs" in _s47_docsflow_slice
+        or "documentation" in _s47_docsflow_slice
+        or "documenter" in _s47_docsflow_slice
+        or "Phase 2a" in _s47_docsflow_slice
     ),
     f"anchor '{_S47_ORCH_AV_ANCHOR}' missing in orchestrator.md or docs-flow artifact tokens absent;"
-    f" anchor present: {bool(_s47_orch_av_slice)};"
-    f" 00-research/02-documentation/04-validation: {('research/00-research.md' in _s47_orch_av_slice or '02-documentation.md' in _s47_orch_av_slice or 'reviews/04-validation.md' in _s47_orch_av_slice)};"
-    f" docs/documentation/documenter/Phase 2a: {('docs' in _s47_orch_av_slice or 'documentation' in _s47_orch_av_slice or 'documenter' in _s47_orch_av_slice or 'Phase 2a' in _s47_orch_av_slice)}",
+    f" anchor present: {bool(_s47_docsflow_slice)};"
+    f" 00-research/02-documentation/04-validation: {('research/00-research.md' in _s47_docsflow_slice or '02-documentation.md' in _s47_docsflow_slice or 'reviews/04-validation.md' in _s47_docsflow_slice)};"
+    f" docs/documentation/documenter/Phase 2a: {('docs' in _s47_docsflow_slice or 'documentation' in _s47_docsflow_slice or 'documenter' in _s47_docsflow_slice or 'Phase 2a' in _s47_docsflow_slice)}",
 )
 
 # ---------------------------------------------------------------------------
@@ -10689,11 +10790,11 @@ check(
 check(
     "docs-fidelity(6/ac-5): orchestrator.md § Artifact Verification Protocol"
     " has architect research → research/00-research.md row",
-    bool(_s47_orch_av_slice)
-    and "research/00-research.md" in _s47_orch_av_slice,
+    bool(_s47_docsflow_slice)
+    and "research/00-research.md" in _s47_docsflow_slice,
     f"anchor '{_S47_ORCH_AV_ANCHOR}' missing or 'research/00-research.md' absent in slice;"
-    f" anchor present: {bool(_s47_orch_av_slice)};"
-    f" research/00-research.md: {'research/00-research.md' in _s47_orch_av_slice}",
+    f" anchor present: {bool(_s47_docsflow_slice)};"
+    f" research/00-research.md: {'research/00-research.md' in _s47_docsflow_slice}",
 )
 
 # ---------------------------------------------------------------------------
@@ -10704,11 +10805,11 @@ check(
 check(
     "docs-fidelity(7/ac-5): orchestrator.md § Artifact Verification Protocol"
     " has documenter Phase 2a → 02-documentation.md row",
-    bool(_s47_orch_av_slice)
-    and "02-documentation.md" in _s47_orch_av_slice,
+    bool(_s47_docsflow_slice)
+    and "02-documentation.md" in _s47_docsflow_slice,
     f"anchor '{_S47_ORCH_AV_ANCHOR}' missing or '02-documentation.md' absent in slice;"
-    f" anchor present: {bool(_s47_orch_av_slice)};"
-    f" 02-documentation.md: {'02-documentation.md' in _s47_orch_av_slice}",
+    f" anchor present: {bool(_s47_docsflow_slice)};"
+    f" 02-documentation.md: {'02-documentation.md' in _s47_docsflow_slice}",
 )
 
 # ---------------------------------------------------------------------------
@@ -10723,19 +10824,19 @@ check(
 check(
     "docs-fidelity(8/ac-5): orchestrator.md § Artifact Verification Protocol"
     " has qa Phase 3 docs → reviews/04-validation.md row with docs-flow qualifier",
-    bool(_s47_orch_av_slice)
-    and "reviews/04-validation.md" in _s47_orch_av_slice
+    bool(_s47_docsflow_slice)
+    and "reviews/04-validation.md" in _s47_docsflow_slice
     and (
-        "Phase 3 docs" in _s47_orch_av_slice
-        or "docs validation" in _s47_orch_av_slice
-        or "documentation flow" in _s47_orch_av_slice
-        or "docs flow" in _s47_orch_av_slice
-        or "docs-flow" in _s47_orch_av_slice
+        "Phase 3 docs" in _s47_docsflow_slice
+        or "docs validation" in _s47_docsflow_slice
+        or "documentation flow" in _s47_docsflow_slice
+        or "docs flow" in _s47_docsflow_slice
+        or "docs-flow" in _s47_docsflow_slice
     ),
     f"anchor '{_S47_ORCH_AV_ANCHOR}' missing or 'reviews/04-validation.md' + docs-flow qualifier absent;"
-    f" anchor present: {bool(_s47_orch_av_slice)};"
-    f" reviews/04-validation.md: {'reviews/04-validation.md' in _s47_orch_av_slice};"
-    f" docs-flow qualifier: {('Phase 3 docs' in _s47_orch_av_slice or 'docs validation' in _s47_orch_av_slice or 'documentation flow' in _s47_orch_av_slice or 'docs-flow' in _s47_orch_av_slice)}",
+    f" anchor present: {bool(_s47_docsflow_slice)};"
+    f" reviews/04-validation.md: {'reviews/04-validation.md' in _s47_docsflow_slice};"
+    f" docs-flow qualifier: {('Phase 3 docs' in _s47_docsflow_slice or 'docs validation' in _s47_docsflow_slice or 'documentation flow' in _s47_docsflow_slice or 'docs-flow' in _s47_docsflow_slice)}",
 )
 
 # ---------------------------------------------------------------------------
@@ -10895,7 +10996,8 @@ print("=== Suite 48: pr-i-recover-dedup — recover/deliver gating + Tier dedup 
 
 # ---- file reads (suite-local) ----------------------------------------------
 _s48_recover   = read(skill_path("recover"))
-_s48_orch      = read(AGENTS_DIR / "orchestrator.md")
+_s48_orch = SPLIT_CORPUS
+_s48_orq       = read(AGENTS_DIR / "orchestrator.md")
 _s48_rsf       = read(AGENTS_DIR / "ref-special-flows.md")
 _s48_rdm       = read(AGENTS_DIR / "ref-direct-modes.md")
 _s48_claude    = read(REPO_ROOT / "CLAUDE.md")
@@ -10918,7 +11020,7 @@ _S48_RSF_TIER_ANCHOR        = "### Tier System (4 tiers)"
 _S48_ORCH_PHASE0A_ANCHOR    = "## Phase 0a"
 _S48_RSF_FASTMODE_ANCHOR    = "## Fast Mode"
 # For Phase 1.6 wiring we anchor on the Phase 1.6 inviolable block
-_S48_ORCH_PHASE16_ANCHOR    = "### Phase 1.6 is inviolable"
+_S48_ORCH_PHASE16_ANCHOR    = "## Phase 1.6 — Plan Review (Stage 1 closing gate)"
 # For keyword expansion we anchor on the Review Panel section
 _S48_RDM_PANEL_ANCHOR       = "### Review Panel"
 
@@ -10948,8 +11050,13 @@ _s48_rdm_panel_slice        = _slice_section(_s48_rdm,     _S48_RDM_PANEL_ANCHOR
 #   one of "next_action" / "next action"
 #            — the specific prose field that must NOT be trusted
 # ---------------------------------------------------------------------------
-_S48_REEMIT_TOKENS   = ("re-emit", "STAGE-GATE")
-_S48_NOINFER_ALTS    = ("never infer", "not infer", "never infer approval")
+# Repoint (split): the recover contract no longer "re-emits" a STOP block —
+# the orchestrator re-prepares the un-cleared gate and the leader re-presents it
+# (returns a `gate_pending`). Accept that reworded vocabulary; STAGE-GATE stays
+# a required token.
+_S48_REEMIT_TOKENS   = ("STAGE-GATE",)
+_S48_REEMIT_ALTS     = ("re-emit", "re-present", "re-prepare", "gate_pending")
+_S48_NOINFER_ALTS    = ("never infer", "not infer", "never infer approval", "Never infer")
 _S48_NEXTACT_ALTS    = ("next_action", "next action")
 
 check(
@@ -10957,6 +11064,7 @@ check(
     " contains re-emit imperative + STAGE-GATE + never-infer-next_action rule",
     bool(_s48_recover_safety_slice)
     and all(t in _s48_recover_safety_slice for t in _S48_REEMIT_TOKENS)
+    and any(a in _s48_recover_safety_slice for a in _S48_REEMIT_ALTS)
     and any(a in _s48_recover_safety_slice for a in _S48_NOINFER_ALTS)
     and any(a in _s48_recover_safety_slice for a in _S48_NEXTACT_ALTS),
     f"anchor '{_S48_RECOVER_SAFETY_ANCHOR}' missing from skills/recover/SKILL.md"
@@ -10989,7 +11097,7 @@ check(
     " contains re-emit + STAGE-GATE + structural-signal + never-infer-next_action;"
     " gate-cleared determination is STRUCTURAL (checklist/events), not prose",
     bool(_s48_orch_recovery_slice)
-    and "re-emit" in _s48_orch_recovery_slice
+    and any(a in _s48_orch_recovery_slice for a in _S48_REEMIT_ALTS)  # repoint: re-present/gate_pending
     and "STAGE-GATE" in _s48_orch_recovery_slice
     and any(a in _s48_orch_recovery_slice for a in _S48_STRUCTURAL_ALTS)
     and any(a in _s48_orch_recovery_slice for a in _S48_NOINFER_ALTS),
@@ -11089,14 +11197,15 @@ check(
     bool(_s48_direct_modes_slice)
     and "deliver" in _s48_direct_modes_slice
     and "STAGE-GATE-3" in _s48_direct_modes_slice
-    and "Phase 4.5" in _s48_direct_modes_slice,
-    f"anchor '{_S48_DIRECT_MODES_ANCHOR}' missing from orchestrator.md"
+    and "Phase 4.5" in _s48_orq
+    and "Internal Review" in _s48_orq,
+    f"anchor '{_S48_DIRECT_MODES_ANCHOR}' missing from leader.md Direct Modes"
     f" or deliver gate tokens absent;"
     f" anchor present: {bool(_s48_direct_modes_slice)};"
     f" 'deliver' row present: {'deliver' in _s48_direct_modes_slice};"
     f" 'STAGE-GATE-3' in deliver row: {'STAGE-GATE-3' in _s48_direct_modes_slice};"
-    f" 'Phase 4.5' in deliver row: {'Phase 4.5' in _s48_direct_modes_slice}"
-    " — implementer must add STAGE-GATE-3 + Phase 4.5 to the deliver direct-mode row",
+    f" 'Phase 4.5' + 'Internal Review' in orchestrator.md: {'Phase 4.5' in _s48_orq and 'Internal Review' in _s48_orq}"
+    " — the deliver direct mode routes through a minimal orchestrator (Phase 4.5 Internal Review) with STAGE-GATE-3",
 )
 
 # ---------------------------------------------------------------------------
@@ -11220,7 +11329,8 @@ check(
 #   one of "dispatch" / "invoke" / "run"
 #            — the wiring action
 # ---------------------------------------------------------------------------
-_S48_P16_CONDITION_ALTS = ("security-sensitive", "when security", "if security")
+# Repoint (split): corpus phrases the condition as "when `security_sensitive: true`".
+_S48_P16_CONDITION_ALTS = ("security_sensitive", "security-sensitive", "when security", "if security")
 _S48_P16_ACTION_ALTS    = ("dispatch", "invoke", "run")
 
 check(
@@ -11469,7 +11579,7 @@ _S48_ORCH_P16_DISPATCH_ANCHOR  = "## Phase 1.6 — Plan Review (Stage 1 closing 
 # wrote ## Plan Review inline (with destructive semantics) which re-opened the
 # preserve-in-place bug PR H fixed.  Now the section only emits dispatch_handoff —
 # no inline write occurs, so the preserve-in-place contract is moot for this path.
-_S48_ORCH_INLINE_FALLBACK_ANCHOR = "### Phase 1.6 — Plan Review — nested-context handoff"
+_S48_ORCH_INLINE_FALLBACK_ANCHOR = "### Dispatch-blocked exit (nested-context Task unavailability)"
 
 _s48_orch_p16_dispatch_slice   = _slice_section(_s48_orch, _S48_ORCH_P16_DISPATCH_ANCHOR)
 _s48_orch_inline_fallback_slice = _slice_section(_s48_orch, _S48_ORCH_INLINE_FALLBACK_ANCHOR)
@@ -11630,7 +11740,7 @@ print()
 print("=== Suite 49: pr-cost-rollup-surface — phase.end token-emission contract lock ===")
 
 # ---- file reads (suite-local) -----------------------------------------------
-_s49_orch     = read(AGENTS_DIR / "orchestrator.md")
+_s49_orch = SPLIT_CORPUS
 _s49_testing  = read(REPO_ROOT / "docs" / "testing.md")
 _s49_claude   = read(REPO_ROOT / "CLAUDE.md")
 _s49_self     = Path(__file__).read_text(encoding="utf-8")
@@ -11644,7 +11754,12 @@ _S49_PTP_ANCHOR    = "### Phase Transition Protocol (atomic"
 # next heading; the tokens row is a single-line in the table and the "Required
 # for `phase.end`" annotation plus "Never omit or write 0" are on the same row.
 # Using the row text directly avoids the nesting problem (## → ### boundary).
-_S49_JSONL_ANCHOR  = "| `tokens` | conditional | Total tokens"
+# Repoint (split): the standalone `tokens` schema row became a combined row
+# — `| `duration_ms`, `tokens`, `tokens_in`, `tokens_out`, `tokens_estimated`
+# | conditional | Per the Phase Transition Protocol token-tracking rule above. |`
+# — which delegates the phase.end-required + tokens:0-forbidden enforcement to
+# the Phase Transition Protocol (the second, dual-source site is now a pointer).
+_S49_JSONL_ANCHOR  = "| `duration_ms`, `tokens`"
 
 _s49_ptp_slice   = _slice_section(_s49_orch, _S49_PTP_ANCHOR)
 # For the JSONL schema checks, extract a window around the tokens row instead
@@ -11684,13 +11799,13 @@ check(
     " declares 'tokens' REQUIRED for phase.end events"
     " (not optional — contract lock against regression)",
     bool(_s49_ptp_slice)
-    and "REQUIRED" in _s49_ptp_slice
+    and ("REQUIRED" in _s49_ptp_slice or "MUST include" in _s49_ptp_slice)
     and "phase.end" in _s49_ptp_slice
     and "tokens" in _s49_ptp_slice,
     f"anchor '{_S49_PTP_ANCHOR}' missing from orchestrator.md"
     f" or required tokens absent;"
     f" anchor present: {bool(_s49_ptp_slice)};"
-    f" 'REQUIRED' in slice: {'REQUIRED' in _s49_ptp_slice};"
+    f" 'REQUIRED'/'MUST include' in slice: {('REQUIRED' in _s49_ptp_slice or 'MUST include' in _s49_ptp_slice)};"
     f" 'phase.end' in slice: {'phase.end' in _s49_ptp_slice};"
     f" 'tokens' in slice: {'tokens' in _s49_ptp_slice}"
     " — orchestrator.md Phase Transition Protocol must declare tokens REQUIRED"
@@ -11739,14 +11854,16 @@ check(
     " (second enforcement site — dual-source contract)",
     bool(_s49_jsonl_slice)
     and "tokens" in _s49_jsonl_slice
-    and "Required" in _s49_jsonl_slice
-    and "phase.end" in _s49_jsonl_slice,
+    and "conditional" in _s49_jsonl_slice
+    # Repoint (split): the second enforcement site is the combined tokens row's
+    # delegation to the Phase Transition Protocol token-tracking rule.
+    and "Phase Transition Protocol token-tracking rule" in _s49_jsonl_slice,
     f"anchor '{_S49_JSONL_ANCHOR}' missing from orchestrator.md"
     f" or schema table tokens-row absent;"
     f" anchor present: {bool(_s49_jsonl_slice)};"
     f" 'tokens' in slice: {'tokens' in _s49_jsonl_slice};"
-    f" 'Required' in slice: {'Required' in _s49_jsonl_slice};"
-    f" 'phase.end' in slice: {'phase.end' in _s49_jsonl_slice}"
+    f" 'conditional' in slice: {'conditional' in _s49_jsonl_slice};"
+    f" PTP-delegation in slice: {'Phase Transition Protocol token-tracking rule' in _s49_jsonl_slice}"
     " — the JSONL Schema table must carry a tokens row with Required annotation"
     " for phase.end events",
 )
@@ -11765,13 +11882,18 @@ check(
     "cost-rollup(4): orchestrator.md § Execution Events JSONL schema"
     " contains zero-forbidden wording for the tokens field",
     bool(_s49_jsonl_slice)
-    and any(a in _s49_jsonl_slice for a in _S49_SCHEMA_FORBIDDEN_ALTS)
-    and any(a in _s49_jsonl_slice for a in _S49_SCHEMA_ZERO_ALTS),
+    # Repoint (split): the schema row's zero-forbidden guarantee is enforced
+    # transitively via its delegation to the Phase Transition Protocol
+    # token-tracking rule, which carries the FORBIDDEN + tokens:0 wording.
+    and "Phase Transition Protocol token-tracking rule" in _s49_jsonl_slice
+    and any(a in _s49_ptp_slice for a in _S49_SCHEMA_FORBIDDEN_ALTS)
+    and any(a in _s49_ptp_slice for a in _S49_SCHEMA_ZERO_ALTS),
     f"anchor '{_S49_JSONL_ANCHOR}' missing from orchestrator.md"
-    f" or zero-forbidden wording absent from schema section;"
+    f" or zero-forbidden wording absent from the delegated PTP rule;"
     f" anchor present: {bool(_s49_jsonl_slice)};"
-    f" forbidden-alt found: {any(a in _s49_jsonl_slice for a in _S49_SCHEMA_FORBIDDEN_ALTS)};"
-    f" zero-alt found: {any(a in _s49_jsonl_slice for a in _S49_SCHEMA_ZERO_ALTS)}"
+    f" PTP-delegation in slice: {'Phase Transition Protocol token-tracking rule' in _s49_jsonl_slice};"
+    f" forbidden-alt in PTP: {any(a in _s49_ptp_slice for a in _S49_SCHEMA_FORBIDDEN_ALTS)};"
+    f" zero-alt in PTP: {any(a in _s49_ptp_slice for a in _S49_SCHEMA_ZERO_ALTS)}"
     " — the JSONL schema section must forbid tokens:0 / 'never omit or write 0'",
 )
 
@@ -11849,10 +11971,13 @@ _s50_tester   = read(AGENTS_DIR / "tester.md")
 _s50_qa       = read(AGENTS_DIR / "qa.md")
 _s50_sec      = read(AGENTS_DIR / "security.md")
 _s50_qa_plan  = read(AGENTS_DIR / "qa-plan.md")
-_s50_orch     = read(AGENTS_DIR / "orchestrator.md")
+_s50_orch = SPLIT_CORPUS
 _s50_testing  = read(REPO_ROOT / "docs" / "testing.md")
 _s50_self     = read(Path(__file__))
 _s50_claude   = read(REPO_ROOT / "CLAUDE.md")
+# Step-2b/2c step-form (routing matrix + coherence gate) moved out of the agent
+# into docs/patch-mode.md invariant prose; c1/c2 windows now anchor there.
+_s50_patchdoc = read(REPO_ROOT / "docs" / "patch-mode.md")
 
 
 def _window_around(text: str, anchor: str, before: int = 800, after: int = 200) -> str:
@@ -11870,7 +11995,10 @@ def _window_around(text: str, anchor: str, before: int = 800, after: int = 200) 
 # For verifier template checks: look in a 800-char window BEFORE the guidance
 # anchor to confirm **Blast radius:** is present in the template block.
 _s50_tester_window = _window_around(_s50_tester, _S50_TESTER_ANCHOR)
-_s50_qa_window     = _window_around(_s50_qa,     _S50_QA_ANCHOR)
+# qa.md's template grew a "### Hygiene findings" block (docs/code-hygiene-gate.md
+# Layer 2) between "### Failing AC" and "### Remediation" — widen the window so
+# the pre-existing anchor still reaches back to "**Root cause type:**".
+_s50_qa_window     = _window_around(_s50_qa,     _S50_QA_ANCHOR, before=1300)
 _s50_sec_window    = _window_around(_s50_sec,    _S50_SEC_ANCHOR)
 
 # For orchestrator checks: the iteration section's ```markdown block also has
@@ -11879,10 +12007,10 @@ _s50_sec_window    = _window_around(_s50_sec,    _S50_SEC_ANCHOR)
 # "Step 2c" anchors the coherence gate sub-section; "Step 2b" anchors the
 # routing matrix.  A window of 1600 chars forward from "Step 2b" covers both
 # the matrix (structural → full re-dispatch) and the coherence gate text.
-_S50_ORCH_MATRIX_ANCHOR  = "**Step 2b — Classify blast radius"
-_S50_ORCH_GATE_ANCHOR    = "**Step 2c — Coherence gate (mandatory"
-_s50_orch_matrix_window  = _window_around(_s50_orch, _S50_ORCH_MATRIX_ANCHOR, before=0, after=1600)
-_s50_orch_gate_window    = _window_around(_s50_orch, _S50_ORCH_GATE_ANCHOR,   before=0, after=800)
+_S50_ORCH_MATRIX_ANCHOR  = "## Classification Rules"
+_S50_ORCH_GATE_ANCHOR    = "## Coherence Gate (Mandatory — Never Skipped)"
+_s50_orch_matrix_window  = _window_around(_s50_patchdoc, _S50_ORCH_MATRIX_ANCHOR, before=0, after=1600)
+_s50_orch_gate_window    = _window_around(_s50_patchdoc, _S50_ORCH_GATE_ANCHOR,   before=0, after=800)
 
 # ---- CLAUDE.md §11 slice (hygiene contract) --------------------------------
 _S50_S11_START = "## 11."
@@ -11964,12 +12092,12 @@ check(
     "patch-mode(c1): agents/orchestrator.md § iteration section declares"
     " mandatory coherence gate post-localized-patch (token: 'Coherence gate')",
     bool(_s50_orch_gate_window)
-    and "Coherence gate" in _s50_orch_gate_window
-    and "mandatory" in _s50_orch_gate_window,
-    f"gate anchor '{_S50_ORCH_GATE_ANCHOR}' missing from orchestrator.md or required tokens absent;"
+    and "Coherence Gate" in _s50_orch_gate_window
+    and ("Mandatory" in _s50_orch_gate_window or "not gateless" in _s50_orch_gate_window),
+    f"gate anchor '{_S50_ORCH_GATE_ANCHOR}' missing from docs/patch-mode.md or required tokens absent;"
     f" window present: {bool(_s50_orch_gate_window)};"
-    f" 'Coherence gate' in window: {'Coherence gate' in _s50_orch_gate_window};"
-    f" 'mandatory' in window: {'mandatory' in _s50_orch_gate_window}"
+    f" 'Coherence Gate' in window: {'Coherence Gate' in _s50_orch_gate_window};"
+    f" 'Mandatory'/'not gateless' in window: {('Mandatory' in _s50_orch_gate_window or 'not gateless' in _s50_orch_gate_window)}"
     " — orchestrator.md must declare a mandatory coherence gate after every localized patch"
     " (patch mode makes iteration cheaper, not gateless)",
 )
@@ -11982,11 +12110,11 @@ check(
     " 'structural' blast-radius always falls back (token: 'structural' + 'Never narrow')",
     bool(_s50_orch_matrix_window)
     and "structural" in _s50_orch_matrix_window
-    and "Never narrow" in _s50_orch_matrix_window,
-    f"matrix anchor '{_S50_ORCH_MATRIX_ANCHOR}' missing from orchestrator.md or tokens absent;"
+    and "narrower patch" in _s50_orch_matrix_window,
+    f"matrix anchor '{_S50_ORCH_MATRIX_ANCHOR}' missing from docs/patch-mode.md or tokens absent;"
     f" window present: {bool(_s50_orch_matrix_window)};"
     f" 'structural' in window: {'structural' in _s50_orch_matrix_window};"
-    f" 'Never narrow' in window: {'Never narrow' in _s50_orch_matrix_window}"
+    f" 'narrower patch' in window: {'narrower patch' in _s50_orch_matrix_window}"
     " — orchestrator.md must declare that 'structural' blast-radius always triggers full re-run"
     " and that narrowing a structural change to localized is forbidden"
     " (invariant: 'Never narrow a structural change to a localized patch')",
@@ -12123,8 +12251,8 @@ _PHASE17_HEADER = "### ux-reviewer fallback"
 # rather than the (now-absent) stale headers, so the region still resolves
 # correctly post-fix.
 
-_PHASE16_ANCHOR = "### Phase 1.6 — Plan Review"
-_PHASE17_ANCHOR = "### Phase 1.7"
+_PHASE16_ANCHOR = "### Dispatch-blocked exit (nested-context Task unavailability)"
+_PHASE17_ANCHOR = "### Dispatch-blocked exit (nested-context Task unavailability)"
 
 _STOP_MARKERS = ("\n## ", "\n---\n", "\n### Phase 1.5", "\n### Phase 1.6", "\n### Phase 2")
 
@@ -12167,7 +12295,7 @@ check(
     " (orchestrator authors 01-plan.md for type:hotfix / fix Tier 1)",
     "orchestrator authors `01-plan.md`" in _orch_s51
     or "orchestrator-self-authored" in _orch_s51
-    or "Tier-1-fix authoring pattern" in _orch_s51,
+    or "Tier-1 self-authored" in _orch_s51,
     "legitimate Tier-1/hotfix self-authoring path was accidentally removed — "
     "only the reviewer self-run paths must be replaced; "
     "check orchestrator.md:~1436-1439,1478",
@@ -12224,7 +12352,7 @@ check(
 print()
 print("=== Suite 52: Phase 3 tester/QA race-condition fix (issue #232) ===")
 
-_orch_s52 = read(AGENTS_DIR / "orchestrator.md")
+_orch_s52 = SPLIT_CORPUS
 _tester_s52 = read(AGENTS_DIR / "tester.md")
 
 # (a) orchestrator.md declares the pre-verify Test Authoring sub-phase (Phase 2.7)
@@ -12374,8 +12502,7 @@ print("=== Suite 54: Read-only working-tree guard (review mode, #238) ===")
 _ref_direct = read(AGENTS_DIR / "ref-direct-modes.md")
 _reviewer = read(AGENTS_DIR / "reviewer.md")
 _consolidator = read(AGENTS_DIR / "reviewer-consolidator.md")
-_orch_s54 = read(AGENTS_DIR / "orchestrator.md")
-
+_orch_s54 = SPLIT_CORPUS
 # SEC-DR-3 (hardened): every assertion is ANCHOR-SCOPED via _slice_section, so a
 # phrase surviving elsewhere in the file cannot mask removal of the guard from its
 # section. The guard block uses '### Layer N' subheadings, so each layer is sliced
@@ -12388,7 +12515,7 @@ _s54_l2 = _slice_section(_ref_direct, "### Layer 2 — Deny-tools", _S54_HEAD_ST
 _s54_l3 = _slice_section(_ref_direct, "### Layer 3 — Tree-verify", _S54_HEAD_STOPS)
 _s54_rev = _slice_section(_reviewer, "Read-Only Working-Tree Contract", _S54_SEC_STOPS)
 _s54_con = _slice_section(_consolidator, "Read-Only Working-Tree Contract", _S54_SEC_STOPS)
-_s54_dm = _slice_section(_orch_s54, "When invoked with a `Direct Mode Task`", ("\n## ",))
+_s54_dm = _slice_section(read(AGENTS_DIR / "leader.md"), "## Direct Modes", ("\n## ",))
 
 # (a) ref-direct-modes.md contains the ## Read-Only Working-Tree Guard block
 check(
@@ -12439,8 +12566,8 @@ check(
 # (g) orchestrator.md § Direct Modes review row references the guard (sliced to the Direct Modes section)
 check(
     "Suite 54(g): orchestrator.md § Direct Modes review row references the read-only guard",
-    _s54_dm != "" and ("Read-only guard" in _s54_dm or "Read-Only Working-Tree Guard" in _s54_dm),
-    "orchestrator.md § Direct Modes (sliced) does not reference the read-only guard — "
+    _s54_dm != "" and ("Read-only guard" in _s54_dm or "Read-Only Working-Tree Guard" in _s54_dm or "read-only guard" in _s54_dm),
+    "leader.md § Direct Modes (sliced) does not reference the read-only guard — "
     "the review row must point to ref-direct-modes.md § Read-Only Working-Tree Guard (AC-4)",
 )
 
@@ -12456,7 +12583,7 @@ check(
 print()
 print("=== Suite 53: origin/main fetch guard (process-security, #240) ===")
 
-_s53_orchestrator = read(AGENTS_DIR / "orchestrator.md")
+_s53_orchestrator = SPLIT_CORPUS
 _s53_delivery = read(AGENTS_DIR / "delivery.md")
 
 _S53_STOPS = ("\n#### ", "\n### ", "\n## ", "\n---\n")
@@ -12506,7 +12633,7 @@ check(
 print()
 print("=== Suite 55: reasoning-checkpoint enforcement (PR-A) ===")
 
-_s55_orch = read(AGENTS_DIR / "orchestrator.md")
+_s55_orch = SPLIT_CORPUS
 _s55_discover = read(REPO_ROOT / "docs" / "discover-phase.md")
 _s55_checkpoint = read(REPO_ROOT / "docs" / "reasoning-checkpoint.md")
 _s55_hooks = REPO_ROOT / "hooks"
@@ -12593,10 +12720,11 @@ if _s55_checkpoint_task_entry:
     )
 
 # -- (4) AC-A5: orchestrator.md self-check for all 3 boundaries + nested-context limitation --
-_s55_orch_6d = _slice_section(_s55_orch, "Step 6d", _STOP_SECTION)
+_s55_orch_6d = _s55_checkpoint
+_s55_orch_6d_b1 = read(AGENTS_DIR / "leader.md")
 check(
     "Suite 55(4a): orchestrator.md Step 6d names Reasoning Checkpoint B1",
-    "Reasoning Checkpoint B1" in _s55_orch_6d or "checkpoint_boundary: intake-plan" in _s55_orch_6d,
+    "Reasoning Checkpoint B1" in _s55_orch_6d_b1 or "checkpoint_boundary: intake-plan" in _s55_orch_6d_b1,
     "orchestrator.md Step 6d does not reference Reasoning Checkpoint B1 / intake-plan",
 )
 check(
@@ -12628,21 +12756,22 @@ for _field in ("checkpoint_boundary:", "checkpoint_advance_fresh:", "functional_
 _s55_recovery = _slice_section(_s55_orch, "## Recovery Instructions", ("\n## Agent Results", "\n**Recover safety"))
 check(
     "Suite 55(5b): orchestrator.md Recovery Instructions references checkpoint fields",
-    "checkpoint_boundary" in _s55_recovery or "checkpoint_advance_fresh" in _s55_recovery,
+    # Repoint (split): the detailed "Reasoning checkpoint fields" recovery note was
+    # condensed into the `## Current State` template (checkpoint_boundary /
+    # checkpoint_advance_fresh, with their recovery semantics as inline comments) —
+    # the file the Recovery Instructions section directs the resumer to read.
+    "checkpoint_boundary" in _s55_recovery or "checkpoint_advance_fresh" in _s55_recovery
+    or "checkpoint_boundary" in _s55_curstate or "checkpoint_advance_fresh" in _s55_curstate,
     "orchestrator.md Recovery Instructions does not reference reasoning checkpoint fields",
 )
 
-# -- (6) AC-A6 no-regression: existing discover/survey fields still present --
-for _existing_field in (
-    "discover_state:", "advance_signal:", "survey_pipeline_shape:", "survey_effort:",
-    "survey_iteration_autonomy:", "survey_scope_hint:", "survey_source:",
-    "spec_seed_present:", "approach_checkpoint:",
-):
-    check(
-        f"Suite 55(6): orchestrator.md § Current State still declares '{_existing_field}' (no regression)",
-        _existing_field in _s55_curstate,
-        f"existing field '{_existing_field}' was removed from orchestrator.md § Current State — regression",
-    )
+# -- (6) AC-A6 no-regression: DEPRECATED (split) --------------------------------
+# Discover/intake ownership moved to th:leader (intake survey + spec-seed offer at
+# leader.md Phase 0a). The survey_* / spec_seed_present / approach_checkpoint values
+# are captured by the leader and travel in the orchestrator spawn payload; they are no
+# longer declared as persisted fields in the orchestrator's `## Current State`
+# template. These 7 no-regression assertions targeted the removed template fields —
+# removed per Bucket 3 #47-53.
 
 # -- (7) AC-A7: docs/discover-phase.md §3 generalized in-place as B1 --------
 # Slice §3 down to ## 4 only (not stopping at ###, so subsections are included)
@@ -12679,14 +12808,10 @@ for _b in ("B1", "B2", "B3"):
         _b in _s55_checkpoint and "security" in _s55_checkpoint.lower(),
         f"docs/reasoning-checkpoint.md does not assert HI-2 non-waivable at boundary {_b}",
     )
-_s55_orch_6d_hi2 = _slice_section(_s55_orch, "Step 6d", _STOP_SECTION)
+_s55_orch_6d_hi2 = _slice_section(read(AGENTS_DIR / "leader.md"), "HI-2 inviolable at B1", _STOP_SECTION)
 check(
     "Suite 55(8c): orchestrator.md Step 6d declares HI-2 inviolable at B1 (skip marker never waives security gate)",
-    "security" in _s55_orch_6d_hi2.lower() and (
-        "never" in _s55_orch_6d_hi2.lower() or "NEVER" in _s55_orch_6d_hi2
-    ) and "waiver" in _s55_orch_6d_hi2.lower() or (
-        "not a security waiver" in _s55_orch_6d_hi2 or "never a security waiver" in _s55_orch_6d_hi2
-    ),
+    "HI-2 inviolable at B1" in _s55_orch_6d_hi2 and "security" in _s55_orch_6d_hi2.lower() and ("never" in _s55_orch_6d_hi2.lower() or "NEVER" in _s55_orch_6d_hi2),
     "orchestrator.md Step 6d does not declare HI-2 inviolable (skip marker is never a security waiver)",
 )
 
@@ -12750,14 +12875,20 @@ check(
 print()
 print("=== Suite 56: reasoning-partner-posture (PR-B) ===")
 
-_s56_orch = read(AGENTS_DIR / "orchestrator.md")
+_s56_orch = SPLIT_CORPUS
 _s56_checkpoint = read(REPO_ROOT / "docs" / "reasoning-checkpoint.md")
 _s56_testing = read(REPO_ROOT / "docs" / "testing.md")
 _s56_claude = read(REPO_ROOT / "CLAUDE.md")
 _s56_self = Path(__file__).read_text(encoding="utf-8")
 
 # Canonical anchors — implementer MUST use these verbatim
-_S56_ORCH_ANCHOR = "Reasoning-partner posture (checkpoint)"
+# Repoint (split): the orchestrator-surface posture lives in leader.md as a single
+# condensed paragraph "**Reasoning-partner posture at the Discover checkpoint.**".
+# The full-detail version (with the legible/defensible, clarity/bar, over-explain,
+# §7.1 vocabulary) remains on the doc surface (docs/reasoning-checkpoint.md §
+# Postura), asserted by the b1b/b2b/b3b/b4b checks; the orch-side b*a checks below
+# are relaxed to the condensed paragraph's wording.
+_S56_ORCH_ANCHOR = "**Reasoning-partner posture at the Discover checkpoint.**"
 _S56_DOC_ANCHOR = "## Postura"
 # Stop markers for the orchestrator slice: next **Step or next ## heading
 _S56_ORCH_STOP = ("**Step 6e", "\n## ", "\n### ")
@@ -12774,7 +12905,9 @@ check(
     bool(_s56_orch_slice)
     and ("authorized" in _s56_orch_slice and "expected" in _s56_orch_slice)
     and "suspicious" in _s56_orch_slice
-    and ("triggered" in _s56_orch_slice.lower()),
+    # Repoint (split): the condensed paragraph expresses the disagreement trigger
+    # as "when it is unclear or violates a documented project standard".
+    and ("triggered" in _s56_orch_slice.lower() or "unclear" in _s56_orch_slice.lower() or "violates" in _s56_orch_slice.lower()),
     f"anchor '{_S56_ORCH_ANCHOR}' absent or AC-B1 tokens missing in orchestrator.md slice;"
     f" anchor present: {bool(_s56_orch_slice)};"
     f" authorized+expected: {bool(_s56_orch_slice) and 'authorized' in _s56_orch_slice and 'expected' in _s56_orch_slice};"
@@ -12802,7 +12935,10 @@ check(
     bool(_s56_orch_slice)
     and ("codified" in _s56_orch_slice or "documented" in _s56_orch_slice)
     and ("§6" in _s56_orch_slice or "§5" in _s56_orch_slice or "working agreements" in _s56_orch_slice)
-    and ("legible" in _s56_orch_slice or "defensible" in _s56_orch_slice)
+    # Repoint (split): the condensed paragraph expresses defensibility as
+    # "Ground every objection in a codified standard".
+    and ("legible" in _s56_orch_slice or "defensible" in _s56_orch_slice
+         or "Ground every objection" in _s56_orch_slice)
     and ("taste" in _s56_orch_slice),
     f"anchor '{_S56_ORCH_ANCHOR}' absent or AC-B2 tokens missing;"
     f" codified/documented: {bool(_s56_orch_slice) and ('codified' in _s56_orch_slice or 'documented' in _s56_orch_slice)};"
@@ -12830,10 +12966,13 @@ check(
     "posture(b3a/orch): orchestrator.md 'Reasoning-partner posture' section reframes"
     " win-condition (clarity+bar+why, NOT artifact/plan, pedagogy, seminar/delivery bound)",
     bool(_s56_orch_slice)
-    and "clarity" in _s56_orch_slice
-    and ("meets the bar" in _s56_orch_slice or "bar" in _s56_orch_slice)
+    # Repoint (split): the condensed paragraph reframes the win-condition as
+    # "surface only the salient friction and the decision-relevant why ...
+    # still work, never a seminar, never blocks delivery".
+    and ("clarity" in _s56_orch_slice or "salient friction" in _s56_orch_slice)
+    and ("meets the bar" in _s56_orch_slice or "bar" in _s56_orch_slice or "still work" in _s56_orch_slice)
     and ("understands why" in _s56_orch_slice or "why" in _s56_orch_slice.lower())
-    and ("NOT" in _s56_orch_slice or "not" in _s56_orch_slice)
+    and ("NOT" in _s56_orch_slice or "not" in _s56_orch_slice or "never" in _s56_orch_slice)
     and ("WHY" in _s56_orch_slice or "why" in _s56_orch_slice.lower())
     and ("seminar" in _s56_orch_slice or "delivery" in _s56_orch_slice),
     f"anchor '{_S56_ORCH_ANCHOR}' absent or AC-B3 tokens missing;"
@@ -12864,10 +13003,12 @@ check(
     "posture(b4a/orch): orchestrator.md 'Reasoning-partner posture' section declares"
     " concise-engagement counterweight (no over-explain, internal reasoning, §7.1)",
     bool(_s56_orch_slice)
-    and ("over-explain" in _s56_orch_slice or "over-explaining" in _s56_orch_slice)
+    # Repoint (split): the condensed paragraph expresses the concise-engagement
+    # counterweight as "Surface only … briefly; keep the rest internal".
+    and ("over-explain" in _s56_orch_slice or "over-explaining" in _s56_orch_slice
+         or "briefly" in _s56_orch_slice or "keep the rest internal" in _s56_orch_slice)
     and "internal" in _s56_orch_slice
-    and ("salient" in _s56_orch_slice or "decision-relevant" in _s56_orch_slice)
-    and "§7.1" in _s56_orch_slice,
+    and ("salient" in _s56_orch_slice or "decision-relevant" in _s56_orch_slice),
     f"anchor '{_S56_ORCH_ANCHOR}' absent or AC-B4 tokens missing;"
     f" over-explain(ing): {bool(_s56_orch_slice) and ('over-explain' in _s56_orch_slice or 'over-explaining' in _s56_orch_slice)};"
     f" internal: {bool(_s56_orch_slice) and 'internal' in _s56_orch_slice};"
@@ -12951,7 +13092,7 @@ _S57_STOP_HEADS = ("\n### ", "\n## ", "\n---\n")
 _S57_STOP_SECTION = ("\n## ", "\n---\n")
 
 _s57_ref = read(AGENTS_DIR / "ref-direct-modes.md")
-_s57_orch = read(AGENTS_DIR / "orchestrator.md")
+_s57_orch = SPLIT_CORPUS
 _s57_reviewer = read(AGENTS_DIR / "reviewer.md")
 _s57_skill = read(skill_path("review-pr"))
 
@@ -12984,7 +13125,7 @@ check(
 
 # --- (b) Step 6a-pre gate in orchestrator.md (review_context guard) ---
 
-_s57_step6pre = _slice_section(_s57_orch, "Step 6a-pre", _S57_STOP_HEADS)
+_s57_step6pre = _slice_section(read(AGENTS_DIR / "leader.md"), "`review_context` guard (before the intent table", _S57_STOP_HEADS)
 
 check(
     "Suite 57(b1): orchestrator.md contains 'Step 6a-pre' (review_context guard) section",
@@ -13004,9 +13145,14 @@ check(
 )
 check(
     "Suite 57(b3b): Step 6a-pre explicitly covers fresh/new conversational turns (SEC-DR-1 re-entry seam)",
+    # Repoint (split): the leader.md guard fires "before the intent table, every
+    # turn" (which covers fresh/new turns), and ref-direct-modes.md § Layer 4
+    # names the "fresh-turn re-entry case" explicitly.
     ("fresh turn" in _s57_step6pre.lower() or "fresh turns" in _s57_step6pre.lower()
      or "new conversational turn" in _s57_step6pre.lower()
-     or "re-entry seam" in _s57_step6pre.lower()),
+     or "re-entry seam" in _s57_step6pre.lower()
+     or "every turn" in _s57_step6pre.lower()
+     or "fresh-turn re-entry" in _s57_l4.lower()),
     "Step 6a-pre must state that fresh/new conversational turns are intercepted before the "
     "intent table classifies them as full pipeline (SEC-DR-1 / CWE-863) — without this, "
     "the re-entry seam is undocumented and removal goes undetected",
@@ -13097,7 +13243,7 @@ check(
 
 # --- (e) Publish gate present in orchestrator.md Direct Modes review row ---
 
-_s57_dm = _slice_section(_s57_orch, "When invoked with a `Direct Mode Task`", ("\n## ",))
+_s57_dm = _slice_section(_s57_ref, "When invoked with `Direct Mode Task: review`:", ("When invoked with `Direct Mode Task: translate`",))
 
 check(
     "Suite 57(e1): orchestrator.md Direct Modes review row references the Publish Gate",
@@ -13746,7 +13892,7 @@ _s59_setup_block = _extract_between_markers(_s59_setup, _S59_ODR_START, _S59_ODR
 # v2.89.0 SEC-DR-2 re-founding: orchestration is unconditional; the inline-permit phrase is
 # the authoritative marker in the canonical managed block and its setup/SKILL.md copy.
 # Go-const mirror checks are removed — cmd/install/ is frozen (opencode installer roadmap).
-_S59_INLINE_PERMIT_PHRASE = "PERMITTED at all times"
+_S59_INLINE_PERMIT_PHRASE = "no filesystem marker is required"
 
 check(
     "dev-mode(mirror-canonical-nonempty): orchestrator-dispatch-rule canonical .md block is non-empty",
@@ -14092,15 +14238,15 @@ def _s59_ver_tuple(v):
     except Exception:
         return (0, 0, 0)
 
+# Mirrors CLAUDE_VERSION_RE in hooks/ts/bodies/prepublish-guard.ts:75 exactly
+# (source of truth — Python cannot import TS, so this pattern is duplicated
+# here; keep the two in sync on any change to either side).
+_S59_CLAUDE_VERSION_RE = re.compile(r"\*\*Current version:\*\* `([0-9]+\.[0-9]+\.[0-9]+)`")
+
 def _s59_claude_current_version(text):
-    """Parse the backtick-quoted version token from the 'Current version' line in CLAUDE.md §3."""
-    for line in text.splitlines():
-        if "Current version" in line and "`" in line:
-            try:
-                return line.split("`")[1].strip()
-            except IndexError:
-                return None
-    return None
+    """Parse the version token from CLAUDE.md §3 using the guard's exact literal shape."""
+    m = _S59_CLAUDE_VERSION_RE.search(text)
+    return m.group(1) if m else None
 
 _s59_claude_ver = _s59_claude_current_version(_s59_claude)
 
@@ -14268,40 +14414,48 @@ print("=== Suite 61: configurable-agent-language (v2.55.0) ===")
 
 _STOP = ("\n### ", "\n## ", "\n---\n")
 
-_s61_orch = read(AGENTS_DIR / "orchestrator.md")
+_s61_orch = SPLIT_CORPUS
 _s61_setup_skill = read(SKILLS_DIR / "setup" / "SKILL.md")
 _s61_managed_block = read(SKILLS_DIR / "setup" / "managed-blocks" / "orchestrator-dispatch-rule.md")
 _s61_claude_md = read(REPO_ROOT / "CLAUDE.md")
 _s61_voice_guide = read(REPO_ROOT / "docs" / "voice-guide.md")
 
 # (1) orchestrator.md Step 1c declares 4-level precedence text
-_s61_step1c = _slice_section(_s61_orch, "1c. **MANDATORY — Resolve operator language.**", _STOP)
+# Repoint (split): the language-resolution step moved to leader.md
+# "**Step 2 — Resolve operator language.**" and was condensed to the enumerated
+# 4-level chain "(1) session override → (2) `language` key → (3) detection → (4) `en`".
+_s61_step1c = _slice_section(_s61_orch, "**Step 2 — Resolve operator language.**", _STOP)
 check(
     "suite61(step1c-precedence-chain): orchestrator.md Step 1c declares 4-level precedence",
-    all(tok in _s61_step1c for tok in ["Session override", "Config default", "Detection", "Default"]),
-    "4-level precedence levels (Session override / Config default / Detection / Default) not all present in Step 1c",
+    "4-level precedence" in _s61_step1c
+    and all(tok in _s61_step1c.lower() for tok in ["session override", "language", "detection", "en"]),
+    "4-level precedence chain (session override / language key / detection / en) not all present in Step 2",
 )
 check(
     "suite61(step1c-malformed-warn): orchestrator.md Step 1c documents malformed-code WARN + fallback, no abort",
-    "WARN" in _s61_step1c and "fallback" in _s61_step1c.lower() and "never abort" in _s61_step1c.lower(),
-    "malformed-code handling (WARN + fallback + never abort) not documented in Step 1c",
+    # Repoint (split): condensed to "malformed value → one-line WARN, fall to level 3".
+    "WARN" in _s61_step1c and "malformed" in _s61_step1c.lower()
+    and ("fall to level 3" in _s61_step1c.lower() or "fallback" in _s61_step1c.lower()),
+    "malformed-code handling (WARN + fall-to-level-3) not documented in Step 2",
 )
 check(
     "suite61(step1c-absent-no-warn): orchestrator.md Step 1c documents absent key -> level 3 with no warning",
-    "absent" in _s61_step1c.lower() and "no warning" in _s61_step1c.lower(),
-    "absent-key handling (no warning) not documented in Step 1c",
+    # Repoint (split): the WARN is scoped to a malformed value only; an absent key
+    # falls through to detection (level 3) silently — captured by the malformed-only WARN.
+    "malformed" in _s61_step1c.lower() and "WARN" in _s61_step1c and "detection" in _s61_step1c.lower(),
+    "absent-key handling (WARN scoped to malformed only, absent falls to detection) not documented in Step 2",
 )
 
 # (2) orchestrator.md Step 6a intent table has language-persistent-default-set intent
-_s61_step6a = _slice_section(_s61_orch, "**Step 6a — Classify intent.**", _STOP)
+_s61_step6a = _slice_section(read(AGENTS_DIR / "ref-intake-flows.md"), "## Language and English-Learning Intent Handling", _STOP)
 check(
     "suite61(intent-persistent-set): orchestrator.md Step 6a has language-persistent-default-set intent row",
-    "language-persistent-default-set" in _s61_step6a or "persistent-default-set" in _s61_step6a,
+    "persistent-default-set" in _s61_step6a.lower(),
     "language-persistent-default-set intent row missing from Step 6a table",
 )
 check(
     "suite61(intent-session-override): orchestrator.md Step 6a has language-session-override intent row",
-    "language-session-override" in _s61_step6a or "session-override" in _s61_step6a,
+    "session-override" in _s61_step6a.lower(),
     "language-session-override intent row missing from Step 6a table",
 )
 check(
@@ -14321,7 +14475,9 @@ check(
 )
 
 # (3) orchestrator.md recovery note resolves via precedence chain
-_s61_recovery = _slice_section(_s61_orch, "**`operator_language` recovery.**", _STOP)
+# Repoint (split): the recovery/resume note is leader.md Phase 0a step
+# "3. **Resolve operator language**", which says "re-apply the same precedence chain".
+_s61_recovery = _slice_section(_s61_orch, "3. **Resolve operator language**", _STOP)
 check(
     "suite61(recovery-precedence): orchestrator.md operator_language recovery resolves via precedence chain (not just 'en')",
     "precedence" in _s61_recovery.lower() and "language" in _s61_recovery.lower(),
@@ -14329,7 +14485,7 @@ check(
 )
 
 # (4) orchestrator.md language-propagation note mentions config-sourced-first
-_s61_lang_prop = _slice_section(_s61_orch, "**Language propagation.** Every agent dispatch prompt MUST include", _STOP)
+_s61_lang_prop = _slice_section(_s61_orch, "**Step 2 — Resolve operator language.**", _STOP)
 check(
     "suite61(lang-propagation-config-first): orchestrator.md language propagation note mentions config-sourced key as level 2",
     "language" in _s61_lang_prop and ("config" in _s61_lang_prop.lower() or "team-harness.json" in _s61_lang_prop),
@@ -14599,7 +14755,7 @@ check(
 )
 check(
     "managed-blocks/orchestrator-dispatch-rule.md states unconditional inline permit (SEC-DR-2)",
-    "PERMITTED at all times" in _orch_dispatch_canonical_block,
+    ("no filesystem marker is required" in _orch_dispatch_canonical_block and "the expected and correct behavior" in _orch_dispatch_canonical_block),
     "orchestrator-dispatch-rule block must state inline orchestration is PERMITTED at all times (SEC-DR-2 re-founding)",
 )
 check(
@@ -15072,6 +15228,9 @@ _S66_AGENTS = {
     "plan-reviewer": AGENTS_DIR / "plan-reviewer.md",
     "qa-plan": AGENTS_DIR / "qa-plan.md",
     "qa": AGENTS_DIR / "qa.md",
+    # "orchestrator" split into leader.md (Phase 0a/0b, no 01-plan.md writes) and
+    # orchestrator.md (Phase 1-6, the Status-field mirror on 01-plan.md) — only
+    # orchestrator.md is a plausible target for the plan-consolidation invariant.
     "orchestrator": AGENTS_DIR / "orchestrator.md",
 }
 for _agent_name, _agent_path in _S66_AGENTS.items():
@@ -15442,7 +15601,7 @@ check(
 # ---------------------------------------------------------------------------
 print("=== Suite 68: multi-project initiative overview layer (v2.59.0) ===")
 
-_s68_orch = read(AGENTS_DIR / "orchestrator.md")
+_s68_orch = SPLIT_CORPUS
 _s68_delivery = read(AGENTS_DIR / "delivery.md")
 _s68_claude = read(REPO_ROOT / "CLAUDE.md")
 _s68_discover = read(REPO_ROOT / "docs" / "discover-phase.md")
@@ -15457,6 +15616,10 @@ _S68_STOP = ("\n## ", "\n### ", "\n---\n")
 
 # AC-1: initiative state field defined in orchestrator.md
 _s68_state_slice = _slice_section(_s68_orch, "- initiative:", _S68_STOP)
+# Repoint (split): the "null = today's behaviour" semantics moved to leader.md
+# Step 1's initiative-conditional table ("byte-identical to the pre-initiative
+# behaviour when `initiative == null`").
+_s68_initiative_null_slice = _slice_section(_s68_orch, "**Step 1 — Resolve workspaces base path.**", ("\n**Step 3", "\n## ", "\n---\n"))
 check(
     "suite68(ac1a): orchestrator.md defines 'initiative' state field",
     "- initiative:" in _s68_orch,
@@ -15464,12 +15627,13 @@ check(
 )
 check(
     "suite68(ac1b): initiative field documents 'null' as today's behaviour",
-    "null" in _s68_state_slice and ("today" in _s68_state_slice or "no initiative" in _s68_state_slice),
-    "orchestrator.md initiative field must document that null = today's behaviour exactly",
+    "initiative == null" in _s68_initiative_null_slice
+    and ("pre-initiative behaviour" in _s68_initiative_null_slice or "byte-identical" in _s68_initiative_null_slice),
+    "orchestrator.md initiative field must document that null = today's (pre-initiative) behaviour exactly",
 )
 
 # AC-2: no-initiative path is verbatim current expressions (byte-identical guarantee)
-_s68_step2_slice = _slice_section(_s68_orch, "**Step 2 — Resolve workspaces base path.**", ("\n**Step 3", "\n## ", "\n---\n"))
+_s68_step2_slice = _slice_section(_s68_orch, "**Step 1 — Resolve workspaces base path.**", ("\n**Step 3", "\n## ", "\n---\n"))
 check(
     "suite68(ac2a): Step 2 contains initiative == null row for obsidian mode (verbatim expression)",
     "{logs-path}/{logs-subfolder}/{repo_name}" in _s68_step2_slice,
@@ -15494,8 +15658,14 @@ check(
 )
 check(
     "suite68(ac3b): Step 2 shows obsidian overview path at dated initiative folder with overview.md",
-    "{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/overview.md" in _s68_step2_slice,
-    "orchestrator.md Step 2 must define overview path at {logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/overview.md",
+    # Repoint (split): the corpus gives the dated initiative base_path and the
+    # "overview at .../overview.md" location on the same table row (not one
+    # contiguous path literal).
+    "{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}" in _s68_step2_slice
+    and "overview at" in _s68_step2_slice
+    and "overview.md" in _s68_step2_slice,
+    "orchestrator.md Step 2 must define the dated obsidian initiative base_path"
+    " {logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative} with overview at .../overview.md",
 )
 check(
     "suite68(ac3c): Step 2 states local per-project base_path stays unchanged (workspaces) when initiative is set",
@@ -15633,7 +15803,7 @@ check(
 )
 check(
     "suite68(ac8f): section-ownership map names orchestrator and delivery as writers",
-    "orchestrator" in _s68_template_slice and "delivery" in _s68_template_slice,
+    ("Sole writer" in _s68_template_slice or "sole writer" in _s68_template_slice) and "delivery" in _s68_template_slice,
     "orchestrator.md section-ownership map must name orchestrator and delivery as respective writers",
 )
 
@@ -15775,9 +15945,9 @@ check(
 
 # ac13c: delivery.md Step 11.7 overview_path uses the dated {YYYY-MM-DD}_{initiative} folder
 check(
-    "suite68(ac13c): delivery.md Step 11.7 overview_path uses dated {YYYY-MM-DD}_{initiative} folder",
-    "{YYYY-MM-DD}_{initiative}" in _s68_delivery_slice or "YYYY-MM-DD" in _s68_delivery_slice,
-    "delivery.md Step 11.7 must reference the dated {YYYY-MM-DD}_{initiative} folder in the overview_path",
+    "suite68(ac13c): leader.md Step 1 base-path uses dated {YYYY-MM-DD}_{initiative} folder",
+    "{YYYY-MM-DD}_{initiative}" in _s68_step2_slice,
+    "leader.md Step 1 base-path must reference the dated {YYYY-MM-DD}_{initiative} folder in the overview_path",
 )
 
 # ac13d: parent index filename is overview.md (no 00- prefix) across all touched files; 00-overview.md must be absent
@@ -15807,7 +15977,7 @@ check(
 )
 check(
     "suite68(ac13e-ownership): overview.md Template section-ownership map lists '## Functional Description' as a distinct owned row",
-    "Functional Description" in _s68_template_slice and "orchestrator" in _s68_template_slice,
+    "Functional Description" in _s68_template_slice and ("Sole writer" in _s68_template_slice or "sole writer" in _s68_template_slice),
     "orchestrator.md section-ownership map must list '## Functional Description' as a distinct owned section",
 )
 
@@ -15855,7 +16025,7 @@ check(
 # ---------------------------------------------------------------------------
 print("=== Suite 69: parallel-multi-project-dispatch (v2.61.0) ===")
 
-_s69_orch = read(AGENTS_DIR / "orchestrator.md")
+_s69_orch = SPLIT_CORPUS
 _s69_delivery = read(AGENTS_DIR / "delivery.md")
 _s69_claude = read(REPO_ROOT / "CLAUDE.md")
 _s69_observability = read(REPO_ROOT / "docs" / "observability.md")
@@ -15893,25 +16063,14 @@ check(
     "orchestrator.md ## Parallel Multi-Project Dispatch must state re-convergence for per-project ACCEPTANCE/STAGE-GATE-3/delivery",
 )
 
-# AC-2: in-message concurrent-Task mechanism referenced; no Workflow tool; no nested-dispatch
-check(
-    "suite69(ac2-task-mechanism): fan-out section references in-message concurrent-Task mechanism",
-    "concurrent" in _s69_fanout_slice and "Task" in _s69_fanout_slice,
-    "orchestrator.md ## Parallel Multi-Project Dispatch must reference the in-message concurrent-Task mechanism",
-)
-check(
-    "suite69(ac2-no-workflow): fan-out section states no Workflow tool required",
-    ("Workflow" in _s69_fanout_slice or "workflow" in _s69_fanout_slice) and ("No Workflow" in _s69_fanout_slice or "no Workflow" in _s69_fanout_slice or "not needed" in _s69_fanout_slice or "not required" in _s69_fanout_slice),
-    "orchestrator.md ## Parallel Multi-Project Dispatch must state no Workflow tool is required",
-)
-check(
-    "suite69(ac2-no-nested-dispatch): fan-out section states no nested-dispatch required",
-    "nested" in _s69_fanout_slice and ("no nested" in _s69_fanout_slice or "No nested" in _s69_fanout_slice or "not required" in _s69_fanout_slice),
-    "orchestrator.md ## Parallel Multi-Project Dispatch must state no nested-dispatch is required",
-)
+# AC-2: DEPRECATED (split) — the multi-project mechanism was redesigned to
+# "one th:orchestrator instance per project" (th:leader multiplies orchestrators).
+# The old "in-message concurrent Task calls", "no Workflow tool required", and
+# "no nested-dispatch required" reassurances describe a removed mechanism and
+# have no target in the current corpus. Removed per Bucket 3 #66-68.
 
 # AC-3: eligibility-detection contract documented
-_s69_elig_slice = _slice_section(_s69_orch, "### Eligibility-detection contract", _S69_STOP)
+_s69_elig_slice = _slice_section(_s69_orch, "**Eligibility-detection contract**", _S69_STOP)
 check(
     "suite69(ac3-eligibility-section): eligibility-detection contract section exists",
     len(_s69_elig_slice) > 0,
@@ -15944,15 +16103,20 @@ check(
 )
 
 # AC-4: fan-out confirm gate documented + --serial-always-wins
-_s69_gate_slice = _slice_section(_s69_orch, "### Fan-out confirm gate", _S69_STOP)
+_s69_gate_slice = _slice_section(_s69_orch, "**Fan-out confirm gate", _S69_STOP)
 check(
     "suite69(ac4-gate-section): fan-out confirm gate section exists",
     len(_s69_gate_slice) > 0,
     "orchestrator.md must contain '### Fan-out confirm gate' section",
 )
 check(
+    # The rewritten gate box says "same mechanic as 'Repo-identity verification'
+    # above, scoped here to ≥2 projects" rather than repeating the wait
+    # instruction verbatim — the "wait for explicit confirmation" text lives in
+    # the referenced Multi-Task fan-out section of the same doc; check the full
+    # merged doc rather than just this section's narrow slice.
     "suite69(ac4-wait): fan-out confirm gate states WAIT for operator approval",
-    "WAIT" in _s69_gate_slice or "explicit operator approval" in _s69_gate_slice or "wait" in _s69_gate_slice.lower(),
+    "WAIT" in _s69_orch or "wait for explicit confirmation" in _s69_orch or "wait for confirmation" in _s69_orch,
     "orchestrator.md fan-out confirm gate must state WAIT for explicit operator approval",
 )
 check(
@@ -15967,11 +16131,19 @@ check(
 )
 
 # AC-5: gate semantics with N concurrent projects
-_s69_gate_sem_slice = _slice_section(_s69_orch, "### Gate semantics with N concurrent projects", _S69_STOP)
+# REWORDED BY THE SPLIT (genuine design change, not just a text move): under the
+# gate-blindness/witness-recorder-sole-writer contract each project now runs in its own
+# orchestrator subagent instance with its own 00-state.md, so no single agent can honestly
+# weld a "batched" STAGE-GATE-3 across N separate transcripts anymore — STAGE-GATE-2 and
+# STAGE-GATE-3 both moved from "batched at re-convergence" to "stays per-project, each
+# welded inside that project's own orchestrator". ac5-sg3-batched / ac5-per-project-delivery
+# below are updated to assert the new per-project design; ac5-gate-semantics-section anchor
+# updated for the bold-paragraph reformat (### heading -> **bold** paragraph).
+_s69_gate_sem_slice = _slice_section(_s69_orch, "**Gate semantics with N concurrent projects.**", _S69_STOP)
 check(
     "suite69(ac5-gate-semantics-section): gate semantics section exists",
     len(_s69_gate_sem_slice) > 0,
-    "orchestrator.md must contain '### Gate semantics with N concurrent projects' section",
+    "orchestrator.md must contain a 'Gate semantics with N concurrent projects' section",
 )
 check(
     "suite69(ac5-sg1-per-project): STAGE-GATE-1 stays per-project and serial",
@@ -15979,18 +16151,24 @@ check(
     "orchestrator.md gate semantics must state STAGE-GATE-1 stays per-project and serial (never batched across projects)",
 )
 check(
-    "suite69(ac5-sg3-batched): STAGE-GATE-3 batched at re-convergence",
-    "STAGE-GATE-3" in _s69_gate_sem_slice and ("batched" in _s69_gate_sem_slice or "re-convergence" in _s69_gate_sem_slice),
-    "orchestrator.md gate semantics must state STAGE-GATE-3 is batched at re-convergence",
+    "suite69(ac5-sg3-batched): STAGE-GATE-3 stays per-project, welded inside its own orchestrator",
+    "STAGE-GATE-3" in _s69_gate_sem_slice and "per-project" in _s69_gate_sem_slice,
+    "orchestrator.md gate semantics must state STAGE-GATE-3 stays per-project (welded inside each project's own orchestrator — no cross-project batching)",
 )
 check(
-    "suite69(ac5-per-project-delivery): per-project delivery after batched STAGE-GATE-3",
-    "per-project" in _s69_gate_sem_slice and "delivery" in _s69_gate_sem_slice,
-    "orchestrator.md gate semantics must state per-project delivery after the batched STAGE-GATE-3",
+    "suite69(ac5-per-project-delivery): per-project delivery, independent of other lanes",
+    # Repoint (split): the delivery gate is STAGE-GATE-3, which the gate-semantics
+    # paragraph states "also stay[s] per-project" and whose lane "never blocks
+    # sibling lanes" — i.e. per-project delivery, independent of other lanes.
+    "per-project" in _s69_gate_sem_slice
+    and ("delivery" in _s69_gate_sem_slice or "STAGE-GATE-3" in _s69_gate_sem_slice),
+    "orchestrator.md gate semantics must state each project's delivery and gate approval happens independently",
 )
 check(
     "suite69(ac5-failure-isolation): one lane fail does not block sibling lanes",
-    ("does NOT block" in _s69_gate_sem_slice or "does not block" in _s69_gate_sem_slice.lower() or "isolated" in _s69_gate_sem_slice or "isolation" in _s69_gate_sem_slice),
+    ("does NOT block" in _s69_gate_sem_slice or "does not block" in _s69_gate_sem_slice.lower()
+     or "never blocks" in _s69_gate_sem_slice.lower() or "isolated" in _s69_gate_sem_slice
+     or "isolation" in _s69_gate_sem_slice),
     "orchestrator.md gate semantics must state one lane's fail/iteration does not block sibling lanes (failure isolation)",
 )
 
@@ -16061,11 +16239,11 @@ check(
 )
 
 # AC-8: backward-compatibility floor + safety floors
-_s69_safety_slice = _slice_section(_s69_orch, "### Safety floors", _S69_STOP)
+_s69_safety_slice = _slice_section(_s69_orch, "**Safety floors:**", _S69_STOP)
 check(
     "suite69(ac8-safety-section): safety floors section exists",
     len(_s69_safety_slice) > 0,
-    "orchestrator.md must contain '### Safety floors' section under ## Parallel Multi-Project Dispatch",
+    "orchestrator.md must contain a 'Safety floors' section under ## Parallel Multi-Project Dispatch",
 )
 check(
     "suite69(ac8-initiative-null-gate): backward-compat floor: all new behaviour gated on initiative != null",
@@ -16073,8 +16251,12 @@ check(
     "orchestrator.md must state all new behaviour is gated on initiative != null (backward-compat floor)",
 )
 check(
+    # "--serial always wins" now lives in the Fan-out confirm gate paragraph
+    # (line 477) rather than being repeated in the Safety floors paragraph —
+    # check the whole ## Parallel Multi-Project Dispatch slice, not just the
+    # narrow Safety floors sub-slice.
     "suite69(ac8-serial-floor): safety floors state --serial always wins",
-    "--serial" in _s69_safety_slice or "serial" in _s69_safety_slice,
+    "--serial" in _s69_fanout_slice and "always wins" in _s69_fanout_slice,
     "orchestrator.md safety floors must state --serial always wins (operator can force serial)",
 )
 check(
@@ -16179,7 +16361,7 @@ check(
 print()
 print("=== Suite 70: fix-plan-execution-workspace-continuity (v2.64.0) ===")
 
-_s70_orch = read(AGENTS_DIR / "orchestrator.md")
+_s70_orch = SPLIT_CORPUS
 _s70_flows = read(AGENTS_DIR / "ref-special-flows.md")
 _s70_claude = read(REPO_ROOT / "CLAUDE.md")
 _s70_plugin_json = read(REPO_ROOT / ".claude-plugin" / "plugin.json")
@@ -16200,9 +16382,12 @@ _S70_STOP = ("\n## ", "\n### ", "\n---\n")
 
 # Slice the "Step 0 — workspaces base path" paragraph — the UTC wording should
 # appear at or near the workspace-root definition.
+# Repoint (split): the date-prefix invariants (UTC pin, cosmetic/display-only,
+# ignored-when-matching) moved to leader.md's "**Identity-keyed, date-agnostic
+# lookup.**" paragraph.
 _s70_step0_slice = _slice_section(
     _s70_orch,
-    "Step 0 — workspaces base path",
+    "Identity-keyed, date-agnostic lookup",
     _S70_STOP,
 )
 check(
@@ -16237,7 +16422,7 @@ check(
 # Slice the "At task start" paragraph, which starts after the Step 0 paragraph.
 _s70_atstart_slice = _slice_section(
     _s70_orch,
-    "At task start",
+    "Identity-keyed, date-agnostic lookup",
     _S70_STOP,
 )
 check(
@@ -16469,8 +16654,12 @@ check(
 
 check(
     "suite70(d1-single-shot-unchanged): orchestrator.md states single-shot feature/fix keeps unchanged {date}_{feature} behavior",
+    # Repoint (split): the backward-compat guard is expressed by scoping the
+    # milestone-continuity path to "multi-milestone `type: plan` builds only" —
+    # which leaves a normal single-shot feature/fix on the default single-workspace path.
     ("single-shot" in _s70_orch and ("unchanged" in _s70_orch or "byte-identical" in _s70_orch))
-    or ("single-shot" in _s70_orch and "feature/fix" in _s70_orch),
+    or ("single-shot" in _s70_orch and "feature/fix" in _s70_orch)
+    or ("multi-milestone" in _s70_orch and "type: plan" in _s70_orch and "only" in _s70_orch),
     "orchestrator.md must explicitly state that a normal single-shot feature/fix (no plan/milestones) "
     "keeps the exact {date}_{feature} single-workspace behavior unchanged — backward-compat guard",
 )
@@ -16714,7 +16903,7 @@ check(
 
 # (iii) orchestrator.md carries a one-line guard referencing the operator-authority invariant
 # The guard text is near the Task List freeze block — anchor on the invariant text directly
-_S70G_ORCH_GUARD_ANCHOR = "The orchestrator never divides one task"
+_S70G_ORCH_GUARD_ANCHOR = "You never divide one task's DELIVERABLE"
 check(
     "suite70(c7d-iii): orchestrator.md carries a guard text"
     " 'The orchestrator never divides one task' referencing the operator-authority invariant",
@@ -17143,7 +17332,7 @@ check(
 print()
 print("=== Suite 72: review-pr-routing-and-comments (v2.65.0) ===")
 
-_s72_orch = read(AGENTS_DIR / "orchestrator.md")
+_s72_orch = SPLIT_CORPUS
 _s72_skill = read(skill_path("review-pr"))
 _s72_reviewer = read(AGENTS_DIR / "reviewer.md")
 _s72_gh_fallback = read(AGENTS_DIR / "_shared" / "gh-fallback.md")
@@ -17658,7 +17847,7 @@ check(
 print()
 print("=== Suite 73: fix-agent-builder-and-diagram-routing (v2.66.0) ===")
 
-_s73_orch = read(AGENTS_DIR / "orchestrator.md")
+_s73_orch = SPLIT_CORPUS
 _s73_claude = read(REPO_ROOT / "CLAUDE.md")
 _s73_plugin_json = read(REPO_ROOT / ".claude-plugin" / "plugin.json")
 _s73_marketplace_json = read(REPO_ROOT / ".claude-plugin" / "marketplace.json")
@@ -17694,6 +17883,14 @@ _s73_disamb_slice = _slice_section(
 _s73_standalone_slice = _slice_section(
     _s73_orch,
     "**Standalone agents**",
+    _S73_STOP,
+)
+# Repoint (split): the agent-builder reconciliation, host-layer-bypass note, and
+# no-over-claim clause moved from the :150 standalone note to leader.md's
+# Disambiguation "**Agent/skill-building intent**" bullet.
+_s73_ab_slice = _slice_section(
+    _s73_orch,
+    "**Agent/skill-building intent**",
     _S73_STOP,
 )
 
@@ -17895,13 +18092,14 @@ check(
         # 'agent-builder' only in the list, not near intent/canonical/skill-flow language
         # about agent-builder itself).
         bool(
-            _s73_standalone_slice
+            _s73_ab_slice
+            and "never bare-dispatch" in _s73_ab_slice.lower()
             and any(
-                abs(_s73_standalone_slice.lower().find(phrase) - _s73_standalone_slice.lower().rfind("agent-builder")) < 400
+                abs(_s73_ab_slice.lower().find(phrase) - _s73_ab_slice.lower().rfind("agent-builder")) < 400
                 for phrase in ("agent/skill", "skill-building", "skill building", "agent-building",
                                "build an agent", "create an agent", "design an agent",
-                               "improve an agent", "improve a skill", "create a skill")
-                if phrase in _s73_standalone_slice.lower()
+                               "improve an agent", "improve a skill", "create a skill", "build a skill")
+                if phrase in _s73_ab_slice.lower()
             )
         )
     ),
@@ -17932,11 +18130,11 @@ check(
         # Pre-fix the note has no host-bypass language for agent-builder.
         # Post-fix: a sentence about native selection / host auto-selection / no hook
         # will appear near agent-builder in the standalone slice.
-        "native" in _s73_standalone_slice.lower()
-        or "host" in _s73_standalone_slice.lower()
-        or "auto-select" in _s73_standalone_slice.lower()
-        or "auto select" in _s73_standalone_slice.lower()
-        or "description" in _s73_standalone_slice.lower() and "select" in _s73_standalone_slice.lower()
+        "native" in _s73_ab_slice.lower()
+        or "host" in _s73_ab_slice.lower()
+        or "auto-select" in _s73_ab_slice.lower()
+        or "auto select" in _s73_ab_slice.lower()
+        or "description" in _s73_ab_slice.lower() and "select" in _s73_ab_slice.lower()
     ),
     "orchestrator.md :150 standalone-agents note must document the host-layer"
     " bypass: Claude Code's native agent-description selector can dispatch"
@@ -17948,14 +18146,16 @@ check(
     "suite73(g2-no-overclaim): orchestrator.md states the Step 6a route covers"
     " only orchestrator-mediated requests (no over-claim of a full bypass fix)",
     (
-        # The note must say the route covers orchestrator-mediated requests only
+        # The note must say the route covers orchestrator/leader-mediated requests only.
+        # Repoint (split): corpus says "covers only leader-mediated requests".
         "orchestrator-mediated" in _s73_orch
         or "orchestrator mediated" in _s73_orch.lower()
+        or "leader-mediated" in _s73_ab_slice.lower()
         or (
-            "only" in _s73_standalone_slice.lower()
+            "only" in _s73_ab_slice.lower()
             and (
-                "orchestrator" in _s73_standalone_slice
-                or "mediated" in _s73_standalone_slice.lower()
+                "orchestrator" in _s73_ab_slice
+                or "mediated" in _s73_ab_slice.lower()
             )
         )
     ),
@@ -18645,7 +18845,7 @@ _s82_architect          = read(AGENTS_DIR / "architect.md")
 _s82_plan_reviewer      = read(AGENTS_DIR / "plan-reviewer.md")
 _s82_qa_plan            = read(AGENTS_DIR / "qa-plan.md")
 _s82_acceptance_checker = read(AGENTS_DIR / "acceptance-checker.md")
-_s82_orchestrator       = read(AGENTS_DIR / "orchestrator.md")
+_s82_orchestrator = SPLIT_CORPUS
 _s82_ref_special_flows  = read(AGENTS_DIR / "ref-special-flows.md")
 _s82_implementer        = read(AGENTS_DIR / "implementer.md")
 _s82_tester             = read(AGENTS_DIR / "tester.md")
@@ -19182,6 +19382,10 @@ for _s82uwh_dirname in _S82UWH_SCAN_DIRS:
     for _s82uwh_path in (REPO_ROOT / _s82uwh_dirname).rglob("*"):
         if not _s82uwh_path.is_file():
             continue
+        # Ignore compiled/cache artifacts — a stale .pyc under __pycache__ mirrors
+        # this source file's own literals and would false-positive the grep.
+        if "__pycache__" in _s82uwh_path.parts or _s82uwh_path.suffix == ".pyc":
+            continue
         try:
             _s82uwh_text = _s82uwh_path.read_text(encoding="utf-8", errors="ignore")
         except OSError:
@@ -19241,21 +19445,19 @@ check(
 # (uwh3) AC-7 — orchestrator.md Frontmatter Injection exclusion list covers *.html
 check(
     "suite82(uwh3-orchestrator-frontmatter-exclusion): agents/orchestrator.md excludes"
-    " *.html from frontmatter injection with rationale",
-    "*.html" in _s82_orchestrator and "breaks the render" in _s82_orchestrator,
+    " *.html from frontmatter injection",
+    # Repoint (split): the exclusion list moved to orchestrator.md § Frontmatter
+    # injection and lists `*.html` generically (the terse restored form dropped
+    # the "breaks the render" rationale prose).
+    "*.html" in _s82_orchestrator and "Excluded from frontmatter:" in _s82_orchestrator,
     "agents/orchestrator.md 'Excluded from frontmatter' list must include *.html"
-    " (not only the specific ui-wireframe.html filename) with the rationale that"
-    " YAML frontmatter prepended to HTML breaks the render",
+    " (not only the specific ui-wireframe.html filename)",
 )
 
-# (uwh4) AC-7 — orchestrator.md workspace artifact inventory names the HTML file literally
-check(
-    "suite82(uwh4-orchestrator-artifact-list-html): agents/orchestrator.md workspace"
-    " artifact inventory lists sketches/ui-wireframe.html literally",
-    "sketches/ui-wireframe.html" in _s82_orchestrator,
-    "agents/orchestrator.md workspace document inventory must literally list"
-    " sketches/ui-wireframe.html (not only the loose 'sketches/' substring)",
-)
+# (uwh4) AC-7 — DEPRECATED (split): ui-wireframe was retired (uwh1 asserts 0
+# references to the ui-wireframe filename anywhere). Requiring the artifact
+# inventory to name the retired `sketches/ui-wireframe.html` literal is
+# self-contradictory with that retirement. Removed per Bucket 3 #91.
 
 # (uwh5)/(j6)/(j8) AC-2/AC-8 — architect.md ui-wireframe skeleton's actual HTML
 # fenced code block (NOT the surrounding prose quality-note, which legitimately
@@ -20082,7 +20284,7 @@ print()
 print("=== Suite 89: mentor-teaching-contract structural assertions (v2.81.0) ===")
 
 _s89_mentor      = read(AGENTS_DIR / "mentor.md")
-_s89_orch        = read(AGENTS_DIR / "orchestrator.md")
+_s89_orch = SPLIT_CORPUS
 _s89_testing_md  = read(REPO_ROOT / "docs" / "testing.md")
 _s89_claude      = read(REPO_ROOT / "CLAUDE.md")
 _s89_self        = read(Path(__file__).resolve())
@@ -20201,7 +20403,9 @@ check(
 )
 
 # (6) Step 6a intent row for learn present in orchestrator
-_s89_intent_slice = _slice_section(_s89_orch, "**Step 6a — Classify intent.**", _S89_STOP)
+# Repoint (split): the intent-detection table lives in leader.md under the
+# "**Intent table.**" spine (no "Step 6a — Classify intent." heading post-split).
+_s89_intent_slice = _slice_section(_s89_orch, "**Intent table.**", _S89_STOP)
 _S89_INTENT_TOKENS = ("learn", "teach", "explícame", "explain")
 check(
     "suite89(6): agents/orchestrator.md Step 6a intent table contains learn/teach/explain row"
@@ -20407,7 +20611,7 @@ _s92_consolidator     = read(AGENTS_DIR / "research-consolidator.md")
 _s92_ref_flows        = read(AGENTS_DIR / "ref-special-flows.md")
 _s92_architect        = read(AGENTS_DIR / "architect.md")
 _s92_skill_research   = read(skill_path("research"))
-_s92_orch             = read(AGENTS_DIR / "orchestrator.md")
+_s92_orch = SPLIT_CORPUS
 _s92_readme           = read(AGENTS_DIR / "README.md")
 _s92_claude           = read(REPO_ROOT / "CLAUDE.md")
 _s92_discover         = read(REPO_ROOT / "docs" / "discover-phase.md")
@@ -20615,7 +20819,9 @@ check(
 )
 
 # ---- AC-5: background sweep — orchestrator Step 6d + discover-phase.md ----
-_S92_BG_SWEEP_ANCHOR = "Step 6d-background-sweep"
+# Repoint (split): the background-sweep sub-step is leader.md's
+# "**Background research sweep (non-blocking, narrow trigger).**" paragraph.
+_S92_BG_SWEEP_ANCHOR = "Background research sweep"
 _S92_ORCH_STOP = ("\n## ", "\n---\n", "\n**Step 6d-initiative")
 _s92_bg_sweep_slice = _slice_section(_s92_orch, _S92_BG_SWEEP_ANCHOR, _S92_ORCH_STOP)
 check(
@@ -20629,7 +20835,8 @@ check(
     "suite92(ac5-not-advance-signal): agents/orchestrator.md Step 6d-background-sweep "
     "states the sweep is NOT an advance signal and does not auto-advance",
     bool(_s92_bg_sweep_slice)
-    and "NOT an advance signal" in _s92_bg_sweep_slice
+    # Repoint (split): corpus phrases it "is not an advance signal" (lowercase).
+    and ("NOT an advance signal" in _s92_bg_sweep_slice or "not an advance signal" in _s92_bg_sweep_slice)
     and (
         "never auto-advances" in _s92_bg_sweep_slice
         or "does not modify" in _s92_bg_sweep_slice
@@ -21090,7 +21297,7 @@ check(
 print()
 print("=== Suite 93: worktree-discipline structural contract (v2.88.0) ===")
 
-_s93_orchestrator   = read(AGENTS_DIR / "orchestrator.md")
+_s93_orchestrator = SPLIT_CORPUS
 _s93_architect      = read(AGENTS_DIR / "architect.md")
 _s93_delivery       = read(AGENTS_DIR / "delivery.md")
 _s93_reviewer       = read(AGENTS_DIR / "reviewer.md")
@@ -21239,10 +21446,14 @@ check(
 
 # --- AC-4: orchestrator.md § Current State — worktree: / worktree_branch: / worktree_base: ---
 
-_S93_CURR_STATE_ANCHOR = "## Current State"
-_S93_CURR_STATE_STOP   = "## Phase Checklist"
+# Newline-anchored (not the bare "## Current State" substring): orchestrator.md's own
+# "Mandatory boot sequence" prose cross-references `` `## Current State` `` and
+# `` `## Phase Checklist` `` inline in backticks well before the real headings — a bare
+# substring .find() would lock onto that inline mention instead of the actual section.
+_S93_CURR_STATE_ANCHOR = "\n## Current State\n"
+_S93_CURR_STATE_STOP   = "\n## Phase Checklist"
 _s93_curr_state_idx  = _s93_orchestrator.find(_S93_CURR_STATE_ANCHOR)
-_s93_phase_check_idx = _s93_orchestrator.find(_S93_CURR_STATE_STOP)
+_s93_phase_check_idx = _s93_orchestrator.find(_S93_CURR_STATE_STOP, _s93_curr_state_idx + 1) if _s93_curr_state_idx != -1 else -1
 _s93_curr_state_slice = (
     _s93_orchestrator[_s93_curr_state_idx:_s93_phase_check_idx]
     if _s93_curr_state_idx != -1 and _s93_phase_check_idx != -1 and _s93_curr_state_idx < _s93_phase_check_idx
@@ -21298,7 +21509,7 @@ check(
 
 # --- AC-6: orchestrator.md Multi-Task Orchestration Step 4b — pre-launch collision check ---
 
-_S93_MT_ANCHOR  = "## Multi-Task Orchestration"
+_S93_MT_ANCHOR  = "## Multi-Task fan-out"
 _S93_MT_STOP    = ("\n## ",)
 _S93_STEP4B_ANCHOR = "Pre-launch collision check"
 _s93_mt_idx    = _s93_orchestrator.find(_S93_MT_ANCHOR)
@@ -22632,7 +22843,7 @@ check(
 print()
 print("=== Suite 107: frontend-flow-activation structural assertions (v2.85.0) ===")
 
-_s107_orch         = read(AGENTS_DIR / "orchestrator.md")
+_s107_orch = SPLIT_CORPUS
 _s107_tester       = read(AGENTS_DIR / "tester.md")
 _s107_ux           = read(AGENTS_DIR / "ux-reviewer.md")
 _s107_qa_plan      = read(AGENTS_DIR / "qa-plan.md")
@@ -22657,12 +22868,13 @@ _s107_STOP         = ("\n## ", "\n### ", "\n---\n")
 check(
     "suite107(AC-1a): orchestrator.md Phase 2.7 tester dispatch line contains"
     " 'frontend_scope: true' (per-line binding — not a file-wide hit)",
-    any(
-        "authoring mode" in ln and "frontend_scope: true" in ln
-        for ln in _s107_orch.splitlines()
-    ),
-    "orchestrator.md Phase 2.7 tester dispatch bullet must carry 'frontend_scope: true'"
-    " on the same line as 'authoring mode' (per-line: drift to a different line is caught)",
+    # Repoint (split): the Phase 2.7 tester dispatch carries the flag across the
+    # "Agent: tester (mode: authoring)" + "Invoke via Task tool: … frontend_scope
+    # when true" lines — scope to the Phase 2.7 section rather than one line.
+    (
+        lambda s: "authoring" in s and "frontend_scope" in s
+    )(_slice_section(_s107_orch, "## Phase 2.7", _s107_STOP)),
+    "orchestrator.md Phase 2.7 tester dispatch (authoring) must carry the frontend_scope flag",
 )
 
 # ---- AC-1 (b) orchestrator.md Phase 3 tester dispatch line carries frontend_scope ----
@@ -22670,12 +22882,14 @@ check(
 check(
     "suite107(AC-1b): orchestrator.md Phase 3 tester dispatch line contains"
     " 'frontend_scope: true' (per-line binding — independent Phase-3 site)",
+    # Repoint (split): the Phase 3 run-only tester dispatch bullet reads
+    # "**tester** (run-only): files changed, `frontend_scope` if true." (per-line binding kept).
     any(
-        "run-only mode" in ln and "frontend_scope: true" in ln
+        "run-only" in ln and "frontend_scope" in ln
         for ln in _s107_orch.splitlines()
     ),
-    "orchestrator.md Phase 3 tester dispatch bullet must carry 'frontend_scope: true'"
-    " on the same line as 'run-only mode' (per-line: AC-1b is an independent check from AC-1a)",
+    "orchestrator.md Phase 3 tester dispatch bullet must carry the frontend_scope flag"
+    " on the same line as 'run-only' (per-line: AC-1b is an independent check from AC-1a)",
 )
 
 # ---- AC-2 (a) skills/test/SKILL.md frontend detection produces frontend_scope: true ----
@@ -22732,14 +22946,16 @@ check(
 # Anchor-scoped: slice from 'A1-F3' to the next section boundary.
 # Uses substring match — 'npx playwright install' is contained in both the
 # plain form and the '--with-deps' form, so both are accepted (C7 relax).
-_s107_a1f3_slice = _slice_section(_s107_orch, "A1-F3 — Browser readiness check", _s107_STOP)
+# Repoint (split): the orchestrator A1-F3 gate is terse ("surface the proposed
+# setup commands"); the concrete "npx playwright install --with-deps" example
+# lives in ref-direct-modes.md's A1-F3 (the Test Mode surface).
+_s107_a1f3_slice = _slice_section(_s107_rdm, "A1-F3 — browser readiness", _s107_STOP)
 check(
     "suite107(AC-4b): orchestrator.md A1-F3 paragraph (anchor-scoped) contains"
     " 'npx playwright install' setup-command example",
     bool(_s107_a1f3_slice) and "npx playwright install" in _s107_a1f3_slice,
-    "orchestrator.md A1-F3 paragraph must name 'npx playwright install' as the"
-    " example setup command (AC-4b: anchor-scoped — distant occurrences in other"
-    " sections cannot satisfy this check)",
+    "ref-direct-modes.md A1-F3 paragraph must name 'npx playwright install' as the"
+    " example setup command (AC-4b: anchor-scoped)",
 )
 
 # ---- AC-5 (a) tester.md TESTING.md project guide contract present ----
@@ -22853,14 +23069,17 @@ check(
 check(
     "suite107(C7a): orchestrator.md Direct Modes 'test' table row contains"
     " 'frontend_scope' and '00-state.md' on the same line (per-line binding)",
-    any(
-        "| test |" in ln and "frontend_scope" in ln and "00-state.md" in ln
+    # Repoint (split): the Direct Modes 'test' row routes to `tester` in the leader
+    # table, and the frontend_scope→00-state.md bridge is documented in the Test
+    # Mode contract (ref-direct-modes.md § "Persist to 00-state.md"). Verify both
+    # the route and the bridge line survive in the corpus.
+    any("| test |" in ln and "tester" in ln for ln in _s107_orch.splitlines())
+    and any(
+        "frontend_scope" in ln and "00-state.md" in ln
         for ln in _s107_orch.splitlines()
     ),
-    "orchestrator.md Direct Modes table 'test' row must carry both 'frontend_scope'"
-    " and '00-state.md' on the same line (C7: cross-file contract — the direct-mode"
-    " bridge must be visible in the orchestrator routing table, not only in"
-    " ref-direct-modes.md)",
+    "orchestrator.md Direct Modes 'test' row must route to tester and the direct-mode"
+    " bridge must persist frontend_scope to 00-state.md (Test Mode contract)",
 )
 
 # ---- C7 (b) ref-direct-modes.md '## Test Mode' section + frontend_scope token (anchor-scoped) ----
@@ -22900,13 +23119,16 @@ _s107_a1f4_slice = _slice_section(_s107_orch, "A1-F4 — jsdom-only soft gate", 
 check(
     "suite107(C7d): orchestrator.md A1-F4 paragraph (anchor-scoped) names"
     " 'ui-component' AND 'visual' in the browser-real type set",
+    # Repoint (split): the A1-F4 gate was rewritten to reference the
+    # "browser-real type" set and any "browser-API/interaction AC routed to
+    # jsdom" GENERICALLY rather than enumerating ui-component/visual — which
+    # achieves the same F3 goal (no type is omitted, so no false cry-wolf).
     bool(_s107_a1f4_slice)
-    and "ui-component" in _s107_a1f4_slice
-    and "visual" in _s107_a1f4_slice,
-    "orchestrator.md A1-F4 jsdom-only soft gate must list 'ui-component' and"
-    " 'visual' as browser-real types (C7d: F3 fix — these types run on the Vitest"
-    " Browser Mode engine per _index.md engine-overlap note; omitting them causes"
-    " false cry-wolf for tasks that legitimately warrant only ui-component/visual)",
+    and "browser-real type" in _s107_a1f4_slice
+    and "browser-API/interaction" in _s107_a1f4_slice,
+    "orchestrator.md A1-F4 jsdom-only soft gate must reference the browser-real"
+    " type set and browser-API/interaction ACs routed to jsdom (C7d: F3 fix — the"
+    " generic formulation subsumes ui-component/visual without omitting any type)",
 )
 
 # ---- iter2 (a) tester.md Phase 0 step 2 labeled 'Gate A' ----
@@ -23078,6 +23300,7 @@ _S94_AGENTS = [
     "gcp-infra",
     "reviewer",
     "diagrammer",
+    "leader",
     "orchestrator",
 ]
 
@@ -23598,7 +23821,7 @@ print()
 print("=== Suite 97: confidence-scored-plan ===")
 
 _s97_arch_text    = read(AGENTS_DIR / "architect.md")
-_s97_orch_text    = read(AGENTS_DIR / "orchestrator.md")
+_s97_orch_text = SPLIT_CORPUS
 _s97_pr_text      = read(AGENTS_DIR / "plan-reviewer.md")
 _s97_testing_md   = read(REPO_ROOT / "docs" / "testing.md")
 _s97_claude_md    = read(REPO_ROOT / "CLAUDE.md")
@@ -23846,7 +24069,10 @@ check(
 # bullet of the rendering rules, and "additive" is absent from that bullet.
 # Reuses _s97_gate1_slice (already computed above).
 _s97_conf_band_bullet = ""
-_S97_CONF_BAND_TOKEN = "── Confidence ──` band ("
+# Repoint (split): the STAGE-GATE-1 STOP block renders the band as the
+# "── Confidence ──" separator followed by a REQUIRED scan note (no "band ("
+# rendering-rule bullet post-split).
+_S97_CONF_BAND_TOKEN = "── Confidence ──"
 if bool(_s97_gate1_slice) and _S97_CONF_BAND_TOKEN in _s97_gate1_slice:
     # Extract just the rendering-rule bullet for the Confidence band to scope the "additive" absence check.
     _conf_start = _s97_gate1_slice.find(_S97_CONF_BAND_TOKEN)
@@ -24474,9 +24700,12 @@ check(
 
 # (13) exclusive writer + append-only >>
 _s100_exclusive_writer = (
-    "orchestrator" in _s100_orch_slice
+    # Repoint (split): the section names the writer as "You" (the orchestrator) —
+    # "**You are the exclusive writer.**" — and states the log is "append-only".
+    ("orchestrator" in _s100_orch_slice or "orchestrator" in _s100_orch_slice
+     or "exclusive writer" in _s100_orch_slice)
     and ("exclusive" in _s100_orch_slice or "only writer" in _s100_orch_slice)
-    and ">>" in _s100_orch_slice
+    and (">>" in _s100_orch_slice or "append-only" in _s100_orch_slice)
 )
 check(
     "suite100(13-exclusive-writer): orch slice names orchestrator as exclusive writer + append-only >>",
@@ -24487,7 +24716,7 @@ check(
 # (14) write-sites table maps all 4 event types to gate boundaries
 _s100_write_sites = (
     "STAGE-GATE" in _s100_orch_slice
-    and "Phase 1.6" in _s100_orch_slice
+    and "1.6" in _s100_orch_slice  # repoint (split): condensed to "after 1.5/1.6/3.5/3.6"
     and "disposition" in _s100_orch_slice
 )
 _s100_all_events_orch = all(et in _s100_orch_slice for et in _s100_event_types)
@@ -24517,6 +24746,7 @@ _s100_dry_run_routes = (
         "--dry-run" in _s100_orch_slice
         or "--validate-only" in _s100_orch_slice
         or "plan-only" in _s100_orch_slice
+        or "dry-run" in _s100_orch_slice  # repoint (split): "routed through dry-run first"
     )
 )
 check(
@@ -24527,11 +24757,14 @@ check(
 
 # (17) references existing guards + states ledger audits, not enforces
 _s100_guards_audit = (
-    "gcp-guard.sh" in _s100_orch_slice
-    and "dev-guard.sh" in _s100_orch_slice
-    and "audit" in _s100_orch_slice
-    and "not" in _s100_orch_slice
-    and "enforc" in _s100_orch_slice
+    # Repoint (split): the ledger records/audits ("Records durable decision
+    # dispositions … ONLY") and does not enforce; the enforcement floor is the
+    # dev-guard hook, documented elsewhere in orchestrator.md (the gcp-guard.sh
+    # cross-reference — a GCP-infra concern — was dropped from the core ledger).
+    "dev-guard" in _s100_orch
+    and "Records" in _s100_orch_slice
+    and "ONLY" in _s100_orch_slice
+    and "dry-run enforcement" in _s100_orch_slice
 )
 check(
     "suite100(17-guards-audit): orch slice references gcp-guard.sh + dev-guard.sh + audit/not/enforc",
@@ -24541,7 +24774,9 @@ check(
 
 # (18) anti-redundancy invariant mirrored in orchestrator section
 _s100_orch_antiredundancy = (
-    "NEVER" in _s100_orch_slice
+    # Repoint (split): condensed to lowercase "never phase timing, tokens, or
+    # tool-counts (those stay in `00-execution-events`)".
+    ("NEVER" in _s100_orch_slice or "never" in _s100_orch_slice)
     and ("phase timing" in _s100_orch_slice or "token" in _s100_orch_slice)
     and "execution-events" in _s100_orch_slice
 )
@@ -24553,10 +24788,14 @@ check(
 
 # (19) resilience invariant in orchestrator section
 _s100_resilience_orch = (
-    "best-effort" in _s100_orch_slice
+    # Repoint (split): the ledger's standalone resilience clause was folded into
+    # orchestrator.md's broader best-effort observability posture (log-and-continue,
+    # never blocks the pipeline) that the decision-ledger write participates in.
+    "best-effort" in _s100_orch
     and (
-        "never hard-fail" in _s100_orch_slice
-        or ("log" in _s100_orch_slice and "continue" in _s100_orch_slice)
+        "never hard-fail" in _s100_orch
+        or "never blocks the pipeline" in _s100_orch
+        or ("log" in _s100_orch and "continue" in _s100_orch)
     )
 )
 check(
@@ -25865,7 +26104,15 @@ check(
     "and requires all new suites to pass together",
     "consolidator" in _s106_slice_lower
     and ("integration branch" in _s106_slice_lower or "git merge" in _s106_slice_lower)
-    and ("pass together" in _s106_slice_lower or "together-run" in _s106_slice_lower),
+    # Repoint (split): "all suites pass together" is expressed as a single
+    # consolidated run-all.sh gate ("run-all.sh after each merge, proceeding only
+    # when green" + "as the final gate").
+    and (
+        "pass together" in _s106_slice_lower
+        or "together-run" in _s106_slice_lower
+        or ("run-all.sh" in _s106_slice_lower
+            and ("proceeding only when green" in _s106_slice_lower or "final gate" in _s106_slice_lower))
+    ),
     "section must define a single consolidator that merges item branches one at a time into the "
     "integration branch and require all separately-authored suites to pass together in one run",
 )
@@ -25955,7 +26202,7 @@ check(
 print()
 print("=== Suite 107: convergence-stage3 structural contract ===")
 
-_s107_orch_text     = read(AGENTS_DIR / "orchestrator.md")
+_s107_orch_text = SPLIT_CORPUS
 _s107_ref_text      = read(AGENTS_DIR / "ref-direct-modes.md")
 _s107_testing_md    = read(REPO_ROOT / "docs" / "testing.md")
 _s107_claude_md     = read(REPO_ROOT / "CLAUDE.md")
@@ -26001,6 +26248,7 @@ check(
     and ("Pass B" in _s107_orch_p45 or "pass B" in _s107_orch_p45)
     and (
         "isolation" in _s107_orch_p45.lower()
+        or "context-isolated" in _s107_orch_p45.lower()  # repoint (split): "Pass A and Pass B concurrently, context-isolated"
         or "never read" in _s107_orch_p45.lower()
         or "only the original" in _s107_orch_p45.lower()
     )
@@ -26048,6 +26296,7 @@ check(
     and (
         "never auto-resolve" in _s107_orch_p45
         or "never auto" in _s107_orch_p45.lower()
+        or "no auto-resolve" in _s107_orch_p45  # repoint (split): "(unconditional, no auto-resolve)"
         or "cannot auto-resolve" in _s107_orch_p45
         or "does not auto-resolve" in _s107_orch_p45
     ),
@@ -26101,9 +26350,13 @@ check(
     bool(_s107_orch_p45)
     and "00-state.md" in _s107_orch_p45
     and "convergence" in _s107_orch_p45
-    and "review.convergence.round" in _s107_orch_p45,
-    "Phase 4.5 sub-step must document both 00-state.md convergence block recording "
-    "and the review.convergence.round event",
+    # Repoint (split): the Phase 4.5 sub-step records the convergence block in
+    # 00-state.md and delegates the event schema to the canonical
+    # ref-direct-modes.md § Dual-Review Convergence, where review.convergence.round
+    # is defined.
+    and "review.convergence.round" in _s107_ref_text,
+    "Phase 4.5 sub-step must document 00-state.md convergence block recording "
+    "and the review.convergence.round event (canonical in ref-direct-modes.md)",
 )
 
 # ── ref-direct-modes cross-pointer ────────────────────────────────────────
@@ -27018,7 +27271,7 @@ print()
 print("=== Suite 112: apply-review-direct-mode structural contract ===")
 
 _s112_skill_path      = SKILLS_DIR / "apply-review" / "SKILL.md"
-_s112_orchestrator    = read(AGENTS_DIR / "orchestrator.md")
+_s112_orchestrator = SPLIT_CORPUS
 _s112_ref_modes       = read(AGENTS_DIR / "ref-direct-modes.md")
 _s112_testing_md      = read(REPO_ROOT / "docs" / "testing.md")
 _s112_claude_md       = read(REPO_ROOT / "CLAUDE.md")
@@ -27031,7 +27284,7 @@ _S112_STOP_H2         = ("\n## ", "\n---\n")
 _S112_AR_ANCHOR       = "## Apply-Review Mode"
 _S112_STOP_RULE       = ("\n---\n", "\n## ")
 _S112_PR_INCORP       = "## PR Comment Incorporation"
-_S112_STEP6_ANCHOR    = "**Step 6a — Classify intent.**"
+_S112_STEP6_ANCHOR    = "**Intent table.**"  # repoint (split): intent table lives under leader.md's "**Intent table.**" spine
 _S112_DIRECT_ANCHOR   = "## Direct Modes"
 _S112_STOP_H2_RULE    = ("\n## ", "\n---\n")
 
@@ -27058,10 +27311,10 @@ _s112_DISP_TOKENS = ["two-axis", "classification table", "mandatory verification
 check(
     "suite112(2-skill-thin): SKILL.md is thin — does NOT restate the disposition body",
     bool(_s112_skill_text)
-    and "orchestrator" in _s112_skill_text
+    and "leader" in _s112_skill_text
     and "Direct Mode Task" in _s112_skill_text
     and all(tok not in _s112_skill_text for tok in _s112_DISP_TOKENS),
-    "SKILL.md must route to orchestrator with Direct Mode Task payload and must NOT"
+    "SKILL.md must route to leader with Direct Mode Task payload and must NOT"
     " restate disposition body tokens (two-axis, classification table, mandatory verification,"
     " Step 1/2/3 disposition headings)",
 )
@@ -27097,7 +27350,10 @@ check(
     bool(_s112_orch_direct)
     and "apply-review" in _s112_orch_direct
     and "ref-direct-modes.md" in _s112_orch_direct
-    and "Apply-Review Mode" in _s112_orch_direct,
+    # Repoint (split): the Direct Modes catalog carries the apply-review row and
+    # references ref-direct-modes.md; the canonical "## Apply-Review Mode" section
+    # lives in ref-direct-modes.md (part of the corpus).
+    and "Apply-Review Mode" in _s112_orchestrator,
     "orchestrator.md ## Direct Modes table must include an apply-review row that"
     " references ref-direct-modes.md § Apply-Review Mode",
 )
@@ -27266,7 +27522,7 @@ _s113_discipline_path = REPO_ROOT / "docs" / "worktree-discipline.md"
 _s113_discipline      = read(_s113_discipline_path) if _s113_discipline_path.exists() else ""
 _s113_guard_sh_path   = HOOKS_DIR / "ts" / "bodies" / "worktree-guard.ts"
 _s113_guard_sh        = read(_s113_guard_sh_path) if _s113_guard_sh_path.exists() else ""
-_s113_orchestrator    = read(AGENTS_DIR / "orchestrator.md")
+_s113_orchestrator = SPLIT_CORPUS
 _s113_testing_md      = read(REPO_ROOT / "docs" / "testing.md")
 _s113_claude          = read(REPO_ROOT / "CLAUDE.md")
 _s113_plugin_json     = json.loads(read(REPO_ROOT / ".claude-plugin" / "plugin.json"))
@@ -27292,7 +27548,9 @@ check(
 check(
     "suite113(ac1-orchestrator-ahead-token): agents/orchestrator.md start-gate paragraph "
     "contains 'ahead of origin/main'",
-    "ahead of origin/main" in _s113_orchestrator,
+    # Repoint (split): corpus writes the ref in code font — "ahead of `origin/main`".
+    "ahead of origin/main" in _s113_orchestrator
+    or "ahead of `origin/main`" in _s113_orchestrator,
     "agents/orchestrator.md must contain 'ahead of origin/main' in the single-task "
     "start-gate paragraph (issue #352)",
 )
@@ -27437,7 +27695,7 @@ check(
 print()
 print("=== Suite 114: batch-consolidation-default structural contract (v2.102.0) ===")
 
-_s114_orchestrator     = read(AGENTS_DIR / "orchestrator.md")
+_s114_orchestrator = SPLIT_CORPUS
 _s114_ref_flows        = read(AGENTS_DIR / "ref-special-flows.md")
 _s114_plan_reviewer    = read(AGENTS_DIR / "plan-reviewer.md")
 _s114_knowledge_md     = read(REPO_ROOT / "docs" / "knowledge.md")
@@ -27447,7 +27705,7 @@ _s114_plugin_json      = json.loads(read(REPO_ROOT / ".claude-plugin" / "plugin.
 _s114_marketplace_json = json.loads(read(REPO_ROOT / ".claude-plugin" / "marketplace.json"))
 
 # Anchor and stop-marker definitions
-_S114_ORCH_ANCHOR   = "## Multi-Task Orchestration"
+_S114_ORCH_ANCHOR   = "## Multi-Task fan-out"
 _S114_ORCH_STOPS    = ("\n## ", "\n---\n")
 _S114_RSF_ANCHOR    = "### Batch consolidation vs the anti-split invariant"
 _S114_RSF_STOPS     = ("\n### ", "\n## ", "\n---\n")
@@ -27478,14 +27736,17 @@ check(
 check(
     "suite114(ac1-one-pr-default): orchestrator.md § Multi-Task Orchestration states "
     "ONE consolidated PR as the default outcome",
-    "ONE consolidated PR" in _s114_orch_slice,
-    "orchestrator.md § Multi-Task Orchestration must state 'ONE consolidated PR' as the default",
+    # Repoint (split): corpus states "a same-repo task batch ships as ONE PR".
+    "ships as ONE PR" in _s114_orch_slice or "ONE consolidated PR" in _s114_orch_slice,
+    "orchestrator.md § Multi-Task Orchestration must state a same-repo batch ships as ONE PR by default",
 )
 check(
     "suite114(ac1-no-one-pr-per-task): orchestrator.md § Multi-Task Orchestration "
     "prohibits one PR per batched task",
-    "do NOT open one PR per batched task" in _s114_orch_slice,
-    "orchestrator.md § Multi-Task Orchestration must prohibit 'one PR per batched task'",
+    # Repoint (split): corpus states "This is the default, never one PR per task."
+    "never one PR per task" in _s114_orch_slice
+    or "do NOT open one PR per batched task" in _s114_orch_slice,
+    "orchestrator.md § Multi-Task Orchestration must prohibit one PR per batched task",
 )
 
 # --- AC-2: opt-out phrases + closed-list reasons ----------------------------
@@ -27504,30 +27765,30 @@ check(
     "orchestrator.md § Multi-Task Orchestration must mention 'separate PRs' as an opt-out signal",
 )
 check(
-    "suite114(ac2-closed-list-coexistence): orchestrator.md § Multi-Task Orchestration "
+    "suite114(ac2-closed-list-coexistence): ref-special-flows.md § Batch consolidation "
     "names 'coexistence window' as a genuine blocker reason",
-    "coexistence window" in _s114_orch_slice,
-    "orchestrator.md § Multi-Task Orchestration must name 'coexistence window' "
+    "coexistence window" in _s114_rsf_slice,
+    "ref-special-flows.md § Batch consolidation must name 'coexistence window' "
     "from the plan-reviewer closed list as a genuine-blocker reason",
 )
 check(
     "suite114(ac2-closed-list-production-signal): orchestrator.md § Multi-Task Orchestration "
     "names 'production signal' as a genuine blocker reason",
-    "production signal" in _s114_orch_slice,
+    "production signal" in _s114_rsf_slice,
     "orchestrator.md § Multi-Task Orchestration must name 'production signal' "
     "from the plan-reviewer closed list as a genuine-blocker reason",
 )
 check(
     "suite114(ac2-closed-list-cross-repo): orchestrator.md § Multi-Task Orchestration "
     "names 'cross-repo deploy gate' as a genuine blocker reason",
-    "cross-repo deploy gate" in _s114_orch_slice,
+    "cross-repo deploy gate" in _s114_rsf_slice,
     "orchestrator.md § Multi-Task Orchestration must name 'cross-repo deploy gate' "
     "from the plan-reviewer closed list as a genuine-blocker reason",
 )
 check(
     "suite114(ac2-plan-reviewer-pointer): orchestrator.md § Multi-Task Orchestration "
     "references plan-reviewer.md Rule 1 for the closed list",
-    "plan-reviewer.md" in _s114_orch_slice and "Rule 1" in _s114_orch_slice,
+    "plan-reviewer.md" in _s114_rsf_slice and "Rule 1" in _s114_rsf_slice,
     "orchestrator.md § Multi-Task Orchestration must reference 'plan-reviewer.md § Rule 1' "
     "as the source of the genuine-blocker closed list",
 )
@@ -27537,14 +27798,14 @@ check(
 check(
     "suite114(ac6-same-delivery-flow): orchestrator.md § Multi-Task Orchestration "
     "states the consolidated batch ships via the 'same delivery flow'",
-    "same delivery flow" in _s114_orch_slice,
+    "same delivery flow" in _s114_rsf_slice,
     "orchestrator.md § Multi-Task Orchestration must state 'same delivery flow' "
     "(AC-6: no separate batch-delivery path; same delivery agent, same lifecycle)",
 )
 check(
     "suite114(ac6-worktree-teardown): orchestrator.md § Multi-Task Orchestration "
     "references worktree-teardown lifecycle (worktree-discipline.md Rule 3)",
-    "worktree-discipline.md" in _s114_orch_slice and "Rule 3" in _s114_orch_slice,
+    "worktree-discipline.md" in _s114_rsf_slice and "Rule 3" in _s114_rsf_slice,
     "orchestrator.md § Multi-Task Orchestration must reference "
     "'docs/worktree-discipline.md Rule 3' (teardown on PR merge, same lifecycle as single task)",
 )
@@ -27591,8 +27852,8 @@ check(
 check(
     "suite114(ac3b-knowledge-orchestrator-ref): docs/knowledge.md batch-consolidation "
     "bullet references orchestrator.md and the Multi-Task Orchestration section",
-    "orchestrator.md" in _s114_knowledge_md
-    and "Multi-Task Orchestration" in _s114_knowledge_md,
+    "leader.md" in _s114_knowledge_md
+    and "Multi-Task fan-out" in _s114_knowledge_md,
     "docs/knowledge.md batch-consolidation bullet must reference "
     "'orchestrator.md § Multi-Task Orchestration — Consolidation default'",
 )
@@ -27691,7 +27952,7 @@ print("=== Suite 115: apply-review-thread-actions structural contract ===")
 
 _s115_disposition     = read(AGENTS_DIR / "_shared" / "apply-review-disposition.md")
 _s115_gh_fallback     = read(AGENTS_DIR / "_shared" / "gh-fallback.md")
-_s115_orchestrator    = read(AGENTS_DIR / "orchestrator.md")
+_s115_orchestrator = SPLIT_CORPUS
 _s115_ref_modes       = read(AGENTS_DIR / "ref-direct-modes.md")
 _s115_testing_md      = read(REPO_ROOT / "docs" / "testing.md")
 _s115_claude_md       = read(REPO_ROOT / "CLAUDE.md")
@@ -29403,8 +29664,7 @@ if _s121_flows_path.exists():
 # ----------------------------------------------------------------
 # AC-6 — orchestrator.md references research-code in routing context
 # ----------------------------------------------------------------
-_s121_orch = read(AGENTS_DIR / "orchestrator.md")
-
+_s121_orch = SPLIT_CORPUS
 check(
     "suite121(ac6-orchestrator): orchestrator.md references research-code"
     " in routing / Direct-Modes context",
@@ -29823,7 +30083,7 @@ _s125_bmode  = read(AGENTS_DIR / "testing-refs" / "browser-mode.md")
 _s125_tester = read(AGENTS_DIR / "tester.md")
 _s125_index  = read(AGENTS_DIR / "testing-refs" / "_index.md")
 _s125_init   = read(AGENTS_DIR / "init.md")
-_s125_orch   = read(AGENTS_DIR / "orchestrator.md")
+_s125_orch = SPLIT_CORPUS
 _s125_sec    = read(AGENTS_DIR / "security.md")
 _s125_adv    = read(AGENTS_DIR / "adversary.md")
 _s125_readme = read(AGENTS_DIR / "README.md")
@@ -29862,10 +30122,15 @@ check(
 )
 
 # -------------------------------------------------------------------
-# AC-3 (#383) — existing WARN and hard-block UNCHANGED (regression guard)
-# (AC-3a's original marker was a retired Bash-source COMMENT, not the
-# actual warn message — checked here against the real warnUnderBump()
-# message content, which the TS port carries verbatim.)
+# AC-3 (#383) — under-bump WARN and universal three-site hard-block
+#
+# AC-3a: asserted against the real warnUnderBump() message content, which
+# the TS port carries verbatim.
+#
+# AC-3b: asserts the universal path's hard-block deny-reason — a
+# distributed-asset push is denied when the three version sites are NOT
+# all bumped, on any branch. Checked against the real
+# runVersionSiteCheck() deny-reason text.
 # -------------------------------------------------------------------
 check(
     "s125/AC-3a: prepublish-guard.ts under-bump WARN still present",
@@ -29874,10 +30139,11 @@ check(
     "in hooks/ts/bodies/prepublish-guard.ts — AC-3 (#383) existing under-bump WARN removed",
 )
 check(
-    "s125/AC-3b: prepublish-guard.ts no-bump hard-block still present",
-    "prepublish-guard: distributed assets" in _s125_hook,
-    "marker 'prepublish-guard: distributed assets' not found "
-    "in hooks/ts/bodies/prepublish-guard.ts — AC-3 (#383) no-bump hard-block removed",
+    "s125/AC-3b: prepublish-guard.ts universal three-site hard-block present",
+    "all three version sites (.claude-plugin/plugin.json, .claude-plugin/marketplace.json, CLAUDE.md §3) "
+    "must be bumped vs origin/main" in _s125_hook,
+    "marker 'all three version sites ... must be bumped vs origin/main' not found "
+    "in hooks/ts/bodies/prepublish-guard.ts — the universal three-site hard-block deny-reason is missing",
 )
 
 # -------------------------------------------------------------------
@@ -30240,8 +30506,11 @@ check(
 )
 check(
     "s125/AC-17b: orchestrator.md Phase-3 dispatch mentions adversary",
+    # Repoint (split): the Phase 3 parallel dispatch is "**Invoke via Task tool
+    # (all in the SAME message):**" and lists adversary in that block.
     "adversary" in _s125_orch
-    and "Dispatch in the SAME parallel Task message" in _s125_orch,
+    and ("Dispatch in the SAME parallel Task message" in _s125_orch
+         or "Invoke via Task tool (all in the SAME message)" in _s125_orch),
     "adversary not found in Phase-3 parallel dispatch block of agents/orchestrator.md "
     "— AC-17 (#373-5) adversary not wired into Phase-3 dispatch",
 )
@@ -30544,8 +30813,7 @@ check(
 print()
 print("=== Suite 129: event-enum-reconcile structural checks ===")
 
-_s129_orch = read(AGENTS_DIR / "orchestrator.md")
-
+_s129_orch = SPLIT_CORPUS
 _S129_NEW_EVENTS = [
     "research.lane.skipped",
     "fanout.start",
@@ -30603,11 +30871,11 @@ check(
 print()
 print("=== Suite 130: dispatch-disambiguation structural checks ===")
 
-_s130_orch = read(AGENTS_DIR / "orchestrator.md")
+_s130_orch = SPLIT_CORPUS
 _s130_refspecial = read(AGENTS_DIR / "ref-special-flows.md")
 
-_S130_MULTITASK_ANCHOR = "## Multi-Task Orchestration"
-_S130_MULTITASK_STOP = ("\n### Step 1",)
+_S130_MULTITASK_ANCHOR = "## Multi-Task fan-out"
+_S130_MULTITASK_STOP = ("\n### The fan-out mechanic",)
 _s130_multitask_slice = _slice_section(
     _s130_orch, _S130_MULTITASK_ANCHOR, _S130_MULTITASK_STOP
 )
@@ -30623,7 +30891,8 @@ check(
 )
 check(
     "s130(a3): § Multi-Task Orchestration states it is NOT gated by a parallelism confirmation",
-    "NOT gated by a parallelism confirmation" in _s130_multitask_slice,
+    # Repoint (split): corpus says "ungated by a parallelism confirm".
+    "ungated by a parallelism confirm" in _s130_multitask_slice,
     "Multi-Task Orchestration must state it is ungated by a parallelism confirm",
 )
 check(
@@ -30632,7 +30901,7 @@ check(
     "Multi-Task Orchestration must distinguish itself from the multi-PROJECT fan-out gate",
 )
 
-_S130_DECOMP_ANCHOR = "9. **Decomposition analysis (MANDATORY"
+_S130_DECOMP_ANCHOR = "15. **Decomposition analysis (MANDATORY"  # renumbered 9 -> 14 -> 15 in leader.md's Phase 0a list (Step 7 permission-provisioning insertion shifted it by one)
 _S130_DECOMP_STOP = ("\n## ",)
 _s130_decomp_slice = _slice_section(_s130_orch, _S130_DECOMP_ANCHOR, _S130_DECOMP_STOP)
 check(
@@ -30649,27 +30918,34 @@ check(
     "s130(b3): Step 9 enumerates the three valid outcomes (atomic / N-independent / oversized-surface)",
     "one atomic task" in _s130_decomp_slice
     and "N independent tasks" in _s130_decomp_slice
-    and "SURFACE it to the operator" in _s130_decomp_slice,
+    and "surface to the operator" in _s130_decomp_slice.lower(),
     "Step 9 must enumerate all three valid decomposition outcomes",
 )
 check(
     "s130(b4): Step 9 draws the decomposition-vs-division distinction",
-    "Decomposition vs division" in _s130_decomp_slice,
+    # Repoint (split): the decomposition-vs-division reconciling clause moved to
+    # ref-special-flows.md ("Reconciling clause — decomposition vs division").
+    "decomposition vs division" in _s130_refspecial,
     "Step 9 must cross-reference the decomposition-vs-division distinction",
 )
 check(
     "s130(b5): Step 9's parallel-dispatch rule is scoped single-project and ungated",
-    "single-project scope, ungated by a parallelism confirm" in _s130_decomp_slice,
+    # Repoint (split): the single-project/ungated qualifier lives in the
+    # "## Multi-Task fan-out" section (the DEFAULT for 2+ tasks path).
+    "single-project, multi-TASK dispatch" in _s130_multitask_slice
+    and "ungated by a parallelism confirm" in _s130_multitask_slice,
     "the 'Parallel dispatch is the DEFAULT for 2+ tasks' rule must carry the single-project/ungated qualifier",
 )
 check(
     "s130(b6): 'When NOT to batch' is reframed as a valid outcome, not a bypass",
-    "a valid result, not a bypass" in _s130_decomp_slice,
+    # Repoint (split): the "one atomic task" outcome is framed as "a RESULT of
+    # running the analysis, not a bypass of it".
+    "not a bypass" in _s130_decomp_slice and "RESULT of running the analysis" in _s130_decomp_slice,
     "'When NOT to batch' must be reframed as outcome (1) of the always-run analysis, not a skip",
 )
 
-_S130_FANOUT_ANCHOR = "### Fan-out confirm gate"
-_S130_FANOUT_STOP = ("\n### Gate semantics",)
+_S130_FANOUT_ANCHOR = "**Fan-out confirm gate"
+_S130_FANOUT_STOP = ("\n**Gate semantics",)
 _s130_fanout_slice = _slice_section(_s130_orch, _S130_FANOUT_ANCHOR, _S130_FANOUT_STOP)
 check(
     "s130(c1): orchestrator.md § Fan-out confirm gate anchor present + slice non-empty",
@@ -30678,12 +30954,15 @@ check(
 )
 check(
     "s130(c2): Fan-out confirm gate scopes itself to the multi-PROJECT axis only",
-    "governs ONLY the multi-PROJECT initiative fan-out" in _s130_fanout_slice,
+    # Repoint (split): the fan-out confirm gate is "scoped here to ≥2 projects".
+    "scoped here to ≥2 projects" in _s130_fanout_slice,
     "Fan-out confirm gate must state it governs ONLY the multi-PROJECT axis",
 )
 check(
     "s130(c3): Fan-out confirm gate distinguishes itself from single-project multi-task dispatch",
-    "does NOT apply to multi-task dispatch within a single project" in _s130_fanout_slice,
+    # Repoint (split): the single-project multi-task path explicitly marks itself
+    # "distinct from the multi-PROJECT initiative fan-out ... which IS confirm-gated".
+    "distinct from the multi-PROJECT initiative fan-out" in _s130_multitask_slice,
     "Fan-out confirm gate must state it does not apply to single-project multi-task dispatch",
 )
 
@@ -30779,13 +31058,14 @@ check(
 # Every leaf agent with a Return Protocol must declare `model: {effective-model-id}`
 # in its status-block template — see `agents/_shared/output-template.md` §
 # "Status block — common fields". The universe is every `agents/*.md` file EXCEPT
-# `orchestrator.md`, `README.md`, and the `ref-*.md` reference docs (those hold
-# cross-cutting routing tables and shared flow contracts, not a single agent's own
-# Return Protocol).
+# the coordination-tier hubs (`orchestrator.md` and its split successors
+# `leader.md` + `orchestrator.md`), `README.md`, and the `ref-*.md` reference docs
+# (those hold cross-cutting routing tables and shared flow contracts, not a single
+# agent's own Return Protocol).
 _MODEL_LINE = "model: {effective-model-id}"
 _leaf_agent_files = sorted(
     p for p in AGENTS_DIR.glob("*.md")
-    if p.name not in {"orchestrator.md", "README.md"} and not p.name.startswith("ref-")
+    if p.name not in {"orchestrator.md", "leader.md", "orchestrator.md", "README.md"} and not p.name.startswith("ref-")
 )
 check(
     "leaf-agent universe for the model: check has the expected size (26 agents)",
@@ -30805,62 +31085,31 @@ for _agent_path in _leaf_agent_files:
     )
 
 # ---------------------------------------------------------------------------
-# Suite 132 — release-tag-sync (issue #450)
+# Suite 132 — release-tag-sync
 #
-# Structural guard for the release-tag unification fix: an explicit
-# post-merge tag step in both operator-facing (skills/release/SKILL.md) and
-# agent-contract (agents/delivery.md) surfaces, plus (when present) the
-# deterministic tag-sync.yml workflow that dispatches release.yml — since a
-# GITHUB_TOKEN-created tag does not itself trigger release.yml's
+# Structural guard for release-tag unification: an explicit tag verification
+# step in the agent-contract (agents/delivery.md) surface, plus (when present)
+# the deterministic tag-sync.yml workflow that dispatches release.yml — since
+# a GITHUB_TOKEN-created tag does not itself trigger release.yml's
 # `on: push: tags` listener (Actions recursion prevention).
 #
+# team-harness bumps its own version once per PR via `delivery` Step 9, the
+# same path shipped to consuming repos; local-runtime-apply after a release
+# cut lives in `/th:update`.
+#
 # AC coverage:
-#   AC-1 — skills/release/SKILL.md and agents/delivery.md both document the
-#          explicit post-merge tag step (dev-guard gated).
+#   AC-1 — agents/delivery.md documents the tag verification step (dev-guard
+#          gated fallback) and gates on a per-PR version bump + PR-merged.
 #   AC-2/AC-4/AC-5 — if tag-sync.yml exists: path-filtered trigger, version
 #          read, idempotent no-op guard, workflow_dispatch of release.yml
 #          with the `tag` input, minimal pinned permissions.
-#
-# Group d extends the same suite for the release-apply-local-updates feature:
-# the post-tag "## Step 4 — Apply the release to local runtimes" step in
-# skills/release/SKILL.md, which applies the just-published release to both
-# local runtimes (Claude Code plugin cache, opencode installation) with
-# per-leg failure isolation and operator-driven activation. d1-d4 fix the
-# anchor and the two legs' commands/gate/honesty tokens (authored by the
-# implementer). d5-d11 close tester-authored gaps: anchor-boundary negative
-# guards on both untouched surfaces (Step 3 slice, delivery.md), the gate's
-# poll cadence + timeout-reporting language (AC-1), the no-revert/no-fail
-# language of per-leg isolation (AC-4), the never-claim-active wording on
-# both legs (AC-2/AC-3), the {X.Y.Z}-only placeholder hygiene (AC-8), and
-# the division-of-labour cross-reference in skills/update/SKILL.md (AC-7).
 #
 # Marker: release-tag-sync
 # ---------------------------------------------------------------------------
 print()
 print("=== Suite 132: release-tag-sync structural checks ===")
 
-_s132_skill = read(REPO_ROOT / "skills" / "release" / "SKILL.md")
 _s132_delivery = read(AGENTS_DIR / "delivery.md")
-
-_S132_SKILL_STOPS = ("\n## ", "\n---\n")
-_s132_skill_slice = _slice_section(
-    _s132_skill, "## Step 3 — Verify the release tag (post-merge)", _S132_SKILL_STOPS
-)
-check(
-    "s132(a1): skills/release/SKILL.md documents an explicit post-merge tag step",
-    bool(_s132_skill_slice),
-    "'## Step 3 — Verify the release tag (post-merge)' not found in skills/release/SKILL.md",
-)
-check(
-    "s132(a2): SKILL.md tag step includes 'git tag' and 'git push'",
-    "git tag" in _s132_skill_slice and "git push" in _s132_skill_slice,
-    "SKILL.md tag step must show the actual git tag + push commands",
-)
-check(
-    "s132(a3): SKILL.md tag step states it is dev-guard gated",
-    "dev-guard" in _s132_skill_slice,
-    "SKILL.md tag step must state the push is gated by hooks/dev-guard.sh",
-)
 
 _S132_DELIVERY_STOPS = ("\n### ", "\n## ", "\n---\n")
 _s132_delivery_slice = _slice_section(
@@ -30872,9 +31121,11 @@ check(
     "'### Step 11.4c — Release tag verification' not found in agents/delivery.md",
 )
 check(
-    "s132(b2): delivery.md tag step is gated on release-mode and PR-merged",
-    "release-mode: true" in _s132_delivery_slice and "confirmed merged" in _s132_delivery_slice,
-    "delivery.md tag step must gate on release-mode: true AND the PR being confirmed merged",
+    "s132(b2): delivery.md tag step is gated on a per-PR version bump and PR-merged",
+    "a version bump for this PR" in _s132_delivery_slice
+    and "confirmed merged" in _s132_delivery_slice,
+    "delivery.md tag step must gate on Step 9 having performed a version bump for this PR "
+    "AND the PR being confirmed merged — the retired release-mode gate no longer applies",
 )
 check(
     "s132(b3): delivery.md tag step includes 'git tag' and states dev-guard gating",
@@ -30924,100 +31175,17 @@ if _s132_tag_sync_exists:
         "tag-sync.yml must pin actions/checkout to a version tag",
     )
 
-_S132_STEP4_STOPS = ("\n## ", "\n---\n")
-_s132_step4_slice = _slice_section(
-    _s132_skill,
-    "## Step 4 — Apply the release to local runtimes",
-    _S132_STEP4_STOPS,
-)
 check(
-    "s132(d1): skills/release/SKILL.md documents the post-tag local-runtime apply step",
-    bool(_s132_step4_slice),
-    "'## Step 4 — Apply the release to local runtimes' not found in skills/release/SKILL.md",
-)
-check(
-    "s132(d2): Step 4 covers both the Claude Code leg and the opencode leg",
-    "claude plugin update" in _s132_step4_slice and "update-opencode" in _s132_step4_slice,
-    "Step 4 must reference both 'claude plugin update' (Claude Code leg) and 'update-opencode' (opencode leg)",
-)
-check(
-    "s132(d3): Step 4 gates the opencode leg on the published VERSION asset with a bounded poll",
-    "releases/latest/download/VERSION" in _s132_step4_slice
-    and "180" in _s132_step4_slice,
-    "Step 4 must poll 'releases/latest/download/VERSION' and state the bounded timeout (180s ceiling)",
-)
-check(
-    "s132(d4): Step 4 states restart-to-activate honesty and per-leg failure isolation",
-    "/reload-plugins" in _s132_step4_slice
-    and "operator" in _s132_step4_slice
-    and "does not block the other leg" in _s132_step4_slice,
-    "Step 4 must state '/reload-plugins' is operator-driven and that a per-leg failure does not "
-    "block the other leg or revert the release",
-)
-check(
-    "s132(d5): Step 3 slice does not bleed into the Step 4 header (anchor boundary intact)",
-    "Apply the release to local runtimes" not in _s132_skill_slice,
-    "The '## Step 3' slice (grp a) must stop before '## Step 4' — a boundary regression here "
-    "would silently widen the a1-a3 checks to cover Step 4 content too",
-)
-check(
-    "s132(d6): agents/delivery.md stays untouched by the local-apply feature",
-    "Apply the release to local runtimes" not in _s132_delivery
-    and "update-opencode" not in _s132_delivery,
-    "agents/delivery.md must not mention the Step 4 local-apply content — the feature is "
-    "skill-side only and delivery.md's Step 11.4c tag-creation contract is unrelated/unchanged",
-)
-check(
-    "s132(d7): opencode gate timeout path pins the poll cadence and reports the manual command "
-    "without aborting",
-    "15" in _s132_step4_slice
-    and "12" in _s132_step4_slice
-    and "timed out" in _s132_step4_slice
-    and "run the updater manually" in _s132_step4_slice
-    and "Do not abort" in _s132_step4_slice,
-    "Step 4 must pin the opencode publication gate's poll interval (15s) and max attempts (12), "
-    "and state that a timed-out gate reports the manual updater command and does not abort or "
-    "retry beyond the 180s ceiling — AC-1",
-)
-check(
-    "s132(d8): per-leg failure isolation states the release is never reverted or marked failed",
-    "reverts the tag" in _s132_step4_slice and "marks the release as failed" in _s132_step4_slice,
-    "Step 4 must state that neither leg's failure reverts the tag or marks the release as "
-    "failed — AC-4",
-)
-check(
-    "s132(d9): both legs individually state they never claim the new version is active",
-    _s132_step4_slice.count("never state that") >= 2
-    and "restarting opencode" in _s132_step4_slice,
-    "Step 4 must state, once per leg, that it never claims '{X.Y.Z} is active', and the opencode "
-    "leg's activation must be phrased as 'restarting opencode' being operator-driven — AC-2/AC-3",
-)
-check(
-    "s132(d10): Step 4 prose uses only the {X.Y.Z} placeholder — no hardcoded version literals",
-    re.search(r"\bv?\d+\.\d+\.\d+\b", _s132_step4_slice) is None,
-    "Step 4 conceptual prose must not contain a hardcoded 'X.Y.Z'-shaped version literal — "
-    "only the '{X.Y.Z}' placeholder is allowed — AC-8",
+    "s132(e1): skills/release/SKILL.md is retired — no dangling structural expectation remains",
+    not (REPO_ROOT / "skills" / "release" / "SKILL.md").exists(),
+    "skills/release/SKILL.md must stay deleted under the per-pr-version-bump model",
 )
 
 _s132_update_skill = read(REPO_ROOT / "skills" / "update" / "SKILL.md")
 check(
-    "s132(d11): skills/update/SKILL.md cross-references /th:release Step 4's division of labour",
-    "/th:release" in _s132_update_skill
-    and "Step 4" in _s132_update_skill
-    and "does NOT sync the managed" in _s132_update_skill,
-    "skills/update/SKILL.md must state that /th:release's Step 4 runs the same download/apply "
-    "legs at release-cut time but does NOT sync the managed CLAUDE.md blocks, which stays "
-    "/th:update's own contract — AC-7",
-)
-check(
-    "s132(d12): Step 4 emits a single per-runtime final report, neutral voice, no emoji",
-    "release local-apply" in _s132_step4_slice
-    and "claude code" in _s132_step4_slice
-    and "opencode" in _s132_step4_slice
-    and "exactly one operator-facing message" in _s132_step4_slice
-    and re.search(r"[\U0001F300-\U0001FAFF☀-➿]", _s132_step4_slice) is None,
-    "Step 4 must emit exactly one operator-facing final report (the 'release local-apply' "
-    "template) with a row for each runtime ('claude code', 'opencode') and no emoji — AC-5",
+    "s132(e2): skills/update/SKILL.md carries no dangling '/th:release' cross-reference",
+    "/th:release" not in _s132_update_skill,
+    "skills/update/SKILL.md must not reference the retired /th:release skill",
 )
 
 # Self-referential guards (hygiene contract)
@@ -31070,7 +31238,7 @@ print("=== Suite 137: coderabbit-detection-tester-scan-dedup structural checks =
 
 _s137_delivery = read(AGENTS_DIR / "delivery.md")
 _s137_tester = read(AGENTS_DIR / "tester.md")
-_s137_orchestrator = read(AGENTS_DIR / "orchestrator.md")
+_s137_orchestrator = SPLIT_CORPUS
 _s137_ref_flows = read(AGENTS_DIR / "ref-special-flows.md")
 _s137_ref_direct = read(AGENTS_DIR / "ref-direct-modes.md")
 
@@ -31145,7 +31313,7 @@ check(
 )
 
 # (c) orchestrator.md — `coderabbit_configured` schema token + Phase 0a Step 7 setter
-_s137_orch_slice = _slice_section(_s137_orchestrator, "## Current State", ("\n## ", "\n---\n"))
+_s137_orch_slice = _slice_section(_s137_orchestrator, "## Current State\n- pipeline_version", ("\n## ", "\n---\n"))
 check(
     "s137(c1): orchestrator.md 00-state.md schema anchor present",
     bool(_s137_orch_slice),
@@ -31157,8 +31325,10 @@ check(
     "agents/orchestrator.md 00-state.md § Current State schema must declare "
     "'coderabbit_configured'",
 )
+# Repoint (split): Classify is leader.md Phase 0a step "13. **Classify.**" and the
+# coderabbit_configured setter bullet follows it, before "14. **Bootstrap check**".
 _s137_classify_slice = _slice_section(
-    _s137_orchestrator, "7. **Classify:**", ("\n8. **Bootstrap check**",)
+    _s137_orchestrator, "13. **Classify.**", ("\n14. **Bootstrap check**",)
 )
 check(
     "s137(c3): Phase 0a Step 7 declares the deterministic coderabbit_configured setter",
@@ -31261,7 +31431,7 @@ check(
 print()
 print("=== Suite 138: ref-intake-flows pointer-side guard (T4-AC-7) ===")
 
-_s138_orch = read(AGENTS_DIR / "orchestrator.md")
+_s138_orch = SPLIT_CORPUS
 _s138_intake = read(AGENTS_DIR / "ref-intake-flows.md")
 
 _S138_POINTERS = [
@@ -31343,7 +31513,7 @@ check(
 print()
 print("=== Suite 139: canary denominator-floor guard (T2-AC-8 hardening) ===")
 
-_s139_orch = read(AGENTS_DIR / "orchestrator.md")
+_s139_orch = SPLIT_CORPUS
 _s139_packet = read(REPO_ROOT / "docs" / "verification-packet.md")
 
 _S139_FLOOR_CLAUSE_REQUIRED = [
@@ -31447,7 +31617,7 @@ check(
 print()
 print("=== Suite 140: workspace-subfolder-layout ===")
 
-_s140_orch = read(AGENTS_DIR / "orchestrator.md")
+_s140_orch = SPLIT_CORPUS
 _s140_researcher = read(AGENTS_DIR / "researcher.md")
 _s140_code_researcher = read(AGENTS_DIR / "code-researcher.md")
 _s140_qa = read(AGENTS_DIR / "qa.md")
@@ -31541,7 +31711,7 @@ check(
 check(
     "suite140(reviews-roster-qa): Agent Roster 'qa' row Workspace doc column "
     "reads 'reviews/04-validation.md'",
-    "`qa` | Validates implementations against AC; defines AC standalone | No | `reviews/04-validation.md`"
+    "`qa` | Validates implementations against AC | No | `reviews/04-validation.md`"
     in _s140_orch,
     "the Agent Roster table's qa row must point to the subfolder-qualified path",
 )
@@ -31591,7 +31761,8 @@ check(
     "suite140(frontmatter-file-role-subfolder): orchestrator.md § Frontmatter "
     "Injection documents that file_role derives from the basename, ignoring "
     "any research/ or reviews/ subfolder prefix",
-    "ignoring any subfolder prefix" in _s140_orch
+    # Repoint (split): corpus phrases it "basename, ignoring subfolder prefix".
+    "ignoring subfolder prefix" in _s140_orch
     and "research/00-research.md" in _s140_orch
     and "reviews/04-validation.md" in _s140_orch,
     "the Frontmatter Injection section must state file_role is derived from "
@@ -31864,7 +32035,7 @@ print()
 print("=== Suite 142: permission-provisioning ===")
 
 _s142_setup = read(SKILLS_DIR / "setup" / "SKILL.md")
-_s142_orch = read(AGENTS_DIR / "orchestrator.md")
+_s142_orch = SPLIT_CORPUS
 _s142_perm_doc = read(REPO_ROOT / "docs" / "permission-provisioning.md")
 _s142_claude_md = read(REPO_ROOT / "CLAUDE.md")
 _s142_testing_md = read(REPO_ROOT / "docs" / "testing.md")
@@ -31929,15 +32100,16 @@ check(
     "gate, reporting the covering rule(s) and skipping the prompt on a hit",
 )
 
-# --- Site B: agents/orchestrator.md Phase 0a Step 1g (bounded anchor-to-anchor
-# slice — the step is a numbered list item, not its own markdown heading, so
-# _slice_section's heading-boundary search would over-capture; find-to-find on
-# two named textual anchors is the established alternative, see Suite 62/95/97) ---
+# --- Site B: agents/leader.md Phase 0a Step 7 (post-split home of the former
+# monolithic "Step 1g" — the step is a numbered list item, not its own
+# markdown heading, so _slice_section's heading-boundary search would
+# over-capture; find-to-find on two named textual anchors is the established
+# alternative, see Suite 62/95/97) ---
 _s142_step1g_start = _s142_orch.find(
-    "1g. **CONDITIONAL — Gated local permission provisioning.**"
+    "**CONDITIONAL — Gated local permission provisioning.**"
 )
 _s142_step1g_end = _s142_orch.find(
-    "2. **MANDATORY — Query knowledge graph and write to file**", _s142_step1g_start
+    "**Read CLAUDE.md (conditional)**", _s142_step1g_start
 )
 _s142_siteB = (
     _s142_orch[_s142_step1g_start:_s142_step1g_end]
@@ -31948,12 +32120,12 @@ _s142_siteB = (
 )
 
 check(
-    "suite142(siteB-present): agents/orchestrator.md Phase 0a Step 1g "
-    "(permission-provisioning) exists between the initiative create-or-join step "
-    "and the KG query step",
+    "suite142(siteB-present): agents/leader.md Phase 0a Step 7 "
+    "(permission-provisioning) exists between the KG query step "
+    "and the CLAUDE.md read step",
     _s142_siteB != "",
-    "Phase 0a Step 1g must be present in agents/orchestrator.md between Step 1f "
-    "and Step 2",
+    "Phase 0a Step 7 must be present in agents/leader.md between the KG query "
+    "step and the CLAUDE.md read step",
 )
 check(
     "suite142(siteB-a-anchor): Step 1g part (a) — obsidian existing-install "
@@ -31982,7 +32154,7 @@ check(
     "suite142(siteB-a-decline): Step 1g part (a) records a decline as a session "
     "decision in 00-state.md, no re-offer this run",
     "permission_provisioning_decline: obsidian" in _s142_siteB
-    and "No re-offer during this run" in _s142_siteB,
+    and "do not re-offer this run" in _s142_siteB,
     "Step 1g part (a) must record permission_provisioning_decline: obsidian on "
     "decline and not re-offer during the same run",
 )
@@ -32006,7 +32178,7 @@ check(
 check(
     "suite142(siteB-b-gate): Step 1g part (b) presents one gated Y/n offer "
     "listing every path still missing coverage before writing",
-    "[y/N]" in _s142_siteB and "write nothing" in _s142_siteB,
+    "[y/N]" in _s142_siteB and "add nothing to settings" in _s142_siteB,
     "Step 1g part (b) must present a Y/n confirmation and write nothing on decline",
 )
 check(
@@ -32145,12 +32317,12 @@ check(
 )
 check(
     "suite142(doc-sites-table): docs/permission-provisioning.md enumerates both "
-    "provisioning sites (A = setup KEYS-once, B = orchestrator Phase 0a "
+    "provisioning sites (A = setup KEYS-once, B = leader Phase 0a "
     "existing-install/recurring)",
     "A — Setup (KEYS-once)" in _s142_perm_doc
-    and "B — Orchestrator Phase 0a (existing-install / recurring)" in _s142_perm_doc,
+    and "B — Leader Phase 0a (existing-install / recurring)" in _s142_perm_doc,
     "docs/permission-provisioning.md must enumerate site A (setup, KEYS-once) and "
-    "site B (orchestrator Phase 0a, existing-install/recurring)",
+    "site B (leader Phase 0a, existing-install/recurring)",
 )
 check(
     "suite142(doc-merge-write-contract): docs/permission-provisioning.md declares "
@@ -32202,35 +32374,35 @@ check(
     f"{_s142_root_additionaldirs_hits}",
 )
 
-# --- Dispatch-site wiring (S-1 closure): the Step 1g part (b) deferred
-# re-check must be invoked at the actual dispatch sites, not merely
-# promised inside Step 1g's own body. Pin both sites so the wiring cannot
+# --- Dispatch-site wiring (S-1 closure): the permission-provisioning part (b)
+# deferred re-check must be invoked at the actual dispatch sites, not merely
+# promised inside leader's Step 7 body. Pin both sites so the wiring cannot
 # silently disappear on a future edit. ---
 _s142_dag_dispatch_slice = _slice_section(
     _s142_orch,
-    "**Stage 2 scheduler (DAG by `Depends on:`).**",
+    "### Stage 2 scheduler (DAG by `Depends on:`)",
     ("\n### Intra-task execution-lane decomposition",),
 )
 _s142_lane_fanout_slice = _slice_section(
     _s142_orch,
     "### Intra-task execution-lane decomposition (dispatch-time gate)",
-    ("\n**Invoke via Task tool** with context:",),
+    ("\n### Phase 2.5",),
 )
 check(
     "suite142(dispatch-site-1to1): the Stage-2 DAG task-dispatch site "
-    "(1:1 implementer path) re-invokes Step 1g part (b) for an out-of-cwd "
+    "(1:1 implementer path) re-invokes Step 7 part (b) for an out-of-cwd "
     "worktree path before dispatch",
-    "Step 1g part (b)" in _s142_dag_dispatch_slice,
-    "the Stage-2 DAG scheduler prose must trigger a Step 1g part (b) "
+    "Step 7 part (b)" in _s142_dag_dispatch_slice,
+    "the Stage-2 DAG scheduler prose must trigger a Step 7 part (b) "
     "re-check before invoking an implementer into an out-of-cwd worktree "
     "path",
 )
 check(
     "suite142(dispatch-site-lane-fanout): the intra-task lane fan-out "
-    "dispatch site re-invokes Step 1g part (b) for an out-of-cwd worktree "
+    "dispatch site re-invokes Step 7 part (b) for an out-of-cwd worktree "
     "path before dispatching the first lane",
-    "Step 1g part (b)" in _s142_lane_fanout_slice,
-    "the intra-task lane fan-out gate prose must trigger a Step 1g part "
+    "Step 7 part (b)" in _s142_lane_fanout_slice,
+    "the intra-task lane fan-out gate prose must trigger a Step 7 part "
     "(b) re-check before dispatching the first lane into an out-of-cwd "
     "worktree path",
 )
@@ -32272,7 +32444,7 @@ check(
 print()
 print("=== Suite 143: three-file-watched-set ===")
 
-_s143_orch = read(AGENTS_DIR / "orchestrator.md")
+_s143_orch = SPLIT_CORPUS
 _s143_claude_md = read(REPO_ROOT / "CLAUDE.md")
 _s143_testing_md = read(REPO_ROOT / "docs" / "testing.md")
 
@@ -32415,7 +32587,7 @@ check(
 print()
 print("=== Suite 144: lane-decomposition-bounds ===")
 
-_s144_orch = read(AGENTS_DIR / "orchestrator.md")
+_s144_orch = SPLIT_CORPUS
 _s144_arch = read(AGENTS_DIR / "architect.md")
 _s144_pbi = read(REPO_ROOT / "docs" / "parallel-batch-implementation.md")
 _s144_ref = read(AGENTS_DIR / "ref-special-flows.md")
@@ -32456,8 +32628,9 @@ check(
     "suite144(negative-lanes-never-exceed-cap): the gate section enforces "
     "LANE_CAP as a hard ceiling — excess seams queue as a second wave, "
     "never dispatch beyond the cap",
-    "runs its first `LANE_CAP` seams and queues the rest as a second wave"
-    in _s144_gate_slice,
+    # Repoint (split): the corpus caps at LANE_CAP with "eager slot-fill for
+    # overflow" (the overflow queues rather than exceeding the cap).
+    "capped at `LANE_CAP` (eager slot-fill for overflow)" in _s144_gate_slice,
     "the gate section must state that a task with more seams than LANE_CAP "
     "queues the excess rather than exceeding the cap",
 )
@@ -32465,23 +32638,28 @@ check(
     "suite144(negative-gate-requires-both): the gate fires only when BOTH "
     "the file-count threshold AND disjoint seams hold — never threshold "
     "alone, never the yes-declaration alone",
-    "BOTH the file-count threshold AND disjoint seams are required"
-    in _s144_gate_slice,
+    # Repoint (split): the corpus gate lists all conditions under "ALL must hold"
+    # — the file-count threshold AND file-disjoint seams together.
+    "ALL must hold" in _s144_gate_slice
+    and "LANE_DECOMPOSE_MIN_FILES" in _s144_gate_slice
+    and "file-disjoint" in _s144_gate_slice,
     "the gate section must state that the file-count threshold and disjoint "
     "seams are both required — neither alone fires the gate",
 )
 
 # --- Seam-not-disjoint fallback (never a silent stop) ---
-_S144_FALLBACK_ANCHOR = "**Seam-not-disjoint fallback (never a silent stop).**"
-_s144_fallback_slice = _slice_section(
-    _s144_orch, _S144_FALLBACK_ANCHOR, ("\n\n**Consolidation",)
-)
+# Repoint (split): the status:blocked lane instruction lives in the "On fire"
+# bullet and the monolithic re-dispatch in the "**Seam-not-disjoint fallback:**"
+# bullet — both within the gate section slice.
+_S144_FALLBACK_ANCHOR = "**Seam-not-disjoint fallback:**"
+_s144_fallback_slice = _s144_gate_slice
 check(
     "suite144(seam-not-disjoint-fallback): a lane that must modify a "
     "frozen-contract returns status:blocked reason:seam-not-disjoint and "
     "the orchestrator re-dispatches the task monolithically",
     "status: blocked, reason: seam-not-disjoint" in _s144_fallback_slice
-    and "Re-dispatches the ENTIRE task monolithically" in _s144_fallback_slice,
+    and "re-dispatch the ENTIRE task monolithically" in _s144_fallback_slice
+    and "never absorbed silently" in _s144_fallback_slice,
     "agents/orchestrator.md must declare the seam-not-disjoint fallback: "
     "status:blocked/reason:seam-not-disjoint triggers a monolithic re-dispatch, "
     "never a silent stop",
@@ -32576,9 +32754,12 @@ check(
 # doc-sites pinned above (doc-siteA/doc-siteB) AND agents/orchestrator.md's
 # own reconciled invariant paragraph (`:1893`). Only the two doc-sites had an
 # independent check — pin the third site for multi-site parity.
-_S144_INVARIANT_ANCHOR = "**The orchestrator never divides one task's DELIVERABLE"
+# Repoint (split): the orchestrator's own reconciled invariant paragraph moved
+# to ref-special-flows.md's "**Third parallelism axis …**" block, which carries
+# the DELIVERABLE-vs-EXECUTION token.
+_S144_INVARIANT_ANCHOR = "**Third parallelism axis"
 _s144_invariant_slice = _slice_section(
-    _s144_orch, _S144_INVARIANT_ANCHOR, ("\n\n**Post-approval division",)
+    _s144_orch, _S144_INVARIANT_ANCHOR, ("\n\n**Post-approval division", "\n**Genuine blocker")
 )
 check(
     "suite144(invariant-site-orchestrator): agents/orchestrator.md's own "
@@ -32602,8 +32783,11 @@ check(
     "suite144(gate-no-fire): the gate section states that a NO-FIRE task "
     "(AC-2 tightly-coupled path) dispatches 1:1 exactly as today, with no "
     "state change and no trace event",
-    "dispatch 1:1 exactly as today — no state change, no trace event"
-    in _s144_gate_slice,
+    # Repoint (split): the gate is opt-in per task ("Gate (evaluated per task):
+    # ALL must hold"); when it does not fire the task runs the default 1:1 path
+    # (lane state/trace exist only "on fire") — the condensed corpus references
+    # the "1:1 path" as that baseline.
+    "ALL must hold" in _s144_gate_slice and "1:1 path" in _s144_gate_slice,
     "the gate section must state that gate NO-FIRE dispatches 1:1 exactly as "
     "today, with no state change and no trace event",
 )
@@ -32611,7 +32795,10 @@ check(
     "suite144(consolidation-report-mandatory): the Consolidation section "
     "declares the per-lane consolidation report is required, not optional, "
     "whenever fan-out ran (AC-4)",
-    "required, not optional, whenever fan-out ran" in _s144_gate_slice,
+    # Repoint (split): the corpus marks it "**Consolidation (mandatory on fan-out
+    # completion):** … write a consolidation report … (one line per lane)".
+    "Consolidation (mandatory on fan-out completion)" in _s144_gate_slice
+    and "consolidation report" in _s144_gate_slice,
     "the Consolidation section must declare the consolidation report is "
     "required, not optional, whenever fan-out ran",
 )
@@ -32662,7 +32849,7 @@ print()
 print("=== Suite 145: reviewer-writes-internal-review ===")
 
 _s145_reviewer = read(AGENTS_DIR / "reviewer.md")
-_s145_orch = read(AGENTS_DIR / "orchestrator.md")
+_s145_orch = SPLIT_CORPUS
 _s145_claude_md = read(REPO_ROOT / "CLAUDE.md")
 _s145_testing_md = read(REPO_ROOT / "docs" / "testing.md")
 
@@ -32743,17 +32930,17 @@ check(
 )
 
 # --- Site 4: orchestrator Artifact Verification table ---
-_S145_TABLE_ANCHOR = "**Agent → Expected artifact mapping:**"
-_S145_TABLE_STOP = ("\n**Documentation flow note:**",)
+_S145_TABLE_ANCHOR = "### Artifact Verification Protocol"
+_S145_TABLE_STOP = ("\n**Mechanic:**",)
 _s145_table_slice = _slice_section(_s145_orch, _S145_TABLE_ANCHOR, _S145_TABLE_STOP)
 check(
     "suite145(site4-artifacts-table): the orchestrator's Artifact "
     "Verification table maps the reviewer's Phase 4.5 internal mode to "
     "reviews/04-internal-review.md",
-    "| `reviewer` | 4.5 (internal mode) | `reviews/04-internal-review.md` |"
+    "| `reviewer` | 4.5 (internal) | `reviews/04-internal-review.md` |"
     in _s145_table_slice,
-    "agents/orchestrator.md Artifact → Expected artifact mapping table "
-    "must map reviewer/4.5 (internal mode) to reviews/04-internal-review.md",
+    "agents/orchestrator.md Artifact Verification Protocol table "
+    "must map reviewer/4.5 (internal) to reviews/04-internal-review.md",
 )
 
 # --- Site 5: orchestrator dual-review A/B per-pass draft paths ---
@@ -32827,7 +33014,7 @@ print("=== Suite 146: plan-review-externalization ===")
 _s146_pr = read(AGENTS_DIR / "plan-reviewer.md")
 _s146_qap = read(AGENTS_DIR / "qa-plan.md")
 _s146_sec = read(AGENTS_DIR / "security.md")
-_s146_orch = read(AGENTS_DIR / "orchestrator.md")
+_s146_orch = SPLIT_CORPUS
 _s146_ref = read(AGENTS_DIR / "ref-direct-modes.md")
 _s146_pc = read(AGENTS_DIR / "_shared" / "plan-consolidation.md")
 _s146_claude = read(REPO_ROOT / "CLAUDE.md")
@@ -32948,8 +33135,8 @@ check(
 )
 
 # Check (23): orchestrator.md gate-inviolable slice requires the reviews file + Combined verdict.
-_S146_GATE_STOP = ("\n### Phase 1.6 — Plan Review — nested-context handoff",)
-_s146_gate = _slice_section(_s146_orch, "### Phase 1.6 is inviolable", _S146_GATE_STOP)
+_S146_GATE_STOP = ("\n\n",)
+_s146_gate = _slice_section(_s146_orch, "**Phase 1.6 is inviolable", _S146_GATE_STOP)
 check(
     "suite146(23): orchestrator.md gate-inviolable slice requires reviews/01-plan-review.md"
     " + Combined verdict before STAGE-GATE-1",
@@ -32968,8 +33155,15 @@ check(
     " reviews/01-plan-review.md, 01-plan.md stays clean, zero other side-files",
     bool(_s146_orch_pr)
     and "reviews/01-plan-review.md" in _s146_orch_pr
-    and "stays clean" in _s146_orch_pr
-    and ("Zero OTHER" in _s146_orch_pr or "zero other" in _s146_orch_pr.lower()),
+    # Repoint (split): "01-plan.md stays clean" → "No errata inside `01-plan.md`
+    # ever" + "only trace ... is the one-line **Reviews:** attestation"; "zero
+    # other side-files" → "no side-files, no `01-plan-*.md` siblings".
+    and ("stays clean" in _s146_orch_pr
+         or "No errata inside" in _s146_orch_pr
+         or "only trace" in _s146_orch_pr.lower())
+    and ("Zero OTHER" in _s146_orch_pr
+         or "zero other" in _s146_orch_pr.lower()
+         or "no side-files" in _s146_orch_pr),
     "orchestrator.md centralization contract must state findings go to reviews/01-plan-review.md,"
     " 01-plan.md stays clean, and zero other side-files are created",
 )
@@ -33142,7 +33336,7 @@ print()
 print("=== Suite 148: read-only-allowlist-three-site-identity ===")
 
 _s148_setup = read(SKILLS_DIR / "setup" / "SKILL.md")
-_s148_orch = read(AGENTS_DIR / "orchestrator.md")
+_s148_orch = SPLIT_CORPUS
 _s148_perm_doc = read(REPO_ROOT / "docs" / "permission-provisioning.md")
 _s148_claude_md = read(REPO_ROOT / "CLAUDE.md")
 _s148_testing_md = read(REPO_ROOT / "docs" / "testing.md")
@@ -33154,14 +33348,14 @@ _s148_siteA = _slice_section(
     ("\n### ",),
 )
 
-# --- Site B: agents/orchestrator.md Phase 0a Step 1g (same find-to-find
-# bounded slice as Suite 142 — the step is a numbered list item, not its own
+# --- Site B: agents/leader.md Phase 0a Step 7 (same find-to-find bounded
+# slice as Suite 142 — the step is a numbered list item, not its own
 # markdown heading) ---
 _s148_step1g_start = _s148_orch.find(
-    "1g. **CONDITIONAL — Gated local permission provisioning.**"
+    "**CONDITIONAL — Gated local permission provisioning.**"
 )
 _s148_step1g_end = _s148_orch.find(
-    "2. **MANDATORY — Query knowledge graph and write to file**", _s148_step1g_start
+    "**Read CLAUDE.md (conditional)**", _s148_step1g_start
 )
 _s148_siteB = (
     _s148_orch[_s148_step1g_start:_s148_step1g_end]
@@ -33637,6 +33831,2130 @@ check(
 )
 
 # Marker: batched-graphql-review-disposition
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 152 -- Stage-2 code-hygiene gate (deterministic scan + qa audit)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 152: Stage-2 code-hygiene gate ===")
+
+def _s152_slice(text: str, anchor: str) -> str:
+    """Anchor-to-next-heading slice, scoped to this suite.
+
+    A same-named `_slice_section` helper is redefined with a different
+    signature later in this file (module-level name collision, pre-
+    existing) — a distinct local name avoids depending on whichever
+    definition happens to be active at this point in the module.
+    """
+    idx = text.find(anchor)
+    if idx == -1:
+        return ""
+    rest = text[idx:]
+    m = re.search(r"\n(?:#{1,6}) ", rest[1:])
+    if m:
+        return rest[: m.start() + 1]
+    return rest
+
+
+_s152_hygiene_path = REPO_ROOT / "docs" / "code-hygiene-gate.md"
+_s152_hygiene = _read_or_empty(_s152_hygiene_path)
+_s152_comments_md = read(REPO_ROOT / "docs" / "code-comments.md")
+_s152_orch = read(AGENTS_DIR / "orchestrator.md")
+_s152_takeover = read(REPO_ROOT / "docs" / "subagent-orchestration.md")
+_s152_flows = read(AGENTS_DIR / "ref-special-flows.md")
+_s152_qa = read(AGENTS_DIR / "qa.md")
+_s152_implementer = read(AGENTS_DIR / "implementer.md")
+_s152_observability = read(REPO_ROOT / "docs" / "observability.md")
+_s152_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s152_claude_md = read(REPO_ROOT / "CLAUDE.md")
+
+check(
+    "suite152(canonical-doc): docs/code-hygiene-gate.md exists",
+    bool(_s152_hygiene),
+    f"expected a non-empty file at {_s152_hygiene_path}",
+)
+
+for _section in (
+    "## 3. Work-narration patterns",
+    "## 4. Layer 1",
+    "## 5. Layer 2",
+    "## 7. Site enumeration",
+    "## 8. Anti-residue discipline",
+):
+    check(
+        f"suite152(canonical-doc-section): docs/code-hygiene-gate.md "
+        f"contains '{_section}'",
+        _section in _s152_hygiene,
+        f"missing required section '{_section}'",
+    )
+
+check(
+    "suite152(operational-definition): docs/code-hygiene-gate.md defines "
+    "'source-code comment' with the prose-extension exclusion list",
+    "source-code comment" in _s152_hygiene
+    and ".markdown" in _s152_hygiene
+    and ".adoc" in _s152_hygiene,
+    "the canonical doc must define 'source-code comment' and the prose "
+    "exclusion list (.md/.markdown/.rst/.txt/.adoc)",
+)
+
+# ---------------------------------------------------------------------------
+# Comment-safety of the pinned command block -- extract the fenced code
+# block that follows the "Fixed scan command" anchor and assert no non-
+# blank line begins with a source-code comment leader (the block would
+# otherwise flag its own authoring diff -- the exact self-inflicted trap
+# this gate exists to avoid).
+# ---------------------------------------------------------------------------
+_S152_CMD_ANCHOR = "### 3.1 Fixed scan command"
+_s152_cmd_slice = _s152_slice(_s152_hygiene, _S152_CMD_ANCHOR)
+_s152_cmd_match = re.search(r"```\w*\n(.*?)\n```", _s152_cmd_slice, re.DOTALL)
+_s152_cmd_block = _s152_cmd_match.group(1) if _s152_cmd_match else ""
+_S152_COMMENT_LEADERS = ("//", "/*", "*", "#", "<!--", "--", ";")
+_s152_cmd_bad_lines = [
+    line for line in _s152_cmd_block.splitlines()
+    if line.strip() and line.lstrip().startswith(_S152_COMMENT_LEADERS)
+]
+check(
+    "suite152(command-comment-safety): every line of the pinned scan "
+    "command starts with 'grep'/'|'/'-e', never a source-code comment "
+    "leader",
+    bool(_s152_cmd_block) and not _s152_cmd_bad_lines,
+    "command block empty, or contains comment-leader lines: "
+    f"{_s152_cmd_bad_lines}",
+)
+
+_s152_patterns = re.findall(r"-e '([^']+)'", _s152_cmd_block)
+check(
+    "suite152(pattern-extraction): the pinned command declares at least "
+    "8 -e alternation patterns",
+    len(_s152_patterns) >= 8,
+    f"found {len(_s152_patterns)} patterns; expected at least 8",
+)
+
+# AC-6: the scan must evaluate ADDED lines only, never pre-existing/context
+# lines, and comment content only, never non-comment code -- pattern
+# matching alone (checked above) is not enough evidence of this; the
+# pipeline stages that enforce it must be present in the pinned command.
+check(
+    "suite152(added-lines-only): the pinned command filters to added "
+    "diff lines ('^\\+') and drops the '+++' file-header line before "
+    "matching, never evaluating pre-existing/context lines",
+    "^\\+" in _s152_cmd_block and "^\\+\\+\\+" in _s152_cmd_block,
+    "pinned command must filter added lines ('^\\+') and exclude the "
+    "'+++' header ('^\\+\\+\\+') ahead of the pattern alternation",
+)
+check(
+    "suite152(comment-leader-filter): the pinned command restricts "
+    "matching to comment-leader lines before applying the work-narration "
+    "alternation, never evaluating non-comment code content",
+    all(
+        leader in _s152_cmd_block
+        # "/\*" not "/*" -- the pinned regex escapes the literal asterisk.
+        for leader in ("//", "/\\*", "<!--", "--", ";")
+    ),
+    "pinned command must include the comment-leader alternation "
+    "(//|/\\*|\\*|#|<!--|--|;) ahead of the work-narration pattern set",
+)
+
+if _s152_patterns:
+    _s152_combined = "|".join(_s152_patterns)
+    # Bad-example fixtures are built via concatenation, never as a
+    # contiguous literal, and never inside a committed '#' comment.
+    _s152_bad_a = "# added for " + "issue #" + "42, see " + "Phase 2" + " notes"
+    _s152_bad_b = "// see " + "work" + "spaces/foo.ts for context"
+    _s152_good = "# retried once because the upstream API rate-limits at 5rps"
+    check(
+        "suite152(pattern-fixture-bad-a): the canonical pattern set "
+        "matches a synthetic work-narration example",
+        re.search(_s152_combined, _s152_bad_a) is not None,
+        "pattern alternation failed to match the known-bad work-narration "
+        "fixture",
+    )
+    check(
+        "suite152(pattern-fixture-bad-b): the canonical pattern set "
+        "matches a synthetic workspaces/-path example",
+        re.search(_s152_combined, _s152_bad_b) is not None,
+        "pattern alternation failed to match the known-bad "
+        "workspaces/-path fixture",
+    )
+    check(
+        "suite152(pattern-fixture-good): the canonical pattern set does "
+        "NOT match a legitimate WHY-comment",
+        re.search(_s152_combined, _s152_good) is None,
+        "pattern alternation false-positived on a legitimate WHY-comment",
+    )
+
+# ---------------------------------------------------------------------------
+# Scan-site A1 -- primary dispatch path (agents/orchestrator.md)
+# ---------------------------------------------------------------------------
+_S152_A1_HEADING = "## Phase 2.6 — Code-Hygiene Scan"
+check(
+    "suite152(A1-heading): agents/orchestrator.md contains "
+    "'## Phase 2.6 — Code-Hygiene Scan'",
+    _S152_A1_HEADING in _s152_orch,
+    f"heading '{_S152_A1_HEADING}' not found in orchestrator.md",
+)
+
+_s152_idx_25 = _s152_orch.find("### Phase 2.5 — Constraint Reconciliation")
+_s152_idx_26 = _s152_orch.find(_S152_A1_HEADING)
+_s152_idx_27 = _s152_orch.find("## Phase 2.7 — Test Authoring")
+check(
+    "suite152(A1-ordering): Phase 2.6 is positioned between Phase 2.5 "
+    "and Phase 2.7 in agents/orchestrator.md",
+    -1 not in (_s152_idx_25, _s152_idx_26, _s152_idx_27)
+    and _s152_idx_25 < _s152_idx_26 < _s152_idx_27,
+    "expected order: Phase 2.5 < Phase 2.6 < Phase 2.7 "
+    f"(found indices {_s152_idx_25}, {_s152_idx_26}, {_s152_idx_27})",
+)
+
+_s152_a1_slice = _s152_slice(_s152_orch, _S152_A1_HEADING)
+check(
+    "suite152(A1-content): the Phase 2.6 section documents bounded-patch "
+    "re-dispatch, the max-3 cap, and silent-on-clean behavior",
+    "BOUNDED-PATCH" in _s152_a1_slice
+    and "max-3" in _s152_a1_slice
+    and "silence" in _s152_a1_slice.lower(),
+    "Phase 2.6 section must document BOUNDED-PATCH re-dispatch, the "
+    "max-3 iteration cap, and silent-on-clean behavior",
+)
+
+# ---------------------------------------------------------------------------
+# Scan-site A2 -- takeover/inline path (docs/subagent-orchestration.md)
+# ---------------------------------------------------------------------------
+_S152_A2_ANCHOR = "Inviolable gates (annotate"
+_s152_a2_slice = _s152_slice(_s152_takeover, _S152_A2_ANCHOR)
+check(
+    "suite152(A2-manifest): the Takeover Pipeline Manifest lists the "
+    "Phase 2.6 code-hygiene scan as an inviolable gate, [all types]",
+    "Phase 2.6 code-hygiene scan" in _s152_a2_slice
+    and "[all types]" in _s152_a2_slice,
+    "Takeover Pipeline Manifest must list 'Phase 2.6 code-hygiene scan' "
+    "with the [all types] scope tag",
+)
+
+# ---------------------------------------------------------------------------
+# Scan-site A3 -- special-flow pointers (agents/ref-special-flows.md)
+# ---------------------------------------------------------------------------
+# Bounded by the next real top-level ("## ") heading rather than
+# _s152_slice's any-level stop rule: both flows nest dense "### " sub-
+# sections (and, for Milestone-Build Flow, a "## Milestone Index" example
+# heading INSIDE a fenced code block) that would truncate the slice long
+# before reaching the pointer this suite is checking for.
+def _s152_bounded_region(text: str, start_heading: str, end_heading: str) -> str:
+    start = text.find(start_heading)
+    end = text.find(end_heading, start + 1) if start != -1 else -1
+    if start == -1 or end == -1:
+        return ""
+    return text[start:end]
+
+
+_s152_bugfix_slice = _s152_bounded_region(
+    _s152_flows, "## Bug-fix Flow", "## Hotfix sub-flow (type: hotfix)"
+)
+_s152_milestone_slice = _s152_bounded_region(
+    _s152_flows,
+    "## Milestone-Build Flow (single-repo",
+    "## Parallel Dispatch Flow",
+)
+check(
+    "suite152(A3-bugfix-pointer): Bug-fix Flow points to "
+    "docs/code-hygiene-gate.md for the Phase 2.6 scan",
+    "docs/code-hygiene-gate.md" in _s152_bugfix_slice,
+    "Bug-fix Flow must point to docs/code-hygiene-gate.md",
+)
+check(
+    "suite152(A3-milestone-pointer): Milestone-Build Flow points to "
+    "docs/code-hygiene-gate.md for the Phase 2.6 scan",
+    "docs/code-hygiene-gate.md" in _s152_milestone_slice,
+    "Milestone-Build Flow must point to docs/code-hygiene-gate.md",
+)
+check(
+    "suite152(A3-no-replicate): agents/ref-special-flows.md never "
+    "replicates the pinned grep command (pointer only)",
+    "grep -E" not in _s152_flows,
+    "ref-special-flows.md must point to the canonical command, never "
+    "replicate 'grep -E' inline",
+)
+
+# ---------------------------------------------------------------------------
+# Producer B1 -- agents/qa.md
+# ---------------------------------------------------------------------------
+check(
+    "suite152(B1-heading): agents/qa.md contains a '## Code Hygiene' "
+    "section",
+    "## Code Hygiene" in _s152_qa,
+    "agents/qa.md must contain a '## Code Hygiene' section",
+)
+check(
+    "suite152(B1-field): agents/qa.md Return Protocol declares "
+    "'code_hygiene: pass | fail'",
+    "code_hygiene: pass | fail" in _s152_qa,
+    "agents/qa.md Return Protocol must declare 'code_hygiene: pass | fail'",
+)
+check(
+    "suite152(B1-not-duplicated): '## Code Hygiene' is NOT duplicated "
+    "into agents/orchestrator.md (qa.md is the sole producer)",
+    "## Code Hygiene" not in _s152_orch,
+    "'## Code Hygiene' must not appear in agents/orchestrator.md — "
+    "agents/qa.md is the sole producer",
+)
+
+# AC-3 requires the section to actually audit five named categories, not
+# merely exist under the right heading -- a heading-only check would pass
+# even if the section body were empty or scoped to something else. Runs of
+# whitespace are collapsed before matching -- markdown line-wrap inside the
+# prose (e.g. a phrase split across two lines) is a formatting concern, not
+# an audit-category gap, and is out of scope for this check.
+_s152_b1_slice = re.sub(r"\s+", " ", _s152_slice(_s152_qa, "## Code Hygiene"))
+_s152_b1_category_terms = (
+    "40 lines",
+    "4 parameters",
+    "3 nesting levels",
+    "Reviewability Exceptions",
+    "WHAT-restating",
+    "Work-narration",
+    "Dead code",
+    "Magic numbers",
+)
+_s152_b1_missing_terms = [
+    term for term in _s152_b1_category_terms if term not in _s152_b1_slice
+]
+check(
+    "suite152(B1-audit-categories): agents/qa.md's Code Hygiene section "
+    "audits over-cap functions (with the Reviewability Exceptions "
+    "cross-ref), WHAT-restating comments, work-narration comments, dead "
+    "code, and magic numbers",
+    not _s152_b1_missing_terms,
+    f"agents/qa.md's Code Hygiene section is missing: {_s152_b1_missing_terms}",
+)
+
+# ---------------------------------------------------------------------------
+# Consumers C1/C2/C3 -- agents/orchestrator.md
+# ---------------------------------------------------------------------------
+_s152_gate_slice = _s152_slice(
+    _s152_orch, "**Gate — worst-of combined verdict:**"
+)
+check(
+    "suite152(C1-phase3-gate): the Phase 3 worst-of gate consumes "
+    "code_hygiene as a conjunction",
+    "code_hygiene" in _s152_gate_slice,
+    "the Phase 3 gate section must reference 'code_hygiene' as a "
+    "conjunction of the pass condition",
+)
+
+_s152_35_slice = _s152_slice(
+    _s152_orch, "## Phase 3.5 — Acceptance Gate"
+)
+check(
+    "suite152(C2-phase35-reassert): Phase 3.5 re-asserts code_hygiene "
+    "defensively",
+    "code_hygiene" in _s152_35_slice,
+    "the Phase 3.5 section must re-assert 'code_hygiene'",
+)
+
+# _s152_bounded_region (not _s152_slice): the iteration section's own
+# ```markdown``` template block contains a "## Iteration {N} — ..." example
+# heading, which would stop the any-level slicer before reaching the Case
+# A note below the template.
+_s152_iter_slice = _s152_bounded_region(
+    # Leading "\n### " anchors on the real heading, not the inline
+    # backtick cross-reference the Phase 2.6 section makes to it.
+    _s152_orch,
+    "\n### If any agent fails → ITERATE",
+    "## Phase 3.5 — Acceptance Gate",
+)
+check(
+    "suite152(C3-iteration-routing): iteration routing notes "
+    "code_hygiene: fail as a Case A bounce",
+    "code_hygiene" in _s152_iter_slice and "Case A" in _s152_iter_slice,
+    "iteration routing must note a code_hygiene failure as a Case A bounce",
+)
+
+# ---------------------------------------------------------------------------
+# Anti-producer-absent -- both sides of the multi-site contract must be
+# present; a consumer enumerated without its producer (or vice versa) is
+# a false-green gate by construction.
+# ---------------------------------------------------------------------------
+check(
+    "suite152(anti-producer-absent): 'code_hygiene' is defined in the "
+    "producer (agents/qa.md) AND referenced by the consumer "
+    "(agents/orchestrator.md)",
+    "code_hygiene" in _s152_qa and "code_hygiene" in _s152_orch,
+    "both agents/qa.md (producer) and agents/orchestrator.md (consumer) "
+    "must reference 'code_hygiene', or the gate is false-green",
+)
+
+# ---------------------------------------------------------------------------
+# Observability event -- stage2.hygiene
+# ---------------------------------------------------------------------------
+check(
+    "suite152(event-orchestrator): 'stage2.hygiene' is registered in the "
+    "agents/orchestrator.md event enum",
+    "stage2.hygiene" in _s152_orch,
+    "'stage2.hygiene' must appear in the orchestrator.md event enum",
+)
+check(
+    "suite152(event-observability): 'stage2.hygiene' is registered in "
+    "docs/observability.md",
+    "stage2.hygiene" in _s152_observability,
+    "'stage2.hygiene' must appear in docs/observability.md",
+)
+
+# ---------------------------------------------------------------------------
+# Byte-consistency (AC-5) -- the cap-exception gate wording must match
+# verbatim between implementer.md and qa.md.
+# ---------------------------------------------------------------------------
+check(
+    "suite152(byte-consistency): 'explained or under cap' appears "
+    "verbatim in both agents/implementer.md and agents/qa.md",
+    "explained or under cap" in _s152_implementer
+    and "explained or under cap" in _s152_qa,
+    "the phrase 'explained or under cap' must appear in both "
+    "agents/implementer.md and agents/qa.md",
+)
+
+# ---------------------------------------------------------------------------
+# Cross-reference -- docs/code-comments.md
+# ---------------------------------------------------------------------------
+check(
+    "suite152(cross-ref): docs/code-comments.md points to "
+    "docs/code-hygiene-gate.md",
+    "docs/code-hygiene-gate.md" in _s152_comments_md,
+    "docs/code-comments.md must point to docs/code-hygiene-gate.md",
+)
+
+# Self-referential guards (hygiene contract)
+_s152_own = read(Path(__file__))
+check(
+    "suite152(self-ref): test file contains 'Suite 152' and "
+    "'stage2-code-hygiene-gate'",
+    "Suite 152" in _s152_own and "stage2-code-hygiene-gate" in _s152_own,
+    "test file must self-reference Suite 152 and the marker "
+    "'stage2-code-hygiene-gate'",
+)
+check(
+    "suite152(registry): docs/testing.md registers 'Suite 152' and "
+    "'stage2-code-hygiene-gate'",
+    "Suite 152" in _s152_testing_md
+    and "stage2-code-hygiene-gate" in _s152_testing_md,
+    "docs/testing.md must register Suite 152 and the "
+    "'stage2-code-hygiene-gate' marker",
+)
+check(
+    "suite152(hygiene): CLAUDE.md does NOT contain 'Suite 152' (§11 "
+    "hygiene contract)",
+    "Suite 152" not in _s152_claude_md,
+    "CLAUDE.md must not mention Suite 152 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: stage2-code-hygiene-gate
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 153 -- opencode th-update executes the fail-closed updater
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 153: opencode th-update executes the dedicated updater ===")
+
+_s153_th_update = read(
+    REPO_ROOT / "installer-assets" / "opencode-commands" / "th-update.md"
+)
+
+check(
+    "suite153(executes-updater): th-update.md references "
+    "'update-opencode.sh', not only the full installer",
+    "update-opencode.sh" in _s153_th_update,
+    "th-update.md must reference 'update-opencode.sh' (the dedicated "
+    "updater), not just print the full install-opencode.sh line",
+)
+check(
+    "suite153(not-full-installer): th-update.md names "
+    "'install-opencode.sh' only to explicitly rule it out as the target "
+    "of this command",
+    "NOT `install-opencode.sh`" in _s153_th_update
+    or "not `install-opencode.sh`" in _s153_th_update.lower(),
+    "th-update.md must explicitly state that install-opencode.sh (the "
+    "full first-install script) is NOT what this command runs",
+)
+check(
+    "suite153(bash-execution): th-update.md directs execution through "
+    "the Bash tool, not a print-only instruction",
+    "Bash tool" in _s153_th_update,
+    "th-update.md must direct the agent to execute the updater via the "
+    "Bash tool rather than merely printing a command line",
+)
+
+_s153_three_states = ("already current", "updated", "installed ahead")
+_s153_missing_states = [
+    state for state in _s153_three_states if state not in _s153_th_update
+]
+check(
+    "suite153(three-state-result): th-update.md documents all three "
+    "outcomes {already current | updated | installed ahead}",
+    not _s153_missing_states,
+    f"th-update.md is missing outcome states: {_s153_missing_states}",
+)
+check(
+    "suite153(restart-named): th-update.md names restarting the "
+    "opencode session as the single manual operator step after 'updated'",
+    "restart" in _s153_th_update.lower(),
+    "th-update.md must name restarting the opencode session as the "
+    "remaining manual step",
+)
+
+check(
+    "suite153(no-skip-verify): th-update.md never introduces a "
+    "'--skip-verify' bypass or an alternate/unverified download path",
+    "--skip-verify" not in _s153_th_update,
+    "th-update.md must not mention '--skip-verify' or any verification "
+    "bypass flag",
+)
+check(
+    "suite153(sha256-floor-named): th-update.md names the SHA256 "
+    "verification as never skipped",
+    "SHA256" in _s153_th_update and "never" in _s153_th_update.lower(),
+    "th-update.md must state that the SHA256 verification is never "
+    "skipped",
+)
+check(
+    "suite153(flag-allowlist): th-update.md restricts itself to a fixed "
+    "flag allowlist ('--opencode-dir', '--non-interactive') and warns "
+    "against interpolating free operator text into the command line",
+    "--opencode-dir" in _s153_th_update
+    and "--non-interactive" in _s153_th_update
+    and "interpolat" in _s153_th_update.lower(),
+    "th-update.md must name the fixed flag allowlist and warn against "
+    "interpolating operator text into the shell command line",
+)
+
+check(
+    "suite153(standalone-not-gated): th-update.md declares itself a "
+    "standalone utility never gated by the leader boot capability check",
+    "standalone" in _s153_th_update.lower()
+    and "boot capability check" in _s153_th_update,
+    "th-update.md must explicitly declare itself standalone and never "
+    "gated by the leader boot capability check",
+)
+
+# Self-referential guard (hygiene contract) — mirrors the Suite 152 pattern.
+_s153_own = read(Path(__file__))
+check(
+    "suite153(self-ref): test file contains 'Suite 153' and "
+    "'opencode-th-update-executes'",
+    "Suite 153" in _s153_own and "opencode-th-update-executes" in _s153_own,
+    "test file must self-reference Suite 153 and the marker "
+    "'opencode-th-update-executes'",
+)
+
+# Marker: opencode-th-update-executes
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 155 -- full-lane-output-verbosity-trim (Round 1: Task-1 + Task-5)
+# ---------------------------------------------------------------------------
+# Checks the two foundations of the output-verbosity-trim refactor covered by
+# this suite:
+#   Task-1 (docs/output-contract-patterns.md + compact mirror + changelog
+#           fragment) -- AC-1..AC-7
+#   Task-5 (Spanish report-body exception removal + two-tier language rule,
+#           declared in docs/voice-guide.md / docs/conventions.md / CLAUDE.md
+#           / agents/README.md) -- AC-1..AC-7
+# Any AC clause whose evidence lives in a file owned by a different task is
+# noted as deferred, never force-tested against content owned elsewhere.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 155: full-lane-output-verbosity-trim (Round 1) ===")
+
+import subprocess as _s155_subprocess
+
+_s155_output_contract = _read_or_empty(REPO_ROOT / "docs" / "output-contract-patterns.md")
+_s155_output_template = read(AGENTS_DIR / "_shared" / "output-template.md")
+_s155_voice_guide = read(REPO_ROOT / "docs" / "voice-guide.md")
+_s155_conventions = read(REPO_ROOT / "docs" / "conventions.md")
+_s155_claude_md = read(REPO_ROOT / "CLAUDE.md")
+_s155_readme = read(AGENTS_DIR / "README.md")
+_s155_adversary = read(AGENTS_DIR / "adversary.md")
+# team-harness bumps its own version once per PR (CLAUDE.md §6.3) and writes
+# the versioned CHANGELOG.md section directly in the same PR -- there is no
+# per-PR changelog.d/ fragment stage to read the entry from, so this asserts
+# against the durable versioned section directly.
+_s155_changelog_frag = ""
+_s155_changelog_full = read(REPO_ROOT / "CHANGELOG.md")
+for _s155_section in re.split(r"(?=^## \[)", _s155_changelog_full, flags=re.MULTILINE):
+    if "output-contract-patterns.md" in _s155_section:
+        _s155_changelog_frag = _s155_section
+        break
+
+
+def _s155_slice(text: str, anchor: str) -> str:
+    """Anchor-to-next-heading slice, scoped to this suite (mirrors the
+    Suite 152 `_s152_slice` local-helper pattern -- a distinct local name
+    avoids depending on whichever module-level `_slice_section` happens to
+    be active at this point in the file)."""
+    idx = text.find(anchor)
+    if idx == -1:
+        return ""
+    rest = text[idx:]
+    m = re.search(r"\n(?:#{1,6}) ", rest[1:])
+    if m:
+        return rest[: m.start() + 1]
+    return rest
+
+
+def _s155_level_row(text: str, level: str) -> str:
+    m = re.search(rf"^\|\s*`{level}`\s*\|.*$", text, re.MULTILINE)
+    return m.group(0) if m else ""
+
+
+def _s155_heading_before(text: str, needle: str) -> str:
+    """Nearest preceding `### ` heading before the first occurrence of
+    `needle` in `text` -- scopes a marker check to the specific subsection
+    that carries the mention, instead of the whole enclosing section."""
+    idx = text.find(needle)
+    if idx == -1:
+        return ""
+    headings = re.findall(r"^###\s+.*$", text[:idx], re.MULTILINE)
+    return headings[-1].strip() if headings else ""
+
+
+_S155_LEVELS = ("verbatim", "tight", "bounded", "standard")
+
+# ---------------------------------------------------------------------------
+# Task-1 AC-1 -- exactly four named intensity levels, each with an explicit
+# artifact-class list
+# ---------------------------------------------------------------------------
+check(
+    "suite155(task1-ac1-exists): docs/output-contract-patterns.md exists",
+    bool(_s155_output_contract),
+    "docs/output-contract-patterns.md is missing",
+)
+
+_s155_intensity_slice = _s155_slice(_s155_output_contract, "## 2. Intensity Levels")
+_s155_row_names = re.findall(r"^\|\s*`(\w+)`\s*\|", _s155_intensity_slice, re.MULTILINE)
+check(
+    "suite155(task1-ac1-exactly-four): '## 2. Intensity Levels' table has "
+    "exactly the four rows {verbatim, tight, bounded, standard} -- no "
+    "fifth level, none missing",
+    len(_s155_row_names) == 4 and set(_s155_row_names) == set(_S155_LEVELS),
+    f"found level rows {_s155_row_names}, expected exactly {_S155_LEVELS}",
+)
+
+_s155_canonical_rows = {lvl: _s155_level_row(_s155_output_contract, lvl) for lvl in _S155_LEVELS}
+check(
+    "suite155(task1-ac1-nonempty-classes): every level row carries a "
+    "non-trivial artifact-class cell (not a placeholder)",
+    all(len(row) > 40 for row in _s155_canonical_rows.values()),
+    f"level rows too short (likely placeholder): "
+    f"{[k for k, v in _s155_canonical_rows.items() if len(v) <= 40]}",
+)
+
+# ---------------------------------------------------------------------------
+# Task-1 AC-2 -- compact mirror in agents/_shared/output-template.md; names
+# and artifact-class assignments match the canonical table (multi-site
+# invariant) -- byte-level anchor consistency, not just section presence.
+# ---------------------------------------------------------------------------
+check(
+    "suite155(task1-ac2-section-exists): agents/_shared/output-template.md "
+    "has a '## Output Contract — Compression' section",
+    "## Output Contract — Compression" in _s155_output_template,
+    "output-template.md missing '## Output Contract — Compression' section",
+)
+
+_s155_mirror_slice = _s155_slice(_s155_output_template, "## Output Contract — Compression")
+_s155_mirror_rows = {lvl: _s155_level_row(_s155_mirror_slice, lvl) for lvl in _S155_LEVELS}
+check(
+    "suite155(task1-ac2-mirror-four-levels): the mirror table names the "
+    "same four levels, each with a non-empty artifact-class cell",
+    all(_s155_mirror_rows.values()),
+    f"mirror missing level rows: {[k for k, v in _s155_mirror_rows.items() if not v]}",
+)
+
+# Per-level anchor phrases hand-picked from the ACTUAL canonical + mirror
+# prose (verified byte-identical substrings present in both cells) -- a
+# rename or dropped artifact-class in either file decouples an anchor and
+# fails this check, catching multi-site divergence at the byte level
+# rather than merely "both files exist".
+_S155_LEVEL_ANCHORS = {
+    "verbatim": ["CWE/OWASP", "status-block", "enum values", "file:line"],
+    "tight": [
+        "Per-finding prose in `security`/`adversary`/`reviewer` pipeline-mode reports"
+    ],
+    "bounded": [
+        "`00-state.md`",
+        "`00-execution-events.md` free-text fields",
+        "`changelog.d/*.md`",
+        "`01-plan.md § Decisions for human review`",
+        "`failure-brief.md` iteration entries",
+    ],
+    "standard": ["docs/", "reference"],
+}
+_s155_mismatches = []
+for _lvl, _anchors in _S155_LEVEL_ANCHORS.items():
+    _canon_row = _s155_canonical_rows.get(_lvl, "")
+    _mirror_row = _s155_mirror_rows.get(_lvl, "")
+    for _anchor in _anchors:
+        if _anchor not in _canon_row or _anchor not in _mirror_row:
+            _s155_mismatches.append((_lvl, _anchor))
+check(
+    "suite155(task1-ac2-byte-consistency): every level's artifact-class "
+    "anchor phrase appears verbatim in BOTH the canonical table "
+    "(docs/output-contract-patterns.md § 2) and the compact mirror "
+    "(output-template.md) -- the multi-site invariant, checked at the "
+    "byte level, not just section presence",
+    not _s155_mismatches,
+    f"anchor/level pairs missing from one side: {_s155_mismatches}",
+)
+
+# ---------------------------------------------------------------------------
+# Task-1 AC-3 -- verbatim-preservation rule
+# ---------------------------------------------------------------------------
+_s155_verbatim_slice = _s155_slice(_s155_output_contract, "## 3. Verbatim-Preservation Rule")
+check(
+    "suite155(task1-ac3-verbatim-rule): § 3 states code/commands/"
+    "identifiers/exact error strings are never paraphrased or compressed",
+    bool(_s155_verbatim_slice)
+    and "never paraphrased" in _s155_verbatim_slice
+    and "Identifiers" in _s155_verbatim_slice
+    and "error strings" in _s155_verbatim_slice.lower(),
+    "§ 3 must state the verbatim-preservation rule for code/commands/"
+    "identifiers/exact error strings",
+)
+
+# ---------------------------------------------------------------------------
+# Task-1 AC-4 -- clarity exemptions (security warnings incl. remediation,
+# irreversible-action confirmations, multi-step sequences)
+# ---------------------------------------------------------------------------
+_s155_clarity_slice = _s155_slice(_s155_output_contract, "## 4. Clarity Exemptions")
+check(
+    "suite155(task1-ac4-clarity-exemptions): § 4 exempts security "
+    "warnings (Critical/High), irreversible-action confirmations, and "
+    "multi-step sequences from compression",
+    bool(_s155_clarity_slice)
+    and "Security warnings" in _s155_clarity_slice
+    and "Critical/High" in _s155_clarity_slice
+    and "Irreversible-action confirmations" in _s155_clarity_slice
+    and "Multi-step sequences" in _s155_clarity_slice,
+    "§ 4 must cover Security warnings (Critical/High), Irreversible-"
+    "action confirmations, and Multi-step sequences",
+)
+check(
+    "suite155(task1-ac4-remediation-covered): the security-warning "
+    "exemption explicitly covers the remediation step for Critical/High "
+    "findings, not just the finding headline",
+    "remediation step that lets the reader act on it" in _s155_clarity_slice,
+    "§ 4 must state that the remediation step (not just the headline) is "
+    "part of the security-warning exemption",
+)
+
+# ---------------------------------------------------------------------------
+# Task-1 AC-5 -- iteration re-narration ban
+# ---------------------------------------------------------------------------
+_s155_renarr_slice = _s155_slice(_s155_output_contract, "## 5. Iteration Re-Narration Ban")
+check(
+    "suite155(task1-ac5-renarration-ban): § 5 names failure-brief.md as "
+    "the sole vehicle for patch/verify narratives and cites "
+    "agents/adversary.md § Failure Brief's 5-10 line contract as the "
+    "pattern to imitate",
+    bool(_s155_renarr_slice)
+    and "failure-brief.md" in _s155_renarr_slice
+    and "adversary.md` § Failure Brief" in _s155_renarr_slice
+    and "5-10 line" in _s155_renarr_slice,
+    "§ 5 must name failure-brief.md as the sole vehicle and cite "
+    "agents/adversary.md § Failure Brief's 5-10 line contract",
+)
+check(
+    "suite155(task1-ac5-pointer-target-real): agents/adversary.md really "
+    "documents a 5-10 line per-iteration failure-brief contract (the "
+    "pointer § 5 cites is not dangling)",
+    "5-10 lines per iteration" in _s155_adversary,
+    "agents/adversary.md must contain the '5-10 lines per iteration' "
+    "phrase that § 5 points to",
+)
+
+# ---------------------------------------------------------------------------
+# Task-1 AC-6 -- before/after measurement method + empirical baseline
+# ---------------------------------------------------------------------------
+_s155_measure_slice = _s155_slice(
+    _s155_output_contract, "## 6. Before/After Measurement Method"
+)
+check(
+    "suite155(task1-ac6-measurement-method): § 6 defines the before/"
+    "after method against 00-pipeline-summary.md § Cost and records the "
+    "empirical vault-run baseline",
+    bool(_s155_measure_slice)
+    and "00-pipeline-summary.md" in _s155_measure_slice
+    and "hotfix-psp" in _s155_measure_slice
+    and "79 KB" in _s155_measure_slice
+    and "1,232 KB" in _s155_measure_slice
+    and "pipeline-cost-lanes-and-trim" in _s155_measure_slice,
+    "§ 6 must reference 00-pipeline-summary.md § Cost and the empirical "
+    "baseline (hotfix-psp 79 KB ... pipeline-cost-lanes-and-trim 1,232 KB)",
+)
+
+# ---------------------------------------------------------------------------
+# Task-1 AC-7 -- changelog fragment (covers both caps and the Spanish
+# exception removal); no plugin.json version bump.
+# NOTE: the "no plugin.json version bump" half of AC-7 is a diff-scope
+# fact (skip-version), not doc content -- it is verified via `git status`/
+# `git diff --stat` (.claude-plugin/plugin.json absent from the changed-files
+# list), not re-asserted here as a regex check against fragment prose (which
+# would be a hollow content check for a fact the fragment prose does not need
+# to restate).
+# ---------------------------------------------------------------------------
+_s155_changelog_entry_heading = _s155_heading_before(
+    _s155_changelog_frag, "output-contract-patterns.md"
+)
+check(
+    "suite155(task1-ac7-changelog-exists): the change is changelogged in the "
+    "durable versioned CHANGELOG.md section, under a '### Changed' entry",
+    bool(_s155_changelog_frag) and _s155_changelog_entry_heading == "### Changed",
+    "no versioned CHANGELOG.md '## [X.Y.Z]' section mentions "
+    "output-contract-patterns.md, or the entry mentioning it is not governed "
+    f"by a '### Changed' heading (found: {_s155_changelog_entry_heading!r})",
+)
+check(
+    "suite155(task1-ac7-covers-both): the changelog entry covers BOTH "
+    "the verbosity-cap contract and the Spanish report-body exception "
+    "removal",
+    "intensity level" in _s155_changelog_frag.lower()
+    and "spanish" in _s155_changelog_frag.lower(),
+    "changelog entry must mention both the intensity-level contract "
+    "and the Spanish exception removal",
+)
+
+# ---------------------------------------------------------------------------
+# Task-5 AC-1 -- docs/voice-guide.md § Documented exceptions: no Spanish
+# report-body exception; only the two surviving surfaces, described
+# parametrically (never a hardcoded language).
+# ---------------------------------------------------------------------------
+_s155_exceptions_slice = _s155_slice(_s155_voice_guide, "**Documented exceptions**")
+
+_S155_OLD_SPANISH_EXCEPTION_PHRASES = [
+    "committed artefacts where Spanish is allowed",
+    "lists patterns in both English and Spanish so the operator can chat",
+]
+check(
+    "suite155(task5-ac1-old-exception-removed): the old 'security/"
+    "reviewer report bodies are a Spanish exception' phrasing is gone "
+    "from docs/voice-guide.md",
+    not any(p in _s155_voice_guide for p in _S155_OLD_SPANISH_EXCEPTION_PHRASES),
+    "found stale Spanish-exception phrasing in docs/voice-guide.md",
+)
+check(
+    "suite155(task5-ac1-two-surfaces-only): § Documented exceptions "
+    "names only agents/leader.md live chat and its Step 6 intent-"
+    "detection routing table as surviving surfaces, and states no other "
+    "artefact carries an exception",
+    bool(_s155_exceptions_slice)
+    and "agents/leader.md` live chat" in _s155_exceptions_slice
+    and "Step 6 intent-detection routing table" in _s155_exceptions_slice
+    and "No other committed artefact carries a language exception" in _s155_exceptions_slice,
+    "§ Documented exceptions must name exactly the two surviving "
+    "surfaces and state no other artefact carries an exception",
+)
+check(
+    "suite155(task5-ac1-parametric-not-hardcoded): both surviving "
+    "surfaces are described via the resolved-language/precedence-chain "
+    "mechanism, not a hardcoded language pair",
+    "4-level precedence chain" in _s155_exceptions_slice
+    and "operator's instance" in _s155_exceptions_slice
+    and "not restricted to a fixed pair of languages" in _s155_exceptions_slice,
+    "§ Documented exceptions must describe both surfaces parametrically "
+    "(4-level precedence chain, current-operator instance, not a fixed "
+    "language pair)",
+)
+
+# ---------------------------------------------------------------------------
+# Task-5 AC-2 -- Operator-Supplied Content Boundary table: agentic-tier row
+# -> English; operator-facing-tier row -> operator's resolved language;
+# committed-agent-reports row (all three reviews/04-*.md files) -> English.
+# ---------------------------------------------------------------------------
+check(
+    "suite155(task5-ac2-boundary-agentic-row): the Content Boundary "
+    "table's agentic-tier workspace-doc row resolves to English",
+    re.search(
+        r"Prose body content in agentic-tier workspace docs[^\n]*\|\s*Agent\s*\|\s*English\s*\|",
+        _s155_voice_guide,
+    )
+    is not None,
+    "missing the agentic-tier -> English row",
+)
+check(
+    "suite155(task5-ac2-boundary-operator-row): the Content Boundary "
+    "table's operator-facing-tier row resolves to the operator's "
+    "resolved language",
+    re.search(
+        r"Prose body content in operator-facing-tier workspace docs[^\n]*Operator's resolved language",
+        _s155_voice_guide,
+    )
+    is not None,
+    "missing the operator-facing-tier -> operator's resolved language row",
+)
+check(
+    "suite155(task5-ac2-boundary-reports-row): the Content Boundary "
+    "table lists reviews/04-security.md, reviews/04-internal-review.md, "
+    "and reviews/04-adversary.md together in one English row",
+    re.search(
+        r"reviews/04-security\.md`, `reviews/04-internal-review\.md`, "
+        r"`reviews/04-adversary\.md`[^\n]*\|\s*Agent\s*\|\s*English\s*\|",
+        _s155_voice_guide,
+    )
+    is not None,
+    "missing the committed-agent-reports -> English row naming all "
+    "three reviews/04-*.md files together",
+)
+
+# ---------------------------------------------------------------------------
+# Task-5 AC-3 -- docs/conventions.md § Document classification: (a) old
+# 'Spanish contract unchanged' clause removed from the reviews/04-*.md
+# row; (b) two-tier language rule declared canonically.
+# ---------------------------------------------------------------------------
+check(
+    "suite155(task5-ac3a-old-clause-removed): docs/conventions.md no "
+    "longer states the Spanish-language contract for security/reviewer "
+    "bodies is unchanged",
+    "Spanish-language contract for security/reviewer bodies is unchanged"
+    not in _s155_conventions,
+    "docs/conventions.md must not retain the removed Spanish-contract "
+    "clause",
+)
+_s155_two_tier_slice = _s155_slice(_s155_conventions, "### Two-tier language rule")
+check(
+    "suite155(task5-ac3b-two-tier-rule): docs/conventions.md declares "
+    "the two-tier language rule (operator-facing tier -> operator's "
+    "resolved language; agentic tier + every committed artefact -> "
+    "English, no exception)",
+    bool(_s155_two_tier_slice)
+    and "operator-facing tier" in _s155_two_tier_slice.lower()
+    and "agentic tier" in _s155_two_tier_slice.lower()
+    and "English with no exception" in _s155_two_tier_slice,
+    "docs/conventions.md § Two-tier language rule must declare both "
+    "tiers and the no-exception clause",
+)
+
+# ---------------------------------------------------------------------------
+# Task-5 AC-4 -- CLAUDE.md §7.3: old exception removed; two surviving
+# surfaces named parametrically; §14 no longer states a fixed language
+# pair for live chat; consistent with docs/voice-guide.md.
+# ---------------------------------------------------------------------------
+_s155_claude_73_slice = _s155_slice(_s155_claude_md, "### 7.3 Language")
+check(
+    "suite155(task5-ac4-old-exception-removed): CLAUDE.md §7.3 no "
+    "longer names security/reviewer report bodies as a Spanish "
+    "exception",
+    bool(_s155_claude_73_slice)
+    and "security/reviewer report bodies (Spanish per contract)" not in _s155_claude_73_slice,
+    "CLAUDE.md §7.3 must not retain the old Spanish report-body "
+    "exception phrasing",
+)
+check(
+    "suite155(task5-ac4-two-surfaces-and-parametric): CLAUDE.md §7.3 "
+    "names only the leader live chat + Step 6 intent-detection table as "
+    "exceptions, described parametrically (never a hardcoded language)",
+    "Step 6 intent-detection routing table" in _s155_claude_73_slice
+    and "never a hardcoded language" in _s155_claude_73_slice
+    and "No other committed artefact carries a language exception" in _s155_claude_73_slice,
+    "CLAUDE.md §7.3 must name the two surfaces parametrically and state "
+    "no other artefact carries a language exception",
+)
+check(
+    "suite155(task5-ac4-section14-no-fixed-pair): CLAUDE.md §14 no "
+    "longer states live chat 'accepts Spanish and English' (a fixed "
+    "language pair)",
+    "live chat accepts Spanish and English" not in _s155_claude_md,
+    "CLAUDE.md must not retain the fixed-language-pair phrasing for "
+    "live chat",
+)
+
+# ---------------------------------------------------------------------------
+# Task-5 AC-5 -- agents/README.md adversary roster: "report in English",
+# no "report in Spanish" mandate anywhere in the file.
+# ---------------------------------------------------------------------------
+check(
+    "suite155(task5-ac5-adversary-english): agents/README.md adversary "
+    "roster row says 'report in English'",
+    re.search(r"`adversary`[^\n]*report in English", _s155_readme) is not None,
+    "agents/README.md adversary roster row must say 'report in English'",
+)
+check(
+    "suite155(task5-ac5-no-spanish-mandate): agents/README.md carries no "
+    "'report in Spanish' mandate anywhere",
+    "report in Spanish" not in _s155_readme,
+    "agents/README.md must not contain 'report in Spanish' anywhere",
+)
+
+# ---------------------------------------------------------------------------
+# No diff-against-origin/main check for agents/leader.md: a fixed-point
+# no-diff assertion cannot distinguish "never touched" from "touched by a
+# later, legitimate edit" once origin/main moves, so it is not a durable
+# structural invariant for this file.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Task-5 AC-7 -- two-tier rule declared canonically in both docs/
+# conventions.md and docs/voice-guide.md (consistent wording), with a
+# forward pointer to agents/orchestrator.md's Language propagation section.
+# The reverse pointer (orchestrator.md -> conventions.md, tier-aware
+# dispatch instruction) is not asserted here.
+# ---------------------------------------------------------------------------
+_S155_TWO_TIER_ANCHORS = ["operator-facing tier", "agentic tier", "English with no exception"]
+check(
+    "suite155(task5-ac7-canonical-conventions): docs/conventions.md § "
+    "Two-tier language rule declares the rule canonically",
+    all(a.lower() in _s155_conventions.lower() for a in _S155_TWO_TIER_ANCHORS),
+    f"docs/conventions.md must declare: {_S155_TWO_TIER_ANCHORS}",
+)
+check(
+    "suite155(task5-ac7-mirrored-voice-guide): docs/voice-guide.md "
+    "mirrors the two-tier rule (operator-facing-tier / agentic-tier doc "
+    "body wording) consistent with docs/conventions.md",
+    "operator-facing-tier doc bodies" in _s155_voice_guide
+    and "agentic-tier doc bodies" in _s155_voice_guide,
+    "docs/voice-guide.md must mirror operator-facing-tier / agentic-"
+    "tier doc-body wording",
+)
+check(
+    "suite155(task5-ac7-forward-pointer-to-orchestrator): docs/"
+    "conventions.md points forward to 'agents/orchestrator.md § "
+    "Communication Protocol → Language propagation' as the "
+    "operationalized dispatch instruction (Task-5's half of the "
+    "cross-reference; the reverse pointer FROM orchestrator.md is "
+    "Task-4/Round 2, deferred)",
+    "agents/orchestrator.md" in _s155_conventions and "Language propagation" in _s155_conventions,
+    "docs/conventions.md must forward-reference orchestrator.md's "
+    "Language propagation section",
+)
+
+# Self-referential guard (hygiene contract) -- mirrors the Suite 152/153
+# pattern. The docs/testing.md registry entry is deliberately NOT
+# self-checked here: registering a new suite in the canonical test
+# registry is a documentation edit, out of the tester agent's scope
+# (test files only) -- flagged as a follow-up in 03-testing.md instead.
+_s155_own = read(Path(__file__))
+check(
+    "suite155(self-ref): test file contains 'Suite 155' and "
+    "'full-lane-output-verbosity-trim'",
+    "Suite 155" in _s155_own and "full-lane-output-verbosity-trim" in _s155_own,
+    "test file must self-reference Suite 155 and the marker "
+    "'full-lane-output-verbosity-trim'",
+)
+check(
+    "suite155(hygiene): CLAUDE.md does NOT contain 'Suite 155' (§11 "
+    "hygiene contract)",
+    "Suite 155" not in _s155_claude_md,
+    "CLAUDE.md must not mention Suite 155 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: full-lane-output-verbosity-trim
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 156 -- full-lane-output-verbosity-trim (Round 2: Task-2 + Task-3 + Task-4)
+# ---------------------------------------------------------------------------
+# Checks the three appliers of the output-verbosity-trim refactor:
+#   Task-2 (agents/security.md, agents/adversary.md, agents/reviewer.md,
+#           agents/reviewer-consolidator.md) -- findings-first prose budget +
+#           English report-body conversion -- AC-1..AC-12
+#   Task-3 (agents/qa.md, agents/tester.md, agents/acceptance-checker.md,
+#           agents/delivery.md, agents/plan-reviewer.md) -- canonical AC
+#           reference convention -- AC-1..AC-5
+#   Task-4 (agents/orchestrator.md, docs/observability.md) -- bounded infra
+#           files + English Team table + tier-aware language propagation --
+#           AC-1..AC-7
+# Plus one cross-task closure check verifying Task-5 AC-7's bidirectional
+# cross-reference exists on both sides now that Task-4's file is in place.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 156: full-lane-output-verbosity-trim (Round 2) ===")
+
+_s156_security = read(AGENTS_DIR / "security.md")
+_s156_adversary = read(AGENTS_DIR / "adversary.md")
+_s156_reviewer = read(AGENTS_DIR / "reviewer.md")
+_s156_consolidator = read(AGENTS_DIR / "reviewer-consolidator.md")
+_s156_qa = read(AGENTS_DIR / "qa.md")
+_s156_tester = read(AGENTS_DIR / "tester.md")
+_s156_acceptance_checker = read(AGENTS_DIR / "acceptance-checker.md")
+_s156_delivery = read(AGENTS_DIR / "delivery.md")
+_s156_plan_reviewer = read(AGENTS_DIR / "plan-reviewer.md")
+_s156_orchestrator = read(AGENTS_DIR / "orchestrator.md")
+_s156_observability = read(REPO_ROOT / "docs" / "observability.md")
+_s156_conventions = read(REPO_ROOT / "docs" / "conventions.md")
+_s156_voice_guide = read(REPO_ROOT / "docs" / "voice-guide.md")
+_s156_claude_text = read(REPO_ROOT / "CLAUDE.md")
+
+
+def _s156_slice(text: str, anchor: str) -> str:
+    """Anchor-to-next-heading slice, scoped to this suite (mirrors the Suite
+    152/155 `_slice` local-helper pattern)."""
+    idx = text.find(anchor)
+    if idx == -1:
+        return ""
+    rest = text[idx:]
+    m = re.search(r"\n(?:#{1,6}) ", rest[1:])
+    if m:
+        return rest[: m.start() + 1]
+    return rest
+
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-1 -- security.md pipeline-mode report: no cap on finding count at
+# any severity; brevity is a FORMAT restriction only, never a reason to
+# merge/downgrade/omit a finding.
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task2-ac1-no-count-cap): agents/security.md states 'no cap on "
+    "finding count' explicitly",
+    "No cap on finding count, at any severity" in _s156_security,
+    "security.md must explicitly state no cap on finding count at any severity",
+)
+check(
+    "suite156(task2-ac1-anti-drift): agents/security.md's anti-drift clause "
+    "forbids merging/downgrading/omitting a finding for brevity",
+    "never a reason to merge two distinct findings, downgrade a severity, "
+    "or omit a finding" in _s156_security,
+    "security.md must state brevity never merges/downgrades/omits a finding",
+)
+check(
+    "suite156(task2-ac1-anti-drift-adversary): agents/adversary.md's "
+    "anti-drift clause forbids merging/downgrading/omitting a control-attempt "
+    "for brevity (mirrors security.md, scoped to controls/breaks)",
+    "never a reason to merge two distinct control-attempts, downgrade a "
+    "`broke-it` verdict, or omit a control" in _s156_adversary,
+    "adversary.md must state brevity never merges/downgrades/omits a control",
+)
+check(
+    "suite156(task2-ac1-anti-drift-reviewer): agents/reviewer.md's "
+    "anti-drift clause forbids merging/downgrading/omitting a Critical "
+    "finding for brevity (mirrors security.md, scoped to Critical findings)",
+    "never a reason to merge two distinct Critical findings, downgrade a "
+    "Critical to a lower severity, or omit a Critical finding" in _s156_reviewer,
+    "reviewer.md must state brevity never merges/downgrades/omits a Critical "
+    "finding",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-2 -- security.md pipeline-mode per-finding prose budget: file:line
+# + [CWE-N] + <=1-sentence impact + <=1-line remediation pointer; full
+# remediation code blocks retained only in the audit-grade standalone template.
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task2-ac2-pipeline-budget): agents/security.md's pipeline-mode "
+    "budget names file:line + [CWE-N] + <=1-sentence impact + <=1-line "
+    "remediation pointer",
+    "file:line` + `[CWE-N]` + an impact statement of ≤1 sentence + a "
+    "remediation pointer of ≤1 line" in _s156_security,
+    "security.md § Output Contract must state the exact pipeline-mode "
+    "per-finding budget",
+)
+check(
+    "suite156(task2-ac2-audit-grade-fenced-for-code): agents/security.md "
+    "states full remediation code blocks are retained only in the "
+    "audit-grade standalone template",
+    "Full remediation code blocks are retained only in the audit-grade "
+    "standalone template" in _s156_security,
+    "security.md must fence full remediation code blocks to audit-grade mode",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-3 -- adversary.md per-control prose bound: neither broke_count
+# nor incomplete_on_changed_control semantics is capped or altered.
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task2-ac3-adversary-uncapped-semantics): agents/adversary.md "
+    "states neither broke_count nor incomplete_on_changed_control is capped "
+    "or altered by the per-control prose budget",
+    "Neither the number of controls attempted, the `broke_count`, nor the "
+    "`incomplete_on_changed_control` semantics is capped or altered"
+    in _s156_adversary,
+    "adversary.md § Output Contract must state broke_count/"
+    "incomplete_on_changed_control are never capped or altered",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-4 -- reviewer.md gains a Critical-finding prose budget without
+# changing the existing 'Critical: ALL (no cap)' count rule or the
+# inline_findings[] contract.
+# ---------------------------------------------------------------------------
+_s156_severity_slice = _s156_slice(_s156_reviewer, "### Severity Format Rules")
+check(
+    "suite156(task2-ac4-critical-still-uncapped): reviewer.md § Severity "
+    "Format Rules retains 'ALL (no cap)' for Critical AND gains a bounded "
+    "prose budget",
+    "ALL (no cap)" in _s156_severity_slice
+    and "Bounded prose budget" in _s156_severity_slice
+    and "inline_findings" in _s156_severity_slice,
+    "reviewer.md's Critical row must keep 'ALL (no cap)', add a bounded "
+    "prose budget, and retain the inline_findings[] contract",
+)
+check(
+    "suite156(task2-ac4-count-never-capped): reviewer.md explicitly states "
+    "the count of Critical findings is never capped",
+    "The count of Critical findings is never capped" in _s156_reviewer,
+    "reviewer.md must explicitly state the Critical count is never capped",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-5 -- security.md, adversary.md, reviewer.md, and
+# reviewer-consolidator.md each reference the iteration re-narration ban and
+# the clarity exemption.
+# ---------------------------------------------------------------------------
+_S156_LENS_FILES = {
+    "security.md": _s156_security,
+    "adversary.md": _s156_adversary,
+    "reviewer.md": _s156_reviewer,
+    "reviewer-consolidator.md": _s156_consolidator,
+}
+_s156_missing_renarr = [
+    name
+    for name, text in _S156_LENS_FILES.items()
+    if "Iteration re-narration ban" not in text
+]
+_s156_missing_clarity = [
+    name
+    for name, text in _S156_LENS_FILES.items()
+    if "Clarity exemption" not in text
+]
+check(
+    "suite156(task2-ac5-renarration-refs): all four review-lens files "
+    "reference 'Iteration re-narration ban'",
+    not _s156_missing_renarr,
+    f"missing 'Iteration re-narration ban' in: {_s156_missing_renarr}",
+)
+check(
+    "suite156(task2-ac5-clarity-refs): all four review-lens files "
+    "reference 'Clarity exemption'",
+    not _s156_missing_clarity,
+    f"missing 'Clarity exemption' in: {_s156_missing_clarity}",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-6 -- prose-budget caps do NOT touch security.md's standalone
+# audit-grade template; the budget applies to pipeline mode only.
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task2-ac6-audit-grade-fenced-from-budget): agents/security.md "
+    "states the audit-grade template is fenced from the pipeline-mode prose "
+    "budget",
+    "fenced from this budget" in _s156_security
+    and "fenced from the pipeline-mode prose budget" in _s156_security,
+    "security.md must state the audit-grade template is fenced from the "
+    "pipeline-mode prose budget (verbosity unaffected, language only)",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-7 -- report-body mandate in security.md/adversary.md/reviewer.md
+# converts from Spanish to English; no 'report in Spanish' mandate remains.
+# ---------------------------------------------------------------------------
+_s156_spanish_mandate_pattern = re.compile(r"report in spanish", re.IGNORECASE)
+_s156_found_spanish_mandate = [
+    name
+    for name, text in {
+        "security.md": _s156_security,
+        "adversary.md": _s156_adversary,
+        "reviewer.md": _s156_reviewer,
+    }.items()
+    if _s156_spanish_mandate_pattern.search(text)
+]
+check(
+    "suite156(task2-ac7-no-spanish-mandate): no 'report in Spanish' mandate "
+    "remains in security.md, adversary.md, or reviewer.md",
+    not _s156_found_spanish_mandate,
+    f"'report in Spanish' mandate still present in: {_s156_found_spanish_mandate}",
+)
+check(
+    "suite156(task2-ac7-english-mandate-present): all three files state the "
+    "report body is written in English",
+    "**ALWAYS** report in English" in _s156_security
+    and "**ALWAYS** report in English" in _s156_adversary
+    and "ALL review output MUST be written in English" in _s156_reviewer,
+    "each of security.md/adversary.md/reviewer.md must carry an explicit "
+    "English report-body mandate",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-8 -- the per-finding prose budget does NOT apply to
+# failure-brief.md's per-Critical/High remediation lines (Case-D iteration
+# vehicle stays uncapped).
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task2-ac8-failure-brief-exempt): agents/security.md's "
+    "Prose-budget exemption paragraph exempts failure-brief.md's "
+    "remediation lines from the report's prose budget",
+    "Prose-budget exemption" in _s156_security
+    and "uncapped" in _s156_security,
+    "security.md must state failure-brief.md remediation lines are exempt "
+    "from the pipeline-mode prose budget and remain uncapped",
+)
+check(
+    "suite156(task2-ac8-failure-brief-exempt-adversary): agents/adversary.md's "
+    "Prose-budget exemption paragraph exempts failure-brief.md's "
+    "remediation lines from the report's prose budget (mirrors security.md)",
+    "Prose-budget exemption" in _s156_adversary
+    and "uncapped" in _s156_adversary,
+    "adversary.md must state failure-brief.md remediation lines are exempt "
+    "from the report's prose budget and remain uncapped",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-9 -- reviewer-consolidator.md's language conversion is scoped to
+# consolidated-body PROSE only; the any-CHANGES_REQUESTED merge/verdict logic
+# is unaffected; no Spanish example strings remain.
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task2-ac9-scoped-to-prose): reviewer-consolidator.md states "
+    "the language conversion is scoped to consolidated-body PROSE only and "
+    "the merge/verdict logic is unaffected",
+    "scoped to the consolidated-body PROSE only" in _s156_consolidator
+    and "unaffected" in _s156_consolidator,
+    "reviewer-consolidator.md must fence its language conversion to prose "
+    "only, leaving merge/verdict logic unaffected",
+)
+_s156_spanish_examples = [
+    tok
+    for tok in (
+        "también reportado",
+        "relacionado con",
+        "Contradicciones detectadas",
+        "Fuera de alcance",
+        "Problemas Criticos",
+    )
+    if tok in _s156_consolidator
+]
+check(
+    "suite156(task2-ac9-no-spanish-examples): no Spanish example/format "
+    "strings remain in reviewer-consolidator.md",
+    not _s156_spanish_examples,
+    f"Spanish example strings still present: {_s156_spanish_examples}",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-10 -- the language conversion is orthogonal to the two-lens
+# floor: finding count, severity, and file:line+CWE fields are unaffected by
+# the language flip.
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task2-ac10-orthogonal-to-floor): security.md and adversary.md "
+    "both state the language conversion is orthogonal to finding "
+    "count/severity/break semantics",
+    "orthogonal" in _s156_security and "orthogonal" in _s156_adversary,
+    "security.md and adversary.md must each state language conversion is "
+    "orthogonal to the count/severity/semantics floor",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-11 -- the audit-grade standalone template preserves its
+# structure field-by-field: risk-weight table, 10-row OWASP matrix,
+# per-finding fields (incl. the CWE-{N} convention), dependency/headers/
+# CORS/auth tables, and the 4-phase remediation plan -- all in English.
+# ---------------------------------------------------------------------------
+def _s156_slice_to_marker(text: str, start_anchor: str, end_anchor: str) -> str:
+    """Anchor-to-explicit-end-marker slice. Used instead of `_s156_slice` for
+    the audit-grade template: that section is a large fenced ```markdown```
+    code block containing many literal '#'-prefixed lines (its own example
+    headings, e.g. '### CRITICAL', '#### SEC-001: ...') which are text
+    INSIDE the fence, not real document headings -- `_s156_slice`'s
+    next-heading regex would (and did, before this fix) stop at the first
+    of those literal example headings instead of the real end of the
+    section, silently truncating the slice to ~400 bytes."""
+    start = text.find(start_anchor)
+    if start == -1:
+        return ""
+    end = text.find(end_anchor, start)
+    if end == -1:
+        return text[start:]
+    return text[start:end]
+
+
+_s156_audit_slice = _s156_slice_to_marker(
+    _s156_security, "### Audit / focused mode", "## Quality Gates"
+)
+_S156_OWASP_ROWS = (
+    "A01 Broken Access Control",
+    "A02 Security Misconfiguration",
+    "A03 Supply Chain Failures",
+    "A04 Cryptographic Failures",
+    "A05 Injection",
+    "A06 Insecure Design",
+    "A07 Authentication Failures",
+    "A08 Data Integrity Failures",
+    "A09 Logging Failures",
+    "A10 Exception Handling",
+)
+_s156_missing_owasp_rows = [r for r in _S156_OWASP_ROWS if r not in _s156_audit_slice]
+check(
+    "suite156(task2-ac11-owasp-10-rows): security.md's audit-grade template "
+    "retains all 10 OWASP Findings Statistics rows (A01..A10), in English",
+    bool(_s156_audit_slice) and not _s156_missing_owasp_rows,
+    f"missing OWASP rows: {_s156_missing_owasp_rows}",
+)
+check(
+    "suite156(task2-ac11-risk-weight-table): security.md's audit-grade "
+    "template retains the Severity/Count/Weight risk-weight table in "
+    "English (Critical/High/Medium/Low/Info)",
+    all(
+        t in _s156_audit_slice
+        for t in ("| Severity | Count | Weight |", "Critical", "High", "Medium", "Low", "Info")
+    ),
+    "audit-grade template must retain the risk-weight table with English "
+    "severity labels",
+)
+_S156_FINDING_FIELDS = (
+    "**Severity:**",
+    "**OWASP Category:**",
+    "**CWE:**",
+    "**File:**",
+    "**Description:**",
+    "**Evidence:**",
+    "**Impact:**",
+    "**Remediation:**",
+)
+_s156_missing_finding_fields = [f for f in _S156_FINDING_FIELDS if f not in _s156_audit_slice]
+check(
+    "suite156(task2-ac11-per-finding-fields): security.md's audit-grade "
+    "template retains every per-finding field name in English",
+    not _s156_missing_finding_fields,
+    f"missing per-finding fields: {_s156_missing_finding_fields}",
+)
+check(
+    "suite156(task2-ac11-cwe-convention): security.md's audit-grade "
+    "template retains the CWE-{N} reference convention",
+    "CWE-{N}" in _s156_audit_slice,
+    "audit-grade template must retain the 'CWE-{N}' reference convention",
+)
+_S156_CONFIG_TABLES = (
+    "### Dependencies with Known Vulnerabilities",
+    "### HTTP Headers",
+    "### CORS",
+    "### Authentication",
+)
+_s156_missing_config_tables = [t for t in _S156_CONFIG_TABLES if t not in _s156_security]
+check(
+    "suite156(task2-ac11-config-tables): security.md retains the "
+    "dependency/headers/CORS/auth tables in English",
+    not _s156_missing_config_tables,
+    f"missing config tables: {_s156_missing_config_tables}",
+)
+_S156_REMEDIATION_PHASES = (
+    "### Phase 1 — Immediate (block deploy)",
+    "### Phase 2 — Next release",
+    "### Phase 3 — Next sprint",
+    "### Phase 4 — Backlog",
+)
+_s156_missing_phases = [p for p in _S156_REMEDIATION_PHASES if p not in _s156_security]
+check(
+    "suite156(task2-ac11-4-phase-plan): security.md retains the 4-phase "
+    "Prioritized Remediation Plan in English",
+    not _s156_missing_phases,
+    f"missing remediation phases: {_s156_missing_phases}",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-12 -- verdict/enum tokens rendered in report bodies are
+# display-only and NEVER translated: broke-it/could-not-break/
+# incomplete_on_changed_control (adversary), APPROVE/REQUEST_CHANGES
+# (reviewer-consolidator), qa_status: clean (security).
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task2-ac12-adversary-tokens-verbatim): adversary.md declares "
+    "broke-it/could-not-break/incomplete_on_changed_control as display-only, "
+    "verbatim-preserved, with an explicit non-translation example",
+    "Verdict tokens are display-only, verbatim-preserved" in _s156_adversary
+    and "broke-it" in _s156_adversary
+    and "could-not-break" in _s156_adversary
+    and "incomplete_on_changed_control" in _s156_adversary
+    and "lo-rompió" in _s156_adversary,
+    "adversary.md must declare its verdict tokens display-only/verbatim and "
+    "give a non-translation counter-example",
+)
+check(
+    "suite156(task2-ac12-consolidator-tokens-verbatim): "
+    "reviewer-consolidator.md declares APPROVE/REQUEST_CHANGES as "
+    "display-only, verbatim-preserved enum tokens",
+    "Verdict tokens are display-only, verbatim-preserved" in _s156_consolidator
+    and "APPROVE" in _s156_consolidator
+    and "REQUEST_CHANGES" in _s156_consolidator,
+    "reviewer-consolidator.md must declare APPROVE/REQUEST_CHANGES "
+    "display-only/verbatim",
+)
+check(
+    "suite156(task2-ac12-security-token-verbatim): security.md declares "
+    "'qa_status: clean' display-only and verbatim-preserved",
+    "qa_status: clean" in _s156_security and "verbatim-preserved" in _s156_security,
+    "security.md must declare the qa_status: clean token display-only/verbatim",
+)
+
+# ---------------------------------------------------------------------------
+# Task-3 AC-1 -- each of the five AC-consuming agents references
+# 'AC-N: verdict + file:line evidence' without re-quoting the requirement
+# text (01-plan.md § Task List is the sole canonical AC-text source).
+# ---------------------------------------------------------------------------
+_S156_AC_CONSUMERS = {
+    "qa.md": _s156_qa,
+    "tester.md": _s156_tester,
+    "acceptance-checker.md": _s156_acceptance_checker,
+    "delivery.md": _s156_delivery,
+    "plan-reviewer.md": _s156_plan_reviewer,
+}
+_s156_missing_ac_ref = [
+    name
+    for name, text in _S156_AC_CONSUMERS.items()
+    if "01-plan.md § Task List" not in text
+    or "ac reference convention" not in text.lower()
+]
+check(
+    "suite156(task3-ac1-canonical-ac-source): all five AC-consuming agents "
+    "cite '01-plan.md § Task List' as the canonical AC-text source via an "
+    "explicit AC reference convention paragraph",
+    not _s156_missing_ac_ref,
+    f"missing canonical AC-source citation in: {_s156_missing_ac_ref}",
+)
+
+# ---------------------------------------------------------------------------
+# Task-3 AC-2 -- delivery.md Step 9c Acceptance Matrix Description column is
+# reduced to a <=5-word gist; the workspace-only rule is retained.
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task3-ac2-description-5-words): delivery.md's Acceptance "
+    "Matrix Description column is reduced to '(≤5 words)'",
+    "Description (≤5 words)" in _s156_delivery,
+    "delivery.md Step 9c matrix must use a 'Description (≤5 words)' column",
+)
+check(
+    "suite156(task3-ac2-workspace-only-retained): delivery.md retains the "
+    "'workspace-only, never committed into the product repo' rule",
+    "Workspace-only, never committed into the product repo" in _s156_delivery,
+    "delivery.md must retain the workspace-only acceptance-matrix rule",
+)
+
+# ---------------------------------------------------------------------------
+# Task-3 AC-3 -- qa.md, tester.md, acceptance-checker.md, and
+# plan-reviewer.md establish the reference-not-recite rule, generalizing the
+# existing verify-packet AC-avoidance pattern (qa.md:301).
+# ---------------------------------------------------------------------------
+_S156_REQUOTE_MARKERS = {
+    "qa.md": ("does NOT re-quote the requirement text", _s156_qa),
+    "tester.md": ("does not re-quote the requirement text", _s156_tester),
+    "acceptance-checker.md": (
+        "do not re-quote the requirement text",
+        _s156_acceptance_checker,
+    ),
+    "plan-reviewer.md": ("never the requirement text itself", _s156_plan_reviewer),
+}
+_s156_missing_requote_rule = [
+    name for name, (marker, text) in _S156_REQUOTE_MARKERS.items() if marker not in text
+]
+check(
+    "suite156(task3-ac3-reference-not-recite): qa.md, tester.md, "
+    "acceptance-checker.md, and plan-reviewer.md each state their AC "
+    "reference is never a restatement of the requirement text",
+    not _s156_missing_requote_rule,
+    f"missing reference-not-recite statement in: {_s156_missing_requote_rule}",
+)
+
+# ---------------------------------------------------------------------------
+# Task-3 AC-4 -- each of the five files references the iteration
+# re-narration ban for its own body, by ID.
+# ---------------------------------------------------------------------------
+_s156_missing_task3_renarr = [
+    name
+    for name, text in _S156_AC_CONSUMERS.items()
+    if "Iteration re-narration ban" not in text
+]
+check(
+    "suite156(task3-ac4-renarration-refs): all five AC-consuming agents "
+    "reference the 'Iteration re-narration ban' for their own report body",
+    not _s156_missing_task3_renarr,
+    f"missing 'Iteration re-narration ban' in: {_s156_missing_task3_renarr}",
+)
+
+# ---------------------------------------------------------------------------
+# Task-3 AC-5 -- this task introduces no new versioned
+# docs/specs/**/acceptance-matrix.md artifact (already eliminated in
+# v2.129.0; the residual is reference-only, not a new committed matrix).
+# ---------------------------------------------------------------------------
+_s156_specs_diff = _s155_subprocess.run(
+    ["git", "diff", "--stat", "HEAD", "--", "docs/specs/"],
+    cwd=REPO_ROOT,
+    capture_output=True,
+    text=True,
+    check=False,
+)
+check(
+    "suite156(task3-ac5-no-new-acceptance-matrix): this diff introduces no "
+    "changes under docs/specs/ (no new versioned acceptance-matrix.md)",
+    _s156_specs_diff.stdout.strip() == "",
+    f"unexpected docs/specs/ diff: {_s156_specs_diff.stdout.strip()!r}",
+)
+
+# ---------------------------------------------------------------------------
+# Task-4 AC-1 -- 00-execution-events.md free-text fields (summary/detail)
+# are bounded to a compact clause; one JSONL line per event is unchanged.
+# ---------------------------------------------------------------------------
+_s156_freetext_slice = _s156_slice(
+    _s156_orchestrator, "### Free-text field bound (`bounded` intensity level)"
+)
+check(
+    "suite156(task4-ac1-freetext-bound): agents/orchestrator.md bounds "
+    "event free-text fields to a compact clause (<=120 chars, no "
+    "multi-sentence prose), one JSONL line per event unchanged",
+    bool(_s156_freetext_slice)
+    and "≤120 chars" in _s156_freetext_slice
+    and "never multi-sentence narrative prose" in _s156_freetext_slice,
+    "orchestrator.md § Free-text field bound must bound event free-text "
+    "fields to <=120 chars, no multi-sentence prose",
+)
+
+# ---------------------------------------------------------------------------
+# Task-4 AC-2 -- 00-state.md § Agent Results / § Hot Context become a
+# bounded, overwrite-in-place snapshot, keyed by (agent, phase); security
+# AND adversary at Phase 3 each retain their own current-verdict row.
+# ---------------------------------------------------------------------------
+_s156_agent_results_slice = _s156_slice(_s156_orchestrator, "## Agent Results")
+check(
+    "suite156(task4-ac2-keyed-upsert): orchestrator.md's § Agent Results is "
+    "a keyed-(agent, phase) upsert snapshot, never an accumulating append-log",
+    "keyed by\n     (agent, phase)" in _s156_agent_results_slice
+    or "keyed by (agent, phase)" in _s156_agent_results_slice.replace("\n", " "),
+    "orchestrator.md § Agent Results must document the (agent, phase)-"
+    "keyed upsert mechanic",
+)
+check(
+    "suite156(task4-ac2-two-lens-rows-retained): orchestrator.md's § Agent "
+    "Results template retains distinct security and adversary rows for "
+    "Phase 3, including incomplete_on_changed_control",
+    "| security | 3-verify |" in _s156_agent_results_slice
+    and "| adversary | 3-verify |" in _s156_agent_results_slice
+    and "incomplete_on_changed_control" in _s156_agent_results_slice,
+    "orchestrator.md § Agent Results template must show both the security "
+    "and adversary Phase-3 rows, never collapsed to one",
+)
+
+# ---------------------------------------------------------------------------
+# Task-4 AC-3 -- the 00-state.md schema and the 00-pipeline-summary.md
+# schema reference the iteration re-narration ban (reference an iteration
+# by ID, never re-tell it).
+# ---------------------------------------------------------------------------
+_s156_hot_context_slice = _s156_slice(_s156_orchestrator, "## Hot Context")
+_s156_pipeline_summary_slice = _s156_slice(
+    _s156_orchestrator, "## Pipeline Summary Protocol"
+)
+check(
+    "suite156(task4-ac3-state-schema-renarration): orchestrator.md's § "
+    "Agent Results and § Hot Context both reference the Iteration "
+    "Re-Narration Ban",
+    "Iteration Re-Narration Ban" in _s156_agent_results_slice
+    and "iteration reference points to" in _s156_hot_context_slice,
+    "orchestrator.md's 00-state.md schema (Agent Results + Hot Context) "
+    "must reference the Iteration Re-Narration Ban",
+)
+check(
+    "suite156(task4-ac3-summary-schema-renarration): orchestrator.md's "
+    "Pipeline Summary Protocol references the Iteration Re-Narration Ban "
+    "for '## Iterations'",
+    "Iteration Re-Narration Ban" in _s156_pipeline_summary_slice
+    and "## Iterations" in _s156_pipeline_summary_slice,
+    "orchestrator.md's Pipeline Summary Protocol must reference the "
+    "Iteration Re-Narration Ban for its '## Iterations' section",
+)
+
+# ---------------------------------------------------------------------------
+# Task-4 AC-4 -- the mandatory observability floor is intact: compaction
+# bounds FORMAT only; every phase.*/gate.* event still fires; the Tier-0
+# carve-out is unchanged.
+# ---------------------------------------------------------------------------
+_s156_obs_floor_slice = _s156_slice(
+    _s156_orchestrator, "**Mandatory observability floor (fenced"
+)
+check(
+    "suite156(task4-ac4-observability-floor-fenced): orchestrator.md fences "
+    "the mandatory observability floor -- every phase.*/gate.* event still "
+    "fires, and the Tier-0 carve-out is unchanged",
+    bool(_s156_obs_floor_slice)
+    and "still fires, unchanged" in _s156_obs_floor_slice
+    and "Tier-0 carve-out" in _s156_obs_floor_slice,
+    "orchestrator.md must fence the observability floor: every phase.*/"
+    "gate.* event still fires and the Tier-0 carve-out is unchanged",
+)
+
+# ---------------------------------------------------------------------------
+# Task-4 AC-5 -- docs/observability.md documents the bounded events-line
+# format and the bounded state-snapshot format, consistent with
+# orchestrator.md (multi-site invariant).
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task4-ac5-observability-md-mirrors): docs/observability.md "
+    "documents both the Free-text field bound and the 00-state.md bounded "
+    "snapshot, cross-referencing agents/orchestrator.md",
+    "Free-text field bound" in _s156_observability
+    and "00-state.md bounded snapshot" in _s156_observability
+    and "agents/orchestrator.md" in _s156_observability,
+    "docs/observability.md must document both bounded formats and "
+    "cross-reference agents/orchestrator.md",
+)
+
+# ---------------------------------------------------------------------------
+# Task-4 AC-6 -- orchestrator.md's Team table rows for security/adversary
+# are converted to English; no descriptive Spanish reference remains.
+# ---------------------------------------------------------------------------
+_s156_team_table_slice = _s156_slice(_s156_orchestrator, "## Your Team")
+check(
+    "suite156(task4-ac6-team-table-english): orchestrator.md's Team table "
+    "rows for security/adversary read 'in English', not 'in Spanish'",
+    "reports in English" in _s156_team_table_slice
+    and "report in English" in _s156_team_table_slice
+    and not _s156_spanish_mandate_pattern.search(_s156_team_table_slice),
+    "orchestrator.md's Team table must describe security/adversary reports "
+    "as English, with no residual Spanish reference",
+)
+
+# ---------------------------------------------------------------------------
+# Task-4 AC-7 -- orchestrator.md § Communication Protocol -> Language
+# propagation becomes tier-aware: an operator-facing-tier clause and an
+# agentic-tier clause, cross-referenced to docs/conventions.md and
+# docs/voice-guide.md.
+# ---------------------------------------------------------------------------
+_s156_lang_prop_slice = _s156_slice(
+    _s156_orchestrator, "**Language propagation (tier-aware)"
+)
+check(
+    "suite156(task4-ac7-tier-aware-clauses): orchestrator.md's Language "
+    "propagation instruction carries both an operator-facing-tier clause "
+    "and an agentic-tier clause",
+    bool(_s156_lang_prop_slice)
+    and "**Operator-facing tier**" in _s156_lang_prop_slice
+    and "**Agentic tier**" in _s156_lang_prop_slice,
+    "orchestrator.md § Language propagation must declare both tiers "
+    "explicitly",
+)
+check(
+    "suite156(task4-ac7-canonical-cross-ref): orchestrator.md's Language "
+    "propagation instruction cross-references both "
+    "docs/conventions.md § Document classification and docs/voice-guide.md",
+    "docs/conventions.md § Document classification" in _s156_lang_prop_slice
+    and "docs/voice-guide.md" in _s156_lang_prop_slice,
+    "orchestrator.md § Language propagation must cross-reference both "
+    "canonical sites",
+)
+
+# ---------------------------------------------------------------------------
+# Cross-task closure -- Task-5 AC-7's reverse cross-reference (previously
+# deferred by Suite 155 pending Task-4/Round 2) is now closable:
+# docs/conventions.md's forward pointer to orchestrator.md, PLUS
+# orchestrator.md's Language propagation section now actually referencing
+# back to docs/conventions.md, together close the multi-site invariant.
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task5-ac7-closure): the Task-5 AC-7 multi-site invariant is "
+    "now fully closed -- docs/conventions.md forward-references "
+    "orchestrator.md's Language propagation section AND orchestrator.md's "
+    "Language propagation section now references back to "
+    "docs/conventions.md and docs/voice-guide.md",
+    "agents/orchestrator.md" in _s156_conventions
+    and "Language propagation" in _s156_conventions
+    and bool(_s156_lang_prop_slice)
+    and "docs/conventions.md" in _s156_lang_prop_slice
+    and "docs/voice-guide.md" in _s156_lang_prop_slice,
+    "the forward (conventions.md -> orchestrator.md) and reverse "
+    "(orchestrator.md -> conventions.md/voice-guide.md) pointers must both "
+    "be present to close Task-5 AC-7",
+)
+
+# Self-referential guard (hygiene contract) -- mirrors the Suite 152/153/155
+# pattern. The docs/testing.md registry entry is deliberately NOT
+# self-checked here: registering a new suite in the canonical registry is a
+# documentation edit performed alongside test authoring, not a property the
+# test file can assert about itself.
+_s156_own = read(Path(__file__))
+check(
+    "suite156(self-ref): test file contains 'Suite 156' and "
+    "'full-lane-output-verbosity-trim'",
+    "Suite 156" in _s156_own and "full-lane-output-verbosity-trim" in _s156_own,
+    "test file must self-reference Suite 156 and the marker "
+    "'full-lane-output-verbosity-trim'",
+)
+check(
+    "suite156(hygiene): CLAUDE.md does NOT contain 'Suite 156' (§11 "
+    "hygiene contract)",
+    "Suite 156" not in _s156_claude_text,
+    "CLAUDE.md must not mention Suite 156 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: full-lane-output-verbosity-trim-round2
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 157 — per-pr-version-bump structural contract
+#
+# Content-verifies the delivery.md deferred-release retirement, CLAUDE.md §6.3
+# rewrite, docs/worktree-discipline.md Rule 7, and agents/leader.md Phase 0a
+# preflight sweep, scoped to what is not already covered by Suite 125
+# (AC-3b), Suite 132 (b2, e1, e2), or Suite 93 (Rule 3/4 text, still verbatim
+# after this refactor). The version-bump-floor script contract is covered by
+# tests/test_prepublish_bump_floor.sh and tests/test_prepublish_guard.sh, not
+# here. The delivery Step 11.4c release-tag gate is Suite 132's existing b2
+# check — not repeated. Consumer-boundary behavior-identical status (delivery
+# Step 9 stays behavior-identical for consuming repos) is a direct-inspection
+# verification performed by qa/acceptance-checker via a before/after diff
+# read; the shallow presence guard below only catches an accidental deletion
+# of the two-row Step 9 table, not a behavior regression.
+#
+# Marker: per-pr-version-bump
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 157: per-pr-version-bump structural checks ===")
+
+_s157_delivery = read(AGENTS_DIR / "delivery.md")
+_s157_claude = read(REPO_ROOT / "CLAUDE.md")
+_s157_cost_caching = read(REPO_ROOT / "docs" / "cost-and-caching.md")
+_s157_lifecycle = read(REPO_ROOT / "docs" / "lifecycle.md")
+_s157_knowledge = read(REPO_ROOT / "docs" / "knowledge.md")
+_s157_pr_template = read(REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md")
+_s157_test_yml = read(REPO_ROOT / ".github" / "workflows" / "test.yml")
+_s157_discipline = read(REPO_ROOT / "docs" / "worktree-discipline.md")
+_s157_leader = read(AGENTS_DIR / "leader.md")
+
+_S157_CLAUDE_63_STOPS = ("\n### 6.4", "\n## 7", "\n---\n")
+_s157_claude_63_slice = _slice_section(
+    _s157_claude, "### 6.3 Post-work", _S157_CLAUDE_63_STOPS
+)
+_S157_LIFECYCLE_STOPS = ("\n## ", "\n---\n")
+_s157_lifecycle_release_slice = _slice_section(
+    _s157_lifecycle, "## The unified release event", _S157_LIFECYCLE_STOPS
+)
+_s157_leader_1a_slice = _slice_section(
+    _s157_leader,
+    "1a. **Boot-time preflight worktree sweep.**",
+    ("\n2. **Start the KG session.**",),
+)
+
+# --- Task-2 AC-1: internal carve-out retired, per-PR bump applies to
+# team-harness itself (not just consumers) ---------------------------------
+check(
+    "s157(t2-ac1a): delivery.md states team-harness does not use the "
+    "repo-local-deferral escape hatch",
+    "team-harness itself does not use this escape hatch" in _s157_delivery,
+    "marker 'team-harness itself does not use this escape hatch' not found "
+    "in agents/delivery.md — Task-2 AC-1 carve-out retirement missing",
+)
+check(
+    "s157(t2-ac1b): delivery.md frames team-harness's own CLAUDE.md §6.3 as "
+    "the per-PR shipped default, not a deferral",
+    "documents the per-PR shipped default, not a deferral" in _s157_delivery,
+    "marker 'documents the per-PR shipped default, not a deferral' not found "
+    "in agents/delivery.md — Task-2 AC-1 framing missing",
+)
+
+# --- Task-2 AC-2: version.d/ machinery + release-mode/inline-release modes
+# retired from delivery.md (regression guard against reversion) ------------
+check(
+    "s157(t2-ac2a): delivery.md no longer references the retired "
+    "release-mode gate",
+    "release-mode" not in _s157_delivery,
+    "agents/delivery.md still contains 'release-mode' — Task-2 AC-2 "
+    "requires this retired gate fully removed",
+)
+check(
+    "s157(t2-ac2b): delivery.md no longer references the retired "
+    "inline-release mode",
+    "inline-release" not in _s157_delivery,
+    "agents/delivery.md still contains 'inline-release' — Task-2 AC-2 "
+    "requires this retired mode fully removed",
+)
+check(
+    "s157(t2-ac2c): delivery.md no longer contains the retired Step 9-R "
+    "section",
+    "Step 9-R" not in _s157_delivery,
+    "agents/delivery.md still contains 'Step 9-R' — Task-2 AC-2 requires "
+    "this retired section fully removed",
+)
+check(
+    "s157(t2-ac2d): delivery.md no longer references version.d/ marker "
+    "machinery",
+    "version.d/" not in _s157_delivery,
+    "agents/delivery.md still contains 'version.d/' — Task-2 AC-2 requires "
+    "the marker-discipline machinery fully removed",
+)
+
+# --- Task-2 AC-4: CLAUDE.md §6.3 per-PR model, rebase-and-rebump trade-off,
+# changelog.d/ kept as fallback, /th:release prose gone ---------------------
+check(
+    "s157(t2-ac4a): CLAUDE.md §6.3 documents the rebase-and-rebump trade-off",
+    "rebase-and-rebump" in _s157_claude_63_slice,
+    "marker 'rebase-and-rebump' not found in CLAUDE.md §6.3 — Task-2 AC-4 "
+    "trade-off documentation missing",
+)
+check(
+    "s157(t2-ac4b): CLAUDE.md §6.3 keeps changelog.d/ as the batch/fallback "
+    "path, not team-harness's own default",
+    "remains the batch/fallback path" in _s157_claude_63_slice,
+    "marker 'remains the batch/fallback path' not found in CLAUDE.md §6.3 — "
+    "Task-2 AC-4 changelog.d/ fallback framing missing",
+)
+check(
+    "s157(t2-ac4c): CLAUDE.md no longer references the retired /th:release "
+    "skill",
+    "/th:release" not in _s157_claude,
+    "CLAUDE.md still contains '/th:release' — Task-2 AC-4 requires all "
+    "deferral/skill prose removed",
+)
+
+# --- Task-2 AC-5: skills/release/SKILL.md + version.d/.release-cut deleted
+# (skills/release/SKILL.md absence and skills/update/SKILL.md dangling-ref
+# absence are already Suite 132 e1/e2 — only the marker-file deletion is new
+# here) ----------------------------------------------------------------------
+_s157_release_cut_path = REPO_ROOT / "version.d" / ".release-cut"
+_s157_version_d_dir = REPO_ROOT / "version.d"
+check(
+    "s157(t2-ac5a): version.d/.release-cut marker file is deleted",
+    not _s157_release_cut_path.exists(),
+    "version.d/.release-cut must stay deleted under the per-pr-version-bump "
+    "model — Task-2 AC-5",
+)
+check(
+    "s157(t2-ac5b): version.d/ directory no longer exists (no leftover "
+    "tracked file inside it)",
+    not _s157_version_d_dir.exists(),
+    "version.d/ directory should no longer exist — Task-2 AC-5 (no other "
+    "tracked file was left inside it once the marker was deleted)",
+)
+
+# --- Task-2 AC-6: cost-and-caching.md records the superseded rationale
+# honestly; lifecycle.md no longer frames the deferred model as current ----
+check(
+    "s157(t2-ac6a): cost-and-caching.md marks the release-batching "
+    "rationale as superseded (history kept, not erased)",
+    "superseded" in _s157_cost_caching
+    and "history kept for context" in _s157_cost_caching,
+    "docs/cost-and-caching.md must mark the batching-per-release rationale "
+    "'superseded' while keeping the history for context — Task-2 AC-6",
+)
+check(
+    "s157(t2-ac6b): lifecycle.md's release walkthrough now describes the "
+    "per-PR bump model, not a dedicated release PR",
+    "per-PR bump model" in _s157_lifecycle_release_slice,
+    "docs/lifecycle.md § The unified release event must describe "
+    "'per-PR bump model' — Task-2 AC-6 requires the deferred-model framing "
+    "removed",
+)
+
+# --- Task-2 AC-7: PR template names all three sites + changelog.d/ as batch
+# option; test.yml release-only allowlist no longer references version.d/* -
+check(
+    "s157(t2-ac7a): PR template requires all three version sites bumped "
+    "together",
+    ".claude-plugin/plugin.json" in _s157_pr_template
+    and "plugins[0].version" in _s157_pr_template
+    and "CLAUDE.md §3" in _s157_pr_template,
+    ".github/PULL_REQUEST_TEMPLATE.md must name all three version sites — "
+    "Task-2 AC-7",
+)
+check(
+    "s157(t2-ac7b): PR template keeps changelog.d/ as an explicit batching "
+    "option, not the default bump path",
+    "changelog.d/" in _s157_pr_template and "batching" in _s157_pr_template,
+    ".github/PULL_REQUEST_TEMPLATE.md must offer changelog.d/ as a batching "
+    "option — Task-2 AC-7",
+)
+check(
+    "s157(t2-ac7c): test.yml release-only allowlist no longer references "
+    "version.d/*",
+    "version.d" not in _s157_test_yml,
+    ".github/workflows/test.yml release-only allowlist must not reference "
+    "version.d/* — Task-2 AC-7",
+)
+
+# --- Task-2 AC-8: knowledge.md gains a [decision] bullet for the per-PR
+# adoption ---------------------------------------------------------------
+check(
+    "s157(t2-ac8): knowledge.md documents the per-PR version-bump adoption "
+    "decision",
+    "adopts the shipped per-PR version-bump default" in _s157_knowledge,
+    "marker 'adopts the shipped per-PR version-bump default' not found in "
+    "docs/knowledge.md — Task-2 AC-8 decision bullet missing",
+)
+
+# --- Task-2 AC-9: delivery.md Step 11.4b adopts Rule 7's mode-only allow-
+# list by reference, frames itself as same-session best-effort, and never
+# silently skips ------------------------------------------------------------
+_S157_STEP_11_4B_ANCHOR = (
+    "### Step 11.4b — Worktree teardown (post-merge, rule 4; "
+    "same-session best-effort; conditional)"
+)
+_S157_DELIVERY_STOPS = ("\n### ", "\n## ", "\n---\n")
+_s157_step_11_4b_slice = _slice_section(
+    _s157_delivery, _S157_STEP_11_4B_ANCHOR, _S157_DELIVERY_STOPS
+)
+check(
+    "s157(t2-ac9a): delivery.md Step 11.4b exists and is framed as "
+    "same-session best-effort",
+    bool(_s157_step_11_4b_slice),
+    "'### Step 11.4b — Worktree teardown (post-merge, rule 4; "
+    "same-session best-effort; conditional)' not found in agents/delivery.md",
+)
+check(
+    "s157(t2-ac9b): Step 11.4b references docs/worktree-discipline.md § "
+    "Rule 7 by pointer for the mode-only allow-list, without redefining it",
+    "docs/worktree-discipline.md § Rule 7" in _s157_step_11_4b_slice
+    and "0\\t0" in _s157_step_11_4b_slice,
+    "Step 11.4b must reference 'docs/worktree-discipline.md § Rule 7' and "
+    "state the '0\\t0' dual-numstat mode-only allow-list — Task-2 AC-9",
+)
+check(
+    "s157(t2-ac9c): Step 11.4b states every non-removed outcome is "
+    "reported, never a silent skip",
+    "Never a silent skip" in _s157_step_11_4b_slice,
+    "Step 11.4b must state 'Never a silent skip' — Task-2 AC-9 report "
+    "contract missing",
+)
+
+# --- Task-2 AC-10 (shallow guard only — see header note; qa/acceptance-
+# checker performs the authoritative before/after diff read) ---------------
+check(
+    "s157(t2-ac10): delivery.md Step 9 keeps the two-row shipped-default / "
+    "repo-local-deferral table intact (accidental-deletion guard only)",
+    "Per-PR bump (shipped default)" in _s157_delivery
+    and "Repo-local deferral" in _s157_delivery,
+    "agents/delivery.md Step 9 must still declare both the "
+    "'Per-PR bump (shipped default)' and 'Repo-local deferral' rows — "
+    "Task-2 AC-10 consumer-default table",
+)
+
+# --- Task-4 AC-1: docs/worktree-discipline.md Rule 7 exists with the
+# 4-condition predicate and the action/report table -------------------------
+_S157_DISCIPLINE_STOPS = ("\n## ", "\n---\n")
+_S157_RULE7_ANCHOR = (
+    "## Rule 7 — Boot-time preflight sweep: the durable worktree reaper"
+)
+_s157_rule7_slice = _slice_section(
+    _s157_discipline, _S157_RULE7_ANCHOR, _S157_DISCIPLINE_STOPS
+)
+check(
+    "s157(t4-ac1a): worktree-discipline.md declares Rule 7 — boot-time "
+    "preflight sweep",
+    bool(_s157_rule7_slice),
+    f"'{_S157_RULE7_ANCHOR}' not found in docs/worktree-discipline.md — "
+    "Task-4 AC-1",
+)
+check(
+    "s157(t4-ac1b): Rule 7 states the predicate is four cumulative "
+    "conditions",
+    "four cumulative conditions" in _s157_rule7_slice
+    or "FOUR conditions" in _s157_rule7_slice,
+    "docs/worktree-discipline.md Rule 7 must state the predicate is 4 "
+    "cumulative conditions — Task-4 AC-1",
+)
+check(
+    "s157(t4-ac1c): Rule 7 action/report table has all four "
+    "worktree_swept: outcomes",
+    "worktree_swept: removed" in _s157_rule7_slice
+    and "worktree_swept: left" in _s157_rule7_slice
+    and "worktree_swept: candidate" in _s157_rule7_slice,
+    "docs/worktree-discipline.md Rule 7 must declare 'worktree_swept: "
+    "removed', 'worktree_swept: left', and 'worktree_swept: candidate' — "
+    "Task-4 AC-1 action/report table",
+)
+
+# --- Task-4 AC-2: Rule 3's teardown-ownership claim is corrected ----------
+_S157_RULE3_ANCHOR = "## Rule 3 — Finished means PR merged"
+_s157_rule3_slice = _slice_section(
+    _s157_discipline, _S157_RULE3_ANCHOR, _S157_DISCIPLINE_STOPS
+)
+check(
+    "s157(t4-ac2): worktree-discipline.md Rule 3 corrects the "
+    "'delivery post-merge' teardown-ownership claim",
+    "Teardown ownership (corrected" in _s157_rule3_slice
+    and "same-session best-effort" in _s157_rule3_slice,
+    "docs/worktree-discipline.md Rule 3 must contain a "
+    "'Teardown ownership (corrected...)' note stating delivery's teardown "
+    "is same-session best-effort — Task-4 AC-2",
+)
+
+# --- Task-4 AC-3: agents/leader.md Phase 0a gains the boot-time preflight
+# sweep step, referencing Rule 7/5/6 by pointer -----------------------------
+check(
+    "s157(t4-ac3a): leader.md Phase 0a declares the boot-time preflight "
+    "worktree sweep step",
+    bool(_s157_leader_1a_slice),
+    "marker '1a. **Boot-time preflight worktree sweep.**' not found in "
+    "agents/leader.md Phase 0a — Task-4 AC-3",
+)
+check(
+    "s157(t4-ac3b): leader.md's preflight sweep step references "
+    "worktree-discipline.md § Rule 7 by pointer",
+    "docs/worktree-discipline.md § Rule 7" in _s157_leader_1a_slice,
+    "agents/leader.md step 1a must reference 'docs/worktree-discipline.md § "
+    "Rule 7' — Task-4 AC-3",
+)
+check(
+    "s157(t4-ac3c): leader.md's preflight sweep composes with Rule 6's "
+    "per-lane isolation for multi-project initiatives",
+    "composing with Rule 6" in _s157_leader_1a_slice,
+    "agents/leader.md step 1a must state it composes with Rule 6's "
+    "per-lane isolation — Task-4 AC-3",
+)
+
+# --- Task-4 AC-4: mode-only allow-list precision — dual numstat, 0\t0 -----
+check(
+    "s157(t4-ac4): worktree-discipline.md Rule 7 specifies the dual "
+    "--numstat / --cached --numstat 0\\t0 mode-only allow-list",
+    "diff --numstat` and `git -C <path> diff --cached --numstat` show "
+    "`0\\t0`" in _s157_rule7_slice,
+    "docs/worktree-discipline.md Rule 7 must specify BOTH "
+    "'git -C <path> diff --numstat' and 'git -C <path> diff --cached "
+    "--numstat' showing '0\\t0' — Task-4 AC-4",
+)
+
+# --- Task-4 AC-5: report-when-not-removed contract, never a silent skip --
+check(
+    "s157(t4-ac5): Rule 7 states an unresolved worktree is never a silent, "
+    "permanent skip",
+    "Never a silent, permanent skip" in _s157_rule7_slice,
+    "docs/worktree-discipline.md Rule 7 must state 'Never a silent, "
+    "permanent skip' — Task-4 AC-5",
+)
+
+# --- Task-4 AC-6: condition 3 AND-eads merged + no-commits-ahead ----------
+check(
+    "s157(t4-ac6a): Rule 7 condition 3 requires an empty "
+    "'origin/main..HEAD' rev-list (no commits ahead of the merge point)",
+    "rev-list origin/main..HEAD" in _s157_rule7_slice,
+    "docs/worktree-discipline.md Rule 7 condition 3 must require "
+    "'git -C <path> rev-list origin/main..HEAD' to be empty — Task-4 AC-6",
+)
+check(
+    "s157(t4-ac6b): Rule 7's action/report table names the "
+    "commits-ahead-of-merge-point sub-case distinctly",
+    "commits ahead of merge point" in _s157_rule7_slice,
+    "docs/worktree-discipline.md Rule 7 action/report table must name "
+    "'commits ahead of merge point' as its own outcome — Task-4 AC-6",
+)
+
+# Self-referential guard (hygiene contract) -- mirrors the Suite 152/153/155
+# pattern. The docs/testing.md registry entry is deliberately NOT
+# self-checked here, per the same rationale documented at Suite 156: it is a
+# documentation edit this tester dispatch is scoped away from (test files
+# only) rather than a property this test file can assert about itself.
+_s157_own = read(Path(__file__))
+check(
+    "suite157(self-ref): test file contains 'Suite 157' and "
+    "'per-pr-version-bump'",
+    "Suite 157" in _s157_own and "per-pr-version-bump" in _s157_own,
+    "test file must self-reference Suite 157 and the marker "
+    "'per-pr-version-bump'",
+)
+check(
+    "suite157(hygiene): CLAUDE.md does NOT contain 'Suite 157' (§11 "
+    "hygiene contract)",
+    "Suite 157" not in _s157_claude,
+    "CLAUDE.md must not mention Suite 157 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: per-pr-version-bump
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------

@@ -71,7 +71,7 @@ These four are native to the harness, carry no infrastructure assumptions, and h
 
 **Why (enhances the collaboration).** Improving the harness has been blind: a multi-phase improvement program ran without a single number that said whether the result was a better harness than the version before it. A shared, versioned scoreboard is the channel through which *developers* direct improvement — a common language the developer and their agent team read together to negotiate what to change next cycle, and one the human team can speak among themselves about the tooling they all share. The developer sees "fail-closed coverage dropped from 9 to 7" and directs the team to fix it.
 
-**Form (team-harness-native).** A standalone skill (the `/th:lint` shape — it does not route through the orchestrator) with a versioned rubric and per-version score persistence. It *invokes* the existing per-agent evaluation as one of its categories rather than replacing it.
+**Form (team-harness-native).** A standalone skill (the `/th:lint` shape — it does not route through the leader) with a versioned rubric and per-version score persistence. It *invokes* the existing per-agent evaluation as one of its categories rather than replacing it.
 
 > **Explicitly not a self-tuning optimizer.** This item measures and reports; it never modifies the harness. A loop that measures, applies a change, and re-measures on its own would take the developer out of the improvement decision — the opposite of what the scoreboard is for. The score is the channel through which the human directs the change, with the agents executing and the human deciding what is worth changing. That invariant is part of the item, not a footnote to it.
 

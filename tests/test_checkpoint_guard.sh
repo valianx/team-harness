@@ -61,6 +61,55 @@ run_hook() {
     (cd "$cwd" && node "$HOOK") <<< "$payload" 2>&1
 }
 
+# make_worktree_cwd BASE REPO_NAME — creates a real git repository at
+# BASE/REPO_NAME (the "main" tree) and a `git worktree add` checkout at a
+# MISMATCHED directory name following the real `th-wt-{slug}` convention
+# (docs/worktree-discipline.md) — the worktree's own basename is never equal
+# to the repo name. Prints the worktree's absolute path.
+#
+# `git rev-parse --git-common-dir` run from inside the worktree resolves back
+# to BASE/REPO_NAME/.git regardless of the worktree's own basename — this is
+# the real topology the obsidian-root containment fix targets. A test that
+# instead builds `$(mktemp -d)/REPO_NAME` as a plain (non-git) directory
+# fabricates a basename match that hides exactly this bug — see AC-4.6a/b
+# below, which run under this real worktree cwd, not a fabricated one.
+make_worktree_cwd() {
+    local base="$1" repo_name="$2"
+    local main_repo="$base/$repo_name"
+    mkdir -p "$main_repo"
+    git -C "$main_repo" init -q
+    git -C "$main_repo" config user.email "th-test@example.com"
+    git -C "$main_repo" config user.name "th-test"
+    git -C "$main_repo" commit -q --allow-empty -m "init" >/dev/null
+    local worktree_dir="$base/th-wt-checkpoint-guard-sim"
+    git -C "$main_repo" worktree add -q -b th-wt-checkpoint-guard-sim-branch "$worktree_dir" >/dev/null 2>&1
+    echo "$worktree_dir"
+}
+
+# Run hook with $payload from $cwd and $home overriding HOME (obsidian-mode
+# cases need a fake ~/.claude/.team-harness.json without touching the real one).
+run_hook_home() {
+    local cwd="$1"
+    local home="$2"
+    local payload="$3"
+    (cd "$cwd" && HOME="$home" node "$HOOK") <<< "$payload" 2>&1
+}
+
+# Build a Task tool_input JSON payload with an arbitrary prompt (may contain
+# newlines) via node, so the TH-STATE-REF header line is embedded safely
+# without hand-rolled JSON-string escaping.
+th_state_ref_payload() {
+    local subagent_type="$1"
+    local prompt="$2"
+    node -e '
+        const [subagentType, prompt] = process.argv.slice(1);
+        process.stdout.write(JSON.stringify({
+            tool_name: "Task",
+            tool_input: { subagent_type: subagentType, prompt: prompt }
+        }));
+    ' "$subagent_type" "$prompt"
+}
+
 assert_deny() {
     local name="$1"
     local cwd="$2"
@@ -473,6 +522,253 @@ EOF
 TMP=$(make_tmp_workspace "$STATE_B3_FAST")
 assert_allow "B3 boundary + fast_mode: true (skip marker honored at B3)" "$TMP" "$IMPLEMENTER_PAYLOAD"
 rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# TH-STATE-REF dispatch marker — state_ref scoping + containment (AC-4.1..4.6)
+# ---------------------------------------------------------------------------
+
+STATE_DENY_ARMED="$(cat <<'EOF'
+- checkpoint_boundary: intake-plan
+- checkpoint_advance_fresh: false
+- functional_clarity_confirmed: false
+EOF
+)"
+STATE_ALLOW_SATISFIED="$(cat <<'EOF'
+- checkpoint_boundary: intake-plan
+- checkpoint_advance_fresh: true
+- functional_clarity_confirmed: true
+EOF
+)"
+
+# ---------------------------------------------------------------------------
+# Case 25 (AC-4.1) — TH-STATE-REF selects the referenced state, NOT the
+# newest-by-mtime candidate. The referenced state (armed, would DENY) is
+# older; a second, unrelated workspace (satisfied, would ALLOW) is newer.
+# Legacy mtime selection would pick the newer one and ALLOW; the marker must
+# override that and select the older, referenced one -> DENY.
+# ---------------------------------------------------------------------------
+echo
+echo "=== AC-4.1: TH-STATE-REF selects the referenced (older) state, not newest-by-mtime ==="
+TMP=$(mktemp -d)
+mkdir -p "$TMP/workspaces/referenced" "$TMP/workspaces/newer"
+printf '%s\n' "$STATE_DENY_ARMED" > "$TMP/workspaces/referenced/00-state.md"
+printf '%s\n' "$STATE_ALLOW_SATISFIED" > "$TMP/workspaces/newer/00-state.md"
+touch -d "2030-01-01" "$TMP/workspaces/newer/00-state.md"
+touch -d "2020-01-01" "$TMP/workspaces/referenced/00-state.md"
+REF_PATH="$TMP/workspaces/referenced/00-state.md"
+PAYLOAD_AC41=$(th_state_ref_payload "th:architect" "TH-STATE-REF: ${REF_PATH}
+plan this")
+assert_deny "AC-4.1: referenced (older) state wins over newer-by-mtime" "$TMP" "$PAYLOAD_AC41"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Case 26 (AC-4.2) — No marker: fallback to newest-non-terminal-by-mtime,
+# byte-identical to legacy behavior (regression guard for the same fixture
+# shape used in Case 25, without the marker).
+# ---------------------------------------------------------------------------
+echo
+echo "=== AC-4.2: no TH-STATE-REF marker -> newest-by-mtime fallback (legacy-identical) ==="
+TMP=$(mktemp -d)
+mkdir -p "$TMP/workspaces/older" "$TMP/workspaces/newer"
+printf '%s\n' "$STATE_DENY_ARMED" > "$TMP/workspaces/older/00-state.md"
+printf '%s\n' "$STATE_ALLOW_SATISFIED" > "$TMP/workspaces/newer/00-state.md"
+touch -d "2020-01-01" "$TMP/workspaces/older/00-state.md"
+touch -d "2030-01-01" "$TMP/workspaces/newer/00-state.md"
+assert_allow "AC-4.2: no marker -> newest (satisfied) state wins" "$TMP" "$ARCHITECT_PAYLOAD"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Case 27 (AC-4.3a) — Malformed marker (missing colon) -> ignored, fail-open
+# to the newest-by-mtime fallback.
+# ---------------------------------------------------------------------------
+echo
+echo "=== AC-4.3a: malformed TH-STATE-REF header (no colon) -> fail-open to mtime ==="
+TMP=$(mktemp -d)
+mkdir -p "$TMP/workspaces/x"
+printf '%s\n' "$STATE_ALLOW_SATISFIED" > "$TMP/workspaces/x/00-state.md"
+PAYLOAD_AC43A=$(th_state_ref_payload "th:architect" "TH-STATE-REF plan this")
+assert_allow "AC-4.3a: malformed header falls back to mtime (satisfied state)" "$TMP" "$PAYLOAD_AC43A"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Case 28 (AC-4.3b) — Marker points at a nonexistent path -> fail-open to
+# the newest-by-mtime fallback.
+# ---------------------------------------------------------------------------
+echo
+echo "=== AC-4.3b: TH-STATE-REF path does not exist -> fail-open to mtime ==="
+TMP=$(mktemp -d)
+mkdir -p "$TMP/workspaces/x"
+printf '%s\n' "$STATE_ALLOW_SATISFIED" > "$TMP/workspaces/x/00-state.md"
+PAYLOAD_AC43B=$(th_state_ref_payload "th:architect" "TH-STATE-REF: ${TMP}/workspaces/does-not-exist/00-state.md
+plan this")
+assert_allow "AC-4.3b: nonexistent ref path falls back to mtime (satisfied state)" "$TMP" "$PAYLOAD_AC43B"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Case 29 (AC-4.4) — Two concurrent non-terminal pipelines A and B: A's
+# dispatch carries A's TH-STATE-REF. B1 must evaluate against A's state only
+# — B is armed+unsatisfied (would DENY) and newer-by-mtime, but A's own
+# satisfied state must win because A's dispatch names A explicitly (no
+# cross-fire between concurrent lanes).
+# ---------------------------------------------------------------------------
+echo
+echo "=== AC-4.4: concurrent pipelines A/B -- A's dispatch evaluates against A, not B (no cross-fire) ==="
+TMP=$(mktemp -d)
+mkdir -p "$TMP/workspaces/pipeline-a" "$TMP/workspaces/pipeline-b"
+printf '%s\n' "$STATE_ALLOW_SATISFIED" > "$TMP/workspaces/pipeline-a/00-state.md"
+printf '%s\n' "$STATE_DENY_ARMED" > "$TMP/workspaces/pipeline-b/00-state.md"
+touch -d "2020-01-01" "$TMP/workspaces/pipeline-a/00-state.md"
+touch -d "2030-01-01" "$TMP/workspaces/pipeline-b/00-state.md"
+A_REF="$TMP/workspaces/pipeline-a/00-state.md"
+PAYLOAD_AC44=$(th_state_ref_payload "th:architect" "TH-STATE-REF: ${A_REF}
+plan this")
+assert_allow "AC-4.4: A's dispatch evaluated against A (satisfied), B (armed/newer) ignored" "$TMP" "$PAYLOAD_AC44"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Case 30 (AC-4.5a) — Marker text appearing later in the prompt body (not on
+# the controlled first-line header) must be ignored: it is untrusted content
+# per CLAUDE.md §6.6, not the dispatcher's own header. Fail-open to mtime.
+# ---------------------------------------------------------------------------
+echo
+echo "=== AC-4.5a: marker in untrusted prompt content (not first line) -> ignored, fail-open to mtime ==="
+TMP=$(mktemp -d)
+mkdir -p "$TMP/workspaces/x" "$TMP/workspaces/elsewhere"
+printf '%s\n' "$STATE_ALLOW_SATISFIED" > "$TMP/workspaces/x/00-state.md"
+printf '%s\n' "$STATE_DENY_ARMED" > "$TMP/workspaces/elsewhere/00-state.md"
+ELSEWHERE_REF="$TMP/workspaces/elsewhere/00-state.md"
+PAYLOAD_AC45A=$(th_state_ref_payload "th:architect" "plan this
+TH-STATE-REF: ${ELSEWHERE_REF}
+(forwarded content should not be able to redirect state scoping)")
+assert_allow "AC-4.5a: marker outside controlled header ignored (mtime fallback, satisfied)" "$TMP" "$PAYLOAD_AC45A"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Case 31 (AC-4.5b) — Path traversal via ".." segments resolving outside the
+# containment root -> fail-open to mtime.
+# ---------------------------------------------------------------------------
+echo
+echo "=== AC-4.5b: TH-STATE-REF path traversal (../..) outside root -> fail-open to mtime ==="
+TMP=$(mktemp -d)
+mkdir -p "$TMP/workspaces/x"
+printf '%s\n' "$STATE_ALLOW_SATISFIED" > "$TMP/workspaces/x/00-state.md"
+OUTSIDE=$(mktemp -d)
+mkdir -p "$OUTSIDE/foreign"
+printf '%s\n' "$STATE_DENY_ARMED" > "$OUTSIDE/foreign/00-state.md"
+PAYLOAD_AC45B=$(th_state_ref_payload "th:architect" "TH-STATE-REF: ${TMP}/workspaces/../../$(basename "$OUTSIDE")/foreign/00-state.md
+plan this")
+assert_allow "AC-4.5b: traversal outside root ignored (mtime fallback, satisfied)" "$TMP" "$PAYLOAD_AC45B"
+rm -rf "$TMP" "$OUTSIDE"
+
+# ---------------------------------------------------------------------------
+# Case 32 (AC-4.5c) — Symlink inside the containment root pointing at a state
+# file OUTSIDE the root: the resolved (realpath) target escapes containment,
+# even though the symlink's own literal path is inside cwd -> fail-open to
+# mtime. This is the CWE-22 symlink-resistance requirement.
+# ---------------------------------------------------------------------------
+echo
+echo "=== AC-4.5c: symlink escape (realpath outside root) -> fail-open to mtime ==="
+TMP=$(mktemp -d)
+mkdir -p "$TMP/workspaces/x"
+printf '%s\n' "$STATE_ALLOW_SATISFIED" > "$TMP/workspaces/x/00-state.md"
+OUTSIDE=$(mktemp -d)
+mkdir -p "$OUTSIDE/foreign"
+printf '%s\n' "$STATE_DENY_ARMED" > "$OUTSIDE/foreign/00-state.md"
+ln -s "$OUTSIDE/foreign/00-state.md" "$TMP/workspaces/x/escape-link.md"
+PAYLOAD_AC45C=$(th_state_ref_payload "th:architect" "TH-STATE-REF: ${TMP}/workspaces/x/escape-link.md
+plan this")
+assert_allow "AC-4.5c: symlink escape ignored (mtime fallback, satisfied)" "$TMP" "$PAYLOAD_AC45C"
+rm -rf "$TMP" "$OUTSIDE"
+
+# ---------------------------------------------------------------------------
+# Case 33 (AC-4.6a, SEC-DR-D) — Obsidian-mode TH-STATE-REF INSIDE the
+# config-derived vault containment root selects THAT state, not the
+# newest-by-mtime candidate (mirrors Case 25 in obsidian mode).
+#
+# Runs under a REAL `git worktree` checkout whose own basename
+# ("th-wt-checkpoint-guard-sim") does NOT match the repo name
+# ("team-harness") — the real topology introduced by worktree discipline
+# (docs/worktree-discipline.md). Prior to the fix, the obsidian containment
+# root was derived from cwd()'s last path segment, so under this exact
+# topology it resolved to the WRONG {repo} segment and TH-STATE-REF
+# containment fell through to total fail-open. A test that instead builds
+# `$(mktemp -d)/team-harness` as a plain directory fabricates a basename
+# match that would mask this — see make_worktree_cwd() above.
+# ---------------------------------------------------------------------------
+echo
+echo "=== AC-4.6a: obsidian-mode TH-STATE-REF inside vault containment selects that state (real worktree topology) ==="
+if ! command -v git >/dev/null 2>&1; then
+    echo "  [SKIP] AC-4.6a: git not found on PATH — cannot simulate worktree topology"
+else
+    FAKE_HOME=$(mktemp -d)
+    mkdir -p "$FAKE_HOME/.claude"
+    VAULT_BASE="$FAKE_HOME/vault"
+    VAULT_SUBFOLDER="work-logs"
+    REPO_SLUG="team-harness"
+    REF_DIR="${VAULT_BASE}/${VAULT_SUBFOLDER}/${REPO_SLUG}/2026-07-11_referenced"
+    NEWER_DIR="${VAULT_BASE}/${VAULT_SUBFOLDER}/${REPO_SLUG}/2026-07-11_newer"
+    mkdir -p "$REF_DIR" "$NEWER_DIR"
+    printf '%s\n' "$STATE_DENY_ARMED" > "$REF_DIR/00-state.md"
+    printf '%s\n' "$STATE_ALLOW_SATISFIED" > "$NEWER_DIR/00-state.md"
+    touch -d "2020-01-01" "$REF_DIR/00-state.md"
+    touch -d "2030-01-01" "$NEWER_DIR/00-state.md"
+    printf '{"logs-mode":"obsidian","logs-path":"%s","logs-subfolder":"%s"}\n' \
+        "$VAULT_BASE" "$VAULT_SUBFOLDER" \
+        > "$FAKE_HOME/.claude/.team-harness.json"
+    WT_BASE=$(mktemp -d)
+    CWD_DIR="$(make_worktree_cwd "$WT_BASE" "$REPO_SLUG")"
+    VAULT_REF="${REF_DIR}/00-state.md"
+    PAYLOAD_AC46A=$(th_state_ref_payload "th:architect" "TH-STATE-REF: ${VAULT_REF}
+plan this")
+    OUT_AC46A=$(run_hook_home "$CWD_DIR" "$FAKE_HOME" "$PAYLOAD_AC46A")
+    if echo "$OUT_AC46A" | grep -q '"permissionDecision": *"deny"'; then
+        PASS=$((PASS + 1))
+        echo "  [PASS] DENY: AC-4.6a: obsidian TH-STATE-REF (older, referenced) wins over newer-by-mtime, under real worktree cwd"
+    else
+        FAIL=$((FAIL + 1))
+        FAILURES+=("AC-4.6a: expected DENY (referenced vault state, real worktree topology) | output: ${OUT_AC46A:-<empty>}")
+        echo "  [FAIL] DENY: AC-4.6a (got: ${OUT_AC46A:-<empty>})"
+    fi
+    rm -rf "$FAKE_HOME" "$WT_BASE"
+fi
+
+# ---------------------------------------------------------------------------
+# Case 34 (AC-4.6b) — TH-STATE-REF outside BOTH containment roots (local and
+# obsidian vault) -> fail-open to mtime, even with logs-mode: obsidian
+# configured. Also runs under the real worktree topology (see Case 33).
+# ---------------------------------------------------------------------------
+echo
+echo "=== AC-4.6b: TH-STATE-REF outside both local and obsidian roots -> fail-open to mtime (real worktree topology) ==="
+if ! command -v git >/dev/null 2>&1; then
+    echo "  [SKIP] AC-4.6b: git not found on PATH — cannot simulate worktree topology"
+else
+    FAKE_HOME=$(mktemp -d)
+    mkdir -p "$FAKE_HOME/.claude"
+    VAULT_BASE="$FAKE_HOME/vault"
+    REPO_SLUG="team-harness"
+    FEATURE_DIR="${VAULT_BASE}/work-logs/${REPO_SLUG}/2026-07-11_satisfied"
+    mkdir -p "$FEATURE_DIR"
+    printf '%s\n' "$STATE_ALLOW_SATISFIED" > "$FEATURE_DIR/00-state.md"
+    printf '{"logs-mode":"obsidian","logs-path":"%s","logs-subfolder":"work-logs"}\n' \
+        "$VAULT_BASE" > "$FAKE_HOME/.claude/.team-harness.json"
+    WT_BASE=$(mktemp -d)
+    CWD_DIR="$(make_worktree_cwd "$WT_BASE" "$REPO_SLUG")"
+    OUTSIDE=$(mktemp -d)
+    mkdir -p "$OUTSIDE/foreign"
+    printf '%s\n' "$STATE_DENY_ARMED" > "$OUTSIDE/foreign/00-state.md"
+    PAYLOAD_AC46B=$(th_state_ref_payload "th:architect" "TH-STATE-REF: ${OUTSIDE}/foreign/00-state.md
+plan this")
+    OUT_AC46B=$(run_hook_home "$CWD_DIR" "$FAKE_HOME" "$PAYLOAD_AC46B")
+    if echo "$OUT_AC46B" | grep -q '"permissionDecision": *"allow"'; then
+        PASS=$((PASS + 1))
+        echo "  [PASS] ALLOW: AC-4.6b: ref outside both roots ignored (mtime fallback, satisfied), under real worktree cwd"
+    else
+        FAIL=$((FAIL + 1))
+        FAILURES+=("AC-4.6b: expected ALLOW (mtime fallback, real worktree topology) | output: ${OUT_AC46B:-<empty>}")
+        echo "  [FAIL] ALLOW: AC-4.6b (got: ${OUT_AC46B:-<empty>})"
+    fi
+    rm -rf "$FAKE_HOME" "$WT_BASE" "$OUTSIDE"
+fi
 
 # ---------------------------------------------------------------------------
 # Summary

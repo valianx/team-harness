@@ -226,7 +226,7 @@ func transformToOpencode(src []byte, kind string) ([]byte, error) {
 		}
 		projected["permission"] = agentToolsToOpencodePermission(toolsStr)
 		// mode: blanket "subagent" for the GENERIC transform (fixture-bound).
-		// The mode-by-role installer layer (orchestrator → primary) is applied
+		// The mode-by-role installer layer (leader → primary) is applied
 		// as a post-projection step in manifest_registry.go, NOT here, to keep
 		// the parity fixture in lockstep with migrate.mjs.
 		projected["mode"] = "subagent"
@@ -328,11 +328,16 @@ func insertModelLine(transformed []byte, concrete string) []byte {
 }
 
 // applyModeByRole applies the installer-specific mode-by-role override:
-// the orchestrator agent receives mode: primary; all others remain subagent.
-// This is layered ON TOP of the generic transform output and is NOT part of
-// the transform-conformance.json fixture (which binds only the generic mapping).
+// the leader agent (the top-level coordinator) receives mode: primary and
+// displays as "TH Leader" in the opencode agent picker; all others —
+// including orchestrator, the task-scoped execution engine — remain
+// subagent with their name unchanged. This is layered ON TOP of the generic
+// transform output and is NOT part of the transform-conformance.json fixture
+// (which binds only the generic mapping). The CC-canonical source keeps
+// frontmatter name: leader — the display rename lives only in this
+// installer-layer projection, so it never reaches the Claude Code output.
 func applyModeByRole(src []byte, agentName string) ([]byte, error) {
-	if agentName != "orchestrator" {
+	if agentName != "leader" {
 		// No change needed — generic transform already set mode: subagent.
 		return src, nil
 	}
@@ -342,6 +347,7 @@ func applyModeByRole(src []byte, agentName string) ([]byte, error) {
 		return nil, fmt.Errorf("applyModeByRole parse: %v", err)
 	}
 	fm["mode"] = "primary"
+	fm["name"] = "TH Leader"
 	return serializeFrontmatterYAML(fm, body), nil
 }
 

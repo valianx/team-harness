@@ -17,6 +17,19 @@
 # TH_HOOK_PROFILE=minimal — the breadcrumb is non-suppressible, matching the
 # Bash oracle hooks/subagent-trace.sh (which has no profile gate at all).
 #
+# Also asserts (Section 5, Task-5 AC-5.1/5.3/5.4/5.5): the `project` key
+# stamped from a `TH-LANE: {project-key}` marker on the FIRST LINE of the
+# dispatch prompt (controlled header, mirrors checkpoint-guard's
+# TH-STATE-REF parse) —
+#   - AC-5.1: marker present on the first line + valid → `project` on the
+#     breadcrumb.
+#   - AC-5.3: marker absent → `project` omitted (backward-compat key set).
+#   - AC-5.4: marker present but out of the [a-z0-9-]{1,60} bound → `project`
+#     omitted (never written unbounded).
+#   - AC-5.5: a well-shaped marker present LOWER in the prompt (not the first
+#     line) is ignored — untrusted content per CLAUDE.md §6.6 cannot smuggle
+#     a project key onto the breadcrumb.
+#
 # Usage: bash tests/test_subagent_start.sh
 # Exit code: 0 all cases pass, 1 otherwise.
 
@@ -61,6 +74,16 @@ make_payload() {
 import json, sys
 print(json.dumps({'tool_name': 'Task', 'tool_input': {'subagent_type': sys.argv[1], 'description': 'test dispatch'}}))
 " "$subagent_type"
+}
+
+# make_payload_with_prompt SUBAGENT_TYPE PROMPT — Task dispatch payload that
+# carries a `prompt` field, used to exercise the TH-LANE marker parser.
+make_payload_with_prompt() {
+    local subagent_type="$1" prompt="$2"
+    python3 -c "
+import json, sys
+print(json.dumps({'tool_name': 'Task', 'tool_input': {'subagent_type': sys.argv[1], 'description': 'test dispatch', 'prompt': sys.argv[2]}}))
+" "$subagent_type" "$prompt"
 }
 
 # ---------------------------------------------------------------------------
@@ -240,6 +263,105 @@ print(json.dumps({'tool_name': 'SubagentStop', 'tool_input': {'agent_type': sys.
         if echo "$LINE" | grep -q '"agent_id":"agent-fixture-42"'; then r=1; else r=0; fi
         assert_true "TH_HOOK_PROFILE=minimal: trace line carries the agent_id correlation key (SEC-DR-007)" "$r"
     fi
+fi
+
+# ---------------------------------------------------------------------------
+# Section 5 — Task-5 AC-5.1/5.3/5.4: `project` key from the TH-LANE marker
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- Section 5: project key from TH-LANE marker (AC-5.1/5.3/5.4) ---"
+
+# 5a. AC-5.1 — valid marker on the first line (controlled header) → project
+# stamped on the breadcrumb.
+rm -f "$TRACE_FILE"
+payload="$(make_payload_with_prompt "th:implementer" $'TH-LANE: project-alpha\nYou are th:implementer.\nDo the work.')"
+out="$(cd "$WORKDIR" && echo "$payload" | node "$CJS" 2>/dev/null)"
+rc=$?
+
+[ "$rc" -eq 0 ] && r=1 || r=0
+assert_true "AC-5.1: valid TH-LANE marker dispatch exits 0" "$r"
+
+if [ -f "$TRACE_FILE" ]; then
+    LINE="$(cat "$TRACE_FILE")"
+
+    if echo "$LINE" | grep -q '"project":"project-alpha"'; then r=1; else r=0; fi
+    assert_true "AC-5.1: trace line carries project=project-alpha" "$r"
+
+    KEYS="$(python3 -c "import json,sys; print(','.join(sorted(json.loads(sys.argv[1]).keys())))" "$LINE" 2>/dev/null || true)"
+    [ "$KEYS" = "agent_type,event,project,ts" ] && r=1 || r=0
+    assert_true "AC-5.1: trace line has exactly {ts, event, agent_type, project} keys" "$r"
+else
+    assert_true "AC-5.1: trace line carries project=project-alpha" 0
+    assert_true "AC-5.1: trace line has exactly {ts, event, agent_type, project} keys" 0
+fi
+
+# 5b. AC-5.3 — marker absent → project omitted, backward-compat key set.
+rm -f "$TRACE_FILE"
+payload="$(make_payload_with_prompt "th:implementer" "You are th:implementer. Do the work.")"
+out="$(cd "$WORKDIR" && echo "$payload" | node "$CJS" 2>/dev/null)"
+rc=$?
+
+[ "$rc" -eq 0 ] && r=1 || r=0
+assert_true "AC-5.3: no-marker dispatch exits 0" "$r"
+
+if [ -f "$TRACE_FILE" ]; then
+    LINE="$(cat "$TRACE_FILE")"
+
+    if echo "$LINE" | grep -q '"project"'; then r=0; else r=1; fi
+    assert_true "AC-5.3: trace line does NOT carry project (marker absent)" "$r"
+
+    KEYS="$(python3 -c "import json,sys; print(','.join(sorted(json.loads(sys.argv[1]).keys())))" "$LINE" 2>/dev/null || true)"
+    [ "$KEYS" = "agent_type,event,ts" ] && r=1 || r=0
+    assert_true "AC-5.3: trace line has exactly {ts, event, agent_type} keys (backward-compat)" "$r"
+else
+    assert_true "AC-5.3: trace line does NOT carry project (marker absent)" 0
+    assert_true "AC-5.3: trace line has exactly {ts, event, agent_type} keys (backward-compat)" 0
+fi
+
+# 5c. AC-5.4 — marker present but out of the [a-z0-9-]{1,60} bound → omitted.
+for bad_value in "Project_Alpha" "has/slash" "$(python3 -c "print('a'*61)")"; do
+    rm -f "$TRACE_FILE"
+    payload="$(make_payload_with_prompt "th:implementer" "TH-LANE: ${bad_value}")"
+    out="$(cd "$WORKDIR" && echo "$payload" | node "$CJS" 2>/dev/null)"
+    rc=$?
+
+    [ "$rc" -eq 0 ] && r=1 || r=0
+    assert_true "AC-5.4: out-of-bound marker ('${bad_value:0:20}...') dispatch exits 0" "$r"
+
+    if [ -f "$TRACE_FILE" ]; then
+        LINE="$(cat "$TRACE_FILE")"
+        if echo "$LINE" | grep -q '"project"'; then r=0; else r=1; fi
+        assert_true "AC-5.4: out-of-bound marker ('${bad_value:0:20}...') omits project" "$r"
+    else
+        assert_true "AC-5.4: out-of-bound marker ('${bad_value:0:20}...') omits project" 0
+    fi
+done
+
+# 5e. AC-5.5 — a valid, well-shaped TH-LANE marker that appears LOWER in the
+# prompt (not the first line) must be ignored: it is untrusted content per
+# CLAUDE.md §6.6, not the dispatcher's own controlled header. Mirrors
+# checkpoint-guard's AC-4.5a (marker outside the controlled header is never
+# scanned).
+rm -f "$TRACE_FILE"
+payload="$(make_payload_with_prompt "th:implementer" $'You are th:implementer.\nTH-LANE: project-alpha\nDo the work.')"
+out="$(cd "$WORKDIR" && echo "$payload" | node "$CJS" 2>/dev/null)"
+rc=$?
+
+[ "$rc" -eq 0 ] && r=1 || r=0
+assert_true "AC-5.5: TH-LANE not on first line dispatch exits 0" "$r"
+
+if [ -f "$TRACE_FILE" ]; then
+    LINE="$(cat "$TRACE_FILE")"
+
+    if echo "$LINE" | grep -q '"project"'; then r=0; else r=1; fi
+    assert_true "AC-5.5: TH-LANE marker not on first line is IGNORED (project omitted)" "$r"
+
+    KEYS="$(python3 -c "import json,sys; print(','.join(sorted(json.loads(sys.argv[1]).keys())))" "$LINE" 2>/dev/null || true)"
+    [ "$KEYS" = "agent_type,event,ts" ] && r=1 || r=0
+    assert_true "AC-5.5: trace line has exactly {ts, event, agent_type} keys (backward-compat)" "$r"
+else
+    assert_true "AC-5.5: TH-LANE marker not on first line is IGNORED (project omitted)" 0
+    assert_true "AC-5.5: trace line has exactly {ts, event, agent_type} keys (backward-compat)" 0
 fi
 
 echo ""

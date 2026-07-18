@@ -1,25 +1,72 @@
 ---
 name: th-update
-description: Update Team Harness (opencode) — re-run the installer to fetch the latest released assets and idempotently apply only changed files.
+description: Update Team Harness (opencode) — execute the dedicated fail-closed updater and report the result.
 ---
 
-Update the Team Harness installation for opencode by re-running the installer.
-opencode has no plugin marketplace; the update mechanism is a re-run of the
-install link, which downloads the latest released binary (the latest embedded
-agents, skills, commands, and hook plugin) and applies a hash-based diff —
-only files whose content changed are rewritten.
+Update the Team Harness opencode installation by executing the dedicated
+updater. Do not just print the command for the operator to copy — run it.
 
-Run this exact command in a terminal:
+## Execute the updater
+
+Run this exact command through the Bash tool:
 
 ```
-curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | bash
+curl -fsSL https://valianx.github.io/team-harness/update-opencode.sh | bash -s -- --non-interactive
 ```
 
-If `MEMORY_MCP_URL` is already exported in the shell, the run is fully
-non-interactive; otherwise the installer prompts for it.
+This downloads and runs `bin/update-opencode.sh` — the dedicated opencode
+updater, NOT `install-opencode.sh` (the full first-install script; do not
+substitute it here).
 
-After the run completes, restart the opencode session so the refreshed agents,
-skills, and commands are loaded.
+`--non-interactive` is the only flag this command adds by default. It
+reuses the existing `.team-harness.json` config already on disk and skips
+the diff-preview `[Y/n]` confirm prompt, which no one is present to answer
+from a Bash tool call.
 
-The Claude Code plugin-marketplace update path does not apply to opencode; this
-re-run of the install link is the only opencode update mechanism.
+The only other flag this command may ever add is `--opencode-dir`, and
+only when the operator explicitly names a non-default config root — pass
+it as a separate, literal argv token appended after `--non-interactive`.
+Never build the command line by interpolating arbitrary operator text; the
+allowlist is exactly these two flags (`--opencode-dir`, `--non-interactive`),
+nothing else.
+
+## What the updater does (unchanged, fail-closed)
+
+1. A cheap `VERSION` pre-check. If the installed version already matches
+   the latest release, it prints "already current" and exits with zero
+   writes and no binary download.
+2. Otherwise, it downloads `SHA256SUMS` and the platform binary and
+   verifies the binary's hash against the anchored `SHA256SUMS` entry
+   before running anything. This verification is never skipped, and there
+   is no alternate or unverified download path — never point the
+   download at a different URL or add a flag that bypasses it.
+3. It runs `binary update --runtime opencode --scope global`, which
+   re-confirms the three-state result authoritatively and applies only
+   the files that changed.
+
+## Report the result
+
+After the command exits, report exactly one of the three states:
+
+- **already current** — no writes, no download.
+- **updated** — asset files were applied. Name restarting the opencode
+  session as the single remaining manual step — the update is not live
+  in any running session until the operator restarts it.
+- **installed ahead** — the installed version is newer than the latest
+  release; no action is possible until the next release ships.
+
+## Integrity floor
+
+The integrity floor is TLS on the download channel, GitHub's control over
+release assets, and the binary SHA256 check inside `update-opencode.sh` —
+this is not a code signature. The Bash tool's own permission prompt, which
+the operator sees before this command executes, is the residual human
+checkpoint on top of that floor.
+
+## Standalone — never gated by the boot capability check
+
+This command is a standalone utility, not a pipeline dispatch. The
+leader's boot capability check gates orchestrator-spawning for pipeline
+work; it never gates a standalone utility. Run this command regardless of
+which runtime branch the boot check resolved, including a session where
+the boot check has not run at all.

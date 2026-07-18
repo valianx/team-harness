@@ -19,9 +19,9 @@ Every workspace doc is either **operator-facing** or **agentic**. The operator's
 | `01-plan.md` | operator-facing | Intrinsic plan schema (`## Review Summary` first, `## Architecture`, `## Task List`); consolidated, ordered, final state before implementation (`## Review Summary` is the plan's own operator summary — not reviewer output) | architect (content); see write-scope table in `agents/_shared/plan-consolidation.md` |
 | `sketches/*` | operator-facing | `docs/plan-sketches.md` manifest (unchanged) | architect |
 | `01-root-cause.md` | operator-facing | Strict root-cause template (unchanged); the bug-fix equivalent of the plan, read at STAGE-GATE-1 | architect |
-| `overview.md` (initiative) | operator-facing | `orchestrator.md § overview.md Template` (unchanged) | orchestrator / delivery |
+| `overview.md` (initiative) | operator-facing | `leader.md § overview.md Template` (unchanged) | leader (sole writer; `delivery` only RETURNS per-project completion-row data, the leader reconciles and writes it) |
 | `reviews/01-plan-review.md` | agentic | Fixed skeleton of anchored sections; no `## Review Summary`/`## Technical Detail` split; minimal prose, tables and labels | panel (single-writer-per-section) |
-| `reviews/04-*.md`, `reviews/01-ux-review.md` | agentic | Each agent's current fixed structure; no two-tier obligation. The Spanish-language contract for security/reviewer bodies is unchanged — language is orthogonal to format | qa / security / adversary / reviewer / ux-reviewer / acceptance-checker |
+| `reviews/04-*.md`, `reviews/01-ux-review.md` | agentic | Each agent's current fixed structure; no two-tier obligation | qa / security / adversary / reviewer / ux-reviewer / acceptance-checker |
 | `02-implementation.md`, `03-testing.md`, `02-regression-test.md`, `02-documentation.md`, `02-gcp-infra.md` | agentic | Each agent's current fixed structure; no two-tier obligation | implementer / tester / documenter / gcp-infra |
 | `00-state.md`, `00-execution-events.*`, `00-pipeline-summary.md`, `00-knowledge-context.md`, `failure-brief.md`, verify packets | agentic | Already agentic (unchanged) | orchestrator / verifiers |
 | `research/00-research.md`, `research/00-audit.md`, `01-planning.md`, `00-acceptance-criteria.md` | agentic | Each agent's current fixed structure; no two-tier obligation | architect / qa-plan |
@@ -29,12 +29,21 @@ Every workspace doc is either **operator-facing** or **agentic**. The operator's
 
 Consequence: the old universal mandate ("every workspace doc gets `## Review Summary` then `## Technical Detail`") is rescoped. Operator-facing docs keep their intrinsic templates (which already carry a `## Review Summary`-equivalent where it matters). Agentic docs use whatever compact, structured format their own agent already defines — no two-tier obligation. STOP blocks and the status-block return protocol are unaffected — they are already agentic/operator-facing by design.
 
+### Two-tier language rule
+
+The same operator-facing/agentic split governs body-prose language, not just format:
+
+- **Operator-facing tier** — body prose in `01-plan.md`, `sketches/*`, and `01-root-cause.md` follows the operator's resolved language (session override in `00-state.md` → `language` key in `~/.claude/.team-harness.json` → detection from the operator's first message → `en`). Structural elements (section headers, field names, table keys, AC identifiers, status-block keys) stay English regardless.
+- **Agentic tier** — body prose in every other workspace doc, including `reviews/01-plan-review.md` and every `reviews/04-*.md` report body, is English. Every versioned/committed artefact is English with no exception.
+
+This rule is mirrored in `docs/voice-guide.md § Operator-Supplied Content Boundary` and operationalized as a dispatch instruction in `agents/orchestrator.md § Communication Protocol → Language propagation`. The only surfaces outside this rule that still render in the operator's resolved language are `agents/leader.md` live chat and its Step 6 intent-detection routing table — both documented as exceptions in `docs/voice-guide.md § Documented exceptions`, never as a hardcoded language.
+
 ## Dual-mode workspaces
 
 Two output modes are available, controlled by `logs-mode` in `~/.claude/.team-harness.json`:
 
 - **local** (default) — writes to `./workspaces/{feature-name}/` in the repo working tree.
-- **obsidian** — writes to the configured Obsidian vault at `{logs-path}/{logs-subfolder}/{repo-name}/{date}_{feature}/`. The orchestrator resolves the base path once at pipeline start and passes it to every subagent. Obsidian mode adds YAML frontmatter (repo, feature, pipeline, date, agent) to every workspace doc.
+- **obsidian** — writes to the configured Obsidian vault at `{logs-path}/{logs-subfolder}/{repo-name}/{date}_{feature}/`. The leader resolves configuration and the base path once, then passes `docs_root` to each orchestrator, which forwards it to every subagent it dispatches. Obsidian mode adds YAML frontmatter (repo, feature, pipeline, date, agent) to every workspace Markdown doc.
 
 The operator switches modes via `/th:setup` or a session override in `00-state.md`.
 

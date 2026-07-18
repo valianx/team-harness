@@ -32,7 +32,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 - **NEVER** commit directly to main — always use a feature branch
 - **NEVER** force push (`--force`, `--force-with-lease`) — if push is rejected, diagnose and report
 - **ALWAYS** bump the project version once per PR at assembly (min one, max one) — this is the shipped default. **NEVER** bump when the orchestrator passes `skip-version: true` in the task context: that flag is set ONLY when the consuming repository documents a repo-local versioning/release convention that defers or batches the bump (see Step 9.0). If you see `skip-version: true`, skip Step 9 entirely and log "Version bump skipped: repo-local deferral convention (skip-version: true)"
-- **ALWAYS** re-derive completion criteria at the top of Step 0 (before any branch / commit / push) by reading `01-plan.md` § Task List (AC list) + `reviews/04-validation.md` (qa PASS/FAIL per AC) + `03-testing.md` (tests per AC) + `reviews/04-security.md` if it exists (critical/high findings). If any AC lacks PASS, lacks a test, or security reports critical/high, abort with `status: failed`. The orchestrator gates on Phase 3.5 / 3.6; this re-derivation is your secondary self-check that those gates produced consistent results. (Historical note: a `done.yml` artifact was previously specified for this purpose — deprecated 2026-05-21, see `agents/orchestrator.md` "Done.yml" deprecation banner.)
+- **ALWAYS** re-derive completion criteria at the top of Step 0 (before any branch / commit / push) by reading `01-plan.md` § Task List (AC list) + `03-testing.md` (tests per AC) + `reviews/04-security.md` if it exists (critical/high findings) + `reviews/04-adversary.md` if it exists (most recently recorded verdict — `broke-it`, or `could-not-break` + `incomplete_on_changed_control: true` with no matching `disposition` entry in `00-decision-ledger.md` accepting the residual) — **lane-gated:** on `lane: full` (or absent) also read `reviews/04-validation.md` (qa PASS/FAIL per AC); on `lane: express`, `reviews/04-validation.md` is legitimately absent (`qa` never runs there) and `03-testing.md` alone is the acceptance evidence — see Step 0 below for the full per-lane branch. If any AC lacks PASS (per-lane evidence source), lacks a test, security reports critical/high, or adversary's recorded verdict resolves to an abort per the rule above, abort with `status: failed`. The orchestrator gates on Phase 3.5 / 3.6; this re-derivation is your secondary self-check that those gates produced consistent results. (Historical note: a `done.yml` artifact was previously specified for this purpose — deprecated 2026-05-21, see `agents/orchestrator.md` "Done.yml" deprecation banner.)
 - **ALWAYS** check if the remote branch is ahead before pushing (fetch + rev-list). If ahead, rebase first
 - **ALWAYS** check PR state before creating or updating a PR. If merged/closed, create a new branch
 - **Outward actions require operator approval.** The PreToolUse hook `dev-guard.sh` intercepts every `git push`, `gh pr create`, `gh pr merge`, and equivalent outward action unconditionally, and emits `permissionDecision: "ask"`. The **operator** must approve each call interactively — the delivery agent CANNOT auto-approve. Route publish actions normally; the gate escalates them to the operator at the point of execution. See `docs/dev-mode.md § Outward-Action Gate`.
@@ -67,7 +67,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 
    Use the loaded context to write accurate documentation.
 
-   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
+   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the leader's resolved base or the session-start directive's announced base — never the repo-local default.
 
 2. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
 
@@ -95,16 +95,34 @@ Determine `{feature_name}` in this order:
 
 **Before doing anything else**, verify the verification stage actually passed. The orchestrator should have only invoked you after Phase 3 succeeded, but never trust that — re-verify directly from the workspaces.
 
+**On `lane: full` (or when `lane` is absent, legacy payload):**
+
 1. Read `workspaces/{feature-name}/01-plan.md` § Task List and extract the AC list (count and identifiers — `AC-1`, `AC-2`, …).
-2. Read `workspaces/{feature-name}/reviews/04-validation.md` (qa) and parse the AC results table. Count `PASS` vs `FAIL` per AC.
-3. Read `workspaces/{feature-name}/03-testing.md` (tester) and verify every AC has at least one test marked as passing in the AC Coverage table.
+2. Read `workspaces/{feature-name}/reviews/04-validation.md` (qa) and parse the AC results table. Count `PASS` vs `FAIL` per AC. **`bug_tier: 1` exception (`type: fix`/`hotfix` only):** per `agents/ref-special-flows.md § "Full workspaces artifact set"`, Tier 1 produces a simplified `reviews/04-validation.md` (≤15 lines, no per-AC table) — read its simplified pass/fail statement instead of a per-AC table; there is no per-AC breakdown to parse on this tier.
+3. Read `workspaces/{feature-name}/03-testing.md` (tester) and verify every AC has at least one test marked as passing in the AC Coverage table. **`bug_tier: 1` exception:** `03-testing.md` is suite-no-regress only on this tier (no per-AC coverage table, per the same artifact-set table) — verify instead that the suite ran with no regressions.
 4. If `reviews/04-security.md` exists (security-sensitive task), read it and check for Critical / High findings.
 
-**Abort criteria — return `status: failed` immediately if:**
-- Any AC is missing a `PASS` in `reviews/04-validation.md`.
-- Any AC has no test in `03-testing.md` AC Coverage table.
+**Abort criteria (full) — return `status: failed` immediately if:**
+- **`bug_tier` absent, or `2`/`3`/`4`:** Any AC is missing a `PASS` in `reviews/04-validation.md`.
+- **`bug_tier` absent, or `2`/`3`/`4`:** Any AC has no test in `03-testing.md` AC Coverage table.
+- **`bug_tier: 1` only:** `reviews/04-validation.md`'s simplified statement is not an unambiguous pass, OR `03-testing.md` reports a regression or a suite failure. (Tier 1 never has a per-AC table on either artifact — the two criteria above do not apply to it.)
 - `reviews/04-security.md` reports Critical or High findings (Medium/Low are warnings, not blockers).
-- Any expected workspace doc is missing.
+- `security_sensitive: true` (i.e. `security_floor_applies == true` per `agents/orchestrator.md § "Single shared Phase-3 floor predicate"`) and `reviews/04-security.md` is absent — the floor predicate guarantees `security` ran on a sensitive-path task regardless of lane; a missing report means the orchestrator failed its own dispatch, not a legitimate skip. When the same predicate also required `adversary` (`security_floor_applies == true`), apply the identical check to `reviews/04-adversary.md`.
+- `reviews/04-adversary.md` exists (per the predicate above) — read the file's final/most-recent verdict line: if `broke-it` → abort; if `could-not-break` + `incomplete_on_changed_control: true` → check `00-decision-ledger.md` for a matching `disposition` entry accepting the residual — if none exists, abort; if one exists, proceed. Presence alone (checked by the criterion above) is not sufficient — the recorded content must resolve to a benign state before delivery proceeds.
+- Any expected workspace doc is missing (`bug_tier: 1` never expects `01-root-cause.md`, `02-regression-test.md` when Phase 2.0 was skipped, or a per-AC table in either acceptance artifact — see `agents/ref-special-flows.md § "Full workspaces artifact set"` for the tier-conditional artifact list).
+
+**On `lane: express` (`agents/orchestrator.md § "Express Lane Profile"`):** `qa` never runs on this lane — the operator's combined-gate review substitutes for the `qa` validate pass, the same lane contract `agents/tester.md § "Express lane — one combined dispatch, same two modes"` already documents on the tester side. `reviews/04-validation.md` is legitimately ABSENT by design on this lane, never a missing artifact — do NOT require it to exist or to contain a PASS table.
+
+1. Read `workspaces/{feature-name}/01-plan.md` § Task List and extract the AC list.
+2. Read `workspaces/{feature-name}/03-testing.md` and verify every diff-scoped AC has at least one passing test. This is the tester's combined authoring+verify result (Phase 2.7 and Phase 3 collapsed into one dispatch on this lane) — it substitutes for `qa`'s AC results table as the acceptance evidence on `lane: express`.
+3. If `reviews/04-security.md` exists (a sensitive-path express run still ran SEC-DR5-01/Phase-3 security), read it and check for Critical / High findings, identically to full.
+
+**Abort criteria (express) — return `status: failed` immediately if:**
+- Any diff-scoped AC has no passing test in `03-testing.md`.
+- `reviews/04-security.md` reports Critical or High findings, when it exists.
+- `03-testing.md` itself is missing — the one acceptance-evidence artifact express always produces.
+- `security_sensitive: true` (i.e. `security_floor_applies == true` per `agents/orchestrator.md § "Single shared Phase-3 floor predicate"`) and `reviews/04-security.md` is absent — the floor predicate guarantees `security` ran on a sensitive-path task regardless of lane; a missing report means the orchestrator failed its own dispatch, not a legitimate skip. When the same predicate also required `adversary` (`security_floor_applies == true`), apply the identical check to `reviews/04-adversary.md`. This criterion never extends to `reviews/04-validation.md`, which remains express's one intentional, by-design absence (qa never runs on this lane).
+- `reviews/04-adversary.md` exists (per the predicate above) — read the file's final/most-recent verdict line: if `broke-it` → abort; if `could-not-break` + `incomplete_on_changed_control: true` → check `00-decision-ledger.md` for a matching `disposition` entry accepting the residual — if none exists, abort; if one exists, proceed. Presence alone (checked by the criterion above) is not sufficient — the recorded content must resolve to a benign state before delivery proceeds.
 
 When aborting, append a `## Delivery` section to `workspaces/{feature-name}/00-state.md` with the failure reason and a per-AC table showing which gate failed for which AC. Do NOT create a branch, do NOT commit.
 
@@ -313,17 +331,6 @@ Example:
 - Deduplicate — skip if the entity name already appears in the file.
 - One bullet per entity; omit entities that only triggered `add_observations` (already cross-linked in a prior run).
 
-### Step 5c — Archive Spec (if valuable)
-
-If the feature was non-trivial (had >2 AC or documented significant decisions), archive the final spec for future reference:
-
-1. Create `docs/specs/` directory if it doesn't exist
-2. Copy the `## Review Summary` section of `workspaces/{feature-name}/01-plan.md` to `docs/specs/{feature-name}.md`
-3. Add a header line: `**Status:** DELIVERED | **Date:** {date}`
-4. Stage the file: `git add docs/specs/{feature-name}.md`
-
-**Skip if:** the feature was a simple bug fix, hotfix, or had ≤2 AC. Only archive specs that document significant decisions or complex requirements.
-
 ### Step 6 — Update README.md
 
 - Read README.md if it exists
@@ -424,48 +431,11 @@ This step is gateway-aware: if the project does not have an external gateway (or
 | Mode | Signal | Behavior |
 |------|--------|----------|
 | **Per-PR bump (shipped default)** | no `skip-version` flag, or `skip-version: false` | Proceed with Step 9. Bump the project version once at assembly (min one, max one) and update the CHANGELOG directly (or via a `changelog.d/` fragment where that convention exists — see Step 9e). |
-| **Repo-local deferral (opt-in, NOT a shipped default)** | `skip-version: true` — set ONLY when the consuming repository documents a repo-local versioning/release convention that defers or batches the bump (e.g., team-harness's own `CLAUDE.md §6.3`) | Skip Step 9 entirely. Write a `changelog.d/` fragment (Step 9e is gated on bump; fragment is written independently via Step 10.0). If this change is a consumer-facing bump that produces no `changelog.d/` fragment (internal refactor), write a `version.d/{slug}.bump` marker (one line: `patch`, `minor`, or `major`) so the deferred release step can include it. |
-| **Deferred release cut (opt-in, NOT a shipped default)** | `release-mode: true` (passed by a repo-local release tool — e.g. team-harness's own `/th:release` — via the orchestrator) | Proceed with Step 9. Discover bump level by aggregating all pending `changelog.d/` fragments and `version.d/` markers (sub-step 9-R below), then run Steps 9.0–9e normally. Cuts a separate `release/vX.Y.Z` branch/PR. |
-| **Inline release cut (opt-in, NOT a shipped default)** | `inline-release: true` (passed by `/th:release --with <feature-branch>` via the orchestrator) | Proceed with Step 9 ON THE FEATURE BRANCH ITSELF — no separate `release/vX.Y.Z` branch. Discover bump level via sub-step 9-R (same aggregation as `release-mode`), bump all three version sites, assemble `changelog.d/` (Step 9e), and write the `version.d/.release-cut` marker (sub-step 9-R-5 below) so `prepublish-guard.ts` recognizes this feature-branch push as a release-path push. One PR, one CI run — see `skills/release/SKILL.md § Mode — Inline release`. |
+| **Repo-local deferral (opt-in, NOT a shipped default)** | `skip-version: true` — set ONLY when the consuming repository documents a repo-local versioning/release convention that defers or batches the bump | Skip Step 9 entirely. The `changelog.d/` fragment was already written by Step 7 (which always runs, ahead of Step 9); Step 9e's release-cut assembly is what's gated on the bump, not the fragment itself. |
 
-**Escape hatch (the seam a repo-local deferral convention uses).** If the consuming repository documents a repo-local versioning/release convention that defers or batches the bump (announced in its own `CLAUDE.md` or equivalent contributor doc), delivery honors that convention instead of bumping per PR — this is what `skip-version: true`, `release-mode: true`, and `inline-release: true` exist for. Absent such a documented convention, the shipped default (bump once per PR) applies unconditionally.
+**Escape hatch (the seam a repo-local deferral convention uses).** If the consuming repository documents a repo-local versioning/release convention that defers or batches the bump (announced in its own `CLAUDE.md` or equivalent contributor doc), delivery honors that convention instead of bumping per PR — this is what `skip-version: true` exists for. Absent such a documented convention, the shipped default (bump once per PR) applies unconditionally. team-harness itself does not use this escape hatch — its own `CLAUDE.md §6.3` documents the per-PR shipped default, not a deferral.
 
-**`version.d/` marker discipline (repo-local-deferral mode only).** Write `version.d/{slug}.bump` ONLY when ALL of the following are true:
-1. The change reaches the consumer (it is not repo-internal docs/tests/CI only).
-2. No `changelog.d/` fragment is being written for this delivery (fragment-less internal bump).
-
-The `{slug}` is the PR slug (same convention as `changelog.d/`). The file contains exactly one line: `patch`, `minor`, or `major`. The `version.d/` directory is tracked by git (not gitignored) so the deferred release step on a fresh checkout sees the markers. Stage it in Step 10.0 alongside the changelog fragment.
-
-**If the orchestrator passed `skip-version: true` in the task context → SKIP THIS ENTIRE STEP** (Steps 9.0–9.4a and the bump portion of 9e). Log "Version bump skipped: repo-local deferral convention (skip-version: true)" in the delivery summary and go to Step 10. Do NOT stage the version files. Step 9e's fragment assembly runs independently as part of Step 10.0 (the fragment is staged regardless of the version skip).
-
-**If the orchestrator passed `release-mode: true` OR `inline-release: true` → continue below through Step 9-R and then Steps 9.0–9e.** (Sub-step 9-R-5 below runs ONLY under `inline-release: true`.)
-
-### Step 9-R — Deferred release-cut bump-level discovery (runs when `release-mode: true` OR `inline-release: true`, a repo-local deferral convention)
-
-Before choosing the SemVer level in Step 9.2, aggregate pending fragments and markers:
-
-**Sub-step 9-R-1 — Collect pending `changelog.d/` fragments.**
-List all `*.md` files in `changelog.d/`. For each fragment, scan for subsection headers and map to SemVer:
-
-| Subsection header | SemVer level |
-|---|---|
-| `### Removed` | major |
-| `### Added` / `### Deprecated` | minor |
-| `### Fixed` / `### Changed` / `### Security` | patch |
-
-**Sub-step 9-R-2 — Collect pending `version.d/` markers.**
-List all `*.bump` files in `version.d/` (if the directory exists). Each file contains one line: `patch`, `minor`, or `major`. Read each and record the level.
-
-**Sub-step 9-R-3 — Derive the bump level.**
-Take the MAX across all fragment-derived levels and all marker levels. If no fragments and no markers exist, default to `patch`.
-
-**Sub-step 9-R-4 — Empty `version.d/`.**
-After deriving the level, delete all `*.bump` files from `version.d/` (the directory itself may remain). Stage the deletions in Step 10.0 alongside the version files.
-
-**Sub-step 9-R-5 — Write the release-cut marker (runs ONLY under `inline-release: true`).**
-Write `version.d/.release-cut` containing exactly `v{X.Y.Z}\n` — the target version derived in Step 9.2. This is the PRIMARY signal `hooks/ts/bodies/prepublish-guard.ts` recognizes to authorize running the release-path check (all three version sites bumped and matching) on a feature branch that is not named `release/vX.Y.Z`. The marker authorizes RUNNING that check — it never bypasses it; a malformed marker denies the push outright. Stage this file in Step 10.0 alongside the version files. Unlike `version.d/*.bump` markers, the `.release-cut` marker is NOT deleted after this delivery — the prepublish-guard only reacts to the marker when it is part of the CURRENT push's diff (added or modified vs `origin/main`), so a marker left over from a prior release on `main` does not retrigger the release-path check on later, unrelated feature branches.
-
-Proceed to Step 9.0 with the derived level as the input to Step 9.2 (skip the git-diff analysis in Step 9.2 — the level is already derived).
+**If the orchestrator passed `skip-version: true` in the task context → SKIP THIS ENTIRE STEP** (Steps 9.0–9.4a and the bump portion of 9e). Log "Version bump skipped: repo-local deferral convention (skip-version: true)" in the delivery summary and go to Step 10. Do NOT stage the version files. The fragment was already written by Step 7 (unconditional, runs before Step 9); Step 10.0 merely stages whatever Step 7 produced, regardless of the version skip.
 
 ### Step 9.0 — Version sites (explicit enumeration)
 
@@ -547,11 +517,12 @@ Before choosing a version, **read the git diff** (`git diff main...HEAD -- . ':!
 
 **Step 9.4 — Confirm** by reading the file again to verify the version was updated correctly.
 
-**Step 9.4a — Multi-site invariant MATCH check (pre-STAGE-GATE-3, non-blocking for single-site bumps).** Read `01-plan.md § Review Summary → ### Multi-site invariants` (if present). If the section exists and lists ≥2 sites for any invariant:
+**Step 9.4a — Multi-site invariant MATCH check (pre-STAGE-GATE-3, unconditional on a discovered multi-site set; no-op for single-site consumers).** This check no longer gates on whether THIS PR's `01-plan.md § Review Summary` happens to declare a `### Multi-site invariants` table — `agents/architect.md` instructs architects to OMIT that table when a plan merely USES an existing invariant rather than modifying it, which is true of nearly every ordinary future PR, so a plan-declaration-only gate left this defense-in-depth backstop dormant for routine work. Instead, run the MATCH check whenever Step 9.0's site discovery (above) resolved a multi-site set — i.e., discovery rule 1 fired (`01-plan.md` declares the table for this PR) **or** discovery rule 2 fired (the repo documents its own canonical multi-site version table in `CLAUDE.md` or an equivalent contributor doc — team-harness documents its three-site table in `CLAUDE.md §3` + this contract, independent of any specific PR's plan). When discovery instead fell through to rule 3 (single-site Glob-first-match — no multi-site table exists for this repo), Step 9.4a remains a **no-op**: there is nothing to cross-check, and the consumer default path is unchanged (preserves AC-10).
 
-1. For each invariant row in the table, read the actual value at every listed site.
-2. Compare all values for the same invariant. A MATCH means every non-fenced site holds the same value and every fenced site is unchanged from `main` (no edit introduced).
-3. If any site diverges — two non-fenced sites hold different values, OR a fenced site was modified — return `status: failed` with a **"partial sync" report** naming the invariant, the expected value, and the actual value at each site. Example report:
+1. Resolve the site list from whichever discovery rule fired — the plan's explicit table, or the repo's documented canonical table.
+2. For each invariant row, read the actual value at every listed site.
+3. Compare all values for the same invariant. A MATCH means every non-fenced site holds the same value and every fenced site is unchanged from `main` (no edit introduced).
+4. If any site diverges — two non-fenced sites hold different values, OR a fenced site was modified — return `status: failed` with a **"partial sync" report** naming the invariant, the expected value, and the actual value at each site. Example report:
 
    ```
    Partial sync detected — invariant: plugin version
@@ -561,9 +532,9 @@ Before choosing a version, **read the git diff** (`git diff main...HEAD -- . ':!
    Action required: update .claude-plugin/marketplace.json before proceeding.
    ```
 
-4. If all sites MATCH (or the section is absent / has only single-site invariants), continue to Step 9e normally.
+5. If all sites MATCH (or discovery resolved a single-site set), continue to Step 9e normally.
 
-**Reference:** `agents/delivery.md` Step 9.0 is the worked example of multi-site enumeration for version-literal sites. The `### Multi-site invariants` table in `01-plan.md` is authored by the architect per `agents/architect.md § Phase 2 → Domain Heuristics → Multi-site invariants`. This step generalizes the Step 9.0 version-site MATCH obligation to arbitrary multi-site invariants declared in the plan.
+**Reference:** `agents/delivery.md` Step 9.0 is the worked example of multi-site enumeration for version-literal sites. The `### Multi-site invariants` table, when a PR's plan declares one, is authored by the architect per `agents/architect.md § Phase 2 → Domain Heuristics → Multi-site invariants`. This step generalizes the Step 9.0 version-site MATCH obligation to any multi-site invariant the repo canonically documents — declared by this PR's plan or standing from an earlier one — not only invariants a given PR's plan happens to restate.
 
 ### Step 9e — CHANGELOG release cut (with `changelog.d/` assembly)
 
@@ -599,6 +570,8 @@ Move the accumulated `[Unreleased]` entries (including anything assembled from f
 - Fragment slugs (`{pr-slug}`) must match `[a-z0-9-]+`; reject any fragment filename that contains path separators (`/`, `\`, `..`) before reading it (path-traversal guard).
 
 ### Step 9b — Definition of Done (DoD) checklist
+
+**On `lane: express` (`agents/orchestrator.md § "Express Lane Profile"`):** delivery produces minimal artifacts only — `00-state.md` (state), `00-execution-events.*` (events), and `01-plan.md` (the self-authored plan) — no full `02-implementation.md`/`03-testing.md`-adjacent documentation set beyond what the express dispatches themselves already wrote. The lint/build gates below are scoped to the diff's changed files (`git diff origin/main...HEAD --name-only`) rather than a full-tree run, mirroring Phase 3.75's own scoping in the same profile ("3.75 — Build Verification" row). On `lane: full` (or when `lane` is absent), the checklist below runs full-tree, unchanged.
 
 **Recorded-state gate (consult this FIRST):** Before running any Golden Command, check whether Phase 3 verify already recorded a green outcome. The gate is satisfied by the recorded outcome — WITHOUT re-running — when ALL three of the following are present:
 1. `03-testing.md` verify section reports no regressions (the tester wrote this artifact in Phase 3).
@@ -653,18 +626,30 @@ If a check command does not exist in the project (e.g. no `lint` script), skip t
 
 ### Step 9c — Acceptance Matrix
 
-Build the AC traceability matrix from `01-plan.md` § Task List (AC list), `03-testing.md`, `reviews/04-validation.md` and (if it exists) `reviews/04-security.md`. Save it to `docs/specs/{feature-name}/acceptance-matrix.md` (create the folder if it does not exist):
+**AC reference convention.** `01-plan.md § Task List` is the single canonical statement of AC text (`docs/output-contract-patterns.md`) — this generalizes `agents/qa.md:301`'s verify-packet AC-avoidance pattern to the matrix below. The matrix references `AC-N` + verdict + evidence; the `Description` column below is a ≤5-word gist, never a restatement of the requirement. **Iteration re-narration ban:** patch/verify round narratives live only in `failure-brief.md` (`docs/output-contract-patterns.md § 5`); this matrix references an iteration by ID when relevant, never retells it.
+
+**On `lane: full` (or when `lane` is absent):** Build the AC traceability matrix from `01-plan.md` § Task List (AC list), `03-testing.md`, `reviews/04-validation.md` and (if it exists) `reviews/04-security.md`. Append it to `workspaces/{feature-name}/reviews/04-validation.md` as a new `## Acceptance Matrix` section — an addition, never a rewrite of qa's existing `## Acceptance Criteria Results` content:
 
 ```markdown
-# Acceptance Matrix: {feature-name}
+## Acceptance Matrix
 
-| AC | Description (1 line) | Test (file:line) | QA evidence (file:line) | Security |
-|----|----------------------|------------------|-------------------------|----------|
-| AC-1 | {gist} | `auth.spec.ts:42` PASS | `service.ts:18` PASS | clean |
-| AC-2 | {gist} | `auth.spec.ts:67` PASS | `controller.ts:25` PASS | clean |
+| AC | Description (≤5 words) | Test (file:line) | QA evidence (file:line) | Security |
+|----|-------------------------|------------------|-------------------------|----------|
+| AC-1 | {≤5-word gist} | `auth.spec.ts:42` PASS | `service.ts:18` PASS | clean |
+| AC-2 | {≤5-word gist} | `auth.spec.ts:67` PASS | `controller.ts:25` PASS | clean |
 ```
 
-This file becomes part of the PR body in Step 11.2. Stage it together with the other delivery artifacts in Step 10.0 (`git add docs/specs/{feature-name}/acceptance-matrix.md`). The path `docs/specs/` is tracked by git (not git-ignored), so the matrix is committed with the PR.
+**On `lane: express`:** `reviews/04-validation.md` is legitimately absent — `qa` never ran on this lane (Step 0 above). Do NOT create it. Build the same matrix shape from `01-plan.md` § Task List (AC list), `03-testing.md` (the tester's combined authoring+verify evidence, which substitutes for the QA-evidence column), and (if it exists) `reviews/04-security.md`. Append it to `workspaces/{feature-name}/03-testing.md` instead, as a new `## Acceptance Matrix` section — the one acceptance-evidence artifact express always produces:
+
+```markdown
+## Acceptance Matrix
+
+| AC | Description (≤5 words) | Test (file:line) | QA evidence (file:line) | Security |
+|----|-------------------------|------------------|-------------------------|----------|
+| AC-1 | {≤5-word gist} | `auth.spec.ts:42` PASS | n/a (express — tester combined result) | clean |
+```
+
+**Workspace-only, never committed into the product repo.** The matrix lives in `reviews/04-validation.md` on `lane: full`, or in `03-testing.md` on `lane: express` — either way inside the gitignored `workspaces/` tree (see CLAUDE.md § "Workspaces as the shared board") — not under any tracked `docs/specs/` path. It is embedded verbatim in the PR body at Step 11.2, which is the durable, human-facing surface for this content; Step 10.0 does not stage `docs/specs/`, on any lane. This holds uniformly on `lane: full` and `lane: express` — express's minimal-artifact profile (`agents/orchestrator.md § Express Lane Profile`) never had a spec/matrix commit to skip in the first place; this step's express branch appends a section to a file the tester already wrote, not a new standalone file.
 
 ### Step 9d — Reviewability size gate
 
@@ -710,13 +695,10 @@ Before staging, reconcile the PR description (or runbook) against the shipped co
 ```
 git add CLAUDE.md CHANGELOG.md
 git add .claude-plugin/plugin.json .claude-plugin/marketplace.json  # ONLY if version was bumped in Step 9 (skip if Step 9.0 skipped)
-git add docs/                 # only if created/modified in Step 5b or 5c (includes docs/specs/ acceptance matrix)
+git add docs/                 # only if created/modified in Step 5b (docs/knowledge.md) — never docs/specs/: no pipeline spec or acceptance matrix is ever staged into the product repo (see Step 9c)
 git add README.md             # only if modified in Step 6
 git add openapi/openapi.yaml  # only if updated in Step 8
-git add changelog.d/{pr-slug}.md  # ALWAYS stage the fragment when one was written (feature-mode or release-mode before assembly)
-git add version.d/{slug}.bump     # ONLY when a version.d/ marker was written in Step 9 feature-mode
-# In release-mode/inline-release after Step 9-R-4: stage version.d/ deletions: git add version.d/
-git add version.d/.release-cut    # ONLY in inline-release mode, after Step 9-R-5
+git add changelog.d/{pr-slug}.md  # ALWAYS stage the fragment when one was written
 ```
 
 **If version was bumped:** verify BOTH `.claude-plugin/plugin.json` AND `.claude-plugin/marketplace.json` are staged: `git diff --cached .claude-plugin/`. If either is not staged, stop and fix.
@@ -881,7 +863,7 @@ When deletions dominate (deletions > 2× additions, or the change is relocation-
 - **After:** {observable behaviour after this PR}
 
 ## Acceptance Matrix (mandatory)
-{paste the table from docs/specs/{feature-name}/acceptance-matrix.md}
+{paste the table from workspaces/{feature-name}/reviews/04-validation.md § Acceptance Matrix on `lane: full`, or workspaces/{feature-name}/03-testing.md § Acceptance Matrix on `lane: express` (Step 9c)}
 
 ## Definition of Done (mandatory)
 - [x] Lint: {command} → PASS
@@ -978,7 +960,7 @@ gh pr view {pr-number} --json mergeable,mergeStateStatus,statusCheckRollup
 
 **Automated review (CodeRabbit) detection.** Not every consumer repo has CodeRabbit configured — team-harness does, but this step runs against whatever repo the pipeline targets, so detect before framing the review surface. CodeRabbit is `detected` when ANY of:
 
-1. `00-state.md § Current State` carries `coderabbit_configured: true` (boot-time hint, set at orchestrator Phase 0a Step 7), OR
+1. `00-state.md § Current State` carries `coderabbit_configured: true` (boot-time hint, set at leader Phase 0a Step 7), OR
 2. `.coderabbit.yaml` or `.coderabbit.yml` exists at the target repo root (cheap file check), OR
 3. the already-fetched `statusCheckRollup` (from the query above) contains a check entry whose name contains `CodeRabbit`.
 
@@ -996,13 +978,18 @@ Signal 3 is authoritative when positive — a `CodeRabbit` check in the rollup p
 
 ---
 
-### Step 11.4b — Worktree teardown (post-merge, rule 4; conditional)
+### Step 11.4b — Worktree teardown (post-merge, rule 4; same-session best-effort; conditional)
 
-**Gate:** run only when ALL of the following are true:
-1. The PR was confirmed merged (Step 11.4 `mergeable_state` shows merged, OR the operator explicitly confirmed merge via STAGE-GATE-3 ship).
-2. `worktree:` in `00-state.md § Current State` is non-null (the task ran in a worktree, not branch-in-place).
+**Gate:** adopts `docs/worktree-discipline.md § Rule 7`'s full 4-condition safety predicate **by reference** (never redefined here). Conditions 1 and 2 are structurally satisfied by this step's own scope; conditions 3 and 4 are evaluated explicitly below. Run teardown only when ALL of the following are true:
+
+1. **Rule 7 condition 1 (not the main tree, not another session's active worktree) — structurally satisfied.** This step only ever acts on the worktree registered in THIS session's own `00-state.md § Current State → worktree:` field — never the repository's main tree, and never a worktree belonging to a different, still-active session.
+2. **Rule 7 condition 2 (pipeline provenance) — structurally satisfied.** The targeted worktree is, by construction, the one this same delivery session created and worked in, and is registered in this session's own `00-state.md` — the authoritative provenance signal.
+3. **Rule 7 condition 3 (merged AND no commits ahead of the merge point) — evaluated explicitly, both sub-conditions AND-ed, regardless of which branch of the merged-determination OR resolved "merged".** The PR was confirmed merged — via Step 11.4 `mergeable_state` showing merged, OR the operator explicitly confirming merge via STAGE-GATE-3 ship — **AND** `git -C <path> rev-list origin/main..HEAD` is empty. A merge signal alone does not prove no work would be lost: it does not catch a follow-up commit landed in this worktree *after* the merge (e.g., a later review-fix session reusing the same branch per Rule 3's documented pattern, where `gh pr view` still reports the *prior* PR as merged while `HEAD` carries new, unmerged commits). If the merge signal is present but `rev-list` is non-empty, treat the worktree as **unmerged** for this gate — do NOT proceed to teardown; log `worktree_teardown: skipped: commits-ahead-of-merge-point` and report `— commits ahead of merge point` (mirrors Rule 7's action/report table).
+4. **Rule 7 condition 4 (clean beyond the mode-only allow-list) — evaluated in the Teardown protocol's step 1 below.**
 
 When `worktree: null`, this step is a **no-op** — log `worktree_teardown: skipped: branch-in-place` and continue.
+
+**Same-session best-effort, not the durable reaper.** Delivery runs pre-merge in the ordinary single-session flow: the PR it just opened is rarely already merged by the time this step executes, so gate condition 1 fails on most runs (`skipped: pr-not-merged`) and teardown here is a no-op. This step only removes a worktree when the PR is already merged at delivery time (e.g., an auto-merge landed while delivery was still running). The durable reaper for the common case — a worktree whose PR merges in a later session — is the boot-time preflight sweep in `th:leader` Phase 0a, which applies the same predicate from `docs/worktree-discipline.md § Rule 7` at a point in time that actually runs after the merge. Both sites reference Rule 7's predicate; neither redefines it.
 
 **Worktree teardown is re-anchored to PR merge (rule 3).** The worktree lives through review — review-fix commits go into the same worktree on the same branch. Do NOT tear down earlier than this step.
 
@@ -1010,13 +997,16 @@ When `worktree: null`, this step is a **no-op** — log `worktree_teardown: skip
 
 Read the `worktree:` field from `00-state.md § Current State` to get `<path>`.
 
-**1. Check for uncommitted changes:**
+**1. Check for uncommitted changes (mode-only diffs are not "dirty"):**
 
 ```bash
 git -C <path> status --porcelain
 ```
 
-If any output exists (dirty worktree): **STOP**. Do not remove. Surface to the operator:
+If the output is empty, the worktree is clean — proceed to step 1b. If output exists, apply the mode-only allow-list defined in `docs/worktree-discipline.md § Rule 7` (referenced here, not redefined): a modified path is mode-only, and does not count as dirty, only when BOTH `git -C <path> diff --numstat` and `git -C <path> diff --cached --numstat` show `0\t0` for that path (e.g., an executable-bit flip on `hooks/sketch-guard.sh`). Any non-zero numstat, any untracked (`??`) path, or any deleted path is a content change and blocks teardown.
+
+- Every modified path is mode-only → treat the worktree as clean. Proceed to step 1b.
+- Any modified path carries a content change, or an untracked/deleted path exists → **STOP**. Do not remove. Surface to the operator:
 ```
 STOP: worktree <path> has uncommitted changes — teardown blocked.
 Inspect with: cd <path> && git status
@@ -1024,12 +1014,28 @@ Options: (A) commit or stash, then re-run teardown; (B) discard with `git -C <pa
 ```
 Log `worktree_teardown: blocked: dirty-worktree` and exit this step. Do NOT proceed.
 
-**2. Remove the worktree (clean path only):**
+**1b. Acquire the sweep lock, then re-verify condition 3 (merged AND no commits ahead) immediately before removal.** Before the ancestry re-check below, acquire this worktree's directory lock per the protocol specified canonically in `docs/worktree-discipline.md § Rule 7` (Lock protocol subsection) — by reference; do not re-derive or duplicate the acquire/check/release sequence (the `mkdir` primitive, the holder-file contents, or the 15-minute stale-lock expiry threshold) here.
+
+- Acquisition fails (another process holds a live, non-stale lock) → do NOT proceed. Log `worktree_teardown: skipped: sweep-lock-held` and report `— sweep lock held (retry next boot)`; the worktree remains a candidate for the leader's next boot-time preflight sweep.
+- The lock mechanism itself errors (not a held-lock `EEXIST`) → treat as "cannot proceed safely". Log `worktree_teardown: skipped: sweep-lock-error` and do NOT remove.
+
+Once the lock is held, this step's Gate evaluated condition 3 once, before the Teardown protocol began — time has passed since then (this same step's condition-4 check, at minimum). Per `docs/worktree-discipline.md § Rule 7`'s Atomicity discipline (referenced here, not redefined — retained as an internal defense layered under the lock), re-run the ancestry check with no other Bash call interleaved between this re-check and step 2's `git worktree remove`:
+
+```bash
+git -C <path> rev-list origin/main..HEAD
+```
+
+- Empty output → condition 3 still holds. Proceed to step 2, still holding the lock.
+- Non-empty output → a commit landed in `<path>` after the Gate's check. **STOP.** Do not remove. Release the lock (step 2b). Treat the worktree as unmerged: log `worktree_teardown: skipped: commits-ahead-of-merge-point` and report `— commits ahead of merge point`. Do NOT proceed to step 2.
+
+**2. Remove the worktree (clean path only), lock held:**
 
 ```bash
 git worktree remove <path>
 git worktree prune
 ```
+
+**2b. Release the lock.** Per `docs/worktree-discipline.md § Rule 7`'s Lock protocol (referenced here, not redefined), release the lock immediately after the removal attempt above — on both the just-removed path and the step 1b leave path (best-effort; a release failure self-heals via the same stale-lock expiry Rule 7 defines).
 
 **3. Verify removal:**
 
@@ -1037,32 +1043,57 @@ git worktree prune
 git worktree list
 ```
 
-Check that `<path>` no longer appears in the output. If it still appears, the removal failed (common on Windows due to file-lock issue #57767). Repair:
+Check that `<path>` no longer appears in the output. If it still appears, do NOT force-remove yet — the apparent failure may be the documented Windows file-lock quirk (#57767), or it may be git correctly REFUSING to delete a tree that became dirty after step 1's check (e.g., a human edit landed while this step ran; note the lock was already released at step 2b, so it offers no protection here). Per the force-repair safety check specified canonically in `docs/worktree-discipline.md § Rule 7`'s Action-and-report table (referenced here, not redefined), collapse the re-check and the repair into **one single Bash tool invocation** — a shell conditional, not two separate agent-issued tool calls:
 
 ```bash
-git worktree prune
-git worktree remove --force <path>
-git worktree list   # verify again
+porcelain="$(git -C <path> status --porcelain)"
+tainted="$(printf '%s\n' "$porcelain" | awk '{code=substr($0,1,2); if (code=="??" || code ~ /D/) print}')"
+if [ -z "$porcelain" ] || { [ -z "$tainted" ] && \
+    [ -z "$(git -C <path> diff --numstat | awk '$1!=0||$2!=0')" ] && \
+    [ -z "$(git -C <path> diff --cached --numstat | awk '$1!=0||$2!=0')" ]; }; then
+  git worktree prune; git worktree remove --force <path>; git worktree list
+else
+  echo "ABORT: worktree became dirty since last check, not force-removing"
+fi
 ```
 
-If `<path>` still appears after `--force`, log `worktree_teardown: failed: path-still-present` and surface to the operator. Do NOT continue silently.
+- The `if` branch fires only when the re-check comes back **still clean** (mode-only-or-nothing,
+  per the numstat allow-list from step 1 above) → the failure is the genuine platform quirk;
+  `prune` + `remove --force` + a final `worktree list` all execute inside this one invocation.
+- The `else` branch fires when the re-check comes back **now dirty** (a real content change) → do
+  NOT force. Treat this exactly like step 1's dirty branch: log `worktree_teardown: blocked:
+  dirty-worktree` and surface to the operator with the same STOP block as step 1, then exit this
+  step. Do NOT proceed to `--force`.
+
+Two prior rounds re-checked dirtiness and then force-removed as two *separate* Bash tool calls,
+leaving an LLM-inference/dispatch-latency window (seconds to tens of seconds) between the check and
+the force-call with zero backstop once force was in play. Folding check + prune + force + verify
+into one shell invocation narrows that window to genuine OS-level command latency (milliseconds) —
+the practical minimum achievable in this tool-call execution model, not a claim of full atomicity:
+the shell still runs `prune` and `remove --force` as sequential OS processes inside that one
+invocation. What this closes is the agent-latency multiplier the last two rounds found, not the
+underlying sequential-steps nature of check-then-act.
+
+If `<path>` still appears after a genuine force-repair (the clean branch above), log `worktree_teardown: failed: path-still-present` and surface to the operator. Do NOT continue silently.
 
 **4. Log the outcome:**
 
 Add one line to the delivery status block:
 ```
-worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-present | skipped: branch-in-place | skipped: pr-not-merged
+worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-present | skipped: branch-in-place | skipped: pr-not-merged | skipped: commits-ahead-of-merge-point | skipped: sweep-lock-held | skipped: sweep-lock-error
 ```
+
+**Never a silent skip.** Every non-`removed` outcome above — `blocked`, `failed`, or `skipped` — is reported in this status-block line; delivery never leaves a worktree behind without logging why. A `skipped: pr-not-merged`, `skipped: commits-ahead-of-merge-point`, or `skipped: sweep-lock-held` worktree is not lost — it remains a candidate for the leader's boot-time preflight sweep once the merge (or ancestry, or lock) condition resolves.
 
 ---
 
-### Step 11.4c — Release tag verification (post-merge, release-mode/inline-release; conditional)
+### Step 11.4c — Release tag verification (post-merge, per-PR bump in a tag-synced repo; conditional)
 
 **Gate:** run only when BOTH of the following are true:
-1. `release-mode: true` OR `inline-release: true` was passed in the task context (release-mode = `/th:release`'s deferred-cut convention onto its own `release/vX.Y.Z` branch; inline-release = the single-PR release path folded into a feature branch — see Step 9's mode table).
+1. Step 9 performed a version bump for this PR (`skip-version: true` was NOT passed and a bump was made) AND `.github/workflows/tag-sync.yml` is present at the target repo root — that workflow is the repo-local signal that a merge to `main` auto-tags the new version. A repo without `tag-sync.yml` has no tagging mechanism to verify and this step never applies to it.
 2. The PR was confirmed merged (Step 11.4 `mergeable_state` shows merged, OR the operator explicitly confirmed merge via STAGE-GATE-3 ship).
 
-When either condition is false, this step is a no-op — log `release_tag: skipped: not-release-mode` or `release_tag: skipped: pr-not-merged` and continue.
+When condition 1 is false, this step is a no-op — log `release_tag: skipped: no-tag-sync-workflow` (repo has no `tag-sync.yml`) or `release_tag: skipped: no-version-bump` (Step 9 was skipped) as applicable. When condition 2 is false, log `release_tag: skipped: pr-not-merged` and continue.
 
 **Verify-only (tag-sync.yml is the single idempotent tag authority).** `.github/workflows/tag-sync.yml` fires on every push to `main` that changes `.claude-plugin/plugin.json`; it checks `git ls-remote --tags` first (idempotent — a pre-existing tag is a no-op) and creates + pushes the `v{X.Y.Z}` tag itself, then dispatches `release.yml`. This step therefore VERIFIES the tag landed rather than creating it:
 
@@ -1087,7 +1118,7 @@ git push origin v{X.Y.Z}
 
 **Log the outcome** — add one line to the delivery status block:
 ```
-release_tag: verified: v{X.Y.Z} (tag-sync.yml) | created: v{X.Y.Z} (manual fallback) | skipped: not-release-mode | skipped: pr-not-merged
+release_tag: verified: v{X.Y.Z} (tag-sync.yml) | created: v{X.Y.Z} (manual fallback) | skipped: no-tag-sync-workflow | skipped: no-version-bump | skipped: pr-not-merged
 ```
 
 ---
@@ -1210,7 +1241,7 @@ The delivery agent's resilience contract is unchanged: **never fail the delivery
 
 #### Path derivation
 
-Derive from the workspaces path (resolved at orchestrator boot, passed in the dispatch):
+Derive from the workspaces path (resolved at leader boot, passed in the dispatch):
 
 ```
 feature_dir = basename(docs_root)                          # e.g. "2026-06-06_obsidian-worklog-interlinking"
@@ -1390,37 +1421,29 @@ The index/MOC files are written to the Obsidian vault (`{logs-path}/{logs-subfol
 
 **Gate:** proceed only when `initiative` in `00-state.md § Current State` is non-null (a confirmed initiative slug). When `initiative == null`, this step is a **no-op** — log `initiative_overview: skipped: no-initiative` and continue. This step is **best-effort**: any failure logs a one-line WARN and continues — the pipeline NEVER fails or blocks on an overview-write error.
 
-**Purpose:** update this project's row in `overview.md` with the resolved branch, version, PR number/URL, and status, now that Delivery has that information.
+**Purpose:** surface this project's resolved row data — branch, version, PR number/URL, and status — so `overview.md` reflects that Delivery has shipped. In lane mode, `th:leader` performs the actual `overview.md` write; Delivery only returns the data.
 
-**Resolve `overview_path`** using the same date-agnostic JOIN rule as orchestrator Phase 0a Step 1f (delivery JOINs the day-1 dated folder; it does NOT create):
-- Obsidian: glob `{logs-path}/{logs-subfolder}/{repo_base}/*_{slug}/overview.md` (the `*_` wildcard absorbs the `{YYYY-MM-DD}_` prefix); confirm by `initiative:` frontmatter. The located path is the dated `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/overview.md` folder.
-- Local: glob `{common-parent-of-cwd-repo}/*_{slug}/overview.md`; confirm by frontmatter.
+**Lane mode — Delivery does NOT write `overview.md`.** A non-null `initiative` means this delivery run is an initiative lane spawned by `th:leader` (equivalently, a `lane_mode: true` spawn signal). `th:leader` is the **sole writer** of `overview.md`; a lane's Delivery MUST NOT glob for, read, or write that file. Instead of a read-modify-write, resolve this project's row data and **return it in the delivery status block** for `th:leader` to write:
 
-If `overview_path` does not exist, log `initiative_overview: skipped: overview-not-found` and continue. Do NOT create the file in this step — creation is the orchestrator's job at intake.
-
-**Read-modify-write:** read the full `overview.md`, locate the row whose `Project` column equals this run's `{project-slug}` (derived from `repo_name`). Replace that row in-place with the updated values:
-
-```
-| {project-slug} | {branch} | {version} | {#PR-number or PR-URL or —} | delivered |
-```
-
-Where:
+- `{project-slug}` — derived from `repo_name`
 - `{branch}` — the feature branch created in Step 3 of this delivery run
 - `{version}` — the bumped version from Step 9 (or `—` if version was skipped)
-- `{#PR-number}` — the PR number from Step 11 (or `—` if no PR was created)
-- `delivered` — the status is advanced to `delivered` on successful delivery
+- `{#PR-number}` — the PR number/URL from Step 11 (or `—` if no PR was created)
+- `status` — `delivered` on successful delivery
 
-Also update `updated:` in the frontmatter to today's date. Write the whole document back. Never write a partial payload.
+Return the row in the status block as a single pipe-delimited line:
 
-If the row for this project does not exist in the `## Projects` table, append a new row rather than failing — a delivery run should always be able to record its outcome.
+```
+initiative_row: | {project-slug} | {branch} | {version} | {#PR-number or PR-URL or —} | delivered |
+```
 
-**On-completion final reconcile:** after writing this project's row, re-read all rows in the `## Projects` table. If every row now shows status `delivered`, perform a final reconcile: update the frontmatter `updated:` to today's date and add a completion signal (e.g. `status: complete`), then finalize `## Functional Description` to reflect shipped reality by re-reading all sibling `01-plan.md` files. Write the whole document back.
+Do NOT resolve an `overview_path`, do NOT read or write `overview.md`, and do NOT run any on-completion reconcile — locating the file, writing each row, ordering lane completions, and the final all-`delivered` reconcile are `th:leader`'s responsibility (see `agents/leader.md § overview.md Template` and § Parallel Multi-Project Dispatch). Log `initiative_overview: deferred-to-leader (lane mode)` and continue.
 
-**Concurrency compatibility (parallel multi-project dispatch).** When the initiative uses parallel fan-out (see `agents/orchestrator.md § Parallel Multi-Project Dispatch`), each per-lane delivery run executes this step independently for its own project row. The `## Projects` rows are keyed per-project, so concurrent per-lane writes touch different rows and are safe under concurrency. The on-completion final-reconcile fires independently in each lane's delivery; the reconcile-ordering rule (parent serializes its own `overview.md` read-modify-writes; lane completions processed in arrival order) is enforced at the orchestrator level. Delivery's responsibility is unchanged: operate per-lane, write only this project's row, remain best-effort.
+**Single-writer model (why Delivery no longer writes `overview.md`).** `th:leader` is the only agent that writes `overview.md` — there is exactly one writer, always. An earlier revision had each per-lane Delivery run its own full-document read-modify-write of `overview.md` on the theory that per-project rows were concurrency-safe. That claim was false and self-contradictory: a full-document read-modify-write races on the entire file, not on a single row, so two concurrent lane writes — or a lane write overlapping a leader reconcile — can clobber a sibling's row or a reconcile in flight. The suppression model above replaces it: every lane returns its row data and `th:leader` serializes all writes.
 
 **Status line (add to delivery status block):**
 ```
-initiative_overview: updated | skipped: no-initiative | skipped: overview-not-found | failed: {error}
+initiative_overview: deferred-to-leader (lane mode) | skipped: no-initiative | failed: {error}
 ```
 
 ---
@@ -1446,9 +1469,6 @@ Append delivery summary as a `## Delivery` section to `workspaces/{feature-name}
 
 ## docs/knowledge.md Updated
 - {entries added, or "No updates needed"}
-
-## Spec Archived
-- {yes → `docs/specs/{feature-name}.md` | no → "Skipped (≤2 AC)" | N/A}
 
 ## README.md
 - Updated: {yes/no}
@@ -1510,8 +1530,8 @@ dod: {pass | no gates discovered | failed: <command>}
 mergeable_state: clean | conflicting | undetermined | blocked | behind | unstable | not-verified: gh-unavailable
 ci_state: passing | failing | pending | none | not-verified
 coderabbit: detected | not-detected | not-verified: gh-unavailable
-worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-present | skipped: branch-in-place | skipped: pr-not-merged
-release_tag: verified: v{X.Y.Z} | created: v{X.Y.Z} | skipped: not-release-mode | skipped: pr-not-merged   # release-mode/inline-release only (Step 11.4c); omit otherwise
+worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-present | skipped: branch-in-place | skipped: pr-not-merged | skipped: commits-ahead-of-merge-point | skipped: sweep-lock-held | skipped: sweep-lock-error
+release_tag: verified: v{X.Y.Z} | created: v{X.Y.Z} | skipped: no-tag-sync-workflow | skipped: no-version-bump | skipped: pr-not-merged   # per-PR bump in a tag-synced repo only (Step 11.4c); omit otherwise
 context7_consult: hit:N miss:N skipped:N
 kg_hit_used: [node-name, ...]   # KG nodes from 00-knowledge-context.md that directly influenced a delivery decision; [] when none
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N

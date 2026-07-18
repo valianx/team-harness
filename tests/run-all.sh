@@ -394,7 +394,34 @@ fi
 
 echo
 echo "############################################################"
-echo "# Suite 151: bin-tty-openability-execbit (#473)"
+echo "# Suite 151: lane-marker-byte-identity (AC-7.4 floor)"
+echo "# Requires: python3. Skipped when absent."
+echo "############################################################"
+if ! command -v python3 >/dev/null 2>&1; then
+    report_skip_or_fail "lane-marker-byte-identity" "python3 not found — install Python 3 to run this suite"
+else
+    if python3 "$TESTS_DIR/test_lane_marker_identity.py"; then
+        echo "lane-marker-byte-identity: PASS (see PENDING notes above if agents/leader.md / agents/orchestrator.md are not yet landed in this branch)"
+    else
+        echo "lane-marker-byte-identity: FAIL"
+        FAILED=$((FAILED + 1))
+    fi
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 154: update-opencode.sh cheap pre-check honors --non-interactive (AC-9)"
+echo "############################################################"
+if bash "$TESTS_DIR/test_update_opencode_sh.sh"; then
+    echo "update-opencode-sh-precheck: PASS"
+else
+    echo "update-opencode-sh-precheck: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 158: bin-tty-openability-execbit (#473)"
 echo "# Requires: python3. Skipped when absent."
 echo "############################################################"
 if ! command -v python3 >/dev/null 2>&1; then
@@ -410,7 +437,7 @@ fi
 
 echo
 echo "############################################################"
-echo "# Suite 152: bin-tty-guard-behavioral (#473 follow-up)"
+echo "# Suite 159: bin-tty-guard-behavioral (#473 follow-up)"
 echo "# Requires: dash, setsid, python3. Skips cleanly when absent."
 echo "############################################################"
 if bash "$TESTS_DIR/test_bin_tty_behavioral.sh"; then

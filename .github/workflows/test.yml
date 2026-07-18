@@ -28,8 +28,8 @@ jobs:
       # matches it, blocking merge. Instead the job always runs (satisfying
       # the required-check contract) and each heavy step below is skipped
       # via `if:` when the diff is release-only (version sites + CHANGELOG +
-      # changelog.d/ + version.d/ only — e.g. an inline-release cut). Any
-      # diff outside that narrow allowlist, or any failure to compute the
+      # changelog.d/ only — e.g. a per-PR version bump with no other changes).
+      # Any diff outside that narrow allowlist, or any failure to compute the
       # diff, defaults to running the full suite (fail-closed toward more
       # verification, never less).
       - name: Detect release-only diff
@@ -46,7 +46,7 @@ jobs:
               while IFS= read -r f; do
                 [ -z "$f" ] && continue
                 case "$f" in
-                  .claude-plugin/plugin.json|.claude-plugin/marketplace.json|CLAUDE.md|CHANGELOG.md|changelog.d/*.md|version.d/*)
+                  .claude-plugin/plugin.json|.claude-plugin/marketplace.json|CLAUDE.md|CHANGELOG.md|changelog.d/*.md)
                     ;;
                   *)
                     is_release_only=false
@@ -98,7 +98,7 @@ jobs:
 
       - name: Release-only diff — heavier suites skipped (structural + policy-block still ran)
         if: steps.release-only.outputs.is_release_only == 'true'
-        run: echo "Diff is limited to version sites + CHANGELOG.md + changelog.d/ + version.d/ (a release cut) — the structural and policy-block suites ran above; skipping the heavier frontmatter (uv/PyYAML) and behavioral suites. This check still ran and reports success; it is not a paths-ignore trigger skip."
+        run: echo "Diff is limited to version sites + CHANGELOG.md + changelog.d/ (a per-PR version bump) — the structural and policy-block suites ran above; skipping the heavier frontmatter (uv/PyYAML) and behavioral suites. This check still ran and reports success; it is not a paths-ignore trigger skip."
 
   go-test:
     name: go test (installer)

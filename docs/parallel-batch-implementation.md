@@ -27,7 +27,7 @@ This document covers ONE parallelism mechanism: an operator-authorized batch of 
 | Mechanism | Axis | Unit of fan-out | Gate | Canonical source |
 |---|---|---|---|---|
 | Inter-task DAG scheduler | tasks within one plan | one implementer per task | none — parallel-by-default, `Depends on:` rounds | `agents/orchestrator.md § Phase 2 — Implementation → Stage 2 scheduler (DAG by Depends on:)` |
-| Parallel Multi-Project Dispatch | projects within one initiative | one implement+verify lane per project | operator confirm gate (`parallel` / `serial`) | `agents/orchestrator.md § Parallel Multi-Project Dispatch` |
+| Parallel Multi-Project Dispatch | projects within one initiative | one implement+verify lane per project | operator confirm gate (`parallel` / `serial`) | `agents/leader.md § Parallel Multi-Project Dispatch` |
 | Batch Implementation (this document) | independent items across an operator-authorized batch | one implementer per item, own worktree | operator authorization + the 5 preconditions in `## When this applies` | this document |
 | **Intra-task execution-lane decomposition** | **files WITHIN one already-approved task** | **one implementer lane per architect-declared, file-disjoint seam** | **`Lane-decomposable: yes` in `01-plan.md` AND `Files:` count ≥ `LANE_DECOMPOSE_MIN_FILES` (8) AND ≥2 disjoint seams** | `agents/orchestrator.md § Phase 2 — Implementation → Intra-task execution-lane decomposition` |
 
@@ -53,7 +53,7 @@ Concurrent implementers never contend on the same working tree because each hold
 
 Dispatch N implementers in parallel via concurrent `Task` calls in the parent orchestrator session. This is the same in-message mechanism already used for `tester + qa + security` at Phase 3 and for project lanes in `## Parallel Multi-Project Dispatch`.
 
-Cap the concurrency at `batch_concurrency` (default 5) using the eager slot-fill wave model from `agents/orchestrator.md § Multi-Task Orchestration § Step 4`: fill all available slots immediately, and as each item finishes open the slot to the next queued item. This mirrors the Stage-1 planning fan-out (N architects + N plan-reviewers) on the implementation side.
+Cap the concurrency at `batch_concurrency` (default 5) using the eager slot-fill wave model from `agents/leader.md § Multi-Task fan-out`: fill all available slots immediately, and as each item finishes open the slot to the next queued item. This mirrors the Stage-1 planning fan-out (N architects + N plan-reviewers) on the implementation side.
 
 ---
 
@@ -74,7 +74,7 @@ Items that touch only item-local files can be fully autonomous in their worktree
 
 ## Consolidation
 
-Consolidation reuses the discipline of merging several PRs one at a time — applied to the item branches so the batch ships as ONE PR instead of N. It runs after all N implementers have finished and each item has passed its in-worktree verify. A SINGLE consolidator (the top-level orchestrator) creates the integration branch (the eventual PR head) from the fresh base, then merges each item branch into it one at a time.
+Consolidation reuses the discipline of merging several PRs one at a time — applied to the item branches so the batch ships as ONE PR instead of N. It runs after all N implementers have finished and each item has passed its in-worktree verify. A SINGLE consolidator (a dedicated consolidator orchestrator) creates the integration branch (the eventual PR head) from the fresh base, then merges each item branch into it one at a time.
 
 ### Sequential merge, validate after each
 
@@ -133,7 +133,7 @@ The consolidated full-suite run is the gate that separates the parallel implemen
 
 ## Consolidator role and directives
 
-Consolidation is owned by a SINGLE designated consolidator — the top-level orchestrator, never a subagent and never split across actors. The consolidator is the only writer of shared-serial files; parallel implementers never reconcile each other's work. The single-owner rule exists because concurrent implementers can contaminate even a notionally-isolated shared file — observed live, two worktrees' copies of `tests/test_agent_structure.py` cross-contaminated, each commit carrying the other item's suite block.
+Consolidation is owned by a SINGLE designated consolidator — a dedicated consolidator orchestrator, never a worker subagent and never split across actors. The consolidator is the only writer of shared-serial files; parallel implementers never reconcile each other's work. The single-owner rule exists because concurrent implementers can contaminate even a notionally-isolated shared file — observed live, two worktrees' copies of `tests/test_agent_structure.py` cross-contaminated, each commit carrying the other item's suite block.
 
 Four directives:
 

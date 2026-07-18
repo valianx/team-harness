@@ -40,7 +40,7 @@ Every committed artefact is in English: `README.md`, all files under `docs/`, `a
 
 **Why:** team-harness is open-source and targets an international developer audience. Mixed-language repos are jarring, harder to grep, and force readers through a translation step. Live chat is ephemeral; repo content is the durable artefact that outlives any conversation.
 
-**workspaces are NOT committed artefacts.** `workspaces/` is gitignored — it is local working memory on each operator's machine, not published. The English-only rule does NOT cover workspace doc PROSE content. Agent-composed prose inside workspace doc bodies follows the **operator's chat language**. Structural elements that must remain machine-readable across operators stay English regardless: section headers (`## TL;DR`, `## Current State`, `## Agent Results`), field names (`status:`, `phase:`, `verdict:`), status-block keys, closed-set enum values (`success`, `pass`, `fail`, `APPROVE`), filenames (`01-architecture.md`), `dispatch_handoff` JSON keys. The boundary is **structure = English, body prose = operator language**.
+**workspaces are NOT committed artefacts.** `workspaces/` is gitignored — it is local working memory on each operator's machine, not published. The English-only rule does NOT cover workspace doc PROSE content uniformly — it follows the two-tier rule declared canonically in `docs/conventions.md § Document classification`: operator-facing-tier doc bodies (`01-plan.md`, `sketches/*`, `01-root-cause.md`) follow the **operator's resolved language**; agentic-tier doc bodies (everything else, including `02-implementation.md`, `03-testing.md`, `reviews/01-plan-review.md`, and every `reviews/04-*.md` report body) are **English**. Structural elements that must remain machine-readable across operators stay English regardless, in either tier: section headers (`## TL;DR`, `## Current State`, `## Agent Results`), field names (`status:`, `phase:`, `verdict:`), status-block keys, closed-set enum values (`success`, `pass`, `fail`, `APPROVE`), filenames (`01-architecture.md`), `dispatch_handoff` JSON keys. The boundary is **structure = English always; body prose = operator's resolved language in the operator-facing tier, English in the agentic tier**.
 
 **Language source precedence — configured-default vs detection vs session-override.** The operator's language is resolved via a 4-level chain. This matters when the language of chat and workspace prose differs from `en`:
 
@@ -53,12 +53,14 @@ Every committed artefact is in English: `README.md`, all files under `docs/`, `a
 
 **Setting a configured default from chat.** An explicit persistence marker (`por defecto`, `siempre`, `default`, `permanente`, `de aquí en adelante`) in a language-change request routes to the persistent-default-set path with a Y/n confirmation gate before any config write. Without that marker — including temporality markers like `por ahora`, `esta vez`, `now` — the change is always ephemeral (session override). The config JSON is NEVER written without an explicit persistence signal.
 
-**Scope of the configured language.** Chat responses and workspace prose follow the configured language. Committed artefacts (repo files, KG nodes, commits, PR bodies, docs) stay in English regardless of the configured language. This scope rule is unchanged by the `language` feature.
+**Scope of the configured language.** Chat responses and operator-facing-tier workspace doc prose follow the operator's resolved language. Agentic-tier workspace doc prose and every committed artefact (repo files, KG nodes, commits, PR bodies, docs) stay in English regardless of the resolved language. This scope rule is unchanged by the `language` feature.
 
-**Documented exceptions** (committed artefacts where Spanish is allowed):
+**Documented exceptions** (the two surviving surfaces that render or route in the operator's resolved language, not a hardcoded language):
 
-- **`agents/security.md` report-body template, `reviews/04-security.md` report bodies, `agents/reviewer.md` review-body templates, `reviews/04-internal-review.md` reviewer outputs.** The two agents produce Spanish-language reports per their contracts. The Spanish output is only the body of those workspace doc reports (and the GitHub PR-review comment). The agent's system prompt, status-block fields, and framework-level fields remain English.
-- **`agents/orchestrator.md` Step 6 intent-detection routing table.** The table lists patterns in both English and Spanish so the operator can chat in either language.
+- **`agents/leader.md` live chat.** The leader replies in the operator's resolved language, determined by the 4-level precedence chain above — never a hardcoded language. For the current operator this resolves to Spanish; that is one operator's instance, not the rule.
+- **`agents/leader.md` Step 6 intent-detection routing table.** The table matches intent patterns in the operator's resolved language so the operator's own phrasing routes correctly. Illustrative patterns in the table may show Spanish alongside English as the current operator's instance — the table is not restricted to a fixed pair of languages.
+
+No other committed artefact carries a language exception. `agents/security.md`, `agents/reviewer.md`, and `agents/adversary.md` report bodies — and their `reviews/04-security.md`, `reviews/04-internal-review.md`, `reviews/04-adversary.md` outputs — are English; see § Operator-Supplied Content Boundary below.
 
 **`agents/translator.md` example glossary tables** are domain illustrations, not operator copy. Out of scope for this guide.
 
@@ -66,7 +68,7 @@ Every committed artefact is in English: `README.md`, all files under `docs/`, `a
 
 ## Operator-Supplied Content Boundary (§7.4)
 
-The agent never composes Spanish (post-audit, with the §7.3 exceptions). The operator may supply Spanish content, and the agent preserves it verbatim.
+Outside the operator-facing tier and the two §7.3 exceptions (leader live chat, Step 6 intent-detection table), the agent never composes prose in the operator's language — it composes English. Within the operator-facing tier and the two exceptions, the agent composes in the operator's resolved language. Whatever content the operator supplies in their own language, the agent preserves verbatim.
 
 | What | Who composes it | Language |
 |---|---|---|
@@ -79,14 +81,15 @@ The agent never composes Spanish (post-audit, with the §7.3 exceptions). The op
 | `dispatch_handoff` JSON keys (`schema_version`, `next_dispatch`, `phase`, `autonomy`) | Agent (machine-parseable surface) | English |
 | Feature name (e.g. `exportación-de-facturas`) | Operator-supplied | Whatever the operator chose |
 | `00-task-intake.md` Original Description block | Operator-quoted | Whatever the operator said |
-| Prose body content inside workspace doc sections (analyses, rationales, summaries, insights, narrative verdicts) | Agent | **Operator's chat language** (workspaces are gitignored — see §7.3) |
-| Prose body content in committed agent reports — `reviews/04-security.md`, `reviews/04-internal-review.md` | Agent | Spanish (per §7.3 documented exception) |
+| Prose body content in operator-facing-tier workspace docs (`01-plan.md`, `sketches/*`, `01-root-cause.md`) | Agent | **Operator's resolved language** (structural elements stay English — see `docs/conventions.md § Document classification` two-tier rule) |
+| Prose body content in agentic-tier workspace docs (analyses, rationales, summaries, insights, narrative verdicts) | Agent | English |
+| Prose body content in committed agent reports — `reviews/04-security.md`, `reviews/04-internal-review.md`, `reviews/04-adversary.md` | Agent | English |
 | Status-block `summary:` of every agent (including security, reviewer) | Agent | English (machine-parseable, always) |
 | Prose anywhere else (committed) | Agent | English (per §7.3) |
 
 **Rule of thumb (two-axis):**
-- **What is it?** Structural (headers, keys, filenames, closed-set enum values) → English always, regardless of where it lives. Prose → depends on where it lives.
-- **Where does it live?** Gitignored workspaces → operator's chat language. Committed repo file → English (with the documented §7.3 exceptions).
+- **What is it?** Structural (headers, keys, filenames, closed-set enum values) → English always, regardless of where it lives. Prose → depends on which tier it lives in.
+- **Which tier does it live in?** Operator-facing-tier workspace docs (`01-plan.md`, `sketches/*`, `01-root-cause.md`) → operator's resolved language. Agentic-tier workspace docs and every committed repo file (including `reviews/04-*.md` report bodies) → English (with the two documented §7.3 exceptions: leader live chat and the Step 6 intent-detection table).
 
 ## Internal Chatter — IN/OUT table (§7.1.1 full)
 
@@ -96,7 +99,7 @@ The table below defines which operations are **silent** vs **operator-facing**. 
 |----------|-----------|------------|-----------|
 | Config load (read `.team-harness.json`, resolve paths) | SILENT — log `operation.*` event | one-line error + suggestion | The operator does not need to see each config read |
 | MCP verify (memory / context7 connectivity probe) | SILENT — log `operation.*` event | one-line error + suggestion | Connectivity OK is noise; failure is actionable |
-| Initialization / boot sequence | SILENT | one-line error + suggestion | Already the established pattern for the orchestrator boot |
+| Initialization / boot sequence | SILENT | one-line error + suggestion | Already the established pattern for the leader boot |
 | Phase-transition status blocks | PERMITTED (operator-facing) | PERMITTED | The operator needs to know which stage is active |
 | Tool error (any tool call fails) | n/a | SURFACE one-line summary + next-step; full output → events | Errors are always reported — never raw dumps |
 
@@ -104,11 +107,11 @@ The table below defines which operations are **silent** vs **operator-facing**. 
 
 ---
 
-## orchestrator as the Canonical Entry Point (§7.5)
+## leader as the Canonical Entry Point (§7.5)
 
-When documenting how to invoke the system, treat `@th:orchestrator <natural-language>` as the primary path. Slash commands (`/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts that route to the same agent under the hood — they are mentioned where they help (deterministic entry, GitHub-issue fetching) but never positioned as the recommended path.
+When documenting how to invoke the system, treat `@th:leader <natural-language>` as the primary path. Slash commands (`/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts that route to the same agent under the hood — they are mentioned where they help (deterministic entry, GitHub-issue fetching) but never positioned as the recommended path.
 
-The operator's mental model is: orchestrator is the single front door; slash commands are a fallback for edge cases. Documentation matches that model.
+The operator's mental model is: leader is the single front door; slash commands are a fallback for edge cases. Documentation matches that model.
 
 ## Application Checklist for Contributors (§7.6)
 
@@ -118,7 +121,7 @@ Before opening a PR that adds or modifies operator-facing copy, walk through thi
 - [ ] No first-person personality or anthropomorphic framing.
 - [ ] Dev-natural verbs (`plan`, `implement`, `PR`, `validate`, `recover`) in operator-visible status blocks, STOP-block templates, install prompts, error messages, skill help text.
 - [ ] Phase numbers and gate identifiers appear only in contributor surfaces (CLAUDE.md, `agents/*.md` instructional sections, workspace doc templates). Exception: `/th:pipelines` and `/trace` output, and STAGE-GATE-{1,2,3} STOP-block header identifiers.
-- [ ] All committed copy is in English. Exception: `agents/security.md` and `agents/reviewer.md` report-body templates and their `reviews/04-security.md` / `reviews/04-internal-review.md` outputs; `agents/orchestrator.md` Step 6 routing table.
-- [ ] If the change documents how to invoke the system, the example uses `@th:orchestrator <natural-language>` as the primary path; slash commands are positioned as optional shortcuts.
+- [ ] All committed copy is in English. Exception: `agents/leader.md` Step 6 intent-detection routing table, which routes in the operator's resolved language (live chat is not committed copy — see §7.3).
+- [ ] If the change documents how to invoke the system, the example uses `@th:leader <natural-language>` as the primary path; slash commands are positioned as optional shortcuts.
 
 `tests/test_agent_structure.py` Suite 25 enforces a mechanical subset of these rules at CI time. The checklist above covers the human-judgement cases the test suite cannot catch (e.g., tone of a multi-sentence error message).
