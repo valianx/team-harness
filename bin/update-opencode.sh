@@ -194,7 +194,7 @@ chmod +x "$TMP/install"
 
 echo "Running updater..."
 # Forward "$@" so the operator can pass --opencode-dir or --non-interactive.
-if [ -e /dev/tty ]; then
+if (exec < /dev/tty) 2>/dev/null; then
     "$TMP/install" update --runtime opencode --scope global "$@" </dev/tty
 else
     "$TMP/install" update --runtime opencode --scope global "$@"

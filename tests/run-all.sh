@@ -421,6 +421,34 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 158: bin-tty-openability-execbit (#473)"
+echo "# Requires: python3. Skipped when absent."
+echo "############################################################"
+if ! command -v python3 >/dev/null 2>&1; then
+    report_skip_or_fail "bin-tty-openability-execbit" "python3 not found — install Python 3 to run this suite"
+else
+    if python3 "$TESTS_DIR/test_bin_tty_execbit.py"; then
+        echo "bin-tty-openability-execbit: PASS"
+    else
+        echo "bin-tty-openability-execbit: FAIL"
+        FAILED=$((FAILED + 1))
+    fi
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 159: bin-tty-guard-behavioral (#473 follow-up)"
+echo "# Requires: dash, setsid, python3. Skips cleanly when absent."
+echo "############################################################"
+if bash "$TESTS_DIR/test_bin_tty_behavioral.sh"; then
+    echo "bin-tty-guard-behavioral: PASS"
+else
+    echo "bin-tty-guard-behavioral: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"

@@ -69,7 +69,7 @@ echo "Launching installer..."
 # Redirect stdin from /dev/tty so the binary reads from the operator's
 # terminal directly. Fall back to inherited stdin in non-TTY environments
 # (CI, containers) where /dev/tty does not exist.
-if [ -e /dev/tty ]; then
+if (exec < /dev/tty) 2>/dev/null; then
     "$TMP/install" "$@" < /dev/tty
 else
     "$TMP/install" "$@"
