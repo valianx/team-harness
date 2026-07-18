@@ -47,8 +47,6 @@ export interface PrepublishReader {
   gitDiffNameStatus(): Array<{ status: string; path: string; oldPath?: string }> | null;
   /** git show <ref>; returns null on any error. */
   gitShow(ref: string): string | null;
-  /** git rev-parse --abbrev-ref HEAD; returns null on any error. */
-  gitCurrentBranch(): string | null;
   /** Read a process environment variable (bump-override token sources). */
   readEnv(name: string): string | undefined;
   /** Emit a one-line advisory to stderr (never affects the decision). */
@@ -74,23 +72,8 @@ export interface PrepublishReader {
 const GIT_PUSH_RE = /(^|[\s|;&<>()`])git(\s+-C\s+\S+|\s+\S+=\S+)*\s+push(\s|$|[;&|<>()`"'$])/i;
 const GH_PR_CREATE_RE = /(^|[\s|;&<>()`])gh\s+pr\s+create(\s|$|[;&|<>()`"'$])/i;
 const SHIPPED_PATH_RE = /^(agents|skills|hooks)\//;
-const RELEASE_BRANCH_RE = /^release\/v([0-9]+\.[0-9]+\.[0-9]+)$/;
-const FRAGMENT_RE = /^changelog\.d\/[a-z0-9-]+\.md$/;
-const MARKER_RE = /^version\.d\/[a-z0-9-]+\.bump$/;
 const CLAUDE_VERSION_RE = /\*\*Current version:\*\* `([0-9]+\.[0-9]+\.[0-9]+)`/;
 
-// Release-cut marker (single-PR release path) — decouples the release
-// path from the `release/vX.Y.Z` branch-name convention. PRIMARY signal: an
-// in-tree file at this fixed path, its presence in THIS push's diff (not mere
-// existence at HEAD) is what triggers recognition — this keeps the marker
-// from re-triggering on every later, unrelated feature branch cut from a
-// `main` that still carries the file from a prior release. SECONDARY signal:
-// a `release-cut: vX.Y.Z` commit trailer / push option, read the same way as
-// the existing bump-override token.
-const RELEASE_CUT_MARKER_PATH = "version.d/.release-cut";
-const RELEASE_CUT_SEMVER_RE = /^v([0-9]+\.[0-9]+\.[0-9]+)$/;
-const RELEASE_CUT_TRAILER_RE = /^release-cut: v([0-9]+\.[0-9]+\.[0-9]+)$/m;
-const RELEASE_CUT_TRAILER_PREFIX_RE = /^release-cut:/m;
 // Token format: bump-override: minor — <reason> (em dash, matches the Bash oracle literally).
 const OVERRIDE_TOKEN_RE = /^bump-override: (minor|major) — .+$/m;
 
@@ -225,96 +208,6 @@ function readVersionSites(reader: PrepublishReader): VersionSites {
 }
 
 // ---------------------------------------------------------------------------
-// Release-cut recognition — a feature branch carrying a well-formed
-// marker or trailer is routed to the release-path check below. This is a
-// recognition-only helper: the governing rule that a recognized-but-malformed
-// signal must DENY (never fall through to the feature path, never skip the
-// version-match checks) lives in the caller (runVersionBumpCheck). Because
-// the marker routes into the SAME runReleasePath as a release/vX.Y.Z branch,
-// the three-site invariant it enforces is preserved as-is — including its
-// pre-existing fail-open on CLAUDE.md §3 parse (see the "Third site" comment
-// in runReleasePath below), unchanged from today.
-// ---------------------------------------------------------------------------
-
-interface ReleaseCutSignal {
-  malformed: boolean;
-  /** Bare X.Y.Z (no leading "v"); only meaningful when !malformed. */
-  version: string;
-}
-
-function resolveReleaseCutMarker(reader: PrepublishReader, changed: ChangedFile[]): ReleaseCutSignal | null {
-  // A deletion (status "D") removes the marker rather than declaring a
-  // release cut — per the delivery contract ("added or modified vs
-  // origin/main"), a delete falls through to the ordinary feature path
-  // instead of being read (and misread as malformed, since the file's
-  // content is gone) as a release-cut signal.
-  const touchedThisPush = changed.some(
-    (c) => c.path === RELEASE_CUT_MARKER_PATH && c.status.charAt(0) !== "D"
-  );
-  if (!touchedThisPush) return null; // marker not part of this diff — not present
-
-  const raw = reader.readFile(RELEASE_CUT_MARKER_PATH);
-  const content = (raw ?? "").trim();
-  const m = RELEASE_CUT_SEMVER_RE.exec(content);
-  return m ? { malformed: false, version: m[1] } : { malformed: true, version: "" };
-}
-
-function resolveReleaseCutTrailer(reader: PrepublishReader): ReleaseCutSignal | null {
-  let src = "";
-  const commitMsg = reader.readEnv("GIT_COMMIT_MSG");
-  if (commitMsg) src += commitMsg;
-
-  const count = parseInt(reader.readEnv("GIT_PUSH_OPTION_COUNT") ?? "0", 10);
-  if (Number.isFinite(count) && count > 0) {
-    for (let i = 0; i < count; i++) {
-      const opt = reader.readEnv(`GIT_PUSH_OPTION_${i}`);
-      if (opt) src += `\n${opt}`;
-    }
-  }
-
-  if (!src) return null;
-
-  if (CONTROL_CHAR_RE.test(src)) {
-    reader.warn(
-      "prepublish-guard: release-cut trailer source contains control characters; treating as absent (SEC-DR-A)."
-    );
-    return null;
-  }
-
-  const m = RELEASE_CUT_TRAILER_RE.exec(src);
-  if (m) return { malformed: false, version: m[1] };
-
-  // The "release-cut:" prefix is present but the value after it did not parse
-  // as strict vX.Y.Z — treat this as a recognized-but-malformed signal.
-  return RELEASE_CUT_TRAILER_PREFIX_RE.test(src) ? { malformed: true, version: "" } : null;
-}
-
-// PRIMARY (in-tree marker) wins over SECONDARY (commit trailer) when both are
-// present, per the plan's file-primary/trailer-secondary decision.
-function resolveReleaseCut(reader: PrepublishReader, changed: ChangedFile[]): ReleaseCutSignal | null {
-  return resolveReleaseCutMarker(reader, changed) ?? resolveReleaseCutTrailer(reader);
-}
-
-// ---------------------------------------------------------------------------
-// Branch discriminator — release/vX.Y.Z vs feature branch.
-// ---------------------------------------------------------------------------
-
-interface BranchInfo {
-  isRelease: boolean;
-  version: string;
-}
-
-function resolveBranch(reader: PrepublishReader): BranchInfo | null {
-  const raw = reader.gitCurrentBranch();
-  if (raw === null) return null; // fault → fail-open (caller returns null)
-
-  // SEC-DR-A: reject control chars in the branch name before the regex match.
-  const branch = CONTROL_CHAR_RE.test(raw) ? "__invalid__" : raw;
-  const m = RELEASE_BRANCH_RE.exec(branch);
-  return m ? { isRelease: true, version: m[1] } : { isRelease: false, version: "" };
-}
-
-// ---------------------------------------------------------------------------
 // Bump-floor derivation — mechanical SemVer floor from the shipped-path diff.
 // D/R shipped path → major; A shipped path → minor; M-only → patch.
 // ---------------------------------------------------------------------------
@@ -336,10 +229,6 @@ function deriveFloor(changed: ChangedFile[]): "major" | "minor" | "patch" | "non
   if (sawAdded) return "minor";
   if (sawModified) return "patch";
   return "none";
-}
-
-function hasFragmentOrMarker(changed: ChangedFile[]): boolean {
-  return changed.some((c) => FRAGMENT_RE.test(c.path) || MARKER_RE.test(c.path));
 }
 
 // ---------------------------------------------------------------------------
@@ -387,60 +276,36 @@ function runNoAssetAdvisory(reader: PrepublishReader, pluginOrigin: string, plug
 }
 
 // ---------------------------------------------------------------------------
-// Feature path — not a release branch. Single-bump invariant + fragment/marker.
+// Version-site check — universal invariant, any branch. All three version
+// sites must be bumped vs origin/main and mutually matching, then the
+// mechanical SemVer floor applies.
 // ---------------------------------------------------------------------------
 
-function runFeaturePath(reader: PrepublishReader, changed: ChangedFile[], sites: VersionSites): NormalizedDecision | null {
-  if (sites.pluginBumped || sites.marketBumped || sites.claudeBumped) {
-    return deny(
-      "prepublish-guard: feature branch (non-release/vX.Y.Z) strays a version bump on a version site. Version bumps are reserved for release/vX.Y.Z branches cut by /th:release. Remove the version change or use the release flow. Push blocked."
-    );
-  }
-
-  if (!hasFragmentOrMarker(changed)) {
-    return deny(
-      "prepublish-guard: distributed assets (agents/|skills/|hooks/) changed but neither a changelog.d/ fragment nor a version.d/ marker was found in the diff. Write a changelog.d/{pr-slug}.md fragment (for user-visible changes) or a version.d/{pr-slug}.bump marker (for internal consumer-received changes with no changelog entry) and re-push. See CLAUDE.md §6.3 and agents/delivery.md Step 9. Push blocked."
-    );
-  }
-
-  return null; // feature push with fragment/marker and no stray bump → allow
-}
-
-// ---------------------------------------------------------------------------
-// Release path — release/vX.Y.Z branch. All-three-sites-bumped + bump-floor.
-// ---------------------------------------------------------------------------
-
-function runReleasePath(
+function runVersionSiteCheck(
   reader: PrepublishReader,
   changed: ChangedFile[],
-  branchVersion: string,
   sites: VersionSites
 ): NormalizedDecision | null {
   if (!sites.pluginBumped || !sites.marketBumped) {
     return deny(
-      "prepublish-guard: release branch requires all three version sites bumped (.claude-plugin/plugin.json, .claude-plugin/marketplace.json, CLAUDE.md §3), but at least one was not changed vs origin/main. Bump all three to the same X.Y.Z matching the branch name and re-push. Push blocked."
+      "prepublish-guard: a distributed asset (agents/|skills/|hooks/) changed, but all three version sites (.claude-plugin/plugin.json, .claude-plugin/marketplace.json, CLAUDE.md §3) must be bumped vs origin/main. Bump all three to the same X.Y.Z and re-push. See CLAUDE.md §6.3 and agents/delivery.md Step 9. Push blocked."
     );
   }
   // Third site: only fires when CLAUDE.md §3 was parseable at HEAD (fail-open otherwise).
   if (sites.claudeHead && !sites.claudeBumped) {
     return deny(
-      "prepublish-guard: release branch requires all three version sites bumped (.claude-plugin/plugin.json, .claude-plugin/marketplace.json, CLAUDE.md §3), but CLAUDE.md §3 was not changed vs origin/main. Bump all three to the same X.Y.Z matching the branch name and re-push. Push blocked."
+      "prepublish-guard: a distributed asset changed, but CLAUDE.md §3 was not bumped vs origin/main while .claude-plugin/plugin.json and .claude-plugin/marketplace.json were. Bump all three version sites to the same X.Y.Z and re-push. Push blocked."
     );
   }
 
-  if (branchVersion && sites.pluginHead && sites.pluginHead !== branchVersion) {
+  if (sites.pluginHead !== sites.marketHead) {
     return deny(
-      `prepublish-guard: release branch is release/v${branchVersion} but .claude-plugin/plugin.json version is '${sites.pluginHead}'. They must match. Update the version files to ${branchVersion} or rename the branch. Push blocked.`
+      `prepublish-guard: version sites do not match — .claude-plugin/plugin.json is '${sites.pluginHead}' but .claude-plugin/marketplace.json plugins[0].version is '${sites.marketHead}'. All version sites must be bumped to the same X.Y.Z. Push blocked.`
     );
   }
-  if (branchVersion && sites.marketHead && sites.marketHead !== branchVersion) {
+  if (sites.claudeHead && sites.pluginHead !== sites.claudeHead) {
     return deny(
-      `prepublish-guard: release branch is release/v${branchVersion} but .claude-plugin/marketplace.json plugins[0].version is '${sites.marketHead}'. They must match. Push blocked.`
-    );
-  }
-  if (branchVersion && sites.claudeHead && sites.claudeHead !== branchVersion) {
-    return deny(
-      `prepublish-guard: release branch is release/v${branchVersion} but CLAUDE.md §3 Current version is '${sites.claudeHead}'. All three version sites must match the branch version. Push blocked.`
+      `prepublish-guard: version sites do not match — .claude-plugin/plugin.json is '${sites.pluginHead}' but CLAUDE.md §3 Current version is '${sites.claudeHead}'. All version sites must be bumped to the same X.Y.Z. Push blocked.`
     );
   }
 
@@ -448,7 +313,7 @@ function runReleasePath(
 }
 
 // ---------------------------------------------------------------------------
-// Bump-floor sub-stage — runs only on the release path after site checks pass.
+// Bump-floor sub-stage — runs after the version-site checks pass.
 // ---------------------------------------------------------------------------
 
 function warnUnderBump(reader: PrepublishReader, floor: string, actual: SemverDelta): void {
@@ -522,32 +387,8 @@ function runVersionBumpCheck(reader: PrepublishReader): NormalizedDecision | nul
     return null;
   }
 
-  const branch = resolveBranch(reader);
-  if (branch === null) return null; // git rev-parse fault → fail-open
-
   const sites = readVersionSites(reader);
-
-  if (branch.isRelease) {
-    return runReleasePath(reader, changed, branch.version, sites);
-  }
-
-  // A feature branch carrying a release-cut marker/trailer is routed to
-  // the release-path check instead of the feature-path check. Governing
-  // principle: the marker authorizes RUNNING the release-path check — it
-  // never bypasses it. A recognized-but-malformed signal DENIES outright and
-  // never falls through to the feature path or skips the version-match
-  // checks.
-  const releaseCut = resolveReleaseCut(reader, changed);
-  if (releaseCut) {
-    if (releaseCut.malformed) {
-      return deny(
-        `prepublish-guard: a release-cut signal (${RELEASE_CUT_MARKER_PATH} or a release-cut: commit trailer) is present but its content does not parse as strict SemVer (vX.Y.Z). The signal authorizes running the release-path check, never bypassing it. Fix the content (e.g. v2.109.0) or remove it to use the ordinary feature path. Push blocked.`
-      );
-    }
-    return runReleasePath(reader, changed, releaseCut.version, sites);
-  }
-
-  return runFeaturePath(reader, changed, sites);
+  return runVersionSiteCheck(reader, changed, sites);
 }
 
 // ---------------------------------------------------------------------------

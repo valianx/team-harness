@@ -14238,15 +14238,15 @@ def _s59_ver_tuple(v):
     except Exception:
         return (0, 0, 0)
 
+# Mirrors CLAUDE_VERSION_RE in hooks/ts/bodies/prepublish-guard.ts:75 exactly
+# (source of truth — Python cannot import TS, so this pattern is duplicated
+# here; keep the two in sync on any change to either side).
+_S59_CLAUDE_VERSION_RE = re.compile(r"\*\*Current version:\*\* `([0-9]+\.[0-9]+\.[0-9]+)`")
+
 def _s59_claude_current_version(text):
-    """Parse the backtick-quoted version token from the 'Current version' line in CLAUDE.md §3."""
-    for line in text.splitlines():
-        if "Current version" in line and "`" in line:
-            try:
-                return line.split("`")[1].strip()
-            except IndexError:
-                return None
-    return None
+    """Parse the version token from CLAUDE.md §3 using the guard's exact literal shape."""
+    m = _S59_CLAUDE_VERSION_RE.search(text)
+    return m.group(1) if m else None
 
 _s59_claude_ver = _s59_claude_current_version(_s59_claude)
 
@@ -30122,10 +30122,15 @@ check(
 )
 
 # -------------------------------------------------------------------
-# AC-3 (#383) — existing WARN and hard-block UNCHANGED (regression guard)
-# (AC-3a's original marker was a retired Bash-source COMMENT, not the
-# actual warn message — checked here against the real warnUnderBump()
-# message content, which the TS port carries verbatim.)
+# AC-3 (#383) — under-bump WARN and universal three-site hard-block
+#
+# AC-3a: asserted against the real warnUnderBump() message content, which
+# the TS port carries verbatim.
+#
+# AC-3b: asserts the universal path's hard-block deny-reason — a
+# distributed-asset push is denied when the three version sites are NOT
+# all bumped, on any branch. Checked against the real
+# runVersionSiteCheck() deny-reason text.
 # -------------------------------------------------------------------
 check(
     "s125/AC-3a: prepublish-guard.ts under-bump WARN still present",
@@ -30134,10 +30139,11 @@ check(
     "in hooks/ts/bodies/prepublish-guard.ts — AC-3 (#383) existing under-bump WARN removed",
 )
 check(
-    "s125/AC-3b: prepublish-guard.ts no-bump hard-block still present",
-    "prepublish-guard: distributed assets" in _s125_hook,
-    "marker 'prepublish-guard: distributed assets' not found "
-    "in hooks/ts/bodies/prepublish-guard.ts — AC-3 (#383) no-bump hard-block removed",
+    "s125/AC-3b: prepublish-guard.ts universal three-site hard-block present",
+    "all three version sites (.claude-plugin/plugin.json, .claude-plugin/marketplace.json, CLAUDE.md §3) "
+    "must be bumped vs origin/main" in _s125_hook,
+    "marker 'all three version sites ... must be bumped vs origin/main' not found "
+    "in hooks/ts/bodies/prepublish-guard.ts — the universal three-site hard-block deny-reason is missing",
 )
 
 # -------------------------------------------------------------------
@@ -31079,62 +31085,31 @@ for _agent_path in _leaf_agent_files:
     )
 
 # ---------------------------------------------------------------------------
-# Suite 132 — release-tag-sync (issue #450)
+# Suite 132 — release-tag-sync
 #
-# Structural guard for the release-tag unification fix: an explicit
-# post-merge tag step in both operator-facing (skills/release/SKILL.md) and
-# agent-contract (agents/delivery.md) surfaces, plus (when present) the
-# deterministic tag-sync.yml workflow that dispatches release.yml — since a
-# GITHUB_TOKEN-created tag does not itself trigger release.yml's
+# Structural guard for release-tag unification: an explicit tag verification
+# step in the agent-contract (agents/delivery.md) surface, plus (when present)
+# the deterministic tag-sync.yml workflow that dispatches release.yml — since
+# a GITHUB_TOKEN-created tag does not itself trigger release.yml's
 # `on: push: tags` listener (Actions recursion prevention).
 #
+# team-harness bumps its own version once per PR via `delivery` Step 9, the
+# same path shipped to consuming repos; local-runtime-apply after a release
+# cut lives in `/th:update`.
+#
 # AC coverage:
-#   AC-1 — skills/release/SKILL.md and agents/delivery.md both document the
-#          explicit post-merge tag step (dev-guard gated).
+#   AC-1 — agents/delivery.md documents the tag verification step (dev-guard
+#          gated fallback) and gates on a per-PR version bump + PR-merged.
 #   AC-2/AC-4/AC-5 — if tag-sync.yml exists: path-filtered trigger, version
 #          read, idempotent no-op guard, workflow_dispatch of release.yml
 #          with the `tag` input, minimal pinned permissions.
-#
-# Group d extends the same suite for the release-apply-local-updates feature:
-# the post-tag "## Step 4 — Apply the release to local runtimes" step in
-# skills/release/SKILL.md, which applies the just-published release to both
-# local runtimes (Claude Code plugin cache, opencode installation) with
-# per-leg failure isolation and operator-driven activation. d1-d4 fix the
-# anchor and the two legs' commands/gate/honesty tokens (authored by the
-# implementer). d5-d11 close tester-authored gaps: anchor-boundary negative
-# guards on both untouched surfaces (Step 3 slice, delivery.md), the gate's
-# poll cadence + timeout-reporting language (AC-1), the no-revert/no-fail
-# language of per-leg isolation (AC-4), the never-claim-active wording on
-# both legs (AC-2/AC-3), the {X.Y.Z}-only placeholder hygiene (AC-8), and
-# the division-of-labour cross-reference in skills/update/SKILL.md (AC-7).
 #
 # Marker: release-tag-sync
 # ---------------------------------------------------------------------------
 print()
 print("=== Suite 132: release-tag-sync structural checks ===")
 
-_s132_skill = read(REPO_ROOT / "skills" / "release" / "SKILL.md")
 _s132_delivery = read(AGENTS_DIR / "delivery.md")
-
-_S132_SKILL_STOPS = ("\n## ", "\n---\n")
-_s132_skill_slice = _slice_section(
-    _s132_skill, "## Step 3 — Verify the release tag (post-merge)", _S132_SKILL_STOPS
-)
-check(
-    "s132(a1): skills/release/SKILL.md documents an explicit post-merge tag step",
-    bool(_s132_skill_slice),
-    "'## Step 3 — Verify the release tag (post-merge)' not found in skills/release/SKILL.md",
-)
-check(
-    "s132(a2): SKILL.md tag step includes 'git tag' and 'git push'",
-    "git tag" in _s132_skill_slice and "git push" in _s132_skill_slice,
-    "SKILL.md tag step must show the actual git tag + push commands",
-)
-check(
-    "s132(a3): SKILL.md tag step states it is dev-guard gated",
-    "dev-guard" in _s132_skill_slice,
-    "SKILL.md tag step must state the push is gated by hooks/dev-guard.sh",
-)
 
 _S132_DELIVERY_STOPS = ("\n### ", "\n## ", "\n---\n")
 _s132_delivery_slice = _slice_section(
@@ -31146,9 +31121,11 @@ check(
     "'### Step 11.4c — Release tag verification' not found in agents/delivery.md",
 )
 check(
-    "s132(b2): delivery.md tag step is gated on release-mode and PR-merged",
-    "release-mode: true" in _s132_delivery_slice and "confirmed merged" in _s132_delivery_slice,
-    "delivery.md tag step must gate on release-mode: true AND the PR being confirmed merged",
+    "s132(b2): delivery.md tag step is gated on a per-PR version bump and PR-merged",
+    "a version bump for this PR" in _s132_delivery_slice
+    and "confirmed merged" in _s132_delivery_slice,
+    "delivery.md tag step must gate on Step 9 having performed a version bump for this PR "
+    "AND the PR being confirmed merged — the retired release-mode gate no longer applies",
 )
 check(
     "s132(b3): delivery.md tag step includes 'git tag' and states dev-guard gating",
@@ -31198,100 +31175,17 @@ if _s132_tag_sync_exists:
         "tag-sync.yml must pin actions/checkout to a version tag",
     )
 
-_S132_STEP4_STOPS = ("\n## ", "\n---\n")
-_s132_step4_slice = _slice_section(
-    _s132_skill,
-    "## Step 4 — Apply the release to local runtimes",
-    _S132_STEP4_STOPS,
-)
 check(
-    "s132(d1): skills/release/SKILL.md documents the post-tag local-runtime apply step",
-    bool(_s132_step4_slice),
-    "'## Step 4 — Apply the release to local runtimes' not found in skills/release/SKILL.md",
-)
-check(
-    "s132(d2): Step 4 covers both the Claude Code leg and the opencode leg",
-    "claude plugin update" in _s132_step4_slice and "update-opencode" in _s132_step4_slice,
-    "Step 4 must reference both 'claude plugin update' (Claude Code leg) and 'update-opencode' (opencode leg)",
-)
-check(
-    "s132(d3): Step 4 gates the opencode leg on the published VERSION asset with a bounded poll",
-    "releases/latest/download/VERSION" in _s132_step4_slice
-    and "180" in _s132_step4_slice,
-    "Step 4 must poll 'releases/latest/download/VERSION' and state the bounded timeout (180s ceiling)",
-)
-check(
-    "s132(d4): Step 4 states restart-to-activate honesty and per-leg failure isolation",
-    "/reload-plugins" in _s132_step4_slice
-    and "operator" in _s132_step4_slice
-    and "does not block the other leg" in _s132_step4_slice,
-    "Step 4 must state '/reload-plugins' is operator-driven and that a per-leg failure does not "
-    "block the other leg or revert the release",
-)
-check(
-    "s132(d5): Step 3 slice does not bleed into the Step 4 header (anchor boundary intact)",
-    "Apply the release to local runtimes" not in _s132_skill_slice,
-    "The '## Step 3' slice (grp a) must stop before '## Step 4' — a boundary regression here "
-    "would silently widen the a1-a3 checks to cover Step 4 content too",
-)
-check(
-    "s132(d6): agents/delivery.md stays untouched by the local-apply feature",
-    "Apply the release to local runtimes" not in _s132_delivery
-    and "update-opencode" not in _s132_delivery,
-    "agents/delivery.md must not mention the Step 4 local-apply content — the feature is "
-    "skill-side only and delivery.md's Step 11.4c tag-creation contract is unrelated/unchanged",
-)
-check(
-    "s132(d7): opencode gate timeout path pins the poll cadence and reports the manual command "
-    "without aborting",
-    "15" in _s132_step4_slice
-    and "12" in _s132_step4_slice
-    and "timed out" in _s132_step4_slice
-    and "run the updater manually" in _s132_step4_slice
-    and "Do not abort" in _s132_step4_slice,
-    "Step 4 must pin the opencode publication gate's poll interval (15s) and max attempts (12), "
-    "and state that a timed-out gate reports the manual updater command and does not abort or "
-    "retry beyond the 180s ceiling — AC-1",
-)
-check(
-    "s132(d8): per-leg failure isolation states the release is never reverted or marked failed",
-    "reverts the tag" in _s132_step4_slice and "marks the release as failed" in _s132_step4_slice,
-    "Step 4 must state that neither leg's failure reverts the tag or marks the release as "
-    "failed — AC-4",
-)
-check(
-    "s132(d9): both legs individually state they never claim the new version is active",
-    _s132_step4_slice.count("never state that") >= 2
-    and "restarting opencode" in _s132_step4_slice,
-    "Step 4 must state, once per leg, that it never claims '{X.Y.Z} is active', and the opencode "
-    "leg's activation must be phrased as 'restarting opencode' being operator-driven — AC-2/AC-3",
-)
-check(
-    "s132(d10): Step 4 prose uses only the {X.Y.Z} placeholder — no hardcoded version literals",
-    re.search(r"\bv?\d+\.\d+\.\d+\b", _s132_step4_slice) is None,
-    "Step 4 conceptual prose must not contain a hardcoded 'X.Y.Z'-shaped version literal — "
-    "only the '{X.Y.Z}' placeholder is allowed — AC-8",
+    "s132(e1): skills/release/SKILL.md is retired — no dangling structural expectation remains",
+    not (REPO_ROOT / "skills" / "release" / "SKILL.md").exists(),
+    "skills/release/SKILL.md must stay deleted under the per-pr-version-bump model",
 )
 
 _s132_update_skill = read(REPO_ROOT / "skills" / "update" / "SKILL.md")
 check(
-    "s132(d11): skills/update/SKILL.md cross-references /th:release Step 4's division of labour",
-    "/th:release" in _s132_update_skill
-    and "Step 4" in _s132_update_skill
-    and "does NOT sync the managed" in _s132_update_skill,
-    "skills/update/SKILL.md must state that /th:release's Step 4 runs the same download/apply "
-    "legs at release-cut time but does NOT sync the managed CLAUDE.md blocks, which stays "
-    "/th:update's own contract — AC-7",
-)
-check(
-    "s132(d12): Step 4 emits a single per-runtime final report, neutral voice, no emoji",
-    "release local-apply" in _s132_step4_slice
-    and "claude code" in _s132_step4_slice
-    and "opencode" in _s132_step4_slice
-    and "exactly one operator-facing message" in _s132_step4_slice
-    and re.search(r"[\U0001F300-\U0001FAFF☀-➿]", _s132_step4_slice) is None,
-    "Step 4 must emit exactly one operator-facing final report (the 'release local-apply' "
-    "template) with a row for each runtime ('claude code', 'opencode') and no emoji — AC-5",
+    "s132(e2): skills/update/SKILL.md carries no dangling '/th:release' cross-reference",
+    "/th:release" not in _s132_update_skill,
+    "skills/update/SKILL.md must not reference the retired /th:release skill",
 )
 
 # Self-referential guards (hygiene contract)
@@ -34482,19 +34376,16 @@ _s155_conventions = read(REPO_ROOT / "docs" / "conventions.md")
 _s155_claude_md = read(REPO_ROOT / "CLAUDE.md")
 _s155_readme = read(AGENTS_DIR / "README.md")
 _s155_adversary = read(AGENTS_DIR / "adversary.md")
-_s155_changelog_frag = _read_or_empty(
-    REPO_ROOT / "changelog.d" / "refactor-full-lane-output-verbosity-trim.md"
-)
-if not _s155_changelog_frag:
-    # Post-release-cut state: the fragment is consumed into the versioned
-    # CHANGELOG section. The AC asserts the change is changelogged, not that
-    # the transient fragment file survives the cut, so fall back to the
-    # assembled section.
-    _s155_changelog_full = read(REPO_ROOT / "CHANGELOG.md")
-    for _s155_section in re.split(r"(?=^## \[)", _s155_changelog_full, flags=re.MULTILINE):
-        if "output-contract-patterns.md" in _s155_section:
-            _s155_changelog_frag = _s155_section
-            break
+# team-harness bumps its own version once per PR (CLAUDE.md §6.3) and writes
+# the versioned CHANGELOG.md section directly in the same PR -- there is no
+# per-PR changelog.d/ fragment stage to read the entry from, so this asserts
+# against the durable versioned section directly.
+_s155_changelog_frag = ""
+_s155_changelog_full = read(REPO_ROOT / "CHANGELOG.md")
+for _s155_section in re.split(r"(?=^## \[)", _s155_changelog_full, flags=re.MULTILINE):
+    if "output-contract-patterns.md" in _s155_section:
+        _s155_changelog_frag = _s155_section
+        break
 
 
 def _s155_slice(text: str, anchor: str) -> str:
@@ -34515,6 +34406,17 @@ def _s155_slice(text: str, anchor: str) -> str:
 def _s155_level_row(text: str, level: str) -> str:
     m = re.search(rf"^\|\s*`{level}`\s*\|.*$", text, re.MULTILINE)
     return m.group(0) if m else ""
+
+
+def _s155_heading_before(text: str, needle: str) -> str:
+    """Nearest preceding `### ` heading before the first occurrence of
+    `needle` in `text` -- scopes a marker check to the specific subsection
+    that carries the mention, instead of the whole enclosing section."""
+    idx = text.find(needle)
+    if idx == -1:
+        return ""
+    headings = re.findall(r"^###\s+.*$", text[:idx], re.MULTILINE)
+    return headings[-1].strip() if headings else ""
 
 
 _S155_LEVELS = ("verbatim", "tight", "bounded", "standard")
@@ -34701,13 +34603,16 @@ check(
 # would be a hollow content check for a fact the fragment prose does not need
 # to restate).
 # ---------------------------------------------------------------------------
+_s155_changelog_entry_heading = _s155_heading_before(
+    _s155_changelog_frag, "output-contract-patterns.md"
+)
 check(
-    "suite155(task1-ac7-changelog-exists): the change is changelogged "
-    "(pending changelog.d fragment OR assembled CHANGELOG.md section) "
-    "with a '### Changed' entry",
-    bool(_s155_changelog_frag) and "### Changed" in _s155_changelog_frag,
-    "changelog entry is missing (neither a pending fragment nor an "
-    "assembled CHANGELOG.md section) or lacks a '### Changed' heading",
+    "suite155(task1-ac7-changelog-exists): the change is changelogged in the "
+    "durable versioned CHANGELOG.md section, under a '### Changed' entry",
+    bool(_s155_changelog_frag) and _s155_changelog_entry_heading == "### Changed",
+    "no versioned CHANGELOG.md '## [X.Y.Z]' section mentions "
+    "output-contract-patterns.md, or the entry mentioning it is not governed "
+    f"by a '### Changed' heading (found: {_s155_changelog_entry_heading!r})",
 )
 check(
     "suite155(task1-ac7-covers-both): the changelog entry covers BOTH "
@@ -34881,62 +34786,18 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Task-5 AC-6 -- the two surviving operator-language surfaces (leader live
-# chat + Step 6 intent-detection table) are unchanged: agents/leader.md
-# is not in this task's Files list, so it must carry NO diff at all
-# (unreachable-by-construction, not just "intended to be unreachable").
-# Diffs against the PR's merge-base with origin/main (falling back to a
-# local main), not bare HEAD -- a bare-HEAD diff only catches uncommitted
-# changes, so a change to agents/leader.md committed earlier in this same
-# PR would slip through undetected. Subprocess-based git checks are
-# precedented in this file (Suite 103, harness-scorecard determinism check).
+# No diff-against-origin/main check for agents/leader.md: a fixed-point
+# no-diff assertion cannot distinguish "never touched" from "touched by a
+# later, legitimate edit" once origin/main moves, so it is not a durable
+# structural invariant for this file.
 # ---------------------------------------------------------------------------
-try:
-    _s155_leader_base_ref = None
-    for _s155_leader_candidate_ref in ("origin/main", "main"):
-        _s155_leader_ref_check = _s155_subprocess.run(
-            ["git", "rev-parse", "--verify", "--quiet", _s155_leader_candidate_ref],
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        if _s155_leader_ref_check.returncode == 0:
-            _s155_leader_base_ref = _s155_leader_candidate_ref
-            break
-    if _s155_leader_base_ref is None:
-        raise _s155_subprocess.SubprocessError(
-            "no resolvable base ref (origin/main or main)"
-        )
-    _s155_leader_diff = _s155_subprocess.run(
-        ["git", "diff", "--stat", f"{_s155_leader_base_ref}...HEAD", "--", "agents/leader.md"],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        timeout=10,
-    )
-    _s155_leader_untouched = (
-        _s155_leader_diff.returncode == 0 and _s155_leader_diff.stdout.strip() == ""
-    )
-    _s155_leader_detail = _s155_leader_diff.stdout.strip()
-except (OSError, _s155_subprocess.SubprocessError):
-    _s155_leader_untouched = False
-    _s155_leader_detail = "git invocation failed"
-check(
-    "suite155(task5-ac6-leader-untouched): agents/leader.md carries no "
-    "uncommitted diff -- unreachable-by-construction confirmed in "
-    "practice, not just by Files-list intent",
-    _s155_leader_untouched,
-    f"agents/leader.md has uncommitted changes: {_s155_leader_detail}",
-)
 
 # ---------------------------------------------------------------------------
 # Task-5 AC-7 -- two-tier rule declared canonically in both docs/
 # conventions.md and docs/voice-guide.md (consistent wording), with a
-# forward pointer to agents/orchestrator.md's Language propagation
-# section. The REVERSE pointer (orchestrator.md -> conventions.md, tier-
-# aware dispatch instruction) is Task-4's job (Round 2, not yet
-# dispatched) -- not asserted here.
+# forward pointer to agents/orchestrator.md's Language propagation section.
+# The reverse pointer (orchestrator.md -> conventions.md, tier-aware
+# dispatch instruction) is not asserted here.
 # ---------------------------------------------------------------------------
 _S155_TWO_TIER_ANCHORS = ["operator-facing tier", "agentic tier", "English with no exception"]
 check(
@@ -35723,6 +35584,377 @@ check(
 )
 
 # Marker: full-lane-output-verbosity-trim-round2
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 157 — per-pr-version-bump structural contract
+#
+# Content-verifies the delivery.md deferred-release retirement, CLAUDE.md §6.3
+# rewrite, docs/worktree-discipline.md Rule 7, and agents/leader.md Phase 0a
+# preflight sweep, scoped to what is not already covered by Suite 125
+# (AC-3b), Suite 132 (b2, e1, e2), or Suite 93 (Rule 3/4 text, still verbatim
+# after this refactor). The version-bump-floor script contract is covered by
+# tests/test_prepublish_bump_floor.sh and tests/test_prepublish_guard.sh, not
+# here. The delivery Step 11.4c release-tag gate is Suite 132's existing b2
+# check — not repeated. Consumer-boundary behavior-identical status (delivery
+# Step 9 stays behavior-identical for consuming repos) is a direct-inspection
+# verification performed by qa/acceptance-checker via a before/after diff
+# read; the shallow presence guard below only catches an accidental deletion
+# of the two-row Step 9 table, not a behavior regression.
+#
+# Marker: per-pr-version-bump
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 157: per-pr-version-bump structural checks ===")
+
+_s157_delivery = read(AGENTS_DIR / "delivery.md")
+_s157_claude = read(REPO_ROOT / "CLAUDE.md")
+_s157_cost_caching = read(REPO_ROOT / "docs" / "cost-and-caching.md")
+_s157_lifecycle = read(REPO_ROOT / "docs" / "lifecycle.md")
+_s157_knowledge = read(REPO_ROOT / "docs" / "knowledge.md")
+_s157_pr_template = read(REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md")
+_s157_test_yml = read(REPO_ROOT / ".github" / "workflows" / "test.yml")
+_s157_discipline = read(REPO_ROOT / "docs" / "worktree-discipline.md")
+_s157_leader = read(AGENTS_DIR / "leader.md")
+
+_S157_CLAUDE_63_STOPS = ("\n### 6.4", "\n## 7", "\n---\n")
+_s157_claude_63_slice = _slice_section(
+    _s157_claude, "### 6.3 Post-work", _S157_CLAUDE_63_STOPS
+)
+_S157_LIFECYCLE_STOPS = ("\n## ", "\n---\n")
+_s157_lifecycle_release_slice = _slice_section(
+    _s157_lifecycle, "## The unified release event", _S157_LIFECYCLE_STOPS
+)
+_s157_leader_1a_slice = _slice_section(
+    _s157_leader,
+    "1a. **Boot-time preflight worktree sweep.**",
+    ("\n2. **Start the KG session.**",),
+)
+
+# --- Task-2 AC-1: internal carve-out retired, per-PR bump applies to
+# team-harness itself (not just consumers) ---------------------------------
+check(
+    "s157(t2-ac1a): delivery.md states team-harness does not use the "
+    "repo-local-deferral escape hatch",
+    "team-harness itself does not use this escape hatch" in _s157_delivery,
+    "marker 'team-harness itself does not use this escape hatch' not found "
+    "in agents/delivery.md — Task-2 AC-1 carve-out retirement missing",
+)
+check(
+    "s157(t2-ac1b): delivery.md frames team-harness's own CLAUDE.md §6.3 as "
+    "the per-PR shipped default, not a deferral",
+    "documents the per-PR shipped default, not a deferral" in _s157_delivery,
+    "marker 'documents the per-PR shipped default, not a deferral' not found "
+    "in agents/delivery.md — Task-2 AC-1 framing missing",
+)
+
+# --- Task-2 AC-2: version.d/ machinery + release-mode/inline-release modes
+# retired from delivery.md (regression guard against reversion) ------------
+check(
+    "s157(t2-ac2a): delivery.md no longer references the retired "
+    "release-mode gate",
+    "release-mode" not in _s157_delivery,
+    "agents/delivery.md still contains 'release-mode' — Task-2 AC-2 "
+    "requires this retired gate fully removed",
+)
+check(
+    "s157(t2-ac2b): delivery.md no longer references the retired "
+    "inline-release mode",
+    "inline-release" not in _s157_delivery,
+    "agents/delivery.md still contains 'inline-release' — Task-2 AC-2 "
+    "requires this retired mode fully removed",
+)
+check(
+    "s157(t2-ac2c): delivery.md no longer contains the retired Step 9-R "
+    "section",
+    "Step 9-R" not in _s157_delivery,
+    "agents/delivery.md still contains 'Step 9-R' — Task-2 AC-2 requires "
+    "this retired section fully removed",
+)
+check(
+    "s157(t2-ac2d): delivery.md no longer references version.d/ marker "
+    "machinery",
+    "version.d/" not in _s157_delivery,
+    "agents/delivery.md still contains 'version.d/' — Task-2 AC-2 requires "
+    "the marker-discipline machinery fully removed",
+)
+
+# --- Task-2 AC-4: CLAUDE.md §6.3 per-PR model, rebase-and-rebump trade-off,
+# changelog.d/ kept as fallback, /th:release prose gone ---------------------
+check(
+    "s157(t2-ac4a): CLAUDE.md §6.3 documents the rebase-and-rebump trade-off",
+    "rebase-and-rebump" in _s157_claude_63_slice,
+    "marker 'rebase-and-rebump' not found in CLAUDE.md §6.3 — Task-2 AC-4 "
+    "trade-off documentation missing",
+)
+check(
+    "s157(t2-ac4b): CLAUDE.md §6.3 keeps changelog.d/ as the batch/fallback "
+    "path, not team-harness's own default",
+    "remains the batch/fallback path" in _s157_claude_63_slice,
+    "marker 'remains the batch/fallback path' not found in CLAUDE.md §6.3 — "
+    "Task-2 AC-4 changelog.d/ fallback framing missing",
+)
+check(
+    "s157(t2-ac4c): CLAUDE.md no longer references the retired /th:release "
+    "skill",
+    "/th:release" not in _s157_claude,
+    "CLAUDE.md still contains '/th:release' — Task-2 AC-4 requires all "
+    "deferral/skill prose removed",
+)
+
+# --- Task-2 AC-5: skills/release/SKILL.md + version.d/.release-cut deleted
+# (skills/release/SKILL.md absence and skills/update/SKILL.md dangling-ref
+# absence are already Suite 132 e1/e2 — only the marker-file deletion is new
+# here) ----------------------------------------------------------------------
+_s157_release_cut_path = REPO_ROOT / "version.d" / ".release-cut"
+_s157_version_d_dir = REPO_ROOT / "version.d"
+check(
+    "s157(t2-ac5a): version.d/.release-cut marker file is deleted",
+    not _s157_release_cut_path.exists(),
+    "version.d/.release-cut must stay deleted under the per-pr-version-bump "
+    "model — Task-2 AC-5",
+)
+check(
+    "s157(t2-ac5b): version.d/ directory no longer exists (no leftover "
+    "tracked file inside it)",
+    not _s157_version_d_dir.exists(),
+    "version.d/ directory should no longer exist — Task-2 AC-5 (no other "
+    "tracked file was left inside it once the marker was deleted)",
+)
+
+# --- Task-2 AC-6: cost-and-caching.md records the superseded rationale
+# honestly; lifecycle.md no longer frames the deferred model as current ----
+check(
+    "s157(t2-ac6a): cost-and-caching.md marks the release-batching "
+    "rationale as superseded (history kept, not erased)",
+    "superseded" in _s157_cost_caching
+    and "history kept for context" in _s157_cost_caching,
+    "docs/cost-and-caching.md must mark the batching-per-release rationale "
+    "'superseded' while keeping the history for context — Task-2 AC-6",
+)
+check(
+    "s157(t2-ac6b): lifecycle.md's release walkthrough now describes the "
+    "per-PR bump model, not a dedicated release PR",
+    "per-PR bump model" in _s157_lifecycle_release_slice,
+    "docs/lifecycle.md § The unified release event must describe "
+    "'per-PR bump model' — Task-2 AC-6 requires the deferred-model framing "
+    "removed",
+)
+
+# --- Task-2 AC-7: PR template names all three sites + changelog.d/ as batch
+# option; test.yml release-only allowlist no longer references version.d/* -
+check(
+    "s157(t2-ac7a): PR template requires all three version sites bumped "
+    "together",
+    ".claude-plugin/plugin.json" in _s157_pr_template
+    and "plugins[0].version" in _s157_pr_template
+    and "CLAUDE.md §3" in _s157_pr_template,
+    ".github/PULL_REQUEST_TEMPLATE.md must name all three version sites — "
+    "Task-2 AC-7",
+)
+check(
+    "s157(t2-ac7b): PR template keeps changelog.d/ as an explicit batching "
+    "option, not the default bump path",
+    "changelog.d/" in _s157_pr_template and "batching" in _s157_pr_template,
+    ".github/PULL_REQUEST_TEMPLATE.md must offer changelog.d/ as a batching "
+    "option — Task-2 AC-7",
+)
+check(
+    "s157(t2-ac7c): test.yml release-only allowlist no longer references "
+    "version.d/*",
+    "version.d" not in _s157_test_yml,
+    ".github/workflows/test.yml release-only allowlist must not reference "
+    "version.d/* — Task-2 AC-7",
+)
+
+# --- Task-2 AC-8: knowledge.md gains a [decision] bullet for the per-PR
+# adoption ---------------------------------------------------------------
+check(
+    "s157(t2-ac8): knowledge.md documents the per-PR version-bump adoption "
+    "decision",
+    "adopts the shipped per-PR version-bump default" in _s157_knowledge,
+    "marker 'adopts the shipped per-PR version-bump default' not found in "
+    "docs/knowledge.md — Task-2 AC-8 decision bullet missing",
+)
+
+# --- Task-2 AC-9: delivery.md Step 11.4b adopts Rule 7's mode-only allow-
+# list by reference, frames itself as same-session best-effort, and never
+# silently skips ------------------------------------------------------------
+_S157_STEP_11_4B_ANCHOR = (
+    "### Step 11.4b — Worktree teardown (post-merge, rule 4; "
+    "same-session best-effort; conditional)"
+)
+_S157_DELIVERY_STOPS = ("\n### ", "\n## ", "\n---\n")
+_s157_step_11_4b_slice = _slice_section(
+    _s157_delivery, _S157_STEP_11_4B_ANCHOR, _S157_DELIVERY_STOPS
+)
+check(
+    "s157(t2-ac9a): delivery.md Step 11.4b exists and is framed as "
+    "same-session best-effort",
+    bool(_s157_step_11_4b_slice),
+    "'### Step 11.4b — Worktree teardown (post-merge, rule 4; "
+    "same-session best-effort; conditional)' not found in agents/delivery.md",
+)
+check(
+    "s157(t2-ac9b): Step 11.4b references docs/worktree-discipline.md § "
+    "Rule 7 by pointer for the mode-only allow-list, without redefining it",
+    "docs/worktree-discipline.md § Rule 7" in _s157_step_11_4b_slice
+    and "0\\t0" in _s157_step_11_4b_slice,
+    "Step 11.4b must reference 'docs/worktree-discipline.md § Rule 7' and "
+    "state the '0\\t0' dual-numstat mode-only allow-list — Task-2 AC-9",
+)
+check(
+    "s157(t2-ac9c): Step 11.4b states every non-removed outcome is "
+    "reported, never a silent skip",
+    "Never a silent skip" in _s157_step_11_4b_slice,
+    "Step 11.4b must state 'Never a silent skip' — Task-2 AC-9 report "
+    "contract missing",
+)
+
+# --- Task-2 AC-10 (shallow guard only — see header note; qa/acceptance-
+# checker performs the authoritative before/after diff read) ---------------
+check(
+    "s157(t2-ac10): delivery.md Step 9 keeps the two-row shipped-default / "
+    "repo-local-deferral table intact (accidental-deletion guard only)",
+    "Per-PR bump (shipped default)" in _s157_delivery
+    and "Repo-local deferral" in _s157_delivery,
+    "agents/delivery.md Step 9 must still declare both the "
+    "'Per-PR bump (shipped default)' and 'Repo-local deferral' rows — "
+    "Task-2 AC-10 consumer-default table",
+)
+
+# --- Task-4 AC-1: docs/worktree-discipline.md Rule 7 exists with the
+# 4-condition predicate and the action/report table -------------------------
+_S157_DISCIPLINE_STOPS = ("\n## ", "\n---\n")
+_S157_RULE7_ANCHOR = (
+    "## Rule 7 — Boot-time preflight sweep: the durable worktree reaper"
+)
+_s157_rule7_slice = _slice_section(
+    _s157_discipline, _S157_RULE7_ANCHOR, _S157_DISCIPLINE_STOPS
+)
+check(
+    "s157(t4-ac1a): worktree-discipline.md declares Rule 7 — boot-time "
+    "preflight sweep",
+    bool(_s157_rule7_slice),
+    f"'{_S157_RULE7_ANCHOR}' not found in docs/worktree-discipline.md — "
+    "Task-4 AC-1",
+)
+check(
+    "s157(t4-ac1b): Rule 7 states the predicate is four cumulative "
+    "conditions",
+    "four cumulative conditions" in _s157_rule7_slice
+    or "FOUR conditions" in _s157_rule7_slice,
+    "docs/worktree-discipline.md Rule 7 must state the predicate is 4 "
+    "cumulative conditions — Task-4 AC-1",
+)
+check(
+    "s157(t4-ac1c): Rule 7 action/report table has all four "
+    "worktree_swept: outcomes",
+    "worktree_swept: removed" in _s157_rule7_slice
+    and "worktree_swept: left" in _s157_rule7_slice
+    and "worktree_swept: candidate" in _s157_rule7_slice,
+    "docs/worktree-discipline.md Rule 7 must declare 'worktree_swept: "
+    "removed', 'worktree_swept: left', and 'worktree_swept: candidate' — "
+    "Task-4 AC-1 action/report table",
+)
+
+# --- Task-4 AC-2: Rule 3's teardown-ownership claim is corrected ----------
+_S157_RULE3_ANCHOR = "## Rule 3 — Finished means PR merged"
+_s157_rule3_slice = _slice_section(
+    _s157_discipline, _S157_RULE3_ANCHOR, _S157_DISCIPLINE_STOPS
+)
+check(
+    "s157(t4-ac2): worktree-discipline.md Rule 3 corrects the "
+    "'delivery post-merge' teardown-ownership claim",
+    "Teardown ownership (corrected" in _s157_rule3_slice
+    and "same-session best-effort" in _s157_rule3_slice,
+    "docs/worktree-discipline.md Rule 3 must contain a "
+    "'Teardown ownership (corrected...)' note stating delivery's teardown "
+    "is same-session best-effort — Task-4 AC-2",
+)
+
+# --- Task-4 AC-3: agents/leader.md Phase 0a gains the boot-time preflight
+# sweep step, referencing Rule 7/5/6 by pointer -----------------------------
+check(
+    "s157(t4-ac3a): leader.md Phase 0a declares the boot-time preflight "
+    "worktree sweep step",
+    bool(_s157_leader_1a_slice),
+    "marker '1a. **Boot-time preflight worktree sweep.**' not found in "
+    "agents/leader.md Phase 0a — Task-4 AC-3",
+)
+check(
+    "s157(t4-ac3b): leader.md's preflight sweep step references "
+    "worktree-discipline.md § Rule 7 by pointer",
+    "docs/worktree-discipline.md § Rule 7" in _s157_leader_1a_slice,
+    "agents/leader.md step 1a must reference 'docs/worktree-discipline.md § "
+    "Rule 7' — Task-4 AC-3",
+)
+check(
+    "s157(t4-ac3c): leader.md's preflight sweep composes with Rule 6's "
+    "per-lane isolation for multi-project initiatives",
+    "composing with Rule 6" in _s157_leader_1a_slice,
+    "agents/leader.md step 1a must state it composes with Rule 6's "
+    "per-lane isolation — Task-4 AC-3",
+)
+
+# --- Task-4 AC-4: mode-only allow-list precision — dual numstat, 0\t0 -----
+check(
+    "s157(t4-ac4): worktree-discipline.md Rule 7 specifies the dual "
+    "--numstat / --cached --numstat 0\\t0 mode-only allow-list",
+    "diff --numstat` and `git -C <path> diff --cached --numstat` show "
+    "`0\\t0`" in _s157_rule7_slice,
+    "docs/worktree-discipline.md Rule 7 must specify BOTH "
+    "'git -C <path> diff --numstat' and 'git -C <path> diff --cached "
+    "--numstat' showing '0\\t0' — Task-4 AC-4",
+)
+
+# --- Task-4 AC-5: report-when-not-removed contract, never a silent skip --
+check(
+    "s157(t4-ac5): Rule 7 states an unresolved worktree is never a silent, "
+    "permanent skip",
+    "Never a silent, permanent skip" in _s157_rule7_slice,
+    "docs/worktree-discipline.md Rule 7 must state 'Never a silent, "
+    "permanent skip' — Task-4 AC-5",
+)
+
+# --- Task-4 AC-6: condition 3 AND-eads merged + no-commits-ahead ----------
+check(
+    "s157(t4-ac6a): Rule 7 condition 3 requires an empty "
+    "'origin/main..HEAD' rev-list (no commits ahead of the merge point)",
+    "rev-list origin/main..HEAD" in _s157_rule7_slice,
+    "docs/worktree-discipline.md Rule 7 condition 3 must require "
+    "'git -C <path> rev-list origin/main..HEAD' to be empty — Task-4 AC-6",
+)
+check(
+    "s157(t4-ac6b): Rule 7's action/report table names the "
+    "commits-ahead-of-merge-point sub-case distinctly",
+    "commits ahead of merge point" in _s157_rule7_slice,
+    "docs/worktree-discipline.md Rule 7 action/report table must name "
+    "'commits ahead of merge point' as its own outcome — Task-4 AC-6",
+)
+
+# Self-referential guard (hygiene contract) -- mirrors the Suite 152/153/155
+# pattern. The docs/testing.md registry entry is deliberately NOT
+# self-checked here, per the same rationale documented at Suite 156: it is a
+# documentation edit this tester dispatch is scoped away from (test files
+# only) rather than a property this test file can assert about itself.
+_s157_own = read(Path(__file__))
+check(
+    "suite157(self-ref): test file contains 'Suite 157' and "
+    "'per-pr-version-bump'",
+    "Suite 157" in _s157_own and "per-pr-version-bump" in _s157_own,
+    "test file must self-reference Suite 157 and the marker "
+    "'per-pr-version-bump'",
+)
+check(
+    "suite157(hygiene): CLAUDE.md does NOT contain 'Suite 157' (§11 "
+    "hygiene contract)",
+    "Suite 157" not in _s157_claude,
+    "CLAUDE.md must not mention Suite 157 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: per-pr-version-bump
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------

@@ -192,14 +192,7 @@ function none() {
 var GIT_PUSH_RE = /(^|[\s|;&<>()`])git(\s+-C\s+\S+|\s+\S+=\S+)*\s+push(\s|$|[;&|<>()`"'$])/i;
 var GH_PR_CREATE_RE = /(^|[\s|;&<>()`])gh\s+pr\s+create(\s|$|[;&|<>()`"'$])/i;
 var SHIPPED_PATH_RE = /^(agents|skills|hooks)\//;
-var RELEASE_BRANCH_RE = /^release\/v([0-9]+\.[0-9]+\.[0-9]+)$/;
-var FRAGMENT_RE = /^changelog\.d\/[a-z0-9-]+\.md$/;
-var MARKER_RE = /^version\.d\/[a-z0-9-]+\.bump$/;
 var CLAUDE_VERSION_RE = /\*\*Current version:\*\* `([0-9]+\.[0-9]+\.[0-9]+)`/;
-var RELEASE_CUT_MARKER_PATH = "version.d/.release-cut";
-var RELEASE_CUT_SEMVER_RE = /^v([0-9]+\.[0-9]+\.[0-9]+)$/;
-var RELEASE_CUT_TRAILER_RE = /^release-cut: v([0-9]+\.[0-9]+\.[0-9]+)$/m;
-var RELEASE_CUT_TRAILER_PREFIX_RE = /^release-cut:/m;
 var OVERRIDE_TOKEN_RE = /^bump-override: (minor|major) — .+$/m;
 var CONTROL_CHAR_RE = /[\x00-\x09\x0b-\x1f\x7f]/;
 function touchesShippedPath(c) {
@@ -282,49 +275,6 @@ function readVersionSites(reader) {
     claudeBumped: isBumped(claudeHead, claudeOrigin)
   };
 }
-function resolveReleaseCutMarker(reader, changed) {
-  const touchedThisPush = changed.some(
-    (c) => c.path === RELEASE_CUT_MARKER_PATH && c.status.charAt(0) !== "D"
-  );
-  if (!touchedThisPush) return null;
-  const raw = reader.readFile(RELEASE_CUT_MARKER_PATH);
-  const content = (raw ?? "").trim();
-  const m = RELEASE_CUT_SEMVER_RE.exec(content);
-  return m ? { malformed: false, version: m[1] } : { malformed: true, version: "" };
-}
-function resolveReleaseCutTrailer(reader) {
-  let src = "";
-  const commitMsg = reader.readEnv("GIT_COMMIT_MSG");
-  if (commitMsg) src += commitMsg;
-  const count = parseInt(reader.readEnv("GIT_PUSH_OPTION_COUNT") ?? "0", 10);
-  if (Number.isFinite(count) && count > 0) {
-    for (let i = 0; i < count; i++) {
-      const opt = reader.readEnv(`GIT_PUSH_OPTION_${i}`);
-      if (opt) src += `
-${opt}`;
-    }
-  }
-  if (!src) return null;
-  if (CONTROL_CHAR_RE.test(src)) {
-    reader.warn(
-      "prepublish-guard: release-cut trailer source contains control characters; treating as absent (SEC-DR-A)."
-    );
-    return null;
-  }
-  const m = RELEASE_CUT_TRAILER_RE.exec(src);
-  if (m) return { malformed: false, version: m[1] };
-  return RELEASE_CUT_TRAILER_PREFIX_RE.test(src) ? { malformed: true, version: "" } : null;
-}
-function resolveReleaseCut(reader, changed) {
-  return resolveReleaseCutMarker(reader, changed) ?? resolveReleaseCutTrailer(reader);
-}
-function resolveBranch(reader) {
-  const raw = reader.gitCurrentBranch();
-  if (raw === null) return null;
-  const branch = CONTROL_CHAR_RE.test(raw) ? "__invalid__" : raw;
-  const m = RELEASE_BRANCH_RE.exec(branch);
-  return m ? { isRelease: true, version: m[1] } : { isRelease: false, version: "" };
-}
 function deriveFloor(changed) {
   let sawAdded = false;
   let sawRemovedOrRenamed = false;
@@ -340,9 +290,6 @@ function deriveFloor(changed) {
   if (sawAdded) return "minor";
   if (sawModified) return "patch";
   return "none";
-}
-function hasFragmentOrMarker(changed) {
-  return changed.some((c) => FRAGMENT_RE.test(c.path) || MARKER_RE.test(c.path));
 }
 function findOverrideToken(reader) {
   let src = "";
@@ -375,43 +322,25 @@ function runNoAssetAdvisory(reader, pluginOrigin, pluginHead) {
     );
   }
 }
-function runFeaturePath(reader, changed, sites) {
-  if (sites.pluginBumped || sites.marketBumped || sites.claudeBumped) {
-    return deny(
-      "prepublish-guard: feature branch (non-release/vX.Y.Z) strays a version bump on a version site. Version bumps are reserved for release/vX.Y.Z branches cut by /th:release. Remove the version change or use the release flow. Push blocked."
-    );
-  }
-  if (!hasFragmentOrMarker(changed)) {
-    return deny(
-      "prepublish-guard: distributed assets (agents/|skills/|hooks/) changed but neither a changelog.d/ fragment nor a version.d/ marker was found in the diff. Write a changelog.d/{pr-slug}.md fragment (for user-visible changes) or a version.d/{pr-slug}.bump marker (for internal consumer-received changes with no changelog entry) and re-push. See CLAUDE.md \xA76.3 and agents/delivery.md Step 9. Push blocked."
-    );
-  }
-  return null;
-}
-function runReleasePath(reader, changed, branchVersion, sites) {
+function runVersionSiteCheck(reader, changed, sites) {
   if (!sites.pluginBumped || !sites.marketBumped) {
     return deny(
-      "prepublish-guard: release branch requires all three version sites bumped (.claude-plugin/plugin.json, .claude-plugin/marketplace.json, CLAUDE.md \xA73), but at least one was not changed vs origin/main. Bump all three to the same X.Y.Z matching the branch name and re-push. Push blocked."
+      "prepublish-guard: a distributed asset (agents/|skills/|hooks/) changed, but all three version sites (.claude-plugin/plugin.json, .claude-plugin/marketplace.json, CLAUDE.md \xA73) must be bumped vs origin/main. Bump all three to the same X.Y.Z and re-push. See CLAUDE.md \xA76.3 and agents/delivery.md Step 9. Push blocked."
     );
   }
   if (sites.claudeHead && !sites.claudeBumped) {
     return deny(
-      "prepublish-guard: release branch requires all three version sites bumped (.claude-plugin/plugin.json, .claude-plugin/marketplace.json, CLAUDE.md \xA73), but CLAUDE.md \xA73 was not changed vs origin/main. Bump all three to the same X.Y.Z matching the branch name and re-push. Push blocked."
+      "prepublish-guard: a distributed asset changed, but CLAUDE.md \xA73 was not bumped vs origin/main while .claude-plugin/plugin.json and .claude-plugin/marketplace.json were. Bump all three version sites to the same X.Y.Z and re-push. Push blocked."
     );
   }
-  if (branchVersion && sites.pluginHead && sites.pluginHead !== branchVersion) {
+  if (sites.pluginHead !== sites.marketHead) {
     return deny(
-      `prepublish-guard: release branch is release/v${branchVersion} but .claude-plugin/plugin.json version is '${sites.pluginHead}'. They must match. Update the version files to ${branchVersion} or rename the branch. Push blocked.`
+      `prepublish-guard: version sites do not match \u2014 .claude-plugin/plugin.json is '${sites.pluginHead}' but .claude-plugin/marketplace.json plugins[0].version is '${sites.marketHead}'. All version sites must be bumped to the same X.Y.Z. Push blocked.`
     );
   }
-  if (branchVersion && sites.marketHead && sites.marketHead !== branchVersion) {
+  if (sites.claudeHead && sites.pluginHead !== sites.claudeHead) {
     return deny(
-      `prepublish-guard: release branch is release/v${branchVersion} but .claude-plugin/marketplace.json plugins[0].version is '${sites.marketHead}'. They must match. Push blocked.`
-    );
-  }
-  if (branchVersion && sites.claudeHead && sites.claudeHead !== branchVersion) {
-    return deny(
-      `prepublish-guard: release branch is release/v${branchVersion} but CLAUDE.md \xA73 Current version is '${sites.claudeHead}'. All three version sites must match the branch version. Push blocked.`
+      `prepublish-guard: version sites do not match \u2014 .claude-plugin/plugin.json is '${sites.pluginHead}' but CLAUDE.md \xA73 Current version is '${sites.claudeHead}'. All version sites must be bumped to the same X.Y.Z. Push blocked.`
     );
   }
   return runBumpFloorSubstage(reader, changed, sites.pluginOrigin, sites.pluginHead);
@@ -466,22 +395,8 @@ function runVersionBumpCheck(reader) {
     runNoAssetAdvisory(reader, pluginOrigin, pluginHead);
     return null;
   }
-  const branch = resolveBranch(reader);
-  if (branch === null) return null;
   const sites = readVersionSites(reader);
-  if (branch.isRelease) {
-    return runReleasePath(reader, changed, branch.version, sites);
-  }
-  const releaseCut = resolveReleaseCut(reader, changed);
-  if (releaseCut) {
-    if (releaseCut.malformed) {
-      return deny(
-        `prepublish-guard: a release-cut signal (${RELEASE_CUT_MARKER_PATH} or a release-cut: commit trailer) is present but its content does not parse as strict SemVer (vX.Y.Z). The signal authorizes running the release-path check, never bypassing it. Fix the content (e.g. v2.109.0) or remove it to use the ordinary feature path. Push blocked.`
-      );
-    }
-    return runReleasePath(reader, changed, releaseCut.version, sites);
-  }
-  return runFeaturePath(reader, changed, sites);
+  return runVersionSiteCheck(reader, changed, sites);
 }
 function runPrepublishCheck(reader) {
   const config = reader.readConfig();
@@ -584,13 +499,6 @@ function makeReader() {
           encoding: "utf8",
           env: { ...process.env, MSYS_NO_PATHCONV: "1" }
         });
-      } catch {
-        return null;
-      }
-    },
-    gitCurrentBranch() {
-      try {
-        return (0, import_node_child_process.execFileSync)("git", ["rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf8" }).trim();
       } catch {
         return null;
       }

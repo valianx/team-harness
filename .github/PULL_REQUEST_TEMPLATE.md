@@ -8,10 +8,13 @@
 
 - [ ] Branch is off `main` and named `feat|fix|chore|docs|refactor/<kebab>`
 - [ ] Commits follow conventional-commit format (`feat(area): …`)
-- [ ] Added a `changelog.d/{slug}.md` fragment for any user-facing change
-- [ ] If this touches `agents/`, `skills/`, or `hooks/`: bumped the version in
-      **both** `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`
-      (matched semver). If it does not, no bump is needed.
+- [ ] If this touches `agents/`, `skills/`, or `hooks/`: bumped the version once in
+      all three sites — `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`
+      `plugins[0].version`, and `CLAUDE.md §3` (matched semver) — and added the
+      `## [X.Y.Z]` CHANGELOG section directly in this PR. If it does not touch a
+      distributed asset, no bump is needed.
+- [ ] Used a `changelog.d/{slug}.md` fragment instead of the direct CHANGELOG
+      section only when intentionally batching several changes into one cut
 - [ ] `bash tests/run-all.sh` passes locally (exits 0)
 - [ ] No secrets, tokens, API keys, `.env` files, or private keys committed
 - [ ] Updated `CLAUDE.md` §3/§4 if the tech stack or golden commands changed
