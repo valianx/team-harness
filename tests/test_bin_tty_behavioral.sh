@@ -7,11 +7,11 @@
 # is STATIC: it checks the git-tracked file mode and greps `bin/*.sh` source
 # text for the presence/absence of specific guard idioms. It cannot catch a
 # case where an idiom is textually present but behaves wrong at RUNTIME under
-# a real shell — which is exactly the class of defect this bug was about: the
-# plan's round-1 candidate fix (`{ : < /dev/tty; }`) looked correct on paper
-# (would have passed a purely textual "guard replaced" check) but is
-# empirically fatal under dash — see `01-plan.md § Review Summary § Fix
-# propuesto` for the `setsid dash -c '...'` reproduction that surfaced this.
+# a real shell — which is exactly the class of defect this bug was about: an
+# alternative guard form (`{ : < /dev/tty; }`) looks correct on paper (it
+# would pass a purely textual "guard replaced" check) but is empirically
+# fatal under dash — reproducible with `setsid dash -c '...'`, which detaches
+# the controlling terminal so `/dev/tty` exists but cannot be opened.
 #
 # This suite exercises the ACTUAL guard logic — extracted verbatim from the
 # real source files via `awk` (never duplicated/reproduced by hand, so a

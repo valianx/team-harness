@@ -27,10 +27,9 @@ bootstrap scripts.
       all four sites) that form fails silently, never reaching the fallback
       branch.
 
-Both defects are captured here BEFORE any fix lands in `bin/*.sh` (Phase 2.0,
-pre-fix regression authoring). This suite is EXPECTED to fail against the
-unmodified tree — that is the contract: the implementer (Phase 2) makes it
-pass without editing this file.
+Both defects were captured here BEFORE the fix landed in `bin/*.sh` — the
+suite fails against the unfixed tree and passes after the fix, without this
+file being edited (fail-first regression contract).
 
 Usage:
     python3 tests/test_bin_tty_execbit.py
