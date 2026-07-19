@@ -5,6 +5,25 @@
 // injected DevGuardReader); returns only NormalizedDecision. Never branches on
 // `input.runtime`.
 //
+// Sibling order-floor: gate-guard.ts (hooks/ts/bodies/gate-guard.ts) is a
+// SEPARATE PreToolUse Bash hook that adds the deterministic outward-action
+// ORDER check described in agents/_shared/gate-contract.md § "Outward-action
+// release floor" — it denies a git push/gh pr create from a detected
+// pipeline lane unless that lane's gate3_release is `ship`. This body stays
+// destination-only (no 00-state.md read) and unaware of that floor; the two
+// hooks are independently additive (deny > allow at the platform precedence
+// level), not a replacement of one by the other.
+//
+// Tokenization pre-pass (Invariant F): every covered-action router
+// below is fed the OUTPUT of command-lexer.ts's prepareRoutableCommand(cmd),
+// not the raw command, so an inert covered-action literal sitting inside a
+// balanced, unwrapped quoted span (e.g. a read-only
+// `grep "git push" file`) no longer satisfies the router's boundary-class
+// and no longer trips a decision. Recognizers that do their OWN raw-string
+// parsing (evaluateGitPush's leading quoting-and-composition guard; the
+// gh-pr-create clean-autogate-form check) still receive the ORIGINAL,
+// unmodified command — only the router `.test()` calls change their input.
+//
 // Coverage catalogue (mirrors dev-guard.sh header, closed and enumerated):
 //   1. Push to a remote: git push (bare, -C, GIT_DIR=)
 //   2. PR/issue writes by ANY binary (gh pr create/merge/review/comment,
@@ -27,11 +46,12 @@
 // one good shape and rejecting everything else has no such enumeration
 // surface.
 //
-//   Step 0 — hard reject on ANY shell quoting/escaping/expansion/composition
-//            character anywhere in the command (`"` `'` `\` `$` `;` `&` `|`
-//            newline backtick `<` `>`) — if the command carries quoting or
-//            expansion, the token this recognizer inspects is not reliably
-//            the value bash executes.
+//   Step 0 — hard reject on any character outside the shared safe set
+//            `[A-Za-z0-9 _./-]` (command-lexer.ts's isLiteralSafeCommand,
+//            Invariant G) anywhere in the command — if the command
+//            carries quoting, escaping, expansion, or composition, the
+//            token this recognizer inspects is not reliably the value bash
+//            executes.
 //   Step 1 — hard reject on tree/directory redirection (`--git-dir`,
 //            `--work-tree`, glue-agnostic) or an env-var prefix (`GIT_*=`) —
 //            these decouple the tree git operates on from the payload cwd
@@ -81,6 +101,12 @@
 // clean autogated `gh pr create`) is unchanged by which repo is targeted.
 
 import type { NormalizedInput, NormalizedDecision } from "../shim/normalized-v1.js";
+import {
+  prepareRoutableCommand,
+  isLiteralSafeCommand,
+  isBenignPushFlag,
+  isPlainBranchDestination,
+} from "./command-lexer.js";
 
 // ---------------------------------------------------------------------------
 // DevGuardReader — injected by the entry module (mirrors PrepublishReader).
@@ -255,12 +281,15 @@ const RAW_OUTWARD_SCAN_RE =
 // git-push recognizer — closed POSITIVE grammar (Steps 0-7, see module header)
 // ---------------------------------------------------------------------------
 
-// Step 0 — quoting/escaping/parameter-expansion characters. If ANY of these
-// appear anywhere in the command, the destination token this recognizer
-// would inspect is not reliably the value bash runs at execution time
-// (`"main"`, `'main'`, `ma\in`, `${x:-main}` all differ from the literal
-// static string but all evaluate to `main` at runtime).
-const SHELL_QUOTING_OR_EXPANSION_RE = /["'\\$]/;
+// Step 0 — the char-gate is the shared isLiteralSafeCommand (Invariant G,
+// command-lexer.ts): if ANY character outside the safe set
+// `[A-Za-z0-9 _./-]` appears anywhere in the command, the destination token
+// this recognizer would inspect is not reliably the value bash runs at
+// execution time (`"main"`, `'main'`, `ma\in`, `${x:-main}`, `main{,}` all
+// differ from the literal static string but can all evaluate to `main` at
+// runtime). Strict superset of the retired local denylist
+// (`["'\\$]`) — rejects everything that rejected, plus `{}*?[]~+:`, closing
+// the brace-refspec-force bug (AC-6) the old denylist let through.
 
 // Shell chaining/control/subshell-substitution operators, anywhere in the
 // command. `allow` is reserved for a single, un-chained `git push` — a
@@ -311,7 +340,8 @@ const GH_PR_CREATE_EXACT_RE = /^gh\s+(?:(?:--repo|-R)(?:=\S+|\s+\S+)\s+)?pr\s+cr
 // `--progress` are output-only. Force, `--mirror`, `--all`, `--tags`,
 // `--delete`, `-o`/`--push-option`, `+`-prefixed refspecs, and any
 // unrecognized flag are NOT here and therefore disqualify by omission.
-const BENIGN_PUSH_FLAG_RE = /^(-u|--set-upstream|-v|--verbose|--progress)$/;
+// Shared with gate-guard.ts's grammar via command-lexer.ts's
+// isBenignPushFlag (Invariant G) — no longer declared locally.
 
 // Step 5 — tag-literal destination heuristic: `git push origin v1.2.3` is a
 // tag push even without `refs/tags/` or `--tags`. The optional prefix accepts
@@ -319,15 +349,15 @@ const BENIGN_PUSH_FLAG_RE = /^(-u|--set-upstream|-v|--verbose|--progress)$/;
 // case of its leading letter.
 const TAG_LIKE_RE = /^[vV]?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$/;
 
-// Step 5 — a destination must fully match this shape to be considered a
-// plain branch name at all (before the ref-namespace-word check below).
-const PLAIN_BRANCH_NAME_RE = /^[A-Za-z0-9._][A-Za-z0-9._/-]*$/;
-
-// Step 5 — ref-namespace words that disqualify a destination's first
-// `/`-segment, checked case-insensitively. This single set closes every
-// qualified (`refs/heads/main`), abbreviated (`heads/main`), and case-variant
-// (`REFS/HEADS/main`) form in one shot — none of them is a plain branch name.
-const REF_NAMESPACE_WORDS = new Set(["refs", "heads", "tags", "remotes"]);
+// The destination-shape check above (see module header) requires a plain,
+// non-ref-namespace-qualified branch name to be considered a plain branch
+// name at all. No longer declared locally (Invariant G): both the full-shape
+// character class AND the ref-namespace-word exclusion (`refs`/`heads`/
+// `tags`/`remotes`) now live in command-lexer.ts's shared
+// isPlainBranchDestination, so this recognizer and gate-guard.ts's
+// matchBenignPushGrammar accept the exact same destination shape — see
+// command-lexer.ts for the closes-every-qualified/abbreviated/case-variant-
+// form-in-one-shot rationale.
 
 // Step 6 — the ask-FLOOR: checked case-insensitively, and NEVER a permissive
 // fallback. An earlier design used this set as a fallback allowlist when the
@@ -343,7 +373,7 @@ const GATE_DOC_POINTER = "see docs/dev-mode.md § Outward-Action Gate";
 // Step 0 — hard reject that must clear before any parsing is attempted.
 // Returns the `ask` decision, or null to continue into Step 1.
 function rejectShellQuotingOrComposition(cmdStr: string): NormalizedDecision | null {
-  if (SHELL_QUOTING_OR_EXPANSION_RE.test(cmdStr) || SHELL_COMPOSITION_RE.test(cmdStr)) {
+  if (!isLiteralSafeCommand(cmdStr)) {
     return ask(
       `outward action 'git push' contains a shell quoting/escaping/expansion/composition character — the inspected token cannot be trusted to equal the value bash actually runs; fail-closed (dev-guard.ts); ${GATE_DOC_POINTER}`
     );
@@ -381,17 +411,6 @@ function extractExactCDirPushTail(trimmedCmd: string): { dir: string; tail: stri
   const m = GIT_C_DIR_PUSH_EXACT_RE.exec(trimmedCmd);
   if (!m) return null;
   return { dir: m[1], tail: trimmedCmd.slice(m[0].length).trim() };
-}
-
-// Step 5 — a destination is a "plain branch name" ONLY when its full shape
-// matches PLAIN_BRANCH_NAME_RE AND its first `/`-segment is not a
-// ref-namespace word. This closes every qualified/abbreviated/case-variant
-// ref form (`refs/heads/x`, `heads/x`, `REFS/HEADS/x`, `tags/x`,
-// `remotes/origin/x`) in one shot, rather than enumerating each grapheme.
-function isPlainBranchDestination(dst: string): boolean {
-  if (!PLAIN_BRANCH_NAME_RE.test(dst)) return false;
-  const firstSegment = dst.split("/")[0].toLowerCase();
-  return !REF_NAMESPACE_WORDS.has(firstSegment);
 }
 
 // Step 6 — default-branch resolution, fail-closed. The static floor is
@@ -597,7 +616,7 @@ function evaluatePushArgs(tail: string, reader: DevGuardReader, dir?: string): N
   const flagTokens = tokens.filter((t) => t.startsWith("-"));
   const positional = tokens.filter((t) => !t.startsWith("-"));
 
-  const disqualifyingFlags = flagTokens.filter((t) => !BENIGN_PUSH_FLAG_RE.test(t));
+  const disqualifyingFlags = flagTokens.filter((t) => !isBenignPushFlag(t));
   if (disqualifyingFlags.length > 0) {
     return ask(
       `outward action ${targetLabel} with disqualifying flag(s) (${disqualifyingFlags.join(", ")}) requires explicit operator approval — only -u/--set-upstream/-v/--verbose/--progress are on the benign allowlist (dev-guard.ts); ${GATE_DOC_POINTER}`
@@ -715,9 +734,15 @@ export function evaluate(input: NormalizedInput, reader: DevGuardReader): Normal
 
   // Step 2 — Detect outward/mutating actions by DESTINATION.
 
+  // Pre-pass (Invariant F): routers below test the ROUTABLE string
+  // (quoted-inert spans blanked, unless a command-executing wrapper or
+  // unbalanced quoting is present — see command-lexer.ts). Recognizers that
+  // do their own raw-string parsing keep receiving `cmdStr` unchanged.
+  const { routable } = prepareRoutableCommand(cmdStr);
+
   // 2a. git push — closed recognizer decides allow vs ask (never none, since
   // GIT_PUSH_RE already identifies this as a covered action).
-  if (GIT_PUSH_RE.test(cmdStr)) {
+  if (GIT_PUSH_RE.test(routable)) {
     return evaluateGitPush(cmdStr, reader);
   }
 
@@ -731,7 +756,9 @@ export function evaluate(input: NormalizedInput, reader: DevGuardReader): Normal
   // requires a clean, exactly-cased, single `gh pr create` invocation: the
   // case-insensitive router only routes here, and a mixed-case or shell-
   // composed form falls through to ask (mirrors the git push recognizer).
-  if (GH_PR_CREATE_RE.test(cmdStr)) {
+  // The clean-form check is a recognizer (not a router) and reads `cmdStr`,
+  // the original command — never the blanked `routable` string.
+  if (GH_PR_CREATE_RE.test(routable)) {
     const cleanAutogateForm =
       !SHELL_COMPOSITION_RE.test(cmdStr) &&
       GH_PR_CREATE_EXACT_RE.test(cmdStr.trim());
@@ -746,56 +773,61 @@ export function evaluate(input: NormalizedInput, reader: DevGuardReader): Normal
   }
 
   // 2c. gh pr merge
-  if (GH_PR_MERGE_RE.test(cmdStr)) {
+  if (GH_PR_MERGE_RE.test(routable)) {
     return ask(
       `outward action 'gh pr merge'${ghTargetNote} requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate`
     );
   }
 
   // 2c. gh pr review
-  if (GH_PR_REVIEW_RE.test(cmdStr)) {
+  if (GH_PR_REVIEW_RE.test(routable)) {
     return ask(
       `outward action 'gh pr review'${ghTargetNote} requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate`
     );
   }
 
   // 2d. gh pr comment
-  if (GH_PR_COMMENT_RE.test(cmdStr)) {
+  if (GH_PR_COMMENT_RE.test(routable)) {
     return ask(
       `outward action 'gh pr comment'${ghTargetNote} requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate`
     );
   }
 
   // 2e. gh api REST mutating PR endpoint
-  if (GH_API_REST_PR_RE.test(cmdStr)) {
+  if (GH_API_REST_PR_RE.test(routable)) {
     return ask(
       "outward action 'gh api' mutating PR endpoint requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate"
     );
   }
 
-  // 2e-bis. gh api graphql with PR-write mutation name
-  if (GH_GRAPHQL_RE.test(cmdStr) && GRAPHQL_PR_MUTATIONS_RE.test(cmdStr)) {
+  // 2e-bis. gh api graphql with PR-write mutation name. GH_GRAPHQL_RE is the
+  // boundary-class router (routable, quoted-inert-search false positives
+  // apply); GRAPHQL_PR_MUTATIONS_RE is a content check whose real signal
+  // legitimately lives INSIDE the `-f query='...'` quoted GraphQL document —
+  // it must keep reading `cmdStr`, the original command, or a genuine
+  // mutation call would be blanked away as a false negative.
+  if (GH_GRAPHQL_RE.test(routable) && GRAPHQL_PR_MUTATIONS_RE.test(cmdStr)) {
     return ask(
       "outward action 'gh api graphql' PR-mutating operation requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate"
     );
   }
 
   // 2e-ter. gh issue mutating writes (create, edit, comment)
-  if (GH_ISSUE_WRITE_RE.test(cmdStr)) {
+  if (GH_ISSUE_WRITE_RE.test(routable)) {
     return ask(
       `outward action 'gh issue write'${ghTargetNote} requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate`
     );
   }
 
   // 2f. curl/wget mutating method to api.github.com (form 1: adjacent -X and api.github.com)
-  if (CURL_WGET_MUTATING_RE.test(cmdStr)) {
+  if (CURL_WGET_MUTATING_RE.test(routable)) {
     return ask(
       "outward action via curl/wget to api.github.com with mutating method requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate"
     );
   }
 
   // 2f continued. (form 2: api.github.com URL anywhere + -X/--request anywhere in cmd)
-  if (API_GITHUB_URL_RE.test(cmdStr) && MUTATING_METHOD_RE.test(cmdStr)) {
+  if (API_GITHUB_URL_RE.test(routable) && MUTATING_METHOD_RE.test(routable)) {
     return ask(
       "outward action to api.github.com with mutating method requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate"
     );

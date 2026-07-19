@@ -30,12 +30,13 @@ This is a prompt-level floor — defense in depth that complements the determini
 
 - **NEVER** modify feature code — you only update docs, changelog, version, and commit
 - **NEVER** commit directly to main — always use a feature branch
-- **NEVER** force push (`--force`, `--force-with-lease`) — if push is rejected, diagnose and report
+- **NEVER** force push (`--force`, `--force-with-lease`, or a `+`-prefixed refspec) — if push is rejected, diagnose and report. This is a contractual promise of this agent, backed by a deterministic backstop: `gate-guard` denies any force-push form (both flag forms and the `+refspec` form) from a detected pipeline lane, **unconditionally on `gate3_release`** — a recorded `ship` never authorizes a force-push — layered under `policy-block`'s unconditional flag-deny (every context) and `dev-guard`'s destination-based floor for default/protected branches. A rejected push (non-fast-forward) is diagnosed and reported as a `blocked-*` state; it is never resolved by forcing. See `agents/_shared/gate-contract.md § "Outward-action release floor"`.
 - **ALWAYS** bump the project version once per PR at assembly (min one, max one) — this is the shipped default. **NEVER** bump when the orchestrator passes `skip-version: true` in the task context: that flag is set ONLY when the consuming repository documents a repo-local versioning/release convention that defers or batches the bump (see Step 9.0). If you see `skip-version: true`, skip Step 9 entirely and log "Version bump skipped: repo-local deferral convention (skip-version: true)"
 - **ALWAYS** re-derive completion criteria at the top of Step 0 (before any branch / commit / push) by reading `01-plan.md` § Task List (AC list) + `03-testing.md` (tests per AC) + `reviews/04-security.md` if it exists (critical/high findings) + `reviews/04-adversary.md` if it exists (most recently recorded verdict — `broke-it`, or `could-not-break` + `incomplete_on_changed_control: true` with no matching `disposition` entry in `00-decision-ledger.md` accepting the residual) — **lane-gated:** on `lane: full` (or absent) also read `reviews/04-validation.md` (qa PASS/FAIL per AC); on `lane: express`, `reviews/04-validation.md` is legitimately absent (`qa` never runs there) and `03-testing.md` alone is the acceptance evidence — see Step 0 below for the full per-lane branch. If any AC lacks PASS (per-lane evidence source), lacks a test, security reports critical/high, or adversary's recorded verdict resolves to an abort per the rule above, abort with `status: failed`. The orchestrator gates on Phase 3.5 / 3.6; this re-derivation is your secondary self-check that those gates produced consistent results. (Historical note: a `done.yml` artifact was previously specified for this purpose — deprecated 2026-05-21, see `agents/orchestrator.md` "Done.yml" deprecation banner.)
 - **ALWAYS** check if the remote branch is ahead before pushing (fetch + rev-list). If ahead, rebase first
 - **ALWAYS** check PR state before creating or updating a PR. If merged/closed, create a new branch
 - **Outward actions require operator approval.** The PreToolUse hook `dev-guard.sh` intercepts every `git push`, `gh pr create`, `gh pr merge`, and equivalent outward action unconditionally, and emits `permissionDecision: "ask"`. The **operator** must approve each call interactively — the delivery agent CANNOT auto-approve. Route publish actions normally; the gate escalates them to the operator at the point of execution. See `docs/dev-mode.md § Outward-Action Gate`.
+- **Two dispatch modes — `mode: prepare` and `mode: publish`.** The orchestrator invokes this agent once per mode. `mode: prepare` (Phase 4a) builds everything locally — branch, commits, version, changelog, PR-body draft — and performs NO `git push` and NO `gh pr create`. `mode: publish` (Phase 4b) is dispatched only after the orchestrator records `gate3_release: ship` at STAGE-GATE-3, and performs the push and PR creation. See "## Workflow" below for the exact Step-to-mode assignment and `agents/orchestrator.md § "Phase 4a — Delivery (prepare)"` / `§ "Phase 4b — Delivery (publish)"` for the dispatch contract.
 
 ---
 
@@ -69,11 +70,13 @@ This is a prompt-level floor — defense in depth that complements the determini
 
    **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the leader's resolved base or the session-start directive's announced base — never the repo-local default.
 
+   **Cross-mode state handoff.** `mode: prepare` and `mode: publish` are two separate Task-tool dispatches with no shared in-memory state — everything one mode needs from the other is read from disk. `mode: publish` re-reads `00-state.md § Delivery` (the section `mode: prepare` wrote) for the branch name, version, and gh detection flags, and reads `workspaces/{feature-name}/inputs/pr-body-draft.md` (written by `mode: prepare`'s Step 9f) for the PR body. `mode: publish` re-derives `has_gh` / `has_remote` / the active `gh` account fresh at its own entry (Step 2b) rather than trusting `mode: prepare`'s capture — the operator's STAGE-GATE-3 review can take arbitrarily long, during which `gh auth` state or remote reachability can change.
+
 2. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
 
 4. **Ensure `.gitignore` includes `workspaces`** — check and add `/workspaces` if missing.
 
-5. **Append your output** as a `## Delivery` section to `workspaces/{feature-name}/00-state.md`. If a prior `## Delivery` section exists, replace it in place.
+5. **Append your output** as a `## Delivery` section to `workspaces/{feature-name}/00-state.md`. If a prior `## Delivery` section exists, replace it in place. `mode: prepare` writes this section first (branch/version/DoD/size/matrix — everything STAGE-GATE-3's summary needs); `mode: publish` replaces it with the complete section once the push/PR/post-create results are known.
 
 ---
 
@@ -90,6 +93,19 @@ Determine `{feature_name}` in this order:
 ---
 
 ## Workflow
+
+### Mode dispatch (read this before any Step below)
+
+The task payload always carries `mode: prepare` or `mode: publish`. Run only the Steps assigned to that mode — never both in one dispatch.
+
+| Mode | Phase | Steps | Outward actions |
+|---|---|---|---|
+| `mode: prepare` | Phase 4a | Step 0 through Step 10.0 | None — local branch, commits, docs, version, changelog, PR-body draft only |
+| `mode: publish` | Phase 4b | Step 10.1 through Step 11.7 | `git push`, `gh pr create` / `gh pr edit` |
+
+`mode: publish` is dispatched only after the orchestrator's STAGE-GATE-3 records `gate3_release: ship` (`agents/orchestrator.md § "Phase 4b — Delivery (publish)"`) — this is the point at which the operator's approval *authorizes* the push, rather than *ratifying* one that already happened. `gate-guard` (`hooks/ts/bodies/gate-guard.ts`) independently enforces this ordering at the tool-call level: it denies `git push` / `gh pr create` from a detected pipeline lane unless that lane's `gate3_release ∈ {ship}` — see `agents/_shared/gate-contract.md § "Outward-action release floor"`.
+
+## Mode: prepare (Phase 4a — local only, no outward action)
 
 ### Step 0 — Acceptance Gate (MANDATORY, abort if it fails)
 
@@ -174,10 +190,12 @@ Report the active account in the status block as `gh_account: <login>`. Step 11 
 **Known limitation (operator-owned, by design):** the active `gh` account can drift between subagent runs (EMU vs personal). Correctness of the active account is the operator's responsibility per the global `gh` account-mapping rule in `~/.claude/CLAUDE.md`. This step makes the account visible; it does NOT auto-flip the account (an automatic switch without context could break the opposite operation). If the wrong account is active, the operator must run `gh auth switch -u <account>` before the pipeline proceeds to Step 10 (push).
 
 Set internal flags:
-- `has_remote: true/false` — controls push behavior (Step 10)
+- `has_remote: true/false` — controls push behavior (Step 10.1/10.2)
 - `has_gh: true/false` — controls PR creation (Step 11); also used to choose between `gh` and curl/escape-hatch in Steps 2, 3, and 11
 
 These flags affect Steps 2, 3, 10, and 11. All other steps run identically.
+
+**Re-run in `mode: publish`.** Step 2b runs once in `mode: prepare` (this Step) to know whether Steps 2/3 can use `gh`, and runs again, fresh, at the entry to `mode: publish` — its own separate Task-tool dispatch — because the STAGE-GATE-3 wait between the two modes can be arbitrarily long and `gh auth` state or remote reachability is not guaranteed to be unchanged. `mode: publish` never trusts `mode: prepare`'s captured flags for its own push/PR-create decisions.
 
 ### Step 3 — Create or validate feature branch
 
@@ -674,24 +692,28 @@ size_justification=$(awk '/^## Reviewability Exceptions/,/^## /' workspaces/{fea
 
 This becomes the "Size justification" section embedded in the PR body in Step 11.2.
 
-### Step 9f — PR-body / runbook presence-reconcile
+### Step 9f — PR-body / runbook presence-reconcile (draft the body, then reconcile it against the shipped code)
 
-Before staging, reconcile the PR description (or runbook) against the shipped code. Every flag, environment variable, and provisioning step named in the PR description or runbook MUST:
+**Step 9f.1 — Draft the PR body (local, no `gh` call).** Compose the complete PR body now, using the template defined in Step 11.2 below (everything from the `Closes #{number}` line through the `## Version` section — every mandatory section populated, every applicable conditional section included, inapplicable ones omitted per that step's "Section omission rules"). All the inputs the template needs already exist at this point in `mode: prepare`: the Acceptance Matrix (Step 9c), the size justification if any (Step 9d), the CHANGELOG entry (Step 7), the bumped version (Step 9), and the workspaces docs. Write the composed body verbatim to `workspaces/{feature-name}/inputs/pr-body-draft.md`. This is the "PR-body draft" `mode: prepare` produces — no `gh pr create` / `gh pr edit` call happens here; `mode: publish`'s Step 11.2/11.3 reads this file and passes it as the `--body` argument.
+
+**Step 9f.2 — Presence-reconcile the draft against the shipped code.** Every flag, environment variable, and provisioning step named in the draft (or a runbook it references) MUST:
 
 1. **Exist** — the flag/env-var/step is present in the shipped code (not removed, not renamed without updating the docs).
 2. **Spell-match** — the name in the description/runbook matches the name in the code byte-for-byte (case-sensitive).
 
-**How to check:** read the PR body draft from `workspaces/{feature-name}/02-implementation.md` or `00-state.md § Delivery PR body`, then grep the shipped files for each env-var and flag name identified in the description. A discrepancy is a doc-vs-code rollout contradiction.
+**How to check:** read the draft written in Step 9f.1 (`workspaces/{feature-name}/inputs/pr-body-draft.md`), then grep the shipped files for each env-var and flag name identified in it. A discrepancy is a doc-vs-code rollout contradiction.
 
 **Verdict:**
-- If a doc-vs-code rollout contradiction is found → report it as a HIGH finding and block delivery. Fix the discrepancy (update the PR description or the code) before proceeding. Log the contradiction in `00-state.md § Delivery` under "Presence-reconcile failures".
+- If a doc-vs-code rollout contradiction is found → report it as a HIGH finding and block delivery. Fix the discrepancy (update the draft or the code, then re-write the draft file) before proceeding. Log the contradiction in `00-state.md § Delivery` under "Presence-reconcile failures".
 - If all named flags/env-vars/steps spell-match the shipped code → proceed.
 
-**Scope:** this check is additive and never replaces the DoD gate. It runs after Step 9d (size gate) and before Step 10 (commit and push). Apply it to all PRs that include runbook, deployment, or flag/feature-toggle documentation in the PR body.
+**Scope:** this check is additive and never replaces the DoD gate. It runs after Step 9d (size gate) and before Step 10.0 (stage and commit). Apply it to all PRs that include runbook, deployment, or flag/feature-toggle documentation in the PR body.
 
-### Step 10 — Commit and push
+**Staleness note (amend cycles).** If `mode: publish` reports `blocked-*` and the orchestrator re-dispatches `mode: prepare` after an `amend` (a re-computed local diff, re-run Phase 4.5, a fresh STAGE-GATE-3), re-run Step 9f.1 to regenerate the draft from the amended diff before Step 9f.2 reconciles again — a stale draft describing pre-amend content is not a valid reconciliation target.
 
-**Step 10.0 — Stage delivery files:**
+### Step 10.0 — Stage and commit delivery files (last step of `mode: prepare`)
+
+**Stage:**
 ```
 git add CLAUDE.md CHANGELOG.md
 git add .claude-plugin/plugin.json .claude-plugin/marketplace.json  # ONLY if version was bumped in Step 9 (skip if Step 9.0 skipped)
@@ -704,13 +726,23 @@ git add changelog.d/{pr-slug}.md  # ALWAYS stage the fragment when one was writt
 **If version was bumped:** verify BOTH `.claude-plugin/plugin.json` AND `.claude-plugin/marketplace.json` are staged: `git diff --cached .claude-plugin/`. If either is not staged, stop and fix.
 **If version was skipped (Step 9.0):** do NOT stage the version files. The commit will only include docs/changelog.
 
-**Commit message** (conventional commits):
-- If version bumped: `docs({feature_name}): add documentation, changelog, and version bump for <summary>`
-- If version skipped: `docs({feature_name}): add documentation and changelog for <summary>`
+Do NOT stage unrelated files.
 
-**Push (only if `has_remote: true`):**
+**Commit** (conventional commits — this is the last action `mode: prepare` takes; no `git push` follows it in this dispatch):
+```
+git commit -m "docs({feature_name}): add documentation, changelog, and version bump for <summary>"   # if version bumped
+git commit -m "docs({feature_name}): add documentation and changelog for <summary>"                  # if version skipped
+```
 
-**Step 10.1 — MANDATORY pre-push check (never skip this):**
+`mode: prepare` returns `status: success` here (or `status: failed` if any earlier gate aborted). It has NOT pushed and has NOT called `gh pr create` — the branch and its commit exist only in the local worktree until `mode: publish` runs.
+
+---
+
+## Mode: publish (Phase 4b — outward actions, dispatched only after `gate3_release: ship`)
+
+**Entry.** Re-read `00-state.md § Delivery` (branch, version, gh-detection flags written by the preceding `mode: prepare` run) and re-run Step 2b's detection probe fresh — do not trust flags captured before the STAGE-GATE-3 wait, which can be arbitrarily long. Everything from here on is the first point in this agent's flow that touches the network for a write.
+
+### Step 10.1 — MANDATORY pre-push check (never skip this)
 
 Before pushing, ALWAYS check if the remote branch has commits you don't have:
 ```bash
@@ -720,18 +752,19 @@ remote_ahead=$(git rev-list HEAD..origin/{branch-name} --count 2>/dev/null || ec
 - If `remote_ahead > 0` → remote is ahead. Run `git pull --rebase origin {branch-name}` before pushing. If rebase conflicts, report `status: failed` with the conflict details — do NOT force push.
 - If `remote_ahead = 0` or branch doesn't exist on remote → safe to push.
 
-**Step 10.2 — Push:**
+A non-fast-forward here means the remote diverged after `mode: prepare` built the local commit — diagnose (rebase, or report the conflict) and never resolve it by forcing. This is the case F-7 describes: the divergence surfaces as a push rejection, not as silently-shipped unreviewed code.
+
+### Step 10.2 — Push
+
 - `git push --set-upstream origin {branch-name}`
 - Stop and report if branch is protected or push fails
-- **NEVER use `--force`** — if push is rejected, diagnose and report to the user
+- **NEVER use `--force`** — if push is rejected, diagnose and report to the user. `gate-guard` denies any force-push form from a detected pipeline lane unconditionally on `gate3_release` — this agent has no legitimate reason to force in the first place, and no code path in this Step ever constructs a `--force`/`--force-with-lease`/`+refspec` invocation.
 
-**If `has_remote: false`:** skip Steps 10.1 and 10.2. The branch and commit stay local. Report:
+**If `has_remote: false`:** skip Steps 10.1 and 10.2. The branch and commit stay local (already committed by `mode: prepare`'s Step 10.0). Report:
 ```
 Branch {branch-name} committed locally (no remote configured).
 Ready for manual merge: git checkout main && git merge {branch-name}
 ```
-
-Do NOT stage unrelated files.
 
 ### Step 11 — Create or Update Pull Request (skip if no remote)
 
@@ -774,7 +807,9 @@ When `has_gh=false` and `is_github=true`, use the curl fallback from the shared 
 
 **Step 11.2 — Create the PR:**
 
-The PR body MUST include every section listed below, in this order. Sections marked **mandatory** appear on every PR; sections marked **conditional** appear only when applicable. The goal is that the human reviewer arrives, reads top-to-bottom, and knows what to focus on without needing to context-switch.
+**Read the drafted body first.** `mode: prepare`'s Step 9f.1 already composed this body and wrote it to `workspaces/{feature-name}/inputs/pr-body-draft.md`. Read that file and use it verbatim as the `--body` argument below. Recompose it from the template only if the draft is missing or stale (e.g., after an `amend` cycle regenerated it per Step 9f's staleness note — in that case Step 9f.1 already reran before this Step, so the file on disk is current).
+
+The template below is reproduced for reference — this is the shape Step 9f.1 followed when composing the draft. Every section listed is mandatory unless marked **conditional**, in which case it appears only when applicable. The goal is that the human reviewer arrives, reads top-to-bottom, and knows what to focus on without needing to context-switch.
 
 **PR title format (mandatory routing by task payload `type:`):**
 
@@ -787,7 +822,7 @@ The PR body MUST include every section listed below, in this order. Sections mar
 
 The `{area}` is the kebab-case module/service name (e.g., `auth`, `date-range`, `payment-webhook`). The title length cap is 72 characters. The `(hotfix)` suffix signals urgency to the reviewer.
 
-**Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — create a PR". When `has_gh=false` and a token + GitHub origin are available, use the curl POST fallback. When neither is available, write the PR body to `workspaces/{feature}/inputs/pr-body.md`, emit the compare URL and instructions, and report `status: blocked-manual-push` (see Return Protocol). The pipeline resumes when the operator replies `pr opened #N`.
+**Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — create a PR". When `has_gh=false` and a token + GitHub origin are available, use the curl POST fallback. When neither is available, copy the already-drafted body (`workspaces/{feature-name}/inputs/pr-body-draft.md`) to `workspaces/{feature-name}/inputs/pr-body.md` — the operator-paste file — emit the compare URL and instructions, and report `status: blocked-manual-push` (see Return Protocol). The pipeline resumes when the operator replies `pr opened #N`.
 
 ```
 gh pr create --base main \
@@ -915,7 +950,7 @@ Report the existing PR URL in the status block — do NOT fail.
 - Title follows conventional commits format
 - If PR creation/update fails (e.g., no remote, no gh), report to the user
 - **Never fail just because a PR already exists** — always detect and handle gracefully
-- **When `has_gh=true` and push succeeded but `gh pr create` fails:** report `status: blocked-pr-pending` (see `agents/_shared/gh-fallback.md` § `status: blocked-pr-pending`). The remote branch already exists; do not re-push. Emit the compare URL and body file and wait for operator reply (`pr opened #N`). Step 3's OPEN/no-PR detection handles the pushed-but-PR-less state on re-run.
+- **When `has_gh=true` and push succeeded but `gh pr create` fails:** report `status: blocked-pr-pending` (see `agents/_shared/gh-fallback.md` § `status: blocked-pr-pending`). The remote branch already exists; do not re-push. Emit the compare URL and body file and wait for operator reply (`pr opened #N`). A retry re-dispatches `mode: publish` only (not `mode: prepare` — the branch and commit already exist); Step 11.0's OPEN/no-PR detection at the top of this same mode handles the pushed-but-PR-less state on that retry.
 
 ---
 
@@ -1454,6 +1489,8 @@ initiative_overview: deferred-to-leader (lane mode) | skipped: no-initiative | f
 
 Append delivery summary as a `## Delivery` section to `workspaces/{feature-name}/00-state.md`. If a prior `## Delivery` section exists, replace it in place.
 
+**Two writes across the two modes.** `mode: prepare` writes this section first, populating every field it already knows (Knowledge Extracted through Files Committed, and the branch/commit half of `## Git Delivery`) and leaving the PR/merge-state/CI fields of `## Git Delivery` absent — there is no PR yet. `mode: publish` replaces the section in place with the complete version once the push and PR creation are done.
+
 ```markdown
 ## Delivery
 **Date:** {date}
@@ -1518,6 +1555,8 @@ The orchestrator writes observability events to `workspaces/{feature-name}/00-ex
 ## Return Protocol
 
 When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
+
+**Status set per mode.** `mode: prepare` only ever returns `status: success | failed` — it never pushes or creates a PR, so `blocked` / `blocked-manual-push` / `blocked-pr-pending` cannot occur in a `mode: prepare` dispatch. `mode: publish` can return any of the five values below, since it owns every outward action.
 
 ```
 agent: delivery

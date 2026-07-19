@@ -240,6 +240,15 @@ run_ts_hook_suite "launcher-fail-closed" "test_launcher_fail_closed.sh"
 
 echo
 echo "############################################################"
+echo "# Suite 160: hooks/ts/bodies/gate-guard.ts — deterministic outward-action"
+echo "# order floor (issues #491/#495). Pre-fix regression (Phase 2.0): the"
+echo "# hook + its compiled artifact do not exist yet — FAILS until Task-2 of"
+echo "# the deterministic-gate-release-enforcement plan lands."
+echo "############################################################"
+run_ts_hook_suite "gate-guard" "test_gate_guard.sh"
+
+echo
+echo "############################################################"
 echo "# Suite 17: harness-migrate bidirectional transform (AC-1..AC-11)"
 echo "# Requires: node. Skipped when absent (NOT a pass — see output)."
 echo "############################################################"

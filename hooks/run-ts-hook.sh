@@ -12,7 +12,7 @@
 #
 # Contract (F5 — three classes, per issue #446 cutover plan):
 #   1. deny-floors (policy-block, dev-guard, gcp-guard, prepublish-guard,
-#      checkpoint-guard): node or the .cjs missing -> emit the explicit deny
+#      checkpoint-guard, gate-guard): node or the .cjs missing -> emit the explicit deny
 #      envelope and block. Never pass-through. This also covers a .cjs that
 #      is PRESENT but does not emit a valid decision (empty/truncated
 #      artifact, or a node runtime error) — SEC-PR2-001: a present-but-
@@ -31,7 +31,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CJS="$ROOT/hooks/ts/dist/${HOOK_NAME}.cjs"
 
 case "$HOOK_NAME" in
-  policy-block|dev-guard|gcp-guard|prepublish-guard|checkpoint-guard)
+  policy-block|dev-guard|gcp-guard|prepublish-guard|checkpoint-guard|gate-guard)
     CLASS="deny-floor"
     ;;
   worktree-guard)

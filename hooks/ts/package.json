@@ -9,6 +9,7 @@
     "build:policy-block": "npx esbuild entry/policy-block.cc.ts --bundle --platform=node --format=cjs --outfile=dist/policy-block.cjs --external:node:*",
     "build:checkpoint-guard": "npx esbuild entry/checkpoint-guard.cc.ts --bundle --platform=node --format=cjs --outfile=dist/checkpoint-guard.cjs --external:node:*",
     "build:prepublish-guard": "npx esbuild entry/prepublish-guard.cc.ts --bundle --platform=node --format=cjs --outfile=dist/prepublish-guard.cjs --external:node:*",
+    "build:gate-guard": "npx esbuild entry/gate-guard.cc.ts --bundle --platform=node --format=cjs --outfile=dist/gate-guard.cjs --external:node:*",
     "build:gcp-guard": "npx esbuild entry/gcp-guard.cc.ts --bundle --platform=node --format=cjs --outfile=dist/gcp-guard.cjs --external:node:*",
     "build:worktree-guard": "npx esbuild entry/worktree-guard.cc.ts --bundle --platform=node --format=cjs --outfile=dist/worktree-guard.cjs --external:node:*",
     "build:session-start": "npx esbuild entry/session-start.cc.ts --bundle --platform=node --format=cjs --outfile=dist/session-start.cjs --external:node:*",
@@ -17,7 +18,7 @@
     "build:precompact-snapshot": "npx esbuild entry/precompact-snapshot.cc.ts --bundle --platform=node --format=cjs --outfile=dist/precompact-snapshot.cjs --external:node:*",
     "build:notify-stage": "npx esbuild entry/notify-stage.cc.ts --bundle --platform=node --format=cjs --outfile=dist/notify-stage.cjs --external:node:*",
     "build:subagent-start": "npx esbuild entry/subagent-start.cc.ts --bundle --platform=node --format=cjs --outfile=dist/subagent-start.cjs --external:node:*",
-    "build": "npm run build:dev-guard && npm run build:policy-block && npm run build:checkpoint-guard && npm run build:prepublish-guard && npm run build:gcp-guard && npm run build:worktree-guard && npm run build:session-start && npm run build:language-user-prompt && npm run build:subagent-trace && npm run build:precompact-snapshot && npm run build:notify-stage && npm run build:subagent-start && echo 'all builds ok'",
+    "build": "npm run build:dev-guard && npm run build:policy-block && npm run build:checkpoint-guard && npm run build:prepublish-guard && npm run build:gate-guard && npm run build:gcp-guard && npm run build:worktree-guard && npm run build:session-start && npm run build:language-user-prompt && npm run build:subagent-trace && npm run build:precompact-snapshot && npm run build:notify-stage && npm run build:subagent-start && echo 'all builds ok'",
     "typecheck": "npx tsc --noEmit"
   }
 }

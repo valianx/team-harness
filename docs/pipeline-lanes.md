@@ -336,6 +336,19 @@ handle is a gap, not a refinement.
 | Root-cause provenance-tier taxonomy | canonical | `docs/pipeline-lanes.md` | § 11 |
 | Root-cause provenance tiers — classification site | leader | `agents/leader.md` | § Root-cause provenance tiers |
 | Root-cause provenance tiers — consumption site | architect | `agents/architect.md` | § Root-Cause Analysis Mode (Task-3) |
+| Outward-action release-floor invariant (`gate3_release ∈ {ship}` required before push/pr-create from a detected pipeline lane) | canonical | `agents/_shared/gate-contract.md` | § "Outward-action release floor" |
+| Outward-action release-floor invariant | enforcer (multi-topology lane detection) | `hooks/ts/bodies/gate-guard.ts` | `evaluate()` |
+| Outward-action release-floor invariant | orchestrator (full lane) | `agents/orchestrator.md` | Phase 4a (prepare) → STAGE-GATE-3 → Phase 4b (publish) |
+| Outward-action release-floor invariant | orchestrator (express lane) | `agents/orchestrator.md` | Express combined gate — "gate-guard on express" |
+| Outward-action release-floor invariant | docs | `docs/dev-mode.md` | § "Deterministic order floor (`gate-guard`)" |
+
+**Lane uniformity — the outward-action release floor applies to all three lanes without reshaping any of them.** `gate-guard`'s deny is detection-dependent, not universal (§ above and `agents/_shared/gate-contract.md § "Outward-action release floor"`), so its behavior per lane follows directly from what each lane already does — no lane-specific carve-out was added for this invariant:
+
+- **inline** — no orchestrator `00-state.md` exists for `gate-guard` to correlate against, so no lane resolves; the invariant defers (`decision: none`) and the pre-existing `dev-guard` destination floor remains the only floor on the inline commit/push. This is independent of the § 5 security-review waiver, which governs a different gate entirely.
+- **express** — the lightweight combined plan+delivery gate already registers `gate3_release: ship` (and `working_branch`) BEFORE the lane's only push/`gh pr create`, so `gate-guard` detects a genuine, non-vacuous lane and denies until that gate clears — no reorder was needed for this lane.
+- **full** — Delivery is split into a `prepare` step (local: branch/commits/version/CHANGELOG/PR-body) and a `publish` step (push + `gh pr create`), with STAGE-GATE-3 re-sequenced between them so the human release authorizes the push instead of ratifying an already-pushed PR.
+
+`gate-guard`'s lane-resolution step covers BOTH delivery topologies uniformly — a worktree lane (`realpath(cwd()) == realpath(worktree)`) and a branch-in-place lane (`worktree: null`, resolved by `working_branch` match alone) — so this invariant needs no lane×topology matrix: one detection mechanism, every lane/topology combination covered without a per-combination special case.
 
 **Rule for any future edit to this contract:** touching one row of this table without touching
 every other row of the same invariant in the same change is the failure mode this gate exists to

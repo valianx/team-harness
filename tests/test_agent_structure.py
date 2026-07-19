@@ -1715,6 +1715,7 @@ for ref in sorted(plausible_agent_refs):
 #    Canonical phases (per the Pipeline Flow ASCII art and Stage table):
 CANONICAL_PHASES = {
     "0a", "0b", "1", "1.5a", "1.5", "1.6", "1.7", "2.0", "2", "2.5", "2.6", "2.7", "3", "3.4", "3.5", "3.6", "3.75", "4", "4.5", "5", "6",
+    "4a", "4b",
     # 2.0 is the Bug-fix Pipeline regression-test phase (type: fix | hotfix only),
     # inserted between STAGE-GATE-1 and Phase 2. See ref-special-flows.md § Bug-fix Flow.
     # 2.6 is the Code-Hygiene Scan (deterministic, all types), sequenced between
@@ -1726,6 +1727,9 @@ CANONICAL_PHASES = {
     # 3.4 is ux-reviewer validate (frontend_scope: true only); runs in the Phase 3 parallel block.
     # 1.5a is the deterministic Plan-Structure Scan (all types, non-self-authored plans),
     # sequenced before the Phase 1.5 qa-plan dispatch. See docs/plan-structure-gate.md.
+    # 4a/4b split Delivery into a local prepare step and a post-gate publish
+    # step so the outward-action release floor cannot deadlock. See the
+    # delivery-prepare sub-phase heading in agents/orchestrator.md.
 }
 # Scoped to the dev-pipeline spine only, not SPLIT_CORPUS — ref-special-flows.md
 # and ref-direct-modes.md host independently-numbered sub-flows (the docs
@@ -35955,6 +35959,734 @@ check(
 )
 
 # Marker: per-pr-version-bump
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 161 — deterministic-gate-release-enforcement (pre-fix regression,
+# written before the corresponding fix landed)
+#
+# This is the SECOND regression-test angle for the deterministic-gate-
+# release-enforcement plan (the first is tests/test_gate_guard.sh, wired as
+# Suite 160 in tests/run-all.sh). Each check below asserts the INTENDED
+# post-fix contract (Task-1/Task-2/Task-3/Task-5 of 01-plan.md) — not
+# today's actual behavior — so every check here is EXPECTED TO FAIL until
+# the corresponding task lands, then flips to pass:
+#   - Task-1 (agents/_shared/gate-contract.md): the "Outward-action release
+#     floor" section and the `gate_nonce` field do not exist yet.
+#   - Task-2 (.claude-plugin/hooks.json): no `gate-guard` PreToolUse entry
+#     is wired yet.
+#   - Task-3 (agents/orchestrator.md): the delivery gate still triggers on
+#     today's completion wording, with delivery (push+PR) already having run
+#     earlier in the flow, before the gate — no "prepared locally" wording,
+#     and no heading for the publish step positioned after the gate exists.
+#   - Task-5 (agents/delivery.md): no `mode: prepare` / `mode: publish`
+#     split exists yet — delivery is still a single undifferentiated Phase.
+# A green run of this suite (i.e. these checks passing) is precisely the
+# structural signal that Task-1/2/3/5 have landed — the accepted "flip".
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 161: deterministic-gate-release-enforcement (pre-fix structural regression) ===")
+
+_s161_gate_contract = read(AGENTS_DIR / "_shared" / "gate-contract.md")
+_s161_delivery = read(AGENTS_DIR / "delivery.md")
+_s161_orchestrator = read(AGENTS_DIR / "orchestrator.md")
+_s161_hooks_json = read(REPO_ROOT / ".claude-plugin" / "hooks.json")
+_s161_claude = read(REPO_ROOT / "CLAUDE.md")
+
+# --- Task-1 AC-1: canonical "Outward-action release floor" section --------
+check(
+    "s161(t1-ac1): gate-contract.md declares the canonical 'Outward-action "
+    "release floor' section",
+    "Outward-action release floor" in _s161_gate_contract,
+    "agents/_shared/gate-contract.md must declare '§ Outward-action release "
+    "floor' — Task-1 AC-1 (pending)",
+)
+
+# --- Task-1 AC-2: gate_nonce field ----------------------------------------
+check(
+    "s161(t1-ac2): gate-contract.md's dual-record gains the `gate_nonce` "
+    "field",
+    "gate_nonce" in _s161_gate_contract,
+    "agents/_shared/gate-contract.md must declare a `gate_nonce` field — "
+    "Task-1 AC-2 (pending)",
+)
+
+# --- Task-2 AC-5: gate-guard wired as a PreToolUse hook entry --------------
+check(
+    "s161(t2-ac5): .claude-plugin/hooks.json wires a `gate-guard` PreToolUse "
+    "entry",
+    "gate-guard" in _s161_hooks_json,
+    ".claude-plugin/hooks.json must wire a `gate-guard` hook entry — "
+    "Task-2 AC-5 (pending; hooks/ts/bodies/gate-guard.ts does not exist yet)",
+)
+
+# --- Task-3 AC-1: publish-step heading positioned AFTER the delivery gate -
+_S161_STAGE_GATE_3_ANCHOR = "## STAGE-GATE-3 — End of Stage 3"
+_s161_phase4b_match = re.search(r"^##\s*Phase\s*4b\b", _s161_orchestrator, re.MULTILINE)
+_s161_gate3_idx = _s161_orchestrator.find(_S161_STAGE_GATE_3_ANCHOR)
+check(
+    "s161(t3-ac1): orchestrator.md declares a 'Phase 4b' (publish) heading "
+    "positioned AFTER STAGE-GATE-3",
+    _s161_phase4b_match is not None
+    and _s161_gate3_idx != -1
+    and _s161_phase4b_match.start() > _s161_gate3_idx,
+    "agents/orchestrator.md must split Delivery into Phase 4a (prepare, "
+    "before STAGE-GATE-3) and Phase 4b (publish, after STAGE-GATE-3) — "
+    "Task-3 AC-1 (pending; today Phase 4 push+PR-create runs BEFORE the "
+    "gate, defect #495)",
+)
+
+# --- Task-3 AC-3: delivery-gate trigger/STOP-block wording changes to
+# "prepared locally" (from today's push-already-happened framing) ---------
+check(
+    "s161(t3-ac3): orchestrator.md's STAGE-GATE-3 section uses 'prepared "
+    "locally' wording (delivery prepared but not yet pushed)",
+    "prepared locally" in _s161_orchestrator,
+    "agents/orchestrator.md's STAGE-GATE-3 trigger/STOP block must read "
+    "'delivery prepared locally, ready to push' — Task-3 AC-3 (pending; "
+    "today it reads 'Phase 4.5 completed' with push already having "
+    "happened at Phase 4)",
+)
+
+# --- Task-5 AC-1: delivery.md mode: prepare / mode: publish split ----------
+check(
+    "s161(t5-ac1a): delivery.md declares a `mode: prepare` entry point",
+    "mode: prepare" in _s161_delivery,
+    "agents/delivery.md must declare `mode: prepare` (rama+commits+version+"
+    "changelog+PR-body, local only, no push/pr-create) — Task-5 AC-1 "
+    "(pending)",
+)
+check(
+    "s161(t5-ac1b): delivery.md declares a `mode: publish` entry point",
+    "mode: publish" in _s161_delivery,
+    "agents/delivery.md must declare `mode: publish` (push + gh pr create, "
+    "only after gate3_release: ship) — Task-5 AC-1 (pending)",
+)
+
+# Self-referential guard (hygiene contract) -- mirrors the Suite 152/155/156/
+# 157 pattern. docs/testing.md registration is deliberately NOT self-checked
+# here (per the same rationale as Suite 156/157): it is a documentation edit
+# outside this tester dispatch's test-files-only scope.
+_s161_own = read(Path(__file__))
+check(
+    "suite161(self-ref): test file contains 'Suite 161' and "
+    "'deterministic-gate-release-enforcement'",
+    "Suite 161" in _s161_own and "deterministic-gate-release-enforcement" in _s161_own,
+    "test file must self-reference Suite 161 and the marker "
+    "'deterministic-gate-release-enforcement'",
+)
+check(
+    "suite161(hygiene): CLAUDE.md does NOT contain 'Suite 161' (§11 "
+    "hygiene contract)",
+    "Suite 161" not in _s161_claude,
+    "CLAUDE.md must not mention Suite 161 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: deterministic-gate-release-enforcement
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 162 — deterministic-gate-release-enforcement, anchor-scoped multi-site
+# suite for Invariants A-E. Unlike Suite 161 (a pre-fix regression pinning a
+# handful of early markers), this suite pins every site enumerated in the
+# plan's own Multi-site invariants table, once all sites have landed, with a
+# positive assert per site plus a negative assert wherever a sibling file is
+# fenced MUST-NOT-CHANGE.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 162: deterministic-gate-release-enforcement (anchor-scoped multi-site) ===")
+
+_s162_gate_contract = read(AGENTS_DIR / "_shared" / "gate-contract.md")
+_s162_gate_guard_ts = read(HOOKS_DIR / "ts" / "bodies" / "gate-guard.ts")
+_s162_dev_guard_ts = read(HOOKS_DIR / "ts" / "bodies" / "dev-guard.ts")
+_s162_policy_block_ts = read(HOOKS_DIR / "ts" / "bodies" / "policy-block.ts")
+_s162_run_ts_hook = read(HOOKS_DIR / "run-ts-hook.sh")
+_s162_orchestrator = read(AGENTS_DIR / "orchestrator.md")
+_s162_delivery = read(AGENTS_DIR / "delivery.md")
+_s162_leader = read(AGENTS_DIR / "leader.md")
+_s162_dev_mode = read(REPO_ROOT / "docs" / "dev-mode.md")
+_s162_pipeline_lanes = read(REPO_ROOT / "docs" / "pipeline-lanes.md")
+_s162_subagent_orch = read(REPO_ROOT / "docs" / "subagent-orchestration.md")
+_s162_claude = read(REPO_ROOT / "CLAUDE.md")
+_s162_hooks_json_raw = read(REPO_ROOT / ".claude-plugin" / "hooks.json")
+try:
+    _s162_hooks_json = json.loads(_s162_hooks_json_raw)
+except json.JSONDecodeError:
+    _s162_hooks_json = {}
+
+# --- Invariant A — outward-action release floor ---------------------------
+
+check(
+    "s162(inv-a-canonical): gate-contract.md declares the release floor and "
+    "names gate-guard as its enforcer",
+    "## Outward-action release floor" in _s162_gate_contract
+    and "gate-guard" in _s162_gate_contract,
+    "agents/_shared/gate-contract.md must declare § Outward-action release "
+    "floor and name gate-guard as the enforcer",
+)
+check(
+    "s162(inv-a-enforcer): gate-guard.ts resolves the governing lane via "
+    "mtime-selection and branch/worktree correlation",
+    "GateGuardReader" in _s162_gate_guard_ts
+    and "resolveGoverningLane" in _s162_gate_guard_ts
+    and "laneCorrelates" in _s162_gate_guard_ts,
+    "hooks/ts/bodies/gate-guard.ts must implement multi-topology governing-"
+    "lane resolution",
+)
+_s162_pretooluse = _s162_hooks_json.get("hooks", {}).get("PreToolUse", [])
+_s162_gate_guard_wired = any(
+    invokes_launcher(h.get("command", ""), "gate-guard")
+    for e in _s162_pretooluse
+    for h in e.get("hooks", [])
+)
+check(
+    "s162(inv-a-wiring): .claude-plugin/hooks.json wires gate-guard through "
+    "the run-ts-hook.sh launcher on a PreToolUse entry",
+    _s162_gate_guard_wired,
+    ".claude-plugin/hooks.json must route a PreToolUse entry through "
+    "run-ts-hook.sh gate-guard",
+)
+check(
+    "s162(inv-a-launcher): run-ts-hook.sh lists gate-guard in the deny-floor "
+    "launcher class",
+    re.search(r"\bgate-guard\)", _s162_run_ts_hook) is not None,
+    "hooks/run-ts-hook.sh must list gate-guard among the deny-floor hooks",
+)
+check(
+    "s162(inv-a-producer-gate3): orchestrator.md's STAGE-GATE-3 records "
+    "gate3_release: ship",
+    "gate3_release: ship" in _s162_orchestrator,
+    "agents/orchestrator.md must record gate3_release: ship at STAGE-GATE-3",
+)
+check(
+    "s162(inv-a-producer-working-branch): orchestrator.md declares "
+    "working_branch as the gate-guard correlation key in both topologies",
+    "working_branch" in _s162_orchestrator
+    and "gate-guard" in _s162_orchestrator,
+    "agents/orchestrator.md must declare a working_branch field consumed by "
+    "gate-guard",
+)
+check(
+    "s162(inv-a-outward-actor): delivery.md's mode: publish is the sole "
+    "outward push/PR-create actor",
+    "mode: publish" in _s162_delivery and "gate3_release" in _s162_delivery,
+    "agents/delivery.md's mode: publish must be gated on gate3_release",
+)
+check(
+    "s162(inv-a-reorder-full): orchestrator.md splits Delivery into Phase 4a "
+    "(prepare) and Phase 4b (publish)",
+    "## Phase 4a — Delivery (prepare)" in _s162_orchestrator
+    and "## Phase 4b — Delivery (publish)" in _s162_orchestrator,
+    "agents/orchestrator.md must declare both Phase 4a and Phase 4b headings",
+)
+check(
+    "s162(inv-a-express-no-reorder): orchestrator.md's Express Lane Profile "
+    "already gates before delivery runs (unchanged by this design)",
+    "## Express Lane Profile" in _s162_orchestrator
+    and "gate-guard` on express" in _s162_orchestrator,
+    "agents/orchestrator.md's Express Lane Profile must document gate-guard "
+    "detecting the already-correct express ordering",
+)
+check(
+    "s162(inv-a-inline-defers): pipeline-lanes.md documents inline deferring "
+    "to dev-guard (no orchestrator state for gate-guard to correlate)",
+    "no orchestrator" in _s162_pipeline_lanes
+    and "gate-guard" in _s162_pipeline_lanes,
+    "docs/pipeline-lanes.md must document the inline lane deferring to "
+    "dev-guard for gate-guard's decision",
+)
+check(
+    "s162(inv-a-takeover): subagent-orchestration.md's takeover manifest "
+    "covers gate-guard by construction (reads 00-state.md, not which agent "
+    "is dispatching)",
+    "gate-guard" in _s162_subagent_orch and "takeover" in _s162_subagent_orch.lower(),
+    "docs/subagent-orchestration.md must document gate-guard covering the "
+    "takeover/inline dispatch path",
+)
+check(
+    "s162(inv-a-lane-uniformity): pipeline-lanes.md's site enumeration lists "
+    "the outward-action release-floor invariant",
+    "Outward-action release-floor invariant" in _s162_pipeline_lanes,
+    "docs/pipeline-lanes.md must enumerate the outward-action release-floor "
+    "invariant among its per-lane sites",
+)
+
+# --- Invariant B — gate-nonce ------------------------------------------------
+
+check(
+    "s162(inv-b-canonical): gate-contract.md's dual-record declares a fresh, "
+    "single-use gate_nonce, never valid from the spawn payload",
+    "gate_nonce" in _s162_gate_contract and "single-use" in _s162_gate_contract,
+    "agents/_shared/gate-contract.md must declare gate_nonce as fresh and "
+    "single-use",
+)
+check(
+    "s162(inv-b-producer): orchestrator.md embeds and verifies gate_nonce at "
+    "every gate, including the Express combined gate",
+    _s162_orchestrator.count("gate_nonce") >= 3
+    and "Express combined gate" in _s162_orchestrator,
+    "agents/orchestrator.md must embed/verify gate_nonce at STAGE-GATE-1/2/3 "
+    "and the Express combined gate",
+)
+check(
+    "s162(inv-b-carrier): leader.md carries gate_nonce unmodified through the "
+    "relay, never treating it as an authentication factor",
+    "gate_nonce" in _s162_leader
+    and "not a secret" in _s162_leader,
+    "agents/leader.md must carry gate_nonce verbatim and disclaim it as a "
+    "freshness token, not a secret",
+)
+
+# --- Invariant C — dev-guard gh pr create coverage preserved ----------------
+
+check(
+    "s162(inv-c-enforcer): dev-guard.ts still preserves the gh pr create "
+    "ask-default + autogate.pr_create opt-in, unregressed",
+    "isPrCreateAutogateEnabled" in _s162_dev_guard_ts
+    and "autogate" in _s162_dev_guard_ts,
+    "hooks/ts/bodies/dev-guard.ts must retain its gh pr create autogate "
+    "opt-in path",
+)
+check(
+    "s162(inv-c-doc): dev-mode.md's outward-action table still lists gh pr "
+    "create's ask-default + autogate opt-in",
+    "autogate.pr_create" in _s162_dev_mode,
+    "docs/dev-mode.md must document gh pr create's ask-default + autogate "
+    "opt-in",
+)
+
+# --- Invariant D — hook catalogue registration -----------------------------
+
+check(
+    "s162(inv-d-catalogue): CLAUDE.md §5 and dev-mode.md both name gate-guard "
+    "in the enumerated hook catalogue",
+    "gate-guard" in _s162_claude and "gate-guard" in _s162_dev_mode,
+    "CLAUDE.md and docs/dev-mode.md must both name gate-guard",
+)
+_s162_gh_pr_merge_block = re.search(
+    r"GH_PR_MERGE_RE\.test.*?\n(.*?\n){0,4}", _s162_dev_guard_ts, re.DOTALL
+)
+check(
+    "s162(inv-d-fenced-merge-ask): dev-guard.ts's gh pr merge row is still "
+    "ask, untouched by this design",
+    _s162_gh_pr_merge_block is not None
+    and "ask(" in _s162_gh_pr_merge_block.group(0),
+    "hooks/ts/bodies/dev-guard.ts's gh pr merge handling must remain ask "
+    "(fenced MUST-NOT-CHANGE)",
+)
+
+# --- Invariant E — force-push deny floor ------------------------------------
+
+check(
+    "s162(inv-e-canonical): gate-contract.md's force-push clause denies "
+    "unconditionally on gate3_release, in-lane, both sub-forms",
+    "DENY unconditional on `gate3_release`" in _s162_gate_contract
+    and "+`-prefixed refspec" in _s162_gate_contract,
+    "agents/_shared/gate-contract.md must declare the force-push clause as "
+    "unconditional on gate3_release, covering both sub-forms",
+)
+check(
+    # Task-9 (Invariant G) replaced the character-denylist force-push
+    # detection (FORCE_FLAG_RE/FORCE_REFSPEC_RE/isForcePush/
+    # hasShellReconstructionChar) with the shared closed positive grammar
+    # (matchBenignPushGrammar, command-lexer.ts) — this anchor was updated
+    # to the new symbols; see Suite 164 for the full single-source contract.
+    "s162(inv-e-enforcer): gate-guard.ts denies force-push (flag, "
+    "+refspec, and non-benign-shape forms) before reading gate3_release, "
+    "via the shared positive grammar",
+    "matchBenignPushGrammar" in _s162_gate_guard_ts
+    and "!matchBenignPushGrammar(rawCmd).matched) {\n    return deny("
+    in _s162_gate_guard_ts,
+    "hooks/ts/bodies/gate-guard.ts must deny any push that does not match "
+    "the shared benign-push grammar, unconditionally on gate3_release",
+)
+
+_s162_policy_force_row = (
+    r"-f\b|--force\b|--force-with-lease" in _s162_policy_block_ts
+)
+check(
+    "s162(inv-e-fenced-policy-block-pos): policy-block.ts's unconditional "
+    "flag-based force-push deny pattern is still present",
+    _s162_policy_force_row,
+    "hooks/ts/bodies/policy-block.ts must retain its force-push flag regex "
+    "(fenced MUST-NOT-CHANGE)",
+)
+check(
+    "s162(inv-e-fenced-policy-block-neg): policy-block.ts still DENIES "
+    "force-push (never downgraded to ask)",
+    "return deny(label);" in _s162_policy_block_ts
+    and "return ask(label);" not in _s162_policy_block_ts,
+    "hooks/ts/bodies/policy-block.ts's DENIED_BASH consumption must still "
+    "call deny(), never ask()",
+)
+
+_s162_refspec_match = re.search(
+    r'refspec\.startsWith\("\+"\)\)\s*\{(.*?)\}', _s162_dev_guard_ts, re.DOTALL
+)
+_s162_refspec_block = _s162_refspec_match.group(1) if _s162_refspec_match else ""
+check(
+    "s162(inv-e-fenced-dev-guard-pos): dev-guard.ts's outside-lane +refspec "
+    "handling is still present",
+    _s162_refspec_match is not None and "force-prefixed refspec" in _s162_refspec_block,
+    "hooks/ts/bodies/dev-guard.ts must retain its +refspec detection "
+    "(fenced MUST-NOT-CHANGE)",
+)
+check(
+    "s162(inv-e-fenced-dev-guard-neg): dev-guard.ts's +refspec handling "
+    "still asks (never allows) outside a detected lane",
+    "ask(" in _s162_refspec_block and "allow(" not in _s162_refspec_block,
+    "hooks/ts/bodies/dev-guard.ts's +refspec handling must still resolve "
+    "to ask(), never allow()",
+)
+check(
+    "s162(inv-e-outward-actor): delivery.md's publish step never force-"
+    "pushes and cites gate-guard's unconditional deny as the backstop",
+    "NEVER** force push" in _s162_delivery and "gate-guard" in _s162_delivery,
+    "agents/delivery.md must promise no force-push and cite gate-guard",
+)
+check(
+    "s162(inv-e-doc): dev-mode.md documents the force-push floor as layered, "
+    "not redundant, over policy-block and dev-guard",
+    "Force-push floor" in _s162_dev_mode and "Non-redundancy rationale" in _s162_dev_mode,
+    "docs/dev-mode.md must document the layered force-push floor rationale",
+)
+
+# --- Self-referential guard (mirrors Suite 161's own pattern) ---------------
+
+_s162_own = read(Path(__file__))
+check(
+    "suite162(self-ref): test file contains 'Suite 162' and "
+    "'deterministic-gate-release-enforcement'",
+    "Suite 162" in _s162_own and "deterministic-gate-release-enforcement" in _s162_own,
+    "test file must self-reference Suite 162 and the marker "
+    "'deterministic-gate-release-enforcement'",
+)
+check(
+    "suite162(hygiene): CLAUDE.md does NOT contain 'Suite 162' (§11 hygiene "
+    "contract)",
+    "Suite 162" not in _s162_claude,
+    "CLAUDE.md must not mention Suite 162 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: deterministic-gate-release-enforcement
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 163 — deterministic-gate-release-enforcement, gap-closure checks for
+# sites the anchor-scoped suite above did not yet pin: the integrity-model
+# sub-clauses, the allowlist/override consistency note, the router's
+# case-insensitive/runtime-pure claim, the reordered dispatch-reference and
+# recovery text, the leader's no-pre-declaration rule and verbatim-relay
+# text, the local diff's freshness premise, and the sibling-hook contrast
+# in the reasoning-checkpoint doc.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 163: deterministic-gate-release-enforcement (gap-closure) ===")
+
+_s163_gate_contract = read(AGENTS_DIR / "_shared" / "gate-contract.md")
+_s163_gate_guard_ts = read(HOOKS_DIR / "ts" / "bodies" / "gate-guard.ts")
+_s163_orchestrator = read(AGENTS_DIR / "orchestrator.md")
+_s163_leader = read(AGENTS_DIR / "leader.md")
+_s163_reasoning_checkpoint = read(REPO_ROOT / "docs" / "reasoning-checkpoint.md")
+_s163_claude = read(REPO_ROOT / "CLAUDE.md")
+
+# --- gate-contract.md's integrity-model rewrite: the three declared layers -
+check(
+    "s163(t1-ac3a): gate-contract.md's integrity model declares the new "
+    "order floor and that gh pr create/push were already covered "
+    "elsewhere, not by order",
+    "gate-guard" in _s163_gate_contract
+    and "ORDER" in _s163_gate_contract
+    and "auto-`allow`ed" in _s163_gate_contract,
+    "agents/_shared/gate-contract.md's integrity model must state the new "
+    "deterministic order floor and the pre-existing destination coverage "
+    "it complements",
+)
+check(
+    "s163(t1-ac3b): gate-contract.md's integrity model declares no "
+    "writer-identity verification is added",
+    "verify writer identity" in _s163_gate_contract
+    and "writer-identity residual" in _s163_gate_contract,
+    "agents/_shared/gate-contract.md must declare that the release-floor "
+    "field read adds no writer-identity verification",
+)
+check(
+    "s163(t1-ac3c): gate-contract.md's integrity model declares the "
+    "approval-to-push content-drift residual and cites the matching "
+    "knowledge-graph pattern",
+    "content-drift" in _s163_gate_contract
+    and "pattern-agent-executed-safety-predicate-no-true-atomicity" in _s163_gate_contract,
+    "agents/_shared/gate-contract.md must cite the content-drift residual "
+    "and the matching knowledge-graph pattern name",
+)
+
+# --- gate-contract.md's allowlist stays consistent with the override reply -
+check(
+    "s163(t1-ac4): gate-contract.md declares `override {reason}` maps 1:1 "
+    "onto the same recorded value a bare `ship` reply writes",
+    "override {reason}" in _s163_gate_contract
+    and "gate3_release ∈ {ship}" in _s163_gate_contract,
+    "agents/_shared/gate-contract.md must declare override {reason} maps "
+    "onto the ship value the release-floor check reads",
+)
+
+# --- gate-guard.ts stays runtime-pure and its routers stay case-insensitive
+_s163_runtime_branch = re.search(
+    r"input\.runtime\s*[=!]=|if\s*\([^)]*input\.runtime", _s163_gate_guard_ts
+)
+check(
+    "s163(t2-ac6): gate-guard.ts never branches on the caller runtime and "
+    "its command routers are case-insensitive",
+    _s163_runtime_branch is None
+    and re.search(r"GIT_PUSH_RE\s*=\s*/.*?/i;", _s163_gate_guard_ts) is not None
+    and re.search(r"GH_PR_CREATE_RE\s*=\s*/.*?/i;", _s163_gate_guard_ts) is not None,
+    "hooks/ts/bodies/gate-guard.ts must stay runtime-pure and keep its "
+    "git push / gh pr create routers case-insensitive",
+)
+
+# --- orchestrator.md's dispatch-reference table and resume text reflect the
+# reordered delivery split --------------------------------------------------
+_s163_dispatch_ref = _slice_section(
+    _s163_orchestrator, "## Phase Dispatch Reference", ("\n## ",)
+)
+check(
+    "s163(t3-ac4a): orchestrator.md's dispatch-reference table lists the "
+    "prepare/publish delivery split gated by the delivery gate",
+    bool(_s163_dispatch_ref)
+    and "mode: prepare" in _s163_dispatch_ref
+    and "mode: publish" in _s163_dispatch_ref,
+    "agents/orchestrator.md's Phase Dispatch Reference table must list "
+    "both delivery modes",
+)
+_s163_recovery = _slice_section(
+    _s163_orchestrator, "## Recovery Instructions", ("\n## ",)
+)
+check(
+    "s163(t3-ac4b): orchestrator.md's resume text names gate-guard as the "
+    "independent order enforcer and distinguishes the two delivery "
+    "sub-phases",
+    bool(_s163_recovery)
+    and "gate-guard" in _s163_recovery
+    and "4a" in _s163_recovery
+    and "4b" in _s163_recovery,
+    "agents/orchestrator.md's Recovery Instructions must reference "
+    "gate-guard and both delivery sub-phases",
+)
+
+# --- leader.md never carries a gate decision in a spawn payload, and the ---
+# relay text names the exact attribution triple -----------------------------
+check(
+    "s163(t4-ac1): leader.md's dispatch-invariant rule forbids any "
+    "pre-declared gate decision in an orchestrator's spawn payload",
+    "spawn payload never carries a gate decision" in _s163_leader
+    and "standing approval" in _s163_leader,
+    "agents/leader.md must declare that the spawn payload never carries a "
+    "gate decision and reject any pre-declared standing approval",
+)
+check(
+    "s163(t4-ac2): leader.md's relay text carries the operator's verbatim "
+    "words, the nonce, and the leader-relayed-operator provenance marker "
+    "together",
+    "verbatim" in _s163_leader
+    and "leader-relayed-operator" in _s163_leader
+    and "gate_nonce" in _s163_leader,
+    "agents/leader.md must document relaying the verbatim reply with the "
+    "nonce and the leader-relayed-operator provenance marker",
+)
+
+# --- orchestrator.md's pre-push review reads a LOCAL diff, and the branch --
+# base it diffs against was fetched fresh, not a possibly stale local ref --
+_s163_review_slice = _slice_section(_s163_orchestrator, "## Phase 4.5", ("\n## ",))
+check(
+    "s163(t5-ac2a): orchestrator.md's pre-push review reads a local diff "
+    "against the recorded branch base rather than a pushed remote branch",
+    bool(_s163_review_slice)
+    and "{worktree_base}...HEAD" in _s163_review_slice
+    and "local" in _s163_review_slice,
+    "agents/orchestrator.md's pre-push review must diff {worktree_base}"
+    "...HEAD locally, not a pushed remote branch",
+)
+check(
+    "s163(t5-ac2b): leader.md fetches the remote default branch fresh "
+    "before pinning a new branch's base, so the pre-push review's base "
+    "reference is not a stale local ref",
+    "git fetch origin main" in _s163_leader and "origin/main" in _s163_leader,
+    "agents/leader.md must fetch origin main fresh before basing a new "
+    "branch, keeping the pre-push review's base reference current",
+)
+
+# --- reasoning-checkpoint.md contrasts gate-guard against checkpoint-guard -
+check(
+    "s163(t6-ac2): reasoning-checkpoint.md contrasts gate-guard's "
+    "outward-order trust model against checkpoint-guard's pedagogical-"
+    "pause trust model, naming both hooks",
+    "gate-guard" in _s163_reasoning_checkpoint
+    and "checkpoint-guard" in _s163_reasoning_checkpoint
+    and "Sibling deterministic floor" in _s163_reasoning_checkpoint,
+    "docs/reasoning-checkpoint.md must contrast gate-guard against "
+    "checkpoint-guard's trust model, naming both hooks",
+)
+
+# --- both routers import the same shared tokenization pre-pass module, so
+# the quoted-literal fix lives in exactly one place, not two copies --------
+_s163_dev_guard_ts = read(HOOKS_DIR / "ts" / "bodies" / "dev-guard.ts")
+check(
+    "s163(t8-ac6): dev-guard.ts and gate-guard.ts both import the shared "
+    "prepareRoutableCommand pre-pass from the same lexer module rather "
+    "than each carrying its own copy",
+    "prepareRoutableCommand" in _s163_dev_guard_ts
+    and 'from "./command-lexer.js"' in _s163_dev_guard_ts
+    and "prepareRoutableCommand" in _s163_gate_guard_ts
+    and 'from "./command-lexer.js"' in _s163_gate_guard_ts,
+    "hooks/ts/bodies/dev-guard.ts and hooks/ts/bodies/gate-guard.ts must "
+    "both import prepareRoutableCommand from the shared command-lexer "
+    "module",
+)
+
+# --- Self-referential guard (mirrors Suite 161/162's own pattern) ----------
+_s163_own = read(Path(__file__))
+check(
+    "suite163(self-ref): test file contains 'Suite 163' and "
+    "'deterministic-gate-release-enforcement'",
+    "Suite 163" in _s163_own and "deterministic-gate-release-enforcement" in _s163_own,
+    "test file must self-reference Suite 163 and the marker "
+    "'deterministic-gate-release-enforcement'",
+)
+check(
+    "suite163(hygiene): CLAUDE.md does NOT contain 'Suite 163' (repo "
+    "hygiene contract — only docs/testing.md is the canonical registry)",
+    "Suite 163" not in _s163_claude,
+    "CLAUDE.md must not mention Suite 163 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: deterministic-gate-release-enforcement
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 164 — deterministic-gate-release-enforcement, Task-9 (pre-fix
+# regression, positive-grammar replacement for force-push detection).
+# Anchors Invariant G's single-source requirement (AC-7) and its
+# not-reappear requirement (AC-4/AC-9): the character-denylist symbols this
+# task REPLACES must be ABSENT from gate-guard.ts, and the new shared
+# positive-grammar symbols must exist ONLY in command-lexer.ts. Every check
+# below asserts the INTENDED post-Task-9 contract, not today's actual
+# structure — the negative-assert checks (t9-ac9a/b) currently FAIL because
+# the old symbols still exist today, and the positive-existence checks
+# (t9-ac7a-d) currently FAIL because the new symbols do not exist yet. A
+# green run of this suite is the structural signal that Task-9 has landed.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 164: deterministic-gate-release-enforcement (Task-9, positive-grammar pre-fix) ===")
+
+_s164_command_lexer_ts = read(HOOKS_DIR / "ts" / "bodies" / "command-lexer.ts")
+_s164_gate_guard_ts = read(HOOKS_DIR / "ts" / "bodies" / "gate-guard.ts")
+_s164_dev_guard_ts = read(HOOKS_DIR / "ts" / "bodies" / "dev-guard.ts")
+_s164_claude = read(REPO_ROOT / "CLAUDE.md")
+
+# --- AC-7/AC-4/AC-9: new shared positive-grammar symbols exist, and exist
+# ONLY in command-lexer.ts (never redefined in gate-guard.ts/dev-guard.ts) --
+_S164_NEW_SYMBOLS = (
+    "matchBenignPushGrammar",
+    "isLiteralSafeCommand",
+    "isBenignPushFlag",
+    "isPlainBranchName",
+)
+for _sym in _S164_NEW_SYMBOLS:
+    check(
+        f"s164(t9-ac7-{_sym}): command-lexer.ts declares `{_sym}`",
+        re.search(rf"\bfunction\s+{_sym}\s*\(", _s164_command_lexer_ts) is not None,
+        f"hooks/ts/bodies/command-lexer.ts must declare `{_sym}` — Task-9 "
+        f"AC-7 (pending)",
+    )
+    check(
+        f"s164(t9-ac7-{_sym}-single-source): `{_sym}` is not REDEFINED as "
+        "its own function declaration in gate-guard.ts or dev-guard.ts "
+        "(import-only)",
+        re.search(rf"\bfunction\s+{_sym}\s*\(", _s164_gate_guard_ts) is None
+        and re.search(rf"\bfunction\s+{_sym}\s*\(", _s164_dev_guard_ts) is None,
+        f"hooks/ts/bodies/gate-guard.ts and hooks/ts/bodies/dev-guard.ts "
+        f"must import `{_sym}` from command-lexer.ts, never redefine it — "
+        "Task-9 AC-7 (single-source)",
+    )
+
+check(
+    "s164(t9-ac7-import-gate-guard): gate-guard.ts imports "
+    "matchBenignPushGrammar from the shared command-lexer module",
+    'matchBenignPushGrammar' in _s164_gate_guard_ts
+    and 'from "./command-lexer.js"' in _s164_gate_guard_ts,
+    "hooks/ts/bodies/gate-guard.ts must import matchBenignPushGrammar from "
+    "./command-lexer.js — Task-9 AC-7 (pending)",
+)
+check(
+    "s164(t9-ac7-import-dev-guard): dev-guard.ts imports the shared "
+    "char-gate predicates (isLiteralSafeCommand/isBenignPushFlag/"
+    "isPlainBranchName) from the shared command-lexer module",
+    "isLiteralSafeCommand" in _s164_dev_guard_ts
+    and 'from "./command-lexer.js"' in _s164_dev_guard_ts,
+    "hooks/ts/bodies/dev-guard.ts must import isLiteralSafeCommand from "
+    "./command-lexer.js — Task-9 AC-7 (pending)",
+)
+
+# --- AC-4/AC-9: the OLD character-denylist symbols this task replaces are
+# ABSENT from gate-guard.ts (negative-assert, not-reappear) ----------------
+_S164_OLD_SYMBOLS = (
+    "isForcePush",
+    "hasShellReconstructionChar",
+    "FORCE_FLAG_RE",
+    "FORCE_REFSPEC_RE",
+)
+for _sym in _S164_OLD_SYMBOLS:
+    check(
+        f"s164(t9-ac4/ac9-not-reappear-{_sym}): gate-guard.ts does NOT "
+        f"contain the retired character-denylist symbol `{_sym}`",
+        _sym not in _s164_gate_guard_ts,
+        f"hooks/ts/bodies/gate-guard.ts must not carry the retired "
+        f"character-denylist symbol `{_sym}` — Task-9 AC-4/AC-9 (pending; "
+        f"it is replaced by the shared positive-grammar matcher)",
+    )
+
+# --- AC-5: dev-guard.ts's old Step 0 char-denylist constant is retired in
+# favor of the shared isLiteralSafeCommand predicate ------------------------
+check(
+    "s164(t9-ac5): dev-guard.ts's Step 0 push recognizer no longer declares "
+    "its own local SHELL_QUOTING_OR_EXPANSION_RE char-denylist constant",
+    "SHELL_QUOTING_OR_EXPANSION_RE" not in _s164_dev_guard_ts,
+    "hooks/ts/bodies/dev-guard.ts must retire its local "
+    "SHELL_QUOTING_OR_EXPANSION_RE constant in favor of the shared "
+    "isLiteralSafeCommand char-gate — Task-9 AC-5 (pending)",
+)
+
+# --- AC-9: the fix does not touch the verb routers (byte-identical) -------
+check(
+    "s164(t9-ac9-routers-untouched): gate-guard.ts's verb routers "
+    "(GIT_PUSH_RE/GH_PR_CREATE_RE) are still present, unmodified by the "
+    "force-detection replacement",
+    "GIT_PUSH_RE" in _s164_gate_guard_ts and "GH_PR_CREATE_RE" in _s164_gate_guard_ts,
+    "hooks/ts/bodies/gate-guard.ts's covered-verb routers must remain "
+    "untouched by the Task-9 force-detection replacement",
+)
+
+# --- Self-referential guard (mirrors Suite 161/162/163's own pattern) ------
+_s164_own = read(Path(__file__))
+check(
+    "suite164(self-ref): test file contains 'Suite 164' and "
+    "'deterministic-gate-release-enforcement'",
+    "Suite 164" in _s164_own and "deterministic-gate-release-enforcement" in _s164_own,
+    "test file must self-reference Suite 164 and the marker "
+    "'deterministic-gate-release-enforcement'",
+)
+check(
+    "suite164(hygiene): CLAUDE.md does NOT contain 'Suite 164' (repo "
+    "hygiene contract — only docs/testing.md is the canonical registry)",
+    "Suite 164" not in _s164_claude,
+    "CLAUDE.md must not mention Suite 164 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: deterministic-gate-release-enforcement
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------

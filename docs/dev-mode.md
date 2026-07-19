@@ -18,6 +18,7 @@ The gate fires UNCONDITIONALLY for covered outward actions and gates by destinat
 |---|---|---|
 | Push to a remote: single recognized refspec targeting a non-default branch on `origin` (no force/mirror/all/tags/delete) | `allow` | The closed-form recognizer confirms the destination is a non-default branch on `origin` — a routine feature-branch push proceeds without a prompt |
 | Push to a remote: default branch, tag, force (flag or `+refspec`/`--mirror`), multi-refspec, delete refspec, or a remote other than `origin` | `ask` | Any push outside the single recognized safe form is an irreversible outward action |
+| `gh pr create` | `ask` by default; `allow` under the opt-in config key `autogate.pr_create: true` (`hooks/ts/bodies/dev-guard.ts:743-754`) | Opens a PR — an outward, GitHub-visible action; the opt-in exists for operators who want to remove the double-prompt on top of the `gate-guard` order floor below |
 | `gh pr merge` | `ask` | Merges to main cannot be undone |
 | `gh pr review` (including `--dismiss`) | `ask` | Publishes a review on behalf of the operator |
 | `gh pr comment` | `ask` | Publishes a comment on behalf of the operator |
@@ -36,6 +37,67 @@ The gate fires UNCONDITIONALLY for covered outward actions and gates by destinat
 **No authorisation file.** A file that the agent can write with `echo authorized > ...` is forgeable by the same subject the gate protects — it is not a control. The authorisation is `ask` (human), not a file.
 
 **Residual limit (documented honesty):** obfuscation via `eval`/`base64`/alias/heredoc — and reconstruction of a gated verb the router cannot see as a contiguous token, whether by quote/backslash splicing (`''git push`, `g''it push`) or by parameter/command expansion (`p=push; git $p …`) — is a known limit of any string-matching gate (parity with `policy-block`). The threat model is disposition that rationalises the readable path — not an adversary who actively obfuscates; for the injected-obfuscation case the prompt-injection floor (§6.6) is the primary defense.
+
+---
+
+## Deterministic order floor (`gate-guard`) — deny vs ask, and the force-push floor (Invariant E)
+
+**`gh pr create` correction — already covered, not net-new.** The table above lists `gh pr create` as `ask` by default with an `allow` opt-in (`autogate.pr_create`) — that coverage PRE-DATES this section and is unchanged by it. The net-new contribution documented below is the ORDER floor (`gate-guard`), not `gh pr create` coverage.
+
+**What `gate-guard` adds.** `gate-guard` (`hooks/ts/bodies/gate-guard.ts`, its own dedicated PreToolUse `Bash` entry, structural sibling of `prepublish-guard`) is a SEPARATE deterministic hook that closes a gap neither `dev-guard` nor `policy-block` addressed: whether a `git push` / `gh pr create` from a pipeline lane is preceded by a recorded `gate3_release: ship` for that lane. It resolves the governing lane by mtime-selecting the active `00-state.md` — parity with `checkpoint-guard`'s `selectByMtime` (local workspaces subtree +, when configured, the obsidian vault subtree) — then correlates the current git context against that lane's `working_branch` field, valid in BOTH delivery topologies: a worktree lane (`realpath(cwd()) == realpath(worktree)`) and a branch-in-place lane (`worktree: null`, resolved purely by branch-name match against `working_branch`). Full contract: `agents/_shared/gate-contract.md § "Outward-action release floor"`.
+
+**Block-on-condition / open-on-fault, fail-closed once a lane resolves.** Once a governing lane RESOLVES, `gate-guard` is fail-closed: `gate3_release ∈ {ship}` → `none` (permit); any other value (`null`, `amend`, `abort`), or a field-read fault discovered after the lane already resolved, → `deny`. When NO lane resolves at all — a manual developer push, an inline (no-orchestrator) session, an unrelated repository, or no active `00-state.md` found — `gate-guard` defers: `decision: none`. `none` is reserved exclusively for "no lane resolved"; it is never returned for a resolved lane with a corrupt or missing field.
+
+**Deny (`gate-guard`, ORDER) vs ask (`dev-guard`, destination) — independent and additive, not a replacement.** `gate-guard`'s decision set is `{none, deny}` only — it never emits `ask`, so it neither inherits nor removes the ask-class caveat below, which continues to apply unchanged to `dev-guard`'s own `ask` on `gh pr create`/`gh pr merge`. `dev-guard` gates by WHAT the command targets (destination), unconditionally on session state. `gate-guard` gates by WHETHER a release was recorded before this specific invocation (order), only when a pipeline lane resolves. A push/pr-create from a detected lane must clear BOTH checks independently — `gate-guard`'s order deny AND `dev-guard`'s destination-based ask/allow — neither one substitutes for the other.
+
+**Residuals this floor does NOT close.** `gate-guard` reads `gate3_release` — an intra-privilege-forgeable field, per the same no-writer-identity limit as every other gate-release field (`agents/_shared/gate-contract.md § "Integrity model"`, layer 1): nothing distinguishes which agent wrote it, and this addition does not verify writer identity. Nor does it bind CONTENT: `gate3_release: ship` fixes ORDER (that the release preceded the push), not a tree hash — HEAD can move between recording `ship` and the push actually running (an `amend`, a concurrent mutation), so the pushed tree can differ from the one the operator saw at the gate. This content-drift residual is mitigated elsewhere (an `amend` re-runs Internal Review and regenerates the gate nonce), never by `gate-guard` itself — see `agents/_shared/gate-contract.md § "Integrity model"` for the full honesty statement.
+
+**Force-push floor (Invariant E, operator-mandated) — layered, not redundant.** `gate-guard` also denies, unconditionally on `gate3_release`, a force-push from a detected pipeline lane in EITHER form: the flag form (`-f`, `--force`, `--force-with-lease`) or the `+`-prefixed refspec form (`git push origin +feature:main`) — force-push is never legitimate from an in-lane pipeline delivery, so `ship` does not authorize it. This deny layers on top of two pre-existing floors, unchanged by this design:
+
+- `policy-block`'s unconditional flag-based force-push deny (`hooks/ts/bodies/policy-block.ts:295` — `/git\s+push\s+(?:[^|]*\s)?(-f\b|--force\b|--force-with-lease)/i`), which applies in every context, pipeline or not.
+- `dev-guard`'s outside-lane `ask` on a `+`-prefixed refspec (`hooks/ts/bodies/dev-guard.ts:559-561`), destination-only, with no lane-state read.
+
+**Detection mechanism (Invariant G) — a shared closed positive grammar, not a
+character-denylist.** `gate-guard`'s force/shape check calls `command-lexer.ts`'s
+`matchBenignPushGrammar(rawCmd)`. It permits ONLY the exact benign push shape — `git
+push [-u|--set-upstream|-v|--verbose|--progress] origin <plain-branch>`, where
+`<plain-branch>` excludes any ref-namespace-qualified or tag-like destination (a
+destination whose first `/`-segment is `refs`/`heads`/`tags`/`remotes`, checked via
+`isPlainBranchDestination`), with the `origin <plain-branch>` positional pair
+required and every character of the command inside the safe set
+`[A-Za-z0-9 _./-]` — and denies every deviation from that one shape: no force flag, no
+`+`-prefixed refspec, and no character-based reconstruction technique (quoting,
+backslash-escaping, `$`-expansion/substitution, backtick substitution, brace
+expansion, globbing, process substitution) can pass, because each requires a character
+outside the safe set. A dash-prefixed positional (`git push origin -f`) is closed
+separately: every dash-prefixed token, in any position, is classified as a flag and
+checked against the same benign allowlist. This replaces an earlier character-denylist
+implementation of the same invariant, defeated three times by three different shell
+token-reconstruction techniques — a denylist can only enumerate the constructions it
+already knows about, while a positive grammar denies anything that is not the one
+permitted shape, known or not. `dev-guard`'s Step 0 push char-gate (`rejectShell
+QuotingOrComposition`) consumes the same shared `isLiteralSafeCommand` predicate, so
+both hooks apply an identical, single-sourced char-gate rather than two independently
+maintained denylists.
+
+**Honest scope of the grammar (string-level, not resolved-execution-level).** The
+grammar reasons about what the git-push command STRING can express, not the resolved
+argv, binary, git config, or environment a real shell would ultimately execute. A `git`
+shell alias or function, a shadowing `git` binary earlier on `PATH`,
+`push.default`/`remote.origin.push` git config (closed for the commands that pass the
+grammar by the required `origin <plain-branch>` positional, since those config keys
+only apply to a bare/no-refspec push), or a `GIT_*` environment-variable override are
+all out of scope by design — an attacker who controls any of those already has code
+execution in the session and does not need to smuggle a force-push through a git
+command string. This is the same class of limit every string-inspecting hook in this
+repo already carries (`policy-block`, `dev-guard`, the retired denylist), not a
+regression introduced by this mechanism.
+
+**Non-redundancy rationale.** `gate-guard`'s own deny is not superfluous: (i) it gives `gate-guard` a self-sufficient in-lane guarantee that does not depend on a sibling hook's regex never changing — a defense-in-depth stance consistent with this repo's own recurring lesson that a contract enforced at one site alone tends to drift from its siblings; (ii) it is the ONLY hook that closes the `+refspec` sub-form for the in-lane case — `policy-block`'s flag-only regex does not match a bare `+`-prefix, and `dev-guard`'s handling of that sub-form is destination-only and never reads pipeline-lane state.
+
+**This design never touches or works around server-side branch protections.** Nothing here bypasses, disables, or reconfigures a repository's branch-protection rules. Mutating `gh api` writes remain `ask` under `dev-guard`, unchanged.
+
+**The philosophy this design anchors: only two hard points.** Force-push (deny in-lane, `ask` outside) and merge (always `ask`, non-configurable) are the only two hard points in the outward-action model; every other git operation — branching, committing, pushing to a feature branch, opening a PR — stays frictionless. "Merge" in this statement means a **PR merge** — `gh pr merge`, or any action that lands commits on `main` or another protected branch — never a LOCAL `git merge origin/main` into the pipeline's own working branch (an ordinary fast-forward/update, which is unremarkable git handling and must never be asked or denied). This distinction holds in the actual matcher: `dev-guard.ts`'s `GH_PR_MERGE_RE` (`hooks/ts/bodies/dev-guard.ts:211-212`) matches only the literal `gh pr merge` CLI subcommand — lexically distinct from `git merge` — and `gate-guard.ts` introduces no matcher for any form of "merge" at all; a local `git merge` is not a covered action for either hook.
 
 ---
 
