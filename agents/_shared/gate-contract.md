@@ -23,6 +23,88 @@ schema).
 needs them to present each gate inline — but never records any half of the dual-record.
 See § "`agents/leader.md` — presenter and relayer" below for the exact boundary.
 
+## Outward-action release floor
+
+No outward action from a **detected** pipeline context — a `git push` to a feature
+branch, or `gh pr create` — proceeds without `gate3_release ∈ {ship}` registered in the
+governing lane's `00-state.md` (see § "The dual-record release" below for the field and
+its per-gate allowlist). `gate-guard` — a deterministic PreToolUse hook, structural
+sibling of `prepublish-guard` — is the enforcer: it resolves the governing lane by
+mtime-selecting the active `00-state.md` (local or vault) and correlating the current
+branch against that lane's `working_branch` field, valid in both the worktree and the
+branch-in-place topology, then denies the outward action unless the resolved lane's
+`gate3_release` is in the allowlist.
+
+**This is detection-dependent, not universal or unconditional coverage.** `gate-guard`
+denies only when a governing lane actually *resolves*. When no lane resolves — a manual
+push by the developer, an inline (no-orchestrator) session, an unrelated repository —
+`gate-guard` defers (`decision: none`) and the action proceeds exactly as it did before
+this design, under whatever floor already applied (`dev-guard`, `policy-block`). Stating
+this plainly is a deliberate correction: an earlier draft of this contract described the
+floor as covering every outward action unconditionally, which overstated it — the floor
+closes the ORDER gap only for a push/pr-create that `gate-guard` can attribute to a
+detected pipeline lane.
+
+**Detection is via string-pattern matching, with the same residual `dev-guard` already
+discloses.** `gate-guard`'s covered-verb routers (`GIT_PUSH_RE`/`GH_PR_CREATE_RE`) are
+boundary-character-class regexes over the literal command string — the same router
+shape `dev-guard` and `policy-block` use, and the same class of limit
+`docs/dev-mode.md § Outward-Action Gate ("Residual limit")` already discloses for that
+hook: a sufficiently deliberate reconstruction of the gated verb so no router ever sees
+it as a contiguous token (e.g., invoking a subcommand through its own per-subcommand
+executable rather than the literal words "git push") evades all three hooks identically,
+with no operator-visible warning. This is a known, accepted, pre-existing limitation of
+the string-matching approach — not something this design claims to close.
+
+**Force-push clause (Invariant E, operator-mandated).** No outward action from a
+detected pipeline context force-pushes — neither the flag form (`-f`, `--force`,
+`--force-with-lease`) nor the `+`-prefixed refspec form (e.g. `git push origin
++feature:main`). This is a **DENY unconditional on `gate3_release`**: force-push is
+never legitimate from an in-lane pipeline delivery, so `ship` does not authorize it.
+`gate-guard` is the in-lane enforcer for both forms, evaluated on the same `git push`
+invocation it already inspects for the order check above.
+
+**Detection mechanism (Invariant G, `hooks/ts/bodies/command-lexer.ts::matchBenignPushGrammar`)
+— a closed positive grammar, not a character-denylist.** An earlier implementation of
+Invariant E enumerated bad characters/flags and was defeated three times by three
+different shell token-reconstruction techniques (whole-token quoting, mid-token
+quote-splicing, then brace expansion/backtick substitution). The replacement permits
+ONLY the exact benign push shape — `git push [-u|--set-upstream|-v|--verbose|
+--progress] origin <plain-branch>`, where `<plain-branch>` excludes any
+ref-namespace-qualified or tag-like destination (a destination whose first
+`/`-segment is `refs`/`heads`/`tags`/`remotes`, checked via
+`isPlainBranchDestination`), every character of the command in the safe set
+`[A-Za-z0-9 _./-]` — and denies every deviation from that one shape. An
+obfuscation technique never specifically considered still lands on the deny
+side, because it is not the one permitted shape, not because it was
+individually detected. `gate-guard` (force+order
+deny) and `dev-guard`'s Step 0 push char-gate both consume this single shared grammar
+module — one source of truth, never duplicated. Honest scope: the grammar reasons
+about the command STRING, not the resolved argv/binary/config/environment — a `git`
+alias or shadowing binary, `push.default`/`remote.origin.push` config, or a `GIT_*`
+environment override are out of scope by design (an attacker controlling any of those
+already has code execution in the session).
+
+This clause layers on top of two pre-existing floors that this design does **not**
+change:
+
+- `policy-block`'s unconditional flag-based force-push deny
+  (`hooks/ts/bodies/policy-block.ts:295`), which applies in every context, pipeline or
+  not.
+- `dev-guard`'s outside-lane `ask` on a `+`-prefixed refspec
+  (`hooks/ts/bodies/dev-guard.ts:551-553`), destination-only, with no lane-state read.
+
+`gate-guard` only **adds** a layer over both — it replaces neither. Non-redundancy
+rationale: (i) it gives `gate-guard` its own self-sufficient in-lane guarantee that does
+not depend on a sibling hook's regex never changing; (ii) it is the only hook that
+closes the `+refspec` sub-form for the in-lane case — `policy-block`'s flag-only regex
+does not match a bare `+`-prefix, and `dev-guard`'s handling of it is destination-only.
+
+This design never touches or works around server-side branch protections; mutating
+`gh api` writes remain `ask` under `dev-guard`, unchanged. The philosophy this design
+anchors: **the only two hard points are force-push (deny in-lane, ask outside) and
+merge (always ask, non-configurable) — every other git operation stays frictionless.**
+
 ## The dual-record release
 
 Each STAGE-GATE releases only when the orchestrator writes **both** of the following, in
@@ -30,8 +112,28 @@ the same phase-transition:
 
 | Record | Where | What it carries |
 |---|---|---|
-| Field | `00-state.md § Current State` | `gate1_release`, `gate2_release_last`, or `gate3_release` — see the per-gate allowlist table below |
-| Event | `{events_file}` | a `stage.gate.release` JSON line carrying `stage`, `decision`, and (for STAGE-GATE-2) `after_round` |
+| Field | `00-state.md § Current State` | `gate1_release`, `gate2_release_last`, or `gate3_release` — see the per-gate allowlist table below — plus `gate_nonce`, the token currently pending for that gate |
+| Event | `{events_file}` | a `stage.gate.release` JSON line carrying `stage`, `decision`, `gate_nonce` (the consumed value), and (for STAGE-GATE-2) `after_round` |
+
+**The `gate_nonce` field.** Each dual-record carries a third element: a `gate_nonce` — a
+fresh, **single-use** token the orchestrator generates every time it prepares a gate,
+**including every re-presentation** (an ambiguous-reply re-ask, a recover-triggered
+re-presentation). The nonce is written to `00-state.md` alongside the pending gate and
+included in the `gate_pending` status the orchestrator returns to `th:leader`; the
+leader carries it back untouched in the relay (see § "`agents/leader.md` — presenter and
+relayer"). Recording a release **consumes** the nonce — it becomes invalid the instant
+the release is written. A relay that arrives carrying a superseded nonce (one issued for
+an earlier presentation of the same gate) is therefore ambiguous, never a valid release:
+the orchestrator re-presents instead of recording (§ "Ambiguous-gate-reply rule").
+
+**The nonce is a freshness/ordering token, not a secret or an authentication factor.** It
+does not prove operator origin — `th:leader` always possesses it, verbatim, the moment
+the gate is presented (it rides `gate_pending`). Its only job is to make each
+presentation of a gate distinguishable from every other presentation, so a stale relay
+(one answering a superseded presentation) can never be recorded as if it answered the
+current one. It closes the exact replay vector where a relay arrives after the gate has
+already been re-presented — it is not, and is never meant to be, evidence of who typed
+the reply.
 
 **Atomic write requirement.** Writing the field and appending the event are ONE inseparable
 step, not two independently-skippable writes — the same atomic-coupling discipline that
@@ -48,22 +150,31 @@ recover backstop"):
 | STAGE-GATE-2 | `gate2_release_last` (scoped to the relevant `after_round`) | `∈ {next, next-autonomous}` | `stop`, `redo`, `null`/missing |
 | STAGE-GATE-3 | `gate3_release` | `= ship` | `amend`, `abort`, `null`/missing |
 
+Clearing a gate against this table is necessary but not sufficient on its own: recording
+the release additionally requires the relayed reply to carry the `gate_nonce` currently
+pending for that gate (§ "The dual-record release" above) — a reply that clears this
+table's allowlist but carries a stale or missing nonce is still not recorded; it is
+treated as ambiguous (§ "Ambiguous-gate-reply rule").
+
 ## preparer + recorder (orchestrator) — presenter + relayer (leader)
 
 Each STAGE-GATE is a two-agent flow with a single recorder:
 
 1. The **orchestrator prepares** the gate — it runs the phases, produces the gate's
-   artifacts in the workspace, and returns a `gate_pending` status to `th:leader` (gate
-   name, summary of what is being approved, workspace path). It then goes dormant,
-   resumable with context intact.
+   artifacts in the workspace, generates a fresh `gate_nonce` (including on every
+   re-presentation of the same gate), and returns a `gate_pending` status to `th:leader`
+   (gate name, summary of what is being approved, workspace path, `gate_nonce`). It then
+   goes dormant, resumable with context intact.
 2. **`th:leader` presents** the gate's STOP block to the operator inline, in the operator's
    main conversation — the channel the operator can reliably reach.
 3. **`th:leader` relays** the operator's decision back to the orchestrator under explicit
-   attribution: the operator's verbatim words plus the provenance marker
-   `leader-relayed-operator`.
-4. The **orchestrator interprets** the relayed decision against the gate's closed allowlist
-   (see § "Ambiguous-gate-reply rule" when the reply does not map cleanly), then **records**
-   both halves of the dual-record atomically, stamping the relay provenance, and routes.
+   attribution: the operator's verbatim words, the `gate_nonce` carried from
+   `gate_pending`, and the provenance marker `leader-relayed-operator`.
+4. The **orchestrator interprets** the relayed decision against the gate's closed
+   allowlist (see § "Ambiguous-gate-reply rule" when the reply does not map cleanly) and
+   verifies the relayed `gate_nonce` matches the one currently pending, then **records**
+   both halves of the dual-record atomically — consuming the nonce — stamping the relay
+   provenance, and routes.
 
 The orchestrator is the single **recorder and sole writer** of its own `00-state.md` — no
 other agent writes a gate-release field or event. The leader never writes any part of the
@@ -136,6 +247,16 @@ Each allowlist above (`approve` / `approve autonomous` / `reject {reason}` / `ed
 closed — see § "Ambiguous-gate-reply rule" for what happens when a reply does not map to
 exactly one of these values.
 
+**Implementation-scoped reply extensions map onto exactly one canonical value.** An
+implementing orchestrator's own STAGE-GATE-3 STOP block may offer a reply form scoped to
+its richer flow that is not shown in the generic template above — for example,
+`agents/orchestrator.md`'s STAGE-GATE-3 offers `override {reason}` when
+`criticals_count ≥ 1`, which records `gate3_release: ship` identically to a bare `ship`
+reply. This is not an allowlist regression: `override {reason}` maps 1:1 onto the
+canonical `ship` value, it never introduces a new stored value, and `gate-guard`'s
+`gate3_release ∈ {ship}` check stays consistent with it — an `override`-recorded release
+clears the same allowlist entry a `ship`-recorded one does.
+
 ## Record-based recover backstop
 
 A STAGE-GATE is cleared **only** when BOTH conditions hold:
@@ -161,8 +282,8 @@ the next section for the precise boundary of what it does and does not close.
 **The dual-record backstop above is record-based, not structural.** Agents share a
 filesystem and the runtime gives no per-agent write-sandbox, so nothing at the filesystem
 level prevents any agent from writing any file the operator's permissions allow. The gate
-decision reaches the recorder through the leader, so the release's integrity rests on two
-layers, honestly stated:
+decision reaches the recorder through the leader, so a release's integrity rests on three
+layers, honestly stated — the third is what this design adds:
 
 **1. Audited relay (the leader layer).** The leader relays ONLY an explicit operator
 decision, verbatim, tagged with the `leader-relayed-operator` provenance the orchestrator
@@ -178,18 +299,57 @@ never an interior write). This residual is pre-existing and platform-bounded —
 prompt-injected *monolithic* orchestrator could forge its own release identically; the
 split neither adds nor removes it.
 
-**2. The deterministic outward floor (`dev-guard`).** The actions that actually cannot be
+**2. The deterministic order floor (`gate-guard`) — new, layered above the outward
+floor below.** Before this design, no control verified that a gate release preceded a
+push/pr-create from a pipeline lane: `gh pr create` was already covered **by
+destination** (`dev-guard`'s `ask` default, or `allow` under the `autogate.pr_create`
+opt-in), and a push to a feature branch already auto-`allow`ed — neither check related
+to whether a STAGE-GATE-3 release had been recorded. `gate-guard` adds exactly that
+missing ORDER check: it denies the outward action from a detected pipeline lane unless
+`gate3_release ∈ {ship}` for that lane (§ "Outward-action release floor").
+
+This addition does **not** verify writer identity. `gate-guard` reads `gate3_release` —
+an **intra-privilege-forgeable field**, per the same no-writer-identity limit described
+in § 1 above: nothing distinguishes which agent wrote it. The writer-identity residual
+from § 1 persists unchanged; `gate-guard` closes an ORDER gap, not that one. The
+**ask-class caveat** (`docs/dev-mode.md § Ask-class caveat`) still applies unchanged to
+`dev-guard`'s own `ask` on `gh pr create` and `gh pr merge` — whether those `ask`s
+actually stop the action depends on the session's permission posture, not on
+`gate-guard`. `gate-guard`'s own decision set is `{none, deny}` (never `ask`), so it
+neither inherits nor removes that softness: the two mechanisms are independent and
+additive, not a replacement of one by the other.
+
+`gate-guard` also does not close the **approval→push content-drift** residual:
+`gate3_release: ship` binds ORDER (that the release preceded the push), not CONTENT (a
+tree hash) — HEAD can move between recording `ship` and the push actually running (an
+`amend`, a concurrent mutation), and the pushed tree can differ from the one the
+operator saw at the gate. This is the same failure shape the KG pattern
+`pattern-agent-executed-safety-predicate-no-true-atomicity` describes — a safety
+predicate and the gated action are not truly atomic. `gate-guard`, as a PreToolUse hook
+evaluating the SAME `git push`/`gh pr create` invocation it gates (not a separate
+check-then-act call pair), has a genuinely tighter check-to-act window than that pattern
+— a real strength for the ORDER guarantee above — but tightening check-to-act timing is
+a different thing from binding content: it does not close the content-drift gap. That
+residual is mitigated elsewhere (an `amend` re-runs Internal Review and regenerates the
+`gate_nonce`), not by `gate-guard` itself.
+
+**3. The pre-existing outward floor (`dev-guard`).** The actions that actually cannot be
 undone — `git push`, `gh pr create/merge`, GitHub/ClickUp API writes — are gated by the
 `dev-guard` hook, which fires unconditionally on the tool call and prompts the operator
-natively in the UI, independent of any gate release. This is the load-bearing floor: even a
-forged STAGE-GATE-3 release cannot ship anything, because the push/PR itself still hits
-`dev-guard`'s native ask. Internal gates (1, 2) — whose fabrication is recoverable and
-visible — rely on the audited-relay layer; the irreversible boundary relies on `dev-guard`.
+natively in the UI, independent of any gate release. This floor is unchanged by this
+design: even a forged STAGE-GATE-3 release still has to clear `dev-guard`'s native
+destination-based gating. Internal gates (1, 2) — whose fabrication is recoverable and
+visible — rely on the audited-relay layer; the irreversible boundary relies on
+`dev-guard`, now with `gate-guard`'s deterministic order check sitting in front of it for
+a detected pipeline lane.
 
-**Never over-claim.** Do not describe the record-based backstop, schema-absence, or any
-hook as structurally preventing a forged release. The honest model is: audited relay for
-the internal gates, plus `dev-guard` for the outward boundary. Any prose elsewhere that
-implies a structural closure is a contract violation.
+**Never over-claim.** Do not describe the record-based backstop, `gate-guard`'s field
+read, or any hook as verifying writer identity, or as closing the approval→push
+content-drift gap, or as structurally preventing a forged release. The honest model is:
+audited relay for the internal gates, a deterministic ORDER floor (`gate-guard`) added
+for a detected pipeline lane's outward action, and `dev-guard`'s pre-existing
+destination-based floor underneath both. Any prose elsewhere that implies a structural
+closure beyond ORDER is a contract violation.
 
 ## `agents/leader.md` — presenter and relayer
 
