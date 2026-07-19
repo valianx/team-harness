@@ -23,8 +23,9 @@ for taking that live measurement.
 
 ## 2. Measured baseline (the anchor, not an assumption)
 
-From `00-execution-events` (zippy runs 2026-07-17/18, recorded in this task's own
-`00-knowledge-context.md`):
+From `00-execution-events` (zippy runs 2026-07-17/18; see PR #506 / issue #498
+for provenance — the runs' own workspace artifacts are not durable repository
+content):
 
 | Run | Adversary tokens | % of run | Dispatches | Per-dispatch |
 |---|---|---|---|---|
@@ -63,7 +64,7 @@ confidence, independent of R5's filtering rate — `01-plan.md § Confidence Sco
 Assuming a typical iteration pattern of **60% round-1 / 40% round-2+** dispatches
 within a run's adversary dispatch count:
 
-```
+```text
 blended per-dispatch = 0.60 × 132,000 + 0.40 × 40,000 = 79,200 + 16,000 = ~95,200
 ```
 
@@ -122,8 +123,8 @@ the ratio against this document's baseline (§ 2) can be computed directly.
 **Data source.** `00-execution-events.{jsonl,md}` `phase.end` events, aggregated
 by the orchestrator into `00-pipeline-summary.md § Cost` at the checkpoints
 `docs/observability.md § Cost rollup` already defines (STAGE-GATE-1, Stage-2
-close, every `iteration.start`, `pipeline.complete`/`end`) — the same trace this
-task's own `00-knowledge-context.md` baseline table (§ 2) was read from.
+close, every `iteration.start`, `pipeline.complete`/`end`) — the same trace § 2's
+baseline table was read from (see PR #506 / issue #498 for provenance).
 
 **Method.**
 

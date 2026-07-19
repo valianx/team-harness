@@ -36983,12 +36983,18 @@ check(
 )
 check(
     "s166(t3-ac1-when-true-guidance): agents/architect.md states "
-    "changes_security_control is true when the change modifies a guard, "
-    "gate, auth-check, floor, waiver, kill-switch, or an "
-    "incomplete-functionality flag",
-    "guard, gate, auth-check, floor, waiver, kill-switch, or a flag that "
-    "hides incomplete functionality" in _s166_architect,
-    "01-plan.md Task-3 AC-1 requires the 'when true' guidance sentence, "
+    "changes_security_control is true when the change modifies the "
+    "canonical control vocabulary (guard, gate, validation, allowlist, "
+    "early-return, error handler, auth/authz check, rate limit, floor, "
+    "waiver, kill-switch, or an incomplete-functionality flag), "
+    "byte-identical to agents/adversary.md's own enumeration "
+    "(CodeRabbit PR #506, adversary Round 4 C-R4-1/C-R4-2 follow-up)",
+    "a guard, a gate, a validation, an allowlist, an early-return, "
+    "an error handler, an auth/authz check, a rate limit, a floor, "
+    "a waiver, a kill-switch, or a flag that hides incomplete "
+    "functionality" in _s166_architect,
+    "01-plan.md Task-3 AC-1 requires the 'when true' guidance sentence "
+    "with the full canonical control vocabulary aligned to agents/adversary.md, "
     "not merely the bare field declaration",
 )
 check(
@@ -37800,6 +37806,144 @@ check(
     "edit made to the surrounding adversary-gating prose, including this "
     "task's own documentation-honesty fix at the security carry-forward "
     "Low finding (agents/orchestrator.md ~line 992)",
+)
+
+# ---------------------------------------------------------------------------
+# Task-6 AC-9 (CodeRabbit PR #506, MAJOR): the 00-state.md schema template
+# declares changes_security_control and the cached adversary_floor_applies
+# value alongside adversary_rounds, and a durable per-round size baseline
+# field backs the report-integrity scan's no-shrink check.
+# ---------------------------------------------------------------------------
+check(
+    "s168(t6-ac9-schema-persists-adversary-gate-inputs): agents/orchestrator.md's "
+    "00-state.md schema template declares changes_security_control and the "
+    "cached adversary_floor_applies value alongside adversary_rounds",
+    "- changes_security_control: {true|false|null}" in _s168_orchestrator
+    and "- adversary_floor_applies: {true|false|null}" in _s168_orchestrator
+    and "- adversary_rounds: {N | null}" in _s168_orchestrator,
+    "CodeRabbit PR #506 (MAJOR, agents/orchestrator.md:310): without both "
+    "fields declared in the authoritative schema, recovery and delivery "
+    "can observe an absent or stale dispatch decision",
+)
+check(
+    "s168(t6-ac10-round-size-baseline-persisted): agents/orchestrator.md "
+    "declares a durable adversary_round_sizes schema field and the "
+    "report-integrity scan's no-shrink check reads it, not an unpersisted "
+    "in-memory value",
+    "- adversary_round_sizes: {{N: bytes, ...} | null}" in _s168_orchestrator
+    and "adversary_round_sizes[round]" in _s168_orchestrator,
+    "CodeRabbit PR #506 (MINOR, agents/orchestrator.md:1056): check 3 "
+    "(no prior-round shrink or disappearance) needs a durable size "
+    "baseline field, or a truncated prior report can still pass",
+)
+
+# ---------------------------------------------------------------------------
+# Task-6 AC-11 (adversary Round-4/renumbered-1 findings, CodeRabbit follow-up):
+# the changes_security_control control vocabulary is byte-identical across
+# agents/architect.md (both the trigger definition and the justification-
+# content instruction) and agents/adversary.md (both the Method-1 enumeration
+# and the Exact-trigger line) -- a cross-file parity gap the adversary agent
+# found live (C-R4-1/C-R4-2: "no test cross-checks the two files' vocabulary
+# strings").
+# ---------------------------------------------------------------------------
+_s168_canonical_control_vocab = (
+    "a guard, a gate, a validation, an allowlist, an early-return, "
+    "an error handler, an auth/authz check, a rate limit, a floor, "
+    "a waiver, a kill-switch, or a flag that hides incomplete functionality"
+)
+_s168_canonical_vocab_terms = [
+    "a guard", "a gate", "a validation", "an allowlist", "an early-return",
+    "an error handler", "an auth/authz check", "a rate limit", "a floor",
+    "a waiver", "a kill-switch",
+]
+check(
+    "s168(t6-ac11-vocab-parity-architect-trigger): agents/architect.md's "
+    "changes_security_control trigger definition (~:870) carries the exact "
+    "canonical control vocabulary string, byte-identical to "
+    "agents/adversary.md's own enumeration",
+    _s168_canonical_control_vocab in _s168_architect,
+    "adversary Round 4 (C-R4-1): the two files' vocabulary lists diverged "
+    "-- architect.md omitted early-return/error-handler, adversary.md "
+    "omitted floor/waiver/kill-switch; a citation claim without an "
+    "enforced parity check is not synchronization",
+)
+check(
+    "s168(t6-ac11-vocab-parity-architect-justification): agents/architect.md's "
+    "diff-grounded-justification instruction (~:872) carries the same "
+    "canonical control vocabulary string as its own trigger definition",
+    _s168_canonical_control_vocab.replace("a guard, a gate, ", "a guard, a gate, ")
+    in _s168_architect
+    and _s168_architect.count(_s168_canonical_control_vocab) >= 2,
+    "adversary Round 4 (C-R4-2): the widened trigger list at :870 was not "
+    "mirrored into the adjacent justification-content instruction at "
+    ":872 -- an architect could satisfy :872's literal text while never "
+    "being asked to rule out a validation/allowlist/rate-limit control",
+)
+check(
+    "s168(t6-ac11-vocab-parity-adversary-method-and-trigger): "
+    "agents/adversary.md's own Method-1 enumeration and Exact-trigger line "
+    "both carry the exact canonical control-vocabulary STRING (not merely "
+    "each term present somewhere in the file) -- byte-identical bar to "
+    "the architect.md-side check above, not a weaker term-presence-anywhere "
+    "bar (adversary Round N=2 follow-up: the original version of this "
+    "check only required each term to appear once anywhere in the file, "
+    "which would not catch a future edit narrowing ONE of the two sites "
+    "while leaving the other untouched -- reintroducing the exact same-file "
+    "drift class C-R4-1 found)",
+    _s168_adversary.count(_s168_canonical_control_vocab) >= 2,
+    "adversary Round 4 (C-R4-1) + Round N=2 follow-up: agents/adversary.md's "
+    "Method-1 enumeration and Exact-trigger line must both carry the full "
+    "canonical string verbatim, not just overlapping terms -- a "
+    "presence-anywhere check cannot catch one site drifting narrower "
+    "while the other stays wide",
+)
+
+# ---------------------------------------------------------------------------
+# Task-6 AC-12 (adversary Round-4/renumbered-1 finding C-R4-3): the staleness
+# re-gate's own trigger vocabulary names the canonical control vocabulary
+# explicitly, not only the auth/API/DB/crypto/session path-based trigger --
+# closing the "validation/allowlist/rate-limit control added outside those
+# paths never re-fires the re-gate" gap.
+# ---------------------------------------------------------------------------
+check(
+    "s168(t6-ac12-staleness-regate-names-control-vocab): the Security-verdict "
+    "staleness re-gate explicitly names the canonical control vocabulary as "
+    "part of its own security-relevant-surface definition, not only the "
+    "auth/API/DB/crypto/session path trigger",
+    "a validation, an allowlist, a rate limit, an early-return, or an "
+    "error handler" in _s168_orchestrator
+    and "add/modify any element of the canonical control vocabulary above, "
+    "regardless of which file or path it lands in" in _s168_orchestrator,
+    "adversary Round 4 (C-R4-3): a Case-A/Case-D patch adding a "
+    "validation/allowlist/rate-limit control outside auth/API/DB/crypto/"
+    "session paths satisfied none of the re-gate's enumerated triggers, "
+    "so the cached adversary_floor_applies (and security itself) never "
+    "re-verified the new control",
+)
+
+# ---------------------------------------------------------------------------
+# Task-6 AC-13 (adversary Round-4/renumbered-1 finding C-R4-4): the
+# per-round-file scheme states an explicit migration/bootstrap rule for a
+# task whose adversary history predates it -- N restarts at 1, and checks
+# 3/4 apply only to the new-scheme round-file series, never a retired
+# single-file report.
+# ---------------------------------------------------------------------------
+check(
+    "s168(t6-ac13-migration-bootstrap-rule): agents/orchestrator.md states "
+    "an explicit migration rule for a task whose adversary history "
+    "predates the per-round-file scheme -- N restarts at 1, checks 3/4 "
+    "apply only to the new-scheme round-file series",
+    "Migration/bootstrap rule for a task whose adversary history predates "
+    "this scheme" in _s168_orchestrator
+    and "begins per-round-file numbering at **N=1** for its FIRST dispatch "
+    "under this scheme" in _s168_orchestrator
+    and "is not required to be backfilled with an `adversary_round_sizes` "
+    "entry" in _s168_orchestrator,
+    "adversary Round 4 (C-R4-4): AC-10's monotonic-N rule is per-dispatch "
+    "and undefined at a task's transition from the retired single-file "
+    "scheme -- this pipeline's own N=4 assignment contradicted it; "
+    "renumbered to N=1 and the rule now states the bootstrap case "
+    "explicitly rather than leaving it to unwritten judgment",
 )
 
 # Marker: adversary-resource-management-task6-structural-verification
