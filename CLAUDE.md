@@ -98,7 +98,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — the only CC install channel. Go installer binary (GH Release assets) — the only opencode install channel; it does not serve Claude Code. |
 
-**Current version:** `2.131.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.132.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
@@ -159,7 +159,7 @@ All commands run from the repo root.
 - **Obsidian interlinking.** 3-tier MOC, knowledge allowlist: `docs/obsidian-linking.md`.
 - **Obsidian-mode diagram embed.** D2/LikeC4 render to vault + `![[…]]` embed in `05-diagram.md`. See `docs/conventions.md`.
 - **Milestone standard.** milestones = commits, NOT PRs; a single task is never split across delivery groups; default `Delivery Grouping` is `all-tasks-one-pr` (same-repo batch consolidates into ONE PR). See `agents/ref-special-flows.md § Milestone-Build Flow`.
-- **Hook enforcement floors.** `policy-block` + `checkpoint-guard` (TS, wired via `run-ts-hook.sh`). See `docs/reasoning-checkpoint.md`.
+- **Hook enforcement floors.** `policy-block` + `checkpoint-guard` + `gate-guard` (TS, wired via `run-ts-hook.sh`). `gate-guard` is the deterministic outward-action-order floor: it denies a `git push`/`gh pr create` from a detected pipeline lane unless `gate3_release: ship` is registered, plus an unconditional in-lane force-push deny (flag or `+`-prefixed refspec) regardless of `gate3_release`; decision set is `{none, deny}` only. See `docs/reasoning-checkpoint.md`, `docs/dev-mode.md § "Deterministic order floor (gate-guard)"`.
 - **Plan-stage sketches.** See `docs/plan-sketches.md`.
 - **Worktree discipline.** Each concurrent effort runs in its own `git worktree`. Before any branch op, `git status` + `git worktree list` — STOP on unfamiliar WIP. Human own-terminal `git checkout -b` is unreachable by any hook (U1 — discipline, not a gate). Full 5-rule contract: `docs/worktree-discipline.md`.
 - **Parallel batch implementation.** ADDITIVE items concurrently; consolidated into ONE PR. See `docs/parallel-batch-implementation.md`.
