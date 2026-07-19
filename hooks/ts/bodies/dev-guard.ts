@@ -14,7 +14,7 @@
 // hooks are independently additive (deny > allow at the platform precedence
 // level), not a replacement of one by the other.
 //
-// Tokenization pre-pass (Task-8, Invariant F): every covered-action router
+// Tokenization pre-pass (Invariant F): every covered-action router
 // below is fed the OUTPUT of command-lexer.ts's prepareRoutableCommand(cmd),
 // not the raw command, so an inert covered-action literal sitting inside a
 // balanced, unwrapped quoted span (e.g. a read-only
@@ -48,7 +48,7 @@
 //
 //   Step 0 — hard reject on any character outside the shared safe set
 //            `[A-Za-z0-9 _./-]` (command-lexer.ts's isLiteralSafeCommand,
-//            Task-9, Invariant G) anywhere in the command — if the command
+//            Invariant G) anywhere in the command — if the command
 //            carries quoting, escaping, expansion, or composition, the
 //            token this recognizer inspects is not reliably the value bash
 //            executes.
@@ -281,8 +281,8 @@ const RAW_OUTWARD_SCAN_RE =
 // git-push recognizer — closed POSITIVE grammar (Steps 0-7, see module header)
 // ---------------------------------------------------------------------------
 
-// Step 0 — the char-gate is the shared isLiteralSafeCommand (Task-9,
-// Invariant G, command-lexer.ts): if ANY character outside the safe set
+// Step 0 — the char-gate is the shared isLiteralSafeCommand (Invariant G,
+// command-lexer.ts): if ANY character outside the safe set
 // `[A-Za-z0-9 _./-]` appears anywhere in the command, the destination token
 // this recognizer would inspect is not reliably the value bash runs at
 // execution time (`"main"`, `'main'`, `ma\in`, `${x:-main}`, `main{,}` all
@@ -341,7 +341,7 @@ const GH_PR_CREATE_EXACT_RE = /^gh\s+(?:(?:--repo|-R)(?:=\S+|\s+\S+)\s+)?pr\s+cr
 // `--delete`, `-o`/`--push-option`, `+`-prefixed refspecs, and any
 // unrecognized flag are NOT here and therefore disqualify by omission.
 // Shared with gate-guard.ts's grammar via command-lexer.ts's
-// isBenignPushFlag (Task-9, Invariant G) — no longer declared locally.
+// isBenignPushFlag (Invariant G) — no longer declared locally.
 
 // Step 5 — tag-literal destination heuristic: `git push origin v1.2.3` is a
 // tag push even without `refs/tags/` or `--tags`. The optional prefix accepts
@@ -734,7 +734,7 @@ export function evaluate(input: NormalizedInput, reader: DevGuardReader): Normal
 
   // Step 2 — Detect outward/mutating actions by DESTINATION.
 
-  // Task-8 pre-pass (Invariant F): routers below test the ROUTABLE string
+  // Pre-pass (Invariant F): routers below test the ROUTABLE string
   // (quoted-inert spans blanked, unless a command-executing wrapper or
   // unbalanced quoting is present — see command-lexer.ts). Recognizers that
   // do their own raw-string parsing keep receiving `cmdStr` unchanged.

@@ -11,7 +11,7 @@
 // a lane resolves -> fail-CLOSED (any post-resolution read fault denies,
 // same as an explicit non-ship value).
 //
-// Tokenization pre-pass (Task-8, Invariant F): the covered-verb routers
+// Tokenization pre-pass (Invariant F): the covered-verb routers
 // below are fed command-lexer.ts's prepareRoutableCommand(cmd) output, not
 // the raw command, so an inert covered-action literal inside a balanced,
 // unwrapped quoted span (e.g. a read-only `grep "git push" file` run
@@ -203,7 +203,7 @@ export function evaluate(input: NormalizedInput, reader: GateGuardReader): Norma
 
   if (!rawCmd) return none();
 
-  // Task-8 pre-pass (Invariant F): routers test the ROUTABLE string (quoted-
+  // Pre-pass (Invariant F): routers test the ROUTABLE string (quoted-
   // inert spans blanked), so an inert quoted covered-action literal does
   // not trip an in-lane deny — see command-lexer.ts.
   const routable = prepareRoutableCommand(rawCmd).routable;
@@ -214,7 +214,7 @@ export function evaluate(input: NormalizedInput, reader: GateGuardReader): Norma
   const lane = resolveGoverningLane(reader);
   if (lane === null) return none(); // no governing lane resolves — defer.
 
-  // Force/shape deny (Invariant G, Task-9), unconditional on gate3_release,
+  // Force/shape deny (Invariant G), unconditional on gate3_release,
   // checked before the order gate. matchBenignPushGrammar reads rawCmd —
   // see command-lexer.ts for the by-construction rationale.
   if (isGitPush && !matchBenignPushGrammar(rawCmd).matched) {

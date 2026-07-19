@@ -1,9 +1,9 @@
 // hooks/ts/bodies/command-lexer.ts
 // Shared pre-pass for hooks/ts/bodies/dev-guard.ts and hooks/ts/bodies/
-// gate-guard.ts — see agents/_shared/gate-contract.md and 01-plan.md § Task-8
-// (Invariant F). Single source of truth: bundled into BOTH .cjs artifacts by
-// esbuild, never imported at .cjs-to-.cjs runtime (parity with
-// entry/*.ts importing CONTROL_CHAR_RE from bodies/prepublish-guard.ts).
+// gate-guard.ts — see agents/_shared/gate-contract.md § "Outward-action
+// release floor" (Invariant F). Single source of truth: bundled into BOTH
+// .cjs artifacts by esbuild, never imported at .cjs-to-.cjs runtime (parity
+// with entry/*.ts importing CONTROL_CHAR_RE from bodies/prepublish-guard.ts).
 //
 // Problem this closes: every covered-action router in dev-guard.ts/
 // gate-guard.ts uses a boundary-character class (`^|[\s|;&<>()\`]`) to decide
@@ -218,21 +218,21 @@ export function prepareRoutableCommand(cmd: string): PrepareRoutableCommandResul
 }
 
 // ---------------------------------------------------------------------------
-// Force-push detection — closed positive grammar (Task-9, Invariant G)
+// Force-push detection — closed positive grammar (Invariant G)
 //
 // Replaces a character-denylist that was defeated three times by three
 // different shell token-reconstruction techniques (whole-token quoting,
-// mid-token quote-splicing, brace expansion / backtick substitution — see
-// 01-root-cause.md § Addendum 2). A denylist enumerates bad characters; this
-// enumerates nothing. It permits ONLY the exact benign push shape — every
-// character in the safe set, benign flags only, and a destination that is
-// both a plain branch name AND not ref-namespace-qualified (see
-// isPlainBranchDestination) — and denies every deviation from that one
-// shape, so an obfuscation technique this module's author never considered
-// still lands on the deny side — because it is not the one permitted shape,
-// not because it was specifically detected.
+// mid-token quote-splicing, brace expansion / backtick substitution). A
+// denylist enumerates bad characters; this enumerates nothing. It permits
+// ONLY the exact benign push shape — every character in the safe set,
+// benign flags only, and a destination that is both a plain branch name AND
+// not ref-namespace-qualified (see isPlainBranchDestination) — and denies
+// every deviation from that one shape, so an obfuscation technique this
+// module's author never considered still lands on the deny side — because
+// it is not the one permitted shape, not because it was specifically
+// detected.
 //
-// By-construction guarantee (proof in 01-root-cause.md § Addendum 2):
+// By-construction guarantee:
 //   (a) forcing a push requires either a force flag (-f/--force/
 //       --force-with-lease) or a `+`-prefixed refspec;
 //   (b) `+` is outside the safe character set below, so every `+refspec`
@@ -266,7 +266,7 @@ export function prepareRoutableCommand(cmd: string): PrepareRoutableCommandResul
 // character outside this set.
 const SAFE_COMMAND_CHAR_RE = /^[A-Za-z0-9 _./-]*$/;
 
-// Total precondition (AC-3a): must be checked, and must pass, before any
+// Total precondition: must be checked, and must pass, before any
 // classification branch below runs — a command containing so much as one
 // out-of-set character is never given a chance to look like the benign form.
 export function isLiteralSafeCommand(cmd: string): boolean {
