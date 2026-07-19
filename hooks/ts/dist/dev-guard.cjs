@@ -182,6 +182,103 @@ function outboundCC(d) {
   process.exit(0);
 }
 
+// bodies/command-lexer.ts
+var FILLER_CHAR = "x";
+var SHELL_DASH_C_RE = /\b(?:bash|sh|zsh|dash|ksh|su)\s+-[a-zA-Z]*c[a-zA-Z]*(?:\s|$)/i;
+var EVAL_RE = /(^|[\s;&|<>()`])eval(\s|$)/i;
+var XARGS_RE = /(^|[\s;&|<>()`])xargs(\s|$)/i;
+var COMMAND_SUBSTITUTION_RE = /\$\(|`/;
+var PROCESS_SUBSTITUTION_RE = /[<>]\(/;
+var PIPE_TO_SHELL_RE = /\|\s*(?:\S*\/)?(?:bash|sh|zsh|dash|ksh)(?:\s|$)/i;
+var SSH_RE = /(^|[\s;&|<>()`])ssh(\s|$)/i;
+function hasCommandExecutingWrapper(cmd) {
+  return SHELL_DASH_C_RE.test(cmd) || EVAL_RE.test(cmd) || XARGS_RE.test(cmd) || COMMAND_SUBSTITUTION_RE.test(cmd) || PROCESS_SUBSTITUTION_RE.test(cmd) || PIPE_TO_SHELL_RE.test(cmd) || SSH_RE.test(cmd);
+}
+function stepInsideSingleQuote(cmd, i, state, spans) {
+  if (cmd[i] === "'") {
+    spans.push({ start: state.spanStart, end: i });
+    state.inSingle = false;
+  }
+  return i + 1;
+}
+function stepInsideDoubleQuote(cmd, i, state, spans) {
+  const ch = cmd[i];
+  if (ch === "\\" && i + 1 < cmd.length) return i + 2;
+  if (ch === '"') {
+    spans.push({ start: state.spanStart, end: i });
+    state.inDouble = false;
+    return i + 1;
+  }
+  return i + 1;
+}
+function stepOutsideQuote(cmd, i, state) {
+  const ch = cmd[i];
+  if (ch === "\\" && i + 1 < cmd.length) return i + 2;
+  if (ch === "'") {
+    state.inSingle = true;
+    state.spanStart = i + 1;
+    return i + 1;
+  }
+  if (ch === '"') {
+    state.inDouble = true;
+    state.spanStart = i + 1;
+    return i + 1;
+  }
+  return i + 1;
+}
+function analyzeQuotes(cmd) {
+  const spans = [];
+  const state = { inSingle: false, inDouble: false, spanStart: -1 };
+  let i = 0;
+  while (i < cmd.length) {
+    if (state.inSingle) {
+      i = stepInsideSingleQuote(cmd, i, state, spans);
+    } else if (state.inDouble) {
+      i = stepInsideDoubleQuote(cmd, i, state, spans);
+    } else {
+      i = stepOutsideQuote(cmd, i, state);
+    }
+  }
+  return { balanced: !state.inSingle && !state.inDouble, spans };
+}
+function blankSpans(cmd, spans) {
+  const chars = cmd.split("");
+  for (const { start, end } of spans) {
+    for (let idx = start; idx < end; idx++) {
+      chars[idx] = FILLER_CHAR;
+    }
+  }
+  return chars.join("");
+}
+function prepareRoutableCommand(cmd) {
+  if (hasCommandExecutingWrapper(cmd)) {
+    return { routable: cmd, blanked: false };
+  }
+  const { balanced, spans } = analyzeQuotes(cmd);
+  if (!balanced || spans.length === 0) {
+    return { routable: cmd, blanked: false };
+  }
+  return { routable: blankSpans(cmd, spans), blanked: true };
+}
+var SAFE_COMMAND_CHAR_RE = /^[A-Za-z0-9 _./-]*$/;
+function isLiteralSafeCommand(cmd) {
+  return SAFE_COMMAND_CHAR_RE.test(cmd);
+}
+var BENIGN_PUSH_FLAG_RE = /^(-u|--set-upstream|-v|--verbose|--progress)$/;
+function isBenignPushFlag(token) {
+  return BENIGN_PUSH_FLAG_RE.test(token);
+}
+var PLAIN_BRANCH_NAME_RE = /^[A-Za-z0-9._][A-Za-z0-9._/-]*$/;
+function isPlainBranchName(token) {
+  return PLAIN_BRANCH_NAME_RE.test(token);
+}
+var REF_NAMESPACE_WORDS = /* @__PURE__ */ new Set(["refs", "heads", "tags", "remotes"]);
+function isPlainBranchDestination(dst) {
+  if (!isPlainBranchName(dst)) return false;
+  const firstSegment = dst.split("/")[0].toLowerCase();
+  return !REF_NAMESPACE_WORDS.has(firstSegment);
+}
+
 // bodies/dev-guard.ts
 function ask(reason) {
   return { decision: "ask", reason, mutations: null };
@@ -212,20 +309,16 @@ var CURL_WGET_MUTATING_RE = /(^|[\s|;&<>()`])(curl|wget)\s.*(-X|--request)\s*(PU
 var API_GITHUB_URL_RE = /api\.github\.com/i;
 var MUTATING_METHOD_RE = /(-X|--request)\s*(PUT|POST|PATCH|DELETE)/i;
 var RAW_OUTWARD_SCAN_RE = /(git\s+push|gh\s+pr\s+(create|merge|review|comment)|gh\s+issue\s+(create|edit|comment)|gh\s+api.*pulls|api\.github\.com)/i;
-var SHELL_QUOTING_OR_EXPANSION_RE = /["'\\$]/;
 var SHELL_COMPOSITION_RE = /[;&|`\n<>]|\$\(/;
 var TREE_OR_ENV_REDIRECT_RE = /((^|\s)-C(?=[\s/=]|$)|--git-dir\b|--work-tree\b|\bGIT_[A-Z_]+=)/;
 var GIT_PUSH_EXACT_RE = /^git\s+push(\s|$)/;
 var GIT_C_DIR_PUSH_EXACT_RE = /^git\s+-C\s+(\S+)\s+push(\s|$)/;
 var GH_PR_CREATE_EXACT_RE = /^gh\s+(?:(?:--repo|-R)(?:=\S+|\s+\S+)\s+)?pr\s+create(\s|$)/;
-var BENIGN_PUSH_FLAG_RE = /^(-u|--set-upstream|-v|--verbose|--progress)$/;
 var TAG_LIKE_RE = /^[vV]?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$/;
-var PLAIN_BRANCH_NAME_RE = /^[A-Za-z0-9._][A-Za-z0-9._/-]*$/;
-var REF_NAMESPACE_WORDS = /* @__PURE__ */ new Set(["refs", "heads", "tags", "remotes"]);
 var DEFAULT_BRANCH_FLOOR = /* @__PURE__ */ new Set(["main", "master"]);
 var GATE_DOC_POINTER = "see docs/dev-mode.md \xA7 Outward-Action Gate";
 function rejectShellQuotingOrComposition(cmdStr) {
-  if (SHELL_QUOTING_OR_EXPANSION_RE.test(cmdStr) || SHELL_COMPOSITION_RE.test(cmdStr)) {
+  if (!isLiteralSafeCommand(cmdStr)) {
     return ask(
       `outward action 'git push' contains a shell quoting/escaping/expansion/composition character \u2014 the inspected token cannot be trusted to equal the value bash actually runs; fail-closed (dev-guard.ts); ${GATE_DOC_POINTER}`
     );
@@ -248,11 +341,6 @@ function extractExactCDirPushTail(trimmedCmd) {
   const m = GIT_C_DIR_PUSH_EXACT_RE.exec(trimmedCmd);
   if (!m) return null;
   return { dir: m[1], tail: trimmedCmd.slice(m[0].length).trim() };
-}
-function isPlainBranchDestination(dst) {
-  if (!PLAIN_BRANCH_NAME_RE.test(dst)) return false;
-  const firstSegment = dst.split("/")[0].toLowerCase();
-  return !REF_NAMESPACE_WORDS.has(firstSegment);
 }
 function evaluateDestinationBranch(dst, reader, allowContext, dir) {
   const targetNote = dir !== void 0 ? ` (target '-C ${dir}')` : "";
@@ -385,7 +473,7 @@ function evaluatePushArgs(tail, reader, dir) {
   const tokens = tail.length > 0 ? tail.split(/\s+/).filter(Boolean) : [];
   const flagTokens = tokens.filter((t) => t.startsWith("-"));
   const positional = tokens.filter((t) => !t.startsWith("-"));
-  const disqualifyingFlags = flagTokens.filter((t) => !BENIGN_PUSH_FLAG_RE.test(t));
+  const disqualifyingFlags = flagTokens.filter((t) => !isBenignPushFlag(t));
   if (disqualifyingFlags.length > 0) {
     return ask(
       `outward action ${targetLabel} with disqualifying flag(s) (${disqualifyingFlags.join(", ")}) requires explicit operator approval \u2014 only -u/--set-upstream/-v/--verbose/--progress are on the benign allowlist (dev-guard.ts); ${GATE_DOC_POINTER}`
@@ -456,12 +544,13 @@ function evaluate(input, reader) {
   if (cmdStr === null) {
     return none();
   }
-  if (GIT_PUSH_RE.test(cmdStr)) {
+  const { routable } = prepareRoutableCommand(cmdStr);
+  if (GIT_PUSH_RE.test(routable)) {
     return evaluateGitPush(cmdStr, reader);
   }
   const ghTargetRepo = extractGhRepoTarget(cmdStr);
   const ghTargetNote = ghTargetRepo ? ` (target repo: '${ghTargetRepo}')` : "";
-  if (GH_PR_CREATE_RE.test(cmdStr)) {
+  if (GH_PR_CREATE_RE.test(routable)) {
     const cleanAutogateForm = !SHELL_COMPOSITION_RE.test(cmdStr) && GH_PR_CREATE_EXACT_RE.test(cmdStr.trim());
     if (cleanAutogateForm && isPrCreateAutogateEnabled(reader)) {
       return allow(
@@ -472,42 +561,42 @@ function evaluate(input, reader) {
       `outward action 'gh pr create'${ghTargetNote} requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md \xA7 Outward-Action Gate`
     );
   }
-  if (GH_PR_MERGE_RE.test(cmdStr)) {
+  if (GH_PR_MERGE_RE.test(routable)) {
     return ask(
       `outward action 'gh pr merge'${ghTargetNote} requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md \xA7 Outward-Action Gate`
     );
   }
-  if (GH_PR_REVIEW_RE.test(cmdStr)) {
+  if (GH_PR_REVIEW_RE.test(routable)) {
     return ask(
       `outward action 'gh pr review'${ghTargetNote} requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md \xA7 Outward-Action Gate`
     );
   }
-  if (GH_PR_COMMENT_RE.test(cmdStr)) {
+  if (GH_PR_COMMENT_RE.test(routable)) {
     return ask(
       `outward action 'gh pr comment'${ghTargetNote} requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md \xA7 Outward-Action Gate`
     );
   }
-  if (GH_API_REST_PR_RE.test(cmdStr)) {
+  if (GH_API_REST_PR_RE.test(routable)) {
     return ask(
       "outward action 'gh api' mutating PR endpoint requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md \xA7 Outward-Action Gate"
     );
   }
-  if (GH_GRAPHQL_RE.test(cmdStr) && GRAPHQL_PR_MUTATIONS_RE.test(cmdStr)) {
+  if (GH_GRAPHQL_RE.test(routable) && GRAPHQL_PR_MUTATIONS_RE.test(cmdStr)) {
     return ask(
       "outward action 'gh api graphql' PR-mutating operation requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md \xA7 Outward-Action Gate"
     );
   }
-  if (GH_ISSUE_WRITE_RE.test(cmdStr)) {
+  if (GH_ISSUE_WRITE_RE.test(routable)) {
     return ask(
       `outward action 'gh issue write'${ghTargetNote} requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md \xA7 Outward-Action Gate`
     );
   }
-  if (CURL_WGET_MUTATING_RE.test(cmdStr)) {
+  if (CURL_WGET_MUTATING_RE.test(routable)) {
     return ask(
       "outward action via curl/wget to api.github.com with mutating method requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md \xA7 Outward-Action Gate"
     );
   }
-  if (API_GITHUB_URL_RE.test(cmdStr) && MUTATING_METHOD_RE.test(cmdStr)) {
+  if (API_GITHUB_URL_RE.test(routable) && MUTATING_METHOD_RE.test(routable)) {
     return ask(
       "outward action to api.github.com with mutating method requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md \xA7 Outward-Action Gate"
     );
