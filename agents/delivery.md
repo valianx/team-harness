@@ -822,7 +822,7 @@ The template below is reproduced for reference — this is the shape Step 9f.1 f
 
 The `{area}` is the kebab-case module/service name (e.g., `auth`, `date-range`, `payment-webhook`). The title length cap is 72 characters. The `(hotfix)` suffix signals urgency to the reviewer.
 
-**Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — create a PR". When `has_gh=false` and a token + GitHub origin are available, use the curl POST fallback. When neither is available, copy the already-drafted body (`workspaces/{feature-name}/inputs/pr-body-draft.md`) to `workspaces/{feature}/inputs/pr-body.md` — the operator-paste file — emit the compare URL and instructions, and report `status: blocked-manual-push` (see Return Protocol). The pipeline resumes when the operator replies `pr opened #N`.
+**Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — create a PR". When `has_gh=false` and a token + GitHub origin are available, use the curl POST fallback. When neither is available, copy the already-drafted body (`workspaces/{feature-name}/inputs/pr-body-draft.md`) to `workspaces/{feature-name}/inputs/pr-body.md` — the operator-paste file — emit the compare URL and instructions, and report `status: blocked-manual-push` (see Return Protocol). The pipeline resumes when the operator replies `pr opened #N`.
 
 ```
 gh pr create --base main \
