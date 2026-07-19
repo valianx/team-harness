@@ -31877,9 +31877,13 @@ check(
 # adversary.md, reviewer.md, acceptance-checker.md ---
 check(
     "suite141(adversary-output-path): agents/adversary.md declares its output as "
-    "'workspaces/{feature-name}/reviews/04-adversary.md'",
-    "workspaces/{feature-name}/reviews/04-adversary.md" in _s141_adversary,
-    "adversary.md's Output field must carry the 'reviews/' prefix",
+    "'workspaces/{feature-name}/reviews/04-adversary-r{N}.md' (per-round path, "
+    "adversary-resource-management R2 — supersedes the single reconstructed-file "
+    "path this pin checked before)",
+    "workspaces/{feature-name}/reviews/04-adversary-r{N}.md" in _s141_adversary,
+    "adversary.md's Output field must carry the 'reviews/' prefix AND the "
+    "per-round '-r{N}' suffix — the single-file path was retired by "
+    "adversary-resource-management Task-2 (PR #494 64k-overflow/silent-overwrite fix)",
 )
 check(
     "suite141(reviewer-output-path): agents/reviewer.md declares its internal-review "
@@ -36687,6 +36691,1118 @@ check(
 )
 
 # Marker: deterministic-gate-release-enforcement
+# Suite 165 — adversary-resource-management pre-fix regression baseline
+# ---------------------------------------------------------------------------
+# Asserts the fixed-state facts 01-plan.md commits to for the per-round
+# adversary report path, the three orchestrator-side dispatch fields, the
+# deterministic report-integrity scan, and the cost-model doc. Scoped to
+# test files only. Full per-task AC-to-test mapping: 03-testing.md § Test
+# Plan.
+#
+# Marker: adversary-resource-management-prefix-regression
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 165: adversary-resource-management (pre-fix regression) ===")
+
+_s165_adversary = read(AGENTS_DIR / "adversary.md")
+_s165_orchestrator = read(AGENTS_DIR / "orchestrator.md")
+_s165_cost_model_path = REPO_ROOT / "docs" / "adversary-cost-model.md"
+
+# --- (a) R2: per-round report path replaces the single reviews/04-adversary.md
+# ---------------------------------------------------------------------------
+check(
+    "s165(a-per-round-path): agents/adversary.md declares the per-round "
+    "output path 'reviews/04-adversary-r{N}.md'",
+    "reviews/04-adversary-r{N}.md" in _s165_adversary,
+    "01-plan.md Task-2 AC-1 requires agents/adversary.md's § Output Contract "
+    "and § Session Context Protocol step 5 to declare a per-round write to "
+    "'reviews/04-adversary-r{N}.md' (N = the dispatch round) instead of a "
+    "single reconstructed 'reviews/04-adversary.md' -- currently absent "
+    "(the old single-file path is what the file actually declares today, "
+    "PR #494 incident: 64k overflow + silent overwrite on retry)",
+)
+
+# --- (b) R5/R3/R4: three new orchestrator-side dispatch fields ------------
+check(
+    "s165(b-predicate): agents/orchestrator.md defines the "
+    "'adversary_floor_applies' predicate",
+    "adversary_floor_applies" in _s165_orchestrator,
+    "01-plan.md Task-1 AC-1 requires agents/orchestrator.md § 'Single "
+    "shared Phase-3 floor predicate' to define "
+    "'adversary_floor_applies = security_floor_applies AND "
+    "changes_security_control' -- currently absent (only "
+    "'security_floor_applies' exists today)",
+)
+check(
+    "s165(b-reverify-scope): agents/orchestrator.md declares a "
+    "'Re-verification scope:' field on the adversary dispatch",
+    "Re-verification scope:" in _s165_orchestrator,
+    "01-plan.md Task-1 AC-3 requires the Case-D/staleness adversary "
+    "re-dispatch payload to carry '**Re-verification scope:** localized "
+    "{files, finding-IDs} | full' -- currently absent",
+)
+check(
+    "s165(b-output-budget): agents/orchestrator.md declares an "
+    "'Adversary output budget' field on the adversary dispatch",
+    "Adversary output budget" in _s165_orchestrator,
+    "01-plan.md Task-1 AC-4 requires the adversary dispatch to declare "
+    "'**Adversary output budget (format guidance):** ~800 + "
+    "600×(changed-control count) tokens' -- currently absent",
+)
+
+# --- (c) R2: deterministic per-round report-integrity scan ----------------
+check(
+    "s165(c-integrity-scan): agents/orchestrator.md declares a "
+    "deterministic report-integrity scan for the adversary's per-round "
+    "reports",
+    "report-integrity scan" in _s165_orchestrator,
+    "01-plan.md Task-1 AC-5 requires a Bash, no-dispatch report-integrity "
+    "scan (same form as Phase 1.5a/2.6) verifying presence, non-emptiness, "
+    "verdict-match, and no-shrink/no-disappear of prior "
+    "'reviews/04-adversary-r{N}.md' rounds -- currently absent",
+)
+
+# --- (d) R1: docs/adversary-cost-model.md does not exist yet --------------
+check(
+    "s165(d-cost-model-exists): docs/adversary-cost-model.md exists",
+    _s165_cost_model_path.is_file(),
+    "01-plan.md Task-5 AC-4 requires a new docs/adversary-cost-model.md "
+    "with a per-round token-accounting table, an arithmetic baseline "
+    "projection, and a deferred-measurement plan -- the file does not "
+    "exist yet on this tree",
+)
+
+# Marker: adversary-resource-management-prefix-regression
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 166 — adversary-resource-management Round-1 AC coverage
+# (Task-1: agents/orchestrator.md, AC-1..AC-10; Task-3: agents/architect.md,
+# AC-1..AC-4)
+# ---------------------------------------------------------------------------
+# Completes the AC-to-test mapping for these two tasks' clauses not already
+# covered by Suite 165's presence-only checks (fail-closed clauses,
+# consumer-site-by-name discipline, integrity-scan sub-checks, monotonic-N
+# retry rule, classification guidance). Full AC Coverage table and
+# cross-references: 03-testing.md § Test Plan.
+#
+# Marker: adversary-resource-management-round1-ac-coverage
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 166: adversary-resource-management Round-1 AC coverage ===")
+
+_s166_orchestrator = read(AGENTS_DIR / "orchestrator.md")
+_s166_architect = read(AGENTS_DIR / "architect.md")
+
+# --- Task-1 AC-1: fail-closed default clause (formula presence already
+# covered by s165(b-predicate); this adds the fail-closed-on-absence clause)
+# ---------------------------------------------------------------------------
+check(
+    "s166(t1-ac1-fail-closed): agents/orchestrator.md states the "
+    "fail-closed default for changes_security_control absence/doubt, and "
+    "that absence is NEVER read as 'do not dispatch'",
+    "is treated as `true`" in _s166_orchestrator
+    and 'NEVER interpreted as "do not dispatch the adversary"' in _s166_orchestrator,
+    "01-plan.md Task-1 AC-1 requires the fail-closed clause to be stated "
+    "explicitly, not merely the bare formula (already covered by "
+    "s165(b-predicate))",
+)
+
+# --- Task-1 AC-2: every consumer site reads the predicate by name; the
+# security lens (security_floor_applies + its own consumer sites) is
+# byte-unchanged (Invariant B, fenced)
+# ---------------------------------------------------------------------------
+_s166_predicate_mentions = _s166_orchestrator.count("adversary_floor_applies")
+check(
+    "s166(t1-ac2-consumer-count): agents/orchestrator.md references "
+    "'adversary_floor_applies' at the definition plus every named "
+    "consumer site (tier table, feature-flow line, Phase-3 dispatch line, "
+    "Case-D rows, staleness re-gate) -- at least 10 occurrences",
+    _s166_predicate_mentions >= 10,
+    f"found only {_s166_predicate_mentions} occurrences of "
+    "'adversary_floor_applies' -- AC-2 requires the definition plus five "
+    "or more distinct consumer sites",
+)
+check(
+    "s166(t1-ac2-security-formula-unchanged): 'security_floor_applies = "
+    "security_sensitive == true' remains byte-identical (Invariant B, "
+    "fenced -- not migrated to the new predicate)",
+    "security_floor_applies = security_sensitive == true" in _s166_orchestrator,
+    "01-plan.md Task-1 AC-2 fences security_floor_applies's own formula as "
+    "unchanged -- it must not read adversary_floor_applies or "
+    "changes_security_control",
+)
+check(
+    "s166(t1-ac2-security-tier-column-unchanged): the tier-gated table's "
+    "`security` column ('skipped, unless `security_sensitive: true` (then "
+    "pipeline mode)') is unchanged for tiers 1 and 2",
+    _s166_orchestrator.count(
+        "skipped, unless `security_sensitive: true` (then pipeline mode)"
+    )
+    == 2,
+    "01-plan.md Task-1 AC-2 fences the `security` column of the "
+    "tier-gated table -- only the `adversary` column migrates to "
+    "adversary_floor_applies",
+)
+
+# --- Task-1 AC-3: Re-verification scope field, round-1=full vs
+# Case-D/staleness=localized, stable-prefix/delta-at-end ordering
+# ---------------------------------------------------------------------------
+check(
+    "s166(t1-ac3-reverify-scope-values): agents/orchestrator.md declares "
+    "'**Re-verification scope:** full' on the round-1 dispatch and "
+    "'**Re-verification scope:** localized {files, finding-IDs}' on the "
+    "Case-D re-dispatch (presence-only coverage already in "
+    "s165(b-reverify-scope))",
+    "**Re-verification scope:** full" in _s166_orchestrator
+    and "**Re-verification scope:** localized {files, finding-IDs}" in _s166_orchestrator,
+    "01-plan.md Task-1 AC-3 requires both values -- round 1 always "
+    "'full', Case-D/staleness re-dispatch 'localized {files, finding-IDs}'",
+)
+check(
+    "s166(t1-ac3-stable-prefix-ordering): the Case-D adversary re-dispatch "
+    "instruction orders stable content at the FRONT and the delta at the "
+    "END",
+    "the FRONT and the delta at the END" in _s166_orchestrator,
+    "01-plan.md Task-1 AC-3 requires the stable-prefix/delta-at-end "
+    "prompt-caching ordering instruction on the Case-D re-dispatch payload",
+)
+
+# --- Task-1 AC-4: output budget is format guidance, never a cap on
+# break_count/control count, never a budget-STOP
+# ---------------------------------------------------------------------------
+check(
+    "s166(t1-ac4-output-budget-clauses): agents/orchestrator.md states the "
+    "output budget never caps break_count/control count and is never a "
+    "budget-STOP (field presence already in s165(b-output-budget))",
+    "never a cap on `break_count`" in _s166_orchestrator
+    and "never a budget-STOP" in _s166_orchestrator,
+    "01-plan.md Task-1 AC-4 requires both disclaiming clauses, not merely "
+    "the bare field name",
+)
+
+# --- Task-1 AC-5: the four report-integrity scan checks, noisy-fail, and
+# the trace event (scan presence already in s165(c-integrity-scan))
+# ---------------------------------------------------------------------------
+_s166_integrity_subchecks = [
+    "Presence + non-empty" in _s166_orchestrator,
+    "Verdict match" in _s166_orchestrator,
+    "No prior-round shrink or disappearance" in _s166_orchestrator,
+    "No superior obsolete round file" in _s166_orchestrator,
+]
+check(
+    "s166(t1-ac5-integrity-scan-checks): all four report-integrity scan "
+    "sub-checks are present (presence+non-empty, verdict-match, "
+    "no-shrink/no-disappear, no-superior-obsolete-round-file)",
+    all(_s166_integrity_subchecks),
+    f"sub-check presence flags: {_s166_integrity_subchecks} -- 01-plan.md "
+    "Task-1 AC-5 requires all four, not merely the scan's existence",
+)
+check(
+    "s166(t1-ac5-noisy-fail-and-trace): the scan fails noisily (never "
+    "silently accepts a shrunk report) and emits an "
+    "'adversary.report_integrity' trace event",
+    "Fails noisily, never silently accepts a shrunk report" in _s166_orchestrator
+    and "adversary.report_integrity" in _s166_orchestrator,
+    "01-plan.md Task-1 AC-5 requires the trace event name and the "
+    "explicit noisy-fail statement",
+)
+
+# --- Task-1 AC-6: worst-of formula byte-identical (fenced D) -- already
+# reconfirmed by the pre-existing s125/AC-18a/b/c assertions above; no new
+# check added here (see 03-testing.md AC Coverage table).
+# --- Task-1 AC-7: regression test exists -- satisfied by Suite 165 itself.
+
+# --- Task-1 AC-8 (SEC-DR-F4): adversary_rounds: N in 00-state.md schema;
+# integrity scan check-4 rejects a stale higher-N-suffix round file
+# ---------------------------------------------------------------------------
+check(
+    "s166(t1-ac8-adversary-rounds-field): the 00-state.md schema template "
+    "in agents/orchestrator.md declares 'adversary_rounds: {N | null}' as "
+    "the authoritative per-round counter (never a filesystem-max glob)",
+    "adversary_rounds: {N | null}" in _s166_orchestrator
+    and "never a filesystem-max glob over `reviews/04-adversary-r*.md`" in _s166_orchestrator,
+    "01-plan.md Task-1 AC-8 requires both the schema field and the "
+    "explicit rejection of the filesystem-max-glob mechanism",
+)
+check(
+    "s166(t1-ac8-reject-superior-round-file): the integrity scan rejects "
+    "any 'reviews/04-adversary-r{N+k}.md' found on disk before accepting "
+    "round N",
+    "reviews/04-adversary-r{N+k}.md" in _s166_orchestrator,
+    "01-plan.md Task-1 AC-8/SEC-DR-F4 requires the scan to explicitly "
+    "reject a superior obsolete round file left by a previous run/recover "
+    "session -- the no-shrink check alone does not catch this",
+)
+
+# --- Task-1 AC-9 (SEC-DR-F6): every consumer site reads the predicate by
+# NAME; the inlined expansion never appears at a live consumer site --
+# it appears exactly once, inside the prohibition sentence itself
+# ---------------------------------------------------------------------------
+check(
+    "s166(t1-ac9-named-only-discipline): the inlined expansion "
+    "'security_sensitive AND changes_security_control' appears exactly "
+    "once in agents/orchestrator.md -- inside the prohibition sentence "
+    "itself, never re-derived at a live consumer site",
+    _s166_orchestrator.count(
+        "security_sensitive AND changes_security_control"
+    )
+    == 1
+    and "BY NAME (SEC-DR-F6, T1-AC-9)" in _s166_orchestrator,
+    "01-plan.md Task-1 AC-9/SEC-DR-F6: a count > 1 would mean a consumer "
+    "site re-derives the AND expansion instead of reading the named "
+    "predicate, silently dropping the fail-closed default",
+)
+
+# --- Task-1 AC-10 (SEC-DR-F7): N strictly monotonic; a retry of a failed
+# round never reuses the failed round's N
+# ---------------------------------------------------------------------------
+check(
+    "s166(t1-ac10-monotonic-retry): agents/orchestrator.md states N is "
+    "strictly monotonic-increasing per dispatch, and a retry of a failed "
+    "round NEVER reuses the failed round's N",
+    "strictly monotonic-increasing per dispatch" in _s166_orchestrator
+    and "NEVER reuses the failed round's `N`" in _s166_orchestrator,
+    "01-plan.md Task-1 AC-10/SEC-DR-F7 requires both the monotonic rule "
+    "and the explicit no-reuse-on-retry statement",
+)
+
+# --- Task-3 AC-1: 9th Classification-block field, with 'when true' guidance
+# and Design-mode + root-cause-mode inheritance
+# ---------------------------------------------------------------------------
+_s166_ninth_field_count = _s166_architect.count("changes_security_control: true|false")
+check(
+    "s166(t3-ac1-ninth-field): agents/architect.md declares "
+    "'changes_security_control: true|false' as the ninth Classification-"
+    "block field at both producer sites (01-plan.md schema template + "
+    "Step 1 00-state.md fenced block)",
+    _s166_ninth_field_count >= 2,
+    f"found only {_s166_ninth_field_count} occurrences -- 01-plan.md "
+    "Task-3 AC-1 requires the field mirrored at both the "
+    "'### Classification block' schema and the Step 1 00-state.md list",
+)
+check(
+    "s166(t3-ac1-when-true-guidance): agents/architect.md states "
+    "changes_security_control is true when the change modifies a guard, "
+    "gate, auth-check, floor, waiver, kill-switch, or an "
+    "incomplete-functionality flag",
+    "guard, gate, auth-check, floor, waiver, kill-switch, or a flag that "
+    "hides incomplete functionality" in _s166_architect,
+    "01-plan.md Task-3 AC-1 requires the 'when true' guidance sentence, "
+    "not merely the bare field declaration",
+)
+check(
+    "s166(t3-ac1-root-cause-inheritance): agents/architect.md's "
+    "root-cause mode explicitly inherits the same nine-value "
+    "Classification block via a 'Root-Cause classification' pointer "
+    "paragraph",
+    "Root-Cause classification" in _s166_architect
+    and "carries the same nine values" in _s166_architect,
+    "01-plan.md Task-3 AC-1 requires root-cause mode to inherit "
+    "changes_security_control, not only Design mode",
+)
+
+# --- Task-3 AC-2: fail-closed default guidance, citing the PR #481
+# omission class
+# ---------------------------------------------------------------------------
+check(
+    "s166(t3-ac2-fail-closed-pr481): agents/architect.md states the "
+    "default is fail-closed to true on doubt/absence, citing PR #481's "
+    "producer-omission false-green class as the rationale",
+    "fail-closed to `true` on doubt or absence" in _s166_architect
+    and "PR #481" in _s166_architect,
+    "01-plan.md Task-3 AC-2 requires both the fail-closed statement and "
+    "the PR #481 citation in the same guidance",
+)
+
+# --- Task-3 AC-3: regression test exists -- satisfied by Suite 165 itself.
+
+# --- Task-3 AC-4 (SEC-DR-F2+F3): diff-grounded, reporter-independent
+# justification required when security_sensitive: true AND
+# changes_security_control: false
+# ---------------------------------------------------------------------------
+check(
+    "s166(t3-ac4-diff-grounded-justification): agents/architect.md "
+    "requires a diff-grounded one-line justification when "
+    "security_sensitive: true AND changes_security_control: false is "
+    "declared, and explicitly forbids deriving it from the reporter/PR "
+    "author's characterization (SEC-DR-F2+F3, section 6.6 floor)",
+    "Diff-grounded justification when declaring `false` on a "
+    "security-sensitive task" in _s166_architect
+    and "never from how the originating issue or PR reporter "
+    "characterized the change" in _s166_architect,
+    "01-plan.md Task-3 AC-4 requires both the justification mandate and "
+    "the reporter-independence clause -- a justification that merely "
+    "repeats the issue's stated scope does not satisfy the §6.6 floor",
+)
+
+# Marker: adversary-resource-management-round1-ac-coverage
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 167 — adversary-resource-management Round-2 AC coverage
+# (Task-2: agents/adversary.md, AC-1..AC-7; Task-4: agents/delivery.md,
+# AC-1..AC-5; Task-5: docs/pipeline-lanes.md + docs/verification-packet.md +
+# docs/knowledge.md + docs/adversary-cost-model.md, AC-1..AC-6)
+# ---------------------------------------------------------------------------
+# Completes the AC-to-test mapping for these three tasks' clauses not already
+# covered by Suite 165's presence-only checks (per-round path, cost-model
+# existence). Full AC Coverage table and cross-references: 03-testing.md
+# § Test Plan.
+#
+# Marker: adversary-resource-management-round2-ac-coverage
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 167: adversary-resource-management Round-2 AC coverage ===")
+
+_s167_adversary = read(AGENTS_DIR / "adversary.md")
+_s167_delivery = read(AGENTS_DIR / "delivery.md")
+_s167_pipeline_lanes = read(REPO_ROOT / "docs" / "pipeline-lanes.md")
+_s167_verification_packet = read(REPO_ROOT / "docs" / "verification-packet.md")
+_s167_knowledge = read(REPO_ROOT / "docs" / "knowledge.md")
+_s167_cost_model = read(REPO_ROOT / "docs" / "adversary-cost-model.md")
+
+# --- Task-2 AC-1: per-round write via Write only, never Edit (path presence
+# already covered by s165(a-per-round-path))
+# ---------------------------------------------------------------------------
+check(
+    "s167(t2-ac1-write-only): agents/adversary.md states the per-round "
+    "report is written via `Write` only, never `Edit`",
+    "via `Write` only" in _s167_adversary and "never `Edit`" in _s167_adversary,
+    "01-plan.md Task-2 AC-1 requires the Write-not-Edit tool-usage "
+    "discipline stated explicitly (path presence alone is "
+    "s165(a-per-round-path))",
+)
+
+# --- Task-2 AC-2: reads existing round files first (Glob), confirms
+# present rounds before writing N
+# ---------------------------------------------------------------------------
+check(
+    "s167(t2-ac2-read-before-write): agents/adversary.md instructs a "
+    "`Glob` for existing round files and confirmation of which rounds are "
+    "present before writing the current round's report",
+    "`Glob` for `workspaces/{feature-name}/reviews/04-adversary-r*.md`"
+    in _s167_adversary
+    and "confirm which rounds already exist on disk" in _s167_adversary,
+    "01-plan.md Task-2 AC-2 requires the read-before-write step (PR #494 "
+    "silent-overwrite recommendation) -- currently absent",
+)
+check(
+    "s167(t2-ac2-status-block-field): the Return Protocol status block "
+    "declares `prior_rounds_found`, the round files confirmed present "
+    "before writing",
+    "prior_rounds_found" in _s167_adversary,
+    "01-plan.md Task-2 AC-2 requires the status block to surface which "
+    "rounds were found present, for auditability",
+)
+
+# --- Task-2 AC-3: delta-scoped reads on localized, full re-attack on full,
+# could-not-break on unchanged surface treated as frozen
+# ---------------------------------------------------------------------------
+check(
+    "s167(t2-ac3-scope-handling): agents/adversary.md defines both the "
+    "`full` (attack the entire changed surface from scratch) and "
+    "`localized {delta}` (prior could-not-break on unchanged surface "
+    "treated as FROZEN) re-verification-scope handling",
+    "attack the entire changed surface from scratch" in _s167_adversary
+    and "treated as FROZEN" in _s167_adversary,
+    "01-plan.md Task-2 AC-3 requires both scope-handling branches stated "
+    "explicitly, not merely the field name",
+)
+
+# --- Task-2 AC-4: reads output-budget field, self-regulates FORMAT only,
+# never reduces break/control count
+# ---------------------------------------------------------------------------
+check(
+    "s167(t2-ac4-output-budget-self-regulation): agents/adversary.md "
+    "states it reads the output-budget field and self-regulates report "
+    "FORMAT only, never reducing the number of breaks/controls reported",
+    "self-regulate your report's FORMAT" in _s167_adversary
+    and "NEVER reduces the number of breaks or controls reported"
+    in _s167_adversary,
+    "01-plan.md Task-2 AC-4 requires both the self-regulation instruction "
+    "and the explicit never-reduces-content clause",
+)
+
+# --- Task-2 AC-5: Exact trigger rewritten to adversary_floor_applies:
+# true, subset (⊆) relation stated, OLD "fire on EXACTLY" claim removed
+# ---------------------------------------------------------------------------
+check(
+    "s167(t2-ac5-subset-trigger): agents/adversary.md's Exact trigger "
+    "reads `adversary_floor_applies: true` by name and states the subset "
+    "relation `adversary ⊆ security`",
+    "`adversary_floor_applies: true` in `00-state.md`" in _s167_adversary
+    and "adversary ⊆ security" in _s167_adversary,
+    "01-plan.md Task-2 AC-5 requires the trigger rewritten to the named "
+    "predicate plus the explicit subset-relation statement",
+)
+check(
+    "s167(t2-ac5-old-claim-removed): the old 'fire on EXACTLY the PRs "
+    "`security` fires on' equality claim is REMOVED, not merely "
+    "supplemented",
+    "fire on EXACTLY the PRs" not in _s167_adversary,
+    "01-plan.md Task-2 AC-5 requires the prior equality claim to be "
+    "REPLACED by the subset relation -- its continued presence means the "
+    "rewrite only supplemented instead of correcting the claim",
+)
+
+# --- Task-2 AC-6: regression test exists -- satisfied by Suite 165 itself.
+
+# --- Task-2 AC-7 (SEC-DR-F1): fail-safe re-attack of a frozen control
+# reachable via the named delta; escalate to full when dependency closure
+# is uncertain
+# ---------------------------------------------------------------------------
+check(
+    "s167(t2-ac7-fail-safe-delta-freeze): agents/adversary.md states the "
+    "fail-safe delta-freeze rule (re-attack, never silently freeze, on "
+    "reachability doubt) and the escalate-to-full rule on uncertain "
+    "dependency closure",
+    "Fail-safe delta-freeze (SEC-DR-F1)" in _s167_adversary
+    and "fail-SAFE toward re-attack, never toward silent freeze"
+    in _s167_adversary
+    and "escalate: treat the round as `full` scope instead of `localized`"
+    in _s167_adversary,
+    "01-plan.md Task-2 AC-7/SEC-DR-F1 requires all three clauses -- "
+    "the section heading, the fail-safe directive, and the escalation "
+    "rule",
+)
+
+# --- Task-4 AC-1: abort criteria (full + express) gate adversary-report
+# existence on adversary_floor_applies, never security_floor_applies;
+# security's own gate unchanged (fenced B)
+# ---------------------------------------------------------------------------
+_s167_delivery_predicate_gate = _s167_delivery.count(
+    "adversary_floor_applies == true` (read the computed value from "
+    "`00-state.md § Current State` directly"
+)
+check(
+    "s167(t4-ac1-existence-gate-count): agents/delivery.md gates "
+    "adversary-report existence on `adversary_floor_applies` at all three "
+    "sites (Step 0 preamble, full-lane abort criteria, express-lane abort "
+    "criteria)",
+    _s167_delivery_predicate_gate == 3,
+    f"found {_s167_delivery_predicate_gate} occurrences -- 01-plan.md "
+    "Task-4 AC-1 requires the existence gate re-derived at Step 0 plus "
+    "both lane-specific abort-criteria blocks",
+)
+check(
+    "s167(t4-ac1-security-gate-unchanged): the `security`-report existence "
+    "gate keyed on `security_sensitive`/`security_floor_applies` remains "
+    "unconditional in both lanes (fenced B), and no longer couples "
+    "adversary's existence check to it",
+    _s167_delivery.count(
+        "security_sensitive: true` (i.e. `security_floor_applies == true`"
+    )
+    == 2
+    and "When the same predicate also required" not in _s167_delivery,
+    "01-plan.md Task-4 AC-1 requires security's gate untouched (2 lane "
+    "occurrences) and the removal of the old inline coupling sentence "
+    "that derived adversary's existence check from security's condition",
+)
+
+# --- Task-4 AC-2: verdict located via orchestrator-declared adversary_rounds:
+# N in 00-state.md, never a filesystem-max-suffix glob; abort semantics
+# intact (broke-it -> abort; could-not-break+incomplete -> check ledger)
+# ---------------------------------------------------------------------------
+check(
+    "s167(t4-ac2-authoritative-n-lookup): agents/delivery.md locates the "
+    "adversary verdict via the orchestrator-declared `adversary_rounds: N`, "
+    "never a filesystem-max-suffix glob",
+    _s167_delivery.count(
+        "NEVER a filesystem-max-suffix glob over `reviews/04-adversary-r*.md`"
+    )
+    == 3,
+    "01-plan.md Task-4 AC-2 requires the anti-glob discipline stated at "
+    "all three sites (Step 0 preamble + both lane abort criteria)",
+)
+check(
+    "s167(t4-ac2-abort-semantics-intact): the per-round verdict-read "
+    "abort semantics (broke-it -> abort; could-not-break + "
+    "incomplete_on_changed_control -> check the decision ledger) are "
+    "preserved at both lane sites",
+    _s167_delivery.count(
+        "if `broke-it` → abort; if `could-not-break` + "
+        "`incomplete_on_changed_control: true` → check "
+        "`00-decision-ledger.md`"
+    )
+    == 2,
+    "01-plan.md Task-4 AC-2 requires the abort-semantics sentence "
+    "unchanged at both lane sites, now reading the per-round file",
+)
+
+# --- Task-4 AC-3 (fenced D): staleness strings AC-12b/AC-12c byte-identical
+# -- already covered by the pre-existing s125/AC-12b/c staleness-string
+# assertions (this task's diff does not touch the staleness-gate section);
+# no new check added here. Reconfirmed directly: both strings are present
+# unchanged in agents/delivery.md (Step 9b, untouched by this task's diff).
+# ---------------------------------------------------------------------------
+check(
+    "s167(t4-ac3-staleness-strings-reconfirm): staleness strings s125/"
+    "AC-12b and AC-12c remain byte-identical in agents/delivery.md "
+    "(covered by the pre-existing s125 assertions; reconfirmed here for "
+    "this task's own file)",
+    "HEAD is ahead of the commit the `security` (or `adversary`) agent "
+    "reviewed" in _s167_delivery
+    and "signal the orchestrator to re-run the `security` and `adversary`"
+    in _s167_delivery,
+    "01-plan.md Task-4 AC-3/fenced-D requires both staleness strings "
+    "untouched -- covered by existing s125/AC-12b/c assertions",
+)
+
+# --- Task-4 AC-4: regression test exists -- satisfied by Suite 165 itself.
+
+# --- Task-4 AC-5 (SEC-DR-F4+F6): reads the COMPUTED predicate directly
+# (never a local re-derivation of the AND); locates the verdict by the
+# authoritative N, never a max-suffix glob -- both already exercised by
+# t4-ac1-existence-gate-count / t4-ac1-security-gate-unchanged (reads the
+# computed value, never re-derives) and t4-ac2-authoritative-n-lookup
+# (anti-glob discipline); this check adds the explicit
+# never-re-derive-locally clause count.
+# ---------------------------------------------------------------------------
+check(
+    "s167(t4-ac5-never-re-derive-locally): agents/delivery.md explicitly "
+    "states it never re-derives `security_sensitive AND "
+    "changes_security_control` locally, at all three sites",
+    _s167_delivery.count(
+        "never re-derive `security_sensitive AND changes_security_control` "
+        "locally"
+    )
+    == 3,
+    "01-plan.md Task-4 AC-5/SEC-DR-F4+F6 requires the explicit "
+    "never-re-derive-locally clause at Step 0 preamble + both lane abort "
+    "criteria (fail-OPEN prevention, mirrors t1-ac9's by-name discipline)",
+)
+
+# --- Task-5 AC-1: docs/pipeline-lanes.md § 7 rewrite -- security
+# unconditional on sensitive path, adversary = narrower subset that also
+# changes a control
+# ---------------------------------------------------------------------------
+check(
+    "s167(t5-ac1-section7-rewrite): docs/pipeline-lanes.md § 7 states "
+    "`security` dispatches unconditionally from `security_floor_applies` "
+    "and `adversary` dispatches from the narrower "
+    "`adversary_floor_applies` predicate, a strict subset by construction",
+    "`security` dispatches at Phase 3 unconditionally from" in _s167_pipeline_lanes
+    and "adversary_floor_applies = security_floor_applies AND "
+    "changes_security_control` — a strict subset" in _s167_pipeline_lanes,
+    "01-plan.md Task-5 AC-1 requires § 7 to state both the unconditional "
+    "security dispatch and the strict-subset adversary predicate",
+)
+
+# --- Task-5 AC-2: § 12 two-lens floor rows updated consistently with § 7
+# (byte-consistency)
+# ---------------------------------------------------------------------------
+_s167_section12_rows = _s167_pipeline_lanes.count(
+    "Two-lens floor (`security` unconditional; `adversary` a narrower "
+    "subset via `adversary_floor_applies`)"
+)
+check(
+    "s167(t5-ac2-section12-byte-consistency): docs/pipeline-lanes.md § 12 "
+    "carries the same two-lens-floor row wording at both the canonical "
+    "and orchestrator site-enumeration rows, byte-consistent with § 7",
+    _s167_section12_rows == 2,
+    f"found {_s167_section12_rows} occurrences -- 01-plan.md Task-5 AC-2 "
+    "requires the § 12 rows to reuse the exact same wording as § 7's "
+    "rewrite (byte-consistency), not an independently-drifted paraphrase",
+)
+
+# --- Task-5 AC-3: docs/verification-packet.md per-iteration adversary
+# pointer updated to reviews/04-adversary-r{N}.md
+# ---------------------------------------------------------------------------
+check(
+    "s167(t5-ac3-verification-packet-pointer): docs/verification-packet.md "
+    "updates the per-iteration adversary verdict pointer to "
+    "'reviews/04-adversary-r{N}.md — one file per round' and the dispatch-"
+    "floor derivation to `adversary_floor_applies: true`",
+    "reviews/04-adversary-r{N}.md` — one file per round," in _s167_verification_packet
+    and "`adversary_floor_applies: true` (a narrower subset of the "
+    "`security` condition" in _s167_verification_packet,
+    "01-plan.md Task-5 AC-3 requires both the per-round verdict-doc "
+    "pointer and the dispatch-floor derivation updated together (same "
+    "section, same-file consistency)",
+)
+
+# --- Task-5 AC-4: docs/adversary-cost-model.md content -- per-round
+# accounting table, arithmetic projection, deferred-measurement plan
+# (file existence alone already covered by s165(d-cost-model-exists))
+# ---------------------------------------------------------------------------
+_s167_cost_model_sections = [
+    "Per-round token accounting" in _s167_cost_model,
+    "Arithmetic baseline projection" in _s167_cost_model,
+    "Deferred measurement plan" in _s167_cost_model,
+]
+check(
+    "s167(t5-ac4-cost-model-content): docs/adversary-cost-model.md "
+    "contains all three required parts -- a per-round accounting table, "
+    "an arithmetic baseline projection, and a deferred-measurement plan",
+    all(_s167_cost_model_sections),
+    f"section presence flags: {_s167_cost_model_sections} -- 01-plan.md "
+    "Task-5 AC-4 requires all three, not merely the file's existence "
+    "(already covered by s165(d-cost-model-exists))",
+)
+check(
+    "s167(t5-ac4-honest-saturated-runs-note): docs/adversary-cost-model.md "
+    "states the honest ~40-50% projection for security-saturated runs, "
+    "not only the <=25% mixed-run figure",
+    "~40-50%" in _s167_cost_model,
+    "01-plan.md Task-5 AC-4 requires the honest security-saturated-run "
+    "note, not a softened universal <=25% claim",
+)
+
+# --- Task-5 AC-5: docs/knowledge.md gains a [decision]/[pattern] bullet
+# for the predicate + per-round path
+# ---------------------------------------------------------------------------
+check(
+    "s167(t5-ac5-knowledge-bullet): docs/knowledge.md gains a `[decision]` "
+    "bullet recording `adversary_floor_applies` and the per-round report "
+    "path scheme",
+    "[decision] `adversary_floor_applies`" in _s167_knowledge
+    and "reviews/04-adversary-r{N}.md" in _s167_knowledge,
+    "01-plan.md Task-5 AC-5 requires a knowledge.md bullet tagged "
+    "'[decision]' naming both the predicate and the per-round path "
+    "scheme, matching the file's existing bullet-tag/citation style",
+)
+
+# --- Task-5 AC-6: regression test exists -- satisfied by Suite 165 itself.
+
+# Marker: adversary-resource-management-round2-ac-coverage
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 168 — adversary-resource-management Task-6 structural verification
+# (Task-6, AC-1..AC-8: per-site Invariant-A enumeration, changes_security_control
+# presence, dispatch-field wiring, per-round path + integrity scan, cost-model
+# content, and the Invariant-B/fenced-D negative guard.)
+# ---------------------------------------------------------------------------
+# Suite 165/166/167 already cover most of Task-1..Task-5's own AC surface at
+# an aggregate/presence level (e.g. s166(t1-ac2-consumer-count) counts >=10
+# total occurrences of the predicate). This suite adds the ONE-ASSERT-PER-SITE
+# enumeration Task-6's own AC-1 requires -- including the sites discovered
+# only during Round-1's adversary hardening (the 4 force-set branches across
+# 3 locations that pair `changes_security_control` with `security_sensitive`)
+# and the docs/verification-packet.md § 8 site the Round-2 acceptance-checker
+# found uncounted. Full AC Coverage table and cross-references: 03-testing.md
+# § Test Plan.
+#
+# Marker: adversary-resource-management-task6-structural-verification
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 168: adversary-resource-management Task-6 structural verification ===")
+
+_s168_orchestrator = read(AGENTS_DIR / "orchestrator.md")
+_s168_architect = read(AGENTS_DIR / "architect.md")
+_s168_adversary = read(AGENTS_DIR / "adversary.md")
+_s168_delivery = read(AGENTS_DIR / "delivery.md")
+_s168_pipeline_lanes = read(REPO_ROOT / "docs" / "pipeline-lanes.md")
+_s168_verification_packet = read(REPO_ROOT / "docs" / "verification-packet.md")
+_s168_cost_model = read(REPO_ROOT / "docs" / "adversary-cost-model.md")
+_s168_own = read(Path(__file__))
+
+# --- Task-6 AC-1: adversary_floor_applies defined + referenced BY NAME at
+# every Invariant-A site (one assert per site, per 01-plan.md § Multi-site
+# invariants + its two [CONSTRAINT-DISCOVERED] annotations + the Round-2
+# acceptance-checker's verification-packet.md § 8 carry-forward)
+# ---------------------------------------------------------------------------
+
+# Producer: the predicate itself
+check(
+    "s168(t6-ac1-predicate-defined): agents/orchestrator.md § 'Adversary "
+    "floor predicate' defines 'adversary_floor_applies = "
+    "security_floor_applies AND changes_security_control'",
+    "### Adversary floor predicate — `adversary_floor_applies` (R5, T1-AC-1/AC-9)"
+    in _s168_orchestrator
+    and "adversary_floor_applies = security_floor_applies AND "
+    "changes_security_control" in _s168_orchestrator,
+    "Invariant-A producer row 'predicado adversary_floor_applies (productor)' "
+    "requires the named heading plus the formula at its defining site",
+)
+
+# Producer: changes_security_control input, Design-mode 01-plan.md schema
+check(
+    "s168(t6-ac1-input-design-schema): agents/architect.md declares "
+    "'changes_security_control: true|false' inside the '### Classification "
+    "block' schema template (01-plan.md § Review Summary producer site)",
+    "### Classification block" in _s168_architect
+    and _s168_architect.index("changes_security_control: true|false")
+    > _s168_architect.index("### Classification block"),
+    "Invariant-A producer row 'input changes_security_control (productor)' "
+    "requires the field inside the Design-mode Classification block schema",
+)
+
+# Producer: changes_security_control input, 00-state.md Step 1 mirror
+check(
+    "s168(t6-ac1-input-state-mirror): agents/architect.md mirrors "
+    "'changes_security_control: true|false' into the fenced "
+    "00-state.md § Current State list at Step 1",
+    "**In `00-state.md § Current State`** (verifier's authority):"
+    in _s168_architect
+    and "changes_security_control: true|false"
+    in _s168_architect[
+        _s168_architect.index(
+            "**In `00-state.md § Current State`** (verifier's authority):"
+        ) :
+    ][:400],
+    "Invariant-A producer row 'input changes_security_control (copia de "
+    "estado)' requires the Step 1 fenced 00-state.md mirror block",
+)
+check(
+    "s168(t6-ac1-input-state-mirror-field): the Step 1 fenced "
+    "00-state.md mirror block carries 'changes_security_control: "
+    "true|false' as its ninth entry",
+    _s168_architect.count("changes_security_control: true|false") >= 2,
+    "Invariant-A producer row 'input changes_security_control (copia de "
+    "estado)' requires the field present at both the Design-mode schema "
+    "AND the 00-state.md Step 1 mirror -- found fewer than 2 occurrences",
+)
+
+# Producer: root-cause-mode inheritance pointer
+check(
+    "s168(t6-ac1-input-rootcause-pointer): agents/architect.md's "
+    "'Root-Cause classification' pointer paragraph names "
+    "'changes_security_control: true|false' explicitly",
+    "Root-Cause classification" in _s168_architect
+    and "changes_security_control: true|false"
+    in _s168_architect[_s168_architect.index("Root-Cause classification") :][:600],
+    "Invariant-A producer row 'input changes_security_control (productor)' "
+    "§ Root-Cause classification requires the field named inline, not "
+    "merely implied by 'the same nine values'",
+)
+
+# Consumer: tier-gated dispatch table, adversary column (all 4 tier rows)
+check(
+    "s168(t6-ac1-consumer-tier-table): the tier-gated dispatch table's "
+    "`adversary` column reads `adversary_floor_applies` at every tier "
+    "(1/2 'skipped, unless...', 3/4 'pipeline mode (if...)')",
+    _s168_orchestrator.count(
+        "skipped, unless `adversary_floor_applies == true` (then pipeline mode)"
+    )
+    == 2
+    and _s168_orchestrator.count("pipeline mode (if `adversary_floor_applies`)")
+    == 2,
+    "Invariant-A consumer row 'tier-gated dispatch table, columna adversary' "
+    "requires all four tier rows to read the named predicate",
+)
+
+# Consumer: feature-flow line
+check(
+    "s168(t6-ac1-consumer-feature-flow): the Feature-flow line reads "
+    "`adversary` whenever `adversary_floor_applies == true`, named as a "
+    "strict subset of `security_floor_applies`",
+    "`adversary` whenever `adversary_floor_applies == true` — a strict "
+    "subset of `security_floor_applies`" in _s168_orchestrator,
+    "Invariant-A consumer row 'feature-flow line' requires the named "
+    "predicate plus the explicit strict-subset framing",
+)
+
+# Consumer: Phase-3 "Invoke via Task tool" adversary dispatch bullet
+check(
+    "s168(t6-ac1-consumer-phase3-dispatch): the Phase-3 adversary dispatch "
+    "bullet gates on `adversary_floor_applies == true` by name",
+    "**adversary** (pipeline mode, when `adversary_floor_applies == true`"
+    in _s168_orchestrator,
+    "Invariant-A consumer row 'Phase-3 dispatch line (adversary)' requires "
+    "the named predicate at the 'Invoke via Task tool' bullet",
+)
+
+# Consumer: Case-D re-dispatch rows (both blast-radius rows)
+check(
+    "s168(t6-ac1-consumer-case-d-rows): both Case-D re-dispatch rows "
+    "(localized, structural) gate the adversary re-run on "
+    "`adversary_floor_applies == true` by name",
+    _s168_orchestrator.count(
+        "(+ `adversary` when `adversary_floor_applies == true`) only"
+    )
+    == 2,
+    "Invariant-A consumer row 'Case-D re-dispatch rows' requires the "
+    "named predicate at both blast-radius rows (localized, structural)",
+)
+check(
+    "s168(t6-ac1-consumer-case-d-fields): the Case-D adversary "
+    "re-dispatch-fields paragraph gates on `adversary_floor_applies == "
+    "true` by name before constructing the payload",
+    "Case-D adversary re-dispatch fields (R3, T1-AC-3).** When Case D "
+    "re-dispatches `adversary` (either blast radius, and only when "
+    "`adversary_floor_applies == true`)" in _s168_orchestrator,
+    "Invariant-A consumer row 'Case-D re-dispatch rows' requires the "
+    "field-construction paragraph to gate on the named predicate too, "
+    "not only the summary table rows",
+)
+
+# Consumer: Security-verdict staleness re-gate
+check(
+    "s168(t6-ac1-consumer-staleness-regate): the staleness re-gate "
+    "paragraph re-runs `adversary` additionally when "
+    "`adversary_floor_applies == true`, by name",
+    "`adversary` additionally when `adversary_floor_applies == true` — "
+    "MUST re-run" in _s168_orchestrator,
+    "Invariant-A consumer row 'Security-verdict staleness re-gate' "
+    "requires the named predicate, not a bare `security_sensitive` re-gate",
+)
+check(
+    "s168(t6-ac1-consumer-recompute-recache): the staleness re-gate's "
+    "recompute-and-recache paragraph names `adversary_floor_applies` as "
+    "the value it recomputes and rewrites into 00-state.md",
+    "**Recompute-and-recache `adversary_floor_applies` whenever this "
+    "re-gate fires" in _s168_orchestrator,
+    "Invariant-A consumer row 'Security-verdict staleness re-gate' "
+    "requires the cached predicate to be named at its own recompute site "
+    "(R2-C2 fix, Round-2 Bounded Patch iteration 1)",
+)
+
+# Consumer: adversary.md Exact trigger + subset (⊆) claim
+check(
+    "s168(t6-ac1-consumer-adversary-exact-trigger): agents/adversary.md § "
+    "Invocation & Scope's 'Exact trigger' reads `adversary_floor_applies: "
+    "true` by name and states the `adversary ⊆ security` subset relation",
+    "**Exact trigger.** `adversary_floor_applies: true` in `00-state.md`"
+    in _s168_adversary
+    and "adversary ⊆ security" in _s168_adversary,
+    "Invariant-A consumer row 'adversary Exact trigger + subset claim' "
+    "requires both the named-trigger rewrite and the subset relation",
+)
+
+# Consumer: delivery.md existence-gate (Step 0 preamble + full-lane +
+# express-lane abort criteria -- one Invariant-A row, three sites)
+check(
+    "s168(t6-ac1-consumer-delivery-existence-gate): agents/delivery.md "
+    "gates the adversary-report existence check on `adversary_floor_applies "
+    "== true` by name at Step 0 preamble, full-lane, AND express-lane abort "
+    "criteria",
+    _s168_delivery.count(
+        "adversary_floor_applies == true` (read the computed value from "
+        "`00-state.md § Current State` directly"
+    )
+    == 3,
+    "Invariant-A consumer row 'delivery existence-gate (Abort criteria, "
+    "full + express)' requires the named predicate at all three sites, "
+    "not only one lane",
+)
+
+# Consumer: docs/pipeline-lanes.md § 7 (two-lens floor, canonical)
+check(
+    "s168(t6-ac1-consumer-pipeline-lanes-sec7): docs/pipeline-lanes.md § 7 "
+    "names `adversary_floor_applies = security_floor_applies AND "
+    "changes_security_control` as the narrower adversary lens",
+    "adversary_floor_applies = security_floor_applies AND "
+    "changes_security_control` — a strict subset" in _s168_pipeline_lanes,
+    "Invariant-A consumer row 'two-lens floor (semántica split)' requires "
+    "§ 7's own rewrite to name the predicate, not paraphrase it",
+)
+
+# Consumer: docs/pipeline-lanes.md § 12 (site-enumeration table rows)
+check(
+    "s168(t6-ac1-consumer-pipeline-lanes-sec12): docs/pipeline-lanes.md § "
+    "12's site-enumeration table carries the 'adversary_floor_applies' "
+    "two-lens-floor row wording at both its canonical and orchestrator "
+    "site entries",
+    _s168_pipeline_lanes.count(
+        "Two-lens floor (`security` unconditional; `adversary` a "
+        "narrower subset via `adversary_floor_applies`)"
+    )
+    == 2,
+    "Invariant-A consumer row 'site-enumeration table (two-lens rows)' "
+    "requires both § 12 rows to name the predicate, byte-consistent with "
+    "§ 7",
+)
+
+# Consumer: docs/verification-packet.md § 8 (carry-forward 14th site,
+# Round-2 acceptance-checker finding -- the 'Dispatch floor' derivation)
+check(
+    "s168(t6-ac1-consumer-verification-packet-sec8): docs/"
+    "verification-packet.md § 8's 'Dispatch floor' derivation re-keys "
+    "adversary's should-have-dispatched condition to "
+    "`adversary_floor_applies: true` by name",
+    "**Dispatch floor — exactly one derivation.**" in _s168_verification_packet
+    and "`adversary_floor_applies: true` (a narrower subset of the "
+    "`security` condition" in _s168_verification_packet,
+    "Round-2 acceptance-checker carry-forward: docs/verification-packet.md "
+    "§ 8 is a genuine 14th Invariant-A consumer site (re-keyed from "
+    "`security_sensitive` to `adversary_floor_applies`), not previously "
+    "listed in 01-plan.md's Multi-site invariants table",
+)
+
+# Guard: this test file is itself the Invariant-A structural-guard site
+check(
+    "s168(t6-ac1-guard-self-site): tests/test_agent_structure.py contains "
+    "'Suite 168' and the "
+    "'adversary-resource-management-task6-structural-verification' marker",
+    "Suite 168" in _s168_own
+    and "adversary-resource-management-task6-structural-verification"
+    in _s168_own,
+    "Invariant-A guard row 'assert por-sitio | tests/test_agent_structure.py' "
+    "requires this suite to self-reference its own marker",
+)
+
+# Consumer (input side): the 4 force-set branches across 3 locations that
+# pair `changes_security_control: true` with a `security_sensitive: true`
+# force-set (01-plan.md's second [CONSTRAINT-DISCOVERED] annotation,
+# Round-1 iteration-3 comprehensive audit, finding 'C6')
+check(
+    "s168(t6-ac1-forceset-branch1): Phase 1.5 T2-AC-17 pre-check's MATCH "
+    "branch also force-sets `changes_security_control: true`",
+    "**Also force-set `changes_security_control: true` on this same "
+    "match**" in _s168_orchestrator,
+    "01-plan.md's exhaustive 4-branch audit requires the T2-AC-17 "
+    "pre-check's match branch (site 1) to pair changes_security_control "
+    "with its security_sensitive force-set -- this was the branch left "
+    "unpaired for 3 rounds before Round-1 iteration 3 found it",
+)
+check(
+    "s168(t6-ac1-forceset-branch2): Phase 1.5 T2-AC-17 pre-check's "
+    "FAIL-CLOSED-ON-AMBIGUITY branch also force-sets "
+    "`changes_security_control: true`",
+    "if the pre-check itself is inconclusive (a path partially matches, "
+    "or the `Files:`/description surface cannot be read), treat the task "
+    "as sensitive, applying the same pairing above" in _s168_orchestrator,
+    "01-plan.md's exhaustive 4-branch audit requires the T2-AC-17 "
+    "pre-check's ambiguity branch (site 2) to pair changes_security_control",
+)
+check(
+    "s168(t6-ac1-forceset-branch3): Phase 2-close `security_sensitive` "
+    "backstop's CONFIRMED-MATCH branch also force-sets "
+    "`changes_security_control: true`",
+    "On any match — path-pattern OR content-trigger — where "
+    "`security_sensitive` is not already `true` in this task's "
+    "`00-state.md § Current State`, force-set it to `true` for the "
+    "remainder of the task, applying the unified rule above"
+    in _s168_orchestrator,
+    "01-plan.md's exhaustive 4-branch audit requires the Phase-2-close "
+    "backstop's confirmed-match branch (site 3) to pair "
+    "changes_security_control -- the original CONSTRAINT-DISCOVERED site",
+)
+check(
+    "s168(t6-ac1-forceset-branch4): Phase 2-close `security_sensitive` "
+    "backstop's FAIL-CLOSED-ON-AMBIGUITY branch also force-sets "
+    "`changes_security_control: true`",
+    "a path only partially matches, a command cannot run, OR the diff is "
+    "unexpectedly EMPTY when changes were expected for this task"
+    in _s168_orchestrator,
+    "01-plan.md's exhaustive 4-branch audit requires the Phase-2-close "
+    "backstop's ambiguity branch (site 4) to pair changes_security_control "
+    "-- the branch Round-1 iteration-2's adversary re-verify found unpaired",
+)
+check(
+    "s168(t6-ac1-unified-rule-names-predicate): the file-wide unified "
+    "rule governing all 4 force-set branches names "
+    "`adversary_floor_applies` as the direct, named consequence of "
+    "pairing -- never an inline re-derivation",
+    "Where this makes `adversary_floor_applies` (`= security_floor_applies "
+    "AND changes_security_control`) evaluate `true`, it does so as a "
+    "direct, named consequence of the firing site" in _s168_orchestrator,
+    "The unified rule (agents/orchestrator.md, immediately before the "
+    "Phase-2-close backstop's branches) must tie the 4 force-set sites "
+    "back to the named predicate, per SEC-DR-F6/T1-AC-9 discipline",
+)
+
+# --- Task-6 AC-2: changes_security_control present in agents/architect.md
+# with the fail-closed default (dedicated Task-6-level assert; per-site
+# presence already covered by the t6-ac1-input-* checks above)
+# ---------------------------------------------------------------------------
+check(
+    "s168(t6-ac2-fail-closed-default): agents/architect.md declares "
+    "`changes_security_control: true|false` AND its fail-closed-to-true "
+    "default on doubt or absence, in the same guidance paragraph",
+    "changes_security_control: true`" in _s168_architect
+    and "**Default: fail-closed to `true` on doubt or absence.**"
+    in _s168_architect,
+    "01-plan.md Task-3 AC-1/AC-2 requires both the field declaration and "
+    "the fail-closed default statement in agents/architect.md",
+)
+
+# --- Task-6 AC-3: Re-verification scope + Adversary output budget fields
+# on the adversary dispatch (dedicated Task-6-level asserts; presence-only
+# already covered by s165(b-reverify-scope)/s165(b-output-budget))
+# ---------------------------------------------------------------------------
+check(
+    "s168(t6-ac3-reverify-scope-staleness-value): the staleness re-gate's "
+    "own `Re-verification scope:` value is `localized {the changed "
+    "surface}` -- a THIRD distinct value from round-1's `full` and "
+    "Case-D's `localized {files, finding-IDs}`",
+    "**Re-verification scope:** localized {the changed surface}"
+    in _s168_orchestrator,
+    "01-plan.md Task-1 AC-3 requires all three Re-verification scope "
+    "sites (round-1 full, Case-D localized, staleness-regate localized) "
+    "to carry a value, not only the first two",
+)
+check(
+    "s168(t6-ac3-output-budget-formula): agents/orchestrator.md declares "
+    "the exact output-budget formula "
+    "'~800 + 600×(changed-control count in scope) tokens'",
+    "~800 + 600×(changed-control count in scope) tokens" in _s168_orchestrator,
+    "01-plan.md Task-1 AC-4 requires the exact formula text, not merely "
+    "the 'Adversary output budget' field name",
+)
+
+# --- Task-6 AC-4: s141 pin updated (verified by the suite141 run itself);
+# new asserts for the deterministic integrity scan (orchestrator.md) and
+# the per-round write (adversary.md)
+# ---------------------------------------------------------------------------
+check(
+    "s168(t6-ac4-integrity-scan-section): agents/orchestrator.md declares "
+    "the '### Adversary per-round report-integrity scan' section, run "
+    "after every adversary round",
+    "### Adversary per-round report-integrity scan" in _s168_orchestrator,
+    "01-plan.md Task-1 AC-5 requires the deterministic (Bash, no-dispatch) "
+    "report-integrity scan section, same shape as Phase 1.5a/2.6",
+)
+check(
+    "s168(t6-ac4-per-round-write): agents/adversary.md's read-before-write "
+    "step writes the current round's report to "
+    "'reviews/04-adversary-r{N}.md' via `Write` only, after confirming "
+    "existing rounds first",
+    "workspaces/{feature-name}/reviews/04-adversary-r{N}.md" in _s168_adversary
+    and "via `Write` only — never `Edit`" in _s168_adversary,
+    "01-plan.md Task-2 AC-1/AC-2 requires the per-round Write-not-Edit "
+    "step, replacing the retired single-file 'reviews/04-adversary.md' path "
+    "s141 pinned before this task",
+)
+
+# --- Task-6 AC-5: docs/adversary-cost-model.md exists and contains the
+# accounting table, the projection, and the deferred-measurement section
+# (dedicated Task-6-level consolidated assert; presence and content already
+# covered separately by s165(d-cost-model-exists) and s167(t5-ac4-*))
+# ---------------------------------------------------------------------------
+check(
+    "s168(t6-ac5-cost-model-consolidated): docs/adversary-cost-model.md "
+    "exists and contains all three required parts in one file -- a "
+    "per-round accounting table, an arithmetic baseline projection, and a "
+    "deferred-measurement plan",
+    (REPO_ROOT / "docs" / "adversary-cost-model.md").is_file()
+    and "Per-round token accounting" in _s168_cost_model
+    and "Arithmetic baseline projection" in _s168_cost_model
+    and "Deferred measurement plan" in _s168_cost_model,
+    "01-plan.md Task-5 AC-4 requires docs/adversary-cost-model.md to exist "
+    "with all three sections present together",
+)
+
+# --- Task-6 AC-6 (fenced D): s125/AC-18 (worst-of formula) and s125/AC-12b/c
+# (delivery staleness strings) remain green -- reconfirmed by the
+# pre-existing s125 assertions above (s125/AC-18a/b/c, s125/AC-12b/c); no
+# new assert added here, per 01-plan.md Task-6's own Notes.
+# --- Task-6 AC-7: regression test exists -- satisfied by Suite 168 itself.
+# ---------------------------------------------------------------------------
+
+# --- Task-6 AC-8 (SEC-DR-F5): security_floor_applies formula AND the
+# "security cell unconditional at bug_tier 3/4" clause remain byte-identical
+# in agents/orchestrator.md -- Invariant B, the highest-risk edit surface,
+# interleaved with the adversary-gating clauses Task-1/Task-6 both edit
+# ---------------------------------------------------------------------------
+check(
+    "s168(t6-ac8-invariant-b-byte-identical): 'security_floor_applies = "
+    "security_sensitive == true' AND the 'security cell unconditional at "
+    "bug_tier 3/4' clause remain byte-identical in agents/orchestrator.md",
+    "security_floor_applies = security_sensitive == true" in _s168_orchestrator
+    and 'the `security` cell is unconditional ("pipeline mode") and fires '
+    "regardless of `security_floor_applies`, because bug severity alone "
+    "is an independent, pre-existing mandate" in _s168_orchestrator,
+    "01-plan.md Task-6 AC-8/SEC-DR-F5 requires Invariant B's fenced "
+    "formula AND its bug_tier-3/4-unconditional clause to survive every "
+    "edit made to the surrounding adversary-gating prose, including this "
+    "task's own documentation-honesty fix at the security carry-forward "
+    "Low finding (agents/orchestrator.md ~line 992)",
+)
+
+# Marker: adversary-resource-management-task6-structural-verification
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
