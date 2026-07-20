@@ -38607,7 +38607,7 @@ check(
     "structural_escalations at 1 by default and escalates a 2nd trigger "
     "to the operator",
     "caps architect-redesign pivots at **1 by" in _s170_patchmode
-    and "scales to the operator (`status: blocked`)" in _s170_patchmode,
+    and "escalates to the operator (`status: blocked`)" in _s170_patchmode,
     "AC-23 requires the canonical contract to cap redesign pivots at 1 "
     "and escalate a 2nd whack-a-mole trigger to the operator as "
     "`status: blocked`, never an unbounded redesign loop",

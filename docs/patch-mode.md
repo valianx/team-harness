@@ -235,11 +235,12 @@ panel re-firing) already guards against, at the same pattern.
 **Scope.** Evaluates ONLY at R1 of the R0/R1/R2 sequencing (§ "Cost-Ordered Patch-Iteration
 Re-Run Sequencing" above), and ONLY when the R1 owner set includes `adversary` — whether
 `adversary` alone, or as part of the security+adversary clamp (§ "Reconciliation with the
-security-verdict staleness re-gate" item 1 above). It NEVER evaluates at R0 or R2, and it never
-interacts with the structural fail-safe (§ "Structural fail-safe" above): `Blast radius:
-structural` collapses R0 straight to the COMPLETE Case-row verifier set, bypassing R1/R2
-narrowing entirely — this detector's R1-scoped evaluation point is simply not reached on that
-branch.
+security-verdict staleness re-gate" item 1 above). It never evaluates at R0; at R2 it evaluates
+only via the secondary evaluation point defined below (§ "Evaluation point (AC-25)" — the
+staleness re-gate forcing a FRESH security+adversary re-run inside R2). It never interacts with
+the structural fail-safe (§ "Structural fail-safe" above): `Blast radius: structural` collapses
+R0 straight to the COMPLETE Case-row verifier set, bypassing R1/R2 narrowing entirely — this
+detector's R1-scoped evaluation point is simply not reached on that branch.
 
 **Why this exists.** The Case → routing table already routes Case B to a full architect
 re-design when the blast radius is `structural`, but only via the failing verifier's OWN
@@ -361,7 +362,7 @@ Either variant firing triggers the SAME action sequence:
 
 `structural_escalations` (new `00-state.md` field) caps architect-redesign pivots at **1 by
 default**. A SECOND whack-a-mole trigger after the redesign already consumed that escalation
-scales to the operator (`status: blocked`) with the accumulated break-set and BOTH design
+escalates to the operator (`status: blocked`) with the accumulated break-set and BOTH design
 iterations attached — never an unbounded redesign loop.
 
 The implementer's max-3-iteration budget is reserved for genuine implementation bugs — a break

@@ -132,7 +132,7 @@ All commands run from the repo root.
 > Extended detail for conventions without a dedicated docs/ file: see `docs/conventions.md`.
 
 - **One concern per file.** One agent per `.md` in `agents/`. One skill per `.md` in `skills/` (complex skills get their own subfolder).
-- **Frontmatter-driven agents.** Every agent file starts with YAML frontmatter (`name`, `description`, `model`, `color`, `effort`). Model tiers: `opus` (architect/agent-builder/security/coordination), `haiku` (researcher/init), `sonnet` (all others). Effort ceiling `xhigh`.
+- **Frontmatter-driven agents.** Every agent file starts with YAML frontmatter (`name`, `description`, `model`, `color`, `effort`). Model tiers: `opus` (architect/agent-builder/security/coordination), `haiku` (researcher/init), `sonnet` (all others). Effort ceiling `xhigh`; session-global on CC, per-agent-advisory on opencode — see `agents/README.md`.
 - **leader is the hub.** Skills never invoke agents directly — they build a task payload and route to `leader`. Exceptions: standalone utilities (`/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:update`).
 - **Workspaces as the shared board.** Agents communicate through files in `workspaces/{feature-name}/`; the operator uses it as a review surface. Never through return values. `workspaces/` is always git-ignored. `docs/conventions.md`.
 - **Dual-mode workspaces.** Local (`./workspaces/`) or Obsidian vault, via `logs-mode` in `~/.claude/.team-harness.json`. `docs/conventions.md`.
