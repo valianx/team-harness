@@ -98,7 +98,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — the only CC install channel. Go installer binary (GH Release assets) — the only opencode install channel; it does not serve Claude Code. |
 
-**Current version:** `2.134.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.135.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
@@ -221,7 +221,7 @@ Agents in this repo routinely read content they did not author — web pages (We
 
 This is a prompt-level floor — defense in depth that complements the deterministic hooks (`policy-block` secret-scanning, `dev-guard` outward-action gating), not a substitute for them.
 
-**Threat model — honest-developer disposition, not an adversarial boundary.** TH's guards, gates, and floors support catching rationalization, haste, and drift on the readable path — they are NOT a security boundary against an active adversary. A gate that does the WRONG thing on a plain, readable input is always an in-scope defect; only the obfuscation-evasion residual of string-matching gates (and the classification-timing gap disclosed at `agents/orchestrator.md:1147`) is documented, not chased. This disposition never licenses skipping a real in-scope finding, weakening a floor, or waiving `security`/`adversary` dispatch. Full statement: `docs/dev-mode.md § "Threat model — honest-developer disposition"`.
+**Threat model — honest-developer disposition, not an adversarial boundary.** TH's guards, gates, and floors support catching rationalization, haste, and drift on the readable path — they are NOT a security boundary against an active adversary. A gate that does the WRONG thing on a plain, readable input is always an in-scope defect; only the obfuscation-evasion residual of string-matching gates is documented, not chased. This disposition never licenses skipping a real in-scope finding, weakening a floor, or waiving `security`/`adversary` dispatch. Full statement: `docs/dev-mode.md § "Threat model — honest-developer disposition"`.
 
 ---
 
@@ -297,7 +297,8 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 - **2026-06-29** — `refreshManagedConfigKeys`: update writes only managed keys (`format_version`/`installed_version`/`updated_at`); operator keys preserved. → `cmd/install/opencode_config.go`
 - **2026-06-29** — `VERSION` asset: bare semver at `releases/latest/download/VERSION` (no GitHub API); best-effort pre-check. → `release.yml`
 - **2026-07-15** — Lanes own cost/speed, floor stays orthogonal. → `docs/pipeline-lanes.md`
-- **2026-07-19** — `adversary_floor_applies` narrows the `adversary` Phase-3 trigger to a strict subset of `security_floor_applies` (fail-closed to `true`); `security`'s own floor is unchanged. → `agents/orchestrator.md § Adversary floor predicate`
+- **2026-07-19** — `adversary_floor_applies` narrows the `adversary` Phase-3 trigger to a strict subset of `security_floor_applies` (fail-closed to `true`); `security`'s own floor is unchanged. → superseded 2026-07-20 by the Pre-Delivery Security Audit below
+- **2026-07-20** — Security verification consolidated into the Pre-Delivery Security Audit (Phase 3.8, once per delivery group over the consolidated final diff): `security` unconditional, `adversary` on `security_floor_applies` alone; findings operator-disposed at STAGE-GATE-3, no autonomous security-lens iterations. Retires `adversary_floor_applies`, per-round reports, the staleness re-gate, and the whack-a-mole detector. → `agents/orchestrator.md § Phase 3.8`
 
 ## 9. Patterns & Conventions
 <!-- Populated by the delivery agent after each feature. Empty at init. -->

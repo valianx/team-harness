@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.135.0] - 2026-07-20
+
+### Added
+- Pre-Delivery Security Audit (orchestrator Phase 3.8): `security` and `adversary` now run exactly ONCE per delivery group, over the consolidated final diff, after Acceptance Check and before Delivery prepare — `security` unconditionally, `adversary` when `security_floor_applies` (`security_sensitive == true`, fail-closed). Findings are presented verbatim in the STAGE-GATE-3 STOP block and disposed by the operator: `ship` stays available with open findings (acceptance recorded in the decision ledger), `amend` triggers a single delta-scoped re-audit, `abort` halts. New `00-state.md` field `audit_status` gates STAGE-GATE-3 preparation. Canonical: `agents/orchestrator.md § Phase 3.8`, `docs/pipeline-lanes.md § 7`.
+- Suite 171 (`tests/test_agent_structure.py`): structural contract for the audit model — dispatch semantics, single-computation-site predicate, negative-residue sweeps, gate presentation, and cross-file coordination. Registered in `docs/testing.md`.
+
+### Changed
+- Phase 3 verify is now `tester` + `qa` only; the security lenses left the per-task verify block and its iteration loop. The Case → routing table drops Case D (security-only); the cost-ordered R0/R1/R2 sequencing is scoped to Case A with the two remaining lenses. No security-lens re-run exists in patch iterations — a mid-iteration security concern is carried forward as audit context, never a re-dispatch.
+- `agents/adversary.md`: single audit dispatch (`reviews/04-adversary.md`; `reviews/04-adversary-amend.md` for the one amend re-audit), trigger simplified to `security_floor_applies` by name, verdict no longer blocks delivery — operator disposition at STAGE-GATE-3 replaces the worst-of roll-up for security lenses.
+- `agents/delivery.md`: Step 0 no longer aborts on open audit findings in `mode: prepare` (that would pre-empt the operator's gate decision); `mode: publish` verifies a matching `disposition` ledger entry exists for any open finding. Step 9b's security-verdict staleness gate became the Audit-currency gate, routing staleness through the single amend re-audit.
+
+### Removed
+- `adversary_floor_applies` predicate and the `changes_security_control` dispatch conjunct (the field remains as an informational classification signal); per-round `reviews/04-adversary-r{N}.md` reports, the per-round report-integrity scan, and the `adversary_rounds`/`adversary_round_sizes` state fields; the security-verdict staleness re-gate (the audit's end-position over the final diff makes staleness structural); the whack-a-mole structural-escalation detector and its three state fields. Suites 165-170 retired, superseded by Suite 171 (rationale: the pinned contract was retired by operator decision — this also resolves issue #500 structurally by removing the multi-site dispatch-decision surface).
+
 ## [2.134.0] - 2026-07-20
 
 ### Added

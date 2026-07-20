@@ -188,7 +188,7 @@ denominator ground truth).** The per-run parity line
 narrower role than the reconciliation backstop above: the parity line's dispatch
 denominator is grounded in the workspace verdict docs (`03-testing.md` run-only
 section, `reviews/04-validation.md`, `reviews/04-security.md`,
-`reviews/04-adversary-r{N}.md` — one file per round, N = the round number,
+`reviews/04-adversary.md` / `reviews/04-adversary-amend.md` — the Phase 3.8 audit reports,
 `reviews/04-ux-validation.md`), and breadcrumbs are consulted only to ADD a
 breadcrumb-evidenced dispatch that has no matching verdict entry, classified
 telemetry-missing. A dispatch's breadcrumb pair being absent never removes it from,

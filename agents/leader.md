@@ -612,8 +612,8 @@ handles.
 | **0** | Trivial/Cosmetic | Skip | Skip | tester only (suite no-regress) | NONE |
 | **1** | Docs/Trivial | Skip — no `01-root-cause.md` | Conditional skip (see below) | tester only | `00-state.md`, `01-plan.md` |
 | **2** | Light fix | `mode: light-root-cause` | Mandatory | tester + qa | full |
-| **3** | Standard fix | `mode: full-root-cause` | Mandatory | tester + qa + security | full |
-| **4** | Critical/Security | `full-root-cause` + mandatory memory prior-art query | Mandatory | tester + qa + security (extended) | full + prior-art |
+| **3** | Standard fix | `mode: full-root-cause` | Mandatory | tester + qa (security at the audit) | full |
+| **4** | Critical/Security | `full-root-cause` + mandatory memory prior-art query | Mandatory | tester + qa (security at the audit, extended) | full + prior-art |
 
 **Tier 0 — auto-detection (ALL must hold):** single file touched; ≤5 lines changed; path is `*.md`, code-comments-only, `CHANGELOG` entries, or whitespace-only; no `*.test.*`/`*.spec.*`/`tests/` paths; and the path does NOT match `cmd/install/*.go`, `agents/*.md`, or `skills/*.md` (these carry system-level impact and are Tier 1 minimum). Any violation auto-promotes to Tier 1+ (`tier_promote: 1` + rationale). **Operator cannot force Tier 0** for changes touching `agents/*.md`, `skills/*.md`, or `cmd/install/*.go` — these always promote to Tier 1 minimum regardless of `[TIER: 0]`. Tier 0 routing (you dispatch `implementer` directly, no orchestrator) is in the **Tier 0 exception** above.
 
