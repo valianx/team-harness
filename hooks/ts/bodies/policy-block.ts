@@ -58,6 +58,8 @@
 // including the quoting inside its embedded --settings JSON blob.
 
 import type { NormalizedInput, NormalizedDecision } from "../shim/normalized-v1.js";
+import { analyzeCommand, classifyCoveredAction } from "./command-lexer.js";
+import type { ArgvToken } from "./command-lexer.js";
 
 // ---------------------------------------------------------------------------
 // Decision helpers
@@ -298,6 +300,58 @@ const DENIED_BASH: Array<[RegExp, string]> = [
   [/\bdrop\s+(?:table|database|schema)\b/i, "destructive SQL: DROP"],
   [/\btruncate\s+table\b/i, "destructive SQL: TRUNCATE TABLE"],
 ];
+
+// ---------------------------------------------------------------------------
+// Wrapper/per-subcommand-binary force-push deny — layered on top of the
+// DENIED_BASH literal regex above, not a replacement for it. The regex
+// matches a bare, unwrapped `git push --force ...` by string shape; it
+// structurally cannot see a force push hidden inside a command-executing
+// wrapper (`bash -c "git push --force origin main"`) or invoked via a
+// per-subcommand binary (`$(git --exec-path)/git-push --force origin main`)
+// — command-lexer.ts's analyzeCommand/classifyCoveredAction resolve BOTH
+// forms to the same classified `git-push` command the regex already
+// recognizes for the bare case, closing that gap. An env-assignment prefix
+// or a `-c <k=v>` config override ahead of `push` (`GIT_DIR=/x git push
+// --force ...`, `git -c k=v push --force ...`), and a case-variant or
+// `.exe`-suffixed binary/subcommand (`Git-Push`, `git.exe push`), are all
+// resolved past by the same centralized, shared classifier (SEC-DR-13) —
+// the statically-visible force token still reaches this check regardless of
+// what precedes it or how the binary/subcommand is spelled.
+// ---------------------------------------------------------------------------
+
+const FORCE_PUSH_FLAG_VALUES = new Set(["-f", "--force", "--force-with-lease"]);
+
+// Long flags that git accepts in the glued `--flag=value` shape IN ADDITION
+// to the bare form above. `-f`/`--force` are plain booleans (no git syntax
+// takes a value on them); `--force-with-lease` is the one flag here that
+// legitimately carries an optional `[=<refname>[:<expect>]]` value, so only
+// its glued prefix is recognized — extending `=value` recognition to a flag
+// that doesn't support it would just be dead code, never a real evasion.
+const FORCE_PUSH_FLAG_PREFIXES_WITH_VALUE = ["--force-with-lease="];
+
+function argsCarryForcePush(args: ArgvToken[]): boolean {
+  return args.some(
+    (tok) =>
+      FORCE_PUSH_FLAG_VALUES.has(tok.value) ||
+      FORCE_PUSH_FLAG_PREFIXES_WITH_VALUE.some((prefix) => tok.value.startsWith(prefix)) ||
+      (!tok.value.startsWith("-") && tok.value.startsWith("+"))
+  );
+}
+
+function findWrapperAwareForcePush(cmd: string): boolean {
+  for (const effective of analyzeCommand(cmd).commands) {
+    const classified = classifyCoveredAction(effective);
+    if (classified === null) continue;
+    if (
+      classified.binary === "git" &&
+      classified.gitSubcommand?.toLowerCase() === "push" &&
+      argsCarryForcePush(classified.args)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 
 // ---------------------------------------------------------------------------
 // SENSITIVE_PATHS — verbatim from policy-block.sh SENSITIVE_PATHS list
@@ -677,6 +731,11 @@ export function evaluate(input: NormalizedInput): NormalizedDecision {
     for (const [pattern, label] of DENIED_BASH) {
       if (pattern.test(cmd)) return deny(label);
     }
+
+    // Wrapper-embedded / per-subcommand-binary / env-prefixed force push —
+    // see findWrapperAwareForcePush above for why this is layered on top of
+    // (not a replacement for) the literal DENIED_BASH force-push pattern.
+    if (findWrapperAwareForcePush(cmd)) return deny("git push --force");
 
     // Position-aware --no-verify / -c core.hooksPath= tokenizer (M3c).
     if (checkNoVerifyTokenized(cmd)) {
