@@ -96,6 +96,117 @@ assert_allow "git clean (no -f)" '{"tool_name":"Bash","tool_input":{"command":"g
 assert_allow "git commit -m message" '{"tool_name":"Bash","tool_input":{"command":"git commit -m hello"}}'
 
 echo
+echo "=== AC-3.3/AC-3.7: force push resolved via wrapper/per-subcommand-binary/env-prefix (DENY) ==="
+# AC-3.3 (INVARIANT A) — the literal DENIED_BASH regex only sees a bare,
+# unwrapped 'git push --force ...'; these forms resolve to the same
+# classified git-push+force command via the shared analyzer.
+assert_deny "force push via per-subcommand binary (git-push --force)" \
+  '{"tool_name":"Bash","tool_input":{"command":"git-push --force origin main"}}'
+assert_deny "force push via dynamic-prefix per-subcommand binary" \
+  '{"tool_name":"Bash","tool_input":{"command":"$(git --exec-path)/git-push --force origin main"}}'
+assert_deny "force push wrapper-embedded (bash -c)" \
+  '{"tool_name":"Bash","tool_input":{"command":"bash -c \"git push --force origin main\""}}'
+assert_deny "force '+'-refspec via per-subcommand binary" \
+  '{"tool_name":"Bash","tool_input":{"command":"git-push origin +feature:main"}}'
+# AC-3.7 (SEC-DR-13) — an env-assignment prefix or a git -c config override
+# ahead of push must not defeat the deny; the shared analyzer resolves
+# argv[0]/subcommand past the prefix/option once, so the statically-visible
+# --force token still reaches this check.
+assert_deny "force push with GIT_DIR= env-assignment prefix" \
+  '{"tool_name":"Bash","tool_input":{"command":"GIT_DIR=/x git push --force origin main"}}'
+assert_deny "force push with git -c k=v config override" \
+  '{"tool_name":"Bash","tool_input":{"command":"git -c k=v push --force origin main"}}'
+# No-regression companion — the same wrapper/prefix forms WITHOUT a force
+# signal must stay ALLOW (the analyzer closes the force-push gap, it does
+# not turn every wrapped/prefixed push into a deny).
+assert_allow "per-subcommand binary push, no force signal" \
+  '{"tool_name":"Bash","tool_input":{"command":"git-push origin feature/x"}}'
+assert_allow "wrapper-embedded push, no force signal" \
+  '{"tool_name":"Bash","tool_input":{"command":"bash -c \"git push origin feature/x\""}}'
+
+echo
+echo "=== Glued --force-with-lease=<value> form (DENY) ==="
+# --force-with-lease is the one force flag that legitimately takes a glued
+# `=<refname>[:<expect>]` value in real git syntax; argsCarryForcePush must
+# recognize the glued form, not just the bare flag, on every resolved shape.
+assert_deny "bare glued --force-with-lease=<value>" \
+  '{"tool_name":"Bash","tool_input":{"command":"git push --force-with-lease=origin/main:deadbeef origin main"}}'
+assert_deny "wrapper-embedded glued --force-with-lease=<value> (bash -c)" \
+  '{"tool_name":"Bash","tool_input":{"command":"bash -c \"git push --force-with-lease=origin/main:deadbeef origin main\""}}'
+assert_deny "glued --force-with-lease=<value> via per-subcommand-dispatcher form" \
+  '{"tool_name":"Bash","tool_input":{"command":"git-push --force-with-lease=origin/main:deadbeef origin main"}}'
+
+echo
+echo "=== Centralized resolution: case-variant/.exe binary + command-runner prefix force push (DENY) ==="
+# Case-insensitive and `.exe`-stripped basename resolution is centralized
+# ONCE in classifyCoveredAction (command-lexer.ts) — policy-block previously
+# had NO case-insensitive fallback at all (adversary finding).
+assert_deny "force push via case-variant per-subcommand binary (Git-push --force)" \
+  '{"tool_name":"Bash","tool_input":{"command":"Git-push --force origin main"}}'
+assert_deny "force push via case-variant dispatcher form (GIT push --force)" \
+  '{"tool_name":"Bash","tool_input":{"command":"GIT push --force origin main"}}'
+assert_deny "force push via .exe-suffixed binary (git.exe push --force)" \
+  '{"tool_name":"Bash","tool_input":{"command":"git.exe push --force origin main"}}'
+assert_deny "force push via dynamic-prefix case-variant per-subcommand binary" \
+  '{"tool_name":"Bash","tool_input":{"command":"$(git --exec-path)/git-Push --force origin main"}}'
+# Command-runner prefixes (env/timeout/nice/nohup/command/stdbuf/setsid/
+# time/sudo/doas) resolve on the REAL command underneath, not the runner's
+# own basename.
+assert_deny "force push via env command-runner prefix" \
+  '{"tool_name":"Bash","tool_input":{"command":"env git push --force origin main"}}'
+assert_deny "force push via timeout command-runner prefix" \
+  '{"tool_name":"Bash","tool_input":{"command":"timeout 5 git push --force origin main"}}'
+assert_deny "force push via sudo command-runner prefix" \
+  '{"tool_name":"Bash","tool_input":{"command":"sudo git push --force origin main"}}'
+
+echo
+echo "=== Structural inversion closure (DENY) ==="
+# The combined worst case: an UNENUMERATED runner (not in RUNNER_MODELS)
+# combined with the per-subcommand-binary dispatcher form, on a force push —
+# the shape that achieves a full none()/none()/none() triple-bypass of
+# every hook's force-push floor when the runner-prefix layer only resolves
+# past a closed, named list. The forward-scan (not a growing enumeration)
+# closes it here too.
+assert_deny "force push via unenumerated runner (flock) + dispatcher form" \
+  '{"tool_name":"Bash","tool_input":{"command":"flock /tmp/x $(git --exec-path)/git-push --force origin main"}}'
+assert_deny "force push via unenumerated runner (unshare) + dispatcher form" \
+  '{"tool_name":"Bash","tool_input":{"command":"unshare -n $(git --exec-path)/git-push --force origin main"}}'
+# env -S/--split-string — the embedded command is extracted as a wrapper
+# payload (same shape as a shell's -c), so a resolved force push still
+# reaches this hook's deny.
+assert_deny 'force push via env -S embedded command' \
+  '{"tool_name":"Bash","tool_input":{"command":"env -S \"git push --force origin main\""}}'
+
+echo
+echo "=== Redesign addendum: dispatcher recognizer force push (DENY) ==="
+# AC-R3/AC-R4/AC-R6 — the shell-name-plus-`-c` structural-signature
+# recognizer catches any dispatcher basename (not enumerated), including
+# with an intervening shell flag before `-c` (SEC-DR-A2 — the recognizer
+# scans every position via extractShellCPayload, not just the fixed argv[2]
+# slot), and the extended SHELL_BASENAMES direct forms.
+assert_deny 'force push via busybox sh -c dispatcher form' \
+  '{"tool_name":"Bash","tool_input":{"command":"busybox sh -c \"git push --force origin main\""}}'
+assert_deny 'force push via busybox sh -x -c (intervening shell flag, SEC-DR-A2)' \
+  '{"tool_name":"Bash","tool_input":{"command":"busybox sh -x -c \"git push --force origin main\""}}'
+assert_deny 'force push via toybox ash -c (dispatcher not named busybox)' \
+  '{"tool_name":"Bash","tool_input":{"command":"toybox ash -c \"git push --force origin main\""}}'
+assert_deny 'force push via sbase sh -c (dispatcher not named busybox/toybox)' \
+  '{"tool_name":"Bash","tool_input":{"command":"sbase sh -c \"git push --force origin main\""}}'
+assert_deny 'force push via ash -c (extended shell set, AC-R6)' \
+  '{"tool_name":"Bash","tool_input":{"command":"ash -c \"git push --force origin main\""}}'
+assert_deny 'force push via hush -c (extended shell set, AC-R6)' \
+  '{"tool_name":"Bash","tool_input":{"command":"hush -c \"git push --force origin main\""}}'
+# AC-R2 (SEC-DR-A3) — sed 'e' force closure is a backstop via this hook's
+# raw-regex, not a structural closure (the buried-token payload is invisible
+# to the forward-scan; the literal `git push --force` text is adjacent).
+assert_deny "force push via sed 'e' backstop (AC-R2/SEC-DR-A3, raw-regex, not structural)" \
+  '{"tool_name":"Bash","tool_input":{"command":"printf \"\\n\" | sed \"e git push --force origin main\""}}'
+# AC-R5 — no INVARIANT-B regression: the overloaded -c flag on unrelated
+# tools must never be treated as a force-push-carrying dispatcher.
+assert_allow 'tar -c archive.tar . (overloaded -c, not a dispatcher, AC-R5)' \
+  '{"tool_name":"Bash","tool_input":{"command":"tar -c archive.tar ."}}'
+
+echo
 echo "=== Bash: claude --dangerously-skip-permissions spawn (Task-6, AC-6.2/6.4/6.5) ==="
 
 # Builds a Bash tool-call JSON payload for an arbitrary (possibly multi-line,

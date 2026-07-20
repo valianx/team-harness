@@ -29282,16 +29282,24 @@ check(
 # (Per-OS hooks/config.json checks RETIRED — the Go installer's CC path was
 # removed at the hook Bash->TS cutover; .claude-plugin/hooks.json is the
 # only CC wiring path now.)
+# (A later, unrelated PR replaced dev-guard.ts's literal-regex router
+# detection — GIT_PUSH_RE.test(cmd) — with parse-based detection over a
+# resolved argv (analyzeCommand/classifyCoveredAction, command-lexer.ts).
+# This AC's intent — dev-guard.ts still declares the unconditional
+# outward-action gate and still detects git push — is unaffected by that
+# mechanism swap; the two checks below were updated to the current symbols.)
 # ----------------------------------------------------------------
 
 check(
     "suite118(ac11-dev-guard-unchanged): dev-guard.ts still declares the unconditional outward-action gate",
-    "outward action" in _s118_dev_guard and "GIT_PUSH_RE" in _s118_dev_guard,
-    "dev-guard.ts must be unchanged by this task (unconditional outward-action gate + git push detection must still be present)",
+    "outward action" in _s118_dev_guard
+    and "analyzeCommand" in _s118_dev_guard
+    and "classifyCoveredAction" in _s118_dev_guard,
+    "dev-guard.ts must be unchanged by this task (unconditional outward-action gate + parse-based covered-action detection must still be present)",
 )
 check(
     "suite118(ac11-dev-guard-push-pattern): dev-guard.ts retains its git push detection; the shared shim emits permissionDecision",
-    "GIT_PUSH_RE.test" in _s118_dev_guard and "permissionDecision" in read(HOOKS_DIR / "ts" / "shim" / "shim.ts"),
+    "isGitPushCandidate" in _s118_dev_guard and "permissionDecision" in read(HOOKS_DIR / "ts" / "shim" / "shim.ts"),
     "dev-guard.ts must retain its git push detection; hooks/ts/shim/shim.ts must still emit permissionDecision",
 )
 
@@ -36104,6 +36112,7 @@ print("=== Suite 162: deterministic-gate-release-enforcement (anchor-scoped mult
 _s162_gate_contract = read(AGENTS_DIR / "_shared" / "gate-contract.md")
 _s162_gate_guard_ts = read(HOOKS_DIR / "ts" / "bodies" / "gate-guard.ts")
 _s162_dev_guard_ts = read(HOOKS_DIR / "ts" / "bodies" / "dev-guard.ts")
+_s162_command_lexer_ts = read(HOOKS_DIR / "ts" / "bodies" / "command-lexer.ts")
 _s162_policy_block_ts = read(HOOKS_DIR / "ts" / "bodies" / "policy-block.ts")
 _s162_run_ts_hook = read(HOOKS_DIR / "run-ts-hook.sh")
 _s162_orchestrator = read(AGENTS_DIR / "orchestrator.md")
@@ -36268,14 +36277,26 @@ check(
     "gate-guard" in _s162_claude and "gate-guard" in _s162_dev_mode,
     "CLAUDE.md and docs/dev-mode.md must both name gate-guard",
 )
-_s162_gh_pr_merge_block = re.search(
-    r"GH_PR_MERGE_RE\.test.*?\n(.*?\n){0,4}", _s162_dev_guard_ts, re.DOTALL
+# A later, unrelated PR replaced dev-guard.ts's literal GH_PR_MERGE_RE
+# router with argv-based verb resolution (GH_MUTATING_PR_VERBS,
+# classifyGhAction) — merge/review/comment now share one "pr-mutating"
+# branch instead of one router each. The anchor below was moved to the
+# new location; the guarantee it protects (a detected gh pr merge always
+# asks, never allows) is unchanged.
+_s162_gh_mutating_pr_verbs = re.search(
+    r"GH_MUTATING_PR_VERBS\s*=\s*new Set\(\[([^\]]*)\]\)", _s162_dev_guard_ts
 )
+_s162_pr_mutating_block_match = re.search(
+    r'if \(action\.kind === "pr-mutating"\) \{(.*?)\n  \}', _s162_dev_guard_ts, re.DOTALL
+)
+_s162_pr_mutating_block = _s162_pr_mutating_block_match.group(1) if _s162_pr_mutating_block_match else ""
 check(
     "s162(inv-d-fenced-merge-ask): dev-guard.ts's gh pr merge row is still "
     "ask, untouched by this design",
-    _s162_gh_pr_merge_block is not None
-    and "ask(" in _s162_gh_pr_merge_block.group(0),
+    _s162_gh_mutating_pr_verbs is not None
+    and '"merge"' in _s162_gh_mutating_pr_verbs.group(1)
+    and "ask(" in _s162_pr_mutating_block
+    and "allow(" not in _s162_pr_mutating_block,
     "hooks/ts/bodies/dev-guard.ts's gh pr merge handling must remain ask "
     "(fenced MUST-NOT-CHANGE)",
 )
@@ -36300,7 +36321,7 @@ check(
     "+refspec, and non-benign-shape forms) before reading gate3_release, "
     "via the shared positive grammar",
     "matchBenignPushGrammar" in _s162_gate_guard_ts
-    and "!matchBenignPushGrammar(rawCmd).matched) {\n    return deny("
+    and "!matchBenignPushGrammar(argv, tainted, reader).matched) {\n      return deny("
     in _s162_gate_guard_ts,
     "hooks/ts/bodies/gate-guard.ts must deny any push that does not match "
     "the shared benign-push grammar, unconditionally on gate3_release",
@@ -36325,23 +36346,40 @@ check(
     "call deny(), never ask()",
 )
 
-_s162_refspec_match = re.search(
-    r'refspec\.startsWith\("\+"\)\)\s*\{(.*?)\}', _s162_dev_guard_ts, re.DOTALL
+# A later, unrelated PR moved +refspec detection out of dev-guard.ts's own
+# inline check and into the shared closed positive grammar dev-guard.ts
+# delegates to (matchBenignPushGrammar, command-lexer.ts) — single-sourced
+# with gate-guard.ts's in-lane force-push deny rather than duplicated. The
+# positive anchor now targets that shared grammar; the negative anchor
+# confirms dev-guard.ts's own git-push handling never allows directly
+# outside a real grammar match (the only path to allow is via
+# evaluateDestinationBranch, reached exclusively when the grammar matches).
+_s162_refspec_grammar_match = re.search(
+    r'refspec\.startsWith\("\+"\)\)\s*return\s+notMatched;', _s162_command_lexer_ts
 )
-_s162_refspec_block = _s162_refspec_match.group(1) if _s162_refspec_match else ""
 check(
     "s162(inv-e-fenced-dev-guard-pos): dev-guard.ts's outside-lane +refspec "
     "handling is still present",
-    _s162_refspec_match is not None and "force-prefixed refspec" in _s162_refspec_block,
-    "hooks/ts/bodies/dev-guard.ts must retain its +refspec detection "
-    "(fenced MUST-NOT-CHANGE)",
+    _s162_refspec_grammar_match is not None and "matchBenignPushGrammar" in _s162_dev_guard_ts,
+    "hooks/ts/bodies/command-lexer.ts's matchBenignPushGrammar must retain "
+    "+refspec detection, and hooks/ts/bodies/dev-guard.ts must delegate to "
+    "it (fenced MUST-NOT-CHANGE guarantee)",
+)
+_s162_evaluate_git_push_args_match = re.search(
+    r"function evaluateGitPushArgs\(.*?\n\}\n", _s162_dev_guard_ts, re.DOTALL
+)
+_s162_evaluate_git_push_args_block = (
+    _s162_evaluate_git_push_args_match.group(0) if _s162_evaluate_git_push_args_match else ""
 )
 check(
     "s162(inv-e-fenced-dev-guard-neg): dev-guard.ts's +refspec handling "
     "still asks (never allows) outside a detected lane",
-    "ask(" in _s162_refspec_block and "allow(" not in _s162_refspec_block,
-    "hooks/ts/bodies/dev-guard.ts's +refspec handling must still resolve "
-    "to ask(), never allow()",
+    "matchBenignPushGrammar" in _s162_evaluate_git_push_args_block
+    and "ask(" in _s162_evaluate_git_push_args_block
+    and "return allow(" not in _s162_evaluate_git_push_args_block,
+    "hooks/ts/bodies/dev-guard.ts's git-push handling must resolve a "
+    "grammar mismatch (including a +refspec) to ask(), never a direct "
+    "allow() outside the shared grammar's own positive match",
 )
 check(
     "s162(inv-e-outward-actor): delivery.md's publish step never force-"
@@ -36436,18 +36474,38 @@ check(
     "onto the ship value the release-floor check reads",
 )
 
-# --- gate-guard.ts stays runtime-pure and its routers stay case-insensitive
+# --- gate-guard.ts stays runtime-pure and its covered-action classification
+# stays case-insensitive on the git/gh binary. Case/`.exe` normalization is
+# now CENTRALIZED, once, in command-lexer.ts's classifyCoveredAction — a
+# case-variant or `.exe`-suffixed binary always resolves to the canonical
+# lowercase `binary` field, so gate-guard.ts no longer carries its own
+# per-hook fallback (the prior `resolveGitPushArgs` helper this check used to
+# pin was removed once the shared classifier absorbed the guarantee).
 _s163_runtime_branch = re.search(
     r"input\.runtime\s*[=!]=|if\s*\([^)]*input\.runtime", _s163_gate_guard_ts
 )
+_s163_no_per_hook_fallback = "resolveGitPushArgs" not in _s163_gate_guard_ts
+_s163_case_insensitive_git = re.search(
+    r'classified\.binary\s*===\s*"git"[\s\S]{0,200}?gitSubcommand\?\.toLowerCase\(\)\s*===\s*"push"',
+    _s163_gate_guard_ts,
+)
+_s163_case_insensitive_gh = re.search(
+    r'classified\.binary\s*===\s*"gh"', _s163_gate_guard_ts
+)
 check(
-    "s163(t2-ac6): gate-guard.ts never branches on the caller runtime and "
-    "its command routers are case-insensitive",
+    "s163(t2-ac6): gate-guard.ts never branches on the caller runtime, "
+    "carries no per-hook case-insensitivity fallback, and its covered-action "
+    "classification is case-insensitive on the git/gh binary via the "
+    "centralized shared classifier",
     _s163_runtime_branch is None
-    and re.search(r"GIT_PUSH_RE\s*=\s*/.*?/i;", _s163_gate_guard_ts) is not None
-    and re.search(r"GH_PR_CREATE_RE\s*=\s*/.*?/i;", _s163_gate_guard_ts) is not None,
-    "hooks/ts/bodies/gate-guard.ts must stay runtime-pure and keep its "
-    "git push / gh pr create routers case-insensitive",
+    and _s163_no_per_hook_fallback
+    and _s163_case_insensitive_git is not None
+    and _s163_case_insensitive_gh is not None,
+    "hooks/ts/bodies/gate-guard.ts must stay runtime-pure, resolve a "
+    "case-variant git/gh binary (GIT, Git, GH) to the same covered "
+    "classification as the lowercase form via command-lexer.ts's "
+    "classifyCoveredAction, and must not reintroduce a per-hook "
+    "case-insensitivity fallback",
 )
 
 # --- orchestrator.md's dispatch-reference table and resume text reflect the
@@ -36533,20 +36591,27 @@ check(
     "checkpoint-guard's trust model, naming both hooks",
 )
 
-# --- both routers import the same shared tokenization pre-pass module, so
-# the quoted-literal fix lives in exactly one place, not two copies --------
+# --- both routers import the same shared tokenization+classification
+# module, so the covered-action detection logic lives in exactly one
+# place, not two copies. A later, unrelated PR retired the raw-string
+# prepareRoutableCommand pre-pass entirely in favor of a fuller shared
+# analyzer (analyzeCommand/classifyCoveredAction) — the single-source-of-
+# truth intent this check protects is unchanged, only the specific
+# imported symbols are ------------------------------------------------------
 _s163_dev_guard_ts = read(HOOKS_DIR / "ts" / "bodies" / "dev-guard.ts")
 check(
     "s163(t8-ac6): dev-guard.ts and gate-guard.ts both import the shared "
-    "prepareRoutableCommand pre-pass from the same lexer module rather "
-    "than each carrying its own copy",
-    "prepareRoutableCommand" in _s163_dev_guard_ts
+    "command analyzer from the same lexer module rather than each "
+    "carrying its own copy",
+    "analyzeCommand" in _s163_dev_guard_ts
+    and "classifyCoveredAction" in _s163_dev_guard_ts
     and 'from "./command-lexer.js"' in _s163_dev_guard_ts
-    and "prepareRoutableCommand" in _s163_gate_guard_ts
+    and "analyzeCommand" in _s163_gate_guard_ts
+    and "classifyCoveredAction" in _s163_gate_guard_ts
     and 'from "./command-lexer.js"' in _s163_gate_guard_ts,
     "hooks/ts/bodies/dev-guard.ts and hooks/ts/bodies/gate-guard.ts must "
-    "both import prepareRoutableCommand from the shared command-lexer "
-    "module",
+    "both import analyzeCommand and classifyCoveredAction from the shared "
+    "command-lexer module",
 )
 
 # --- Self-referential guard (mirrors Suite 161/162's own pattern) ----------
@@ -36624,14 +36689,23 @@ check(
     "hooks/ts/bodies/gate-guard.ts must import matchBenignPushGrammar from "
     "./command-lexer.js — Task-9 AC-7 (pending)",
 )
+# A later, unrelated PR fully replaced dev-guard.ts's whole-command
+# char-gate approach (which isLiteralSafeCommand belonged to) with
+# per-token taint tracking (analyzeCommand/classifyCoveredAction) — a
+# strictly wider mechanism, so isLiteralSafeCommand has no remaining
+# caller anywhere and importing it now would be dead code. The intent
+# this check protects — dev-guard.ts sources its safety predicates from
+# the shared module rather than a local copy — is verified against the
+# predicates dev-guard.ts actually still consumes.
 check(
     "s164(t9-ac7-import-dev-guard): dev-guard.ts imports the shared "
-    "char-gate predicates (isLiteralSafeCommand/isBenignPushFlag/"
-    "isPlainBranchName) from the shared command-lexer module",
-    "isLiteralSafeCommand" in _s164_dev_guard_ts
+    "safety predicates (isBenignPushFlag/isPlainBranchDestination) from "
+    "the shared command-lexer module",
+    "isBenignPushFlag" in _s164_dev_guard_ts
+    and "isPlainBranchDestination" in _s164_dev_guard_ts
     and 'from "./command-lexer.js"' in _s164_dev_guard_ts,
-    "hooks/ts/bodies/dev-guard.ts must import isLiteralSafeCommand from "
-    "./command-lexer.js — Task-9 AC-7 (pending)",
+    "hooks/ts/bodies/dev-guard.ts must import isBenignPushFlag and "
+    "isPlainBranchDestination from ./command-lexer.js",
 )
 
 # --- AC-4/AC-9: the OLD character-denylist symbols this task replaces are
