@@ -46,8 +46,8 @@ explicitly so the projection in § 4 is falsifiable rather than asserted.
 
 | Round type | Input tokens (assumption) | Output tokens (R4 formula, avg 2 changed controls: `800 + 600×2`) | Total/round |
 |---|---|---|---|
-| Round 1 (`Re-verification scope: full`) — first attack on a task | ~130,000 | ~2,000 | ~132,000 |
-| Round 2+ (`Re-verification scope: localized {delta}`) — delta-scoped re-verify | ~38,000 | ~2,000 | ~40,000 |
+| Audit dispatch (`Scope: full`) — one per delivery group | ~130,000 | ~2,000 | ~132,000 |
+| Amend re-audit (`Scope: localized {delta}`) — at most one per amend cycle | ~38,000 | ~2,000 | ~40,000 |
 
 **Basis for the input figures.** Round 1 reads the full workspace input manifest
 (design, plan AC, implementation, `reviews/04-security.md`) exactly as the

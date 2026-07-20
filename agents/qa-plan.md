@@ -78,7 +78,7 @@ Used standalone to define acceptance criteria for a feature or issue, outside th
 
 **Plan consolidation invariant:** see `agents/_shared/plan-consolidation.md` § "Invariant" and § "Section-ownership map". No forked `01-plan-*.md` sibling in the workspace root. The `## Plan Ratification` section is written in place to the single canonical `reviews/01-plan-review.md` (replacing any prior copy) — NEVER to `01-plan.md`. `01-plan.md` itself is read-only for this mode: when a ratification gap changes a canonical field (base branch, version bump) or AC text, that correction is surfaced for the architect to apply in-place in `01-plan.md`; `qa-plan` never edits the plan body directly.
 
-Used between Phase 1 (Design) and Phase 2 (Implementation) to confirm that the architect's Work Plan covers every AC **before** any code is written. This is the cheapest loop guard in the pipeline: catch coverage gaps before they cost an implementer + tester + qa + security cycle.
+Used between Phase 1 (Design) and Phase 2 (Implementation) to confirm that the architect's Work Plan covers every AC **before** any code is written. This is the cheapest loop guard in the pipeline: catch coverage gaps before they cost an implementer + tester + qa cycle.
 
 **Judgment-layer scope only (Layer 2 of the plan-structure gate).** This mode audits exactly two
 properties a fixed script cannot express: coverage completeness (AC ↔ Work Plan mapping, below) and

@@ -120,8 +120,8 @@ The bug-fix pipeline is tier-classified at Phase 0a to calibrate ceremony to sev
 | **0** | Trivial/Cosmetic | Skipped | Skipped | tester only (suite no-regress; no full audit) | **None** — no workspaces created |
 | **1** | Docs/Trivial | Skipped — one-sentence prose plan | Conditional skip when no behavior change | tester (no-regress suite) only | Yes — minimal |
 | **2** | Light fix | Architect `mode: light-root-cause`, ≤30 lines | Mandatory | tester + qa | Yes — full |
-| **3** | Standard fix (default) | Architect `mode: full-root-cause`, 1 page max | Mandatory | tester + qa + security | Yes — full |
-| **4** | Critical/Security | `mode: full-root-cause` + mandatory `mcp__memory__search_nodes` Prior Art query | Mandatory | tester + qa + security (extended analysis) | Yes — full + prior-art |
+| **3** | Standard fix (default) | Architect `mode: full-root-cause`, 1 page max | Mandatory | tester + qa (security at the Phase 3.8 audit) | Yes — full |
+| **4** | Critical/Security | `mode: full-root-cause` + mandatory `mcp__memory__search_nodes` Prior Art query | Mandatory | tester + qa (security at the Phase 3.8 audit, extended analysis) | Yes — full + prior-art |
 
 **Tier 0 — no workspaces.** Tier 0 is the genuinely-lite path for trivially cosmetic changes (typo in a comment, whitespace in README, CHANGELOG typo). The implementer makes the fix, runs tests, and opens the PR. No `workspaces/` folder is created. The PR review is the only gate. Auto-classifies when all of: single file touched, ≤5 lines changed, docs/comment/whitespace-only path, no test paths, no system-level files (`agents/*.md`, `skills/*.md`, `cmd/install/*.go`). Auto-promotes to Tier 1+ if any rule breaks during implementation.
 
