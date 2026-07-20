@@ -183,86 +183,598 @@ function outboundCC(d) {
 }
 
 // bodies/command-lexer.ts
-var FILLER_CHAR = "x";
-var SHELL_DASH_C_RE = /\b(?:bash|sh|zsh|dash|ksh|su)\s+-[a-zA-Z]*c[a-zA-Z]*(?:\s|$)/i;
-var EVAL_RE = /(^|[\s;&|<>()`])eval(\s|$)/i;
-var XARGS_RE = /(^|[\s;&|<>()`])xargs(\s|$)/i;
-var COMMAND_SUBSTITUTION_RE = /\$\(|`/;
-var PROCESS_SUBSTITUTION_RE = /[<>]\(/;
-var PIPE_TO_SHELL_RE = /\|\s*(?:\S*\/)?(?:bash|sh|zsh|dash|ksh)(?:\s|$)/i;
-var SSH_RE = /(^|[\s;&|<>()`])ssh(\s|$)/i;
-function hasCommandExecutingWrapper(cmd) {
-  return SHELL_DASH_C_RE.test(cmd) || EVAL_RE.test(cmd) || XARGS_RE.test(cmd) || COMMAND_SUBSTITUTION_RE.test(cmd) || PROCESS_SUBSTITUTION_RE.test(cmd) || PIPE_TO_SHELL_RE.test(cmd) || SSH_RE.test(cmd);
+var UNQUOTED_TAINT_CHARS = /* @__PURE__ */ new Set(["{", "}", "*", "?", "[", "~"]);
+function appendChar(state, ch, taints) {
+  state.value += ch;
+  state.hasToken = true;
+  if (taints) state.tainted = true;
 }
-function stepInsideSingleQuote(cmd, i, state, spans) {
-  if (cmd[i] === "'") {
-    spans.push({ start: state.spanStart, end: i });
-    state.inSingle = false;
+function pushToken(state) {
+  if (!state.hasToken) return;
+  state.argv.push({ value: state.value, tainted: state.tainted });
+  state.value = "";
+  state.tainted = false;
+  state.hasToken = false;
+}
+function pushSegment(state, nextOperator) {
+  pushToken(state);
+  if (state.argv.length > 0) {
+    state.segments.push({ argv: state.argv, precedingOperator: state.pendingOp });
   }
-  return i + 1;
+  state.argv = [];
+  state.pendingOp = nextOperator;
 }
-function stepInsideDoubleQuote(cmd, i, state, spans) {
+function stepSingleQuote(cmd, i, state) {
   const ch = cmd[i];
-  if (ch === "\\" && i + 1 < cmd.length) return i + 2;
-  if (ch === '"') {
-    spans.push({ start: state.spanStart, end: i });
-    state.inDouble = false;
-    return i + 1;
-  }
-  return i + 1;
-}
-function stepOutsideQuote(cmd, i, state) {
-  const ch = cmd[i];
-  if (ch === "\\" && i + 1 < cmd.length) return i + 2;
   if (ch === "'") {
-    state.inSingle = true;
-    state.spanStart = i + 1;
+    state.inSQ = false;
+    return i + 1;
+  }
+  appendChar(state, ch, false);
+  return i + 1;
+}
+function consumeParenSubstitution(cmd, startI, state) {
+  appendChar(state, "$", true);
+  appendChar(state, "(", true);
+  let i = startI + 2;
+  let depth = 1;
+  let sq = false;
+  let dq = false;
+  while (i < cmd.length && depth > 0) {
+    const ch = cmd[i];
+    if (sq) {
+      appendChar(state, ch, false);
+      if (ch === "'") sq = false;
+      i++;
+      continue;
+    }
+    if (dq) {
+      if (ch === "\\" && i + 1 < cmd.length) {
+        appendChar(state, ch, false);
+        appendChar(state, cmd[i + 1], false);
+        i += 2;
+        continue;
+      }
+      appendChar(state, ch, false);
+      if (ch === '"') dq = false;
+      i++;
+      continue;
+    }
+    if (ch === "'") sq = true;
+    else if (ch === '"') dq = true;
+    else if (ch === "(") depth++;
+    else if (ch === ")") depth--;
+    appendChar(state, ch, false);
+    i++;
+  }
+  return i;
+}
+function consumeBacktickSubstitution(cmd, startI, state) {
+  appendChar(state, "`", true);
+  let i = startI + 1;
+  while (i < cmd.length && cmd[i] !== "`") {
+    if (cmd[i] === "\\" && i + 1 < cmd.length) {
+      appendChar(state, cmd[i], false);
+      appendChar(state, cmd[i + 1], false);
+      i += 2;
+      continue;
+    }
+    appendChar(state, cmd[i], false);
+    i++;
+  }
+  if (i < cmd.length) {
+    appendChar(state, "`", false);
+    i++;
+  }
+  return i;
+}
+function stepDoubleQuote(cmd, i, state) {
+  const ch = cmd[i];
+  if (ch === '"') {
+    state.inDQ = false;
+    return i + 1;
+  }
+  if (ch === "\\" && i + 1 < cmd.length) {
+    const nc = cmd[i + 1];
+    if (nc === '"' || nc === "\\" || nc === "$" || nc === "`") {
+      appendChar(state, nc, false);
+    } else {
+      appendChar(state, "\\", false);
+      appendChar(state, nc, false);
+    }
+    return i + 2;
+  }
+  if (ch === "$" && cmd[i + 1] === "(") return consumeParenSubstitution(cmd, i, state);
+  if (ch === "`") return consumeBacktickSubstitution(cmd, i, state);
+  if (ch === "$") {
+    appendChar(state, ch, true);
+    return i + 1;
+  }
+  appendChar(state, ch, false);
+  return i + 1;
+}
+var TWO_CHAR_OPERATORS = [
+  ["&&", "&&"],
+  ["||", "||"]
+];
+var ONE_CHAR_OPERATORS = {
+  ";": ";",
+  "\n": "\n",
+  "&": "&",
+  "|": "|"
+};
+var PAREN_BOUNDARY_CHARS = /* @__PURE__ */ new Set(["(", ")"]);
+function matchOperatorAt(cmd, i) {
+  for (const [token, op] of TWO_CHAR_OPERATORS) {
+    if (cmd.startsWith(token, i)) return { op, length: token.length };
+  }
+  const ch = cmd[i];
+  if (ch in ONE_CHAR_OPERATORS) return { op: ONE_CHAR_OPERATORS[ch], length: 1 };
+  if (PAREN_BOUNDARY_CHARS.has(ch)) return { op: "start", length: 1 };
+  return null;
+}
+function stepUnquoted(cmd, i, state) {
+  const ch = cmd[i];
+  if (ch === " " || ch === "	" || ch === "\r") {
+    pushToken(state);
+    return i + 1;
+  }
+  const operator = matchOperatorAt(cmd, i);
+  if (operator) {
+    pushSegment(state, operator.op);
+    return i + operator.length;
+  }
+  if (ch === "'") {
+    state.inSQ = true;
     return i + 1;
   }
   if (ch === '"') {
-    state.inDouble = true;
-    state.spanStart = i + 1;
+    state.inDQ = true;
     return i + 1;
   }
+  if (ch === "\\" && i + 1 < cmd.length) {
+    appendChar(state, cmd[i + 1], false);
+    return i + 2;
+  }
+  if (ch === "$" && cmd[i + 1] === "(") return consumeParenSubstitution(cmd, i, state);
+  if (ch === "`") return consumeBacktickSubstitution(cmd, i, state);
+  if (ch === "$") {
+    appendChar(state, ch, true);
+    return i + 1;
+  }
+  if (UNQUOTED_TAINT_CHARS.has(ch)) {
+    appendChar(state, ch, true);
+    return i + 1;
+  }
+  appendChar(state, ch, false);
   return i + 1;
 }
-function analyzeQuotes(cmd) {
-  const spans = [];
-  const state = { inSingle: false, inDouble: false, spanStart: -1 };
+function scanCommand(cmd) {
+  const state = {
+    segments: [],
+    argv: [],
+    value: "",
+    tainted: false,
+    hasToken: false,
+    pendingOp: "start",
+    inSQ: false,
+    inDQ: false
+  };
   let i = 0;
   while (i < cmd.length) {
-    if (state.inSingle) {
-      i = stepInsideSingleQuote(cmd, i, state, spans);
-    } else if (state.inDouble) {
-      i = stepInsideDoubleQuote(cmd, i, state, spans);
-    } else {
-      i = stepOutsideQuote(cmd, i, state);
+    if (state.inSQ) i = stepSingleQuote(cmd, i, state);
+    else if (state.inDQ) i = stepDoubleQuote(cmd, i, state);
+    else i = stepUnquoted(cmd, i, state);
+  }
+  if (state.inSQ || state.inDQ) state.tainted = true;
+  pushSegment(state, "start");
+  return state.segments;
+}
+var DEFAULT_MAX_DEPTH = 5;
+var SHELL_BASENAMES = /* @__PURE__ */ new Set([
+  "bash",
+  "sh",
+  "zsh",
+  "dash",
+  "ksh",
+  "su",
+  "ash",
+  "hush",
+  "mksh",
+  "tcsh",
+  "csh",
+  "fish"
+]);
+var SHELL_C_FLAG_RE = /^-[A-Za-z]*c[A-Za-z]*$/;
+var SAFE_NON_EXECUTING_BASENAMES = /* @__PURE__ */ new Set([
+  "grep",
+  "egrep",
+  "fgrep",
+  "echo",
+  "printf",
+  "cat",
+  "ls",
+  "ln",
+  "test",
+  "[",
+  "tee",
+  "head",
+  "tail",
+  "wc",
+  "uniq",
+  "cut",
+  "tr",
+  "nl",
+  "rev",
+  "tac",
+  "paste",
+  "join",
+  "column",
+  "fold",
+  "fmt",
+  "pr",
+  "diff",
+  "cmp",
+  "comm",
+  "md5sum",
+  "sha1sum",
+  "sha256sum",
+  "sha512sum",
+  "base64",
+  "xxd",
+  "od",
+  "hexdump",
+  "strings",
+  "file",
+  "pwd",
+  "true",
+  "false"
+]);
+var KNOWN_WRAPPER_BASENAMES = /* @__PURE__ */ new Set([...SHELL_BASENAMES, "eval", "xargs"]);
+function lastPathSegment(value) {
+  const idx = value.lastIndexOf("/");
+  return idx >= 0 ? value.slice(idx + 1) : value;
+}
+function extractShellCPayload(argv) {
+  for (let i = 1; i < argv.length; i++) {
+    if (SHELL_C_FLAG_RE.test(argv[i].value)) {
+      const payloadToken = argv[i + 1];
+      if (!payloadToken) return { literal: null };
+      return { literal: payloadToken.tainted ? null : payloadToken.value };
     }
   }
-  return { balanced: !state.inSingle && !state.inDouble, spans };
+  return null;
 }
-function blankSpans(cmd, spans) {
-  const chars = cmd.split("");
-  for (const { start, end } of spans) {
-    for (let idx = start; idx < end; idx++) {
-      chars[idx] = FILLER_CHAR;
+function extractEvalPayload(argv) {
+  const rest = argv.slice(1);
+  if (rest.length === 0 || rest.some((t) => t.tainted)) return { literal: null };
+  return { literal: rest.map((t) => t.value).join(" ") };
+}
+function extractXargsReplacementString(argv, shellIndex) {
+  for (let i = 1; i < shellIndex; i++) {
+    const tok = argv[i].value;
+    if (tok === "-I") return argv[i + 1]?.value ?? "{}";
+    if (tok === "-i" || tok === "--replace") return "{}";
+    if (tok.startsWith("--replace=")) return tok.slice("--replace=".length);
+    if (tok.startsWith("-I") && tok.length > 2) return tok.slice(2);
+    if (tok.startsWith("-i") && tok.length > 2) return tok.slice(2);
+  }
+  return null;
+}
+function extractXargsPayload(argv) {
+  for (let i = 1; i < argv.length; i++) {
+    if (!SHELL_BASENAMES.has(lastPathSegment(argv[i].value))) continue;
+    const shellPayload = extractShellCPayload(argv.slice(i)) ?? { literal: null };
+    const replacement = extractXargsReplacementString(argv, i);
+    if (replacement !== null && shellPayload.literal !== null && shellPayload.literal.includes(replacement)) {
+      return { literal: null };
+    }
+    return shellPayload;
+  }
+  return null;
+}
+function extractEnvSplitStringPayload(argv) {
+  for (let i = 1; i < argv.length; i++) {
+    const tok = argv[i];
+    if (tok.value === "-S" || tok.value === "--split-string") {
+      const payloadToken = argv[i + 1];
+      if (!payloadToken) return { literal: null };
+      return { literal: payloadToken.tainted ? null : payloadToken.value };
+    }
+    if (tok.value.startsWith("--split-string=")) {
+      return { literal: tok.tainted ? null : tok.value.slice("--split-string=".length) };
     }
   }
-  return chars.join("");
+  return null;
 }
-function prepareRoutableCommand(cmd) {
-  if (hasCommandExecutingWrapper(cmd)) {
-    return { routable: cmd, blanked: false };
-  }
-  const { balanced, spans } = analyzeQuotes(cmd);
-  if (!balanced || spans.length === 0) {
-    return { routable: cmd, blanked: false };
-  }
-  return { routable: blankSpans(cmd, spans), blanked: true };
+function detectDispatcherShellCPayload(argv) {
+  if (argv.length < 3) return null;
+  if (!SHELL_BASENAMES.has(canonicalBasename(argv[1].value))) return null;
+  return extractShellCPayload(argv.slice(1));
 }
-var SAFE_COMMAND_CHAR_RE = /^[A-Za-z0-9 _./-]*$/;
-function isLiteralSafeCommand(cmd) {
-  return SAFE_COMMAND_CHAR_RE.test(cmd);
+function detectSingleSegmentWrapperPayload(argv) {
+  if (argv.length === 0) return null;
+  const basename2 = canonicalBasename(argv[0].value);
+  if (SHELL_BASENAMES.has(basename2)) return extractShellCPayload(argv);
+  if (basename2 === "eval") return extractEvalPayload(argv);
+  if (basename2 === "xargs") return extractXargsPayload(argv);
+  if (basename2 === "env") return extractEnvSplitStringPayload(argv);
+  if (!SAFE_NON_EXECUTING_BASENAMES.has(basename2)) {
+    const dispatcherPayload = detectDispatcherShellCPayload(argv);
+    if (dispatcherPayload !== null) return dispatcherPayload;
+  }
+  return null;
+}
+function detectPipeToShellPayload(first, second) {
+  if (first.length === 0 || second.length === 0) return null;
+  if (SAFE_NON_EXECUTING_BASENAMES.has(canonicalBasename(second[0].value))) return null;
+  if (extractShellCPayload(second) !== null) return null;
+  const firstBasename = lastPathSegment(first[0].value);
+  if (firstBasename !== "echo" && firstBasename !== "printf") return { literal: null };
+  const literalArgs = first.slice(1).filter((t) => !t.value.startsWith("-"));
+  if (literalArgs.some((t) => t.tainted)) return { literal: null };
+  return { literal: literalArgs.map((t) => t.value).join(" ") };
+}
+function toEffectiveCommand(argv) {
+  return { argv, tainted: argv.some((t) => t.tainted) };
+}
+function mergeWrapperPayload(payload, depth, maxDepth) {
+  if (payload.literal === null) return { commands: [], unresolvable: true, depthExceeded: false };
+  if (depth >= maxDepth) return { commands: [], unresolvable: false, depthExceeded: true };
+  const inner = analyzeCommandAtDepth(payload.literal, depth + 1, maxDepth);
+  return {
+    commands: inner.commands,
+    unresolvable: inner.unresolvableShellPayload,
+    depthExceeded: inner.depthExceeded
+  };
+}
+function resolveSegments(rawSegments, depth, maxDepth) {
+  const commands = [];
+  let unresolvableShellPayload = false;
+  let depthExceeded = false;
+  const absorb = (result) => {
+    commands.push(...result.commands);
+    unresolvableShellPayload = unresolvableShellPayload || result.unresolvable;
+    depthExceeded = depthExceeded || result.depthExceeded;
+  };
+  let i = 0;
+  while (i < rawSegments.length) {
+    const seg = rawSegments[i];
+    commands.push(toEffectiveCommand(seg.argv));
+    const next = rawSegments[i + 1];
+    if (next && next.precedingOperator === "|") {
+      const pipePayload = detectPipeToShellPayload(seg.argv, next.argv);
+      if (pipePayload !== null) {
+        commands.push(toEffectiveCommand(next.argv));
+        absorb(mergeWrapperPayload(pipePayload, depth, maxDepth));
+        i += 2;
+        continue;
+      }
+    }
+    const payload = detectSingleSegmentWrapperPayload(seg.argv);
+    if (payload !== null) absorb(mergeWrapperPayload(payload, depth, maxDepth));
+    i++;
+  }
+  return { commands, unresolvableShellPayload, depthExceeded };
+}
+function analyzeCommandAtDepth(cmd, depth, maxDepth) {
+  return resolveSegments(scanCommand(cmd), depth, maxDepth);
+}
+function analyzeCommand(cmd, maxDepth = DEFAULT_MAX_DEPTH) {
+  return analyzeCommandAtDepth(cmd, 0, maxDepth);
+}
+var ENV_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/;
+function isEnvAssignmentToken(token) {
+  return ENV_ASSIGNMENT_RE.test(token.value);
+}
+var GIT_BOOLEAN_GLOBAL_OPTIONS = /* @__PURE__ */ new Set(["-p", "--paginate", "--no-pager"]);
+var GIT_TREE_REDIRECT_OPTIONS = /* @__PURE__ */ new Set(["--git-dir", "--work-tree", "--namespace", "--exec-path"]);
+function resolveCDirToken(argv, index, alreadySeen) {
+  const dirTok = argv[index + 1];
+  if (!alreadySeen && dirTok && !dirTok.tainted && !dirTok.value.startsWith("-")) {
+    return { cDir: dirTok.value, failClosed: false };
+  }
+  return { cDir: null, failClosed: true };
+}
+function stepGitGlobalOption(argv, i, cDirSeen) {
+  const tok = argv[i];
+  if (tok.tainted) return { advance: 1, failClosed: true, cDir: null };
+  if (GIT_BOOLEAN_GLOBAL_OPTIONS.has(tok.value)) return { advance: 1, failClosed: false, cDir: null };
+  if (tok.value === "-C") {
+    const resolved = resolveCDirToken(argv, i, cDirSeen);
+    return { advance: 2, failClosed: resolved.failClosed, cDir: resolved.cDir };
+  }
+  if (tok.value === "-c") return { advance: 2, failClosed: true, cDir: null };
+  const eqIdx = tok.value.indexOf("=");
+  const optName = eqIdx >= 0 ? tok.value.slice(0, eqIdx) : tok.value;
+  const advance = GIT_TREE_REDIRECT_OPTIONS.has(optName) && eqIdx < 0 ? 2 : 1;
+  return { advance, failClosed: true, cDir: null };
+}
+function scanGitGlobalOptions(argv, start) {
+  let i = start;
+  let requiresFailClosed = false;
+  let cDir = null;
+  let cDirSeen = false;
+  while (i < argv.length && argv[i].value.startsWith("-")) {
+    const step = stepGitGlobalOption(argv, i, cDirSeen);
+    if (step.cDir !== null) {
+      cDir = step.cDir;
+      cDirSeen = true;
+    }
+    requiresFailClosed = requiresFailClosed || step.failClosed;
+    i += step.advance;
+  }
+  return { subcommandIndex: i < argv.length ? i : -1, requiresFailClosed, cDir: requiresFailClosed ? null : cDir };
+}
+var GIT_DISPATCHER_PREFIX = "git-";
+function stripExeSuffix(basename2) {
+  return /\.exe$/i.test(basename2) ? basename2.slice(0, -4) : basename2;
+}
+function canonicalBasename(rawValue) {
+  return stripExeSuffix(lastPathSegment(rawValue)).toLowerCase();
+}
+function basenameNoExe(rawValue) {
+  return stripExeSuffix(lastPathSegment(rawValue));
+}
+function extractGitDispatcherSubcommand(canonical, rawNoExe) {
+  if (!canonical.startsWith(GIT_DISPATCHER_PREFIX)) return null;
+  const sub = rawNoExe.slice(GIT_DISPATCHER_PREFIX.length);
+  return sub.length > 0 ? sub : null;
+}
+function classifyGitDispatcher(argv, afterBinary, prefixFailClosed) {
+  const scan = scanGitGlobalOptions(argv, afterBinary);
+  const requiresFailClosed = prefixFailClosed || scan.requiresFailClosed;
+  if (scan.subcommandIndex < 0) {
+    return { binary: "git", gitSubcommand: null, args: [], requiresFailClosed, cDir: requiresFailClosed ? null : scan.cDir };
+  }
+  const subTok = argv[scan.subcommandIndex];
+  return {
+    binary: "git",
+    gitSubcommand: subTok.value,
+    args: argv.slice(scan.subcommandIndex + 1),
+    requiresFailClosed: requiresFailClosed || subTok.tainted,
+    cDir: requiresFailClosed ? null : scan.cDir
+  };
+}
+var RUNNER_MODELS = {
+  env: { valueFlags: /* @__PURE__ */ new Set(["-u", "--unset", "-C", "--chdir", "-S", "--split-string"]), extraPositionals: 0 },
+  timeout: { valueFlags: /* @__PURE__ */ new Set(["-k", "--kill-after", "-s", "--signal"]), extraPositionals: 1 },
+  nice: { valueFlags: /* @__PURE__ */ new Set(["-n", "--adjustment"]), extraPositionals: 0 },
+  nohup: { valueFlags: /* @__PURE__ */ new Set(), extraPositionals: 0 },
+  command: { valueFlags: /* @__PURE__ */ new Set(), extraPositionals: 0 },
+  stdbuf: { valueFlags: /* @__PURE__ */ new Set(["-i", "--input", "-o", "--output", "-e", "--error"]), extraPositionals: 0 },
+  setsid: { valueFlags: /* @__PURE__ */ new Set(), extraPositionals: 0 },
+  time: { valueFlags: /* @__PURE__ */ new Set(["-o", "--output"]), extraPositionals: 0 },
+  sudo: {
+    valueFlags: /* @__PURE__ */ new Set([
+      "-u",
+      "--user",
+      "-g",
+      "--group",
+      "-h",
+      "--host",
+      "-p",
+      "--prompt",
+      "-r",
+      "--role",
+      "-t",
+      "--type",
+      "-C",
+      "--close-from"
+    ]),
+    extraPositionals: 0
+  },
+  doas: { valueFlags: /* @__PURE__ */ new Set(["-C", "-u"]), extraPositionals: 0 }
+};
+function skipRunnerPrefix(argv, start, model) {
+  let idx = start;
+  while (idx < argv.length && argv[idx].value.startsWith("-") && argv[idx].value !== "--") {
+    const tok = argv[idx].value;
+    const eqIdx = tok.indexOf("=");
+    const name = eqIdx >= 0 ? tok.slice(0, eqIdx) : tok;
+    idx += model.valueFlags.has(name) && eqIdx < 0 ? 2 : 1;
+  }
+  if (idx < argv.length && argv[idx].value === "--") idx++;
+  idx += model.extraPositionals;
+  while (idx < argv.length && isEnvAssignmentToken(argv[idx])) idx++;
+  return idx;
+}
+function buildClassifiedResult(resolved) {
+  const { argv, afterBinary, canonical, rawNoExe, requiresFailClosed, noExeSuffixPresent } = resolved;
+  if (canonical === "git") {
+    const classified = classifyGitDispatcher(argv, afterBinary, requiresFailClosed);
+    return { ...classified, binaryCaseExact: noExeSuffixPresent && rawNoExe === "git" };
+  }
+  const dispatcherSub = extractGitDispatcherSubcommand(canonical, rawNoExe);
+  if (dispatcherSub !== null) {
+    return {
+      binary: "git",
+      gitSubcommand: dispatcherSub,
+      args: argv.slice(afterBinary),
+      requiresFailClosed,
+      cDir: null,
+      binaryCaseExact: noExeSuffixPresent && rawNoExe.startsWith(GIT_DISPATCHER_PREFIX)
+    };
+  }
+  return {
+    binary: canonical,
+    gitSubcommand: null,
+    args: argv.slice(afterBinary),
+    requiresFailClosed,
+    cDir: null,
+    binaryCaseExact: noExeSuffixPresent && rawNoExe === canonical
+  };
+}
+function scanForGitGhSignal(argv, start) {
+  for (let j = start; j < argv.length; j++) {
+    const raw = argv[j].value;
+    const canon = canonicalBasename(raw);
+    if (canon === "git") return { index: j, binary: "git", dispatcherSub: null };
+    if (canon === "gh") return { index: j, binary: "gh", dispatcherSub: null };
+    const dispatcherSub = extractGitDispatcherSubcommand(canon, basenameNoExe(raw));
+    if (dispatcherSub !== null) return { index: j, binary: "git", dispatcherSub };
+  }
+  return null;
+}
+function buildAmbiguousWrapperResult(argv, match) {
+  if (match.dispatcherSub !== null) {
+    return {
+      binary: "git",
+      gitSubcommand: match.dispatcherSub,
+      args: argv.slice(match.index + 1),
+      requiresFailClosed: true,
+      cDir: null,
+      binaryCaseExact: false
+    };
+  }
+  if (match.binary === "git") {
+    const classified = classifyGitDispatcher(argv, match.index + 1, true);
+    return { ...classified, binaryCaseExact: false };
+  }
+  return {
+    binary: "gh",
+    gitSubcommand: null,
+    args: argv.slice(match.index + 1),
+    requiresFailClosed: true,
+    cDir: null,
+    binaryCaseExact: false
+  };
+}
+function classifyCoveredAction(cmd) {
+  const argv = cmd.argv;
+  let i = 0;
+  let requiresFailClosed = false;
+  for (; ; ) {
+    if (i >= argv.length) return null;
+    if (isEnvAssignmentToken(argv[i])) {
+      requiresFailClosed = true;
+      i++;
+      continue;
+    }
+    const model = RUNNER_MODELS[canonicalBasename(argv[i].value)];
+    if (!model) break;
+    requiresFailClosed = true;
+    i = skipRunnerPrefix(argv, i + 1, model);
+  }
+  if (i >= argv.length) return null;
+  const binaryTok = argv[i];
+  const rawWithExe = lastPathSegment(binaryTok.value);
+  const rawNoExe = stripExeSuffix(rawWithExe);
+  const canonical = rawNoExe.toLowerCase();
+  const isDirectGitForm = canonical === "git" || extractGitDispatcherSubcommand(canonical, rawNoExe) !== null;
+  if (!isDirectGitForm && !SAFE_NON_EXECUTING_BASENAMES.has(canonical) && !KNOWN_WRAPPER_BASENAMES.has(canonical)) {
+    const match = scanForGitGhSignal(argv, i + 1);
+    if (match !== null) return buildAmbiguousWrapperResult(argv, match);
+  }
+  if (binaryTok.tainted) requiresFailClosed = true;
+  return buildClassifiedResult({
+    argv,
+    afterBinary: i + 1,
+    canonical,
+    rawNoExe,
+    requiresFailClosed,
+    noExeSuffixPresent: rawWithExe === rawNoExe
+  });
 }
 var BENIGN_PUSH_FLAG_RE = /^(-u|--set-upstream|-v|--verbose|--progress)$/;
 function isBenignPushFlag(token) {
@@ -278,18 +790,36 @@ function isPlainBranchDestination(dst) {
   const firstSegment = dst.split("/")[0].toLowerCase();
   return !REF_NAMESPACE_WORDS.has(firstSegment);
 }
-function matchBenignPushGrammar(rawCmd) {
-  if (!isLiteralSafeCommand(rawCmd)) return { matched: false };
-  const tokens = rawCmd.trim().split(/\s+/).filter(Boolean);
-  if (tokens[0] !== "git" || tokens[1] !== "push") return { matched: false };
-  const rest = tokens.slice(2);
-  const flagTokens = rest.filter((t) => t.startsWith("-"));
-  const positionals = rest.filter((t) => !t.startsWith("-"));
-  if (!flagTokens.every(isBenignPushFlag)) return { matched: false };
-  if (positionals.length !== 2) return { matched: false };
-  if (positionals[0] !== "origin") return { matched: false };
-  if (!isPlainBranchDestination(positionals[1])) return { matched: false };
-  return { matched: true };
+var TAG_LIKE_RE = /^[vV]?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$/;
+function extractRawDestination(refspec) {
+  const colonIdx = refspec.lastIndexOf(":");
+  if (colonIdx < 0) return refspec;
+  const src = refspec.slice(0, colonIdx);
+  if (src === "") return null;
+  const afterColon = refspec.slice(colonIdx + 1);
+  return afterColon === "" ? src : afterColon;
+}
+function resolveSymbolicDestination(rawDst, reader) {
+  if (rawDst === "HEAD" || rawDst === "@") return reader.gitCurrentBranch();
+  if (rawDst.startsWith("@")) return null;
+  return rawDst;
+}
+function matchBenignPushGrammar(argv, tainted, reader) {
+  const notMatched = { matched: false, destination: null };
+  if (tainted.some(Boolean)) return notMatched;
+  const flagTokens = argv.filter((t) => t.startsWith("-"));
+  const positionals = argv.filter((t) => !t.startsWith("-"));
+  if (!flagTokens.every(isBenignPushFlag)) return notMatched;
+  if (positionals.length !== 2) return notMatched;
+  if (positionals[0] !== "origin") return notMatched;
+  const refspec = positionals[1];
+  if (refspec.startsWith("+")) return notMatched;
+  const rawDst = extractRawDestination(refspec);
+  if (rawDst === null) return notMatched;
+  if (TAG_LIKE_RE.test(rawDst)) return notMatched;
+  const dst = resolveSymbolicDestination(rawDst, reader);
+  if (dst === null || !isPlainBranchDestination(dst)) return notMatched;
+  return { matched: true, destination: dst };
 }
 
 // bodies/gate-guard.ts
@@ -299,8 +829,22 @@ function deny(reason) {
 function none() {
   return { decision: "none", reason: "", mutations: null };
 }
-var GIT_PUSH_RE = /(^|[\s|;&<>()`])git(\s+-C\s+\S+|\s+\S+=\S+)*\s+push(\s|$|[;&|<>()`"'$])/i;
-var GH_PR_CREATE_RE = /(^|[\s|;&<>()`])gh\s+pr\s+create(\s|$|[;&|<>()`"'$])/i;
+function isGhPrCreateArgs(args) {
+  return args[0]?.value.toLowerCase() === "pr" && args[1]?.value.toLowerCase() === "create";
+}
+function findCoveredMatch(analyzed) {
+  for (const effective of analyzed.commands) {
+    const classified = classifyCoveredAction(effective);
+    if (classified === null) continue;
+    if (classified.binary === "git" && classified.gitSubcommand?.toLowerCase() === "push") {
+      return { kind: "push", args: classified.args };
+    }
+    if (classified.binary === "gh" && isGhPrCreateArgs(classified.args)) {
+      return { kind: "pr-create" };
+    }
+  }
+  return null;
+}
 function readField(content, field) {
   const lines = content.split("\n");
   const prefix = new RegExp(`^\\s*-\\s*${field}:\\s*(.+?)\\s*$`);
@@ -367,16 +911,18 @@ function resolveGoverningLane(reader) {
 function evaluate(input, reader) {
   const rawCmd = typeof input.tool?.input?.["command"] === "string" ? input.tool.input["command"] : "";
   if (!rawCmd) return none();
-  const routable = prepareRoutableCommand(rawCmd).routable;
-  const isGitPush = GIT_PUSH_RE.test(routable);
-  const isGhPrCreate = GH_PR_CREATE_RE.test(routable);
-  if (!isGitPush && !isGhPrCreate) return none();
+  const covered = findCoveredMatch(analyzeCommand(rawCmd));
+  if (covered === null) return none();
   const lane = resolveGoverningLane(reader);
   if (lane === null) return none();
-  if (isGitPush && !matchBenignPushGrammar(rawCmd).matched) {
-    return deny(
-      "gate-guard: force-push denied \u2014 unconditional on gate3_release for a detected pipeline lane (Invariant E/G). Only the exact benign form (git push [-u|--set-upstream|-v|--verbose|--progress] origin <plain-branch>) is authorized in-lane; any deviation \u2014 a force flag, a '+'-prefixed refspec, or any character outside the safe set [A-Za-z0-9 _./-] \u2014 is denied, even after 'ship'. See agents/_shared/gate-contract.md \xA7 Outward-action release floor."
-    );
+  if (covered.kind === "push") {
+    const argv = covered.args.map((tok) => tok.value);
+    const tainted = covered.args.map((tok) => tok.tainted);
+    if (!matchBenignPushGrammar(argv, tainted, reader).matched) {
+      return deny(
+        "gate-guard: force-push denied \u2014 unconditional on gate3_release for a detected pipeline lane (Invariant E/G). Only the exact benign form (git push [-u|--set-upstream|-v|--verbose|--progress] origin <plain-branch>) is authorized in-lane, resolved from the executed argv \u2014 a wrapper-embedded or per-subcommand-binary invocation is inspected the same as a bare command; any deviation \u2014 a force flag, a '+'-prefixed refspec, a tainted/unresolved token, or a tag-like/ref-namespace-qualified destination \u2014 is denied, even after 'ship'. See agents/_shared/gate-contract.md \xA7 Outward-action release floor."
+      );
+    }
   }
   const gate3Release = readField(lane, "gate3_release");
   if (gate3Release === "ship") return none();
