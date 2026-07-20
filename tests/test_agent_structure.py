@@ -38024,6 +38024,982 @@ check(
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
+# Suite 169 — cost-ordered-verify-reruns Task-1 structural verification
+#
+# Asserts the fixed-state facts 01-plan.md Task-1 (AC-1..AC-15) commits to for
+# the new Cost-Ordered Patch-Iteration Re-Run Sequencing contract: the R0/R1/R2
+# stage names, the owner-attribution-by-brief-header rule, the per-lens
+# delta-scope split, the structural fail-safe, the AC-7/AC-8 STAGE-GATE-1
+# operator-corrected wording (see 01-plan.md's own frozen AC-7/AC-8 prose vs.
+# the carry-forward implementation guidance disposed at STAGE-GATE-1), the
+# orchestrator wiring subsection's position in the file, the
+# docs/pipeline-lanes.md § 7 cross-ref, the 3-site byte-consistency table, and
+# byte-for-byte preservation of every pre-existing fenced anchor this purely
+# additive change must not disturb (worst-of block, both floor predicates, the
+# staleness re-gate's opening clause, the `Re-verification scope` field
+# definitions, the per-round integrity scan, and the Case A-D routing table).
+#
+# docs/testing.md registration is deliberately NOT self-checked here (per the
+# same rationale as Suite 161/162/163/164/165): it is a documentation edit
+# outside this tester dispatch's test-files-only scope.
+#
+# Marker: cost-ordered-verify-reruns-task1-structural-verification
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 169: cost-ordered-verify-reruns Task-1 structural verification ===")
+
+
+def _s169_norm(text: str) -> str:
+    return re.sub(r"\s+", " ", text)
+
+
+_s169_patchmode = read(REPO_ROOT / "docs" / "patch-mode.md")
+_s169_orch = read(AGENTS_DIR / "orchestrator.md")
+_s169_lanes = read(REPO_ROOT / "docs" / "pipeline-lanes.md")
+_s169_adversary = read(AGENTS_DIR / "adversary.md")
+_s169_claude = read(REPO_ROOT / "CLAUDE.md")
+
+_s169_patchmode_n = _s169_norm(_s169_patchmode)
+_s169_orch_n = _s169_norm(_s169_orch)
+_s169_lanes_n = _s169_norm(_s169_lanes)
+
+# --- AC-1/AC-2/AC-3: canonical section exists, names all three stages ------
+check(
+    "s169(a-section-exists): docs/patch-mode.md declares the "
+    "'Cost-Ordered Patch-Iteration Re-Run Sequencing' section",
+    "## Cost-Ordered Patch-Iteration Re-Run Sequencing" in _s169_patchmode,
+    "01-plan.md Task-1 AC-1/AC-2/AC-3 require a new canonical section "
+    "defining the R0/R1/R2 sequencing -- absent from docs/patch-mode.md",
+)
+check(
+    "s169(b-stage-names-patchmode): docs/patch-mode.md names all three "
+    "stages -- R0 (deterministic test gate), R1 (owner-lens "
+    "re-verification), R2 (single consolidated final-state confirmation)",
+    "R0 — Deterministic test gate" in _s169_patchmode
+    and "R1 — Owner-lens re-verification" in _s169_patchmode
+    and "R2 — Single consolidated final-state confirmation" in _s169_patchmode,
+    "AC-1/AC-2/AC-3 require the three named stages verbatim in the "
+    "canonical contract",
+)
+check(
+    "s169(b-stage-names-orchestrator): agents/orchestrator.md's wiring "
+    "subsection names the same three stages R0/R1/R2",
+    "R0 — deterministic test gate" in _s169_orch
+    and "R1 — owner-lens re-verification" in _s169_orch
+    and "R2 — single consolidated confirmation" in _s169_orch,
+    "AC-1/AC-2/AC-3 require the orchestrator wiring to name the same "
+    "three stages as the canonical contract",
+)
+
+# --- AC-4: owner attribution by brief header, not by Case letter ----------
+check(
+    "s169(c-owner-attribution-patchmode): docs/patch-mode.md declares "
+    "owner attribution by the failure-brief header, not by Case letter",
+    "### Owner attribution — by brief header, not by Case letter" in _s169_patchmode
+    and "Case → producer; brief author → owner." in _s169_patchmode,
+    "AC-4 requires the canonical contract to state owner attribution is "
+    "by the failure-brief's `## Iteration {N} — {agent}` header, not the "
+    "Case letter",
+)
+check(
+    "s169(c-owner-attribution-orchestrator): agents/orchestrator.md's "
+    "wiring subsection states the same owner-attribution-by-brief-header "
+    "rule",
+    "Owner attribution is by brief header, not by Case letter." in _s169_orch,
+    "AC-4 requires the orchestrator wiring to mirror the canonical "
+    "owner-attribution rule",
+)
+
+# --- AC-2: per-lens delta-scope descriptor split (adversary vs. the rest) --
+check(
+    "s169(d-delta-scope-split-patchmode): docs/patch-mode.md splits the "
+    "R1 delta-scope descriptor by owner lens -- adversary carries "
+    "'Re-verification scope', security/qa/tester carry 'Blast radius'",
+    "Owner is **`adversary`** → the dispatch carries the real `**Re-verification scope:**"
+    in _s169_patchmode
+    and "Owner is **`security`/`qa`/`tester`** → the delta-scope descriptor is the brief's `Blast"
+    in _s169_patchmode,
+    "AC-2 requires the two distinct per-lens delta-scope descriptors -- "
+    "never conflated -- in the canonical contract",
+)
+check(
+    "s169(d-delta-scope-split-orchestrator): agents/orchestrator.md's "
+    "wiring subsection carries the same per-lens delta-scope split",
+    "Owner `adversary` → carries the real `**Re-verification scope:** localized {files, finding-IDs}`"
+    in _s169_orch
+    and "Owner `security`/`qa`/`tester` → the delta-scope descriptor is the brief's own `Blast radius: localized {IDs}` field"
+    in _s169_orch,
+    "AC-2 requires the orchestrator wiring to mirror the same per-lens "
+    "delta-scope split",
+)
+
+# --- AC-10: structural fail-safe -- never narrows to R1/R2 -----------------
+check(
+    "s169(e-structural-fail-safe-patchmode): docs/patch-mode.md declares "
+    "the structural fail-safe -- `Blast radius: structural` never "
+    "narrows to the R1/R2 shape",
+    "**Structural fail-safe.** For `Blast radius: structural`, R0 still runs first, but the R1"
+    in _s169_patchmode
+    and "narrowed to a localized patch's R1/R2 shape" in _s169_patchmode,
+    "AC-10 requires the structural fail-safe stated explicitly in the "
+    "canonical contract",
+)
+check(
+    "s169(e-structural-fail-safe-orchestrator): agents/orchestrator.md's "
+    "wiring subsection declares the same structural fail-safe",
+    "**Structural fail-safe.** For `Blast radius: structural`, R0 still runs first, but R1/R2 collapse"
+    in _s169_orch
+    and "never narrowed to a localized R1/R2 shape" in _s169_orch,
+    "AC-10 requires the orchestrator wiring to mirror the structural "
+    "fail-safe",
+)
+
+# --- AC-7 (STAGE-GATE-1 operator-corrected wording): FRESH R2 re-run trigger
+# defers BY REFERENCE to the FULL two-limb agents/orchestrator.md staleness
+# trigger -- never a narrower "design-surface-only" paraphrase. Normalized
+# whitespace is used for docs/patch-mode.md because the prose wraps this
+# assertion across multiple lines.
+# ---------------------------------------------------------------------------
+check(
+    "s169(f-ac7-full-trigger-patchmode): docs/patch-mode.md's AC-7 "
+    "reconciliation defers to the FULL two-limb staleness trigger by "
+    "reference (both limb (a) and limb (b)), never a design-surface-only "
+    "paraphrase",
+    'the FULL trigger at `agents/orchestrator.md § "Security- verdict staleness '
+    're-gate"` governs' in _s169_patchmode_n
+    and 'not a narrower "design-surface-only" reading' in _s169_patchmode_n
+    and "(a) an edit to the security-relevant design surface" in _s169_patchmode_n
+    and "OR (b) new implementation files that touch" in _s169_patchmode_n,
+    "01-plan.md Task-1 AC-7 prose is narrower than the implemented "
+    "behavior by design (operator-authorized correction disposed at "
+    "STAGE-GATE-1, reviews/01-plan-review.md § Security Design-Review): "
+    "the FRESH R2 re-run trigger must defer BY REFERENCE to the full "
+    'two-limb agents/orchestrator.md § "Security-verdict staleness '
+    're-gate" rule, not a paraphrase limited to limb (a)',
+)
+check(
+    "s169(f-ac7-full-trigger-orchestrator): agents/orchestrator.md's "
+    "wiring subsection defers to its own FULL two-limb staleness trigger "
+    "by reference, never a design-surface-only paraphrase",
+    "fires on its own FULL trigger (both limbs:" in _s169_orch
+    and 'never a narrower "design-surface-only" reading' in _s169_orch,
+    "AC-7 (corrected per STAGE-GATE-1 carry-forward guidance) requires "
+    "the orchestrator wiring to name both limbs of its own staleness "
+    "trigger, not a narrower paraphrase",
+)
+
+# --- AC-8 (STAGE-GATE-1 operator-corrected wording): the R1 owner-set clamp
+# to {security, adversary} is CONDITIONAL on adversary_floor_applies == true
+# -- never an unconditional "always clamp both" rule.
+# ---------------------------------------------------------------------------
+check(
+    "s169(g-ac8-conditional-clamp-patchmode): docs/patch-mode.md's AC-8 "
+    "reconciliation clamps the R1 owner set to BOTH {security, adversary} "
+    "CONDITIONALLY on adversary_floor_applies == true, never "
+    "unconditionally",
+    "the owner set clamps to BOTH `{security, adversary}` in R1 whenever `adversary_floor_applies == true`"
+    in _s169_patchmode_n,
+    "01-plan.md Task-1 AC-8 prose reads as an unconditional clamp; the "
+    "operator-authorized correction (STAGE-GATE-1 carry-forward guidance) "
+    "requires the clamp to fire only when `adversary_floor_applies == "
+    "true` -- mirroring agents/orchestrator.md:1129 exactly, not a "
+    "looser unconditional variant",
+)
+check(
+    "s169(g-ac8-conditional-clamp-orchestrator): agents/orchestrator.md's "
+    "wiring subsection states the same conditional clamp",
+    "the owner set clamps to BOTH `{security, adversary}` in R1 whenever `adversary_floor_applies == true`"
+    in _s169_orch_n,
+    "AC-8 (corrected) requires the orchestrator wiring to mirror the "
+    "same adversary_floor_applies == true qualifier on the clamp",
+)
+
+# --- AC-13: docs/pipeline-lanes.md § 7 cross-ref ---------------------------
+_s169_lanes_s7_idx = _s169_lanes.find("## 7. Two-lens floor")
+_s169_lanes_s8_idx = _s169_lanes.find("## 8. Active-lane visibility")
+_s169_lanes_s7_slice = (
+    _s169_lanes[_s169_lanes_s7_idx:_s169_lanes_s8_idx]
+    if _s169_lanes_s7_idx != -1 and _s169_lanes_s8_idx != -1
+    else ""
+)
+_s169_lanes_s7_slice_n = _s169_norm(_s169_lanes_s7_slice)
+check(
+    "s169(h-pipeline-lanes-crossref): docs/pipeline-lanes.md § 7 (before "
+    "§ 8) carries the cost-ordered re-run sequencing cross-ref, naming "
+    "the canonical contract and confirming neither lens is ever omitted",
+    "**Cross-ref — cost-ordered re-run sequencing.**" in _s169_lanes_s7_slice_n
+    and "docs/patch-mode.md § Cost-Ordered Patch-Iteration Re-Run Sequencing"
+    in _s169_lanes_s7_slice_n
+    and "never omits either lens the floor predicates above require" in _s169_lanes_s7_slice_n,
+    "AC-13 requires the docs/pipeline-lanes.md § 7 cross-ref line "
+    "confirming the sequencing reorders WHEN the two lenses re-run "
+    "without ever omitting either lens the floor predicates require",
+)
+
+# --- AC-13: 3-site byte-consistency table ----------------------------------
+check(
+    "s169(i-byte-consistency-table): docs/patch-mode.md declares the "
+    "3-site byte-consistency invariant table naming all three sites",
+    "### Byte-consistency requirement (3-site invariant)" in _s169_patchmode
+    and "Canonical contract" in _s169_patchmode
+    and "Orchestrator wiring" in _s169_patchmode
+    and "Cross-reference" in _s169_patchmode
+    and "§ Cost-Ordered Patch-Iteration Re-Run Sequencing" in _s169_patchmode
+    and '§ "If any agent fails → ITERATE" — R0/R1/R2 subsection' in _s169_patchmode
+    and "§ 7 (two-lens floor)" in _s169_patchmode,
+    "AC-13 requires a byte-consistency table enumerating "
+    "docs/patch-mode.md (canonical), agents/orchestrator.md (wiring), "
+    "and docs/pipeline-lanes.md § 7 (cross-ref)",
+)
+
+# --- AC-11: the orchestrator wiring subsection sits after the Case →
+# routing table and before the Security-verdict staleness re-gate --------
+_s169_idx_case_table = _s169_orch.find("**Case → routing table:**")
+_s169_idx_cost_seq = _s169_orch.find(
+    "### Cost-ordered re-run sequencing — R0 → R1 → R2"
+)
+_s169_idx_staleness = _s169_orch.find(
+    "**Security-verdict staleness re-gate (applies regardless of blast radius or case type).**"
+)
+check(
+    "s169(j-position-orchestrator): the R0/R1/R2 wiring subsection sits "
+    "after the Case → routing table and before the Security-verdict "
+    "staleness re-gate, in that order",
+    _s169_idx_case_table != -1
+    and _s169_idx_cost_seq != -1
+    and _s169_idx_staleness != -1
+    and _s169_idx_case_table < _s169_idx_cost_seq < _s169_idx_staleness,
+    "01-plan.md Task-1's Work Plan requires the new subsection wired "
+    "immediately after the Case → routing table and before the "
+    "Security-verdict staleness re-gate -- found indices "
+    f"case_table={_s169_idx_case_table}, cost_seq={_s169_idx_cost_seq}, "
+    f"staleness={_s169_idx_staleness}",
+)
+
+# --- AC-11/AC-5/AC-6/AC-9: pre-existing fenced anchors survive byte-for-byte
+# (this is a purely additive change -- 0 deletions per the implementer's own
+# record) ---------------------------------------------------------------
+_S169_CASE_TABLE = (
+    "| Case | Blast radius | Producer dispatch | Verifier re-run | Coherence gate |\n"
+    "|------|-------------|-------------------|-----------------|----------------|\n"
+    "| A | `localized {IDs}` | `implementer` — BOUNDED-PATCH | `tester`+`qa` only | `qa validate` on patched AC |\n"
+    "| A | `structural` | `implementer` — full re-implement | `tester`+`qa`+`security` (full) | standard acceptance gate |\n"
+    "| B | `localized {IDs}` | `architect` — BOUNDED-PATCH | `plan-reviewer` only | `plan-reviewer` on patched plan |\n"
+    "| B | `structural` | `architect` — full re-design | all verifiers (full) | standard acceptance gate |\n"
+    "| C | any | adjust `01-plan.md § Task List` AC, mark in brief | all verifiers (full) | standard acceptance gate |\n"
+    "| D | `localized {IDs}` | `implementer` — BOUNDED-PATCH | `security` (+ `adversary` when `adversary_floor_applies == true`) only | `security`/`adversary` re-run + `qa validate` on patched IDs |\n"
+    "| D | `structural` | `implementer` — full re-implement | `security` (+ `adversary` when `adversary_floor_applies == true`) only | standard security re-run |"
+)
+check(
+    "s169(k-case-table-byte-preserved): the Case → routing table (Cases "
+    "A-D, both blast-radius rows each) remains byte-for-byte unchanged "
+    "in agents/orchestrator.md",
+    _S169_CASE_TABLE in _s169_orch,
+    "AC-11 requires the pre-existing Case → routing table (`:1109-1119`) "
+    "to survive this purely additive edit unchanged -- the sequencing "
+    "layer consumes the table's 'Verifier re-run' column, it never "
+    "replaces the table",
+)
+check(
+    "s169(k-worst-of-byte-preserved): the worst-of combined-verdict gate "
+    "block remains byte-for-byte unchanged in agents/orchestrator.md",
+    "**Gate — worst-of combined verdict:**" in _s169_orch
+    and "worst-of(qa_verdict, security_verdict_when_ran, adversary_verdict_when_ran)"
+    in _s169_orch,
+    "AC-5 requires the worst-of block (`:1078-1085`) and its verdict "
+    "mappings to survive unchanged",
+)
+check(
+    "s169(k-floor-predicates-byte-preserved): both floor predicates "
+    "remain byte-for-byte unchanged and are referenced by name only in "
+    "agents/orchestrator.md",
+    "security_floor_applies = security_sensitive == true" in _s169_orch
+    and "adversary_floor_applies = security_floor_applies AND changes_security_control"
+    in _s169_orch
+    and "### Single shared Phase-3 floor predicate" in _s169_orch
+    and "### Adversary floor predicate" in _s169_orch,
+    "AC-6 requires both floor predicates (`:1012`, `:1028`) to survive "
+    "unchanged -- the adversary dispatch gate must never degrade to "
+    "`security_floor_applies` alone",
+)
+check(
+    "s169(k-staleness-clause-byte-preserved): the Security-verdict "
+    "staleness re-gate's opening clause remains byte-for-byte unchanged "
+    "in agents/orchestrator.md",
+    "A security/adversary verdict is BOUND to the security-relevant design surface it reviewed at issue time."
+    in _s169_orch,
+    "AC-7/AC-8 require the staleness re-gate's own opening clause "
+    "(`:1129` pre-edit) to survive unchanged -- the new subsection defers "
+    "to it by reference, it never restates or narrows it",
+)
+check(
+    "s169(k-reverification-scope-field-byte-preserved): the "
+    "`Re-verification scope` field definitions remain byte-for-byte "
+    "unchanged in both agents/orchestrator.md and agents/adversary.md",
+    "**Re-verification scope:** localized {files, finding-IDs}" in _s169_orch
+    and "**Re-verification scope (R3, SEC-DR-F1).** Every dispatch carries "
+    "`**Re-verification scope:** full | localized {files, finding-IDs}`"
+    in _s169_adversary,
+    "AC-2/AC-9 require the pre-existing `Re-verification scope` field "
+    "definitions (`agents/orchestrator.md:1123`, `agents/adversary.md:118`) "
+    "to survive unchanged -- the new subsection reads this field by "
+    "name, it never redefines it",
+)
+check(
+    "s169(k-integrity-scan-byte-preserved): the adversary per-round "
+    "report-integrity scan remains byte-for-byte unchanged in "
+    "agents/orchestrator.md",
+    "report-integrity scan" in _s169_orch
+    and "adversary_round_sizes[round]" in _s169_orch
+    and "No prior-round shrink or disappearance." in _s169_orch,
+    "AC-9 requires the per-round report-integrity scan (`:1045-1074`) to "
+    "survive unchanged -- the new subsection only declares WHEN it runs "
+    "(R1 or R2), never redefines its checks",
+)
+check(
+    "s169(k-max3-budget-byte-preserved): the max-3 iteration budget for "
+    "Phase-3 verify re-dispatches remains byte-for-byte unchanged in "
+    "agents/orchestrator.md",
+    "**Max 3 iterations.**" in _s169_orch,
+    "AC-12 requires the pre-existing max-3 iteration budget (`:1139` "
+    "pre-edit) to survive unchanged -- each R0/R1/R2 bounce cycle still "
+    "counts as one iteration against the same cap, never a separate or "
+    "widened budget",
+)
+
+# --- Self-referential guard (mirrors Suite 161/162/163/164/165's own
+# pattern). docs/testing.md registration is deliberately NOT self-checked
+# here -- it is a documentation edit outside this tester dispatch's
+# test-files-only scope. -----------------------------------------------
+_s169_own = read(Path(__file__))
+check(
+    "suite169(self-ref): test file contains 'Suite 169' and "
+    "'cost-ordered-verify-reruns-task1-structural-verification'",
+    "Suite 169" in _s169_own
+    and "cost-ordered-verify-reruns-task1-structural-verification" in _s169_own,
+    "test file must self-reference Suite 169 and the marker "
+    "'cost-ordered-verify-reruns-task1-structural-verification'",
+)
+check(
+    "suite169(hygiene): CLAUDE.md does NOT contain 'Suite 169' (§11 "
+    "hygiene contract)",
+    "Suite 169" not in _s169_claude,
+    "CLAUDE.md must not mention Suite 169 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: cost-ordered-verify-reruns-task1-structural-verification
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 170 — cost-ordered-verify-reruns Task-2 structural verification
+#
+# Asserts the fixed-state facts 01-plan.md Task-2 (AC-16..AC-28) commits to for
+# the new Whack-a-Mole Structural Escalation contract: the canonical section
+# and its wiring-subsection mirror in agents/orchestrator.md, the two OR'd
+# detector variants (new-surface, consecutive threshold N=2), the
+# evaluation-point gating on the per-round report-integrity scan (AC-25), the
+# 5-point action-on-trigger mechanics (no implementer-iteration consumption,
+# R2 preemption, accumulated break-set as design spec, the AC-28 external-
+# research directive, plan-review + security design-review re-run, fresh base
+# pass), the structural_escalations cap=1 + operator-escalation-on-2nd-trigger
+# mechanics with the AC-24 CORRECTED monotonicity wording (never reset by a
+# redesign or fresh base pass) and the AC-17 CORRECTED zeroing-on-fresh-pass
+# wording for adversary_consecutive_broke_it, the no-parallel-dispatch
+# predicate (AC-26), the 2-site byte-consistency table (AC-27), the wiring
+# subsection's position in agents/orchestrator.md, and that the forward
+# pointer Task-1 left (`docs/patch-mode.md § Whack-a-Mole Structural
+# Escalation`) now resolves to this real heading. Also reuses/extends the
+# existing anchor-preservation pattern (Suite 50/125/152/165/166/169) for the
+# two Task-1 anchors immediately adjacent to this addition's insertion point
+# in each file — the rest of Task-1's byte-preserved surface is already
+# re-confirmed by Suite 169 re-running unchanged in the same process.
+#
+# docs/testing.md registration is deliberately NOT self-checked here (per the
+# same rationale as Suite 161/162/163/164/165/169): it is a documentation edit
+# outside this tester dispatch's test-files-only scope.
+#
+# Marker: cost-ordered-verify-reruns-task2-structural-verification
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 170: cost-ordered-verify-reruns Task-2 structural verification ===")
+
+_s170_patchmode = read(REPO_ROOT / "docs" / "patch-mode.md")
+_s170_orch = read(AGENTS_DIR / "orchestrator.md")
+_s170_claude = read(REPO_ROOT / "CLAUDE.md")
+
+# --- section exists (canonical + wiring) -----------------------------------
+check(
+    "s170(a-section-exists-patchmode): docs/patch-mode.md declares the "
+    "'Whack-a-Mole Structural Escalation' canonical section",
+    "## Whack-a-Mole Structural Escalation" in _s170_patchmode,
+    "01-plan.md Task-2 requires a new canonical section defining the "
+    "whack-a-mole detector and escalation action -- absent from "
+    "docs/patch-mode.md",
+)
+check(
+    "s170(a-section-exists-orchestrator): agents/orchestrator.md declares "
+    "the wiring subsection cross-referencing the canonical contract",
+    "### Whack-a-mole structural escalation — architect re-design pivot" in _s170_orch
+    and "docs/patch-mode.md § Whack-a-Mole Structural Escalation" in _s170_orch,
+    "01-plan.md Task-2 requires the orchestrator wiring subsection naming "
+    "the canonical contract by its exact section title",
+)
+
+# --- forward-pointer resolution: the dangling Task-1 pointer now resolves --
+check(
+    "s170(fwd-pointer-resolves): the forward pointer Task-1 left "
+    "(`docs/patch-mode.md § Whack-a-Mole Structural Escalation`) now "
+    "resolves to a real heading of that exact title",
+    "docs/patch-mode.md § Whack-a-Mole Structural Escalation" in _s170_orch
+    and "## Whack-a-Mole Structural Escalation" in _s170_patchmode,
+    "Task-1 left a forward-pointer citing "
+    "'docs/patch-mode.md § Whack-a-Mole Structural Escalation' as a "
+    "section that did not yet exist; Task-2 must land the real heading "
+    "under that exact title so the pointer resolves",
+)
+
+# --- AC-16: new-surface variant, both directions of the set difference -----
+check(
+    "s170(b-detector-variant1-patchmode): docs/patch-mode.md's new-surface "
+    "variant fires on BOTH directions of the set difference, read from the "
+    "per-control break-set report",
+    "B(N-1) \\ B(N) ≠ ∅" in _s170_patchmode
+    and "B(N) \\ B(N-1) ≠ ∅" in _s170_patchmode
+    and "reviews/04-adversary-r{N}.md § Attempts by Control" in _s170_patchmode,
+    "AC-16 requires the canonical contract to fire the new-surface variant "
+    "when a previously-broken control CONFIRMED closes AND a new control "
+    "breaks on the patch's own surface, read from the adversary round "
+    "report's per-control break-set",
+)
+check(
+    "s170(b-detector-variant1-orchestrator): agents/orchestrator.md's "
+    "wiring subsection states the same new-surface variant",
+    "B(N-1) \\ B(N) ≠ ∅" in _s170_orch
+    and "B(N) \\ B(N-1) ≠ ∅" in _s170_orch
+    and "reviews/04-adversary-r{N}.md § Attempts by Control" in _s170_orch,
+    "AC-16 requires the orchestrator wiring to mirror the same "
+    "new-surface detector formula",
+)
+
+# --- AC-17: consecutive variant, threshold N=2 -----------------------------
+check(
+    "s170(c-detector-variant2-patchmode): docs/patch-mode.md's consecutive "
+    "variant fires at threshold N=2",
+    "Fires when the counter reaches 2" in _s170_patchmode
+    and "adversary_consecutive_broke_it" in _s170_patchmode,
+    "AC-17 requires the canonical contract to fire the consecutive "
+    "variant at the 2nd consecutive integrity-clean `broke-it` round",
+)
+check(
+    "s170(c-detector-variant2-orchestrator): agents/orchestrator.md's "
+    "wiring subsection states the same consecutive threshold",
+    "Fires at 2 — deliberately before the implementer's max-3 budget" in _s170_orch,
+    "AC-17 requires the orchestrator wiring to mirror the same "
+    "threshold-2 consecutive-variant trigger",
+)
+
+# --- AC-25: evaluation point gated on the per-round integrity scan --------
+check(
+    "s170(d-eval-point-gated-patchmode): docs/patch-mode.md gates the "
+    "detector's evaluation point on the per-round report-integrity scan "
+    "ACCEPTING the round",
+    "### Evaluation point (AC-25)" in _s170_patchmode
+    and "ACCEPTS the round as clean" in _s170_patchmode,
+    "AC-25 requires the canonical contract to evaluate the detector ONLY "
+    "after the per-round report-integrity scan accepts the round -- never "
+    "on a blocked or integrity-failed round",
+)
+check(
+    "s170(d-eval-point-gated-orchestrator): agents/orchestrator.md's "
+    "wiring subsection states the same integrity-scan gating",
+    "**Evaluation point (AC-25).**" in _s170_orch
+    and "NEVER on a `status: blocked` or integrity-failed round" in _s170_orch,
+    "AC-25 requires the orchestrator wiring to mirror the same "
+    "evaluation-point gating on the per-round integrity scan",
+)
+
+# --- AC-18/AC-19: no implementer iteration consumed, R2 preempted ----------
+check(
+    "s170(e-no-iteration-r2-preempt-patchmode): docs/patch-mode.md states "
+    "the trigger does not consume an implementer iteration and preempts R2",
+    "Does not consume an implementer iteration (AC-18)" in _s170_patchmode
+    and "Preempts R2 for this iteration (AC-19)" in _s170_patchmode,
+    "AC-18/AC-19 require the canonical contract to state the triggering "
+    "round is terminal (no implementer bounce) and that R2 is preempted",
+)
+check(
+    "s170(e-no-iteration-r2-preempt-orchestrator): agents/orchestrator.md's "
+    "wiring subsection states the same two mechanics",
+    "Does NOT consume an implementer iteration" in _s170_orch
+    and "Preempts R2 for this iteration —" in _s170_orch,
+    "AC-18/AC-19 require the orchestrator wiring to mirror the same "
+    "no-iteration-consumed and R2-preempted mechanics",
+)
+
+# --- AC-20/AC-28: accumulated break-set + external-research directive -----
+check(
+    "s170(f-accumulated-breakset-research-patchmode): docs/patch-mode.md's "
+    "trigger action carries the ACCUMULATED break-set as the design spec "
+    "and mandates the AC-28 external-research directive",
+    "ACCUMULATED break-set" in _s170_patchmode
+    and "WebSearch/WebFetch for known solution patterns and established mitigations"
+    in _s170_patchmode
+    and "no applicable prior art was found" in _s170_patchmode,
+    "AC-20 requires the accumulated (all-rounds) break-set as the "
+    "redesign specification, and AC-28 requires the dispatch payload to "
+    "mandate external research (WebSearch/WebFetch + context7) with a "
+    "prior-art citation or an explicit none-found statement",
+)
+check(
+    "s170(f-accumulated-breakset-research-orchestrator): "
+    "agents/orchestrator.md's wiring subsection states the same "
+    "accumulated break-set and external-research directive",
+    "ACCUMULATED break-set" in _s170_orch
+    and "WebSearch/WebFetch for known solution patterns/mitigations" in _s170_orch
+    and "citing findings or explicitly stating none applicable were found" in _s170_orch,
+    "AC-20/AC-28 require the orchestrator wiring to mirror the same "
+    "accumulated break-set and mandatory external-research directive",
+)
+
+# --- AC-21: plan-review + security design-review re-run before re-implementing
+check(
+    "s170(g-panel-rerun-patchmode): docs/patch-mode.md requires "
+    "plan-review + security design-review to re-run before re-implementing",
+    "Re-runs plan-review (Phase 1.6) + security design-review (Phase 1.5 panel) before"
+    in _s170_patchmode,
+    "AC-21 requires the canonical contract to state the redesign is "
+    "never fast-tracked straight to the implementer",
+)
+check(
+    "s170(g-panel-rerun-orchestrator): agents/orchestrator.md's wiring "
+    "subsection states the same panel re-run requirement",
+    "Re-runs plan-review (Phase 1.6) + security design-review (Phase 1.5 panel) before"
+    in _s170_orch,
+    "AC-21 requires the orchestrator wiring to mirror the same "
+    "plan-review + security design-review re-run gate",
+)
+
+# --- AC-22/AC-23/AC-24: fresh base pass consumes one escalation ------------
+check(
+    "s170(h-fresh-base-pass-patchmode): docs/patch-mode.md states the "
+    "trigger consumes one structural escalation and re-implementation "
+    "runs a fresh base pass",
+    "Consumes one structural escalation; re-implementation runs a fresh base pass (AC-22, AC-23,"
+    in _s170_patchmode,
+    "AC-22/AC-23/AC-24 require the canonical contract to state the "
+    "trigger consumes one structural escalation and the re-implementation "
+    "runs as a fresh Phase-3 base pass, not a continuation",
+)
+check(
+    "s170(h-fresh-base-pass-orchestrator): agents/orchestrator.md's "
+    "wiring subsection states the same fresh-base-pass mechanics",
+    "Consumes one structural escalation; re-implementation runs a FRESH Phase-3 base pass"
+    in _s170_orch
+    and "verdicts tied to the old design model are void" in _s170_orch,
+    "AC-22 requires the orchestrator wiring to mirror the same "
+    "fresh-base-pass mechanics, with prior verdicts voided",
+)
+
+# --- AC-23: structural_escalations cap=1 + operator escalation on 2nd ------
+check(
+    "s170(i-cap-one-escalate-patchmode): docs/patch-mode.md caps "
+    "structural_escalations at 1 by default and escalates a 2nd trigger "
+    "to the operator",
+    "caps architect-redesign pivots at **1 by" in _s170_patchmode
+    and "scales to the operator (`status: blocked`)" in _s170_patchmode,
+    "AC-23 requires the canonical contract to cap redesign pivots at 1 "
+    "and escalate a 2nd whack-a-mole trigger to the operator as "
+    "`status: blocked`, never an unbounded redesign loop",
+)
+check(
+    "s170(i-cap-one-escalate-orchestrator): agents/orchestrator.md's "
+    "wiring subsection states the same cap and operator-escalation rule",
+    "caps redesign pivots at 1 by default" in _s170_orch
+    and "escalates to the operator (`status: blocked`)" in _s170_orch,
+    "AC-23 requires the orchestrator wiring to mirror the same cap=1 and "
+    "operator-escalation-on-2nd-trigger mechanics",
+)
+
+# --- AC-24 (CORRECTED wording, per dispatch's carry-forward guidance):
+# structural_escalations is MONOTONIC per task, NEVER reset by a redesign or
+# a fresh base pass -- only the implementer iteration budget resets. This is
+# the corrected framing, narrower than 01-plan.md's literal AC-24 prose. ----
+check(
+    "s170(j-ac24-corrected-monotonic-patchmode): docs/patch-mode.md states "
+    "the CORRECTED monotonicity wording -- structural_escalations is "
+    "monotonic per task, NEVER reset by a redesign or fresh base pass",
+    "is monotonic per task and is NEVER reset by a redesign or by a fresh"
+    in _s170_patchmode
+    and "only the implementer iteration budget resets" in _s170_patchmode,
+    "01-plan.md Task-2 AC-24 prose is narrower than the implemented "
+    "behavior by design (operator-authorized correction, same disposition "
+    "class as Task-1's AC-7/AC-8): the canonical contract must state "
+    "`structural_escalations` is monotonic per task and NEVER reset by a "
+    "redesign or fresh base pass -- only the implementer iteration budget "
+    "resets",
+)
+check(
+    "s170(j-ac24-corrected-monotonic-orchestrator): agents/orchestrator.md's "
+    "wiring subsection states the same CORRECTED monotonicity wording",
+    "is MONOTONIC per task and is NEVER reset by a redesign or a fresh base pass"
+    in _s170_orch
+    and "only the implementer iteration budget resets" in _s170_orch,
+    "AC-24 (corrected) requires the orchestrator wiring to mirror the "
+    "same never-reset monotonicity wording for structural_escalations",
+)
+
+# --- AC-17 (CORRECTED wording, per dispatch's carry-forward guidance): the
+# fresh base pass following a redesign explicitly ZEROES
+# adversary_consecutive_broke_it (the prior count is bound to the discarded
+# design model). This is additive to the threshold-2 check above. ----------
+check(
+    "s170(k-ac17-corrected-zeroing-patchmode): docs/patch-mode.md states "
+    "the CORRECTED zeroing wording -- the fresh base pass zeroes "
+    "adversary_consecutive_broke_it after a redesign",
+    "The fresh base pass zeroes `adversary_consecutive_broke_it`" in _s170_patchmode,
+    "01-plan.md Task-2 AC-17 prose does not mention the redesign-zeroing "
+    "behavior (operator-authorized correction, same disposition class as "
+    "Task-1's AC-7/AC-8): the canonical contract must state the fresh "
+    "base pass following a redesign zeroes `adversary_consecutive_broke_it`",
+)
+check(
+    "s170(k-ac17-corrected-zeroing-orchestrator): agents/orchestrator.md's "
+    "wiring subsection states the same CORRECTED zeroing wording",
+    "The fresh base pass following a redesign zeroes `adversary_consecutive_broke_it`"
+    in _s170_orch,
+    "AC-17 (corrected) requires the orchestrator wiring to mirror the "
+    "same redesign-zeroing wording for adversary_consecutive_broke_it",
+)
+
+# --- AC-26: no parallel dispatch predicate, adds exactly two new fields ----
+check(
+    "s170(l-no-parallel-predicate-patchmode): docs/patch-mode.md states "
+    "the detector reads existing state only and adds exactly two new "
+    "00-state.md fields",
+    "### No parallel dispatch predicate (AC-26)" in _s170_patchmode
+    and "adversary_consecutive_broke_it` and `structural_escalations`" in _s170_patchmode,
+    "AC-26 requires the canonical contract to state the detector reads "
+    "existing state only and adds exactly `adversary_consecutive_broke_it` "
+    "and `structural_escalations` -- no rival dispatch predicate",
+)
+check(
+    "s170(l-no-parallel-predicate-orchestrator): agents/orchestrator.md's "
+    "wiring subsection states the same no-parallel-predicate rule",
+    "**No parallel dispatch predicate (AC-26).**" in _s170_orch
+    and "adds exactly two new `00-state.md` fields (`adversary_consecutive_broke_it`, `structural_escalations`)"
+    in _s170_orch,
+    "AC-26 requires the orchestrator wiring to mirror the same "
+    "no-parallel-dispatch-predicate rule and the exact two-field list",
+)
+
+# --- 00-state.md schema: both new fields declared in the Current State
+# schema block, with the MONOTONIC/never-reset wording present at the field
+# declaration site itself (not only in prose below) -----------------------
+check(
+    "s170(m-schema-fields-declared): agents/orchestrator.md's "
+    "'Current State' schema declares both new fields "
+    "(adversary_consecutive_broke_it, structural_escalations) with their "
+    "reset rules stated at the declaration site",
+    "- adversary_consecutive_broke_it: {N | 0}" in _s170_orch
+    and "- structural_escalations: {N | 0}" in _s170_orch
+    and "MONOTONIC per task, NEVER reset by a redesign or a fresh base pass"
+    in _s170_orch,
+    "AC-26/AC-24 require both new 00-state.md schema fields declared with "
+    "their monotonicity/reset rules stated inline at the schema site",
+)
+
+# --- AC-27: 2-site byte-consistency table (canonical + wiring) -------------
+check(
+    "s170(n-byte-consistency-table-patchmode): docs/patch-mode.md declares "
+    "the 2-site byte-consistency invariant table naming both sites",
+    "### Byte-consistency requirement (2-site invariant) (AC-27)" in _s170_patchmode
+    and "| Canonical contract | `docs/patch-mode.md` (this file) | § Whack-a-Mole Structural Escalation |"
+    in _s170_patchmode
+    and "| Orchestrator wiring | `agents/orchestrator.md` | § \"If any agent fails → ITERATE\" — whack-a-mole escalation subsection |"
+    in _s170_patchmode,
+    "AC-27 requires a byte-consistency table enumerating docs/patch-mode.md "
+    "(canonical) and agents/orchestrator.md (wiring)",
+)
+check(
+    "s170(n-byte-consistency-table-orchestrator): agents/orchestrator.md's "
+    "wiring subsection declares the same 2-site table",
+    "**Byte-consistency requirement (2-site invariant, AC-27).**" in _s170_orch
+    and "| Canonical contract | `docs/patch-mode.md` | § Whack-a-Mole Structural Escalation |"
+    in _s170_orch
+    and "| Orchestrator wiring | `agents/orchestrator.md` (this section) | § \"If any agent fails → ITERATE\" — whack-a-mole escalation subsection |"
+    in _s170_orch,
+    "AC-27 requires the orchestrator wiring to mirror the same 2-site "
+    "byte-consistency table",
+)
+
+# --- Position: the wiring subsection sits after Task-1's own "Reconciliation
+# with the adversary per-round report-integrity scan" paragraph and before
+# the pre-existing Security-verdict staleness re-gate paragraph, in that
+# order (mirrors s169(j-position-orchestrator)'s pattern) ------------------
+_s170_idx_recon = _s170_orch.find(
+    "**Reconciliation with the adversary per-round report-integrity scan.**"
+)
+_s170_idx_wam = _s170_orch.find(
+    "### Whack-a-mole structural escalation — architect re-design pivot"
+)
+_s170_idx_staleness = _s170_orch.find(
+    "**Security-verdict staleness re-gate (applies regardless of blast radius or case type).**"
+)
+check(
+    "s170(o-position-orchestrator): the whack-a-mole wiring subsection "
+    "sits after Task-1's Reconciliation paragraph and before the "
+    "pre-existing Security-verdict staleness re-gate paragraph, in that "
+    "order",
+    _s170_idx_recon != -1
+    and _s170_idx_wam != -1
+    and _s170_idx_staleness != -1
+    and _s170_idx_recon < _s170_idx_wam < _s170_idx_staleness,
+    "01-plan.md Task-2's Work Plan requires the new subsection wired "
+    "immediately after Task-1's Reconciliation paragraph and before the "
+    "pre-existing Security-verdict staleness re-gate paragraph -- found "
+    f"indices recon={_s170_idx_recon}, wam={_s170_idx_wam}, "
+    f"staleness={_s170_idx_staleness}",
+)
+
+# --- Position (canonical): the new section sits after Task-1's own
+# "Reconciliation with the adversary per-round report-integrity scan"
+# section and before the pre-existing "Coherence Gate" section -------------
+_s170_pm_idx_recon = _s170_patchmode.find(
+    "### Reconciliation with the adversary per-round report-integrity scan"
+)
+_s170_pm_idx_wam = _s170_patchmode.find("## Whack-a-Mole Structural Escalation")
+_s170_pm_idx_coherence = _s170_patchmode.find("## Coherence Gate")
+check(
+    "s170(p-position-patchmode): the new canonical section sits after "
+    "Task-1's Reconciliation section and before the pre-existing "
+    "Coherence Gate section, in that order",
+    _s170_pm_idx_recon != -1
+    and _s170_pm_idx_wam != -1
+    and _s170_pm_idx_coherence != -1
+    and _s170_pm_idx_recon < _s170_pm_idx_wam < _s170_pm_idx_coherence,
+    "01-plan.md Task-2's Work Plan requires the new canonical section "
+    "landed immediately after Task-1's Reconciliation section and before "
+    "the pre-existing Coherence Gate section -- found indices "
+    f"recon={_s170_pm_idx_recon}, wam={_s170_pm_idx_wam}, "
+    f"coherence={_s170_pm_idx_coherence}",
+)
+
+# --- Anchor preservation (extends Suite 50/125/152/165/166/169's pattern):
+# the two Task-1 anchors immediately adjacent to this addition's insertion
+# point in each file remain byte-for-byte unchanged. The rest of Task-1's
+# byte-preserved surface (Case table, worst-of block, floor predicates, the
+# staleness re-gate's opening clause, the Re-verification scope field
+# definitions, the per-round integrity scan, the max-3 budget) is already
+# re-confirmed by Suite 169 re-running unchanged in this same process. -----
+check(
+    "s170(q-recon-paragraph-byte-preserved): Task-1's Reconciliation "
+    "paragraph in agents/orchestrator.md remains byte-for-byte unchanged "
+    "immediately before this addition's insertion point",
+    "**Reconciliation with the adversary per-round report-integrity scan.** "
+    "Whichever stage (R1 as owner, or R2 as confirmation) dispatches "
+    "`adversary`, declare the next monotonic `adversary_rounds: N` BEFORE "
+    "the dispatch and run the per-round scan (`:1045-1074`) AFTER it "
+    "returns — unchanged. Sequencing changes WHEN/HOW OFTEN these lenses "
+    "run, never WHAT they do when they run."
+    in _s170_orch,
+    "Task-2 must land its wiring subsection purely additively -- Task-1's "
+    "own Reconciliation paragraph immediately before the insertion point "
+    "must survive byte-for-byte unchanged",
+)
+check(
+    "s170(q-staleness-clause-byte-preserved): the pre-existing "
+    "Security-verdict staleness re-gate's opening clause immediately "
+    "after this addition's insertion point remains byte-for-byte "
+    "unchanged in agents/orchestrator.md",
+    "A security/adversary verdict is BOUND to the security-relevant design surface it reviewed at issue time."
+    in _s170_orch,
+    "Task-2 must land its wiring subsection purely additively -- the "
+    "pre-existing Security-verdict staleness re-gate's opening clause "
+    "immediately after the insertion point must survive byte-for-byte "
+    "unchanged",
+)
+check(
+    "s170(q-coherence-gate-byte-preserved): the pre-existing Coherence "
+    "Gate section heading immediately after this addition's insertion "
+    "point remains byte-for-byte unchanged in docs/patch-mode.md",
+    "## Coherence Gate (Mandatory — Never Skipped)" in _s170_patchmode,
+    "Task-2 must land its canonical section purely additively -- the "
+    "pre-existing Coherence Gate section heading immediately after the "
+    "insertion point must survive byte-for-byte unchanged",
+)
+
+# --- QUEUED GAP CLOSURE (flagged at iteration-2 re-verify, ts
+# 2026-07-20T14:08:01Z): iteration-2's WAM-2 IF/ELSE cap-precondition gate
+# and WAM-3's (then-new) whack_a_mole_episode_start_round field had ZERO
+# dedicated Suite-170 assertions. Closed below. -----------------------------
+
+# --- (r) IF/ELSE precondition structure on the structural_escalations cap,
+# "Action on trigger" step 3 (both files) --------------------------------
+check(
+    "s170(r-ifelse-cap-precondition-patchmode): docs/patch-mode.md's "
+    "Action on trigger step 3 is an explicit IF/ELSE gated on the "
+    "structural_escalations cap precondition, not an unconditional pivot",
+    "IF `structural_escalations` is below its cap (default 1)" in _s170_patchmode
+    and "ELSE (the cap is already consumed):** escalates" in _s170_patchmode,
+    "The queued gap requires docs/patch-mode.md § Action on trigger step 3 "
+    "to gate the redesign pivot on an explicit IF (`structural_escalations` "
+    "below cap) / ELSE (cap already consumed, escalate) precondition -- a "
+    "silent revert to an unconditional pivot would defeat AC-23's cap",
+)
+check(
+    "s170(r-ifelse-cap-precondition-orchestrator): agents/orchestrator.md's "
+    "wiring subsection states the same IF/ELSE cap-precondition gate",
+    "**IF `structural_escalations` is below its cap (default 1):**"
+    in _s170_orch
+    and "**ELSE (the cap is already consumed):** escalates directly to the "
+    "operator (`status: blocked`)" in _s170_orch,
+    "The queued gap requires agents/orchestrator.md's wiring subsection to "
+    "mirror the same explicit IF/ELSE cap-precondition gate",
+)
+
+# --- (s) whack_a_mole_episode_start_round field: existence + reset-on-
+# fresh-base-pass clause (both files, schema description) ------------------
+_s170_field_start = _s170_orch.find("- whack_a_mole_episode_start_round:")
+_s170_field_end = _s170_orch.find(
+    "- changes_security_control:", _s170_field_start
+)
+_s170_field_desc = (
+    _s170_orch[_s170_field_start:_s170_field_end]
+    if _s170_field_start != -1 and _s170_field_end != -1
+    else ""
+)
+check(
+    "s170(s-episode-start-field-exists-orchestrator): agents/orchestrator.md's "
+    "'Current State' schema declares whack_a_mole_episode_start_round with "
+    "the reset-on-fresh-base-pass clause at the declaration site",
+    "- whack_a_mole_episode_start_round: {N | null}" in _s170_orch
+    and "reset to `null` when a fresh base pass runs after a "
+    "detector-triggered redesign (a new episode begins)" in _s170_orch,
+    "The queued gap requires the whack_a_mole_episode_start_round schema "
+    "field to exist AND state its reset-on-fresh-base-pass-after-redesign "
+    "clause inline at the declaration site -- absent from "
+    "agents/orchestrator.md's 'Current State' schema",
+)
+check(
+    "s170(s-episode-start-field-referenced-patchmode): docs/patch-mode.md "
+    "names whack_a_mole_episode_start_round as episode-boundary "
+    "bookkeeping and cross-references its schema declaration site",
+    "whack_a_mole_episode_start_round" in _s170_patchmode
+    and "episode-boundary bookkeeping" in _s170_patchmode
+    and 'declared in `agents/orchestrator.md § "Current' in _s170_patchmode,
+    "The queued gap requires docs/patch-mode.md to name "
+    "whack_a_mole_episode_start_round, describe it as episode-boundary "
+    "bookkeeping, and cross-reference agents/orchestrator.md as the "
+    "field's schema declaration site -- the canonical contract must not "
+    "silently drop the field it depends on for round-range computation",
+)
+
+# --- (t) THIS ROUND's fix 1 (WAM-3): the limb-(b) mid-iteration
+# first-dispatch setter branch is present in the field's own description
+# (agents/orchestrator.md:314) ----------------------------------------------
+check(
+    "s170(t-limb-b-setter-branch-orchestrator): the "
+    "whack_a_mole_episode_start_round field description carries the "
+    "limb-(b) mid-iteration first-dispatch setter branch (this round's "
+    "WAM-3 fix), co-occurring within the same field's own description",
+    "limb-(b)" in _s170_field_desc
+    and "recompute-and-recache extension" in _s170_field_desc
+    and "EITHER of two reachable paths" in _s170_field_desc
+    and "no base-pass round exists to anchor to on this path" in _s170_field_desc,
+    "WAM-3 (this round's fix) requires the "
+    "whack_a_mole_episode_start_round field description to carry a "
+    "second setter branch covering a task whose base pass did NOT "
+    "dispatch `adversary`, later first-dispatching it mid-iteration via "
+    "the limb-(b) recompute-and-recache extension -- without it the field "
+    "can be permanently `null` on that reachable path",
+)
+
+# --- (u) THIS ROUND's fix 2 (WAM-2/AC-30): the new "Fail-closed-on-
+# unconfirmable-persistence-state" paragraph is present, byte-consistent in
+# substance, in BOTH files, and correctly distinguishes residual (1) (now
+# fail-closed-escalate-bound) from residuals (2)/(3) (still max-3-bound) ---
+check(
+    "s170(u-ac30-paragraph-patchmode): docs/patch-mode.md carries the "
+    "Fail-closed-on-unconfirmable-persistence-state (AC-30) paragraph, "
+    "naming AC-30, escalating to the operator, and never granting a "
+    "fresh implementer budget against unconfirmed persistence state",
+    "**Fail-closed-on-unconfirmable-persistence-state (AC-30) — closes "
+    "residual (1)'s compounding" in _s170_patchmode
+    and "escalates directly to the operator (`status: blocked`)"
+    in _s170_patchmode
+    and "NEVER grants a FRESH implementer budget against unconfirmed "
+    "persistence state" in _s170_patchmode,
+    "AC-30 requires docs/patch-mode.md to carry the "
+    "Fail-closed-on-unconfirmable-persistence-state paragraph, naming "
+    "AC-30, stating the escalate-to-operator action, and stating the "
+    "orchestrator never grants a fresh implementer budget against "
+    "unconfirmed persistence state",
+)
+check(
+    "s170(u-ac30-paragraph-orchestrator): agents/orchestrator.md carries "
+    "the same Fail-closed-on-unconfirmable-persistence-state (AC-30) "
+    "paragraph, naming AC-30, escalating to the operator, and never "
+    "granting a fresh implementer budget against unconfirmed persistence "
+    "state",
+    "**Fail-closed-on-unconfirmable-persistence-state (AC-30) — closes "
+    "residual (1)'s compounding" in _s170_orch
+    and "escalates directly to the operator (`status: blocked`)" in _s170_orch
+    and "NEVER grants a FRESH implementer budget against unconfirmed "
+    "persistence state" in _s170_orch,
+    "AC-30 requires agents/orchestrator.md's wiring to mirror the same "
+    "Fail-closed-on-unconfirmable-persistence-state paragraph, naming "
+    "AC-30, stating the escalate-to-operator action, and stating the "
+    "orchestrator never grants a fresh implementer budget against "
+    "unconfirmed persistence state",
+)
+check(
+    "s170(u-ac30-residual-distinction-patchmode): docs/patch-mode.md "
+    "correctly distinguishes residual (1) (now fail-closed-escalate-bound, "
+    "not max-3) from residuals (2)/(3) (still max-3-bound, unchanged)",
+    "Residuals (2) and (3) remain bounded exactly as before" in _s170_patchmode
+    and "Residual (1)'s own ultimate bound is now the" in _s170_patchmode,
+    "AC-30 requires docs/patch-mode.md to state that residuals (2)/(3) "
+    "remain max-3-bound exactly as before while residual (1) is now bound "
+    "by the fail-closed-escalate rule instead of max-3 -- a blanket, "
+    "undifferentiated 'backstopped by max-3' claim covering all three "
+    "residuals would be the exact defect AC-30 fixes",
+)
+check(
+    "s170(u-ac30-residual-distinction-orchestrator): agents/orchestrator.md "
+    "correctly distinguishes residual (1) from residuals (2)/(3) with the "
+    "same framing",
+    "Residuals (2) and (3) remain bounded exactly as before" in _s170_orch
+    and "Residual (1)'s own ultimate bound is now the" in _s170_orch,
+    "AC-30 requires agents/orchestrator.md's wiring to mirror the same "
+    "residual-(1)-vs-(2)/(3) distinction",
+)
+
+# --- Self-referential guard (mirrors Suite 161/162/163/164/165/169's own
+# pattern). docs/testing.md registration is deliberately NOT self-checked
+# here -- it is a documentation edit outside this tester dispatch's
+# test-files-only scope. -----------------------------------------------
+_s170_own = read(Path(__file__))
+check(
+    "suite170(self-ref): test file contains 'Suite 170' and "
+    "'cost-ordered-verify-reruns-task2-structural-verification'",
+    "Suite 170" in _s170_own
+    and "cost-ordered-verify-reruns-task2-structural-verification" in _s170_own,
+    "test file must self-reference Suite 170 and the marker "
+    "'cost-ordered-verify-reruns-task2-structural-verification'",
+)
+check(
+    "suite170(hygiene): CLAUDE.md does NOT contain 'Suite 170' (§11 "
+    "hygiene contract)",
+    "Suite 170" not in _s170_claude,
+    "CLAUDE.md must not mention Suite 170 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: cost-ordered-verify-reruns-task2-structural-verification
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

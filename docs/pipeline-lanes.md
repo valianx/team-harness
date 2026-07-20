@@ -215,6 +215,10 @@ lens is ever skipped by the lane, a trim, a flag, or an env var; whether `advers
 fires on a given sensitive path still depends solely on its own narrower predicate, never on
 `security` firing alongside it.
 
+**Cross-ref — cost-ordered re-run sequencing.** `docs/patch-mode.md § Cost-Ordered
+Patch-Iteration Re-Run Sequencing` reorders WHEN the two lenses above re-run across a patch
+iteration's R0/R1/R2 stages, but never omits either lens the floor predicates above require.
+
 ## 8. Active-lane visibility
 
 The chosen lane must be impossible to miss for the whole run, not only at the initial choice
