@@ -38178,6 +38178,8 @@ for _s169_anchor in [
     "detected AFTER drafting and BEFORE commit",
     "evaluated BEFORE any soft signal and takes precedence",
     "defaults OFF and requires the operator's explicit re-declaration",
+    "prompt-level self-discipline, not a cryptographic or platform-level guarantee",
+    "the operator starting pipeline-routed work",
 ]:
     check(
         f"s169(ac2-anchor): shared literal present in BOTH canonical § 2b "
