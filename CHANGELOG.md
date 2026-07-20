@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.134.0] - 2026-07-20
+
+### Added
+- Cost-ordered Phase-3 verify re-run sequencing: a patch-mode re-run now re-runs the cheap, deterministic R0 tests first, attributes each remaining failure to its owning review lens by brief header, and dispatches a single re-verification round scoped to the owning lens's delta rather than a full re-run of every reviewer. Canonical contract: `docs/patch-mode.md`, wired into `agents/orchestrator.md`; cross-referenced from `docs/pipeline-lanes.md § 7`.
+- Whack-a-mole structural-escalation detector: when a Phase-3 patch/verify cycle keeps oscillating on the same security control across rounds (tracked via two new `00-state.md` fields, `adversary_consecutive_broke_it` and `structural_escalations`, plus `whack_a_mole_episode_start_round` for episode-boundary bookkeeping), the orchestrator escalates to an architect re-design instead of granting another implementer patch budget. The escalation is capped at one per task by default, with a second trigger surfaced to the operator. Canonical contract: `docs/patch-mode.md`, wired into `agents/orchestrator.md`.
+- `docs/dev-mode.md § "Threat model — honest-developer disposition"` — CLAUDE.md §6.6's threat-model statement (disposition-boundary vs. adversarial-boundary distinction) relocated to its full form here, with a short pointer left in CLAUDE.md, as part of the CLAUDE.md §7b size-hygiene remediation below.
+
+### Changed
+- CLAUDE.md trimmed several §5/§6/§8 bullets to their essential statement, moving extended detail to their already-referenced `docs/` files (`docs/dev-mode.md`, `docs/cost-and-caching.md`, `docs/reasoning-checkpoint.md`), bringing the file back under the 35 KB soft cap (§7b) after it drifted to within a few hundred bytes of the 36 KB test-suite hard guard.
+
 ## [2.133.0] - 2026-07-20
 
 ### Added
