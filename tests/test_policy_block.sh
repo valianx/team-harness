@@ -137,6 +137,27 @@ assert_deny "glued --force-with-lease=<value> via per-subcommand-dispatcher form
   '{"tool_name":"Bash","tool_input":{"command":"git-push --force-with-lease=origin/main:deadbeef origin main"}}'
 
 echo
+echo "=== Clustered short-option force push (-fv/-vf) (DENY) ==="
+# git accepts bundled single-letter short options, so 'f' can appear bundled
+# with other letters instead of as a bare '-f' token; argsCarryForcePush must
+# recognize any single-dash, letters-only cluster containing 'f', not just
+# the exact '-f' token, on every resolved shape.
+assert_deny "bare clustered -fv" \
+  '{"tool_name":"Bash","tool_input":{"command":"git push -fv origin main"}}'
+assert_deny "bare clustered -vf" \
+  '{"tool_name":"Bash","tool_input":{"command":"git push -vf origin main"}}'
+assert_deny "wrapper-embedded clustered -fv (bash -c)" \
+  '{"tool_name":"Bash","tool_input":{"command":"bash -c \"git push -fv origin main\""}}'
+assert_deny "clustered -vf via per-subcommand-dispatcher form" \
+  '{"tool_name":"Bash","tool_input":{"command":"git-push -vf origin main"}}'
+# No-regression companion — a benign short-option cluster with NO 'f' must
+# stay ALLOW; clustering itself is not the deny signal, the letter 'f' is.
+assert_allow "bare clustered -vu (no f)" \
+  '{"tool_name":"Bash","tool_input":{"command":"git push -vu origin main"}}'
+assert_allow "per-subcommand-dispatcher form, clustered non-force flags" \
+  '{"tool_name":"Bash","tool_input":{"command":"git-push -vu origin main"}}'
+
+echo
 echo "=== Centralized resolution: case-variant/.exe binary + command-runner prefix force push (DENY) ==="
 # Case-insensitive and `.exe`-stripped basename resolution is centralized
 # ONCE in classifyCoveredAction (command-lexer.ts) — policy-block previously

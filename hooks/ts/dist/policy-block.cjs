@@ -867,9 +867,10 @@ var DENIED_BASH = [
 ];
 var FORCE_PUSH_FLAG_VALUES = /* @__PURE__ */ new Set(["-f", "--force", "--force-with-lease"]);
 var FORCE_PUSH_FLAG_PREFIXES_WITH_VALUE = ["--force-with-lease="];
+var SHORT_FLAG_CLUSTER_WITH_FORCE_RE = /^-[a-zA-Z]*f[a-zA-Z]*$/;
 function argsCarryForcePush(args) {
   return args.some(
-    (tok) => FORCE_PUSH_FLAG_VALUES.has(tok.value) || FORCE_PUSH_FLAG_PREFIXES_WITH_VALUE.some((prefix) => tok.value.startsWith(prefix)) || !tok.value.startsWith("-") && tok.value.startsWith("+")
+    (tok) => FORCE_PUSH_FLAG_VALUES.has(tok.value) || FORCE_PUSH_FLAG_PREFIXES_WITH_VALUE.some((prefix) => tok.value.startsWith(prefix)) || SHORT_FLAG_CLUSTER_WITH_FORCE_RE.test(tok.value) || !tok.value.startsWith("-") && tok.value.startsWith("+")
   );
 }
 function findWrapperAwareForcePush(cmd) {

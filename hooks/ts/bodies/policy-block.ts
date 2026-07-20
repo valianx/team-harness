@@ -329,11 +329,19 @@ const FORCE_PUSH_FLAG_VALUES = new Set(["-f", "--force", "--force-with-lease"]);
 // that doesn't support it would just be dead code, never a real evasion.
 const FORCE_PUSH_FLAG_PREFIXES_WITH_VALUE = ["--force-with-lease="];
 
+// git accepts bundled single-letter short options (`-fv` === `-f -v`), so a
+// token with a single leading dash carries the force flag whenever `f`
+// appears anywhere among its letters, not just as the sole option. The
+// leading `--` of a long flag fails the "letters only after the dash" shape
+// below, so `--force`/`--force-with-lease` are unaffected by this check.
+const SHORT_FLAG_CLUSTER_WITH_FORCE_RE = /^-[a-zA-Z]*f[a-zA-Z]*$/;
+
 function argsCarryForcePush(args: ArgvToken[]): boolean {
   return args.some(
     (tok) =>
       FORCE_PUSH_FLAG_VALUES.has(tok.value) ||
       FORCE_PUSH_FLAG_PREFIXES_WITH_VALUE.some((prefix) => tok.value.startsWith(prefix)) ||
+      SHORT_FLAG_CLUSTER_WITH_FORCE_RE.test(tok.value) ||
       (!tok.value.startsWith("-") && tok.value.startsWith("+"))
   );
 }
