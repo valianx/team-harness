@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.133.0] - 2026-07-20
+
+### Added
+- `hooks/ts/bodies/command-lexer.ts` gains a real, resolved-argv command parser (`analyzeCommand`/`classifyCoveredAction`) replacing the retired raw-string boundary-class routers: it tokenizes the command with a bounded, quote-aware scanner, splits on unquoted command separators, and recursively unwraps command-executing wrappers (`bash`/`sh`/`zsh`/`dash`/`ksh`/`su -c`, `eval`, a literal `echo`/`printf`-to-shell pipe, `xargs … <shell> -c`) up to a bounded depth, classifying the result on argv[0]'s basename (case-insensitive, `.exe`-stripped) so a per-subcommand binary or dispatcher form resolves identically to its direct spelling. `dev-guard`, `gate-guard`, and `policy-block` all rewire onto this shared analyzer, single-sourcing detection that was previously duplicated per hook.
+- `docs/dev-mode.md § Threat Model` — a new, permanent, documented threat model: TH's guard hooks (`dev-guard`, `gate-guard`, `policy-block`) exist to sustain a cooperating developer's own honest disposition along the normal, legible path, not to withstand an actor who has already decided to defeat the tool. The section enumerates residual, obfuscation-motivated evasion classes explicitly as documented residuals (an interpreter-embedded covered action such as `awk 'BEGIN{system("git push")}'`; an unrecognized-shell-name or multi-layer dispatcher nesting; a runner prefix composed with a shell `-c` wrapper) rather than claiming complete adversarial closure, and defers a genuine defense against an actively hostile local actor to the permission/sandbox architecture tracked separately as issue #505.
+
+### Changed
+- A benign, non-force `git push` to a non-default branch on `origin` — including a colon refspec or a quoted-but-literal destination (`git push origin HEAD:feat/x`, `git push origin "feat/x"`) — no longer prompts; `matchBenignPushGrammar` now validates the resolved argv instead of the raw command string, so widening what the grammar recognizes as benign does not widen the character class it accepts.
+- Detection now recognizes several previously-unhandled but legible forms consistently across all three hooks: wrapper-embedded quoted commands, `xargs` replacement-string forms (fail-closed rather than misread as a literal payload), a closed set of command-runner prefixes (`env`, `timeout`, `nice`, `nohup`, `command`, `stdbuf`, `setsid`, `time`, `sudo`, `doas`) resolved past to the real command underneath, cross-hook case- and `.exe`-insensitive binary resolution (one centralized resolution, not a per-hook fallback), a capability-audited `SAFE_NON_EXECUTING_BASENAMES` exemption list for read-only/data-only tools, and the direct multi-call-dispatcher form (`busybox sh -c ...`).
+
+### Fixed
+- Closed a class of adversarially-discovered gaps in the retired raw-string routers: wrapper-embedded quoted commands bypassing detection entirely, case-sensitive subcommand resolution on an exact-case binary token, and a missing case-insensitive fallback in `policy-block`'s force-push backstop.
+
+### Security
+- This change does not claim complete adversarial closure of command-detection bypasses — see `docs/dev-mode.md § Threat Model` for the exact, honestly-scoped boundary. Obfuscation-motivated evasions (an interpreter-embedded covered action, an unrecognized-shell-name dispatcher, a runner-prefix-composed-with-shell-`-c` wrapper) are documented, out-of-scope residuals, deferred to the permission/sandbox architecture tracked as issue #505 — not chased through further iterative patching of this analyzer. Server-side branch protection, `gh pr merge` always-`ask`, and force-push deny-in-lane/ask-outside-lane remain the authoritative floor regardless of any client-side gap.
+
 ## [2.132.1] - 2026-07-19
 
 ### Fixed
