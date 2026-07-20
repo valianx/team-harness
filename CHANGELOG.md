@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.132.1] - 2026-07-19
+
+### Fixed
+- `adversary` no longer reconstructs one growing report per round: each round now writes its own immutable `reviews/04-adversary-r{N}.md`, closing the 64k-truncation and silent-overwrite defect recorded against PR #494 (issue #498). A deterministic, dispatch-free integrity scan runs after every round, rejecting a shrunk or missing prior round and a stale `N+k` file left by an earlier run/recover.
+- Case-D and staleness re-dispatches to `adversary` now scope re-verification to the named delta (`Re-verification scope: localized {files, finding-IDs} | full`) instead of the full diff, with stable-prefix context ordering for cache reuse.
+
+### Changed
+- `adversary`'s Phase-3 trigger narrows from `security_floor_applies` to `adversary_floor_applies = security_floor_applies AND changes_security_control`, a strict subset computed once in the orchestrator: `adversary` now fires only on security-sensitive changes that also modify a security control (guard/gate/auth-check/floor/waiver/kill-switch), while `security`'s own floor is unchanged and still fires on every security-sensitive path. The new `changes_security_control` boolean is declared by the architect, fail-closed to `true` on absence or doubt.
+- The `adversary` dispatch declares a per-dispatch output-budget format guidance (`~800 + 600×(changed-control count) tokens`) that never caps the number of reported breaks.
+
 ## [2.132.0] - 2026-07-19
 
 ### Added
