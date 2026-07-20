@@ -382,28 +382,23 @@ assert_deny "Task-8 AC-5 (baseline, must stay PASS): real unquoted -f force flag
     "$TMP" "$(push_payload "${_t8_git} ${_t8_push} -f origin feat/deterministic-gate-release-enforcement")"
 rm -rf "$TMP"
 
-# --- (c) PRE-EXISTING, SEPARATE BYPASS — bound-scope correction, same
-# divergence discovered in tests/test_dev_guard.sh Suite 83f (c2): a
-# command-executing wrapper whose inner command is realistically QUOTED (the
-# only way bash -c/eval actually take a multi-word argument) puts the
-# covered-action verb immediately after the wrapper's opening quote
-# character, which no router boundary class admits — GIT_PUSH_RE/
-# GH_PR_CREATE_RE never match at all, and evaluate() falls through to
-# none(), not deny, WITH OR WITHOUT this fix. This was flagged during test
-# authoring as a CRITICAL FINDING and resolved by the operator ("bound +
-# follow-up", 01-plan.md § Task-8 AC-5 corrected wording): closing this
-# bypass requires real shell-evaluation-context parsing, materially harder
-# than quote-blanking and explicitly OUT OF SCOPE for this fix — filed as a
-# tracked follow-up (see the implementation record for the full
-# characterization). These cases assert the REQUIRED post-fix behavior:
-# unchanged from today (`none`) — the pre-pass must not worsen this
-# pre-existing gap, and must not mask it either.
+# --- (c) FORMERLY a preserved-but-open bypass under the boundary-class
+# router: a command-executing wrapper whose inner command is realistically
+# QUOTED (the only way bash -c/eval actually take a multi-word argument)
+# puts the covered-action verb immediately after the wrapper's opening quote
+# character, which no router boundary class admitted — GIT_PUSH_RE/
+# GH_PR_CREATE_RE never matched at all, and evaluate() fell through to
+# none(), not deny. The command-analyzer rewrite (AC-3.1) closes this: the
+# wrapper's statically-resolvable payload is recursively re-tokenized into
+# its own effective command, which classifyCoveredAction then classifies
+# identically to a bare invocation — so a resolvable wrapper-embedded push
+# now reaches the same order-gate deny a bare one does.
 TMP=$(mktemp -d)
 make_branch_in_place_repo "$TMP" "feat/deterministic-gate-release-enforcement"
 make_lane_state "$TMP" "$(lane_fields null feat/deterministic-gate-release-enforcement null)"
-assert_nodecision "Task-8 AC-5 (pre-existing bypass, preserved not closed): bash -c QUOTED git push, in-lane -> none, unchanged from today" \
+assert_deny "AC-3.1: bash -c QUOTED git push, in-lane non-ship -> deny (order gate; closed bypass, was none)" \
     "$TMP" "$(push_payload "bash -c ${_t8_dq}${_t8_lit_git_push} origin main${_t8_dq}")"
-assert_nodecision "Task-8 AC-5 (pre-existing bypass, preserved not closed): eval QUOTED git push, in-lane -> none, unchanged from today" \
+assert_deny "AC-3.1: eval QUOTED git push, in-lane non-ship -> deny (order gate; closed bypass, was none)" \
     "$TMP" "$(push_payload "eval ${_t8_dq}${_t8_lit_git_push} origin main${_t8_dq}")"
 rm -rf "$TMP"
 
@@ -465,15 +460,16 @@ assert_deny "round 2/3: MID-TOKEN quote-splice on refspec +\"feature:main\", in-
     "$TMP" "$(push_payload "${_t8_git} ${_t8_push} origin +${_t8_dq}feature:main${_t8_dq}")"
 rm -rf "$TMP"
 
-# NEW — accepted trade-off, intentional post-fix behavior: any quoting in a
-# confirmed push denies, EVEN a legitimate quoted-but-non-force push (a
-# quoted branch name, no force signal at all). This is the deliberate cost
-# of closing the whole vulnerability class rather than one construction at
-# a time — see gate-guard.ts's evaluate() comment.
+# SUPERSEDED (INVARIANT B, AC-3.4) — the retired raw-string char-gate denied
+# ANY quoting in a confirmed push, even a legitimate quoted-but-non-force
+# destination. The argv-based grammar resolves a quoted-but-literal token
+# to its clean value (untainted) exactly like an unquoted one, so a quoted
+# destination with no force signal now matches the benign shape and is no
+# longer over-denied — the order gate is the only thing left to decide.
 TMP=$(mktemp -d)
 make_branch_in_place_repo "$TMP" "main"
 make_lane_state "$TMP" "$(lane_fields ship main null)"
-assert_deny "round 2/3 (accepted trade-off, intentional): quoted branch name, NO force signal, in-lane, ship -> deny (conservative any-quote rule)" \
+assert_nodecision "AC-3.4 (INVARIANT B, no over-deny): quoted-but-literal branch name, NO force signal, in-lane, ship -> none (argv resolves the quoted literal)" \
     "$TMP" "$(push_payload "${_t8_git} ${_t8_push} origin ${_t8_dq}main${_t8_dq}")"
 rm -rf "$TMP"
 
@@ -733,7 +729,18 @@ assert_nodecision "Task-9 AC-10(c): plain kebab-branch push, in-lane ship -> non
     "$TMP" "$(push_payload "${_t9_git} ${_t9_push} origin feat/deterministic-gate-release-enforcement")"
 assert_nodecision "Task-9 AC-10(c): -u kebab-branch push, in-lane ship -> none (unaffected)" \
     "$TMP" "$(push_payload "${_t9_git} ${_t9_push} -u origin feat/deterministic-gate-release-enforcement")"
-assert_nodecision "Task-9 AC-10(c): semver tag push, in-lane ship -> none (unaffected)" \
+rm -rf "$TMP"
+
+# SUPERSEDED — the shared argv-based grammar (command-lexer.ts,
+# matchBenignPushGrammar) now rejects a tag-like destination as part of its
+# closed positive shape (the same rejection dev-guard.ts's own recognizer
+# already applied), so a semver-tag push is a grammar mismatch and denies
+# unconditionally on gate3_release, same as a force push — not an
+# order-gate-only case anymore.
+TMP=$(mktemp -d)
+make_branch_in_place_repo "$TMP" "feat/deterministic-gate-release-enforcement"
+make_lane_state "$TMP" "$(lane_fields ship feat/deterministic-gate-release-enforcement null)"
+assert_deny "AC-1.4 (grammar, no longer unaffected): semver tag push, in-lane ship -> deny (tag-like destination fails the shared grammar, unconditional)" \
     "$TMP" "$(push_payload "${_t9_git} ${_t9_push} origin v2.130.1")"
 rm -rf "$TMP"
 
@@ -783,6 +790,157 @@ assert_nodecision "G2 (no regression): ordinary branch 'feature/my-branch' (non-
 rm -rf "$TMP"
 
 # Marker: deterministic-gate-release-enforcement
+
+# ---------------------------------------------------------------------------
+# AC-3.1 — per-subcommand-binary invocation of a covered push, in-lane
+# non-ship -> deny (order gate; INVARIANT A, basename equivalence closes the
+# dispatcher-vs-per-subcommand-binary bypass by construction).
+# ---------------------------------------------------------------------------
+echo
+echo "=== AC-3.1: per-subcommand-binary push, in-lane -> deny (order gate) ==="
+TMP=$(mktemp -d)
+make_branch_in_place_repo "$TMP" "feat/deterministic-gate-release-enforcement"
+make_lane_state "$TMP" "$(lane_fields null feat/deterministic-gate-release-enforcement null)"
+assert_deny "AC-3.1: per-subcommand-binary push (git-push), in-lane non-ship -> deny (was none)" \
+    "$TMP" "$(push_payload 'git-push origin feat/deterministic-gate-release-enforcement')"
+assert_deny "AC-3.1: dynamic-prefix per-subcommand-binary push (\$(git --exec-path)/git-push), in-lane non-ship -> deny (was none)" \
+    "$TMP" "$(push_payload '$(git --exec-path)/git-push origin feat/deterministic-gate-release-enforcement')"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# AC-3.2 — force push, wrapper-embedded, in-lane ship -> deny unconditional
+# on gate3_release (hard point extended to the wrapped form).
+# ---------------------------------------------------------------------------
+echo
+echo "=== AC-3.2: wrapper-embedded force push, in-lane ship -> deny (unconditional) ==="
+TMP=$(mktemp -d)
+make_branch_in_place_repo "$TMP" "feat/deterministic-gate-release-enforcement"
+make_lane_state "$TMP" "$(lane_fields ship feat/deterministic-gate-release-enforcement null)"
+assert_deny "AC-3.2: bash -c QUOTED force push, in-lane ship -> deny (unconditional; was none)" \
+    "$TMP" "$(push_payload 'bash -c "git push --force origin main"')"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# AC-3.4 — colon-refspec destination, in-lane ship -> none (INVARIANT B, the
+# argv-based grammar no longer over-denies a legitimate colon refspec).
+# ---------------------------------------------------------------------------
+echo
+echo "=== AC-3.4: colon-refspec push, in-lane ship -> none (INVARIANT B) ==="
+TMP=$(mktemp -d)
+make_branch_in_place_repo "$TMP" "feat/deterministic-gate-release-enforcement"
+make_lane_state "$TMP" "$(lane_fields ship feat/deterministic-gate-release-enforcement null)"
+assert_nodecision "AC-3.4: colon-refspec 'origin HEAD:feat/x', in-lane ship -> none (was deny)" \
+    "$TMP" "$(push_payload 'git push origin HEAD:feat/x')"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# AC-3.7 (SEC-DR-13) — env-assignment prefix / -c config override on a force
+# push still deny, in-lane, unconditional on gate3_release. The shared
+# analyzer resolves argv[0]/subcommand past the prefix/option once for all
+# three hooks, so the statically-visible --force token still reaches this
+# hook's deny without a per-hook re-implementation.
+# ---------------------------------------------------------------------------
+echo
+echo "=== AC-3.7: env-prefix / -c config override on a force push -> deny (unconditional) ==="
+TMP=$(mktemp -d)
+make_branch_in_place_repo "$TMP" "feat/deterministic-gate-release-enforcement"
+make_lane_state "$TMP" "$(lane_fields ship feat/deterministic-gate-release-enforcement null)"
+assert_deny "AC-3.7: GIT_DIR=/x git push --force origin main, in-lane ship -> deny (unconditional)" \
+    "$TMP" "$(push_payload 'GIT_DIR=/x git push --force origin main')"
+assert_deny "AC-3.7: git -c k=v push --force origin main, in-lane ship -> deny (unconditional)" \
+    "$TMP" "$(push_payload 'git -c k=v push --force origin main')"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Case-insensitive binary resolution — a mixed-case `git` invocation (Git,
+# GIT) must still classify as a covered push, so the force-push deny floor
+# is unconditional regardless of case (symmetric to dev-guard.ts's own
+# case-insensitive resolution).
+# ---------------------------------------------------------------------------
+echo
+echo "=== Case-insensitive git binary: force push still denies unconditionally ==="
+TMP=$(mktemp -d)
+make_branch_in_place_repo "$TMP" "feat/deterministic-gate-release-enforcement"
+make_lane_state "$TMP" "$(lane_fields ship feat/deterministic-gate-release-enforcement null)"
+assert_deny "case-insensitive: Git push --force origin main, in-lane ship -> deny (unconditional)" \
+    "$TMP" "$(push_payload 'Git push --force origin main')"
+assert_deny "case-insensitive: GIT push --force origin main, in-lane ship -> deny (unconditional)" \
+    "$TMP" "$(push_payload 'GIT push --force origin main')"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Case-insensitive per-subcommand-binary form, `.exe` suffix, and a
+# command-runner prefix — all resolved by the shared, centralized
+# classifyCoveredAction (command-lexer.ts), not a per-hook fallback.
+# ---------------------------------------------------------------------------
+echo
+echo "=== Centralized resolution: per-subcommand-binary case-variant, .exe, command-runner prefix ==="
+TMP=$(mktemp -d)
+make_branch_in_place_repo "$TMP" "feat/deterministic-gate-release-enforcement"
+make_lane_state "$TMP" "$(lane_fields ship feat/deterministic-gate-release-enforcement null)"
+assert_deny "Git-push --force origin main (case-variant per-subcommand-binary), in-lane ship -> deny (unconditional)" \
+    "$TMP" "$(push_payload 'Git-push --force origin main')"
+assert_deny "git.exe push --force origin main (.exe-suffixed binary), in-lane ship -> deny (unconditional)" \
+    "$TMP" "$(push_payload 'git.exe push --force origin main')"
+assert_deny "timeout 5 git push --force origin main (command-runner prefix), in-lane ship -> deny (unconditional)" \
+    "$TMP" "$(push_payload 'timeout 5 git push --force origin main')"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# The combined worst case: an UNENUMERATED runner prefix (not in
+# RUNNER_MODELS) combined with the per-subcommand-binary dispatcher form, on
+# a force push — the shape that achieves a full none()/none()/none()
+# triple-bypass of this unconditional deny when the runner-prefix layer only
+# resolves past a closed, named list. The structural forward-scan (not a
+# growing enumeration) closes it.
+# ---------------------------------------------------------------------------
+echo
+echo "=== Combined worst finding: unenumerated runner + dispatcher form + force -> deny ==="
+TMP=$(mktemp -d)
+make_branch_in_place_repo "$TMP" "feat/deterministic-gate-release-enforcement"
+make_lane_state "$TMP" "$(lane_fields ship feat/deterministic-gate-release-enforcement null)"
+assert_deny "flock /tmp/x \$(git --exec-path)/git-push --force origin main, in-lane ship -> deny (unconditional)" \
+    "$TMP" "$(push_payload 'flock /tmp/x $(git --exec-path)/git-push --force origin main')"
+assert_deny "unshare -n \$(git --exec-path)/git-push --force origin main, in-lane ship -> deny (unconditional)" \
+    "$TMP" "$(push_payload 'unshare -n $(git --exec-path)/git-push --force origin main')"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# env -S/--split-string — the embedded command is extracted as a wrapper
+# payload (same shape as a shell's -c), so the resolved force push still
+# reaches this hook's unconditional deny.
+# ---------------------------------------------------------------------------
+echo
+echo "=== env -S/--split-string embedded force push -> deny (unconditional) ==="
+TMP=$(mktemp -d)
+make_branch_in_place_repo "$TMP" "feat/deterministic-gate-release-enforcement"
+make_lane_state "$TMP" "$(lane_fields ship feat/deterministic-gate-release-enforcement null)"
+assert_deny 'env -S "git push --force origin main", in-lane ship -> deny (unconditional)' \
+    "$TMP" "$(push_payload 'env -S "git push --force origin main"')"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Redesign addendum (AC-R3/AC-R4/AC-R6) — shell-name-plus-`-c` dispatcher
+# recognizer: any dispatcher basename piping through a recognized shell name
+# still reaches this hook's unconditional force-push deny, including with an
+# intervening shell flag before `-c` (SEC-DR-A2) and for a dispatcher basename
+# not named "busybox"/"toybox" (no enumeration), and for the newly-extended
+# shell basenames.
+# ---------------------------------------------------------------------------
+echo
+echo "=== Redesign addendum: dispatcher recognizer force push -> deny (unconditional) ==="
+TMP=$(mktemp -d)
+make_branch_in_place_repo "$TMP" "feat/deterministic-gate-release-enforcement"
+make_lane_state "$TMP" "$(lane_fields ship feat/deterministic-gate-release-enforcement null)"
+assert_deny 'busybox sh -c "git push --force origin main" (AC-R3), in-lane ship -> deny (unconditional)' \
+    "$TMP" "$(push_payload 'busybox sh -c "git push --force origin main"')"
+assert_deny 'busybox sh -x -c "git push --force origin main" (intervening flag, SEC-DR-A2), in-lane ship -> deny' \
+    "$TMP" "$(push_payload 'busybox sh -x -c "git push --force origin main"')"
+assert_deny 'sbase sh -c "git push --force origin main" (dispatcher not named busybox/toybox, AC-R4), in-lane ship -> deny' \
+    "$TMP" "$(push_payload 'sbase sh -c "git push --force origin main"')"
+assert_deny 'ash -c "git push --force origin main" (extended shell set, AC-R6), in-lane ship -> deny' \
+    "$TMP" "$(push_payload 'ash -c "git push --force origin main"')"
+rm -rf "$TMP"
 
 # ---------------------------------------------------------------------------
 # Summary

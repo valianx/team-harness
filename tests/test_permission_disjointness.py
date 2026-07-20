@@ -199,9 +199,12 @@ OUTWARD_SAMPLES: dict[str, list[str]] = {
         "gh --repo owner/repo pr create --title x",
     ],
     "BENIGN_PUSH_FLAG_RE": ["-u", "--set-upstream"],
-    # Task-6 (AC-6.1) additions below.
     "GIT_C_DIR_PUSH_EXACT_RE": ["git -C /tmp/other push origin feat/x"],
     "GH_REPO_FLAG_VALUE_RE": ["gh --repo owner/repo pr create --title x"],
+    # A dynamic subcommand token (e.g. `git $SUBCMD origin main`) could
+    # resolve to "push" at runtime and must fail closed to ask rather than
+    # silently miss the coverage.
+    "DYNAMIC_TOKEN_PREFIX_RE": ["$SUBCMD"],
 }
 
 missing_samples = sorted(set(extracted_patterns) - set(OUTWARD_SAMPLES))

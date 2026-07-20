@@ -183,86 +183,598 @@ function outboundCC(d) {
 }
 
 // bodies/command-lexer.ts
-var FILLER_CHAR = "x";
-var SHELL_DASH_C_RE = /\b(?:bash|sh|zsh|dash|ksh|su)\s+-[a-zA-Z]*c[a-zA-Z]*(?:\s|$)/i;
-var EVAL_RE = /(^|[\s;&|<>()`])eval(\s|$)/i;
-var XARGS_RE = /(^|[\s;&|<>()`])xargs(\s|$)/i;
-var COMMAND_SUBSTITUTION_RE = /\$\(|`/;
-var PROCESS_SUBSTITUTION_RE = /[<>]\(/;
-var PIPE_TO_SHELL_RE = /\|\s*(?:\S*\/)?(?:bash|sh|zsh|dash|ksh)(?:\s|$)/i;
-var SSH_RE = /(^|[\s;&|<>()`])ssh(\s|$)/i;
-function hasCommandExecutingWrapper(cmd) {
-  return SHELL_DASH_C_RE.test(cmd) || EVAL_RE.test(cmd) || XARGS_RE.test(cmd) || COMMAND_SUBSTITUTION_RE.test(cmd) || PROCESS_SUBSTITUTION_RE.test(cmd) || PIPE_TO_SHELL_RE.test(cmd) || SSH_RE.test(cmd);
+var UNQUOTED_TAINT_CHARS = /* @__PURE__ */ new Set(["{", "}", "*", "?", "[", "~"]);
+function appendChar(state, ch, taints) {
+  state.value += ch;
+  state.hasToken = true;
+  if (taints) state.tainted = true;
 }
-function stepInsideSingleQuote(cmd, i, state, spans) {
-  if (cmd[i] === "'") {
-    spans.push({ start: state.spanStart, end: i });
-    state.inSingle = false;
+function pushToken(state) {
+  if (!state.hasToken) return;
+  state.argv.push({ value: state.value, tainted: state.tainted });
+  state.value = "";
+  state.tainted = false;
+  state.hasToken = false;
+}
+function pushSegment(state, nextOperator) {
+  pushToken(state);
+  if (state.argv.length > 0) {
+    state.segments.push({ argv: state.argv, precedingOperator: state.pendingOp });
   }
-  return i + 1;
+  state.argv = [];
+  state.pendingOp = nextOperator;
 }
-function stepInsideDoubleQuote(cmd, i, state, spans) {
+function stepSingleQuote(cmd, i, state) {
   const ch = cmd[i];
-  if (ch === "\\" && i + 1 < cmd.length) return i + 2;
-  if (ch === '"') {
-    spans.push({ start: state.spanStart, end: i });
-    state.inDouble = false;
-    return i + 1;
-  }
-  return i + 1;
-}
-function stepOutsideQuote(cmd, i, state) {
-  const ch = cmd[i];
-  if (ch === "\\" && i + 1 < cmd.length) return i + 2;
   if (ch === "'") {
-    state.inSingle = true;
-    state.spanStart = i + 1;
+    state.inSQ = false;
+    return i + 1;
+  }
+  appendChar(state, ch, false);
+  return i + 1;
+}
+function consumeParenSubstitution(cmd, startI, state) {
+  appendChar(state, "$", true);
+  appendChar(state, "(", true);
+  let i = startI + 2;
+  let depth = 1;
+  let sq = false;
+  let dq = false;
+  while (i < cmd.length && depth > 0) {
+    const ch = cmd[i];
+    if (sq) {
+      appendChar(state, ch, false);
+      if (ch === "'") sq = false;
+      i++;
+      continue;
+    }
+    if (dq) {
+      if (ch === "\\" && i + 1 < cmd.length) {
+        appendChar(state, ch, false);
+        appendChar(state, cmd[i + 1], false);
+        i += 2;
+        continue;
+      }
+      appendChar(state, ch, false);
+      if (ch === '"') dq = false;
+      i++;
+      continue;
+    }
+    if (ch === "'") sq = true;
+    else if (ch === '"') dq = true;
+    else if (ch === "(") depth++;
+    else if (ch === ")") depth--;
+    appendChar(state, ch, false);
+    i++;
+  }
+  return i;
+}
+function consumeBacktickSubstitution(cmd, startI, state) {
+  appendChar(state, "`", true);
+  let i = startI + 1;
+  while (i < cmd.length && cmd[i] !== "`") {
+    if (cmd[i] === "\\" && i + 1 < cmd.length) {
+      appendChar(state, cmd[i], false);
+      appendChar(state, cmd[i + 1], false);
+      i += 2;
+      continue;
+    }
+    appendChar(state, cmd[i], false);
+    i++;
+  }
+  if (i < cmd.length) {
+    appendChar(state, "`", false);
+    i++;
+  }
+  return i;
+}
+function stepDoubleQuote(cmd, i, state) {
+  const ch = cmd[i];
+  if (ch === '"') {
+    state.inDQ = false;
+    return i + 1;
+  }
+  if (ch === "\\" && i + 1 < cmd.length) {
+    const nc = cmd[i + 1];
+    if (nc === '"' || nc === "\\" || nc === "$" || nc === "`") {
+      appendChar(state, nc, false);
+    } else {
+      appendChar(state, "\\", false);
+      appendChar(state, nc, false);
+    }
+    return i + 2;
+  }
+  if (ch === "$" && cmd[i + 1] === "(") return consumeParenSubstitution(cmd, i, state);
+  if (ch === "`") return consumeBacktickSubstitution(cmd, i, state);
+  if (ch === "$") {
+    appendChar(state, ch, true);
+    return i + 1;
+  }
+  appendChar(state, ch, false);
+  return i + 1;
+}
+var TWO_CHAR_OPERATORS = [
+  ["&&", "&&"],
+  ["||", "||"]
+];
+var ONE_CHAR_OPERATORS = {
+  ";": ";",
+  "\n": "\n",
+  "&": "&",
+  "|": "|"
+};
+var PAREN_BOUNDARY_CHARS = /* @__PURE__ */ new Set(["(", ")"]);
+function matchOperatorAt(cmd, i) {
+  for (const [token, op] of TWO_CHAR_OPERATORS) {
+    if (cmd.startsWith(token, i)) return { op, length: token.length };
+  }
+  const ch = cmd[i];
+  if (ch in ONE_CHAR_OPERATORS) return { op: ONE_CHAR_OPERATORS[ch], length: 1 };
+  if (PAREN_BOUNDARY_CHARS.has(ch)) return { op: "start", length: 1 };
+  return null;
+}
+function stepUnquoted(cmd, i, state) {
+  const ch = cmd[i];
+  if (ch === " " || ch === "	" || ch === "\r") {
+    pushToken(state);
+    return i + 1;
+  }
+  const operator = matchOperatorAt(cmd, i);
+  if (operator) {
+    pushSegment(state, operator.op);
+    return i + operator.length;
+  }
+  if (ch === "'") {
+    state.inSQ = true;
     return i + 1;
   }
   if (ch === '"') {
-    state.inDouble = true;
-    state.spanStart = i + 1;
+    state.inDQ = true;
     return i + 1;
   }
+  if (ch === "\\" && i + 1 < cmd.length) {
+    appendChar(state, cmd[i + 1], false);
+    return i + 2;
+  }
+  if (ch === "$" && cmd[i + 1] === "(") return consumeParenSubstitution(cmd, i, state);
+  if (ch === "`") return consumeBacktickSubstitution(cmd, i, state);
+  if (ch === "$") {
+    appendChar(state, ch, true);
+    return i + 1;
+  }
+  if (UNQUOTED_TAINT_CHARS.has(ch)) {
+    appendChar(state, ch, true);
+    return i + 1;
+  }
+  appendChar(state, ch, false);
   return i + 1;
 }
-function analyzeQuotes(cmd) {
-  const spans = [];
-  const state = { inSingle: false, inDouble: false, spanStart: -1 };
+function scanCommand(cmd) {
+  const state = {
+    segments: [],
+    argv: [],
+    value: "",
+    tainted: false,
+    hasToken: false,
+    pendingOp: "start",
+    inSQ: false,
+    inDQ: false
+  };
   let i = 0;
   while (i < cmd.length) {
-    if (state.inSingle) {
-      i = stepInsideSingleQuote(cmd, i, state, spans);
-    } else if (state.inDouble) {
-      i = stepInsideDoubleQuote(cmd, i, state, spans);
-    } else {
-      i = stepOutsideQuote(cmd, i, state);
+    if (state.inSQ) i = stepSingleQuote(cmd, i, state);
+    else if (state.inDQ) i = stepDoubleQuote(cmd, i, state);
+    else i = stepUnquoted(cmd, i, state);
+  }
+  if (state.inSQ || state.inDQ) state.tainted = true;
+  pushSegment(state, "start");
+  return state.segments;
+}
+var DEFAULT_MAX_DEPTH = 5;
+var SHELL_BASENAMES = /* @__PURE__ */ new Set([
+  "bash",
+  "sh",
+  "zsh",
+  "dash",
+  "ksh",
+  "su",
+  "ash",
+  "hush",
+  "mksh",
+  "tcsh",
+  "csh",
+  "fish"
+]);
+var SHELL_C_FLAG_RE = /^-[A-Za-z]*c[A-Za-z]*$/;
+var SAFE_NON_EXECUTING_BASENAMES = /* @__PURE__ */ new Set([
+  "grep",
+  "egrep",
+  "fgrep",
+  "echo",
+  "printf",
+  "cat",
+  "ls",
+  "ln",
+  "test",
+  "[",
+  "tee",
+  "head",
+  "tail",
+  "wc",
+  "uniq",
+  "cut",
+  "tr",
+  "nl",
+  "rev",
+  "tac",
+  "paste",
+  "join",
+  "column",
+  "fold",
+  "fmt",
+  "pr",
+  "diff",
+  "cmp",
+  "comm",
+  "md5sum",
+  "sha1sum",
+  "sha256sum",
+  "sha512sum",
+  "base64",
+  "xxd",
+  "od",
+  "hexdump",
+  "strings",
+  "file",
+  "pwd",
+  "true",
+  "false"
+]);
+var KNOWN_WRAPPER_BASENAMES = /* @__PURE__ */ new Set([...SHELL_BASENAMES, "eval", "xargs"]);
+function lastPathSegment(value) {
+  const idx = value.lastIndexOf("/");
+  return idx >= 0 ? value.slice(idx + 1) : value;
+}
+function extractShellCPayload(argv) {
+  for (let i = 1; i < argv.length; i++) {
+    if (SHELL_C_FLAG_RE.test(argv[i].value)) {
+      const payloadToken = argv[i + 1];
+      if (!payloadToken) return { literal: null };
+      return { literal: payloadToken.tainted ? null : payloadToken.value };
     }
   }
-  return { balanced: !state.inSingle && !state.inDouble, spans };
+  return null;
 }
-function blankSpans(cmd, spans) {
-  const chars = cmd.split("");
-  for (const { start, end } of spans) {
-    for (let idx = start; idx < end; idx++) {
-      chars[idx] = FILLER_CHAR;
+function extractEvalPayload(argv) {
+  const rest = argv.slice(1);
+  if (rest.length === 0 || rest.some((t) => t.tainted)) return { literal: null };
+  return { literal: rest.map((t) => t.value).join(" ") };
+}
+function extractXargsReplacementString(argv, shellIndex) {
+  for (let i = 1; i < shellIndex; i++) {
+    const tok = argv[i].value;
+    if (tok === "-I") return argv[i + 1]?.value ?? "{}";
+    if (tok === "-i" || tok === "--replace") return "{}";
+    if (tok.startsWith("--replace=")) return tok.slice("--replace=".length);
+    if (tok.startsWith("-I") && tok.length > 2) return tok.slice(2);
+    if (tok.startsWith("-i") && tok.length > 2) return tok.slice(2);
+  }
+  return null;
+}
+function extractXargsPayload(argv) {
+  for (let i = 1; i < argv.length; i++) {
+    if (!SHELL_BASENAMES.has(lastPathSegment(argv[i].value))) continue;
+    const shellPayload = extractShellCPayload(argv.slice(i)) ?? { literal: null };
+    const replacement = extractXargsReplacementString(argv, i);
+    if (replacement !== null && shellPayload.literal !== null && shellPayload.literal.includes(replacement)) {
+      return { literal: null };
+    }
+    return shellPayload;
+  }
+  return null;
+}
+function extractEnvSplitStringPayload(argv) {
+  for (let i = 1; i < argv.length; i++) {
+    const tok = argv[i];
+    if (tok.value === "-S" || tok.value === "--split-string") {
+      const payloadToken = argv[i + 1];
+      if (!payloadToken) return { literal: null };
+      return { literal: payloadToken.tainted ? null : payloadToken.value };
+    }
+    if (tok.value.startsWith("--split-string=")) {
+      return { literal: tok.tainted ? null : tok.value.slice("--split-string=".length) };
     }
   }
-  return chars.join("");
+  return null;
 }
-function prepareRoutableCommand(cmd) {
-  if (hasCommandExecutingWrapper(cmd)) {
-    return { routable: cmd, blanked: false };
-  }
-  const { balanced, spans } = analyzeQuotes(cmd);
-  if (!balanced || spans.length === 0) {
-    return { routable: cmd, blanked: false };
-  }
-  return { routable: blankSpans(cmd, spans), blanked: true };
+function detectDispatcherShellCPayload(argv) {
+  if (argv.length < 3) return null;
+  if (!SHELL_BASENAMES.has(canonicalBasename(argv[1].value))) return null;
+  return extractShellCPayload(argv.slice(1));
 }
-var SAFE_COMMAND_CHAR_RE = /^[A-Za-z0-9 _./-]*$/;
-function isLiteralSafeCommand(cmd) {
-  return SAFE_COMMAND_CHAR_RE.test(cmd);
+function detectSingleSegmentWrapperPayload(argv) {
+  if (argv.length === 0) return null;
+  const basename = canonicalBasename(argv[0].value);
+  if (SHELL_BASENAMES.has(basename)) return extractShellCPayload(argv);
+  if (basename === "eval") return extractEvalPayload(argv);
+  if (basename === "xargs") return extractXargsPayload(argv);
+  if (basename === "env") return extractEnvSplitStringPayload(argv);
+  if (!SAFE_NON_EXECUTING_BASENAMES.has(basename)) {
+    const dispatcherPayload = detectDispatcherShellCPayload(argv);
+    if (dispatcherPayload !== null) return dispatcherPayload;
+  }
+  return null;
+}
+function detectPipeToShellPayload(first, second) {
+  if (first.length === 0 || second.length === 0) return null;
+  if (SAFE_NON_EXECUTING_BASENAMES.has(canonicalBasename(second[0].value))) return null;
+  if (extractShellCPayload(second) !== null) return null;
+  const firstBasename = lastPathSegment(first[0].value);
+  if (firstBasename !== "echo" && firstBasename !== "printf") return { literal: null };
+  const literalArgs = first.slice(1).filter((t) => !t.value.startsWith("-"));
+  if (literalArgs.some((t) => t.tainted)) return { literal: null };
+  return { literal: literalArgs.map((t) => t.value).join(" ") };
+}
+function toEffectiveCommand(argv) {
+  return { argv, tainted: argv.some((t) => t.tainted) };
+}
+function mergeWrapperPayload(payload, depth, maxDepth) {
+  if (payload.literal === null) return { commands: [], unresolvable: true, depthExceeded: false };
+  if (depth >= maxDepth) return { commands: [], unresolvable: false, depthExceeded: true };
+  const inner = analyzeCommandAtDepth(payload.literal, depth + 1, maxDepth);
+  return {
+    commands: inner.commands,
+    unresolvable: inner.unresolvableShellPayload,
+    depthExceeded: inner.depthExceeded
+  };
+}
+function resolveSegments(rawSegments, depth, maxDepth) {
+  const commands = [];
+  let unresolvableShellPayload = false;
+  let depthExceeded = false;
+  const absorb = (result) => {
+    commands.push(...result.commands);
+    unresolvableShellPayload = unresolvableShellPayload || result.unresolvable;
+    depthExceeded = depthExceeded || result.depthExceeded;
+  };
+  let i = 0;
+  while (i < rawSegments.length) {
+    const seg = rawSegments[i];
+    commands.push(toEffectiveCommand(seg.argv));
+    const next = rawSegments[i + 1];
+    if (next && next.precedingOperator === "|") {
+      const pipePayload = detectPipeToShellPayload(seg.argv, next.argv);
+      if (pipePayload !== null) {
+        commands.push(toEffectiveCommand(next.argv));
+        absorb(mergeWrapperPayload(pipePayload, depth, maxDepth));
+        i += 2;
+        continue;
+      }
+    }
+    const payload = detectSingleSegmentWrapperPayload(seg.argv);
+    if (payload !== null) absorb(mergeWrapperPayload(payload, depth, maxDepth));
+    i++;
+  }
+  return { commands, unresolvableShellPayload, depthExceeded };
+}
+function analyzeCommandAtDepth(cmd, depth, maxDepth) {
+  return resolveSegments(scanCommand(cmd), depth, maxDepth);
+}
+function analyzeCommand(cmd, maxDepth = DEFAULT_MAX_DEPTH) {
+  return analyzeCommandAtDepth(cmd, 0, maxDepth);
+}
+var ENV_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/;
+function isEnvAssignmentToken(token) {
+  return ENV_ASSIGNMENT_RE.test(token.value);
+}
+var GIT_BOOLEAN_GLOBAL_OPTIONS = /* @__PURE__ */ new Set(["-p", "--paginate", "--no-pager"]);
+var GIT_TREE_REDIRECT_OPTIONS = /* @__PURE__ */ new Set(["--git-dir", "--work-tree", "--namespace", "--exec-path"]);
+function resolveCDirToken(argv, index, alreadySeen) {
+  const dirTok = argv[index + 1];
+  if (!alreadySeen && dirTok && !dirTok.tainted && !dirTok.value.startsWith("-")) {
+    return { cDir: dirTok.value, failClosed: false };
+  }
+  return { cDir: null, failClosed: true };
+}
+function stepGitGlobalOption(argv, i, cDirSeen) {
+  const tok = argv[i];
+  if (tok.tainted) return { advance: 1, failClosed: true, cDir: null };
+  if (GIT_BOOLEAN_GLOBAL_OPTIONS.has(tok.value)) return { advance: 1, failClosed: false, cDir: null };
+  if (tok.value === "-C") {
+    const resolved = resolveCDirToken(argv, i, cDirSeen);
+    return { advance: 2, failClosed: resolved.failClosed, cDir: resolved.cDir };
+  }
+  if (tok.value === "-c") return { advance: 2, failClosed: true, cDir: null };
+  const eqIdx = tok.value.indexOf("=");
+  const optName = eqIdx >= 0 ? tok.value.slice(0, eqIdx) : tok.value;
+  const advance = GIT_TREE_REDIRECT_OPTIONS.has(optName) && eqIdx < 0 ? 2 : 1;
+  return { advance, failClosed: true, cDir: null };
+}
+function scanGitGlobalOptions(argv, start) {
+  let i = start;
+  let requiresFailClosed = false;
+  let cDir = null;
+  let cDirSeen = false;
+  while (i < argv.length && argv[i].value.startsWith("-")) {
+    const step = stepGitGlobalOption(argv, i, cDirSeen);
+    if (step.cDir !== null) {
+      cDir = step.cDir;
+      cDirSeen = true;
+    }
+    requiresFailClosed = requiresFailClosed || step.failClosed;
+    i += step.advance;
+  }
+  return { subcommandIndex: i < argv.length ? i : -1, requiresFailClosed, cDir: requiresFailClosed ? null : cDir };
+}
+var GIT_DISPATCHER_PREFIX = "git-";
+function stripExeSuffix(basename) {
+  return /\.exe$/i.test(basename) ? basename.slice(0, -4) : basename;
+}
+function canonicalBasename(rawValue) {
+  return stripExeSuffix(lastPathSegment(rawValue)).toLowerCase();
+}
+function basenameNoExe(rawValue) {
+  return stripExeSuffix(lastPathSegment(rawValue));
+}
+function extractGitDispatcherSubcommand(canonical, rawNoExe) {
+  if (!canonical.startsWith(GIT_DISPATCHER_PREFIX)) return null;
+  const sub = rawNoExe.slice(GIT_DISPATCHER_PREFIX.length);
+  return sub.length > 0 ? sub : null;
+}
+function classifyGitDispatcher(argv, afterBinary, prefixFailClosed) {
+  const scan = scanGitGlobalOptions(argv, afterBinary);
+  const requiresFailClosed = prefixFailClosed || scan.requiresFailClosed;
+  if (scan.subcommandIndex < 0) {
+    return { binary: "git", gitSubcommand: null, args: [], requiresFailClosed, cDir: requiresFailClosed ? null : scan.cDir };
+  }
+  const subTok = argv[scan.subcommandIndex];
+  return {
+    binary: "git",
+    gitSubcommand: subTok.value,
+    args: argv.slice(scan.subcommandIndex + 1),
+    requiresFailClosed: requiresFailClosed || subTok.tainted,
+    cDir: requiresFailClosed ? null : scan.cDir
+  };
+}
+var RUNNER_MODELS = {
+  env: { valueFlags: /* @__PURE__ */ new Set(["-u", "--unset", "-C", "--chdir", "-S", "--split-string"]), extraPositionals: 0 },
+  timeout: { valueFlags: /* @__PURE__ */ new Set(["-k", "--kill-after", "-s", "--signal"]), extraPositionals: 1 },
+  nice: { valueFlags: /* @__PURE__ */ new Set(["-n", "--adjustment"]), extraPositionals: 0 },
+  nohup: { valueFlags: /* @__PURE__ */ new Set(), extraPositionals: 0 },
+  command: { valueFlags: /* @__PURE__ */ new Set(), extraPositionals: 0 },
+  stdbuf: { valueFlags: /* @__PURE__ */ new Set(["-i", "--input", "-o", "--output", "-e", "--error"]), extraPositionals: 0 },
+  setsid: { valueFlags: /* @__PURE__ */ new Set(), extraPositionals: 0 },
+  time: { valueFlags: /* @__PURE__ */ new Set(["-o", "--output"]), extraPositionals: 0 },
+  sudo: {
+    valueFlags: /* @__PURE__ */ new Set([
+      "-u",
+      "--user",
+      "-g",
+      "--group",
+      "-h",
+      "--host",
+      "-p",
+      "--prompt",
+      "-r",
+      "--role",
+      "-t",
+      "--type",
+      "-C",
+      "--close-from"
+    ]),
+    extraPositionals: 0
+  },
+  doas: { valueFlags: /* @__PURE__ */ new Set(["-C", "-u"]), extraPositionals: 0 }
+};
+function skipRunnerPrefix(argv, start, model) {
+  let idx = start;
+  while (idx < argv.length && argv[idx].value.startsWith("-") && argv[idx].value !== "--") {
+    const tok = argv[idx].value;
+    const eqIdx = tok.indexOf("=");
+    const name = eqIdx >= 0 ? tok.slice(0, eqIdx) : tok;
+    idx += model.valueFlags.has(name) && eqIdx < 0 ? 2 : 1;
+  }
+  if (idx < argv.length && argv[idx].value === "--") idx++;
+  idx += model.extraPositionals;
+  while (idx < argv.length && isEnvAssignmentToken(argv[idx])) idx++;
+  return idx;
+}
+function buildClassifiedResult(resolved) {
+  const { argv, afterBinary, canonical, rawNoExe, requiresFailClosed, noExeSuffixPresent } = resolved;
+  if (canonical === "git") {
+    const classified = classifyGitDispatcher(argv, afterBinary, requiresFailClosed);
+    return { ...classified, binaryCaseExact: noExeSuffixPresent && rawNoExe === "git" };
+  }
+  const dispatcherSub = extractGitDispatcherSubcommand(canonical, rawNoExe);
+  if (dispatcherSub !== null) {
+    return {
+      binary: "git",
+      gitSubcommand: dispatcherSub,
+      args: argv.slice(afterBinary),
+      requiresFailClosed,
+      cDir: null,
+      binaryCaseExact: noExeSuffixPresent && rawNoExe.startsWith(GIT_DISPATCHER_PREFIX)
+    };
+  }
+  return {
+    binary: canonical,
+    gitSubcommand: null,
+    args: argv.slice(afterBinary),
+    requiresFailClosed,
+    cDir: null,
+    binaryCaseExact: noExeSuffixPresent && rawNoExe === canonical
+  };
+}
+function scanForGitGhSignal(argv, start) {
+  for (let j = start; j < argv.length; j++) {
+    const raw = argv[j].value;
+    const canon = canonicalBasename(raw);
+    if (canon === "git") return { index: j, binary: "git", dispatcherSub: null };
+    if (canon === "gh") return { index: j, binary: "gh", dispatcherSub: null };
+    const dispatcherSub = extractGitDispatcherSubcommand(canon, basenameNoExe(raw));
+    if (dispatcherSub !== null) return { index: j, binary: "git", dispatcherSub };
+  }
+  return null;
+}
+function buildAmbiguousWrapperResult(argv, match) {
+  if (match.dispatcherSub !== null) {
+    return {
+      binary: "git",
+      gitSubcommand: match.dispatcherSub,
+      args: argv.slice(match.index + 1),
+      requiresFailClosed: true,
+      cDir: null,
+      binaryCaseExact: false
+    };
+  }
+  if (match.binary === "git") {
+    const classified = classifyGitDispatcher(argv, match.index + 1, true);
+    return { ...classified, binaryCaseExact: false };
+  }
+  return {
+    binary: "gh",
+    gitSubcommand: null,
+    args: argv.slice(match.index + 1),
+    requiresFailClosed: true,
+    cDir: null,
+    binaryCaseExact: false
+  };
+}
+function classifyCoveredAction(cmd) {
+  const argv = cmd.argv;
+  let i = 0;
+  let requiresFailClosed = false;
+  for (; ; ) {
+    if (i >= argv.length) return null;
+    if (isEnvAssignmentToken(argv[i])) {
+      requiresFailClosed = true;
+      i++;
+      continue;
+    }
+    const model = RUNNER_MODELS[canonicalBasename(argv[i].value)];
+    if (!model) break;
+    requiresFailClosed = true;
+    i = skipRunnerPrefix(argv, i + 1, model);
+  }
+  if (i >= argv.length) return null;
+  const binaryTok = argv[i];
+  const rawWithExe = lastPathSegment(binaryTok.value);
+  const rawNoExe = stripExeSuffix(rawWithExe);
+  const canonical = rawNoExe.toLowerCase();
+  const isDirectGitForm = canonical === "git" || extractGitDispatcherSubcommand(canonical, rawNoExe) !== null;
+  if (!isDirectGitForm && !SAFE_NON_EXECUTING_BASENAMES.has(canonical) && !KNOWN_WRAPPER_BASENAMES.has(canonical)) {
+    const match = scanForGitGhSignal(argv, i + 1);
+    if (match !== null) return buildAmbiguousWrapperResult(argv, match);
+  }
+  if (binaryTok.tainted) requiresFailClosed = true;
+  return buildClassifiedResult({
+    argv,
+    afterBinary: i + 1,
+    canonical,
+    rawNoExe,
+    requiresFailClosed,
+    noExeSuffixPresent: rawWithExe === rawNoExe
+  });
 }
 var BENIGN_PUSH_FLAG_RE = /^(-u|--set-upstream|-v|--verbose|--progress)$/;
 function isBenignPushFlag(token) {
@@ -278,6 +790,37 @@ function isPlainBranchDestination(dst) {
   const firstSegment = dst.split("/")[0].toLowerCase();
   return !REF_NAMESPACE_WORDS.has(firstSegment);
 }
+var TAG_LIKE_RE = /^[vV]?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$/;
+function extractRawDestination(refspec) {
+  const colonIdx = refspec.lastIndexOf(":");
+  if (colonIdx < 0) return refspec;
+  const src = refspec.slice(0, colonIdx);
+  if (src === "") return null;
+  const afterColon = refspec.slice(colonIdx + 1);
+  return afterColon === "" ? src : afterColon;
+}
+function resolveSymbolicDestination(rawDst, reader) {
+  if (rawDst === "HEAD" || rawDst === "@") return reader.gitCurrentBranch();
+  if (rawDst.startsWith("@")) return null;
+  return rawDst;
+}
+function matchBenignPushGrammar(argv, tainted, reader) {
+  const notMatched = { matched: false, destination: null };
+  if (tainted.some(Boolean)) return notMatched;
+  const flagTokens = argv.filter((t) => t.startsWith("-"));
+  const positionals = argv.filter((t) => !t.startsWith("-"));
+  if (!flagTokens.every(isBenignPushFlag)) return notMatched;
+  if (positionals.length !== 2) return notMatched;
+  if (positionals[0] !== "origin") return notMatched;
+  const refspec = positionals[1];
+  if (refspec.startsWith("+")) return notMatched;
+  const rawDst = extractRawDestination(refspec);
+  if (rawDst === null) return notMatched;
+  if (TAG_LIKE_RE.test(rawDst)) return notMatched;
+  const dst = resolveSymbolicDestination(rawDst, reader);
+  if (dst === null || !isPlainBranchDestination(dst)) return notMatched;
+  return { matched: true, destination: dst };
+}
 
 // bodies/dev-guard.ts
 function ask(reason) {
@@ -289,59 +832,11 @@ function allow(reason) {
 function none() {
   return { decision: "none", reason: "", mutations: null };
 }
-var CLICKUP_WRITE_RE = /^mcp__.+__clickup_(update_task|create_task|create_task_comment|attach_task_file|delete_task)$/;
-var GIT_PUSH_RE = /(^|[\s|;&<>()`])git(\s+-C\s+\S+|\s+--git-dir(?:=\S+|\s+\S+)|\s+--work-tree(?:=\S+|\s+\S+)|\s+-\S*|\s+\S+=\S+)*\s+push(\s|$|[;&|<>()`"'$])/i;
-var GH_PR_CREATE_RE = /(^|[\s|;&<>()`])gh\s+(?:(?:--repo|-R)(?:=\S+|\s+\S+)\s+)?pr\s+create(\s|$|[;&|<>()`"'$])/i;
-var GH_PR_MERGE_RE = /(^|[\s|;&<>()`])gh\s+(?:(?:--repo|-R)(?:=\S+|\s+\S+)\s+)?pr\s+merge(\s|$|[;&|<>()`"'$])/i;
-var GH_PR_REVIEW_RE = /(^|[\s|;&<>()`])gh\s+(?:(?:--repo|-R)(?:=\S+|\s+\S+)\s+)?pr\s+review(\s|$|[;&|<>()`"'$])/i;
-var GH_PR_COMMENT_RE = /(^|[\s|;&<>()`])gh\s+(?:(?:--repo|-R)(?:=\S+|\s+\S+)\s+)?pr\s+comment(\s|$|[;&|<>()`"'$])/i;
-var GH_API_REST_PR_RE = /(^|[\s|;&<>()`])gh\s+api\s+.*(-X|--method)\s*(PUT|POST|PATCH|DELETE).*pulls/i;
-var GH_GRAPHQL_RE = /(^|[\s|;&<>()`])gh\s+api\s+graphql/i;
-var GRAPHQL_PR_MUTATIONS_RE = /(resolveReviewThread|unresolveReviewThread|addPullRequestReviewThreadReply|addPullRequestReviewComment|addPullRequestReview|submitPullRequestReview|mergePullRequest)/;
-var GH_ISSUE_WRITE_RE = /(^|[\s|;&<>()`])gh\s+(?:(?:--repo|-R)(?:=\S+|\s+\S+)\s+)?issue\s+(create|edit|comment)(\s|$|[;&|<>()`"'$])/i;
-var GH_REPO_FLAG_VALUE_RE = /(?:--repo|-R)(?:=(\S+)|\s+(\S+))/;
-function extractGhRepoTarget(cmdStr) {
-  const m = GH_REPO_FLAG_VALUE_RE.exec(cmdStr);
-  if (!m) return null;
-  return m[1] ?? m[2] ?? null;
-}
-var CURL_WGET_MUTATING_RE = /(^|[\s|;&<>()`])(curl|wget)\s.*(-X|--request)\s*(PUT|POST|PATCH|DELETE).*api\.github\.com/i;
-var API_GITHUB_URL_RE = /api\.github\.com/i;
-var MUTATING_METHOD_RE = /(-X|--request)\s*(PUT|POST|PATCH|DELETE)/i;
-var RAW_OUTWARD_SCAN_RE = /(git\s+push|gh\s+pr\s+(create|merge|review|comment)|gh\s+issue\s+(create|edit|comment)|gh\s+api.*pulls|api\.github\.com)/i;
-var SHELL_COMPOSITION_RE = /[;&|`\n<>]|\$\(/;
-var TREE_OR_ENV_REDIRECT_RE = /((^|\s)-C(?=[\s/=]|$)|--git-dir\b|--work-tree\b|\bGIT_[A-Z_]+=)/;
-var GIT_PUSH_EXACT_RE = /^git\s+push(\s|$)/;
-var GIT_C_DIR_PUSH_EXACT_RE = /^git\s+-C\s+(\S+)\s+push(\s|$)/;
-var GH_PR_CREATE_EXACT_RE = /^gh\s+(?:(?:--repo|-R)(?:=\S+|\s+\S+)\s+)?pr\s+create(\s|$)/;
-var TAG_LIKE_RE = /^[vV]?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$/;
-var DEFAULT_BRANCH_FLOOR = /* @__PURE__ */ new Set(["main", "master"]);
 var GATE_DOC_POINTER = "see docs/dev-mode.md \xA7 Outward-Action Gate";
-function rejectShellQuotingOrComposition(cmdStr) {
-  if (!isLiteralSafeCommand(cmdStr)) {
-    return ask(
-      `outward action 'git push' contains a shell quoting/escaping/expansion/composition character \u2014 the inspected token cannot be trusted to equal the value bash actually runs; fail-closed (dev-guard.ts); ${GATE_DOC_POINTER}`
-    );
-  }
-  return null;
-}
-function rejectTreeOrEnvRedirect(cmdStr) {
-  if (TREE_OR_ENV_REDIRECT_RE.test(cmdStr)) {
-    return ask(
-      `outward action 'git push' combined with a tree/directory redirection (--git-dir, --work-tree, a GIT_*= environment prefix, a glued/second/misplaced -C) requires explicit operator approval \u2014 the payload-cwd reader would evaluate a different tree than the one git operates on; only the single, spaced 'git -C {dir} push ...' shape is resolved against a real target (dev-guard.ts); ${GATE_DOC_POINTER}`
-    );
-  }
-  return null;
-}
-function extractExactPushTail(trimmedCmd) {
-  const m = GIT_PUSH_EXACT_RE.exec(trimmedCmd);
-  return m ? trimmedCmd.slice(m[0].length).trim() : null;
-}
-function extractExactCDirPushTail(trimmedCmd) {
-  const m = GIT_C_DIR_PUSH_EXACT_RE.exec(trimmedCmd);
-  if (!m) return null;
-  return { dir: m[1], tail: trimmedCmd.slice(m[0].length).trim() };
-}
+var CLICKUP_WRITE_RE = /^mcp__.+__clickup_(update_task|create_task|create_task_comment|attach_task_file|delete_task)$/;
+var RAW_OUTWARD_SCAN_RE = /(git\s+push|gh\s+pr\s+(create|merge|review|comment)|gh\s+issue\s+(create|edit|comment)|gh\s+api.*pulls|api\.github\.com)/i;
+var GRAPHQL_PR_MUTATIONS_RE = /(resolveReviewThread|unresolveReviewThread|addPullRequestReviewThreadReply|addPullRequestReviewComment|addPullRequestReview|submitPullRequestReview|mergePullRequest)/;
+var DEFAULT_BRANCH_FLOOR = /* @__PURE__ */ new Set(["main", "master"]);
 function evaluateDestinationBranch(dst, reader, allowContext, dir) {
   const targetNote = dir !== void 0 ? ` (target '-C ${dir}')` : "";
   if (DEFAULT_BRANCH_FLOOR.has(dst.toLowerCase())) {
@@ -418,103 +913,138 @@ function evaluateBarePush(reader, dir) {
     `bare 'git push' resolved to non-default branch '${destBranch}' with effective remote 'origin'`
   );
 }
-function extractRawDestination(refspec) {
-  const colonIdx = refspec.lastIndexOf(":");
-  if (colonIdx < 0) return refspec;
-  const src = refspec.slice(0, colonIdx);
-  if (src === "") return null;
-  const afterColon = refspec.slice(colonIdx + 1);
-  return afterColon === "" ? src : afterColon;
+function pushGrammarReader(reader, dir) {
+  return {
+    gitCurrentBranch: () => dir !== void 0 ? reader.gitCurrentBranch(dir) : reader.gitCurrentBranch()
+  };
 }
-function resolveSymbolicDestination(rawDst, reader, dir) {
-  if (rawDst === "HEAD" || rawDst === "@") {
-    return dir !== void 0 ? reader.gitCurrentBranch(dir) : reader.gitCurrentBranch();
-  }
-  if (rawDst.startsWith("@")) return null;
-  return rawDst;
-}
-function evaluateSingleRefspec(refspec, reader, dir) {
-  if (refspec.startsWith("+")) {
-    return ask(
-      `outward action 'git push' with a '+' force-prefixed refspec requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
-    );
-  }
-  const rawDst = extractRawDestination(refspec);
-  if (rawDst === null) {
-    return ask(
-      `outward action 'git push' with an empty-source (delete) refspec requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
-    );
-  }
-  if (TAG_LIKE_RE.test(rawDst)) {
-    return ask(
-      `outward action 'git push' to a tag ref requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
-    );
-  }
-  const dst = resolveSymbolicDestination(rawDst, reader, dir);
-  if (dst === null) {
-    return ask(
-      `outward action 'git push' with an unresolved symbolic destination ('${rawDst}') requires explicit operator approval \u2014 resolution is attempted only for bare HEAD/@; fail-closed on any other shorthand or resolution fault (dev-guard.ts); ${GATE_DOC_POINTER}`
-    );
-  }
-  if (!isPlainBranchDestination(dst)) {
-    return ask(
-      `outward action 'git push' with a destination that is not a plain branch name ('${dst}') requires explicit operator approval \u2014 fail-closed on any ref-namespace-qualified or malformed destination (dev-guard.ts); ${GATE_DOC_POINTER}`
-    );
-  }
-  return evaluateDestinationBranch(
-    dst,
-    reader,
-    `single refspec push to non-default branch '${dst}' on 'origin' recognized as the closed safe form`,
-    dir
-  );
-}
-function evaluatePushArgs(tail, reader, dir) {
+function evaluateGitPushArgs(args, reader, dir) {
   const targetLabel = dir !== void 0 ? `'git -C ${dir} push'` : "'git push'";
-  const tokens = tail.length > 0 ? tail.split(/\s+/).filter(Boolean) : [];
-  const flagTokens = tokens.filter((t) => t.startsWith("-"));
-  const positional = tokens.filter((t) => !t.startsWith("-"));
-  const disqualifyingFlags = flagTokens.filter((t) => !isBenignPushFlag(t));
+  const values = args.map((t) => t.value);
+  const tainted = args.map((t) => t.tainted);
+  const grammar = matchBenignPushGrammar(values, tainted, pushGrammarReader(reader, dir));
+  if (grammar.matched && grammar.destination !== null) {
+    return evaluateDestinationBranch(
+      grammar.destination,
+      reader,
+      `${targetLabel} recognized as the closed benign-push form`,
+      dir
+    );
+  }
+  const flagTokens = values.filter((v) => v.startsWith("-"));
+  const positional = values.filter((v) => !v.startsWith("-"));
+  const disqualifyingFlags = flagTokens.filter((v) => !isBenignPushFlag(v));
   if (disqualifyingFlags.length > 0) {
     return ask(
       `outward action ${targetLabel} with disqualifying flag(s) (${disqualifyingFlags.join(", ")}) requires explicit operator approval \u2014 only -u/--set-upstream/-v/--verbose/--progress are on the benign allowlist (dev-guard.ts); ${GATE_DOC_POINTER}`
     );
   }
-  if (positional.length === 0) {
-    return evaluateBarePush(reader, dir);
-  }
-  const remoteToken = positional[0];
-  if (remoteToken !== "origin") {
+  if (positional.length === 0) return evaluateBarePush(reader, dir);
+  if (positional[0] !== "origin") {
     return ask(
-      `outward action ${targetLabel} to a remote other than 'origin' (resolved by NAME) requires explicit operator approval \u2014 origin-URL integrity is a model assumption, and 'git remote set-url|add|rename|set-head' stay outside this allowlist (dev-guard.ts); ${GATE_DOC_POINTER}`
+      `outward action ${targetLabel} to a remote other than 'origin' (resolved by NAME) requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
     );
   }
-  if (positional.length === 1) {
-    return evaluateBarePush(reader, dir);
-  }
-  if (positional.length > 2) {
-    return ask(
-      `outward action ${targetLabel} with more than one refspec requires explicit operator approval \u2014 the recognizer allows exclusively a single simple refspec (dev-guard.ts); ${GATE_DOC_POINTER}`
-    );
-  }
-  return evaluateSingleRefspec(positional[1], reader, dir);
+  if (positional.length === 1) return evaluateBarePush(reader, dir);
+  return ask(
+    `outward action ${targetLabel} does not match the closed benign-push grammar (multi-refspec, tainted token, tag-like/qualified destination, or delete refspec) \u2014 requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
+  );
 }
-function evaluateGitPush(cmdStr, reader) {
-  const quotingReject = rejectShellQuotingOrComposition(cmdStr);
-  if (quotingReject) return quotingReject;
-  const trimmed = cmdStr.trim();
-  const cDirForm = extractExactCDirPushTail(trimmed);
-  if (cDirForm) {
-    return evaluatePushArgs(cDirForm.tail, reader, cDirForm.dir);
-  }
-  const redirectReject = rejectTreeOrEnvRedirect(cmdStr);
-  if (redirectReject) return redirectReject;
-  const tail = extractExactPushTail(trimmed);
-  if (tail === null) {
+var DYNAMIC_TOKEN_PREFIX_RE = /^[$`{]/;
+function isPushCandidateSubcommand(sub) {
+  const lower = sub.toLowerCase();
+  if (lower === "push") return true;
+  if (DYNAMIC_TOKEN_PREFIX_RE.test(sub)) return true;
+  if (!lower.startsWith("push")) return false;
+  const boundaryChar = sub.charAt(4);
+  return boundaryChar !== "" && !/[A-Za-z0-9_]/.test(boundaryChar);
+}
+function isGitPushCandidate(classified) {
+  return classified.gitSubcommand !== null && isPushCandidateSubcommand(classified.gitSubcommand);
+}
+function evaluateGitClassified(classified, reader) {
+  if (classified.gitSubcommand === null || !isPushCandidateSubcommand(classified.gitSubcommand)) return none();
+  if (!classified.binaryCaseExact || classified.gitSubcommand !== "push") {
     return ask(
-      `outward action 'git push' is not expressed as a single, bare 'git push ...' invocation with nothing preceding it \u2014 fail-closed on any other structure (dev-guard.ts); ${GATE_DOC_POINTER}`
+      `outward action 'git push' \u2014 the binary/subcommand token does not exactly and literally match 'git'/'push' (case-sensitive, no '.exe'), or could not be statically resolved to it; fail-closed rather than assume it is not a covered push (dev-guard.ts); ${GATE_DOC_POINTER}`
     );
   }
-  return evaluatePushArgs(tail, reader);
+  if (classified.requiresFailClosed) {
+    return ask(
+      `outward action 'git push' combined with an environment-assignment prefix, a command-runner prefix (env/timeout/nice/nohup/command/stdbuf/setsid/time/sudo/doas), a '-c' config override, a tree/exec-path redirect, or an unresolved/unknown option requires explicit operator approval \u2014 fail-closed (dev-guard.ts); ${GATE_DOC_POINTER}`
+    );
+  }
+  return evaluateGitPushArgs(classified.args, reader, classified.cDir ?? void 0);
+}
+var REPO_FLAG_NAMES = /* @__PURE__ */ new Set(["--repo", "-R"]);
+var GH_MUTATING_PR_VERBS = /* @__PURE__ */ new Set(["create", "merge", "review", "comment"]);
+var GH_MUTATING_ISSUE_VERBS = /* @__PURE__ */ new Set(["create", "edit", "comment"]);
+function resolveGhVerb(args) {
+  const cleanArgs = [];
+  let repoTarget = null;
+  for (let i = 0; i < args.length; i++) {
+    const tok = args[i];
+    const eqIdx = tok.value.indexOf("=");
+    const name = eqIdx >= 0 ? tok.value.slice(0, eqIdx) : tok.value;
+    if (REPO_FLAG_NAMES.has(name)) {
+      repoTarget = eqIdx >= 0 ? tok.value.slice(eqIdx + 1) : args[i + 1]?.value ?? null;
+      if (eqIdx < 0) i++;
+      continue;
+    }
+    cleanArgs.push(tok);
+  }
+  return {
+    subcommand: cleanArgs[0]?.value.toLowerCase() ?? null,
+    verb: cleanArgs[1]?.value.toLowerCase() ?? null,
+    repoTarget,
+    cleanArgs
+  };
+}
+function matchesVerbPrefix(verbLower, knownVerbs) {
+  if (knownVerbs.has(verbLower)) return verbLower;
+  for (const verb of knownVerbs) {
+    if (!verbLower.startsWith(verb)) continue;
+    const boundaryChar = verbLower.charAt(verb.length);
+    if (boundaryChar !== "" && !/[A-Za-z0-9_]/.test(boundaryChar)) return verb;
+  }
+  return null;
+}
+function isGraphqlPrMutation(cleanArgs) {
+  return cleanArgs.some((t) => GRAPHQL_PR_MUTATIONS_RE.test(t.value));
+}
+function isRestMutatingPrEndpoint(cleanArgs) {
+  const hasMutatingMethod = cleanArgs.some((t, i) => {
+    if (t.value === "-X" || t.value === "--method") {
+      const next = cleanArgs[i + 1];
+      return !!next && /^(PUT|POST|PATCH|DELETE)$/i.test(next.value);
+    }
+    return /^(--method=|-X)(PUT|POST|PATCH|DELETE)$/i.test(t.value);
+  });
+  return hasMutatingMethod && cleanArgs.some((t) => /pulls/i.test(t.value));
+}
+function classifyGhAction(args) {
+  const { subcommand, verb, repoTarget, cleanArgs } = resolveGhVerb(args);
+  if (subcommand === "pr") {
+    const matched = verb !== null ? matchesVerbPrefix(verb, GH_MUTATING_PR_VERBS) : null;
+    if (matched === "create") return { kind: "pr-create", verb: matched, repoTarget, cleanArgs };
+    if (matched !== null) return { kind: "pr-mutating", verb: matched, repoTarget, cleanArgs };
+    return null;
+  }
+  if (subcommand === "issue") {
+    const matched = verb !== null ? matchesVerbPrefix(verb, GH_MUTATING_ISSUE_VERBS) : null;
+    return matched !== null ? { kind: "issue-mutating", verb: matched, repoTarget, cleanArgs } : null;
+  }
+  if (subcommand === "api") {
+    const verbToken = cleanArgs[1]?.value.toLowerCase() ?? null;
+    if (verbToken === "graphql") {
+      return isGraphqlPrMutation(cleanArgs) ? { kind: "api-graphql-pr", verb: null, repoTarget, cleanArgs } : null;
+    }
+    return isRestMutatingPrEndpoint(cleanArgs) ? { kind: "api-rest-pr", verb: null, repoTarget, cleanArgs } : null;
+  }
+  return null;
+}
+function isCleanGhPrCreate(classified, action) {
+  return classified.binary === "gh" && classified.binaryCaseExact && !classified.requiresFailClosed && action.cleanArgs[0]?.value === "pr" && action.cleanArgs[1]?.value === "create" && classified.args.every((t) => !t.tainted);
 }
 function isPrCreateAutogateEnabled(reader) {
   const config = reader.readConfig();
@@ -522,6 +1052,69 @@ function isPrCreateAutogateEnabled(reader) {
   const autogate = config["autogate"];
   if (!autogate || typeof autogate !== "object") return false;
   return autogate["pr_create"] === true;
+}
+function evaluateGhClassified(classified, reader) {
+  const action = classifyGhAction(classified.args);
+  if (!action) return null;
+  const ghTargetNote = action.repoTarget ? ` (target repo: '${action.repoTarget}')` : "";
+  if (action.kind === "pr-create") {
+    if (isCleanGhPrCreate(classified, action) && isPrCreateAutogateEnabled(reader)) {
+      return allow(
+        `outward action 'gh pr create'${ghTargetNote} auto-allowed by opt-in config autogate.pr_create=true (dev-guard.ts); the prepublish-guard tests-before-PR floor still applies independently (deny > allow); ${GATE_DOC_POINTER}`
+      );
+    }
+    return ask(
+      `outward action 'gh pr create'${ghTargetNote} requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
+    );
+  }
+  if (action.kind === "pr-mutating") {
+    return ask(
+      `outward action 'gh pr ${action.verb}'${ghTargetNote} requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
+    );
+  }
+  if (action.kind === "issue-mutating") {
+    return ask(
+      `outward action 'gh issue write'${ghTargetNote} requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
+    );
+  }
+  if (action.kind === "api-graphql-pr") {
+    return ask(`outward action 'gh api graphql' PR-mutating operation requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`);
+  }
+  return ask(`outward action 'gh api' mutating PR endpoint requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`);
+}
+function hasGithubMutatingSignal(argv) {
+  if (!argv.some((t) => /api\.github\.com/i.test(t.value))) return false;
+  return argv.some((t, i) => {
+    if (t.value === "-X" || t.value === "--request") {
+      const next = argv[i + 1];
+      return !!next && /^(PUT|POST|PATCH|DELETE)$/i.test(next.value);
+    }
+    return /^(--request=|-X)(PUT|POST|PATCH|DELETE)$/i.test(t.value);
+  });
+}
+function isCoveredEffectiveCommand(cmd) {
+  const classified = classifyCoveredAction(cmd);
+  if (!classified) return hasGithubMutatingSignal(cmd.argv);
+  const binaryLower = classified.binary.toLowerCase();
+  if (binaryLower === "git") return isGitPushCandidate(classified);
+  if (binaryLower === "gh") return classifyGhAction(classified.args) !== null;
+  return hasGithubMutatingSignal(cmd.argv);
+}
+function askGithubMutating() {
+  return ask(
+    `outward action to api.github.com with mutating method requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
+  );
+}
+function evaluateSingleCommand(cmd, reader) {
+  const classified = classifyCoveredAction(cmd);
+  if (!classified) return hasGithubMutatingSignal(cmd.argv) ? askGithubMutating() : none();
+  const binaryLower = classified.binary.toLowerCase();
+  if (binaryLower === "git") return evaluateGitClassified(classified, reader);
+  if (binaryLower === "gh") {
+    const decision = evaluateGhClassified(classified, reader);
+    if (decision) return decision;
+  }
+  return hasGithubMutatingSignal(cmd.argv) ? askGithubMutating() : none();
 }
 function evaluate(input, reader) {
   const toolName = input.tool?.name ?? "";
@@ -541,65 +1134,22 @@ function evaluate(input, reader) {
     }
     return none();
   }
-  if (cmdStr === null) {
-    return none();
+  if (cmdStr === null) return none();
+  const analyzed = analyzeCommand(cmdStr);
+  if (analyzed.unresolvableShellPayload || analyzed.depthExceeded) {
+    return ask(
+      `outward action \u2014 the command contains a shell-executing wrapper whose payload could not be statically resolved, or nested wrapper recursion exceeded the bounded depth; fail-closed rather than silently permit (dev-guard.ts); ${GATE_DOC_POINTER}`
+    );
   }
-  const { routable } = prepareRoutableCommand(cmdStr);
-  if (GIT_PUSH_RE.test(routable)) {
-    return evaluateGitPush(cmdStr, reader);
+  if (analyzed.commands.length === 1) {
+    return evaluateSingleCommand(analyzed.commands[0], reader);
   }
-  const ghTargetRepo = extractGhRepoTarget(cmdStr);
-  const ghTargetNote = ghTargetRepo ? ` (target repo: '${ghTargetRepo}')` : "";
-  if (GH_PR_CREATE_RE.test(routable)) {
-    const cleanAutogateForm = !SHELL_COMPOSITION_RE.test(cmdStr) && GH_PR_CREATE_EXACT_RE.test(cmdStr.trim());
-    if (cleanAutogateForm && isPrCreateAutogateEnabled(reader)) {
-      return allow(
-        `outward action 'gh pr create'${ghTargetNote} auto-allowed by opt-in config autogate.pr_create=true (dev-guard.ts); the prepublish-guard tests-before-PR floor still applies independently (deny > allow); ${GATE_DOC_POINTER}`
+  for (const command of analyzed.commands) {
+    if (isCoveredEffectiveCommand(command)) {
+      return ask(
+        `outward action detected inside a compound or wrapper-embedded command; allow is reserved for a single, bare, un-chained invocation \u2014 requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
       );
     }
-    return ask(
-      `outward action 'gh pr create'${ghTargetNote} requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md \xA7 Outward-Action Gate`
-    );
-  }
-  if (GH_PR_MERGE_RE.test(routable)) {
-    return ask(
-      `outward action 'gh pr merge'${ghTargetNote} requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md \xA7 Outward-Action Gate`
-    );
-  }
-  if (GH_PR_REVIEW_RE.test(routable)) {
-    return ask(
-      `outward action 'gh pr review'${ghTargetNote} requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md \xA7 Outward-Action Gate`
-    );
-  }
-  if (GH_PR_COMMENT_RE.test(routable)) {
-    return ask(
-      `outward action 'gh pr comment'${ghTargetNote} requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md \xA7 Outward-Action Gate`
-    );
-  }
-  if (GH_API_REST_PR_RE.test(routable)) {
-    return ask(
-      "outward action 'gh api' mutating PR endpoint requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md \xA7 Outward-Action Gate"
-    );
-  }
-  if (GH_GRAPHQL_RE.test(routable) && GRAPHQL_PR_MUTATIONS_RE.test(cmdStr)) {
-    return ask(
-      "outward action 'gh api graphql' PR-mutating operation requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md \xA7 Outward-Action Gate"
-    );
-  }
-  if (GH_ISSUE_WRITE_RE.test(routable)) {
-    return ask(
-      `outward action 'gh issue write'${ghTargetNote} requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md \xA7 Outward-Action Gate`
-    );
-  }
-  if (CURL_WGET_MUTATING_RE.test(routable)) {
-    return ask(
-      "outward action via curl/wget to api.github.com with mutating method requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md \xA7 Outward-Action Gate"
-    );
-  }
-  if (API_GITHUB_URL_RE.test(routable) && MUTATING_METHOD_RE.test(routable)) {
-    return ask(
-      "outward action to api.github.com with mutating method requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md \xA7 Outward-Action Gate"
-    );
   }
   return none();
 }

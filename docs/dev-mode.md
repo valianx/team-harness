@@ -30,13 +30,59 @@ The gate fires UNCONDITIONALLY for covered outward actions and gates by destinat
 
 **What `ask` means:** `permissionDecision: "ask"` causes the Claude Code runtime to prompt the OPERATOR interactively for that specific call. The agent CANNOT auto-approve an `ask`. There is NO authorisation marker file — the authorisation is human out-of-band. A legitimate delivery push at STAGE-GATE-3 proceeds through this same operator approval, mirroring the preview-and-confirm contract of review-mode (#251/#252).
 
-**Fail-CLOSED for covered actions:** the hook evaluates every covered outward action unconditionally and returns a destination-aware decision — `allow` only for the single recognized safe push form, `ask` for every other form (default-branch/tag/force/multi-refspec/non-`origin` pushes, merges, PR/issue creation, API/ClickUp writes). This is the intentional fail-mode: the consequences of an unauthorised merge to main are irreversible; the consequences of an over-zealous `ask` are a minor friction.
+**Fail-CLOSED for covered actions:** the hook evaluates every covered outward action unconditionally and returns a destination-aware decision — `allow` only for the single recognized safe push form, `ask` for every other form (default-branch/tag/force/multi-refspec/non-`origin` pushes, merges, PR/issue creation, API/ClickUp writes). This is the intentional fail-mode: the consequences of an unauthorized merge to main are irreversible; the consequences of an over-zealous `ask` are a minor friction.
 
 **Default → no-decision for non-covered calls:** when the command is not a covered outward action, the hook emits **no permissionDecision** — exit 0, empty stdout — and defers to the operator's normal permission flow. A permission gate must never widen permissions on its fail-safe path.
 
 **No authorisation file.** A file that the agent can write with `echo authorized > ...` is forgeable by the same subject the gate protects — it is not a control. The authorisation is `ask` (human), not a file.
 
-**Residual limit (documented honesty):** obfuscation via `eval`/`base64`/alias/heredoc — and reconstruction of a gated verb the router cannot see as a contiguous token, whether by quote/backslash splicing (`''git push`, `g''it push`) or by parameter/command expansion (`p=push; git $p …`) — is a known limit of any string-matching gate (parity with `policy-block`). The threat model is disposition that rationalises the readable path — not an adversary who actively obfuscates; for the injected-obfuscation case the prompt-injection floor (§6.6) is the primary defense.
+### Detection mechanism
+
+Covered-action detection is parse-based, not string-matching. A shared analyzer (`hooks/ts/bodies/command-lexer.ts::analyzeCommand`) tokenizes the command with a bounded, linear-scan, quote-aware scanner, splits it into effective simple commands on unquoted `;`/`&&`/`||`/`|`/`&`/newline and bare subshell boundaries, and resolves each one to an **argv** — unquoted tokens, each marked `tainted` when it still carries an unresolved shell metacharacter (`$VAR`, `$(...)`, backtick, brace/glob/tilde). A command-executing wrapper (`bash`/`sh`/`zsh`/`dash`/`ksh`/`su -c <str>`, `eval <args>`, a literal `echo`/`printf <lit> | <shell>` pipe, ANY producer piped into a bare shell invocation, `xargs … <shell> -c <str>`) has its statically-resolvable inner payload recursively unwrapped up to a bounded depth, and the unwrapped effective commands are classified exactly like a directly-typed command — this is what closes the wrapper-embedded bypass (`bash -c "git push origin main"` now reaches the gate). `classifyCoveredAction` keys on argv[0]'s **basename**, resolved case-insensitively and `.exe`-stripped, rather than its literal spelling, so a per-subcommand binary (`git-push`, `GIT-PUSH`, `git-push.exe`, or the dynamic-path form `$(git --exec-path)/git-push`) classifies identically to the dispatcher form (`git push`) — this is what closes the per-subcommand-binary bypass, uniformly across every consumer (a single centralized resolution, not a per-hook fallback). A closed set of command-runner prefixes (`env`, `timeout`, `nice`, `nohup`, `command`, `stdbuf`, `setsid`, `time`, `sudo`, `doas`) is resolved past to the real command underneath (`env git push origin main` classifies on `git`, not `env`) and always fails closed. The retired boundary-character-class routers and the raw-string safe-character char-gate are gone; the positive benign-push grammar (`matchBenignPushGrammar`, Invariant G) now validates the RESOLVED argv instead of the command string, which is what lets a colon-refspec or a quoted-but-literal destination (`git push origin HEAD:feat/x`, `git push origin "feat/x"`) resolve to `allow` without widening what the grammar accepts — the taint marking, not a wider character set, is what tells the grammar which tokens are safe to read. A case-variant or `.exe`-suffixed binary/subcommand is still classified as covered (`ask`/`deny`) but can never itself reach `allow`.
+
+**Residual static-resolution limits (documented honesty, not silently closed).** The analyzer resolves STRUCTURE, never shell EXPANSION — it never performs brace, glob, variable, or command-substitution expansion — so several forms remain genuinely unresolvable and fail CLOSED to `ask`/`deny` rather than being silently treated as "no covered action":
+
+- **Dynamic verb/executable** (`git $V origin main`, a dynamic subcommand or binary token) — the token is `tainted`, so the effective command stays covered-shaped and the decision fails closed to `ask`.
+- **Dynamic producer piped into a bare shell** (`curl … | bash`, `wget … | sh`, or any other non-literal producer whose output cannot be known ahead of execution) — sets `unresolvableShellPayload: true` and fails closed to `ask`. Only a literal `echo`/`printf` producer is statically resolvable; every other producer resolves this way.
+- **xargs replacement-string placeholder** (`echo "…" | xargs -I{} bash -c "{}"`) — the `-I`/`--replace` placeholder is a runtime template filled in per input line, not the literal text of the wrapped payload; recognized as inherently unresolvable rather than (mis)treated as a resolved literal, and fails closed to `ask`.
+- **Recursion-depth-exceeded** wrapper nesting — sets `depthExceeded: true` and fails closed to `ask`, rather than silently dropping the unresolved layers.
+- **Script-file execution** (`./some-script.sh` that internally runs a covered action) is NOT modeled — unchanged from the retired mechanism, which also could not see inside an executed script file.
+- **Alias / shell-function / PATH-shadowing execution** is NOT modeled — unchanged from the retired mechanism; an attacker with alias or PATH control already has code execution in the session and does not need to smuggle a covered action through a command string.
+- **`ssh <host> "<covered action>"`** is NOT modeled as a wrapper — unchanged from the retired mechanism, which also did not unwrap an ssh-remote-quoted covered action.
+
+**Active-obfuscation residuals (§6.6 class — not claimed closed).** Two forms remain open by construction, documented honestly rather than asserted resolved:
+
+- **A covered action buried in an interpreter's own program-text argument** (`awk 'BEGIN{system("git push origin main")}'`, `perl -e '...'`, `python -c '...'`, `sed 'e git push origin main'`). The token-granular forward-scan cannot see inside a single quoted program-text token — closing this requires parsing the interpreter's own grammar, the general de-obfuscation path this analyzer deliberately does not attempt (it resolves STRUCTURE, never a language's semantics). Removing `awk`/`gawk`/`sed` from `SAFE_NON_EXECUTING_BASENAMES` closes the adjacent *pipe-into-executor* vector (`curl <url> | awk '{system($0)}'` now resolves to `ask`, since the receiver is no longer safe-list-exempt) but does NOT close this buried-token *direct* form — a force-push variant of this shape is caught only as a backstop by `policy-block`'s raw-regex when the literal text is adjacent (e.g. `sed 'e git push --force origin main'`), not structurally; a non-force variant, or one split across multiple flag-value tokens, has no backstop. Server-side branch protection is the real floor for this class; the client hooks are defense-in-depth with an honestly-stated boundary.
+- **A multi-call dispatcher invoking a shell whose basename is outside the recognized `SHELL_BASENAMES` set** (`busybox <exotic-shell> -c ...`), or **multi-level dispatcher nesting** (`busybox env sh -c ...`, dispatcher→runner→shell). The shell-name-plus-`-c` structural-signature recognizer (`detectDispatcherShellCPayload`) closes any dispatcher piping through a *recognized* shell name — it does not enumerate dispatcher basenames, so `busybox`/`toybox`/`sbase`/a renamed binary are all caught uniformly — but an unrecognized shell name or a second layer of dispatch is outside what one recognizer pass resolves.
+
+Removing `sort`/`less`/`more` from `SAFE_NON_EXECUTING_BASENAMES` (capability-based curation — each has a documented exec-adjacent flag or interactive shell-escape) trades a small, bounded friction cost for closing the false-safety claim: these basenames are now forward-scanned like any other unrecognized leading binary, so a shape like `sort git-push-list.txt` or `less git-notes.log` may over-`ask` on the adjacent `git-`-prefixed argument token. This is friction, never a bypass.
+
+The threat model this gate defends is disposition that rationalises the readable path — not an adversary who actively obfuscates a command past a fixed recursion bound or a shadowed binary; for the injected-obfuscation case the prompt-injection floor (§6.6) is the primary defense.
+
+### Threat Model
+
+**What this gate defends against, and what it does not claim to.** TH's operator is a developer working on their own system or repository. The guard hooks (`dev-guard`, `gate-guard`, `policy-block`) exist to sustain that developer's own honest disposition along the normal, legible path — catching the rationalization, haste, or drift that produces an unintended force-push typed in a hurry, an unreviewed merge clicked past, or a stray mutating command run without thinking. They are not designed, and are not claimed, to withstand an adversary who has already decided to defeat the tool. Someone motivated to bypass their own guard rails would simply not invoke TH's guarded path at all — these hooks add friction and visibility for a cooperating user, they do not sandbox an untrusted or hostile actor. This is a calibrated engineering-cost decision, not an oversight: hardening these guards to withstand every user as a potential adversary would make developing and maintaining TH prohibitively expensive for no proportionate benefit, since an actual adversary would simply not use TH at all — the guards only add friction and visibility for a cooperating user, so a hostile actor gains nothing from working within them and loses nothing by working outside them. This is why an obfuscated-evasion residual is out of the threat model by definition, not merely hard to close: a construction built specifically to defeat the analyzer is, by construction, outside the population these guards exist to help. This is a deliberate, permanent design stance, not a temporary gap awaiting the next patch.
+
+**Scope of this framing.** Everything above and below in this section describes TH's OWN outward-action guard hooks — `policy-block`, `dev-guard`, `gate-guard` — the floors that gate the operator's own git and outward actions on their own system. It does not apply to, and must not be read as governing, the security-review work this repository's pipeline performs on application repositories it is invoked against. This pipeline's own `security` and `adversary` agents, when auditing a user's application code, keep a real adversarial threat model by default: a finding is taken seriously — fixed, or explicitly operator-risk-accepted with a documented rationale — never merely documented and deferred because reaching it required obfuscation or cleverness. The "sustain the honest developer's disposition, document rather than chase" framing is a statement about the harness's own legible-path guard hooks, not about how the pipeline evaluates security in the code it reviews for others.
+
+**Why a bounded resolver, not a complete one.** Because the threat model above is scoped to sustaining the honest developer's disposition, not to defeating an adversary, a resolver that recognizes the command shapes normal developer and pipeline usage actually produces — and fails closed whenever a shape falls outside that recognized set — is the right-sized engineering answer; chasing every conceivable obfuscation would mean solving a problem outside this tool's actual scope. That right-sizing is reinforced by a genuine technical limit: recognizing every way a POSIX-family shell can interpret an arbitrary byte string — across quoting, parameter/command/arithmetic expansion, word splitting, multi-layer process wrapping, and interpreter-embedded execution — is undecidable in general for a client-side static analyzer, since a shell's runtime behavior depends on environment state (`$IFS`, exported variables, aliases, functions, `PATH` order) that a pre-execution parse cannot fully observe. Chasing every new obfuscation with another special case would also reopen the failure mode this repo already retired once for the force-push floor (`docs/knowledge.md`'s character-denylist decision): each patch closes the one construction found and leaks the next spelling of the same gap. The engineering answer applied here has four parts, none of them an absolute guarantee on its own:
+
+1. **Bounded resolver** — `analyzeCommand`/`classifyCoveredAction` (`hooks/ts/bodies/command-lexer.ts`) recognize the command shapes a normal developer, script, or CI wrapper actually produces: direct commands, the modeled runner prefixes, the modeled shell/`eval`/`xargs` wrappers, and per-subcommand-binary dispatch — see § Detection mechanism above for the mechanism detail.
+2. **Fail-closed on ambiguity** — an unresolvable token (`tainted`), an unresolvable wrapper payload (`unresolvableShellPayload`), or an exceeded unwrap depth (`depthExceeded`) is surfaced as `requiresFailClosed` rather than silently treated as "no covered action"; the consuming hook then asks or denies instead of guessing `allow`.
+3. **Documented residuals** — every construction the resolver does not structurally unify is enumerated below, not silently absorbed into "closed."
+4. **Defense-in-depth** — the client-side gate is one layer among several. Server-side branch protection is the authoritative floor for an unauthorized push regardless of any client-side gap; `gh pr merge` stays `ask` unconditionally; force-push stays deny-in-lane/ask-outside-lane regardless of how the command was assembled; human review at STAGE-GATE-3 / PR review is the last check before a change lands.
+
+**What this design closes (mechanism detail: § Detection mechanism above).** Relative to the retired raw-string boundary-class/char-gate routers, the resolved-argv analyzer closes: wrapper-embedded quoted commands (`bash -c "git push origin main"`, `eval`, a literal `echo`/`printf`-to-shell pipe); the per-subcommand-binary dispatch form (`$(git --exec-path)/git-push`, case/`.exe`-variant binaries) via `classifyCoveredAction`'s centralized basename normalization; `xargs` replacement-string forms (`-I{}`/`-i`, fail-closed rather than misread as a literal payload); cross-hook case- and `.exe`-insensitive binary resolution (one centralized resolution, not a per-hook fallback); a capability-audited `SAFE_NON_EXECUTING_BASENAMES` exemption list for read-only/data-only tools; and the multi-call-dispatcher direct form (`busybox sh -c ...`) via `detectDispatcherShellCPayload`. It also removes friction: a benign non-force push to a non-default branch on `origin` — including a colon refspec or a quoted-but-literal destination — resolves to `allow` under `matchBenignPushGrammar` instead of prompting.
+
+**Scope boundary of the legible-path gate (honestly disclosed, not an unclosed adversarial gap).** The constructions below sit outside what a normal-usage-support gate is built to recognize — they are not failures of an otherwise-adversarial-security mechanism, because no such mechanism is claimed here:
+
+- **Runner-prefix composed with a shell `-c` wrapper** (`env sh -c "git push origin main"`, `timeout 5 sh -c "<covered>"`) — the modeled runner prefixes (`RUNNER_MODELS`) are resolved during classification (`classifyCoveredAction`), while shell/`eval`/`xargs` payload unwrapping is resolved during tokenization (`analyzeCommand`, keyed on argv[0]); the two passes do not compose into a single recursive resolution, so a runner immediately followed by a shell `-c` payload is not unwrapped.
+- **A covered action buried inside an interpreter's own program-text argument** (`awk 'BEGIN{system("git push")}'`, `perl -e '...'`, `python -c '...'`, GNU `sed`'s `e` command) — the forward-scan is token-granular and cannot see inside a single quoted program-text token; closing this would require parsing each interpreter's own grammar, which the analyzer deliberately does not attempt (see the "structural default" note in § Detection mechanism).
+- **A multi-call dispatcher invoking an unrecognized-shell-name applet, or a second layer of dispatcher nesting** (`busybox <exotic-shell> -c ...`, `busybox env sh -c ...`) — `detectDispatcherShellCPayload` recognizes any dispatcher piping through a name already in `SHELL_BASENAMES`, generalizing across dispatcher basenames (`busybox`/`toybox`/a renamed binary), but an unrecognized shell name or a second layer of dispatch is outside what one recognizer pass resolves.
+- **Parser-differential constructions** (brace expansion, `$IFS`-based word splitting, line continuation) that could cause the analyzer's tokenization to diverge from what the shell actually executes — the analyzer resolves STRUCTURE, never shell EXPANSION; any token carrying an unresolved metacharacter is marked `tainted` and fails closed, but a construction that changes word boundaries themselves, rather than substituting inside an already-bounded token, is a class the tokenizer does not model.
+- **`ssh <host> "<covered action>"`** — never modeled as a wrapper, unchanged from the retired mechanism; an operator with `ssh` access to the target host already has code execution there independent of this gate.
+
+**Follow-on.** Adversarial-evasion concerns are out of this gate's threat model by definition — per the framing above, a construction built to defeat the analyzer is, by construction, outside the population this gate protects. Anyone who genuinely needs a defense against an actively hostile local actor needs a permission/sandbox architecture, tracked separately as issue #505; that is out of scope here.
 
 ---
 
@@ -57,47 +103,51 @@ The gate fires UNCONDITIONALLY for covered outward actions and gates by destinat
 - `policy-block`'s unconditional flag-based force-push deny (`hooks/ts/bodies/policy-block.ts:295` — `/git\s+push\s+(?:[^|]*\s)?(-f\b|--force\b|--force-with-lease)/i`), which applies in every context, pipeline or not.
 - `dev-guard`'s outside-lane `ask` on a `+`-prefixed refspec (`hooks/ts/bodies/dev-guard.ts:559-561`), destination-only, with no lane-state read.
 
-**Detection mechanism (Invariant G) — a shared closed positive grammar, not a
-character-denylist.** `gate-guard`'s force/shape check calls `command-lexer.ts`'s
-`matchBenignPushGrammar(rawCmd)`. It permits ONLY the exact benign push shape — `git
-push [-u|--set-upstream|-v|--verbose|--progress] origin <plain-branch>`, where
-`<plain-branch>` excludes any ref-namespace-qualified or tag-like destination (a
-destination whose first `/`-segment is `refs`/`heads`/`tags`/`remotes`, checked via
-`isPlainBranchDestination`), with the `origin <plain-branch>` positional pair
-required and every character of the command inside the safe set
-`[A-Za-z0-9 _./-]` — and denies every deviation from that one shape: no force flag, no
-`+`-prefixed refspec, and no character-based reconstruction technique (quoting,
-backslash-escaping, `$`-expansion/substitution, backtick substitution, brace
-expansion, globbing, process substitution) can pass, because each requires a character
-outside the safe set. A dash-prefixed positional (`git push origin -f`) is closed
-separately: every dash-prefixed token, in any position, is classified as a flag and
-checked against the same benign allowlist. This replaces an earlier character-denylist
-implementation of the same invariant, defeated three times by three different shell
-token-reconstruction techniques — a denylist can only enumerate the constructions it
-already knows about, while a positive grammar denies anything that is not the one
-permitted shape, known or not. `dev-guard`'s Step 0 push char-gate (`rejectShell
-QuotingOrComposition`) consumes the same shared `isLiteralSafeCommand` predicate, so
-both hooks apply an identical, single-sourced char-gate rather than two independently
-maintained denylists.
+**Detection mechanism (Invariant G) — a shared closed positive grammar over resolved
+argv, not a character-denylist.** `gate-guard`'s force/shape check consumes the same
+shared analyzer described above (`command-lexer.ts::analyzeCommand` +
+`classifyCoveredAction`) to resolve the executed command — including through a
+command-executing wrapper or a per-subcommand binary — to argv, then calls
+`matchBenignPushGrammar(argv, tainted, reader)` on the RESOLVED argv. It permits ONLY
+the exact benign push shape — `git push [-u|--set-upstream|-v|--verbose|--progress]
+origin <plain-branch>`, where `<plain-branch>` excludes any ref-namespace-qualified or
+tag-like destination (checked via `isPlainBranchDestination`) — and denies every
+deviation from that one shape: no force flag, no `+`-prefixed refspec, and no token
+that stayed `tainted` (an unresolved `$`-expansion, substitution, brace expansion, or
+glob) can pass, because the grammar rejects any tainted token outright rather than
+inspecting its characters against a fixed safe set. A dash-prefixed positional (`git
+push origin -f`) is closed separately: every dash-prefixed token, in any position, is
+classified as a flag and checked against the same benign allowlist. This replaces an
+earlier character-denylist implementation of the same invariant, defeated three times
+by three different shell token-reconstruction techniques — a denylist can only
+enumerate the constructions it already knows about, while a positive grammar over
+resolved argv denies anything that is not the one permitted shape, known or not,
+INCLUDING a shape reached only through a wrapper or a per-subcommand binary that the
+retired string-level grammar never saw. `gate-guard` (force+order deny) and
+`dev-guard`'s push gate both consume this single shared analyzer and grammar module —
+one source of truth, never duplicated.
 
-**Honest scope of the grammar (string-level, not resolved-execution-level).** The
-grammar reasons about what the git-push command STRING can express, not the resolved
-argv, binary, git config, or environment a real shell would ultimately execute. A `git`
-shell alias or function, a shadowing `git` binary earlier on `PATH`,
-`push.default`/`remote.origin.push` git config (closed for the commands that pass the
-grammar by the required `origin <plain-branch>` positional, since those config keys
-only apply to a bare/no-refspec push), or a `GIT_*` environment-variable override are
-all out of scope by design — an attacker who controls any of those already has code
-execution in the session and does not need to smuggle a force-push through a git
-command string. This is the same class of limit every string-inspecting hook in this
-repo already carries (`policy-block`, `dev-guard`, the retired denylist), not a
-regression introduced by this mechanism.
+**Honest scope of the grammar (resolved-argv-level, still not full shell
+semantics).** The grammar reasons about the RESOLVED argv the analyzer could
+statically determine, not everything a live shell might ultimately execute. An
+env-assignment prefix (`GIT_SSH_COMMAND=x git push …`), a `git -c <k=v>` config
+override, or a tree/exec-path-redirecting global option (`--git-dir`, `--work-tree`,
+`--namespace`, `--exec-path`, a non-exact `-C`) on a covered push is surfaced by the
+analyzer and the consuming hook fails closed on it — these are no longer silently out
+of scope, unlike the retired string-level grammar. What remains genuinely out of scope
+by design: git config already persisted in the repository (`push.default`,
+`remote.origin.push`, a `.gitconfig` URL rewrite), a `git` shell alias or function, a
+shadowing `git` binary earlier on `PATH`, and remote execution via `ssh <host>
+"<cmd>"` — an attacker who controls any of those already has code execution in the
+session or on the target host and does not need to smuggle a force-push through a git
+command string. This is the same class of limit every parse-based hook in this repo
+carries (`policy-block`, `dev-guard`), not a regression introduced by this mechanism.
 
 **Non-redundancy rationale.** `gate-guard`'s own deny is not superfluous: (i) it gives `gate-guard` a self-sufficient in-lane guarantee that does not depend on a sibling hook's regex never changing — a defense-in-depth stance consistent with this repo's own recurring lesson that a contract enforced at one site alone tends to drift from its siblings; (ii) it is the ONLY hook that closes the `+refspec` sub-form for the in-lane case — `policy-block`'s flag-only regex does not match a bare `+`-prefix, and `dev-guard`'s handling of that sub-form is destination-only and never reads pipeline-lane state.
 
 **This design never touches or works around server-side branch protections.** Nothing here bypasses, disables, or reconfigures a repository's branch-protection rules. Mutating `gh api` writes remain `ask` under `dev-guard`, unchanged.
 
-**The philosophy this design anchors: only two hard points.** Force-push (deny in-lane, `ask` outside) and merge (always `ask`, non-configurable) are the only two hard points in the outward-action model; every other git operation — branching, committing, pushing to a feature branch, opening a PR — stays frictionless. "Merge" in this statement means a **PR merge** — `gh pr merge`, or any action that lands commits on `main` or another protected branch — never a LOCAL `git merge origin/main` into the pipeline's own working branch (an ordinary fast-forward/update, which is unremarkable git handling and must never be asked or denied). This distinction holds in the actual matcher: `dev-guard.ts`'s `GH_PR_MERGE_RE` (`hooks/ts/bodies/dev-guard.ts:211-212`) matches only the literal `gh pr merge` CLI subcommand — lexically distinct from `git merge` — and `gate-guard.ts` introduces no matcher for any form of "merge" at all; a local `git merge` is not a covered action for either hook.
+**The philosophy this design anchors: only two hard points.** Force-push (deny in-lane, `ask` outside) and merge (always `ask`, non-configurable) are the only two hard points in the outward-action model; every other git operation — branching, committing, pushing to a feature branch, opening a PR — stays frictionless. "Merge" in this statement means a **PR merge** — `gh pr merge`, or any action that lands commits on `main` or another protected branch — never a LOCAL `git merge origin/main` into the pipeline's own working branch (an ordinary fast-forward/update, which is unremarkable git handling and must never be asked or denied). This distinction holds at the classification level: the shared analyzer resolves a covered `gh pr merge` invocation to argv `["gh", "pr", "merge", …]` — lexically distinct from `git merge` — and `gate-guard` introduces no classification for any form of "merge" at all; a local `git merge` is not a covered action for either hook.
 
 ---
 

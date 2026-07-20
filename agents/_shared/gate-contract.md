@@ -45,16 +45,20 @@ floor as covering every outward action unconditionally, which overstated it — 
 closes the ORDER gap only for a push/pr-create that `gate-guard` can attribute to a
 detected pipeline lane.
 
-**Detection is via string-pattern matching, with the same residual `dev-guard` already
-discloses.** `gate-guard`'s covered-verb routers (`GIT_PUSH_RE`/`GH_PR_CREATE_RE`) are
-boundary-character-class regexes over the literal command string — the same router
-shape `dev-guard` and `policy-block` use, and the same class of limit
-`docs/dev-mode.md § Outward-Action Gate ("Residual limit")` already discloses for that
-hook: a sufficiently deliberate reconstruction of the gated verb so no router ever sees
-it as a contiguous token (e.g., invoking a subcommand through its own per-subcommand
-executable rather than the literal words "git push") evades all three hooks identically,
-with no operator-visible warning. This is a known, accepted, pre-existing limitation of
-the string-matching approach — not something this design claims to close.
+**Detection is parse-based, via the shared command analyzer.** `gate-guard`'s
+covered-verb detection resolves the executed command through the same shared analyzer
+`dev-guard` and `policy-block` consume (`hooks/ts/bodies/command-lexer.ts::analyzeCommand`
++ `classifyCoveredAction`) — recursive wrapper resolution plus per-subcommand-binary
+basename equivalence, not a boundary-character-class regex over the literal string. A
+covered verb reconstructed through a wrapper (`bash -c "git push …"`) or invoked via its
+own per-subcommand executable (`git-push`, `$(git --exec-path)/git-push`) now resolves
+to the same classified command as the literal dispatcher form, closing the evasion this
+paragraph previously disclosed as accepted. The residual static-resolution limits that
+remain — a dynamic verb/executable token, a statically-unresolvable pipe-to-shell
+payload, recursion-depth-exceeded, script-file execution, alias/PATH-shadowing
+execution, and `ssh <host> "<cmd>"` — are documented in
+`docs/dev-mode.md § Outward-Action Gate / § Detection mechanism` and fail CLOSED
+(`ask`/`deny`), never silently treated as "no covered action."
 
 **Force-push clause (Invariant E, operator-mandated).** No outward action from a
 detected pipeline context force-pushes — neither the flag form (`-f`, `--force`,
@@ -64,26 +68,35 @@ never legitimate from an in-lane pipeline delivery, so `ship` does not authorize
 `gate-guard` is the in-lane enforcer for both forms, evaluated on the same `git push`
 invocation it already inspects for the order check above.
 
-**Detection mechanism (Invariant G, `hooks/ts/bodies/command-lexer.ts::matchBenignPushGrammar`)
-— a closed positive grammar, not a character-denylist.** An earlier implementation of
-Invariant E enumerated bad characters/flags and was defeated three times by three
-different shell token-reconstruction techniques (whole-token quoting, mid-token
-quote-splicing, then brace expansion/backtick substitution). The replacement permits
-ONLY the exact benign push shape — `git push [-u|--set-upstream|-v|--verbose|
+**Detection mechanism (Invariant G, `hooks/ts/bodies/command-lexer.ts::matchBenignPushGrammar`
+over resolved argv) — a closed positive grammar, not a character-denylist.** An earlier
+implementation of Invariant E enumerated bad characters/flags and was defeated three
+times by three different shell token-reconstruction techniques (whole-token quoting,
+mid-token quote-splicing, then brace expansion/backtick substitution). The replacement
+permits ONLY the exact benign push shape — `git push [-u|--set-upstream|-v|--verbose|
 --progress] origin <plain-branch>`, where `<plain-branch>` excludes any
 ref-namespace-qualified or tag-like destination (a destination whose first
 `/`-segment is `refs`/`heads`/`tags`/`remotes`, checked via
-`isPlainBranchDestination`), every character of the command in the safe set
-`[A-Za-z0-9 _./-]` — and denies every deviation from that one shape. An
-obfuscation technique never specifically considered still lands on the deny
-side, because it is not the one permitted shape, not because it was
-individually detected. `gate-guard` (force+order
-deny) and `dev-guard`'s Step 0 push char-gate both consume this single shared grammar
+`isPlainBranchDestination`) — validated against the RESOLVED argv the shared analyzer
+produces (after recursive wrapper unwrapping and basename resolution), not the raw
+command string: any token that still carries an unresolved shell metacharacter is
+marked `tainted` and the grammar rejects it outright, rather than inspecting its
+characters against a fixed safe set. An obfuscation technique never specifically
+considered still lands on the deny side, because it is not the one permitted shape or
+it stayed tainted, not because it was individually detected — INCLUDING a shape reached
+only through a command-executing wrapper or a per-subcommand binary, which the retired
+string-level grammar could not see at all. `gate-guard` (force+order
+deny) and `dev-guard`'s push gate both consume this single shared analyzer and grammar
 module — one source of truth, never duplicated. Honest scope: the grammar reasons
-about the command STRING, not the resolved argv/binary/config/environment — a `git`
-alias or shadowing binary, `push.default`/`remote.origin.push` config, or a `GIT_*`
-environment override are out of scope by design (an attacker controlling any of those
-already has code execution in the session).
+about the resolved argv the analyzer could statically determine, not everything a live
+shell might ultimately execute — an env-assignment prefix, a `git -c <k=v>` config
+override, or a tree/exec-path-redirecting option on a covered push is surfaced by the
+analyzer and fails closed on the consuming hook, no longer silently out of scope; what
+remains genuinely out of scope by design is git config already persisted in the
+repository (`push.default`, `remote.origin.push`), a `git` shell alias or function, a
+shadowing `git` binary earlier on `PATH`, and `ssh`-remote execution — an attacker
+controlling any of those already has code execution in the session or on the target
+host.
 
 This clause layers on top of two pre-existing floors that this design does **not**
 change:
