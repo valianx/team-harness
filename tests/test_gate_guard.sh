@@ -252,9 +252,11 @@ assert_nodecision "AC-7: branch-in-place, gate3_release: ship -> none" \
 rm -rf "$TMP"
 
 # ---------------------------------------------------------------------------
-# Worktree topology — correlation via realpath(cwd()) -> `worktree` field,
-# with working_branch DELIBERATELY non-matching so only the worktree-realpath
-# path (not branch correlation) can resolve the lane (F-1 companion path).
+# Worktree topology — correlation via realpath(cwd()) -> `worktree` field.
+# The lane declares NO working_branch (its pre-branch window), so only the
+# worktree-realpath path can resolve it (F-1 companion path). A declared
+# working_branch that mismatches the current branch now defers instead — see
+# the branch-scoped correlation case below.
 # ---------------------------------------------------------------------------
 echo
 echo "=== Worktree topology: cwd realpath correlates to \`worktree\` field ==="
@@ -263,11 +265,37 @@ if ! command -v git >/dev/null 2>&1; then
 else
     BASE=$(mktemp -d)
     read -r MAIN_REPO WT_DIR WT_BRANCH <<< "$(make_worktree_pair "$BASE")"
-    # working_branch intentionally mismatches the worktree's real branch —
-    # only the worktree-realpath correlation can resolve this lane.
-    make_lane_state "$WT_DIR" "$(lane_fields null unrelated-working-branch "$WT_DIR")"
-    assert_deny "worktree topology: cwd realpath matches \`worktree\` field (branch mismatch), gate3_release: null -> deny" \
+    # working_branch absent (literal null) — only worktree-realpath correlates.
+    make_lane_state "$WT_DIR" "$(lane_fields null null "$WT_DIR")"
+    assert_deny "worktree topology: cwd realpath matches \`worktree\` field (pre-branch lane), gate3_release: null -> deny" \
         "$WT_DIR" "$(push_payload "git push origin $WT_BRANCH")"
+    rm -rf "$BASE"
+fi
+
+# ---------------------------------------------------------------------------
+# Branch-scoped correlation — a lane that DECLARES a working_branch owns
+# exactly that branch. Non-pipeline (inline-posture) work on a different
+# branch in the same directory must defer to dev-guard, not be captured by
+# an order gate it can never satisfy (regression: /th:inline ship blocked
+# by a stale non-terminal lane state).
+# ---------------------------------------------------------------------------
+echo
+echo "=== Branch-scoped correlation: declared working_branch mismatch defers ==="
+if ! command -v git >/dev/null 2>&1; then
+    echo "  [SKIP] branch-scoped correlation: git not found on PATH"
+else
+    BASE=$(mktemp -d)
+    read -r MAIN_REPO WT_DIR WT_BRANCH <<< "$(make_worktree_pair "$BASE")"
+    # worktree realpath matches cwd, but the lane's declared branch is another
+    # branch entirely — the current work is not the lane's delivery.
+    make_lane_state "$WT_DIR" "$(lane_fields null unrelated-working-branch "$WT_DIR")"
+    assert_nodecision "branch-scoped: worktree matches but declared working_branch differs, gate3_release: null -> none (defer to dev-guard)" \
+        "$WT_DIR" "$(push_payload "git push origin $WT_BRANCH")"
+    # Control: same lane state, current branch equals the declared branch ->
+    # the order gate still denies (the lane's own delivery stays gated).
+    git -C "$WT_DIR" checkout -q -b unrelated-working-branch
+    assert_deny "branch-scoped (control): declared working_branch checked out, gate3_release: null -> deny" \
+        "$WT_DIR" "$(push_payload 'git push origin unrelated-working-branch')"
     rm -rf "$BASE"
 fi
 

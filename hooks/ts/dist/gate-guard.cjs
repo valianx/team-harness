@@ -884,8 +884,8 @@ function gatherCandidatePaths(reader) {
 }
 function laneCorrelates(content, currentBranch, cwdReal, reader) {
   const workingBranch = readField(content, "working_branch");
-  if (workingBranch !== null && currentBranch !== null && workingBranch === currentBranch) {
-    return true;
+  if (workingBranch !== null && workingBranch !== "null" && currentBranch !== null) {
+    return workingBranch === currentBranch;
   }
   const worktreeField = readField(content, "worktree");
   if (worktreeField !== null && worktreeField !== "null" && cwdReal !== null) {
