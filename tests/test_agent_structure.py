@@ -37339,11 +37339,11 @@ check(
     "s172(state-field): 00-state.md schema declares plan_review_status with "
     "the not-applicable/deferred/reviewed-pass/reviewed-concerns/skipped vocabulary",
     "plan_review_status:" in _s172_orch
-    and "not-applicable" in _s172_orch
-    and "reviewed-pass" in _s172_orch
-    and "reviewed-concerns" in _s172_orch,
+    and "not-applicable | deferred | reviewed-pass | reviewed-concerns | skipped | null"
+    in _s172_orch,
     "agents/orchestrator.md must declare plan_review_status in the "
-    "00-state.md § Current State schema with its full value vocabulary",
+    "00-state.md § Current State schema with its full value vocabulary "
+    "(including deferred and skipped)",
 )
 check(
     "s172(trace-events): plan_review.deferred / plan_review.offered / "
@@ -37430,9 +37430,10 @@ check(
     "s172(phase18-autonomous-skip): approve autonomous skips Phase 1.8 and "
     "records plan_review_status: skipped",
     "skips this section entirely" in _s172_orch
-    and "this offer never fires" in _s172_orch,
+    and "this offer never fires" in _s172_orch
+    and "set `plan_review_status: skipped` at that same recording step" in _s172_orch,
     "agents/orchestrator.md must state that approve autonomous skips "
-    "Phase 1.8 entirely",
+    "Phase 1.8 entirely and records plan_review_status: skipped",
 )
 check(
     "s172(canonical-phase-1.8): 1.8 is registered in this test file's own "

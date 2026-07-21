@@ -11,7 +11,7 @@ name: plan-review
 ## Mode 1 — Feature name provided
 
 1. Pass to the `leader` agent:
-   ```
+   ```text
    Direct Mode Task:
    - Mode: plan-review
    - Feature: {feature-name}
