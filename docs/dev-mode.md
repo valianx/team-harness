@@ -274,6 +274,22 @@ The gate does NOT re-implement the review-mode publish gate. It reinforces it wi
 
 ---
 
+## Threat model — honest-developer disposition
+
+TH users are developers working on their own systems. The guards, gates, and floors described throughout this repo support the honest-developer disposition — catching rationalization, haste, and drift on the readable path — they are NOT a security boundary against an active adversary.
+
+The observation that someone determined to break a system would not route the attack through the harness — which only adds friction and visibility — is bound specifically to the injected-content / deliberate-obfuscation vector, for which CLAUDE.md §6.6's own prompt-injection floor is the primary defense. It never justifies waving off a gate's incorrect behavior on an honest, readable input.
+
+A gate or floor that does the WRONG thing on a plain, readable, non-obfuscated input — a logic error, a destination/classification mistake, a missing or fail-open check, an incorrect predicate — is ALWAYS an in-scope defect, chased through iterations like any other finding, and is NOT covered by this disposition. This disposition covers ONLY the residual where a gate behaves correctly on every readable input and can be defeated solely by deliberate obfuscation that reconstructs a gated token the string-matching gate cannot see as a contiguous string (the `eval`/`base64`/quote-splicing/`$`-expansion class enumerated at `docs/dev-mode.md:39`, this same file's "Residual static-resolution limits" section above).
+
+Only that obfuscation-evasion residual of string-matching gates is a documented, disclosed limitation — not chased through pipeline iterations, and outside this threat model — recorded honestly where it lives.
+
+A limitation qualifies as "documented, not chased" only when it is BOTH (a) disclosed in-place where it lives, AND (b) scoped out through a legitimate mechanism — the architectural-inevitability limit for the string-matching-gate case is the canonical example. (A previously-tracked second example, the mid-iteration classification-timing gap in the retired per-task Phase-3 security dispatch, was closed structurally by the Pre-Delivery Security Audit: `security` now audits every delivery group's consolidated final diff unconditionally, so a control introduced by any patch iteration is always reviewed regardless of the task's classification — `agents/orchestrator.md § "Phase 3.8 — Pre-Delivery Security Audit"`.) Cross-ref: this file's "Residual static-resolution limits" section.
+
+This disposition is narrowly scoped to the residual class described above. It does NOT license skipping any real in-scope finding, does NOT weaken or waive any floor, and does NOT change when or whether `security`/`adversary` dispatch — security floors stay non-waivable.
+
+---
+
 ## Installation
 
 `/th:setup` installs the outward-action gate by:

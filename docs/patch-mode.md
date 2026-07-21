@@ -13,7 +13,7 @@ Every verifier that writes a `failure-brief.md` declares a **blast radius** — 
 
 ## Classification Rules
 
-The verifier (tester / qa / security) declares blast radius in the `failure-brief.md` entry:
+The verifier (tester / qa) declares blast radius in the `failure-brief.md` entry:
 
 ```markdown
 **Blast radius:** localized {AC-2, STEP-3} | structural
@@ -48,16 +48,84 @@ After a localized patch, the orchestrator re-runs only the verifier(s) whose dom
 
 | Case | Localized re-run | Full re-run (structural) |
 |------|-----------------|--------------------------|
-| A (impl) | `tester` + `qa` (security skipped unless patch touches security-sensitive code) | `tester` + `qa` + `security` |
+| A (impl) | `tester` + `qa` | `tester` + `qa` |
 | B (design) | `plan-reviewer` only | all verifiers |
 | C (criteria) | all verifiers (criteria changes always touch everything) | all verifiers |
-| D (security-only) | `security` only — plus mandatory coherence gate (`qa` validate on patched AC IDs, per § Coherence Gate) | `security` only |
+
+**No security-lens re-run exists in this table.** `security` and `adversary` do not participate in Phase-3 patch iterations: they run exactly ONCE per delivery group at the Pre-Delivery Security Audit (`agents/orchestrator.md § "Phase 3.8 — Pre-Delivery Security Audit"`), over the consolidated final diff, after all patch iterations have closed — so no patch can stale their verdict and no patch triggers their re-dispatch. Their findings are disposed by the operator at STAGE-GATE-3, never routed into this table. The audit's position is itself the staleness protection: nothing ships that the audit did not see, and the only re-audit is the single operator-caused amend re-run (`agents/orchestrator.md § "Re-audit on amend"`).
+
+## Cost-Ordered Patch-Iteration Re-Run Sequencing
+
+> Extends the Selective Verifier Re-Run table above (§ "Selective Verifier Re-Run") with an
+> ordering layer: WHICH verifiers re-run per Case is unchanged; this section fixes the ORDER and
+> the gating between them within one iteration. Wired at `agents/orchestrator.md § "If any agent
+> fails → ITERATE"` (the R0/R1/R2 subsection, inserted after the Case → routing table);
+> cross-referenced at `docs/pipeline-lanes.md § 7`.
+
+**Scope.** Applies to Case A with `Blast radius: localized {IDs}`. `Blast radius:
+structural` never narrows — see "Structural fail-safe" below.
+
+**Why this exists.** The Case → routing table's "Verifier re-run" column names a SET of verifiers
+per Case, re-dispatched in full on every iteration. Sequencing the same set by cost-per-signal —
+cheapest first, each stage gating the next — spends zero reasoning-lens tokens on a patch that a
+deterministic re-run already rejects, without changing which lenses are eligible to run or the
+combined-verdict formula they feed.
+
+### Owner attribution — by brief header, not by Case letter
+
+The **finding-owner** is the lens named in the `## Iteration {N} — {agent}` header of the
+`failure-brief.md` entry (`agents/orchestrator.md § "If any agent fails → ITERATE"`) — the lens
+that raised the blocking finding — NOT the Case letter, which only routes the producer.
+**Case → producer; brief author → owner.** Multi-owner: when more than one lens appealed in
+iteration N, the owner set is the set of `{agent}` values across that iteration's headers; every
+owner must close before R2 is eligible.
+
+### The three stages, per localized iteration (Case A)
+
+- **R0 — Deterministic test gate (always first, cheapest).** Before dispatching any reasoning
+  lens, the orchestrator runs the frozen suite deterministically — a direct Bash run, the same
+  pattern as Phase 3.75 build verification. Red is a confirmed regression: append a Case A brief
+  entry (`Blast radius: localized {failing test IDs}`), bounce to the producer immediately, and
+  spend zero lens tokens. Green enables R1.
+- **R1 — Owner-lens re-verification (delta-scoped).** With R0 green, re-dispatch ONLY the owner
+  lens (`qa` or `tester`, per the header-based attribution above); the delta-scope descriptor is
+  the brief's `Blast radius: localized {IDs}` field. Owner still open (`fail`) → append a brief
+  entry, bounce to the producer, zero tokens spent on the non-owner lens. Owner closed (`pass`) →
+  enables R2.
+- **R2 — Single consolidated final-state confirmation (delta-scoped, non-owner lens).** With
+  every owner closed, the orchestrator issues exactly ONE delta-scoped dispatch of the non-owner
+  lens over the final patched state — NOT a fresh full base pass. The combined verdict is computed
+  over both lenses' final verdicts with the unchanged formula (`agents/orchestrator.md § "Gate —
+  combined verdict"`). A fail on any lens in R2 opens a new iteration (counts against max-3).
+
+**How R2 differs from a fresh base pass.** The base pass runs both lenses in parallel, each
+reviewing the full diff. R2 runs only the non-owner lens, delta-scoped. It is cheaper on two
+axes: (a) fewer lenses, (b) delta-scope instead of a full diff review. Stateless-dispatch honesty
+(§ "Stateless-Dispatch Honesty" below) still applies: every lens still reads its inputs at
+dispatch start; the saving is fewer lenses, fewer generation tokens, and delta-scoped reads —
+never zero-read.
+
+**Structural fail-safe.** For `Blast radius: structural`, R0 still runs first, but the R1
+"owner-only" and R2 "confirmation" stages collapse: the COMPLETE Case-row verifier set runs.
+A structural change is never narrowed to a localized patch's R1/R2 shape.
+
+### Byte-consistency requirement (3-site invariant)
+
+| Site | File | Anchor |
+|------|------|--------|
+| Canonical contract | `docs/patch-mode.md` (this file) | § Cost-Ordered Patch-Iteration Re-Run Sequencing |
+| Orchestrator wiring | `agents/orchestrator.md` | § "If any agent fails → ITERATE" — R0/R1/R2 subsection |
+| Cross-reference | `docs/pipeline-lanes.md` | § 7 |
+
+A future edit to the sequencing rule at one site without the other two desynchronizes the
+contract — the same failure mode § "Byte-consistency requirement" (Stage-1 panel re-firing,
+below) already guards against, at the same pattern.
 
 ## Coherence Gate (Mandatory — Never Skipped)
 
 After every localized patch, the orchestrator runs a coherence gate to confirm the patch did not introduce inconsistency. The gate is selective (cheaper) but never absent:
 
-- **Patch of implementation (Case A/D localized):** dispatch `qa` in validate mode on the patched AC IDs. Pass → clear iteration. Fail → new iteration (counts against max-3).
+- **Patch of implementation (Case A localized):** dispatch `qa` in validate mode on the patched AC IDs. Pass → clear iteration. Fail → new iteration (counts against max-3).
 - **Patch of plan (Case B localized):** dispatch `plan-reviewer` on the updated `01-plan.md`. Pass → clear iteration. Fail/concerns → new iteration.
 
 **Patch mode makes iteration cheaper, not gateless.** This is the invariant: every localized path still goes through a gate before proceeding.

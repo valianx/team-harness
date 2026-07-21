@@ -51,7 +51,7 @@ Concurrent implementers never contend on the same working tree because each hold
 
 ## Concurrent implementer fan-out
 
-Dispatch N implementers in parallel via concurrent `Task` calls in the parent orchestrator session. This is the same in-message mechanism already used for `tester + qa + security` at Phase 3 and for project lanes in `## Parallel Multi-Project Dispatch`.
+Dispatch N implementers in parallel via concurrent `Task` calls in the parent orchestrator session. This is the same in-message mechanism already used for `tester + qa` at Phase 3 and for project lanes in `## Parallel Multi-Project Dispatch`.
 
 Cap the concurrency at `batch_concurrency` (default 5) using the eager slot-fill wave model from `agents/leader.md § Multi-Task fan-out`: fill all available slots immediately, and as each item finishes open the slot to the next queued item. This mirrors the Stage-1 planning fan-out (N architects + N plan-reviewers) on the implementation side.
 

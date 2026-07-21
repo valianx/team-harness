@@ -85,8 +85,8 @@ The Bug-fix Pipeline is **tier-classified** at Phase 0a (Classify) so trivial bu
 | **0** | Trivial/Cosmetic | Skipped | Skipped | tester only (suite no-regress; no full audit) | **None** — no `workspaces/` folder created |
 | **1** | Docs/Trivial | Skipped — one-sentence prose plan | Conditional skip when no behavior change | tester (suite no-regress) only | Yes — minimal |
 | **2** | Light fix | Architect with `mode: light-root-cause`, ≤30 lines | Mandatory | tester + qa | Yes — full |
-| **3** | Standard fix | Architect with `mode: full-root-cause`, 1 pg max | Mandatory | tester + qa + security | Yes — full |
-| **4** | Critical/Security | Architect with `mode: full-root-cause` + mandatory `## Prior Art` (`mcp__memory__search_nodes`) | Mandatory | tester + qa + security (extended analysis) | Yes — full + prior-art |
+| **3** | Standard fix | Architect with `mode: full-root-cause`, 1 pg max | Mandatory | tester + qa (security at the Phase 3.8 audit) | Yes — full |
+| **4** | Critical/Security | Architect with `mode: full-root-cause` + mandatory `## Prior Art` (`mcp__memory__search_nodes`) | Mandatory | tester + qa (security at the Phase 3.8 audit, extended analysis) | Yes — full + prior-art |
 
 **Tier 0 — no workspaces.** Genuinely cosmetic changes (typo in a comment, whitespace in README, CHANGELOG typo): the implementer makes the fix, runs tests, and opens the PR. No `00-state.md`, no `01-plan.md`, no workspaces folder. The PR review is the only gate. Auto-classifies when all of: single file, ≤5 lines changed, docs/comment/whitespace-only path, no test paths, no system-level files (`agents/*.md`, `skills/*.md`, `cmd/install/*.go`). Declare explicitly with `[TIER: 0]`.
 
