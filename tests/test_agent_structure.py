@@ -1714,7 +1714,7 @@ for ref in sorted(plausible_agent_refs):
 #    orchestrator.md) are in the canonical set.
 #    Canonical phases (per the Pipeline Flow ASCII art and Stage table):
 CANONICAL_PHASES = {
-    "0a", "0b", "1", "1.5a", "1.5", "1.6", "1.7", "2.0", "2", "2.5", "2.6", "2.7", "3", "3.4", "3.5", "3.6", "3.75", "3.8", "4", "4.5", "5", "6",
+    "0a", "0b", "1", "1.5a", "1.5", "1.6", "1.7", "1.8", "2.0", "2", "2.5", "2.6", "2.7", "3", "3.4", "3.5", "3.6", "3.75", "3.8", "4", "4.5", "5", "6",
     "4a", "4b",
     # 2.0 is the Bug-fix Pipeline regression-test phase (type: fix | hotfix only),
     # inserted between STAGE-GATE-1 and Phase 2. See ref-special-flows.md § Bug-fix Flow.
@@ -1724,6 +1724,8 @@ CANONICAL_PHASES = {
     # before the Phase 3 parallel verify block. Introduced by fix/phase3-tester-qa-race-condition.
     # 3.75 is Build Verification, a sub-step of Verify between Phase 3.5 and 3.6.
     # 1.7 is ux-reviewer enrich (frontend_scope: true only); executes after architect, before 1.5.
+    # 1.8 is the Post-approval Plan-Review Offer (deferred, non-sensitive plans only); executes
+    # after STAGE-GATE-1, before Phase 2.0/2. See agents/orchestrator.md § "Phase 1.8".
     # 3.4 is ux-reviewer validate (frontend_scope: true only); runs in the Phase 3 parallel block.
     # 1.5a is the deterministic Plan-Structure Scan (all types, non-self-authored plans),
     # sequenced before the Phase 1.5 qa-plan dispatch. See docs/plan-structure-gate.md.
@@ -37305,6 +37307,244 @@ check(
 )
 
 # Marker: inline-working-posture
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 172 — plan-review-opt-in
+#
+# Structural coverage for the deferred-by-default plan-review panel (AC-1..
+# AC-9 of the plan-review-opt-in task): Stage 1's qa-plan/plan-reviewer
+# dispatch defers pre-gate for a non-sensitive, architect-authored plan
+# (STAGE-GATE-1 presents a deferred-review note instead of a combined
+# verdict), the post-approval Phase 1.8 offer resolves the deferral, SEC-002
+# stays non-deferrable, and the on-demand `/th:plan-review` skill exists.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 172: plan-review-opt-in ===")
+
+_s172_orch = SPLIT_CORPUS
+_s172_gate_contract = read(AGENTS_DIR / "_shared" / "gate-contract.md")
+_s172_qa_plan = read(AGENTS_DIR / "qa-plan.md")
+_s172_plan_reviewer = read(AGENTS_DIR / "plan-reviewer.md")
+_s172_ref_direct = read(AGENTS_DIR / "ref-direct-modes.md")
+_s172_lanes = read(REPO_ROOT / "docs" / "pipeline-lanes.md")
+_s172_discover = read(REPO_ROOT / "docs" / "discover-phase.md")
+_s172_claude = read(REPO_ROOT / "CLAUDE.md")
+_s172_skill = read(skill_path("plan-review"))
+_s172_testing = read(REPO_ROOT / "docs" / "testing.md")
+_s172_self = Path(__file__).read_text(encoding="utf-8")
+
+# --- AC-1/AC-3/AC-9: plan_review_status field + deferral event + STOP note --
+check(
+    "s172(state-field): 00-state.md schema declares plan_review_status with "
+    "the not-applicable/deferred/reviewed-pass/reviewed-concerns/skipped vocabulary",
+    "plan_review_status:" in _s172_orch
+    and "not-applicable | deferred | reviewed-pass | reviewed-concerns | skipped | null"
+    in _s172_orch,
+    "agents/orchestrator.md must declare plan_review_status in the "
+    "00-state.md § Current State schema with its full value vocabulary "
+    "(including deferred and skipped)",
+)
+check(
+    "s172(trace-events): plan_review.deferred / plan_review.offered / "
+    "plan_review.offer_declined are named in the event enum",
+    "plan_review.deferred" in _s172_orch
+    and "plan_review.offered" in _s172_orch
+    and "plan_review.offer_declined" in _s172_orch,
+    "agents/orchestrator.md must name the three plan_review.* trace events "
+    "in its Execution Events JSONL schema",
+)
+check(
+    "s172(gate1-deferred-note): STAGE-GATE-1 STOP block renders a deferred-"
+    "review note instead of a combined verdict when plan_review_status is "
+    "deferred or not-applicable",
+    'deferred (non-sensitive)' in _s172_orch
+    and "not applicable (self-authored plan)" in _s172_orch,
+    "agents/orchestrator.md's STAGE-GATE-1 STOP block must carry the "
+    "deferred-review and not-applicable variant lines",
+)
+check(
+    "s172(gate-contract-mirror): agents/_shared/gate-contract.md's abstract "
+    "STAGE-GATE-1 template documents the deferred-review variant",
+    "deferred-review" in _s172_gate_contract,
+    "gate-contract.md must document the deferred-review STOP-block variant "
+    "(Multi-site invariant: orchestrator.md + gate-contract.md)",
+)
+
+# --- AC-1/AC-3: the deferral gate itself + SEC-002 non-deferrability --------
+check(
+    "s172(defer-gate): Phase 1.5 documents the deferred-by-default gate for "
+    "an architect-authored, non-sensitive plan",
+    "Deferred-by-default — architect-authored, non-sensitive plan" in _s172_orch,
+    "agents/orchestrator.md § Phase 1.5 must document the deferred-by-"
+    "default gate",
+)
+check(
+    "s172(sec002-never-deferred): Phase 1.6 states SEC-002 is never carved "
+    "out AND never deferred",
+    "never carved out, on any lane, and never deferred" in _s172_orch,
+    "agents/orchestrator.md § Phase 1.6 must reaffirm SEC-002 is never "
+    "deferred by the new gate",
+)
+check(
+    "s172(inviolable-amended): 'Phase 1.6 is inviolable' is amended to "
+    "except the deferred-by-default gate",
+    "Phase 1.6 is inviolable" in _s172_orch
+    and "except under the deferred-by-default gate above" in _s172_orch,
+    "agents/orchestrator.md's 'Phase 1.6 is inviolable' invariant must be "
+    "amended for the deferred case, not silently contradicted",
+)
+
+# --- AC-2: Phase 1.5a runs regardless of the deferral gate -----------------
+check(
+    "s172(1.5a-unaffected): Phase 1.5a (deterministic Plan-Structure Scan) "
+    "runs regardless of the deferred-by-default gate and still bounces to "
+    "architect under BOUNDED-PATCH on a plan_structure fail",
+    "Phase 1.5a still runs" in _s172_orch
+    and "regardless of this gate" in _s172_orch
+    and "Bounce to `architect` under the BOUNDED-PATCH contract" in _s172_orch,
+    "agents/orchestrator.md § Phase 1.5/1.5a must state the deterministic "
+    "scan is unaffected by the new deferral gate (AC-2)",
+)
+
+# --- AC-5/AC-6: Phase 1.8 post-approval offer -------------------------------
+check(
+    "s172(phase18-exists): Phase 1.8 — Post-approval Plan-Review Offer is "
+    "documented as a leader-relayed checkpoint, not a dual-record gate",
+    "## Phase 1.8 — Post-approval Plan-Review Offer" in _s172_orch
+    and "NOT part of the dual-record schema" in _s172_orch,
+    "agents/orchestrator.md must carry the Phase 1.8 section as a "
+    "leader-relayed, non-dual-record checkpoint",
+)
+check(
+    "s172(phase18-allowlist): Phase 1.8 offers exactly 'proceed'/'review' "
+    "and routes review's pass/concerns outcomes correctly",
+    '"proceed" → continue to Stage 2 without running the panel' in _s172_orch
+    and '"review"' in _s172_orch
+    and "reviewed-pass" in _s172_orch
+    and "gate1_release: null" in _s172_orch,
+    "agents/orchestrator.md § Phase 1.8 must document the proceed/review "
+    "allowlist and the concerns/fail re-presentation path",
+)
+check(
+    "s172(phase18-autonomous-skip): approve autonomous skips Phase 1.8 and "
+    "records plan_review_status: skipped",
+    "skips this section entirely" in _s172_orch
+    and "this offer never fires" in _s172_orch
+    and "set `plan_review_status: skipped` at that same recording step" in _s172_orch,
+    "agents/orchestrator.md must state that approve autonomous skips "
+    "Phase 1.8 entirely and records plan_review_status: skipped",
+)
+check(
+    "s172(canonical-phase-1.8): 1.8 is registered in this test file's own "
+    "CANONICAL_PHASES set (no false positive on the phase-number audit)",
+    '"1.8"' in _s172_self,
+    "tests/test_agent_structure.py CANONICAL_PHASES must include \"1.8\"",
+)
+
+# --- AC-4: correction-classification precondition generalized --------------
+check(
+    "s172(correction-precondition): the correction-classification procedure "
+    "states it does not apply while the panel has never run (deferred)",
+    "this procedure does not apply" in _s172_orch
+    and "plan_review_status: deferred" in _s172_orch,
+    "agents/orchestrator.md's Correction-classification section must state "
+    "the panel-ran precondition",
+)
+
+# --- AC-7: skill + direct-mode reconciliation + carve-out distinctness -----
+check(
+    "s172(skill-exists): skills/plan-review/SKILL.md exists with frontmatter "
+    "name: plan-review and routes to the leader",
+    _s172_skill.startswith("---")
+    and parse_frontmatter(_s172_skill).get("name", "").strip() == "plan-review"
+    and "leader" in _s172_skill
+    and "Direct Mode Task" in _s172_skill
+    and "Mode: plan-review" in _s172_skill,
+    "skills/plan-review/SKILL.md must exist, declare name: plan-review, and "
+    "route a Direct Mode Task: plan-review payload to the leader",
+)
+check(
+    "s172(skill-readme-entry): skills/README.md routing line lists "
+    "/th:plan-review",
+    "/th:plan-review" in read(REPO_ROOT / "skills" / "README.md"),
+    "skills/README.md must enumerate /th:plan-review among leader-routing skills",
+)
+check(
+    "s172(direct-mode-reconciliation): ref-direct-modes.md documents that "
+    "the Phase 1.8 offer and the direct mode reuse the same panel/reviews "
+    "artifact",
+    "Reconciliation with the in-pipeline deferred-by-default offer" in _s172_ref_direct
+    and "reviews/01-plan-review.md" in _s172_ref_direct,
+    "agents/ref-direct-modes.md § Plan Review Mode must reconcile the "
+    "in-pipeline offer with the direct mode",
+)
+check(
+    "s172(carve-out-distinct): the self-authored carve-out stays a distinct "
+    "always-skip case, never offered",
+    "not-applicable" in _s172_orch
+    and "never offered" in _s172_orch,
+    "agents/orchestrator.md must keep the self-authored carve-out "
+    "(plan_review_status: not-applicable) distinct from the deferred case",
+)
+check(
+    "s172(dispatch-trigger-notes): qa-plan.md and plan-reviewer.md each "
+    "carry a dispatch-trigger note about the deferred-by-default gate",
+    "Dispatch-trigger note" in _s172_qa_plan
+    and "Dispatch-trigger note" in _s172_plan_reviewer,
+    "agents/qa-plan.md and agents/plan-reviewer.md must each document the "
+    "orchestrator-side deferral without changing their own procedure",
+)
+
+# --- AC-9: multi-site consistency (docs + CLAUDE.md) ------------------------
+check(
+    "s172(lanes-full-row): docs/pipeline-lanes.md § 2 'full' row documents "
+    "the deferred-by-default panel",
+    "Plan-review panel deferred-by-default" in _s172_lanes,
+    "docs/pipeline-lanes.md's 'full' lane row must describe the "
+    "deferred-by-default panel policy",
+)
+check(
+    "s172(discover-he2-3): docs/discover-phase.md HI-E2-3 states the "
+    "deferred-by-default policy is orthogonal to spec_seed and no GATE is "
+    "skipped",
+    "HI-E2-3" in _s172_discover
+    and "deferred-by-default policy" in _s172_discover
+    and "STAGE-GATE-1 always runs" in _s172_discover,
+    "docs/discover-phase.md HI-E2-3 must be amended for the deferred-by-"
+    "default policy without claiming a GATE is skipped",
+)
+check(
+    "s172(claude-s5): CLAUDE.md §5 plan-review bullet names the "
+    "deferred-by-default policy",
+    "Deferred-by-default for a non-sensitive, architect-authored plan" in _s172_claude,
+    "CLAUDE.md §5 must mention the deferred-by-default policy in the "
+    "plan-review panel centralization bullet",
+)
+
+# --- Self-ref, registry, hygiene guards -------------------------------------
+check(
+    "suite172(self-ref): test file contains 'Suite 172' and 'plan-review-opt-in'",
+    "Suite 172" in _s172_self and "plan-review-opt-in" in _s172_self,
+    "test file must self-reference Suite 172 and the marker "
+    "'plan-review-opt-in'",
+)
+check(
+    "s172(registry): docs/testing.md registers Suite 172 with the "
+    "plan-review-opt-in marker",
+    "Suite 172" in _s172_testing and "plan-review-opt-in" in _s172_testing,
+    "docs/testing.md is the canonical suite registry — Suite 172 must be "
+    "registered there",
+)
+check(
+    "suite172(hygiene): CLAUDE.md does NOT contain 'Suite 172' (§11 hygiene "
+    "contract)",
+    "Suite 172" not in _s172_claude,
+    "CLAUDE.md must not mention Suite 172 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: plan-review-opt-in
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------

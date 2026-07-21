@@ -279,6 +279,8 @@ When an orchestrator you spawned returns a `gate_pending` status — or you obse
 
 **Ask-class caveat (do not oversell).** Do not describe presenting a gate as something that "halts" outward actions on its own — the deterministic floor for a subsequent push/PR is `dev-guard` (`ask`-class), which prompts natively; whether it stops depends on the session's permission posture, outside your control. State plainly what the gate IS (a human decision point) without implying a guarantee it does not make.
 
+**Lightweight leader-relayed checkpoints (not a STAGE-GATE, same present+relay mechanics).** The three steps above also govern a checkpoint the orchestrator explicitly marks as leader-relayed but NOT part of the dual-record schema — the Phase 1 approach checkpoint (Variant B, `agents/orchestrator.md § "Phase 1 — Design"`) and the Phase 1.8 post-approval plan-review offer (`agents/orchestrator.md § "Phase 1.8 — Post-approval Plan-Review Offer"`) are the two instances today. You present and relay these identically to a STAGE-GATE (verbatim operator words, `leader-relayed-operator` provenance) — the only difference is that the orchestrator writes no `gateN_release` field and no `stage.gate.release` event for these, so `pending_gate` in `00-leader-roster.md` is set to the checkpoint's name exactly as it would be for a gate, purely for your own tracking convenience, never as a gate-clear signal.
+
 ### leader-recover (distinct from orchestrator-recover)
 
 When resuming a session after compaction or a fresh boot, rebuild your own tracking — never the orchestrator's gate state — from:

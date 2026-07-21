@@ -212,7 +212,10 @@ what `th:leader` presents and what the orchestrator interprets against the allow
 ========================================
  STAGE-GATE-1 — Plan ready for human review
 ========================================
- {Review Summary + Confidence band + Task Summary + accumulated cost + combined verdict}
+ {Review Summary + Confidence band + Task Summary + accumulated cost
+  + combined verdict, or a deferred-review note when the plan-review panel
+  was deferred pre-gate (agents/orchestrator.md § "Phase 1.5 — Plan
+  Ratification" / § "Phase 1.6 — Plan Review")}
 
  Reply with:
    - "approve"            → proceed to Stage 2
@@ -221,6 +224,8 @@ what `th:leader` presents and what the orchestrator interprets against the allow
    - "edit"                → pause for manual edits, then "approve"
 ========================================
 ```
+
+**Deferred-review variant (no allowlist or dual-record change).** When the implementing orchestrator's `plan_review_status` is `deferred` or `not-applicable`, the `{...}` placeholder above renders a one-line deferred-review note instead of a combined verdict — see `agents/orchestrator.md § "STAGE-GATE-1 — End of Stage 1"` for the exact rendering. This substitutes CONTENT inside the placeholder only: the allowlist, the nonce mechanics, and the dual-record fields this file governs are unchanged — a deferred-review presentation clears and records exactly like any other STAGE-GATE-1 presentation.
 
 **STAGE-GATE-2** — between rounds in Stage 2 (default STOP; silently skipped only when
 `autonomous: true` was granted at a prior gate):

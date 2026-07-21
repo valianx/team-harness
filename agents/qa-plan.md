@@ -97,6 +97,15 @@ this mode in that case (`agents/orchestrator.md § "Self-authored-plan panel car
 (the `security` design-review) is never carved out by this condition — it is a distinct trigger
 gated on `security_sensitive: true` alone, independent of authorship or lane.
 
+**Dispatch-trigger note — deferred-by-default for a non-sensitive, architect-authored plan.**
+Separately from the carve-out above, the orchestrator may also defer your Phase 1.5 dispatch for an
+architect-authored plan (any `complexity`, any task count) when `security_sensitive: false`
+(`plan_review_status: deferred`) — a default-skip-but-offered case, not the always-skip carve-out
+above. This changes nothing about how you run in `ratify-plan` mode WHEN dispatched: pre-gate on a
+sensitive plan, at the post-approval offer, or via an on-demand `/th:plan-review` run all invoke you
+identically. See `agents/orchestrator.md § "Phase 1.5 — Plan Ratification"` and
+`§ "Phase 1.8 — Post-approval Plan-Review Offer"` for the orchestrator-side gating.
+
 - **Trigger:** orchestrator invokes with `mode: ratify-plan`
 - **Flow:** Phase 0 (read intake + architecture) → Plan-AC Mapping → return verdict
 - **Output:** brief written to `workspaces/{feature-name}/reviews/01-plan-review.md` under `## Plan Ratification (Phase 1.5)` (replace any prior copy; create the file with the full skeleton if it does not yet exist) — do NOT write to `01-plan.md`, do NOT create `01-plan-ratification.md`.

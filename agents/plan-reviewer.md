@@ -48,9 +48,19 @@ dispatched to approve your own absence — this is orchestrator-side gating, not
 **SEC-002 is never carved out by this condition.** When `security_sensitive: true`, the orchestrator
 dispatches `security` in `design-review` mode BEFORE any plan-reviewer/qa-plan panel dispatch,
 REGARDLESS of authorship or lane — the carve-out above governs only the shape/coverage panel (you +
-`qa-plan`), never the security design-review trigger. An architect-authored, multi-task,
-above-`standard`-complexity, or security-sensitive plan does NOT qualify for the carve-out on any
-lane (including express) — you run Phase 1.6 exactly as documented in this file.
+`qa-plan`), never the security design-review trigger. A security-sensitive plan does NOT qualify for
+the carve-out on any lane (including express) — you run Phase 1.6 exactly as documented in this file.
+
+**Dispatch-trigger note — deferred-by-default for a non-sensitive, architect-authored plan.** The
+orchestrator may ALSO defer your Phase 1.6 dispatch — separately from the carve-out above — for an
+architect-authored plan (any `complexity`, any task count) when `security_sensitive: false`; this is
+a distinct, default-skip-but-offered case (`plan_review_status: deferred`), not the always-skip
+carve-out above. It changes nothing about how you run WHEN you are dispatched: you still audit
+`01-plan.md` against the plan-shape rules exactly as documented in this file, whether that dispatch
+happens pre-gate (a plan that turns out sensitive), at the post-approval offer, or via an on-demand
+`/th:plan-review` run. See `agents/orchestrator.md § "Phase 1.6 — Plan Review"` and
+`§ "Phase 1.8 — Post-approval Plan-Review Offer"` for the orchestrator-side gating; this is
+orchestrator-side dispatch scheduling, not a decision you make or a change to your own procedure.
 
 ---
 
