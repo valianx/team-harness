@@ -660,6 +660,114 @@ check("docs/pipelines.md mentions STAGE-GATE-3", "STAGE-GATE-3" in pipelines_md,
 #  lives in agents/README.md, covered by the check above. See the relocation
 #  note for the gate identifiers immediately above.)
 
+# Rule 9 cross-repo carve-out (issue #477). The base-branch check hard-fails
+# any delivery group whose Base is not literally `main`, with no repo-aware
+# exemption — so a legitimate cross-repo group targeting its own repo's
+# mandated integration branch (e.g. release/test) fails Rule 9 every round.
+# Slice scoped to the Rule 9 section only (next heading is Rule 10) so
+# occurrences of "main"/"Repo" elsewhere in the file cannot false-green or
+# false-red this check.
+_rule9_anchor = "### Rule 9 — No stacked PRs / base must be `main`"
+_rule9_slice = (
+    plan_reviewer.split(_rule9_anchor)[1].split("### Rule 10")[0]
+    if _rule9_anchor in plan_reviewer
+    else ""
+)
+check(
+    "plan-reviewer.md Rule 9 declares a cross-repo carve-out for the "
+    "base-branch check (issue #477)",
+    "Repo" in _rule9_slice
+    and ("primary" in _rule9_slice.lower() or "secondary" in _rule9_slice.lower()),
+    "Rule 9 must scope the base-branch check to same-repo (primary) delivery "
+    "groups — a group whose Repo differs from the primary repo must be "
+    "exempt from the Base-must-be-main finding",
+)
+# Guard (must pass BOTH before and after the fix): the same-repo half of
+# Rule 9 — base must be `main`, stacked PRs unconditionally prohibited,
+# non-overridable — stays textually present. Proves the carve-out above is
+# a narrowing, not a blanket relaxation of the stacked-PR prohibition.
+check(
+    "plan-reviewer.md Rule 9 retains the same-repo base-must-be-main / "
+    "stacked-PR prohibition unchanged (guard — issue #477)",
+    "MUST be `main`" in _rule9_slice
+    and "PROHIBITED" in _rule9_slice
+    and "may NOT override" in _rule9_slice,
+    "Rule 9's same-repo half (base MUST be main; stacked PRs unconditionally "
+    "PROHIBITED; non-overridable) must remain textually present in the Rule "
+    "9 slice — this proves the cross-repo carve-out narrows the false "
+    "positive without relaxing the same-repo prohibition",
+)
+# AC-5 guard: the N>1-groups-requires-closed-list-Reason half of Rule 9 is
+# untouched by the carve-out — the fix only narrows the base-branch finding.
+check(
+    "plan-reviewer.md Rule 9 Reason closed-list requirement for N>1 groups "
+    "is unchanged (issue #477)",
+    "valid closed-list Reason" in _rule9_slice,
+    "Rule 9's N>1-groups-requires-closed-list-Reason finding text must stay "
+    "present — the carve-out narrows the base-branch finding only",
+)
+
+# AC-3: architect.md documents an optional Repo column in BOTH
+# `### Delivery Grouping` occurrences (feature template + the "Full
+# 01-plan.md template" reference), with no group required to declare it.
+_dg_heading_anchor = "\n### Delivery Grouping\n\nDefault"
+_dg_parts = architect.split(_dg_heading_anchor)
+_dg_slices = [part.split("### Task-1")[0] for part in _dg_parts[1:]]
+check(
+    "architect.md has both Delivery Grouping occurrences (issue #477)",
+    len(_dg_slices) == 2,
+    "expected exactly 2 occurrences of '### Delivery Grouping' in "
+    "architect.md (feature template + Full 01-plan.md template reference)",
+)
+for _dg_index, _dg_slice in enumerate(_dg_slices, start=1):
+    check(
+        f"architect.md Delivery Grouping occurrence {_dg_index} documents "
+        "an optional Repo column (issue #477)",
+        "Repo" in _dg_slice and "optional" in _dg_slice.lower(),
+        "### Delivery Grouping must document a Repo column and mark it "
+        "optional",
+    )
+    check(
+        f"architect.md Delivery Grouping occurrence {_dg_index} Repo "
+        "column has no mandatory-declaration language (issue #477)",
+        "Repo" in _dg_slice
+        and (
+            "no group" in _dg_slice.lower()
+            or "omit" in _dg_slice.lower()
+            or "not required" in _dg_slice.lower()
+        ),
+        "the Repo column must read as opt-in — no group required to "
+        "declare it, no new mandatory field",
+    )
+
+# AC-4: Rule 3h clarifies that legitimately different base branches across
+# cross-repo delivery groups are not a contradiction — 3h only fires on
+# intra-group inconsistency between sections.
+_r3h_anchor = (
+    "Pattern 3h — Mutually contradictory canonical field (detection notes)."
+)
+_r3h_slice = (
+    plan_reviewer.split(_r3h_anchor)[1].split("Severity:")[0]
+    if _r3h_anchor in plan_reviewer
+    else ""
+)
+check(
+    "plan-reviewer.md Rule 3h clarifies cross-repo base differences across "
+    "groups are legitimate (issue #477)",
+    (
+        "cross-repo" in _r3h_slice.lower()
+        or "different repositories" in _r3h_slice.lower()
+    )
+    and (
+        "intra-group" in _r3h_slice.lower()
+        or "same group" in _r3h_slice.lower()
+        or "within the same group" in _r3h_slice.lower()
+    ),
+    "Rule 3h's detection notes must state that different base branches "
+    "across cross-repo delivery groups are legitimate, and that 3h fires "
+    "only on intra-group inconsistency",
+)
+
 # ---------------------------------------------------------------------------
 # Suite 13 — human-readable state (## TL;DR + /status timeline)
 # ---------------------------------------------------------------------------

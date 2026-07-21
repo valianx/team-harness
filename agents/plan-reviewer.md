@@ -216,7 +216,7 @@ The plan-reviewer does NOT police AC quality. It only checks that ACs exist in t
 
 **The top-of-document `**Date:** YYYY-MM-DD` stamp is allowed** — rule 3e explicitly excludes that line.
 
-**Pattern 3h — Mutually contradictory canonical field (detection notes).** For each field in the canonical-field set defined in `agents/_shared/plan-consolidation.md` § "Canonical-field set" (base branch, version bump): collect the distinct intended values it carries across `## Review Summary`, `### Work Plan`, and `## Task List` of the same plan. If a single canonical field holds more than one mutually-exclusive value, emit: `Rule 3h: canonical field '{field}' holds contradictory values {v1, v2, …} across {sections}`. Precision boundaries: for **base branch**, parse the `Base:` column of every group in `### Delivery Grouping` and any explicit base-branch statement in Review Summary/Work Plan Notes — all must agree per group. For **version bump**, parse the intended target version from the suggested-bump notes across the three sections (the canonical *target*, not each version-site token — listing five version sites all at the same version is not a contradiction). Severity: `concerns` (consistent with the rest of Rule 3). A contradictory base or version is a real defect but never fail-blocks the gate.
+**Pattern 3h — Mutually contradictory canonical field (detection notes).** For each field in the canonical-field set defined in `agents/_shared/plan-consolidation.md` § "Canonical-field set" (base branch, version bump): collect the distinct intended values it carries across `## Review Summary`, `### Work Plan`, and `## Task List` of the same plan. If a single canonical field holds more than one mutually-exclusive value, emit: `Rule 3h: canonical field '{field}' holds contradictory values {v1, v2, …} across {sections}`. Precision boundaries: for **base branch**, parse the `Base:` column of every group in `### Delivery Grouping` and any explicit base-branch statement in Review Summary/Work Plan Notes — all must agree per group. For **version bump**, parse the intended target version from the suggested-bump notes across the three sections (the canonical *target*, not each version-site token — listing five version sites all at the same version is not a contradiction). Cross-repo legitimacy: when `### Delivery Grouping` declares a `Repo` column, two different groups legitimately carrying two different `Base:` values because they target two different repositories is NOT a 3h contradiction — 3h's per-group agreement check is intra-group (the same group's base must agree across `## Review Summary`, `### Work Plan`, and `## Task List`), never across two different groups' `Repo` values. Severity: `concerns` (consistent with the rest of Rule 3). A contradictory base or version is a real defect but never fail-blocks the gate.
 
 **Severity:** `concerns` (the architect can rewrite in place; the human at STAGE-GATE-1 sees the concerns and can bounce them back via `reject`).
 
@@ -374,18 +374,20 @@ For each task section in `01-plan.md` (§ Task List):
 
 **What to check:**
 
-1. For each group declared in `### Delivery Grouping` (`01-plan.md` § Task List) that carries an explicit `Base:` column: the value MUST be `main`. Any other value (a sibling group's branch name, a feature branch, anything that is not the word `main`) is a finding.
-2. When `### Delivery Grouping` declares N > 1 groups, every group MUST declare a `Reason` drawn from the closed list (same list as Rule 1). A group without a closed-list `Reason` is a finding. (This is the stacking signal: the architect is splitting a single-repo delivery without a valid temporal-prod reason.)
+1. For each **primary-repo** group declared in `### Delivery Grouping` (`01-plan.md` § Task List) that carries an explicit `Base:` column: the value MUST be `main`. Any other value (a sibling group's branch name, a feature branch, anything that is not the word `main`) is a finding. **Primary repo** is the repo of the first group in the table, or any group that omits the `Repo` column — when the table has no `Repo` column at all, every group is primary and this check behaves exactly as before the carve-out below. A group whose `Repo` differs from the primary is a **secondary (cross-repo) group** — it is exempt from this base-branch finding and may declare its own repository's mandated integration branch (e.g. `release/test`) in `Base:` instead of `main`.
+2. When `### Delivery Grouping` declares N > 1 groups, every group — primary or secondary — MUST declare a `Reason` drawn from the closed list (same list as Rule 1). A group without a closed-list `Reason` is a finding. (This is the stacking signal: the architect is splitting a single-repo delivery without a valid temporal-prod reason.) This half of the rule is unaffected by `Repo` — a cross-repo group still owes a closed-list `Reason`.
 
-**Absence tolerance:** a group with no `Base:` column value at all is treated as `Base: main` implicitly — no finding. Only an explicit `Base:` value that is not `main` triggers this rule.
+**Absence tolerance:** a group with no `Base:` column value at all is treated as `Base: main` implicitly — no finding. Only an explicit `Base:` value that is not `main`, on a primary-repo group, triggers this rule.
 
 **Detection algorithm:**
 
 ```
 grouping = parse_delivery_grouping(01-plan.md § Task List § Delivery Grouping)
 if grouping.mode == "groups":
+    primary_repo = grouping.groups[0].repo  # first group's Repo, or None when omitted
     for group in grouping.groups:
-        if group.base is not None and group.base.strip() != "main":
+        is_secondary = group.repo is not None and group.repo != primary_repo
+        if not is_secondary and group.base is not None and group.base.strip() != "main":
             findings.append((group.pr, f"Rule 9: PR {group.pr} declares Base: '{group.base}' — base must be main; stacked PRs are PROHIBITED"))
         if group.reason is None or group.reason.lower() not in VALID_REASONS:
             findings.append((group.pr, f"Rule 9: delivery group {group.pr} (of {len(grouping.groups)} groups) has no valid closed-list Reason — consolidate into all-tasks-one-pr or cite a valid reason"))
@@ -393,9 +395,9 @@ if grouping.mode == "groups":
 
 Note: Rule 9's split-check is complementary to Rule 1's split-check. Rule 1 fires when `### Delivery Grouping` declares N > 1 groups with a missing/invalid `Reason`. Rule 9 fires from the angle of stacking detection — the same structural signal, read from the same block. Both rules should produce consistent findings on the same input.
 
-**Severity:** `fail`. A group whose base is not `main` will cause silent commit loss via GitHub's async auto-retargeting on merge. A delivery split without a valid reason is the structural pattern the prohibition is designed to prevent.
+**Severity:** `fail`. A primary-repo group whose base is not `main` will cause silent commit loss via GitHub's async auto-retargeting on merge. A delivery split without a valid reason is the structural pattern the prohibition is designed to prevent.
 
-**Override:** the architect may NOT override Rule 9. Stacked PRs are unconditionally prohibited.
+**Override:** the architect may NOT override Rule 9. Stacked PRs are unconditionally prohibited within the same repository — this applies to the primary-repo half above; the `Repo`-based cross-repo carve-out is a scoping of the base-branch finding, not an override mechanism, and it grants no exception to same-repo stacking.
 
 ### Rule 10 — Multi-service consolidation (disjoint from Rule 1/9; fires only when `Consolidates:` is declared)
 
