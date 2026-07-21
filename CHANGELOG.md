@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.135.1] - 2026-07-21
+
+### Changed
+- `dev-guard` recalibrated to eliminate false-positive prompts on everyday Bash composition. An unresolvable wrapper payload or exceeded unwrap depth is no longer gated on its own — evaluation proceeds over the effective commands the analyzer resolved, so pipes into non-safe-listed utilities (`ls | sort`, `… | awk`, `… | jq`), variable-carrying `-c` payloads (`bash -c "echo $HOME"`), and dynamic producers piped to a shell (`curl … | bash`) produce no decision. A covered action in any resolved segment or statically-resolvable wrapper payload (`bash -c "git push origin main"`, `gh --repo o/r pr create && …`) still asks. Runtime-composed payloads (`eval "$CMD"`, xargs `-I{}` placeholders, depth-exceeded nesting) are documented residuals under the honest-developer threat model (`docs/dev-mode.md § Threat model`).
+- Retired the raw-HTTP GitHub gate: `curl`/`wget` with a mutating method against `api.github.com` is no longer a covered action, and `api.github.com` left `RAW_OUTWARD_SCAN_RE`. Its replacement is the prompt-level **GitHub channel rule — git and gh only** (managed CLAUDE.md block + repo CLAUDE.md §6.2): agents never call the GitHub API directly; `git` and `gh` are the only sanctioned channels, with the documented gh-fallback (`agents/_shared/gh-fallback.md`) as the sole exception. `gh api` mutating PR endpoints remain covered (they are the `gh` channel).
+- Test suites recalibrated to the new contract: `tests/test_dev_guard.sh` (retired-gate and unresolvable-payload cases flipped to nodecision, new everyday-pipe regression cases added), `tests/test_ts_hook_parity.sh`, `tests/test_permission_disjointness.py`.
+
 ## [2.135.0] - 2026-07-20
 
 ### Added

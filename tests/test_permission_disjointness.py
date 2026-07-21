@@ -174,7 +174,7 @@ OUTWARD_SAMPLES: dict[str, list[str]] = {
         "some-wrapper --request POST https://api.github.com/repos/o/r/pulls/1/merge",
     ],
     "RAW_OUTWARD_SCAN_RE": [
-        "raw payload mentions api.github.com endpoint",
+        "raw payload mentions git push somewhere",
     ],
     "CLICKUP_WRITE_RE": [
         "mcp__clickup__clickup_update_task",

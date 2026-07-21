@@ -834,7 +834,7 @@ function none() {
 }
 var GATE_DOC_POINTER = "see docs/dev-mode.md \xA7 Outward-Action Gate";
 var CLICKUP_WRITE_RE = /^mcp__.+__clickup_(update_task|create_task|create_task_comment|attach_task_file|delete_task)$/;
-var RAW_OUTWARD_SCAN_RE = /(git\s+push|gh\s+pr\s+(create|merge|review|comment)|gh\s+issue\s+(create|edit|comment)|gh\s+api.*pulls|api\.github\.com)/i;
+var RAW_OUTWARD_SCAN_RE = /(git\s+push|gh\s+pr\s+(create|merge|review|comment)|gh\s+issue\s+(create|edit|comment)|gh\s+api.*pulls)/i;
 var GRAPHQL_PR_MUTATIONS_RE = /(resolveReviewThread|unresolveReviewThread|addPullRequestReviewThreadReply|addPullRequestReviewComment|addPullRequestReview|submitPullRequestReview|mergePullRequest)/;
 var DEFAULT_BRANCH_FLOOR = /* @__PURE__ */ new Set(["main", "master"]);
 function evaluateDestinationBranch(dst, reader, allowContext, dir) {
@@ -1082,39 +1082,24 @@ function evaluateGhClassified(classified, reader) {
   }
   return ask(`outward action 'gh api' mutating PR endpoint requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`);
 }
-function hasGithubMutatingSignal(argv) {
-  if (!argv.some((t) => /api\.github\.com/i.test(t.value))) return false;
-  return argv.some((t, i) => {
-    if (t.value === "-X" || t.value === "--request") {
-      const next = argv[i + 1];
-      return !!next && /^(PUT|POST|PATCH|DELETE)$/i.test(next.value);
-    }
-    return /^(--request=|-X)(PUT|POST|PATCH|DELETE)$/i.test(t.value);
-  });
-}
 function isCoveredEffectiveCommand(cmd) {
   const classified = classifyCoveredAction(cmd);
-  if (!classified) return hasGithubMutatingSignal(cmd.argv);
+  if (!classified) return false;
   const binaryLower = classified.binary.toLowerCase();
   if (binaryLower === "git") return isGitPushCandidate(classified);
   if (binaryLower === "gh") return classifyGhAction(classified.args) !== null;
-  return hasGithubMutatingSignal(cmd.argv);
-}
-function askGithubMutating() {
-  return ask(
-    `outward action to api.github.com with mutating method requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
-  );
+  return false;
 }
 function evaluateSingleCommand(cmd, reader) {
   const classified = classifyCoveredAction(cmd);
-  if (!classified) return hasGithubMutatingSignal(cmd.argv) ? askGithubMutating() : none();
+  if (!classified) return none();
   const binaryLower = classified.binary.toLowerCase();
   if (binaryLower === "git") return evaluateGitClassified(classified, reader);
   if (binaryLower === "gh") {
     const decision = evaluateGhClassified(classified, reader);
     if (decision) return decision;
   }
-  return hasGithubMutatingSignal(cmd.argv) ? askGithubMutating() : none();
+  return none();
 }
 function evaluate(input, reader) {
   const toolName = input.tool?.name ?? "";
@@ -1136,11 +1121,6 @@ function evaluate(input, reader) {
   }
   if (cmdStr === null) return none();
   const analyzed = analyzeCommand(cmdStr);
-  if (analyzed.unresolvableShellPayload || analyzed.depthExceeded) {
-    return ask(
-      `outward action \u2014 the command contains a shell-executing wrapper whose payload could not be statically resolved, or nested wrapper recursion exceeded the bounded depth; fail-closed rather than silently permit (dev-guard.ts); ${GATE_DOC_POINTER}`
-    );
-  }
   if (analyzed.commands.length === 1) {
     return evaluateSingleCommand(analyzed.commands[0], reader);
   }
