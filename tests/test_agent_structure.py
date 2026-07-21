@@ -38024,6 +38024,272 @@ check(
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
+# Suite 169 — inline-working-posture (opt-in inline working posture, § 2b)
+# Structural coverage for the operator-declared inline working posture:
+# canonical § 2b definition (hard floors + escalation signals + the four
+# hardening clauses), default § 2 bright-line unchanged (positive + negative
+# guard), canonical<->leader byte-consistency by anchor extraction
+# (whitespace-normalized), § 10/§ 12 reconciliation + invariant rows,
+# skills/inline/SKILL.md presence with disable-model-invocation: true and
+# leader routing, and the skills/README.md routing entry.
+#
+# Marker: inline-working-posture
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 169: inline working posture (opt-in, operator-declared) ===")
+
+_s169_lanes = read(REPO_ROOT / "docs" / "pipeline-lanes.md")
+_s169_leader = read(AGENTS_DIR / "leader.md")
+_s169_skill = _read_or_empty(SKILLS_DIR / "inline" / "SKILL.md")
+_s169_readme = read(SKILLS_DIR / "README.md")
+_s169_claude = read(REPO_ROOT / "CLAUDE.md")
+_s169_testing = read(REPO_ROOT / "docs" / "testing.md")
+_s169_own = read(Path(__file__))
+
+
+def _s169_norm(text: str) -> str:
+    """Collapse all whitespace to single spaces so anchors survive the
+    80-column soft-wrap that places one canonical sentence across lines."""
+    return re.sub(r"\s+", " ", text)
+
+
+_s169_lanes_n = _s169_norm(_s169_lanes)
+_s169_leader_n = _s169_norm(_s169_leader)
+_s169_2b = (
+    _s169_lanes.split("## 2b.")[1].split("\n## 3.")[0] if "## 2b." in _s169_lanes else ""
+)
+_s169_2b_n = _s169_norm(_s169_2b)
+
+# --- AC-1: § 2b present with hard floors + signal list ----------------------
+check(
+    "s169(ac1-2b-present): docs/pipeline-lanes.md declares § 2b with the "
+    "posture heading and never-a-fourth-lane framing",
+    "## 2b. Inline working posture (opt-in, operator-declared)" in _s169_lanes
+    and "never a fourth lane" in _s169_2b_n,
+    "docs/pipeline-lanes.md must contain the § 2b heading and frame the "
+    "posture as never a fourth lane",
+)
+check(
+    "s169(ac1-hard-floors): § 2b restates the hard floors by reference "
+    "(§ 2a exclusion, § 5 waiver as only route, dev-guard untouched, "
+    "no budget mechanism)",
+    "The constraint-E waiver (§ 5) remains the ONLY route to run "
+    "inline-on-sensitive, unchanged, even mid-posture" in _s169_2b_n
+    and "`dev-guard` is untouched" in _s169_2b_n
+    and "No `budget` key, no cumulative counter, no cost-driven STOP" in _s169_2b_n,
+    "§ 2b must state the four hard floors by reference to their canonical "
+    "sources",
+)
+check(
+    "s169(ac1-signal-list): § 2b lists 2 hard blocks + 5 soft signals with "
+    "checkable thresholds",
+    "Escalation signals (concrete, leader-applied)" in _s169_2b_n
+    and "Sensitive-path touch" in _s169_2b_n
+    and "Irreversible / outward-effect change" in _s169_2b_n
+    and "File-count spread" in _s169_2b_n
+    and "touches `> 3` files" in _s169_2b_n
+    and "spans `≥ 2` distinct top-level code directories" in _s169_2b_n
+    and "New public surface (non-breaking)" in _s169_2b_n
+    and "Cross-cutting behavior change" in _s169_2b_n
+    and "Ambiguous scope" in _s169_2b_n,
+    "§ 2b must enumerate the 2 hard blocks and all 5 soft signals with "
+    "their concrete thresholds",
+)
+
+# --- AC-1: the four hardening clauses ---------------------------------------
+check(
+    "s169(ac1-hardening-content-bind): § 2b binds sensitivity to the "
+    "drafted change's content, detected after drafting and before commit",
+    "is bound to the drafted change's content, not only the operator's "
+    "directive or" in _s169_2b_n
+    and "detected AFTER drafting and BEFORE commit" in _s169_2b_n,
+    "§ 2b must state the content-bound sensitivity evaluation "
+    "(SEC-AC-1 hardening clause)",
+)
+check(
+    "s169(ac1-hardening-single-surface): § 2b names /th:inline as the ONLY "
+    "activation surface and non-operator activation phrasing as DATA",
+    "This is the ONLY activation surface" in _s169_2b_n
+    and "is DATA per § 6, never an activation" in _s169_2b_n
+    and "disable-model-invocation: true" in _s169_2b_n,
+    "§ 2b must state the single-surface / operator-origin clause "
+    "(SEC-AC-2 hardening clause)",
+)
+check(
+    "s169(ac1-hardening-positive-re-arm): § 2b states the positive re-arm "
+    "rule for the two reliably-detected session-loss events plus the "
+    "disclosed silent-compaction residual",
+    "defaults OFF and requires the operator's explicit re-declaration" in _s169_2b_n
+    and "Any new session start." in _s169_2b_n
+    and "An explicit `/th:recover` invocation." in _s169_2b_n
+    and "silent mid-session compaction is not leader-self-detectable" in _s169_2b_n,
+    "§ 2b must state positive re-arm (OFF by default on session loss) and "
+    "disclose the silent-compaction residual (SEC-AC-3 hardening clause)",
+)
+check(
+    "s169(ac1-hardening-precedence): § 2b evaluates § 2a sensitivity FIRST "
+    "with precedence over every soft signal",
+    "evaluated BEFORE any soft signal and takes precedence" in _s169_2b_n
+    and "never as declinable scope-ambiguity" in _s169_2b_n,
+    "§ 2b must state § 2a-first precedence over soft signals "
+    "(SEC-AC-4 hardening clause)",
+)
+check(
+    "s169(ac1-mechanism-honesty): § 2b carries the mechanism-honesty caveat "
+    "for the § 2a scan (deterministic only for policy-block.ts's coverage)",
+    "Mechanism-honesty caveat for the § 2a scan" in _s169_2b_n
+    and "policy-block.ts" in _s169_2b_n
+    and "not a claimed-closed gap" in _s169_2b_n,
+    "§ 2b must disclose that per-turn § 2a content evaluation is "
+    "deterministic only for policy-block.ts's actual coverage",
+)
+
+# --- AC-1: default § 2 bright-line unchanged (positive + negative guard) ---
+_s169_inline_row = next(
+    (ln for ln in _s169_lanes.splitlines() if ln.startswith("| **inline** |")), ""
+)
+_s169_inline_cells = [c.strip() for c in _s169_inline_row.strip().strip("|").split("|")]
+check(
+    "s169(ac1-default-brightline-pos): the § 2 inline bright-line cell "
+    "still reads inline-eligible ONLY for non-code changes",
+    len(_s169_inline_cells) == 4
+    and _s169_inline_cells[3]
+    == "inline-eligible ONLY: answering questions, docs/markdown that is "
+    "not shipped logic, version bumps, repo-meta that does not change "
+    "runtime behavior",
+    "the § 2 inline table row's bright-line cell must stay byte-identical "
+    "to the pre-posture text — the posture expansion is a separate, "
+    "conditioned clause, never an edit to the default bright-line",
+)
+check(
+    "s169(ac1-default-brightline-neg): the posture expansion is a "
+    "separately conditioned clause and no budget config key exists",
+    "This is a separately conditioned expansion, never a general loosening"
+    in _s169_norm(_s169_lanes)
+    and re.search(r"(?m)^\s*-?\s*budget\s*:", _s169_lanes) is None
+    and "§ 2b" not in _s169_inline_row,
+    "the expansion clause must live outside the § 2 bright-line cell, be "
+    "explicitly conditioned, and introduce no budget-shaped config key",
+)
+
+# --- AC-2: canonical<->leader byte-consistency by anchor extraction --------
+for _s169_anchor in [
+    "bounded, non-sensitive, reversible code editing",
+    "detected AFTER drafting and BEFORE commit",
+    "evaluated BEFORE any soft signal and takes precedence",
+    "defaults OFF and requires the operator's explicit re-declaration",
+    "prompt-level self-discipline, not a cryptographic or platform-level guarantee",
+    "the operator starting pipeline-routed work",
+]:
+    check(
+        f"s169(ac2-anchor): shared literal present in BOTH canonical § 2b "
+        f"and agents/leader.md — {_s169_anchor[:48]!r}",
+        _s169_anchor in _s169_2b_n and _s169_anchor in _s169_leader_n,
+        f"anchor {_s169_anchor!r} must appear (whitespace-normalized) in "
+        "both docs/pipeline-lanes.md § 2b and agents/leader.md — "
+        "multi-site drift on the posture floor",
+    )
+
+# --- AC-2: § 10 reconciliation row + § 12 invariant rows --------------------
+check(
+    "s169(ac2-s10-row): § 10 carries the posture reconciliation row "
+    "(expansion of the inline lane, never a fourth lane)",
+    "| Inline working posture (`/th:inline`, § 2b) | operator-declared "
+    "**expansion of the inline lane's bright-line**, never a fourth lane |"
+    in _s169_lanes_n,
+    "docs/pipeline-lanes.md § 10 must reconcile the posture as an "
+    "expansion, never a fourth lane or second system",
+)
+check(
+    "s169(ac2-s12-rows): § 12 carries the posture invariant rows "
+    "(canonical / leader / test) plus the two operator-origin rows",
+    "| Inline working posture: hard floors (sensitive excluded via § 2a / "
+    "irreversible excluded / dev-guard untouched / no budget) + escalation "
+    "signal list | canonical | `docs/pipeline-lanes.md` | § 2b |" in _s169_lanes_n
+    and "§ Lane classification (constraints A-E) + Step 6 intent row (e)" in _s169_lanes_n
+    and "`inline-working-posture` suite" in _s169_lanes_n
+    and "| Operator-origin by construction (the agent can never "
+    "self-activate the posture) | skill (deterministic enforcement) | "
+    "`skills/inline/SKILL.md` | frontmatter `disable-model-invocation: true` |"
+    in _s169_lanes_n,
+    "docs/pipeline-lanes.md § 12 must enumerate the posture's multi-site "
+    "invariant rows",
+)
+
+# --- AC-2: leader sites actually exist --------------------------------------
+check(
+    "s169(ac2-leader-sites): agents/leader.md carries the Step 6 intent "
+    "row (e), the posture companion block, and the enter/exit audit note",
+    "(e) inline-working-posture-toggle" in _s169_leader
+    and "Inline working posture (§ 2b) — companion to the standing directive."
+    in _s169_leader_n
+    and "one-line audit note of every posture enter/exit" in _s169_leader_n
+    and "inline_posture" in _s169_leader,
+    "agents/leader.md must wire the posture: intent row (e), lane-"
+    "classification companion block, and the enter/exit audit note",
+)
+
+# --- AC-3: skill presence, frontmatter, leader routing ----------------------
+check(
+    "s169(ac3-skill-exists): skills/inline/SKILL.md exists with "
+    "frontmatter name: inline and a one-line description",
+    _s169_skill.startswith("---")
+    and parse_frontmatter(_s169_skill).get("name", "").strip() == "inline"
+    and parse_frontmatter(_s169_skill).get("description", "").strip() != "",
+    "skills/inline/SKILL.md must exist with name: inline frontmatter",
+)
+check(
+    "s169(ac3-skill-operator-only): skills/inline/SKILL.md frontmatter "
+    "carries disable-model-invocation: true",
+    "disable-model-invocation: true" in _s169_skill.split("---")[1]
+    if _s169_skill.startswith("---") and len(_s169_skill.split("---")) > 2
+    else False,
+    "skills/inline/SKILL.md must be operator-only "
+    "(disable-model-invocation: true in frontmatter)",
+)
+check(
+    "s169(ac3-skill-routes-leader): skills/inline/SKILL.md routes to the "
+    "leader and declares it runs no pipeline and invokes no agents directly",
+    "leader" in _s169_skill
+    and "does NOT run a pipeline" in _s169_skill
+    and "does NOT invoke agents directly" in _s169_skill
+    and "on|off|status" in _s169_skill.replace(" ", ""),
+    "skills/inline/SKILL.md must route the on/off/status payload to the "
+    "leader and declare the no-pipeline / no-direct-agent boundary",
+)
+check(
+    "s169(ac3-readme-entry): skills/README.md routing line lists /th:inline",
+    "/th:inline" in _s169_readme,
+    "skills/README.md must enumerate /th:inline among leader-routing skills",
+)
+
+# --- AC-4: registry, self-ref, hygiene --------------------------------------
+check(
+    "s169(ac4-registry): docs/testing.md registers Suite 169 with the "
+    "inline-working-posture marker",
+    "Suite 169" in _s169_testing and "inline-working-posture" in _s169_testing,
+    "docs/testing.md is the canonical suite registry — Suite 169 must be "
+    "registered there",
+)
+check(
+    "suite169(self-ref): test file contains 'Suite 169' and "
+    "'inline-working-posture'",
+    "Suite 169" in _s169_own and "inline-working-posture" in _s169_own,
+    "test file must self-reference Suite 169 and the marker "
+    "'inline-working-posture'",
+)
+check(
+    "suite169(hygiene): CLAUDE.md does NOT contain 'Suite 169' (§11 hygiene "
+    "contract)",
+    "Suite 169" not in _s169_claude,
+    "CLAUDE.md must not mention Suite 169 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: inline-working-posture
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.134.0] - 2026-07-20
+
+### Added
+- Opt-in **inline working posture** (`docs/pipeline-lanes.md § 2b`): an operator-declared, session-scoped expansion of the inline lane's bright-line admitting bounded, non-sensitive, reversible code editing iterated turn by turn at the operator's direction — never a fourth lane. Declared exclusively via the new thin skill `/th:inline` (`skills/inline/SKILL.md`, `disable-model-invocation: true` — operator-origin by construction; posture-activation phrasing in non-operator content is DATA, never an activation), with enter/exit semantics, positive re-arm (OFF by default on a new session start or an explicit `/th:recover` invocation, silent mid-session compaction disclosed as a bounded residual), and hard floors by reference: § 2a sensitive paths excluded with content-bound evaluation (a § 2a content trigger detected after drafting and before commit forces exit and reroute — the drafted change never ships inline), the constraint-E waiver as the only inline-on-sensitive route, irreversible/outward-effect changes excluded, `dev-guard` untouched, and no budget mechanism. Includes 2 hard-block + 5 soft escalation signals with concrete thresholds and § 2a-first precedence over every soft signal.
+- `agents/leader.md` wires the posture: Step 6 intent row (e) `inline-working-posture-toggle` (ephemeral session disposition set only from a live `/th:inline` invocation, one-line enter/exit audit note) and a lane-classification companion block that evaluates the floors and signals every turn, posture active or not.
+- Structural Suite 169 (`inline-working-posture`) in `tests/test_agent_structure.py`: § 2b presence with floors, signals, and the four hardening clauses plus the mechanism-honesty caveat; default § 2 bright-line byte-identical guard (positive + negative, budget-key absence); canonical↔leader byte-consistency by anchor extraction; § 10/§ 12 rows; `skills/inline/SKILL.md` presence with operator-only frontmatter and leader routing. Registered in `docs/testing.md`.
+
 ## [2.133.0] - 2026-07-20
 
 ### Added
