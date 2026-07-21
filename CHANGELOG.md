@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.136.0] - 2026-07-21
+
+### Added
+- Stage-1 plan-review panel (`qa-plan` ratification + `plan-reviewer` shape audit) is now deferred-by-default for a non-sensitive, architect-authored plan: the panel no longer dispatches pre-gate, `STAGE-GATE-1` presents a `deferred (non-sensitive)` note instead of a combined verdict, and a new post-approval **Phase 1.8 — Post-approval Plan-Review Offer** (leader-relayed checkpoint, no dual-record) lets the operator run the panel on demand or proceed. New `/th:plan-review` skill routes to the existing `plan-review` direct mode for on-demand invocation at any time. The deterministic Phase 1.5a structural scan still always runs. The `SEC-002` security design-review floor is unaffected — it remains non-deferrable on every lane, reaffirmed with an explicit statement and locked by a new regression test. Canonical: `agents/orchestrator.md § Phase 1.5/1.6/1.8`, `agents/_shared/gate-contract.md`.
+
 ## [2.135.1] - 2026-07-21
 
 ### Changed

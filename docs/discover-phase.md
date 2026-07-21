@@ -241,7 +241,7 @@ The `survey_scope_hint` captured in §5 above is passed to the architect regardl
 
 - **HI-E2-1 — Prior, not order.** The seed is a strong prior for the architect, not a mandate. The architect evaluates alternatives the seed did not consider and dissents when the seeded approach is deficient.
 - **HI-E2-2 — No security fields from seed.** `security_sensitive` and all gate-status fields remain input-independent of seed content. HI-2 (§6) applies unchanged.
-- **HI-E2-3 — No gate skipped.** `spec_seed_present: true` never marks any Phase Checklist item as skipped. Specify (Phase 0b), Design (Phase 1), ratify-plan (1.5), and plan-review (1.6) all run in full.
+- **HI-E2-3 — No GATE skipped; the plan-review panel's own deferred-by-default policy is orthogonal.** `spec_seed_present: true` never marks any Phase Checklist item as skipped, and it never skips a GATE — STAGE-GATE-1 always runs, regardless of the seed. Specify (Phase 0b) and Design (Phase 1) always run in full. Whether ratify-plan (1.5) and plan-review (1.6) dispatch pre-gate or defer is governed exclusively by the deferred-by-default policy in `agents/orchestrator.md §§ "Phase 1.5 — Plan Ratification" / "Phase 1.6 — Plan Review"` (architect-authored + `security_sensitive: false` → deferred, offered post-approval at Phase 1.8; `security_sensitive: true` → run in full, unchanged) — `spec_seed_present` never widens or narrows that gate.
 - **HI-E2-4 — Recoverable.** `spec_seed_present` and `spec_seed_dissents` are plain-text key:value fields in `00-state.md § Current State`; `00-spec-seed.md` is human-readable prose. Both survive context compaction without re-interrogating the manifest.
 
 ---

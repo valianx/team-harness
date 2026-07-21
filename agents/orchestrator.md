@@ -160,9 +160,10 @@ This table is the operational index of your own pipeline. It lists every phase, 
 |-------|-------|-------|--------|------|
 | 1 — Design | `architect` | AC + codebase context (from spawn payload) | `01-plan.md` | — |
 | 1.5a — Plan-Structure Scan | you (Bash gate, no dispatch) | `01-plan.md` | `plan_structure` trace event | bounce to architect (BOUNDED-PATCH) on `fail` |
-| 1.5 — Plan Ratification | `qa-plan` | `01-plan.md` | ratified AC (`reviews/01-plan-review.md § Plan Ratification`) | — |
-| 1.6 — Plan Review | `plan-reviewer` | `01-plan.md` | Combined verdict (`reviews/01-plan-review.md`) | — |
-| **STAGE-GATE-1** | **human, via `th:leader` relay** | plan + verdict | approve / reject / edit | **MANDATORY STOP, recorded by you** |
+| 1.5 — Plan Ratification | `qa-plan` | `01-plan.md` | ratified AC (`reviews/01-plan-review.md § Plan Ratification`) | deferred pre-gate for a non-sensitive architect-authored plan — see Phase 1.5 |
+| 1.6 — Plan Review | `plan-reviewer` | `01-plan.md` | Combined verdict (`reviews/01-plan-review.md`) | deferred pre-gate for a non-sensitive architect-authored plan — see Phase 1.6 |
+| **STAGE-GATE-1** | **human, via `th:leader` relay** | plan + verdict (or deferred-review note) | approve / reject / edit | **MANDATORY STOP, recorded by you** |
+| 1.8 — Post-approval Plan-Review Offer | you (leader-relayed checkpoint) + `qa-plan`/`plan-reviewer` (when `review` chosen) | `plan_review_status: deferred` + `gate1_release: approved` | `plan_review_status: skipped`/`reviewed-pass`/`reviewed-concerns` | leader-relayed checkpoint, NOT a dual-record gate — only when applicable |
 | 2 — Implement | `implementer` | `01-plan.md` | `02-implementation.md` + code | — |
 | 2.6 — Code-Hygiene Scan | you (Bash gate, no dispatch) | task diff vs `Base ref` | `stage2.hygiene` trace event | bounded-patch re-dispatch on violations (max 3) |
 | 2.7 — Test Authoring | `tester` (authoring mode) | code + AC | `03-testing.md` (authoring section) | must complete before Phase 3 |
@@ -309,6 +310,7 @@ After `delivery` returns `status: success` at Phase 4b (publish), and before Pha
 - next_action: {what to do next}
 - regression_test_path: {path | null}
 - regression_test_status: {failing | passing | skipped | null}
+- plan_review_status: {not-applicable | deferred | reviewed-pass | reviewed-concerns | skipped | null}  # Stage-1 panel dispatch status under the deferred-by-default policy (§§ Phase 1.5/1.6/1.8). `not-applicable` = self-authored-plan carve-out (distinct always-skip case, never offered). `deferred` = architect-authored + `security_sensitive: false`, panel dispatch skipped pre-gate, offer pending at Phase 1.8. `reviewed-pass`/`reviewed-concerns` = the panel ran (pre-gate on a sensitive plan, or via the Phase 1.8 offer / the `/th:plan-review` on-demand skill) and returned that verdict. `skipped` = the operator declined the Phase 1.8 offer (`proceed`) or approved autonomously while the panel was still deferred. `null` = the panel ran pre-gate exactly as today (a non-deferred path, e.g. `security_sensitive: true`, or a legacy/pre-existing skip unrelated to this field) — the combined verdict already lives in `reviews/01-plan-review.md`.
 - changes_security_control: {true|false|null} # architect-declared Classification-block boolean (`agents/architect.md § Classification block`) — mirrored here at Design time as an informational classification signal (design-review scoping, Phase 3.8 audit context); NOT a dispatch predicate: `adversary` gates on `security_floor_applies` alone (§ "Single shared Phase-3 floor predicate")
 - audit_status: {pending|done|unavailable|null} # Phase 3.8 Pre-Delivery Security Audit completion marker — `done` when the audit's lens set returned (`security` always; `adversary` additionally when `security_floor_applies == true`); `unavailable ({lens})` after a second infrastructure failure of a lens (§ "Phase 3.8" failure handling); STAGE-GATE-3 is never prepared while this field is `pending`, and `delivery`/recovery read it verbatim rather than re-deriving audit completion from the filesystem
 - security_sensitive: {true|false}          # copied verbatim from the leader spawn payload
@@ -343,9 +345,10 @@ After `delivery` returns `status: success` at Phase 4b (publish), and before Pha
 <!-- Your checklist starts at Phase 1 — Phase 0a/0b belong to leader, not you. -->
 - [ ] 1 — Design (architect → 01-plan.md)
 - [ ] 1.5a — Plan-Structure Scan (deterministic, no dispatch — skipped on the self-authored-plan carve-out)
-- [ ] 1.5 — Plan Ratification (qa-plan validates AC)
-- [ ] 1.6 — Plan Review (plan-reviewer audits plan shape)
+- [ ] 1.5 — Plan Ratification (qa-plan validates AC; deferred pre-gate for a non-sensitive architect-authored plan — see Phase 1.5)
+- [ ] 1.6 — Plan Review (plan-reviewer audits plan shape; deferred pre-gate for a non-sensitive architect-authored plan — see Phase 1.6)
 - [ ] STAGE-GATE-1 — Human review, recorded by you (mandatory stop)
+- [ ] 1.8 — Post-approval Plan-Review Offer (leader-relayed checkpoint, no dual-record; only when plan_review_status: deferred and gate1_release: approved — see Phase 1.8)
 - [ ] 2 — Implement (per task)
 - [ ] 2.6 — Code-Hygiene Scan (deterministic, no dispatch)
 - [ ] 2.7 — Test Authoring (tester authoring mode)
@@ -423,11 +426,11 @@ If reading this after context compaction:
 
 | Stage | Phases | Closing gate | Skippable in autonomous? |
 |-------|--------|--------------|--------------------------|
-| **Stage 1 — Analysis** | 1 Design, 1.5 Plan Ratification, 1.6 Plan Review | STAGE-GATE-1 | **No** |
+| **Stage 1 — Analysis** | 1 Design, 1.5 Plan Ratification (deferred-by-default, non-sensitive), 1.6 Plan Review (deferred-by-default, non-sensitive) | STAGE-GATE-1 | **No** |
 | **Stage 2 — Implementation** | 2 Implement, 2.5 Reconcile, 2.6 Code-Hygiene Scan, 3 Verify, 3.5 Acceptance Gate, 3.6 Acceptance Check | STAGE-GATE-2 (between tasks only) | **Yes** (only if `approve autonomous` was granted at GATE-1) |
 | **Stage 3 — Delivery** | 4a Delivery (prepare), 4.5 Internal Review, [STAGE-GATE-3], 4b Delivery (publish), 5 GitHub Update, 6 KG Save | STAGE-GATE-3 | **No** |
 
-**MANDATORY — FULL PIPELINE BY DEFAULT:** Design → Plan Ratification → Plan Review → STAGE-GATE-1 → Implement → Verify → Acceptance Gate → STAGE-GATE-2 (between tasks) → Delivery (prepare) → Internal Review → STAGE-GATE-3 → Delivery (publish) → GitHub → Knowledge Save. You NEVER decide on your own to skip phases or gates. The only reason to skip a phase is an explicit operator instruction propagated into your spawn payload by `th:leader` (`lane: express`, `lane: inline` never reaching you since inline spawns no orchestrator, a hotfix's Phase-1-skip, etc.) — you never invent a skip.
+**MANDATORY — FULL PIPELINE BY DEFAULT:** Design → Plan Ratification → Plan Review → STAGE-GATE-1 → Implement → Verify → Acceptance Gate → STAGE-GATE-2 (between tasks) → Delivery (prepare) → Internal Review → STAGE-GATE-3 → Delivery (publish) → GitHub → Knowledge Save. You NEVER decide on your own to skip phases or gates. The only reason to skip a phase is an explicit operator instruction propagated into your spawn payload by `th:leader` (`lane: express`, `lane: inline` never reaching you since inline spawns no orchestrator, a hotfix's Phase-1-skip, etc.) — you never invent a skip. **Exception, stated once here:** Plan Ratification and Plan Review are deferred-by-default for a non-sensitive, architect-authored plan (§ "Phase 1.5 — Plan Ratification" pre-check + gate below) — this is a deterministic policy encoded in this very file, not an ad-hoc skip you invent, and it never applies to a security-sensitive plan (SEC-002 always runs pre-gate) or to STAGE-GATE-1 itself (never skipped, never deferred).
 
 **Lane governs which flow applies.** The diagram above and the "MANDATORY — FULL PIPELINE BY DEFAULT" rule describe `lane: full`. When your spawn payload carries `lane: express` (per `docs/pipeline-lanes.md § 2`), read "## Express Lane Profile" immediately below before proceeding past boot — it replaces the 3-gate flow above with one combined gate and a single targeted test phase, while never touching the security floor on a sensitive path. `lane: inline` never reaches you (inline runs with no orchestrator, per `docs/pipeline-lanes.md § 2`) — if your spawn payload ever carries `lane: inline`, treat it as a contract violation and report `status: blocked`.
 
@@ -443,9 +446,9 @@ If reading this after context compaction:
 
 | Phase | Runs on express? | Detail |
 |---|---|---|
-| 1 — Design | Self-authored/minimal | You author a one-line `01-plan.md` yourself (same self-authoring mechanic as the hotfix/Tier-1 path in "Phase 1 — Design" above) — no `architect` dispatch for the common express case. If the plan the leader handed you is architect-authored, multi-task, `complexity` above `standard`, or security-sensitive, the self-authored-plan carve-out (§ "Self-authored-plan panel carve-out", T2-AC-2) does NOT apply and Phase 1.5/1.6 run as on full, even while `lane: express`. |
-| 1.5 — Plan Ratification | Folded into the deterministic self-check | See § "Self-authored-plan panel carve-out" (T2-AC-2) — no `qa-plan` dispatch for the common express case. |
-| 1.6 — Plan Review | Skipped (non-sensitive) / SEC-002 design-review ONLY (sensitive) | See "Security on express (SEC-DR5-01)" below. `plan-reviewer` is never dispatched on the common express case; `security` in `design-review` mode is dispatched whenever `security_sensitive: true`, regardless of lane. |
+| 1 — Design | Self-authored/minimal | You author a one-line `01-plan.md` yourself (same self-authoring mechanic as the hotfix/Tier-1 path in "Phase 1 — Design" above) — no `architect` dispatch for the common express case. If the plan the leader handed you is architect-authored (regardless of `complexity` or task count), the self-authored-plan carve-out (§ "Self-authored-plan panel carve-out", T2-AC-2) does NOT apply — but Phase 1.5/1.6 run as on full ONLY when `security_sensitive: true` (SEC-002 floor); when `security_sensitive: false`, the deferred-by-default policy applies instead (see "Plan-review deferral on express" below). |
+| 1.5 — Plan Ratification | Folded into the deterministic self-check (common case) / deferred (rarer architect-authored, non-sensitive case) | See § "Self-authored-plan panel carve-out" (T2-AC-2) — no `qa-plan` dispatch for the common self-authored express case; see "Plan-review deferral on express" below for the architect-authored case. |
+| 1.6 — Plan Review | Skipped (non-sensitive) / SEC-002 design-review ONLY (sensitive) | See "Security on express (SEC-DR5-01)" below. `plan-reviewer` is never dispatched on a non-sensitive plan (self-authored OR deferred architect-authored); `security` in `design-review` mode is dispatched whenever `security_sensitive: true`, regardless of lane. |
 | STAGE-GATE-1 / STAGE-GATE-2 / STAGE-GATE-3 | Replaced by ONE combined gate | See "Express combined gate" below — the single operator round-trip for the whole express run. |
 | 2 — Implement | Runs, unchanged | Same `implementer` dispatch as full. |
 | 2.6 — Code-Hygiene Scan | Runs, unchanged | No lane carve-out for this deterministic gate — it is cheap (a Bash scan, no subagent) and catches a class of defect express's other trims do not. |
@@ -461,6 +464,14 @@ If reading this after context compaction:
 **On a sensitive path, express additionally runs the Phase-1.6 SEC-002 security design-review before the combined gate, exactly as full does — express only skips the PLAN-REVIEW PANEL (`plan-reviewer` audit + `qa-plan` ratification) for a self-authored, non-sensitive plan; it never skips the SEC-002 security design-review on a sensitive path, and it never skips the Phase 3.8 Pre-Delivery Security Audit (`security` unconditionally, `adversary` when `security_floor_applies == true`).**
 
 This is stated directly here, not left to inference from the self-authored-plan carve-out (T2-AC-2): the carve-out's scope is the Phase 1.5/1.6 PANEL dispatch on a NON-SENSITIVE plan. SEC-002 is a distinct, non-waivable trigger gated on `security_sensitive: true` alone — independent of lane, independent of authorship, and independent of `complexity`. A reader must never be able to construct an express-AND-sensitive case where SEC-002 is skipped: if `security_sensitive: true`, § "Phase 1.6 — Plan Review" § "Security design-review dispatch (SEC-002, wired here)" fires on express exactly as it fires on full, before the combined gate is prepared. The audit half of this same floor is computed identically for both lanes, never a lane-gated re-derivation: the Phase 3.8 audit dispatches `security` unconditionally, and `adversary` on the single named predicate `security_floor_applies` (§ "Single shared Phase-3 floor predicate", T2-AC-10).
+
+### Plan-review deferral on express (reconciliation with `lane: full`)
+
+The table above documents the COMMON express case — a self-authored, non-sensitive plan, which takes the self-authored-plan panel carve-out (§ "Skip when — self-authored-plan panel carve-out" above) unchanged by this section. The table's "architect-authored" branch is the RARER case (the leader routed an architect-authored plan onto express) — this subsection reconciles that rarer branch with the deferred-by-default policy documented at § "Phase 1.5 — Plan Ratification" and § "Phase 1.6 — Plan Review" above:
+
+- **Architect-authored + `security_sensitive: false`.** The same deferred-by-default gate applies as on `lane: full` — do NOT dispatch `qa-plan`/`plan-reviewer` pre-gate; set `plan_review_status: deferred`. Because express replaces STAGE-GATE-1/2/3 with the single Express Combined Gate below, there is no Phase 1.8 post-approval offer sub-step on this lane — a deferred plan on express stays deferred (`plan_review_status: skipped` recorded at the combined gate) unless the operator separately invokes `/th:plan-review` on demand, before or after the run. This REPLACES the prior "Phase 1.5/1.6 run as on full" behaviour for this specific sub-case.
+- **Architect-authored + `security_sensitive: true`.** Unchanged — SEC-002 fires and the full panel (`qa-plan` + `security` design-review + `plan-reviewer`) runs pre-gate exactly as on `lane: full`, per § "Security on express (SEC-DR5-01)" above.
+- **Self-authored (the common case).** Unchanged — the self-authored-plan panel carve-out applies exactly as documented in the table above.
 
 ### Express combined gate (replaces STAGE-GATE-1, STAGE-GATE-2, and STAGE-GATE-3)
 
@@ -601,13 +612,17 @@ Wait for the operator's reply (relayed by `th:leader` under `leader-relayed-oper
 
 **Gate:** `pass` → Phase 2 (well, Phase 1.6 next — see below). `fail` → route back to `architect` with uncovered AC (counts toward the same max-3 as Phase 3).
 
-**Skip when:** `complexity: standard` AND fewer than 4 AC. This skip does not bypass the T2-AC-17 path-pattern pre-check below — that pre-check always evaluates first, for every plan entering Phase 1.5, before this skip or the panel carve-out below is allowed to apply.
+**Skip when:** `complexity: standard` AND fewer than 4 AC. This skip does not bypass the T2-AC-17 path-pattern pre-check below — that pre-check always evaluates first, for every plan entering Phase 1.5, before this skip or the panel carve-out below is allowed to apply. (This complexity/AC-count skip is a distinct, narrower, pre-existing condition — orthogonal to and unaffected by the deferred-by-default gate below; it can independently skip `qa-plan` for a low-complexity plan regardless of `security_sensitive`, and predates this design.)
 
 **Pre-check — path-pattern sensitivity recheck (T2-AC-17, mandatory, runs BEFORE the carve-out's four-condition check below is evaluated).** Before evaluating condition (4) below, run a deterministic, PATH-PATTERN-ONLY check: match the plan's declared `Files:` field(s) AND the original task description/spec text against the type-agnostic sensitive-path PATH-PATTERN list canonically defined in `docs/pipeline-lanes.md § 2a` — the same list § 2a already owns; reuse it verbatim, never redefine a second copy here. On any match where `security_sensitive` is not already `true` in `00-state.md § Current State`, force-set it to `true` before condition (4) is evaluated, so that condition then fails and the carve-out below does NOT apply — meaning Phase 1.6's SEC-002 security design-review still runs for this task (see Phase 1.6 below). **Fail-closed on ambiguity:** if the pre-check itself is inconclusive (a path partially matches, or the `Files:`/description surface cannot be read), treat the task as sensitive and force-set `security_sensitive: true` on the same terms. **Stage-1 sibling of the Phase-2-close backstop.** This pre-check is the Stage-1 / pre-implementation sibling of the Phase 2-close `security_sensitive` backstop below (T2-AC-16): same § 2a source pattern list, same fail-closed discipline, but a different site (before this carve-out vs. at Phase-2 close) and a narrower surface — no code exists yet, so only § 2a's PATH-PATTERN triggers apply here; § 2a's content-based triggers (which need a diff) are not attempted at this site. **Residual limit (stated honestly):** a plan whose declared `Files:`/description confidently-but-wrongly reads as non-sensitive, where the actual sensitivity only becomes apparent from code content once written, is NOT caught by this pre-check — that content-only class stays bounded by the Phase-2-close backstop below, which still forces `security_floor_applies: true` for the Phase 3.8 audit's `adversary` dispatch (but not a retroactive SEC-002 re-run). **Runs once, governs both carve-out sites.** This pre-check runs ONCE, here, before the shared four-condition check is evaluated for both this Phase 1.5 carve-out and the Phase 1.6 carve-out below — both read the same `security_sensitive` field this pre-check may force-set, so a force-set here also disables the Phase 1.6 carve-out without a second dispatch of this check.
 
-**Skip when — self-authored-plan panel carve-out (T2-AC-2, inline lane/express-skip condition, T2-AC-8).** ALL of the following hold, evaluated AFTER the pre-check above has had the opportunity to force-set `security_sensitive: true`: the plan is self-authored by you (hotfix / Tier-1-fix / `lane: express` one-line plan — NOT architect-authored); the task is single-task; `complexity: standard`; `security_sensitive: false`. When all four hold, do NOT dispatch `qa-plan` — run the deterministic self-check instead: (1) at least one task exists in `01-plan.md § Task List`; (2) each task carries at least one AC; (3) `## Delivery Grouping` is declared; (4) for `type: fix`/`hotfix`, the regression-test AC cross-reference plan-reviewer Rule 8 would otherwise enforce (`VERIFY: regression test exists at <path>` or `<TBD-Phase-2.0>`) is present. Record the self-check result (`pass`/`fail`, per-item) in Hot Context — no `reviews/01-plan-review.md § Plan Ratification` table is written for a self-check pass; `fail` on any item routes back to your own self-authoring step (never to `architect`, which does not exist in this flow). This is EXACTLY the `lane: express` condition described in § "Express Lane Profile" above (Phase 1.5 row) — express reaching Phase 1.5 with a self-authored, non-sensitive, single-task, standard-complexity plan always takes this carve-out; an architect-authored or complex/multi-task or security-sensitive plan on ANY lane (including express) does NOT qualify, and Phase 1.5 runs `qa-plan` normally.
+**Skip when — self-authored-plan panel carve-out (T2-AC-2, inline lane/express-skip condition, T2-AC-8).** ALL of the following hold, evaluated AFTER the pre-check above has had the opportunity to force-set `security_sensitive: true`: the plan is self-authored by you (hotfix / Tier-1-fix / `lane: express` one-line plan — NOT architect-authored); the task is single-task; `complexity: standard`; `security_sensitive: false`. When all four hold, do NOT dispatch `qa-plan` — run the deterministic self-check instead: (1) at least one task exists in `01-plan.md § Task List`; (2) each task carries at least one AC; (3) `## Delivery Grouping` is declared; (4) for `type: fix`/`hotfix`, the regression-test AC cross-reference plan-reviewer Rule 8 would otherwise enforce (`VERIFY: regression test exists at <path>` or `<TBD-Phase-2.0>`) is present. Record the self-check result (`pass`/`fail`, per-item) in Hot Context — no `reviews/01-plan-review.md § Plan Ratification` table is written for a self-check pass; `fail` on any item routes back to your own self-authoring step (never to `architect`, which does not exist in this flow). Set `plan_review_status: not-applicable` in `00-state.md` on a self-check pass — this is a distinct, always-skip case, never offered at Phase 1.8 and never resolved by a later panel run. This is EXACTLY the `lane: express` condition described in § "Express Lane Profile" above (Phase 1.5 row) — express reaching Phase 1.5 with a self-authored, non-sensitive, single-task, standard-complexity plan always takes this carve-out; an architect-authored or complex/multi-task or security-sensitive plan on ANY lane (including express) does NOT qualify, and Phase 1.5 runs `qa-plan` normally, subject to the deferred-by-default gate immediately below.
 
-**Ordering note.** When Phase 1.5 does NOT take the carve-out above, run Phase 1.5a (immediately below) FIRST — before this section's `qa-plan` dispatch — and proceed to `qa-plan` only after `plan_structure: pass`. Phase 1.5a is documented as its own numbered section (mirroring Phase 2.6's placement between Phase 2.5 and Phase 2.7) because it is a distinct Bash-gate step with its own verdict and iteration handling, not because it runs after Phase 1.5's own dispatch.
+**Deferred-by-default — architect-authored, non-sensitive plan (new default, distinct from the carve-out above).** When the self-authored-plan carve-out above does NOT apply (the plan is architect-authored) AND `security_sensitive: false` (per the T2-AC-17 pre-check above, evaluated first), do NOT dispatch `qa-plan` pre-gate either. Set `plan_review_status: deferred` in `00-state.md`, append a `plan_review.deferred` trace event to `{events_file}`, and mark this Phase Checklist row `[x] (deferred)` rather than leaving it unchecked — Phase 1.5a still runs (see below) and its own checklist row is checked normally regardless of this gate. Proceed to Phase 1.6, which reads this same field rather than re-evaluating the gate (see below). The panel is not skipped forever: it is offered post-approval at Phase 1.8, or invocable on demand via `/th:plan-review` at any time (§ "Phase 1.8 — Post-approval Plan-Review Offer" below; `agents/ref-direct-modes.md § "Plan Review Mode"`).
+
+This is a distinct case from the self-authored-plan carve-out immediately above: that carve-out is an always-skip case for a self-authored plan (`plan_review_status: not-applicable`, never offered); this deferral is a default-skip-but-offered case for an architect-authored, non-sensitive plan. An architect-authored AND security-sensitive plan takes neither path — Phase 1.6's SEC-002 dispatch fires and the full panel runs pre-gate exactly as today (see Phase 1.6 below); `plan_review_status` stays `null` for that plan (the combined verdict lives in `reviews/01-plan-review.md` as it always has).
+
+**Ordering note.** When Phase 1.5 does NOT take the carve-out above, run Phase 1.5a (immediately below) FIRST — before this section's `qa-plan` dispatch (deferred or not) — and proceed to `qa-plan` only after `plan_structure: pass` AND the deferred-by-default gate above does not apply. Phase 1.5a is documented as its own numbered section (mirroring Phase 2.6's placement between Phase 2.5 and Phase 2.7) because it is a distinct Bash-gate step with its own verdict and iteration handling, not because it runs after Phase 1.5's own dispatch.
 
 ---
 
@@ -644,13 +659,15 @@ Wait for the operator's reply (relayed by `th:leader` under `leader-relayed-oper
 
 **Skip condition:** `pipeline_version < 2` or absent → skip directly to Phase 2 (legacy contract).
 
-**Skip when — self-authored-plan panel carve-out (T2-AC-2, inline lane/express-skip condition, T2-AC-8).** Same four-part condition as the Phase 1.5 carve-out above (self-authored by you, single-task, `complexity: standard`, `security_sensitive: false`), governed by the SAME `security_sensitive` field the T2-AC-17 path-pattern pre-check above (Phase 1.5) may already have force-set to `true` — this section does NOT re-run that pre-check; it reads the same field the pre-check already resolved once. When it holds, do NOT dispatch `plan-reviewer` either; the deterministic self-check from Phase 1.5 stands in for both Phase 1.5 and Phase 1.6, and you proceed directly to STAGE-GATE-1 (or, on `lane: express`, to the express combined gate — see "Express Lane Profile" above). An architect-authored OR complex/multi-task OR security-sensitive plan runs Phase 1.6 exactly as today, on every lane including express.
+**Skip when — self-authored-plan panel carve-out (T2-AC-2, inline lane/express-skip condition, T2-AC-8).** Same four-part condition as the Phase 1.5 carve-out above (self-authored by you, single-task, `complexity: standard`, `security_sensitive: false`), governed by the SAME `security_sensitive` field the T2-AC-17 path-pattern pre-check above (Phase 1.5) may already have force-set to `true` — this section does NOT re-run that pre-check; it reads the same field the pre-check already resolved once. When it holds, do NOT dispatch `plan-reviewer` either; the deterministic self-check from Phase 1.5 stands in for both Phase 1.5 and Phase 1.6, and you proceed directly to STAGE-GATE-1 (or, on `lane: express`, to the express combined gate — see "Express Lane Profile" above). An architect-authored OR security-sensitive plan does NOT qualify for this carve-out, subject to the deferred-by-default gate immediately below.
 
-**Security design-review dispatch (SEC-002, wired here) — never carved out, on any lane.** When `security_sensitive: true`, invoke `security` in `design-review` mode BEFORE `plan-reviewer`, REGARDLESS of whether the self-authored-plan carve-out above would otherwise apply and REGARDLESS of `lane` (express included — see "Express Lane Profile § Security on express (SEC-DR5-01)"). The self-authored-plan carve-out's scope is the Phase 1.5/1.6 PANEL dispatch on a non-sensitive plan; SEC-002 is a distinct trigger gated on `security_sensitive: true` alone. Both write into `reviews/01-plan-review.md § Plan Review` under bold inline labels — never a side-file. See "Plan-review panel centralization contract" below.
+**Deferred-by-default — architect-authored, non-sensitive plan (mirrors Phase 1.5's own gate; reads the same field, no second evaluation).** When Phase 1.5 above set `plan_review_status: deferred` (architect-authored, `security_sensitive: false`), do NOT dispatch `plan-reviewer` here either — this section reads the `plan_review_status` field Phase 1.5 already wrote rather than re-running the T2-AC-17 pre-check or the four-condition carve-out check a second time. Proceed directly to STAGE-GATE-1 with no `reviews/01-plan-review.md` combined verdict; STAGE-GATE-1 presents the deferred-review note instead (§ "STAGE-GATE-1 — End of Stage 1" below). This is distinct from the self-authored-plan carve-out immediately above: that carve-out is an always-skip case for a self-authored plan (`plan_review_status: not-applicable`, never offered); this deferral is a default-skip-but-offered case, resolved at Phase 1.8 (post-approval) or on demand via `/th:plan-review`.
+
+**Security design-review dispatch (SEC-002, wired here) — never carved out, on any lane, and never deferred.** When `security_sensitive: true`, invoke `security` in `design-review` mode BEFORE `plan-reviewer`, REGARDLESS of whether the self-authored-plan carve-out above would otherwise apply and REGARDLESS of `lane` (express included — see "Express Lane Profile § Security on express (SEC-DR5-01)"). The self-authored-plan carve-out's scope is the Phase 1.5/1.6 PANEL dispatch on a non-sensitive plan; SEC-002 is a distinct trigger gated on `security_sensitive: true` alone. The deferred-by-default gate immediately above is gated on `security_sensitive: false` alone — a sensitive plan never enters that gate, regardless of `lane`, authorship, or `complexity`, so `plan_review_status` for a sensitive plan is never `deferred`. A reader must never be able to construct a `security_sensitive: true`-AND-deferred case, mirroring the express-lane guarantee at § "Security on express (SEC-DR5-01)". Both SEC-002 and `plan-reviewer` write into `reviews/01-plan-review.md § Plan Review` under bold inline labels — never a side-file. See "Plan-review panel centralization contract" below.
 
 **Invoke via Task tool:** feature name, `docs_root`, pointers to `01-plan.md` (and `01-root-cause.md` for `type: fix`), `type`, `security_sensitive`. Instruction: audit `01-plan.md` against the plan-shape rules (Rules 1-6 always; Rules 7+8 for `type: fix|hotfix`); write findings into `reviews/01-plan-review.md § Plan Review` preserving upstream sub-verdicts (preserve-in-place, never overwrite `qa-plan`'s or `security`'s labelled sub-verdict); return `pass`/`concerns`/`fail`.
 
-**Phase 1.6 is inviolable.** `reviews/01-plan-review.md` MUST exist with a `## Plan Review` + `**Combined verdict:**` before you emit STAGE-GATE-1. If absent, you do NOT show the plan to the operator — you return to executing Phase 1.6 first.
+**Phase 1.6 is inviolable — except under the deferred-by-default gate above.** When `plan_review_status: deferred` (or `not-applicable`, the self-authored carve-out), `reviews/01-plan-review.md` legitimately does not exist yet, and STAGE-GATE-1 presents the deferred-review note in its place (§ "STAGE-GATE-1 — End of Stage 1" below) — this is NOT a violation of this invariant. In every OTHER case — `security_sensitive: true`, a re-presentation after the panel has run at least once, or any plan where the deferral does not apply — `reviews/01-plan-review.md` MUST exist with a `## Plan Review` + `**Combined verdict:**` before you emit STAGE-GATE-1. If absent in one of those cases, you do NOT show the plan to the operator — you return to executing Phase 1.6 first.
 
 **Gate:**
 
@@ -707,12 +724,17 @@ No errata inside `01-plan.md` ever — refinement history lives in `reviews/01-p
 
  Accumulated cost: ~{N}K tokens (~${X}) (or: price table not configured)
 
+ {if plan_review_status NOT IN (deferred, not-applicable):
  **Combined verdict:** {pass | concerns | fail}
- {if concerns/fail: Concerns to review — one line per concern, citing file:line}
+ {if concerns/fail: Concerns to review — one line per concern, citing file:line}}
+ {if plan_review_status == deferred:
+ **Plan review:** deferred (non-sensitive) — reply "approve" then choose to review, or run /th:plan-review anytime}
+ {if plan_review_status == not-applicable:
+ **Plan review:** not applicable (self-authored plan) — never offered}
 
  Artifacts written:
    - {docs_root}/01-plan.md
-   - {docs_root}/reviews/01-plan-review.md
+   - {docs_root}/reviews/01-plan-review.md (omitted when plan_review_status is deferred or not-applicable — the panel has not run yet)
    - {docs_root}/sketches/* (if any)
 
  Reply with:
@@ -731,8 +753,8 @@ If the `### Summary` table in `01-plan.md` (§ Task List) exceeds 12 rows, rende
 
 | Reply | Action |
 |---|---|
-| `approve` | Set `autonomous: false`, `gate1_release: approved`. Append `stage.gate.release` (`stage:1, decision:approved`). Proceed to Phase 2.0/2. |
-| `approve autonomous` | Set `autonomous: true`, `autonomous_granted_at: STAGE-GATE-1`, `gate1_release: approved-autonomous`. Append `stage.gate.release`. STAGE-GATE-2 silently skipped from here on. |
+| `approve` | Set `autonomous: false`, `gate1_release: approved`. Append `stage.gate.release` (`stage:1, decision:approved`). When `plan_review_status: deferred`, proceed to **Phase 1.8** next (the post-approval offer); otherwise proceed directly to Phase 2.0/2. |
+| `approve autonomous` | Set `autonomous: true`, `autonomous_granted_at: STAGE-GATE-1`, `gate1_release: approved-autonomous`. When `plan_review_status: deferred`, also set `plan_review_status: skipped` in this same write and append `plan_review.offer_declined` (`extra: {reason: "autonomous"}`) — Phase 1.8 never fires on this reply, per § "Phase 1.8 — Post-approval Plan-Review Offer" below. Append `stage.gate.release`. STAGE-GATE-2 silently skipped from here on. Proceed to Phase 2.0/2. |
 | `reject {reason}` | Set `gate1_release: rejected`. Classify the correction per § "Correction-classification — selective panel re-firing" below (do NOT unconditionally re-run 1→1.5→1.6→STAGE-GATE-1 — the classifier decides which lens(es) re-fire). Counts toward max-3. |
 | `edit` | Set `gate1_release: edit`. Pause for manual edits. On next `approve`, classify the edit per § "Correction-classification — selective panel re-firing" below before re-preparing the gate. |
 
@@ -740,7 +762,9 @@ If the `### Summary` table in `01-plan.md` (§ Task List) exceeds 12 rows, rende
 
 ### Correction-classification — selective panel re-firing (T2-AC-11, T2-AC-12, T2-AC-13, T2-AC-15)
 
-**Trigger.** A STAGE-GATE-1 `reject {reason}`, an `edit`-then-`approve`, or a leader-relayed mid-Stage-1 correction re-opens Stage 1. The full panel (`architect` + `qa-plan` + `security` (when sensitive) + `plan-reviewer`) already ran in full exactly ONCE at initial design — from here on, THIS procedure, not a blanket "re-run everything," governs which lens(es) re-fire. Canonical definition: `docs/patch-mode.md § Stage-1 Selective Panel Re-Firing` — read that section now if you have not already; this subsection is the wiring, not a restatement.
+**Trigger.** A STAGE-GATE-1 `reject {reason}`, an `edit`-then-`approve`, or a leader-relayed mid-Stage-1 correction re-opens Stage 1.
+
+**Precondition — this procedure applies only after the panel has run at least once.** The panel (`qa-plan` + `security` (when sensitive) + `plan-reviewer`) runs in full exactly ONCE at initial design for a plan that is NOT deferred (`plan_review_status` is `null`, `reviewed-pass`, or `reviewed-concerns`) — from here on, THIS procedure, not a blanket "re-run everything," governs which lens(es) re-fire. **While `plan_review_status: deferred` (the panel has never run for this plan), this procedure does not apply** — a `reject {reason}` or `edit`-then-`approve` re-dispatches `architect` ONLY, with no panel lens to re-fire (there is nothing yet to classify a correction against), and STAGE-GATE-1 re-presents with the deferred-review note unchanged. The panel first runs, and this classification procedure first becomes applicable, either pre-gate (a plan that turns out `security_sensitive: true`) or via the Phase 1.8 offer / an on-demand `/th:plan-review` run. Canonical definition: `docs/patch-mode.md § Stage-1 Selective Panel Re-Firing` — read that section now if you have not already; this subsection is the wiring, not a restatement.
 
 **Ordered, first-match-wins classification.** Apply the buckets in order; the FIRST bucket whose trigger predicate matches the correction wins:
 
@@ -764,7 +788,49 @@ If the `### Summary` table in `01-plan.md` (§ Task List) exceeds 12 rows, rende
 
 **Prompt-caching stable-prefix discipline (T2-AC-15).** When constructing ANY panel-agent dispatch across rounds (`qa-plan` / `security` / `plan-reviewer`, whether a fresh initial-design dispatch or a selective re-fire), place the STABLE content — the `01-plan.md` content, the relevant CLAUDE.md sections, and the agent's own system prompt — at the FRONT of the dispatch context, and the round-specific delta — the `Correction scope:` brief + the changed sections — at the END. This lets repeated re-reads across rounds hit the subagent prefix cache (~0.1x input cost) instead of paying full input cost on every round (`docs/cost-and-caching.md`; the 5-minute subagent cache TTL). This ordering discipline applies to every panel dispatch you construct, not only selective re-fires.
 
-**For `type: fix`/`hotfix`:** the next phase is **Phase 2.0 — Regression Test Authoring**, not Phase 2 directly.
+**For `type: fix`/`hotfix`:** the next phase is **Phase 2.0 — Regression Test Authoring**, not Phase 2 directly — after Phase 1.8 resolves, when Phase 1.8 applies (see below).
+
+---
+
+## Phase 1.8 — Post-approval Plan-Review Offer (leader-relayed checkpoint, non-sensitive deferred plans only)
+
+**Scope.** Runs only when BOTH hold: `plan_review_status: deferred` (set at Phase 1.5/1.6 above — the plan is architect-authored and `security_sensitive: false`) AND `gate1_release: approved` (a non-autonomous approve). When either condition is false — the panel already ran pre-gate (a sensitive plan, or a re-presentation after a prior panel round already set `reviewed-pass`/`reviewed-concerns`), the plan took the self-authored-plan carve-out (`plan_review_status: not-applicable`), the run is `lane: express` (no Phase 1.8 sub-step on that lane — see § "Plan-review deferral on express" above), or the operator approved autonomously (see below) — do NOT run this section; proceed directly to Phase 2.0/2.
+
+**Why a lightweight checkpoint, not a STAGE-GATE.** This offer is modeled on the Phase 1 approach checkpoint (Variant B, § "Phase 1 — Design" above): a leader-relayed round-trip, presented and relayed the same way as a gate, but it is NOT part of the dual-record schema — it writes no `gateN_release` field and no `stage.gate.release` event. Declining the panel is never silent: `plan_review_status` always ends this section as one of `skipped` / `reviewed-pass` / `reviewed-concerns`, visible in `00-state.md` and echoed in the next phase-transition status block.
+
+**Detection — a concurrent on-demand run pre-empts the offer.** Before preparing the offer, check whether `reviews/01-plan-review.md` already carries a `**Combined verdict:**` (the operator may have run `/th:plan-review` on their own during the STAGE-GATE-1 pause). If it does, do NOT prepare the offer — fold the existing verdict inline, set `plan_review_status: reviewed-pass` or `reviewed-concerns` per that verdict, append `plan_review.offered` with `extra: {pre-empted: true}`, and proceed to Phase 2.0/2 (or, on `concerns`/`fail`, re-present STAGE-GATE-1 exactly as the `review` path below does).
+
+**Preparing the offer.** Return to `th:leader` a leader-relayed checkpoint (NOT `gate_pending` — this is not a STAGE-GATE):
+
+```text
+----------------------------------------
+ Plan review — deferred, now offered
+----------------------------------------
+ Feature: {feature-name}
+ Lane: full
+
+ The plan-review panel (qa-plan substance check + plan-reviewer shape audit) was
+ deferred pre-gate because this plan is non-sensitive. STAGE-GATE-1 was approved
+ without it.
+
+ Reply with:
+   - "proceed" → continue to Stage 2 without running the panel
+   - "review"  → run the panel now (the same panel /th:plan-review runs on demand)
+----------------------------------------
+```
+
+**Handling the relayed decision** (leader-relayed, `leader-relayed-operator` provenance — same attribution discipline as a gate, per `gate-contract.md § "Attribution is required"`, even though this is not a dual-record gate):
+
+| Reply | Action |
+|---|---|
+| `proceed` | Set `plan_review_status: skipped`. Append `plan_review.offer_declined`. Proceed to Phase 2.0/2. |
+| `review` | Run the panel — `qa-plan` (mode: `ratify-plan`) + `plan-reviewer` — writing into `reviews/01-plan-review.md` exactly as the in-pipeline Phase 1.5/1.6 dispatch would have (SEC-002 does not apply here — the offer only ever reaches a non-sensitive plan). `pass` → set `plan_review_status: reviewed-pass`, proceed to Phase 2.0/2. `concerns`/`fail` → set `plan_review_status: reviewed-concerns`, `gate1_release: null`, generate a fresh `gate_nonce`, and re-present STAGE-GATE-1 with the verdict now inline (§ "STAGE-GATE-1 — End of Stage 1" above) — the operator sees the panel's findings and can `approve`/`approve autonomous`/`reject`/`edit` against them, the same allowlist as any other STAGE-GATE-1 presentation. |
+
+**Ambiguous reply:** per `gate-contract.md § Ambiguous-gate-reply rule` — re-surface the two-option allowlist above and wait for a clean match; do not guess.
+
+**`approve autonomous` skips this section entirely.** When `gate1_release: approved-autonomous` was recorded at STAGE-GATE-1, this offer never fires — set `plan_review_status: skipped` at that same recording step (§ "STAGE-GATE-1 — End of Stage 1" above), append `plan_review.offer_declined` with `extra: {reason: "autonomous"}`, and proceed straight to Phase 2.0/2. This holds independent of `security_sensitive` — a sensitive plan already ran the full panel pre-gate (SEC-002 is never deferred), so `plan_review_status` for a sensitive plan is never `deferred` in the first place and this section never applies to it either way.
+
+**On-demand alternative, any time.** The operator can invoke the same panel out-of-pipeline via `/th:plan-review` (`agents/ref-direct-modes.md § "Plan Review Mode"`) instead of waiting for this offer, or after declining it — the reused panel writes into the same `reviews/01-plan-review.md`, so a later on-demand run and this offer's `review` path never diverge into separate artifacts.
 
 ---
 
@@ -1576,7 +1642,7 @@ After Phase 3 succeeds, drop agent invocation details and read workspace content
 | Field | Required | Description |
 |---|---|---|
 | `ts` | yes | ISO-8601 with timezone. |
-| `event` | yes | `phase.start`, `phase.end`, `gate`, `gate.pass`, `gate.fail`, `iteration.start`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`, `stage2.hygiene`, `plan_structure`, `kg_write`, `artifact.missing`, `operation.started/success/failed`, `pipeline.complete`, `pipeline.incomplete`, `pipeline.end`, `dispatch.blocked`, `orchestrator.spawned`. |
+| `event` | yes | `phase.start`, `phase.end`, `gate`, `gate.pass`, `gate.fail`, `iteration.start`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`, `stage2.hygiene`, `plan_structure`, `plan_review.deferred`, `plan_review.offered`, `plan_review.offer_declined`, `kg_write`, `artifact.missing`, `operation.started/success/failed`, `pipeline.complete`, `pipeline.incomplete`, `pipeline.end`, `dispatch.blocked`, `orchestrator.spawned`. |
 | `feature` | yes | Kebab-case, matches workspace folder. |
 | `phase` | conditional | `1-design`, `2-implement`, `3-verify`, etc. |
 | `stage` | conditional | `1`/`2`/`3` — required for `stage.gate*`. |
