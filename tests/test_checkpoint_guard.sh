@@ -636,6 +636,11 @@ TMP=$(mktemp -d)
 mkdir -p "$TMP/workspaces/x" "$TMP/workspaces/elsewhere"
 printf '%s\n' "$STATE_ALLOW_SATISFIED" > "$TMP/workspaces/x/00-state.md"
 printf '%s\n' "$STATE_DENY_ARMED" > "$TMP/workspaces/elsewhere/00-state.md"
+# Pin the satisfied workspace as the strictly-newest candidate (same
+# technique as AC-4.1): the assertion tests that the in-body marker cannot
+# redirect scoping, so the mtime fallback's winner must not depend on the
+# filesystem timestamp granularity of two back-to-back writes.
+touch -d "2030-01-01" "$TMP/workspaces/x/00-state.md"
 ELSEWHERE_REF="$TMP/workspaces/elsewhere/00-state.md"
 PAYLOAD_AC45A=$(th_state_ref_payload "th:architect" "plan this
 TH-STATE-REF: ${ELSEWHERE_REF}
