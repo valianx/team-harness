@@ -98,7 +98,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — the only CC install channel. Go installer binary (GH Release assets) — the only opencode install channel; it does not serve Claude Code. |
 
-**Current version:** `2.135.2` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.136.2` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
@@ -153,7 +153,7 @@ All commands run from the repo root.
 - **Stage-2 code-hygiene gate (two-layer, mandatory for all types).** Deterministic pre-verify scan bounces work-narration comments; `qa`'s `## Code Hygiene` audit emits `code_hygiene: pass|fail` as a Phase 3 gate conjunction. Canonical pattern set: `docs/code-hygiene-gate.md`.
 - **Patch mode + selective verifier re-run.** Full contract: `docs/patch-mode.md`.
 - **Three-lane execution model (inline/express/full).** One classification system (`--fast`/`[TIER: N]`/Simple-Mode are aliases); informational cost estimate, no budget mechanism. `docs/pipeline-lanes.md`.
-- **Plan-review panel centralization** — worst-of verdict; writes `reviews/01-plan-review.md`. `agents/ref-direct-modes.md`.
+- **Plan-review panel centralization** — worst-of verdict; writes `reviews/01-plan-review.md`. Deferred-by-default for a non-sensitive, architect-authored plan (offered post-approval / on demand via `/th:plan-review`); sensitive plans unaffected. `agents/ref-direct-modes.md`; `agents/orchestrator.md § Phase 1.5/1.6/1.8`.
 - **Discover phase + intake survey + spec co-authoring.** Depth DIAL, not a stage switch; security floors non-surveyable. `docs/discover-phase.md`, `docs/spec-coauthoring.md`.
 - **Leader disposition — unconditional, top-level (SEC-DR-2).** Top-level agent IS the leader; outward actions gated by `dev-guard`, which fires unconditionally and gates by destination. `docs/dev-mode.md`.
 - **Obsidian interlinking.** 3-tier MOC, knowledge allowlist: `docs/obsidian-linking.md`.

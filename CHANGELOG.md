@@ -7,10 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.135.2] - 2026-07-21
+## [2.136.2] - 2026-07-21
 
 ### Fixed
 - `plan-reviewer` Rule 9's base-branch check false-positived on legitimate cross-repo `### Delivery Grouping` topologies, hard-failing any group whose `Base:` was not literally `main` regardless of which repository it targeted. `agents/architect.md`'s `### Delivery Grouping` schema gains an optional `Repo` column (absent cell = primary repository; no group is required to declare it); Rule 9's base-branch finding is now scoped to primary-repo groups only, so a secondary-repo group may legitimately target its own repository's integration branch. The same-repo stacked-PR prohibition, its non-overridable status, and the N>1-groups-requires-closed-list-Reason requirement are textually and semantically unchanged. Rule 3h is clarified as intra-group-only so a legitimate cross-repo base difference across groups never trips a false contradiction. Fixes #477.
+
+## [2.136.1] - 2026-07-21
+
+### Fixed
+
+- `gate-guard`: branch-scoped lane correlation — a lane that declares a `working_branch` owns exactly that branch; work on a different branch in the same directory (e.g. the `/th:inline` posture, or any non-pipeline work sharing a directory with a stale non-terminal lane state) now defers to `dev-guard` instead of being denied by an order gate it can never satisfy. The worktree-realpath match now governs only the lane's pre-branch window; the in-lane order gate and the force-push grammar are unchanged for the lane's own branch. Regression + control cases added to `tests/test_gate_guard.sh`; accepted renamed-branch residual documented in `docs/dev-mode.md`.
+
+## [2.136.0] - 2026-07-21
+
+### Added
+- Stage-1 plan-review panel (`qa-plan` ratification + `plan-reviewer` shape audit) is now deferred-by-default for a non-sensitive, architect-authored plan: the panel no longer dispatches pre-gate, `STAGE-GATE-1` presents a `deferred (non-sensitive)` note instead of a combined verdict, and a new post-approval **Phase 1.8 — Post-approval Plan-Review Offer** (leader-relayed checkpoint, no dual-record) lets the operator run the panel on demand or proceed. New `/th:plan-review` skill routes to the existing `plan-review` direct mode for on-demand invocation at any time. The deterministic Phase 1.5a structural scan still always runs. The `SEC-002` security design-review floor is unaffected — it remains non-deferrable on every lane, reaffirmed with an explicit statement and locked by a new regression test. Canonical: `agents/orchestrator.md § Phase 1.5/1.6/1.8`, `agents/_shared/gate-contract.md`.
 
 ## [2.135.1] - 2026-07-21
 
