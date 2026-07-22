@@ -184,10 +184,20 @@ function gatherCandidatePaths(reader: GateGuardReader): string[] {
 
 // ---------------------------------------------------------------------------
 // Correlation — the step checkpoint-guard.ts does not need. A candidate
-// counts as the governing lane only when it matches the current git context:
-// working_branch equals the current branch, or realpath(cwd()) equals
-// realpath(worktree). The literal string "null" is treated as an absent
-// worktree field, never as a path to resolve.
+// counts as the governing lane only when it matches the current git context.
+// A lane that declares its working_branch owns exactly that branch: when the
+// current branch is readable and differs, the work being pushed is not the
+// lane's delivery — operator-directed non-pipeline work sharing a directory
+// with a lane state (or with a stale, never-terminated one) must fall through
+// to dev-guard instead of being captured by an order gate it can never
+// satisfy. The worktree-realpath match therefore governs only while the lane
+// has not yet declared a branch (its pre-branch window) or the current branch
+// cannot be resolved (fail-closed toward the lane). The literal string "null"
+// is treated as an absent field, never as a value to match or a path to
+// resolve. Accepted residual (honest-developer threat model, docs/dev-mode.md
+// § "Threat model"): in-lane work pushed from a renamed branch escapes this
+// correlation — a plain-readable circumvention outside the floor's scope;
+// force pushes remain covered by dev-guard/policy-block regardless.
 // ---------------------------------------------------------------------------
 
 function laneCorrelates(
@@ -197,8 +207,8 @@ function laneCorrelates(
   reader: GateGuardReader
 ): boolean {
   const workingBranch = readField(content, "working_branch");
-  if (workingBranch !== null && currentBranch !== null && workingBranch === currentBranch) {
-    return true;
+  if (workingBranch !== null && workingBranch !== "null" && currentBranch !== null) {
+    return workingBranch === currentBranch;
   }
 
   const worktreeField = readField(content, "worktree");

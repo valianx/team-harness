@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.136.1] - 2026-07-21
+
+### Fixed
+
+- `gate-guard`: branch-scoped lane correlation — a lane that declares a `working_branch` owns exactly that branch; work on a different branch in the same directory (e.g. the `/th:inline` posture, or any non-pipeline work sharing a directory with a stale non-terminal lane state) now defers to `dev-guard` instead of being denied by an order gate it can never satisfy. The worktree-realpath match now governs only the lane's pre-branch window; the in-lane order gate and the force-push grammar are unchanged for the lane's own branch. Regression + control cases added to `tests/test_gate_guard.sh`; accepted renamed-branch residual documented in `docs/dev-mode.md`.
+
 ## [2.136.0] - 2026-07-21
 
 ### Added
