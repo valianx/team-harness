@@ -192,6 +192,7 @@ Canonical matrix (must match exactly):
 | `security` | opus | xhigh |
 | `adversary` | sonnet | xhigh |
 | `reviewer` | sonnet | medium |
+| `reviewer-consolidator` | sonnet | medium |
 | `qa` | sonnet | high |
 | `qa-plan` | opus | high |
 | `gcp-cost-analyzer` | opus | high |

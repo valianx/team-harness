@@ -187,7 +187,10 @@ check(
 BASE_REF = "544bf2f"
 import subprocess
 
-def git_show(ref: str, path: str) -> str:
+def git_show(ref: str, path: str):
+    """Return file content at ref, or None when the ref itself is unavailable
+    (shallow checkout / unfetched base) — callers must distinguish that
+    environment condition from a genuine byte-drift."""
     try:
         return subprocess.run(
             ["git", "show", f"{ref}:{path}"],
@@ -196,11 +199,17 @@ def git_show(ref: str, path: str) -> str:
             text=True,
             check=True,
         ).stdout
-    except Exception:
-        return ""
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return None
 
 
 base_orchestrator = git_show(BASE_REF, "agents/orchestrator.md")
+BASE_AVAILABLE = base_orchestrator is not None
+if not BASE_AVAILABLE:
+    print(f"  [SKIP] INV-C byte-unchanged checks: base commit {BASE_REF} is not"
+          " reachable in this checkout (shallow clone / unfetched base) —"
+          " skipped as an environment condition, not reported as drift")
+    base_orchestrator = ""
 
 
 def extract_line(text: str, needle: str) -> str:
@@ -212,20 +221,22 @@ def extract_line(text: str, needle: str) -> str:
 
 base_predicate = extract_line(base_orchestrator, "security_floor_applies = security_sensitive == true")
 cur_predicate = extract_line(orchestrator, "security_floor_applies = security_sensitive == true")
-check(
-    "T1-AC6 (INV-C fenced): `security_floor_applies` predicate line byte-unchanged vs base "
-    f"{BASE_REF}",
-    bool(base_predicate) and base_predicate == cur_predicate,
-    f"base={base_predicate!r} current={cur_predicate!r}",
-)
+if BASE_AVAILABLE:
+    check(
+        "T1-AC6 (INV-C fenced): `security_floor_applies` predicate line byte-unchanged vs base "
+        f"{BASE_REF}",
+        bool(base_predicate) and base_predicate == cur_predicate,
+        f"base={base_predicate!r} current={cur_predicate!r}",
+    )
 
 base_failclosed = extract_line(base_orchestrator, "**Fail-closed default:**")
 cur_failclosed = extract_line(orchestrator, "**Fail-closed default:**")
-check(
-    f"T1-AC6 (INV-C fenced): 'Fail-closed default' sentence byte-unchanged vs base {BASE_REF}",
-    bool(base_failclosed) and base_failclosed == cur_failclosed,
-    f"base={base_failclosed!r} current={cur_failclosed!r}",
-)
+if BASE_AVAILABLE:
+    check(
+        f"T1-AC6 (INV-C fenced): 'Fail-closed default' sentence byte-unchanged vs base {BASE_REF}",
+        bool(base_failclosed) and base_failclosed == cur_failclosed,
+        f"base={base_failclosed!r} current={cur_failclosed!r}",
+    )
 
 # ---------------------------------------------------------------------------
 # Task-1 AC-7 (Phase 2.5 reconciliation): frontmatter description, "Your

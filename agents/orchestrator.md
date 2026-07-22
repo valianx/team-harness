@@ -1508,7 +1508,7 @@ Do NOT add or rename values without a coordinated two-repo change.
 |---------|-----------------|-------------------|
 | `guard.block` | `hook`, `reason`, `resolved` | `hook` ∈ {prepublish, dev, policy}; `reason` ∈ {over-bump, secret, outward}; `resolved` bool |
 | `gate.fail` | `gate`, `verdict` | `gate` ∈ {STAGE-GATE-1, STAGE-GATE-2, STAGE-GATE-3, acceptance, plan-review}; `verdict` ∈ {fail, concerns} |
-| `verify.reject` | `agent`, `verdict` | `agent` ∈ {qa, security, tester}; `verdict` ∈ {fail, concerns} |
+| `verify.reject` | `agent`, `verdict` | `agent` ∈ {qa, tester}; `verdict` ∈ {fail, concerns} |
 | `iteration.loop` | `stage`, `iterations` | `stage` ∈ {1, 2, 3}; `iterations` int ≥ 2 |
 | `blocked` | `reason` | `reason` ∈ {no-dispatch, manual-push, guard, dependency} |
 | `scope.collapse` | `items_dropped` | `items_dropped` int ≥ 1 |
@@ -1534,7 +1534,7 @@ construction. Neither side relies solely on the other (defense in depth).
 | STAGE-GATE-1/2/3 operator rejects or requests edit | `gate.fail` | When the operator votes `rejected`/`edit`/`amend`/`abort` at any STAGE-GATE you witness |
 | Plan-review verdicts `concerns` or `fail` | `gate.fail` | When `plan-reviewer` returns `concerns` or `fail` (gate: `plan-review`) |
 | Acceptance gate fails a verify round | `gate.fail` | When Phase 3.5 routes back to implementer (gate: `acceptance`) |
-| A verifier returns `fail` or `concerns` | `verify.reject` | When `qa`, `security`, or `tester` returns a non-pass verdict |
+| A verifier returns `fail` or `concerns` | `verify.reject` | When `qa` or `tester` returns a non-pass verdict |
 | An agent iterates (≥2 rounds) | `iteration.loop` | When Phase 3.5 has reached the 2nd iteration for a stage |
 | Pipeline reaches `blocked-no-dispatch` or `blocked-manual-push` | `blocked` | When dispatch is unavailable or push is blocked |
 | Operator or pipeline collapses scope | `scope.collapse` | When AC items are dropped from the plan during STAGE-GATE-1 edit review |

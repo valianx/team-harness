@@ -46,7 +46,7 @@ var lowCostMatrix = map[string]AgentOverride{
 	"agent-builder":         {Model: "sonnet", Effort: "high"},
 	"security":              {Model: "sonnet", Effort: "high"},
 	"reviewer":              {Model: "sonnet", Effort: "high"},
-	"reviewer-consolidator": {Model: "sonnet", Effort: "high"},
+	"reviewer-consolidator": {Model: "sonnet", Effort: "medium"},
 	"qa":                    {Model: "sonnet", Effort: "high"},
 
 	// Advisory, executor, downstream generators — effort: medium

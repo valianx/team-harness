@@ -46,13 +46,14 @@ func TestLowCostMatrixInvariants(t *testing.T) {
 	}
 }
 
-// TestLowCostMatrixTally verifies the 7 high / 10 medium split from the architecture.
+// TestLowCostMatrixTally verifies the 7 high / 11 medium split from the architecture.
 func TestLowCostMatrixTally(t *testing.T) {
 	high := []string{"leader", "orchestrator", "architect", "agent-builder", "security", "reviewer", "qa"}
 	medium := []string{
 		"plan-reviewer", "gcp-cost-analyzer", "init", "implementer",
 		"tester", "diagrammer", "likec4-diagrammer",
 		"d2-diagrammer", "translator", "delivery",
+		"reviewer-consolidator",
 	}
 
 	for _, name := range high {

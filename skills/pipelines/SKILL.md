@@ -304,7 +304,7 @@ When Stage 2 is active and multiple tasks run in parallel within a round, the JS
 - For each round, collect every `phase.end` event whose `phase` starts with `2-`, `2.5-`, `3-`, `3.5-`, or `3.75-` until the next `stage.gate` with `stage: 2` fires (or `pipeline.end` fires).
 
 Render each round as a single block:
-```
+```text
 Round R{R} ({N} tasks, started {ts}, closed {ts}):
   Task-1: Phase 2 → Phase 3 → Phase 3.5 → Phase 3.75 [duration / status per phase]
   Task-2: Phase 2 → Phase 3 → ... ↻ ITERATION 1 → Phase 3 → ...

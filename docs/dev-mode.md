@@ -287,7 +287,7 @@ Only that obfuscation-evasion residual of string-matching gates is a documented,
 
 A limitation qualifies as "documented, not chased" only when it is BOTH (a) disclosed in-place where it lives, AND (b) scoped out through a legitimate mechanism — the architectural-inevitability limit for the string-matching-gate case is the canonical example. (A previously-tracked second example, the mid-iteration classification-timing gap in the retired per-task Phase-3 security dispatch, is addressed by the Pre-Delivery Security Audit's positional design: `adversary` reviews the consolidated final diff once per delivery group when `security_floor_applies` holds, so a control introduced by any patch iteration on a sensitive task is reviewed regardless of which iteration introduced it. This coverage is scoped to `security_floor_applies == true`, not classification-independent — code-level review on a non-sensitive task is delegated to PR review — `agents/orchestrator.md § "Phase 3.8 — Pre-Delivery Security Audit"`.) Cross-ref: this file's "Residual static-resolution limits" section.
 
-This disposition is narrowly scoped to the residual class described above. It does NOT license skipping any real in-scope finding, does NOT weaken or waive any floor, and does NOT change when or whether `security`/`adversary` dispatch — security floors stay non-waivable.
+This disposition is narrowly scoped to the residual class described above. It does NOT license skipping any real in-scope finding, does NOT weaken or waive any floor, and does NOT change when or whether the SEC-002 design-review or `adversary` dispatch — security floors stay non-waivable.
 
 ---
 

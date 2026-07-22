@@ -72,7 +72,10 @@ def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def git_show(ref: str, path: str) -> str:
+def git_show(ref: str, path: str):
+    """Return file content at ref, or None when the ref itself is unavailable
+    (shallow checkout / unfetched base) — callers must distinguish that
+    environment condition from a genuine byte-drift."""
     try:
         return subprocess.run(
             ["git", "show", f"{ref}:{path}"],
@@ -81,8 +84,8 @@ def git_show(ref: str, path: str) -> str:
             text=True,
             check=True,
         ).stdout
-    except Exception:
-        return ""
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return None
 
 
 def slice_section(text: str, header: str, next_header_pattern: str = r"\n## ") -> str:
@@ -109,6 +112,14 @@ managed_block = read(SKILLS_DIR / "setup" / "managed-blocks" / "orchestrator-dis
 base_dev_mode = git_show(BASE_REF, "docs/dev-mode.md")
 base_claude_md = git_show(BASE_REF, "CLAUDE.md")
 base_managed_block = git_show(BASE_REF, "skills/setup/managed-blocks/orchestrator-dispatch-rule.md")
+BASE_AVAILABLE = base_dev_mode is not None and base_claude_md is not None and base_managed_block is not None
+if not BASE_AVAILABLE:
+    print(f"  [SKIP] INV-C byte-unchanged checks: base commit {BASE_REF} is not"
+          " reachable in this checkout (shallow clone / unfetched base) —"
+          " skipped as an environment condition, not reported as drift")
+    base_dev_mode = base_dev_mode or ""
+    base_claude_md = base_claude_md or ""
+    base_managed_block = base_managed_block or ""
 
 print("=== Round 3: Task-5 (security-floor prose, managed block, CLAUDE.md §5/§7.2/§8) ===")
 
@@ -220,32 +231,33 @@ check(
 # ---------------------------------------------------------------------------
 base_hi2 = extract_line(base_dev_mode, "**HI-2 (discover-phase.md §3):**")
 cur_hi2 = extract_line(dev_mode, "**HI-2 (discover-phase.md §3):**")
-check(
-    f"T5-AC4 (INV-C fenced): HI-2 bullet byte-unchanged vs base {BASE_REF}",
-    bool(base_hi2) and base_hi2 == cur_hi2,
-    f"base={base_hi2!r} current={cur_hi2!r}",
-)
 base_path_pattern = extract_line(base_dev_mode, "**Path-pattern auto-escalation")
 cur_path_pattern = extract_line(dev_mode, "**Path-pattern auto-escalation")
-check(
-    f"T5-AC4 (INV-C fenced): Path-pattern auto-escalation bullet byte-unchanged vs base {BASE_REF}",
-    bool(base_path_pattern) and base_path_pattern == cur_path_pattern,
-    f"base={base_path_pattern!r} current={cur_path_pattern!r}",
-)
 base_intro = extract_line(base_dev_mode, "run **input-independent** and are NOT waivable")
 cur_intro = extract_line(dev_mode, "run **input-independent** and are NOT waivable")
-check(
-    f"T5-AC4 (INV-C fenced): 'run input-independent and are NOT waivable' intro sentence "
-    f"byte-unchanged vs base {BASE_REF}",
-    bool(base_intro) and base_intro == cur_intro,
-    f"base={base_intro!r} current={cur_intro!r}",
-)
+if BASE_AVAILABLE:
+    check(
+        f"T5-AC4 (INV-C fenced): HI-2 bullet byte-unchanged vs base {BASE_REF}",
+        bool(base_hi2) and base_hi2 == cur_hi2,
+        f"base={base_hi2!r} current={cur_hi2!r}",
+    )
+    check(
+        f"T5-AC4 (INV-C fenced): Path-pattern auto-escalation bullet byte-unchanged vs base {BASE_REF}",
+        bool(base_path_pattern) and base_path_pattern == cur_path_pattern,
+        f"base={base_path_pattern!r} current={cur_path_pattern!r}",
+    )
+    check(
+        f"T5-AC4 (INV-C fenced): 'run input-independent and are NOT waivable' intro sentence "
+        f"byte-unchanged vs base {BASE_REF}",
+        bool(base_intro) and base_intro == cur_intro,
+        f"base={base_intro!r} current={cur_intro!r}",
+    )
 check(
     "T5-AC4: honest-developer threat-model disposition sentence is not weakened "
     "(still forbids skipping findings, weakening floors, or changing dispatch)",
     "does NOT license skipping any real in-scope finding, does NOT weaken or waive any floor, "
-    "and does NOT change when or whether `security`/`adversary` dispatch — security floors "
-    "stay non-waivable." in dev_mode,
+    "and does NOT change when or whether the SEC-002 design-review or `adversary` dispatch — "
+    "security floors stay non-waivable." in dev_mode,
 )
 
 # ---------------------------------------------------------------------------
@@ -303,12 +315,13 @@ current_illustrative_example = extract_line(
     base_section_72, "The three things a developer already knows"
 )
 base_section_72_minus_example = base_section_72.replace(current_illustrative_example, "", 1)
-check(
-    "T5-AC6: §7.2's surrounding rule text, table, and Permitted Exceptions are byte-unchanged "
-    f"vs base {BASE_REF} (only the illustrative-example sentence differs)",
-    section_72_minus_example == base_section_72_minus_example,
-    "expected the two sections to match after removing each one's own illustrative-example line",
-)
+if BASE_AVAILABLE:
+    check(
+        "T5-AC6: §7.2's surrounding rule text, table, and Permitted Exceptions are byte-unchanged "
+        f"vs base {BASE_REF} (only the illustrative-example sentence differs)",
+        section_72_minus_example == base_section_72_minus_example,
+        "expected the two sections to match after removing each one's own illustrative-example line",
+    )
 
 print()
 print("=== Round 3: Task-5 supplementary — docs/knowledge.md (Files: list, no numbered AC) ===")

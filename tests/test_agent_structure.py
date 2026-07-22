@@ -4295,8 +4295,8 @@ check(
 # fully retired — no '## Phase 3.6' heading exists at any mandatory/conditional
 # tier. Rewritten from a title-wording pin to a retirement pin.
 _phase36_title_match = [
-    l for l in _orch_v29.splitlines()
-    if l.startswith("## Phase 3.6")
+    line for line in _orch_v29.splitlines()
+    if line.startswith("## Phase 3.6")
 ]
 check(
     "Phase 3.6 heading does not exist (retired — no acceptance-checker dispatch)",

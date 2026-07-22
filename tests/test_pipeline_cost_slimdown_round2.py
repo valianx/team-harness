@@ -191,15 +191,42 @@ check(
     "T2-AC4: adversary.md '### 1. Identify the changed controls' contains the canonical control vocabulary",
     CONTROL_VOCAB in method_1,
 )
-classification_block = slice_section(architect, "### Classification block")
+def _vocab_occurrences(text: str) -> list[str]:
+    """Every occurrence of the control-vocabulary enumeration in `text`,
+    normalized across line-wrapping, anchored on its distinctive opening and
+    closing tokens — so a divergent or duplicated enumeration anywhere in the
+    file is surfaced, not just the first substring hit."""
+    joined = " ".join(text.split())
+    anchor = "a guard, a gate, a validation,"
+    tail = "hides incomplete functionality"
+    out: list[str] = []
+    idx = 0
+    while True:
+        i = joined.find(anchor, idx)
+        if i == -1:
+            break
+        end = joined.find(tail, i)
+        out.append(joined[i : end + len(tail)] if end != -1 else joined[i : i + 300])
+        idx = i + 1
+    return out
+
+
+_arch_occurrences = _vocab_occurrences(architect)
 check(
-    "T2-AC4: architect.md carries the same canonical control vocabulary (parity check)",
-    CONTROL_VOCAB in architect,
-    "expected the exact same vocabulary string to appear verbatim in agents/architect.md",
+    "T2-AC4: architect.md carries the canonical control vocabulary and every occurrence "
+    "in the file is byte-identical to it (no divergent duplicate anywhere)",
+    bool(_arch_occurrences) and all(o == CONTROL_VOCAB for o in _arch_occurrences),
+    f"occurrences={len(_arch_occurrences)}; first divergent="
+    f"{next((o for o in _arch_occurrences if o != CONTROL_VOCAB), None)!r}",
 )
+_adv_occurrences = _vocab_occurrences(adversary)
 check(
-    "T2-AC4: the two enumerations are byte-identical (explicit string-equality diff, not a substring guess)",
-    CONTROL_VOCAB in method_1 and CONTROL_VOCAB in architect,
+    "T2-AC4: the two files' enumerations are byte-identical (string-equality over every "
+    "normalized occurrence in both files, not a substring guess)",
+    bool(_adv_occurrences)
+    and bool(_arch_occurrences)
+    and all(o == CONTROL_VOCAB for o in _adv_occurrences + _arch_occurrences),
+    f"adversary occurrences={len(_adv_occurrences)}, architect occurrences={len(_arch_occurrences)}",
 )
 
 # ---------------------------------------------------------------------------
