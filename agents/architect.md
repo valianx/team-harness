@@ -281,7 +281,7 @@ Ordered implementation steps. The implementer follows this sequence.
 Notes:
 - Rows in DAG order (Round 1 first: tasks with `Depends on: none`).
 - `Files` is the count, not the list — the list lives in the per-task section.
-- `Base` and `Split reason` are declared once, at the delivery-group level (see `### Delivery Grouping` below), not per task.
+- `Base`, `Split reason`, and the optional `Repo` are declared once, at the delivery-group level (see `### Delivery Grouping` below), not per task.
 
 ### Delivery Grouping
 
@@ -291,12 +291,14 @@ Default (single repo, no temporal-prod reason): all tasks ship as ONE PR.
 
 OR, when a temporal-prod reason applies (coexistence window, production signal, cross-repo deploy gate), N serial groups, each shipping as its own PR:
 
-  | PR | Tasks | Base | Reason |
-  |----|-------|------|--------|
-  | 1  | Task-1, Task-2 | main | — |
-  | 2  | Task-3         | main | coexistence window |
+  | PR | Tasks | Base | Reason | Repo |
+  |----|-------|------|--------|------|
+  | 1  | Task-1, Task-2 | main | — | — |
+  | 2  | Task-3         | main | coexistence window | — |
 
-Stacked PRs (a group's Base = a sibling group's branch instead of `main`) are PROHIBITED.
+`Repo` is an **optional** column — no group is required to declare it, and a plan that omits the column entirely behaves exactly as before this column existed. Leave the cell empty when every group ships to the same repository. When a delivery genuinely spans multiple repositories, name each group's repository in `Repo`: the first group in the table (or any group that omits `Repo`) is the **primary repository**; a group whose `Repo` differs from the primary is a secondary, cross-repo group and may declare its own repository's mandated integration branch in `Base:` (e.g. `release/test`) instead of `main` — `plan-reviewer` Rule 9 exempts secondary groups from the base-must-be-`main` check accordingly.
+
+Stacked PRs within the SAME repository (a group's Base = a sibling group's branch instead of `main`) are PROHIBITED — this prohibition is unaffected by the `Repo` column and cannot be worked around by declaring a `Repo`.
 
 ### Task-1: {imperative title}
 
@@ -1625,6 +1627,8 @@ Ordered implementation steps. The implementer follows this sequence.
 Default (single repo, no temporal-prod reason): all tasks ship as ONE PR.
 
   Grouping: all-tasks-one-pr
+
+OR, N serial groups with the `PR | Tasks | Base | Reason | Repo` schema (see "Design Mode — Plan Output" above for the full table example). `Repo` is an **optional** column — no group is required to declare it; absence (or an omitted column) means every group is the primary repository, unchanged from before this column existed. A group whose `Repo` differs from the primary is a secondary, cross-repo group exempt from the base-must-be-`main` check.
 
 ### Task-1: {imperative title}
 

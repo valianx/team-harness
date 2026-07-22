@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.136.2] - 2026-07-21
+
+### Fixed
+- `plan-reviewer` Rule 9's base-branch check false-positived on legitimate cross-repo `### Delivery Grouping` topologies, hard-failing any group whose `Base:` was not literally `main` regardless of which repository it targeted. `agents/architect.md`'s `### Delivery Grouping` schema gains an optional `Repo` column (absent cell = primary repository; no group is required to declare it); Rule 9's base-branch finding is now scoped to primary-repo groups only, so a secondary-repo group may legitimately target its own repository's integration branch. The same-repo stacked-PR prohibition, its non-overridable status, and the N>1-groups-requires-closed-list-Reason requirement are textually and semantically unchanged. Rule 3h is clarified as intra-group-only so a legitimate cross-repo base difference across groups never trips a false contradiction. Fixes #477.
+
 ## [2.136.1] - 2026-07-21
 
 ### Fixed
