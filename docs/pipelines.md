@@ -68,7 +68,6 @@ Full contract: [`docs/discover-phase.md`](./discover-phase.md).
 | Phase 3 — Verify | tester (run-only), qa, security* (parallel) | `03-testing.md` (verify section), `reviews/04-validation.md`, `reviews/04-security.md` |
 | Phase 3.5 — Acceptance Gate | th:orchestrator | re-routes to implementer if any AC is missing a passing test (max 3 loops) |
 | Phase 3.75 — Build Verification | th:orchestrator | build/lint commands; retry implementer once if fail |
-| Phase 3.6 — Acceptance Check | acceptance-checker | verdict appended to `reviews/04-validation.md` |
 | **STAGE-GATE-2** | operator | Per-round approval (skipped when operator granted `approve-autonomous` at GATE-1) |
 | Phase 4 — Delivery | delivery | CHANGELOG entry, version bump, branch, commit |
 | Phase 4.5 — Internal Review | reviewer | advisory top-3 issues |
@@ -80,7 +79,7 @@ Full contract: [`docs/discover-phase.md`](./discover-phase.md).
 
 **STAGE-GATE-1** is mandatory and cannot be skipped. **STAGE-GATE-3** is mandatory and cannot be skipped. **STAGE-GATE-2** fires **per-round** (once per round of tasks, between rounds) and is skipped when the operator granted `approve-autonomous` at GATE-1. A "round" is all tasks that share the same dependency depth; independent tasks run in parallel within a round, and STAGE-GATE-2 fires once when the whole round completes — not once per task.
 
-**Phase ordering note.** Phase 1.7 executes before Phase 1.5 in time (assigned a higher number for observability-identity continuity, following the same precedent as Phase 3.75 which executes before Phase 3.6). Phase 2.7 (test authoring) must complete before Phase 3 (verify).
+**Phase ordering note.** Phase 1.7 executes before Phase 1.5 in time (assigned a higher number for observability-identity continuity — the phase-number sequence tracks identity, not execution order). Phase 2.7 (test authoring) must complete before Phase 3 (verify).
 
 ### Notable artifacts
 

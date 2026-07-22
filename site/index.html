@@ -496,7 +496,7 @@
         After install, 17 specialized agents and 32 slash commands are registered
         in your <span class="inline-code">~/.claude/</span>. The system runs a full
         Spec-Driven Development pipeline: intake, architecture design, implementation,
-        parallel test + validation, security review, acceptance check, and delivery —
+        tester/QA verification, security review, and delivery —
         all coordinated through workspaces files that persist across sessions.
       </p>
       <p class="prose" style="margin-top:12px;">
@@ -537,8 +537,9 @@
           <div class="stage-subtitle">Stage 2 — Implementation</div>
           <p class="stage-desc">
             Implementer writes production code. Tester, QA, and security agents verify
-            in parallel. Acceptance-checker performs a final spec-vs-delivered audit.
-            Iteration loops run automatically until all gates pass.
+            in parallel. An adversarial reviewer runs a pre-delivery audit on
+            security-sensitive changes. Iteration loops run automatically until all
+            gates pass.
           </p>
         </div>
 
@@ -608,14 +609,6 @@
             <span class="agent-pill" style="background:var(--role-orange);color:var(--role-orange-t);">validation</span>
           </div>
           <p class="agent-desc">Performs comprehensive security audits on backend and frontend projects. Evaluates against OWASP Top 10, CWE Top 25, ASVS, and SANS Top 25. Detects vulnerabilities, hardcoded secrets, insecure configurations, auth flaws, and injection risks. Does not implement fixes or modify source code.</p>
-        </div>
-
-        <div class="agent-card">
-          <div class="agent-header">
-            <span class="agent-name">acceptance-checker</span>
-            <span class="agent-pill" style="background:var(--role-pink);color:var(--role-pink-t);">validation</span>
-          </div>
-          <p class="agent-desc">External auditor that compares the original spec against the actual delivered artifacts. Detects drift between "what was asked" and "what was delivered". Produces a non-binding verdict (pass / concerns / fail) the th:orchestrator uses to decide whether to proceed to Delivery. Read-only.</p>
         </div>
 
         <div class="agent-card">

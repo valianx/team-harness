@@ -222,7 +222,6 @@ also see the classification block and the diff signal. The check is `concerns`-s
 | Stage 2 Test Authoring | tester | **Required reading:** reads the triggered `sketches/*` files; derives test cases from each declared contract surface (endpoint, table, call-hop, etc.) in addition to the per-task AC; emits `sketches_read` in status block |
 | Phase 3 Validation | qa | **Required reading:** reads the triggered `sketches/*` files; cross-checks the delivered API/data/UI/call-flow against the corresponding sketch contract as part of AC validation; emits `sketches_read` in status block |
 | Phase 3 Code Review | reviewer | **Required reading:** reads the triggered `sketches/*` files; confirms the diff matches the sketch contracts; flags a delivered surface that silently diverges from the api-contract or service-interaction sketch |
-| Phase 3.6 (Acceptance Check) | acceptance-checker | **Required reading:** reads every triggered `sketches/*` file (required, not optional); diffs the delivered surface against each sketch; includes service-interaction diff row when `spans_multiple_services: true`; resolves consolidated `{overview_root}/sketches/` paths in multi-project workspaces |
 | Direct-entry skills | `/th:review-pr`, `/th:validate` | Run `sketch-guard.sh` as a prerequisite probe; **required reading:** reads the triggered sketch files when entering mid-pipeline before the consuming pass begins |
 
 ---

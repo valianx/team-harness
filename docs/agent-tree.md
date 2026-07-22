@@ -23,8 +23,7 @@ th:leader  ── top-level session agent · the operator's single point of cont
 │   └─ dispatches pipeline specialists (leaf agents — no further orchestration):
 │        Stage 1 · Analysis        architect · qa-plan (ratify) · plan-reviewer ·
 │                                   security (design-review)
-│        Stage 2 · Implementation  implementer · tester · qa · security · adversary ·
-│                                   acceptance-checker
+│        Stage 2 · Implementation  implementer · tester · qa · security · adversary
 │        Stage 3 · Delivery        delivery · reviewer (internal pre-PR) ·
 │                                   reviewer-consolidator
 │        UI / diagrams (triggered) ux-reviewer · diagrammer · d2-diagrammer ·
@@ -55,7 +54,6 @@ meta (outside any pipeline run):  agent-builder  ── authors new agents and s
 | `qa` | implementation | orchestrator | No |
 | `security` | analysis + implementation | orchestrator (design-review + verify) | No |
 | `adversary` | implementation | orchestrator (verify, security-sensitive) | No |
-| `acceptance-checker` | implementation | orchestrator | No |
 | `delivery` | delivery | orchestrator | No |
 | `reviewer` / `reviewer-consolidator` | delivery | orchestrator | No |
 | `ux-reviewer` | analysis + implementation | orchestrator (frontend scope) | No |

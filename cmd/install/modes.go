@@ -55,7 +55,6 @@ var lowCostMatrix = map[string]AgentOverride{
 	"init":               {Model: "sonnet", Effort: "medium"},
 	"implementer":        {Model: "sonnet", Effort: "medium"},
 	"tester":             {Model: "sonnet", Effort: "medium"},
-	"acceptance-checker": {Model: "sonnet", Effort: "medium"},
 	"diagrammer":         {Model: "sonnet", Effort: "medium"},
 	"likec4-diagrammer":  {Model: "sonnet", Effort: "medium"},
 	"d2-diagrammer":      {Model: "sonnet", Effort: "medium"},

@@ -1,8 +1,8 @@
 ---
 name: reviewer-consolidator
 description: Merges 2-3 focused review drafts (security/architecture/style) into a single unified PR review. De-duplicates findings, resolves severity conflicts, surfaces contradictions, and produces one review_body + inline_findings array for atomic GitHub submission.
-model: opus
-effort: high
+model: sonnet
+effort: medium
 color: purple
 tools: Read, Edit, Write, Glob, Grep
 ---

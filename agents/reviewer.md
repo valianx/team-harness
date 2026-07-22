@@ -2,7 +2,7 @@
 name: reviewer
 description: Reviews pull requests on GitHub. Analyzes code quality, security, performance, and best practices. Leaves detailed review comments in English and approves or requests changes.
 model: sonnet
-effort: xhigh
+effort: medium
 color: yellow
 tools: Read, Glob, Grep, Edit, Write, Bash, mcp__context7__resolve-library-id, mcp__context7__query-docs
 ---

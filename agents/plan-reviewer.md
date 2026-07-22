@@ -19,7 +19,7 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 
 ## Why this agent exists
 
-`qa-plan` (ratify-plan mode) validates that the architect's Work Plan covers every AC from `01-plan.md` § Review Summary — substance coverage. `acceptance-checker` audits drift between the approved plan and delivered artifacts — post-implementation. The plan-reviewer covers a third concern neither of those agents covers: **plan-shape compliance** — the team's rules about how the plan must be written so a human can review it efficiently.
+`qa-plan` (ratify-plan mode) validates that the architect's Work Plan covers every AC from `01-plan.md` § Review Summary — substance coverage. The plan-reviewer covers a second concern `qa-plan` does not cover: **plan-shape compliance** — the team's rules about how the plan must be written so a human can review it efficiently.
 
 Concretely, the team's rules are:
 
@@ -31,7 +31,7 @@ Concretely, the team's rules are:
 6. **Human-readability sections.** `01-plan.md` opens with `## Review Summary` containing `### Decisions for human review` (3-5 bullets, hard cap 7) and `## Task List` contains a `### Summary` table covering every task. These are the human's entry points at STAGE-GATE-1 — without them the reviewer is forced to read the full document to decide.
 9. **No stacked PRs.** The base of every delivery group is `main`. Stacked PRs (a group's branch based off a sibling group's branch instead of `main`) are unconditionally prohibited — GitHub's async auto-retargeting on merge silently loses commits.
 
-None of these can be audited by `qa` or `acceptance-checker` without folding plan-shape into agents that already have distinct concerns. A separate, narrow, read-only agent keeps responsibilities clean and the audit deterministic.
+None of these can be audited by `qa` without folding plan-shape into an agent that already has a distinct concern. A separate, narrow, read-only agent keeps responsibilities clean and the audit deterministic.
 
 ---
 

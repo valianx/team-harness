@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.137.0] - 2026-07-22
+
+### Changed
+- Pre-Delivery Security Audit (Phase 3.8) narrowed to `adversary` alone, conditional on `security_floor_applies`: the unconditional `security` code-audit dispatch is removed; code-level security review for non-sensitive tasks is delegated to PR review (named generically). SEC-002 design-review on sensitive tasks, the `security_floor_applies` fail-closed predicate, the Phase-2-close backstops, and Phase 4.5 internal review are unchanged. Supersedes the 2026-07-20 consolidated-audit model.
+- `adversary` input contract re-pointed from `reviews/04-security.md` (no longer produced in-pipeline) to the SEC-002 design-review verdict in `reviews/01-plan-review.md`; on the Phase-2-close sensitivity-escalation path it proceeds over the diff with an explicit `design_review: absent (escalated post-1.6)` note and a real verdict, never degrading to "unavailable".
+- `reviewer` re-tiered `effort: xhigh → medium`; `reviewer-consolidator` re-tiered `model: opus → sonnet`, `effort: high → medium` (effort per-agent is opencode-honored, advisory on Claude Code).
+- `CLAUDE.md` slimmed under its §7b size budget: §6.3 Post-work offloaded to `docs/working-agreements.md`, §7.1 OUT/IN lists offloaded to `docs/voice-guide.md`, §6.1 condensed — all as pointers, no rule content removed.
+
+### Removed
+- `acceptance-checker` agent fully retired: the Phase 3.6 Acceptance Check dispatch and every reference site (roster, lint Check-7, Go installer embedded lists and count canary, docs, site) are removed. AC validation ends with `qa` at Stage 2; drift protection is covered by the plan-reconciliation ledger and STAGE-GATE review.
+
+### Security
+- The non-waivable security floor is explicitly redefined (`docs/dev-mode.md`): SEC-002 design-review on `security_sensitive` tasks + `adversary` over the consolidated final diff at pre-delivery; the classification-independent unconditional code-audit net is removed as an operator-accepted trade-off, with the concrete residual (non-sensitive tasks on repos without a deterministic PR-review gate) documented in `docs/knowledge.md`.
+
+### Added
+- Structural test convergence: 5 crash sites fixed after the agent-file deletion, ~20 assertions rewritten to the new model, and Suite 170 pins the adversary↔architect control-vocabulary parity plus the SEC-002→adversary producer-coupling invariant; per-round verification scripts (`tests/test_pipeline_cost_slimdown_round{1,2,3}.py`) added.
+
 ## [2.136.2] - 2026-07-21
 
 ### Fixed

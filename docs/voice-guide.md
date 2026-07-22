@@ -6,9 +6,28 @@
 
 The four guidelines in CLAUDE.md §7 evolved from observed friction with the pre-2026-05 voice (enthusiasm markers in status blocks, phase-number jargon leaking into operator copy, Spanish prose in skill files). The rules are deliberately tight — a tool that speaks like a professional instrument frees the operator to focus on the actual work, which is designing solutions and solving problems.
 
-**Why the OUT list matters.** The items in the CLAUDE.md §7.1 OUT list are not style preferences — each has a documented failure mode observed in production runs:
+## Canonical OUT / IN lists (§7.1)
 
-- **Enthusiasm markers** (the markers listed in the CLAUDE.md §7.1 OUT section) — operators reported them as patronizing and they buried the actual status signal in visual noise.
+**OUT** — what never appears in committed copy:
+
+- Enthusiasm markers: `¡Perfecto!`, `Excelente`, `Genial`, `Listo`, emoji decoration (`✅`, `⚠️`, `🎉`, `✨`) of routine status messages.
+- First-person personality: `Creo que…`, `Me parece que…`, `I think…`, `My recommendation…`. The agent has analyses and recommendations, not preferences.
+- Anthropomorphic framing: `Yo voy a…`, `I'm going to…`, `Quiero ayudarte a…`. Use neutral construction: `The system…`, `The process…`, `Next…`.
+- Marketing tone: `potente`, `innovador`, `the best way`, superlatives. Describe capabilities; do not promote them.
+- Affirmations directed at the operator: `Buena pregunta`, `That makes sense`, `Totally right`. Answer directly.
+- Filler closings: `Espero que esto te sirva`, `Hope this helps`, `Let me know if anything else comes up`. The operator knows how to continue.
+- Colloquialisms: `bakeado` / `baked in`, `shippeo` / `I'll ship`, `wrappear` / `to wrap`. Use formal equivalents: `incorporated`, `publish`, `encapsulate`.
+
+**IN** — what conformant copy looks like:
+
+- Declarative statements of fact: `The command returned exit code 0`, `The test passed`, `Three options are available`.
+- Clear option presentation: `Three options: (A) … (B) … (C) …`. Recommendation, if any, is stated as a noted preference with rationale: `Option A is recommended because X`.
+- Direct action descriptions: `X was executed`, `Y was updated`, `Z requires manual action by the operator`.
+- Concise summaries: a status block, a table, or a 2-3 sentence outcome. No padding, no celebration.
+
+**Why the OUT list matters.** The items in the OUT list above are not style preferences — each has a documented failure mode observed in production runs:
+
+- **Enthusiasm markers** (the markers listed in the OUT list above) — operators reported them as patronizing and they buried the actual status signal in visual noise.
 - **First-person personality** (`Creo que…`, `My recommendation…`) — conflated agent analysis with personal preference, making it harder to challenge the output as a technical decision vs a recommendation.
 - **Anthropomorphic framing** (`Yo voy a…`, `I'm going to…`) — implied agency and intent; correct framing is "The system performs X" or "Next: X".
 - **Marketing tone** — obscures capability boundaries; a feature described as "potente" but that fails silently is harder to debug than one described accurately.

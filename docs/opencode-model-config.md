@@ -116,7 +116,7 @@ CLI surface:
 ```shell
 install --runtime opencode --opencode-tier anthropic
 # bakes: leader → anthropic/claude-opus-4-6; implementer → anthropic/claude-sonnet-4-6;
-#        init/acceptance-checker/translator/researcher → anthropic/claude-haiku-4-5
+#        init/translator/researcher → anthropic/claude-haiku-4-5
 /th:update-models   # later: refreshes those ids to the newest live versions per tier
 ```
 

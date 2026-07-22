@@ -16,13 +16,13 @@ import (
 // TestLowCostMatrixInvariants verifies the canonical constraints on the matrix:
 //   - every model is "sonnet" (no opus, no haiku)
 //   - every effort is "medium" or "high" (no max, no low)
-//   - all 19 expected agents are present
+//   - all 18 expected agents are present
 func TestLowCostMatrixInvariants(t *testing.T) {
 	expectedAgents := []string{
 		"leader", "orchestrator", "architect", "agent-builder", "security", "reviewer",
 		"reviewer-consolidator",
 		"qa", "plan-reviewer", "gcp-cost-analyzer", "init", "implementer",
-		"tester", "acceptance-checker", "diagrammer", "likec4-diagrammer",
+		"tester", "diagrammer", "likec4-diagrammer",
 		"d2-diagrammer", "translator", "delivery",
 	}
 
@@ -46,12 +46,12 @@ func TestLowCostMatrixInvariants(t *testing.T) {
 	}
 }
 
-// TestLowCostMatrixTally verifies the 7 high / 11 medium split from the architecture.
+// TestLowCostMatrixTally verifies the 7 high / 10 medium split from the architecture.
 func TestLowCostMatrixTally(t *testing.T) {
 	high := []string{"leader", "orchestrator", "architect", "agent-builder", "security", "reviewer", "qa"}
 	medium := []string{
 		"plan-reviewer", "gcp-cost-analyzer", "init", "implementer",
-		"tester", "acceptance-checker", "diagrammer", "likec4-diagrammer",
+		"tester", "diagrammer", "likec4-diagrammer",
 		"d2-diagrammer", "translator", "delivery",
 	}
 
@@ -141,7 +141,7 @@ func TestTransformAgentFile_LowCostMode_AllAgents(t *testing.T) {
 // agents already at sonnet/medium produce byte-identical output.
 func TestTransformAgentFile_LowCostMode_PassthroughAgentsUnchanged(t *testing.T) {
 	passthroughAgents := []string{
-		"plan-reviewer", "tester", "acceptance-checker",
+		"plan-reviewer", "tester",
 		"diagrammer", "likec4-diagrammer", "d2-diagrammer", "translator", "delivery",
 	}
 	for _, name := range passthroughAgents {

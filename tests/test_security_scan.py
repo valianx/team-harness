@@ -49,9 +49,11 @@ PLUGIN_DIR = REPO_ROOT / ".claude-plugin"
 # Mirror of test_agent_structure.py READ_ONLY_AGENTS (line 86).
 # These agents MUST NOT carry Bash in their frontmatter tools:.
 # Source of truth: tests/test_agent_structure.py:86
+# pipeline-cost-slimdown (Task-6): acceptance-checker is fully retired —
+# dropped from this mirror to stay in sync with the source of truth.
 READ_ONLY_AGENTS = {
     "architect", "security", "qa", "qa-plan",
-    "acceptance-checker", "plan-reviewer", "mentor",
+    "plan-reviewer", "mentor",
 }
 
 # Mirror of test_agent_structure.py EXPECTED_AGENTS.
@@ -61,7 +63,7 @@ EXPECTED_AGENTS = [
     "leader", "orchestrator", "architect", "agent-builder", "security", "reviewer",
     "reviewer-consolidator",
     "qa", "qa-plan", "gcp-cost-analyzer", "gcp-infra", "init", "implementer", "tester",
-    "acceptance-checker", "plan-reviewer", "diagrammer", "likec4-diagrammer",
+    "plan-reviewer", "diagrammer", "likec4-diagrammer",
     "d2-diagrammer", "translator", "delivery", "mentor",
     "researcher", "research-consolidator",
 ]

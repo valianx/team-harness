@@ -125,7 +125,7 @@ func readSourceFrontmatter(agentName string) (model, effort string) {
 var agentPrintOrder = []string{
 	"leader", "orchestrator", "architect", "agent-builder", "security", "reviewer", "qa",
 	"gcp-cost-analyzer", "init", "documenter", "ux-reviewer", "implementer",
-	"plan-reviewer", "tester", "acceptance-checker", "diagrammer",
+	"plan-reviewer", "tester", "diagrammer",
 	"likec4-diagrammer", "d2-diagrammer", "translator", "delivery",
 }
 

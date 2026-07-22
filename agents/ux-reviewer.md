@@ -74,7 +74,7 @@ Read the architect's `01-plan.md`. Add UI/UX acceptance criteria to the plan.
 
 ### AC sink — 01-plan.md § Task List
 
-**Primary AC sink (gate source-of-truth):** enrich-mode AC MUST be pinned into `01-plan.md § Task List` (the per-task AC block), not only into `reviews/01-ux-review.md`. The acceptance gate at Phase 3.5 and the acceptance-checker at Phase 3.6 both read AC from `01-plan.md § Task List` — AC that exist only in `reviews/01-ux-review.md` are never evaluated by any gate.
+**Primary AC sink (gate source-of-truth):** enrich-mode AC MUST be pinned into `01-plan.md § Task List` (the per-task AC block), not only into `reviews/01-ux-review.md`. The acceptance gate at Phase 3.5 reads AC from `01-plan.md § Task List` — AC that exist only in `reviews/01-ux-review.md` are never evaluated by any gate.
 
 **Procedure:**
 1. Write the full UX narrative (findings, checklist evaluation, existing patterns) in `reviews/01-ux-review.md`.
