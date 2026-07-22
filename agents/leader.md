@@ -757,7 +757,7 @@ Immediately BEFORE the `Task` invocation that spawns this orchestrator, write (o
 1. **Read dispatch labels** (from `01-planning.md`'s Dispatch Map, or your own dependency analysis of the issue set): `BLOCKER`, `PARALLEL`, `CONVERGENCE`, `SEQUENTIAL`.
 2. **Build execution rounds** — Round 1 = BLOCKERs + dependency-free PARALLELs; Round N = SEQUENTIALs/PARALLELs whose deps completed in earlier rounds; CONVERGENCE tasks wait for all their deps.
 3. **Fan-out confirm** (per "Repo-identity verification" above) — show lane count + cost estimate, wait for confirmation. `--serial` always wins.
-4. **Per round, spawn one `th:orchestrator` per task**, each in its own worktree, via concurrent `Task` calls in the same message (cap: `batch_concurrency`, default 5; overflow queues in eager slot-fill waves). Each orchestrator receives `skip-delivery: true` — it runs Phase 1 through Phase 3.6 (Design → Verify → Acceptance Check) and stops, exactly as "Batch-lane mode" in `agents/orchestrator.md` describes.
+4. **Per round, spawn one `th:orchestrator` per task**, each in its own worktree, via concurrent `Task` calls in the same message (cap: `batch_concurrency`, default 5; overflow queues in eager slot-fill waves). Each orchestrator receives `skip-delivery: true` — it runs Phase 1 through Phase 3.75 (Design → Verify → Build Verification) and stops, exactly as "Batch-lane mode" in `agents/orchestrator.md` describes.
 
    #### 4a. Determine base branch
    - **Round 1** → run `git fetch origin main` first, then base the branch from `origin/main` (never from the active local branch, which may carry unmerged commits from a prior session).
@@ -780,7 +780,7 @@ Immediately BEFORE the `Task` invocation that spawns this orchestrator, write (o
 
    **Worktree branch base:** the branch created for each worktree task MUST be based from updated `origin/main` (or from the completed dependency branch for Round N tasks), never from the active local branch. Run `git fetch origin main` before spawning worktrees so the base reflects the remote canonical state.
 5. **Track each lane** via `00-leader-roster.md` — you read each orchestrator's coarse `phase`/`status`, never its gate fields. A lane paused at STAGE-GATE-1 (every lane clears its own Design → plan-review → STAGE-GATE-1, independently and per-lane) is presented per the "Gate presentation protocol" above.
-6. **After all lanes of a round return `status: verified`** (Phase 3.6 done, delivery deferred), proceed to the next round, or to consolidation if this was the last round.
+6. **After all lanes of a round return `status: verified`** (Phase 3.75 done, delivery deferred), proceed to the next round, or to consolidation if this was the last round.
 
 ### Consolidated delivery — a dedicated consolidator orchestrator
 

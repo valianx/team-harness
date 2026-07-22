@@ -127,8 +127,7 @@ Every Stage-2 verifier's Session Context Protocol follows this ladder:
    (per-AC verdict), `tester` run-only (AC→test mapping confirmation), `ux-reviewer`
    validate (UI/UX AC), `adversary` (when attacking AC/plan controls as written). `security`
    does not baseline its verdict on AC (its scan target is code + scope flags) and needs no
-   AC read; `acceptance-checker` is not a packet consumer at all (see
-   `agents/acceptance-checker.md`). The AC block for one task is small (§-scoped, typically
+   AC read. The AC block for one task is small (§-scoped, typically
    ≤30 lines) — this read is what makes an AC-substance edit, same-count reword included,
    visible with zero rebuild machinery.
 1. **Read `00-verify-packet.md` for implementation context.** Changed files, deviations,

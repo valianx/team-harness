@@ -98,7 +98,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — the only CC install channel. Go installer binary (GH Release assets) — the only opencode install channel; it does not serve Claude Code. |
 
-**Current version:** `2.136.2` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.137.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
@@ -150,6 +150,7 @@ All commands run from the repo root.
 - **Pipeline observability is mandatory.** Every run produces `00-execution-events.jsonl`/`.md` and `00-pipeline-summary.md` (Tier 0 fixes exempt). Full contract: `docs/observability.md`.
 - **Documentation freshness via context7.** Verify third-party APIs before generating code. Mandatory triggers: `docs/context7-usage.md §2`.
 - **Bug-fix flow forces security review + regression test.** `type: fix`/`hotfix`. `agents/ref-special-flows.md § Bug-fix Flow`.
+- **Pre-delivery security audit — `adversary` alone, conditional (Phase 3.8).** `adversary` runs once per delivery group over the consolidated final diff when `security_floor_applies` holds; SEC-002 design-review (Phase 1.6) and PR review complete the floor — no unconditional in-pipeline code-audit dispatch. `agents/orchestrator.md § Phase 3.8`, `docs/dev-mode.md § Security Floor Non-Waivability`.
 - **Stage-2 code-hygiene gate (two-layer, mandatory for all types).** Deterministic pre-verify scan bounces work-narration comments; `qa`'s `## Code Hygiene` audit emits `code_hygiene: pass|fail` as a Phase 3 gate conjunction. Canonical pattern set: `docs/code-hygiene-gate.md`.
 - **Patch mode + selective verifier re-run.** Full contract: `docs/patch-mode.md`.
 - **Three-lane execution model (inline/express/full).** One classification system (`--fast`/`[TIER: N]`/Simple-Mode are aliases); informational cost estimate, no budget mechanism. `docs/pipeline-lanes.md`.
@@ -176,9 +177,8 @@ All commands run from the repo root.
 
 ### 6.1 Pre-work (read before you touch code)
 
-- Read CLAUDE.md (this file) front to back, paying attention to §3 Tech Stack and §4 Golden Commands.
-- Read README.md and scan `docs/` for any file titled `knowledge.md`, `architecture.md`, or a specific area README.
-- Read the most recent `[Unreleased]` block of CHANGELOG.md to understand work in flight.
+Read CLAUDE.md (this file) front to back — §3 Tech Stack and §4 Golden Commands first — then
+README.md, any `docs/` knowledge/architecture file, and CHANGELOG.md's latest block for work in flight.
 
 ### 6.2 During-work
 
@@ -190,12 +190,12 @@ All commands run from the repo root.
 
 ### 6.3 Post-work (deliverables for any user-facing change)
 
-- Write a CHANGELOG fragment to `changelog.d/{pr-slug}.md` (preferred) rather than editing `## [Unreleased]` inline. Each PR writes one file; no two PRs in the same session can conflict. The delivery agent assembles all fragments into the versioned CHANGELOG section at release cut (Step 9e). Fragment format: a standard Keep-a-Changelog subsection block (`### Added`, `### Changed`, `### Fixed`, `### Security`) with one-line entries. Slug rule: lowercase branch name with non-alphanumeric characters replaced by hyphens, matching `[a-z0-9-]+`. Direct `## [Unreleased]` edits are acceptable as a fallback when `changelog.d/` cannot be used (e.g., pre-convention repos).
-- If §3 Tech Stack or §4 Golden Commands of CLAUDE.md changed, update those sections in the same PR — do not let CLAUDE.md drift from the repo.
-- If the change establishes a decision, pattern, or constraint that future work must respect, append a one-line bullet to `docs/knowledge.md` with the matching tag prefix (`[decision]`, `[pattern]`, `[stack]`, `[constraint]`).
-- If the repo has an OpenAPI spec (`openapi/openapi.yaml` or similar) and the change touches endpoints, bump `info.version` in the same commit as the spec change — never in a separate commit.
-- **Internal distribution rule of the team-harness repository** — matches the shipped pipeline default (`delivery`/`orchestrator` bump the project version once per PR; see `agents/delivery.md § Step 9`). Changes touching distributed plugin assets bump all three version sites in the same PR and write the `## [X.Y.Z]` CHANGELOG section directly. **Trade-off:** concurrent PRs touching distributed assets race on the version line (rebase-and-rebump). `changelog.d/{pr-slug}.md` remains the batch/fallback path for grouped sessions, not team-harness's own default. Full site list: `docs/cost-and-caching.md § "team-harness's own version sites"`.
-- **New hooks must be authored in TypeScript, not Bash** (Decision A = closed). See `docs/opencode-distribution-roadmap.md` § Cross-Harness Authoring Mandate.
+Post-work deliverable rules now live in [`docs/working-agreements.md`](./docs/working-agreements.md):
+the `changelog.d/{pr-slug}.md` fragment mechanism (Keep-a-Changelog subsection; direct
+`## [Unreleased]` edits stay a valid fallback), CLAUDE.md §3/§4 sync, `docs/knowledge.md` capture,
+the OpenAPI version-bump rule, the internal-distribution version rule (three sites per PR;
+rebase-and-rebump trade-off; `changelog.d/` remains the batch/fallback path), and the
+TypeScript-hooks mandate. This section is intentionally a pointer to keep one source of truth.
 
 ### 6.4 Governance (when to stop and escalate to a human)
 
@@ -234,22 +234,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 
 Operator-facing copy presents facts, options, and outcomes. It does not perform emotion, friendship, opinion, or salesmanship. These rules apply to every response the agent produces — chat replies, status blocks, workspace doc prose, memory writes, self-corrections, and any other operator-facing surface — not only to text committed to the repo. There is no informal-chat-mode loophole.
 
-**OUT** — what never appears in committed copy:
-
-- Enthusiasm markers: `¡Perfecto!`, `Excelente`, `Genial`, `Listo`, emoji decoration (`✅`, `⚠️`, `🎉`, `✨`) of routine status messages.
-- First-person personality: `Creo que…`, `Me parece que…`, `I think…`, `My recommendation…`. The agent has analyses and recommendations, not preferences.
-- Anthropomorphic framing: `Yo voy a…`, `I'm going to…`, `Quiero ayudarte a…`. Use neutral construction: `The system…`, `The process…`, `Next…`.
-- Marketing tone: `potente`, `innovador`, `the best way`, superlatives. Describe capabilities; do not promote them.
-- Affirmations directed at the operator: `Buena pregunta`, `That makes sense`, `Totally right`. Answer directly.
-- Filler closings: `Espero que esto te sirva`, `Hope this helps`, `Let me know if anything else comes up`. The operator knows how to continue.
-- Colloquialisms: `bakeado` / `baked in`, `shippeo` / `I'll ship`, `wrappear` / `to wrap`. Use formal equivalents: `incorporated`, `publish`, `encapsulate`.
-
-**IN** — what conformant copy looks like:
-
-- Declarative statements of fact: `The command returned exit code 0`, `The test passed`, `Three options are available`.
-- Clear option presentation: `Three options: (A) … (B) … (C) …`. Recommendation, if any, is stated as a noted preference with rationale: `Option A is recommended because X`.
-- Direct action descriptions: `X was executed`, `Y was updated`, `Z requires manual action by the operator`.
-- Concise summaries: a status block, a table, or a 2-3 sentence outcome. No padding, no celebration.
+**OUT** — enthusiasm markers and emoji decoration, first-person personality, anthropomorphic framing, marketing tone, affirmations directed at the operator, filler closings, and colloquialisms. **IN** — declarative statements of fact, clear option presentation with stated rationale, direct action descriptions, and concise summaries. The canonical, itemized OUT/IN lists (with examples) live in `docs/voice-guide.md § Canonical OUT / IN lists` — this section is the binding rule; that file is the full enumeration.
 
 See `docs/voice-guide.md` for the full Bad/Good example and extended rationale.
 
@@ -261,7 +246,7 @@ See `docs/voice-guide.md` for the full Bad/Good example and extended rationale.
 
 ### 7.2 Vocabulary — dev-natural verbs at the operator surface
 
-The three things a developer already knows how to ask for — a work plan, an implementation, a PR — map cleanly onto the three pipeline stages. The operator never learns `Phase 1.5`, `Phase 3.6`, or `STAGE-GATE-2`. Those are internal mechanics.
+The three things a developer already knows how to ask for — a work plan, an implementation, a PR — map cleanly onto the three pipeline stages. The operator never learns `Phase 1.5`, `Phase 3.8`, or `STAGE-GATE-2`. Those are internal mechanics.
 
 | Operator asks for | Maps to | Internal mechanics (operator never sees) |
 |---|---|---|
@@ -299,7 +284,8 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 - **2026-06-29** — `VERSION` asset: bare semver at `releases/latest/download/VERSION` (no GitHub API); best-effort pre-check. → `release.yml`
 - **2026-07-15** — Lanes own cost/speed, floor stays orthogonal. → `docs/pipeline-lanes.md`
 - **2026-07-19** — `adversary_floor_applies` narrows the `adversary` Phase-3 trigger to a strict subset of `security_floor_applies` (fail-closed to `true`); `security`'s own floor is unchanged. → superseded 2026-07-20 by the Pre-Delivery Security Audit below
-- **2026-07-20** — Security verification consolidated into the Pre-Delivery Security Audit (Phase 3.8, once per delivery group over the consolidated final diff): `security` unconditional, `adversary` on `security_floor_applies` alone; findings operator-disposed at STAGE-GATE-3, no autonomous security-lens iterations. Retires `adversary_floor_applies`, per-round reports, the staleness re-gate, and the whack-a-mole detector. → `agents/orchestrator.md § Phase 3.8`
+- **2026-07-20** — Security verification consolidated into the Pre-Delivery Security Audit (Phase 3.8, once per delivery group over the consolidated final diff): `security` unconditional, `adversary` on `security_floor_applies` alone; findings operator-disposed at STAGE-GATE-3, no autonomous security-lens iterations. Retires `adversary_floor_applies`, per-round reports, the staleness re-gate, and the whack-a-mole detector. → `agents/orchestrator.md § Phase 3.8` → superseded 2026-07-21 by the adversary-only-conditional model below
+- **2026-07-21** — Pre-Delivery Security Audit narrowed to `adversary` alone, conditional on `security_floor_applies`: the unconditional `security` code-audit dispatch is removed from Phase 3.8, and code-level review for a non-sensitive task is delegated to PR review (named generically, not tied to any specific configured tool). SEC-002 design-review (Phase 1.6), the `security_floor_applies` predicate, the Phase-2-close backstops, and Phase 4.5 internal review are unchanged. Also retires the Phase 3.6 `acceptance-checker` drift audit entirely (no replacement dispatch). → `agents/orchestrator.md § Phase 3.8`, `docs/dev-mode.md § Security Floor Non-Waivability`
 
 ## 9. Patterns & Conventions
 <!-- Populated by the delivery agent after each feature. Empty at init. -->

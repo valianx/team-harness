@@ -108,7 +108,7 @@ The `Status` column in the no-args table uses a 7-value enum derived by cross-re
 | `/th:pipelines` shows | Derived from `00-state.md` |
 |---|---|
 | `waiting_gate_1` | `status: waiting` AND `phase: 1.6` (STAGE-GATE-1 emitted, no release yet) |
-| `waiting_gate_2` | `status: waiting` AND `phase: 3.6` AND `autonomous: false` (STAGE-GATE-2 between rounds) |
+| `waiting_gate_2` | `status: waiting` AND `phase: 3.75` AND `autonomous: false` (STAGE-GATE-2 between rounds) |
 | `waiting_gate_3` | `status: waiting` AND `phase: 4.5` (STAGE-GATE-3 emitted before Phase 5) |
 | `autonomous` | `status: in_progress` AND `autonomous: true` |
 | `iterating` | `status: iterating` (any phase) |
@@ -301,12 +301,12 @@ When Stage 2 is active and multiple tasks run in parallel within a round, the JS
 
 - **Round 1** opens at the first `stage.gate.release` with `stage: 1`.
 - **Round R+1** opens at each `stage.gate.release` with `stage: 2, after_round: R{R}`.
-- For each round, collect every `phase.end` event whose `phase` starts with `2-`, `2.5-`, `3-`, `3.5-`, or `3.6-` until the next `stage.gate` with `stage: 2` fires (or `pipeline.end` fires).
+- For each round, collect every `phase.end` event whose `phase` starts with `2-`, `2.5-`, `3-`, `3.5-`, or `3.75-` until the next `stage.gate` with `stage: 2` fires (or `pipeline.end` fires).
 
 Render each round as a single block:
-```
+```text
 Round R{R} ({N} tasks, started {ts}, closed {ts}):
-  Task-1: Phase 2 → Phase 3 → Phase 3.5 → Phase 3.6 [duration / status per phase]
+  Task-1: Phase 2 → Phase 3 → Phase 3.5 → Phase 3.75 [duration / status per phase]
   Task-2: Phase 2 → Phase 3 → ... ↻ ITERATION 1 → Phase 3 → ...
 ```
 Tasks within a round are listed in ascending task identifier order, regardless of which finished first.
@@ -372,14 +372,14 @@ Timeline
 → STAGE-GATE-1 RELEASED at 14:08:01 — decision: approved-autonomous
 
 Round R1 (2 tasks, started 14:08:02, closed 14:21:47):
-  Task-1: Phase 2 (1m 48s, success) → Phase 3 verify (2m 12s, pass) → Phase 3.5 (PASS) → Phase 3.6 (pass)
-  Task-2: Phase 2 (1m 21s, success) → Phase 3 verify (1m 55s, pass) → Phase 3.5 (PASS) → Phase 3.6 (skipped)
+  Task-1: Phase 2 (1m 48s, success) → Phase 3 verify (2m 12s, pass) → Phase 3.5 (PASS) → Phase 3.75 (pass)
+  Task-2: Phase 2 (1m 21s, success) → Phase 3 verify (1m 55s, pass) → Phase 3.5 (PASS) → Phase 3.75 (pass)
 
 ↷ STAGE-GATE-2 SKIPPED at 14:21:48 — reason: autonomous, after_round: R1
 
 Round R2 (1 task, started 14:21:49, closed 14:31:02):
   Task-3: Phase 2 (2m 04s, success) → Phase 3 verify (1m 47s, fail) ↻ ITERATION 1 START — "AC-3 missing null check"
-        → Phase 2 (38s, success) → Phase 3 verify (1m 41s, pass) → Phase 3.5 (PASS) → Phase 3.6 (pass)
+        → Phase 2 (38s, success) → Phase 3 verify (1m 41s, pass) → Phase 3.5 (PASS) → Phase 3.75 (pass)
 
 ▸ Phase 4 delivery — 22s — success — "branch feat/auth-jwt, version 1.5"
 ▸ Phase 4.5 internal-review — 1m 12s — success — "0C / 2S / 1N"

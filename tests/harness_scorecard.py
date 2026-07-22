@@ -48,19 +48,21 @@ BASELINE_PATH = TESTS_DIR / "harness_scorecard_baseline.json"
 
 # ---------------------------------------------------------------------------
 # Constants mirrored from test_agent_structure.py (single source of truth)
+# pipeline-cost-slimdown (Task-6): acceptance-checker is fully retired —
+# dropped from this mirror to stay in sync with the source of truth.
 # ---------------------------------------------------------------------------
 EXPECTED_AGENTS = [
     "orchestrator", "architect", "agent-builder", "security", "reviewer",
     "reviewer-consolidator",
     "qa", "qa-plan", "gcp-cost-analyzer", "gcp-infra", "init", "implementer", "tester",
-    "acceptance-checker", "plan-reviewer", "diagrammer", "likec4-diagrammer",
+    "plan-reviewer", "diagrammer", "likec4-diagrammer",
     "d2-diagrammer", "translator", "delivery", "mentor",
     "researcher", "research-consolidator",
 ]
 
 READ_ONLY_AGENTS = {
     "architect", "security", "qa", "qa-plan",
-    "acceptance-checker", "plan-reviewer", "mentor",
+    "plan-reviewer", "mentor",
 }
 
 # Worker agents: non-orchestrator, non-ref files that should carry the 5 mandatory sections

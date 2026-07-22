@@ -224,7 +224,7 @@ The following security mechanisms run **input-independent** and are NOT waivable
 
 - **HI-2 (discover-phase.md §3):** the security floor non-waivability invariant. No disposition signal can bypass the security gate. The gate fires whenever `security_sensitive: true` is set, regardless of session state.
 - **Path-pattern auto-escalation (`leader.md § Phase 0a` classification):** sets `security_sensitive: true` based on file paths touched by the PR. This runs on the diff, not on the session state.
-- **Bug-fix forcing rule:** for `type: fix` and `type: hotfix`, `security_sensitive: true` is forced and the security agent always runs at Phase 3.
+- **Bug-fix forcing rule:** for `type: fix` and `type: hotfix`, `security_sensitive: true` is forced. On a sensitive task the non-waivable floor is: SEC-002 design-review at Stage 1, plus `adversary` at the Pre-Delivery Security Audit (Phase 3.8); code-level audit is delegated to PR review, referred to generically (not dependent on any specific configured tool).
 
 ---
 
@@ -285,9 +285,9 @@ A gate or floor that does the WRONG thing on a plain, readable, non-obfuscated i
 
 Only that obfuscation-evasion residual of string-matching gates is a documented, disclosed limitation — not chased through pipeline iterations, and outside this threat model — recorded honestly where it lives.
 
-A limitation qualifies as "documented, not chased" only when it is BOTH (a) disclosed in-place where it lives, AND (b) scoped out through a legitimate mechanism — the architectural-inevitability limit for the string-matching-gate case is the canonical example. (A previously-tracked second example, the mid-iteration classification-timing gap in the retired per-task Phase-3 security dispatch, was closed structurally by the Pre-Delivery Security Audit: `security` now audits every delivery group's consolidated final diff unconditionally, so a control introduced by any patch iteration is always reviewed regardless of the task's classification — `agents/orchestrator.md § "Phase 3.8 — Pre-Delivery Security Audit"`.) Cross-ref: this file's "Residual static-resolution limits" section.
+A limitation qualifies as "documented, not chased" only when it is BOTH (a) disclosed in-place where it lives, AND (b) scoped out through a legitimate mechanism — the architectural-inevitability limit for the string-matching-gate case is the canonical example. (A previously-tracked second example, the mid-iteration classification-timing gap in the retired per-task Phase-3 security dispatch, is addressed by the Pre-Delivery Security Audit's positional design: `adversary` reviews the consolidated final diff once per delivery group when `security_floor_applies` holds, so a control introduced by any patch iteration on a sensitive task is reviewed regardless of which iteration introduced it. This coverage is scoped to `security_floor_applies == true`, not classification-independent — code-level review on a non-sensitive task is delegated to PR review — `agents/orchestrator.md § "Phase 3.8 — Pre-Delivery Security Audit"`.) Cross-ref: this file's "Residual static-resolution limits" section.
 
-This disposition is narrowly scoped to the residual class described above. It does NOT license skipping any real in-scope finding, does NOT weaken or waive any floor, and does NOT change when or whether `security`/`adversary` dispatch — security floors stay non-waivable.
+This disposition is narrowly scoped to the residual class described above. It does NOT license skipping any real in-scope finding, does NOT weaken or waive any floor, and does NOT change when or whether the SEC-002 design-review or `adversary` dispatch — security floors stay non-waivable.
 
 ---
 

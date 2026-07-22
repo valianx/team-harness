@@ -191,7 +191,8 @@ Canonical matrix (must match exactly):
 | `agent-builder` | opus | xhigh |
 | `security` | opus | xhigh |
 | `adversary` | sonnet | xhigh |
-| `reviewer` | sonnet | xhigh |
+| `reviewer` | sonnet | medium |
+| `reviewer-consolidator` | sonnet | medium |
 | `qa` | sonnet | high |
 | `qa-plan` | opus | high |
 | `gcp-cost-analyzer` | opus | high |
@@ -199,7 +200,6 @@ Canonical matrix (must match exactly):
 | `implementer` | sonnet | high |
 | `tester` | sonnet | high |
 | `documenter` | sonnet | high |
-| `acceptance-checker` | sonnet | medium |
 | `diagrammer` | sonnet | medium |
 | `likec4-diagrammer` | sonnet | medium |
 | `d2-diagrammer` | sonnet | medium |

@@ -96,7 +96,7 @@ blast radius, breaks found, required changes). This is the shape every other age
 iteration-reference points back to; no other file restates the round's content.
 
 Consumers of this ban (`security`, `adversary`, `reviewer`, `reviewer-consolidator`, `qa`,
-`tester`, `acceptance-checker`, `delivery`, `plan-reviewer`, the orchestrator's `00-state.md` and
+`tester`, `delivery`, `plan-reviewer`, the orchestrator's `00-state.md` and
 `00-pipeline-summary.md`) each add a short reference to this section — they do not copy the ban's
 text or reproduce the iteration narrative locally.
 

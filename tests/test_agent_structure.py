@@ -132,7 +132,7 @@ EXPECTED_AGENTS = [
     "leader", "orchestrator", "architect", "agent-builder", "security", "reviewer",
     "reviewer-consolidator",
     "qa", "qa-plan", "gcp-cost-analyzer", "gcp-infra", "init", "implementer", "tester",
-    "acceptance-checker", "plan-reviewer", "diagrammer", "likec4-diagrammer",
+    "plan-reviewer", "diagrammer", "likec4-diagrammer",
     "d2-diagrammer", "translator", "delivery", "mentor",
     "researcher", "research-consolidator",
     "code-researcher",  # AC-1: new sonnet codebase-research map agent
@@ -140,7 +140,17 @@ EXPECTED_AGENTS = [
 ]
 
 # Read-only agents that MUST NOT have Bash in their allowlist
-READ_ONLY_AGENTS = {"architect", "security", "qa", "qa-plan", "acceptance-checker", "plan-reviewer", "mentor", "adversary"}
+READ_ONLY_AGENTS = {"architect", "security", "qa", "qa-plan", "plan-reviewer", "mentor", "adversary"}
+
+# pipeline-cost-slimdown (Task-6): acceptance-checker is fully retired (no
+# dispatch path, no standalone skill) — pin its absence rather than its
+# presence, mirroring the nested-dispatch-takeover retirement precedent above.
+check(
+    "agents/acceptance-checker.md does not exist (retired — no Phase 3.6 dispatch)",
+    not (AGENTS_DIR / "acceptance-checker.md").exists(),
+    "agents/acceptance-checker.md must not exist — the agent was fully retired,"
+    " not merely unwired from its dispatch",
+)
 
 for agent_name in EXPECTED_AGENTS:
     path = AGENTS_DIR / f"{agent_name}.md"
@@ -196,7 +206,6 @@ checks_orch = [
     ("Phase 1.6", "Phase 1.6 — Plan Review"),
     ("Phase 2.5", "Phase 2.5 — Constraint Reconciliation"),
     ("Phase 3.5", "Phase 3.5 — Acceptance Gate"),
-    ("Phase 3.6", "Phase 3.6 — Acceptance Check"),
     ("Phase 4.5", "Phase 4.5 — Internal Review"),
     ("STAGE-GATE-1", "STAGE-GATE-1"),
     ("STAGE-GATE-2", "STAGE-GATE-2"),
@@ -249,6 +258,22 @@ check(
     "orchestrator.md declares STAGE-GATE-3 is mandatory / non-skippable",
     "STAGE-GATE-3" in orch and ("irreversible" in orch.lower() or "cannot be skipped" in orch.lower()),
     "STAGE-GATE-3 mandatory-ness not documented",
+)
+
+# pipeline-cost-slimdown (Task-6): Phase 3.6 (acceptance-checker drift audit)
+# is fully retired — no heading, no acceptance-checker reference anywhere in
+# orchestrator.md. Negative reintroduction guard.
+check(
+    "orchestrator.md does not contain a '## Phase 3.6' heading (retired)",
+    "## Phase 3.6" not in orch,
+    "orchestrator.md must not reintroduce a '## Phase 3.6' heading —"
+    " the acceptance-checker drift audit was fully retired",
+)
+check(
+    "orchestrator.md does not reference 'acceptance-checker' (retired)",
+    "acceptance-checker" not in orch,
+    "orchestrator.md must not reference 'acceptance-checker' — the agent"
+    " was fully retired, not merely unwired from its dispatch",
 )
 
 # verify-report-scope contract — companion checks for architect.md and docs
@@ -1809,9 +1834,15 @@ plausible_agent_refs = {
     or n in {"orchestrator", "architect", "implementer", "tester", "qa", "security",
              "delivery", "init", "diagrammer", "reviewer", "translator"}
 }
+# Names of agents fully retired by a past PR, cited only inside historical
+# narrative (an Architecture Decision entry describing the retirement itself,
+# never a live routing/dispatch reference) — not an orphan-reference defect.
+RETIRED_AGENT_NAMES_HISTORICAL_ONLY = {"acceptance-checker"}
 for ref in sorted(plausible_agent_refs):
     if ref in KNOWN_AGENT_NAMES:
         continue  # resolves cleanly
+    if ref in RETIRED_AGENT_NAMES_HISTORICAL_ONLY:
+        continue  # historical mention of a fully-retired agent, not a live reference
     check(
         f"CLAUDE.md reference `{ref}` resolves to an existing agent",
         False,
@@ -1822,7 +1853,7 @@ for ref in sorted(plausible_agent_refs):
 #    orchestrator.md) are in the canonical set.
 #    Canonical phases (per the Pipeline Flow ASCII art and Stage table):
 CANONICAL_PHASES = {
-    "0a", "0b", "1", "1.5a", "1.5", "1.6", "1.7", "1.8", "2.0", "2", "2.5", "2.6", "2.7", "3", "3.4", "3.5", "3.6", "3.75", "3.8", "4", "4.5", "5", "6",
+    "0a", "0b", "1", "1.5a", "1.5", "1.6", "1.7", "1.8", "2.0", "2", "2.5", "2.6", "2.7", "3", "3.4", "3.5", "3.75", "3.8", "4", "4.5", "5", "6",
     "4a", "4b",
     # 2.0 is the Bug-fix Pipeline regression-test phase (type: fix | hotfix only),
     # inserted between STAGE-GATE-1 and Phase 2. See ref-special-flows.md § Bug-fix Flow.
@@ -1830,7 +1861,8 @@ CANONICAL_PHASES = {
     # sub-phases 2.5 and 2.7. See docs/code-hygiene-gate.md.
     # 2.7 is the Test Authoring sub-phase (Stage 2, pre-verify): tester writes AC tests
     # before the Phase 3 parallel verify block. Introduced by fix/phase3-tester-qa-race-condition.
-    # 3.75 is Build Verification, a sub-step of Verify between Phase 3.5 and 3.6.
+    # 3.75 is Build Verification, a sub-step of Verify running standalone after
+    # Phase 3.5 (Phase 3.6 was fully retired — no concurrent dispatch to pair with).
     # 1.7 is ux-reviewer enrich (frontend_scope: true only); executes after architect, before 1.5.
     # 1.8 is the Post-approval Plan-Review Offer (deferred, non-sensitive plans only); executes
     # after STAGE-GATE-1, before Phase 2.0/2. See agents/orchestrator.md § "Phase 1.8".
@@ -1852,7 +1884,14 @@ _phase_number_source = (
 )
 # Extract `Phase X` mentions, case-insensitive.
 phase_mentions = set(re.findall(r"Phase\s+([0-9]+(?:\.[0-9]+)?[a-z]?)", _phase_number_source))
-unknown_phases = phase_mentions - CANONICAL_PHASES - {"N"}  # "{N}" placeholder is OK
+# pipeline-cost-slimdown (Task-1/Task-6): "3.6" was fully retired from
+# CANONICAL_PHASES, but orchestrator.md § Phase 3.75 legitimately mentions
+# "Phase 3.6" exactly once, in a negation sentence explaining WHY Phase 3.75
+# now runs standalone ("Phase 3.6 no longer exists, so there is no concurrent
+# dispatch to pair with") — a retirement-explanation reference, not a typo or
+# a live phase. Excluded here the same way the "{N}" placeholder is excluded.
+_RETIRED_PHASE_MENTIONS_OK = {"3.6"}
+unknown_phases = phase_mentions - CANONICAL_PHASES - {"N"} - _RETIRED_PHASE_MENTIONS_OK
 check(
     "orchestrator.md uses only canonical phase numbers",
     not unknown_phases,
@@ -2838,10 +2877,11 @@ for _md_file in _md_files_to_scan:
     if not _md_file.exists():
         continue
     _content = read(_md_file)
-    # For CLAUDE.md: strip the Voice and Language Guide OUT section (§7.1)
-    # which legitimately lists banned markers as negative examples.
+    # For CLAUDE.md and docs/voice-guide.md (the canonical home of the §7.1
+    # OUT/IN lists): strip the OUT section, which legitimately lists banned
+    # markers as negative examples.
     _scan_content = _content
-    if _md_file.name == "CLAUDE.md":
+    if _md_file.name in ("CLAUDE.md", "voice-guide.md"):
         _voice_guide_section = _extract_section(
             _content, "**OUT** — what never appears in committed copy:", "**IN** — what conformant copy looks like:"
         )
@@ -4251,24 +4291,18 @@ check(
     "orchestrator.md must contain the agent-to-artifact mapping table",
 )
 
-# (3) Phase 3.6 title does NOT contain 'conditional'
+# (3)/(4) pipeline-cost-slimdown (Task-6): Phase 3.6 (acceptance-checker) was
+# fully retired — no '## Phase 3.6' heading exists at any mandatory/conditional
+# tier. Rewritten from a title-wording pin to a retirement pin.
 _phase36_title_match = [
-    l for l in _orch_v29.splitlines()
-    if l.startswith("## Phase 3.6")
+    line for line in _orch_v29.splitlines()
+    if line.startswith("## Phase 3.6")
 ]
 check(
-    "Phase 3.6 title does not contain 'conditional'",
-    len(_phase36_title_match) > 0
-    and "conditional" not in _phase36_title_match[0].lower(),
-    "Phase 3.6 title must not contain 'conditional'",
-)
-
-# (4) Phase 3.6 title contains 'mandatory'
-check(
-    "Phase 3.6 title contains 'mandatory'",
-    len(_phase36_title_match) > 0
-    and "mandatory" in _phase36_title_match[0].lower(),
-    "Phase 3.6 title must contain 'mandatory'",
+    "Phase 3.6 heading does not exist (retired — no acceptance-checker dispatch)",
+    len(_phase36_title_match) == 0,
+    "orchestrator.md must not carry a '## Phase 3.6' heading at any tier —"
+    " the acceptance-checker drift audit was fully retired, not narrowed",
 )
 
 # (5) Phase 4.5 title does NOT contain 'gated by diff size'
@@ -5207,7 +5241,7 @@ check(
 #
 # CANONICAL ANCHORS (implementer must use these verbatim):
 #   agents/orchestrator.md  :  "### KG read on error"
-#   agents/orchestrator.md  :  "### KG write on security findings"
+#   agents/orchestrator.md  :  "### KG write on Phase 3.8 audit findings"
 #   agents/orchestrator.md  :  "**No mid-pipeline investigation writes**"
 #   agents/security.md      :  "remediation_text" is NEW -- scoped via the
 #                               KG-access / status-block region containing the
@@ -5261,39 +5295,27 @@ check(
     " -- kg-mid checks (1)(2)(4) will fail",
 )
 
-# Check (1) -- AC-1: Phase 3.6 fail cases with re-dispatch (A/B/D), Case C excluded.
-# Assert within the anchor slice:
-#   - search_nodes is invoked
-#   - Phase 3.6 scope is declared (acceptance-check / 3.6 / acceptance fail)
-#   - Cases A/B/D are covered (re-dispatch cases)
-#   - Case C is explicitly excluded (no-redispatch / does not trigger / Case C)
+# Check (1) -- pipeline-cost-slimdown (Task-6): the KG-read-on-Phase-3.6-fail
+# touchpoint was fully removed (Task-1 AC-5) — Phase 3.6 no longer exists, so
+# there is no acceptance-checker fail case to re-dispatch on. Rewritten from a
+# "Phase 3.6 Cases A/B/D, Case C excluded" positive pin to a retirement pin:
+# the anchor slice is now scoped ONLY to the Phase 3.75 fail case, with no
+# Phase-3.6/acceptance/Case-letter machinery left in it.
 _c1_search_nodes = bool(_kg_read) and "search_nodes" in _kg_read
-_c1_phase36 = bool(_kg_read) and (
-    "3.6" in _kg_read or "acceptance" in _kg_read.lower()
-)
-_c1_cases_abd = bool(_kg_read) and (
-    ("Case A" in _kg_read or "case A" in _kg_read or "A/B" in _kg_read or "A, B" in _kg_read)
-    and ("Case B" in _kg_read or "case B" in _kg_read or "B" in _kg_read)
-)
-_c1_case_c_excluded = bool(_kg_read) and (
-    "Case C" in _kg_read or "case C" in _kg_read
-) and (
-    "not" in _kg_read.lower()
-    or "excluded" in _kg_read.lower()
-    or "no-redispatch" in _kg_read.lower()
-    or "does not trigger" in _kg_read.lower()
-    or "skip" in _kg_read.lower()
+_c1_scoped_to_375_only = bool(_kg_read) and (
+    "3.75" in _kg_read
+    and "3.6" not in _kg_read
+    and "acceptance" not in _kg_read.lower()
 )
 check(
-    "kg-mid(1/ac-1): orchestrator.md § 'KG read on error' declares"
-    " search_nodes, Phase 3.6 scope (Cases A/B), and explicit Case C exclusion",
-    _c1_search_nodes and _c1_phase36 and _c1_cases_abd and _c1_case_c_excluded,
+    "kg-mid(1/retired): orchestrator.md § 'KG read on error' is scoped ONLY to"
+    " the Phase 3.75 fail case — no Phase 3.6 / acceptance-checker Case-letter"
+    " machinery remains (Task-1 AC-5 retirement)",
+    _c1_search_nodes and _c1_scoped_to_375_only,
     (
         f"anchor '{_KG_READ_ANCHOR}' slice:"
         f" search_nodes={_c1_search_nodes},"
-        f" phase3.6={_c1_phase36},"
-        f" cases_ABD={_c1_cases_abd},"
-        f" case_C_excluded={_c1_case_c_excluded}"
+        f" scoped_to_3.75_only={_c1_scoped_to_375_only}"
     ),
 )
 
@@ -5353,23 +5375,31 @@ check(
     " -- field presence in status block not documented",
 )
 
+# pipeline-cost-slimdown (Task-6): acceptance-checker.md is fully retired —
+# its kg_prior_art field pin is moot. Rewritten to a retirement-consistent
+# guard: the file does not exist, so no status-block field can be pinned there.
 check(
-    "kg-mid(3b/ac-3): agents/acceptance-checker.md status block declares field 'kg_prior_art'",
-    _c3_ac,
-    f"literal 'kg_prior_art' absent from acceptance-checker.md ({_s33_ac_checker_path})"
-    " -- field presence in status block not documented",
+    "kg-mid(3b/retired): agents/acceptance-checker.md does not exist"
+    " (kg_prior_art field pin retired along with the agent)",
+    not _s33_ac_checker_path.exists(),
+    f"agents/acceptance-checker.md unexpectedly present at {_s33_ac_checker_path}"
+    " — the agent was fully retired",
 )
 
 # ---------------------------------------------------------------------------
-# Anchor B: agents/orchestrator.md "### KG write on security findings"
+# Anchor B: agents/orchestrator.md "### KG write on Phase 3.8 audit findings"
 # (Covers checks (7) and the orchestrator side of (8))
+# pipeline-cost-slimdown (Task-1): the section was renamed from "### KG write
+# on security findings" — `security` no longer produces the Phase 3.8 audit
+# findings, `adversary` does. The content-filter/dedup/cross-merge contract
+# is unchanged, only the writer identity and heading changed.
 # ---------------------------------------------------------------------------
-_KG_WRITE_ANCHOR = "### KG write on security findings"
+_KG_WRITE_ANCHOR = "### KG write on Phase 3.8 audit findings"
 _kg_write = _slice_section(_s33_orch, _KG_WRITE_ANCHOR)
 
 check(
     "kg-mid(anchor-write): agents/orchestrator.md contains"
-    " '### KG write on security findings' section",
+    " '### KG write on Phase 3.8 audit findings' section",
     bool(_kg_write),
     f"anchor '{_KG_WRITE_ANCHOR}' not found in orchestrator.md"
     " -- kg-mid checks (7)(8-orch) will fail",
@@ -5388,7 +5418,7 @@ _c7_create_nodes = bool(_kg_write) and (
     "create_nodes" in _kg_write or "add_observations" in _kg_write
 )
 check(
-    "kg-mid(7/ac-7): orchestrator.md § 'KG write on security findings' declares"
+    "kg-mid(7/ac-7): orchestrator.md § 'KG write on Phase 3.8 audit findings' declares"
     " content-filter (kg-content-policy) + dedup (suggest_node_type + search_nodes)"
     " before create_nodes/add_observations",
     _c7_content_filter and _c7_suggest_node_type and _c7_search_nodes and _c7_create_nodes,
@@ -5421,7 +5451,7 @@ _c8_orch_no_cross = bool(_kg_write) and (
     or "cross-merge" in _kg_write
 )
 check(
-    "kg-mid(8-orch/ac-8): orchestrator.md § 'KG write on security findings' declares"
+    "kg-mid(8-orch/ac-8): orchestrator.md § 'KG write on Phase 3.8 audit findings' declares"
     " cross-dedup: error/pattern types distinct from process-insight, no cross-merge",
     _c8_orch_error_pattern and _c8_orch_process_insight and _c8_orch_no_cross,
     (
@@ -5649,7 +5679,7 @@ check(
 # open-ended catch-all literal `or other forbidden content`. If a future edit
 # narrows the filter to a closed list (dropping the catch-all), the defense
 # silently degrades and SEC-002's gap reopens with no test catching it.
-# Asserted within the '### KG write on security findings' slice (anchor-scoped).
+# Asserted within the '### KG write on Phase 3.8 audit findings' slice (anchor-scoped).
 # ---------------------------------------------------------------------------
 _c7c_policy_pointer = bool(_kg_write) and (
     "docs/kg-content-policy.md" in _kg_write
@@ -5657,7 +5687,7 @@ _c7c_policy_pointer = bool(_kg_write) and (
 )
 _c7c_catchall = bool(_kg_write) and "or other forbidden content" in _kg_write
 check(
-    "kg-mid(7c/sec-004): orchestrator.md § 'KG write on security findings'"
+    "kg-mid(7c/sec-004): orchestrator.md § 'KG write on Phase 3.8 audit findings'"
     " content-filter references BOTH docs/kg-content-policy.md policy pointer"
     " AND catch-all clause 'or other forbidden content'"
     " (defense-in-depth invariant — SEC-004)",
@@ -8453,13 +8483,20 @@ check(
 # ---------------------------------------------------------------------------
 _S40_PIPELINE_MODE = "pipeline mode"
 
+# pipeline-cost-slimdown (Task-1): the Phase 3.8 audit is now `adversary`
+# alone, conditional on `security_floor_applies` — never unconditional. The
+# invariant this check pins is narrower but unchanged in substance: bug
+# severity (`bug_tier`) never selects a different per-task security lens or
+# buys a tier-based skip — the SAME single predicate governs every tier.
 check(
     "failopen(8b/ac-9/sec-d2): orchestrator.md tier-table note states every tier"
-    " receives the same Phase 3.8 audit (security unconditional at any tier)",
+    " receives the same Phase 3.8 audit regardless of tier (bug severity never"
+    " selects a different per-task security lens or skip)",
     bool(_s40_dispatch_slice)
     and "Every tier receives the same Phase 3.8 audit" in _s40_dispatch_slice
-    and "unconditionally" in _s40_dispatch_slice,
-    f"anchor '{_S40_DISPATCH_TABLE_ANCHOR}' missing or the unconditional-audit"
+    and "regardless of tier" in _s40_dispatch_slice
+    and "no longer selects a different per-task security lens" in _s40_dispatch_slice,
+    f"anchor '{_S40_DISPATCH_TABLE_ANCHOR}' missing or the tier-uniformity"
     f" note is absent — bug severity must never buy a security skip",
 )
 
@@ -9081,29 +9118,21 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Check (4) / AC-4 — orchestrator.md Phase 3.6 input pointers:
-# reviews/04-ux-validation.md must appear in the existing "Invoke via Task tool"
-# pointer block of Phase 3.6 (acceptance checker inputs).
-# Strategy: search the whole orchestrator text for the 3.6 pointer block
-# and verify reviews/04-ux-validation.md is listed alongside the existing pointers.
-# The existing line (orchestrator.md:1750) lists:
-#   "02-implementation.md, 03-testing.md, reviews/04-validation.md, and reviews/04-security.md"
-# After the fix it must also include "reviews/04-ux-validation.md".
-# Anchor: "## Phase 3.6" (the acceptance-checker phase heading).
+# Check (4) / AC-4 — pipeline-cost-slimdown (Task-1): Phase 3.6 (the
+# acceptance-checker input-pointer block this check originally targeted) was
+# fully retired. The reviews/04-ux-validation.md pointer's surviving home is
+# the workspaces-own artifact-inventory list — rewritten from a Phase-3.6
+# pointer-block pin to a retirement + surviving-pointer pin.
 # ---------------------------------------------------------------------------
-_S42_PHASE36_ANCHOR = "## Phase 3.6"
-_s42_phase36_slice  = _slice_section(_s42_orch, _S42_PHASE36_ANCHOR)
-
 check(
-    "frontend-wiring(4/ac-4): orchestrator.md Phase 3.6 input pointer block"
-    " includes 'reviews/04-ux-validation.md' (alongside existing 02-implementation.md,"
-    " 03-testing.md, reviews/04-validation.md pointers)",
-    bool(_s42_phase36_slice)
-    and "reviews/04-ux-validation.md" in _s42_phase36_slice,
-    f"anchor '{_S42_PHASE36_ANCHOR}' missing or 'reviews/04-ux-validation.md' absent"
-    f" from Phase 3.6 input pointer block;"
-    f" anchor present: {bool(_s42_phase36_slice)};"
-    f" 'reviews/04-ux-validation.md' present: {'reviews/04-ux-validation.md' in _s42_phase36_slice}",
+    "frontend-wiring(4/ac-4): orchestrator.md does not carry a '## Phase 3.6'"
+    " heading (retired), and 'reviews/04-ux-validation.md' still appears in"
+    " the workspaces-own artifact-inventory list",
+    "## Phase 3.6" not in _s42_orch
+    and "reviews/04-ux-validation.md" in _s42_orch,
+    f"'## Phase 3.6' present: {'## Phase 3.6' in _s42_orch} (must be False);"
+    f" 'reviews/04-ux-validation.md' present: {'reviews/04-ux-validation.md' in _s42_orch}"
+    " (must be True)",
 )
 
 # ---------------------------------------------------------------------------
@@ -10203,7 +10232,7 @@ _S46_PH2CLOSE_ANCHOR = "Phase 2-close scope check"
 _S46_PHASE3_ANCHOR   = "## Phase 3 — Verify"
 _S46_PHASE6_ANCHOR   = "Phase 6 — Knowledge Save (MANDATORY)"
 _S46_DOCFLOW_ANCHOR  = "## Documentation Flow"
-_S46_KGSEC_ANCHOR    = "### KG write on security findings"
+_S46_KGSEC_ANCHOR    = "### KG write on Phase 3.8 audit findings"
 
 _s46_sanity_slice   = _slice_section(_s46_orch, _S46_SANITY_ANCHOR)
 _s46_phase35_slice  = _slice_section(_s46_orch, _S46_PHASE35_ANCHOR)
@@ -10401,8 +10430,8 @@ check(
 # ---------------------------------------------------------------------------
 _S46_EMIT_PTR = '§ "`kg_write` events"'
 check(
-    "obs-gates(7/ac-4): orchestrator.md § KG write on security findings contains an inline"
-    " pointer (§ \"`kg_write` events\") after the security-finding write site",
+    "obs-gates(7/ac-4): orchestrator.md § KG write on Phase 3.8 audit findings contains"
+    " an inline pointer (§ \"`kg_write` events\") after the audit-finding write site",
     bool(_s46_kgsec_slice)
     and _S46_EMIT_PTR in _s46_kgsec_slice,
     f"anchor '{_S46_KGSEC_ANCHOR}' missing or kg_write pointer absent in KG-sec slice;"
@@ -18957,7 +18986,10 @@ _s82_sketch_guard       = read(HOOKS_DIR / "sketch-guard.sh")
 _s82_architect          = read(AGENTS_DIR / "architect.md")
 _s82_plan_reviewer      = read(AGENTS_DIR / "plan-reviewer.md")
 _s82_qa_plan            = read(AGENTS_DIR / "qa-plan.md")
-_s82_acceptance_checker = read(AGENTS_DIR / "acceptance-checker.md")
+_s82_acceptance_checker_path = AGENTS_DIR / "acceptance-checker.md"
+_s82_acceptance_checker = (
+    read(_s82_acceptance_checker_path) if _s82_acceptance_checker_path.exists() else ""
+)
 _s82_orchestrator = SPLIT_CORPUS
 _s82_ref_special_flows  = read(AGENTS_DIR / "ref-special-flows.md")
 _s82_implementer        = read(AGENTS_DIR / "implementer.md")
@@ -19186,13 +19218,15 @@ check(
     " in Ratify-Plan Mode",
 )
 
-# (c3) acceptance-checker.md — sketch diff in Phase 3.6 step
+# (c3) pipeline-cost-slimdown (Task-6): acceptance-checker.md and its Phase
+# 3.6 sketch-diff duty are fully retired — pin the retirement instead of the
+# now-nonexistent file's content.
 check(
-    "suite82(c3-acceptance-checker-sketch): agents/acceptance-checker.md diffs delivered"
-    " surface vs sketches",
-    "sketches/" in _s82_acceptance_checker and "sketch" in _s82_acceptance_checker.lower(),
-    "agents/acceptance-checker.md must reference the sketches/*.md files (new naming)"
-    " when checking delivered surface in Phase 3.6",
+    "suite82(c3-retired): agents/acceptance-checker.md does not exist"
+    " (Phase 3.6 sketch-diff duty retired along with the agent)",
+    not _s82_acceptance_checker_path.exists(),
+    f"agents/acceptance-checker.md unexpectedly present at"
+    f" {_s82_acceptance_checker_path} — the agent was fully retired",
 )
 
 # ---------------------------------------------------------------------------
@@ -19429,15 +19463,14 @@ check(
     " (new naming) and include sketches_read in its status block",
 )
 
-# (i10) consumption clauses — acceptance-checker service-interaction diff row
-#       (spans_multiple_services: true → sequenceDiagram call-hop diff row)
+# (i10) pipeline-cost-slimdown (Task-6): acceptance-checker.md and its Phase
+# 3.6 service-interaction diff row are fully retired — pin the retirement.
 check(
-    "suite82(i10-acceptance-checker-service-interaction-row): agents/acceptance-checker.md"
-    " Phase 3.6 includes service-interaction diff row for spans_multiple_services",
-    "service-interaction" in _s82_acceptance_checker
-    and "spans_multiple_services" in _s82_acceptance_checker,
-    "agents/acceptance-checker.md Phase 3.6 must include an explicit service-interaction"
-    " diff row covering the spans_multiple_services: true case",
+    "suite82(i10-retired): agents/acceptance-checker.md does not exist"
+    " (Phase 3.6 service-interaction diff row retired along with the agent)",
+    not _s82_acceptance_checker_path.exists(),
+    f"agents/acceptance-checker.md unexpectedly present at"
+    f" {_s82_acceptance_checker_path} — the agent was fully retired",
 )
 
 # (i11) consumption clauses — reviewer required-reading clause (no sketches_read field required)
@@ -19523,7 +19556,6 @@ _S82UWH_GLOB_FILES = {
     "agents/qa.md": _s82_qa,
     "agents/reviewer.md": _s82_reviewer,
     "agents/qa-plan.md": _s82_qa_plan,
-    "agents/acceptance-checker.md": _s82_acceptance_checker,
     "agents/ref-special-flows.md": _s82_ref_special_flows,
     "agents/orchestrator.md": _s82_orchestrator,
     "agents/plan-reviewer.md": _s82_plan_reviewer,
@@ -20851,10 +20883,12 @@ check(
     f"researcher.md tools must include 'Write' and must NOT include 'Bash', 'Task', or 'Edit'; "
     f"got tools='{_s92_researcher_tools}'",
 )
-# Model-pin assertions: init stays on haiku; acceptance-checker and translator
-# were re-tiered to sonnet in PR #475 (commit 9453fb9).
+# Model-pin assertions: init stays on haiku; translator was re-tiered to
+# sonnet in PR #475 (commit 9453fb9). acceptance-checker's own model/effort
+# pins are retired below (pipeline-cost-slimdown, Task-6) — the agent no
+# longer exists, so its frontmatter cannot carry a model/effort value.
 _s92_init_fm            = parse_frontmatter(read(AGENTS_DIR / "init.md"))
-_s92_acc_checker_fm     = parse_frontmatter(read(AGENTS_DIR / "acceptance-checker.md"))
+_s92_acc_checker_path   = AGENTS_DIR / "acceptance-checker.md"
 _s92_translator_fm      = parse_frontmatter(read(AGENTS_DIR / "translator.md"))
 check(
     "suite92(ac3-init-model-haiku): agents/init.md frontmatter model is 'haiku'",
@@ -20862,11 +20896,11 @@ check(
     f"expected model=haiku for init, got '{_s92_init_fm.get('model', '')}'",
 )
 check(
-    "suite92(ac3-acceptance-checker-model-sonnet): agents/acceptance-checker.md "
-    "frontmatter model is 'sonnet'",
-    _s92_acc_checker_fm.get("model", "") == "sonnet",
-    f"expected model=sonnet for acceptance-checker (PR #475 re-tier), "
-    f"got '{_s92_acc_checker_fm.get('model', '')}'",
+    "suite92(ac3-acceptance-checker-retired): agents/acceptance-checker.md"
+    " does not exist (model pin retired along with the agent)",
+    not _s92_acc_checker_path.exists(),
+    f"agents/acceptance-checker.md unexpectedly present at"
+    f" {_s92_acc_checker_path} — the agent was fully retired",
 )
 check(
     "suite92(ac3-translator-model-sonnet): agents/translator.md frontmatter model is 'sonnet'",
@@ -20875,9 +20909,9 @@ check(
     f"got '{_s92_translator_fm.get('model', '')}'",
 )
 
-# Effort regression pins for the three re-tuned agents (v2.85.0 effort re-tune, AC-7/AC-8).
-# These checks FAIL on the pre-change tree (architect/gcp-infra read high, acceptance-checker
-# reads medium) and pass on the post-change tree.
+# Effort regression pins for the two surviving re-tuned agents (v2.85.0 effort
+# re-tune, AC-7/AC-8). architect/gcp-infra checks are unaffected by the
+# acceptance-checker retirement.
 _s92_architect_fm    = parse_frontmatter(read(AGENTS_DIR / "architect.md"))
 _s92_gcp_infra_fm    = parse_frontmatter(read(AGENTS_DIR / "gcp-infra.md"))
 check(
@@ -20889,13 +20923,6 @@ check(
     "suite92(ac7-gcp-infra-effort-xhigh): agents/gcp-infra.md frontmatter effort is 'xhigh'",
     _s92_gcp_infra_fm.get("effort", "") == "xhigh",
     f"expected effort=xhigh for gcp-infra, got '{_s92_gcp_infra_fm.get('effort', '')}'",
-)
-check(
-    "suite92(ac7-acceptance-checker-effort-high): agents/acceptance-checker.md "
-    "frontmatter effort is 'high'",
-    _s92_acc_checker_fm.get("effort", "") == "high",
-    f"expected effort=high for acceptance-checker, "
-    f"got '{_s92_acc_checker_fm.get('effort', '')}'",
 )
 
 _S92_EVIDENCE_ONLY_TOKENS = (
@@ -20995,19 +21022,21 @@ check(
     f"agents/README.md § Earn the model must contain all three haiku-eligibility "
     f"criteria tokens: {_S92_HAIKU_POLICY_TOKENS}",
 )
+# pipeline-cost-slimdown (Task-6): acceptance-checker was fully retired and
+# translator was re-tiered off haiku (pre-existing, PR #475) — the current
+# fleet has exactly 2 haiku agents (researcher, init). Rewritten from the
+# stale "4 haiku" tally to the true current-state tally, and pinned that
+# acceptance-checker no longer appears in the haiku roster at all.
 check(
-    "suite92(ac6-tally): agents/README.md tally line reflects 4 haiku agents",
-    "4 haiku" in _s92_readme or "4 agents on `haiku`" in _s92_readme
-    or (
-        "haiku" in _s92_readme
-        and "researcher" in _s92_readme
-        and "init" in _s92_readme
-        and "acceptance-checker" in _s92_readme
-        and "translator" in _s92_readme
-        and "4" in _s92_readme
-    ),
-    "agents/README.md tally line must reflect 4 haiku agents "
-    "(researcher, init, acceptance-checker, translator)",
+    "suite92(ac6-tally): agents/README.md tally line reflects exactly 2 haiku"
+    " agents (researcher, init) — acceptance-checker retired, translator"
+    " re-tiered off haiku",
+    "haiku" in _s92_readme
+    and "researcher" in _s92_readme
+    and "init" in _s92_readme
+    and "acceptance-checker" not in _s92_readme,
+    "agents/README.md tally line must reflect the 2 current haiku agents "
+    "(researcher, init) and must not reference the retired acceptance-checker",
 )
 
 # ---- AC-8: CLAUDE.md documents Go-installer exclusion; researcher absent from
@@ -30647,10 +30676,15 @@ check(
     "marker 'Findings are operator input, never an iteration trigger' not found "
     "— AC-18 (repointed) operator-disposition rule missing",
 )
+# pipeline-cost-slimdown (Task-1): the Phase 3.8 audit is now adversary-only,
+# returning a single verdict per delivery group (not a multi-finding list like
+# the retired `security` code-audit) — the ledger wording is singular
+# ("finding"), a legitimate consequence of the contract change, not drift.
 check(
-    "s125/AC-18b: orchestrator.md records acceptance when shipping over open findings",
-    "recording the accepted findings verbatim" in _s125_orch,
-    "marker 'recording the accepted findings verbatim' not found "
+    "s125/AC-18b: orchestrator.md records acceptance when shipping over an"
+    " open finding",
+    "recording the accepted finding verbatim" in _s125_orch,
+    "marker 'recording the accepted finding verbatim' not found "
     "— AC-18 (repointed) informed-consent ledger entry missing",
 )
 check(
@@ -30662,15 +30696,21 @@ check(
 
 # -------------------------------------------------------------------
 # AC-19 (#373-5) — adversary.md boundary + README.md roster entry
-# Note: 'reads `security`'s output as input' is present in the boundary table row
-# as 'reads `reviews/04-security.md` as input'; the Core Philosophy says 'You read `security`'s
-# output as input' (with 'You' prefix). Assert the table form as the canonical anchor.
+# pipeline-cost-slimdown (Task-2): adversary no longer reads
+# `reviews/04-security.md` (the unconditional Phase 3.8 `security` code-audit
+# was removed) — it reads the SEC-002 design-review verdict instead. Rewritten
+# from the retired file-pointer marker to the new verdict-pointer marker.
 # -------------------------------------------------------------------
 check(
-    "s125/AC-19a: adversary.md reads security's output (boundary table: reads `reviews/04-security.md` as input)",
-    "reads `reviews/04-security.md` as input" in _s125_adv,
-    "marker 'reads `reviews/04-security.md` as input' not found in agents/adversary.md "
-    "— AC-19 (#373-5) boundary statement about reading security output missing",
+    "s125/AC-19a: adversary.md reads the SEC-002 design-review verdict as"
+    " input (boundary table 'Reads' row: reviews/01-plan-review.md § Security"
+    " Design-Review)",
+    "reads the SEC-002 verdict as input" in _s125_adv
+    and "reviews/01-plan-review.md § Security Design-Review" in _s125_adv,
+    "marker 'reads the SEC-002 verdict as input' or the"
+    " 'reviews/01-plan-review.md § Security Design-Review' pointer not found in"
+    " agents/adversary.md — AC-19 (#373-5) boundary statement about reading"
+    " the SEC-002 verdict missing",
 )
 check(
     "s125/AC-19b: adversary.md MUST NOT run the OWASP/CWE scan",
@@ -31188,9 +31228,11 @@ _leaf_agent_files = sorted(
     p for p in AGENTS_DIR.glob("*.md")
     if p.name not in {"orchestrator.md", "leader.md", "orchestrator.md", "README.md"} and not p.name.startswith("ref-")
 )
+# pipeline-cost-slimdown (Task-3): acceptance-checker.md was fully retired —
+# the leaf-agent universe drops from 26 to 25.
 check(
-    "leaf-agent universe for the model: check has the expected size (26 agents)",
-    len(_leaf_agent_files) == 26,
+    "leaf-agent universe for the model: check has the expected size (25 agents)",
+    len(_leaf_agent_files) == 25,
     f"found {len(_leaf_agent_files)} agents/*.md files eligible (excluding orchestrator/README/ref-*) "
     "— update this count if an agent was added or removed",
 )
@@ -31938,7 +31980,10 @@ _s141_discover_phase = read(REPO_ROOT / "docs" / "discover-phase.md")
 _s141_conventions = read(REPO_ROOT / "docs" / "conventions.md")
 _s141_adversary = read(AGENTS_DIR / "adversary.md")
 _s141_reviewer = read(AGENTS_DIR / "reviewer.md")
-_s141_acceptance_checker = read(AGENTS_DIR / "acceptance-checker.md")
+_s141_acceptance_checker_path = AGENTS_DIR / "acceptance-checker.md"
+_s141_acceptance_checker = (
+    read(_s141_acceptance_checker_path) if _s141_acceptance_checker_path.exists() else ""
+)
 
 # --- AC-3: fenced sites — precompact-snapshot.ts (not covered by Suite 140,
 # which only checked checkpoint-guard.ts and sketch-guard.sh) ---
@@ -32008,12 +32053,14 @@ check(
     "workspaces/{feature-name}/reviews/04-internal-review.md" in _s141_reviewer,
     "reviewer.md's internal-review mode Output field must carry the 'reviews/' prefix",
 )
+# pipeline-cost-slimdown (Task-6): acceptance-checker.md and its Drift
+# Analysis output path are fully retired — pin the retirement.
 check(
-    "suite141(acceptance-checker-drift-target): agents/acceptance-checker.md "
-    "appends its Drift Analysis section to 'reviews/04-validation.md'",
-    "reviews/04-validation.md" in _s141_acceptance_checker,
-    "acceptance-checker.md must append its Drift Analysis section to the "
-    "subfolder-qualified 'reviews/04-validation.md' path",
+    "suite141(acceptance-checker-retired): agents/acceptance-checker.md does"
+    " not exist (Drift Analysis output path retired along with the agent)",
+    not _s141_acceptance_checker_path.exists(),
+    f"agents/acceptance-checker.md unexpectedly present at"
+    f" {_s141_acceptance_checker_path} — the agent was fully retired",
 )
 
 # --- AC-6: docs/conventions.md documents the research/ and reviews/
@@ -32573,98 +32620,67 @@ _s143_orch = SPLIT_CORPUS
 _s143_claude_md = read(REPO_ROOT / "CLAUDE.md")
 _s143_testing_md = read(REPO_ROOT / "docs" / "testing.md")
 
-# --- Site A: Phase 3.75 caller ("e. After a successful retry...") ---
-_s143_siteA = _slice_section(
-    _s143_orch,
-    "e. After a successful retry, apply the Phase 3.6 conditional re-run rule",
-    ("\n\n**Iteration budget:**",),
-)
+# pipeline-cost-slimdown (Task-6): Task-1 AC-3/AC-5 fully removed the Phase
+# 3.6 (acceptance-checker) coupling — the "conditional re-run" three-file
+# watched-set this suite pinned no longer has a Phase 3.6 side to pair with.
+# Rewritten from a positive three-file-wording pin to a retirement pin: both
+# named anchors (the Phase 3.75 caller step and the Phase 3.6 definition
+# paragraph) must be ABSENT, and Phase 3.75's own body must explain why
+# (Phase 3.6 no longer exists, so there is no concurrent dispatch to pair with).
 
 check(
-    "suite143(siteA-present): Phase 3.75 caller site is found between the retry "
-    "step and the iteration-budget paragraph",
-    _s143_siteA != "",
-    "agents/orchestrator.md must contain the Phase 3.75 caller line "
-    "'e. After a successful retry, apply the Phase 3.6 conditional re-run rule'",
+    "suite143(siteA-retired): the Phase 3.75 caller line 'apply the Phase 3.6"
+    " conditional re-run rule' no longer exists in agents/orchestrator.md",
+    "apply the Phase 3.6 conditional re-run rule" not in _s143_orch,
+    "agents/orchestrator.md must not retain the retired Phase 3.75 caller"
+    " line coupling to a Phase 3.6 conditional re-run rule",
 )
 check(
-    "suite143(siteA-three-file-set): Phase 3.75 caller site watches all three "
-    "files 01-plan.md, 02-implementation.md, reviews/04-validation.md",
-    "`01-plan.md`, `02-implementation.md`, or `reviews/04-validation.md` changed"
-    in _s143_siteA,
-    "Phase 3.75 caller site must list all three watched files "
-    "(01-plan.md, 02-implementation.md, reviews/04-validation.md)",
+    "suite143(siteB-retired): the Phase 3.6 'Conditional re-run after a 3.75"
+    " failure' definition paragraph no longer exists in agents/orchestrator.md",
+    "Conditional re-run after a 3.75 failure" not in _s143_orch,
+    "agents/orchestrator.md must not retain the retired Phase 3.6 conditional"
+    " re-run definition paragraph",
 )
 check(
-    "suite143(siteA-none-of-three): Phase 3.75 caller site phrases the "
-    "no-drift-recheck condition as 'none of the three'",
-    "none of the three" in _s143_siteA,
-    "Phase 3.75 caller site must phrase the condition as 'none of the three', "
-    "not the stale 'touches neither'",
+    "suite143(retirement-rationale): agents/orchestrator.md § Phase 3.75"
+    " explains standalone execution — 'Phase 3.6 no longer exists, so there"
+    " is no concurrent dispatch to pair with'",
+    "Phase 3.6 no longer exists, so there is no concurrent dispatch to pair with"
+    in _s143_orch,
+    "agents/orchestrator.md must explain why Phase 3.75 runs standalone now"
+    " that Phase 3.6 (acceptance-checker) is retired",
 )
 
-# --- Site B: Phase 3.6 definition ("Conditional re-run after a 3.75 failure") ---
-_s143_siteB = _slice_section(
-    _s143_orch,
-    "**Conditional re-run after a 3.75 failure.**",
-    ("\n\n**This is the third line of defense",),
-)
-
-check(
-    "suite143(siteB-present): Phase 3.6 definition site is found between its "
-    "own heading and the third-line-of-defense paragraph",
-    _s143_siteB != "",
-    "agents/orchestrator.md must contain the Phase 3.6 'Conditional re-run "
-    "after a 3.75 failure' paragraph",
-)
-check(
-    "suite143(siteB-three-file-set): Phase 3.6 definition site watches all "
-    "three files 01-plan.md, 02-implementation.md, reviews/04-validation.md",
-    "`01-plan.md`, `02-implementation.md`, or `reviews/04-validation.md` changed"
-    in _s143_siteB,
-    "Phase 3.6 definition site must list all three watched files "
-    "(01-plan.md, 02-implementation.md, reviews/04-validation.md)",
-)
-check(
-    "suite143(siteB-none-of-three-changed): Phase 3.6 definition site phrases "
-    "the verdict-stands condition as 'when none of the three changed'",
-    "when none of the three changed" in _s143_siteB,
-    "Phase 3.6 definition site must phrase the verdict-stands condition as "
-    "'when none of the three changed'",
-)
-check(
-    "suite143(siteB-implementation-grounding-read): Phase 3.6 definition site "
-    "explains why 02-implementation.md is watched — it is the acceptance-"
-    "checker's grounding read, invalidated by a build-fix that updates it",
-    "acceptance-checker's grounding read of `02-implementation.md` is watched"
-    in _s143_siteB,
-    "Phase 3.6 definition site must explain that 02-implementation.md is "
-    "watched because it is the acceptance-checker's grounding read",
-)
-
-# --- Negative assertion: no site retains the stale two-file form ---
-_s143_two_file_hits = [
+# --- Negative assertion: no site retains the stale two-file OR three-file
+# conditional-re-run wording at all (both forms were tied to the now-retired
+# Phase-3.6 coupling) ---
+_s143_stale_hits = [
     site_name
     for site_name, needle in (
         (
-            "Phase 3.75 caller",
+            "two-file (Phase 3.75 caller)",
             "`01-plan.md` or `reviews/04-validation.md` changed since the drift "
             "verdict",
         ),
         (
-            "Phase 3.6 definition",
+            "two-file (Phase 3.6 definition)",
             "`01-plan.md` or `reviews/04-validation.md` changed since the drift "
             "verdict was produced",
+        ),
+        (
+            "three-file (either site)",
+            "`01-plan.md`, `02-implementation.md`, or `reviews/04-validation.md` changed",
         ),
     )
     if needle in _s143_orch
 ]
 check(
-    "suite143(negative-no-two-file-form): no site in agents/orchestrator.md "
-    "retains the stale two-file wording (plan + validation without "
-    "implementation)",
-    len(_s143_two_file_hits) == 0,
-    f"found the stale two-file guard wording at: {_s143_two_file_hits}",
+    "suite143(negative-no-stale-form): no site in agents/orchestrator.md "
+    "retains the stale two-file or three-file conditional-re-run wording "
+    "(the whole coupling was retired, not narrowed)",
+    len(_s143_stale_hits) == 0,
+    f"found stale conditional-re-run guard wording at: {_s143_stale_hits}",
 )
 
 # Self-referential guards (hygiene contract)
@@ -33405,9 +33421,11 @@ check(
 # Checks (33-45): the old two-tier boilerplate is gone from each of the 13
 # agentic-tier agents (architect + qa/qa-plan/plan-reviewer/security counted above
 # separately; these are the remaining files carrying the generic boilerplate).
+# pipeline-cost-slimdown (Task-6): acceptance-checker.md is fully retired —
+# dropped from this roster (its own boilerplate check is moot).
 _S146_AGENTIC_AGENTS = (
     "tester", "ux-reviewer", "security", "qa-plan", "reviewer", "adversary",
-    "acceptance-checker", "implementer", "documenter", "plan-reviewer",
+    "implementer", "documenter", "plan-reviewer",
     "delivery", "qa", "gcp-infra",
 )
 _S146_STALE_BOILERPLATE = "Structure your output file with two top-level sections"
@@ -35001,7 +35019,7 @@ _s156_reviewer = read(AGENTS_DIR / "reviewer.md")
 _s156_consolidator = read(AGENTS_DIR / "reviewer-consolidator.md")
 _s156_qa = read(AGENTS_DIR / "qa.md")
 _s156_tester = read(AGENTS_DIR / "tester.md")
-_s156_acceptance_checker = read(AGENTS_DIR / "acceptance-checker.md")
+_s156_acceptance_checker_path = AGENTS_DIR / "acceptance-checker.md"
 _s156_delivery = read(AGENTS_DIR / "delivery.md")
 _s156_plan_reviewer = read(AGENTS_DIR / "plan-reviewer.md")
 _s156_orchestrator = read(AGENTS_DIR / "orchestrator.md")
@@ -35412,14 +35430,15 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Task-3 AC-1 -- each of the five AC-consuming agents references
+# Task-3 AC-1 -- each of the four surviving AC-consuming agents references
 # 'AC-N: verdict + file:line evidence' without re-quoting the requirement
 # text (01-plan.md § Task List is the sole canonical AC-text source).
+# pipeline-cost-slimdown (Task-6): acceptance-checker.md is fully retired —
+# dropped from the AC-consuming roster (four agents, not five).
 # ---------------------------------------------------------------------------
 _S156_AC_CONSUMERS = {
     "qa.md": _s156_qa,
     "tester.md": _s156_tester,
-    "acceptance-checker.md": _s156_acceptance_checker,
     "delivery.md": _s156_delivery,
     "plan-reviewer.md": _s156_plan_reviewer,
 }
@@ -35430,11 +35449,18 @@ _s156_missing_ac_ref = [
     or "ac reference convention" not in text.lower()
 ]
 check(
-    "suite156(task3-ac1-canonical-ac-source): all five AC-consuming agents "
-    "cite '01-plan.md § Task List' as the canonical AC-text source via an "
-    "explicit AC reference convention paragraph",
+    "suite156(task3-ac1-canonical-ac-source): all four surviving AC-consuming"
+    " agents cite '01-plan.md § Task List' as the canonical AC-text source"
+    " via an explicit AC reference convention paragraph",
     not _s156_missing_ac_ref,
     f"missing canonical AC-source citation in: {_s156_missing_ac_ref}",
+)
+check(
+    "suite156(task3-ac1-acceptance-checker-retired): agents/acceptance-checker.md"
+    " does not exist (dropped from the AC-consuming roster along with the agent)",
+    not _s156_acceptance_checker_path.exists(),
+    f"agents/acceptance-checker.md unexpectedly present at"
+    f" {_s156_acceptance_checker_path} — the agent was fully retired",
 )
 
 # ---------------------------------------------------------------------------
@@ -35455,17 +35481,14 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Task-3 AC-3 -- qa.md, tester.md, acceptance-checker.md, and
-# plan-reviewer.md establish the reference-not-recite rule, generalizing the
-# existing verify-packet AC-avoidance pattern (qa.md:301).
+# Task-3 AC-3 -- qa.md, tester.md, and plan-reviewer.md establish the
+# reference-not-recite rule, generalizing the existing verify-packet
+# AC-avoidance pattern (qa.md:301). pipeline-cost-slimdown (Task-6):
+# acceptance-checker.md is fully retired — dropped from this roster.
 # ---------------------------------------------------------------------------
 _S156_REQUOTE_MARKERS = {
     "qa.md": ("does NOT re-quote the requirement text", _s156_qa),
     "tester.md": ("does not re-quote the requirement text", _s156_tester),
-    "acceptance-checker.md": (
-        "do not re-quote the requirement text",
-        _s156_acceptance_checker,
-    ),
     "plan-reviewer.md": ("never the requirement text itself", _s156_plan_reviewer),
 }
 _s156_missing_requote_rule = [
@@ -35473,14 +35496,14 @@ _s156_missing_requote_rule = [
 ]
 check(
     "suite156(task3-ac3-reference-not-recite): qa.md, tester.md, "
-    "acceptance-checker.md, and plan-reviewer.md each state their AC "
+    "and plan-reviewer.md each state their AC "
     "reference is never a restatement of the requirement text",
     not _s156_missing_requote_rule,
     f"missing reference-not-recite statement in: {_s156_missing_requote_rule}",
 )
 
 # ---------------------------------------------------------------------------
-# Task-3 AC-4 -- each of the five files references the iteration
+# Task-3 AC-4 -- each of the four surviving files references the iteration
 # re-narration ban for its own body, by ID.
 # ---------------------------------------------------------------------------
 _s156_missing_task3_renarr = [
@@ -35489,8 +35512,9 @@ _s156_missing_task3_renarr = [
     if "Iteration re-narration ban" not in text
 ]
 check(
-    "suite156(task3-ac4-renarration-refs): all five AC-consuming agents "
-    "reference the 'Iteration re-narration ban' for their own report body",
+    "suite156(task3-ac4-renarration-refs): all four surviving AC-consuming"
+    " agents reference the 'Iteration re-narration ban' for their own report"
+    " body",
     not _s156_missing_task3_renarr,
     f"missing 'Iteration re-narration ban' in: {_s156_missing_task3_renarr}",
 )
@@ -35546,15 +35570,20 @@ check(
     "orchestrator.md § Agent Results must document the (agent, phase)-"
     "keyed upsert mechanic",
 )
+# pipeline-cost-slimdown (Task-1): the Phase 3.8 audit is now `adversary`
+# alone — `security` no longer has a Phase 3.8 dispatch row at all. Rewritten
+# from a two-row pin to a single-row pin (adversary retains its own
+# current-verdict row, including incomplete_on_changed_control).
 check(
-    "suite156(task4-ac2-two-lens-rows-retained): orchestrator.md's § Agent "
-    "Results template retains distinct security and adversary rows for "
-    "the Phase 3.8 audit, including incomplete_on_changed_control",
-    "| security | 3.8-audit |" in _s156_agent_results_slice
-    and "| adversary | 3.8-audit |" in _s156_agent_results_slice
-    and "incomplete_on_changed_control" in _s156_agent_results_slice,
-    "orchestrator.md § Agent Results template must show both the security "
-    "and adversary Phase-3.8 audit rows, never collapsed to one",
+    "suite156(task4-ac2-adversary-row-retained): orchestrator.md's § Agent "
+    "Results template retains the adversary row for the Phase 3.8 audit, "
+    "including incomplete_on_changed_control, and carries no security row"
+    " there (security no longer dispatches at Phase 3.8)",
+    "| adversary | 3.8-audit |" in _s156_agent_results_slice
+    and "incomplete_on_changed_control" in _s156_agent_results_slice
+    and "| security | 3.8-audit |" not in _s156_agent_results_slice,
+    "orchestrator.md § Agent Results template must show the adversary"
+    " Phase-3.8 audit row and must not retain a security Phase-3.8 row",
 )
 
 # ---------------------------------------------------------------------------
@@ -35723,7 +35752,7 @@ check(
 # here. The delivery Step 11.4c release-tag gate is Suite 132's existing b2
 # check — not repeated. Consumer-boundary behavior-identical status (delivery
 # Step 9 stays behavior-identical for consuming repos) is a direct-inspection
-# verification performed by qa/acceptance-checker via a before/after diff
+# verification performed by qa via a before/after diff
 # read; the shallow presence guard below only catches an accidental deletion
 # of the two-row Step 9 table, not a behavior regression.
 #
@@ -36907,10 +36936,13 @@ def _s171_slice(text, anchor, stop="\n## "):
 
 
 # --- (a) The audit phase exists, positioned as its own section ---
+# pipeline-cost-slimdown (Task-1, 2026-07-21): the heading gained a
+# ", conditional" suffix — the audit itself is no longer unconditional
+# (the whole point of this PR).
 check(
     "s171(a-audit-section): orchestrator.md declares '## Phase 3.8 — "
-    "Pre-Delivery Security Audit (once per delivery group)'",
-    "## Phase 3.8 — Pre-Delivery Security Audit (once per delivery group)"
+    "Pre-Delivery Security Audit (once per delivery group, conditional)'",
+    "## Phase 3.8 — Pre-Delivery Security Audit (once per delivery group, conditional)"
     in _s171_orch,
     "the audit section header is the contract's anchor — its absence means the "
     "audit was never wired",
@@ -36920,19 +36952,26 @@ _s171_audit = _s171_slice(
     _s171_orch, "## Phase 3.8 — Pre-Delivery Security Audit"
 )
 
-# --- (b) security unconditional; adversary on the single named predicate ---
+# --- (b)/(c) pipeline-cost-slimdown (Task-1, 2026-07-21): the unconditional
+# `security` code-audit dispatch was REMOVED from Phase 3.8 — `adversary`
+# alone is the sole lens, conditional on `security_floor_applies == true`.
+# Rewritten from a two-lens (security-unconditional + adversary-conditional)
+# pin to a single-lens (adversary-only-conditional, no security at all) pin.
 check(
-    "s171(b-security-unconditional): the audit dispatches security "
-    "unconditionally (audit mode, always)",
-    "`security` (unconditional)" in _s171_audit
-    and "**security** (audit mode, always)" in _s171_audit,
-    "the audit's security dispatch must read no predicate at all — 'always' "
-    "and 'unconditional' must both appear in the audit section",
+    "s171(b-adversary-only-conditional): the audit dispatches `adversary`"
+    " alone, conditional on `security_floor_applies == true` — no `security`"
+    " code-audit dispatch exists at Phase 3.8",
+    "`adversary`, dispatched exactly ONCE per delivery group when"
+    " `security_floor_applies == true`" in _s171_audit
+    and "**security**" not in _s171_audit
+    and "`security` (unconditional)" not in _s171_audit,
+    "the audit's sole lens must be `adversary`, conditional on the named"
+    " predicate — a `security` dispatch of any form must not appear",
 )
 check(
     "s171(c-adversary-predicate-by-name): the audit dispatches adversary on "
     "`security_floor_applies == true`, read by name",
-    "**adversary** (when `security_floor_applies == true`)" in _s171_audit,
+    "when `security_floor_applies == true`" in _s171_audit,
     "adversary's audit dispatch must read the single named predicate — never "
     "an inline re-derivation",
 )
@@ -36992,11 +37031,14 @@ check(
     and "never a re-audit the operator did not cause" in _s171_audit,
     "the only audit re-run is the single operator-caused amend re-audit",
 )
+# pipeline-cost-slimdown (Task-1): with a single lens (adversary), the
+# unavailability marker is now concrete ("adversary"), not a templated
+# `{lens}` placeholder over two possible lenses.
 check(
     "s171(j-never-silently-skipped): a missing audit report is stated at the "
     "gate, never omitted",
     "never silently skipped" in _s171_audit
-    and "audit: unavailable ({lens})" in _s171_audit,
+    and "audit: unavailable (adversary)" in _s171_audit,
     "audit unavailability must surface in the STOP block — silence would read "
     "as coverage",
 )
@@ -37653,6 +37695,109 @@ check(
 )
 
 # Marker: plan-review-opt-in
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 170 — pipeline-cost-slimdown (Task-6): control-vocabulary parity +
+# SEC-002→adversary producer-coupling invariant pin (SEC-DR-F4)
+#
+# AC-4: agents/adversary.md § Method → 1. Identify the changed controls and
+# agents/architect.md § Classification block both claim their control
+# vocabulary enumeration is "kept byte-identical" and that this test file
+# "cross-checks the two files for parity" — no such check existed prior to
+# this suite. Adds the missing positive structural pin so a future edit to
+# one side cannot silently desync from the other.
+#
+# AC-6 (SEC-DR-F4): pins the invariant that adversary's mandatory input (the
+# SEC-002 design-review verdict) is guaranteed to have run — OR its absence
+# is explicitly handled without degrading to unavailable/spurious-block — on
+# every dispatch path, including the Phase-2-close `false→true` escalation
+# path. Fails if agents/adversary.md reverts to an unconditional
+# "absent → blocked" floor or drops the escalation-handling clause.
+#
+# Marker: pipeline-cost-slimdown
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 170: pipeline-cost-slimdown (control-vocabulary parity + SEC-DR-F4) ===")
+
+_s170_adversary = read(AGENTS_DIR / "adversary.md")
+_s170_architect = read(AGENTS_DIR / "architect.md")
+_s170_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s170_claude = read(REPO_ROOT / "CLAUDE.md")
+_s170_own = read(Path(__file__))
+
+# --- AC-4: control-vocabulary parity (byte-identical enumeration) ----------
+_S170_CONTROL_VOCAB = (
+    "a guard, a gate, a validation, an allowlist, an early-return, an error "
+    "handler, an auth/authz check, a rate limit, a floor, a waiver, a "
+    "kill-switch, or a flag that hides incomplete functionality"
+)
+check(
+    "suite170(ac4-vocab-parity): the canonical control-vocabulary enumeration"
+    " is byte-identical between agents/adversary.md and"
+    " agents/architect.md",
+    _S170_CONTROL_VOCAB in _s170_adversary
+    and _S170_CONTROL_VOCAB in _s170_architect,
+    "agents/adversary.md and agents/architect.md must both contain the exact"
+    " same control-vocabulary enumeration — a divergence here mis-scopes"
+    " either the design review or the adversarial attack surface",
+)
+
+# --- AC-6 (SEC-DR-F4): producer-coupling invariant, scoped fail-closed floor
+_S170_SCOPED_FLOOR = (
+    "When the task was sensitive from Stage 1 (SEC-002 was expected to run)"
+    " and the verdict is absent, this is fail-closed: `status: blocked`,"
+    " never a verdict formed without it."
+)
+_S170_ESCALATION_HANDLING = (
+    "When the task was escalated to sensitive only after Phase 1.6 (SEC-002"
+    " never ran), the absence is expected — proceed per the escalation"
+    " handling in § Session Context Protocol, never a block."
+)
+_S170_ESCALATION_MARKER = "design_review: absent (escalated post-1.6)"
+check(
+    "suite170(ac6-sec-dr-f4-scoped-floor): agents/adversary.md's fail-closed"
+    " floor is scoped to 'sensitive from Stage 1 AND verdict absent' — never"
+    " an unconditional 'absent -> blocked'",
+    _S170_SCOPED_FLOOR in _s170_adversary,
+    "agents/adversary.md must scope the fail-closed block to the"
+    " genuine-missing-artifact case only, not every absent-verdict case",
+)
+check(
+    "suite170(ac6-sec-dr-f4-escalation-handled): agents/adversary.md handles"
+    " the Phase-2-close false->true escalation path without degrading to"
+    " blocked or unavailable",
+    _S170_ESCALATION_HANDLING in _s170_adversary
+    and _S170_ESCALATION_MARKER in _s170_adversary,
+    "agents/adversary.md must proceed over the diff on the escalation path,"
+    " recording 'design_review: absent (escalated post-1.6)' and a real"
+    " verdict — never blocked, never unavailable",
+)
+
+# Self-referential guards (hygiene contract)
+check(
+    "suite170(self-ref): test file contains 'Suite 170' and"
+    " 'pipeline-cost-slimdown'",
+    "Suite 170" in _s170_own and "pipeline-cost-slimdown" in _s170_own,
+    "test file must self-reference Suite 170 and the marker"
+    " 'pipeline-cost-slimdown'",
+)
+check(
+    "suite170(registry): docs/testing.md registers 'Suite 170' and"
+    " 'pipeline-cost-slimdown'",
+    "Suite 170" in _s170_testing_md and "pipeline-cost-slimdown" in _s170_testing_md,
+    "docs/testing.md must register Suite 170 and the 'pipeline-cost-slimdown'"
+    " marker",
+)
+check(
+    "suite170(hygiene): CLAUDE.md does NOT contain 'Suite 170' (§11 hygiene"
+    " contract)",
+    "Suite 170" not in _s170_claude,
+    "CLAUDE.md must not mention Suite 170 — only docs/testing.md is the"
+    " canonical registry",
+)
+
+# Marker: pipeline-cost-slimdown
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
