@@ -3,7 +3,7 @@
     "id": "orch-gate-handling",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "## Gate handling — you prepare and record; th:leader presents and relays",
+    "anchor": "## Gate handling \u2014 you prepare and record; th:leader presents and relays",
     "sha256": "4acf85217a5a8970d1d06345f765e642840ec8c71f22f0692b159a1b72dc836b",
     "length": 4872,
     "modal_counts": {
@@ -78,7 +78,7 @@
     "id": "orch-security-on-express",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "### Security on express (SEC-DR5-01 — mandatory, stated directly, never inferred)",
+    "anchor": "### Security on express (SEC-DR5-01 \u2014 mandatory, stated directly, never inferred)",
     "sha256": "c0785449bbab282b4eb7b0638533509220a91704786e5aa0f50d926522b40879",
     "length": 1492,
     "modal_counts": {
@@ -108,7 +108,7 @@
     "id": "orch-gate-guard-express",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "### `gate-guard` on express (no reorder, no deadlock — AC-5)",
+    "anchor": "### `gate-guard` on express (no reorder, no deadlock \u2014 AC-5)",
     "sha256": "2c88bea619d9e0f205b3c159ba3e07641a54cabf9377be54d7bce6897da072d2",
     "length": 867,
     "modal_counts": {
@@ -123,7 +123,7 @@
     "id": "orch-plan-structure-scan",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "## Phase 1.5a — Plan-Structure Scan (deterministic, T2-AC-14)",
+    "anchor": "## Phase 1.5a \u2014 Plan-Structure Scan (deterministic, T2-AC-14)",
     "sha256": "adde934992bbd10d5611b42a614ba9cebbe4c8e5a6444c2fa84f15dff0b90cc6",
     "length": 2530,
     "modal_counts": {
@@ -138,7 +138,7 @@
     "id": "orch-phase16-plan-review",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "## Phase 1.6 — Plan Review (Stage 1 closing gate)",
+    "anchor": "## Phase 1.6 \u2014 Plan Review (Stage 1 closing gate)",
     "sha256": "cf5cbe3e714da31aae1bab91c6562f33c53455014476cff415a655759f206964",
     "length": 7819,
     "modal_counts": {
@@ -153,7 +153,7 @@
     "id": "orch-stage-gate-1",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "## STAGE-GATE-1 — End of Stage 1 (mandatory human review)",
+    "anchor": "## STAGE-GATE-1 \u2014 End of Stage 1 (mandatory human review)",
     "sha256": "70fd5ed653187e0b384290f389f3458623e8bdac109fa729bdcc61d039ef122a",
     "length": 13020,
     "modal_counts": {
@@ -183,7 +183,7 @@
     "id": "orch-phase26-code-hygiene",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "## Phase 2.6 — Code-Hygiene Scan",
+    "anchor": "## Phase 2.6 \u2014 Code-Hygiene Scan",
     "sha256": "9be12d0c76bad12c7382c3fbf5221b9aa8a59050ee0cab0579792acfd4a236c8",
     "length": 1808,
     "modal_counts": {
@@ -213,7 +213,7 @@
     "id": "orch-phase35-acceptance-gate",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "## Phase 3.5 — Acceptance Gate (MANDATORY before Delivery)",
+    "anchor": "## Phase 3.5 \u2014 Acceptance Gate (MANDATORY before Delivery)",
     "sha256": "a6698c727b806bfb56db3a05acfc9512e8b359c69f9608eb9c111283e8dedc6d",
     "length": 2133,
     "modal_counts": {
@@ -228,7 +228,7 @@
     "id": "orch-phase38-audit",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "## Phase 3.8 — Pre-Delivery Security Audit (once per delivery group, conditional)",
+    "anchor": "## Phase 3.8 \u2014 Pre-Delivery Security Audit (once per delivery group, conditional)",
     "sha256": "e94b0d927d757f595a8684530db4937da328e7195d3d222ae172c437e78e6574",
     "length": 5774,
     "modal_counts": {
@@ -258,7 +258,7 @@
     "id": "orch-phase45-internal-review",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "## Phase 4.5 — Internal Review (mandatory, advisory)",
+    "anchor": "## Phase 4.5 \u2014 Internal Review (mandatory, advisory)",
     "sha256": "427b26769ddce0291f6f8dede4ed096b39156e78512403cc87e4e0c7eb1d8ab4",
     "length": 2529,
     "modal_counts": {
@@ -273,7 +273,7 @@
     "id": "orch-stage-gate-2",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "## STAGE-GATE-2 — Between rounds in Stage 2 (autonomous-skippable)",
+    "anchor": "## STAGE-GATE-2 \u2014 Between rounds in Stage 2 (autonomous-skippable)",
     "sha256": "87e711fdf978a1612cbe307f0080b8b1f16676a9d3d40889da73f9c4bd95e7e3",
     "length": 3032,
     "modal_counts": {
@@ -288,7 +288,7 @@
     "id": "orch-stage-gate-3",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "## STAGE-GATE-3 — End of Stage 3 (mandatory human approval before push)",
+    "anchor": "## STAGE-GATE-3 \u2014 End of Stage 3 (mandatory human approval before push)",
     "sha256": "723e7e2f839811118f1d1e2d72d4043ecb9506ebfee0b124ce92191232c66b65",
     "length": 5577,
     "modal_counts": {
@@ -333,7 +333,7 @@
     "id": "orch-to-specialists",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "### To specialists — always include in every invocation:",
+    "anchor": "### To specialists \u2014 always include in every invocation:",
     "sha256": "aa790577865388578f088780a5defeb3df4a6e3693d357b4e8009e9c5a2c1ab6",
     "length": 3763,
     "modal_counts": {
@@ -348,7 +348,7 @@
     "id": "leader-gate-mediation",
     "file": "agents/leader.md",
     "mode": "heading",
-    "anchor": "## Gate mediation — you present gates inline and relay decisions with attribution",
+    "anchor": "## Gate mediation \u2014 you present gates inline and relay decisions with attribution",
     "sha256": "ecae9c1b14f0209c0942d31296f42b2cc16ce8ef9aa0900d7a8ab1fe4ba84140",
     "length": 4656,
     "modal_counts": {
@@ -423,7 +423,7 @@
     "id": "leader-verify-real-scope",
     "file": "agents/leader.md",
     "mode": "heading",
-    "anchor": "### Step 1.5 — Verify real scope of external reports",
+    "anchor": "### Step 1.5 \u2014 Verify real scope of external reports",
     "sha256": "72fc03be10c122c1f3a453ea439b9792c9b3bb8f67a761edb76b0713da1569e1",
     "length": 650,
     "modal_counts": {
@@ -438,7 +438,7 @@
     "id": "leader-spawning-payload-contract",
     "file": "agents/leader.md",
     "mode": "heading",
-    "anchor": "## Spawning an orchestrator — the payload contract",
+    "anchor": "## Spawning an orchestrator \u2014 the payload contract",
     "sha256": "8227dc55f170cbf5e3570c6d2e3bff523cff60a83aea2caffa626d0ebceab95c",
     "length": 4075,
     "modal_counts": {
@@ -453,7 +453,7 @@
     "id": "leader-multitask-fanout",
     "file": "agents/leader.md",
     "mode": "heading",
-    "anchor": "## Multi-Task fan-out (same-repo, single project, 2+ tasks) — DEFAULT for 2+ tasks",
+    "anchor": "## Multi-Task fan-out (same-repo, single project, 2+ tasks) \u2014 DEFAULT for 2+ tasks",
     "sha256": "c01a957c3f3789ae2f6bce641922f61098d2955d3b12acad13fb523dc94131bb",
     "length": 6231,
     "modal_counts": {
@@ -468,7 +468,7 @@
     "id": "leader-parallel-multiproject",
     "file": "agents/leader.md",
     "mode": "heading",
-    "anchor": "## Parallel Multi-Project Dispatch (initiative, N ≥ 2 distinct repos)",
+    "anchor": "## Parallel Multi-Project Dispatch (initiative, N \u2265 2 distinct repos)",
     "sha256": "7f688ef7e3850f0b437031bec655cbc52a3933bf7dd3ddab39b904a241a40e81",
     "length": 3649,
     "modal_counts": {
@@ -498,7 +498,7 @@
     "id": "deliv-step0-acceptance-gate",
     "file": "agents/delivery.md",
     "mode": "heading",
-    "anchor": "### Step 0 — Acceptance Gate (MANDATORY, abort if it fails)",
+    "anchor": "### Step 0 \u2014 Acceptance Gate (MANDATORY, abort if it fails)",
     "sha256": "8e1aa9221de3f8bd00d61e0fac3ae970f7036ec03979163c6173f4a4b111227d",
     "length": 6090,
     "modal_counts": {
@@ -513,7 +513,7 @@
     "id": "deliv-mode-publish",
     "file": "agents/delivery.md",
     "mode": "heading",
-    "anchor": "## Mode: publish (Phase 4b — outward actions, dispatched only after `gate3_release: ship`)",
+    "anchor": "## Mode: publish (Phase 4b \u2014 outward actions, dispatched only after `gate3_release: ship`)",
     "sha256": "b692f0308c75e640deca882a1e1a8c25d3c6ac65dc945e5f4679cc7400eccd89",
     "length": 8243,
     "modal_counts": {
@@ -528,7 +528,7 @@
     "id": "deliv-step10-1",
     "file": "agents/delivery.md",
     "mode": "heading",
-    "anchor": "### Step 10.1 — MANDATORY pre-push check (never skip this)",
+    "anchor": "### Step 10.1 \u2014 MANDATORY pre-push check (never skip this)",
     "sha256": "234b6467652d748e84d035f7a1838bbbea368c1088e10432e2767683410e8317",
     "length": 842,
     "modal_counts": {
@@ -543,7 +543,7 @@
     "id": "deliv-step10-2",
     "file": "agents/delivery.md",
     "mode": "heading",
-    "anchor": "### Step 10.2 — Push",
+    "anchor": "### Step 10.2 \u2014 Push",
     "sha256": "440cfca7947a6578d4178ffaf916d8328c6652c2b6dcef15b06b87cee4f781b0",
     "length": 770,
     "modal_counts": {
@@ -558,7 +558,7 @@
     "id": "deliv-preflight-quality-gates",
     "file": "agents/delivery.md",
     "mode": "heading",
-    "anchor": "### Pre-flight quality gates (mandatory — run before `create_nodes`)",
+    "anchor": "### Pre-flight quality gates (mandatory \u2014 run before `create_nodes`)",
     "sha256": "b679254f5d10c56adb8893a9614da7f730add6d30ef4e697a34e09f3e088b4eb",
     "length": 2869,
     "modal_counts": {
@@ -603,7 +603,7 @@
     "id": "arch-classification-step1",
     "file": "agents/architect.md",
     "mode": "heading",
-    "anchor": "### Step 1 — Record the classification block",
+    "anchor": "### Step 1 \u2014 Record the classification block",
     "sha256": "4529e7412a5c8e9ee413259434b3e28f5d2c9eea2a0fa987111b5905fef8abe9",
     "length": 5885,
     "modal_counts": {
@@ -648,7 +648,7 @@
     "id": "arch-channel3-stale-scope",
     "file": "agents/architect.md",
     "mode": "heading",
-    "anchor": "### Channel 3 — Stale external-report scope (architect → plan)",
+    "anchor": "### Channel 3 \u2014 Stale external-report scope (architect \u2192 plan)",
     "sha256": "2c2382584c6bba3c9bc31a04b6a6dfc12547f5da09f8cbad294b2fa8c5ce3333",
     "length": 1217,
     "modal_counts": {
@@ -739,8 +739,8 @@
     "file": "CLAUDE.md",
     "mode": "heading",
     "anchor": "## 5. Architectural Conventions",
-    "sha256": "bbf268ff8c795a615a172f4e1e4c7aa9f19546b4a7da082c091744d9da977c38",
-    "length": 7185,
+    "sha256": "1ef7dfcb643e5163ffded52b4f2b69633490c3afb89ae03fc99dc0d83519cdd6",
+    "length": 7604,
     "modal_counts": {
       "MUST NOT": 1,
       "MUST": 1,
@@ -889,8 +889,8 @@
     "file": "docs/dev-mode.md",
     "mode": "heading",
     "anchor": "## Outward-Action Gate (`dev-guard`)",
-    "sha256": "0048b10072c468a7cfefdb79e66f3d5067ba8fe29dfd382b0fddf5b1ef93bb7b",
-    "length": 22329,
+    "sha256": "74a59c30de029b41849fb0a2831639f410ea444f0aab1e42fb3f30d26e29dc06",
+    "length": 22587,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -993,8 +993,8 @@
     "id": "gate-contract-whole",
     "file": "agents/_shared/gate-contract.md",
     "mode": "file",
-    "sha256": "814f971065ba6ed5cdda572a34b8aafcbc0ca03dc61d301779a5c3b178175f5d",
-    "length": 27966,
+    "sha256": "24a5cad9038786261ec55859044c2da0740432f62d99f5ba3d67d5d28f63a058",
+    "length": 28596,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
