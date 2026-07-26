@@ -92,6 +92,17 @@ Multipliers are relative to the base input token price for the same model. These
 
 The pipeline's larger agent prompts (orchestrator, architect, the verifier agents) are well above the 4,096-token Opus minimum, so they cache; a very small standalone prompt may fall below the threshold and silently not cache.
 
+## Measured reductions — dispatch-cost-reduction (Task-2)
+
+`CLAUDE.md` is re-injected into the project-context cache layer on every dispatch cold start (`§ Three cache layers` above) — the largest per-dispatch multiplier of any single file in the harness, since every other large prompt (`orchestrator.md`, `delivery.md`, `architect.md`, `leader.md`) loads once or twice per run while `CLAUDE.md` loads once per dispatch.
+
+| Metric | Before | After | Delta |
+|---|---|---|---|
+| `CLAUDE.md` size (`wc -c`) | 34,862 bytes (~8.5K tokens) | 34,413 bytes (~8.4K tokens) | −449 bytes (−1.3%) |
+| Estimated per-run cost (× ~39 dispatches, `pipeline-cost-slimdown` telemetry, PR #520) | ~330K tokens | ~326.5K tokens | ~−3.5K tokens/run |
+
+**Why the delta is small, and why that is the expected — not a diluted — result.** This task had two deliverables in a fixed order: build the fenced-surface guard (Work Plan Step 5, `tests/fixtures/fenced/manifest.json` + `tests/test_agent_structure.py` Suite 174 — 71 canonical snapshots covering every row of `01-plan.md § Multi-site invariants — Clase B` across `orchestrator.md`, `leader.md`, `delivery.md`, `architect.md`, `CLAUDE.md`, and their `_shared/`/`docs/` co-sites), then reduce `CLAUDE.md` density on whatever survives outside that fenced surface (Step 6). The fenced rows in `CLAUDE.md` itself — §5, §6.2, §6.4, §6.5, §6.6, §10, §15 — are the sections with the highest floor-per-line density in the file and are **intocable sin excepción**; the reducible surface is only what is left (§1-§4, §6.1, §7, §7b-§16 minus the fenced subsections), and most of that surface was already lean from prior slimming rounds (§6.3, §7b, §11, §13 are already one-line pointers; §2-§4 are golden-reference tables/trees a model cannot infer). Three genuine, low-risk cuts were found and applied (see `02-implementation.md § Task-2` for the per-item log); no further cut was forced to hit a number, per this plan's explicit "no byte target" decision (`01-plan.md § Trade-offs`).
+
 ## Known issue — TTL regression
 
 Claude Code issue 46829 (https://github.com/anthropics/claude-code/issues/46829) documents a regression in which the default cache TTL silently dropped from 1 hour to 5 minutes for a period in early 2026, inflating cache-creation cost by roughly 20–32% on subscription plans. The issue was closed as "not planned." Periodically confirm the `cache_read_input_tokens` ratio (via the statusline `current_usage` object) is consistent with expected behavior; a sudden drop in hit rate can indicate a TTL regression of this kind.

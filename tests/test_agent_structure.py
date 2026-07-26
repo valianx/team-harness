@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import os
@@ -38033,6 +38034,341 @@ check(
     "Suite 173" not in _s173_claude,
     "CLAUDE.md must not mention Suite 173 — only docs/testing.md is the"
     " canonical registry",
+)
+
+# Marker: dispatch-cost-reduction
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 174 — Fenced-surface guard: Class-B canonical snapshots, pointer
+# integrity, and incoming-anchor resolution (Task-2, Work Plan Step 5)
+#
+# Built BEFORE any CLAUDE.md density reduction (Step 6) and before Task-4's
+# reduction pass over orchestrator.md/leader.md/delivery.md/architect.md —
+# nothing in this plan may remove a check this suite adds (Work Plan Notes,
+# "no-relaxation rule"). Protects every row of 01-plan.md § "Multi-site
+# invariants — Clase B" with a byte-exact SHA-256 snapshot rather than a
+# substring-presence check, so a MUST->SHOULD softening, a moved threshold,
+# or a shrunk enumeration fails even when the section heading and most of
+# its prose survive untouched. Canonical snapshots live in
+# tests/fixtures/fenced/manifest.json (one entry per row); a legitimate
+# future edit to fenced content requires a reviewed, deliberate update of
+# that manifest, never a silent hash drift.
+#
+# Marker: dispatch-cost-reduction
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 174: fenced-surface guard (Class-B canonical snapshots) ===")
+
+_S174_MANIFEST_PATH = REPO_ROOT / "tests" / "fixtures" / "fenced" / "manifest.json"
+_s174_manifest = json.loads(_S174_MANIFEST_PATH.read_text(encoding="utf-8"))
+
+_S174_REF_AND_SHARED_FILES = sorted(AGENTS_DIR.glob("ref-*.md")) + sorted(
+    (AGENTS_DIR / "_shared").glob("*.md")
+)
+
+
+def _s174_ref_shared_corpus_excluding(own_path: Path) -> str:
+    """The ref-*.md/_shared/*.md corpus, minus a block's own source file —
+    a block whose canonical home already IS one of these files would
+    otherwise trivially 'find itself' and fail a check meant to catch
+    RELOCATION into a different file."""
+    return "\n".join(
+        _read_or_empty(p) for p in _S174_REF_AND_SHARED_FILES if p.resolve() != own_path.resolve()
+    )
+
+_s174_file_cache: dict[str, str] = {}
+
+
+def _s174_read_cached(rel_path: str) -> str:
+    if rel_path not in _s174_file_cache:
+        _s174_file_cache[rel_path] = read(REPO_ROOT / rel_path)
+    return _s174_file_cache[rel_path]
+
+
+def _s174_slice(entry: dict) -> str:
+    """Re-derive the current live slice for one manifest entry, using the
+    same heading-nesting convention the manifest was generated with: a
+    `## ` anchor extends to the next `## ` (nested `### ` subsections stay
+    inside it — the standard Markdown nesting reading), a `### ` anchor
+    stops at the next `### ` OR `## `, whichever comes first."""
+    text = _s174_read_cached(entry["file"])
+    if entry["mode"] == "file":
+        return text
+    if entry["mode"] == "heading":
+        anchor = entry["anchor"]
+        stops = (
+            ("\n## ", "\n---\n")
+            if anchor.startswith("## ")
+            else ("\n## ", "\n### ", "\n---\n")
+        )
+        return _slice_section(text, anchor, stops)
+    # mode == "literal": bounded by an explicit start substring and end marker
+    idx = text.find(entry["start"])
+    if idx == -1:
+        return ""
+    tail = text[idx:]
+    pos = tail.find(entry["end"], len(entry["start"]))
+    return tail if pos == -1 else tail[:pos]
+
+
+_S174_CASE_SENSITIVE_MODALS = ("MUST NOT", "MUST", "NEVER")
+_S174_CASE_INSENSITIVE_MODALS = ("unconditionally", "non-waivable")
+
+
+def _s174_modal_counts(text: str) -> dict:
+    counts = {tok: len(re.findall(re.escape(tok), text)) for tok in _S174_CASE_SENSITIVE_MODALS}
+    counts.update(
+        {
+            tok: len(re.findall(re.escape(tok), text, re.IGNORECASE))
+            for tok in _S174_CASE_INSENSITIVE_MODALS
+        }
+    )
+    return counts
+
+
+# --- Per-block checks: byte-snapshot, modal-token preservation, no-relocation
+for _s174_entry in _s174_manifest:
+    _s174_current_slice = _s174_slice(_s174_entry)
+    _s174_current_hash = hashlib.sha256(_s174_current_slice.encode("utf-8")).hexdigest()
+    check(
+        f"suite174(fenced-snapshot): {_s174_entry['id']} ({_s174_entry['file']}) unchanged"
+        " byte-for-byte against its canonical snapshot",
+        _s174_current_hash == _s174_entry["sha256"],
+        f"{_s174_entry['file']} block '{_s174_entry['id']}' no longer matches"
+        " tests/fixtures/fenced/manifest.json — any legitimate edit to fenced Class-B"
+        " content requires a reviewed, deliberate snapshot update, never a silent drift",
+    )
+
+    _s174_current_modal = _s174_modal_counts(_s174_current_slice)
+    _s174_modal_ok = all(
+        _s174_current_modal[_tok] >= _count
+        for _tok, _count in _s174_entry["modal_counts"].items()
+    )
+    check(
+        f"suite174(modal-preservation): {_s174_entry['id']} keeps modal-token counts >= canonical",
+        _s174_modal_ok,
+        f"{_s174_entry['id']} modal-token count dropped below canonical"
+        f" ({_s174_entry['modal_counts']} -> {_s174_current_modal}) — a shrinking"
+        " MUST/MUST NOT/NEVER/unconditionally/non-waivable count is the softening"
+        " signature a byte-snapshot alone would still catch, but this makes the"
+        " specific failure mode explicit in the failure message",
+    )
+
+    if _s174_entry["mode"] != "file" and _s174_current_slice.strip():
+        _s174_corpus_for_entry = _s174_ref_shared_corpus_excluding(
+            REPO_ROOT / _s174_entry["file"]
+        )
+        check(
+            f"suite174(no-relocation): {_s174_entry['id']}'s canonical body is absent from"
+            " every OTHER agents/ref-*.md and agents/_shared/*.md file",
+            _s174_current_slice not in _s174_corpus_for_entry,
+            f"{_s174_entry['id']}'s fenced body must not be duplicated or relocated into a"
+            " different ref-*.md or _shared/*.md file — a corpus-wide existence check would"
+            " read that relocation as 'still present' and pass vacuously",
+        )
+
+# --- Meta-check: no check in THIS suite reads the concatenated multi-file
+# corpus instead of a single named file's own read(path) — split the forbidden
+# token so this very check does not match its own source line ------------
+_s174_own_source = read(Path(__file__))
+_s174_suite_start = _s174_own_source.find("Suite 174: fenced-surface guard")
+_s174_suite_end = _s174_own_source.find("Marker: dispatch-cost-reduction", _s174_suite_start)
+_s174_suite_body = (
+    _s174_own_source[_s174_suite_start:_s174_suite_end] if _s174_suite_start != -1 else ""
+)
+_S174_FORBIDDEN_TOKEN = "SPLIT" + "_CORPUS"
+check(
+    "suite174(meta-no-split-corpus): no fenced-guard check in this suite reads the"
+    " multi-file SPLIT_CORPUS constant",
+    _S174_FORBIDDEN_TOKEN not in _s174_suite_body,
+    "a fenced check that reads the concatenated multi-file corpus instead of read(path)"
+    " on a single named file would let a relocation into a ref-*.md/_shared/*.md file"
+    " pass vacuously — see tests/test_agent_structure.py:70-98",
+)
+
+# --- Canary: a deliberately softened copy must FAIL the snapshot guard,
+# proving the guard cannot pass vacuously (docs/permission-provisioning.md's
+# own anti-false-green discipline, mirrored here) ---------------------------
+_s174_canary_entry = next(e for e in _s174_manifest if e["id"] == "orch-dispatch-invariants")
+_s174_canary_original = _s174_slice(_s174_canary_entry)
+_s174_canary_mutated = _s174_canary_original.replace("never", "avoid", 1)
+check(
+    "suite174(canary): a deliberately softened copy (never->avoid) of a fenced block"
+    " fails the snapshot guard",
+    _s174_canary_mutated != _s174_canary_original
+    and hashlib.sha256(_s174_canary_mutated.encode("utf-8")).hexdigest() != _s174_canary_entry["sha256"],
+    "the canonical-snapshot guard must reject a mutated copy of fenced text — if this"
+    " ever passes vacuously the guard itself has degenerated into a no-op",
+)
+
+# --- Enumeration-by-literal: the Phase-2-close backstop's 23 `-e` keyword
+# entries (counted against the live file, never hand-copied) ----------------
+_s174_backstop_entry = next(e for e in _s174_manifest if e["id"] == "orch-phase2close-backstop")
+_s174_backstop_slice = _s174_slice(_s174_backstop_entry)
+_S174_BACKSTOP_KEYWORDS = (
+    "auth(entication|entic|oriz(e|ation))", r"\blogin\b", r"\bcredential", r"\bpassword\b",
+    "permission", "role[_-]?(based|check)", r"\bacl\b", r"\bsecret", "api[_-]?key",
+    "private[_-]?key", r"\bpayment", "card[_-]?number", r"\bbilling\b", r"\bstripe\b",
+    r"\bpii\b", r"\bssn\b", "social[_-]?security", "personal[_-]?data", r"\bsql\b",
+    r"exec\(", r"eval\(", "deserialize", "template[_-]?inject",
+)
+check(
+    "suite174(enum-backstop-keyword-count): Phase 2-close backstop keeps exactly 23"
+    " `-e` keyword entries",
+    len(_S174_BACKSTOP_KEYWORDS) == 23,
+    "this test's own literal keyword tuple must enumerate 23 entries — count against"
+    " agents/orchestrator.md:964-986 if this ever fails",
+)
+_s174_missing_backstop_keywords = [
+    kw for kw in _S174_BACKSTOP_KEYWORDS if f"-e '{kw}'" not in _s174_backstop_slice
+]
+check(
+    "suite174(enum-backstop-keywords-present): every one of the 23 backstop keyword"
+    " entries is present, by literal, in the live section",
+    not _s174_missing_backstop_keywords,
+    f"missing backstop keyword entries: {_s174_missing_backstop_keywords}",
+)
+
+# --- Enumeration-by-literal: the four named hook floors in CLAUDE.md §5 ----
+_s174_claude5_entry = next(e for e in _s174_manifest if e["id"] == "claude-md-5-conventions")
+_s174_claude5_slice = _s174_slice(_s174_claude5_entry)
+_S174_HOOK_NAMES = ("policy-block", "checkpoint-guard", "gate-guard", "dev-guard")
+_s174_missing_hooks = [h for h in _S174_HOOK_NAMES if h not in _s174_claude5_slice]
+check(
+    "suite174(enum-hook-names): CLAUDE.md §5 names all four enforcement hooks"
+    " (policy-block, checkpoint-guard, gate-guard, dev-guard)",
+    not _s174_missing_hooks,
+    f"missing hook names in CLAUDE.md §5: {_s174_missing_hooks}",
+)
+
+# --- Enumeration-by-literal: gate_nonce freshness AND single-use, as a pair -
+_s174_gate_contract_entry = next(e for e in _s174_manifest if e["id"] == "gate-contract-whole")
+_s174_gate_contract_text = _s174_slice(_s174_gate_contract_entry)
+check(
+    "suite174(enum-gate-nonce-pair): agents/_shared/gate-contract.md states both the"
+    " nonce's freshness property AND its single-use property",
+    "freshness" in _s174_gate_contract_text and "single-use" in _s174_gate_contract_text,
+    "gate-contract.md must keep both 'freshness' and 'single-use' — dropping either"
+    " half of the pair changes what the nonce actually guarantees",
+)
+
+# --- Enumeration-by-literal: the three fail-closed clauses of
+# security_floor_applies ------------------------------------------------------
+_s174_floor_entry = next(e for e in _s174_manifest if e["id"] == "orch-phase3-floor-predicate")
+_s174_floor_slice = _s174_slice(_s174_floor_entry)
+_S174_FLOOR_CLAUSES = (
+    "absent or doubtful",
+    "NEVER interpreted",
+    "never gated, ANDed, or overridden by",
+)
+_s174_missing_floor_clauses = [c for c in _S174_FLOOR_CLAUSES if c not in _s174_floor_slice]
+check(
+    "suite174(enum-floor-fail-closed-clauses): all three fail-closed clauses of"
+    " security_floor_applies are present",
+    not _s174_missing_floor_clauses,
+    f"missing fail-closed clause(s) in the Single shared Phase-3 floor predicate:"
+    f" {_s174_missing_floor_clauses}",
+)
+
+# --- Pointer integrity (Task-2 AC-4): every backtick-quoted `docs/*.md`
+# reference inside CLAUDE.md resolves to a real file, and any reference of
+# the form `docs/file.md § Section Name` resolves to a real anchor inside
+# that file --------------------------------------------------------------
+_s174_claude_md_full = _s174_read_cached("CLAUDE.md")
+_S174_DOCS_POINTER_RE = re.compile(r"`(docs/[a-zA-Z0-9_/-]+\.md)(?: § ([^`]+))?`")
+_s174_pointer_failures = []
+for _s174_match in _S174_DOCS_POINTER_RE.finditer(_s174_claude_md_full):
+    _s174_doc_path, _s174_section = _s174_match.group(1), _s174_match.group(2)
+    _s174_doc_file = REPO_ROOT / _s174_doc_path
+    if not _s174_doc_file.exists():
+        _s174_pointer_failures.append(f"{_s174_doc_path} does not exist")
+        continue
+    if _s174_section:
+        _s174_doc_text = _s174_read_cached(_s174_doc_path)
+        # A quoted section name may itself carry a trailing clause (e.g.
+        # "Document classification") or be wrapped in literal quote marks
+        # (e.g. `docs/x.md § "Some Section"`); require only its leading
+        # words to resolve, since some pointers append a short qualifier
+        # after the anchor's own title.
+        _s174_section_stripped = _s174_section.strip().strip('"').strip("'")
+        _s174_section_head = _s174_section_stripped.split(" — ")[0].split(", ")[0]
+        # Citations sometimes drop the backticks a heading wraps around an
+        # inline code term (e.g. "(gate-guard)" citing "(`gate-guard`)") —
+        # that is style noise, not a broken pointer, so compare with
+        # backticks stripped from both sides.
+        if _s174_section_head.replace("`", "") not in _s174_doc_text.replace("`", ""):
+            _s174_pointer_failures.append(
+                f"{_s174_doc_path} has no section matching {_s174_section_head!r}"
+            )
+check(
+    "suite174(ac4-pointer-integrity): every `docs/*.md` pointer in CLAUDE.md resolves"
+    " to an existing file, and every quoted section resolves inside it",
+    not _s174_pointer_failures,
+    f"broken CLAUDE.md pointer(s): {_s174_pointer_failures}",
+)
+
+# --- Incoming-anchor guard (Task-2 AC-4): known external citations of an
+# exact section name inside orchestrator.md/leader.md still resolve, not
+# just the pointers Task-2 itself creates -----------------------------------
+_S174_INCOMING_ANCHORS = (
+    ("agents/adversary.md", "agents/orchestrator.md", "Re-audit on amend"),
+    ("agents/adversary.md", "agents/orchestrator.md", "Phase 3.8"),
+    ("agents/delivery.md", "agents/orchestrator.md", "Phase 4b — Delivery (publish)"),
+    ("agents/delivery.md", "agents/orchestrator.md", "Phase 4a — Delivery (prepare)"),
+    ("agents/delivery.md", "agents/orchestrator.md", "Express Lane Profile"),
+    ("agents/leader.md", "agents/orchestrator.md", "Phase 1.8 — Post-approval Plan-Review Offer"),
+    ("agents/leader.md", "agents/orchestrator.md", "Phase 1 — Design"),
+    ("agents/plan-reviewer.md", "agents/orchestrator.md", "Self-authored-plan panel carve-out"),
+    ("agents/plan-reviewer.md", "agents/orchestrator.md", "Phase 1.6 — Plan Review"),
+    ("agents/plan-reviewer.md", "agents/orchestrator.md",
+     "Correction-classification — selective panel re-firing"),
+    ("agents/qa-plan.md", "agents/orchestrator.md", "Phase 1.5 — Plan Ratification"),
+    ("agents/ref-special-flows.md", "agents/orchestrator.md",
+     "Single shared Phase-3 floor predicate"),
+    ("agents/ref-special-flows.md", "agents/orchestrator.md", "Test-phase consolidation"),
+    ("agents/_shared/gate-contract.md", "agents/orchestrator.md", "STAGE-GATE-1 — End of Stage 1"),
+    ("docs/dev-mode.md", "agents/orchestrator.md", "Phase 3.8 — Pre-Delivery Security Audit"),
+    ("docs/patch-mode.md", "agents/orchestrator.md", "If any agent fails → ITERATE"),
+    ("docs/patch-mode.md", "agents/orchestrator.md",
+     "Correction-classification — selective panel re-firing"),
+    ("docs/observability.md", "agents/orchestrator.md", "Flow Telemetry Emission"),
+    ("docs/knowledge.md", "agents/orchestrator.md", "Workspaces: what you own"),
+    ("docs/knowledge.md", "agents/leader.md", "Multi-Task fan-out"),
+    ("docs/knowledge.md", "agents/leader.md", "Consolidated delivery"),
+    ("agents/ref-direct-modes.md", "agents/orchestrator.md",
+     "Phase 1.8 — Post-approval Plan-Review Offer"),
+    ("agents/tester.md", "agents/orchestrator.md", "Express Lane Profile"),
+)
+_s174_broken_incoming_anchors = []
+for _s174_src, _s174_dst, _s174_text in _S174_INCOMING_ANCHORS:
+    if _s174_text not in _s174_read_cached(_s174_dst):
+        _s174_broken_incoming_anchors.append(f"{_s174_src} -> {_s174_dst} § {_s174_text!r}")
+check(
+    "suite174(ac4-incoming-anchors): known external citations of an exact section name"
+    " inside the four Class-B files still resolve",
+    not _s174_broken_incoming_anchors,
+    f"broken incoming anchor(s): {_s174_broken_incoming_anchors}",
+)
+
+# --- Self-referential guards (hygiene contract) -----------------------------
+_s174_own = read(Path(__file__))
+_s174_testing_md = _s174_read_cached("docs/testing.md")
+_s174_claude_hygiene = _s174_read_cached("CLAUDE.md")
+check(
+    "suite174(self-ref): test file contains 'Suite 174' and 'dispatch-cost-reduction'",
+    "Suite 174" in _s174_own and "dispatch-cost-reduction" in _s174_own,
+    "test file must self-reference Suite 174 and the marker 'dispatch-cost-reduction'",
+)
+check(
+    "suite174(registry): docs/testing.md registers 'Suite 174' and 'dispatch-cost-reduction'",
+    "Suite 174" in _s174_testing_md and "dispatch-cost-reduction" in _s174_testing_md,
+    "docs/testing.md must register Suite 174 and the 'dispatch-cost-reduction' marker",
+)
+check(
+    "suite174(hygiene): CLAUDE.md does NOT contain 'Suite 174' (§11 hygiene contract)",
+    "Suite 174" not in _s174_claude_hygiene,
+    "CLAUDE.md must not mention Suite 174 — only docs/testing.md is the canonical registry",
 )
 
 # Marker: dispatch-cost-reduction

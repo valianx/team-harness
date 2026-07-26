@@ -1,0 +1,9 @@
+### Changed
+
+- **Subagent-nesting-depth prerequisite provisioned from both lifecycle commands.** `/th:setup` and `/th:update` now offer to provision `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: "2"` in `~/.claude/settings.json` (already-present → silent pass-through; absent → Y/n gated write with a durable decline record). Restores nested `Task` retention for `th:orchestrator`, so the pipeline no longer degrades to the `dispatch_handoff` relay by default. The relay remains a fully-supported fallback for any runtime or configuration where nesting is not provisioned. Nesting-related documentation (`CLAUDE.md`, `docs/subagent-orchestration.md`, the `orchestrator-dispatch-rule` managed block, `docs/troubleshooting.md`) now describes the relay as a fallback, never the normal state.
+- **`CLAUDE.md` reduced to repo-specific gotchas** where the reduction was safe to apply without touching any control-, gate-, or security-relevant content — three small duplicated-prose cuts (a restated GitHub-fallback detail, a restated `hooks/` ownership rule, and a restated Voice-guide rationale paragraph), each pointed at its existing canonical `docs/` home instead.
+
+### Added
+
+- **Fenced-surface guard for the pipeline's Class-B control surface** (`tests/test_agent_structure.py` Suite 174, `tests/fixtures/fenced/manifest.json`): 71 canonical byte-snapshots covering every control/gate/security-relevant block across `agents/orchestrator.md`, `agents/leader.md`, `agents/delivery.md`, `agents/architect.md`, `CLAUDE.md`, and their `_shared/`/`docs/` co-sites, so a future density-reduction pass cannot soften a `MUST`, shrink an enumeration, or relocate fenced content into a `ref-*.md`/`_shared/*.md` file without the guard failing — even when a substring-presence check would still pass.
+- `docs/cost-and-caching.md § Measured reductions` — before/after `CLAUDE.md` size table and the per-run token-savings estimate.
