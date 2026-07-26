@@ -30629,9 +30629,14 @@ check(
     "Bash found in adversary.md tools — adversary must be read-only (AC-15)",
 )
 check(
-    "s125/AC-15i: adversary.md tools EXCLUDES Edit",
-    "Edit" not in _s125_adv_tools,
-    "Edit found in adversary.md tools — adversary must not modify source (AC-15)",
+    "s125/AC-15i: adversary.md tools includes Edit",
+    "Edit" in _s125_adv_tools,
+    "Edit not in adversary.md tools — needed to amend its own report in place (AC-15)",
+)
+check(
+    "s125/AC-15i2: adversary.md declares the write-scope limit",
+    "Write-scope limit — your own working file only" in _s125_adv,
+    "adversary.md must state the write-scope limit — Edit is granted for its own report only (AC-15)",
 )
 
 # -------------------------------------------------------------------

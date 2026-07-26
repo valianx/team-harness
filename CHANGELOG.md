@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.138.1] - 2026-07-26
+
+### Fixed
+- **`plan-reviewer` and `adversary` now declare `Edit`.** Both contracts require updating a file in place — `plan-reviewer` replaces the `**Reviews:**` attestation line in `01-plan.md` and appends its section to the shared `reviews/01-plan-review.md`; `adversary` amends its own report — but both declared `Write` alone, leaving whole-file regeneration as the only reachable mechanism for a one-line change. That is what killed a `plan-reviewer` round on the 64K output cap, and the same rewrite would have silently destroyed a concurrent reviewer's appended findings. An agent that can only rewrite either rewrites badly or blocks; instructing it to "edit in place" without the tool is an unreachable remedy. `Write` is retained for each agent's documented initial file creation, and `Edit` is strictly narrower in blast radius than the `Write` both already had, so neither gains reach over any file it could not already write.
+
+### Changed
+- **`adversary`'s source-immutability guarantee moved from tool absence to an explicit write-scope limit.** The agent previously could not modify source because it lacked `Edit`; `tests/test_agent_structure.py` asserted that absence directly. With `Edit` granted, `agents/adversary.md` now states the limit as contract — its two report paths are the only files it may write or edit, and it never touches source, tests, configuration, another agent's report, or any shared review file — and the structural assertion was retargeted from the tool list to that declared limit. The guarantee is unchanged; what enforces it is now a stated contract plus a test, rather than a missing capability.
+
 ## [2.138.0] - 2026-07-26
 
 ### Changed
