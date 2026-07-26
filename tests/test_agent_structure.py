@@ -29072,13 +29072,17 @@ for _floor_name in _S117_FLOORS:
         f".claude-plugin/hooks.json PreToolUse must still route through the launcher to '{_floor_name}' (additive-wiring regression guard)",
     )
 for _unwired_name in _S117_UNWIRED:
+    # Scan EVERY event, not just PreToolUse: the contract is that no event
+    # dispatches these, so a registration under SessionStart or PreCompact
+    # would violate it just as surely as a PreToolUse entry.
     _hj_unwired_present = any(
         any(invokes_launcher(h.get("command", ""), _unwired_name) for h in entry.get("hooks", []))
-        for entry in _hj_pretooluse
+        for _event_entries in _s117_hj_hooks.values()
+        for entry in _event_entries
     )
     check(
         f"suite117(ac11-unwired-{_unwired_name}-hooks-json): "
-        f"hooks.json PreToolUse does NOT have {_unwired_name}",
+        f"hooks.json does NOT register {_unwired_name} under ANY event",
         not _hj_unwired_present,
         f"'{_unwired_name}' is unwired as of v2.139.0 and must not be routed from "
         f".claude-plugin/hooks.json — re-wiring it is a deliberate decision, not a silent restore",

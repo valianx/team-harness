@@ -889,8 +889,8 @@
     "file": "docs/dev-mode.md",
     "mode": "heading",
     "anchor": "## Outward-Action Gate (`dev-guard`)",
-    "sha256": "0048b10072c468a7cfefdb79e66f3d5067ba8fe29dfd382b0fddf5b1ef93bb7b",
-    "length": 22329,
+    "sha256": "74a59c30de029b41849fb0a2831639f410ea444f0aab1e42fb3f30d26e29dc06",
+    "length": 22587,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
