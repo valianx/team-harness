@@ -2284,13 +2284,22 @@ policy_checks = [
 for label, condition in policy_checks:
     check(f"docs/kg-content-policy.md: {label}", condition)
 
-# --- orchestrator.md: session_start in Phase 0a, session_end in Phase 6 ---
+# --- session lifecycle: session_start owned by leader.md (Phase 0a), session_end
+# owned by orchestrator.md (Phase 6) — per agents/_shared/kg-write-policy.md
+# § "Session attribution". These two frontmatter checks read each file
+# directly rather than `orch` (= SPLIT_CORPUS): `orch.split("---", 2)[1]`
+# resolves to leader.md's frontmatter block (leader.md is first in
+# _SPLIT_CORPUS_FILES), not orchestrator.md's, so a check anchored on that
+# slice silently validates the wrong file's frontmatter.
+
+_leader_frontmatter = read(AGENTS_DIR / "leader.md").split("---", 2)[1]
+_orch_frontmatter = read(AGENTS_DIR / "orchestrator.md").split("---", 2)[1]
 
 orch_session_checks = [
-    ("orchestrator.md frontmatter declares mcp__memory__session_start",
-     "mcp__memory__session_start" in orch.split("---", 2)[1]),
-    ("orchestrator.md frontmatter declares mcp__memory__session_end",
-     "mcp__memory__session_end" in orch.split("---", 2)[1]),
+    ("leader.md frontmatter declares mcp__memory__session_start (session open)",
+     "mcp__memory__session_start" in _leader_frontmatter),
+    ("orchestrator.md frontmatter declares mcp__memory__session_end (session close)",
+     "mcp__memory__session_end" in _orch_frontmatter),
     ("Phase 0a calls session_start before search_nodes",
      "session_start" in orch and "1b" in orch),
     ("Phase 0a writes session.json",
@@ -25759,11 +25768,15 @@ check(
     "skills/lint/SKILL.md must document both '--against' and '--changed' arguments",
 )
 
-# (12) lint summary denominator updated to 10 (positive) AND old '/ 8' is absent (negative)
+# (12) lint summary denominator updated to 11 (positive) AND old '/ 8' and stale
+# '/ 10' are both absent (negative) — dispatch-cost-reduction (Task-3) added
+# Check 11 (tools/MCP allowlist minimality), bumping the tally from 10 to 11.
 check(
-    "suite104(12-denominator-10): lint SKILL.md contains '/ 10 checks passed' and does NOT contain '/ 8 checks passed'",
-    "/ 10 checks passed" in _s104_lint and "/ 8 checks passed" not in _s104_lint,
-    "skills/lint/SKILL.md must declare '/ 10 checks passed' and must NOT contain '/ 8 checks passed'",
+    "suite104(12-denominator-11): lint SKILL.md contains '/ 11 checks passed' and does NOT contain '/ 10 checks passed' or '/ 8 checks passed'",
+    "/ 11 checks passed" in _s104_lint
+    and "/ 10 checks passed" not in _s104_lint
+    and "/ 8 checks passed" not in _s104_lint,
+    "skills/lint/SKILL.md must declare '/ 11 checks passed' and must NOT contain the stale '/ 10' or '/ 8' denominators",
 )
 
 # (13) lint Output Format includes Check 9 and Check 10 blocks
@@ -38369,6 +38382,168 @@ check(
     "suite174(hygiene): CLAUDE.md does NOT contain 'Suite 174' (§11 hygiene contract)",
     "Suite 174" not in _s174_claude_hygiene,
     "CLAUDE.md must not mention Suite 174 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: dispatch-cost-reduction
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 175 — Tools/MCP minimality guard (Task-3, Work Plan Step 8):
+# an agent's frontmatter MUST NOT grant an MCP tool (`mcp__memory__*` or
+# `mcp__context7__*`) that its own body never invokes. Anchored on both
+# sides: the frontmatter `tools:`/`mcpServers:` line (the grant) AND the
+# body text (evidence of a real call site or an explicit usage directive).
+# Matches on the SHORT tool name (e.g. `search_nodes`, not the fully-
+# qualified `mcp__memory__search_nodes`) because most agent bodies describe
+# KG/context7 usage via the bare tool name or a `## Knowledge Graph Access`
+# section, not the qualified MCP identifier — a fully-qualified-only match
+# would false-flag nearly every agent in the roster.
+#
+# Additive-only: extends the roster audit this task performed, never
+# relaxes an existing check.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 175: Tools/MCP minimality guard (frontmatter <-> body) ===")
+
+_S175_MCP_TOOL_RE = re.compile(r"mcp__(memory|context7)__([A-Za-z0-9_-]+)")
+
+# Documented, human-verified residuals this guard does NOT flag as a fresh
+# violation — each is a real finding from this task's roster audit that is
+# out of THIS task's edit scope, named here so it stays visible instead of
+# silently passing or silently failing the suite:
+_S175_KNOWN_UNUSED_MCP_GRANTS: dict[str, list[str]] = {
+    # agents/orchestrator.md's frontmatter/body belong exclusively to Task-4
+    # per 01-plan.md Work Plan Notes ("Archivo compartido -- agents/
+    # orchestrator.md: lo toca solo Task-4") -- this task may not edit
+    # either side of it, even though the roster-wide audit surfaced this
+    # grant as unused too. Flagged for Task-4 to remove alongside its
+    # density pass on this file.
+    "orchestrator.md": ["mcp__memory__read_graph"],
+    # ux-reviewer.md's body genuinely directs context7 use ("ALWAYS verify
+    # accessibility findings against WCAG 2.1 AA (use context7 for current
+    # spec)") but names the product, never the specific tool -- a real,
+    # human-verified usage this mechanical short-name matcher cannot
+    # detect. Kept per Task-3 AC-2's case-by-case evaluation rather than
+    # removed on the matcher's say-so alone.
+    "ux-reviewer.md": ["mcp__context7__query-docs", "mcp__context7__resolve-library-id"],
+}
+
+
+def _s175_frontmatter_block(text: str) -> str:
+    if not text.startswith("---"):
+        return ""
+    end = text.find("\n---", 3)
+    return text[3:end] if end > 0 else ""
+
+
+def _s175_body(text: str) -> str:
+    if not text.startswith("---"):
+        return text
+    end = text.find("\n---", 3)
+    return text[end + 4:] if end > 0 else text
+
+
+def _s175_declared_mcp_tools(frontmatter_block: str) -> set[tuple[str, str]]:
+    return set(_S175_MCP_TOOL_RE.findall(frontmatter_block))
+
+
+def _s175_unused_mcp_grants(frontmatter_block: str, body: str) -> list[str]:
+    """MCP tools this frontmatter grants that the body never mentions by
+    short name (`search_nodes`) or by fully-qualified name
+    (`mcp__memory__search_nodes`) — either counts as invoked."""
+    declared = _s175_declared_mcp_tools(frontmatter_block)
+    unused = []
+    for server, tool in declared:
+        qualified = f"mcp__{server}__{tool}"
+        if tool not in body and qualified not in body:
+            unused.append(qualified)
+    return sorted(unused)
+
+
+# Glob-derived, not EXPECTED_AGENTS: that list is missing at least
+# ux-reviewer.md and documenter.md (a pre-existing staleness this suite
+# does not own), and this guard must cover every invocable agent, including
+# both of the files this task trimmed.
+for _s175_path in sorted(AGENTS_DIR.glob("*.md")):
+    agent_name = _s175_path.stem
+    if agent_name in ("README",) or agent_name.startswith("ref-"):
+        continue
+    text = read(_s175_path)
+    unused = _s175_unused_mcp_grants(_s175_frontmatter_block(text), _s175_body(text))
+    expected = _S175_KNOWN_UNUSED_MCP_GRANTS.get(f"{agent_name}.md", [])
+    check(
+        f"suite175(minimality): agents/{agent_name}.md frontmatter grants no undocumented unused MCP tool",
+        unused == expected,
+        f"unused MCP grant(s) {unused} do not match the documented residual {expected} — remove the"
+        f" over-grant from tools:/mcpServers:, or add invoking body text, or (if genuinely deferred)"
+        f" register it in _S175_KNOWN_UNUSED_MCP_GRANTS with a citation",
+    )
+
+# --- Regression pins: the agents corrected by this task keep zero unused
+# grants (the trim this task performed does not regress on a future edit) ---
+for _s175_fixed_agent in ("leader", "adversary"):
+    _s175_text = read(AGENTS_DIR / f"{_s175_fixed_agent}.md")
+    _s175_unused_fixed = _s175_unused_mcp_grants(
+        _s175_frontmatter_block(_s175_text), _s175_body(_s175_text)
+    )
+    check(
+        f"suite175(regression): agents/{_s175_fixed_agent}.md has zero unused MCP grants post-trim",
+        _s175_unused_fixed == [],
+        f"agents/{_s175_fixed_agent}.md unexpectedly has unused MCP grant(s): {_s175_unused_fixed}",
+    )
+
+# --- Canary: a synthetic over-grant must be DETECTED, not pass vacuously ---
+_S175_CANARY_FRONTMATTER = "tools: Read, Write, mcp__memory__search_nodes, mcp__memory__open_nodes"
+_S175_CANARY_BODY = "This body only ever calls mcp__memory__search_nodes; it never mentions the other grant."
+_s175_canary_unused = _s175_unused_mcp_grants(_S175_CANARY_FRONTMATTER, _S175_CANARY_BODY)
+check(
+    "suite175(canary): a synthetic frontmatter grant with no matching body invocation is DETECTED",
+    _s175_canary_unused == ["mcp__memory__open_nodes"],
+    f"canary must flag exactly the deliberately-unused grant; got {_s175_canary_unused}",
+)
+
+# --- skills/lint/SKILL.md: Check 11 (tools/MCP allowlist minimality) mirrors
+# this suite's own guard at the operator-facing lint-skill surface ---
+_s175_lint_skill = read(skill_path("lint"))
+check(
+    "suite175(lint-check11-exists): skills/lint/SKILL.md contains '## Check 11 — Tools/MCP allowlist minimality'",
+    "## Check 11 — Tools/MCP allowlist minimality" in _s175_lint_skill,
+    "skills/lint/SKILL.md is missing the new Check 11 section",
+)
+check(
+    "suite175(lint-check11-known-residuals): Check 11 cites the same known-residuals rationale as Suite 175",
+    "_S175_KNOWN_UNUSED_MCP_GRANTS" in _s175_lint_skill,
+    "skills/lint/SKILL.md Check 11 must point to Suite 175's exceptions registry, not silently re-derive its own",
+)
+check(
+    "suite175(lint-check11-output-format): skills/lint/SKILL.md Output Format includes 'Check 11:'",
+    "Check 11:" in _s175_lint_skill,
+    "skills/lint/SKILL.md Output Format must include a 'Check 11:' block",
+)
+check(
+    "suite175(lint-denominator-11): skills/lint/SKILL.md declares '/ 11 checks passed'",
+    "/ 11 checks passed" in _s175_lint_skill,
+    "skills/lint/SKILL.md must declare the bumped '/ 11 checks passed' tally",
+)
+
+# --- self-ref/registry/hygiene (per this repo's own Suite-174 precedent) ---
+_s175_own = read(REPO_ROOT / "tests" / "test_agent_structure.py")
+_s175_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s175_claude_hygiene = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite175(self-ref): test file contains 'Suite 175' and 'dispatch-cost-reduction'",
+    "Suite 175" in _s175_own and "dispatch-cost-reduction" in _s175_own,
+    "test file must self-reference Suite 175 and the marker 'dispatch-cost-reduction'",
+)
+check(
+    "suite175(registry): docs/testing.md registers 'Suite 175' and 'dispatch-cost-reduction'",
+    "Suite 175" in _s175_testing_md and "dispatch-cost-reduction" in _s175_testing_md,
+    "docs/testing.md must register Suite 175 and the 'dispatch-cost-reduction' marker",
+)
+check(
+    "suite175(hygiene): CLAUDE.md does NOT contain 'Suite 175' (§11 hygiene contract)",
+    "Suite 175" not in _s175_claude_hygiene,
+    "CLAUDE.md must not mention Suite 175 — only docs/testing.md is the canonical registry",
 )
 
 # Marker: dispatch-cost-reduction

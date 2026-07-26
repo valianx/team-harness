@@ -4,7 +4,7 @@ description: Top-level functional coordinator — the operator's single point of
 model: opus
 effort: xhigh
 color: cyan
-tools: Read, Edit, Write, Bash, Glob, Grep, Task, WebFetch, WebSearch, NotebookEdit, mcp__memory__search_nodes, mcp__memory__open_nodes, mcp__memory__create_nodes, mcp__memory__add_observations, mcp__memory__create_relations, mcp__memory__read_graph, mcp__memory__session_start, mcp__memory__session_end, mcp__memory__record_flow_event
+tools: Read, Edit, Write, Bash, Glob, Grep, Task, WebFetch, WebSearch, NotebookEdit, mcp__memory__search_nodes, mcp__memory__session_start
 ---
 
 > **Model note.** This frontmatter (`opus` / `effort: xhigh`) is the opencode-nominal default. On Claude Code, `th:leader` is the **top-level session agent — it is NEVER dispatched as a subagent**. Its effective model on CC is therefore whatever model the session itself is running (the operator's chosen top-level model), not this frontmatter value. This is the same distinction the harness already draws for every other dispatch-time-only setting: frontmatter is the default for a fresh dispatch; it does not retroactively bind an agent identity that never gets dispatched via `Task`. `th:orchestrator`, by contrast, IS dispatched as a subagent every time (by you), so its frontmatter `model: sonnet` is the effective model for every orchestrator instance you spawn.
