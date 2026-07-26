@@ -814,6 +814,482 @@ assert_ask "JSON array instead of object" '[1,2,3]'
 assert_ask "JSON scalar instead of object" '"just-a-string"'
 assert_ask "truncated JSON object" '{"tool_name":"Bash","tool_input":'
 
+# ---------------------------------------------------------------------------
+# Data-position: inert-data-span carve-out (hooks/ts/bodies/data-position.ts)
+#
+# Three named, non-overlapping corpus blocks — heredoc idiom, quoted-literal
+# idiom, and predicate-soundness — followed by the
+# subset assertion, the structural checks, and an on-the-fly differential /
+# invariant harness (AC-1.11/AC-1.11a/AC-1.27, which need to inspect
+# data-position.ts's own parse, not just policy-block's final decision).
+# ---------------------------------------------------------------------------
+
+_FP="git push --force origin main"
+_AWS_KEY_SHAPE="AKIA""1234567890ABCDEF"
+
+echo
+echo "=== Data-position: heredoc carve-out corpus (AC-1.1 - AC-1.13a) ==="
+# Reproduces the observed heredoc-audit-log false-positive shape (an inert
+# sink's body quoting a covered pattern). None of these cases are
+# reused to satisfy the quoted-literal corpus (AC-1.19 forbids it).
+
+AC_1_1_CMD=$(cat <<RAWEOF
+cat >> log.jsonl << 'EOF'
+${_FP}
+EOF
+RAWEOF
+)
+assert_allow "AC-1.1: heredoc audit note to cat, body quotes a force-push -> no-decision" \
+    "$(make_bash_payload "$AC_1_1_CMD")"
+
+AC_1_2_CMD=$(cat <<RAWEOF
+bash << 'EOF'
+${_FP}
+EOF
+RAWEOF
+)
+assert_deny "AC-1.2: same heredoc idiom consumed by bash -> deny (bash is not an inert sink)" \
+    "$(make_bash_payload "$AC_1_2_CMD")"
+
+AC_1_3_CMD=$(cat <<RAWEOF
+cat << 'EOF' | bash
+${_FP}
+EOF
+RAWEOF
+)
+assert_deny "AC-1.3: cat heredoc piped into bash -> deny (pipe receiver not inert)" \
+    "$(make_bash_payload "$AC_1_3_CMD")"
+
+AC_1_4_CMD=$(cat <<RAWEOF
+cat >> log << EOF
+\$(${_FP})
+EOF
+RAWEOF
+)
+assert_deny "AC-1.4: unquoted heredoc delimiter, body has \$(...) substitution -> deny" \
+    "$(make_bash_payload "$AC_1_4_CMD")"
+
+assert_allow "AC-1.5: echo quoted argument mentions a force-push -> no-decision" \
+    "$(make_bash_payload "echo \"${_FP}\" >> audit.log")"
+
+assert_deny "AC-1.6: bash -c wraps a quoted force-push -> deny (argv0 not inert, quote never redacted)" \
+    "$(make_bash_payload "bash -c \"${_FP}\"")"
+
+# AC-1.7 — VERIFY: every pre-existing DENY/ALLOW case above this block (200
+# cases, none of which touch a heredoc or the quote-idiom carve-out) keeps
+# its recorded decision — proven by this suite run itself: the full file is
+# always executed top to bottom, so a regression in the pre-existing corpus
+# fails this same run.
+
+# AC-1.8 — the secret scanner runs on the RAW string end to end, never on
+# scanCmd: an AWS-key-shaped fixture inside a heredoc handed to an inert
+# sink still denies. Built via concatenation (matching the convention a few
+# hundred lines above for the JWT/Bearer/Azure-SAS fixtures) so it never
+# appears as one contiguous literal in this file.
+AC_1_8_CMD=$(cat <<RAWEOF
+tee -a config.env << 'EOF'
+${_AWS_KEY_SHAPE}
+EOF
+RAWEOF
+)
+assert_deny "AC-1.8: high-confidence secret inside a heredoc to an inert sink -> deny (raw scan)" \
+    "$(make_bash_payload "$AC_1_8_CMD")"
+
+echo
+echo "--- AC-1.9/AC-1.9a: HEREDOC_INERT_SINKS subset assertion (source-text extraction) ---"
+# Extracts both Set literals as TEXT from their source files (no TS
+# execution needed) — a failed extraction on EITHER file fails the test
+# rather than silently passing on an empty set (AC-1.9a non-vacuity).
+_AC19_OUT=$(AC19_REPO_ROOT="$REPO_ROOT" node -e '
+const fs = require("fs");
+const path = require("path");
+
+function extractSet(filePath, constName) {
+  const src = fs.readFileSync(filePath, "utf8");
+  const re = new RegExp(constName + "\\s*=\\s*new Set\\(\\[([\\s\\S]*?)\\]\\)");
+  const m = src.match(re);
+  if (!m) return null;
+  return [...m[1].matchAll(/"([^"]*)"/g)].map((x) => x[1]);
+}
+
+const repoRoot = process.env.AC19_REPO_ROOT;
+const sinks = extractSet(path.join(repoRoot, "hooks/ts/bodies/data-position.ts"), "HEREDOC_INERT_SINKS");
+const origin = extractSet(path.join(repoRoot, "hooks/ts/bodies/command-lexer.ts"), "SAFE_NON_EXECUTING_BASENAMES");
+
+// Recorded at authoring time (AC-1.9a cardinality floor) — the copy may
+// only ever grow more conservative (narrower), never silently wider.
+const RECORDED_MIN_CARDINALITY = 42;
+
+if (sinks === null || origin === null) {
+  console.log("could not extract one or both Set literals from source (treated as failure, not an empty set)");
+  process.exit(1);
+}
+if (sinks.length === 0 || origin.length === 0) {
+  console.log("an extracted set is empty (non-vacuity requirement, AC-1.9a)");
+  process.exit(1);
+}
+if (sinks.length < RECORDED_MIN_CARDINALITY) {
+  console.log("HEREDOC_INERT_SINKS cardinality (" + sinks.length + ") fell below the recorded floor (" + RECORDED_MIN_CARDINALITY + ")");
+  process.exit(1);
+}
+const originSet = new Set(origin);
+const notCovered = sinks.filter((s) => !originSet.has(s));
+if (notCovered.length > 0) {
+  console.log("HEREDOC_INERT_SINKS has members outside SAFE_NON_EXECUTING_BASENAMES: " + notCovered.join(", "));
+  process.exit(1);
+}
+console.log("HEREDOC_INERT_SINKS (" + sinks.length + ") is a non-empty subset of SAFE_NON_EXECUTING_BASENAMES (" + origin.length + ")");
+process.exit(0);
+' 2>&1)
+_AC19_STATUS=$?
+if [ $_AC19_STATUS -eq 0 ]; then
+    PASS=$((PASS + 1))
+    echo "  [PASS] AC-1.9/AC-1.9a: $_AC19_OUT"
+else
+    FAIL=$((FAIL + 1))
+    FAILURES+=("AC-1.9/AC-1.9a: $_AC19_OUT")
+    echo "  [FAIL] AC-1.9/AC-1.9a: $_AC19_OUT"
+fi
+
+echo
+echo "--- AC-1.13/AC-1.13a: legacy tmux spawn exemption unaffected by this task ---"
+# The exact literal exemption (asserted above at "legacy tmux batch-spawn,
+# exact literal form") and its anti-forgery variants are pre-existing cases
+# in this file, re-run unchanged by every invocation of this suite — this
+# task's redactor sits AFTER evaluateClaudeSkipPermissionsSpawn's early
+# return in policy-block.ts's Bash branch, so nothing about that check's
+# input changes. AC-1.13a is the structural half: the call site must pass
+# the raw parameter, never the redacted one.
+if grep -q 'evaluateClaudeSkipPermissionsSpawn(cmd)' "$REPO_ROOT/hooks/ts/bodies/policy-block.ts" \
+    && ! grep -q 'evaluateClaudeSkipPermissionsSpawn(scanCmd)' "$REPO_ROOT/hooks/ts/bodies/policy-block.ts"; then
+    PASS=$((PASS + 1))
+    echo "  [PASS] AC-1.13a: evaluateClaudeSkipPermissionsSpawn call site passes the raw cmd, never scanCmd"
+else
+    FAIL=$((FAIL + 1))
+    FAILURES+=("AC-1.13a: evaluateClaudeSkipPermissionsSpawn call site does not structurally match cmd-only")
+    echo "  [FAIL] AC-1.13a: evaluateClaudeSkipPermissionsSpawn call site does not structurally match cmd-only"
+fi
+
+echo
+echo "=== Data-position: quoted-literal carve-out corpus (AC-1.14 - AC-1.19) ==="
+# Named, separate block — the quote idiom has no observed false-positive
+# report (extrapolated from the heredoc idiom above), so it carries its own
+# adversarial corpus. AC-1.19 forbids satisfying it with heredoc cases.
+
+assert_allow "AC-1.14: single quote nested inside a double-quoted sink argument -> no-decision" \
+    "$(make_bash_payload "echo \"he said '${_FP}'\" >> audit.log")"
+
+AC_1_15_CMD=$(cat <<RAWEOF
+echo 'a'\''b' ; ${_FP}
+RAWEOF
+)
+assert_deny "AC-1.15: quote-escape idiom followed by a real command after ';' -> deny (widening guard)" \
+    "$(make_bash_payload "$AC_1_15_CMD")"
+
+AC_1_16_CMD=$(cat <<RAWEOF
+echo "text \" >> audit.log; ${_FP}" >> audit.log
+RAWEOF
+)
+assert_allow "AC-1.16: backslash-escaped double-quote inside sink arg does not close the span early -> no-decision" \
+    "$(make_bash_payload "$AC_1_16_CMD")"
+
+assert_deny "AC-1.17a: unclosed double-quote -> deny (fail-closed, not \"the rest is data\")" \
+    "$(make_bash_payload "echo \"${_FP} >> audit.log")"
+assert_deny "AC-1.17b: unclosed single-quote -> deny (fail-closed)" \
+    "$(make_bash_payload "echo '${_FP} >> audit.log")"
+
+assert_deny "AC-1.18a: \$(...) command substitution inside double-quoted sink arg -> deny" \
+    "$(make_bash_payload "echo \"\$(${_FP})\" >> audit.log")"
+AC_1_18B_CMD=$(cat <<RAWEOF
+echo "\`${_FP}\`" >> audit.log
+RAWEOF
+)
+assert_deny "AC-1.18b: backtick command substitution inside double-quoted sink arg -> deny" \
+    "$(make_bash_payload "$AC_1_18B_CMD")"
+assert_deny "AC-1.18c: \${X} parameter expansion inside double-quoted sink arg -> deny" \
+    "$(make_bash_payload "echo \"\${X}${_FP}\" >> audit.log")"
+
+# AC-1.19 — VERIFY: the six cases above (AC-1.14 ... AC-1.18c) form their
+# own named block, distinct from the heredoc block above and the
+# predicate-soundness block below; none of the heredoc cases (AC-1.1 ...
+# AC-1.4) are reused here — confirmed by inspection: no assert_* call in
+# this block constructs a heredoc (`<<`) payload.
+
+echo
+echo "=== Data-position: predicate-soundness corpus (AC-1.20 - AC-1.30) ==="
+# Third named block — output-destination-is-not-an-executor, heredoc
+# boundary/attribution rules, argv[0] exclusion, and the skip-permissions
+# router's continued exclusion from the carve-out.
+
+AC_1_20_CMD=$(cat <<'RAWEOF'
+tee >(bash) << 'EOF'
+rm -rf /
+EOF
+RAWEOF
+)
+assert_deny "AC-1.20: sink's own argv carries a process-substitution span -> deny (global fail-closed, irresoluble)" \
+    "$(make_bash_payload "$AC_1_20_CMD")"
+
+AC_1_21_CMD=$(cat <<RAWEOF
+cat << 'EOF' > >(bash)
+${_FP}
+EOF
+RAWEOF
+)
+assert_deny "AC-1.21: sink's own redirection target is a process substitution -> deny (global fail-closed)" \
+    "$(make_bash_payload "$AC_1_21_CMD")"
+
+AC_1_10_FD_CMD=$(cat <<RAWEOF
+exec 3> >(bash)
+cat << 'EOF' >&3
+${_FP}
+EOF
+RAWEOF
+)
+assert_deny "AC-1.10 fd-indirection sub-clause: exec 3> >(bash); cat << 'EOF' >&3 routes heredoc body through fd-duplication to a process substitution -> deny (functional policy-block decision, distinct from the FAIL_CLOSED_CASES unit-level redactor-only check)" \
+    "$(make_bash_payload "$AC_1_10_FD_CMD")"
+
+assert_allow "AC-1.22: fully single-quoted argv0 keeps its own name (sink still recognized) -> no-decision" \
+    "$(make_bash_payload "'cat' '${_FP}' >> log.jsonl")"
+
+AC_1_23_CMD=$(cat <<RAWEOF
+cat << 'EOF' ; ${_FP}
+some body
+EOF
+RAWEOF
+)
+assert_deny "AC-1.23: heredoc body starts after the introducer line's own newline -> deny (rest of that line is real code)" \
+    "$(make_bash_payload "$AC_1_23_CMD")"
+
+AC_1_24_CMD=$(cat <<RAWEOF
+cat <<- 'EOF'
+some body
+	EOF
+${_FP}
+RAWEOF
+)
+assert_deny "AC-1.24: <<- terminator matching strips only leading tabs, redaction stops there -> deny (later real command)" \
+    "$(make_bash_payload "$AC_1_24_CMD")"
+
+AC_1_25_CMD=$(cat <<RAWEOF
+cat << 'A' << 'B'
+first body
+${_FP}
+RAWEOF
+)
+AC_1_25_CMD="${AC_1_25_CMD}
+A"
+AC_1_25_CMD="${AC_1_25_CMD}
+B"
+assert_allow "AC-1.25: two consecutive heredoc bodies on the same command, consumed in declaration order -> no-decision" \
+    "$(make_bash_payload "$AC_1_25_CMD")"
+
+assert_deny "AC-1.26: skip-permissions spawn inside a heredoc body still denies (router excluded from carve-out)" \
+    "$(make_bash_payload "$(cat <<RAWEOF
+cat > run.sh << 'EOF'
+claude --dangerously-skip-permissions
+EOF
+RAWEOF
+)")"
+
+echo "--- AC-1.27: quoting/escape state machine documented identical to command-lexer.ts::scanCommand ---"
+if grep -q 'identical to command-lexer.ts::scanCommand' "$REPO_ROOT/hooks/ts/bodies/data-position.ts"; then
+    PASS=$((PASS + 1))
+    echo "  [PASS] AC-1.27 (doc): quote/escape state machine documented as identical to scanCommand"
+else
+    FAIL=$((FAIL + 1))
+    FAILURES+=("AC-1.27 (doc): missing behavioral-identity documentation for the quote/escape state machine")
+    echo "  [FAIL] AC-1.27 (doc): missing behavioral-identity documentation for the quote/escape state machine"
+fi
+
+echo "--- AC-1.28: HEREDOC_INERT_SINKS membership criterion documents BOTH conditions ---"
+if grep -q 'it has no mechanism to' "$REPO_ROOT/hooks/ts/bodies/data-position.ts" \
+    && grep -q 'cannot be routed to an executor by' "$REPO_ROOT/hooks/ts/bodies/data-position.ts"; then
+    PASS=$((PASS + 1))
+    echo "  [PASS] AC-1.28: both membership conditions (never-executes + span-cannot-route-to-executor) are documented"
+else
+    FAIL=$((FAIL + 1))
+    FAILURES+=("AC-1.28: HEREDOC_INERT_SINKS documentation is missing one of its two membership conditions")
+    echo "  [FAIL] AC-1.28: HEREDOC_INERT_SINKS documentation is missing one of its two membership conditions"
+fi
+
+AC_1_29_CMD=$(cat <<RAWEOF
+bash << 'A' ; cat << 'B'
+${_FP}
+A
+second body
+B
+RAWEOF
+)
+assert_deny "AC-1.29: two heredocs on one physical line, each attributed to its OWN declaring command -> deny" \
+    "$(make_bash_payload "$AC_1_29_CMD")"
+
+AC_1_30_CMD=$(cat <<RAWEOF
+cat << 'A'
+cat << 'B'
+A
+${_FP}
+RAWEOF
+)
+assert_deny "AC-1.30: heredoc body content is never re-scanned for a nested introducer -> deny" \
+    "$(make_bash_payload "$AC_1_30_CMD")"
+
+echo
+echo "--- AC-1.11b: a denied pattern straddling a marked and an unmarked span still denies ---"
+# git push's absorbing group ([^|]*\s) between "push" and the force flag
+# does not care whether the characters it consumes are letters or spaces —
+# so a redacted (all-space) quoted argument belonging to an UNRELATED,
+# intervening inert-sink command, sitting inside that absorbing group, must
+# not swallow the match: the flag itself lives entirely outside any marked
+# span, and the match's own start ("git push") does too.
+assert_deny "AC-1.11b: DENIED_BASH match straddles a redacted quoted span and an unmarked one -> deny" \
+    "$(make_bash_payload 'git push ; echo "hello world" ; --force origin main')"
+
+echo
+echo "--- AC-1.10/AC-1.11/AC-1.11a/AC-1.27: internal invariants (on-the-fly TS harness) ---"
+# These ACs are properties of redactInertDataSpans/probeArgv0SequenceForDiff
+# themselves (fail-closed-returns-input-unmodified; length+charset
+# invariant swept over the whole corpus; differential agreement with
+# analyzeCommand on the comparable domain) — not directly observable from
+# policy-block's binary deny/ask/allow decision, so this harness imports
+# data-position.ts's exports directly. Bundled on the fly with esbuild
+# (already a devDependency, same tool the build:* npm scripts use); nothing
+# here is a committed file.
+_AC_HARNESS_DIR=$(mktemp -d)
+_AC_HARNESS_TS="$_AC_HARNESS_DIR/harness.ts"
+_AC_HARNESS_CJS="$_AC_HARNESS_DIR/harness.cjs"
+_DATA_POSITION_JS="$REPO_ROOT/hooks/ts/bodies/data-position.js"
+_COMMAND_LEXER_JS="$REPO_ROOT/hooks/ts/bodies/command-lexer.js"
+
+cat > "$_AC_HARNESS_TS" <<HARNESSEOF
+import { redactInertDataSpans, probeArgv0SequenceForDiff } from "${_DATA_POSITION_JS}";
+import { analyzeCommand } from "${_COMMAND_LEXER_JS}";
+
+let failures = 0;
+function check(name: string, ok: boolean, detail?: string): void {
+  if (ok) {
+    console.log("PASS: " + name);
+  } else {
+    failures++;
+    console.log("FAIL: " + name + (detail ? " (" + detail + ")" : ""));
+  }
+}
+
+// AC-1.10 — every fail-closed trigger returns the input completely
+// unmodified (never a partially-redacted string).
+const FAIL_CLOSED_CASES: Array<[string, string]> = [
+  ["unclosed double-quote", 'echo "git push --force origin main >> audit.log'],
+  ["unclosed single-quote", "echo 'git push --force origin main >> audit.log"],
+  ["unterminated heredoc (no terminator line at all)", "cat << 'EOF'\ngit push --force origin main\n"],
+  ["unresolvable (empty) heredoc delimiter", "cat << \ngit push --force origin main\n"],
+  ["unresolvable (tainted) argv0", "\$CMD << 'EOF'\ngit push --force origin main\nEOF\n"],
+  [">( lexically present only inside an otherwise-inert heredoc body", "cat >> notes.md << 'EOF'\nsee >(example) for docs\ngit push --force origin main\nEOF\n"],
+  ["<( lexically present anywhere in the input", "cat << 'EOF'\nbody\nEOF\necho <(x)"],
+  ["oversized input (above the bounded cap)", "cat >> log << 'EOF'\n" + "x".repeat(70000) + "\ngit push --force origin main\nEOF\n"],
+];
+for (const [name, raw] of FAIL_CLOSED_CASES) {
+  const redacted = redactInertDataSpans(raw);
+  check("AC-1.10 fail-closed unmodified: " + name, redacted === raw);
+}
+
+// AC-1.11 / AC-1.11a — length preservation + U+0020-only substitution,
+// swept over every corpus entry across all three named blocks, not a
+// single spot check.
+const CORPUS: string[] = [
+  "cat >> log.jsonl << 'EOF'\ngit push --force origin main\nEOF\n",
+  "bash << 'EOF'\ngit push --force origin main\nEOF\n",
+  "cat << 'EOF' | bash\ngit push --force origin main\nEOF\n",
+  "cat >> log << EOF\n\$(git push --force origin main)\nEOF\n",
+  'echo "git push --force origin main" >> audit.log',
+  'bash -c "git push --force origin main"',
+  "tee -a config.env << 'EOF'\n" + "AKIA" + "1234567890ABCDEF" + "\nEOF\n",
+  "echo \"he said 'git push --force origin main'\" >> audit.log",
+  "echo 'a'\\''b' ; git push --force origin main",
+  'echo "text \\" >> audit.log; git push --force origin main" >> audit.log',
+  'echo "\$(git push --force origin main)" >> audit.log',
+  "echo \"\`git push --force origin main\`\" >> audit.log",
+  'echo "\${X}git push --force origin main" >> audit.log',
+  "tee >(bash) << 'EOF'\nrm -rf /\nEOF\n",
+  "cat << 'EOF' > >(bash)\ngit push --force origin main\nEOF\n",
+  "'cat' 'git push --force origin main' >> log.jsonl",
+  "cat << 'EOF' ; git push --force origin main\nsome body\nEOF\n",
+  "cat <<- 'EOF'\nsome body\n\tEOF\ngit push --force origin main",
+  "cat << 'A' << 'B'\nfirst body\ngit push --force origin main\nA\nB",
+  "bash << 'A' ; cat << 'B'\ngit push --force origin main\nA\nsecond body\nB",
+  "cat << 'A'\ncat << 'B'\nA\ngit push --force origin main",
+  'git push ; echo "hello world" ; --force origin main',
+];
+for (const raw of CORPUS) {
+  const redacted = redactInertDataSpans(raw);
+  const sameLength = redacted.length === raw.length;
+  let onlySpaceDiffs = true;
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i] !== redacted[i] && redacted[i] !== " ") {
+      onlySpaceDiffs = false;
+      break;
+    }
+  }
+  check(
+    "AC-1.11/AC-1.11a length+charset invariant on: " + JSON.stringify(raw.slice(0, 48)),
+    sameLength && onlySpaceDiffs,
+    sameLength ? "a non-space substitution was introduced" : "length changed (" + raw.length + " -> " + redacted.length + ")"
+  );
+}
+
+// AC-1.27 — differential assertion, bounded to the domain where this
+// module's parse is comparable to analyzeCommand's own (see
+// data-position.ts's probeArgv0SequenceForDiff doc comment). One entry of
+// CORPUS above ("bash -c ...") is excluded from THIS loop only (it stays in
+// the AC-1.11/AC-1.11a sweep above) for a SECOND, distinct reason the
+// bounded domain must also exclude: analyzeCommand recursively unwraps a
+// recognized wrapper's statically-resolvable payload and merges the
+// unwrapped commands into its result (`bash -c "git push …"` yields two
+// EffectiveCommands, "bash" and "git"), which this module intentionally
+// never attempts (it only needs to know what DATA a sink consumes, never
+// what a wrapper's payload recursively resolves to) — a real divergence,
+// not a bug, and out of scope for the same reason heredoc bodies are.
+const DIFF_DOMAIN_CORPUS = CORPUS.filter((raw) => !raw.startsWith('bash -c '));
+for (const raw of DIFF_DOMAIN_CORPUS) {
+  const probe = probeArgv0SequenceForDiff(raw);
+  if (probe === null) continue; // a fail-closed input has nothing comparable
+  const lex = analyzeCommand(probe.comparablePrefix);
+  const lexArgv0s = lex.commands.filter((c) => c.argv.length > 0).map((c) => c.argv[0].value);
+  const match = JSON.stringify(probe.argv0s) === JSON.stringify(lexArgv0s);
+  check(
+    "AC-1.27 differential (argv0 sequence) on: " + JSON.stringify(raw.slice(0, 48)),
+    match,
+    match ? undefined : "mine=" + JSON.stringify(probe.argv0s) + " lexer=" + JSON.stringify(lexArgv0s)
+  );
+}
+
+console.log(failures === 0 ? "HARNESS_OK" : "HARNESS_FAIL:" + failures);
+process.exit(failures === 0 ? 0 : 1);
+HARNESSEOF
+
+if npx --prefix "$REPO_ROOT/hooks/ts" esbuild "$_AC_HARNESS_TS" --bundle --platform=node --format=cjs --outfile="$_AC_HARNESS_CJS" --external:node:* >/dev/null 2>&1; then
+    _HARNESS_OUT=$(node "$_AC_HARNESS_CJS" 2>&1)
+    _HARNESS_STATUS=$?
+    echo "$_HARNESS_OUT" | while IFS= read -r _line; do
+        case "$_line" in
+            PASS:*) echo "  [PASS] ${_line#PASS: }" ;;
+            FAIL:*) echo "  [FAIL] ${_line#FAIL: }" ;;
+            *) echo "  $_line" ;;
+        esac
+    done
+    _HARNESS_PASS_COUNT=$(echo "$_HARNESS_OUT" | grep -c '^PASS:')
+    _HARNESS_FAIL_COUNT=$(echo "$_HARNESS_OUT" | grep -c '^FAIL:')
+    PASS=$((PASS + _HARNESS_PASS_COUNT))
+    if [ "$_HARNESS_FAIL_COUNT" -gt 0 ] || [ $_HARNESS_STATUS -ne 0 ]; then
+        FAIL=$((FAIL + (_HARNESS_FAIL_COUNT > 0 ? _HARNESS_FAIL_COUNT : 1)))
+        FAILURES+=("AC-1.10/AC-1.11/AC-1.11a/AC-1.27 harness: see [FAIL] lines above")
+    fi
+else
+    FAIL=$((FAIL + 1))
+    FAILURES+=("AC-1.10/AC-1.11/AC-1.11a/AC-1.27 harness: esbuild bundling failed")
+    echo "  [FAIL] AC-1.10/AC-1.11/AC-1.11a/AC-1.27 harness: esbuild bundling failed"
+fi
+rm -rf "$_AC_HARNESS_DIR"
+
 echo
 echo "============================================================"
 echo "  policy-block tests: $PASS passed / $((PASS + FAIL)) total"
