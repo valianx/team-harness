@@ -38634,6 +38634,301 @@ check(
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
+# Suite 176 — commit-ownership-contract (Task-1 of verifiable-contracts, #528):
+# no agent file previously instructed committing the actual implementation/
+# test diff, so a dispatch could return `status: success` with nothing
+# committed and leave three downstream gates (Phase 3, Phase 3.75, Phase 3.8)
+# nothing to evaluate. Asserts producer sites (implementer.md, tester.md) and
+# the consumer site (orchestrator.md) separately, anchor-scoped, so a change
+# to one side is never masked by the other still passing.
+#
+# Marker: commit-ownership-contract
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 176: commit-ownership-contract (commit field + branch/worktree/staging discipline) ===")
+
+
+def _s176_slice(text: str, anchor: str) -> str:
+    """Return text from anchor (inclusive) to the next markdown heading or EOF.
+
+    Local to this suite — `_slice_section` was redefined (3-arg, explicit
+    stop markers) further down in this file for Suite 174's use, so this
+    suite carries its own copy of the original 2-arg heading-to-heading
+    slice rather than depending on which definition is in scope by name.
+    """
+    idx = text.find(anchor)
+    if idx == -1:
+        return ""
+    rest = text[idx:]
+    m = re.search(r"\n(?:#{1,6}) ", rest[1:])
+    if m:
+        return rest[: m.start() + 1]
+    return rest
+
+
+_s176_implementer = read(AGENTS_DIR / "implementer.md")
+_s176_tester = read(AGENTS_DIR / "tester.md")
+_s176_orchestrator = read(AGENTS_DIR / "orchestrator.md")
+_s176_delivery = read(AGENTS_DIR / "delivery.md")
+_s176_output_template = read(AGENTS_DIR / "_shared" / "output-template.md")
+_s176_batch_doc = read(REPO_ROOT / "docs" / "parallel-batch-implementation.md")
+
+# --- Producer: agents/implementer.md ---------------------------------------
+_s176_imp_commit = _s176_slice(_s176_implementer, "## Commit Contract")
+_s176_imp_return = _s176_slice(_s176_implementer, "## Return Protocol")
+
+check(
+    "suite176(imp-ac1): agents/implementer.md contains '## Commit Contract'",
+    bool(_s176_imp_commit),
+    "the § Commit Contract heading is missing",
+)
+check(
+    "suite176(imp-ac2): agents/implementer.md § Return Protocol declares the 'commit:' field",
+    "commit: {sha} | lane-deferred | none — no source change" in _s176_imp_return,
+    "the Return Protocol status block must declare 'commit:' with its three closed values",
+)
+check(
+    "suite176(imp-ac3): § Commit Contract enumerates exactly the three closed commit: values",
+    all(tok in _s176_imp_commit for tok in ("`{sha}`", "`lane-deferred`", "`none — no source change`")),
+    "the three-value vocabulary ({sha} / lane-deferred / none — no source change) is incomplete",
+)
+check(
+    "suite176(imp-ac6-ac8): § Commit Contract names the branch preconditions with their exact commands",
+    "git rev-parse --abbrev-ref HEAD" in _s176_imp_commit
+    and "working_branch" in _s176_imp_commit
+    and "default branch" in _s176_imp_commit,
+    "the branch-equality and not-default-branch preconditions must name git rev-parse --abbrev-ref HEAD",
+)
+check(
+    "suite176(imp-ac7): § Commit Contract names the worktree precondition with its exact command",
+    "git rev-parse --show-toplevel" in _s176_imp_commit,
+    "the worktree-equality precondition must name git rev-parse --show-toplevel",
+)
+check(
+    "suite176(imp-ac31): § Commit Contract names every prohibited block-staging form",
+    all(
+        tok in _s176_imp_commit
+        for tok in ("git add -A", "git add .", "git add --all", "git add :/", "git commit -a", "git commit -am")
+    ),
+    "the enumerate-never-sweep discipline must name all six prohibited git add/commit forms",
+)
+check(
+    "suite176(imp-ac32-ac33): § Commit Contract names the pre-commit staging-scope check and its blocked/escalate outcome",
+    "git diff --cached --name-only" in _s176_imp_commit
+    and "status: blocked" in _s176_imp_commit
+    and "escalate to the operator" in _s176_imp_commit,
+    "a path outside declared scope must trigger git diff --cached --name-only + status: blocked + escalation, never a wider sweep",
+)
+check(
+    "suite176(imp-ac9-ac10): § Commit Contract distinguishes the 1:1 sha case from the lane-deferred fan-out case",
+    "fan-out lane sharing a worktree and branch" in _s176_imp_commit,
+    "the lane-deferred value must be scoped to the intra-task fan-out case, distinct from a 1:1 dispatch",
+)
+
+# --- Producer: agents/tester.md ---------------------------------------------
+_s176_test_commit = _s176_slice(_s176_tester, "## Commit Contract (authoring modes")
+_s176_test_prefix_status = _s176_slice(
+    _s176_tester, "### Status block from tester (pre-fix-regression mode)"
+)
+_s176_test_authoring = _s176_slice(_s176_tester, "## Mode: `authoring`")
+
+check(
+    "suite176(test-ac4): agents/tester.md declares the same commit contract for authored test diffs",
+    bool(_s176_test_commit) and "agents/implementer.md § Commit Contract" in _s176_test_commit,
+    "tester.md must declare its own § Commit Contract mirroring the implementer's",
+)
+check(
+    "suite176(test-ac4-preconditions): tester's § Commit Contract names the same branch/worktree preconditions",
+    "git rev-parse --abbrev-ref HEAD" in _s176_test_commit
+    and "git rev-parse --show-toplevel" in _s176_test_commit,
+    "tester's Commit Contract must name the identical branch/worktree precondition commands",
+)
+check(
+    "suite176(test-ac34): tester's § Commit Contract declares enumerate-never-sweep staging for its authored test files",
+    "Stage exactly the test file(s) you authored or extended this dispatch" in _s176_test_commit
+    and "git add -A" in _s176_test_commit,
+    "tester's staging discipline must scope to its own authored test files and name the prohibited forms",
+)
+check(
+    "suite176(test-vocab): tester's § Commit Contract declares only two commit: values (no lane-deferred)",
+    "two values" in _s176_test_commit and "never intra-task lane-decomposed" in _s176_test_commit,
+    "tester dispatches are never lane-decomposed — the contract must state only {sha} / none — no source change apply",
+)
+check(
+    "suite176(test-ac5-prefix): the pre-fix-regression status block carries the commit: field",
+    "commit: {sha} | none — no source change" in _s176_test_prefix_status,
+    "the pre-fix-regression mode status block must declare commit:",
+)
+check(
+    "suite176(test-ac5-authoring): the authoring-mode status block carries the commit: field",
+    "commit: {sha} | none — no source change" in _s176_test_authoring,
+    "the authoring mode status block must declare commit:",
+)
+
+# --- Consumer: agents/orchestrator.md ---------------------------------------
+_s176_orch_boot = _s176_slice(_s176_orchestrator, "**`working_branch` at boot")
+_s176_orch_phase2entry = _s176_slice(
+    _s176_orchestrator,
+    "### Branch guarantee, `working_branch` assertion, and `base_sha` registration",
+)
+_s176_orch_lane = _s176_slice(_s176_orchestrator, "### Intra-task execution-lane decomposition")
+_s176_orch_close = _s176_slice(_s176_orchestrator, "### Phase 2-close commit-integrity check (mandatory")
+_s176_orch_phase27 = _s176_slice(_s176_orchestrator, "## Phase 2.7 — Test Authoring")
+_s176_orch_phase4a_wb = _s176_slice(_s176_orchestrator, "**`working_branch` (producer for `gate-guard`, branch-in-place topology, AC-6).**")
+
+check(
+    "suite176(orch-ac26-boot): boot Step 2 names itself producer site 1 of 3 and the orchestrator as sole writer",
+    "producer site 1 of the three `working_branch` sites" in _s176_orch_boot
+    and "you write all three, and only you" in _s176_orch_boot,
+    "boot Step 2's working_branch paragraph must reconcile the three-site topology and name sole-writer status",
+)
+check(
+    "suite176(orch-ac26-phase4a): Phase 4a names itself producer site 3 of 3",
+    "producer site 3 of the three `working_branch` sites" in _s176_orch_phase4a_wb,
+    "Phase 4a's working_branch paragraph must name itself site 3 of the reconciled three",
+)
+check(
+    "suite176(orch-ac11-ac27): Phase 2 entry asserts (never unconditionally writes) working_branch,"
+    " writes only when boot left it null, and names the Gate-field write integrity check as post-condition",
+    "never unconditionally write" in _s176_orch_phase2entry
+    and "ONLY when boot left it `null`" in _s176_orch_phase2entry
+    and "Gate-field write integrity check" in _s176_orch_phase2entry
+    and "worktree" in _s176_orch_phase2entry,
+    "the Phase 2 entry must assert-not-write working_branch outside branch-in-place, and name the"
+    " gate-field check as post-condition of writing working_branch/worktree",
+)
+check(
+    "suite176(orch-ac28): Phase 2 entry registers base_sha via git rev-parse HEAD on phase.start before each dispatch",
+    "git rev-parse HEAD" in _s176_orch_phase2entry
+    and "base_sha" in _s176_orch_phase2entry
+    and "phase.start" in _s176_orch_phase2entry,
+    "base_sha registration (git rev-parse HEAD, attribute of phase.start) must precede every implementer/tester dispatch",
+)
+check(
+    "suite176(orch-ac12-ac13): Intra-task lane decomposition names the orchestrator as sole consolidation"
+    " committer and both sha-recording sites",
+    "sole committer of the consolidation" in _s176_orch_lane
+    and "02-implementation.md § Review Summary" in _s176_orch_lane
+    and "lane_decomposition` field" in _s176_orch_lane,
+    "the section must name the orchestrator as sole committer and both sites the consolidation sha is recorded in",
+)
+check(
+    "suite176(orch-ac14-ac15): the consolidation sha is subjected to the same ancestry check,"
+    " and lane-deferred without a registered sha never terminates as success",
+    "git merge-base --is-ancestor" in _s176_orch_lane
+    and "never a terminal `status: success`" in _s176_orch_lane,
+    "the section must apply the shared ancestry check to the consolidation sha and forbid a terminal"
+    " success without a registered consolidation sha",
+)
+check(
+    "suite176(orch-ac16-ac20-ac29-ac35): Phase 2-close commit-integrity check carries all seven conjuncts",
+    all(
+        tok in _s176_orch_close
+        for tok in (
+            "git status --porcelain",
+            "git merge-base --is-ancestor {sha} HEAD",
+            "git diff --quiet {base_sha} HEAD",
+            "lane-deferred",
+            "git rev-parse --abbrev-ref HEAD",
+            "git rev-parse --show-toplevel",
+            "git diff-tree --no-commit-id --name-only -r {sha}",
+        )
+    ),
+    "all seven conjuncts (tree-clean, ancestry, baseline-movement, lane-deferred coverage, branch,"
+    " worktree, staging-scope) must be present with their named commands",
+)
+check(
+    "suite176(orch-ac30): the exemption clause names only 'none — no source change' as exempt,"
+    " and only from conjuncts 2/3/7",
+    "exempt from conjuncts 2, 3, and 7" in _s176_orch_close
+    and "No other `commit:` value is exempt from any conjunct" in _s176_orch_close,
+    "the exemption must be scoped to commit: none — no source change and conjuncts 2/3/7 only",
+)
+check(
+    "suite176(orch-ac21): Phase 2.7's Gate line re-runs the Phase 2-close commit-integrity check a second time",
+    "### Phase 2-close commit-integrity check" in _s176_orch_phase27
+    and "a second time" in _s176_orch_phase27,
+    "Phase 2.7 close must re-run the same commit-integrity check over the tester's authoring dispatch",
+)
+
+# --- Consumer: agents/delivery.md Step 10.0 ---------------------------------
+_s176_deliv_step10 = _s176_slice(_s176_delivery, "### Step 10.0 — Stage and commit delivery files")
+_S176_GIT_ADD_BLOCK = (
+    "git add CLAUDE.md CHANGELOG.md\n"
+    "git add .claude-plugin/plugin.json .claude-plugin/marketplace.json"
+    "  # ONLY if version was bumped in Step 9 (skip if Step 9.0 skipped)\n"
+    "git add docs/                 # only if created/modified in Step 5b (docs/knowledge.md)"
+    " — never docs/specs/: no pipeline spec or acceptance matrix is ever staged into the product repo (see Step 9c)\n"
+    "git add README.md             # only if modified in Step 6\n"
+    "git add openapi/openapi.yaml  # only if updated in Step 8\n"
+    "git add changelog.d/{pr-slug}.md  # ALWAYS stage the fragment when one was written"
+)
+
+check(
+    "suite176(deliv-ac23): Step 10.0 asserts the implementation diff is already committed via"
+    " git status --porcelain, blocking without staging on any uncommitted implementation path",
+    "git status --porcelain" in _s176_deliv_step10
+    and "status: blocked" in _s176_deliv_step10
+    and "Do NOT stage or commit anything" in _s176_deliv_step10
+    and "agents/implementer.md § Commit Contract" in _s176_deliv_step10,
+    "Step 10.0 must assert pre-commit via git status --porcelain and block-without-staging on failure",
+)
+check(
+    "suite176(deliv-ac24): Step 10.0's git add block is unchanged byte-for-byte (regression pin)",
+    _S176_GIT_ADD_BLOCK in _s176_delivery,
+    "the pre-existing git add staging list must not be altered by this task's addition",
+)
+
+# --- output-template.md: retired over-claim, self-report successor (AC-22) --
+check(
+    "suite176(ac22-retired): output-template.md no longer claims the agent is the ONLY party"
+    " that reliably knows its effective model",
+    "the only party that reliably knows" not in _s176_output_template,
+    "the retired sole-reliability over-claim must be gone",
+)
+check(
+    "suite176(ac22-successor): output-template.md's successor text frames model self-report as"
+    " unverified/consultative and names #524 as the structural-fix owner",
+    "self-report" in _s176_output_template
+    and "unverified" in _s176_output_template
+    and "#524" in _s176_output_template,
+    "the successor text must declare the self-report unverified/consultative and point to #524",
+)
+
+# --- docs/parallel-batch-implementation.md: item-commit reconciliation -----
+check(
+    "suite176(batch-reconcile): parallel-batch-implementation.md reconciles per-item commit ownership"
+    " against agents/implementer.md § Commit Contract, distinct from lane-deferred",
+    "agents/implementer.md § Commit Contract" in _s176_batch_doc
+    and "never `lane-deferred`" in _s176_batch_doc,
+    "the batch doc must name the implementer's Commit Contract and distinguish the per-item {sha}"
+    " case from the shared-worktree lane-deferred case",
+)
+
+# --- self-ref/registry/hygiene (per this repo's own Suite-174/175 precedent) --
+_s176_own = read(REPO_ROOT / "tests" / "test_agent_structure.py")
+_s176_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s176_claude_hygiene = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite176(self-ref): test file contains 'Suite 176' and 'commit-ownership-contract'",
+    "Suite 176" in _s176_own and "commit-ownership-contract" in _s176_own,
+    "test file must self-reference Suite 176 and the marker 'commit-ownership-contract'",
+)
+check(
+    "suite176(registry): docs/testing.md registers 'Suite 176' and 'commit-ownership-contract'",
+    "Suite 176" in _s176_testing_md and "commit-ownership-contract" in _s176_testing_md,
+    "docs/testing.md must register Suite 176 and the 'commit-ownership-contract' marker",
+)
+check(
+    "suite176(hygiene): CLAUDE.md does NOT contain 'Suite 176' (§11 hygiene contract)",
+    "Suite 176" not in _s176_claude_hygiene,
+    "CLAUDE.md must not mention Suite 176 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: commit-ownership-contract
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

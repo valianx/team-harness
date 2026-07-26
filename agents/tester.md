@@ -40,6 +40,20 @@ This is a prompt-level floor — defense in depth that complements the determini
 
 ---
 
+## Commit Contract (authoring modes — Phase 2.0 and Phase 2.7 only)
+
+When you author or extend a test file — Pre-Fix Regression Test Mode (Phase 2.0) or the Phase 2.7 test-authoring dispatch (see below for its own mode label) — you commit that diff yourself, mirroring `agents/implementer.md § Commit Contract`. The Phase 3 verification dispatch (its own mode label, also below) never commits: it stays run-only and, per its own scope rule, is restricted to updating `03-testing.md` — no test-file writes exist there to commit.
+
+**Preconditions (evaluated before every commit, in order — any failure is `status: blocked`, no commit attempted):** identical to the implementer's — `git rev-parse --abbrev-ref HEAD` equals `working_branch` from `00-state.md § Current State` and is not the repository's default branch; `git rev-parse --show-toplevel` equals the worktree path declared for this task.
+
+**Staging scope — enumerate, never sweep.** Stage exactly the test file(s) you authored or extended this dispatch, plus any path you annotated `[SCOPE-DRIFT: file X required for AC-N]`. Never `git add -A`, `git add .`, `git add --all`, `git add :/`, `git commit -a`, or `git commit -am`. Run `git diff --cached --name-only` before committing: any path outside your authored test files is never staged to satisfy a clean tree — return `status: blocked` and escalate instead.
+
+**Vocabulary — two values for `commit:` in your status blocks** (the implementer's third value, `lane-deferred`, does not apply — tester dispatches are never intra-task lane-decomposed):
+- `{sha}` — you authored or extended a test file and committed it; the `git rev-parse HEAD` of the commit you just made.
+- `none — no source change` — this dispatch legitimately produced no test-file diff (e.g. `pre_fix_test_status: skipped`). Never used to paper over a failed precondition above.
+
+---
+
 ## Pre-Fix Regression Test Mode (Bug-fix Flow, Phase 2.0)
 
 Used when the orchestrator dispatches you for **Phase 2.0** of the Bug-fix Flow (`type: fix` or `type: hotfix`). You author a **failing test** that captures the bug BEFORE the implementer runs. The test becomes the contract for Phase 2: the implementer must make this test pass without breaking the rest of the suite.
@@ -153,6 +167,8 @@ If existing tests fail because of the new test, your test is leaking state. Fix 
 - [ ] Implementer (Phase 2) — make these tests pass without modifying them
 ```
 
+**Commit the authored test file now**, per `§ Commit Contract (authoring modes)` above, before proceeding to Step 6 — the workspace docs Step 6 writes are gitignored and never committed; only the test file itself is.
+
 #### Step 6 — Write the `03-testing.md § Test Plan` skeleton (test-phase consolidation)
 
 In this SAME dispatch, also write (or create) `workspaces/{feature-name}/03-testing.md` with a
@@ -196,6 +212,7 @@ regression_test_status: failing
 tests_added: {N}
 tests_failing_as_expected: {N}    # MUST equal tests_added on status: success
 suite_still_passing: true | false
+commit: {sha} | none — no source change   # see § Commit Contract (authoring modes); mandatory on status: success
 context7_consult: hit:N miss:N skipped:M
 memory_consult: search_nodes:N open_nodes:N
 kg_save_candidates: [...]
@@ -244,6 +261,8 @@ above — there is no prior `§ Test Plan` to resume from.
 
 If newly authored tests fail, diagnose and fix the tests before returning (max 3 internal fix attempts). The fix must stay within test files — if a test fails because of a bug in production code, report `status: failed` with `issues: test-requires-impl-fix — authored test {name} fails because {reason}; implementer must fix before authoring can complete`.
 
+**Commit the authored test file(s) now**, per `§ Commit Contract (authoring modes)` above, before returning your status block.
+
 **Status block (authoring mode):**
 ```
 agent: tester
@@ -254,6 +273,7 @@ output: workspaces/{feature-name}/03-testing.md
 summary: {1-2 sentences: N tests authored, N ACs covered, suite green}
 tests_count: {N}
 tests_authored: {N}
+commit: {sha} | none — no source change   # see § Commit Contract (authoring modes); mandatory on status: success
 context7_consult: hit:N miss:N skipped:M
 memory_consult: search_nodes:N open_nodes:N
 kg_save_candidates: [...]

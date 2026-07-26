@@ -55,6 +55,8 @@ Dispatch N implementers in parallel via concurrent `Task` calls in the parent or
 
 Cap the concurrency at `batch_concurrency` (default 5) using the eager slot-fill wave model from `agents/leader.md § Multi-Task fan-out`: fill all available slots immediately, and as each item finishes open the slot to the next queued item. This mirrors the Stage-1 planning fan-out (N architects + N plan-reviewers) on the implementation side.
 
+**Commit ownership per item (`agents/implementer.md § Commit Contract`).** Each item's implementer commits its own diff — `commit: {sha}` in its status block — before the item's in-worktree verify runs. This is the standard 1:1 case, never `lane-deferred`: `lane-deferred` is reserved for intra-task execution-lane decomposition, where multiple lanes share ONE worktree and branch (see the mechanism-comparison table above). Each item in this batch holds its own isolated worktree and its own branch, so no lane index-race exists here — the item's own committed sha is what `git merge <item-branch>` (below) merges into the integration branch at consolidation.
+
 ---
 
 ## Edit-class split

@@ -382,6 +382,28 @@ Write your implementation summary to `workspaces/{feature-name}/02-implementatio
 
 ---
 
+## Commit Contract
+
+You commit your own implementation diff at the close of every 1:1 dispatch, after Phase 3 (Self-Review) passes and before you write your status block. The orchestrator no longer absorbs your diff into a later delivery commit — a dispatch that returns `status: success` with nothing committed leaves every downstream gate (Phase 3, Phase 3.75, Phase 3.8) nothing to evaluate, which is the defect this contract exists to close. A fan-out lane (`agents/orchestrator.md § Intra-task execution-lane decomposition`) never commits itself — see "Fan-out lanes" below.
+
+**Preconditions (evaluated before every commit, in order — any failure is `status: blocked`, no commit attempted):**
+1. `git rev-parse --abbrev-ref HEAD` equals `working_branch` from `00-state.md § Current State`. A mismatch means you are about to commit on the wrong branch.
+2. `git rev-parse --abbrev-ref HEAD` is not the repository's default branch (e.g., `main`/`master`).
+3. `git rev-parse --show-toplevel` equals the worktree path declared for this task in `00-state.md`. A mismatch means your working directory drifted — most likely into a sibling lane's or a sibling task's worktree.
+
+None of these three is decorative: no deterministic hook gates `git commit` itself (`policy-block` covers secrets and `--no-verify`; `gate-guard` covers `git push`/`gh pr create`), so these preconditions are the only structural backstop against a commit landing on the wrong branch or in the wrong worktree — a live risk, not a hypothetical one, in a serial task chain or a fan-out that reuses one worktree.
+
+**Staging scope — enumerate, never sweep.** Stage exactly the files in your task's `Files:` list (`01-plan.md § Task List`) plus any path you annotated `[SCOPE-DRIFT: file X required for AC-N]`. Never use a block-staging form: `git add -A`, `git add .`, `git add --all`, `git add :/`, `git commit -a`, `git commit -am`. Before committing, run `git diff --cached --name-only`: if it reports any path outside your declared scope, that path is never staged to satisfy a clean tree — stop, return `status: blocked`, and escalate to the operator instead. A worktree holding unrelated material (a scratch file, a leftover experiment) is a real anomaly whose disposition belongs to the operator, not a reason to widen the commit.
+
+**Vocabulary — exactly three values for `commit:` in your status block:**
+- `{sha}` — a 1:1 dispatch that modified source files and committed them; the `git rev-parse HEAD` of the commit you just made.
+- `lane-deferred` — this dispatch is a fan-out lane sharing a worktree and branch with sibling lanes; committing per-lane would race the shared git index. The orchestrator's consolidation step is the sole committer for the fan-out (see "Intra-task execution-lane decomposition" for where its sha is recorded).
+- `none — no source change` — this dispatch legitimately produced no source diff. Never use this value to paper over a failed precondition above — a precondition failure is `status: blocked`, not a `status: success` carrying this value.
+
+No other value is valid. `commit: {sha}` requires the sha to have just been produced by your own commit in this dispatch — never a sha inherited from a prior commit already on the branch.
+
+---
+
 ## Execution Log Protocol
 
 The orchestrator writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orchestrator propagates it.
@@ -398,6 +420,7 @@ status: success | failed | blocked
 model: {effective-model-id}
 output: workspaces/{feature-name}/02-implementation.md
 summary: {1-2 sentences: N files created/modified, key patterns used, any deviations}
+commit: {sha} | lane-deferred | none — no source change   # see § Commit Contract; mandatory on status: success
 context7_consult: hit:N miss:N skipped:M
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 kg_prior_art: hit:N applied:bool | n/a

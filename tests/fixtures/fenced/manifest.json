@@ -709,8 +709,8 @@
     "file": "agents/tester.md",
     "mode": "heading",
     "anchor": "### Status block from tester (pre-fix-regression mode)",
-    "sha256": "b12f2df6f8e40ab88e1af1015ac84d4e345878921d0bde65df3e346d9032e325",
-    "length": 1264,
+    "sha256": "07107f34e6bb8d7369982ef1f38add8ca24ea25f1c20172bc8abbaef7ecc54a9",
+    "length": 1378,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 2,

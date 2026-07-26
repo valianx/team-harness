@@ -709,6 +709,8 @@ This becomes the "Size justification" section embedded in the PR body in Step 11
 
 ### Step 10.0 — Stage and commit delivery files (last step of `mode: prepare`)
 
+**Assert the implementation diff is already committed, before staging anything.** This step stages and commits ONLY the delivery files below (docs, changelog, version) — the task's actual implementation diff is `implementer`'s and `tester`'s own responsibility (`agents/implementer.md § Commit Contract`, `agents/tester.md § Commit Contract (authoring modes)`), committed at the close of their own dispatches. Run `git status --porcelain` and exclude the exact delivery-file paths the **Stage** block below is about to add (`CLAUDE.md`, `CHANGELOG.md`, `.claude-plugin/`, `docs/`, `README.md`, `openapi/openapi.yaml`, `changelog.d/{pr-slug}.md`) — those appearing as pending is expected at this point in the flow, since this step has not staged them yet. Any OTHER path remaining after that exclusion means the implementation diff was never committed upstream. Do NOT stage or commit anything in that case — return `status: blocked` and escalate to the operator, naming the uncommitted paths.
+
 **Stage:**
 ```
 git add CLAUDE.md CHANGELOG.md

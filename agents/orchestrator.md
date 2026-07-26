@@ -84,6 +84,8 @@ You do not run your own Discover/Intake/Specify conversation. `th:leader` alread
 
 **`working_branch` at boot (producer half of the AC-6/F-1 correlation key, worktree topology).** In the same write, if the payload carries a non-null `worktree_branch`, set `working_branch` to that value — this is the earliest point in the pipeline the branch is known (branch-establishment already happened at `th:leader`'s Phase 0a, before you were even spawned), so recording it here rather than later at delivery time is the tightest producer point available to you. `gate-guard` (`hooks/ts/bodies/gate-guard.ts`) correlates the current push's branch against this field to resolve the governing lane in either topology. When `worktree` is null (branch-in-place), no branch exists yet at boot — leave `working_branch: null` here; it is set at Phase 4a, the point `delivery mode: prepare` actually creates the branch (see "Phase 4a — Delivery (prepare)" below).
 
+This is producer site 1 of the three `working_branch` sites this contract reconciles by topology — you write all three, and only you. The Phase 2 entry (see "Phase 2 — Implementation" below) asserts this value and writes it only when it is still `null` at that point; Phase 4a writes it only in the branch-in-place topology, where no branch existed yet at this boot step. No other site, and no agent other than you, ever writes `working_branch`.
+
 **Step 3 — Proceed to Phase 1 (Design).** No boot acknowledgment line to the operator — proceed silently per Output Discipline, exactly as the legacy boot sequence did.
 
 **Your Phase Checklist starts at Phase 1.** Phase 0a (Intake) and Phase 0b (Specify) are `th:leader`'s phases — they do not appear as rows in your Phase Checklist and you never mark them `[x]`. Your checklist begins at `1 — Design`.
@@ -866,6 +868,14 @@ At Phase 2.7, the SAME tester contract resumes: it reads its own `03-testing.md 
 
 **Agent:** `implementer`
 
+### Branch guarantee, `working_branch` assertion, and `base_sha` registration (Phase 2 entry, before any dispatch)
+
+Before dispatching `implementer` or `tester` for the first time in this phase, guarantee a working branch distinct from the repository's default branch exists. In the worktree topology this is already true from boot (`working_branch` is non-null — see "Mandatory boot sequence" Step 2); in the branch-in-place topology no branch normally exists yet at this point (it is created later, at Phase 4a).
+
+**Assert — never unconditionally write — `working_branch`.** Verify it is non-null, equal to `git rev-parse --abbrev-ref HEAD`, and distinct from the repository's default branch. Write it to `00-state.md § Current State` ONLY when boot left it `null` (the branch-in-place topology, producer site 2 of the three sites this contract reconciles — see "Mandatory boot sequence" Step 2). In the worktree topology it is already non-null from boot: this step only asserts, it never overwrites. Immediately after asserting/writing `working_branch` (and confirming `worktree`, the companion field these preconditions rely on), invoke `### Gate-field write integrity check` as this transition's post-condition — see that section for its command and verdict table.
+
+**Register `base_sha` before EACH dispatch of `implementer` or `tester`.** Immediately before every such dispatch, run `git rev-parse HEAD` and record the result as `base_sha`, an attribute of that dispatch's `phase.start` event. This is the external baseline the `### Phase 2-close commit-integrity check` (below) anchors against: a dispatch that produces no diff must never be able to report a stale-but-ancestor sha and pass a "clean tree" check trivially, since any ancestor of HEAD — including the worktree's own base commit — would otherwise satisfy a bare ancestry check.
+
 ### Mirror task-level progress into `01-plan.md`
 
 Every state transition mirrors into `**Status:**` in `01-plan.md § Task List`:
@@ -911,6 +921,8 @@ Distinct from the DAG above — this parallelizes EXECUTION WITHIN one task (mul
 **Seam-not-disjoint fallback:** abort the fan-out for that task, emit `stage2.lane.result` with the blocking reason, re-dispatch the ENTIRE task monolithically, report the fallback to the operator (never absorbed silently).
 
 **Consolidation (mandatory on fan-out completion):** verify no lane's diff touches a file outside its declared seam/frozen-contract; write a consolidation report into `02-implementation.md § Review Summary` (one line per lane); record `lane_decomposition` in `00-state.md` with `status: consolidated`; proceed to Phase 2.5 exactly as the 1:1 path.
+
+**You are the sole committer of the consolidation.** Every lane reports `commit: lane-deferred` — no lane commits its own diff, since concurrent lanes committing on the same shared worktree/branch would race the git index. You alone commit the consolidated result once, after verifying every lane's diff is seam-disjoint. Record the resulting sha in two places: the consolidation report in `02-implementation.md § Review Summary`, and the `lane_decomposition` field of `00-state.md`. Subject that sha to the same `git merge-base --is-ancestor` check the `### Phase 2-close commit-integrity check` (below) applies to any lane-reported sha. A task where any lane reported `commit: lane-deferred` and no consolidation sha is registered is `status: blocked` — never a terminal `status: success`.
 
 **Trace events:** `stage2.lane.dispatch`, `stage2.lane.result`, `stage2.lanes.consolidated` — see the Execution Events schema below for field shapes.
 
@@ -1000,6 +1012,26 @@ On any match — path-pattern OR content-trigger — where `security_sensitive` 
 
 **Coordination note — three distinct Phase-2-close mechanisms.** (1) The scope check above (`fix`/`hotfix` only) verifies diff-vs-`Scope of Fix` — implementer scope-discipline. (2) The re-tier GATE above (`fix`/`hotfix` only) verifies diff-vs-sensitive-paths and forces `tier_promote: 3`. (3) This backstop (every type) verifies diff-vs-the-same-§-2a-sensitive-path-list and forces `security_sensitive: true`. All three run at Phase 2 close; (2) and (3) share the same canonical pattern-list source (`docs/pipeline-lanes.md § 2a`) but produce distinct consequences on distinct scopes — neither duplicates the other's authority list or consequence.
 
+### Phase 2-close commit-integrity check (mandatory, before Phase 3; re-run at Phase 2.7 close)
+
+Run immediately after every `implementer`/`tester` dispatch of this task returns `status: success` — before advancing to Phase 3. **Re-run the identical check at Phase 2.7 close**, over the tester's authoring dispatch, before the verification packet is built (see "Phase 2.7 — Test Authoring" below). Evaluate all seven conjuncts below; any failure is `status: blocked` and escalation to the operator — never a silent pass and never a corrective write by you.
+
+| # | Conjunct | Command | Failure condition |
+|---|----------|---------|--------------------|
+| 1 | Tree clean | `git status --porcelain` | Any line reported, including untracked paths |
+| 2 | Ancestry | `git merge-base --is-ancestor {sha} HEAD` | Non-zero exit for any reported `{sha}` |
+| 3 | Baseline movement | compare `{sha}` to this dispatch's registered `base_sha`; `git diff --quiet {base_sha} HEAD` | `{sha}` equals `base_sha`, OR the diff command exits 0 (no movement) |
+| 4 | Lane-deferred coverage | — (see "Intra-task execution-lane decomposition" above) | Any lane reported `commit: lane-deferred` with no consolidation sha registered |
+| 5 | Branch | `git rev-parse --abbrev-ref HEAD` | Not equal to `working_branch`, OR equal to the repository's default branch |
+| 6 | Worktree | `git rev-parse --show-toplevel` | Not equal to the worktree declared for this task |
+| 7 | Staging scope | `git diff-tree --no-commit-id --name-only -r {sha}` for every reported `{sha}` (including the consolidation sha) | Any path outside the task's `Files:` list (`01-plan.md § Task List`) without a matching `[SCOPE-DRIFT: file X required for AC-N]` annotation |
+
+**Exemption.** A dispatch that reported `commit: none — no source change` is exempt from conjuncts 2, 3, and 7 — there is no sha to check ancestry, baseline movement, or staging scope against. Conjuncts 1, 5, and 6 still apply: a "no source change" report on a dirty tree, the wrong branch, or the wrong worktree is itself a contract violation. No other `commit:` value is exempt from any conjunct.
+
+**Why conjunct 3 exists.** Conjuncts 1 and 2 alone pass trivially on a dispatch that produced nothing: a clean tree is trivial when nothing changed, and any ancestor of HEAD — including the worktree's own base commit — satisfies conjunct 2. Conjunct 3 anchors against `base_sha`, registered by you at this dispatch's `phase.start` (see "Phase 2 — Implementation → Branch guarantee..." above) — a record the dispatched agent never wrote — so a dispatch that moved nothing cannot pass by reporting a stale-but-valid sha.
+
+**On any failure:** `status: blocked`, escalate to the operator naming the failing conjunct(s). No conjunct here has a repair path — a failure means the commit itself is wrong (wrong branch, wrong worktree, incomplete, out-of-scope, or vacuous), and the only remedy is a correct re-commit by the original committer.
+
 ---
 
 ## Phase 2.6 — Code-Hygiene Scan
@@ -1030,7 +1062,7 @@ On any match — path-pattern OR content-trigger — where `security_sensitive` 
 
 **Invoke via Task tool:** feature name, `docs_root`, files created/modified, AC from `01-plan.md § Task List`, `frontend_scope` when true (with the mandatory browser-test decision rule instruction). Instruction: map each AC to at least one test, run the suite once to confirm; test files only. For `type: fix`/`hotfix`, additionally point at the Phase 2.0-authored `03-testing.md § Test Plan` and instruct completion of the remaining AC tests from that plan.
 
-**Gate:** `success` → proceed to Phase 3. `failed` → route back to tester (counts toward max-3); Phase 3 does not launch until authoring succeeds.
+**Gate:** `success` → run the `### Phase 2-close commit-integrity check` (§ "Phase 2 — Implementation" above) a second time, over this dispatch's `commit:` report, before proceeding to Phase 3. A conjunct failure here blocks and escalates exactly as at Phase 2 close — never a silent pass. `failed` → route back to tester (counts toward max-3); Phase 3 does not launch until authoring succeeds.
 
 **A1-F3 — browser readiness (non-blocking).** When `warranted_types` includes `e2e`/`browser-mode` and tooling/binaries are missing, surface the proposed setup commands to the operator before Phase 3 and wait for confirmation (or an explicit decline).
 
@@ -1294,7 +1326,7 @@ After each KG write call above, emit a `kg_write` event per § "`kg_write` event
 
 **What this mode does (local only, no outward action).** Branch + commits, version bump, CHANGELOG fragment, PR-body draft — everything Phase 4.5's diff review and STAGE-GATE-3's summary (version/size/DoD) need, computed here, entirely local. It does NOT push and does NOT call `gh pr create` — that is Phase 4b, dispatched only after STAGE-GATE-3 records `gate3_release: ship`. This split is what makes "ship" an *authorization* for the outward action rather than a *ratification* of one that already happened, and is the reordering `gate-guard` (`hooks/ts/bodies/gate-guard.ts`, a deterministic PreToolUse hook) depends on: it denies a `git push`/`gh pr create` from a detected pipeline lane unless that lane's `gate3_release ∈ {ship}` (`agents/_shared/gate-contract.md § "Outward-action release floor"`) — without this reorder, `gate-guard` would deadlock the old single-phase Delivery.
 
-**`working_branch` (producer for `gate-guard`, branch-in-place topology, AC-6).** When this mode creates the branch — the branch-in-place case, where no branch existed before this phase — write `working_branch` to `00-state.md § Current State` the instant `delivery` returns `success`, before Phase 4.5 runs and strictly before Phase 4b's push. In the worktree topology, `working_branch` was already set at boot (see "Mandatory boot sequence" Step 2) — this phase does not need to re-derive it.
+**`working_branch` (producer for `gate-guard`, branch-in-place topology, AC-6).** When this mode creates the branch — the branch-in-place case, where no branch existed before this phase — write `working_branch` to `00-state.md § Current State` the instant `delivery` returns `success`, before Phase 4.5 runs and strictly before Phase 4b's push. In the worktree topology, `working_branch` was already set at boot (see "Mandatory boot sequence" Step 2) — this phase does not need to re-derive it. This is producer site 3 of the three `working_branch` sites this contract reconciles by topology — see "Mandatory boot sequence" Step 2 for site 1 (worktree topology) and the Phase 2 entry (§ "Phase 2 — Implementation") for site 2's assertion-only behavior; the three are mutually exclusive by topology and all three are written by you alone.
 
 **Gate:**
 
