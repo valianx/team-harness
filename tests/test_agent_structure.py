@@ -12859,9 +12859,10 @@ _s55_checkpoint_task_entry = next(
     None,
 )
 check(
-    "Suite 55(3a): .claude-plugin/hooks.json has a Task PreToolUse entry for checkpoint-guard",
-    _s55_checkpoint_task_entry is not None,
-    "no Task PreToolUse entry invoking checkpoint-guard found in hooks.json",
+    "Suite 55(3a): .claude-plugin/hooks.json has NO Task PreToolUse entry for checkpoint-guard (unwired, v2.139.0)",
+    _s55_checkpoint_task_entry is None,
+    "checkpoint-guard is unwired as of v2.139.0 and must not be registered in hooks.json — "
+    "its body, entry points and behavioral tests stay in the tree, but no event may dispatch it",
 )
 if _s55_checkpoint_task_entry:
     _s55_task_cmd = (_s55_checkpoint_task_entry.get("hooks", [{}])[0]).get("command", "")
@@ -21829,19 +21830,16 @@ check(
     "intercept a human's own-terminal git commands (the U1 boundary)",
 )
 check(
-    "suite93(ac9-hooks-json-registered): .claude-plugin/hooks.json registers "
-    "worktree-guard for the plugin-runtime path",
-    invokes_launcher(_s93_hooks_json, "worktree-guard"),
-    ".claude-plugin/hooks.json must wire the launcher with worktree-guard",
+    "suite93(ac9-hooks-json-unwired): .claude-plugin/hooks.json does NOT register "
+    "worktree-guard (unwired, v2.139.0)",
+    not invokes_launcher(_s93_hooks_json, "worktree-guard"),
+    "worktree-guard is unwired as of v2.139.0 and must not be wired in .claude-plugin/hooks.json — "
+    "its body and behavioral tests stay in the tree, but no event may dispatch it",
 )
-check(
-    "suite93(ac9-hooks-json-bash-matcher): .claude-plugin/hooks.json worktree-guard entry "
-    "is under PreToolUse with Bash matcher",
-    invokes_launcher(_s93_hooks_json, "worktree-guard")
-    and "PreToolUse" in _s93_hooks_json
-    and '"Bash"' in _s93_hooks_json,
-    ".claude-plugin/hooks.json worktree-guard must be a PreToolUse Bash-matched entry",
-)
+# The Bash-matcher shape assertion that stood here is retired with the wiring:
+# an unwired hook has no entry whose matcher could be checked. The launcher-class
+# and body assertions above still run — the code remains correct and tested, it is
+# simply not dispatched.
 
 # --- AC-10: reviewer.md — PR-review worktree lifecycle ---
 #
@@ -29058,7 +29056,8 @@ check(
 #          RETIRED — the Go installer's CC path is gone); JSON loads cleanly
 # ----------------------------------------------------------------
 
-_S117_FLOORS = ["policy-block", "dev-guard", "gcp-guard", "worktree-guard", "checkpoint-guard"]
+_S117_FLOORS = ["policy-block", "dev-guard", "gcp-guard"]
+_S117_UNWIRED = ["worktree-guard", "checkpoint-guard", "gate-guard", "prepublish-guard"]
 
 _hj_pretooluse = _s117_hj_hooks.get("PreToolUse", [])
 for _floor_name in _S117_FLOORS:
@@ -29071,6 +29070,18 @@ for _floor_name in _S117_FLOORS:
         f"hooks.json PreToolUse still has {_floor_name}",
         _hj_floor_present,
         f".claude-plugin/hooks.json PreToolUse must still route through the launcher to '{_floor_name}' (additive-wiring regression guard)",
+    )
+for _unwired_name in _S117_UNWIRED:
+    _hj_unwired_present = any(
+        any(invokes_launcher(h.get("command", ""), _unwired_name) for h in entry.get("hooks", []))
+        for entry in _hj_pretooluse
+    )
+    check(
+        f"suite117(ac11-unwired-{_unwired_name}-hooks-json): "
+        f"hooks.json PreToolUse does NOT have {_unwired_name}",
+        not _hj_unwired_present,
+        f"'{_unwired_name}' is unwired as of v2.139.0 and must not be routed from "
+        f".claude-plugin/hooks.json — re-wiring it is a deliberate decision, not a silent restore",
     )
 
 # ----------------------------------------------------------------
@@ -29462,9 +29473,10 @@ _hj118_prepublish_entries = [
     if any(invokes_launcher(h.get("command", ""), "prepublish-guard") for h in e.get("hooks", []))
 ]
 check(
-    "suite118(ac11-hooks-json-prepublish-own-entry): .claude-plugin/hooks.json has prepublish-guard as its OWN PreToolUse entry",
-    len(_hj118_prepublish_entries) >= 1,
-    ".claude-plugin/hooks.json must have prepublish-guard as its own PreToolUse entry",
+    "suite118(ac11-hooks-json-prepublish-unwired): .claude-plugin/hooks.json has NO prepublish-guard PreToolUse entry (unwired, v2.139.0)",
+    len(_hj118_prepublish_entries) == 0,
+    "prepublish-guard is unwired as of v2.139.0 and must not be registered in hooks.json — "
+    "its body and behavioral tests stay in the tree, but no event may dispatch it",
 )
 _hj118_devguard_bash_entries = [
     e for e in _s118_hj_pretooluse
@@ -29581,9 +29593,9 @@ for _entry in _s118_hj_pretooluse:
         if invokes_launcher(_h.get("command", ""), "prepublish-guard"):
             _hj118_prepublish_timeout = _h.get("timeout")
 check(
-    "suite118(ac16-wiring-timeout-hooks-json): .claude-plugin/hooks.json prepublish-guard entry has timeout: 120",
-    _hj118_prepublish_timeout == 120,
-    ".claude-plugin/hooks.json prepublish-guard entry must have timeout: 120",
+    "suite118(ac16-wiring-timeout-hooks-json): no prepublish-guard wiring timeout to assert (unwired, v2.139.0)",
+    _hj118_prepublish_timeout is None,
+    "prepublish-guard is unwired; no hooks.json entry may declare a timeout for it",
 )
 
 # ----------------------------------------------------------------
@@ -36326,11 +36338,12 @@ _s162_gate_guard_wired = any(
     for h in e.get("hooks", [])
 )
 check(
-    "s162(inv-a-wiring): .claude-plugin/hooks.json wires gate-guard through "
-    "the run-ts-hook.sh launcher on a PreToolUse entry",
-    _s162_gate_guard_wired,
-    ".claude-plugin/hooks.json must route a PreToolUse entry through "
-    "run-ts-hook.sh gate-guard",
+    "s162(inv-a-wiring): .claude-plugin/hooks.json does NOT wire gate-guard "
+    "(unwired, v2.139.0)",
+    not _s162_gate_guard_wired,
+    "gate-guard is unwired as of v2.139.0 and must not be routed from "
+    ".claude-plugin/hooks.json — the STAGE-GATE release record is now a contract "
+    "the pipeline honours, not a precondition a hook enforces",
 )
 check(
     "s162(inv-a-launcher): run-ts-hook.sh lists gate-guard in the deny-floor "

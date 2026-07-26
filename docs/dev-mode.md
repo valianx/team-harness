@@ -87,7 +87,19 @@ The threat model this gate defends is disposition that rationalises the readable
 
 ---
 
-## Deterministic order floor (`gate-guard`) — deny vs ask, and the force-push floor (Invariant E)
+## Boundary, not flow — what is registered as of v2.139.0
+
+**Only three gates are registered in `.claude-plugin/hooks.json`:** `policy-block`, `dev-guard` and `gcp-guard`. `gate-guard`, `checkpoint-guard`, `prepublish-guard` and `worktree-guard` are **unwired** — their bodies, entry points and test suites remain in the tree and still pass, but no event dispatches them.
+
+**The line that decides.** A hook guards what is **irreversible** (a committed secret, a force-push) or **outward-facing** (a merge, a ClickUp write, a destructive gcloud verb) — cases where no upstream contract can make the condition impossible, so the check at the choke point *is* the control. How work is done *inside* the pipeline is contract, not gate: an output contract the agent must satisfy, and tools scoped so the wrong action is unavailable rather than merely forbidden.
+
+**The test:** if some upstream change could make the condition impossible, the guard is a patch; if not, the guard is the control.
+
+**Why the four came out, empirically.** They enforced process over a non-deterministic agent flow, and the false positives accumulated faster than the prevented incidents. Three shipped as bugs against this repo, and a fourth surfaced inside the pipeline while those three were being fixed — an anti-gaming check flagged a plan because a file path contained the substring `model`. Meanwhile no incident is recorded as prevented, because **none of the hooks logs its decisions** — measured cost against unmeasured benefit. Decision logging is the prerequisite for reinstating any of them.
+
+**Everything below in this section describes the unwired `gate-guard` and is retained for the follow-up cleanup, not as a description of current behavior.**
+
+## Deterministic order floor (`gate-guard`) — deny vs ask, and the force-push floor (Invariant E) — UNWIRED as of v2.139.0
 
 **`gh pr create` correction — already covered, not net-new.** The table above lists `gh pr create` as `ask` by default with an `allow` opt-in (`autogate.pr_create`) — that coverage PRE-DATES this section and is unchanged by it. The net-new contribution documented below is the ORDER floor (`gate-guard`), not `gh pr create` coverage.
 
