@@ -76,9 +76,13 @@ Before doing anything else in a fresh session, verify this environment can run t
 
 This model does NOT depend on the operator reaching the orchestrator's own subagent panel directly. An earlier design did — via an M3 direct-panel round-trip that proved unreachable in real clients (herdr and other TUIs expose no in-session-subagent reply path), deadlocking the gate. Gate decisions now flow operator → leader (inline, reachable) → orchestrator (relayed, with attribution), so the only capability that must hold is the parent-to-child spawn-and-resume path above, which is standard at this version floor.
 
-**On failure → hard STOP, no fallback.** Do NOT run the pipeline inline as a monolith. This gates **spawning a `th:orchestrator`** for pipeline work; non-gated direct modes (research, translate, diagram, define-ac, security audit) never spawn an orchestrator and still run. Surface a single clear operator-facing error and stop — for example:
+**On failure → hard STOP, no fallback.** Do NOT run the pipeline inline as a monolith. This gates **spawning a `th:orchestrator`** for pipeline work; non-gated direct modes (research, translate, diagram, define-ac, security audit) never spawn an orchestrator and still run. Surface a single clear operator-facing error naming the exact cause and remedy — never a generic STOP — for example:
 
 > This version of team-harness requires Claude Code ≥ v2.1.199 (nested subagents with resumable context): {the failing condition}. Upgrade Claude Code, or install an earlier `th` version.
+
+A second, distinct failing condition produces `th:orchestrator` itself losing the `Task` tool once spawned (it falls back to `dispatch_handoff` — `docs/subagent-orchestration.md`): Claude Code's subagent-nesting depth is configurable, not a permanent cap, via `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` in `~/.claude/settings.json`, and defaults to unset. When that is the observed cause, name it exactly instead of the generic version STOP above:
+
+> `th:orchestrator` lost the `Task` tool and fell back to a relayed dispatch. Cause: `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` is not set in `~/.claude/settings.json` (defaults to unset — depth-2 nesting is not on by default). Remedy: run `/th:setup` or `/th:update` to provision `"2"`, then restart the session. This check only diagnoses — it never offers, prompts, or writes; provisioning happens exclusively via those two commands (`docs/setup-update-model.md § Architecture prerequisite: subagent nesting depth`).
 
 A silent monolith fallback is deliberately NOT provided — it would mask that the split is not actually running. This holds for both branches above: the state (c) opencode path is the same gated split running under leader-relay + takeover, never an inline monolith.
 

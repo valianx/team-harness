@@ -280,6 +280,26 @@ Ask the operator whether to enable the english-learning correction mode. This mo
 - On `y`: persist `english_learning: true` to `~/.claude/.team-harness.json` via **merge-write-whole-document** — read the full JSON, replace or add only the `english_learning` key (set to `true`), write the whole document back. Never emit a partial payload — this preserves `logs-mode`, `logs-path`, `logs-subfolder`, `files`, `clickup`, `pricing`, and all other existing keys. Then ask a separate immersion question: `Also set English as the response language for immersion? [y/N]` (default: N). On `y`, additionally set `language: en` in the same merge-write. On `n`/Enter, leave `language` unchanged.
 - On `n`/Enter (declining the correction mode): if no prior `english_learning` key existed, omit the key entirely (absence of the key means mode OFF — matching the `language` omit-when-blank rule). If a prior value of `true` existed and the operator declines, write `english_learning: false` to clear it. Do NOT modify the `language` key on disable.
 
+### 3.7. Provision the subagent-nesting-depth prerequisite (gated)
+
+Full mechanism: `docs/setup-update-model.md § Architecture prerequisite: subagent nesting depth`. This step applies only the concrete values below — it does not restate the mechanism.
+
+1. **Already-present check.** Read `~/.claude/settings.json` (if present). If `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` already equals `"2"`, or a prior decline is already recorded at `nested_spawn_depth.declined` in `~/.claude/.team-harness.json`, skip to Step 4a with no prompt and no write — record the fact for the Step 7 summary row only.
+2. **Gate (only reached when both checks above are false).**
+   ```text
+   Provision Claude Code's subagent-nesting depth (env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH = "2")
+   in ~/.claude/settings.json? Without it, th:orchestrator cannot dispatch its own specialists and
+   falls back to a relayed dispatch instead.
+
+   This setting applies to every Claude Code session on this machine, on every project, not only
+   this pipeline, and persists until removed manually. It requires a session restart to take effect.
+
+   Write this value now? [y/N]
+   ```
+3. **On `y`:** merge-write-whole-document to `~/.claude/settings.json` — back up to `settings.json.bak` at `0o600` (skipped if the file does not exist), read the full document, set only `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` to `"2"`, write to a temp file at `0o600`, validate as JSON, rename atomically. Then re-read and re-parse: assert exactly one JSON path changed and that `permissions.allow`/`permissions.deny`/`permissions.additionalDirectories` are unchanged element-for-element; on any other delta, restore `.bak` and report the write as failed. Report: `Subagent nesting depth provisioned in ~/.claude/settings.json. Restart the session (or start a new one) for it to take effect.` Never state that it is already active in the current session.
+4. **On `n`/Enter (decline):** persist `nested_spawn_depth.declined: true` to `~/.claude/.team-harness.json` via merge-write-whole-document (preserving every other key). Do not write to `~/.claude/settings.json`. Continue to Step 4a. This decline is durable — neither this command nor `/th:update` re-offers it in a future run.
+5. **Never claim liveness.** No message in this step, on either branch, states or implies the value is active in the current session.
+
 ### 4a. Write orchestrator dispatch rule
 
 Read the canonical block from `managed-blocks/orchestrator-dispatch-rule.md` (resolved from the plugin cache: `~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/skills/setup/managed-blocks/orchestrator-dispatch-rule.md`).
@@ -293,7 +313,7 @@ The canonical block (source of truth in `managed-blocks/orchestrator-dispatch-ru
 <!-- orchestrator-dispatch-rule:start -->
 ## orchestrator dispatch
 
-**Foundation — the top-level agent IS th:leader.** Team Harness runs on Claude Code's native general-agent architecture: the top-level session agent is th:leader, the operator's functional coordinator. th:leader handles intake, discover/framing, and spec co-authoring, then spawns a th:orchestrator subagent per development task to run the gated execution pipeline (architect → implementer → tester + qa → pre-delivery security audit → delivery). When the boot capability check in `agents/leader.md` does not pass, th:leader STOPS with a clear error instead of running the pipeline inline — there is no monolith fallback (a silent degradation would mask that the split is not running). This is not a mode — it is the CC architecture; no filesystem marker is required. th:leader spawning th:orchestrator is the expected and correct behavior. A th:orchestrator spawning another orchestrator or a leader, or executing the orchestrator's execution role inline when it is itself running as a nested subagent, is the ad-hoc improvisation that weakens gate enforcement and is PROHIBITED — use the opencode/legacy FALLBACK described below.
+**Foundation — the top-level agent IS th:leader.** Team Harness runs on Claude Code's native general-agent architecture: the top-level session agent is th:leader, the operator's functional coordinator. th:leader handles intake, discover/framing, and spec co-authoring, then spawns a th:orchestrator subagent per development task to run the gated execution pipeline (architect → implementer → tester + qa → pre-delivery security audit → delivery). When the boot capability check in `agents/leader.md` does not pass, th:leader STOPS with a clear error instead of running the pipeline inline — there is no monolith fallback (a silent degradation would mask that the split is not running). This is not a mode — it is the CC architecture; no filesystem marker is required. th:leader spawning th:orchestrator is the expected and correct behavior. A th:orchestrator spawning another orchestrator or a leader, or executing the orchestrator's execution role inline when it is itself running as a nested subagent, is the ad-hoc improvisation that weakens gate enforcement and is PROHIBITED — use the FALLBACK described below.
 
 **Development tasks route through the full pipeline.** Route each development task (features, fixes, refactors, enhancements, hotfixes, issue work, review) through the full pipeline (architect → implementer → tester + qa → pre-delivery security audit → delivery) with quality gates at each stage boundary. Do not skip stages or substitute yourself for a subagent — the pipeline runs in full or stops with a real error.
 
@@ -313,7 +333,7 @@ The canonical block (source of truth in `managed-blocks/orchestrator-dispatch-ru
 
 **Report team-harness problems via `/th:report-issue`.** When a bug, gap, or improvement is detected in the `th` plugin itself — its agents, skills, or any orchestrator behavior — report it with `/th:report-issue <bug|feature|docs|question> "<summary>"`, not with `gh issue create` directly and not by editing files under the plugin cache (those edits are transient and are overwritten on the next `th:update`). The skill builds the correct issue pattern (Summary, Environment with `th`/Claude Code/OS versions), de-duplicates against open issues, and requires confirmation before creating; a manual `gh issue create` skips that pattern and the dedup check.
 
-**FALLBACK — opencode/legacy nested-context path.** When `th:orchestrator` is invoked via `Agent(subagent_type='th:orchestrator', ...)` from a nested context (e.g. opencode or a chained dispatch) and the harness strips its `Task` tool, the orchestrator emits a `dispatch_handoff` directive. Top-level Claude MUST parse the `dispatch_handoff` JSON, dispatch the named agent via `Task`, and continue the pipeline. This takeover machinery is RETAINED for opencode compatibility but is NOT the primary path on the CC foreground path (where nested subagents retain `Task`). Full protocol: `docs/subagent-orchestration.md`.
+**FALLBACK — nested-context Task unavailability (opencode, or CC without the nesting prerequisite).** When `th:orchestrator` is invoked via `Agent(subagent_type='th:orchestrator', ...)` from a nested context and does not retain its `Task` tool, it emits a `dispatch_handoff` directive. Top-level Claude MUST parse the `dispatch_handoff` JSON, dispatch the named agent via `Task`, and continue the pipeline. Claude Code's subagent-nesting depth is configurable, not a permanent cap, via `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` in `~/.claude/settings.json` (defaults to unset; `/th:setup`/`/th:update` provision `"2"` — `docs/setup-update-model.md § Architecture prerequisite: subagent nesting depth`). This takeover machinery is the fallback for a runtime or a configuration where nesting is not provisioned — opencode always, or CC before that prerequisite is set — never the normal state on a correctly-provisioned CC session. Full protocol: `docs/subagent-orchestration.md`.
 <!-- orchestrator-dispatch-rule:end -->
 
 ### 4e. Copy the developer-mode output style
@@ -382,7 +402,7 @@ Write `~/.claude/.team-harness.json` with:
 }
 ```
 
-Preserve ALL existing fields (like `files`, `clickup`, `pricing`, `gh_config_dirs`, `nested_lane_capability`, `lane_autoselect`) if the manifest already exists. Use the **merge-write-whole-document** contract: read the full JSON, replace or add only the keys this step owns (`format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, and optionally `language`, and optionally `english_learning`, and optionally `flow_telemetry.enabled`), write the whole document back. NEVER emit a partial payload — that would destroy `files`, `clickup`, `pricing`, `gh_config_dirs` (Step 3b), `nested_lane_capability` (Step 6c), `lane_autoselect` (§ Targeted: Lane Auto-select), and any other operator-configured key.
+Preserve ALL existing fields (like `files`, `clickup`, `pricing`, `gh_config_dirs`, `nested_lane_capability`, `nested_spawn_depth`, `lane_autoselect`) if the manifest already exists. Use the **merge-write-whole-document** contract: read the full JSON, replace or add only the keys this step owns (`format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, and optionally `language`, and optionally `english_learning`, and optionally `flow_telemetry.enabled`), write the whole document back. NEVER emit a partial payload — that would destroy `files`, `clickup`, `pricing`, `gh_config_dirs` (Step 3b), `nested_lane_capability` (Step 6c), `nested_spawn_depth` (Step 3.7), `lane_autoselect` (§ Targeted: Lane Auto-select), and any other operator-configured key.
 
 The `language` key is written only when the operator provided a value in Step 3.5; if they left it blank and no prior value existed, omit the key entirely (absence of the key means detection-based behavior, which is the default).
 
@@ -496,6 +516,7 @@ Team Harness setup complete.
   Memory MCP:  connected (https://your-mcp.example.com/mcp)
   context7:    connected (API key: ****...abcd)
   Workspaces:  obsidian (D:\vault\Work\work-logs)
+  Nesting:     provisioned (restart required) | already provisioned | declined
   Agents:      22 registered
   Skills:      38 available
 

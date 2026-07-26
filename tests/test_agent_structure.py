@@ -37801,6 +37801,244 @@ check(
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
+# Suite 173 — dispatch-cost-reduction (Task-5): subagent-nesting-depth
+# prerequisite reconciliation
+#
+# AC-1/AC-7: the provisioning mechanism (env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH
+# in ~/.claude/settings.json) is specified once in docs/setup-update-model.md;
+# both skills/setup/SKILL.md and skills/update/SKILL.md reference it rather
+# than re-specifying it, and use identical key/value/decline-record literals.
+# AC-8: agents/leader.md's boot-check message names the exact cause and
+# remedy, without touching the fenced version-floor logic. AC-10: the
+# permission-provisioning allowlist enumeration stays byte-intact, with a new
+# disjointness cross-reference naming the separate env mechanism. AC-14: the
+# nesting-depth framing is corrected to "configurable, not a permanent cap"
+# at every Class-A site, and the stale "opencode/legacy path only" framing is
+# gone from all of them. AC-9 residual: the effort-axis claims are asserted
+# UNCHANGED (left unresolved per explicit dispatch instruction — documentation
+# review is not proof of runtime behavior).
+#
+# Marker: dispatch-cost-reduction
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 173: dispatch-cost-reduction (subagent-nesting-depth prerequisite) ===")
+
+_S173_STOP_H2 = ("\n## ", "\n---\n")
+
+_s173_setup_model = read(REPO_ROOT / "docs" / "setup-update-model.md")
+_s173_perm_prov = read(REPO_ROOT / "docs" / "permission-provisioning.md")
+_s173_setup_skill = read(SKILLS_DIR / "setup" / "SKILL.md")
+_s173_update_skill = read(SKILLS_DIR / "update" / "SKILL.md")
+_s173_leader = read(AGENTS_DIR / "leader.md")
+_s173_claude = read(REPO_ROOT / "CLAUDE.md")
+_s173_suborch = read(REPO_ROOT / "docs" / "subagent-orchestration.md")
+_s173_troubleshooting = read(REPO_ROOT / "docs" / "troubleshooting.md")
+_s173_odr_canonical = read(SKILLS_DIR / "setup" / "managed-blocks" / "orchestrator-dispatch-rule.md")
+_s173_readme = read(AGENTS_DIR / "README.md")
+_s173_qa_plan = read(AGENTS_DIR / "qa-plan.md")
+_s173_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s173_own = read(Path(__file__))
+
+_S173_ENV_KEY = "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH"
+_S173_CANONICAL_ANCHOR = "## Architecture prerequisite: subagent nesting depth"
+_s173_canonical_slice = _slice_section(_s173_setup_model, _S173_CANONICAL_ANCHOR, _S173_STOP_H2)
+
+# --- AC-1: canonical mechanism defined once, with the concrete value --------
+check(
+    "suite173(ac1-canonical-exists): docs/setup-update-model.md declares the"
+    " canonical prerequisite section",
+    bool(_s173_canonical_slice),
+    f"expected the heading '{_S173_CANONICAL_ANCHOR}' in docs/setup-update-model.md",
+)
+check(
+    "suite173(ac1-canonical-value): canonical section names the key and the"
+    ' value "2"',
+    _S173_ENV_KEY in _s173_canonical_slice and '"2"' in _s173_canonical_slice,
+    f"docs/setup-update-model.md § {_S173_CANONICAL_ANCHOR} must name"
+    f" {_S173_ENV_KEY} and the value \"2\"",
+)
+
+# --- AC-7: both skills reference the canonical doc, neither re-specifies ---
+check(
+    "suite173(ac7-setup-references-canonical): skills/setup/SKILL.md"
+    " references docs/setup-update-model.md for this mechanism",
+    "setup-update-model.md" in _s173_setup_skill and _S173_ENV_KEY in _s173_setup_skill,
+    "skills/setup/SKILL.md must reference docs/setup-update-model.md and"
+    f" name {_S173_ENV_KEY}",
+)
+check(
+    "suite173(ac7-update-references-canonical): skills/update/SKILL.md"
+    " references docs/setup-update-model.md for this mechanism",
+    "setup-update-model.md" in _s173_update_skill and _S173_ENV_KEY in _s173_update_skill,
+    "skills/update/SKILL.md must reference docs/setup-update-model.md and"
+    f" name {_S173_ENV_KEY}",
+)
+check(
+    "suite173(ac7-identical-decline-key): both skills use the identical"
+    " decline-record key 'nested_spawn_depth'",
+    "nested_spawn_depth" in _s173_setup_skill and "nested_spawn_depth" in _s173_update_skill,
+    "skills/setup/SKILL.md and skills/update/SKILL.md must both use the"
+    " literal key 'nested_spawn_depth' for the durable decline record — a"
+    " divergent key name would desync the two sites' reconciliation",
+)
+
+# --- AC-1b: the residual-seam amendment reconciles the closed exception ----
+_S173_RESIDUAL_ANCHOR = "## The residual seam: new operator keys"
+_s173_residual_slice = _slice_section(_s173_setup_model, _S173_RESIDUAL_ANCHOR, _S173_STOP_H2)
+check(
+    "suite173(ac1b-residual-seam-amended): the residual-seam section declares"
+    " the closed one-key exception for the decline record",
+    "Closed exception" in _s173_residual_slice and "nested_spawn_depth" in _s173_residual_slice,
+    f"docs/setup-update-model.md § {_S173_RESIDUAL_ANCHOR} must declare the"
+    " closed one-key exception that permits /th:update to write"
+    " nested_spawn_depth.declined, reconciling the 'never writes' claim",
+)
+_S173_UPDATE_IMPORTANT_ANCHOR = "## Important"
+_s173_update_important_slice = _slice_section(_s173_update_skill, _S173_UPDATE_IMPORTANT_ANCHOR, _S173_STOP_H2)
+check(
+    "suite173(ac1b-update-skill-amended): skills/update/SKILL.md's Important"
+    " section states the closed exception rather than an unqualified"
+    " 'never writes' claim",
+    "closed exception" in _s173_update_important_slice
+    and "nested_spawn_depth" in _s173_update_important_slice,
+    "skills/update/SKILL.md § Important must name the closed exception for"
+    " nested_spawn_depth.declined",
+)
+
+# --- AC-10: permission-provisioning allowlist stays byte-intact, plus a new
+# disjointness cross-reference naming the separate env mechanism -----------
+_S173_PERM_ENUM = (
+    "touches ONLY `permissions.allow`, `permissions.deny`, and "
+    "`permissions.additionalDirectories`, nothing else"
+)
+check(
+    "suite173(ac10-perm-enum-intact): docs/permission-provisioning.md's"
+    " closed-allowlist enumeration is unchanged",
+    _S173_PERM_ENUM in _s173_perm_prov,
+    "docs/permission-provisioning.md must still contain the exact closed-"
+    "allowlist sentence for the permissions.* mechanism — Task-5 must not"
+    " edit this fenced enumeration",
+)
+check(
+    "suite173(ac10-perm-disjoint-xref): docs/permission-provisioning.md"
+    " cross-references the separate architecture-prerequisite mechanism",
+    _S173_ENV_KEY in _s173_perm_prov and "setup-update-model.md" in _s173_perm_prov,
+    "docs/permission-provisioning.md must name"
+    f" {_S173_ENV_KEY} and point to docs/setup-update-model.md, declaring"
+    " the two mechanisms disjoint",
+)
+
+# --- AC-8: leader.md boot-check message names cause + remedy, without
+# touching the fenced version-floor STOP text -------------------------------
+_S173_BOOT_ANCHOR = "## Boot capability check (AC-2.6)"
+_s173_boot_slice = _slice_section(_s173_leader, _S173_BOOT_ANCHOR, _S173_STOP_H2)
+check(
+    "suite173(ac8-boot-check-names-cause): leader.md boot-check message names"
+    " the env var, the value, and both lifecycle commands",
+    _S173_ENV_KEY in _s173_boot_slice
+    and '"2"' in _s173_boot_slice
+    and "/th:setup" in _s173_boot_slice
+    and "/th:update" in _s173_boot_slice,
+    f"agents/leader.md § {_S173_BOOT_ANCHOR} must name {_S173_ENV_KEY}, the"
+    ' value "2", and both /th:setup and /th:update as the remedy',
+)
+check(
+    "suite173(ac8-fenced-version-floor-untouched): the pre-existing CC"
+    " version-floor STOP text is preserved verbatim",
+    "This version of team-harness requires Claude Code" in _s173_boot_slice
+    and "v2.1.199" in _s173_boot_slice,
+    f"agents/leader.md § {_S173_BOOT_ANCHOR} must still contain the original"
+    " v2.1.199 version-floor STOP message — Task-5 may only add a second,"
+    " distinct message, never replace the first",
+)
+
+# --- AC-14: nesting framed as configurable at every Class-A site, and the
+# stale exclusive-opencode framing is gone -----------------------------------
+_S173_STALE_PHRASE = "opencode/legacy nested-context path"
+for _label, _text, _path in (
+    ("CLAUDE.md", _s173_claude, "CLAUDE.md"),
+    ("managed-blocks/orchestrator-dispatch-rule.md", _s173_odr_canonical,
+     "skills/setup/managed-blocks/orchestrator-dispatch-rule.md"),
+    ("docs/subagent-orchestration.md", _s173_suborch, "docs/subagent-orchestration.md"),
+):
+    check(
+        f"suite173(ac14-no-stale-framing): {_label} does NOT contain the"
+        " stale 'opencode/legacy nested-context path' framing",
+        _S173_STALE_PHRASE not in _text,
+        f"{_path} must not describe nesting-loss as exclusive to an"
+        " 'opencode/legacy nested-context path' — it is configurable via"
+        f" {_S173_ENV_KEY} on any runtime",
+    )
+check(
+    "suite173(ac14-claude-md-configurable): CLAUDE.md §14 FALLBACK line"
+    " describes nesting as configurable",
+    "configurable" in _s173_claude and _S173_ENV_KEY in _s173_claude,
+    f"CLAUDE.md §14 must state nesting is configurable and name {_S173_ENV_KEY}",
+)
+check(
+    "suite173(ac14-suborch-configurable): docs/subagent-orchestration.md"
+    " Primary Path section describes nesting as configurable, not a"
+    " permanent cap",
+    "configurable" in _s173_suborch and "not a permanent cap" in _s173_suborch,
+    "docs/subagent-orchestration.md must state nesting depth is configurable,"
+    " not a permanent cap",
+)
+check(
+    "suite173(ac14-troubleshooting-remedy): docs/troubleshooting.md names the"
+    " env var and the remedy commands",
+    _S173_ENV_KEY in _s173_troubleshooting
+    and "/th:setup" in _s173_troubleshooting
+    and "/th:update" in _s173_troubleshooting,
+    f"docs/troubleshooting.md must name {_S173_ENV_KEY} and both /th:setup"
+    " and /th:update as the remedy",
+)
+
+# --- AC-9 residual: effort-axis claims left UNCHANGED (unresolved, per
+# explicit dispatch instruction — documentation review is not proof of
+# runtime behavior; do not flip without empirical evidence) -----------------
+check(
+    "suite173(ac9-effort-claim-unchanged-readme-26): agents/README.md still"
+    " claims effort is session-global on Claude Code",
+    "On Claude Code `effort` is session-global" in _s173_readme,
+    "agents/README.md:26 must be left as-is — AC-9 is unresolved, not"
+    " flipped, absent empirical runtime evidence",
+)
+check(
+    "suite173(ac9-effort-claim-unchanged-qa-plan): agents/qa-plan.md still"
+    " distinguishes the model axis (per-agent) from the effort axis"
+    " (session-global on CC)",
+    "on Claude Code, `effort` is session-global" in _s173_qa_plan,
+    "agents/qa-plan.md § Model right-sizing must be left as-is — AC-9 is"
+    " unresolved, not flipped, absent empirical runtime evidence",
+)
+
+# --- Self-referential guards (hygiene contract) -----------------------------
+check(
+    "suite173(self-ref): test file contains 'Suite 173' and"
+    " 'dispatch-cost-reduction'",
+    "Suite 173" in _s173_own and "dispatch-cost-reduction" in _s173_own,
+    "test file must self-reference Suite 173 and the marker"
+    " 'dispatch-cost-reduction'",
+)
+check(
+    "suite173(registry): docs/testing.md registers 'Suite 173' and"
+    " 'dispatch-cost-reduction'",
+    "Suite 173" in _s173_testing_md and "dispatch-cost-reduction" in _s173_testing_md,
+    "docs/testing.md must register Suite 173 and the 'dispatch-cost-reduction'"
+    " marker",
+)
+check(
+    "suite173(hygiene): CLAUDE.md does NOT contain 'Suite 173' (§11 hygiene"
+    " contract)",
+    "Suite 173" not in _s173_claude,
+    "CLAUDE.md must not mention Suite 173 — only docs/testing.md is the"
+    " canonical registry",
+)
+
+# Marker: dispatch-cost-reduction
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
