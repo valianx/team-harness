@@ -30629,9 +30629,29 @@ check(
     "Bash found in adversary.md tools — adversary must be read-only (AC-15)",
 )
 check(
-    "s125/AC-15i: adversary.md tools EXCLUDES Edit",
-    "Edit" not in _s125_adv_tools,
-    "Edit found in adversary.md tools — adversary must not modify source (AC-15)",
+    "s125/AC-15i: adversary.md tools includes Edit",
+    "Edit" in _s125_adv_tools,
+    "Edit not in adversary.md tools — needed to amend its own report in place (AC-15)",
+)
+check(
+    "s125/AC-15i2: adversary.md declares the write-scope limit",
+    "Write-scope limit — your own working file only" in _s125_adv,
+    "adversary.md must state the write-scope limit — Edit is granted for its own report only (AC-15)",
+)
+_s125_adv_allowed = ("reviews/04-adversary.md", "reviews/04-adversary-amend.md")
+check(
+    "s125/AC-15i3: adversary.md write-scope names both permitted report paths",
+    all(p in _s125_adv for p in _s125_adv_allowed),
+    "adversary.md must name both permitted report paths "
+    f"({', '.join(_s125_adv_allowed)}) — the allowlist the write-scope limit refers to (AC-15)",
+)
+_s125_adv_forbidden = ("source code", "tests", "configuration", "another agent's report", "shared review file")
+_s125_adv_missing = [t for t in _s125_adv_forbidden if t not in _s125_adv]
+check(
+    "s125/AC-15i4: adversary.md write-scope enumerates the prohibited targets",
+    not _s125_adv_missing,
+    "adversary.md write-scope limit must enumerate the prohibited targets — "
+    f"missing: {', '.join(_s125_adv_missing)} (AC-15)",
 )
 
 # -------------------------------------------------------------------
