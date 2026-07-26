@@ -285,7 +285,7 @@ Ask the operator whether to enable the english-learning correction mode. This mo
 Full mechanism: `docs/setup-update-model.md § Architecture prerequisite: subagent nesting depth`. This step applies only the concrete values below — it does not restate the mechanism.
 
 1. **Already-present check.** Read `~/.claude/settings.json` (if present). If `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` already equals `"2"`, or a prior decline is already recorded at `nested_spawn_depth.declined` in `~/.claude/.team-harness.json`, skip to Step 4a with no prompt and no write — record the fact for the Step 7 summary row only.
-2. **Gate (only reached when both checks above are false).**
+2. **Absent-value gate (reached only when the checks above are false AND the key is absent from `settings.json`).**
    ```text
    Provision Claude Code's subagent-nesting depth (env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH = "2")
    in ~/.claude/settings.json? Without it, th:orchestrator cannot dispatch its own specialists and
@@ -296,9 +296,18 @@ Full mechanism: `docs/setup-update-model.md § Architecture prerequisite: subage
 
    Write this value now? [y/N]
    ```
-3. **On `y`:** merge-write-whole-document to `~/.claude/settings.json` — back up to `settings.json.bak` at `0o600` (skipped if the file does not exist), read the full document, set only `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` to `"2"`, write to a temp file at `0o600`, validate as JSON, rename atomically. Then re-read and re-parse: assert exactly one JSON path changed and that `permissions.allow`/`permissions.deny`/`permissions.additionalDirectories` are unchanged element-for-element; on any other delta, restore `.bak` and report the write as failed. Report: `Subagent nesting depth provisioned in ~/.claude/settings.json. Restart the session (or start a new one) for it to take effect.` Never state that it is already active in the current session.
-4. **On `n`/Enter (decline):** persist `nested_spawn_depth.declined: true` to `~/.claude/.team-harness.json` via merge-write-whole-document (preserving every other key). Do not write to `~/.claude/settings.json`. Continue to Step 4a. This decline is durable — neither this command nor `/th:update` re-offers it in a future run.
-5. **Never claim liveness.** No message in this step, on either branch, states or implies the value is active in the current session.
+2a. **Present-but-different-value gate (reached only when the checks in Step 1 are false AND the key IS present with a value other than `"2"`).** A present-but-different value is a distinct case from "absent" — it is never silently folded into the absent-value gate above, and the write never proceeds on that gate's text alone.
+   ```text
+   ~/.claude/settings.json currently sets env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH = "{current-value}".
+   Team Harness recommends "2" so th:orchestrator can dispatch its own specialists directly; any
+   other value (including this one) falls back to a relayed dispatch instead.
+
+   Overwrite "{current-value}" with "2"? [y/N]
+   ```
+   On `n`/Enter here: record the same durable decline as Step 4 below (keeping a deliberately-different value is treated the same as declining "2") — never re-prompted once recorded.
+3. **On `y` (either gate):** merge-write-whole-document to `~/.claude/settings.json` — back up to `settings.json.bak` at `0o600` (skipped if the file does not exist). Read the target file: if it does not exist, start from `{}`; if it exists but fails to parse as JSON, **abort before writing** and report the corrupted-file failure by name — never fall back to `{}` for an existing-but-unparseable file, since that would silently discard any `permissions.*` rules already present. Otherwise set only `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` to `"2"`, write to a temp file at `0o600`, validate as JSON, rename atomically. Then re-read and re-parse: assert exactly one JSON path changed and that `permissions.allow`/`permissions.deny`/`permissions.additionalDirectories` are unchanged element-for-element; on any other delta, restore `.bak` and report the write as failed. Report: `Subagent nesting depth provisioned in ~/.claude/settings.json. Restart the session (or start a new one) for it to take effect.` Never state that it is already active in the current session.
+4. **On `n`/Enter (decline, either gate):** persist `nested_spawn_depth.declined: true` to `~/.claude/.team-harness.json` via merge-write-whole-document (preserving every other key). Do not write to `~/.claude/settings.json`. Continue to Step 4a. This decline is durable — neither this command nor `/th:update` re-offers it in a future run.
+5. **Never claim liveness.** No message in this step, on any branch, states or implies the value is active in the current session.
 
 ### 4a. Write orchestrator dispatch rule
 

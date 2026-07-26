@@ -38447,15 +38447,46 @@ def _s175_declared_mcp_tools(frontmatter_block: str) -> set[tuple[str, str]]:
     return set(_S175_MCP_TOOL_RE.findall(frontmatter_block))
 
 
+# Negation cues that, immediately preceding a tool-name mention, mark prose
+# DESCRIBING non-use rather than a genuine invocation directive (e.g. "never
+# invokes mcp__memory__search_nodes" should not count as usage evidence).
+# Verified against the full agents/ corpus before adding this: no currently-
+# passing agent has its only mention of a declared tool inside this window,
+# so the addition narrows the false-positive class without flipping any
+# existing suite outcome.
+_S175_NEGATION_CUES = (
+    "never", "does not", "do not", "doesn't", "don't", "no longer",
+    "not use", "won't", "avoid",
+)
+_S175_NEGATION_WINDOW = 60
+
+
+def _s175_has_genuine_invocation_mention(body: str, needle: str) -> bool:
+    """True if at least one occurrence of `needle` in `body` is NOT preceded,
+    within `_S175_NEGATION_WINDOW` characters, by a negation cue — a prose
+    aside describing non-use is not invocation evidence."""
+    for match in re.finditer(re.escape(needle), body):
+        window = body[max(0, match.start() - _S175_NEGATION_WINDOW):match.start()].lower()
+        if not any(cue in window for cue in _S175_NEGATION_CUES):
+            return True
+    return False
+
+
 def _s175_unused_mcp_grants(frontmatter_block: str, body: str) -> list[str]:
-    """MCP tools this frontmatter grants that the body never mentions by
-    short name (`search_nodes`) or by fully-qualified name
-    (`mcp__memory__search_nodes`) — either counts as invoked."""
+    """MCP tools this frontmatter grants that the body never mentions with a
+    genuine (non-negated) mention by short name (`search_nodes`) or by
+    fully-qualified name (`mcp__memory__search_nodes`) — either counts as
+    invoked. This is a text-level heuristic, not proof of runtime invocation:
+    a markdown system prompt has no call sites in the code sense, only
+    directives a model may or may not follow at runtime."""
     declared = _s175_declared_mcp_tools(frontmatter_block)
     unused = []
     for server, tool in declared:
         qualified = f"mcp__{server}__{tool}"
-        if tool not in body and qualified not in body:
+        if not (
+            _s175_has_genuine_invocation_mention(body, tool)
+            or _s175_has_genuine_invocation_mention(body, qualified)
+        ):
             unused.append(qualified)
     return sorted(unused)
 
@@ -38500,6 +38531,22 @@ check(
     "suite175(canary): a synthetic frontmatter grant with no matching body invocation is DETECTED",
     _s175_canary_unused == ["mcp__memory__open_nodes"],
     f"canary must flag exactly the deliberately-unused grant; got {_s175_canary_unused}",
+)
+
+# --- Prose-only false-positive: a negated mention must NOT count as usage
+# evidence — proves the mention/invocation distinction the review flagged ---
+_S175_PROSE_ONLY_FRONTMATTER = "tools: Read, Write, mcp__memory__search_nodes"
+_S175_PROSE_ONLY_BODY = (
+    "This agent never invokes mcp__memory__search_nodes; a sibling agent owns that call."
+)
+_s175_prose_only_unused = _s175_unused_mcp_grants(
+    _S175_PROSE_ONLY_FRONTMATTER, _S175_PROSE_ONLY_BODY
+)
+check(
+    "suite175(prose-only-false-positive): a negated mention ('never invokes X') does"
+    " not count as invocation evidence",
+    _s175_prose_only_unused == ["mcp__memory__search_nodes"],
+    f"a prose-only negated mention must still flag the grant as unused; got {_s175_prose_only_unused}",
 )
 
 # --- skills/lint/SKILL.md: Check 11 (tools/MCP allowlist minimality) mirrors

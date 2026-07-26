@@ -379,8 +379,8 @@
     "file": "agents/leader.md",
     "mode": "heading",
     "anchor": "## Boot capability check (AC-2.6)",
-    "sha256": "8613adf80f90065a4088aac13f5a248793667412bd14d9849da6391b984a136f",
-    "length": 6576,
+    "sha256": "2967bc3303c7acc21df03610d654158cb5ffbbcc51f9a1a87533c1ff711c1e90",
+    "length": 7002,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -821,6 +821,21 @@
       "MUST": 0,
       "NEVER": 0,
       "unconditionally": 0,
+      "non-waivable": 0
+    }
+  },
+  {
+    "id": "claude-md-14-subagent-orchestration",
+    "file": "CLAUDE.md",
+    "mode": "heading",
+    "anchor": "## 14. Subagent Orchestration",
+    "sha256": "e33d4de3758fe04688b38c8b8394168af3ebc17c04cda79a99f694104d971f7f",
+    "length": 2044,
+    "modal_counts": {
+      "MUST NOT": 0,
+      "MUST": 1,
+      "NEVER": 0,
+      "unconditionally": 1,
       "non-waivable": 0
     }
   },
