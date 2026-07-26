@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import os
@@ -2283,13 +2284,22 @@ policy_checks = [
 for label, condition in policy_checks:
     check(f"docs/kg-content-policy.md: {label}", condition)
 
-# --- orchestrator.md: session_start in Phase 0a, session_end in Phase 6 ---
+# --- session lifecycle: session_start owned by leader.md (Phase 0a), session_end
+# owned by orchestrator.md (Phase 6) — per agents/_shared/kg-write-policy.md
+# § "Session attribution". These two frontmatter checks read each file
+# directly rather than `orch` (= SPLIT_CORPUS): `orch.split("---", 2)[1]`
+# resolves to leader.md's frontmatter block (leader.md is first in
+# _SPLIT_CORPUS_FILES), not orchestrator.md's, so a check anchored on that
+# slice silently validates the wrong file's frontmatter.
+
+_leader_frontmatter = read(AGENTS_DIR / "leader.md").split("---", 2)[1]
+_orch_frontmatter = read(AGENTS_DIR / "orchestrator.md").split("---", 2)[1]
 
 orch_session_checks = [
-    ("orchestrator.md frontmatter declares mcp__memory__session_start",
-     "mcp__memory__session_start" in orch.split("---", 2)[1]),
-    ("orchestrator.md frontmatter declares mcp__memory__session_end",
-     "mcp__memory__session_end" in orch.split("---", 2)[1]),
+    ("leader.md frontmatter declares mcp__memory__session_start (session open)",
+     "mcp__memory__session_start" in _leader_frontmatter),
+    ("orchestrator.md frontmatter declares mcp__memory__session_end (session close)",
+     "mcp__memory__session_end" in _orch_frontmatter),
     ("Phase 0a calls session_start before search_nodes",
      "session_start" in orch and "1b" in orch),
     ("Phase 0a writes session.json",
@@ -25758,11 +25768,15 @@ check(
     "skills/lint/SKILL.md must document both '--against' and '--changed' arguments",
 )
 
-# (12) lint summary denominator updated to 10 (positive) AND old '/ 8' is absent (negative)
+# (12) lint summary denominator updated to 11 (positive) AND old '/ 8' and stale
+# '/ 10' are both absent (negative) — dispatch-cost-reduction (Task-3) added
+# Check 11 (tools/MCP allowlist minimality), bumping the tally from 10 to 11.
 check(
-    "suite104(12-denominator-10): lint SKILL.md contains '/ 10 checks passed' and does NOT contain '/ 8 checks passed'",
-    "/ 10 checks passed" in _s104_lint and "/ 8 checks passed" not in _s104_lint,
-    "skills/lint/SKILL.md must declare '/ 10 checks passed' and must NOT contain '/ 8 checks passed'",
+    "suite104(12-denominator-11): lint SKILL.md contains '/ 11 checks passed' and does NOT contain '/ 10 checks passed' or '/ 8 checks passed'",
+    "/ 11 checks passed" in _s104_lint
+    and "/ 10 checks passed" not in _s104_lint
+    and "/ 8 checks passed" not in _s104_lint,
+    "skills/lint/SKILL.md must declare '/ 11 checks passed' and must NOT contain the stale '/ 10' or '/ 8' denominators",
 )
 
 # (13) lint Output Format includes Check 9 and Check 10 blocks
@@ -37798,6 +37812,788 @@ check(
 )
 
 # Marker: pipeline-cost-slimdown
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 173 — dispatch-cost-reduction (Task-5): subagent-nesting-depth
+# prerequisite reconciliation
+#
+# AC-1/AC-7: the provisioning mechanism (env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH
+# in ~/.claude/settings.json) is specified once in docs/setup-update-model.md;
+# both skills/setup/SKILL.md and skills/update/SKILL.md reference it rather
+# than re-specifying it, and use identical key/value/decline-record literals.
+# AC-8: agents/leader.md's boot-check message names the exact cause and
+# remedy, without touching the fenced version-floor logic. AC-10: the
+# permission-provisioning allowlist enumeration stays byte-intact, with a new
+# disjointness cross-reference naming the separate env mechanism. AC-14: the
+# nesting-depth framing is corrected to "configurable, not a permanent cap"
+# at every Class-A site, and the stale "opencode/legacy path only" framing is
+# gone from all of them. AC-9 residual: the effort-axis claims are asserted
+# UNCHANGED (left unresolved per explicit dispatch instruction — documentation
+# review is not proof of runtime behavior).
+#
+# Marker: dispatch-cost-reduction
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 173: dispatch-cost-reduction (subagent-nesting-depth prerequisite) ===")
+
+_S173_STOP_H2 = ("\n## ", "\n---\n")
+
+_s173_setup_model = read(REPO_ROOT / "docs" / "setup-update-model.md")
+_s173_perm_prov = read(REPO_ROOT / "docs" / "permission-provisioning.md")
+_s173_setup_skill = read(SKILLS_DIR / "setup" / "SKILL.md")
+_s173_update_skill = read(SKILLS_DIR / "update" / "SKILL.md")
+_s173_leader = read(AGENTS_DIR / "leader.md")
+_s173_claude = read(REPO_ROOT / "CLAUDE.md")
+_s173_suborch = read(REPO_ROOT / "docs" / "subagent-orchestration.md")
+_s173_troubleshooting = read(REPO_ROOT / "docs" / "troubleshooting.md")
+_s173_odr_canonical = read(SKILLS_DIR / "setup" / "managed-blocks" / "orchestrator-dispatch-rule.md")
+_s173_readme = read(AGENTS_DIR / "README.md")
+_s173_qa_plan = read(AGENTS_DIR / "qa-plan.md")
+_s173_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s173_own = read(Path(__file__))
+
+_S173_ENV_KEY = "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH"
+_S173_CANONICAL_ANCHOR = "## Architecture prerequisite: subagent nesting depth"
+_s173_canonical_slice = _slice_section(_s173_setup_model, _S173_CANONICAL_ANCHOR, _S173_STOP_H2)
+
+# --- AC-1: canonical mechanism defined once, with the concrete value --------
+check(
+    "suite173(ac1-canonical-exists): docs/setup-update-model.md declares the"
+    " canonical prerequisite section",
+    bool(_s173_canonical_slice),
+    f"expected the heading '{_S173_CANONICAL_ANCHOR}' in docs/setup-update-model.md",
+)
+check(
+    "suite173(ac1-canonical-value): canonical section names the key and the"
+    ' value "2"',
+    _S173_ENV_KEY in _s173_canonical_slice and '"2"' in _s173_canonical_slice,
+    f"docs/setup-update-model.md § {_S173_CANONICAL_ANCHOR} must name"
+    f" {_S173_ENV_KEY} and the value \"2\"",
+)
+
+# --- AC-7: both skills reference the canonical doc, neither re-specifies ---
+check(
+    "suite173(ac7-setup-references-canonical): skills/setup/SKILL.md"
+    " references docs/setup-update-model.md for this mechanism",
+    "setup-update-model.md" in _s173_setup_skill and _S173_ENV_KEY in _s173_setup_skill,
+    "skills/setup/SKILL.md must reference docs/setup-update-model.md and"
+    f" name {_S173_ENV_KEY}",
+)
+check(
+    "suite173(ac7-update-references-canonical): skills/update/SKILL.md"
+    " references docs/setup-update-model.md for this mechanism",
+    "setup-update-model.md" in _s173_update_skill and _S173_ENV_KEY in _s173_update_skill,
+    "skills/update/SKILL.md must reference docs/setup-update-model.md and"
+    f" name {_S173_ENV_KEY}",
+)
+check(
+    "suite173(ac7-identical-decline-key): both skills use the identical"
+    " decline-record key 'nested_spawn_depth'",
+    "nested_spawn_depth" in _s173_setup_skill and "nested_spawn_depth" in _s173_update_skill,
+    "skills/setup/SKILL.md and skills/update/SKILL.md must both use the"
+    " literal key 'nested_spawn_depth' for the durable decline record — a"
+    " divergent key name would desync the two sites' reconciliation",
+)
+
+# --- AC-1b: the residual-seam amendment reconciles the closed exception ----
+_S173_RESIDUAL_ANCHOR = "## The residual seam: new operator keys"
+_s173_residual_slice = _slice_section(_s173_setup_model, _S173_RESIDUAL_ANCHOR, _S173_STOP_H2)
+check(
+    "suite173(ac1b-residual-seam-amended): the residual-seam section declares"
+    " the closed one-key exception for the decline record",
+    "Closed exception" in _s173_residual_slice and "nested_spawn_depth" in _s173_residual_slice,
+    f"docs/setup-update-model.md § {_S173_RESIDUAL_ANCHOR} must declare the"
+    " closed one-key exception that permits /th:update to write"
+    " nested_spawn_depth.declined, reconciling the 'never writes' claim",
+)
+_S173_UPDATE_IMPORTANT_ANCHOR = "## Important"
+_s173_update_important_slice = _slice_section(_s173_update_skill, _S173_UPDATE_IMPORTANT_ANCHOR, _S173_STOP_H2)
+check(
+    "suite173(ac1b-update-skill-amended): skills/update/SKILL.md's Important"
+    " section states the closed exception rather than an unqualified"
+    " 'never writes' claim",
+    "closed exception" in _s173_update_important_slice
+    and "nested_spawn_depth" in _s173_update_important_slice,
+    "skills/update/SKILL.md § Important must name the closed exception for"
+    " nested_spawn_depth.declined",
+)
+
+# --- AC-10: permission-provisioning allowlist stays byte-intact, plus a new
+# disjointness cross-reference naming the separate env mechanism -----------
+_S173_PERM_ENUM = (
+    "touches ONLY `permissions.allow`, `permissions.deny`, and "
+    "`permissions.additionalDirectories`, nothing else"
+)
+check(
+    "suite173(ac10-perm-enum-intact): docs/permission-provisioning.md's"
+    " closed-allowlist enumeration is unchanged",
+    _S173_PERM_ENUM in _s173_perm_prov,
+    "docs/permission-provisioning.md must still contain the exact closed-"
+    "allowlist sentence for the permissions.* mechanism — Task-5 must not"
+    " edit this fenced enumeration",
+)
+check(
+    "suite173(ac10-perm-disjoint-xref): docs/permission-provisioning.md"
+    " cross-references the separate architecture-prerequisite mechanism",
+    _S173_ENV_KEY in _s173_perm_prov and "setup-update-model.md" in _s173_perm_prov,
+    "docs/permission-provisioning.md must name"
+    f" {_S173_ENV_KEY} and point to docs/setup-update-model.md, declaring"
+    " the two mechanisms disjoint",
+)
+
+# --- AC-8: leader.md boot-check message names cause + remedy, without
+# touching the fenced version-floor STOP text -------------------------------
+_S173_BOOT_ANCHOR = "## Boot capability check (AC-2.6)"
+_s173_boot_slice = _slice_section(_s173_leader, _S173_BOOT_ANCHOR, _S173_STOP_H2)
+check(
+    "suite173(ac8-boot-check-names-cause): leader.md boot-check message names"
+    " the env var, the value, and both lifecycle commands",
+    _S173_ENV_KEY in _s173_boot_slice
+    and '"2"' in _s173_boot_slice
+    and "/th:setup" in _s173_boot_slice
+    and "/th:update" in _s173_boot_slice,
+    f"agents/leader.md § {_S173_BOOT_ANCHOR} must name {_S173_ENV_KEY}, the"
+    ' value "2", and both /th:setup and /th:update as the remedy',
+)
+check(
+    "suite173(ac8-fenced-version-floor-untouched): the pre-existing CC"
+    " version-floor STOP text is preserved verbatim",
+    "This version of team-harness requires Claude Code" in _s173_boot_slice
+    and "v2.1.199" in _s173_boot_slice,
+    f"agents/leader.md § {_S173_BOOT_ANCHOR} must still contain the original"
+    " v2.1.199 version-floor STOP message — Task-5 may only add a second,"
+    " distinct message, never replace the first",
+)
+
+# --- AC-14: nesting framed as configurable at every Class-A site, and the
+# stale exclusive-opencode framing is gone -----------------------------------
+_S173_STALE_PHRASE = "opencode/legacy nested-context path"
+for _label, _text, _path in (
+    ("CLAUDE.md", _s173_claude, "CLAUDE.md"),
+    ("managed-blocks/orchestrator-dispatch-rule.md", _s173_odr_canonical,
+     "skills/setup/managed-blocks/orchestrator-dispatch-rule.md"),
+    ("docs/subagent-orchestration.md", _s173_suborch, "docs/subagent-orchestration.md"),
+):
+    check(
+        f"suite173(ac14-no-stale-framing): {_label} does NOT contain the"
+        " stale 'opencode/legacy nested-context path' framing",
+        _S173_STALE_PHRASE not in _text,
+        f"{_path} must not describe nesting-loss as exclusive to an"
+        " 'opencode/legacy nested-context path' — it is configurable via"
+        f" {_S173_ENV_KEY} on any runtime",
+    )
+check(
+    "suite173(ac14-claude-md-configurable): CLAUDE.md §14 FALLBACK line"
+    " describes nesting as configurable",
+    "configurable" in _s173_claude and _S173_ENV_KEY in _s173_claude,
+    f"CLAUDE.md §14 must state nesting is configurable and name {_S173_ENV_KEY}",
+)
+check(
+    "suite173(ac14-suborch-configurable): docs/subagent-orchestration.md"
+    " Primary Path section describes nesting as configurable, not a"
+    " permanent cap",
+    "configurable" in _s173_suborch and "not a permanent cap" in _s173_suborch,
+    "docs/subagent-orchestration.md must state nesting depth is configurable,"
+    " not a permanent cap",
+)
+check(
+    "suite173(ac14-troubleshooting-remedy): docs/troubleshooting.md names the"
+    " env var and the remedy commands",
+    _S173_ENV_KEY in _s173_troubleshooting
+    and "/th:setup" in _s173_troubleshooting
+    and "/th:update" in _s173_troubleshooting,
+    f"docs/troubleshooting.md must name {_S173_ENV_KEY} and both /th:setup"
+    " and /th:update as the remedy",
+)
+
+# --- AC-9 residual: effort-axis claims left UNCHANGED (unresolved, per
+# explicit dispatch instruction — documentation review is not proof of
+# runtime behavior; do not flip without empirical evidence) -----------------
+check(
+    "suite173(ac9-effort-claim-unchanged-readme-26): agents/README.md still"
+    " claims effort is session-global on Claude Code",
+    "On Claude Code `effort` is session-global" in _s173_readme,
+    "agents/README.md:26 must be left as-is — AC-9 is unresolved, not"
+    " flipped, absent empirical runtime evidence",
+)
+check(
+    "suite173(ac9-effort-claim-unchanged-qa-plan): agents/qa-plan.md still"
+    " distinguishes the model axis (per-agent) from the effort axis"
+    " (session-global on CC)",
+    "on Claude Code, `effort` is session-global" in _s173_qa_plan,
+    "agents/qa-plan.md § Model right-sizing must be left as-is — AC-9 is"
+    " unresolved, not flipped, absent empirical runtime evidence",
+)
+
+# --- Self-referential guards (hygiene contract) -----------------------------
+check(
+    "suite173(self-ref): test file contains 'Suite 173' and"
+    " 'dispatch-cost-reduction'",
+    "Suite 173" in _s173_own and "dispatch-cost-reduction" in _s173_own,
+    "test file must self-reference Suite 173 and the marker"
+    " 'dispatch-cost-reduction'",
+)
+check(
+    "suite173(registry): docs/testing.md registers 'Suite 173' and"
+    " 'dispatch-cost-reduction'",
+    "Suite 173" in _s173_testing_md and "dispatch-cost-reduction" in _s173_testing_md,
+    "docs/testing.md must register Suite 173 and the 'dispatch-cost-reduction'"
+    " marker",
+)
+check(
+    "suite173(hygiene): CLAUDE.md does NOT contain 'Suite 173' (§11 hygiene"
+    " contract)",
+    "Suite 173" not in _s173_claude,
+    "CLAUDE.md must not mention Suite 173 — only docs/testing.md is the"
+    " canonical registry",
+)
+
+# Marker: dispatch-cost-reduction
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 174 — Fenced-surface guard: Class-B canonical snapshots, pointer
+# integrity, and incoming-anchor resolution (Task-2, Work Plan Step 5)
+#
+# Built BEFORE any CLAUDE.md density reduction (Step 6) and before Task-4's
+# reduction pass over orchestrator.md/leader.md/delivery.md/architect.md —
+# nothing in this plan may remove a check this suite adds (Work Plan Notes,
+# "no-relaxation rule"). Protects every row of 01-plan.md § "Multi-site
+# invariants — Clase B" with a byte-exact SHA-256 snapshot rather than a
+# substring-presence check, so a MUST->SHOULD softening, a moved threshold,
+# or a shrunk enumeration fails even when the section heading and most of
+# its prose survive untouched. Canonical snapshots live in
+# tests/fixtures/fenced/manifest.json (one entry per row); a legitimate
+# future edit to fenced content requires a reviewed, deliberate update of
+# that manifest, never a silent hash drift.
+#
+# Marker: dispatch-cost-reduction
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 174: fenced-surface guard (Class-B canonical snapshots) ===")
+
+_S174_MANIFEST_PATH = REPO_ROOT / "tests" / "fixtures" / "fenced" / "manifest.json"
+_s174_manifest = json.loads(_S174_MANIFEST_PATH.read_text(encoding="utf-8"))
+
+_S174_REF_AND_SHARED_FILES = sorted(AGENTS_DIR.glob("ref-*.md")) + sorted(
+    (AGENTS_DIR / "_shared").glob("*.md")
+)
+
+
+def _s174_ref_shared_corpus_excluding(own_path: Path) -> str:
+    """The ref-*.md/_shared/*.md corpus, minus a block's own source file —
+    a block whose canonical home already IS one of these files would
+    otherwise trivially 'find itself' and fail a check meant to catch
+    RELOCATION into a different file."""
+    return "\n".join(
+        _read_or_empty(p) for p in _S174_REF_AND_SHARED_FILES if p.resolve() != own_path.resolve()
+    )
+
+_s174_file_cache: dict[str, str] = {}
+
+
+def _s174_read_cached(rel_path: str) -> str:
+    if rel_path not in _s174_file_cache:
+        _s174_file_cache[rel_path] = read(REPO_ROOT / rel_path)
+    return _s174_file_cache[rel_path]
+
+
+def _s174_slice(entry: dict) -> str:
+    """Re-derive the current live slice for one manifest entry, using the
+    same heading-nesting convention the manifest was generated with: a
+    `## ` anchor extends to the next `## ` (nested `### ` subsections stay
+    inside it — the standard Markdown nesting reading), a `### ` anchor
+    stops at the next `### ` OR `## `, whichever comes first."""
+    text = _s174_read_cached(entry["file"])
+    if entry["mode"] == "file":
+        return text
+    if entry["mode"] == "heading":
+        anchor = entry["anchor"]
+        stops = (
+            ("\n## ", "\n---\n")
+            if anchor.startswith("## ")
+            else ("\n## ", "\n### ", "\n---\n")
+        )
+        return _slice_section(text, anchor, stops)
+    # mode == "literal": bounded by an explicit start substring and end marker
+    idx = text.find(entry["start"])
+    if idx == -1:
+        return ""
+    tail = text[idx:]
+    pos = tail.find(entry["end"], len(entry["start"]))
+    return tail if pos == -1 else tail[:pos]
+
+
+_S174_CASE_SENSITIVE_MODALS = ("MUST NOT", "MUST", "NEVER")
+_S174_CASE_INSENSITIVE_MODALS = ("unconditionally", "non-waivable")
+
+
+def _s174_modal_counts(text: str) -> dict:
+    counts = {tok: len(re.findall(re.escape(tok), text)) for tok in _S174_CASE_SENSITIVE_MODALS}
+    counts.update(
+        {
+            tok: len(re.findall(re.escape(tok), text, re.IGNORECASE))
+            for tok in _S174_CASE_INSENSITIVE_MODALS
+        }
+    )
+    return counts
+
+
+# --- Per-block checks: byte-snapshot, modal-token preservation, no-relocation
+for _s174_entry in _s174_manifest:
+    _s174_current_slice = _s174_slice(_s174_entry)
+    _s174_current_hash = hashlib.sha256(_s174_current_slice.encode("utf-8")).hexdigest()
+    check(
+        f"suite174(fenced-snapshot): {_s174_entry['id']} ({_s174_entry['file']}) unchanged"
+        " byte-for-byte against its canonical snapshot",
+        _s174_current_hash == _s174_entry["sha256"],
+        f"{_s174_entry['file']} block '{_s174_entry['id']}' no longer matches"
+        " tests/fixtures/fenced/manifest.json — any legitimate edit to fenced Class-B"
+        " content requires a reviewed, deliberate snapshot update, never a silent drift",
+    )
+
+    _s174_current_modal = _s174_modal_counts(_s174_current_slice)
+    _s174_modal_ok = all(
+        _s174_current_modal[_tok] >= _count
+        for _tok, _count in _s174_entry["modal_counts"].items()
+    )
+    check(
+        f"suite174(modal-preservation): {_s174_entry['id']} keeps modal-token counts >= canonical",
+        _s174_modal_ok,
+        f"{_s174_entry['id']} modal-token count dropped below canonical"
+        f" ({_s174_entry['modal_counts']} -> {_s174_current_modal}) — a shrinking"
+        " MUST/MUST NOT/NEVER/unconditionally/non-waivable count is the softening"
+        " signature a byte-snapshot alone would still catch, but this makes the"
+        " specific failure mode explicit in the failure message",
+    )
+
+    if _s174_entry["mode"] != "file" and _s174_current_slice.strip():
+        _s174_corpus_for_entry = _s174_ref_shared_corpus_excluding(
+            REPO_ROOT / _s174_entry["file"]
+        )
+        check(
+            f"suite174(no-relocation): {_s174_entry['id']}'s canonical body is absent from"
+            " every OTHER agents/ref-*.md and agents/_shared/*.md file",
+            _s174_current_slice not in _s174_corpus_for_entry,
+            f"{_s174_entry['id']}'s fenced body must not be duplicated or relocated into a"
+            " different ref-*.md or _shared/*.md file — a corpus-wide existence check would"
+            " read that relocation as 'still present' and pass vacuously",
+        )
+
+# --- Meta-check: no check in THIS suite reads the concatenated multi-file
+# corpus instead of a single named file's own read(path) — split the forbidden
+# token so this very check does not match its own source line ------------
+_s174_own_source = read(Path(__file__))
+_s174_suite_start = _s174_own_source.find("Suite 174: fenced-surface guard")
+_s174_suite_end = _s174_own_source.find("Marker: dispatch-cost-reduction", _s174_suite_start)
+_s174_suite_body = (
+    _s174_own_source[_s174_suite_start:_s174_suite_end] if _s174_suite_start != -1 else ""
+)
+_S174_FORBIDDEN_TOKEN = "SPLIT" + "_CORPUS"
+check(
+    "suite174(meta-no-split-corpus): no fenced-guard check in this suite reads the"
+    " multi-file SPLIT_CORPUS constant",
+    _S174_FORBIDDEN_TOKEN not in _s174_suite_body,
+    "a fenced check that reads the concatenated multi-file corpus instead of read(path)"
+    " on a single named file would let a relocation into a ref-*.md/_shared/*.md file"
+    " pass vacuously — see tests/test_agent_structure.py:70-98",
+)
+
+# --- Canary: a deliberately softened copy must FAIL the snapshot guard,
+# proving the guard cannot pass vacuously (docs/permission-provisioning.md's
+# own anti-false-green discipline, mirrored here) ---------------------------
+_s174_canary_entry = next(e for e in _s174_manifest if e["id"] == "orch-dispatch-invariants")
+_s174_canary_original = _s174_slice(_s174_canary_entry)
+_s174_canary_mutated = _s174_canary_original.replace("never", "avoid", 1)
+check(
+    "suite174(canary): a deliberately softened copy (never->avoid) of a fenced block"
+    " fails the snapshot guard",
+    _s174_canary_mutated != _s174_canary_original
+    and hashlib.sha256(_s174_canary_mutated.encode("utf-8")).hexdigest() != _s174_canary_entry["sha256"],
+    "the canonical-snapshot guard must reject a mutated copy of fenced text — if this"
+    " ever passes vacuously the guard itself has degenerated into a no-op",
+)
+
+# --- Enumeration-by-literal: the Phase-2-close backstop's 23 `-e` keyword
+# entries (counted against the live file, never hand-copied) ----------------
+_s174_backstop_entry = next(e for e in _s174_manifest if e["id"] == "orch-phase2close-backstop")
+_s174_backstop_slice = _s174_slice(_s174_backstop_entry)
+_S174_BACKSTOP_KEYWORDS = (
+    "auth(entication|entic|oriz(e|ation))", r"\blogin\b", r"\bcredential", r"\bpassword\b",
+    "permission", "role[_-]?(based|check)", r"\bacl\b", r"\bsecret", "api[_-]?key",
+    "private[_-]?key", r"\bpayment", "card[_-]?number", r"\bbilling\b", r"\bstripe\b",
+    r"\bpii\b", r"\bssn\b", "social[_-]?security", "personal[_-]?data", r"\bsql\b",
+    r"exec\(", r"eval\(", "deserialize", "template[_-]?inject",
+)
+check(
+    "suite174(enum-backstop-keyword-count): Phase 2-close backstop keeps exactly 23"
+    " `-e` keyword entries",
+    len(_S174_BACKSTOP_KEYWORDS) == 23,
+    "this test's own literal keyword tuple must enumerate 23 entries — count against"
+    " agents/orchestrator.md:964-986 if this ever fails",
+)
+_s174_missing_backstop_keywords = [
+    kw for kw in _S174_BACKSTOP_KEYWORDS if f"-e '{kw}'" not in _s174_backstop_slice
+]
+check(
+    "suite174(enum-backstop-keywords-present): every one of the 23 backstop keyword"
+    " entries is present, by literal, in the live section",
+    not _s174_missing_backstop_keywords,
+    f"missing backstop keyword entries: {_s174_missing_backstop_keywords}",
+)
+
+# --- Enumeration-by-literal: the four named hook floors in CLAUDE.md §5 ----
+_s174_claude5_entry = next(e for e in _s174_manifest if e["id"] == "claude-md-5-conventions")
+_s174_claude5_slice = _s174_slice(_s174_claude5_entry)
+_S174_HOOK_NAMES = ("policy-block", "checkpoint-guard", "gate-guard", "dev-guard")
+_s174_missing_hooks = [h for h in _S174_HOOK_NAMES if h not in _s174_claude5_slice]
+check(
+    "suite174(enum-hook-names): CLAUDE.md §5 names all four enforcement hooks"
+    " (policy-block, checkpoint-guard, gate-guard, dev-guard)",
+    not _s174_missing_hooks,
+    f"missing hook names in CLAUDE.md §5: {_s174_missing_hooks}",
+)
+
+# --- Enumeration-by-literal: gate_nonce freshness AND single-use, as a pair -
+_s174_gate_contract_entry = next(e for e in _s174_manifest if e["id"] == "gate-contract-whole")
+_s174_gate_contract_text = _s174_slice(_s174_gate_contract_entry)
+check(
+    "suite174(enum-gate-nonce-pair): agents/_shared/gate-contract.md states both the"
+    " nonce's freshness property AND its single-use property",
+    "freshness" in _s174_gate_contract_text and "single-use" in _s174_gate_contract_text,
+    "gate-contract.md must keep both 'freshness' and 'single-use' — dropping either"
+    " half of the pair changes what the nonce actually guarantees",
+)
+
+# --- Enumeration-by-literal: the three fail-closed clauses of
+# security_floor_applies ------------------------------------------------------
+_s174_floor_entry = next(e for e in _s174_manifest if e["id"] == "orch-phase3-floor-predicate")
+_s174_floor_slice = _s174_slice(_s174_floor_entry)
+_S174_FLOOR_CLAUSES = (
+    "absent or doubtful",
+    "NEVER interpreted",
+    "never gated, ANDed, or overridden by",
+)
+_s174_missing_floor_clauses = [c for c in _S174_FLOOR_CLAUSES if c not in _s174_floor_slice]
+check(
+    "suite174(enum-floor-fail-closed-clauses): all three fail-closed clauses of"
+    " security_floor_applies are present",
+    not _s174_missing_floor_clauses,
+    f"missing fail-closed clause(s) in the Single shared Phase-3 floor predicate:"
+    f" {_s174_missing_floor_clauses}",
+)
+
+# --- Pointer integrity (Task-2 AC-4): every backtick-quoted `docs/*.md`
+# reference inside CLAUDE.md resolves to a real file, and any reference of
+# the form `docs/file.md § Section Name` resolves to a real anchor inside
+# that file --------------------------------------------------------------
+_s174_claude_md_full = _s174_read_cached("CLAUDE.md")
+_S174_DOCS_POINTER_RE = re.compile(r"`(docs/[a-zA-Z0-9_/-]+\.md)(?: § ([^`]+))?`")
+_s174_pointer_failures = []
+for _s174_match in _S174_DOCS_POINTER_RE.finditer(_s174_claude_md_full):
+    _s174_doc_path, _s174_section = _s174_match.group(1), _s174_match.group(2)
+    _s174_doc_file = REPO_ROOT / _s174_doc_path
+    if not _s174_doc_file.exists():
+        _s174_pointer_failures.append(f"{_s174_doc_path} does not exist")
+        continue
+    if _s174_section:
+        _s174_doc_text = _s174_read_cached(_s174_doc_path)
+        # A quoted section name may itself carry a trailing clause (e.g.
+        # "Document classification") or be wrapped in literal quote marks
+        # (e.g. `docs/x.md § "Some Section"`); require only its leading
+        # words to resolve, since some pointers append a short qualifier
+        # after the anchor's own title.
+        _s174_section_stripped = _s174_section.strip().strip('"').strip("'")
+        _s174_section_head = _s174_section_stripped.split(" — ")[0].split(", ")[0]
+        # Citations sometimes drop the backticks a heading wraps around an
+        # inline code term (e.g. "(gate-guard)" citing "(`gate-guard`)") —
+        # that is style noise, not a broken pointer, so compare with
+        # backticks stripped from both sides.
+        if _s174_section_head.replace("`", "") not in _s174_doc_text.replace("`", ""):
+            _s174_pointer_failures.append(
+                f"{_s174_doc_path} has no section matching {_s174_section_head!r}"
+            )
+check(
+    "suite174(ac4-pointer-integrity): every `docs/*.md` pointer in CLAUDE.md resolves"
+    " to an existing file, and every quoted section resolves inside it",
+    not _s174_pointer_failures,
+    f"broken CLAUDE.md pointer(s): {_s174_pointer_failures}",
+)
+
+# --- Incoming-anchor guard (Task-2 AC-4): known external citations of an
+# exact section name inside orchestrator.md/leader.md still resolve, not
+# just the pointers Task-2 itself creates -----------------------------------
+_S174_INCOMING_ANCHORS = (
+    ("agents/adversary.md", "agents/orchestrator.md", "Re-audit on amend"),
+    ("agents/adversary.md", "agents/orchestrator.md", "Phase 3.8"),
+    ("agents/delivery.md", "agents/orchestrator.md", "Phase 4b — Delivery (publish)"),
+    ("agents/delivery.md", "agents/orchestrator.md", "Phase 4a — Delivery (prepare)"),
+    ("agents/delivery.md", "agents/orchestrator.md", "Express Lane Profile"),
+    ("agents/leader.md", "agents/orchestrator.md", "Phase 1.8 — Post-approval Plan-Review Offer"),
+    ("agents/leader.md", "agents/orchestrator.md", "Phase 1 — Design"),
+    ("agents/plan-reviewer.md", "agents/orchestrator.md", "Self-authored-plan panel carve-out"),
+    ("agents/plan-reviewer.md", "agents/orchestrator.md", "Phase 1.6 — Plan Review"),
+    ("agents/plan-reviewer.md", "agents/orchestrator.md",
+     "Correction-classification — selective panel re-firing"),
+    ("agents/qa-plan.md", "agents/orchestrator.md", "Phase 1.5 — Plan Ratification"),
+    ("agents/ref-special-flows.md", "agents/orchestrator.md",
+     "Single shared Phase-3 floor predicate"),
+    ("agents/ref-special-flows.md", "agents/orchestrator.md", "Test-phase consolidation"),
+    ("agents/_shared/gate-contract.md", "agents/orchestrator.md", "STAGE-GATE-1 — End of Stage 1"),
+    ("docs/dev-mode.md", "agents/orchestrator.md", "Phase 3.8 — Pre-Delivery Security Audit"),
+    ("docs/patch-mode.md", "agents/orchestrator.md", "If any agent fails → ITERATE"),
+    ("docs/patch-mode.md", "agents/orchestrator.md",
+     "Correction-classification — selective panel re-firing"),
+    ("docs/observability.md", "agents/orchestrator.md", "Flow Telemetry Emission"),
+    ("docs/knowledge.md", "agents/orchestrator.md", "Workspaces: what you own"),
+    ("docs/knowledge.md", "agents/leader.md", "Multi-Task fan-out"),
+    ("docs/knowledge.md", "agents/leader.md", "Consolidated delivery"),
+    ("agents/ref-direct-modes.md", "agents/orchestrator.md",
+     "Phase 1.8 — Post-approval Plan-Review Offer"),
+    ("agents/tester.md", "agents/orchestrator.md", "Express Lane Profile"),
+)
+_s174_broken_incoming_anchors = []
+for _s174_src, _s174_dst, _s174_text in _S174_INCOMING_ANCHORS:
+    if _s174_text not in _s174_read_cached(_s174_dst):
+        _s174_broken_incoming_anchors.append(f"{_s174_src} -> {_s174_dst} § {_s174_text!r}")
+check(
+    "suite174(ac4-incoming-anchors): known external citations of an exact section name"
+    " inside the four Class-B files still resolve",
+    not _s174_broken_incoming_anchors,
+    f"broken incoming anchor(s): {_s174_broken_incoming_anchors}",
+)
+
+# --- Self-referential guards (hygiene contract) -----------------------------
+_s174_own = read(Path(__file__))
+_s174_testing_md = _s174_read_cached("docs/testing.md")
+_s174_claude_hygiene = _s174_read_cached("CLAUDE.md")
+check(
+    "suite174(self-ref): test file contains 'Suite 174' and 'dispatch-cost-reduction'",
+    "Suite 174" in _s174_own and "dispatch-cost-reduction" in _s174_own,
+    "test file must self-reference Suite 174 and the marker 'dispatch-cost-reduction'",
+)
+check(
+    "suite174(registry): docs/testing.md registers 'Suite 174' and 'dispatch-cost-reduction'",
+    "Suite 174" in _s174_testing_md and "dispatch-cost-reduction" in _s174_testing_md,
+    "docs/testing.md must register Suite 174 and the 'dispatch-cost-reduction' marker",
+)
+check(
+    "suite174(hygiene): CLAUDE.md does NOT contain 'Suite 174' (§11 hygiene contract)",
+    "Suite 174" not in _s174_claude_hygiene,
+    "CLAUDE.md must not mention Suite 174 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: dispatch-cost-reduction
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 175 — Tools/MCP minimality guard (Task-3, Work Plan Step 8):
+# an agent's frontmatter MUST NOT grant an MCP tool (`mcp__memory__*` or
+# `mcp__context7__*`) that its own body never invokes. Anchored on both
+# sides: the frontmatter `tools:`/`mcpServers:` line (the grant) AND the
+# body text (evidence of a real call site or an explicit usage directive).
+# Matches on the SHORT tool name (e.g. `search_nodes`, not the fully-
+# qualified `mcp__memory__search_nodes`) because most agent bodies describe
+# KG/context7 usage via the bare tool name or a `## Knowledge Graph Access`
+# section, not the qualified MCP identifier — a fully-qualified-only match
+# would false-flag nearly every agent in the roster.
+#
+# Additive-only: extends the roster audit this task performed, never
+# relaxes an existing check.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 175: Tools/MCP minimality guard (frontmatter <-> body) ===")
+
+_S175_MCP_TOOL_RE = re.compile(r"mcp__(memory|context7)__([A-Za-z0-9_-]+)")
+
+# Documented, human-verified residuals this guard does NOT flag as a fresh
+# violation — each is a real finding from this task's roster audit that is
+# out of THIS task's edit scope, named here so it stays visible instead of
+# silently passing or silently failing the suite:
+_S175_KNOWN_UNUSED_MCP_GRANTS: dict[str, list[str]] = {
+    # agents/orchestrator.md's frontmatter/body belong exclusively to Task-4
+    # per 01-plan.md Work Plan Notes ("Archivo compartido -- agents/
+    # orchestrator.md: lo toca solo Task-4") -- this task may not edit
+    # either side of it, even though the roster-wide audit surfaced this
+    # grant as unused too. Flagged for Task-4 to remove alongside its
+    # density pass on this file.
+    "orchestrator.md": ["mcp__memory__read_graph"],
+    # ux-reviewer.md's body genuinely directs context7 use ("ALWAYS verify
+    # accessibility findings against WCAG 2.1 AA (use context7 for current
+    # spec)") but names the product, never the specific tool -- a real,
+    # human-verified usage this mechanical short-name matcher cannot
+    # detect. Kept per Task-3 AC-2's case-by-case evaluation rather than
+    # removed on the matcher's say-so alone.
+    "ux-reviewer.md": ["mcp__context7__query-docs", "mcp__context7__resolve-library-id"],
+}
+
+
+def _s175_frontmatter_block(text: str) -> str:
+    if not text.startswith("---"):
+        return ""
+    end = text.find("\n---", 3)
+    return text[3:end] if end > 0 else ""
+
+
+def _s175_body(text: str) -> str:
+    if not text.startswith("---"):
+        return text
+    end = text.find("\n---", 3)
+    return text[end + 4:] if end > 0 else text
+
+
+def _s175_declared_mcp_tools(frontmatter_block: str) -> set[tuple[str, str]]:
+    return set(_S175_MCP_TOOL_RE.findall(frontmatter_block))
+
+
+# Negation cues that, immediately preceding a tool-name mention, mark prose
+# DESCRIBING non-use rather than a genuine invocation directive (e.g. "never
+# invokes mcp__memory__search_nodes" should not count as usage evidence).
+# Verified against the full agents/ corpus before adding this: no currently-
+# passing agent has its only mention of a declared tool inside this window,
+# so the addition narrows the false-positive class without flipping any
+# existing suite outcome.
+_S175_NEGATION_CUES = (
+    "never", "does not", "do not", "doesn't", "don't", "no longer",
+    "not use", "won't", "avoid",
+)
+_S175_NEGATION_WINDOW = 60
+
+
+def _s175_has_genuine_invocation_mention(body: str, needle: str) -> bool:
+    """True if at least one occurrence of `needle` in `body` is NOT preceded,
+    within `_S175_NEGATION_WINDOW` characters, by a negation cue — a prose
+    aside describing non-use is not invocation evidence."""
+    for match in re.finditer(re.escape(needle), body):
+        window = body[max(0, match.start() - _S175_NEGATION_WINDOW):match.start()].lower()
+        if not any(cue in window for cue in _S175_NEGATION_CUES):
+            return True
+    return False
+
+
+def _s175_unused_mcp_grants(frontmatter_block: str, body: str) -> list[str]:
+    """MCP tools this frontmatter grants that the body never mentions with a
+    genuine (non-negated) mention by short name (`search_nodes`) or by
+    fully-qualified name (`mcp__memory__search_nodes`) — either counts as
+    invoked. This is a text-level heuristic, not proof of runtime invocation:
+    a markdown system prompt has no call sites in the code sense, only
+    directives a model may or may not follow at runtime."""
+    declared = _s175_declared_mcp_tools(frontmatter_block)
+    unused = []
+    for server, tool in declared:
+        qualified = f"mcp__{server}__{tool}"
+        if not (
+            _s175_has_genuine_invocation_mention(body, tool)
+            or _s175_has_genuine_invocation_mention(body, qualified)
+        ):
+            unused.append(qualified)
+    return sorted(unused)
+
+
+# Glob-derived, not EXPECTED_AGENTS: that list is missing at least
+# ux-reviewer.md and documenter.md (a pre-existing staleness this suite
+# does not own), and this guard must cover every invocable agent, including
+# both of the files this task trimmed.
+for _s175_path in sorted(AGENTS_DIR.glob("*.md")):
+    agent_name = _s175_path.stem
+    if agent_name in ("README",) or agent_name.startswith("ref-"):
+        continue
+    text = read(_s175_path)
+    unused = _s175_unused_mcp_grants(_s175_frontmatter_block(text), _s175_body(text))
+    expected = _S175_KNOWN_UNUSED_MCP_GRANTS.get(f"{agent_name}.md", [])
+    check(
+        f"suite175(minimality): agents/{agent_name}.md frontmatter grants no undocumented unused MCP tool",
+        unused == expected,
+        f"unused MCP grant(s) {unused} do not match the documented residual {expected} — remove the"
+        f" over-grant from tools:/mcpServers:, or add invoking body text, or (if genuinely deferred)"
+        f" register it in _S175_KNOWN_UNUSED_MCP_GRANTS with a citation",
+    )
+
+# --- Regression pins: the agents corrected by this task keep zero unused
+# grants (the trim this task performed does not regress on a future edit) ---
+for _s175_fixed_agent in ("leader", "adversary"):
+    _s175_text = read(AGENTS_DIR / f"{_s175_fixed_agent}.md")
+    _s175_unused_fixed = _s175_unused_mcp_grants(
+        _s175_frontmatter_block(_s175_text), _s175_body(_s175_text)
+    )
+    check(
+        f"suite175(regression): agents/{_s175_fixed_agent}.md has zero unused MCP grants post-trim",
+        _s175_unused_fixed == [],
+        f"agents/{_s175_fixed_agent}.md unexpectedly has unused MCP grant(s): {_s175_unused_fixed}",
+    )
+
+# --- Canary: a synthetic over-grant must be DETECTED, not pass vacuously ---
+_S175_CANARY_FRONTMATTER = "tools: Read, Write, mcp__memory__search_nodes, mcp__memory__open_nodes"
+_S175_CANARY_BODY = "This body only ever calls mcp__memory__search_nodes; it never mentions the other grant."
+_s175_canary_unused = _s175_unused_mcp_grants(_S175_CANARY_FRONTMATTER, _S175_CANARY_BODY)
+check(
+    "suite175(canary): a synthetic frontmatter grant with no matching body invocation is DETECTED",
+    _s175_canary_unused == ["mcp__memory__open_nodes"],
+    f"canary must flag exactly the deliberately-unused grant; got {_s175_canary_unused}",
+)
+
+# --- Prose-only false-positive: a negated mention must NOT count as usage
+# evidence — proves the mention/invocation distinction the review flagged ---
+_S175_PROSE_ONLY_FRONTMATTER = "tools: Read, Write, mcp__memory__search_nodes"
+_S175_PROSE_ONLY_BODY = (
+    "This agent never invokes mcp__memory__search_nodes; a sibling agent owns that call."
+)
+_s175_prose_only_unused = _s175_unused_mcp_grants(
+    _S175_PROSE_ONLY_FRONTMATTER, _S175_PROSE_ONLY_BODY
+)
+check(
+    "suite175(prose-only-false-positive): a negated mention ('never invokes X') does"
+    " not count as invocation evidence",
+    _s175_prose_only_unused == ["mcp__memory__search_nodes"],
+    f"a prose-only negated mention must still flag the grant as unused; got {_s175_prose_only_unused}",
+)
+
+# --- skills/lint/SKILL.md: Check 11 (tools/MCP allowlist minimality) mirrors
+# this suite's own guard at the operator-facing lint-skill surface ---
+_s175_lint_skill = read(skill_path("lint"))
+check(
+    "suite175(lint-check11-exists): skills/lint/SKILL.md contains '## Check 11 — Tools/MCP allowlist minimality'",
+    "## Check 11 — Tools/MCP allowlist minimality" in _s175_lint_skill,
+    "skills/lint/SKILL.md is missing the new Check 11 section",
+)
+check(
+    "suite175(lint-check11-known-residuals): Check 11 cites the same known-residuals rationale as Suite 175",
+    "_S175_KNOWN_UNUSED_MCP_GRANTS" in _s175_lint_skill,
+    "skills/lint/SKILL.md Check 11 must point to Suite 175's exceptions registry, not silently re-derive its own",
+)
+check(
+    "suite175(lint-check11-output-format): skills/lint/SKILL.md Output Format includes 'Check 11:'",
+    "Check 11:" in _s175_lint_skill,
+    "skills/lint/SKILL.md Output Format must include a 'Check 11:' block",
+)
+check(
+    "suite175(lint-denominator-11): skills/lint/SKILL.md declares '/ 11 checks passed'",
+    "/ 11 checks passed" in _s175_lint_skill,
+    "skills/lint/SKILL.md must declare the bumped '/ 11 checks passed' tally",
+)
+
+# --- self-ref/registry/hygiene (per this repo's own Suite-174 precedent) ---
+_s175_own = read(REPO_ROOT / "tests" / "test_agent_structure.py")
+_s175_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s175_claude_hygiene = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite175(self-ref): test file contains 'Suite 175' and 'dispatch-cost-reduction'",
+    "Suite 175" in _s175_own and "dispatch-cost-reduction" in _s175_own,
+    "test file must self-reference Suite 175 and the marker 'dispatch-cost-reduction'",
+)
+check(
+    "suite175(registry): docs/testing.md registers 'Suite 175' and 'dispatch-cost-reduction'",
+    "Suite 175" in _s175_testing_md and "dispatch-cost-reduction" in _s175_testing_md,
+    "docs/testing.md must register Suite 175 and the 'dispatch-cost-reduction' marker",
+)
+check(
+    "suite175(hygiene): CLAUDE.md does NOT contain 'Suite 175' (§11 hygiene contract)",
+    "Suite 175" not in _s175_claude_hygiene,
+    "CLAUDE.md must not mention Suite 175 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: dispatch-cost-reduction
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------

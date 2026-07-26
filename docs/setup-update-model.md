@@ -11,11 +11,16 @@ This document describes the working model that governs how Team Harness is insta
 | What | Owner | Frequency |
 |------|-------|-----------|
 | Operator KEYS — Memory MCP URL + token, context7 API key, workspace mode (`logs-mode`, `logs-path`, `logs-subfolder`), default `language` | `/th:setup` | One-time bootstrap; re-run to reconfigure |
+| Architecture prerequisites — fixed constants the pipeline itself needs to run correctly, with no operator value to elicit (e.g. the subagent nesting-depth env var below) | **BOTH** `/th:setup` and `/th:update` | One-time write per prerequisite; self-healing (re-checked, silently) on every run of either command |
 | FILES — managed `~/.claude/CLAUDE.md` blocks, `output-styles/developer-mode.md` | `/th:update` | Every release |
 | FLOWS — marketplace catalog refresh, plugin version download | `/th:update` | Every release |
 | `~/.claude/.team-harness.json` full write (merge-write-whole-document) | `/th:setup` | One-time bootstrap; re-run to reconfigure |
 
-**Key constraint:** `/th:update` reads `~/.claude/.team-harness.json` but **never writes it**. Writing that file is `/th:setup`'s domain. This means a brand-new operator KEY introduced in a release never arrives via `/th:update` — see [The residual seam: new operator keys](#the-residual-seam-new-operator-keys).
+**Key constraint:** `/th:update` reads `~/.claude/.team-harness.json` but **never writes it**, with one closed exception — see [The residual seam: new operator keys](#the-residual-seam-new-operator-keys). That exception is scoped to a single namespaced decline-record key for the architecture-prerequisite class below; it is not a general write grant.
+
+### Operator KEYS vs architecture prerequisites — why the split exists
+
+An operator KEY is personal and sensitive — a URL, a token, a workspace path — and there is no correct default: `/th:setup` must ask. An architecture prerequisite is neither: it is a single fixed value the pipeline itself needs (today, one value — `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: "2"`) to restore Claude Code's native subagent-nesting capability, and there is exactly one correct value to offer, never a range of operator preference. Gating it behind a one-time `/th:setup`-only bootstrap would leave every operator who never re-runs `/th:setup` — the majority, per the residual-seam limitation below — permanently on the degraded relay path. Both commands own it for that reason: `/th:setup` covers a fresh install, `/th:update` covers the installed base that never returns to setup.
 
 ---
 
@@ -103,11 +108,44 @@ This is the same family of failure as issue #272: an artifact was shipped to the
 
 ---
 
+## Architecture prerequisite: subagent nesting depth
+
+Claude Code's native subagent-nesting depth is configurable, not a permanent cap, via the `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` environment variable in `~/.claude/settings.json`. When unset, a dispatched subagent (e.g. `th:orchestrator`) does not itself retain the `Task` tool, so it cannot dispatch its own leaf specialists — it falls back to emitting a `dispatch_handoff` directive for the top-level session to relay instead (`docs/subagent-orchestration.md`). Setting the value to `"2"` (one layer below the top-level session, one more below that) restores direct nested dispatch: the top-level session is layer 0, `th:orchestrator` is layer 1, and its own specialist dispatches are layer 2, with no further nesting permitted below that.
+
+This is the canonical mechanism both lifecycle commands implement identically. Neither `skills/setup/SKILL.md` nor `skills/update/SKILL.md` restates it — each references this section and applies only the concrete values below.
+
+**The prerequisite:**
+
+| Field | Value |
+|---|---|
+| Target file | `~/.claude/settings.json` |
+| JSON path | `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` |
+| Value | `"2"` (string, matching the env-var convention) |
+
+**Mechanism (identical at both sites):**
+
+1. **Already present with the expected value → silent pass-through.** No prompt, no write. The fact appears as one row in the command's final report only.
+2. **Absent, and no decline previously recorded → explicit Y/n gate (absent-value gate).** Before writing, the gate shows the exact JSON path and value, and states the blast radius: this key applies to every Claude Code session on the machine, on every project, not only to team-harness, and persists until removed manually. On decline, nothing is written — see step 5.
+3. **Present with a DIFFERENT value, and no decline previously recorded → its own gate, never a silent overwrite.** A present-but-different value (e.g. an operator who deliberately set `"1"` or `"3"`) is NOT treated as absent. Before writing, this gate discloses the exact current value read from the file (`env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` is currently set to "{current-value}"`), states the same blast radius as step 2, and asks whether to overwrite it with `"2"`. Only an explicit confirmation to THIS gate authorizes the write; the absent-value gate's text (step 2) must never be shown when a different value is already present — a reader of that text could otherwise infer no value is set. On decline, record the same durable decline as step 5 (an operator who kept a deliberately-different value has, in effect, declined "2") — this is never re-prompted once recorded.
+4. **On confirm (either gate) → write following the merge-write-whole-document contract already established for this class of file** (`docs/permission-provisioning.md § Merge-write-whole-document contract`): back up the existing `~/.claude/settings.json` to `settings.json.bak` at `0o600` from the moment of creation (skipped if the file does not yet exist). Read the target file: if it does not exist, start from `{}`; if it exists but fails to parse as JSON (corrupted file), **abort before writing** — no backup restore is needed since nothing was written yet — and report the failure naming the corrupted file and the exact parse error; never fall back to `{}` for an existing-but-unparseable file, since that would silently discard any `permissions.*` rules already present. Only when the file parses (or does not exist) does the write proceed: set only `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`; write the merged document to a temp file in the same directory at `0o600`, validate it parses as JSON, then rename it atomically over the target.
+5. **Post-write assertion (mandatory).** Re-read and re-parse the written file. Assert it differs from the pre-write parse in **exactly one** JSON path (`env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`), and that `permissions.allow`, `permissions.deny`, and `permissions.additionalDirectories` are identical element-for-element to the pre-write parse. On any other delta, restore the `.bak` and report the write as failed — never leave a partially-changed file in place. This guards specifically against a lost `permissions.deny` entry (deny-over-allow resolution means a dropped entry widens access without producing an error).
+6. **On decline (either gate) → record durably, never re-prompt.** Persist a single namespaced key under `~/.claude/.team-harness.json` (merge-write-whole-document, preserving every other key) recording that the operator declined this prerequisite. On every later run of either command, a recorded decline is treated the same as "nothing to offer" — report it as a row, never re-ask. This is the one closed exception `/th:update` needs to `~/.claude/.team-harness.json` — see [The residual seam: new operator keys](#the-residual-seam-new-operator-keys) for its scope.
+7. **After any write → never claim the value is live.** `env` in `settings.json` resolves at session start, so a write in the middle of a running session has no effect on that session. Report that a session restart is required before the value takes effect — the same restart-to-activate honesty this skill already applies to plugin reloads.
+8. **On decline, an aborted corrupted-file write, or a failed write → the functional path is preserved, not removed.** The `dispatch_handoff` relay (`docs/subagent-orchestration.md`) remains fully functional as the fallback when nesting is not provisioned. This mechanism buys back the cost of that relay; it does not gate correctness on adopting it.
+
+**Never conflated with permission provisioning.** `docs/permission-provisioning.md`'s allowlist mechanism touches only `permissions.allow`, `permissions.deny`, and `permissions.additionalDirectories` — never `env`. This mechanism touches only `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` — never any key under `permissions`. Neither command establishes a general-purpose `env`-provisioning path; the JSON path above is the only one this mechanism ever writes.
+
+**Diagnosing a missing prerequisite (not a third provisioning site).** `agents/leader.md § Boot capability check` names this exact cause and remedy when the nesting capability is not available at boot — it diagnoses only: it never offers, prompts, or writes. The two commands above are the only two write sites.
+
+---
+
 ## The residual seam: new operator keys
 
-`/th:update` never writes `~/.claude/.team-harness.json`. That file is `/th:setup`'s domain — it holds the operator's personal configuration (MCP URLs, tokens, workspace mode, language preference).
+`/th:update` never writes an **operator KEY** to `~/.claude/.team-harness.json` — a personal, sensitive value the operator must supply (MCP URLs, tokens, workspace mode, language preference). That remains `/th:setup`'s exclusive domain, for the reason below.
 
-**Consequence:** when a new operator KEY is introduced in a release (for example, the `language` key), an operator who already has Team Harness installed does not receive a prompt to configure the new key when they run `/th:update`. The key is simply absent from their `~/.claude/.team-harness.json` until they re-run `/th:setup`.
+**Closed exception — the architecture-prerequisite decline record.** `/th:update` MAY write exactly one namespaced key, `nested_spawn_depth.declined`: the durable decline record for the subagent-nesting-depth prerequisite (see [Architecture prerequisite: subagent nesting depth](#architecture-prerequisite-subagent-nesting-depth) above). This is not an operator KEY — it elicits no personal value, carries no sensitive data, and records a fact about pipeline state (declined / not yet offered), not an operator preference. The allowlist for this exception is closed to that single key; it does not open a general write path, and it does not authorize `/th:update` to write any other key in this file, now or in a future release, without a corresponding documented exception here.
+
+**Consequence for genuine operator KEYS:** when a new operator KEY is introduced in a release (for example, the `language` key), an operator who already has Team Harness installed does not receive a prompt to configure the new key when they run `/th:update`. The key is simply absent from their `~/.claude/.team-harness.json` until they re-run `/th:setup`.
 
 This is a known, intentional limitation. The alternative — having `/th:update` write to `.team-harness.json` — would require it to prompt for sensitive values (MCP URL, tokens) on every update, which conflicts with the goal of a non-interactive repeatable command.
 

@@ -38,6 +38,8 @@ Both provisioning sites write to a Claude Code settings file (`~/.claude/setting
 
 A partial payload (writing only the new keys, dropping the rest of the document) is never acceptable — this is the exact failure mode the merge-write contract exists to prevent.
 
+**Disjoint from the architecture-prerequisite mechanism.** `docs/setup-update-model.md § Architecture prerequisite: subagent nesting depth` reuses this same merge-write-whole-document discipline to provision `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` in the same `~/.claude/settings.json` file — but it is a separate mechanism with a disjoint key allowlist. This contract touches ONLY `permissions.allow`, `permissions.deny`, and `permissions.additionalDirectories` (point 5 above); it never touches `env`. The architecture-prerequisite mechanism touches only its one `env` path; it never touches any key under `permissions`. Neither mechanism widens the other's scope, and the two are never merged into a single write.
+
 ## Resolved-value validation floor
 
 Before any rule is constructed from a resolved `base`/`path`, this contract validates the resolved value itself — not merely the rule template. Provisioning **aborts before any gate is shown** — no rule written, no Y/n offer — reporting a one-line operator-facing reason, when the resolved value is any of:

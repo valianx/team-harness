@@ -12,7 +12,7 @@
 
 **External dependencies (required).** A **context7 API key** (get one at https://context7.com/, or set `CONTEXT7_API_KEY`) and a **Memory MCP URL** — the public URL of any MCP-compatible server (e.g., Railway/Render/Fly/Docker, or a local container). The installer prompts for it interactively or reads `MEMORY_MCP_URL` non-interactively. **No default URL** — empty input is rejected and a missing env var exits the installer with an explicit error (rationale: `docs/knowledge.md`). Example format only: `https://your-mcp.example.com/mcp`.
 
-**External dependencies (recommended).** `gh` — GitHub CLI, for full GitHub integration in `/issue`, `/review-pr`, `/deliver`, and others (install: https://cli.github.com/). When absent or unauthenticated, skills fall back to `curl` against the GitHub REST API (if `$GH_TOKEN`/`$GITHUB_TOKEN` is set) or operator-paste paths with `blocked-manual-push` status. See `agents/_shared/gh-fallback.md`.
+**External dependencies (recommended).** `gh` — GitHub CLI, for full GitHub integration in `/issue`, `/review-pr`, `/deliver`, and others (install: https://cli.github.com/). When absent or unauthenticated, skills fall back per the documented chain: `agents/_shared/gh-fallback.md`.
 
 **External dependencies (optional).** `d2` CLI (`/d2-diagram`), `likec4` CLI (`/likec4-diagram`), Playwright (auto-installed by the Excalidraw skill on first use).
 
@@ -80,8 +80,6 @@ team-harness/
 - `hooks/` — keep these **generic and portable** (no personal tokens, no private endpoints). User-specific hooks belong in `~/.claude/hooks/`, not here.
 - `cmd/install/` — Go installer source. Uses `charm.land/huh/v2` for TUI. Compiled with `CGO_ENABLED=0` for static single-file binaries.
 
-**Ephemeral content** (not committed): `workspaces/`.
-
 ---
 
 ## 3. Tech Stack
@@ -98,7 +96,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — the only CC install channel. Go installer binary (GH Release assets) — the only opencode install channel; it does not serve Claude Code. |
 
-**Current version:** `2.137.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.138.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
@@ -228,7 +226,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 
 ## 7. Voice and Language Guide
 
-> This section codifies the voice, vocabulary, and language conventions for every operator-facing surface in this repo. It is normative for humans and agents. The four guidelines below evolved from observed friction with the pre-2026-05 voice (enthusiasm markers in status blocks, phase-number jargon leaking into operator copy, Spanish prose in skill files). The rules are deliberately tight — a tool that speaks like a professional instrument frees the operator to focus on the actual work, which is designing solutions and solving problems.
+> This section codifies the voice, vocabulary, and language conventions for every operator-facing surface in this repo. It is normative for humans and agents. Friction history and full rationale for why the rules are this tight: `docs/voice-guide.md § Voice §7.1 — full examples and rationale`.
 
 ### 7.1 Voice — formal, neutral, helpful-tool
 
@@ -315,7 +313,7 @@ This repo ships assets to other developers, so the contribution flow matters mor
 - **Develop in `agents/`, `skills/`, `hooks/` directly.** Do not edit `~/.claude/` by hand for changes you intend to share — they'll get overwritten or drift.
 - **Propagate via installer.** Run `./bin/install.sh` locally to sync into your own `~/.claude/`; it overwrites files that differ from the embedded bytes.
 - **Complex skills** live in `skills/{name}/` with a `SKILL.md` plus any `references/`. The installer recursively copies the whole subfolder to `~/.claude/skills/{name}/`.
-- **Never commit personal data.** Hooks must be generic (no tokens, no private endpoints).
+- **Hooks stay generic** — see §2 Ownership boundaries.
 
 ---
 
@@ -333,7 +331,7 @@ Routing table and escalation rules: `docs/subagent-orchestration.md § Routing T
 
 **Inline orchestration at top level — SEC-DR-2 re-founding (v2.89.0).** No filesystem marker is required — the general agent IS the leader, and `dev-guard` gates outward actions unconditionally. Nesting this inline inside another orchestrator is the ad-hoc improvisation that is PROHIBITED — use the FALLBACK below. See `docs/dev-mode.md § Outward-Action Gate`.
 
-**FALLBACK — nested-handoff/takeover (opencode/legacy path).** Nested subagents retain `Task` on the CC foreground path; `dispatch_handoff` takeover is RETAINED for opencode compatibility only. Full protocol: `docs/subagent-orchestration.md`.
+**FALLBACK — nested-handoff/takeover (opencode, or CC without the nesting prerequisite).** Claude Code's subagent-nesting depth is configurable, not a permanent cap, via `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` in `~/.claude/settings.json` (defaults to unset; `/th:setup`/`/th:update` provision `"2"` — `docs/setup-update-model.md § Architecture prerequisite: subagent nesting depth`). `dispatch_handoff` takeover is the fallback for a runtime or a configuration where nesting is not provisioned — opencode always, or CC before that prerequisite is set — never the normal state on a correctly-provisioned CC session. Full protocol: `docs/subagent-orchestration.md`.
 
 **Universal rule — auto-takeover on `blocked-no-dispatch`:** when the orchestrator returns "Dispatch handoff — top-level Claude takes over now", or `00-state.md` has `status: blocked-no-dispatch`, top-level Claude **MUST** take over dispatch immediately — parse the `dispatch_handoff` JSON, dispatch the named agent via `Task`, and continue. Not a user-decision point. Full 8-step protocol, JSON schema, and `blocked-manual-push` handling: `docs/subagent-orchestration.md`.
 

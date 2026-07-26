@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.138.0] - 2026-07-26
+
+### Changed
+- **Subagent-nesting-depth prerequisite provisioned from both lifecycle commands.** `/th:setup` and `/th:update` now offer to provision `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: "2"` in `~/.claude/settings.json` (already-present → silent pass-through; absent → Y/n gated write with a durable decline record). Restores nested `Task` retention for `th:orchestrator`, so the pipeline no longer degrades to the `dispatch_handoff` relay by default. The relay remains a fully-supported fallback for any runtime or configuration where nesting is not provisioned. Nesting-related documentation (`CLAUDE.md`, `docs/subagent-orchestration.md`, the `orchestrator-dispatch-rule` managed block, `docs/troubleshooting.md`) now describes the relay as a fallback, never the normal state.
+- **`CLAUDE.md` reduced to repo-specific gotchas** where the reduction was safe to apply without touching any control-, gate-, or security-relevant content — three small duplicated-prose cuts (a restated GitHub-fallback detail, a restated `hooks/` ownership rule, and a restated Voice-guide rationale paragraph), each pointed at its existing canonical `docs/` home instead.
+- **Per-agent MCP tool grants trimmed to what each body actually invokes.** `agents/leader.md` (9 → 2 `mcp__memory__*` tools — keeps only the up-front KG search and the KG-session open; every write/close/relation/telemetry tool belongs to the `orchestrator` instance it spawns), `agents/ux-reviewer.md` (drops an unused KG-read pair — the body never queries the KG), and `agents/adversary.md` (drops an unused context7 pair — the body never verifies a library/CVE version) each lose grants their body never referenced, cutting dead MCP schema weight from every cold dispatch of those agents.
+
+### Added
+- **Fenced-surface guard for the pipeline's Class-B control surface** (`tests/test_agent_structure.py` Suite 174, `tests/fixtures/fenced/manifest.json`): 71 canonical byte-snapshots covering every control/gate/security-relevant block across `agents/orchestrator.md`, `agents/leader.md`, `agents/delivery.md`, `agents/architect.md`, `CLAUDE.md`, and their `_shared/`/`docs/` co-sites, so a future density-reduction pass cannot soften a `MUST`, shrink an enumeration, or relocate fenced content into a `ref-*.md`/`_shared/*.md` file without the guard failing — even when a substring-presence check would still pass.
+- `docs/cost-and-caching.md § Measured reductions` — before/after `CLAUDE.md` size table and the per-run token-savings estimate.
+- **Tools/MCP allowlist minimality guard** (`tests/test_agent_structure.py` Suite 175; `skills/lint/SKILL.md` Check 11): fails when an agent's frontmatter grants an `mcp__memory__*`/`mcp__context7__*` tool its body never invokes, anchored on both the frontmatter grant and the body evidence — durable protection against future MCP-schema re-bloat, with a small named registry for the two residuals this task's roster audit could not close within its own file-ownership scope.
+
 ## [2.137.0] - 2026-07-22
 
 ### Changed
@@ -2478,7 +2490,8 @@ Initial release of the `claude-dev-team` agent system distribution.
 - `gh` — GitHub CLI (used by several skills).
 - **context7 API key** — for library docs retrieval.
 
-[Unreleased]: https://github.com/valianx/team-harness/compare/v2.131.0...HEAD
+[Unreleased]: https://github.com/valianx/team-harness/compare/v2.138.0...HEAD
+[2.138.0]: https://github.com/valianx/team-harness/compare/v2.137.0...v2.138.0
 [2.131.0]: https://github.com/valianx/team-harness/compare/v2.130.1...v2.131.0
 [2.15.1]: https://github.com/valianx/team-harness/compare/v2.15.0...v2.15.1
 [2.15.0]: https://github.com/valianx/team-harness/compare/v2.14.0...v2.15.0

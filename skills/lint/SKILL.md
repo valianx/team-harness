@@ -285,6 +285,26 @@ Result:
 ---
 name: lint
 
+## Check 11 — Tools/MCP allowlist minimality
+
+For each `.md` file in `agents/` (excluding `README.md` and `ref-*.md` reference files, which carry no `tools:` frontmatter):
+
+1. Parse the frontmatter `tools:` (and `mcpServers:`, when present) line and extract every `mcp__memory__*` and `mcp__context7__*` entry.
+2. For each entry, search the agent's body (everything after the closing `---`) for either the short tool name (`search_nodes`) or the fully-qualified name (`mcp__memory__search_nodes`). A mention preceded, within 60 characters, by a negation cue (`never`, `does not`, `do not`, `no longer`, `avoid`, …) does not count — this excludes a prose aside describing non-use (`"never invokes search_nodes"`) from reading as invocation evidence. Any other mention counts as invoked.
+3. An entry with no genuine (non-negated) mention in either form is an unused grant — the agent declares access to an MCP tool it never calls, which is dead schema weight on every cold dispatch of that agent.
+
+**Honesty note on what this check proves.** This is a text-level heuristic over a markdown system prompt, not proof of runtime invocation — a system prompt has no call sites in the code sense, only directives a model may or may not follow. The negation-aware matching narrows the specific false-positive class of a prose-only mention reading as usage; it does not eliminate every way prose can describe a tool without genuinely directing its use.
+
+**Known, documented residuals (do not report as a new finding):** `agents/orchestrator.md`'s `mcp__memory__read_graph` and `agents/ux-reviewer.md`'s two context7 tools — see `tests/test_agent_structure.py` Suite 175's `_S175_KNOWN_UNUSED_MCP_GRANTS` for the rationale of each.
+
+Result:
+- **PASS** if every agent's MCP grants are each matched by a body invocation (beyond the documented residuals above).
+- **WARN** if any agent has an undocumented unused MCP grant — lists `<agent>: unused <tool> — remove from tools:/mcpServers: or add the invoking body text`.
+- **FAIL** — not used for this check (mirrors Suite 175's own minimality guard, which is the enforced source of truth; this check is the human-facing summary of the same audit).
+
+---
+name: lint
+
 ## Arguments
 
 | Argument | Applies to | Description |
@@ -388,8 +408,13 @@ Scope: {all skills | changed-only (--changed)}
 {for each skill with issues: "  [WARN] <skill>: missing <Qn> — <reason>"}
 {if PASS: "All scanned skills satisfy Q1–Q5"}
 
+--- Check 11: Tools/MCP allowlist minimality ---
+Status: {PASS|WARN}
+{for each agent with an unused grant: "  [WARN] <agent>: unused <mcp-tool> — remove from tools:/mcpServers: or add the invoking body text"}
+{if PASS: "All agents' MCP grants are matched by a body invocation"}
+
 ====================================
-  Result: {X} / 10 checks passed
+  Result: {X} / 11 checks passed
 ====================================
 {if --fix applied: "\n--- Auto-fix applied ---\n{list of fixes}"}
 ```
