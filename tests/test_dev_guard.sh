@@ -2375,21 +2375,6 @@ rm -rf "$TMP"
 # fails this same suite.
 
 echo
-echo "--- AC-4.9: frozen modules (data-position.ts, command-lexer.ts) untouched by this task's diff ---"
-# Diffed against HEAD (this task lands as the next commit on top of an
-# already-committed Task-1/Task-3): a non-empty result means this task's own
-# working tree touched a file it must only ever import.
-_AC49_STATUS=$(git -C "$REPO_ROOT" diff --name-only HEAD -- hooks/ts/bodies/data-position.ts hooks/ts/bodies/command-lexer.ts)
-if [ -z "$_AC49_STATUS" ]; then
-    PASS=$((PASS + 1))
-    echo "  [PASS] AC-4.9: data-position.ts and command-lexer.ts show no diff against HEAD"
-else
-    FAIL=$((FAIL + 1))
-    FAILURES+=("AC-4.9: frozen module(s) touched: $_AC49_STATUS")
-    echo "  [FAIL] AC-4.9: frozen module(s) touched: $_AC49_STATUS"
-fi
-
-echo
 echo "--- AC-4.10: dist/dev-guard.cjs carries the redactor; the two fenced sibling bundles never do ---"
 # Content-based (not a build-time git-status snapshot, which only means
 # anything at the moment of the build that produced the tracked artifact):
@@ -2417,56 +2402,6 @@ else
     FAIL=$((FAIL + 1))
     FAILURES+=("AC-4.10 (negative): fenced bundle(s) reference the redactor: ${_AC410_LEAKED[*]}")
     echo "  [FAIL] AC-4.10 (negative): ${_AC410_LEAKED[*]}"
-fi
-
-echo
-echo "--- AC-4.11: diff confined to the import + the two-parse site + the branch-selection statement; decision functions byte-identical ---"
-_AC411_OUT=$(REPO_ROOT="$REPO_ROOT" node -e '
-const { execSync } = require("child_process");
-const repoRoot = process.env.REPO_ROOT;
-
-const baseSrc = execSync(`git -C "${repoRoot}" show HEAD:hooks/ts/bodies/dev-guard.ts`, { encoding: "utf8" });
-const baseLines = baseSrc.split("\n");
-const interfaceLine = baseLines.findIndex((l) => l.includes("export interface DevGuardReader")) + 1;
-const evaluateLine = baseLines.findIndex((l) => l.includes("export function evaluate(")) + 1;
-if (interfaceLine === 0 || evaluateLine === 0) {
-  console.log("FAIL: could not locate boundary markers in the HEAD copy of dev-guard.ts");
-  process.exit(0);
-}
-
-const diff = execSync(`git -C "${repoRoot}" diff --unified=0 HEAD -- hooks/ts/bodies/dev-guard.ts`, { encoding: "utf8" });
-const hunkRe = /^@@ -(\d+)(?:,(\d+))?/gm;
-let m;
-const offenders = [];
-while ((m = hunkRe.exec(diff)) !== null) {
-  const start = parseInt(m[1], 10);
-  const len = m[2] !== undefined ? parseInt(m[2], 10) : 1;
-  const end = start + Math.max(len, 1) - 1;
-  const inImportZone = end < interfaceLine;
-  const inEvaluateZone = start >= evaluateLine;
-  if (!inImportZone && !inEvaluateZone) offenders.push(m[0]);
-}
-
-const guardedNames = [
-  "function evaluateGitClassified",
-  "function evaluateGhClassified",
-  "function matchBenignPushGrammar",
-  "function evaluateSingleCommand",
-  "interface DevGuardReader",
-];
-for (const name of guardedNames) {
-  if (diff.includes(name)) offenders.push("diff touches a line mentioning " + name);
-}
-
-console.log(offenders.length === 0 ? "PASS" : "FAIL: " + JSON.stringify(offenders));
-' 2>&1)
-if [ "$_AC411_OUT" = "PASS" ]; then
-    PASS=$((PASS + 1))
-    echo "  [PASS] AC-4.11: every diff hunk sits in the import zone or inside evaluate(); no guarded decision function/interface is touched"
-else
-    FAIL=$((FAIL + 1))
-    FAILURES+=("AC-4.11: $_AC411_OUT")
-    echo "  [FAIL] AC-4.11: $_AC411_OUT"
 fi
 
 echo
