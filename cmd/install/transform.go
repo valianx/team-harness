@@ -21,7 +21,7 @@ const anthropicPrefix = "anthropic/"
 
 // aliasToConcreteModel maps the three CC bare alias names to their current
 // concrete opencode model ids. Pinned at release time from models.dev;
-// installed configs stay fresh via the on-demand /th:update-models runtime path.
+// re-running the installer re-bakes installed configs against a refreshed pin.
 // Map content must stay byte-identical to ALIAS_TO_CONCRETE_MODEL in migrate.mjs.
 var aliasToConcreteModel = map[string]string{
 	"opus":   "claude-opus-4-6",
@@ -37,11 +37,10 @@ var aliasToConcreteModel = map[string]string{
 // When the operator opts into tiering for a provider (--opencode-tier /
 // opencode.cost_tier_provider), the transform instead BAKES a concrete
 // provider/model-id derived from each agent's CC source tier. This section is
-// the Go half of a three-site invariant: providerTierFamily and
+// the Go half of a two-site invariant: providerTierFamily and
 // providerTierConcrete must stay byte-identical to PROVIDER_TIER_FAMILY /
-// PROVIDER_TIER_CONCRETE in tools/harness-migrate/migrate.mjs and to the
-// embedded copy in skills/update-models/SKILL.md (locked by a structural
-// parity test — see tier_test.go).
+// PROVIDER_TIER_CONCRETE in tools/harness-migrate/migrate.mjs (locked by a
+// structural parity test — see tier_test.go).
 
 // ccModelAliasToTier maps a CC agent's source model: alias to its cost tier
 // label. The tier label set (default/medium/low) is provider-agnostic; a
@@ -73,7 +72,7 @@ var providerTierFamily = map[string]map[string]string{
 
 // providerTierConcrete is the release-time pin: provider→tier→concrete model
 // id. Used by the installer to bake a model: line without a network call;
-// /th:update-models resolves the live equivalent post-install.
+// re-running the installer with a refreshed pin re-bakes it.
 var providerTierConcrete = map[string]map[string]string{
 	"anthropic": {
 		"default": "claude-opus-4-6",
