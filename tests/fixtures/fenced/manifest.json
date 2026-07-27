@@ -993,8 +993,8 @@
     "id": "gate-contract-whole",
     "file": "agents/_shared/gate-contract.md",
     "mode": "file",
-    "sha256": "ed9d29bf469c857a6706b5f10a9e783cce44ef99c45389c89a21a6746ede8b24",
-    "length": 30491,
+    "sha256": "3e09aaa261ff48f2d4da0a1a683199ba73022b1804a8ff1699fc71f3839bb3d5",
+    "length": 30632,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,

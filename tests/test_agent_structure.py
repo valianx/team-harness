@@ -39374,7 +39374,8 @@ check(
 # ---------------------------------------------------------------------------
 # Suite 179 — gate-field-contract (Task-4 of verifiable-contracts, #530):
 # `gate-guard` and `checkpoint-guard` are unwired from `.claude-plugin/hooks.json`
-# as of v2.139.0, so no hook any longer verifies a gate-state field. This suite
+# as of v2.139.0, so no hook wired in the Claude Code plugin path any longer
+# verifies a gate-state field there. This suite
 # asserts the resulting bare-literal requirement at both write sites — the
 # canonical declaration in gate-contract.md and its replication in
 # orchestrator.md § Current State — and the named "No gate-field repair"
@@ -39494,12 +39495,14 @@ check(
     "Current State must name the live consumers of all six fields, plus working_branch/worktree's extra consumers",
 )
 check(
-    "suite179(ac11): orchestrator.md § Current State declares no hook reads any of the six"
-    " fields since v2.139.0, and never claims a hook verifies one",
-    "Since v2.139.0 neither `gate-guard` nor" in _s179_current_state
+    "suite179(ac11): orchestrator.md § Current State declares no hook wired in the Claude"
+    " Code plugin path reads any of the six fields since v2.139.0, and never claims a Claude"
+    " Code plugin hook verifies one",
+    "Since v2.139.0 no hook wired in the Claude Code plugin path" in _s179_current_state
     and "reads any of the six" in _s179_current_state
-    and "so no hook verifies a gate field" in _s179_current_state,
-    "Current State must state that no hook reads a gate field post-v2.139.0, and never claim a hook verifies one",
+    and "so no Claude Code plugin hook verifies a gate field" in _s179_current_state,
+    "Current State must state that no Claude Code plugin hook reads a gate field post-v2.139.0,"
+    " scoped to the Claude Code plugin path, and never claim a hook verifies one universally",
 )
 check(
     "suite179(ac12): orchestrator.md § Current State warns the # annotations are template"

@@ -345,12 +345,14 @@ After `delivery` returns `status: success` at Phase 4b (publish), and before Pha
      record-based recover backstop and the operator reading this file consume all six;
      `working_branch` and `worktree` are additionally consumed by the executable
      branch/worktree comparisons `implementer`, `tester`, and the Phase 2-close
-     commit-integrity check run. Since v2.139.0 neither `gate-guard` nor
-     `checkpoint-guard` reads any of the six — both are unwired from
-     `.claude-plugin/hooks.json` — so no hook verifies a gate field; never describe one as
-     doing so. The `#` annotations throughout this schema, this one included, are template
-     documentation for you, the orchestrator authoring the real file — they are never
-     written to the actual `00-state.md`. -->
+     commit-integrity check run. Since v2.139.0 no hook wired in the Claude Code plugin path
+     (`.claude-plugin/hooks.json`) reads any of the six — `gate-guard` and `checkpoint-guard`
+     are both unwired there — so no Claude Code plugin hook verifies a gate field; never
+     describe one as doing so universally, since opencode's own plugin wiring
+     (`hooks/ts/opencode-plugin.ts`) registers `checkpoint-guard` independently of this claim
+     and outside this file's scope. The `#` annotations throughout this schema, this one
+     included, are template documentation for you, the orchestrator authoring the real file
+     — they are never written to the actual `00-state.md`. -->
 
 ## Phase Checklist
 <!-- Your checklist starts at Phase 1 — Phase 0a/0b belong to leader, not you. -->

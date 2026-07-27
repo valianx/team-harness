@@ -1,12 +1,14 @@
 # Gate contract
 
-> **`gate-guard` is UNWIRED as of v2.139.0.** The STAGE-GATE mechanism below — the dual-record
-> release, the recover backstop, the STOP-block templates and the preparer/presenter flow — is
-> unchanged and remains binding: it is how the pipeline records and presents gates. What changed
-> is that no deterministic hook enforces it any more. Every reference below to `gate-guard`
-> denying a push, or to a hook verifying a gate field, describes code that is no longer
-> dispatched. Do not rely on a hook to catch a missing or malformed release; the contract is
-> the control. Rationale: `docs/dev-mode.md § "Boundary, not flow"`.
+> **`gate-guard` is UNWIRED as of v2.139.0 in the Claude Code plugin path.** The STAGE-GATE
+> mechanism below — the dual-record release, the recover backstop, the STOP-block templates
+> and the preparer/presenter flow — is unchanged and remains binding: it is how the pipeline
+> records and presents gates. What changed is that no hook wired in the Claude Code plugin
+> path (`.claude-plugin/hooks.json`) enforces it any more. Every reference below to
+> `gate-guard` denying a push, or to a hook verifying a gate field, describes Claude Code
+> plugin behavior that is no longer dispatched there. Do not rely on the Claude Code plugin's
+> hooks to catch a missing or malformed release; the contract is the control. Rationale:
+> `docs/dev-mode.md § "Boundary, not flow"`.
 <!-- Single source of truth for the STAGE-GATE mechanism: the dual-record release,
      the record-based recover backstop, the STOP-block templates, and the
      preparer+recorder (orchestrator) / presenter+relayer (leader) flow.
