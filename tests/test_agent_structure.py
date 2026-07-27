@@ -38634,13 +38634,12 @@ check(
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# Suite 176 — commit-ownership-contract (Task-1 of verifiable-contracts, #528):
-# no agent file previously instructed committing the actual implementation/
-# test diff, so a dispatch could return `status: success` with nothing
-# committed and leave three downstream gates (Phase 3, Phase 3.75, Phase 3.8)
-# nothing to evaluate. Asserts producer sites (implementer.md, tester.md) and
-# the consumer site (orchestrator.md) separately, anchor-scoped, so a change
-# to one side is never masked by the other still passing.
+# Suite 176 — commit-ownership-contract: no agent file previously instructed
+# committing the actual implementation/test diff, so a dispatch could return
+# `status: success` with nothing committed for downstream gates to evaluate.
+# Asserts producer sites (implementer.md, tester.md) and the consumer site
+# (orchestrator.md) separately, anchor-scoped, so a change to one side is
+# never masked by the other still passing. Full provenance: docs/testing.md.
 #
 # Marker: commit-ownership-contract
 # ---------------------------------------------------------------------------
@@ -38927,13 +38926,14 @@ check(
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# Suite 177 — suite-run-evidence (Task-2 of verifiable-contracts, #532): no
-# durable, consultable record existed that a verification command already ran
-# against a concrete tree state, so downstream consumers re-ran idempotent
-# full-suite commands that a prior run had already proven green. Asserts the
-# canonical contract (docs/suite-evidence.md) and, separately and
-# anchor-scoped, both the producer and the consumer half of each named pair —
-# so a change on one side is never masked by the other side still passing.
+# Suite 177 — suite-run-evidence: no durable, consultable record existed that
+# a verification command already ran against a concrete tree state, so
+# downstream consumers re-ran idempotent full-suite commands that a prior run
+# had already proven green. Asserts the canonical contract
+# (docs/suite-evidence.md) and, separately and anchor-scoped, both the
+# producer and the consumer half of each named pair — so a change on one side
+# is never masked by the other side still passing. Full provenance:
+# docs/testing.md.
 #
 # Marker: suite-run-evidence
 # ---------------------------------------------------------------------------
@@ -39132,19 +39132,19 @@ check(
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# Suite 178 — panel-write-discipline (Task-3 of verifiable-contracts, #527):
-# the four panel writers on reviews/01-plan-review.md (plan-reviewer, qa-plan,
-# security, adversary) held Write without the anchored-Edit discipline that
-# makes a whole-file overwrite of another agent's section detectable. Edit
-# (already granted in the base tree, pinned here as a regression) closes the
-# noisy failure — a full Write destroying every heading at once — but cannot
-# itself impose the anchoring discipline that prevents the silent one (a
-# broad old_string/replace_all corrupting another section while every heading
-# survives). Asserts the canonical write-tool-discipline section, each of the
-# four contracts' MUST + pointer (with a generic cross-file guard on the
-# shared 'edited in place' marker), the plan-reviewer regression on the
-# Reviews: line write form, the frontmatter Edit regressions, and the
-# orchestrator's header-survival check producer/consumer.
+# Suite 178 — panel-write-discipline: the four panel writers on
+# reviews/01-plan-review.md (plan-reviewer, qa-plan, security, adversary) held
+# Write without the anchored-Edit discipline that makes a whole-file overwrite
+# of another agent's section detectable. Edit (already granted in the base
+# tree, pinned here as a regression) closes the noisy failure — a full Write
+# destroying every heading at once — but cannot itself impose the anchoring
+# discipline that prevents the silent one (a broad old_string/replace_all
+# corrupting another section while every heading survives). Asserts the
+# canonical write-tool-discipline section, each of the four contracts' MUST +
+# pointer (with a generic cross-file guard on the shared 'edited in place'
+# marker), the plan-reviewer regression on the Reviews: line write form, the
+# frontmatter Edit regressions, and the orchestrator's header-survival check
+# producer/consumer. Full provenance: docs/testing.md.
 #
 # Marker: panel-write-discipline
 # ---------------------------------------------------------------------------
@@ -39372,17 +39372,17 @@ check(
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# Suite 179 — gate-field-contract (Task-4 of verifiable-contracts, #530):
-# `gate-guard` and `checkpoint-guard` are unwired from `.claude-plugin/hooks.json`
-# as of v2.139.0, so no hook wired in the Claude Code plugin path any longer
-# verifies a gate-state field there. This suite
+# Suite 179 — gate-field-contract: `gate-guard` and `checkpoint-guard` are
+# unwired from `.claude-plugin/hooks.json`, so no hook wired in the Claude
+# Code plugin path any longer verifies a gate-state field there. This suite
 # asserts the resulting bare-literal requirement at both write sites — the
 # canonical declaration in gate-contract.md and its replication in
 # orchestrator.md § Current State — and the named "No gate-field repair"
 # invariant plus its nominal reference beside delivery.md's push step. It
-# asserts no check FORM (this task retires its verification mechanism
-# entirely), fixes no `readField` literal, and asserts no identity between
-# any files under `hooks/ts/`.
+# asserts no check FORM (the prior verification mechanism was retired
+# entirely, without replacement), fixes no `readField` literal, and asserts
+# no identity between any files under `hooks/ts/`. Full provenance:
+# docs/testing.md.
 #
 # Marker: gate-field-contract
 # ---------------------------------------------------------------------------
