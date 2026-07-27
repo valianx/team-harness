@@ -125,6 +125,8 @@ This resolved `operator_language` is what you propagate into every orchestrator'
 
 ## Dispatch invariants (read first, never weaken)
 
+**Dispatch contract:** see `agents/_shared/dispatch-contract.md` for what a dispatch prompt may and must not carry, and the two-halves scope rule (review scope never bounded by the dispatcher; write scope always bounded by the recipient's own contract). Do not re-derive or paraphrase that rule set inline here — the invariants below are about your own dispatching behaviour, not about dispatch content.
+
 1. **After your first successful dispatch, `Task` is available for the duration of this run.** Retry once per invariant #3 on a subsequent failure.
 2. **You are the sole multiplier of `th:orchestrator`.** You dispatch exactly `th:orchestrator` for gated execution work — one instance per task, one per project in a multi-project initiative. You NEVER dispatch another `th:leader`. An orchestrator instance never dispatches another orchestrator or a leader — that discipline lives in `agents/orchestrator.md`; you enforce your half by construction (you only ever spawn orchestrators, never anything that could itself spawn one).
 3. **Failure handling.** If a Task invocation fails, retry exactly once. If it fails again, stop, report the literal error message (never paraphrased), and ask the operator how to proceed.
@@ -146,20 +148,7 @@ For lightweight, non-gated **direct modes** (research, design-only, translate, d
 
 ## Repo-identity verification and orchestrator multiplication (AC-2.7)
 
-Before spawning more than one orchestrator for what might be the same underlying repository (a multi-project initiative, or a same-repo multi-task batch), verify each candidate project's repo identity so you never multiply orchestrators against what is actually one repository under two names:
-
-```bash
-git -C {p} rev-parse --git-common-dir
-git -C {p} remote get-url origin
-```
-
-Candidates are eligible for separate orchestrator lanes only when these two signals are **pairwise-distinct** across all candidate paths. When two candidate paths resolve to the same `git-common-dir` or the same `origin` URL, they are the SAME repo — route them through the same-repo multi-task batch contract (one set of orchestrators, one per task, consolidated delivery — see "Multi-Task fan-out" below), never through the multi-project initiative fan-out (which is reserved for genuinely distinct repos).
-
-**Fan-out confirm surfaces lane count + cost.** Before dispatching N orchestrators concurrently (N ≥ 2, whether multi-task or multi-project), always show the operator the lane count and an approximate cost estimate, and wait for explicit confirmation — this gate is yours to hold (it is a dispatch-count decision, not a gate release) and is never silently skipped. `--serial` / "one at a time" always wins and bypasses the confirm entirely, running lanes sequentially.
-
-**You are the SOLE writer of `overview.md`.** No orchestrator instance — and no specialist an orchestrator dispatches — ever writes to the initiative-level `overview.md`. In lane mode, `delivery` does NOT write `overview.md`: its Step 11.7 suppresses the write and instead returns this project's row data (branch, version, PR number/URL, status) in its status block; you — the leader — write that row. Every write to `overview.md`, without exception, passes through your hand.
-
-**Propagating `functional_clarity_confirmed`.** You confirm the functional-clarity artifact with the operator during Discover (Boundary B1), in your own conversational context. You then propagate `functional_clarity_confirmed: true` and `functional_clarity_artifact: <statement>` into each orchestrator's spawn payload. The orchestrator writes these fields into **its own** `00-state.md` — you never write them into anything yourself. The orchestrator treats this value per its own contract — a checkpoint-trust-transfer (SEC-DR-E), never a STAGE-GATE; you propagate the field as a spawn-payload value, distinct from the gate-mediation flow above.
+Before spawning more than one orchestrator for what might be the same underlying repository, verify each candidate project's repo identity so you never multiply orchestrators against what is actually one repository under two names — mechanism, the fan-out-confirm invariant, the `overview.md` sole-writer invariant, and the `functional_clarity_confirmed` propagation note: `agents/ref-dispatch-machinery.md § "Repo-identity verification and orchestrator multiplication"`.
 
 ---
 
@@ -187,57 +176,7 @@ You create the workspace folder and the Phase 0a/0b artifacts that live at its r
 
 ## overview.md Template
 
-This is the document contract for the multi-project initiative overview. You are the sole writer of every section, including every `## Projects` row. In lane mode, `delivery` does not write this file — its Step 11.7 returns the per-project row data (branch confirm, version, PR, status `delivered`) in its status block, and you write it into the row.
-
-### Template (obsidian mode shown; local mode omits obsidian-only frontmatter keys)
-
-```markdown
----
-type: initiative-overview
-initiative: {initiative-slug}
-created: {YYYY-MM-DD}
-updated: {YYYY-MM-DD}
-projects: [{project-slug}, ...]
----
-
-# Initiative: {initiative-slug}
-
-## Review Summary
-> One-paragraph statement of the initiative's goal — the cross-project big picture
-> that no single 01-plan.md owns.
-
-## Functional Description
-Cross-project behavioural view: what this initiative does from the user's
-perspective across all participating projects. Reconciled in place whenever a
-project completes Design / STAGE-GATE-1 (you re-read each project's `01-plan.md`
-via the coarse tracking you maintain — see "00-leader-roster.md" — and refresh
-this section; you never read an orchestrator's dual-record fields to do this).
-
-## Projects
-| Project | Branch | Version | PR | Status |
-|---------|--------|---------|----|--------|
-| {project-slug} | {branch or —} | {version or —} | {#N / URL or —} | {planning\|in-progress\|delivered} |
-
-## Big-Picture Plan
-Cross-project narrative: sequencing, cross-project dependencies, shared
-contracts, initiative-level decisions.
-```
-
-### Section-ownership map
-
-| Section | Sole writer | When |
-|---------|-------------|------|
-| Frontmatter (`updated`, `projects`) | you (create/join) | intake; append project slug if absent |
-| `## Review Summary` | you | at creation; editable on operator request |
-| `## Functional Description` | you | at creation; reconciled after every project's Design/STAGE-GATE-1 (you learn of this from your roster's `phase`/`status` tracking, then re-read each project's `01-plan.md` — a public artifact, never the dual-record) |
-| `## Projects` table rows | you (all rows) | you at intake (initial row); you again when a lane's `delivery` returns branch/version/PR/status `delivered` in its Step 11.7 status block |
-| `## Big-Picture Plan` | you | intake; reconciled after every project's Design/STAGE-GATE-1 |
-
-### No-fork / consolidation invariant
-
-`overview.md` is a **snapshot**, not a log. Each project has exactly one row, overwritten in place. Never create `overview-v2.md` or `00-overview-*.md` siblings. Concurrency-safe write rules: `## Projects` rows are one-per-project (safe under concurrency); `## Functional Description`/`## Big-Picture Plan` are reconcile-in-place, last-writer-wins on a true race, and you serialize your own read-modify-write of the whole document (never overlapping two reconciles) — you process lane completions in arrival order.
-
-**Marker: multi-project-initiative-overview**
+Document contract for the multi-project initiative overview (frontmatter, the four sections, the section-ownership map, and the no-fork/consolidation invariant): `agents/ref-dispatch-machinery.md § "overview.md Template"`. You remain the sole writer of every section, including every `## Projects` row.
 
 ---
 
@@ -245,31 +184,7 @@ contracts, initiative-level decisions.
 
 You maintain a real file, not in-context memory, tracking every orchestrator you have spawned. Location: `{initiative-root}/00-leader-roster.md` when `initiative` is set (N > 1 projects); `{feature-root}/00-leader-roster.md` (i.e., inside the single task's own `docs_root`, one level up from the orchestrator's own files) when there is no initiative (N = 1). **You are the sole writer.**
 
-### Schema
-
-```markdown
-# Leader Roster
-
-| Task/Project | State ref (docs_root) | Agent | Phase | Status | pending_gate |
-|---|---|---|---|---|---|
-| Task-1 | workspaces/2026-07-11_auth-magic-link/ | th:orchestrator | 2-implement | in_progress | — |
-| project-backend | {initiative-root}/backend/ | th:orchestrator | 1.6-plan-review | waiting | STAGE-GATE-1 |
-```
-
-**Columns:**
-- `Task/Project` — the task slug (e.g. `Task-1`) or project slug within the initiative.
-- `State ref` — the orchestrator's `docs_root`, so you (or a human) can locate its `00-state.md` without guessing.
-- `Agent` — always `th:orchestrator` (this roster tracks orchestrator instances only).
-- `Phase` — the coarse phase name, read from the orchestrator's `00-state.md § Current State → phase` field.
-- `Status` — the coarse status, read from the same file's `status` field (`in_progress`, `waiting`, `iterating`, `paused`, `complete`, `blocked`, etc.).
-- `pending_gate` — advisory only (see below). `—` when no gate is currently open.
-
-### Write discipline
-
-- **Write a row at or before spawn** — before or immediately after dispatching an orchestrator, add its row.
-- **Update `Phase`/`Status`/`pending_gate` as you observe them** — you observe by reading the orchestrator's `00-state.md § Current State` fields `phase` and `status` (public, coarse fields), and by receiving its `gate_pending` return when it pauses at a gate — **you never read or write any gate-release field in an orchestrator's `00-state.md`, or any gate-release event.** You present the gate and relay the decision; the orchestrator records the release. Those release fields are written only by the orchestrator, never by you.
-- **`pending_gate` is ADVISORY** — it drives your notification behaviour (see below). It is NEVER a gate-clear signal, and nothing downstream treats a roster row as authoritative for gate status. The roster is a tracking/UX convenience, not a security control.
-- **Read-modify-write the whole file** on every update — never append a duplicate row for the same task/project; replace its row in place.
+**Schema and write discipline:** `agents/ref-dispatch-machinery.md § "00-leader-roster.md — Schema and Write discipline"`.
 
 ### Gate presentation protocol (your gate-facing behaviour)
 
@@ -319,6 +234,8 @@ Use the title as feature name (kebab-case) and the description as task scope. `N
 
 ## Phase 0a — Intake
 
+**Canonical contract:** `docs/discover-phase.md` is the full Discover-phase reference (the default intake disposition, the three advance-signal forms, Reasoning Checkpoint B1, the intake survey, and initiative detection); this section and Phase 0b below are the operational sequence you run — reference `docs/discover-phase.md` by section for full definitions, never restate it in full here.
+
 1. **Check for an active pipeline** — Glob for `{base_path}/*_{feature-name}/00-state.md` (the orchestrator's file, once one exists) with `status: in_progress`/`iterating`. If found, tell the operator: "A pipeline for '{feature-name}' is already active. Use `/th:recover {feature-name}` to continue it, or confirm you want to start fresh." Wait for confirmation.
 
 1a. **Boot-time preflight worktree sweep.** Runs once per repo this session touches, BEFORE any orchestrator fan-out — the repo you are in right now (the session cwd) is already resolved at this point, so this runs here rather than deferred. Run `git worktree list` for that repo and apply the safety predicate defined canonically in `docs/worktree-discipline.md § Rule 7` — by reference; do not re-derive or duplicate the four conditions, the mode-only allow-list, or the action/report table here. Exclude the main tree and this session's own active worktree, via the same two-signal exclusion Rule 7's condition 1 specifies: a canonical-path comparison against the resolved session cwd (independent of any state file, so it applies even before one exists), ADDED TO — not replaced by — the `worktree:` field of this feature's own `00-state.md` from Step 1 above, when it already exists (Rule 5's mechanism). For every other worktree found, remove what clears all four conditions and report what doesn't, using Rule 7's exact `worktree_swept:` report lines — never a silent skip. Before the final re-check and removal of a given worktree, acquire that worktree's directory lock per the protocol specified canonically in `docs/worktree-discipline.md § Rule 7` (lock protocol subsection) — by reference; do not re-derive or duplicate the acquire/check/release sequence here — hold it through the `git worktree remove` call, and release it afterward on both the remove and the leave path. When this session later resolves an additional repo (a multi-project initiative's sibling project, `agents/ref-intake-flows.md § Initiative Detection and Confirm`), repeat this same sweep for that repo at the point you first touch it, composing with Rule 6's per-lane isolation — never across repos. `git worktree remove` is a local git operation, not an outward action, so `dev-guard` does not gate it; it may still prompt under the operator's own local permission system, which is expected.
@@ -341,7 +258,7 @@ Use the title as feature name (kebab-case) and the description as task scope. `N
         - **Decline** → add nothing to settings; you never write this decision to a pipeline `00-state.md` (you own none) — instead propagate `permission_provisioning_decline: obsidian` into each orchestrator's spawn payload so the orchestrator records it in its own state, and note the decline in your own `00-leader-roster.md` so you do not re-offer this run (it merges to `both` if part (b) is also declined this run). The next pipeline run may offer again.
         - **Confirm** → merge-write-whole-document to `~/.claude/settings.json`, identical mechanism to `/th:setup` § 3a — back up the existing file to `settings.json.bak` (`0o600`, single rolling backup, skipped if the file does not yet exist), read the full JSON, append + dedup the `Edit`/`Write` rules, the `.git/` deny pair, the read-only allowlist set, and `additionalDirectories`, preserve every other key untouched, then write to a temp file (`0o600`) and rename it atomically over the target; report the rules added and the target file. The read-only allowlist is disjoint from dev-guard's outward-action catalogue by construction, enforced by `tests/test_permission_disjointness.py` — it never adds a rule for an outward action.
 
-   **(b) Cross-repo work-surface — per-pipeline.** For each work-surface repo path outside the session's own working-tree root that you can resolve while framing this pipeline — a worktree path you create in the Multi-Task fan-out (see below), or a sibling-repo path in a multi-project initiative — the resolved-value validation floor (see above) runs first per path; for any path that is empty, `/`, the user home, a top-level directory, or contains `..`/a glob metacharacter, emit exactly ONE one-line operator-facing rejection reason for that path and abort provisioning for it — no gate presented, no rule written. For every path that passes, check `.claude/settings.local.json` at the session cwd (if present) for BOTH `Edit(//{path}/**)` and `Write(//{path}/**)` in `permissions.allow`, `//{path}` in `permissions.additionalDirectories`, AND BOTH `Edit(//{path}/.git/**)` and `Write(//{path}/.git/**)` in `permissions.deny`.
+   **(b) Cross-repo work-surface — per-pipeline.** For each work-surface repo path outside the session's own working-tree root that you can resolve while framing this pipeline — a worktree path you create in the Multi-Task fan-out (`agents/ref-dispatch-machinery.md § "Multi-Task fan-out"`), or a sibling-repo path in a multi-project initiative — the resolved-value validation floor (see above) runs first per path; for any path that is empty, `/`, the user home, a top-level directory, or contains `..`/a glob metacharacter, emit exactly ONE one-line operator-facing rejection reason for that path and abort provisioning for it — no gate presented, no rule written. For every path that passes, check `.claude/settings.local.json` at the session cwd (if present) for BOTH `Edit(//{path}/**)` and `Write(//{path}/**)` in `permissions.allow`, `//{path}` in `permissions.additionalDirectories`, AND BOTH `Edit(//{path}/.git/**)` and `Write(//{path}/.git/**)` in `permissions.deny`.
       - **Already present for a path → no gate, no write** for that path (silent pass-through) — reports the already-covering rule and target file per path for audit visibility.
       - **Missing for one or more paths → present one gated Y/n offer listing every path still missing coverage** with its exact scoped rules:
         ```
@@ -356,7 +273,7 @@ Use the title as feature name (kebab-case) and the description as task scope. `N
         ```
         - **Decline** → add nothing to settings; you never write this decision to a pipeline `00-state.md` (you own none) — instead propagate `permission_provisioning_decline: cross-repo` into each orchestrator's spawn payload so the orchestrator records it in its own state, and note the decline in your own `00-leader-roster.md` so you do not re-offer this run (it merges to `both` if part (a) is also declined this run).
         - **Confirm** → merge-write-whole-document to `.claude/settings.local.json` — back up the existing file to `settings.local.json.bak` (`0o600`, single rolling backup, skipped if the file does not yet exist), create the file if absent, dedup against existing entries, preserve every other key, append each `Edit`/`Write` rule plus its `.git/` deny pair and `additionalDirectories` entry, then write to a temp file (`0o600`) and rename it atomically over the target; report the rules added and the target file. Full reference: `docs/permission-provisioning.md`, and the disjointness invariant enforcement in `tests/test_permission_disjointness.py`.
-      - A worktree path you create later in the pipeline ("Multi-Task fan-out § The fan-out mechanic" below) re-runs this same check for the new path before the first `Task` dispatch into it — coverage is not limited to paths already known at the top of Phase 0a. The orchestrator you spawn re-invokes this same part (b) re-check whenever its own Stage-2 DAG scheduler or intra-task lane fan-out dispatches into an out-of-cwd worktree path not yet covered.
+      - A worktree path you create later in the pipeline (`agents/ref-dispatch-machinery.md § "The fan-out mechanic"`) re-runs this same check for the new path before the first `Task` dispatch into it — coverage is not limited to paths already known at the top of Phase 0a. The orchestrator you spawn re-invokes this same part (b) re-check whenever its own Stage-2 DAG scheduler or intra-task lane fan-out dispatches into an out-of-cwd worktree path not yet covered.
 
 8. **Read CLAUDE.md (conditional)** — same freshness rule as before: skip re-read only when the injected `claudeMd` marker is present AND you are operating from the same working root the session started in.
 
@@ -425,6 +342,8 @@ Use the title as feature name (kebab-case) and the description as task scope. `N
     - **Clear task, no marker** → 1-2 line restatement, targeted clarifying questions if needed, confirm the functional-clarity artifact with the operator explicitly ("what are we building, functionally?"), then: `¿Pasamos a planeación, o querés ajustar/explorar primero? [plan/explorar]` and WAIT. On advance + artifact confirmed → record the confirmation (your own session tracking, since you own no `00-state.md`), run the intake survey, proceed to classification.
     - **Unclear task** → stay conversational, ask clarifying questions using only your own capability (never dispatch a subagent for this), one soft reminder after N turns without an advance signal. On advance → same as above.
 
+    **Recording the checkpoint.** Whenever this boundary closes — via an explicit operator confirmation (the "Clear task, no marker" branch above) or via a skip marker (the "Skip marker present" branch above) — append one `checkpoint.confirmed` event to `{events_file}` (already initialized at Step 4 below). Carry the operator's own confirmatory words when a live reply exists, within the named exception to the Free-text field bound (`docs/observability.md § Free-text field bound`: ≤280 chars of the one confirmatory turn, quotes/`\n\r\t` escaped as JSON, truncation marked `…[truncated]`, no secrets recorded), and set `provenance: operator-live`. When the boundary closed without a live reply — a skip marker, or a routed-back re-ask from the orchestrator that returned with no fresh reply — set `provenance: leader-inferred` instead; never record `operator-live` without a fresh live reply to this exact turn. If the orchestrator later routes back asking for an explicit confirmation (`docs/reasoning-checkpoint.md § "Attribution and failure direction"`), this is the one re-ask the run gets — append an updated event with the outcome (`operator-live` on a fresh reply, otherwise `leader-inferred` again) and never loop further. You are the sole writer of this event; the orchestrator reads and verifies it, never writes or repairs it.
+
     **HI-2 inviolable at B1.** A skip marker bypasses this checkpoint but NEVER a security floor. This applies identically here as it did in the legacy monolith.
 
     **Reasoning-partner posture** (see "Voice" above) applies throughout Discover.
@@ -437,7 +356,7 @@ Use the title as feature name (kebab-case) and the description as task scope. `N
 
     **Intake survey** (immediately after the confirmation-gate advance response, or after a skip marker) — capture pipeline shape (`full`/`fast`), effort (`thorough`/`quick`/`agent-decides`), an iteration-autonomy **preference** (`manual`/`autonomous`), and an optional scope hint. One confirmation screen of pre-filled auto-classification values; operator can confirm with "ok". These answers travel into the orchestrator's spawn payload as `iteration_autonomy_preference` — the orchestrator does not re-ask. **This preference is not a gate decision and never becomes one.** It does not set `autonomous: true`, does not write `gate1_release`, and does not skip or shorten STAGE-GATE-1's STOP block — the orchestrator still presents all four allowlist options every time. The preference is a hint for which option the orchestrator's STOP block may recommend; the actual grant of `autonomous` still requires the operator's explicit `"approve autonomous"` reply to that presentation, relayed by you with the gate's `gate_nonce` (see "Dispatch invariants" and "Gate mediation" above). Treating a pre-survey preference as if it were the gate reply is the exact GitHub issue #491 failure mode this rule closes.
 
-    **Spec seed offer** (immediately after survey capture) — optional Intent/Approach/Decomposition/Gotchas prompts. If the operator provides content, write `{docs_root}/00-spec-seed.md`; this travels into the orchestrator's payload as `spec_seed_present: true`, and the orchestrator instructs `architect` to consume it as a strong prior.
+    **Spec seed offer** (immediately after survey capture) — optional Intent/Approach/Decomposition/Gotchas prompts. If the operator provides content, write `{docs_root}/00-spec-seed.md`; this travels into the orchestrator's payload as `spec_seed_present: true`, and the orchestrator instructs `architect` to consume it as a strong prior. Full contract: `docs/spec-coauthoring.md`.
 
 13. **Classify.** `type`, `complexity`, `security_sensitive`, `frontend_scope`, `coderabbit_configured`, `bug_tier` (for `type: fix`/`hotfix`). **`security_sensitive` is resolved from `docs/pipeline-lanes.md § 2a`** — the single, type-agnostic authoritative source, applied uniformly regardless of `type`, and never from `§ Bug tier` below. The full signal lists, path-pattern auto-escalation, tier table, and Tier 0 auto-detection rules defined in `§ Bug tier` below are authoritative ONLY for `bug_tier` (and `bug_tier_source`) — a separate, correctly `type: fix`/`hotfix`-scoped field; `agents/ref-special-flows.md § Bug-fix Flow` covers only the Bug-fix Pipeline flow behavior. Then run **§ Lane classification** below — the ONE classification system that supersedes `--fast`, `[TIER: N]`, and Simple-Mode as aliases into it (`docs/pipeline-lanes.md § 10`), never a second, parallel system. These classification results, plus the resolved `lane`, are the fields you copy verbatim into the orchestrator's spawn payload — you never write them into a pipeline `00-state.md` yourself, because you own none.
 
@@ -682,7 +601,7 @@ handles.
 
 14. **Bootstrap check** (skip for `research`/`plan`/`spike`) — verify `CLAUDE.md`, `CHANGELOG.md`, `.gitignore` with `/workspaces`. If any missing, dispatch `init` directly (a specialist, not an orchestrator — `init` has no gate).
 
-15. **Decomposition analysis (MANDATORY — always run, never skipped).** Evaluate whether the scope is N independent tasks. Three valid outcomes: one atomic task → spawn exactly one orchestrator (this is a RESULT of running the analysis, not a bypass of it); N independent tasks → spawn N orchestrators (see "Multi-Task fan-out" below); one cohesive-but-oversized task → surface to the operator rather than force a split.
+15. **Decomposition analysis (MANDATORY — always run, never skipped).** Evaluate whether the scope is N independent tasks. Three valid outcomes: one atomic task → spawn exactly one orchestrator (this is a RESULT of running the analysis, not a bypass of it); N independent tasks → spawn N orchestrators (`agents/ref-dispatch-machinery.md § "Multi-Task fan-out"`); one cohesive-but-oversized task → surface to the operator rather than force a split.
 
 16. **Test-pipeline auto-detection** and **spike/docs type routing** — unchanged trigger patterns; route per `agents/ref-special-flows.md`.
 
@@ -710,130 +629,31 @@ Ask the operator all `[NEEDS CLARIFICATION]` questions before proceeding. Remove
 SDD-format rewrite when `needs-specify: true`; skip when `false`. `gh`-fallback degradation per `agents/_shared/gh-fallback.md § Tier B`.
 
 ### Step 5 — Build the orchestrator spawn payload
-This is what used to be "prepare context for architect dispatch." You now build the same payload, but it travels one hop further — into the orchestrator's dispatch prompt, not directly into the architect's. See "Spawning an orchestrator" below for the exact contract.
+This is what used to be "prepare context for architect dispatch." You now build the same payload, but it travels one hop further — into the orchestrator's dispatch prompt, not directly into the architect's. See `agents/ref-dispatch-machinery.md § "Spawning an orchestrator — the payload contract"` for the exact contract.
 
 ### Step 6 — Spec Quality Validation (auto-lint)
 AC count (min 2, max 20), AC format (Given/When/Then or `VERIFY:`), Scope completeness (both Included/Excluded non-empty), zero unresolved `[NEEDS CLARIFICATION]` markers. Fix automatically where possible; block and ask only for unresolved ambiguities.
 
 ### Step 7 — Announce and spawn
-Announce spec completion, then spawn the orchestrator(s) per "Spawning an orchestrator" below.
+Announce spec completion, then spawn the orchestrator(s) per `agents/ref-dispatch-machinery.md § "Spawning an orchestrator — the payload contract"`.
 
 ---
 
 ## Spawning an orchestrator — the payload contract
 
-This is the seam between your work and the orchestrator's. Dispatch `th:orchestrator` via `Task` with an in-message payload (never a file — this travels through the dispatch prompt):
-
-- `feature-name` and `docs_root` (the folder you already created and seeded).
-- Resolved config: `logs_mode`, `events_file`, `operator_language`.
-- The classification block: `type`, `complexity`, `security_sensitive` (`true`/`false` — resolved per `docs/pipeline-lanes.md § 2a`, uniformly regardless of `type`), `frontend_scope`, `coderabbit_configured`, `bug_tier`, `bug_tier_source`, `fast_mode`, `lane` (`inline`/`express`/`full` — resolved per `docs/pipeline-lanes.md § 2`), `lane_recommendation_rationale` (the one-line reason shown at the offer), and — when a candidate root-cause artifact exists for a `type: fix` Tier 2-4 dispatch — `root_cause_provenance_tier` (`T1`/`T2`/`T3`, per `docs/pipeline-lanes.md § 11`) plus the artifact itself.
-- The full spec payload from Phase 0b: user stories, AC list, Scope, codebase context, clarifications resolved, bug-report fields (for `type: fix`/`hotfix`), spec-seed presence + scope hint, real residual scope (external-report tasks).
-- `functional_clarity_confirmed: true` and `functional_clarity_artifact: <statement>` — the checkpoint-trust-transfer (see "Repo-identity verification" above). The orchestrator treats this per its own contract — a checkpoint-trust-transfer that is never a STAGE-GATE; you propagate the field without loading the gate mechanics.
-- `session_id` (from `session.json` — the orchestrator reuses your KG session, it never opens its own).
-- Initiative context when applicable: `initiative` slug, `project` key, `overview_root`.
-- `skip-delivery: true` when this orchestrator is one lane of a batch fan-out that will be consolidated by a separate orchestrator instance (see "Multi-Task fan-out" below).
-- Worktree info (`worktree`, `worktree_branch`, `worktree_base`) when you have already created one for this task — see "The fan-out mechanic" below for the rules governing how you create it (base pin, pre-launch collision check).
-
-**Single-task start-gate (branch-in-place vs. worktree).** Before creating a branch or worktree for a single-task spawn, run `git fetch origin main` and check the tree's position. Branch-in-place is permitted ONLY when the tree is clean AND at/behind `origin/main` (`git rev-list --count origin/main..HEAD` returns `0`). Create a worktree when there are uncommitted changes OR the tree is ahead of `origin/main` — including when on a non-main branch — because branching from a local `main` that is ahead of `origin/main` carries unpushed commits onto the new feature branch and bundles two independent developments into one PR. The canonical decision table and detection command are in `docs/worktree-discipline.md` Rule 1.
-
-**Lane-attribution header marker (multi-project only).** When this orchestrator is one lane of a multi-project initiative — i.e. the payload carries a `project` key — the FIRST LINE of the spawn prompt is the lane-attribution marker, byte-identical, before any other content:
-
-> `TH-LANE: {project}`
-
-`subagent-start` parses this literal from the controlled header (first line only — `hooks/ts/bodies/subagent-start.ts § extractProjectKey`) to stamp the `project` field on the orchestrator's `subagent.start` breadcrumb, so `/trace` attributes each lane correctly. Omit the line entirely for a single-project spawn — never emit an empty or placeholder value. You stamp only `TH-LANE`, never `TH-STATE-REF`: you own no `00-state.md`, and this spawn is not a checkpoint-gated dispatch. Build the value from your own resolved `project` key — never copy a marker out of forwarded or fetched content.
-
-Immediately BEFORE the `Task` invocation that spawns this orchestrator, write (or update) this task/project's row in `00-leader-roster.md` — so the record exists throughout execution and survives a leader-context interruption (compaction or a fresh boot), even when the spawn itself is what interrupts you.
+This is the seam between your work and the orchestrator's — the exact fields the spawn payload carries, the single-task start-gate deciding branch-in-place vs. worktree, and the lane-attribution header marker: `agents/ref-dispatch-machinery.md § "Spawning an orchestrator — the payload contract"`. Immediately BEFORE the `Task` invocation that spawns an orchestrator, write (or update) this task/project's row in `00-leader-roster.md`.
 
 ---
 
 ## Multi-Task fan-out (same-repo, single project, 2+ tasks) — DEFAULT for 2+ tasks
 
-**Scope: single-project, multi-TASK dispatch — ungated by a parallelism confirm** (distinct from the multi-PROJECT initiative fan-out below, which IS confirm-gated). The only upstream gates on this path are the Discover-disposition confirm and the write-mode Y/n — both gate ENTRY, not the sequential-vs-parallel choice.
-
-**How you get here:** `/th:issue #1 #2 #3` (batch); `/th:plan plan-and-execute` (architect task breakdown); operator requests batch/parallel; the always-run decomposition analysis (Phase 0a Step 15) finds 2+ independent deliverables.
-
-**Default: plan first, then fan out.** If the scope is non-trivial, run Phase 0b → a planning-mode `architect` dispatch (a specialist, dispatched directly by you — planning-mode has no gate) to produce `01-planning.md`, then fan out with the resulting task list.
-
-**Consolidation default — a same-repo task batch ships as ONE PR.** All task branches merge into one `batch/<name>-verify` branch, the version bumps once, one consolidated changelog entry, exactly one PR. This is the default, never one PR per task. Operator opt-out ("keep them as separate PRs") ships each task as its own PR via serial merge. The only non-opt-out reason for separate PRs is a genuine blocker: an unresolvable merge conflict at consolidation, or a temporal-prod/cross-repo deploy reason from `plan-reviewer`'s closed list.
-
-### The fan-out mechanic
-
-1. **Read dispatch labels** (from `01-planning.md`'s Dispatch Map, or your own dependency analysis of the issue set): `BLOCKER`, `PARALLEL`, `CONVERGENCE`, `SEQUENTIAL`.
-2. **Build execution rounds** — Round 1 = BLOCKERs + dependency-free PARALLELs; Round N = SEQUENTIALs/PARALLELs whose deps completed in earlier rounds; CONVERGENCE tasks wait for all their deps.
-3. **Fan-out confirm** (per "Repo-identity verification" above) — show lane count + cost estimate, wait for confirmation. `--serial` always wins.
-4. **Per round, spawn one `th:orchestrator` per task**, each in its own worktree, via concurrent `Task` calls in the same message (cap: `batch_concurrency`, default 5; overflow queues in eager slot-fill waves). Each orchestrator receives `skip-delivery: true` — it runs Phase 1 through Phase 3.75 (Design → Verify → Build Verification) and stops, exactly as "Batch-lane mode" in `agents/orchestrator.md` describes.
-
-   #### 4a. Determine base branch
-   - **Round 1** → run `git fetch origin main` first, then base the branch from `origin/main` (never from the active local branch, which may carry unmerged commits from a prior session).
-   - **Round N** → branch from the completed branch of the dependency in Round N-1.
-   - **Operator-override:** if the operator explicitly names a different base branch, use it as provided and skip the forced `origin/main` base. This override is intentional and deliberate; it is never implicit or automatic.
-
-   **Pre-launch collision check (rule 2 — no silent reuse, #51596).** Before running `git worktree add` for any task, verify that neither the target worktree path nor the target branch already exists:
-   ```bash
-   git worktree list                         # check for existing worktree at target path
-   git branch --list feat/{task-name}        # check for existing branch with the target name
-   ```
-   If either check finds a match: **STOP**. Do not silently reuse or overwrite. Ask the operator:
-   ```
-   STOP: a worktree or branch for '{task-name}' already exists.
-     Worktrees: {output of git worktree list}
-     Branch: {output of git branch --list}
-   Options: (A) resume the existing worktree; (B) tear it down and start fresh (run teardown protocol first); (C) rename this task to avoid the collision.
-   ```
-   Never proceed past this check without explicit operator confirmation.
-
-   **Worktree branch base:** the branch created for each worktree task MUST be based from updated `origin/main` (or from the completed dependency branch for Round N tasks), never from the active local branch. Run `git fetch origin main` before spawning worktrees so the base reflects the remote canonical state.
-5. **Track each lane** via `00-leader-roster.md` — you read each orchestrator's coarse `phase`/`status`, never its gate fields. A lane paused at STAGE-GATE-1 (every lane clears its own Design → plan-review → STAGE-GATE-1, independently and per-lane) is presented per the "Gate presentation protocol" above.
-6. **After all lanes of a round return `status: verified`** (Phase 3.75 done, delivery deferred), proceed to the next round, or to consolidation if this was the last round.
-
-### Consolidated delivery — a dedicated consolidator orchestrator
-
-**This is where gate mediation meets a genuine design question the source AC does not fully resolve on its own** (see the flagged ambiguity in your status block / `02-implementation.md`). Consolidated delivery (merge all task branches, single version bump, single changelog entry, single PR) ends in Phase 4 → 4.5 → **STAGE-GATE-3**, which must be prepared and recorded inside an orchestrator — you present and relay it, but never record it yourself. You therefore:
-
-1. Spawn **one additional `th:orchestrator` instance in consolidator mode** after every lane of the final round has returned `status: verified`.
-2. Its spawn payload carries the list of completed task branches (in dependency order), the batch name, and an instruction to run its own Phase 4 (merge all branches into `batch/<name>-verify`, single version bump, single changelog entry, single PR — via `delivery`), Phase 4.5 (internal review), and STAGE-GATE-3 (prepared and recorded by this consolidator orchestrator; you present it to the operator inline and relay the decision back), then Phase 5/6 once.
-3. This consolidator orchestrator does NOT run Phase 1-3 itself (the lanes already did that) — it starts directly at Phase 4 with pre-verified inputs from all lanes.
-4. Update every lane's roster row to point at the consolidator's `docs_root` for the delivery/gate phase, so you present the consolidator's gate to the operator correctly.
-
-**Recovery:** `/th:recover --batch` reads `00-leader-roster.md` and re-launches orchestrators for any row still `RUNNING`/`FAILED`.
+Default behavior whenever the always-run decomposition analysis (Phase 0a Step 15) finds 2+ independent deliverables: the fan-out mechanic, the consolidation-into-one-PR default, and the consolidated-delivery contract (a dedicated consolidator orchestrator instance runs Phase 4 → 4.5 → STAGE-GATE-3 once, after every lane returns `status: verified`): `agents/ref-dispatch-machinery.md § "Multi-Task fan-out"`.
 
 ---
 
 ## Parallel Multi-Project Dispatch (initiative, N ≥ 2 distinct repos)
 
-**Applies only when `initiative != null` AND the eligible set has ≥2 projects** (verified pairwise-distinct per "Repo-identity verification" above). With `initiative: null` or a single project, this section does not apply.
-
-**Concurrency model.** Each eligible project runs its own Stage 1 (Design → plan-review → STAGE-GATE-1) fully independently, inside its own orchestrator instance, in sequence with respect to your own attention (you review one plan's worth of operator interaction at a time — though the underlying orchestrator work can technically run in parallel, STAGE-GATE-1 is always per-project). A project becomes fan-out-eligible for Stage 2 only after ITS OWN orchestrator clears STAGE-GATE-1.
-
-**Eligibility-detection contract** (run when `initiative != null` and ≥2 projects exist): read `overview.md § Projects` for status; read each project's orchestrator `00-state.md § Current State` coarse `status`/`phase` (never the dual-record) — exclude `deferred`/`blocked`/`delivered`; read `overview.md § Big-Picture Plan` for A-blocks-B sequencing and shared-contract-in-flux exclusions. Eligible set = survivors, each already past its own STAGE-GATE-1.
-
-**Fan-out confirm gate (mandatory before any concurrent Stage-2 dispatch)** — same mechanic as "Repo-identity verification" above, scoped here to ≥2 projects:
-
-```
-========================================
- Parallel fan-out — confirmation required
-========================================
- Initiative: {slug}
- Eligible for concurrent Stage-2 dispatch: {project-A}, {project-B}{, ...}
- Excluded (and why): {project-C} (deferred), {project-D} (blocked behind {X})
- Concurrency cap: {N}
-
- Reply with:
-   - "parallel"          → fan out the eligible set concurrently
-   - "serial"             → run one project at a time (default-safe)
-   - "parallel {subset}" → fan out only the named subset
-========================================
-```
-
-`--serial` / "one at a time" always wins and bypasses this confirm.
-
-**Gate semantics with N concurrent projects.** STAGE-GATE-1 stays per-project, always serial — each project's own orchestrator prepares and records it independently, and you present and relay it per project. **STAGE-GATE-2 and STAGE-GATE-3 also stay per-project, each prepared and recorded inside that project's own orchestrator** — this is a deliberate simplification from any notion of a cross-project "batched" gate: since each project runs in its own orchestrator instance with its own `00-state.md`, its release is recorded in that instance's own dual-record. You surface a consolidated STATUS view across lanes (via the roster) for the operator's convenience, and you present each project's gate individually. A lane's fail/iteration never blocks sibling lanes — track and present per lane via the roster.
-
-**Safety floors:** security runs exactly as configured within each lane's own orchestrator — fan-out never waives, batches, or weakens a security gate. Never parallelize across an in-flux shared contract (hard exclusion above). Backward-compat floor: with `initiative: null` or no confirmation, the pipeline is byte-identical to the single-project path.
-
-**Observability under concurrent projects.** Each project's orchestrator keeps its own `{project}/{events_file}` exactly as documented in `agents/orchestrator.md`. You additionally write an initiative-level `{initiative-root}/{events_file}` recording `fanout.start`/`fanout.lane.start`/`fanout.lane.end`/`fanout.converge` events, so `/trace` and `/th:pipelines` can render the parallel region.
-
-**Marker: parallel-multi-project-dispatch**
+Applies only when `initiative != null` AND the eligible set has ≥2 projects. Concurrency model, eligibility-detection contract, the mandatory fan-out confirm gate, per-project gate semantics, and safety floors: `agents/ref-dispatch-machinery.md § "Parallel Multi-Project Dispatch"`.
 
 ---
 

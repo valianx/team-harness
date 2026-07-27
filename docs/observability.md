@@ -455,6 +455,9 @@ The following event types appear in `00-execution-events` in addition to the cor
 | `artifact.missing` | When an expected agent output file is absent after dispatch | `expected_file`, `agent`, `action` (`retry`/`escalate`) |
 | `stage2.hygiene` | When the Phase 2.6 code-hygiene scan completes (deterministic, orchestrator-run — see `docs/code-hygiene-gate.md § Layer 1`) | `verdict` (`pass`/`fail`), `extra.files` (int, on `fail`), `extra.count` (int, on `fail`) |
 | `plan_structure` | When the Phase 1.5a deterministic plan-structure scan completes, before any `qa-plan` dispatch (deterministic, orchestrator-run — see `docs/plan-structure-gate.md § 2`) | `verdict` (`pass`/`fail`), `extra.check`/`extra.detail` (on `fail`, the specific mechanical failure) |
+| `checkpoint.confirmed` | When `th:leader` obtains — or fails to obtain — the operator's live confirmation of the functional-clarity artifact at Discover Boundary B1, before spawning `th:orchestrator` (`docs/reasoning-checkpoint.md § "Attribution and failure direction"`) | `provenance` (`operator-live`/`leader-inferred`), the confirmatory text (named exception to the Free-text field bound, see below) |
+
+Note: `checkpoint.confirmed` is written exclusively by `th:leader`, on the same file it already initializes at Phase 0a (`agents/leader.md § Phase 0a`) — `th:orchestrator` reads and verifies the event but never writes or repairs it.
 
 Note: `gate` (human checkpoint) is distinct from `gate.pass` / `gate.fail` (automated agent-to-agent gates). The latter fire when the orchestrator evaluates a plan-review or acceptance-gate result without pausing for human input; the former fires when execution is suspended pending operator approval.
 

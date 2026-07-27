@@ -165,7 +165,10 @@ All 7 survey fields in `00-state.md` are plain-text key: value pairs readable by
 - functional_clarity_artifact: {<short functional statement> | null}
   # confirmed functional statement ("what we are building, functionally"); null until confirmed
 - functional_clarity_confirmed: {true | false}
-  # true when the operator confirmed the functional clarity artifact
+  # DERIVED CACHE — the `checkpoint.confirmed` event in {events_file} is the sole
+  # authority (docs/reasoning-checkpoint.md § "Attribution and failure direction");
+  # this field mirrors its `provenance` for convenience and is never consulted in
+  # place of the event
 ```
 
 **Recovery Instructions update (add to `## Recovery Instructions`):**
