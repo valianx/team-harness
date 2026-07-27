@@ -293,9 +293,9 @@ func TestResolveFamilyForTier_UnknownProviderFailsClosed(t *testing.T) {
 // VALUE to the PROVIDER_TIER_FAMILY / PROVIDER_TIER_CONCRETE maps declared in
 // tools/harness-migrate/migrate.mjs.
 //
-// This is the multi-site invariant lock (01-plan.md § Multi-site invariants):
-// a drift at either of the two sites reds this test and names exactly
-// which site and which (provider, tier) drifted.
+// This is the multi-site invariant lock (docs/opencode-model-config.md
+// § Per-provider cost tiering): a drift at either of the two sites reds this
+// test and names exactly which site and which (provider, tier) drifted.
 func TestProviderTierMaps_CrossSurfaceParity_AC8(t *testing.T) {
 	repoRoot := repoRootForTierTest(t)
 
@@ -306,12 +306,33 @@ func TestProviderTierMaps_CrossSurfaceParity_AC8(t *testing.T) {
 	jsFamily := extractJSProviderTierMap(t, migrateSrc, "PROVIDER_TIER_FAMILY")
 	jsConcrete := extractJSProviderTierMap(t, migrateSrc, "PROVIDER_TIER_CONCRETE")
 
+	assertSameProviderKeys(t, "PROVIDER_TIER_FAMILY", "migrate.mjs", providerTierFamily, jsFamily)
+	assertSameProviderKeys(t, "PROVIDER_TIER_CONCRETE", "migrate.mjs", providerTierConcrete, jsConcrete)
+
 	for provider, goTiers := range providerTierFamily {
 		compareProviderTierMap(t, "PROVIDER_TIER_FAMILY", "migrate.mjs", provider, goTiers, jsFamily[provider])
 	}
 
 	for provider, goTiers := range providerTierConcrete {
 		compareProviderTierMap(t, "PROVIDER_TIER_CONCRETE", "migrate.mjs", provider, goTiers, jsConcrete[provider])
+	}
+}
+
+// assertSameProviderKeys compares the outer provider key sets. The per-provider
+// comparisons below key off the Go maps, so a provider declared only at the
+// other site is never visited by them — without this check the two surfaces can
+// drift by a whole provider while the test stays green.
+func assertSameProviderKeys(t *testing.T, mapName, site string, want, got map[string]map[string]string) {
+	t.Helper()
+	for provider := range got {
+		if _, ok := want[provider]; !ok {
+			t.Errorf("%s: %s declares provider %q that Go's curated map does not have", mapName, site, provider)
+		}
+	}
+	for provider := range want {
+		if _, ok := got[provider]; !ok {
+			t.Errorf("%s: %s has no entry for provider %q (present in Go's curated map)", mapName, site, provider)
+		}
 	}
 }
 
