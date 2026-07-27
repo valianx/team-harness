@@ -30,7 +30,7 @@
 #     line) is ignored — untrusted content per CLAUDE.md §6.6 cannot smuggle
 #     a project key onto the breadcrumb.
 #
-# Also asserts (Section 6, Task-6 AC-1/AC-2/AC-5): `payload_bytes` — the
+# Also asserts (Section 6, AC-1/AC-2/AC-5): `payload_bytes` — the
 # byte length of the dispatch prompt —
 #   - AC-1: every breadcrumb carries `payload_bytes`, ungated by any
 #     threshold.
@@ -39,7 +39,7 @@
 #   - AC-5: the value is exactly the byte count and nothing else — no
 #     content beyond that count enters the record.
 #
-# Also asserts (Section 7, Task-6 AC-4/AC-5): docs/observability.md's
+# Also asserts (Section 7, AC-4/AC-5): docs/observability.md's
 # `### subagent.start` section documents `payload_bytes` — the line-schema
 # example includes the key, the visibility-only/no-ceiling posture is
 # stated, the Claude-Code-plugin-only coverage limitation is named without
@@ -385,7 +385,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Section 6 — Task-6 AC-1/AC-2/AC-5: payload_bytes visibility, no ceiling
+# Section 6 — AC-1/AC-2/AC-5: payload_bytes visibility, no ceiling
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Section 6: payload_bytes (AC-1/AC-2/AC-5) ---"
@@ -422,7 +422,7 @@ if command grep -qE 'PAYLOAD_BYTES_(MAX|MIN|THRESHOLD|LIMIT|CAP)' "$BODY_TS"; th
 assert_true "AC-2: no payload_bytes threshold constant declared in the hook body" "$r"
 
 # ---------------------------------------------------------------------------
-# Section 7 — Task-6 AC-4/AC-5: docs/observability.md documents the field
+# Section 7 — AC-4/AC-5: docs/observability.md documents the field
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Section 7: docs/observability.md § subagent.start documents payload_bytes (AC-4) ---"
