@@ -39134,6 +39134,246 @@ check(
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
+# Suite 178 — panel-write-discipline (Task-3 of verifiable-contracts, #527):
+# the four panel writers on reviews/01-plan-review.md (plan-reviewer, qa-plan,
+# security, adversary) held Write without the anchored-Edit discipline that
+# makes a whole-file overwrite of another agent's section detectable. Edit
+# (already granted in the base tree, pinned here as a regression) closes the
+# noisy failure — a full Write destroying every heading at once — but cannot
+# itself impose the anchoring discipline that prevents the silent one (a
+# broad old_string/replace_all corrupting another section while every heading
+# survives). Asserts the canonical write-tool-discipline section, each of the
+# four contracts' MUST + pointer (with a generic cross-file guard on the
+# shared 'edited in place' marker), the plan-reviewer regression on the
+# Reviews: line write form, the frontmatter Edit regressions, and the
+# orchestrator's header-survival check producer/consumer.
+#
+# Marker: panel-write-discipline
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 178: panel-write-discipline (Edit anchoring + header-survival check) ===")
+
+
+def _s178_slice(text: str, anchor: str) -> str:
+    """Return text from anchor (inclusive) to the next markdown heading or EOF.
+
+    Local copy — mirrors Suite 176/177's own slice helper, kept independent
+    for the same reason documented there: `_slice_section` was redefined
+    elsewhere in this file with a different signature.
+    """
+    idx = text.find(anchor)
+    if idx == -1:
+        return ""
+    rest = text[idx:]
+    m = re.search(r"\n(?:#{1,6}) ", rest[1:])
+    if m:
+        return rest[: m.start() + 1]
+    return rest
+
+
+_s178_pc = read(AGENTS_DIR / "_shared" / "plan-consolidation.md")
+_s178_pr = read(AGENTS_DIR / "plan-reviewer.md")
+_s178_qap = read(AGENTS_DIR / "qa-plan.md")
+_s178_sec = read(AGENTS_DIR / "security.md")
+_s178_adv = read(AGENTS_DIR / "adversary.md")
+_s178_orch = read(AGENTS_DIR / "orchestrator.md")
+_s178_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s178_claude = read(REPO_ROOT / "CLAUDE.md")
+
+# --- Canonical section: agents/_shared/plan-consolidation.md (ac4-ac11) -----
+_s178_wtd = _s178_slice(_s178_pc, "## Write-tool discipline (shared review files)")
+
+check(
+    "suite178(ac4): plan-consolidation.md contains '## Write-tool discipline (shared review files)'",
+    bool(_s178_wtd),
+    "the canonical Write-tool discipline section is missing",
+)
+check(
+    "suite178(ac5): the section states the rule generally, for the panel, not one agent's exception",
+    bool(_s178_wtd) and "not an exception carved out for one agent" in _s178_wtd,
+    "the section must state the rule applies to the panel as a whole, not one agent",
+)
+check(
+    "suite178(ac6): the section reserves Write to the writer's own file's initial creation,"
+    " excluding an existing/foreign/shared file",
+    bool(_s178_wtd)
+    and "reserved for the initial creation of the agent's own review file" in _s178_wtd
+    and "never for a file that already exists, never for a file owned by another agent, never"
+    " for a shared file" in _s178_wtd,
+    "the section must reserve Write to own-file initial creation and exclude existing/foreign/shared files",
+)
+check(
+    "suite178(ac7): the section prohibits replace_all: true on the shared review file",
+    bool(_s178_wtd) and "`replace_all: true` is PROHIBITED on this file" in _s178_wtd,
+    "the section must prohibit replace_all: true on reviews/01-plan-review.md",
+)
+check(
+    "suite178(ac8): the section requires old_string anchored to the writer's own section or labelled line",
+    bool(_s178_wtd)
+    and "anchored exclusively to the writer's own section or its own labelled line" in _s178_wtd,
+    "the section must require old_string anchored to the writer's own section/labelled line",
+)
+check(
+    "suite178(ac9): the section declares Edit as a verifiable capacity and the Write-destination"
+    " reservation as a contract the grant cannot impose (not path-scoped)",
+    bool(_s178_wtd)
+    and "`Edit` is a CAPACITY" in _s178_wtd
+    and "CONTRACT the tool grant cannot impose" in _s178_wtd
+    and "not path-scoped" in _s178_wtd,
+    "the section must declare the capacity-vs-contract asymmetry and the not-path-scoped reason",
+)
+check(
+    "suite178(ac10): the section names the header-subset (header-survival) check as what"
+    " actually detects a violation of the Write-destination contract",
+    bool(_s178_wtd)
+    and "header-subset (header-survival) check" in _s178_wtd
+    and 'agents/orchestrator.md § "Header-survival check (panel dispatch integrity)"' in _s178_wtd,
+    "the section must name the orchestrator's header-survival check as the actual detector",
+)
+check(
+    "suite178(ac11): the section declares why 01-plan.md carries no equivalent check and"
+    " names the residual that absence leaves open",
+    bool(_s178_wtd)
+    and "carries no equivalent check" in _s178_wtd
+    and "would not be caught by any structural guard" in _s178_wtd,
+    "the section must explain the absent check on 01-plan.md and name the open residual",
+)
+
+# --- Per-contract MUST + pointer (ac12-ac15) --------------------------------
+_S178_POINTER = 'agents/_shared/plan-consolidation.md § "Write-tool discipline (shared review files)"'
+_S178_CONTRACTS = (
+    ("plan-reviewer", _s178_pr, "## Critical Rules"),
+    ("qa-plan", _s178_qap, "## Files I write (exhaustive)"),
+    ("security", _s178_sec, "**Centralization contract (MUST NOT violate):**"),
+    ("adversary", _s178_adv, "## Session Context Protocol"),
+)
+for _name, _text, _anchor in _S178_CONTRACTS:
+    _slice = _s178_slice(_text, _anchor)
+    check(
+        f"suite178(ac12-15/{_name}): agents/{_name}.md contains the MUST + canonical pointer to"
+        " plan-consolidation.md's Write-tool discipline section",
+        bool(_slice) and "MUST" in _slice and _S178_POINTER in _slice,
+        f"agents/{_name}.md must contain the MUST + pointer to the canonical Write-tool discipline section",
+    )
+
+# --- Generic capacity-vs-contract guard: shared 'edited in place' marker ----
+for _name, _text in (
+    ("plan-reviewer", _s178_pr),
+    ("qa-plan", _s178_qap),
+    ("security", _s178_sec),
+    ("adversary", _s178_adv),
+):
+    check(
+        f"suite178(generic-marker/{_name}): agents/{_name}.md's Write-tool-discipline MUST clause"
+        " anchors editing with the fixed 'edited in place' marker",
+        "edited in place" in _text,
+        f"agents/{_name}.md's Write-tool-discipline MUST clause must contain the fixed"
+        " 'edited in place' marker",
+    )
+
+# --- Frontmatter regression: Edit present alongside Write (ac1-ac2) ---------
+_s178_pr_frontmatter = _s178_pr.split("---", 2)[1] if _s178_pr.count("---") >= 2 else ""
+_s178_adv_frontmatter = _s178_adv.split("---", 2)[1] if _s178_adv.count("---") >= 2 else ""
+check(
+    "suite178(ac1): agents/plan-reviewer.md frontmatter declares Edit, keeping Write (regression pin)",
+    "Edit" in _s178_pr_frontmatter and "Write" in _s178_pr_frontmatter,
+    "plan-reviewer.md's tools: line must declare Edit and keep Write",
+)
+check(
+    "suite178(ac2): agents/adversary.md frontmatter declares Edit, keeping Write (regression pin)",
+    "Edit" in _s178_adv_frontmatter and "Write" in _s178_adv_frontmatter,
+    "adversary.md's tools: line must declare Edit and keep Write",
+)
+
+# --- plan-reviewer.md Critical Rules: Reviews: line write form (ac16) -------
+_s178_pr_critical = _slice_section(_s178_pr, "## Critical Rules", ("\n## Core Philosophy",))
+check(
+    "suite178(ac16): plan-reviewer.md Critical Rules declares the Reviews: line is replaced"
+    " in place with Edit, anchored to that line, and never with Write",
+    bool(_s178_pr_critical)
+    and "replace in place with `Edit`, anchored to that single line, and never with `Write`"
+    in _s178_pr_critical,
+    "Critical Rules must declare the Reviews: line write form (Edit, anchored, never Write)",
+)
+
+# --- Orchestrator: header-survival check producer (ac18-ac21) ---------------
+_s178_orch_check = _s178_slice(_s178_orch, "### Header-survival check (panel dispatch integrity)")
+check(
+    "suite178(ac18): the header-survival check blocks and emits plan_review_integrity: fail on a"
+    " lost heading/sub-verdict label, without advancing to STAGE-GATE-1",
+    bool(_s178_orch_check)
+    and "status: blocked" in _s178_orch_check
+    and "`plan_review_integrity`" in _s178_orch_check
+    and "`verdict: fail`" in _s178_orch_check
+    and "Do NOT advance to STAGE-GATE-1" in _s178_orch_check,
+    "the check must declare status: blocked + plan_review_integrity: fail + no advance to STAGE-GATE-1"
+    " on a lost heading/label",
+)
+check(
+    "suite178(ac19): the pre-dispatch snapshot is written to {docs_root}/inputs/01-plan-review.pre-dispatch.md,"
+    " overwritten on each dispatch",
+    bool(_s178_orch_check)
+    and "{docs_root}/inputs/01-plan-review.pre-dispatch.md" in _s178_orch_check
+    and "overwriting any snapshot left by a prior dispatch" in _s178_orch_check,
+    "the check must name the exact snapshot path and the overwrite-per-dispatch behaviour",
+)
+check(
+    "suite178(ac20): the snapshot is preserved while a plan_review_integrity: fail is undisposed,"
+    " and no retry overwrites it",
+    bool(_s178_orch_check)
+    and "UNLESS a `plan_review_integrity: fail` from a previous dispatch is still undisposed" in _s178_orch_check
+    and "no retry of the same dispatch is allowed to erase it" in _s178_orch_check,
+    "the check must preserve the snapshot while a fail is undisposed and forbid retry-overwrite",
+)
+check(
+    "suite178(ac21): the orchestrator never auto-restores reviews/01-plan-review.md on a"
+    " plan_review_integrity: fail",
+    bool(_s178_orch_check)
+    and "No repair, no auto-restore" in _s178_orch_check
+    and "you do not reconstruct `reviews/01-plan-review.md` from the snapshot yourself" in _s178_orch_check,
+    "the check must declare no auto-restore of reviews/01-plan-review.md",
+)
+
+# --- Orchestrator: header-survival check consumer/invocation sites ----------
+_s178_orch_15 = _s178_slice(_s178_orch, "## Phase 1.5 — Plan Ratification")
+_s178_orch_16 = _s178_slice(_s178_orch, "## Phase 1.6 — Plan Review (Stage 1 closing gate)")
+check(
+    "suite178(invocation-1.5): Phase 1.5's qa-plan dispatch names the header-survival check"
+    " as wrapping its own dispatch",
+    bool(_s178_orch_15) and "Header-survival check (panel dispatch integrity)" in _s178_orch_15,
+    "Phase 1.5's qa-plan Invoke line must reference the header-survival check",
+)
+check(
+    "suite178(invocation-1.6): Phase 1.6 names both the security design-review and the"
+    " plan-reviewer dispatch as wrapped by the header-survival check",
+    bool(_s178_orch_16)
+    and _s178_orch_16.count("Header-survival check (panel dispatch integrity)") >= 1
+    and "wrapped by the header-survival check" in _s178_orch_16,
+    "Phase 1.6 must name both panel dispatches as wrapped by the header-survival check",
+)
+
+# --- self-ref/registry/hygiene (per this repo's own Suite-176/177 precedent) --
+_s178_own = read(REPO_ROOT / "tests" / "test_agent_structure.py")
+check(
+    "suite178(self-ref): test file contains 'Suite 178' and 'panel-write-discipline'",
+    "Suite 178" in _s178_own and "panel-write-discipline" in _s178_own,
+    "test file must self-reference Suite 178 and the marker 'panel-write-discipline'",
+)
+check(
+    "suite178(registry): docs/testing.md registers 'Suite 178' and 'panel-write-discipline'",
+    "Suite 178" in _s178_testing_md and "panel-write-discipline" in _s178_testing_md,
+    "docs/testing.md must register Suite 178 and the 'panel-write-discipline' marker",
+)
+check(
+    "suite178(hygiene): CLAUDE.md does NOT contain 'Suite 178' (§11 hygiene contract)",
+    "Suite 178" not in _s178_claude,
+    "CLAUDE.md must not mention Suite 178 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: panel-write-discipline
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

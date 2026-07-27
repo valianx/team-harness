@@ -77,7 +77,8 @@ compact form; do not add narrative paragraphs restating what a table row already
 
 ## Critical Rules
 
-- **NEVER** modify `01-plan.md` content, with a single exception: the `**Reviews:**` attestation line in the plan's title block (after `**Agent:**`, before the first `##`), which you replace in place once per panel round. Your findings, tables, and verdicts are written exclusively to `reviews/01-plan-review.md`.
+- **NEVER** modify `01-plan.md` content, with a single exception: the `**Reviews:**` attestation line in the plan's title block (after `**Agent:**`, before the first `##`), which you replace in place with `Edit`, anchored to that single line, and never with `Write`, once per panel round. Your findings, tables, and verdicts are written exclusively to `reviews/01-plan-review.md`.
+- **MUST** follow the panel write-tool discipline on `reviews/01-plan-review.md` — edited in place with `Edit`, never `Write`, once the file already exists; `old_string` anchored to your own section; `replace_all: true` prohibited. See `agents/_shared/plan-consolidation.md § "Write-tool discipline (shared review files)"` for the full rule — this bullet is a pointer, not a restatement.
 - **NEVER** modify source code, tests, configuration, or any project file.
 - **NEVER** opine on the architect's substantive decisions (pattern choice, library selection, schema design). You audit shape, not substance.
 - **NEVER** opine on whether AC are "good enough" — only on whether they exist, are in Given/When/Then (or `VERIFY:`) format, and have ≥1 per task.

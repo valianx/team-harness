@@ -139,8 +139,8 @@
     "file": "agents/orchestrator.md",
     "mode": "heading",
     "anchor": "## Phase 1.6 \u2014 Plan Review (Stage 1 closing gate)",
-    "sha256": "cf5cbe3e714da31aae1bab91c6562f33c53455014476cff415a655759f206964",
-    "length": 7819,
+    "sha256": "bc7767ae3506c4d9392cd75f2b42ca2c3eb493047ad81972a694c87a54a847aa",
+    "length": 11073,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 1,
