@@ -952,6 +952,64 @@ else
 fi
 
 echo
+echo "--- AC-1.12: redactInertDataSpans wiring stays confined to policy-block.cjs (never leaks into an unrelated bundle) ---"
+# Reframed from the original build-time VERIFY ("git status --porcelain
+# hooks/ts/dist/ reports only policy-block.cjs modified") into a content-based
+# structural invariant: a git-diff assertion only reflects UNCOMMITTED
+# changes, so it goes vacuously-passing the moment this task's commits land —
+# it can never fail again regardless of whether the disjunction still holds.
+# The content check below stays meaningful at any point in git history because
+# it inspects the compiled bundles themselves, not a diff against a moving
+# base.
+#
+# Positive half: policy-block.cjs must actually contain the redactor (proves
+# the build genuinely wired Task-1's module in, not a silent no-op).
+if grep -q 'redactInertDataSpans' "$REPO_ROOT/hooks/ts/dist/policy-block.cjs"; then
+    PASS=$((PASS + 1))
+    echo "  [PASS] AC-1.12 (positive): hooks/ts/dist/policy-block.cjs contains redactInertDataSpans"
+else
+    FAIL=$((FAIL + 1))
+    FAILURES+=("AC-1.12 (positive): hooks/ts/dist/policy-block.cjs does not contain redactInertDataSpans — build did not wire the redactor in")
+    echo "  [FAIL] AC-1.12 (positive): hooks/ts/dist/policy-block.cjs does not contain redactInertDataSpans"
+fi
+
+# Negative half: every OTHER tracked bundle must NOT contain it, enumerated
+# dynamically so a future bundle is covered automatically. Two bundles are
+# excluded by name, each for a distinct, load-bearing reason (not because the
+# property is expected to fail there):
+#   - opencode-plugin.cjs is the umbrella bundle that aggregates every
+#     opencode-runtime entry point, including policy-block's own — once ANY
+#     constituent imports data-position.ts, this bundle legitimately contains
+#     it too. Asserting its absence here would fail today, by construction,
+#     against a bundle that isn't a leak.
+#   - dev-guard.cjs is this same feature's own Task-4 (Round 2, not yet
+#     landed): it will legitimately import the identical redactor next round.
+#     Excluding it here is scoped to THIS task's own build-disjointness claim;
+#     Task-4's own AC governs dev-guard.cjs once that round ships.
+_AC112_LEAK_FOUND=0
+_AC112_LEAKED_FILES=()
+for _bundle in "$REPO_ROOT"/hooks/ts/dist/*.cjs; do
+    _bundle_name="$(basename "$_bundle")"
+    case "$_bundle_name" in
+        policy-block.cjs|opencode-plugin.cjs|dev-guard.cjs)
+            continue
+            ;;
+    esac
+    if grep -q 'redactInertDataSpans\|data-position' "$_bundle"; then
+        _AC112_LEAK_FOUND=1
+        _AC112_LEAKED_FILES+=("$_bundle_name")
+    fi
+done
+if [ "$_AC112_LEAK_FOUND" -eq 0 ]; then
+    PASS=$((PASS + 1))
+    echo "  [PASS] AC-1.12 (negative): no other tracked bundle references redactInertDataSpans/data-position"
+else
+    FAIL=$((FAIL + 1))
+    FAILURES+=("AC-1.12 (negative): redactInertDataSpans/data-position leaked into: ${_AC112_LEAKED_FILES[*]}")
+    echo "  [FAIL] AC-1.12 (negative): leaked into: ${_AC112_LEAKED_FILES[*]}"
+fi
+
+echo
 echo "--- AC-1.13/AC-1.13a: legacy tmux spawn exemption unaffected by this task ---"
 # The exact literal exemption (asserted above at "legacy tmux batch-spawn,
 # exact literal form") and its anti-forgery variants are pre-existing cases
