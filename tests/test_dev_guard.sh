@@ -2252,11 +2252,11 @@ assert_nodecision 'echo "git push" (retained safe entry, AC-RG8) -> nodecision' 
 rm -rf "$TMP"
 
 # ---------------------------------------------------------------------------
-# Suite 83h (Task-4, hook-payload-batch) — dev-guard imports the shared
-# data-position.ts redactor. Branch selection and the single-command
-# EffectiveCommand both derive from the raw parse; the redacted parse only
-# narrows coverage on the compound branch and gates the single-command
-# branch's cardinality — see hooks/ts/bodies/dev-guard.ts's evaluate().
+# Suite 83h — dev-guard imports the shared data-position.ts redactor. Branch
+# selection and the single-command EffectiveCommand both derive from the raw
+# parse; the redacted parse only narrows coverage on the compound branch and
+# gates the single-command branch's cardinality — see
+# hooks/ts/bodies/dev-guard.ts's evaluate().
 # ---------------------------------------------------------------------------
 
 echo
