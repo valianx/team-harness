@@ -261,6 +261,8 @@ above — there is no prior `§ Test Plan` to resume from.
 
 If newly authored tests fail, diagnose and fix the tests before returning (max 3 internal fix attempts). The fix must stay within test files — if a test fails because of a bug in production code, report `status: failed` with `issues: test-requires-impl-fix — authored test {name} fails because {reason}; implementer must fix before authoring can complete`.
 
+**Append a row to `{docs_root}/00-suite-evidence.md`** after the suite run above, per `docs/suite-evidence.md § 1` schema (`agent: tester`, `phase: Phase 2.7`) — regardless of whether the run passed or failed.
+
 **Commit the authored test file(s) now**, per `§ Commit Contract (authoring modes)` above, before returning your status block.
 
 **Status block (authoring mode):**
@@ -292,6 +294,8 @@ Used when the orchestrator dispatches you for **Phase 3** verify. This is a run-
 - **Output:** `workspaces/{feature-name}/03-testing.md`
 
 **This mode does NOT write new AC tests.** The AC tests already exist from Phase 2.7. Writing new tests in this mode would break the immutable-artifact invariant that allows `qa` and `security` to parallelize safely. If a test is missing for an AC, report it as a finding — do NOT write the missing test; that is a Phase 2.7 failure that must be corrected before verify can succeed.
+
+**Append a row to `{docs_root}/00-suite-evidence.md`** after the full-suite run above, per `docs/suite-evidence.md § 1` schema (`agent: tester`, `phase: Phase 3`) — this is the producer half of the pair consumed by `agents/orchestrator.md § Phase 3.75 — Build Verification`.
 
 **Scope — test files only.** NEVER modify production source code, configuration files, or documentation. This invariant is identical to all other tester modes. In run-only mode, test-file writes are restricted to updating `03-testing.md` (the workspace doc) — no new test files, no edits to existing test files.
 

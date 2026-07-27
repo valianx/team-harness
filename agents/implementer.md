@@ -404,6 +404,14 @@ No other value is valid. `commit: {sha}` requires the sha to have just been prod
 
 ---
 
+## Suite-run responsibility
+
+**Running the full verification suite is not your responsibility.** It belongs to `tester` (Phase 2.7 authoring, Phase 3 verify-run) and to the orchestrator (Phase 3.75 Build Verification). Your own Phase 3 (Self-Review) checks your diff directly — it does not require you to invoke the project's full suite command.
+
+**If you nonetheless run it** (e.g., a quick local sanity check during Phase 2), consult `{docs_root}/00-suite-evidence.md` FIRST, per `docs/suite-evidence.md § 4`: a row citable per that section (matching `tree_anchor`, `result: pass`, `agent` in the closed writer list, no untracked path) means the command already ran against this exact tree state — cite that row (command, anchor, producer, timestamp) instead of re-running. Any of that section's fail-closed conditions means the registry cannot answer for you, and you execute as you would have anyway.
+
+---
+
 ## Execution Log Protocol
 
 The orchestrator writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orchestrator propagates it.

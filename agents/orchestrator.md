@@ -1203,11 +1203,13 @@ Security findings are NOT checked here — the Pre-Delivery Security Audit (Phas
 
 **Build command detection order:** CLAUDE.md Golden Commands → `package.json` scripts → `Makefile` → `go.mod` → `Cargo.toml`. No command found → log `skipped`, close this task's Stage-2 loop.
 
+**Consult `{docs_root}/00-suite-evidence.md` FIRST, before running the full-suite command.** Follow `docs/suite-evidence.md § 4` resolution exactly: a row citable per that section (matching `tree_anchor`, `result: pass`, `agent` in the closed writer list, no untracked path) lets you skip that command and cite the row (command, anchor, producer agent, timestamp) in place of a fresh execution; any of that section's fail-closed conditions forces execution. This consult-first step applies to the full-suite command only — the build and lint commands below still run every time; this registry never substitutes for them.
+
 **Execution:**
 
 a. Run the detected build command via Bash.
 b. Run the detected lint command via Bash (separate invocation).
-c. Both pass (exit code 0) → this task's Stage-2 loop closes (next DAG round, STAGE-GATE-2, or, once every task in the delivery group has closed, Phase 3.8).
+c. Both pass (exit code 0) → append a row to `{docs_root}/00-suite-evidence.md` per `docs/suite-evidence.md § 1` schema (`agent: orchestrator`, `phase: Phase 3.75`) — unless the consult-first step above cited an existing row instead of executing. Then this task's Stage-2 loop closes (next DAG round, STAGE-GATE-2, or, once every task in the delivery group has closed, Phase 3.8).
 d. Either fails → re-dispatch the implementer with the failure output, retry once. If the retry also fails: `status: blocked`, escalate to the operator with the full failure output.
 
 **Iteration budget:** max 2 attempts (separate from the Phase 3 budget).
@@ -1759,7 +1761,7 @@ In obsidian mode (`{events_file}` = `00-execution-events.md`), extract the JSONL
 
 **Consolidation:** you are the SINGLE designated consolidator. Create the integration branch, `git merge` each item branch one at a time in reserved order, `bash tests/run-all.sh` after each merge, proceeding only when green. Resolve additive same-anchor conflicts by keeping all blocks in reserved order — never drop, never pick a winner. Version + CHANGELOG done ONCE at the end.
 
-**Verify:** per-item `python3 tests/test_agent_structure.py` in the worktree (never concurrent `run-all.sh`); on the integration branch, `bash tests/run-all.sh` after every merge and as the final gate.
+**Verify:** per-item `python3 tests/test_agent_structure.py` in the worktree (never concurrent `run-all.sh`); on the integration branch, `bash tests/run-all.sh` after every merge and as the final gate. Append a row to `{docs_root}/00-suite-evidence.md` after each `run-all.sh` invocation on the integration branch, per `docs/suite-evidence.md § 1` schema (`agent: orchestrator`, `phase: Parallel Batch consolidation`) — one row per merge, never overwritten, since each merge moves the tree anchor and the next merge's consult-first check (`docs/suite-evidence.md § 4`) needs its own row to compare against.
 
 **Empirical basis:** this contract was first dogfooded in PR #338 — N items planned in parallel, implemented across isolated worktrees, consolidated into one PR with a single final `run-all.sh`. The sequential `git merge` + validate-after-each consolidation above hardens the original hand-splice procedure, which a later batch broke on cross-contamination and a global-guard collision; the merge-and-validate sequence surfaces those failure modes as a merge conflict or a per-merge red run rather than silently accepting them.
 

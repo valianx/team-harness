@@ -591,15 +591,20 @@ Move the accumulated `[Unreleased]` entries (including anything assembled from f
 
 **On `lane: express` (`agents/orchestrator.md § "Express Lane Profile"`):** delivery produces minimal artifacts only — `00-state.md` (state), `00-execution-events.*` (events), and `01-plan.md` (the self-authored plan) — no full `02-implementation.md`/`03-testing.md`-adjacent documentation set beyond what the express dispatches themselves already wrote. The lint/build gates below are scoped to the diff's changed files (`git diff origin/main...HEAD --name-only`) rather than a full-tree run, mirroring Phase 3.75's own scoping in the same profile ("3.75 — Build Verification" row). On `lane: full` (or when `lane` is absent), the checklist below runs full-tree, unchanged.
 
-**Recorded-state gate (consult this FIRST):** Before running any Golden Command, check whether Phase 3 verify already recorded a green outcome. The gate is satisfied by the recorded outcome — WITHOUT re-running — when ALL three of the following are present:
+**Recorded-state gate (consult this FIRST):** Before running any Golden Command, check whether a prior run already recorded a green outcome for the exact tree state delivery is about to commit against. The gate is satisfied by the recorded outcome — WITHOUT re-running — only when ALL FOUR of the following named registers hold. They are enumerated separately, as retained sets, rather than summarized by count, precisely so a binding surface and a narrative surface can never diverge without detection:
+
 1. `03-testing.md` verify section reports no regressions (the tester wrote this artifact in Phase 3).
 2. The tester status block contains `regression_test_status: passing` and `suite_still_passing: true`.
 3. A Phase-3-verify `phase.end` event exists in `00-execution-events`.
+4. `{docs_root}/00-suite-evidence.md` carries a row citable per `docs/suite-evidence.md § 4` for the full-suite command — `tree_anchor` equal to the current tree state, `result: pass`, `agent` in the closed writer list, and `git status --porcelain` reporting no untracked path. Cite the row (command, anchor, producer, timestamp) in the delivery summary when register 4 is what satisfies the gate.
 
-Re-run the test gate ONLY when one of these three exceptions applies:
-- (a) **no Phase 3 green** is recorded (any of the three fields above is absent or does not confirm green).
-- (b) The record is stale: delivery's HEAD is ahead of the commit Phase 3 verify ran against, or test-relevant files (source, tests, build config) changed since Phase 3 verify completed.
-- (c) Delivery itself modified test-relevant files in this run (source code, test files, or build config).
+Registers 1-3 are retained **unchanged** from before this contract — they never generalize the obsolescence dimension and are never dropped in favor of register 4. Register 4 is the ONLY register that determines obsolescence, and it replaces the previous heuristic entirely: no more "delivery's HEAD is ahead of the commit Phase 3 verify ran against" and no more "test-relevant files (source, tests, build config) changed since Phase 3 verify completed" — both retired in favor of strict `tree_anchor` equality, because a heuristic list of "relevant" files is exactly the fuzzy criterion this contract exists to remove.
+
+Re-run the test gate whenever EITHER of these holds:
+- (a) **no Phase 3 green** is recorded across registers 1-3 (any is absent or does not confirm green) — unchanged from before.
+- (b) Register 4 fails to resolve as citable per `docs/suite-evidence.md § 4` — row absent or unreadable, `tree_anchor` mismatch, `result: fail`, any untracked path reported by `git status --porcelain`, or `agent` outside the closed writer list. This subsumes delivery itself having modified test-relevant files in this run: that modification leaves the tree dirty or untracked, which register 4's own untracked-path clause already resolves to EXECUTE.
+
+When a re-run under (b) executes the full-suite command, append a row to `{docs_root}/00-suite-evidence.md` per `docs/suite-evidence.md § 1` schema (`agent: delivery`, `phase: Step 9b`).
 
 **Audit-currency gate.** In addition to the test-staleness check above, verify the Phase 3.8 audit reports are current before proceeding. The audit is STALE and delivery is BLOCKED when implementation content (source, hooks, configs — anything beyond delivery's own mechanical writes in this dispatch: version bump, CHANGELOG, docs) changed after `reviews/04-security.md` (and `reviews/04-adversary.md`/`reviews/04-adversary-amend.md`, when present) were written. When the audit is stale: block delivery and signal the orchestrator to run the single delta-scoped re-audit (`agents/orchestrator.md § "Re-audit on amend"`) before the next delivery attempt — never a per-lens Phase-3 re-run. Do NOT proceed to commit with a stale audit. Record the staleness reason in `00-state.md § Delivery` under "Security audit stale".
 

@@ -38929,6 +38929,211 @@ check(
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
+# Suite 177 — suite-run-evidence (Task-2 of verifiable-contracts, #532): no
+# durable, consultable record existed that a verification command already ran
+# against a concrete tree state, so downstream consumers re-ran idempotent
+# full-suite commands that a prior run had already proven green. Asserts the
+# canonical contract (docs/suite-evidence.md) and, separately and
+# anchor-scoped, both the producer and the consumer half of each named pair —
+# so a change on one side is never masked by the other side still passing.
+#
+# Marker: suite-run-evidence
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 177: suite-run-evidence (append-only suite-run registry, producer/consumer pairs) ===")
+
+
+def _s177_slice(text: str, anchor: str) -> str:
+    """Return text from anchor (inclusive) to the next markdown heading or EOF.
+
+    Local copy — mirrors Suite 176's own `_s176_slice`, kept independent for
+    the same reason documented there: `_slice_section` was redefined
+    elsewhere in this file with a different signature.
+    """
+    idx = text.find(anchor)
+    if idx == -1:
+        return ""
+    rest = text[idx:]
+    m = re.search(r"\n(?:#{1,6}) ", rest[1:])
+    if m:
+        return rest[: m.start() + 1]
+    return rest
+
+
+_s177_evidence_doc = read(REPO_ROOT / "docs" / "suite-evidence.md")
+_s177_orchestrator = read(AGENTS_DIR / "orchestrator.md")
+_s177_delivery = read(AGENTS_DIR / "delivery.md")
+_s177_tester = read(AGENTS_DIR / "tester.md")
+_s177_implementer = read(AGENTS_DIR / "implementer.md")
+_s177_claude = read(REPO_ROOT / "CLAUDE.md")
+
+# --- Canonical contract: docs/suite-evidence.md ------------------------------
+check(
+    "suite177(ac1): docs/suite-evidence.md exists and defines the row schema fields",
+    bool(_s177_evidence_doc)
+    and all(
+        tok in _s177_evidence_doc
+        for tok in ("`command`", "`tree_anchor`", "`result`", "`exit_code`", "`counts`", "`agent`", "`phase`", "`timestamp`")
+    ),
+    "docs/suite-evidence.md must exist and its row schema must name all eight fields",
+)
+check(
+    "suite177(ac2): tree_anchor is defined by reference to docs/verification-packet.md § 2, no second identity mechanism",
+    "docs/verification-packet.md § 2" in _s177_evidence_doc
+    and "introduces no second tree-identity mechanism" in _s177_evidence_doc,
+    "tree_anchor must point to verification-packet.md § 2 and disclaim a second identity mechanism",
+)
+check(
+    "suite177(ac3): at least two named producer→consumer pairs, file+section on both ends",
+    _s177_evidence_doc.count("agents/orchestrator.md § Phase 3.75") >= 2
+    and "agents/tester.md § Mode: verify-run" in _s177_evidence_doc
+    and "agents/delivery.md § Step 9b" in _s177_evidence_doc,
+    "at least two pairs must name a concrete file+section producer and a concrete file+section consumer",
+)
+check(
+    "suite177(ac4): closed list of writers names exactly tester, orchestrator, delivery",
+    "**`tester`**" in _s177_evidence_doc
+    and "**`orchestrator`**" in _s177_evidence_doc
+    and "**`delivery`**" in _s177_evidence_doc
+    and "Exactly three agents may append a row" in _s177_evidence_doc,
+    "the closed writer list must name exactly tester, orchestrator, and delivery",
+)
+check(
+    "suite177(ac5): a row attributed to an agent outside the closed list is ignored and forces execution",
+    "ignored by every consumer" in _s177_evidence_doc
+    and "forces" in _s177_evidence_doc
+    and "execution of the command" in _s177_evidence_doc,
+    "an out-of-list writer must be stated as ignored and execution-forcing",
+)
+check(
+    "suite177(ac6): the registry never satisfies a security floor, a STAGE-GATE, or the Phase 3.8 audit",
+    "never satisfies a security floor, a STAGE-GATE release, or the Phase 3.8" in _s177_evidence_doc,
+    "§ 5 must disclaim security floor / STAGE-GATE / Phase 3.8 audit substitution",
+)
+check(
+    "suite177(ac7): scope is idempotent re-runs of a verification command",
+    "idempotent re-runs of a verification command" in _s177_evidence_doc,
+    "§ 5 must scope the registry to idempotent verification-command re-runs",
+)
+check(
+    "suite177(ac8-ac12): § 4 resolution names every fail-closed condition plus the sole citable condition",
+    all(
+        tok in _s177_evidence_doc
+        for tok in (
+            "row is absent or unreadable",
+            "`tree_anchor` differs from the current tree state",
+            "row's `result` is `fail`",
+            "names anyone outside the closed list",
+            "reports any untracked path",
+            "citing a row in that state is prohibited outright",
+            "may a consumer skip the run and cite the row",
+        )
+    ),
+    "§ 4 must name each EXECUTE-forcing condition (absent/unreadable, anchor mismatch, fail,"
+    " out-of-list writer, untracked path) and the single citable condition, with the untracked-path"
+    " prohibition stated independently of the anchor comparison",
+)
+
+# --- Producer + consumer: agents/orchestrator.md § Phase 3.75 (ac13) --------
+_s177_orch_3_75 = _s177_slice(_s177_orchestrator, "## Phase 3.75 — Build Verification")
+check(
+    "suite177(ac13): Phase 3.75 consults the registry before executing and appends a row after",
+    "Consult `{docs_root}/00-suite-evidence.md` FIRST" in _s177_orch_3_75
+    and "docs/suite-evidence.md § 4" in _s177_orch_3_75
+    and "append a row to `{docs_root}/00-suite-evidence.md`" in _s177_orch_3_75,
+    "Phase 3.75 must consult-first per § 4 and append a row on a green outcome",
+)
+
+# --- Producer + consumer: Parallel Batch consolidation loop (ac14) ----------
+_s177_orch_batch = _s177_slice(_s177_orchestrator, "## Parallel Batch Implementation")
+check(
+    "suite177(ac14): the Parallel Batch consolidation loop appends a row after each run-all.sh",
+    "Append a row to `{docs_root}/00-suite-evidence.md` after each `run-all.sh`" in _s177_orch_batch,
+    "the consolidation loop must append a row after every run-all.sh invocation on the integration branch",
+)
+
+# --- Producer: agents/tester.md Phase 2.7 + Phase 3 (ac15) ------------------
+_s177_test_authoring = _s177_slice(_s177_tester, "## Mode: `authoring`")
+_s177_test_verify = _s177_slice(_s177_tester, "## Mode: `verify-run`")
+check(
+    "suite177(ac15-authoring): Phase 2.7 authoring mode appends a row after the suite run",
+    "Append a row to `{docs_root}/00-suite-evidence.md`" in _s177_test_authoring
+    and "phase: Phase 2.7" in _s177_test_authoring,
+    "authoring mode must append a suite-evidence row tagged phase: Phase 2.7",
+)
+check(
+    "suite177(ac15-verify): Phase 3 verify-run mode appends a row after the suite run",
+    "Append a row to `{docs_root}/00-suite-evidence.md`" in _s177_test_verify
+    and "phase: Phase 3" in _s177_test_verify,
+    "verify-run mode must append a suite-evidence row tagged phase: Phase 3",
+)
+
+# --- Consumer: agents/delivery.md Step 9b (ac16-ac17) -----------------------
+_s177_deliv_step9b = _s177_slice(_s177_delivery, "### Step 9b — Definition of Done (DoD) checklist")
+check(
+    "suite177(ac16): Step 9b's operative gate condition is strict tree_anchor equality,"
+    " with the retired heuristic named explicitly as superseded",
+    "tree_anchor` equal to the current tree state" in _s177_deliv_step9b
+    and "both retired in favor of strict `tree_anchor` equality" in _s177_deliv_step9b,
+    "register 4's operative condition must be tree_anchor equality, and the HEAD-ahead/"
+    "test-relevant-files heuristic must be named as explicitly retired in its favor",
+)
+check(
+    "suite177(ac17): Step 9b enumerates the three retained registers by name and adds the cited row as a fourth",
+    "03-testing.md` verify section reports no regressions" in _s177_deliv_step9b
+    and "regression_test_status: passing`" in _s177_deliv_step9b
+    and "suite_still_passing: true`" in _s177_deliv_step9b
+    and "phase.end` event exists in `00-execution-events`" in _s177_deliv_step9b
+    and "00-suite-evidence.md`" in _s177_deliv_step9b
+    and "retained **unchanged**" in _s177_deliv_step9b
+    and "never dropped in favor of register 4" in _s177_deliv_step9b,
+    "the three pre-existing registers must be named individually and the cited row added as a fourth,"
+    " never substituting any of the three",
+)
+
+# --- Consumer/opt-in: agents/implementer.md § Suite-run responsibility (ac18) -
+_s177_imp_suite = _s177_slice(_s177_implementer, "## Suite-run responsibility")
+check(
+    "suite177(ac18): implementer.md declares suite execution is not its responsibility, names the owners,"
+    " and states the consult-before-cite rule for the case it runs anyway",
+    bool(_s177_imp_suite)
+    and "not your responsibility" in _s177_imp_suite
+    and "tester" in _s177_imp_suite
+    and "Phase 3.75" in _s177_imp_suite
+    and "docs/suite-evidence.md § 4" in _s177_imp_suite
+    and "cite that row" in _s177_imp_suite,
+    "§ Suite-run responsibility must disclaim ownership, name tester/orchestrator as owners, and state the"
+    " consult-first-then-cite rule for a voluntary run",
+)
+
+# --- self-ref/registry/hygiene (per this repo's own Suite-175/176 precedent) --
+_s177_own = read(REPO_ROOT / "tests" / "test_agent_structure.py")
+_s177_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite177(self-ref): test file contains 'Suite 177' and 'suite-run-evidence'",
+    "Suite 177" in _s177_own and "suite-run-evidence" in _s177_own,
+    "test file must self-reference Suite 177 and the marker 'suite-run-evidence'",
+)
+check(
+    "suite177(registry): docs/testing.md registers 'Suite 177' and 'suite-run-evidence'",
+    "Suite 177" in _s177_testing_md and "suite-run-evidence" in _s177_testing_md,
+    "docs/testing.md must register Suite 177 and the 'suite-run-evidence' marker",
+)
+check(
+    "suite177(hygiene): CLAUDE.md does NOT contain 'Suite 177' (§11 hygiene contract)",
+    "Suite 177" not in _s177_claude,
+    "CLAUDE.md must not mention Suite 177 — only docs/testing.md is the canonical registry",
+)
+check(
+    "suite177(claude-bullet): CLAUDE.md §5 registers docs/suite-evidence.md as the canonical document",
+    "docs/suite-evidence.md" in _s177_claude,
+    "CLAUDE.md §5 must carry a one-line bullet pointing at docs/suite-evidence.md",
+)
+
+# Marker: suite-run-evidence
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

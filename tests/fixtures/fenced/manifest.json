@@ -739,8 +739,8 @@
     "file": "CLAUDE.md",
     "mode": "heading",
     "anchor": "## 5. Architectural Conventions",
-    "sha256": "1ef7dfcb643e5163ffded52b4f2b69633490c3afb89ae03fc99dc0d83519cdd6",
-    "length": 7604,
+    "sha256": "fd69512b33cff9b3b979fbaf90a42e46aa3c1f15c4c60564d37ac54ae8d22ba5",
+    "length": 7825,
     "modal_counts": {
       "MUST NOT": 1,
       "MUST": 1,
