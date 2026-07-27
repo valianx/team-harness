@@ -1,7 +1,9 @@
 ---
 name: update-models
-description: Refresh the model: lines in the operator's opencode agent files to the latest concrete Anthropic id per tier, resolved from models.dev at run time.
+description: opencode runtime only; no effect under Claude Code. Refresh the model: lines in the operator's opencode agent files to the latest concrete Anthropic id per tier, resolved from models.dev at run time.
 ---
+
+**Runtime: opencode only.** This skill has no effect under Claude Code — see `## Scope — OPENCODE-ONLY` below.
 
 **IMPORTANT:** This skill runs directly — do NOT invoke the `orchestrator` agent or any other agent. Execute all steps yourself using the tools available to you (Bash, Read, Write, Edit, Glob).
 

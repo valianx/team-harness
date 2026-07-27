@@ -60,6 +60,7 @@
 import type { NormalizedInput, NormalizedDecision } from "../shim/normalized-v1.js";
 import { analyzeCommand, classifyCoveredAction } from "./command-lexer.js";
 import type { ArgvToken } from "./command-lexer.js";
+import { redactInertDataSpans } from "./data-position.js";
 
 // ---------------------------------------------------------------------------
 // Decision helpers
@@ -735,18 +736,28 @@ export function evaluate(input: NormalizedInput): NormalizedDecision {
     const skipPermissionsDecision = evaluateClaudeSkipPermissionsSpawn(cmd);
     if (skipPermissionsDecision) return skipPermissionsDecision;
 
+    // Command-position gates below are fed the inert-data-redacted string
+    // (scanCmd), never the raw one — a heredoc body or quoted argument
+    // handed to a never-executing consumer (`cat >> log.jsonl << 'EOF'`,
+    // `echo "..." >> audit.log`) is data these gates exist to look PAST, not
+    // through. evaluateClaudeSkipPermissionsSpawn above, and
+    // shouldScanBash/scanForSecrets below, deliberately keep consuming the
+    // RAW cmd end to end — see data-position.ts's module header for why
+    // those two must never see the redacted string.
+    const scanCmd = redactInertDataSpans(cmd);
+
     // DENIED_BASH patterns
     for (const [pattern, label] of DENIED_BASH) {
-      if (pattern.test(cmd)) return deny(label);
+      if (pattern.test(scanCmd)) return deny(label);
     }
 
     // Wrapper-embedded / per-subcommand-binary / env-prefixed force push —
     // see findWrapperAwareForcePush above for why this is layered on top of
     // (not a replacement for) the literal DENIED_BASH force-push pattern.
-    if (findWrapperAwareForcePush(cmd)) return deny("git push --force");
+    if (findWrapperAwareForcePush(scanCmd)) return deny("git push --force");
 
     // Position-aware --no-verify / -c core.hooksPath= tokenizer (M3c).
-    if (checkNoVerifyTokenized(cmd)) {
+    if (checkNoVerifyTokenized(scanCmd)) {
       return deny("--no-verify (bypasses pre-commit hooks)");
     }
 

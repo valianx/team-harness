@@ -2252,6 +2252,244 @@ assert_nodecision 'echo "git push" (retained safe entry, AC-RG8) -> nodecision' 
 rm -rf "$TMP"
 
 # ---------------------------------------------------------------------------
+# Suite 83h — dev-guard imports the shared data-position.ts redactor. Branch
+# selection and the single-command EffectiveCommand both derive from the raw
+# parse; the redacted parse only narrows coverage on the compound branch and
+# gates the single-command branch's cardinality — see
+# hooks/ts/bodies/dev-guard.ts's evaluate().
+# ---------------------------------------------------------------------------
+
+echo
+echo "=== Suite 83h: heredoc/quoted-literal payload no longer asks on an inert sink (AC-4.1 - AC-4.4) ==="
+
+AC_4_1_CMD=$(cat <<'RAWEOF'
+cat >> notes.md << 'EOF'
+git push origin main
+EOF
+RAWEOF
+)
+TMP=$(make_tmp)
+assert_nodecision "AC-4.1: heredoc note to cat, body quotes 'git push origin main' -> nodecision (was ask)" \
+    "$TMP" "$(make_payload "$AC_4_1_CMD")"
+rm -rf "$TMP"
+
+TMP=$(make_tmp)
+assert_nodecision 'AC-4.2: echo "gh pr merge 123 --squash" >> audit.log -> nodecision (single-command branch, regression-locked)' \
+    "$TMP" "$(make_payload 'echo "gh pr merge 123 --squash" >> audit.log')"
+rm -rf "$TMP"
+
+AC_4_3_CMD=$(cat <<'RAWEOF'
+bash << 'EOF'
+git push origin main
+EOF
+RAWEOF
+)
+TMP=$(make_tmp)
+assert_ask "AC-4.3: bash << 'EOF' with 'git push origin main' in the body -> ask (bash is not an inert sink; body never redacted)" \
+    "$TMP" "$(make_payload "$AC_4_3_CMD")"
+rm -rf "$TMP"
+
+AC_4_4_CMD=$(cat <<'RAWEOF'
+cat << 'EOF' | bash
+git push origin main
+EOF
+RAWEOF
+)
+TMP=$(make_tmp)
+assert_ask "AC-4.4: cat << 'EOF' | bash with 'git push origin main' in the body -> ask (pipe receiver is not inert)" \
+    "$TMP" "$(make_payload "$AC_4_4_CMD")"
+rm -rf "$TMP"
+
+# Regression: a capitalized argv0 spelling ("Cat") must not fold into the
+# inert-sink set — the sink-membership predicate is exact-case only, so a
+# case-variant spelling leaves the heredoc body live and the compound
+# branch still sees the covered action inside it (contrast with AC-4.1,
+# whose lowercase "cat" IS the inert sink and collapses to nodecision).
+AC_4_CASEVARIANT_CMD=$(cat <<'RAWEOF'
+Cat >> notes.md << 'EOF'
+git push origin main
+EOF
+RAWEOF
+)
+TMP=$(make_tmp)
+assert_ask "regression: Cat >> notes.md << 'EOF' (capitalized sink) with 'git push origin main' in the body -> ask (case-variant sink never folds into HEREDOC_INERT_SINKS; compound branch retains coverage)" \
+    "$TMP" "$(make_payload "$AC_4_CASEVARIANT_CMD")"
+rm -rf "$TMP"
+
+echo
+echo "=== Suite 83h: differential/anti-widening corpus (AC-4.5, AC-4.12, AC-4.13, AC-4.16) ==="
+
+# AC-4.5 — ONE representative worked case, not the full-corpus sweep: a
+# heredoc on an inert sink combined with a real, bare push to a non-default
+# branch resolves to ask both before and after this task, because the inert
+# sink survives redaction and the effective-command count used to select a
+# branch stays above one. The universal, whole-corpus guarantee (no entry
+# anywhere crosses from ask on the raw parse to allow on the redacted one) is
+# established jointly by AC-4.14 (cardinality differential over the corpus)
+# and AC-4.15 (structural proof that the single-command branch always
+# consumes the raw EffectiveCommand) below, not by this one named case alone.
+AC_4_5_CMD=$(cat <<'RAWEOF'
+cat >> notes.md << 'EOF'
+git push origin main
+EOF
+git push origin feat/x
+RAWEOF
+)
+TMP=$(make_tmp)
+assert_ask "AC-4.5: heredoc-on-inert-sink combined with a real 'git push origin feat/x' -> ask (one representative compound-preservation case; the full-corpus guarantee is AC-4.14+AC-4.15)" \
+    "$TMP" "$(make_payload "$AC_4_5_CMD")"
+rm -rf "$TMP"
+
+# AC-4.12 — the heredoc sink routes its own output to a process substitution
+# (an executor); no redaction applies at all, so the body stays live.
+AC_4_12_CMD=$(cat <<'RAWEOF'
+tee >(bash) << 'EOF'
+git push origin main
+EOF
+RAWEOF
+)
+TMP=$(make_tmp)
+assert_ask "AC-4.12: tee >(bash) << 'EOF' with 'git push origin main' in the body -> ask (sink's own output routes to an executor)" \
+    "$TMP" "$(make_payload "$AC_4_12_CMD")"
+rm -rf "$TMP"
+
+# AC-4.13 — a quoted-literal argv0 idiom ('echo') must not drop the compound
+# branch's effective-command count below the covered 'gh pr create'.
+TMP=$(make_tmp)
+assert_ask "AC-4.13: 'echo' 'note'; gh pr create --fill -> ask (compound floor never drops below the covered action)" \
+    "$TMP" "$(make_payload "'echo' 'note'; gh pr create --fill")"
+rm -rf "$TMP"
+
+# AC-4.16 — the single-command branch classifies the RAW argv0 ('echo'),
+# never a token promoted by a defective redaction of the module's own
+# argv[0] exclusion.
+TMP=$(make_tmp)
+assert_nodecision "AC-4.16: 'echo' git push origin feat/x -> nodecision (argv0 classified is the raw one, never redaction-promoted)" \
+    "$TMP" "$(make_payload "'echo' git push origin feat/x")"
+rm -rf "$TMP"
+
+echo
+echo "=== Suite 83h: branches this task must leave unaffected (AC-4.6, AC-4.7) ==="
+
+# AC-4.6 — F-016 raw-payload scan (no "command" field) still consumes the
+# raw JSON representation; there is no command string to redact here, and
+# redacting the JSON representation itself would widen that defense in depth.
+TMP=$(make_tmp)
+assert_ask "AC-4.6: Bash payload with no command field, covered pattern in another field -> ask (F-016 raw scan, unaffected)" \
+    "$TMP" '{"tool_name":"Bash","tool_input":{"description":"note: git push origin main"}}'
+rm -rf "$TMP"
+
+# AC-4.7 — ClickUp MCP outward write runs before command extraction.
+TMP=$(make_tmp)
+assert_ask "AC-4.7: ClickUp MCP outward write -> ask (runs before command extraction, unaffected)" \
+    "$TMP" '{"tool_name":"mcp__clickup__clickup_update_task","tool_input":{"task_id":"123"}}'
+rm -rf "$TMP"
+
+# AC-4.8 — every pre-existing case above this block (all of Suites 83-83g)
+# keeps its recorded decision: proven by this same run, since the full file
+# always executes top to bottom and a regression in the pre-existing corpus
+# fails this same suite.
+
+echo
+echo "--- AC-4.10: dist/dev-guard.cjs carries the redactor; the two fenced sibling bundles never do ---"
+# Content-based (not a build-time git-status snapshot, which only means
+# anything at the moment of the build that produced the tracked artifact):
+# dev-guard.cjs must actually bundle redactInertDataSpans, and gate-guard.cjs/
+# checkpoint-guard.cjs — the two bundles AC-4.10 names by name — must never
+# reference it, regardless of when this assertion runs.
+if grep -q 'redactInertDataSpans' "$REPO_ROOT/hooks/ts/dist/dev-guard.cjs"; then
+    PASS=$((PASS + 1))
+    echo "  [PASS] AC-4.10 (positive): hooks/ts/dist/dev-guard.cjs contains redactInertDataSpans"
+else
+    FAIL=$((FAIL + 1))
+    FAILURES+=("AC-4.10 (positive): hooks/ts/dist/dev-guard.cjs does not contain redactInertDataSpans — rebuild required")
+    echo "  [FAIL] AC-4.10 (positive): hooks/ts/dist/dev-guard.cjs does not contain redactInertDataSpans"
+fi
+_AC410_LEAKED=()
+for _fenced in gate-guard checkpoint-guard; do
+    if grep -q 'redactInertDataSpans\|data-position' "$REPO_ROOT/hooks/ts/dist/${_fenced}.cjs" 2>/dev/null; then
+        _AC410_LEAKED+=("${_fenced}.cjs")
+    fi
+done
+if [ ${#_AC410_LEAKED[@]} -eq 0 ]; then
+    PASS=$((PASS + 1))
+    echo "  [PASS] AC-4.10 (negative): gate-guard.cjs and checkpoint-guard.cjs do not reference the redactor"
+else
+    FAIL=$((FAIL + 1))
+    FAILURES+=("AC-4.10 (negative): fenced bundle(s) reference the redactor: ${_AC410_LEAKED[*]}")
+    echo "  [FAIL] AC-4.10 (negative): ${_AC410_LEAKED[*]}"
+fi
+
+echo
+echo "--- AC-4.14: raw-vs-redacted cardinality — no corpus entry reaches the single-command branch on the redacted parse without already being there on the raw parse ---"
+# Scoped to this task's own new corpus (AC-4.1-4.5, AC-4.12, AC-4.13, AC-4.16)
+# plus a representative sample of the pre-existing single-command git-push/gh
+# corpus already exercised behaviorally above. AC-4.8's full-suite run covers
+# the remaining pre-existing corpus at the decision level; this adds the
+# cardinality-level invariant AC-4.14 is specifically about.
+_AC414_TMPDIR=$(mktemp -d)
+cat > "$_AC414_TMPDIR/probe.ts" <<TSEOF
+import { analyzeCommand } from "${REPO_ROOT}/hooks/ts/bodies/command-lexer.ts";
+import { redactInertDataSpans } from "${REPO_ROOT}/hooks/ts/bodies/data-position.ts";
+
+let input = "";
+process.stdin.on("data", (c) => (input += c));
+process.stdin.on("end", () => {
+  const commands = JSON.parse(input);
+  const results = commands.map((cmd) => ({
+    raw: analyzeCommand(cmd).commands.length,
+    redacted: analyzeCommand(redactInertDataSpans(cmd)).commands.length,
+  }));
+  process.stdout.write(JSON.stringify(results));
+});
+TSEOF
+cat > "$_AC414_TMPDIR/corpus.json" <<'JSONEOF'
+[
+  "cat >> notes.md << 'EOF'\ngit push origin main\nEOF",
+  "echo \"gh pr merge 123 --squash\" >> audit.log",
+  "bash << 'EOF'\ngit push origin main\nEOF",
+  "cat << 'EOF' | bash\ngit push origin main\nEOF",
+  "cat >> notes.md << 'EOF'\ngit push origin main\nEOF\ngit push origin feat/x",
+  "tee >(bash) << 'EOF'\ngit push origin main\nEOF",
+  "'echo' 'note'; gh pr create --fill",
+  "'echo' git push origin feat/x",
+  "git push origin feat/my-branch",
+  "gh pr merge 123 --squash",
+  "gh pr create --title X --body Y",
+  "git push origin main",
+  "git status",
+  "ls -la /tmp"
+]
+JSONEOF
+(cd "$_AC414_TMPDIR" && npx esbuild probe.ts --bundle --platform=node --format=cjs --outfile=probe.cjs --external:'node:*') >/dev/null 2>&1
+_AC414_RESULTS=$(node "$_AC414_TMPDIR/probe.cjs" < "$_AC414_TMPDIR/corpus.json" 2>&1)
+_AC414_VIOLATION=$(node -e '
+const results = JSON.parse(process.argv[1]);
+console.log(JSON.stringify(results.filter((r) => r.redacted === 1 && r.raw !== 1)));
+' "$_AC414_RESULTS" 2>&1)
+rm -rf "$_AC414_TMPDIR"
+if [ "$_AC414_VIOLATION" = "[]" ]; then
+    PASS=$((PASS + 1))
+    echo "  [PASS] AC-4.14: no corpus entry crosses into the single-command branch on the redacted parse without already being there on the raw parse"
+else
+    FAIL=$((FAIL + 1))
+    FAILURES+=("AC-4.14: $_AC414_VIOLATION (raw results: $_AC414_RESULTS)")
+    echo "  [FAIL] AC-4.14: $_AC414_VIOLATION"
+fi
+
+echo
+echo "--- AC-4.15: single-command branch structurally consumes the raw EffectiveCommand, never the redacted one ---"
+if grep -q 'evaluateSingleCommand(analyzed\.commands\[0\], reader)' "$REPO_ROOT/hooks/ts/bodies/dev-guard.ts" \
+    && ! grep -q 'evaluateSingleCommand(redactedAnalyzed' "$REPO_ROOT/hooks/ts/bodies/dev-guard.ts"; then
+    PASS=$((PASS + 1))
+    echo "  [PASS] AC-4.15: evaluateSingleCommand's call site passes analyzed.commands[0] (raw); no call site passes an artifact of redactedAnalyzed"
+else
+    FAIL=$((FAIL + 1))
+    FAILURES+=("AC-4.15: evaluateSingleCommand's call site does not structurally match raw-only consumption")
+    echo "  [FAIL] AC-4.15: evaluateSingleCommand's call site does not structurally match raw-only consumption"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo

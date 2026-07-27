@@ -96,7 +96,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — the only CC install channel. Go installer binary (GH Release assets) — the only opencode install channel; it does not serve Claude Code. |
 
-**Current version:** `2.139.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.140.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
@@ -278,10 +278,9 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 
 ## 8. Architecture Decisions
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
-- **2026-06-29** — `refreshManagedConfigKeys`: update writes only managed keys (`format_version`/`installed_version`/`updated_at`); operator keys preserved. → `cmd/install/opencode_config.go`
+> Full history: see `docs/decisions.md`. Recent entries below.
 - **2026-06-29** — `VERSION` asset: bare semver at `releases/latest/download/VERSION` (no GitHub API); best-effort pre-check. → `release.yml`
 - **2026-07-15** — Lanes own cost/speed, floor stays orthogonal. → `docs/pipeline-lanes.md`
-- **2026-07-19** — `adversary_floor_applies` narrows the `adversary` Phase-3 trigger to a strict subset of `security_floor_applies` (fail-closed to `true`); `security`'s own floor is unchanged. → superseded 2026-07-20 by the Pre-Delivery Security Audit below
 - **2026-07-20** — Security verification consolidated into the Pre-Delivery Security Audit (Phase 3.8, once per delivery group over the consolidated final diff): `security` unconditional, `adversary` on `security_floor_applies` alone; findings operator-disposed at STAGE-GATE-3, no autonomous security-lens iterations. Retires `adversary_floor_applies`, per-round reports, the staleness re-gate, and the whack-a-mole detector. → `agents/orchestrator.md § Phase 3.8` → superseded 2026-07-21 by the adversary-only-conditional model below
 - **2026-07-21** — Pre-Delivery Security Audit narrowed to `adversary` alone, conditional on `security_floor_applies`: the unconditional `security` code-audit dispatch is removed from Phase 3.8, and code-level review for a non-sensitive task is delegated to PR review (named generically, not tied to any specific configured tool). SEC-002 design-review (Phase 1.6), the `security_floor_applies` predicate, the Phase-2-close backstops, and Phase 4.5 internal review are unchanged. Also retires the Phase 3.6 `acceptance-checker` drift audit entirely (no replacement dispatch). → `agents/orchestrator.md § Phase 3.8`, `docs/dev-mode.md § Security Floor Non-Waivability`
 
@@ -290,6 +289,7 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 - **Three-state update**: update-available / already-current / installed-ahead; installed-ahead reports only; already-current zero-writes. → `cmd/install/update.go`
 - **Restart-to-activate honesty**: never claim live; print after any apply, not on zero-write paths. → `cmd/install/update.go`
 - **TTY prompt → stderr**: prompt to `os.Stderr`, read from `/dev/tty`/stdin; never write an O_RDONLY handle. → `cmd/install/update.go`
+- **Data-position redaction, not payload widening**: when a gate false-positives on a command quoted/heredoc'd as inert data, mask the data span (fixed-length, space-substitution) before position-command checks run — never relax the checks themselves. `allow`-capable consumers must derive branch selection AND the classified command from the RAW parse only; the redacted parse feeds exclusively non-`allow` branches. → `hooks/ts/bodies/data-position.ts`, `hooks/ts/bodies/dev-guard.ts` (`evaluate()`)
 
 - Self-documenting code first; comment WHY not WHAT; route genuine rationale to `/docs` not to inline comments — see `docs/code-comments.md`.
 

@@ -822,6 +822,395 @@ function matchBenignPushGrammar(argv, tainted, reader) {
   return { matched: true, destination: dst };
 }
 
+// bodies/data-position.ts
+var HEREDOC_INERT_SINKS = /* @__PURE__ */ new Set([
+  "grep",
+  "egrep",
+  "fgrep",
+  "echo",
+  "printf",
+  "cat",
+  "ls",
+  "ln",
+  "test",
+  "[",
+  "tee",
+  "head",
+  "tail",
+  "wc",
+  "uniq",
+  "cut",
+  "tr",
+  "nl",
+  "rev",
+  "tac",
+  "paste",
+  "join",
+  "column",
+  "fold",
+  "fmt",
+  "pr",
+  "diff",
+  "cmp",
+  "comm",
+  "md5sum",
+  "sha1sum",
+  "sha256sum",
+  "sha512sum",
+  "base64",
+  "xxd",
+  "od",
+  "hexdump",
+  "strings",
+  "file",
+  "pwd",
+  "true",
+  "false"
+]);
+var MAX_INPUT_LENGTH = 65536;
+function matchOperator(cmd, i) {
+  if (cmd.startsWith("<<<", i)) return { kind: "in-command", op: "<<<", length: 3 };
+  if (cmd.startsWith("<<-", i)) return { kind: "in-command", op: "<<-", length: 3 };
+  if (cmd.startsWith("<<", i)) return { kind: "in-command", op: "<<", length: 2 };
+  if (cmd.startsWith("&&", i)) return { kind: "segment", op: "&&", length: 2 };
+  if (cmd.startsWith("||", i)) return { kind: "segment", op: "||", length: 2 };
+  if (cmd.startsWith(">>", i)) return { kind: "in-command", op: ">>", length: 2 };
+  if (cmd.startsWith("&>", i)) return { kind: "in-command", op: "&>", length: 2 };
+  const ch = cmd[i];
+  if (ch === ";" || ch === "\n" || ch === "&" || ch === "|") {
+    return { kind: "segment", op: ch, length: 1 };
+  }
+  if (ch === "(" || ch === ")") return { kind: "segment", op: "start", length: 1 };
+  if (ch === ">") return { kind: "in-command", op: ">", length: 1 };
+  return null;
+}
+function consumeParenSpan(cmd, startI) {
+  let i = startI + 2;
+  let depth = 1;
+  let sq = false;
+  let dq = false;
+  while (i < cmd.length && depth > 0) {
+    const ch = cmd[i];
+    if (sq) {
+      if (ch === "'") sq = false;
+      i++;
+      continue;
+    }
+    if (dq) {
+      if (ch === "\\" && i + 1 < cmd.length) {
+        i += 2;
+        continue;
+      }
+      if (ch === '"') dq = false;
+      i++;
+      continue;
+    }
+    if (ch === "'") sq = true;
+    else if (ch === '"') dq = true;
+    else if (ch === "(") depth++;
+    else if (ch === ")") depth--;
+    i++;
+  }
+  return i;
+}
+function consumeBacktickSpan(cmd, startI) {
+  let i = startI + 1;
+  while (i < cmd.length && cmd[i] !== "`") {
+    if (cmd[i] === "\\" && i + 1 < cmd.length) {
+      i += 2;
+      continue;
+    }
+    i++;
+  }
+  if (i < cmd.length) i++;
+  return i;
+}
+var UNQUOTED_TAINT_CHARS2 = /* @__PURE__ */ new Set(["{", "}", "*", "?", "[", "~"]);
+function readSingleQuotedSpan(cmd, i) {
+  let value = "";
+  let pos = i + 1;
+  while (pos < cmd.length && cmd[pos] !== "'") {
+    value += cmd[pos];
+    pos++;
+  }
+  if (pos >= cmd.length) return { value, end: pos, unclosedQuote: true, tainted: false };
+  return { value, end: pos + 1, unclosedQuote: false, tainted: false };
+}
+function readDoubleQuotedSpan(cmd, i) {
+  let value = "";
+  let pos = i + 1;
+  let tainted = false;
+  while (pos < cmd.length && cmd[pos] !== '"') {
+    const c = cmd[pos];
+    if (c === "\\" && pos + 1 < cmd.length) {
+      const nc = cmd[pos + 1];
+      value += nc === '"' || nc === "\\" || nc === "$" || nc === "`" ? nc : "\\" + nc;
+      pos += 2;
+      continue;
+    }
+    if (c === "$" && cmd[pos + 1] === "(") {
+      tainted = true;
+      const consumed = consumeParenSpan(cmd, pos);
+      value += cmd.slice(pos, consumed);
+      pos = consumed;
+      continue;
+    }
+    if (c === "`") {
+      tainted = true;
+      const consumed = consumeBacktickSpan(cmd, pos);
+      value += cmd.slice(pos, consumed);
+      pos = consumed;
+      continue;
+    }
+    if (c === "$") {
+      tainted = true;
+      value += c;
+      pos++;
+      continue;
+    }
+    value += c;
+    pos++;
+  }
+  if (pos >= cmd.length) return { value, end: pos, unclosedQuote: true, tainted };
+  return { value, end: pos + 1, unclosedQuote: false, tainted };
+}
+function consumeUnquotedSegment(cmd, i) {
+  const ch = cmd[i];
+  if (ch === "\\" && i + 1 < cmd.length) {
+    return { value: cmd[i + 1], end: i + 2, tainted: false, wasEscape: true };
+  }
+  if (ch === "$" && cmd[i + 1] === "(") {
+    const consumed = consumeParenSpan(cmd, i);
+    return { value: cmd.slice(i, consumed), end: consumed, tainted: true, wasEscape: false };
+  }
+  if (ch === "`") {
+    const consumed = consumeBacktickSpan(cmd, i);
+    return { value: cmd.slice(i, consumed), end: consumed, tainted: true, wasEscape: false };
+  }
+  if (ch === "$" || UNQUOTED_TAINT_CHARS2.has(ch)) {
+    return { value: ch, end: i + 1, tainted: true, wasEscape: false };
+  }
+  return { value: ch, end: i + 1, tainted: false, wasEscape: false };
+}
+function readToken(cmd, start) {
+  let i = start;
+  let value = "";
+  let tainted = false;
+  let wasQuotedOrEscaped = false;
+  let unclosedQuote = false;
+  const quoteSpans = [];
+  while (i < cmd.length) {
+    const ch = cmd[i];
+    if (ch === " " || ch === "	" || ch === "\r") break;
+    if (matchOperator(cmd, i)) break;
+    if (ch === "'" || ch === '"') {
+      wasQuotedOrEscaped = true;
+      const spanStart = i;
+      const span = ch === "'" ? readSingleQuotedSpan(cmd, i) : readDoubleQuotedSpan(cmd, i);
+      if (span.unclosedQuote) {
+        unclosedQuote = true;
+        break;
+      }
+      value += span.value;
+      i = span.end;
+      if (span.tainted) tainted = true;
+      const kind = ch === "'" ? "single" : "double";
+      quoteSpans.push({ start: spanStart, end: i, kind, hasUnescapedExpansion: span.tainted });
+      continue;
+    }
+    const seg = consumeUnquotedSegment(cmd, i);
+    if (seg.wasEscape) wasQuotedOrEscaped = true;
+    if (seg.tainted) tainted = true;
+    value += seg.value;
+    i = seg.end;
+  }
+  return { value, tainted, start, end: i, quoteSpans, unclosedQuote, wasQuotedOrEscaped };
+}
+function findHeredocTerminator(cmd, from, delimiter, stripLeadingTabs) {
+  let pos = from;
+  while (pos <= cmd.length) {
+    const nlIdx = cmd.indexOf("\n", pos);
+    const lineEnd = nlIdx === -1 ? cmd.length : nlIdx;
+    const line = cmd.slice(pos, lineEnd);
+    const content = stripLeadingTabs ? line.replace(/^\t+/, "") : line;
+    if (content === delimiter) {
+      return { lineStart: pos, afterLine: nlIdx === -1 ? cmd.length : nlIdx + 1 };
+    }
+    if (nlIdx === -1) return null;
+    pos = nlIdx + 1;
+  }
+  return null;
+}
+function consumeHeredocQueue(cmd, startPos, queueIds, heredocs) {
+  let cursor = startPos;
+  for (const id of queueIds) {
+    const rec = heredocs[id];
+    const bodyStart = cursor;
+    const terminator = findHeredocTerminator(cmd, bodyStart, rec.delimiter, rec.stripLeadingTabs);
+    if (terminator === null) return null;
+    rec.bodyStart = bodyStart;
+    rec.bodyEnd = terminator.lineStart;
+    rec.afterTerminator = terminator.afterLine;
+    rec.bodyHasDollarOrBacktick = /[$`]/.test(cmd.slice(bodyStart, terminator.lineStart));
+    cursor = terminator.afterLine;
+  }
+  return cursor;
+}
+function scanForDataPositions(cmd) {
+  const commands = [];
+  const heredocs = [];
+  const quoteSpans = [];
+  let pendingHeredocQueue = [];
+  let firstHeredocIntroducerStart = null;
+  let curArgv0 = null;
+  let curTokenCount = 0;
+  let curHeredocIds = [];
+  let curRedirectOk = true;
+  let curPrecedingOp = "start";
+  const finalizeCommand = () => {
+    commands.push({
+      argv0: curArgv0,
+      heredocIds: curHeredocIds,
+      redirectTargetsOk: curRedirectOk,
+      precedingOperator: curPrecedingOp
+    });
+    curArgv0 = null;
+    curTokenCount = 0;
+    curHeredocIds = [];
+    curRedirectOk = true;
+  };
+  let i = 0;
+  while (i < cmd.length) {
+    const ch = cmd[i];
+    if (ch === " " || ch === "	" || ch === "\r") {
+      i++;
+      continue;
+    }
+    const op = matchOperator(cmd, i);
+    if (op) {
+      if (op.kind === "segment") {
+        if (op.op === "\n") {
+          finalizeCommand();
+          i += op.length;
+          const consumed = consumeHeredocQueue(cmd, i, pendingHeredocQueue, heredocs);
+          if (consumed === null) return null;
+          i = consumed;
+          pendingHeredocQueue = [];
+          curPrecedingOp = "\n";
+          continue;
+        }
+        finalizeCommand();
+        i += op.length;
+        curPrecedingOp = op.op;
+        continue;
+      }
+      if (op.op === "<<" || op.op === "<<-") {
+        if (firstHeredocIntroducerStart === null) firstHeredocIntroducerStart = i;
+        i += op.length;
+        while (i < cmd.length && (cmd[i] === " " || cmd[i] === "	")) i++;
+        const delim = readToken(cmd, i);
+        if (delim.unclosedQuote) return null;
+        if (delim.end === delim.start) return null;
+        if (delim.tainted) return null;
+        i = delim.end;
+        const hId = heredocs.length;
+        heredocs.push({
+          attributedCmdIndex: commands.length,
+          quotedDelimiter: delim.wasQuotedOrEscaped,
+          delimiter: delim.value,
+          stripLeadingTabs: op.op === "<<-",
+          bodyStart: -1,
+          bodyEnd: -1,
+          afterTerminator: -1,
+          bodyHasDollarOrBacktick: false
+        });
+        curHeredocIds.push(hId);
+        pendingHeredocQueue.push(hId);
+        continue;
+      }
+      if (op.op === "<<<") {
+        i += op.length;
+        continue;
+      }
+      i += op.length;
+      while (i < cmd.length && (cmd[i] === " " || cmd[i] === "	")) i++;
+      const target = readToken(cmd, i);
+      if (target.unclosedQuote) return null;
+      i = target.end;
+      const targetValid = target.end > target.start && !target.tainted;
+      if (!targetValid) curRedirectOk = false;
+      continue;
+    }
+    const tok = readToken(cmd, i);
+    if (tok.unclosedQuote) return null;
+    if (tok.end === tok.start) {
+      i++;
+      continue;
+    }
+    const isArgv0 = curTokenCount === 0;
+    if (isArgv0) {
+      curArgv0 = { start: tok.start, end: tok.end, value: tok.value, tainted: tok.tainted };
+    }
+    for (const qs of tok.quoteSpans) {
+      quoteSpans.push({ ...qs, cmdIndex: commands.length, isArgv0 });
+    }
+    curTokenCount++;
+    i = tok.end;
+  }
+  finalizeCommand();
+  if (pendingHeredocQueue.length > 0) {
+    const consumed = consumeHeredocQueue(cmd, i, pendingHeredocQueue, heredocs);
+    if (consumed === null) return null;
+  }
+  return { commands, heredocs, quoteSpans, firstHeredocIntroducerStart };
+}
+function sinkCandidateBasename(value) {
+  const idx = value.lastIndexOf("/");
+  const base = idx >= 0 ? value.slice(idx + 1) : value;
+  return /\.exe$/i.test(base) ? base.slice(0, -4) : base;
+}
+function computeSinkFlags(commands) {
+  const isSink = new Array(commands.length).fill(false);
+  let groupStart = 0;
+  for (let idx = 0; idx <= commands.length; idx++) {
+    const startsNewGroup = idx === commands.length || commands[idx].precedingOperator !== "|";
+    if (!startsNewGroup) continue;
+    if (idx > groupStart) {
+      const group = commands.slice(groupStart, idx);
+      const groupInert = group.every((c) => {
+        if (c.argv0 === null) return false;
+        return HEREDOC_INERT_SINKS.has(sinkCandidateBasename(c.argv0.value)) && c.redirectTargetsOk;
+      });
+      for (let k = groupStart; k < idx; k++) isSink[k] = groupInert;
+    }
+    groupStart = idx;
+  }
+  return isSink;
+}
+function redactInertDataSpans(cmd) {
+  if (cmd.length > MAX_INPUT_LENGTH) return cmd;
+  if (cmd.includes(">(") || cmd.includes("<(")) return cmd;
+  const scan = scanForDataPositions(cmd);
+  if (scan === null) return cmd;
+  if (scan.commands.some((c) => c.argv0 !== null && c.argv0.tainted)) return cmd;
+  const isSink = computeSinkFlags(scan.commands);
+  const mask = new Uint8Array(cmd.length);
+  for (const qs of scan.quoteSpans) {
+    if (qs.isArgv0) continue;
+    if (!isSink[qs.cmdIndex]) continue;
+    if (qs.kind === "double" && qs.hasUnescapedExpansion) continue;
+    for (let p = qs.start; p < qs.end; p++) mask[p] = 1;
+  }
+  for (const h of scan.heredocs) {
+    if (!isSink[h.attributedCmdIndex]) continue;
+    if (!h.quotedDelimiter && h.bodyHasDollarOrBacktick) continue;
+    for (let p = h.bodyStart; p < h.bodyEnd; p++) mask[p] = 1;
+  }
+  let out = "";
+  for (let p = 0; p < cmd.length; p++) out += mask[p] ? " " : cmd[p];
+  return out;
+}
+
 // bodies/dev-guard.ts
 function ask(reason) {
   return { decision: "ask", reason, mutations: null };
@@ -1121,10 +1510,11 @@ function evaluate(input, reader) {
   }
   if (cmdStr === null) return none();
   const analyzed = analyzeCommand(cmdStr);
+  const redactedAnalyzed = analyzeCommand(redactInertDataSpans(cmdStr));
   if (analyzed.commands.length === 1) {
-    return evaluateSingleCommand(analyzed.commands[0], reader);
+    return redactedAnalyzed.commands.length === 1 ? evaluateSingleCommand(analyzed.commands[0], reader) : none();
   }
-  for (const command of analyzed.commands) {
+  for (const command of redactedAnalyzed.commands) {
     if (isCoveredEffectiveCommand(command)) {
       return ask(
         `outward action detected inside a compound or wrapper-embedded command; allow is reserved for a single, bare, un-chained invocation \u2014 requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`

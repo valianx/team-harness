@@ -1,0 +1,4 @@
+### Fixed
+- `policy-block` no longer denies a Bash command whose denied pattern (`git push --force`, `rm -rf`, etc.) appears only as inert data quoted or heredoc'd to a non-executing sink (e.g. `cat >> log.jsonl << 'EOF'` … `EOF`, or `echo "git push --force origin main" >> audit.log`) — closes #531.
+- `dev-guard` no longer asks for approval on an outward-action verb (`git push`, `gh pr create`, etc.) quoted or heredoc'd as inert data to the same class of sinks, using the same shared redaction module; the gate's sole `allow`-capable branch continues to derive both its branch selection and its classified command from the raw, unredacted parse.
+- `/th:update-models`'s opencode-only runtime is now legible in Claude Code's skill listing (first clause of `description`, plus a runtime line at the top of the skill body) — closes #522.

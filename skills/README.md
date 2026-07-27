@@ -9,6 +9,8 @@ Every skill lives at `skills/<name>/SKILL.md`. This format is compatible with bo
 When the plugin is active (canonical path), skills are invoked as `/th:<name>`.
 When installed via the legacy Go binary installer, skills are invoked as `/<name>`.
 
+**Runtime-restricted skills — durable convention.** A skill that functions under only one runtime (Claude Code or opencode) must name that restriction in the first clause of its `description` frontmatter field, and add a matching runtime line near the top of the body, before the first operational instruction. Claude Code's skill frontmatter reference does not honor a `runtime`/`os`/`platform` field, so legibility in the listed text is the only mechanism available — see `skills/update-models/SKILL.md` for the pattern. The one-way exclusion from the opposite direction (a Claude-Code-only skill kept out of the opencode copy) is enforced separately by `cmd/install/manifest_registry.go`'s `opencodeExcludedSkills`.
+
 ### Complex skill — subfolder with references
 
 Skills that need supporting material (scripts, templates, reference data) add a `references/` subdirectory inside the skill folder:
@@ -25,7 +27,7 @@ Convention: parse arguments, build a task payload, route to the `leader` agent.
 ## Routing
 
 - **Routes to leader** (default for pipeline work): `/th:issue`, `/th:plan`, `/th:design`, `/th:plan-review`, `/th:research`, `/th:learn`, `/th:spike`, `/th:test`, `/th:test-cross-browser`, `/th:test-pipeline`, `/th:validate`, `/th:define-ac`, `/th:security`, `/th:audit`, `/th:review-pr`, `/th:deliver`, `/th:diagram`, `/th:likec4-diagram`, `/th:d2-diagram`, `/th:translate`, `/th:bootstrap`, `/th:recover`, `/th:eval`, `/th:gcp-costs`, `/th:cross-repo`, `/th:inline` (operator-only session toggle, `disable-model-invocation: true`).
-- **Standalone** (no leader involvement): `/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:background`, `/th:update`, `/th:report-issue`, `/th:hookify`, `/th:save-session`, `/th:resume-session`, `/th:harness-audit`, `/th:todo`, `/th:mcp-optimize`.
+- **Standalone** (no leader involvement): `/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:background`, `/th:update`, `/th:report-issue`, `/th:hookify`, `/th:save-session`, `/th:resume-session`, `/th:harness-audit`, `/th:todo`, `/th:mcp-optimize`, `/th:update-models` (opencode runtime only — see the runtime-restricted-skills convention above).
 - **Standalone complex skills** (no slash-command entry point, triggered by description matching): `obsidian-markdown`, `obsidian-bases`, `json-canvas`, `obsidian-cli`.
 
 ## Adding a skill
