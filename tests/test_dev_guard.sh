@@ -2303,10 +2303,15 @@ rm -rf "$TMP"
 echo
 echo "=== Suite 83h: differential/anti-widening corpus (AC-4.5, AC-4.12, AC-4.13, AC-4.16) ==="
 
-# AC-4.5 — explicit compound-preservation case: a heredoc on an inert sink
-# combined with a real, bare push to a non-default branch resolves to ask
-# both before and after this task, because the inert sink survives redaction
-# and the effective-command count used to select a branch stays above one.
+# AC-4.5 — ONE representative worked case, not the full-corpus sweep: a
+# heredoc on an inert sink combined with a real, bare push to a non-default
+# branch resolves to ask both before and after this task, because the inert
+# sink survives redaction and the effective-command count used to select a
+# branch stays above one. The universal, whole-corpus guarantee (no entry
+# anywhere crosses from ask on the raw parse to allow on the redacted one) is
+# established jointly by AC-4.14 (cardinality differential over the corpus)
+# and AC-4.15 (structural proof that the single-command branch always
+# consumes the raw EffectiveCommand) below, not by this one named case alone.
 AC_4_5_CMD=$(cat <<'RAWEOF'
 cat >> notes.md << 'EOF'
 git push origin main
@@ -2315,7 +2320,7 @@ git push origin feat/x
 RAWEOF
 )
 TMP=$(make_tmp)
-assert_ask "AC-4.5: heredoc-on-inert-sink combined with a real 'git push origin feat/x' -> ask (compound floor preserved, not allow)" \
+assert_ask "AC-4.5: heredoc-on-inert-sink combined with a real 'git push origin feat/x' -> ask (one representative compound-preservation case; the full-corpus guarantee is AC-4.14+AC-4.15)" \
     "$TMP" "$(make_payload "$AC_4_5_CMD")"
 rm -rf "$TMP"
 
