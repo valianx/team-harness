@@ -30,6 +30,15 @@
 #     line) is ignored — untrusted content per CLAUDE.md §6.6 cannot smuggle
 #     a project key onto the breadcrumb.
 #
+# Also asserts (Section 6, Task-6 AC-1/AC-2/AC-5): `payload_bytes` — the
+# byte length of the dispatch prompt —
+#   - AC-1: every breadcrumb carries `payload_bytes`, ungated by any
+#     threshold.
+#   - AC-2: no threshold constant, comparison, or decision branch on
+#     `payload_bytes` exists in the hook body (static check on the source).
+#   - AC-5: the value is exactly the byte count and nothing else — no
+#     content beyond that count enters the record.
+#
 # Usage: bash tests/test_subagent_start.sh
 # Exit code: 0 all cases pass, 1 otherwise.
 
@@ -37,6 +46,7 @@ set -u
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CJS="$REPO_ROOT/hooks/ts/dist/subagent-start.cjs"
+BODY_TS="$REPO_ROOT/hooks/ts/bodies/subagent-start.ts"
 
 PASS=0
 FAIL=0
@@ -133,10 +143,13 @@ if [ -f "$TRACE_FILE" ]; then
     if echo "$LINE" | grep -q '"agent_id"'; then r=0; else r=1; fi
     assert_true "trace line does NOT carry agent_id (not yet assigned at PreToolUse time)" "$r"
 
-    # Exact key set: only ts, event, agent_type — no extra fields leaked.
+    if echo "$LINE" | grep -qE '"payload_bytes":[0-9]+'; then r=1; else r=0; fi
+    assert_true "trace line has a numeric payload_bytes field" "$r"
+
+    # Exact key set: ts, event, agent_type, payload_bytes — no extra fields leaked.
     KEYS="$(python3 -c "import json,sys; print(','.join(sorted(json.loads(sys.argv[1]).keys())))" "$LINE" 2>/dev/null || true)"
-    [ "$KEYS" = "agent_type,event,ts" ] && r=1 || r=0
-    assert_true "trace line has exactly {ts, event, agent_type} keys" "$r"
+    [ "$KEYS" = "agent_type,event,payload_bytes,ts" ] && r=1 || r=0
+    assert_true "trace line has exactly {ts, event, agent_type, payload_bytes} keys" "$r"
 fi
 
 # ---------------------------------------------------------------------------
@@ -288,11 +301,11 @@ if [ -f "$TRACE_FILE" ]; then
     assert_true "AC-5.1: trace line carries project=project-alpha" "$r"
 
     KEYS="$(python3 -c "import json,sys; print(','.join(sorted(json.loads(sys.argv[1]).keys())))" "$LINE" 2>/dev/null || true)"
-    [ "$KEYS" = "agent_type,event,project,ts" ] && r=1 || r=0
-    assert_true "AC-5.1: trace line has exactly {ts, event, agent_type, project} keys" "$r"
+    [ "$KEYS" = "agent_type,event,payload_bytes,project,ts" ] && r=1 || r=0
+    assert_true "AC-5.1: trace line has exactly {ts, event, agent_type, project, payload_bytes} keys" "$r"
 else
     assert_true "AC-5.1: trace line carries project=project-alpha" 0
-    assert_true "AC-5.1: trace line has exactly {ts, event, agent_type, project} keys" 0
+    assert_true "AC-5.1: trace line has exactly {ts, event, agent_type, project, payload_bytes} keys" 0
 fi
 
 # 5b. AC-5.3 — marker absent → project omitted, backward-compat key set.
@@ -311,11 +324,11 @@ if [ -f "$TRACE_FILE" ]; then
     assert_true "AC-5.3: trace line does NOT carry project (marker absent)" "$r"
 
     KEYS="$(python3 -c "import json,sys; print(','.join(sorted(json.loads(sys.argv[1]).keys())))" "$LINE" 2>/dev/null || true)"
-    [ "$KEYS" = "agent_type,event,ts" ] && r=1 || r=0
-    assert_true "AC-5.3: trace line has exactly {ts, event, agent_type} keys (backward-compat)" "$r"
+    [ "$KEYS" = "agent_type,event,payload_bytes,ts" ] && r=1 || r=0
+    assert_true "AC-5.3: trace line has exactly {ts, event, agent_type, payload_bytes} keys (backward-compat)" "$r"
 else
     assert_true "AC-5.3: trace line does NOT carry project (marker absent)" 0
-    assert_true "AC-5.3: trace line has exactly {ts, event, agent_type} keys (backward-compat)" 0
+    assert_true "AC-5.3: trace line has exactly {ts, event, agent_type, payload_bytes} keys (backward-compat)" 0
 fi
 
 # 5c. AC-5.4 — marker present but out of the [a-z0-9-]{1,60} bound → omitted.
@@ -357,12 +370,49 @@ if [ -f "$TRACE_FILE" ]; then
     assert_true "AC-5.5: TH-LANE marker not on first line is IGNORED (project omitted)" "$r"
 
     KEYS="$(python3 -c "import json,sys; print(','.join(sorted(json.loads(sys.argv[1]).keys())))" "$LINE" 2>/dev/null || true)"
-    [ "$KEYS" = "agent_type,event,ts" ] && r=1 || r=0
-    assert_true "AC-5.5: trace line has exactly {ts, event, agent_type} keys (backward-compat)" "$r"
+    [ "$KEYS" = "agent_type,event,payload_bytes,ts" ] && r=1 || r=0
+    assert_true "AC-5.5: trace line has exactly {ts, event, agent_type, payload_bytes} keys (backward-compat)" "$r"
 else
     assert_true "AC-5.5: TH-LANE marker not on first line is IGNORED (project omitted)" 0
-    assert_true "AC-5.5: trace line has exactly {ts, event, agent_type} keys (backward-compat)" 0
+    assert_true "AC-5.5: trace line has exactly {ts, event, agent_type, payload_bytes} keys (backward-compat)" 0
 fi
+
+# ---------------------------------------------------------------------------
+# Section 6 — Task-6 AC-1/AC-2/AC-5: payload_bytes visibility, no ceiling
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- Section 6: payload_bytes (AC-1/AC-2/AC-5) ---"
+
+# 6a. AC-1/AC-5 — a real-size prompt yields payload_bytes equal to the exact
+# UTF-8 byte length of that prompt, nothing more and nothing less.
+rm -f "$TRACE_FILE"
+PROMPT_TEXT="You are th:implementer. Implement Task-6 per 01-plan.md."
+EXPECTED_BYTES="$(printf '%s' "$PROMPT_TEXT" | wc -c | tr -d ' ')"
+payload="$(make_payload_with_prompt "th:implementer" "$PROMPT_TEXT")"
+out="$(cd "$WORKDIR" && echo "$payload" | node "$CJS" 2>/dev/null)"
+rc=$?
+
+[ "$rc" -eq 0 ] && r=1 || r=0
+assert_true "AC-1: payload_bytes dispatch exits 0" "$r"
+
+if [ -f "$TRACE_FILE" ]; then
+    LINE="$(cat "$TRACE_FILE")"
+    ACTUAL_BYTES="$(python3 -c "import json,sys; print(json.loads(sys.argv[1])['payload_bytes'])" "$LINE" 2>/dev/null || true)"
+    [ "$ACTUAL_BYTES" = "$EXPECTED_BYTES" ] && r=1 || r=0
+    assert_true "AC-5: payload_bytes ($ACTUAL_BYTES) equals the prompt's exact byte length ($EXPECTED_BYTES)" "$r"
+else
+    assert_true "AC-5: payload_bytes equals the prompt's exact byte length" 0
+fi
+
+# 6b. AC-2 — static check: no threshold constant, comparison, or decision
+# branch on payload_bytes in the hook body. The only conditional touching
+# the computed value is the fail-open null check, which this pattern does
+# not match.
+if command grep -qE 'payloadBytes\s*(>|<|>=|<=)' "$BODY_TS"; then r=0; else r=1; fi
+assert_true "AC-2: no size comparison operator applied to payloadBytes in the hook body" "$r"
+
+if command grep -qE 'PAYLOAD_BYTES_(MAX|MIN|THRESHOLD|LIMIT|CAP)' "$BODY_TS"; then r=0; else r=1; fi
+assert_true "AC-2: no payload_bytes threshold constant declared in the hook body" "$r"
 
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="

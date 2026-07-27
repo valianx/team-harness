@@ -206,13 +206,25 @@ derivable from a single file.
 
 Line schema:
 ```json
-{"ts":"<ISO>","event":"subagent.start","agent_type":"th:<agent>","project":"<optional — bounded [a-z0-9-]{1,60}>"}
+{"ts":"<ISO>","event":"subagent.start","agent_type":"th:<agent>","project":"<optional — bounded [a-z0-9-]{1,60}>","payload_bytes":"<optional — byte length of the dispatch prompt>"}
 ```
 
 `agent_id` is intentionally absent — at PreToolUse time the runtime has not
 yet assigned one (it only becomes observable on the corresponding
 `SubagentStop` payload). Readers pair a `subagent.start` line with the next
 `subagent.stop` line carrying the same `agent_type` in file order.
+
+**`payload_bytes` (visibility, no ceiling).** The byte length of the dispatch
+prompt, measured with the same UTF-8 byte-counting the shim already uses for
+its own pre-parse size guard. No constant, comparison, or branch anywhere in
+`hooks/ts/bodies/subagent-start.ts` reads this value — it is purely
+observational, never a rejection or a warning threshold. A measurement error
+omits the field alone (fail-open, same posture as the rest of this hook);
+the record's other fields still land. Coverage: measured only on the Claude
+Code plugin path — there is no `subagent-start.opencode.ts` entry, so an
+opencode dispatch never gets this field. No content beyond the byte count —
+not the whole prompt, not a truncated excerpt, not any other derived value —
+ever enters the record.
 
 **`project` key (lane-scoped dispatch, bounded).** When the dispatching
 agent's prompt carries a `TH-LANE: {project-key}` line, this hook stamps a
