@@ -102,6 +102,28 @@ carve-out" below for the sole exemption from the observability floor itself).
 Canonical source: `agents/orchestrator.md § "Free-text field bound"`; the two
 sites must not diverge.
 
+**Named exception — the `checkpoint.confirmed` confirmatory-text field, additive only.**
+The general clause above governs every OTHER free-text field unchanged. The field
+carrying the operator's own words in the `checkpoint.confirmed` event (the
+functional-clarity confirmation, `agents/orchestrator.md § "Gate handling § Checkpoint-trust-transfer"`)
+is a single named exception, additive to — never a replacement of — the general clause:
+≤280 chars (one confirmatory turn, not the surrounding conversation); quotes and
+`\n\r\t` are ESCAPED as JSON string escapes, never stripped, so the operator's exact
+characters survive; every backtick character is escaped at the byte level with its
+JSON unicode escape (code point U+0060) rather than left literal — this protects the
+` ```jsonl ` fence Obsidian mode wraps the trace in (§ "Dual-format lifecycle"), which
+the quote/whitespace escape alone does not — and is never neutralized or substituted,
+since altering the recorded characters inside the bound is exactly the stripping
+behaviour this exception exists to avoid; truncation beyond the 280-char bound is
+marked visibly with `…[truncated]`; the secret prohibition (§ "Secret prohibition") is
+unaffected — a confirmation carrying a credential records `provenance` and
+`withheld — secret prohibition` in place of the text. `provenance` itself is a closed
+enum, not free text, and is never subject to this bound. Without this reconciliation
+written at both sites — here and `agents/orchestrator.md § "Free-text field bound"`,
+which must not diverge — the field is not added. This exception is scoped to exactly
+this one field: the general `≤120 chars`/`never multi-sentence narrative prose` clause
+above is byte-preserved for every other free-text field.
+
 ## Placement in 00-execution-events
 
 `operation.*` events are written as additional JSONL lines within the existing
