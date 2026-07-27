@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 # tests/test_task2_output_contracts.py
-# Structural tests for Task-2 of the agent-authoring-standard change:
-# per-agent output-contract language declarations (13 agents), the
-# `audit_coverage` self-declaration, qa.md's alignment with its own :95
-# statement, and the review-scope-bounding instruction's removal from its
-# five real sites.
+# Structural tests for the agent-authoring-standard change's per-agent
+# output-contract scope: per-agent output-contract language declarations
+# (13 agents), the `audit_coverage` self-declaration, qa.md's alignment
+# with its own :95 statement, and the review-scope-bounding instruction's
+# removal from its five real sites.
 #
-# Scope: this file asserts Task-2's own six acceptance criteria against the
-# tree state produced by commits f8cb9e1 (per-agent output contracts) and
+# Scope: this file asserts this scope's own six acceptance criteria against
+# the tree state produced by commits f8cb9e1 (per-agent output contracts) and
 # 67eacdd (bounded-patch fix adding the missing agents/reviewer.md
-# declaration). It deliberately does NOT assert the Task-9-owned, whole-tree
-# checks (fenced-manifest sha256 reconciliation, the consolidated Suite 180)
-# — those land once every task in the DAG has closed. This file does not
-# modify tests/test_agent_structure.py, docs/testing.md, or
-# tests/fixtures/fenced/manifest.json.
+# declaration). It deliberately does NOT assert the whole-tree checks
+# (fenced-manifest sha256 reconciliation, the consolidated Suite 180) owned
+# by a later scope in the same change — those land once every scope in the
+# change has closed. This file does not modify tests/test_agent_structure.py,
+# docs/testing.md, or tests/fixtures/fenced/manifest.json.
 #
 # This is NOT a behavioural test — agent prose only runs inside Claude Code.
 # It checks that what the files SAY about themselves is internally
@@ -33,7 +33,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-BASE_SHA = "7929343"  # worktree_base per 01-plan.md Task-2 — origin/main @ 7929343, 2.141.0
+BASE_SHA = "7929343"  # worktree base for this scope — origin/main @ 7929343, 2.141.0
 
 AGENTS = REPO_ROOT / "agents"
 ORCHESTRATOR = AGENTS / "orchestrator.md"
@@ -224,7 +224,8 @@ for rel_path, (substrings, may_be_operator_facing) in _LANGUAGE_AGENTS.items():
         )
 
 # =============================================================================
-# AC-3 — three named fences stay byte-identical to the pre-Task-2 tree
+# AC-3 — three named fences stay byte-identical to the tree state before this
+# scope's own commits
 # (agents/tester.md § "Status block from tester (pre-fix-regression mode)",
 # agents/adversary.md § "1. Identify the changed controls",
 # agents/qa.md § "Code Hygiene")
@@ -362,7 +363,7 @@ check(
 # sites, in one commit; the Correction scope: field survives as a coordinate;
 # the anchor heading and two Suite-172 literals are preserved; what must NOT
 # be touched (buckets table, fail-safes, Stage-2 Blast radius mechanism)
-# stays byte-identical to the pre-Task-2 tree
+# stays byte-identical to the tree state before this scope's own commits
 # =============================================================================
 _FORBIDDEN_LITERALS = ("frozen/trusted", "review ONLY", "never re-reviewed")
 
@@ -433,10 +434,10 @@ check(
 )
 
 # AC-6d — everything else in the orchestrator's Correction-classification
-# section that the plan did NOT license for change stays byte-identical to
-# the pre-Task-2 tree: compare line-by-line, ignoring only the two paragraphs
-# the plan explicitly names (Delta-scoped dispatch; the carried-forward
-# paragraph's "delta-scoped the same way" tail).
+# section that was not licensed for change stays byte-identical to the tree
+# state before this scope's own commits: compare line-by-line, ignoring only
+# the two paragraphs explicitly named as licensed (Delta-scoped dispatch;
+# the carried-forward paragraph's "delta-scoped the same way" tail).
 _base_orch_slice = slice_section(
     git_show(BASE_SHA, "agents/orchestrator.md"),
     "### Correction-classification — selective panel re-firing",
@@ -502,7 +503,8 @@ check(
 )
 
 # AC-6f — the Stage-2 Blast radius mechanism is explicitly out of this
-# removal's scope and stays byte-identical to the pre-Task-2 tree
+# removal's scope and stays byte-identical to the tree state before this
+# scope's own commits
 _base_patch_mode = git_show(BASE_SHA, "docs/patch-mode.md")
 
 
