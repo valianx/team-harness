@@ -32,7 +32,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 - **NEVER** commit directly to main — always use a feature branch
 - **NEVER** force push (`--force`, `--force-with-lease`, or a `+`-prefixed refspec) — if push is rejected, diagnose and report. This is a contractual promise of this agent, backed by a deterministic backstop: `gate-guard` denies any force-push form (both flag forms and the `+refspec` form) from a detected pipeline lane, **unconditionally on `gate3_release`** — a recorded `ship` never authorizes a force-push — layered under `policy-block`'s unconditional flag-deny (every context) and `dev-guard`'s destination-based floor for default/protected branches. A rejected push (non-fast-forward) is diagnosed and reported as a `blocked-*` state; it is never resolved by forcing. See `agents/_shared/gate-contract.md § "Outward-action release floor"`.
 - **ALWAYS** bump the project version once per PR at assembly (min one, max one) — this is the shipped default. **NEVER** bump when the orchestrator passes `skip-version: true` in the task context: that flag is set ONLY when the consuming repository documents a repo-local versioning/release convention that defers or batches the bump (see Step 9.0). If you see `skip-version: true`, skip Step 9 entirely and log "Version bump skipped: repo-local deferral convention (skip-version: true)"
-- **ALWAYS** re-derive completion criteria at the top of Step 0 (before any branch / commit / push) by reading `01-plan.md` § Task List (AC list) + `03-testing.md` (tests per AC) + the Phase 3.8 audit artifacts: `reviews/04-security.md` (unconditional — the audit dispatches `security` for every delivery group) and `reviews/04-adversary.md` when `security_floor_applies == true` (read `security_sensitive` from `00-state.md § Current State`; fail-closed to `true` on absence or doubt). Audit findings are the operator's STAGE-GATE-3 input, never your own abort trigger in `mode: prepare`; in `mode: publish`, open Critical/High findings or a `broke-it`/INCOMPLETE adversary verdict require a matching `disposition` entry in `00-decision-ledger.md` (written when STAGE-GATE-3 recorded `ship` over open findings) — absent entry → abort. **Lane-gated:** on `lane: full` (or absent) also read `reviews/04-validation.md` (qa PASS/FAIL per AC); on `lane: express`, `reviews/04-validation.md` is legitimately absent (`qa` never runs there) and `03-testing.md` alone is the acceptance evidence — see Step 0 below for the full per-lane branch. If any AC lacks PASS (per-lane evidence source) or lacks a test, abort with `status: failed`. The orchestrator gates on Phase 3.5 / 3.6; this re-derivation is your secondary self-check that those gates produced consistent results. (Historical note: a `done.yml` artifact was previously specified for this purpose — deprecated 2026-05-21, see `agents/orchestrator.md` "Done.yml" deprecation banner.)
+- **ALWAYS** re-derive completion criteria at the top of Step 0 (before any branch / commit / push) by reading `01-plan.md` § Task List (AC list) + `03-testing.md` (tests per AC) + the Phase 3.8 audit artifacts: `reviews/04-security.md` (unconditional — the audit dispatches `security` for every delivery group) and `reviews/04-adversary.md` when `security_floor_applies == true` (read `security_sensitive` from `00-state.md § Current State`; fail-closed to `true` on absence or doubt). Audit findings are the operator's STAGE-GATE-3 input, never your own abort trigger in `mode: prepare`; in `mode: publish`, open Critical/High findings or a `broke-it`/INCOMPLETE adversary verdict require a matching `disposition` entry in `00-decision-ledger.md` (written when STAGE-GATE-3 recorded `ship` over open findings) — absent entry → abort. **Lane-gated:** on `lane: full` (or absent) also read `reviews/04-validation.md` (qa PASS/FAIL per AC); on `lane: express`, `reviews/04-validation.md` is legitimately absent (`qa` never runs there) and `03-testing.md` alone is the acceptance evidence — see Step 0 below for the full per-lane branch. If any AC lacks PASS (per-lane evidence source) or lacks a test, abort with `status: failed`. The orchestrator gates on Phase 3.5; this re-derivation is your secondary self-check that that gate produced consistent results. (Historical note: a `done.yml` artifact was previously specified for this purpose — deprecated 2026-05-21, see `agents/orchestrator.md` "Done.yml" deprecation banner.)
 - **ALWAYS** check if the remote branch is ahead before pushing (fetch + rev-list). If ahead, rebase first
 - **ALWAYS** check PR state before creating or updating a PR. If merged/closed, create a new branch
 - **Outward actions require operator approval.** The PreToolUse hook `dev-guard.sh` intercepts every `git push`, `gh pr create`, `gh pr merge`, and equivalent outward action unconditionally, and emits `permissionDecision: "ask"`. The **operator** must approve each call interactively — the delivery agent CANNOT auto-approve. Route publish actions normally; the gate escalates them to the operator at the point of execution. See `docs/dev-mode.md § Outward-Action Gate`.
@@ -670,7 +670,7 @@ If a check command does not exist in the project (e.g. no `lint` script), skip t
 
 **Workspace-only, never committed into the product repo.** The matrix lives in `reviews/04-validation.md` on `lane: full`, or in `03-testing.md` on `lane: express` — either way inside the gitignored `workspaces/` tree (see CLAUDE.md § "Workspaces as the shared board") — not under any tracked `docs/specs/` path. It is embedded verbatim in the PR body at Step 11.2, which is the durable, human-facing surface for this content; Step 10.0 does not stage `docs/specs/`, on any lane. This holds uniformly on `lane: full` and `lane: express` — express's minimal-artifact profile (`agents/orchestrator.md § Express Lane Profile`) never had a spec/matrix commit to skip in the first place; this step's express branch appends a section to a file the tester already wrote, not a new standalone file.
 
-### Step 9d — Reviewability size gate
+### Step 9d — Reviewability size gate and diff composition
 
 Before staging files, check the diff size against the human-reviewer caps. Cognition reported merge rate drops sharply on large PRs and the team's experience confirms it: PRs above ~400 lines or ~8 files get either rubber-stamped or stuck in review.
 
@@ -683,7 +683,8 @@ diff_files=$(git diff origin/main...HEAD --name-only | wc -l)
 |---|---|
 | `diff_lines ≤ 400` AND `diff_files ≤ 8` | Pass. Proceed to Step 10. |
 | `diff_lines > 400` OR `diff_files > 8` | Read the implementer's `02-implementation.md` for any `## Reviewability Exceptions` block. If the implementer documented why the size is justified (cross-cutting refactor, generated code, large config table that cannot be split), proceed but flag it in the PR body under "Size justification" (Step 11.2). Otherwise abort with `status: failed` and message: "Diff is {N} lines across {M} files but no reviewability justification was provided in 02-implementation.md. Either split the change into multiple PRs (preferred) or add a Reviewability Exceptions section explaining why the size is necessary." |
-| `diff_lines > 1000` OR `diff_files > 20` | Always abort regardless of justification — no diff this large is genuinely review-friendly. Report to the user with a suggested split strategy: refactor commits first, then feature commits, each as its own PR. |
+
+**No threshold aborts regardless of justification, at any diff size.** The row above is the sole remaining size check, and it always leaves a path to proceed — document why the size is justified, and the delivery continues. There is no larger tier above it that escalates into an unconditional stop no justification can satisfy, and no diff is ever split into multiple PRs by this step itself. What lets the operator judge a large, unsplit diff is the composition breakdown below, presented at STAGE-GATE-3 — not a line-count ceiling substituting for that judgment.
 
 When the gate flags but is overridden by a justification, capture it for the PR body:
 
@@ -692,6 +693,26 @@ size_justification=$(awk '/^## Reviewability Exceptions/,/^## /' workspaces/{fea
 ```
 
 This becomes the "Size justification" section embedded in the PR body in Step 11.2.
+
+**Diff composition (unconditional — computed regardless of whether the size gate flagged, and regardless of diff size).** Classify every changed file into exactly one of two buckets, then report the total alongside the split:
+
+- **Mechanical/append-only** — a delivery-authored housekeeping path (`CLAUDE.md`, `CHANGELOG.md`, `changelog.d/*`, `docs/**`, `README.md`, `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `openapi/openapi.*`), OR any file whose diff is pure addition (zero deleted lines) regardless of path.
+- **Substantive** — every other file: at least one deleted or modified line, and not a housekeeping path.
+
+```bash
+mechanical_files=$(git diff origin/main...HEAD --numstat | awk '
+  {
+    file=$3
+    is_housekeeping = (file ~ /^(CLAUDE\.md|CHANGELOG\.md|changelog\.d\/|docs\/|README\.md|\.claude-plugin\/(plugin|marketplace)\.json|openapi\/openapi\.)/)
+    is_append_only = ($1 != "-" && $2 == 0)
+    if (is_housekeeping || is_append_only) count++
+  }
+  END { print count+0 }
+')
+substantive_files=$(( diff_files - mechanical_files ))
+```
+
+This composition — `diff_composition: {total_lines: {diff_lines}, total_files: {diff_files}, mechanical_files, substantive_files}` — is computed by `delivery` itself, over the consolidated diff, independently of any auditor self-declaration. Report it in the status block (see Return Protocol) unconditionally, even when the diff is well under the 400/8 caps: it is what the STAGE-GATE-3 gate data presents adjacent to the Phase 3.8 auditor's own `audit_coverage` self-declaration, so diff size is never mistaken for coverage — a self-declared `full` coverage claim over a diff whose `substantive_files` count is large reads as visibly implausible next to it. That producer independence (delivery computing composition, the auditor computing coverage, neither reading the other's figure) is what makes a contradiction between the two legible to the operator.
 
 ### Step 9f — PR-body / runbook presence-reconcile (draft the body, then reconcile it against the shipped code)
 
@@ -1573,6 +1594,7 @@ model: {effective-model-id}
 output: workspaces/{feature-name}/00-state.md § Delivery
 summary: {1-2 sentences: branch name, version X→Y, PR #N, CLAUDE.md sections updated}
 gh_account: <login> | unknown | n/a (has_gh=false)
+diff_composition: {total_lines: N, total_files: M, mechanical_files: X, substantive_files: Y}   # computed once in mode: prepare (Step 9d), over the consolidated diff; mode: publish echoes the value from 00-state.md § Delivery unchanged — the diff does not change between modes
 dod: {pass | no gates discovered | failed: <command>}
 mergeable_state: clean | conflicting | undetermined | blocked | behind | unstable | not-verified: gh-unavailable
 ci_state: passing | failing | pending | none | not-verified
@@ -1620,6 +1642,8 @@ issues: gh pr create failed: {error message}
 ```
 
 The orchestrator pauses and waits for the operator to reply `pr opened #N`. On continue, the pipeline re-probes the PR number with a Tier A read and records it in `00-state.md`.
+
+**Language.** Every artifact this agent produces is written in English throughout, no operator-language exception (`docs/conventions.md § Document classification`): the `00-state.md § Delivery` section (agentic-tier workspace doc), CLAUDE.md memory entries (Step 5), `docs/knowledge.md` (Step 5b), README.md updates (Step 6), the CHANGELOG fragment (Step 7), and the PR body draft (Step 9f.1) — this repo's own committed-artefact convention (CLAUDE.md §7.3) admits no exception for a PR body, which reaches GitHub the same way any other committed content does.
 
 Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.
 
