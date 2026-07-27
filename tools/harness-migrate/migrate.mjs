@@ -37,8 +37,8 @@ const ANTHROPIC_PREFIX = "anthropic/";
 
 /**
  * Maps the three CC bare alias names to their current concrete opencode model ids.
- * Pinned at release time from models.dev; installed configs stay fresh via
- * the on-demand /th:update-models runtime path.
+ * Pinned at release time from models.dev; re-running the installer re-bakes
+ * installed configs against a refreshed pin.
  * Content must stay byte-identical to aliasToConcreteModel in cmd/install/transform.go.
  */
 const ALIAS_TO_CONCRETE_MODEL = {
@@ -54,11 +54,10 @@ const ALIAS_TO_CONCRETE_MODEL = {
 // The model-less baseline above is the default for every opencode install.
 // When the operator opts into tiering for a provider, the transform instead
 // BAKES a concrete provider/model-id derived from each agent's CC source
-// tier. This is the JS half of a three-site invariant: PROVIDER_TIER_FAMILY
+// tier. This is the JS half of a two-site invariant: PROVIDER_TIER_FAMILY
 // and PROVIDER_TIER_CONCRETE must stay byte-identical to providerTierFamily /
-// providerTierConcrete in cmd/install/transform.go and to the embedded copy
-// in skills/update-models/SKILL.md (locked by a Go-side structural parity
-// test — see cmd/install/tier_test.go).
+// providerTierConcrete in cmd/install/transform.go (locked by a Go-side
+// structural parity test — see cmd/install/tier_test.go).
 
 /** CC agent source model: alias -> cost tier label (provider-agnostic). */
 const CC_MODEL_ALIAS_TO_TIER = {
@@ -86,8 +85,8 @@ const PROVIDER_TIER_FAMILY = {
 
 /**
  * Release-time pin: provider -> tier -> concrete model id. Used by the
- * installer to bake a model: line without a network call; /th:update-models
- * resolves the live equivalent post-install.
+ * installer to bake a model: line without a network call; re-running the
+ * installer with a refreshed pin re-bakes it.
  */
 const PROVIDER_TIER_CONCRETE = {
   anthropic: {

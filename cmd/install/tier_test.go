@@ -11,11 +11,10 @@ package main
 //                    fails closed.
 //  AC-8 [automated]: cross-surface structural parity — the curated map and
 //                    its concrete-id pin are byte-identical across
-//                    cmd/install/transform.go, tools/harness-migrate/migrate.mjs,
-//                    and the embedded skills/update-models/SKILL.md copy.
+//                    cmd/install/transform.go and
+//                    tools/harness-migrate/migrate.mjs.
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -292,45 +291,47 @@ func TestResolveFamilyForTier_UnknownProviderFailsClosed(t *testing.T) {
 // TestProviderTierMaps_CrossSurfaceParity_AC8 asserts that providerTierFamily
 // and providerTierConcrete (the Go source of truth) are byte-identical in
 // VALUE to the PROVIDER_TIER_FAMILY / PROVIDER_TIER_CONCRETE maps declared in
-// tools/harness-migrate/migrate.mjs and to every occurrence of the same two
-// maps embedded in skills/update-models/SKILL.md.
+// tools/harness-migrate/migrate.mjs.
 //
-// This is the multi-site invariant lock (01-plan.md § Multi-site invariants):
-// a drift at ANY one of the three sites reds this test and names exactly
-// which site and which (provider, tier) drifted.
+// This is the multi-site invariant lock (docs/opencode-model-config.md
+// § Per-provider cost tiering): a drift at either of the two sites reds this
+// test and names exactly which site and which (provider, tier) drifted.
 func TestProviderTierMaps_CrossSurfaceParity_AC8(t *testing.T) {
 	repoRoot := repoRootForTierTest(t)
 
 	migratePath := filepath.Join(repoRoot, "tools", "harness-migrate", "migrate.mjs")
-	skillPath := filepath.Join(repoRoot, "skills", "update-models", "SKILL.md")
 
 	migrateSrc := mustReadFile(t, migratePath)
-	skillSrc := mustReadFile(t, skillPath)
 
 	jsFamily := extractJSProviderTierMap(t, migrateSrc, "PROVIDER_TIER_FAMILY")
 	jsConcrete := extractJSProviderTierMap(t, migrateSrc, "PROVIDER_TIER_CONCRETE")
 
-	skillFamilyOccurrences := extractQuotedProviderTierMapOccurrences(t, skillSrc, "PROVIDER_TIER_FAMILY")
-	skillConcreteOccurrences := extractQuotedProviderTierMapOccurrences(t, skillSrc, "PROVIDER_TIER_CONCRETE")
-
-	if len(skillFamilyOccurrences) == 0 {
-		t.Fatalf("no PROVIDER_TIER_FAMILY occurrence found in %s — embedded curated map is missing or its format drifted", skillPath)
-	}
-	if len(skillConcreteOccurrences) == 0 {
-		t.Fatalf("no PROVIDER_TIER_CONCRETE occurrence found in %s — embedded curated map is missing or its format drifted", skillPath)
-	}
+	assertSameProviderKeys(t, "PROVIDER_TIER_FAMILY", "migrate.mjs", providerTierFamily, jsFamily)
+	assertSameProviderKeys(t, "PROVIDER_TIER_CONCRETE", "migrate.mjs", providerTierConcrete, jsConcrete)
 
 	for provider, goTiers := range providerTierFamily {
 		compareProviderTierMap(t, "PROVIDER_TIER_FAMILY", "migrate.mjs", provider, goTiers, jsFamily[provider])
-		for i, occ := range skillFamilyOccurrences {
-			compareProviderTierMap(t, "PROVIDER_TIER_FAMILY", fmt.Sprintf("SKILL.md (occurrence %d)", i+1), provider, goTiers, occ[provider])
-		}
 	}
 
 	for provider, goTiers := range providerTierConcrete {
 		compareProviderTierMap(t, "PROVIDER_TIER_CONCRETE", "migrate.mjs", provider, goTiers, jsConcrete[provider])
-		for i, occ := range skillConcreteOccurrences {
-			compareProviderTierMap(t, "PROVIDER_TIER_CONCRETE", fmt.Sprintf("SKILL.md (occurrence %d)", i+1), provider, goTiers, occ[provider])
+	}
+}
+
+// assertSameProviderKeys compares the outer provider key sets. The per-provider
+// comparisons below key off the Go maps, so a provider declared only at the
+// other site is never visited by them — without this check the two surfaces can
+// drift by a whole provider while the test stays green.
+func assertSameProviderKeys(t *testing.T, mapName, site string, want, got map[string]map[string]string) {
+	t.Helper()
+	for provider := range got {
+		if _, ok := want[provider]; !ok {
+			t.Errorf("%s: %s declares provider %q that Go's curated map does not have", mapName, site, provider)
+		}
+	}
+	for provider := range want {
+		if _, ok := got[provider]; !ok {
+			t.Errorf("%s: %s has no entry for provider %q (present in Go's curated map)", mapName, site, provider)
 		}
 	}
 }
@@ -363,22 +364,6 @@ func extractJSProviderTierMap(t *testing.T, src, varName string) map[string]map[
 		t.Fatalf("migrate.mjs: %s declaration not found (format drift?)", varName)
 	}
 	return parseProviderTierBlocks(m[1], `(\w+)\s*:\s*\{([^}]*)\}`, `(\w+)\s*:\s*"([^"]+)"`)
-}
-
-// extractQuotedProviderTierMapOccurrences parses every fenced
-// `VARNAME = { "provider": { "tier": "value", ... }, ... }` block in
-// SKILL.md (quoted JSON/Python-dict-style keys). SKILL.md embeds the curated
-// map twice — once in the human-readable contract summary, once inside the
-// executable Python resolver block — both occurrences are checked.
-func extractQuotedProviderTierMapOccurrences(t *testing.T, src, varName string) []map[string]map[string]string {
-	t.Helper()
-	outer := regexp.MustCompile(`(?s)` + regexp.QuoteMeta(varName) + `\s*=\s*\{(.*?)\n\}`)
-	matches := outer.FindAllStringSubmatch(src, -1)
-	var results []map[string]map[string]string
-	for _, m := range matches {
-		results = append(results, parseProviderTierBlocks(m[1], `"(\w+)"\s*:\s*\{([^}]*)\}`, `"(\w+)"\s*:\s*"([^"]+)"`))
-	}
-	return results
 }
 
 // parseProviderTierBlocks finds provider sub-blocks within body using

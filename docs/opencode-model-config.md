@@ -80,16 +80,15 @@ default (no opt-in) stays model-less, byte-identical to the v1 baseline.
 curated maps are keyed by provider, and the resolver takes a provider argument — so
 adding a provider later is a checked-in map edit, not a code change.
 
-1. **Curated provider→tier→family map (checked into the repo, three sites byte-identical).**
+1. **Curated provider→tier→family map (checked into the repo, two sites byte-identical).**
    Per provider, each tier label (`default`/`medium`/`low`, mapping from CC
    `opus`/`sonnet`/`haiku`) → a model family/base name. Ragged — only the tiers a
    provider's current generation actually exposes. Missing tier → nearest cheaper
    neighbor; worst case, one curated model serves every tier. The same map (and its
-   release-time concrete-id pin) is declared at three sites and locked by a structural
+   release-time concrete-id pin) is declared at two sites and locked by a structural
    parity test so they cannot drift:
    - Go installer: `cmd/install/transform.go` — `providerTierFamily` / `providerTierConcrete`
    - JS contributor tool: `tools/harness-migrate/migrate.mjs` — `PROVIDER_TIER_FAMILY` / `PROVIDER_TIER_CONCRETE`
-   - Skill (embedded copy + live resolver): `skills/update-models/SKILL.md`
    - Parity lock: `cmd/install/tier_test.go` (`TestProviderTierMaps_CrossSurfaceParity_AC8`)
 2. **Install-time bake = release-time pin, no network.** `--opencode-tier <provider>`
    (installer flag) or the persisted config key `opencode.cost_tier_provider`
@@ -97,14 +96,9 @@ adding a provider later is a checked-in map edit, not a code change.
    selects the provider. The CC→opencode transform then reads each agent's CC source
    `model:` (opus/sonnet/haiku), resolves tier → family → the **release-time pinned
    concrete id**, and emits `model: <provider>/<concrete-id>`. No network call at
-   install. Absent selection ⇒ unchanged model-less baseline.
-3. **`/th:update-models` live refresh.** Resolves `(provider, family) → newest concrete
-   by release_date` from the live models.dev API (`data[provider]["models"][bare_id]`,
-   grouped by the model's `family` field — the real nested shape, not a flat
-   provider-prefixed map) and rewrites the baked `model:` lines to the freshest version.
-   **Never mix providers** — when the selected provider differs from what is currently
-   baked, the whole installed set is regenerated for the newly selected provider rather
-   than incrementally patched.
+   install. Absent selection ⇒ unchanged model-less baseline. A newer concrete id
+   requires re-running the installer against a refreshed pin — there is no separate
+   live-refresh path.
 
 The helper `toProviderPrefixedModel` (`transform.go` / `migrate.mjs`) — the prior
 alias→concrete pin — was lifted into the provider-keyed `providerTierFamily` /
@@ -117,7 +111,6 @@ CLI surface:
 install --runtime opencode --opencode-tier anthropic
 # bakes: leader → anthropic/claude-opus-4-6; implementer → anthropic/claude-sonnet-4-6;
 #        init/researcher → anthropic/claude-haiku-4-5
-/th:update-models   # later: refreshes those ids to the newest live versions per tier
 ```
 
 ## Reference

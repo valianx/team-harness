@@ -22,7 +22,7 @@
 #
 # Also covers AC-7: --force-blocks overrides row 5 and reports "force-adopted".
 #
-# Skips cleanly when python3 is absent (mirrors test_update_models_resolver.sh).
+# Skips cleanly when python3 is absent.
 #
 # Usage:
 #   bash tests/test_th_update_block_sync.sh
