@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.142.0] - 2026-07-27
+
+### Removed
+- `/th:update-models` (`skills/update-models/SKILL.md`) and its dedicated Suite 128 fixture test (`tests/test_update_models_resolver.sh`, `tests/fixtures/models-dev-api-slice.json`). The skill was a no-op under Claude Code — its own scope forbade touching `~/.claude/agents/*.md` — yet still shipped via the plugin marketplace. Opencode operators who used it to live-refresh a baked tier pin lose that capability; the manual alternative is re-running the installer with `--opencode-tier anthropic`, which re-bakes the release-time pin. The cross-surface parity lock for the curated tier maps (`providerTierFamily`/`providerTierConcrete`) narrows from three sites to two — `cmd/install/transform.go` and `tools/harness-migrate/migrate.mjs`, locked by `cmd/install/tier_test.go` — the curated maps themselves are unchanged.
+
 ## [2.141.0] - 2026-07-26
 
 ### Added
