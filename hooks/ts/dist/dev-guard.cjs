@@ -1164,11 +1164,10 @@ function scanForDataPositions(cmd) {
   }
   return { commands, heredocs, quoteSpans, firstHeredocIntroducerStart };
 }
-function canonicalBasename2(value) {
+function sinkCandidateBasename(value) {
   const idx = value.lastIndexOf("/");
   const base = idx >= 0 ? value.slice(idx + 1) : value;
-  const noExe = /\.exe$/i.test(base) ? base.slice(0, -4) : base;
-  return noExe.toLowerCase();
+  return /\.exe$/i.test(base) ? base.slice(0, -4) : base;
 }
 function computeSinkFlags(commands) {
   const isSink = new Array(commands.length).fill(false);
@@ -1180,7 +1179,7 @@ function computeSinkFlags(commands) {
       const group = commands.slice(groupStart, idx);
       const groupInert = group.every((c) => {
         if (c.argv0 === null) return false;
-        return HEREDOC_INERT_SINKS.has(canonicalBasename2(c.argv0.value)) && c.redirectTargetsOk;
+        return HEREDOC_INERT_SINKS.has(sinkCandidateBasename(c.argv0.value)) && c.redirectTargetsOk;
       });
       for (let k = groupStart; k < idx; k++) isSink[k] = groupInert;
     }

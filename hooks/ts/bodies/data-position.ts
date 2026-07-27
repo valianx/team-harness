@@ -599,11 +599,23 @@ function scanForDataPositions(cmd: string): ScanResult | null {
 // size one (no pipe at all) reduces to checking its lone member.
 // ---------------------------------------------------------------------------
 
-function canonicalBasename(value: string): string {
+// Path-segment and `.exe`-suffix resolution mirror command-lexer.ts's own
+// `canonicalBasename` (path segment last, `.exe` stripped case-insensitively
+// via the same `/\.exe$/i` rule), but deliberately WITHOUT its final
+// `.toLowerCase()`. HEREDOC_INERT_SINKS membership is the load-bearing
+// SOUNDNESS-OF-THE-PREDICATE claim this module's header names (an
+// under-inclusive match only costs a fail-safe over-ask; an over-inclusive
+// one masks a real command from the deny scan) — so it requires an
+// EXACT-case match against the set's own all-lowercase spellings, the same
+// exact-case discipline `command-lexer.ts`'s `binaryCaseExact` field applies
+// before an `allow`-capable branch in `dev-guard.ts` may trust a resolved
+// basename (`command-lexer.ts:850-1084`, gated at `dev-guard.ts:354,477`). A
+// capitalized spelling (`Cat`, `Tee`, `Echo`) is a DIFFERENT executable on a
+// case-sensitive filesystem and must not fold into the sink set.
+function sinkCandidateBasename(value: string): string {
   const idx = value.lastIndexOf("/");
   const base = idx >= 0 ? value.slice(idx + 1) : value;
-  const noExe = /\.exe$/i.test(base) ? base.slice(0, -4) : base;
-  return noExe.toLowerCase();
+  return /\.exe$/i.test(base) ? base.slice(0, -4) : base;
 }
 
 function computeSinkFlags(commands: CommandRecord[]): boolean[] {
@@ -618,7 +630,7 @@ function computeSinkFlags(commands: CommandRecord[]): boolean[] {
       const group = commands.slice(groupStart, idx);
       const groupInert = group.every((c) => {
         if (c.argv0 === null) return false;
-        return HEREDOC_INERT_SINKS.has(canonicalBasename(c.argv0.value)) && c.redirectTargetsOk;
+        return HEREDOC_INERT_SINKS.has(sinkCandidateBasename(c.argv0.value)) && c.redirectTargetsOk;
       });
       for (let k = groupStart; k < idx; k++) isSink[k] = groupInert;
     }

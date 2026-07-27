@@ -1192,6 +1192,15 @@ RAWEOF
 assert_deny "AC-1.30: heredoc body content is never re-scanned for a nested introducer -> deny" \
     "$(make_bash_payload "$AC_1_30_CMD")"
 
+AC_CASE_CMD=$(cat <<'RAWEOF'
+Cat >> notes.md << 'EOF'
+rm -rf /
+EOF
+RAWEOF
+)
+assert_deny "case-variant sink spelling (Cat) does not fold into HEREDOC_INERT_SINKS -> deny (adversary finding: canonicalBasename lowercased before membership check, masking a denied command attributed to a capitalized argv0 on a case-sensitive filesystem)" \
+    "$(make_bash_payload "$AC_CASE_CMD")"
+
 echo
 echo "--- AC-1.11b: a denied pattern straddling a marked and an unmarked span still denies ---"
 # git push's absorbing group ([^|]*\s) between "push" and the force flag
