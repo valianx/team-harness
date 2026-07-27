@@ -177,6 +177,38 @@ pending for that gate (§ "The dual-record release" above) — a reply that clea
 table's allowlist but carries a stale or missing nonce is still not recorded; it is
 treated as ambiguous (§ "Ambiguous-gate-reply rule").
 
+**Bare-literal field values.** Each of the six gate-state fields —
+`gate1_release`, `gate2_release_last`, `gate3_release`, `gate_nonce`,
+`working_branch`, and `worktree` — is written to `00-state.md § Current State`
+as a bare literal: the value carries no second token delimited by a space on
+the same line, no trailing nonce, attribution, justification, or condition
+appended after it. Every reader of these fields — the record-based recover
+backstop above, `agents/orchestrator.md § Current State`, and the executable
+`working_branch`/`worktree` comparisons this contract's consumers install in
+`implementer` and `tester` — matches the first equal line by strict string
+equality, so a value carrying any annotation stops matching the instant one
+is appended.
+
+For the three `*_release` fields, the per-gate allowlist table above is the
+closed, citable set of literal values the field may hold — no value outside
+that set, and no annotated variant of an allowlisted value, is ever written.
+`gate_nonce`, `working_branch`, and `worktree` are open-ended by
+construction — a token, a branch name, a filesystem path — and admit no
+allowlist; they are subject to the bare-literal requirement alone, never to
+a closed-set check.
+
+A nonce, an attribution, a justification, or any condition attached to a
+gate decision belongs in `00-decision-ledger` (`operator-approval`,
+`disposition`) — never appended to the field line itself.
+
+**The "No gate-field repair" invariant.** No agent converts a malformed
+gate-field value into a well-formed one. No agent other than the
+orchestrator writes any of the six fields above, under any circumstance —
+including one it finds already malformed. Recovery from a malformed field is
+re-presenting the affected gate with a fresh `gate_nonce` (see above); the
+write that eventually lands is the product of a new operator reply, never a
+repair of the existing value.
+
 ## preparer + recorder (orchestrator) — presenter + relayer (leader)
 
 Each STAGE-GATE is a two-agent flow with a single recorder:

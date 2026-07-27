@@ -337,6 +337,20 @@ After `delivery` returns `status: success` at Phase 4b (publish), and before Pha
 - working_branch: {branch name | null}       # the branch `gate-guard` correlates a `git push`/`gh pr create` against to resolve this lane's governing state in EITHER topology — producer field for hooks/ts/bodies/gate-guard.ts. Worktree topology: copied verbatim from `worktree_branch` at boot (branch-establishment time — see "Mandatory boot sequence" Step 2). Branch-in-place topology: set at Phase 4a, the point `delivery mode: prepare` creates the branch (delivery.md owns the actual `git checkout -b`) — this is the earliest point within your own scope, strictly before Phase 4b's push. Set BEFORE any lane (full or express) reaches its outward push.
 - lane_decomposition: {task: Task-{N}, seam_map: {...}, lanes_dispatched: N, lane_cap: 5, status: dispatching|consolidated|fallback-monolithic} | null
 - permission_provisioning_decline: {obsidian | cross-repo | both | null}  # set when the operator declines a gated permission-provisioning offer (leader Phase 0a Step 7, or your own re-check before an out-of-cwd dispatch); null = no decline this run (rules already present, granted, or not yet offered). `both` is written when part (a) and part (b) are each declined within the same run — the second decline merges into `both` rather than overwriting the first. Session-scoped — no re-offer during this run when set; the next pipeline run may offer again.
+<!-- Gate-field write contract — `agents/_shared/gate-contract.md § "The dual-record
+     release"` is canonical; this note applies it to the six fields above and never
+     reformulates it. `gate1_release`, `gate2_release_last`, `gate3_release`, `gate_nonce`,
+     `working_branch`, and `worktree` are each a bare literal when written to the real
+     file — no second space-delimited token trails the value. Live consumers: the
+     record-based recover backstop and the operator reading this file consume all six;
+     `working_branch` and `worktree` are additionally consumed by the executable
+     branch/worktree comparisons `implementer`, `tester`, and the Phase 2-close
+     commit-integrity check run. Since v2.139.0 neither `gate-guard` nor
+     `checkpoint-guard` reads any of the six — both are unwired from
+     `.claude-plugin/hooks.json` — so no hook verifies a gate field; never describe one as
+     doing so. The `#` annotations throughout this schema, this one included, are template
+     documentation for you, the orchestrator authoring the real file — they are never
+     written to the actual `00-state.md`. -->
 
 ## Phase Checklist
 <!-- Your checklist starts at Phase 1 — Phase 0a/0b belong to leader, not you. -->
@@ -889,7 +903,7 @@ At Phase 2.7, the SAME tester contract resumes: it reads its own `03-testing.md 
 
 Before dispatching `implementer` or `tester` for the first time in this phase, guarantee a working branch distinct from the repository's default branch exists. In the worktree topology this is already true from boot (`working_branch` is non-null — see "Mandatory boot sequence" Step 2); in the branch-in-place topology no branch normally exists yet at this point (it is created later, at Phase 4a).
 
-**Assert — never unconditionally write — `working_branch`.** Verify it is non-null, equal to `git rev-parse --abbrev-ref HEAD`, and distinct from the repository's default branch. Write it to `00-state.md § Current State` ONLY when boot left it `null` (the branch-in-place topology, producer site 2 of the three sites this contract reconciles — see "Mandatory boot sequence" Step 2). In the worktree topology it is already non-null from boot: this step only asserts, it never overwrites. Immediately after asserting/writing `working_branch` (and confirming `worktree`, the companion field these preconditions rely on), invoke `### Gate-field write integrity check` as this transition's post-condition — see that section for its command and verdict table.
+**Assert — never unconditionally write — `working_branch`.** Verify it is non-null, equal to `git rev-parse --abbrev-ref HEAD`, and distinct from the repository's default branch. Write it to `00-state.md § Current State` ONLY when boot left it `null` (the branch-in-place topology, producer site 2 of the three sites this contract reconciles — see "Mandatory boot sequence" Step 2). In the worktree topology it is already non-null from boot: this step only asserts, it never overwrites.
 
 **Register `base_sha` before EACH dispatch of `implementer` or `tester`.** Immediately before every such dispatch, run `git rev-parse HEAD` and record the result as `base_sha`, an attribute of that dispatch's `phase.start` event. This is the external baseline the `### Phase 2-close commit-integrity check` (below) anchors against: a dispatch that produces no diff must never be able to report a stale-but-ancestor sha and pass a "clean tree" check trivially, since any ancestor of HEAD — including the worktree's own base commit — would otherwise satisfy a bare ancestry check.
 

@@ -38789,13 +38789,11 @@ check(
 )
 check(
     "suite176(orch-ac11-ac27): Phase 2 entry asserts (never unconditionally writes) working_branch,"
-    " writes only when boot left it null, and names the Gate-field write integrity check as post-condition",
+    " and writes only when boot left it null",
     "never unconditionally write" in _s176_orch_phase2entry
     and "ONLY when boot left it `null`" in _s176_orch_phase2entry
-    and "Gate-field write integrity check" in _s176_orch_phase2entry
     and "worktree" in _s176_orch_phase2entry,
-    "the Phase 2 entry must assert-not-write working_branch outside branch-in-place, and name the"
-    " gate-field check as post-condition of writing working_branch/worktree",
+    "the Phase 2 entry must assert-not-write working_branch outside branch-in-place, and confirm worktree",
 )
 check(
     "suite176(orch-ac28): Phase 2 entry registers base_sha via git rev-parse HEAD on phase.start before each dispatch",
@@ -39371,6 +39369,166 @@ check(
 )
 
 # Marker: panel-write-discipline
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 179 — gate-field-contract (Task-4 of verifiable-contracts, #530):
+# `gate-guard` and `checkpoint-guard` are unwired from `.claude-plugin/hooks.json`
+# as of v2.139.0, so no hook any longer verifies a gate-state field. This suite
+# asserts the resulting bare-literal requirement at both write sites — the
+# canonical declaration in gate-contract.md and its replication in
+# orchestrator.md § Current State — and the named "No gate-field repair"
+# invariant plus its nominal reference beside delivery.md's push step. It
+# asserts no check FORM (this task retires its verification mechanism
+# entirely), fixes no `readField` literal, and asserts no identity between
+# any files under `hooks/ts/`.
+#
+# Marker: gate-field-contract
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 179: gate-field-contract (bare-literal fields + No gate-field repair) ===")
+
+
+def _s179_slice(text: str, anchor: str) -> str:
+    """Return text from anchor (inclusive) to the next markdown heading or EOF.
+
+    Local copy — mirrors Suite 176/178's own slice helper, kept independent
+    for the same reason documented there.
+    """
+    idx = text.find(anchor)
+    if idx == -1:
+        return ""
+    rest = text[idx:]
+    m = re.search(r"\n(?:#{1,6}) ", rest[1:])
+    if m:
+        return rest[: m.start() + 1]
+    return rest
+
+
+_s179_gate_contract = read(AGENTS_DIR / "_shared" / "gate-contract.md")
+_s179_orch = read(AGENTS_DIR / "orchestrator.md")
+_s179_delivery = read(AGENTS_DIR / "delivery.md")
+_s179_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s179_claude = read(REPO_ROOT / "CLAUDE.md")
+
+_s179_dual_record = _s179_slice(_s179_gate_contract, "## The dual-record release")
+_s179_current_state = _s179_slice(_s179_orch, "<!-- Gate-field write contract")
+_s179_delivery_push = _s179_slice(_s179_delivery, "### Step 10.2 — Push")
+
+# --- Canonical declaration: agents/_shared/gate-contract.md § The dual-record release ---
+check(
+    "suite179(ac1): gate-contract.md § The dual-record release names all six gate-state"
+    " fields and requires a bare literal with no second space-delimited token",
+    all(
+        f in _s179_dual_record
+        for f in (
+            "gate1_release",
+            "gate2_release_last",
+            "gate3_release",
+            "gate_nonce",
+            "working_branch",
+            "worktree",
+        )
+    )
+    and "no second token delimited by a space" in _s179_dual_record,
+    "the dual-record-release section must name all six fields and the bare-literal requirement",
+)
+check(
+    "suite179(ac2-ac3): the *_release allowlist stays closed while gate_nonce/working_branch/"
+    "worktree admit no allowlist, bare-literal requirement only",
+    "and admit no" in _s179_dual_record
+    and "they are subject to the bare-literal requirement alone" in _s179_dual_record,
+    "the section must state the *_release closed-set vs. the three open-ended fields' no-allowlist carve-out",
+)
+check(
+    "suite179(ac4): gate-contract.md names 00-decision-ledger (operator-approval, disposition)"
+    " as the destination for a gate nonce/attribution/justification/condition",
+    "00-decision-ledger" in _s179_dual_record
+    and "operator-approval" in _s179_dual_record
+    and "disposition" in _s179_dual_record,
+    "the bare-literal paragraph must name 00-decision-ledger as the destination for anything appended to a gate decision",
+)
+check(
+    "suite179(ac5-ac7): gate-contract.md declares the named 'No gate-field repair' invariant"
+    " — no repair, sole orchestrator writer, recovery via fresh-nonce re-presentation",
+    '"No gate-field repair" invariant' in _s179_dual_record
+    and "No agent converts a malformed" in _s179_dual_record
+    and "well-formed one" in _s179_dual_record
+    and "No agent other than the" in _s179_dual_record
+    and "writes any of the six fields above" in _s179_dual_record
+    and "Recovery from a malformed field is" in _s179_dual_record
+    and "re-presenting the affected gate with a fresh" in _s179_dual_record,
+    "the invariant must be named, and must state no-repair, sole-writer, and fresh-nonce-recovery",
+)
+
+# --- Nominal reference: agents/delivery.md, beside the push Steps 10.1/10.2 ---
+check(
+    "suite179(ac8): delivery.md references the named 'No gate-field repair' invariant beside the push step",
+    '"No gate-field repair" invariant' in _s179_delivery_push
+    and "this agent never repairs a malformed gate field to" in _s179_delivery_push,
+    "the push step must reference the No gate-field repair invariant by name",
+)
+
+# --- Replication site: agents/orchestrator.md § Current State ---
+check(
+    "suite179(ac9): orchestrator.md § Current State replicates the bare-literal requirement"
+    " over the six named fields",
+    all(
+        f in _s179_current_state
+        for f in (
+            "gate1_release",
+            "gate2_release_last",
+            "gate3_release",
+            "gate_nonce",
+            "working_branch",
+            "worktree",
+        )
+    )
+    and "no second space-delimited token trails the value" in _s179_current_state,
+    "Current State must replicate the bare-literal rule over all six named fields",
+)
+check(
+    "suite179(ac10): orchestrator.md § Current State enumerates each field's live consumers",
+    "record-based recover backstop and the operator reading this file consume all six" in _s179_current_state
+    and "are additionally consumed by the executable" in _s179_current_state,
+    "Current State must name the live consumers of all six fields, plus working_branch/worktree's extra consumers",
+)
+check(
+    "suite179(ac11): orchestrator.md § Current State declares no hook reads any of the six"
+    " fields since v2.139.0, and never claims a hook verifies one",
+    "Since v2.139.0 neither `gate-guard` nor" in _s179_current_state
+    and "reads any of the six" in _s179_current_state
+    and "so no hook verifies a gate field" in _s179_current_state,
+    "Current State must state that no hook reads a gate field post-v2.139.0, and never claim a hook verifies one",
+)
+check(
+    "suite179(ac12): orchestrator.md § Current State warns the # annotations are template"
+    " documentation never written to the real file",
+    "The `#` annotations throughout this schema" in _s179_current_state
+    and "documentation for you, the orchestrator authoring the real file" in _s179_current_state
+    and "written to the actual `00-state.md`" in _s179_current_state,
+    "Current State must warn that its # annotations are template-only, never literal file content",
+)
+
+# --- self-ref/registry/hygiene (per this repo's own Suite-176/177/178 precedent) --
+_s179_own = read(REPO_ROOT / "tests" / "test_agent_structure.py")
+check(
+    "suite179(self-ref): test file contains 'Suite 179' and 'gate-field-contract'",
+    "Suite 179" in _s179_own and "gate-field-contract" in _s179_own,
+    "test file must self-reference Suite 179 and the marker 'gate-field-contract'",
+)
+check(
+    "suite179(registry): docs/testing.md registers 'Suite 179' and 'gate-field-contract'",
+    "Suite 179" in _s179_testing_md and "gate-field-contract" in _s179_testing_md,
+    "docs/testing.md must register Suite 179 and the 'gate-field-contract' marker",
+)
+check(
+    "suite179(hygiene): CLAUDE.md does NOT contain 'Suite 179' (§11 hygiene contract)",
+    "Suite 179" not in _s179_claude,
+    "CLAUDE.md must not mention Suite 179 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: gate-field-contract
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------

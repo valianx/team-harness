@@ -514,8 +514,8 @@
     "file": "agents/delivery.md",
     "mode": "heading",
     "anchor": "## Mode: publish (Phase 4b \u2014 outward actions, dispatched only after `gate3_release: ship`)",
-    "sha256": "b692f0308c75e640deca882a1e1a8c25d3c6ac65dc945e5f4679cc7400eccd89",
-    "length": 8243,
+    "sha256": "328c34efeb5dca7816dae5cbe72984f710d7605fc8f697da3f5e26cc5e1a143a",
+    "length": 8518,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -544,8 +544,8 @@
     "file": "agents/delivery.md",
     "mode": "heading",
     "anchor": "### Step 10.2 \u2014 Push",
-    "sha256": "440cfca7947a6578d4178ffaf916d8328c6652c2b6dcef15b06b87cee4f781b0",
-    "length": 770,
+    "sha256": "797664055794993c92064663248cc5231e2d6c365f887b53276861af1ad899dc",
+    "length": 1045,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -993,8 +993,8 @@
     "id": "gate-contract-whole",
     "file": "agents/_shared/gate-contract.md",
     "mode": "file",
-    "sha256": "24a5cad9038786261ec55859044c2da0740432f62d99f5ba3d67d5d28f63a058",
-    "length": 28596,
+    "sha256": "ed9d29bf469c857a6706b5f10a9e783cce44ef99c45389c89a21a6746ede8b24",
+    "length": 30491,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,

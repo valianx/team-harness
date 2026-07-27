@@ -759,6 +759,11 @@ A non-fast-forward here means the remote diverged after `mode: prepare` built th
 
 ### Step 10.2 — Push
 
+**Gate-field integrity (nominal reference).** This is the push site STAGE-GATE-3
+governs — see `agents/_shared/gate-contract.md § "The dual-record release"` for the
+"No gate-field repair" invariant: this agent never repairs a malformed gate field to
+unblock the push below.
+
 - `git push --set-upstream origin {branch-name}`
 - Stop and report if branch is protected or push fails
 - **NEVER use `--force`** — if push is rejected, diagnose and report to the user. `gate-guard` denies any force-push form from a detected pipeline lane unconditionally on `gate3_release` — this agent has no legitimate reason to force in the first place, and no code path in this Step ever constructs a `--force`/`--force-with-lease`/`+refspec` invocation.
