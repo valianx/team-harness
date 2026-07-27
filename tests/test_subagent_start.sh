@@ -39,6 +39,13 @@
 #   - AC-5: the value is exactly the byte count and nothing else — no
 #     content beyond that count enters the record.
 #
+# Also asserts (Section 7, Task-6 AC-4/AC-5): docs/observability.md's
+# `### subagent.start` section documents `payload_bytes` — the line-schema
+# example includes the key, the visibility-only/no-ceiling posture is
+# stated, the Claude-Code-plugin-only coverage limitation is named without
+# overclaiming opencode coverage, and the content-boundary invariant (byte
+# count only, never the prompt itself) is stated.
+#
 # Usage: bash tests/test_subagent_start.sh
 # Exit code: 0 all cases pass, 1 otherwise.
 
@@ -413,6 +420,44 @@ assert_true "AC-2: no size comparison operator applied to payloadBytes in the ho
 
 if command grep -qE 'PAYLOAD_BYTES_(MAX|MIN|THRESHOLD|LIMIT|CAP)' "$BODY_TS"; then r=0; else r=1; fi
 assert_true "AC-2: no payload_bytes threshold constant declared in the hook body" "$r"
+
+# ---------------------------------------------------------------------------
+# Section 7 — Task-6 AC-4/AC-5: docs/observability.md documents the field
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- Section 7: docs/observability.md § subagent.start documents payload_bytes (AC-4) ---"
+
+OBS_MD="$REPO_ROOT/docs/observability.md"
+if [ ! -f "$OBS_MD" ]; then
+    echo "  [SKIP] docs/observability.md not found at $OBS_MD"
+else
+    # Slice from the "### subagent.start" heading to the next "## "/"### "
+    # heading (or EOF), then collapse whitespace runs to a single space so a
+    # phrase that hard-wraps across source lines still matches a contiguous
+    # substring check.
+    OBS_SECTION="$(awk '
+        /^### subagent\.start/ { found=1 }
+        found && /^(##|###) / && !/^### subagent\.start/ { exit }
+        found { print }
+    ' "$OBS_MD" | tr "\n" " " | tr -s " ")"
+
+    [ -n "$OBS_SECTION" ] && r=1 || r=0
+    assert_true "AC-4: docs/observability.md has a '### subagent.start' section" "$r"
+
+    if echo "$OBS_SECTION" | grep -qF '"payload_bytes"'; then r=1; else r=0; fi
+    assert_true "AC-4: section's line-schema example includes payload_bytes" "$r"
+
+    if echo "$OBS_SECTION" | grep -qF 'visibility, no ceiling'; then r=1; else r=0; fi
+    assert_true "AC-4: section declares payload_bytes visibility-only, no ceiling" "$r"
+
+    if echo "$OBS_SECTION" | grep -qF 'measured only on the Claude Code plugin path' \
+        && echo "$OBS_SECTION" | grep -qF 'no `subagent-start.opencode.ts`' \
+        && echo "$OBS_SECTION" | grep -qF 'opencode dispatch never gets this field'; then r=1; else r=0; fi
+    assert_true "AC-4: section names the Claude-Code-plugin-only coverage limitation without overclaiming" "$r"
+
+    if echo "$OBS_SECTION" | grep -qF 'No content beyond the byte count'; then r=1; else r=0; fi
+    assert_true "AC-5: section states the content-boundary invariant (byte count only)" "$r"
+fi
 
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
