@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 # tests/test_dispatch_contract_standard.py
-# Structural tests for Task-1 of the agent-authoring-standard initiative:
-# the canonical dispatch contract (agents/_shared/dispatch-contract.md) and
-# its three registration sites (CLAUDE.md §5, CLAUDE.md §8, docs/decisions.md).
+# Structural tests for the canonical dispatch contract
+# (agents/_shared/dispatch-contract.md) and its three registration sites
+# (CLAUDE.md §5, CLAUDE.md §8, docs/decisions.md).
 #
-# Scope: this file asserts ONLY Task-1's own six acceptance criteria, against
-# the tree state Task-1 alone produces. It deliberately does NOT assert the
-# cross-file, whole-tree checks (single-pointer-from-five-consumers, zero
-# canonical-prose duplication across agents/leader.md and
-# agents/orchestrator.md, language declared in the 14 output contracts, the
-# review-scope-absence check across five named files) — those depend on
-# Tasks 2-8 landing first and are Task-9's job, consolidated into Suite 180
-# (tests/test_agent_structure.py, per 01-plan.md § Task-9). Registering this
-# file in docs/testing.md and/or folding these checks into Suite 180 is also
-# Task-9's call — this file does not modify test_agent_structure.py,
-# docs/testing.md, or tests/fixtures/fenced/manifest.json, all three of
-# which are Task-9's declared Files.
+# Scope: this file asserts the dispatch-contract standard's own six
+# acceptance criteria, against the tree state produced so far. It
+# deliberately does NOT assert the cross-file, whole-tree checks
+# (single-pointer-from-five-consumers, zero canonical-prose duplication
+# across agents/leader.md and agents/orchestrator.md, language declared in
+# the output contracts, the review-scope-absence check across the other
+# named files) — those depend on the standard's remaining consumer files
+# landing first and are deferred to the consolidated structural suite
+# (tests/test_agent_structure.py). Registering this file in
+# docs/testing.md and/or folding these checks into that consolidated suite
+# is deferred there too — this file does not modify test_agent_structure.py,
+# docs/testing.md, or tests/fixtures/fenced/manifest.json.
 #
 # This is NOT a behavioural test — agent/CLAUDE.md prose only runs inside
 # Claude Code. It checks that what the files SAY about themselves is
@@ -73,11 +73,19 @@ def slice_section(text: str, start_marker: str, end_markers: tuple[str, ...]) ->
     return tail[:stop]
 
 
+_SELF_PATH = str(Path(__file__).resolve().relative_to(REPO_ROOT))
+
+
 def git_grep_count(pattern: str) -> tuple[int, list[str]]:
     """Count of tracked files (repo-wide) containing an exact literal string.
     Uses `git grep -F -l` so the check reflects the committed tree, matching
     the convention Suite 174's no-relocation check already uses (read(path)
-    against tracked files, never an untracked scratch copy)."""
+    against tracked files, never an untracked scratch copy). Excludes this
+    test file's own path from the match list — a canary pattern is embedded
+    here as a Python string literal for comparison purposes, which would
+    otherwise self-match and produce a false "duplicated" count, the same
+    self-exclusion convention Suite 174's own meta-check and no-relocation
+    check already apply to their own source."""
     try:
         proc = subprocess.run(
             ["git", "grep", "-F", "-l", pattern],
@@ -90,7 +98,11 @@ def git_grep_count(pattern: str) -> tuple[int, list[str]]:
         return (-1, [])
     if proc.returncode not in (0, 1):
         return (-1, [])
-    files = [line for line in proc.stdout.splitlines() if line.strip()]
+    files = [
+        line
+        for line in proc.stdout.splitlines()
+        if line.strip() and line.strip() != _SELF_PATH
+    ]
     return (len(files), files)
 
 
