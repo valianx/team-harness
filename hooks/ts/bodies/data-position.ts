@@ -60,7 +60,7 @@
 //      argv arguments, (b) execute/evaluate stdin (or any input byte-stream)
 //      as a command or script, or (c) invoke an operator-named external
 //      program via any flag, builtin, environment variable, or
-//      interactive/input-triggered mechanism. Ante la duda, se excluye — a
+//      interactive/input-triggered mechanism. When in doubt, exclude — a
 //      wrong exclusion only costs a fail-safe over-ask, never a bypass.
 //   2. (this module's own requirement — the origin does not certify this)
 //      the span this command CONSUMES cannot be routed to an executor by
