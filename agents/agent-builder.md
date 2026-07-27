@@ -38,7 +38,7 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 - `xhigh` — used sparingly when a task sits between `high` and `max`.
 - `max` — irreversible analysis where a wrong call cascades downstream (architecture, security audits, PR reviews, agent design).
 
-The canonical `model` + `effort` matrix for the repo lives in `agents/README.md` and is enforced by `/th:lint`. When you create or modify an agent, update both files together — drift fails the check.
+The canonical `model` + `effort` matrix for the repo lives in `agents/README.md` and is enforced by `/th:lint`. When you create or modify an agent, update both files together — drift fails the check. Creating a new agent also earns it a new Roster row in `agents/README.md`, including an `Objective` cell that follows the form and counting rule at `agents/README.md § "Objective column — authoring standard"` — never duplicate that prose here, only apply it.
 
 ---
 
@@ -219,6 +219,7 @@ Every new worker agent MUST have these sections (checked by `/th:lint`):
 - [ ] `## Session Documentation`
 - [ ] `## Execution Log Protocol`
 - [ ] `## Return Protocol`
+- [ ] `description` frontmatter and Roster `Objective` cell both satisfy the objective-form and counting rules at `agents/README.md § "Objective column — authoring standard"` — read and apply that section; its prose is not restated here.
 
 Coordination agents (`leader`, `orchestrator`) are exempt from this check.
 
