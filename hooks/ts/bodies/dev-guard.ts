@@ -84,6 +84,7 @@ import {
   isPlainBranchDestination,
 } from "./command-lexer.js";
 import type { ArgvToken, EffectiveCommand, ClassifiedCommand, PushGrammarReader } from "./command-lexer.js";
+import { redactInertDataSpans } from "./data-position.js";
 
 // ---------------------------------------------------------------------------
 // DevGuardReader — injected by the entry module (mirrors PrepublishReader).
@@ -603,16 +604,26 @@ export function evaluate(input: NormalizedInput, reader: DevGuardReader): Normal
   // execution; gating every unresolvable shell composition proved to be a
   // constant false-positive tax on ordinary development.
   const analyzed = analyzeCommand(cmdStr);
+  const redactedAnalyzed = analyzeCommand(redactInertDataSpans(cmdStr));
 
   // `allow` is reserved for a single, un-chained, un-wrapped invocation — a
   // compound command or a wrapper-embedded covered action always has more
   // than one effective command in the resolved list (the wrapper's own
   // invocation plus its resolved payload, or multiple chained segments).
+  // Branch selection and the EffectiveCommand handed to evaluateSingleCommand
+  // both come from the raw parse (`analyzed`) — the only function in this
+  // file whose lattice includes `allow` never consumes an artifact derived
+  // from the redacted string. The redacted parse only narrows coverage on
+  // the compound branch below and gates this branch with a cardinality
+  // check (a redacted collapse below one command falls to no-decision, never
+  // to `allow`).
   if (analyzed.commands.length === 1) {
-    return evaluateSingleCommand(analyzed.commands[0], reader);
+    return redactedAnalyzed.commands.length === 1
+      ? evaluateSingleCommand(analyzed.commands[0], reader)
+      : none();
   }
 
-  for (const command of analyzed.commands) {
+  for (const command of redactedAnalyzed.commands) {
     if (isCoveredEffectiveCommand(command)) {
       return ask(
         `outward action detected inside a compound or wrapper-embedded command; allow is reserved for a single, bare, un-chained invocation — requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
