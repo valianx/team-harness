@@ -2300,6 +2300,22 @@ assert_ask "AC-4.4: cat << 'EOF' | bash with 'git push origin main' in the body 
     "$TMP" "$(make_payload "$AC_4_4_CMD")"
 rm -rf "$TMP"
 
+# Regression: a capitalized argv0 spelling ("Cat") must not fold into the
+# inert-sink set — the sink-membership predicate is exact-case only, so a
+# case-variant spelling leaves the heredoc body live and the compound
+# branch still sees the covered action inside it (contrast with AC-4.1,
+# whose lowercase "cat" IS the inert sink and collapses to nodecision).
+AC_4_CASEVARIANT_CMD=$(cat <<'RAWEOF'
+Cat >> notes.md << 'EOF'
+git push origin main
+EOF
+RAWEOF
+)
+TMP=$(make_tmp)
+assert_ask "regression: Cat >> notes.md << 'EOF' (capitalized sink) with 'git push origin main' in the body -> ask (case-variant sink never folds into HEREDOC_INERT_SINKS; compound branch retains coverage)" \
+    "$TMP" "$(make_payload "$AC_4_CASEVARIANT_CMD")"
+rm -rf "$TMP"
+
 echo
 echo "=== Suite 83h: differential/anti-widening corpus (AC-4.5, AC-4.12, AC-4.13, AC-4.16) ==="
 
