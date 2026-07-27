@@ -1,12 +1,14 @@
 # Gate contract
 
-> **`gate-guard` is UNWIRED as of v2.139.0.** The STAGE-GATE mechanism below — the dual-record
-> release, the recover backstop, the STOP-block templates and the preparer/presenter flow — is
-> unchanged and remains binding: it is how the pipeline records and presents gates. What changed
-> is that no deterministic hook enforces it any more. Every reference below to `gate-guard`
-> denying a push, or to a hook verifying a gate field, describes code that is no longer
-> dispatched. Do not rely on a hook to catch a missing or malformed release; the contract is
-> the control. Rationale: `docs/dev-mode.md § "Boundary, not flow"`.
+> **`gate-guard` is UNWIRED as of v2.139.0 in the Claude Code plugin path.** The STAGE-GATE
+> mechanism below — the dual-record release, the recover backstop, the STOP-block templates
+> and the preparer/presenter flow — is unchanged and remains binding: it is how the pipeline
+> records and presents gates. What changed is that no hook wired in the Claude Code plugin
+> path (`.claude-plugin/hooks.json`) enforces it any more. Every reference below to
+> `gate-guard` denying a push, or to a hook verifying a gate field, describes Claude Code
+> plugin behavior that is no longer dispatched there. Do not rely on the Claude Code plugin's
+> hooks to catch a missing or malformed release; the contract is the control. Rationale:
+> `docs/dev-mode.md § "Boundary, not flow"`.
 <!-- Single source of truth for the STAGE-GATE mechanism: the dual-record release,
      the record-based recover backstop, the STOP-block templates, and the
      preparer+recorder (orchestrator) / presenter+relayer (leader) flow.
@@ -176,6 +178,38 @@ the release additionally requires the relayed reply to carry the `gate_nonce` cu
 pending for that gate (§ "The dual-record release" above) — a reply that clears this
 table's allowlist but carries a stale or missing nonce is still not recorded; it is
 treated as ambiguous (§ "Ambiguous-gate-reply rule").
+
+**Bare-literal field values.** Each of the six gate-state fields —
+`gate1_release`, `gate2_release_last`, `gate3_release`, `gate_nonce`,
+`working_branch`, and `worktree` — is written to `00-state.md § Current State`
+as a bare literal: the value carries no second token delimited by a space on
+the same line, no trailing nonce, attribution, justification, or condition
+appended after it. Every reader of these fields — the record-based recover
+backstop above, `agents/orchestrator.md § Current State`, and the executable
+`working_branch`/`worktree` comparisons this contract's consumers install in
+`implementer` and `tester` — matches the first equal line by strict string
+equality, so a value carrying any annotation stops matching the instant one
+is appended.
+
+For the three `*_release` fields, the per-gate allowlist table above is the
+closed, citable set of literal values the field may hold — no value outside
+that set, and no annotated variant of an allowlisted value, is ever written.
+`gate_nonce`, `working_branch`, and `worktree` are open-ended by
+construction — a token, a branch name, a filesystem path — and admit no
+allowlist; they are subject to the bare-literal requirement alone, never to
+a closed-set check.
+
+A nonce, an attribution, a justification, or any condition attached to a
+gate decision belongs in `00-decision-ledger` (`operator-approval`,
+`disposition`) — never appended to the field line itself.
+
+**The "No gate-field repair" invariant.** No agent converts a malformed
+gate-field value into a well-formed one. No agent other than the
+orchestrator writes any of the six fields above, under any circumstance —
+including one it finds already malformed. Recovery from a malformed field is
+re-presenting the affected gate with a fresh `gate_nonce` (see above); the
+write that eventually lands is the product of a new operator reply, never a
+repair of the existing value.
 
 ## preparer + recorder (orchestrator) — presenter + relayer (leader)
 

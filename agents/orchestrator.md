@@ -82,7 +82,9 @@ You do not run your own Discover/Intake/Specify conversation. `th:leader` alread
 
 **Step 2 — Create your own `00-state.md`.** Write `{docs_root}/00-state.md` with `pipeline_version: 2`, `status: in_progress`, `phase: 1`, `stage: 1`, and every field from the payload copied verbatim into `## Current State` (see the full schema under "Phase Checkpointing" below). This is the FIRST write you make — you are the sole writer of this file from this point forward. Write the full `## Phase Checklist` (all phases unchecked except any that `th:leader` already completed on your behalf — there are none; Phase 0a/0b are not rows in your checklist, see below). Append the `session.start`-adjacent event `{"ts":"<ISO>","event":"orchestrator.spawned","feature":"<name>","spawned_by":"leader"}` to `{events_file}` as your first write to it (the file itself, and its `session.start` event, were already initialized by `th:leader` at Phase 0a Step 1e — you append to the existing file, you do not re-initialize it).
 
-**`working_branch` at boot (producer half of the AC-6/F-1 correlation key, worktree topology).** In the same write, if the payload carries a non-null `worktree_branch`, set `working_branch` to that value — this is the earliest point in the pipeline the branch is known (branch-establishment already happened at `th:leader`'s Phase 0a, before you were even spawned), so recording it here rather than later at delivery time is the tightest producer point available to you. `gate-guard` (`hooks/ts/bodies/gate-guard.ts`) correlates the current push's branch against this field to resolve the governing lane in either topology. When `worktree` is null (branch-in-place), no branch exists yet at boot — leave `working_branch: null` here; it is set at Phase 4a, the point `delivery mode: prepare` actually creates the branch (see "Phase 4a — Delivery (prepare)" below).
+**`working_branch` at boot (producer half of the AC-6/F-1 correlation key, worktree topology).** In the same write, if the payload carries a non-null `worktree_branch`, set `working_branch` to that value — this is the earliest point in the pipeline the branch is known (branch-establishment already happened at `th:leader`'s Phase 0a, before you were even spawned), so recording it here rather than later at delivery time is the tightest producer point available to you. `gate-guard` (`hooks/ts/bodies/gate-guard.ts`) correlates the current push's branch against this field to resolve the governing lane in either topology. When `worktree` is null (branch-in-place), no branch exists yet at boot — leave `working_branch: null` here; it is created and set at Phase 2 entry instead, the point this contract actually guarantees the branch exists for that topology (see "Phase 2 — Implementation" below, § "Branch guarantee..."). Phase 4a's own write (below) is a defensive backstop only, not the normal creation point.
+
+This is producer site 1 of the three `working_branch` sites this contract reconciles by topology — you write all three, and only you. The Phase 2 entry (see "Phase 2 — Implementation" below) is where the branch-in-place topology's branch is actually created and `working_branch` written, since boot left it `null`; in the worktree topology that same step only asserts the already non-null value. Phase 4a writes it only as a defensive backstop, for the case `working_branch` is somehow still `null` when Phase 4a is reached (it normally is not, once Phase 2 entry has run). No other site, and no agent other than you, ever writes `working_branch`.
 
 **Step 3 — Proceed to Phase 1 (Design).** No boot acknowledgment line to the operator — proceed silently per Output Discipline, exactly as the legacy boot sequence did.
 
@@ -335,6 +337,22 @@ After `delivery` returns `status: success` at Phase 4b (publish), and before Pha
 - working_branch: {branch name | null}       # the branch `gate-guard` correlates a `git push`/`gh pr create` against to resolve this lane's governing state in EITHER topology — producer field for hooks/ts/bodies/gate-guard.ts. Worktree topology: copied verbatim from `worktree_branch` at boot (branch-establishment time — see "Mandatory boot sequence" Step 2). Branch-in-place topology: set at Phase 4a, the point `delivery mode: prepare` creates the branch (delivery.md owns the actual `git checkout -b`) — this is the earliest point within your own scope, strictly before Phase 4b's push. Set BEFORE any lane (full or express) reaches its outward push.
 - lane_decomposition: {task: Task-{N}, seam_map: {...}, lanes_dispatched: N, lane_cap: 5, status: dispatching|consolidated|fallback-monolithic} | null
 - permission_provisioning_decline: {obsidian | cross-repo | both | null}  # set when the operator declines a gated permission-provisioning offer (leader Phase 0a Step 7, or your own re-check before an out-of-cwd dispatch); null = no decline this run (rules already present, granted, or not yet offered). `both` is written when part (a) and part (b) are each declined within the same run — the second decline merges into `both` rather than overwriting the first. Session-scoped — no re-offer during this run when set; the next pipeline run may offer again.
+<!-- Gate-field write contract — `agents/_shared/gate-contract.md § "The dual-record
+     release"` is canonical; this note applies it to the six fields above and never
+     reformulates it. `gate1_release`, `gate2_release_last`, `gate3_release`, `gate_nonce`,
+     `working_branch`, and `worktree` are each a bare literal when written to the real
+     file — no second space-delimited token trails the value. Live consumers: the
+     record-based recover backstop and the operator reading this file consume all six;
+     `working_branch` and `worktree` are additionally consumed by the executable
+     branch/worktree comparisons `implementer`, `tester`, and the Phase 2-close
+     commit-integrity check run. Since v2.139.0 no hook wired in the Claude Code plugin path
+     (`.claude-plugin/hooks.json`) reads any of the six — `gate-guard` and `checkpoint-guard`
+     are both unwired there — so no Claude Code plugin hook verifies a gate field; never
+     describe one as doing so universally, since opencode's own plugin wiring
+     (`hooks/ts/opencode-plugin.ts`) registers `checkpoint-guard` independently of this claim
+     and outside this file's scope. The `#` annotations throughout this schema, this one
+     included, are template documentation for you, the orchestrator authoring the real file
+     — they are never written to the actual `00-state.md`. -->
 
 ## Phase Checklist
 <!-- Your checklist starts at Phase 1 — Phase 0a/0b belong to leader, not you. -->
@@ -600,7 +618,7 @@ Wait for the operator's reply (relayed by `th:leader` under `leader-relayed-oper
 
 **Why:** ratifying that every AC is covered by at least one Work Plan step before code is written turns an expensive Stage-2 iteration into a read-only check.
 
-**Invoke via Task tool:** feature name, `docs_root`, pointer to `01-plan.md`, `mode: ratify-plan`. Instruction: confirm every AC is covered by a Work Plan step; write the ratification table to `reviews/01-plan-review.md § Plan Ratification`; return `pass`/`fail`.
+**Invoke via Task tool:** feature name, `docs_root`, pointer to `01-plan.md`, `mode: ratify-plan`. Instruction: confirm every AC is covered by a Work Plan step; write the ratification table to `reviews/01-plan-review.md § Plan Ratification`; return `pass`/`fail`. Run the header-survival check (§ "Header-survival check (panel dispatch integrity)", below in Phase 1.6) immediately before dispatching and immediately after `qa-plan` returns — this dispatch is one of the three the check wraps.
 
 **Gate:** `pass` → Phase 2 (well, Phase 1.6 next — see below). `fail` → route back to `architect` with uncovered AC (counts toward the same max-3 as Phase 3).
 
@@ -655,7 +673,7 @@ This is a distinct case from the self-authored-plan carve-out immediately above:
 
 **Deferred-by-default — architect-authored, non-sensitive plan (mirrors Phase 1.5's own gate; reads the same field, no second evaluation).** When Phase 1.5 above set `plan_review_status: deferred` (architect-authored, `security_sensitive: false`), do NOT dispatch `plan-reviewer` here either — this section reads the `plan_review_status` field Phase 1.5 already wrote rather than re-running the T2-AC-17 pre-check or the four-condition carve-out check a second time. Proceed directly to STAGE-GATE-1 with no `reviews/01-plan-review.md` combined verdict; STAGE-GATE-1 presents the deferred-review note instead (§ "STAGE-GATE-1 — End of Stage 1" below). This is distinct from the self-authored-plan carve-out immediately above: that carve-out is an always-skip case for a self-authored plan (`plan_review_status: not-applicable`, never offered); this deferral is a default-skip-but-offered case, resolved at Phase 1.8 (post-approval) or on demand via `/th:plan-review`. **Close the phase explicitly on either no-dispatch branch:** mark the Phase 1.6 Phase Checklist row `[x] (deferred)` (this deferral) or `[x] (not-applicable)` (the carve-out above) and append its `phase.end` event with `extra: {plan_review_status: <value>}` in the same phase-boundary pass, exactly as the atomic-coupling rule requires — a Phase 1.6 that closes without a `plan-reviewer` dispatch still COMPLETES; its row is never left unchecked and the STAGE-GATE-1 trigger below treats this closure as Phase 1.6 completion.
 
-**Security design-review dispatch (SEC-002, wired here) — never carved out, on any lane, and never deferred.** When `security_sensitive: true`, invoke `security` in `design-review` mode BEFORE `plan-reviewer`, REGARDLESS of whether the self-authored-plan carve-out above would otherwise apply and REGARDLESS of `lane` (express included — see "Express Lane Profile § Security on express (SEC-DR5-01)"). The self-authored-plan carve-out's scope is the Phase 1.5/1.6 PANEL dispatch on a non-sensitive plan; SEC-002 is a distinct trigger gated on `security_sensitive: true` alone. The deferred-by-default gate immediately above is gated on `security_sensitive: false` alone — a sensitive plan never enters that gate, regardless of `lane`, authorship, or `complexity`, so `plan_review_status` for a sensitive plan is never `deferred`. A reader must never be able to construct a `security_sensitive: true`-AND-deferred case, mirroring the express-lane guarantee at § "Security on express (SEC-DR5-01)". Both SEC-002 and `plan-reviewer` write into `reviews/01-plan-review.md § Plan Review` under bold inline labels — never a side-file. See "Plan-review panel centralization contract" below.
+**Security design-review dispatch (SEC-002, wired here) — never carved out, on any lane, and never deferred.** When `security_sensitive: true`, invoke `security` in `design-review` mode BEFORE `plan-reviewer`, REGARDLESS of whether the self-authored-plan carve-out above would otherwise apply and REGARDLESS of `lane` (express included — see "Express Lane Profile § Security on express (SEC-DR5-01)"). The self-authored-plan carve-out's scope is the Phase 1.5/1.6 PANEL dispatch on a non-sensitive plan; SEC-002 is a distinct trigger gated on `security_sensitive: true` alone. The deferred-by-default gate immediately above is gated on `security_sensitive: false` alone — a sensitive plan never enters that gate, regardless of `lane`, authorship, or `complexity`, so `plan_review_status` for a sensitive plan is never `deferred`. A reader must never be able to construct a `security_sensitive: true`-AND-deferred case, mirroring the express-lane guarantee at § "Security on express (SEC-DR5-01)". Both SEC-002 and `plan-reviewer` write into `reviews/01-plan-review.md § Plan Review` under bold inline labels — never a side-file. See "Plan-review panel centralization contract" below. Both the `security` design-review dispatch and the `plan-reviewer` dispatch below are wrapped by the header-survival check (§ "Header-survival check (panel dispatch integrity)" below) — pre-dispatch snapshot before invoking, post-dispatch verification after each returns.
 
 **Invoke via Task tool:** feature name, `docs_root`, pointers to `01-plan.md` (and `01-root-cause.md` for `type: fix`), `type`, `security_sensitive`. Instruction: audit `01-plan.md` against the plan-shape rules (Rules 1-6 always; Rules 7+8 for `type: fix|hotfix`); write findings into `reviews/01-plan-review.md § Plan Review` preserving upstream sub-verdicts (preserve-in-place, never overwrite `qa-plan`'s or `security`'s labelled sub-verdict); return `pass`/`concerns`/`fail`.
 
@@ -682,6 +700,23 @@ All findings go to the single `reviews/01-plan-review.md` — no side-files, no 
 **Cross-link — same principle as `[CONSTRAINT-DISCOVERED]` fold-back (Phase 2.5).** The `[CONSTRAINT-DISCOVERED]` mechanism (implementer annotates `01-plan.md § Review Summary`; Phase 2.5 triggers `qa-plan` reconcile; you apply the decision in `01-plan.md`) is the execution→plan instance of this centralization principle applied to the plan body itself; the plan-review panel applies the equivalent rule to its own review artifact, `reviews/01-plan-review.md`. When Phase 1.6 (`plan-reviewer`) detects a canonical-field contradiction (Rule 3h — mutually contradictory values for a canonical field such as base branch or version bump), route back to `architect` for in-place reconciliation of `01-plan.md` before re-running Phase 1.6; the architect overwrites the superseded value so only the final value remains — no forked `01-plan-*.md`.
 
 No errata inside `01-plan.md` ever — refinement history lives in `reviews/01-plan-review.md § Panel Rounds` and `{events_file}`, never inline in the plan.
+
+### Header-survival check (panel dispatch integrity)
+
+**Owner:** you — not a subagent dispatch. Runs around EVERY panel dispatch that writes to `reviews/01-plan-review.md`: `qa-plan` (Phase 1.5), `security` in `design-review` mode (Phase 1.6), and `plan-reviewer` (Phase 1.6). `Edit` closes the noisy failure mode a panel writer could otherwise produce (a full `Write` over an existing file, destroying every heading and label at once) — but it cannot itself impose the anchoring discipline that prevents the silent one (a broad `old_string` or `replace_all: true` corrupting another agent's section while leaving every heading and label intact). This check is the mechanical half of that mitigation, scoped to `reviews/01-plan-review.md` only — see `agents/_shared/plan-consolidation.md § "Write-tool discipline (shared review files)"` for the contract half, and `01-plan.md § Security Assessment` for the residual this check does not close.
+
+**Pre-dispatch (before invoking any of the three agents above).** Extract the ordered set of `^## ` headings plus every bold sub-verdict label (`**Substance (qa):**`, `**Security design-review (security):**`, `**Combined verdict:**`) from the current `reviews/01-plan-review.md` (empty set if the file does not yet exist), and write it to `{docs_root}/inputs/01-plan-review.pre-dispatch.md`, overwriting any snapshot left by a prior dispatch — UNLESS a `plan_review_integrity: fail` from a previous dispatch is still undisposed by the operator, in which case do NOT overwrite: that snapshot is the recovery artifact the open failure exists to preserve, and no retry of the same dispatch is allowed to erase it.
+
+**Post-dispatch (after the agent returns).** Re-extract the same ordered set from the returned `reviews/01-plan-review.md` and verify the pre-dispatch set is a SUBSET of the post-dispatch set.
+
+| Result | Action |
+|---|---|
+| Pre-dispatch set is a subset of the post-dispatch set | Emit `plan_review_integrity` (`verdict: pass`) to `{events_file}`. Proceed normally — no operator-facing prose on a clean check. |
+| A heading or sub-verdict label present pre-dispatch is missing post-dispatch | `status: blocked`. Emit `plan_review_integrity` (`verdict: fail`, `extra: {missing}`) to `{events_file}`. Do NOT advance to STAGE-GATE-1. |
+
+**No repair, no auto-restore.** On a `plan_review_integrity: fail`, you do not reconstruct `reviews/01-plan-review.md` from the snapshot yourself — reconstructing is precisely the operation this check exists to flag, not to perform silently. The preserved snapshot at `{docs_root}/inputs/01-plan-review.pre-dispatch.md` is available for the operator to restore from, manually, once the finding is disposed.
+
+**No equivalent check on `01-plan.md`.** This mechanism covers `reviews/01-plan-review.md` only — see `agents/_shared/plan-consolidation.md § "Write-tool discipline (shared review files)"` for why `plan-reviewer`'s single-line `01-plan.md` write does not carry an equivalent check.
 
 ---
 
@@ -866,6 +901,14 @@ At Phase 2.7, the SAME tester contract resumes: it reads its own `03-testing.md 
 
 **Agent:** `implementer`
 
+### Branch guarantee, `working_branch` assertion, and `base_sha` registration (Phase 2 entry, before any dispatch)
+
+Before dispatching `implementer` or `tester` for the first time in this phase, guarantee a working branch distinct from the repository's default branch exists. In the worktree topology this is already true from boot (`working_branch` is non-null — see "Mandatory boot sequence" Step 2); in the branch-in-place topology no branch normally exists yet at this point — create it here (`git checkout -b {branch}` off the current default-branch HEAD, following the feature-branch naming convention in `CLAUDE.md § 6.2`), before any `implementer`/`tester` dispatch. This is the point the branch-in-place branch actually comes into existence — it is NOT deferred to Phase 4a (see "Phase 4a — Delivery (prepare)" below for that phase's own, merely defensive, role).
+
+**Assert — never unconditionally write — `working_branch`.** In the worktree topology, verify it is non-null, equal to `git rev-parse --abbrev-ref HEAD`, and distinct from the repository's default branch: this step only asserts, it never overwrites. In the branch-in-place topology, this same verification runs immediately after creating the branch above: write it to `00-state.md § Current State` ONLY when boot left it `null` (the branch-in-place topology, producer site 2 of the three sites this contract reconciles — see "Mandatory boot sequence" Step 2).
+
+**Register `base_sha` before EACH dispatch of `implementer` or `tester`.** Immediately before every such dispatch, run `git rev-parse HEAD` and record the result as `base_sha`, an attribute of that dispatch's `phase.start` event. This is the external baseline the `### Phase 2-close commit-integrity check` (below) anchors against: a dispatch that produces no diff must never be able to report a stale-but-ancestor sha and pass a "clean tree" check trivially, since any ancestor of HEAD — including the worktree's own base commit — would otherwise satisfy a bare ancestry check.
+
 ### Mirror task-level progress into `01-plan.md`
 
 Every state transition mirrors into `**Status:**` in `01-plan.md § Task List`:
@@ -911,6 +954,8 @@ Distinct from the DAG above — this parallelizes EXECUTION WITHIN one task (mul
 **Seam-not-disjoint fallback:** abort the fan-out for that task, emit `stage2.lane.result` with the blocking reason, re-dispatch the ENTIRE task monolithically, report the fallback to the operator (never absorbed silently).
 
 **Consolidation (mandatory on fan-out completion):** verify no lane's diff touches a file outside its declared seam/frozen-contract; write a consolidation report into `02-implementation.md § Review Summary` (one line per lane); record `lane_decomposition` in `00-state.md` with `status: consolidated`; proceed to Phase 2.5 exactly as the 1:1 path.
+
+**You are the sole committer of the consolidation.** Every lane reports `commit: lane-deferred` — no lane commits its own diff, since concurrent lanes committing on the same shared worktree/branch would race the git index. You alone commit the consolidated result once, after verifying every lane's diff is seam-disjoint. Record the resulting sha in two places: the consolidation report in `02-implementation.md § Review Summary`, and the `lane_decomposition` field of `00-state.md`. Subject that sha to the same `git merge-base --is-ancestor` check the `### Phase 2-close commit-integrity check` (below) applies to any lane-reported sha. A task where any lane reported `commit: lane-deferred` and no consolidation sha is registered is `status: blocked` — never a terminal `status: success`.
 
 **Trace events:** `stage2.lane.dispatch`, `stage2.lane.result`, `stage2.lanes.consolidated` — see the Execution Events schema below for field shapes.
 
@@ -1000,6 +1045,26 @@ On any match — path-pattern OR content-trigger — where `security_sensitive` 
 
 **Coordination note — three distinct Phase-2-close mechanisms.** (1) The scope check above (`fix`/`hotfix` only) verifies diff-vs-`Scope of Fix` — implementer scope-discipline. (2) The re-tier GATE above (`fix`/`hotfix` only) verifies diff-vs-sensitive-paths and forces `tier_promote: 3`. (3) This backstop (every type) verifies diff-vs-the-same-§-2a-sensitive-path-list and forces `security_sensitive: true`. All three run at Phase 2 close; (2) and (3) share the same canonical pattern-list source (`docs/pipeline-lanes.md § 2a`) but produce distinct consequences on distinct scopes — neither duplicates the other's authority list or consequence.
 
+### Phase 2-close commit-integrity check (mandatory, before Phase 3; re-run at Phase 2.7 close)
+
+Run immediately after every `implementer`/`tester` dispatch of this task returns `status: success` — before advancing to Phase 3. **Re-run the identical check at Phase 2.7 close**, over the tester's authoring dispatch, before the verification packet is built (see "Phase 2.7 — Test Authoring" below). Evaluate all seven conjuncts below; any failure is `status: blocked` and escalation to the operator — never a silent pass and never a corrective write by you.
+
+| # | Conjunct | Command | Failure condition |
+|---|----------|---------|--------------------|
+| 1 | Tree clean | `git status --porcelain` | Any line reported, including untracked paths |
+| 2 | Ancestry | `git merge-base --is-ancestor {sha} HEAD` | Non-zero exit for any reported `{sha}` |
+| 3 | Baseline movement | compare `{sha}` to this dispatch's registered `base_sha`; `git diff --quiet {base_sha} HEAD` | `{sha}` equals `base_sha`, OR the diff command exits 0 (no movement) |
+| 4 | Lane-deferred coverage | — (see "Intra-task execution-lane decomposition" above) | Any lane reported `commit: lane-deferred` with no consolidation sha registered |
+| 5 | Branch | `git rev-parse --abbrev-ref HEAD` | Not equal to `working_branch`, OR equal to the repository's default branch |
+| 6 | Worktree | `git rev-parse --show-toplevel` | Not equal to the worktree declared for this task |
+| 7 | Staging scope | `git diff-tree --no-commit-id --name-only -r {sha}` for every reported `{sha}` (including the consolidation sha) | Any path outside the task's `Files:` list (`01-plan.md § Task List`) without a matching `[SCOPE-DRIFT: file X required for AC-N]` annotation |
+
+**Exemption.** A dispatch that reported `commit: none — no source change` is exempt from conjuncts 2, 3, and 7 — there is no sha to check ancestry, baseline movement, or staging scope against. Conjuncts 1, 5, and 6 still apply: a "no source change" report on a dirty tree, the wrong branch, or the wrong worktree is itself a contract violation. No other `commit:` value is exempt from any conjunct.
+
+**Why conjunct 3 exists.** Conjuncts 1 and 2 alone pass trivially on a dispatch that produced nothing: a clean tree is trivial when nothing changed, and any ancestor of HEAD — including the worktree's own base commit — satisfies conjunct 2. Conjunct 3 anchors against `base_sha`, registered by you at this dispatch's `phase.start` (see "Phase 2 — Implementation → Branch guarantee..." above) — a record the dispatched agent never wrote — so a dispatch that moved nothing cannot pass by reporting a stale-but-valid sha.
+
+**On any failure:** `status: blocked`, escalate to the operator naming the failing conjunct(s). No conjunct here has a repair path — a failure means the commit itself is wrong (wrong branch, wrong worktree, incomplete, out-of-scope, or vacuous), and the only remedy is a correct re-commit by the original committer.
+
 ---
 
 ## Phase 2.6 — Code-Hygiene Scan
@@ -1030,7 +1095,7 @@ On any match — path-pattern OR content-trigger — where `security_sensitive` 
 
 **Invoke via Task tool:** feature name, `docs_root`, files created/modified, AC from `01-plan.md § Task List`, `frontend_scope` when true (with the mandatory browser-test decision rule instruction). Instruction: map each AC to at least one test, run the suite once to confirm; test files only. For `type: fix`/`hotfix`, additionally point at the Phase 2.0-authored `03-testing.md § Test Plan` and instruct completion of the remaining AC tests from that plan.
 
-**Gate:** `success` → proceed to Phase 3. `failed` → route back to tester (counts toward max-3); Phase 3 does not launch until authoring succeeds.
+**Gate:** `success` → run the `### Phase 2-close commit-integrity check` (§ "Phase 2 — Implementation" above) a second time, over this dispatch's `commit:` report, before proceeding to Phase 3. A conjunct failure here blocks and escalates exactly as at Phase 2 close — never a silent pass. `failed` → route back to tester (counts toward max-3); Phase 3 does not launch until authoring succeeds.
 
 **A1-F3 — browser readiness (non-blocking).** When `warranted_types` includes `e2e`/`browser-mode` and tooling/binaries are missing, surface the proposed setup commands to the operator before Phase 3 and wait for confirmation (or an explicit decline).
 
@@ -1171,11 +1236,13 @@ Security findings are NOT checked here — the Pre-Delivery Security Audit (Phas
 
 **Build command detection order:** CLAUDE.md Golden Commands → `package.json` scripts → `Makefile` → `go.mod` → `Cargo.toml`. No command found → log `skipped`, close this task's Stage-2 loop.
 
+**Consult `{docs_root}/00-suite-evidence.md` FIRST, before running the full-suite command.** Follow `docs/suite-evidence.md § 4` resolution exactly: a row citable per that section (matching `tree_anchor`, `result: pass`, `agent` in the closed writer list, no untracked path) lets you skip that command and cite the row (command, anchor, producer agent, timestamp) in place of a fresh execution; any of that section's fail-closed conditions forces execution. This consult-first step applies to the full-suite command only — the build and lint commands below still run every time; this registry never substitutes for them.
+
 **Execution:**
 
 a. Run the detected build command via Bash.
 b. Run the detected lint command via Bash (separate invocation).
-c. Both pass (exit code 0) → this task's Stage-2 loop closes (next DAG round, STAGE-GATE-2, or, once every task in the delivery group has closed, Phase 3.8).
+c. Both pass (exit code 0) → append a row to `{docs_root}/00-suite-evidence.md` per `docs/suite-evidence.md § 1` schema (`agent: orchestrator`, `phase: Phase 3.75`) — unless the consult-first step above cited an existing row instead of executing. Then this task's Stage-2 loop closes (next DAG round, STAGE-GATE-2, or, once every task in the delivery group has closed, Phase 3.8).
 d. Either fails → re-dispatch the implementer with the failure output, retry once. If the retry also fails: `status: blocked`, escalate to the operator with the full failure output.
 
 **Iteration budget:** max 2 attempts (separate from the Phase 3 budget).
@@ -1294,7 +1361,7 @@ After each KG write call above, emit a `kg_write` event per § "`kg_write` event
 
 **What this mode does (local only, no outward action).** Branch + commits, version bump, CHANGELOG fragment, PR-body draft — everything Phase 4.5's diff review and STAGE-GATE-3's summary (version/size/DoD) need, computed here, entirely local. It does NOT push and does NOT call `gh pr create` — that is Phase 4b, dispatched only after STAGE-GATE-3 records `gate3_release: ship`. This split is what makes "ship" an *authorization* for the outward action rather than a *ratification* of one that already happened, and is the reordering `gate-guard` (`hooks/ts/bodies/gate-guard.ts`, a deterministic PreToolUse hook) depends on: it denies a `git push`/`gh pr create` from a detected pipeline lane unless that lane's `gate3_release ∈ {ship}` (`agents/_shared/gate-contract.md § "Outward-action release floor"`) — without this reorder, `gate-guard` would deadlock the old single-phase Delivery.
 
-**`working_branch` (producer for `gate-guard`, branch-in-place topology, AC-6).** When this mode creates the branch — the branch-in-place case, where no branch existed before this phase — write `working_branch` to `00-state.md § Current State` the instant `delivery` returns `success`, before Phase 4.5 runs and strictly before Phase 4b's push. In the worktree topology, `working_branch` was already set at boot (see "Mandatory boot sequence" Step 2) — this phase does not need to re-derive it.
+**`working_branch` (producer for `gate-guard`, branch-in-place topology, AC-6).** By the time this phase runs, `working_branch` is already set in both topologies — from boot in the worktree topology (see "Mandatory boot sequence" Step 2), and from Phase 2 entry's branch guarantee in the branch-in-place topology (§ "Phase 2 — Implementation" above, where the branch-in-place branch is actually created and the field written, since boot left it `null`). This phase's own write is a defensive backstop only: if `working_branch` is somehow STILL `null` when this phase is reached, create the branch here instead and write `working_branch` to `00-state.md § Current State` the instant `delivery` returns `success`, before Phase 4.5 runs and strictly before Phase 4b's push. This is producer site 3 of the three `working_branch` sites this contract reconciles by topology — see "Mandatory boot sequence" Step 2 for site 1 (worktree topology) and the Phase 2 entry (§ "Phase 2 — Implementation") for site 2 (branch-in-place topology, the normal producer); the three are mutually exclusive in the normal case and all three are written by you alone.
 
 **Gate:**
 
@@ -1727,7 +1794,7 @@ In obsidian mode (`{events_file}` = `00-execution-events.md`), extract the JSONL
 
 **Consolidation:** you are the SINGLE designated consolidator. Create the integration branch, `git merge` each item branch one at a time in reserved order, `bash tests/run-all.sh` after each merge, proceeding only when green. Resolve additive same-anchor conflicts by keeping all blocks in reserved order — never drop, never pick a winner. Version + CHANGELOG done ONCE at the end.
 
-**Verify:** per-item `python3 tests/test_agent_structure.py` in the worktree (never concurrent `run-all.sh`); on the integration branch, `bash tests/run-all.sh` after every merge and as the final gate.
+**Verify:** per-item `python3 tests/test_agent_structure.py` in the worktree (never concurrent `run-all.sh`); on the integration branch, `bash tests/run-all.sh` after every merge and as the final gate. Append a row to `{docs_root}/00-suite-evidence.md` after each `run-all.sh` invocation on the integration branch, per `docs/suite-evidence.md § 1` schema (`agent: orchestrator`, `phase: Parallel Batch consolidation`) — one row per merge, never overwritten, since each merge moves the tree anchor and the next merge's consult-first check (`docs/suite-evidence.md § 4`) needs its own row to compare against.
 
 **Empirical basis:** this contract was first dogfooded in PR #338 — N items planned in parallel, implemented across isolated worktrees, consolidated into one PR with a single final `run-all.sh`. The sequential `git merge` + validate-after-each consolidation above hardens the original hand-splice procedure, which a later batch broke on cross-contamination and a global-guard collision; the merge-and-validate sequence surfaces those failure modes as a merge conflict or a per-merge red run rather than silently accepting them.
 

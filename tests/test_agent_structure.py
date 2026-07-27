@@ -38634,6 +38634,907 @@ check(
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
+# Suite 176 — commit-ownership-contract: no agent file previously instructed
+# committing the actual implementation/test diff, so a dispatch could return
+# `status: success` with nothing committed for downstream gates to evaluate.
+# Asserts producer sites (implementer.md, tester.md) and the consumer site
+# (orchestrator.md) separately, anchor-scoped, so a change to one side is
+# never masked by the other still passing. Full provenance: docs/testing.md.
+#
+# Marker: commit-ownership-contract
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 176: commit-ownership-contract (commit field + branch/worktree/staging discipline) ===")
+
+
+def _s176_slice(text: str, anchor: str) -> str:
+    """Return text from anchor (inclusive) to the next markdown heading or EOF.
+
+    Local to this suite — `_slice_section` was redefined (3-arg, explicit
+    stop markers) further down in this file for Suite 174's use, so this
+    suite carries its own copy of the original 2-arg heading-to-heading
+    slice rather than depending on which definition is in scope by name.
+    """
+    idx = text.find(anchor)
+    if idx == -1:
+        return ""
+    rest = text[idx:]
+    m = re.search(r"\n(?:#{1,6}) ", rest[1:])
+    if m:
+        return rest[: m.start() + 1]
+    return rest
+
+
+_s176_implementer = read(AGENTS_DIR / "implementer.md")
+_s176_tester = read(AGENTS_DIR / "tester.md")
+_s176_orchestrator = read(AGENTS_DIR / "orchestrator.md")
+_s176_delivery = read(AGENTS_DIR / "delivery.md")
+_s176_output_template = read(AGENTS_DIR / "_shared" / "output-template.md")
+_s176_batch_doc = read(REPO_ROOT / "docs" / "parallel-batch-implementation.md")
+
+# --- Producer: agents/implementer.md ---------------------------------------
+_s176_imp_commit = _s176_slice(_s176_implementer, "## Commit Contract")
+_s176_imp_return = _s176_slice(_s176_implementer, "## Return Protocol")
+
+check(
+    "suite176(imp-ac1): agents/implementer.md contains '## Commit Contract'",
+    bool(_s176_imp_commit),
+    "the § Commit Contract heading is missing",
+)
+check(
+    "suite176(imp-ac2): agents/implementer.md § Return Protocol declares the 'commit:' field",
+    "commit: {sha} | lane-deferred | none — no source change" in _s176_imp_return,
+    "the Return Protocol status block must declare 'commit:' with its three closed values",
+)
+check(
+    "suite176(imp-ac3): § Commit Contract enumerates exactly the three closed commit: values",
+    all(tok in _s176_imp_commit for tok in ("`{sha}`", "`lane-deferred`", "`none — no source change`")),
+    "the three-value vocabulary ({sha} / lane-deferred / none — no source change) is incomplete",
+)
+check(
+    "suite176(imp-ac6-ac8): § Commit Contract names the branch preconditions with their exact commands",
+    "git rev-parse --abbrev-ref HEAD" in _s176_imp_commit
+    and "working_branch" in _s176_imp_commit
+    and "default branch" in _s176_imp_commit,
+    "the branch-equality and not-default-branch preconditions must name git rev-parse --abbrev-ref HEAD",
+)
+check(
+    "suite176(imp-ac7): § Commit Contract names the worktree precondition with its exact command",
+    "git rev-parse --show-toplevel" in _s176_imp_commit,
+    "the worktree-equality precondition must name git rev-parse --show-toplevel",
+)
+check(
+    "suite176(imp-ac31): § Commit Contract names every prohibited block-staging form",
+    all(
+        tok in _s176_imp_commit
+        for tok in ("git add -A", "git add .", "git add --all", "git add :/", "git commit -a", "git commit -am")
+    ),
+    "the enumerate-never-sweep discipline must name all six prohibited git add/commit forms",
+)
+check(
+    "suite176(imp-ac32-ac33): § Commit Contract names the pre-commit staging-scope check and its blocked/escalate outcome",
+    "git diff --cached --name-only" in _s176_imp_commit
+    and "status: blocked" in _s176_imp_commit
+    and "escalate to the operator" in _s176_imp_commit,
+    "a path outside declared scope must trigger git diff --cached --name-only + status: blocked + escalation, never a wider sweep",
+)
+check(
+    "suite176(imp-ac9-ac10): § Commit Contract distinguishes the 1:1 sha case from the lane-deferred fan-out case",
+    "fan-out lane sharing a worktree and branch" in _s176_imp_commit,
+    "the lane-deferred value must be scoped to the intra-task fan-out case, distinct from a 1:1 dispatch",
+)
+
+# --- Producer: agents/tester.md ---------------------------------------------
+_s176_test_commit = _s176_slice(_s176_tester, "## Commit Contract (authoring modes")
+_s176_test_prefix_status = _s176_slice(
+    _s176_tester, "### Status block from tester (pre-fix-regression mode)"
+)
+_s176_test_authoring = _s176_slice(_s176_tester, "## Mode: `authoring`")
+
+check(
+    "suite176(test-ac4): agents/tester.md declares the same commit contract for authored test diffs",
+    bool(_s176_test_commit) and "agents/implementer.md § Commit Contract" in _s176_test_commit,
+    "tester.md must declare its own § Commit Contract mirroring the implementer's",
+)
+check(
+    "suite176(test-ac4-preconditions): tester's § Commit Contract names the same branch/worktree preconditions",
+    "git rev-parse --abbrev-ref HEAD" in _s176_test_commit
+    and "git rev-parse --show-toplevel" in _s176_test_commit,
+    "tester's Commit Contract must name the identical branch/worktree precondition commands",
+)
+check(
+    "suite176(test-ac34): tester's § Commit Contract declares enumerate-never-sweep staging for its authored test files",
+    "Stage exactly the test file(s) you authored or extended this dispatch" in _s176_test_commit
+    and "git add -A" in _s176_test_commit,
+    "tester's staging discipline must scope to its own authored test files and name the prohibited forms",
+)
+check(
+    "suite176(test-vocab): tester's § Commit Contract declares only two commit: values (no lane-deferred)",
+    "two values" in _s176_test_commit and "never intra-task lane-decomposed" in _s176_test_commit,
+    "tester dispatches are never lane-decomposed — the contract must state only {sha} / none — no source change apply",
+)
+check(
+    "suite176(test-ac5-prefix): the pre-fix-regression status block carries the commit: field",
+    "commit: {sha} | none — no source change" in _s176_test_prefix_status,
+    "the pre-fix-regression mode status block must declare commit:",
+)
+check(
+    "suite176(test-ac5-authoring): the authoring-mode status block carries the commit: field",
+    "commit: {sha} | none — no source change" in _s176_test_authoring,
+    "the authoring mode status block must declare commit:",
+)
+
+# --- Consumer: agents/orchestrator.md ---------------------------------------
+_s176_orch_boot = _s176_slice(_s176_orchestrator, "**`working_branch` at boot")
+_s176_orch_phase2entry = _s176_slice(
+    _s176_orchestrator,
+    "### Branch guarantee, `working_branch` assertion, and `base_sha` registration",
+)
+_s176_orch_lane = _s176_slice(_s176_orchestrator, "### Intra-task execution-lane decomposition")
+_s176_orch_close = _s176_slice(_s176_orchestrator, "### Phase 2-close commit-integrity check (mandatory")
+_s176_orch_phase27 = _s176_slice(_s176_orchestrator, "## Phase 2.7 — Test Authoring")
+_s176_orch_phase4a_wb = _s176_slice(_s176_orchestrator, "**`working_branch` (producer for `gate-guard`, branch-in-place topology, AC-6).**")
+
+check(
+    "suite176(orch-ac26-boot): boot Step 2 names itself producer site 1 of 3 and the orchestrator as sole writer",
+    "producer site 1 of the three `working_branch` sites" in _s176_orch_boot
+    and "you write all three, and only you" in _s176_orch_boot,
+    "boot Step 2's working_branch paragraph must reconcile the three-site topology and name sole-writer status",
+)
+check(
+    "suite176(orch-ac26-phase4a): Phase 4a names itself producer site 3 of 3",
+    "producer site 3 of the three `working_branch` sites" in _s176_orch_phase4a_wb,
+    "Phase 4a's working_branch paragraph must name itself site 3 of the reconciled three",
+)
+check(
+    "suite176(orch-ac11-ac27): Phase 2 entry asserts (never unconditionally writes) working_branch,"
+    " and writes only when boot left it null",
+    "never unconditionally write" in _s176_orch_phase2entry
+    and "ONLY when boot left it `null`" in _s176_orch_phase2entry
+    and "worktree" in _s176_orch_phase2entry,
+    "the Phase 2 entry must assert-not-write working_branch outside branch-in-place, and confirm worktree",
+)
+check(
+    "suite176(orch-ac28): Phase 2 entry registers base_sha via git rev-parse HEAD on phase.start before each dispatch",
+    "git rev-parse HEAD" in _s176_orch_phase2entry
+    and "base_sha" in _s176_orch_phase2entry
+    and "phase.start" in _s176_orch_phase2entry,
+    "base_sha registration (git rev-parse HEAD, attribute of phase.start) must precede every implementer/tester dispatch",
+)
+check(
+    "suite176(orch-ac12-ac13): Intra-task lane decomposition names the orchestrator as sole consolidation"
+    " committer and both sha-recording sites",
+    "sole committer of the consolidation" in _s176_orch_lane
+    and "02-implementation.md § Review Summary" in _s176_orch_lane
+    and "lane_decomposition` field" in _s176_orch_lane,
+    "the section must name the orchestrator as sole committer and both sites the consolidation sha is recorded in",
+)
+check(
+    "suite176(orch-ac14-ac15): the consolidation sha is subjected to the same ancestry check,"
+    " and lane-deferred without a registered sha never terminates as success",
+    "git merge-base --is-ancestor" in _s176_orch_lane
+    and "never a terminal `status: success`" in _s176_orch_lane,
+    "the section must apply the shared ancestry check to the consolidation sha and forbid a terminal"
+    " success without a registered consolidation sha",
+)
+check(
+    "suite176(orch-ac16-ac20-ac29-ac35): Phase 2-close commit-integrity check carries all seven conjuncts",
+    all(
+        tok in _s176_orch_close
+        for tok in (
+            "git status --porcelain",
+            "git merge-base --is-ancestor {sha} HEAD",
+            "git diff --quiet {base_sha} HEAD",
+            "lane-deferred",
+            "git rev-parse --abbrev-ref HEAD",
+            "git rev-parse --show-toplevel",
+            "git diff-tree --no-commit-id --name-only -r {sha}",
+        )
+    ),
+    "all seven conjuncts (tree-clean, ancestry, baseline-movement, lane-deferred coverage, branch,"
+    " worktree, staging-scope) must be present with their named commands",
+)
+check(
+    "suite176(orch-ac30): the exemption clause names only 'none — no source change' as exempt,"
+    " and only from conjuncts 2/3/7",
+    "exempt from conjuncts 2, 3, and 7" in _s176_orch_close
+    and "No other `commit:` value is exempt from any conjunct" in _s176_orch_close,
+    "the exemption must be scoped to commit: none — no source change and conjuncts 2/3/7 only",
+)
+check(
+    "suite176(orch-ac21): Phase 2.7's Gate line re-runs the Phase 2-close commit-integrity check a second time",
+    "### Phase 2-close commit-integrity check" in _s176_orch_phase27
+    and "a second time" in _s176_orch_phase27,
+    "Phase 2.7 close must re-run the same commit-integrity check over the tester's authoring dispatch",
+)
+
+# --- Consumer: agents/delivery.md Step 10.0 ---------------------------------
+_s176_deliv_step10 = _s176_slice(_s176_delivery, "### Step 10.0 — Stage and commit delivery files")
+_S176_GIT_ADD_BLOCK = (
+    "git add CLAUDE.md CHANGELOG.md\n"
+    "git add .claude-plugin/plugin.json .claude-plugin/marketplace.json"
+    "  # ONLY if version was bumped in Step 9 (skip if Step 9.0 skipped)\n"
+    "git add docs/                 # only if created/modified in Step 5b (docs/knowledge.md)"
+    " — never docs/specs/: no pipeline spec or acceptance matrix is ever staged into the product repo (see Step 9c)\n"
+    "git add README.md             # only if modified in Step 6\n"
+    "git add openapi/openapi.yaml  # only if updated in Step 8\n"
+    "git add changelog.d/{pr-slug}.md  # ALWAYS stage the fragment when one was written"
+)
+
+check(
+    "suite176(deliv-ac23): Step 10.0 asserts the implementation diff is already committed via"
+    " git status --porcelain, blocking without staging on any uncommitted implementation path",
+    "git status --porcelain" in _s176_deliv_step10
+    and "status: blocked" in _s176_deliv_step10
+    and "Do NOT stage or commit anything" in _s176_deliv_step10
+    and "agents/implementer.md § Commit Contract" in _s176_deliv_step10,
+    "Step 10.0 must assert pre-commit via git status --porcelain and block-without-staging on failure",
+)
+check(
+    "suite176(deliv-ac24): Step 10.0's git add block is unchanged byte-for-byte (regression pin)",
+    _S176_GIT_ADD_BLOCK in _s176_delivery,
+    "the pre-existing git add staging list must not be altered by this task's addition",
+)
+
+# --- output-template.md: retired over-claim, self-report successor (AC-22) --
+check(
+    "suite176(ac22-retired): output-template.md no longer claims the agent is the ONLY party"
+    " that reliably knows its effective model",
+    "the only party that reliably knows" not in _s176_output_template,
+    "the retired sole-reliability over-claim must be gone",
+)
+check(
+    "suite176(ac22-successor): output-template.md's successor text frames model self-report as"
+    " unverified/consultative and names #524 as the structural-fix owner",
+    "self-report" in _s176_output_template
+    and "unverified" in _s176_output_template
+    and "#524" in _s176_output_template,
+    "the successor text must declare the self-report unverified/consultative and point to #524",
+)
+
+# --- docs/parallel-batch-implementation.md: item-commit reconciliation -----
+check(
+    "suite176(batch-reconcile): parallel-batch-implementation.md reconciles per-item commit ownership"
+    " against agents/implementer.md § Commit Contract, distinct from lane-deferred",
+    "agents/implementer.md § Commit Contract" in _s176_batch_doc
+    and "never `lane-deferred`" in _s176_batch_doc,
+    "the batch doc must name the implementer's Commit Contract and distinguish the per-item {sha}"
+    " case from the shared-worktree lane-deferred case",
+)
+
+# --- self-ref/registry/hygiene (per this repo's own Suite-174/175 precedent) --
+_s176_own = read(REPO_ROOT / "tests" / "test_agent_structure.py")
+_s176_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s176_claude_hygiene = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite176(self-ref): test file contains 'Suite 176' and 'commit-ownership-contract'",
+    "Suite 176" in _s176_own and "commit-ownership-contract" in _s176_own,
+    "test file must self-reference Suite 176 and the marker 'commit-ownership-contract'",
+)
+check(
+    "suite176(registry): docs/testing.md registers 'Suite 176' and 'commit-ownership-contract'",
+    "Suite 176" in _s176_testing_md and "commit-ownership-contract" in _s176_testing_md,
+    "docs/testing.md must register Suite 176 and the 'commit-ownership-contract' marker",
+)
+check(
+    "suite176(hygiene): CLAUDE.md does NOT contain 'Suite 176' (§11 hygiene contract)",
+    "Suite 176" not in _s176_claude_hygiene,
+    "CLAUDE.md must not mention Suite 176 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: commit-ownership-contract
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 177 — suite-run-evidence: no durable, consultable record existed that
+# a verification command already ran against a concrete tree state, so
+# downstream consumers re-ran idempotent full-suite commands that a prior run
+# had already proven green. Asserts the canonical contract
+# (docs/suite-evidence.md) and, separately and anchor-scoped, both the
+# producer and the consumer half of each named pair — so a change on one side
+# is never masked by the other side still passing. Full provenance:
+# docs/testing.md.
+#
+# Marker: suite-run-evidence
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 177: suite-run-evidence (append-only suite-run registry, producer/consumer pairs) ===")
+
+
+def _s177_slice(text: str, anchor: str) -> str:
+    """Return text from anchor (inclusive) to the next markdown heading or EOF.
+
+    Local copy — mirrors Suite 176's own `_s176_slice`, kept independent for
+    the same reason documented there: `_slice_section` was redefined
+    elsewhere in this file with a different signature.
+    """
+    idx = text.find(anchor)
+    if idx == -1:
+        return ""
+    rest = text[idx:]
+    m = re.search(r"\n(?:#{1,6}) ", rest[1:])
+    if m:
+        return rest[: m.start() + 1]
+    return rest
+
+
+_s177_evidence_doc = read(REPO_ROOT / "docs" / "suite-evidence.md")
+_s177_orchestrator = read(AGENTS_DIR / "orchestrator.md")
+_s177_delivery = read(AGENTS_DIR / "delivery.md")
+_s177_tester = read(AGENTS_DIR / "tester.md")
+_s177_implementer = read(AGENTS_DIR / "implementer.md")
+_s177_claude = read(REPO_ROOT / "CLAUDE.md")
+
+# --- Canonical contract: docs/suite-evidence.md ------------------------------
+check(
+    "suite177(ac1): docs/suite-evidence.md exists and defines the row schema fields",
+    bool(_s177_evidence_doc)
+    and all(
+        tok in _s177_evidence_doc
+        for tok in ("`command`", "`tree_anchor`", "`result`", "`exit_code`", "`counts`", "`agent`", "`phase`", "`timestamp`")
+    ),
+    "docs/suite-evidence.md must exist and its row schema must name all eight fields",
+)
+check(
+    "suite177(ac2): tree_anchor is defined by reference to docs/verification-packet.md § 2, no second identity mechanism",
+    "docs/verification-packet.md § 2" in _s177_evidence_doc
+    and "introduces no second tree-identity mechanism" in _s177_evidence_doc,
+    "tree_anchor must point to verification-packet.md § 2 and disclaim a second identity mechanism",
+)
+check(
+    "suite177(ac3): at least two named producer→consumer pairs, file+section on both ends",
+    _s177_evidence_doc.count("agents/orchestrator.md § Phase 3.75") >= 2
+    and "agents/tester.md § Mode: verify-run" in _s177_evidence_doc
+    and "agents/delivery.md § Step 9b" in _s177_evidence_doc,
+    "at least two pairs must name a concrete file+section producer and a concrete file+section consumer",
+)
+check(
+    "suite177(ac4): closed list of writers names exactly tester, orchestrator, delivery",
+    "**`tester`**" in _s177_evidence_doc
+    and "**`orchestrator`**" in _s177_evidence_doc
+    and "**`delivery`**" in _s177_evidence_doc
+    and "Exactly three agents may append a row" in _s177_evidence_doc,
+    "the closed writer list must name exactly tester, orchestrator, and delivery",
+)
+check(
+    "suite177(ac5): a row attributed to an agent outside the closed list is ignored and forces execution",
+    "ignored by every consumer" in _s177_evidence_doc
+    and "forces" in _s177_evidence_doc
+    and "execution of the command" in _s177_evidence_doc,
+    "an out-of-list writer must be stated as ignored and execution-forcing",
+)
+check(
+    "suite177(ac6): the registry never satisfies a security floor, a STAGE-GATE, or the Phase 3.8 audit",
+    "never satisfies a security floor, a STAGE-GATE release, or the Phase 3.8" in _s177_evidence_doc,
+    "§ 5 must disclaim security floor / STAGE-GATE / Phase 3.8 audit substitution",
+)
+check(
+    "suite177(ac7): scope is idempotent re-runs of a verification command",
+    "idempotent re-runs of a verification command" in _s177_evidence_doc,
+    "§ 5 must scope the registry to idempotent verification-command re-runs",
+)
+check(
+    "suite177(ac8-ac12): § 4 resolution names every fail-closed condition plus the sole citable condition",
+    all(
+        tok in _s177_evidence_doc
+        for tok in (
+            "row is absent or unreadable",
+            "`tree_anchor` differs from the current tree state",
+            "row's `result` is `fail`",
+            "names anyone outside the closed list",
+            "reports any untracked path",
+            "citing a row in that state is prohibited outright",
+            "may a consumer skip the run and cite the row",
+        )
+    ),
+    "§ 4 must name each EXECUTE-forcing condition (absent/unreadable, anchor mismatch, fail,"
+    " out-of-list writer, untracked path) and the single citable condition, with the untracked-path"
+    " prohibition stated independently of the anchor comparison",
+)
+
+# --- Producer + consumer: agents/orchestrator.md § Phase 3.75 (ac13) --------
+_s177_orch_3_75 = _s177_slice(_s177_orchestrator, "## Phase 3.75 — Build Verification")
+check(
+    "suite177(ac13): Phase 3.75 consults the registry before executing and appends a row after",
+    "Consult `{docs_root}/00-suite-evidence.md` FIRST" in _s177_orch_3_75
+    and "docs/suite-evidence.md § 4" in _s177_orch_3_75
+    and "append a row to `{docs_root}/00-suite-evidence.md`" in _s177_orch_3_75,
+    "Phase 3.75 must consult-first per § 4 and append a row on a green outcome",
+)
+
+# --- Producer + consumer: Parallel Batch consolidation loop (ac14) ----------
+_s177_orch_batch = _s177_slice(_s177_orchestrator, "## Parallel Batch Implementation")
+check(
+    "suite177(ac14): the Parallel Batch consolidation loop appends a row after each run-all.sh",
+    "Append a row to `{docs_root}/00-suite-evidence.md` after each `run-all.sh`" in _s177_orch_batch,
+    "the consolidation loop must append a row after every run-all.sh invocation on the integration branch",
+)
+
+# --- Producer: agents/tester.md Phase 2.7 + Phase 3 (ac15) ------------------
+_s177_test_authoring = _s177_slice(_s177_tester, "## Mode: `authoring`")
+_s177_test_verify = _s177_slice(_s177_tester, "## Mode: `verify-run`")
+check(
+    "suite177(ac15-authoring): Phase 2.7 authoring mode appends a row after the suite run",
+    "Append a row to `{docs_root}/00-suite-evidence.md`" in _s177_test_authoring
+    and "phase: Phase 2.7" in _s177_test_authoring,
+    "authoring mode must append a suite-evidence row tagged phase: Phase 2.7",
+)
+check(
+    "suite177(ac15-verify): Phase 3 verify-run mode appends a row after the suite run",
+    "Append a row to `{docs_root}/00-suite-evidence.md`" in _s177_test_verify
+    and "phase: Phase 3" in _s177_test_verify,
+    "verify-run mode must append a suite-evidence row tagged phase: Phase 3",
+)
+
+# --- Consumer: agents/delivery.md Step 9b (ac16-ac17) -----------------------
+_s177_deliv_step9b = _s177_slice(_s177_delivery, "### Step 9b — Definition of Done (DoD) checklist")
+check(
+    "suite177(ac16): Step 9b's operative gate condition is strict tree_anchor equality,"
+    " with the retired heuristic named explicitly as superseded",
+    "tree_anchor` equal to the current tree state" in _s177_deliv_step9b
+    and "both retired in favor of strict `tree_anchor` equality" in _s177_deliv_step9b,
+    "register 4's operative condition must be tree_anchor equality, and the HEAD-ahead/"
+    "test-relevant-files heuristic must be named as explicitly retired in its favor",
+)
+check(
+    "suite177(ac17): Step 9b enumerates the three retained registers by name and adds the cited row as a fourth",
+    "03-testing.md` verify section reports no regressions" in _s177_deliv_step9b
+    and "regression_test_status: passing`" in _s177_deliv_step9b
+    and "suite_still_passing: true`" in _s177_deliv_step9b
+    and "phase.end` event exists in `00-execution-events`" in _s177_deliv_step9b
+    and "00-suite-evidence.md`" in _s177_deliv_step9b
+    and "retained **unchanged**" in _s177_deliv_step9b
+    and "never dropped in favor of register 4" in _s177_deliv_step9b,
+    "the three pre-existing registers must be named individually and the cited row added as a fourth,"
+    " never substituting any of the three",
+)
+
+# --- Consumer/opt-in: agents/implementer.md § Suite-run responsibility (ac18) -
+_s177_imp_suite = _s177_slice(_s177_implementer, "## Suite-run responsibility")
+check(
+    "suite177(ac18): implementer.md declares suite execution is not its responsibility, names the owners,"
+    " and states the consult-before-cite rule for the case it runs anyway",
+    bool(_s177_imp_suite)
+    and "not your responsibility" in _s177_imp_suite
+    and "tester" in _s177_imp_suite
+    and "Phase 3.75" in _s177_imp_suite
+    and "docs/suite-evidence.md § 4" in _s177_imp_suite
+    and "cite that row" in _s177_imp_suite,
+    "§ Suite-run responsibility must disclaim ownership, name tester/orchestrator as owners, and state the"
+    " consult-first-then-cite rule for a voluntary run",
+)
+
+# --- self-ref/registry/hygiene (per this repo's own Suite-175/176 precedent) --
+_s177_own = read(REPO_ROOT / "tests" / "test_agent_structure.py")
+_s177_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite177(self-ref): test file contains 'Suite 177' and 'suite-run-evidence'",
+    "Suite 177" in _s177_own and "suite-run-evidence" in _s177_own,
+    "test file must self-reference Suite 177 and the marker 'suite-run-evidence'",
+)
+check(
+    "suite177(registry): docs/testing.md registers 'Suite 177' and 'suite-run-evidence'",
+    "Suite 177" in _s177_testing_md and "suite-run-evidence" in _s177_testing_md,
+    "docs/testing.md must register Suite 177 and the 'suite-run-evidence' marker",
+)
+check(
+    "suite177(hygiene): CLAUDE.md does NOT contain 'Suite 177' (§11 hygiene contract)",
+    "Suite 177" not in _s177_claude,
+    "CLAUDE.md must not mention Suite 177 — only docs/testing.md is the canonical registry",
+)
+check(
+    "suite177(claude-bullet): CLAUDE.md §5 registers docs/suite-evidence.md as the canonical document",
+    "docs/suite-evidence.md" in _s177_claude,
+    "CLAUDE.md §5 must carry a one-line bullet pointing at docs/suite-evidence.md",
+)
+
+# Marker: suite-run-evidence
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 178 — panel-write-discipline: the four panel writers on
+# reviews/01-plan-review.md (plan-reviewer, qa-plan, security, adversary) held
+# Write without the anchored-Edit discipline that makes a whole-file overwrite
+# of another agent's section detectable. Edit (already granted in the base
+# tree, pinned here as a regression) closes the noisy failure — a full Write
+# destroying every heading at once — but cannot itself impose the anchoring
+# discipline that prevents the silent one (a broad old_string/replace_all
+# corrupting another section while every heading survives). Asserts the
+# canonical write-tool-discipline section, each of the four contracts' MUST +
+# pointer (with a generic cross-file guard on the shared 'edited in place'
+# marker), the plan-reviewer regression on the Reviews: line write form, the
+# frontmatter Edit regressions, and the orchestrator's header-survival check
+# producer/consumer. Full provenance: docs/testing.md.
+#
+# Marker: panel-write-discipline
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 178: panel-write-discipline (Edit anchoring + header-survival check) ===")
+
+
+def _s178_slice(text: str, anchor: str) -> str:
+    """Return text from anchor (inclusive) to the next markdown heading or EOF.
+
+    Local copy — mirrors Suite 176/177's own slice helper, kept independent
+    for the same reason documented there: `_slice_section` was redefined
+    elsewhere in this file with a different signature.
+    """
+    idx = text.find(anchor)
+    if idx == -1:
+        return ""
+    rest = text[idx:]
+    m = re.search(r"\n(?:#{1,6}) ", rest[1:])
+    if m:
+        return rest[: m.start() + 1]
+    return rest
+
+
+_s178_pc = read(AGENTS_DIR / "_shared" / "plan-consolidation.md")
+_s178_pr = read(AGENTS_DIR / "plan-reviewer.md")
+_s178_qap = read(AGENTS_DIR / "qa-plan.md")
+_s178_sec = read(AGENTS_DIR / "security.md")
+_s178_adv = read(AGENTS_DIR / "adversary.md")
+_s178_orch = read(AGENTS_DIR / "orchestrator.md")
+_s178_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s178_claude = read(REPO_ROOT / "CLAUDE.md")
+
+# --- Canonical section: agents/_shared/plan-consolidation.md (ac4-ac11) -----
+_s178_wtd = _s178_slice(_s178_pc, "## Write-tool discipline (shared review files)")
+
+check(
+    "suite178(ac4): plan-consolidation.md contains '## Write-tool discipline (shared review files)'",
+    bool(_s178_wtd),
+    "the canonical Write-tool discipline section is missing",
+)
+check(
+    "suite178(ac5): the section states the rule generally, for the panel, not one agent's exception",
+    bool(_s178_wtd) and "not an exception carved out for one agent" in _s178_wtd,
+    "the section must state the rule applies to the panel as a whole, not one agent",
+)
+check(
+    "suite178(ac6): the section reserves Write to the writer's own file's initial creation,"
+    " excluding an existing/foreign/shared file",
+    bool(_s178_wtd)
+    and "reserved for the initial creation of the agent's own review file" in _s178_wtd
+    and "never for a file that already exists, never for a file owned by another agent, never"
+    " for a shared file" in _s178_wtd,
+    "the section must reserve Write to own-file initial creation and exclude existing/foreign/shared files",
+)
+check(
+    "suite178(ac7): the section prohibits replace_all: true on the shared review file",
+    bool(_s178_wtd) and "`replace_all: true` is PROHIBITED on this file" in _s178_wtd,
+    "the section must prohibit replace_all: true on reviews/01-plan-review.md",
+)
+check(
+    "suite178(ac8): the section requires old_string anchored to the writer's own section or labelled line",
+    bool(_s178_wtd)
+    and "anchored exclusively to the writer's own section or its own labelled line" in _s178_wtd,
+    "the section must require old_string anchored to the writer's own section/labelled line",
+)
+check(
+    "suite178(ac9): the section declares Edit as a verifiable capacity and the Write-destination"
+    " reservation as a contract the grant cannot impose (not path-scoped)",
+    bool(_s178_wtd)
+    and "`Edit` is a CAPACITY" in _s178_wtd
+    and "CONTRACT the tool grant cannot impose" in _s178_wtd
+    and "not path-scoped" in _s178_wtd,
+    "the section must declare the capacity-vs-contract asymmetry and the not-path-scoped reason",
+)
+check(
+    "suite178(ac10): the section names the header-subset (header-survival) check as what"
+    " actually detects a violation of the Write-destination contract",
+    bool(_s178_wtd)
+    and "header-subset (header-survival) check" in _s178_wtd
+    and 'agents/orchestrator.md § "Header-survival check (panel dispatch integrity)"' in _s178_wtd,
+    "the section must name the orchestrator's header-survival check as the actual detector",
+)
+check(
+    "suite178(ac11): the section declares why 01-plan.md carries no equivalent check and"
+    " names the residual that absence leaves open",
+    bool(_s178_wtd)
+    and "carries no equivalent check" in _s178_wtd
+    and "would not be caught by any structural guard" in _s178_wtd,
+    "the section must explain the absent check on 01-plan.md and name the open residual",
+)
+
+# --- Per-contract MUST + pointer (ac12-ac15) --------------------------------
+_S178_POINTER = 'agents/_shared/plan-consolidation.md § "Write-tool discipline (shared review files)"'
+_S178_CONTRACTS = (
+    ("plan-reviewer", _s178_pr, "## Critical Rules"),
+    ("qa-plan", _s178_qap, "## Files I write (exhaustive)"),
+    ("security", _s178_sec, "**Centralization contract (MUST NOT violate):**"),
+    ("adversary", _s178_adv, "## Session Context Protocol"),
+)
+for _name, _text, _anchor in _S178_CONTRACTS:
+    _slice = _s178_slice(_text, _anchor)
+    check(
+        f"suite178(ac12-15/{_name}): agents/{_name}.md contains the MUST + canonical pointer to"
+        " plan-consolidation.md's Write-tool discipline section",
+        bool(_slice) and "MUST" in _slice and _S178_POINTER in _slice,
+        f"agents/{_name}.md must contain the MUST + pointer to the canonical Write-tool discipline section",
+    )
+
+# --- Generic capacity-vs-contract guard: shared 'edited in place' marker ----
+for _name, _text in (
+    ("plan-reviewer", _s178_pr),
+    ("qa-plan", _s178_qap),
+    ("security", _s178_sec),
+    ("adversary", _s178_adv),
+):
+    check(
+        f"suite178(generic-marker/{_name}): agents/{_name}.md's Write-tool-discipline MUST clause"
+        " anchors editing with the fixed 'edited in place' marker",
+        "edited in place" in _text,
+        f"agents/{_name}.md's Write-tool-discipline MUST clause must contain the fixed"
+        " 'edited in place' marker",
+    )
+
+# --- Frontmatter regression: Edit present alongside Write (ac1-ac2) ---------
+_s178_pr_frontmatter = _s178_pr.split("---", 2)[1] if _s178_pr.count("---") >= 2 else ""
+_s178_adv_frontmatter = _s178_adv.split("---", 2)[1] if _s178_adv.count("---") >= 2 else ""
+check(
+    "suite178(ac1): agents/plan-reviewer.md frontmatter declares Edit, keeping Write (regression pin)",
+    "Edit" in _s178_pr_frontmatter and "Write" in _s178_pr_frontmatter,
+    "plan-reviewer.md's tools: line must declare Edit and keep Write",
+)
+check(
+    "suite178(ac2): agents/adversary.md frontmatter declares Edit, keeping Write (regression pin)",
+    "Edit" in _s178_adv_frontmatter and "Write" in _s178_adv_frontmatter,
+    "adversary.md's tools: line must declare Edit and keep Write",
+)
+
+# --- plan-reviewer.md Critical Rules: Reviews: line write form (ac16) -------
+_s178_pr_critical = _slice_section(_s178_pr, "## Critical Rules", ("\n## Core Philosophy",))
+check(
+    "suite178(ac16): plan-reviewer.md Critical Rules declares the Reviews: line is replaced"
+    " in place with Edit, anchored to that line, and never with Write",
+    bool(_s178_pr_critical)
+    and "replace in place with `Edit`, anchored to that single line, and never with `Write`"
+    in _s178_pr_critical,
+    "Critical Rules must declare the Reviews: line write form (Edit, anchored, never Write)",
+)
+
+# --- Orchestrator: header-survival check producer (ac18-ac21) ---------------
+_s178_orch_check = _s178_slice(_s178_orch, "### Header-survival check (panel dispatch integrity)")
+check(
+    "suite178(ac18): the header-survival check blocks and emits plan_review_integrity: fail on a"
+    " lost heading/sub-verdict label, without advancing to STAGE-GATE-1",
+    bool(_s178_orch_check)
+    and "status: blocked" in _s178_orch_check
+    and "`plan_review_integrity`" in _s178_orch_check
+    and "`verdict: fail`" in _s178_orch_check
+    and "Do NOT advance to STAGE-GATE-1" in _s178_orch_check,
+    "the check must declare status: blocked + plan_review_integrity: fail + no advance to STAGE-GATE-1"
+    " on a lost heading/label",
+)
+check(
+    "suite178(ac19): the pre-dispatch snapshot is written to {docs_root}/inputs/01-plan-review.pre-dispatch.md,"
+    " overwritten on each dispatch",
+    bool(_s178_orch_check)
+    and "{docs_root}/inputs/01-plan-review.pre-dispatch.md" in _s178_orch_check
+    and "overwriting any snapshot left by a prior dispatch" in _s178_orch_check,
+    "the check must name the exact snapshot path and the overwrite-per-dispatch behaviour",
+)
+check(
+    "suite178(ac20): the snapshot is preserved while a plan_review_integrity: fail is undisposed,"
+    " and no retry overwrites it",
+    bool(_s178_orch_check)
+    and "UNLESS a `plan_review_integrity: fail` from a previous dispatch is still undisposed" in _s178_orch_check
+    and "no retry of the same dispatch is allowed to erase it" in _s178_orch_check,
+    "the check must preserve the snapshot while a fail is undisposed and forbid retry-overwrite",
+)
+check(
+    "suite178(ac21): the orchestrator never auto-restores reviews/01-plan-review.md on a"
+    " plan_review_integrity: fail",
+    bool(_s178_orch_check)
+    and "No repair, no auto-restore" in _s178_orch_check
+    and "you do not reconstruct `reviews/01-plan-review.md` from the snapshot yourself" in _s178_orch_check,
+    "the check must declare no auto-restore of reviews/01-plan-review.md",
+)
+
+# --- Orchestrator: header-survival check consumer/invocation sites ----------
+_s178_orch_15 = _s178_slice(_s178_orch, "## Phase 1.5 — Plan Ratification")
+_s178_orch_16 = _s178_slice(_s178_orch, "## Phase 1.6 — Plan Review (Stage 1 closing gate)")
+check(
+    "suite178(invocation-1.5): Phase 1.5's qa-plan dispatch names the header-survival check"
+    " as wrapping its own dispatch",
+    bool(_s178_orch_15) and "Header-survival check (panel dispatch integrity)" in _s178_orch_15,
+    "Phase 1.5's qa-plan Invoke line must reference the header-survival check",
+)
+check(
+    "suite178(invocation-1.6): Phase 1.6 names both the security design-review and the"
+    " plan-reviewer dispatch as wrapped by the header-survival check",
+    bool(_s178_orch_16)
+    and _s178_orch_16.count("Header-survival check (panel dispatch integrity)") >= 1
+    and "wrapped by the header-survival check" in _s178_orch_16,
+    "Phase 1.6 must name both panel dispatches as wrapped by the header-survival check",
+)
+
+# --- self-ref/registry/hygiene (per this repo's own Suite-176/177 precedent) --
+_s178_own = read(REPO_ROOT / "tests" / "test_agent_structure.py")
+check(
+    "suite178(self-ref): test file contains 'Suite 178' and 'panel-write-discipline'",
+    "Suite 178" in _s178_own and "panel-write-discipline" in _s178_own,
+    "test file must self-reference Suite 178 and the marker 'panel-write-discipline'",
+)
+check(
+    "suite178(registry): docs/testing.md registers 'Suite 178' and 'panel-write-discipline'",
+    "Suite 178" in _s178_testing_md and "panel-write-discipline" in _s178_testing_md,
+    "docs/testing.md must register Suite 178 and the 'panel-write-discipline' marker",
+)
+check(
+    "suite178(hygiene): CLAUDE.md does NOT contain 'Suite 178' (§11 hygiene contract)",
+    "Suite 178" not in _s178_claude,
+    "CLAUDE.md must not mention Suite 178 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: panel-write-discipline
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 179 — gate-field-contract: `gate-guard` and `checkpoint-guard` are
+# unwired from `.claude-plugin/hooks.json`, so no hook wired in the Claude
+# Code plugin path any longer verifies a gate-state field there. This suite
+# asserts the resulting bare-literal requirement at both write sites — the
+# canonical declaration in gate-contract.md and its replication in
+# orchestrator.md § Current State — and the named "No gate-field repair"
+# invariant plus its nominal reference beside delivery.md's push step. It
+# asserts no check FORM (the prior verification mechanism was retired
+# entirely, without replacement), fixes no `readField` literal, and asserts
+# no identity between any files under `hooks/ts/`. Full provenance:
+# docs/testing.md.
+#
+# Marker: gate-field-contract
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 179: gate-field-contract (bare-literal fields + No gate-field repair) ===")
+
+
+def _s179_slice(text: str, anchor: str) -> str:
+    """Return text from anchor (inclusive) to the next markdown heading or EOF.
+
+    Local copy — mirrors Suite 176/178's own slice helper, kept independent
+    for the same reason documented there.
+    """
+    idx = text.find(anchor)
+    if idx == -1:
+        return ""
+    rest = text[idx:]
+    m = re.search(r"\n(?:#{1,6}) ", rest[1:])
+    if m:
+        return rest[: m.start() + 1]
+    return rest
+
+
+_s179_gate_contract = read(AGENTS_DIR / "_shared" / "gate-contract.md")
+_s179_orch = read(AGENTS_DIR / "orchestrator.md")
+_s179_delivery = read(AGENTS_DIR / "delivery.md")
+_s179_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s179_claude = read(REPO_ROOT / "CLAUDE.md")
+
+_s179_dual_record = _s179_slice(_s179_gate_contract, "## The dual-record release")
+_s179_current_state = _s179_slice(_s179_orch, "<!-- Gate-field write contract")
+_s179_delivery_push = _s179_slice(_s179_delivery, "### Step 10.2 — Push")
+
+# --- Canonical declaration: agents/_shared/gate-contract.md § The dual-record release ---
+check(
+    "suite179(ac1): gate-contract.md § The dual-record release names all six gate-state"
+    " fields and requires a bare literal with no second space-delimited token",
+    all(
+        f in _s179_dual_record
+        for f in (
+            "gate1_release",
+            "gate2_release_last",
+            "gate3_release",
+            "gate_nonce",
+            "working_branch",
+            "worktree",
+        )
+    )
+    and "no second token delimited by a space" in _s179_dual_record,
+    "the dual-record-release section must name all six fields and the bare-literal requirement",
+)
+check(
+    "suite179(ac2-ac3): the *_release allowlist stays closed while gate_nonce/working_branch/"
+    "worktree admit no allowlist, bare-literal requirement only",
+    "and admit no" in _s179_dual_record
+    and "they are subject to the bare-literal requirement alone" in _s179_dual_record,
+    "the section must state the *_release closed-set vs. the three open-ended fields' no-allowlist carve-out",
+)
+check(
+    "suite179(ac4): gate-contract.md names 00-decision-ledger (operator-approval, disposition)"
+    " as the destination for a gate nonce/attribution/justification/condition",
+    "00-decision-ledger" in _s179_dual_record
+    and "operator-approval" in _s179_dual_record
+    and "disposition" in _s179_dual_record,
+    "the bare-literal paragraph must name 00-decision-ledger as the destination for anything appended to a gate decision",
+)
+check(
+    "suite179(ac5-ac7): gate-contract.md declares the named 'No gate-field repair' invariant"
+    " — no repair, sole orchestrator writer, recovery via fresh-nonce re-presentation",
+    '"No gate-field repair" invariant' in _s179_dual_record
+    and "No agent converts a malformed" in _s179_dual_record
+    and "well-formed one" in _s179_dual_record
+    and "No agent other than the" in _s179_dual_record
+    and "writes any of the six fields above" in _s179_dual_record
+    and "Recovery from a malformed field is" in _s179_dual_record
+    and "re-presenting the affected gate with a fresh" in _s179_dual_record,
+    "the invariant must be named, and must state no-repair, sole-writer, and fresh-nonce-recovery",
+)
+
+# --- Nominal reference: agents/delivery.md, beside the push Steps 10.1/10.2 ---
+check(
+    "suite179(ac8): delivery.md references the named 'No gate-field repair' invariant beside the push step",
+    '"No gate-field repair" invariant' in _s179_delivery_push
+    and "this agent never repairs a malformed gate field to" in _s179_delivery_push,
+    "the push step must reference the No gate-field repair invariant by name",
+)
+
+# --- Replication site: agents/orchestrator.md § Current State ---
+check(
+    "suite179(ac9): orchestrator.md § Current State replicates the bare-literal requirement"
+    " over the six named fields",
+    all(
+        f in _s179_current_state
+        for f in (
+            "gate1_release",
+            "gate2_release_last",
+            "gate3_release",
+            "gate_nonce",
+            "working_branch",
+            "worktree",
+        )
+    )
+    and "no second space-delimited token trails the value" in _s179_current_state,
+    "Current State must replicate the bare-literal rule over all six named fields",
+)
+check(
+    "suite179(ac10): orchestrator.md § Current State enumerates each field's live consumers",
+    "record-based recover backstop and the operator reading this file consume all six" in _s179_current_state
+    and "are additionally consumed by the executable" in _s179_current_state,
+    "Current State must name the live consumers of all six fields, plus working_branch/worktree's extra consumers",
+)
+check(
+    "suite179(ac11): orchestrator.md § Current State declares no hook wired in the Claude"
+    " Code plugin path reads any of the six fields since v2.139.0, and never claims a Claude"
+    " Code plugin hook verifies one",
+    "Since v2.139.0 no hook wired in the Claude Code plugin path" in _s179_current_state
+    and "reads any of the six" in _s179_current_state
+    and "so no Claude Code plugin hook verifies a gate field" in _s179_current_state,
+    "Current State must state that no Claude Code plugin hook reads a gate field post-v2.139.0,"
+    " scoped to the Claude Code plugin path, and never claim a hook verifies one universally",
+)
+check(
+    "suite179(ac12): orchestrator.md § Current State warns the # annotations are template"
+    " documentation never written to the real file",
+    "The `#` annotations throughout this schema" in _s179_current_state
+    and "documentation for you, the orchestrator authoring the real file" in _s179_current_state
+    and "written to the actual `00-state.md`" in _s179_current_state,
+    "Current State must warn that its # annotations are template-only, never literal file content",
+)
+
+# --- self-ref/registry/hygiene (per this repo's own Suite-176/177/178 precedent) --
+_s179_own = read(REPO_ROOT / "tests" / "test_agent_structure.py")
+check(
+    "suite179(self-ref): test file contains 'Suite 179' and 'gate-field-contract'",
+    "Suite 179" in _s179_own and "gate-field-contract" in _s179_own,
+    "test file must self-reference Suite 179 and the marker 'gate-field-contract'",
+)
+check(
+    "suite179(registry): docs/testing.md registers 'Suite 179' and 'gate-field-contract'",
+    "Suite 179" in _s179_testing_md and "gate-field-contract" in _s179_testing_md,
+    "docs/testing.md must register Suite 179 and the 'gate-field-contract' marker",
+)
+check(
+    "suite179(hygiene): CLAUDE.md does NOT contain 'Suite 179' (§11 hygiene contract)",
+    "Suite 179" not in _s179_claude,
+    "CLAUDE.md must not mention Suite 179 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: gate-field-contract
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

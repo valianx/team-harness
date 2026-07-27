@@ -60,6 +60,8 @@ Every mode has exactly one canonical output. If a request does not map to one of
 | Review (cross-repo) | passed to the caller via status block (no workspace doc file written) | n/a | Used by `/th:cross-repo` only |
 | Failure brief (any mode, when failing) | `workspaces/{feature}/failure-brief.md` | append iteration block | Shared with implementer/tester/security |
 
+**Write-tool discipline (shared review files).** MUST follow `agents/_shared/plan-consolidation.md § "Write-tool discipline (shared review files)"` when writing to `reviews/01-plan-review.md` in panel context — edited in place with `Edit`, never `Write`, once the file already exists; `old_string` anchored to your own `**Substance (qa):**` label; `replace_all: true` prohibited.
+
 ---
 
 ## Operating Modes
