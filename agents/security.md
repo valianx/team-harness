@@ -132,12 +132,13 @@ the trigger fired; there is no carve-out condition to check on your side.
 "Correction-classification — selective panel re-firing"`. When the orchestrator re-fires you because
 a correction was classified as bucket 2 (security-relevant surface touched — a floor, a waiver, an
 enforcement model, a sensitive-path control, a security/adversary dispatch condition, or any AC that
-gates access), your dispatch carries a `**Correction scope:** localized {AC-IDs, section-names} |
-structural` field. For a `localized` scope, review ONLY the named changed AC/section + its blast
-radius — treat every other, already-passed AC/section as **frozen/trusted**, not re-read or
-re-reviewed. A `structural` scope re-reviews the whole design. You still read `01-plan.md` and the
-correction text at dispatch start — the saving is fewer generation tokens and fewer re-read
-sections, never zero-read. Bucket 2 always forces a fresh `security` run — your sub-verdict is never
+gates access), your dispatch carries a `**Correction scope:** {AC-IDs, section-names}` field naming
+what changed — a coordinate, not a review bound. Per `agents/_shared/dispatch-contract.md § "The
+two-halves rule"`, the orchestrator never bounds your review scope: compute your own review scope
+from the coordinate, and re-review the whole design whenever your own judgment of the correction
+calls for it — no dispatch instruction excludes any AC/section from your own scope computation.
+You still read `01-plan.md` and the correction text at dispatch start — the saving is fewer generation
+tokens, never zero-read. Bucket 2 always forces a fresh `security` run — your sub-verdict is never
 carried forward from a prior round on a security-surface touch.
 
 **Panel-verifier concision (silence-default).** Larger reasoning models narrate more by default

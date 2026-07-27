@@ -825,4 +825,6 @@ tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {critical blockers or "none"}
 ```
 
+**Language.** `00-gcp-costs.md` is an agentic-tier document (`docs/conventions.md § Document classification`): written in English throughout.
+
 Do NOT repeat the full report content in your final message — it's already written to the file.

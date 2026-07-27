@@ -375,4 +375,6 @@ issues: {blocking issues if failed/blocked, or "none"}
 - The render-validate loop was not executed
 - MCP tools were used instead of the local render pipeline
 
+**Language.** `diagram.excalidraw` carries no prose (visual JSON, not a language surface). `05-diagram.md` is an agentic-tier document (`docs/conventions.md § Document classification`): written in English throughout.
+
 Do NOT repeat the full workspaces content in your final message. The orchestrator uses this status block to validate completeness before accepting.

@@ -204,16 +204,16 @@ explicit override of the classifier's own result, always available, never silent
 ### Delta-scoped Stage-1 review — the `Correction scope:` field
 
 When a routed lens re-fires (buckets 1-3), its dispatch carries a
-`**Correction scope:** localized {AC-IDs, section-names} | structural` field — the exact Stage-1
-analog of the Stage-2 `**Blast radius:**` field above. For a `localized` scope, the dispatched
-lens reviews ONLY the changed AC/section + its blast radius, treating unchanged, already-passed
-AC/sections as **frozen/trusted** — not re-read, not re-reviewed. A `structural` scope re-reviews
-the whole plan.
+`**Correction scope:** {AC-IDs, section-names}` field naming what changed — a coordinate, not a
+review bound. Per `agents/_shared/dispatch-contract.md § "The two-halves rule"`, review scope is
+never bounded by the dispatcher: the lens reviews at whatever scope its own judgment of the
+correction requires, using the coordinate to locate what changed, never to exclude the rest of the
+plan from consideration.
 
 **Stateless-dispatch honesty carries over verbatim (§ "Stateless-Dispatch Honesty" above).** The
 re-firing lens still reads its inputs at dispatch start — `01-plan.md`, the correction
-text/`failure-brief.md` entry. The saving is fewer generation tokens and fewer re-read sections,
-never zero-read. Do not over-promise a saving this mechanism does not deliver.
+text/`failure-brief.md` entry. What makes full-scope review affordable is the prompt-caching
+stable-prefix discipline below, not a narrowed read.
 
 ### Carried-forward sub-verdicts + combined-verdict recomputation
 
@@ -260,21 +260,25 @@ STABLE content — the `01-plan.md` content, the relevant CLAUDE.md sections, an
 system prompt — at the FRONT of the dispatch context, and the round-specific delta — the
 `Correction scope:` brief + the changed sections — at the END. Repeated re-reads across rounds
 then hit the subagent prefix cache (~0.1x input cost) instead of paying full input cost on every
-round (`docs/cost-and-caching.md`; the 5-minute subagent cache TTL). This compounds with the
-delta-scoped review above: a small, stable-prefixed, delta-only dispatch is cheaper to generate
-AND cheaper to read.
+round (`docs/cost-and-caching.md`; the 5-minute subagent cache TTL). This is what makes full-scope
+review (§ "Delta-scoped Stage-1 review" above — the dispatcher no longer bounds what a lens
+reviews) affordable: a stable-prefixed dispatch with a small round-specific delta is cheaper to
+generate AND cheaper to read, even when the lens reviews the whole plan.
 
 ### Byte-consistency requirement (fenced multi-site invariant)
 
 The correction-classification procedure, the `Correction scope:` field, and the carried-forward
-labeling contract above must be byte-consistent across:
+labeling contract above must be byte-consistent across the **five** real sites — a canonical
+contract, its producer, and three consumers:
 
 | Site | File | Anchor |
 |------|------|--------|
 | Canonical contract | `docs/patch-mode.md` (this file) | § Stage-1 Selective Panel Re-Firing |
-| Orchestrator wiring | `agents/orchestrator.md` | § "Correction-classification — selective panel re-firing" |
-| Combined-verdict consolidator | `agents/plan-reviewer.md` | § combined verdict under selective re-firing (Task-4 scope) |
+| Producer / orchestrator wiring | `agents/orchestrator.md` | § "Correction-classification — selective panel re-firing" |
+| Consumer — combined-verdict consolidator | `agents/plan-reviewer.md` | § combined verdict under selective re-firing (Task-4 scope) |
+| Consumer | `agents/qa-plan.md` | § "Delta-scoped review on selective re-firing (`Correction scope:`)" |
+| Consumer | `agents/security.md` | § "Delta-scoped review on selective re-firing (`Correction scope:`)" |
 
-A future edit to any one row without touching the other two is exactly the failure mode this
-table exists to prevent — a classification rule the orchestrator applies that `plan-reviewer`
-does not know how to render is a gap, not a refinement.
+A future edit to any one row without touching the other four is exactly the failure mode this
+table exists to prevent — a classification rule the orchestrator applies that a consumer does not
+know how to render is a gap, not a refinement.

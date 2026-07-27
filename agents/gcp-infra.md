@@ -486,4 +486,6 @@ tools: read:N write:N edit:N bash:N grep:N glob:N context7:N websearch:N webfetc
 issues: {critical blockers, pending operator approval at the gate, or "none"}
 ```
 
+**Language.** `02-gcp-infra.md` is an agentic-tier document (`docs/conventions.md § Document classification`): written in English throughout.
+
 Do NOT repeat the full report content in your final message — it's already written to the file.

@@ -1028,6 +1028,8 @@ The orchestrator propagates these into the `tools` field of the `phase.end` even
 - `tests_deleted` — number of test cases removed this iteration. **Default: 0.**
 - `tests_deleted_reason` — required only when `tests_deleted > 0`. Examples that pass the orchestrator's test-ratchet gate: "obsolete tests for removed feature X", "duplicate tests consolidated into shared factory", "tests covered scenarios reverted by user request". Examples that FAIL the gate: "tests were broken", "tests were flaky", "couldn't make them pass" — these are NOT valid reasons to delete tests, fix the underlying issue instead.
 
+**Language.** `03-testing.md` and `02-regression-test.md` are agentic-tier documents (`docs/conventions.md § Document classification`): written in English throughout, no operator-language exception. Test code itself follows the repo's existing test-file language (identifiers, assertion messages), never a separate rule.
+
 Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.
 
 ### Failure Brief (when `status: failed` only)

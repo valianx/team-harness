@@ -1729,6 +1729,8 @@ issues: {list of blockers, or "none"}
 
 The orchestrator propagates these into the `tools` field of the `phase.end` event in `00-execution-events.jsonl` and aggregates them into `00-pipeline-summary.md` (see orchestrator's "Pipeline Summary Protocol" section).
 
+**Language.** `01-plan.md` and `01-root-cause.md` are operator-facing documents (`docs/conventions.md § Document classification`): body prose follows the operator's resolved language; structural elements (headers, field names, AC identifiers) stay English. `research/00-research.md`, `research/00-audit.md`, and `01-planning.md` are agentic-tier: written in English throughout, no operator-language exception.
+
 Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.
 
 ---

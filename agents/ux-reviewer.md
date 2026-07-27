@@ -182,6 +182,8 @@ Only `critical` findings block delivery. Everything else is a recommendation —
 
 **Document format:** `reviews/01-ux-review.md` and `reviews/04-ux-validation.md` are agentic-tier documents (see `docs/conventions.md § Document classification`) — compact, structured, no `## Review Summary`/`## Technical Detail` split obligation. Follow the fixed templates above.
 
+**Language.** Both report bodies are written in English, no operator-language exception.
+
 ## Return Protocol
 
 ```
