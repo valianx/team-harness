@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.141.0] - 2026-07-26
+
+### Added
+- `docs/suite-evidence.md` defines an append-only, per-feature suite-run evidence ledger (`{command, tree_anchor, result, exit_code, counts, agent, phase, timestamp}`) so a downstream pipeline step can cite a prior full-suite run instead of re-running it, gated on strict full-tree-anchor equality — closes #532.
+
+### Fixed
+- `implementer` and `tester` now commit their own implementation/test diffs and report a `commit:` field (`{sha}` / `lane-deferred` / `none — no source change`) in their status blocks; the orchestrator's Phase-2-close check independently verifies the reported sha against a pre-dispatch baseline, tree cleanliness, branch/worktree location, and staging scope before accepting a `status: success` — closes #528.
+- Every panel writer that edits a shared review file (`plan-reviewer`, `qa-plan`, `security`, `adversary`) now uses section-scoped `Edit` instead of whole-file `Write`, with `replace_all` prohibited and `old_string` anchored to the writer's own section; the orchestrator runs a header-survival check around each panel dispatch so a lost heading/sub-verdict label blocks instead of silently passing — closes #527.
+- `00-state.md`'s six gate-state fields (`gate1_release`, `gate2_release_last`, `gate3_release`, `gate_nonce`, `working_branch`, `worktree`) now require bare-literal values with no trailing annotation, and the "No gate-field repair" invariant is named explicitly in the canonical gate contract — closes #530.
+- `policy-block` no longer denies a Bash command whose denied pattern (`git push --force`, `rm -rf`, etc.) appears only as inert data quoted or heredoc'd to a non-executing sink (e.g. `cat >> log.jsonl << 'EOF'` … `EOF`, or `echo "git push --force origin main" >> audit.log`) — closes #531.
+- `dev-guard` no longer asks for approval on an outward-action verb (`git push`, `gh pr create`, etc.) quoted or heredoc'd as inert data to the same class of sinks, using the same shared redaction module; the gate's sole `allow`-capable branch continues to derive both its branch selection and its classified command from the raw, unredacted parse.
+- `/th:update-models`'s opencode-only runtime is now legible in Claude Code's skill listing (first clause of `description`, plus a runtime line at the top of the skill body) — closes #522.
+
 ## [2.138.1] - 2026-07-26
 
 ### Fixed

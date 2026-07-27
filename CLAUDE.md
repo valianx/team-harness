@@ -96,7 +96,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — the only CC install channel. Go installer binary (GH Release assets) — the only opencode install channel; it does not serve Claude Code. |
 
-**Current version:** `2.140.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.141.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
@@ -280,17 +280,17 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 ## 8. Architecture Decisions
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
 > Full history: see `docs/decisions.md`. Recent entries below.
-- **2026-06-29** — `VERSION` asset: bare semver at `releases/latest/download/VERSION` (no GitHub API); best-effort pre-check. → `release.yml`
 - **2026-07-15** — Lanes own cost/speed, floor stays orthogonal. → `docs/pipeline-lanes.md`
-- **2026-07-20** — Security verification consolidated into the Pre-Delivery Security Audit (Phase 3.8, once per delivery group over the consolidated final diff): `security` unconditional, `adversary` on `security_floor_applies` alone; findings operator-disposed at STAGE-GATE-3, no autonomous security-lens iterations. Retires `adversary_floor_applies`, per-round reports, the staleness re-gate, and the whack-a-mole detector. → `agents/orchestrator.md § Phase 3.8` → superseded 2026-07-21 by the adversary-only-conditional model below
 - **2026-07-21** — Pre-Delivery Security Audit narrowed to `adversary` alone, conditional on `security_floor_applies`: the unconditional `security` code-audit dispatch is removed from Phase 3.8, and code-level review for a non-sensitive task is delegated to PR review (named generically, not tied to any specific configured tool). SEC-002 design-review (Phase 1.6), the `security_floor_applies` predicate, the Phase-2-close backstops, and Phase 4.5 internal review are unchanged. Also retires the Phase 3.6 `acceptance-checker` drift audit entirely (no replacement dispatch). → `agents/orchestrator.md § Phase 3.8`, `docs/dev-mode.md § Security Floor Non-Waivability`
+- **2026-07-27** — Implementation-diff commit ownership assigned explicitly (verifiable-contracts, #528): `implementer` commits its own diff, `tester` its own test diff, three-value vocabulary (`{sha}` / `lane-deferred` / `none — no source change`); orchestrator gates via a 7-conjunct Phase-2-close commit-integrity check anchored on a `base_sha` registered before each 1:1 dispatch. → `agents/implementer.md § "Commit Contract"`, `agents/orchestrator.md § "Phase 2-close commit-integrity check"`
+- **2026-07-27** — Gate-state contract (#530): the six named `00-state.md` fields (`gate1_release`, `gate2_release_last`, `gate3_release`, `gate_nonce`, `working_branch`, `worktree`) require bare-literal values (no annotation), enforced as prose contract only — no hook mechanism, since `gate-guard`/`checkpoint-guard` are unwired from Claude Code's `.claude-plugin/hooks.json` since v2.139.0 — plus the named "No gate-field repair" invariant. → `agents/_shared/gate-contract.md § "The dual-record release"`
 
 ## 9. Patterns & Conventions
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
-- **Three-state update**: update-available / already-current / installed-ahead; installed-ahead reports only; already-current zero-writes. → `cmd/install/update.go`
-- **Restart-to-activate honesty**: never claim live; print after any apply, not on zero-write paths. → `cmd/install/update.go`
+> Full history: see `docs/patterns.md`. Recent entries below.
 - **TTY prompt → stderr**: prompt to `os.Stderr`, read from `/dev/tty`/stdin; never write an O_RDONLY handle. → `cmd/install/update.go`
-- **Data-position redaction, not payload widening**: when a gate false-positives on a command quoted/heredoc'd as inert data, mask the data span (fixed-length, space-substitution) before position-command checks run — never relax the checks themselves. `allow`-capable consumers must derive branch selection AND the classified command from the RAW parse only; the redacted parse feeds exclusively non-`allow` branches. → `hooks/ts/bodies/data-position.ts`, `hooks/ts/bodies/dev-guard.ts` (`evaluate()`)
+- **Suite-run evidence ledger** (#532): append-only `docs/suite-evidence.md`-defined per-feature registry, one row per verification-command run; `tree_anchor` reused literally from `docs/verification-packet.md § 2`; strict full-tree-anchor equality (never a "relevant files" heuristic) decides skip-vs-rerun; closed writer list. → `docs/suite-evidence.md`, `agents/delivery.md § "Step 9b"`
+- **Shared-review-file write discipline** (#527): every panel writer (`plan-reviewer`, `qa-plan`, `security`, `adversary`) uses `Edit` (never `Write`) on an existing shared review file, `old_string` anchored to its own section, `replace_all` forbidden; orchestrator runs a header-survival snapshot/compare around each panel dispatch. → `agents/_shared/plan-consolidation.md § "Write-tool discipline (shared review files)"`
 
 - Self-documenting code first; comment WHY not WHAT; route genuine rationale to `/docs` not to inline comments — see `docs/code-comments.md`.
 
