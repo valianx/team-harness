@@ -31,10 +31,11 @@ the consumer is about to check.
 
 ### `tree_anchor`
 
-Defined **by reference** to `docs/verification-packet.md § 2` "Tree anchor" field — the identical
-mechanic (`git rev-parse HEAD`, plus a dirty-tree diff hash when uncommitted changes exist). This
-document introduces no second tree-identity mechanism; a row's `tree_anchor` and a verification
-packet's `Tree anchor` are the same primitive read at two different call sites.
+Defined **by reference** to `docs/verification-packet.md § 1a` — the canonical algorithm
+definition (`git rev-parse HEAD`, plus a dirty-tree hash covering both tracked changes and
+untracked-file content when the tree is dirty). This document introduces no second tree-identity mechanism,
+and no second command; a row's `tree_anchor` and a verification packet's `Tree anchor` are the
+same primitive, computed by the same command, read at different call sites.
 
 ---
 

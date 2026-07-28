@@ -199,8 +199,8 @@
     "file": "agents/orchestrator.md",
     "mode": "heading",
     "anchor": "### Single shared Phase-3 floor predicate (T2-AC-10)",
-    "sha256": "f392511808f07401b9d2b3e581a3359d34bb48941e42855909c46d81f2ea7e1c",
-    "length": 3930,
+    "sha256": "b9728ddecbce407da3504496a22d163c788c324e2936f5698303afa6c1597a66",
+    "length": 4443,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -244,8 +244,8 @@
     "file": "agents/orchestrator.md",
     "mode": "heading",
     "anchor": "## STAGE-GATE-3 \u2014 End of Stage 3 (mandatory human approval before push)",
-    "sha256": "e7bff46ef59bc739527fd7e7429ac463cdd1a4f1a36bb3ec9b06dc3cac48a62a",
-    "length": 5322,
+    "sha256": "12e4ad767740fb4bd25f36cb320f693f7e49a9283fe714298895014d972a013b",
+    "length": 5701,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -439,12 +439,12 @@
     "file": "agents/delivery.md",
     "mode": "heading",
     "anchor": "## Critical Rules",
-    "sha256": "0722c58c03ca4b977a975212cccc46bb34e3dcf0a7a273899b76bfc0a20e569f",
-    "length": 1535,
+    "sha256": "8af37c24f66b429106ecc3335d74c2048667912dce8053a1d8838e6db7536984",
+    "length": 2414,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
-      "NEVER": 2,
+      "NEVER": 3,
       "unconditionally": 0,
       "non-waivable": 0
     }
@@ -454,13 +454,13 @@
     "file": "agents/_shared/delivery-mechanics.md",
     "mode": "heading",
     "anchor": "## 6. The push-step precondition block (three conjuncts, none repairable in place)",
-    "sha256": "8c26965495ea97b67098a4f1e4fed5c561b238b5087d0623611b9abdffc5661b",
-    "length": 3944,
+    "sha256": "4946c9159ca05b6a0bba83aacd7cffb5a1960c3d09810cb55abe2d00d4abf632",
+    "length": 6272,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
       "NEVER": 1,
-      "unconditionally": 0,
+      "unconditionally": 1,
       "non-waivable": 0
     }
   },
@@ -499,8 +499,8 @@
     "file": "agents/delivery.md",
     "mode": "heading",
     "anchor": "## Return Protocol",
-    "sha256": "0b86dc65ba9b4dcf2773395bc60c740a74c54e26942a89841a1c39f510c7d9b9",
-    "length": 2553,
+    "sha256": "cde8d89b76b6269c507c389366b86e1a4e688ccc8aa5d99f316d6fb068d2c6bb",
+    "length": 3385,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,

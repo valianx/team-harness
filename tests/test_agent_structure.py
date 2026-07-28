@@ -2081,7 +2081,7 @@ for ref in sorted(plausible_agent_refs):
 #    orchestrator.md) are in the canonical set.
 #    Canonical phases (per the Pipeline Flow ASCII art and Stage table):
 CANONICAL_PHASES = {
-    "0a", "0b", "1", "1.5a", "1.5", "1.6", "1.7", "1.8", "2.0", "2", "2.5", "2.6", "2.7", "2.8", "3", "3.4", "3.5", "4", "5", "6",
+    "0a", "0b", "1", "1.5a", "1.5", "1.6", "1.7", "1.8", "2.0", "2", "2.5", "2.6", "2.7", "2.75", "2.8", "3", "3.4", "3.5", "4", "5", "6",
     # 2.0 is the Bug-fix Pipeline regression-test phase (type: fix | hotfix only),
     # inserted between STAGE-GATE-1 and Phase 2. See ref-special-flows.md § Bug-fix Flow.
     # 2.6 is the Code-Hygiene Scan (deterministic, all types), sequenced between
@@ -2092,6 +2092,10 @@ CANONICAL_PHASES = {
     # Verification plus a new base-advance reconcile, and is the single point that opens the
     # fan governed by the re-open rule in Phase 3 — Verify. See agents/orchestrator.md § "Phase
     # 2.8 — Freeze".
+    # 2.75 is Knowledge Capture (security-hardening round, C1): a pre-gate `delivery`
+    # (mode: knowledge-capture) dispatch that writes docs/knowledge.md/decisions.md/patterns.md
+    # BEFORE Phase 2.8 closes, so their content is inside the tree the Phase 3 fan audits. See
+    # agents/orchestrator.md § "Phase 2.75 — Knowledge Capture".
     # 1.7 is ux-reviewer enrich (frontend_scope: true only); executes after architect, before 1.5.
     # 1.8 is the Post-approval Plan-Review Offer (deferred, non-sensitive plans only); executes
     # after STAGE-GATE-1, before Phase 2.0/2. See agents/orchestrator.md § "Phase 1.8".
@@ -31131,11 +31135,41 @@ check(
     "marker 'recording the accepted finding verbatim' not found "
     "— AC-18 (repointed) informed-consent ledger entry missing",
 )
+# RETARGETED (pipeline-dispatch-shape, security-hardening round, STAGE-GATE-2
+# HOLD ruling C4): the prior form asserted "incomplete_on_changed_control in
+# _s125_orch" (SPLIT_CORPUS, whole-corpus substring) -- satisfied by the stale
+# "3.8-audit" worked-example row in the `## Agent Results` template, not by
+# operative logic (6th false-green of this class this run). Re-scoped to the
+# two operative sites the wiring actually lives in: the Phase 3 combined-
+# verdict formula and the STAGE-GATE-3 gate_pending field list, both anchor-
+# scoped via the file's own _slice_section idiom (see "Slice helpers" above)
+# -- a future removal from either site now fails this check even if the
+# cosmetic example row is left untouched.
+_S125_C4_STOP = ("\n## ",)
+_S125_C4_VERDICT_ANCHOR = "**Gate — combined verdict (T2-AC-13, severity floor).**"
+_s125_c4_verdict_slice = _slice_section(_s125_orch, _S125_C4_VERDICT_ANCHOR, _S125_C4_STOP)
+# The generic "**Gate data you return to `th:leader` as `gate_pending`" bold lead-in repeats
+# verbatim at THREE gate sites in orchestrator.md (STAGE-GATE-1 line ~467, an intermediate
+# gate line ~688, STAGE-GATE-3 line ~1250) -- anchoring on it alone would resolve to the
+# FIRST (STAGE-GATE-1) occurrence via first-match .find(), never reaching STAGE-GATE-3's own
+# incomplete_on_changed_control addition. Anchored instead on a phrase unique to the
+# STAGE-GATE-3 field-list sentence itself.
+_S125_C4_GATE3_ANCHOR = "omitting `security_audit`'s `broke-it` findings"
+_s125_c4_gate3_slice = _slice_section(_s125_orch, _S125_C4_GATE3_ANCHOR, _S125_C4_STOP)
 check(
-    "s125/AC-18c: orchestrator.md reads incomplete_on_changed_control from adversary status block",
-    "incomplete_on_changed_control" in _s125_orch,
-    "marker 'incomplete_on_changed_control' not found in agents/orchestrator.md "
-    "— AC-18 (#373-5) INCOMPLETE field not read in worst-of gate",
+    "s125/AC-18c: orchestrator.md wires incomplete_on_changed_control into"
+    " BOTH the Phase 3 combined-verdict formula and the STAGE-GATE-3"
+    " gate_pending.security_audit field list (not merely present somewhere"
+    " in the corpus)",
+    bool(_s125_c4_verdict_slice)
+    and "incomplete_on_changed_control" in _s125_c4_verdict_slice
+    and bool(_s125_c4_gate3_slice)
+    and "incomplete_on_changed_control" in _s125_c4_gate3_slice,
+    "marker 'incomplete_on_changed_control' missing from the Phase 3"
+    " combined-verdict formula slice and/or the STAGE-GATE-3 gate_pending"
+    " field-list slice of agents/orchestrator.md — AC-18 (#373-5) INCOMPLETE"
+    " field not wired into the worst-of gate/gate data (a hit on the stale"
+    " '3.8-audit' worked-example row alone does not satisfy this check)",
 )
 
 # -------------------------------------------------------------------
@@ -39477,10 +39511,24 @@ check(
 # at the new home's live text rather than freezing the pre-move wording.
 _s176_deliv_mechanics = read(AGENTS_DIR / "_shared" / "delivery-mechanics.md")
 _s176_deliv_mechanics_s4 = _s176_slice(_s176_deliv_mechanics, "## 4. Staging and commit")
+# RETARGETED (pipeline-dispatch-shape, security-hardening round, STAGE-GATE-2 HOLD ruling
+# C2): the prior pin froze `git add docs/  # only if delivery modified docs/knowledge.md
+# — never docs/specs/` — the adversary's own C2 finding (reviews/04-adversary.md) is that
+# this EXACT line stages the entire docs/ tree, contradicting its own comment, and sweeps
+# docs/specs/ into the delivery commit. The block is deliberately rewritten to explicit
+# file paths (no directory prefix) as the fix itself, not an unrelated drift — the pin
+# re-baselines at the new, corrected content, the same "re-baseline at the new home's live
+# text" precedent already used once for this exact block's prior move.
 _S176_GIT_ADD_BLOCK = (
     "git add CLAUDE.md CHANGELOG.md\n"
     "git add .claude-plugin/plugin.json .claude-plugin/marketplace.json  # only if version bumped\n"
-    "git add docs/                 # only if delivery modified docs/knowledge.md — never docs/specs/\n"
+    "git add docs/constraints.md docs/testing.md  # only if this dispatch's CLAUDE.md §10/§11\n"
+    "                                              # auto-offload wrote them — NEVER docs/specs/,\n"
+    "                                              # and NEVER docs/knowledge.md / docs/decisions.md /\n"
+    "                                              # docs/patterns.md, which are committed pre-gate by\n"
+    "                                              # delivery's own mode: knowledge-capture dispatch\n"
+    "                                              # (agents/orchestrator.md § \"Phase 2.75 — Knowledge\n"
+    "                                              # Capture\") and are never staged here\n"
     "git add README.md             # only if delivery modified it\n"
     "git add openapi/openapi.yaml  # only if updated\n"
     "git add changelog.d/{pr-slug}.md  # always stage the fragment when one was written, pre-deletion"
@@ -39499,9 +39547,13 @@ check(
 )
 check(
     "suite176(deliv-ac24): delivery-mechanics.md § 4's git add block is unchanged"
-    " byte-for-byte (regression pin, re-baselined at its new home)",
-    _S176_GIT_ADD_BLOCK in _s176_deliv_mechanics,
-    "the git add staging list at its new home must not be altered by an unrelated edit",
+    " byte-for-byte (regression pin, re-baselined at its new, corrected home — no bare"
+    " 'git add docs/' directory sweep)",
+    _S176_GIT_ADD_BLOCK in _s176_deliv_mechanics
+    and "git add docs/ " not in _s176_deliv_mechanics_s4
+    and "git add docs/\n" not in _s176_deliv_mechanics_s4,
+    "the git add staging list at its new home must not be altered by an unrelated edit,"
+    " and must never regress to a bare 'git add docs/' directory sweep",
 )
 
 # --- output-template.md: retired over-claim, self-report successor (AC-22) --
@@ -39603,11 +39655,20 @@ check(
     ),
     "docs/suite-evidence.md must exist and its row schema must name all eight fields",
 )
+# RETARGETED (pipeline-dispatch-shape, security-hardening round, STAGE-GATE-2 HOLD ruling
+# C3): the tree-anchor "dirty-diff hash" was prose-only at every citing site, with no
+# concrete, reproducible command defined anywhere (reviews/04-adversary.md C3 finding).
+# docs/verification-packet.md § 1a is now the single canonical site that names the actual
+# command; this doc's own § 2 "Tree anchor" field is only the packet's header-field
+# description, not the algorithm itself, so the pointer moves to § 1a specifically — a
+# repoint to a more precise anchor within the SAME canonical file, not a relocation away
+# from it.
 check(
-    "suite177(ac2): tree_anchor is defined by reference to docs/verification-packet.md § 2, no second identity mechanism",
-    "docs/verification-packet.md § 2" in _s177_evidence_doc
+    "suite177(ac2): tree_anchor is defined by reference to docs/verification-packet.md § 1a"
+    " (the canonical algorithm), no second identity mechanism",
+    "docs/verification-packet.md § 1a" in _s177_evidence_doc
     and "introduces no second tree-identity mechanism" in _s177_evidence_doc,
-    "tree_anchor must point to verification-packet.md § 2 and disclaim a second identity mechanism",
+    "tree_anchor must point to verification-packet.md § 1a and disclaim a second identity mechanism",
 )
 # RETARGETED (pipeline-dispatch-shape, T7-AC-2 residual, Suite-171 relocation
 # pattern — same doc, renamed anchor): docs/suite-evidence.md was already

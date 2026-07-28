@@ -3,10 +3,13 @@
 This file is the single source of truth for the mechanical, one-correct-answer half of
 delivery: every step here is executed by the orchestrator directly (Bash/`gh`/`git`), never
 dispatched to a subagent. `delivery` (the subagent) owns the prose half AND its own
-best-effort post-PR tail — PR body text, CHANGELOG entry text, `docs/knowledge.md`
-capture, README/CLAUDE.md memory updates, worktree teardown, release-tag verification, KG
-passive capture, obsidian interlinking, and initiative-overview data — see
-`agents/delivery.md`. That tail stays with `delivery` deliberately: every one of those steps
+best-effort post-PR tail — PR body text, CHANGELOG entry text, README/CLAUDE.md §3/§8/§9
+memory updates, worktree teardown, release-tag verification, KG passive capture, obsidian
+interlinking, and initiative-overview data — see `agents/delivery.md`. `docs/knowledge.md`,
+`docs/decisions.md`, and `docs/patterns.md` capture is a SEPARATE, earlier `delivery` dispatch
+(`mode: knowledge-capture`, before this file's procedures ever run — `agents/orchestrator.md
+§ "Phase 2.75 — Knowledge Capture"`), not part of the prose half this file assumes has already
+returned. That post-gate tail stays with `delivery` deliberately: every one of those steps
 already tolerates running before its trigger condition holds (a PR not yet merged, no
 initiative context) by logging a named `skipped:` outcome — there is no ordering conflict to
 resolve by relocating them. `agents/orchestrator.md § Phase 4 — Delivery` points here by
@@ -20,10 +23,14 @@ once, at Phase 4 — never at boot, unlike anything inlined directly into
 `agents/_shared/dispatch-contract.md` and `agents/_shared/gate-contract.md`.
 
 **Ordering — this file's procedures run in the order listed**, immediately after
-STAGE-GATE-3 records `gate3_release: ship` and the `delivery` subagent's single dispatch has
-returned with its prose artifacts on disk (`docs/knowledge.md`, `README.md`, `CLAUDE.md`,
+STAGE-GATE-3 records `gate3_release: ship` and the `delivery` subagent's post-gate dispatch has
+returned with its prose artifacts on disk (`README.md`, `CLAUDE.md`,
 `changelog.d/{pr-slug}.md`, the Acceptance Matrix appended to `reviews/04-validation.md` or
 `03-testing.md`, and the PR-body draft at `workspaces/{feature-name}/inputs/pr-body-draft.md`).
+`docs/knowledge.md`, `docs/decisions.md`, and `docs/patterns.md` are produced earlier, by
+`delivery`'s own pre-gate `mode: knowledge-capture` dispatch
+(`agents/orchestrator.md § "Phase 2.75 — Knowledge Capture"`), and are already committed by the
+time this file's procedures run — never staged or written here.
 
 ---
 
@@ -147,11 +154,20 @@ any OTHER path remaining means the implementation diff was never committed — S
 escalate to the operator, naming the uncommitted paths. Never stage or commit to close this
 gap silently.
 
-**Stage:**
+**Stage — explicit paths only, never a directory sweep.** `git add docs/` staged the entire
+`docs/` tree (contradicting its own prior comment) and would sweep unrelated content
+(`docs/specs/`, `docs/dev-mode.md`, anything else dirty under `docs/`) into this commit. Every
+path below is a fully-qualified file, never a directory prefix:
 ```
 git add CLAUDE.md CHANGELOG.md
 git add .claude-plugin/plugin.json .claude-plugin/marketplace.json  # only if version bumped
-git add docs/                 # only if delivery modified docs/knowledge.md — never docs/specs/
+git add docs/constraints.md docs/testing.md  # only if this dispatch's CLAUDE.md §10/§11
+                                              # auto-offload wrote them — NEVER docs/specs/,
+                                              # and NEVER docs/knowledge.md / docs/decisions.md /
+                                              # docs/patterns.md, which are committed pre-gate by
+                                              # delivery's own mode: knowledge-capture dispatch
+                                              # (agents/orchestrator.md § "Phase 2.75 — Knowledge
+                                              # Capture") and are never staged here
 git add README.md             # only if delivery modified it
 git add openapi/openapi.yaml  # only if updated
 git add changelog.d/{pr-slug}.md  # always stage the fragment when one was written, pre-deletion
@@ -262,33 +278,62 @@ effort), another actor pushing to this same feature branch is not an admitted ca
 
 ### (c) Tree-anchor and post-gate write-allowlist check
 
+**Independent untracked-file guard (runs FIRST, unconditionally — mirrors
+`docs/suite-evidence.md § 4`'s equivalent guard for the identical primitive).** Before
+computing or comparing any tree anchor, run `git status --porcelain` on its own. If it
+reports ANY untracked path, that alone is sufficient to force re-opening Phase 2.8 → Phase 3
+→ STAGE-GATE-3 — **independent of, and in addition to**, whatever the tree-anchor comparison
+below would otherwise conclude. Rationale, stated at its true width: `git diff` does not
+report untracked paths, so a new file left uncommitted at this, the more security-critical of
+the two anchor-comparison sites (it guards the irreversible push), would otherwise leave a
+prior anchor looking intact over a tree that in fact changed — the exact failure mode
+`docs/suite-evidence.md § 4` names for its own sibling primitive. This guard is unconditional:
+it fires even when the tree-anchor comparison below reports a clean match.
+
 Compare the current tree anchor against the fan-open anchor Phase 2.8 recorded
-(`00-verify-packet.md § Tree anchor:`). On a mismatch, classify every changed path against
+(`00-verify-packet.md § Tree anchor:`), re-deriving the current side FRESH per the canonical
+algorithm at `docs/verification-packet.md § 1a` (never re-derived or paraphrased here). On a
+mismatch, classify every changed path against
 the **post-gate write allowlist** below:
 
 ```
 CHANGELOG.md, changelog.d/**
 {the three declared version sites, per § 1}
-docs/knowledge.md, docs/decisions.md, docs/patterns.md
+docs/knowledge.md — restricted to the `[kg]` bullet-append ONLY (Phase 6's own
+                     mechanically-generated write, one line per saved KG entity;
+                     agents/orchestrator.md § "Phase 6 — Knowledge Save"; no other
+                     content is allowlisted here)
 README.md
 CLAUDE.md §3, §8, §9
 ```
+
+`docs/decisions.md` and `docs/patterns.md` are REMOVED from this allowlist (security-hardening
+round, C1) — they are no longer post-gate writes at all. Their content is produced and
+committed earlier, by `delivery`'s pre-gate `mode: knowledge-capture` dispatch
+(`agents/orchestrator.md § "Phase 2.75 — Knowledge Capture"`), inside the tree the fan audits;
+a change to either path detected at THIS check now correctly fails closed like any other
+out-of-allowlist path, rather than passing silently as it did before this round.
 
 Any changed path OUTSIDE this allowlist fails closed — re-open Phase 2.8 → Phase 3 →
 STAGE-GATE-3. `agents/**`, `docs/dev-mode.md`, and `CLAUDE.md` §5/§6/§7 are explicitly OFF
 this allowlist — every contract-statement surface stating this project's security floors is
 never eligible for a silent post-gate pass.
 
-Derive the changed-path set the same way the tree anchor itself is derived — committed range
-plus the dirty working tree, untracked paths included; a plain `git diff --name-only HEAD` is
-not sufficient on an already-dirty branch.
+Derive the changed-path set the same way the tree anchor itself is derived — per
+`docs/verification-packet.md § 1a`'s canonical algorithm, never re-derived or paraphrased
+here.
 
-**Residual, stated at its true width.** This check classifies PATHS, not authorship and not
-content — every byte inside an allowlisted path ships unread by construction, including
-`docs/decisions.md` and `docs/patterns.md`, which carry no section restriction at all. The
-`CLAUDE.md` section restriction is a hunk-header scan, coarser than a semantic diff — a
-floor-weakening sentence smuggled inside an allowed §8 row would pass it. PR review is the
-named backstop for this whole residual, not a substitute for it.
+**Residual, stated at its true width — narrowed by this round (C1), not eliminated.** This
+check classifies PATHS, not authorship and not content — every byte inside an allowlisted path
+ships unread by construction. Before this round, that included the whole of `docs/knowledge.md`,
+`docs/decisions.md`, and `docs/patterns.md`, none of which carried a section restriction; those
+two files are now removed from the allowlist entirely (moved pre-gate), and `docs/knowledge.md`
+is now restricted to a single, mechanically-generated `[kg]` bullet line per KG entity —
+content already passed through the KG write-time content filter (`docs/kg-content-policy.md`)
+before it reaches this check, not free-form prose. The remaining residual is narrower but not
+zero: the `CLAUDE.md` section restriction is still a hunk-header scan, coarser than a semantic
+diff — a floor-weakening sentence smuggled inside an allowed §8/§9 row would still pass it. PR
+review is the named backstop for this remaining residual, not a substitute for it.
 
 ---
 
