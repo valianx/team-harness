@@ -38004,6 +38004,35 @@ check(
     " divergent key name would desync the two sites' reconciliation",
 )
 
+# --- Regression seed (issue #544): refused-write outcome for the settings.json
+# provisioning write. Task-1 adds the outcome to the canonical section; Task-2
+# applies it at both skill sites. Both literals are absent from the tree today,
+# so this check fails until Task-1 and Task-2 land — see workspaces
+# 01-root-cause.md § Regression Test Approach. Task-3 extends this seed with
+# the refusal-vs-decline distinction, the security-load-bearing command
+# anchors, and the double-prohibition anchor.
+_S173_REFUSED_WRITE_LITERALS = ("operator-executed fallback", "operator-action-required")
+check(
+    "suite173(refused-write-canonical): docs/setup-update-model.md's canonical"
+    " prerequisite section names the refused-write outcome",
+    all(lit in _s173_canonical_slice for lit in _S173_REFUSED_WRITE_LITERALS),
+    f"docs/setup-update-model.md § {_S173_CANONICAL_ANCHOR} must contain both"
+    f" {_S173_REFUSED_WRITE_LITERALS!r} — the refused-write outcome is not yet"
+    " specified",
+)
+check(
+    "suite173(refused-write-setup-skill): skills/setup/SKILL.md applies the"
+    " refused-write outcome",
+    all(lit in _s173_setup_skill for lit in _S173_REFUSED_WRITE_LITERALS),
+    f"skills/setup/SKILL.md must contain both {_S173_REFUSED_WRITE_LITERALS!r}",
+)
+check(
+    "suite173(refused-write-update-skill): skills/update/SKILL.md applies the"
+    " refused-write outcome",
+    all(lit in _s173_update_skill for lit in _S173_REFUSED_WRITE_LITERALS),
+    f"skills/update/SKILL.md must contain both {_S173_REFUSED_WRITE_LITERALS!r}",
+)
+
 # --- AC-1b: the residual-seam amendment reconciles the closed exception ----
 _S173_RESIDUAL_ANCHOR = "## The residual seam: new operator keys"
 _s173_residual_slice = _slice_section(_s173_setup_model, _S173_RESIDUAL_ANCHOR, _S173_STOP_H2)
