@@ -68,8 +68,8 @@ def _read_or_empty(path: Path) -> str:
         return ""
 
 
-# The monolithic agents/orchestrator.md was split into ten files: the two
-# always-loaded spine files (leader.md, orchestrator.md), three read-on-demand
+# The monolithic agents/orchestrator.md was split into eleven files: the two
+# always-loaded spine files (leader.md, orchestrator.md), four read-on-demand
 # reference files (ref-*.md), and the shared cross-agent contract fragments
 # under _shared/. A check that used to assert "orchestrator.md contains X" is
 # a content-EXISTENCE check against the former monolith — its faithful
@@ -80,7 +80,19 @@ def _read_or_empty(path: Path) -> str:
 # did before this constant existed) for use by existence-style assertions.
 # Assertions that verify a specific file OWNS a piece of content (as opposed
 # to merely containing it) stay scoped to that single file's `read(...)`.
+#
+# ref-dispatch-machinery.md is placed BEFORE leader.md, not after orchestrator.md
+# with the other ref-*.md files: five sections relocated out of leader.md keep a
+# same-heading-text stub in leader.md (a one-line pointer to their new home), so
+# an existence check anchored on that exact heading text would otherwise match
+# the STUB (leader.md, shallow body) via first-match if leader.md preceded this
+# file in the corpus, instead of the byte-preserved full content this file now
+# owns. Placing it first makes `.find()`/`_slice_section`'s first match resolve
+# to the real content; it never collides with orchestrator.md (verified: none of
+# its headings duplicate any orchestrator.md heading), so the documented
+# leader->orchestrator relative order above is unaffected.
 _SPLIT_CORPUS_FILES = [
+    AGENTS_DIR / "ref-dispatch-machinery.md",
     AGENTS_DIR / "leader.md",
     AGENTS_DIR / "orchestrator.md",
     AGENTS_DIR / "ref-special-flows.md",
@@ -94,6 +106,7 @@ _SPLIT_CORPUS_FILES = [
     AGENTS_DIR / "_shared" / "apply-review-disposition.md",
     AGENTS_DIR / "_shared" / "finding-connection.md",
     AGENTS_DIR / "_shared" / "gh-fallback.md",
+    AGENTS_DIR / "_shared" / "dispatch-contract.md",
 ]
 
 SPLIT_CORPUS = "\n".join(_read_or_empty(p) for p in _SPLIT_CORPUS_FILES)
@@ -1764,9 +1777,21 @@ check(
 #     (introducing "Phase 1.7" without wiring it in is silent UX breakage)
 print("=== Suite 19: Agent identity & cross-reference consistency ===")
 
-# Agents that legitimately have no .md file because they're reference files
-# (loaded on-demand by the orchestrator, not standalone agents)
-REFERENCE_ONLY_AGENTS = {"ref-direct-modes", "ref-special-flows", "ref-intake-flows"}
+# Agents that legitimately have no dispatchable identity because they are
+# lazy-loaded reference files (consumed on-demand by leader/orchestrator, never
+# invocable subagents). Derived from the `ref-` filename prefix — the same
+# semantics `skills/lint/SKILL.md` already uses to exclude these files from its
+# own agent-facing checks (see `skills/lint/SKILL.md:125`, `:128`, `:209`,
+# `:290`) — rather than a hand-maintained enumerated set. A hardcoded set fails
+# CLOSED (a new ref-*.md file breaks the build until registered, which is
+# exactly the mechanism that surfaced this correction); the prefix derivation
+# fails OPEN instead (a future ref-*.md silently excludes itself from the
+# Roster bijection and the Suite 19 orphan-agent check). Suite 180's
+# dispatch-target assertion is the compensating control for that direction:
+# no `th:ref-*` name may ever appear as a dispatch target in agents/**/
+# skills/** — see "Suite 180" below and `agents/README.md § "Objective column
+# — authoring standard"` for the authoring-convention half of this pair.
+REFERENCE_ONLY_AGENTS = {p.stem for p in AGENTS_DIR.glob("ref-*.md")}
 
 # Pipeline + standalone + reference agents that legitimately exist
 ALL_AGENT_FILES = sorted(p.stem for p in AGENTS_DIR.glob("*.md") if p.stem != "README")
@@ -38385,7 +38410,7 @@ _S174_INCOMING_ANCHORS = (
     ("docs/observability.md", "agents/orchestrator.md", "Flow Telemetry Emission"),
     ("docs/knowledge.md", "agents/orchestrator.md", "Workspaces: what you own"),
     ("docs/knowledge.md", "agents/leader.md", "Multi-Task fan-out"),
-    ("docs/knowledge.md", "agents/leader.md", "Consolidated delivery"),
+    ("docs/knowledge.md", "agents/ref-dispatch-machinery.md", "Consolidated delivery"),
     ("agents/ref-direct-modes.md", "agents/orchestrator.md",
      "Phase 1.8 — Post-approval Plan-Review Offer"),
     ("agents/tester.md", "agents/orchestrator.md", "Express Lane Profile"),
