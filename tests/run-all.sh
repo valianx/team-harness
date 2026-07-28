@@ -347,18 +347,6 @@ fi
 
 echo
 echo "############################################################"
-echo "# Suite 22: update-models resolver fixture test (Suite 128)"
-echo "# Requires: python3. Skips cleanly when absent."
-echo "############################################################"
-if bash "$TESTS_DIR/test_update_models_resolver.sh"; then
-    echo "update-models-resolver: PASS"
-else
-    echo "update-models-resolver: FAIL"
-    FAILED=$((FAILED + 1))
-fi
-
-echo
-echo "############################################################"
 echo "# Suite 23: /th:update managed-block sync — five-row matrix"
 echo "# Requires: python3. Skips cleanly when absent."
 echo "############################################################"

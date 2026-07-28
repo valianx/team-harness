@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.142.0] - 2026-07-28
+## [2.143.0] - 2026-07-28
 
 ### Added
 - Canonical dispatch contract (`agents/_shared/dispatch-contract.md`) states the two-halves scope rule (review scope never bounded by the dispatcher; write scope always bounded by the recipient's own contract) and a five-column control rubric; consumed by pointer from `leader`, `orchestrator`, `agents/README.md`, and `agent-builder` — closes #524.
@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 14 agent output contracts each declare the language of every artifact they produce, replacing the orchestrator's own dispatch-time language directive — closes #524.
 - The leader's dispatch machinery (repo-identity verification, `overview.md` template, Roster schema/write discipline, spawn payload contract, fan-out and consolidated-delivery mechanics, parallel multi-project dispatch) relocates byte-preserved to a new `agents/ref-dispatch-machinery.md`; dead pointers to `docs/discover-phase.md` and `docs/spec-coauthoring.md` are restored — closes #524.
 - `agents/qa.md` no longer claims to define acceptance criteria standalone; its five stale references are aligned with `agents/qa-plan.md`, which already owns that work.
+## [2.142.0] - 2026-07-27
+
+### Removed
+- `/th:update-models` (`skills/update-models/SKILL.md`) and its dedicated Suite 128 fixture test (`tests/test_update_models_resolver.sh`, `tests/fixtures/models-dev-api-slice.json`). The skill was a no-op under Claude Code — its own scope forbade touching `~/.claude/agents/*.md` — yet still shipped via the plugin marketplace. Opencode operators who used it to live-refresh a baked tier pin lose that capability; the manual alternative is re-running the installer with `--opencode-tier anthropic`, which re-bakes the release-time pin. The cross-surface parity lock for the curated tier maps (`providerTierFamily`/`providerTierConcrete`) narrows from three sites to two — `cmd/install/transform.go` and `tools/harness-migrate/migrate.mjs`, locked by `cmd/install/tier_test.go` — the curated maps themselves are unchanged. That lock now also compares the outer provider key sets in both directions, so a provider declared at only one of the two sites reds the test instead of passing unvisited.
 
 ## [2.141.0] - 2026-07-26
 
