@@ -295,9 +295,9 @@ func TestResolveFamilyForTier_UnknownProviderFailsClosed(t *testing.T) {
 // tools/harness-migrate/migrate.mjs and to every occurrence of the same two
 // maps embedded in skills/update-models/SKILL.md.
 //
-// This is the multi-site invariant lock (01-plan.md § Multi-site invariants):
-// a drift at ANY one of the three sites reds this test and names exactly
-// which site and which (provider, tier) drifted.
+// This is the multi-site invariant lock (docs/opencode-model-config.md
+// § Per-provider cost tiering): a drift at ANY one of the three sites reds
+// this test and names exactly which site and which (provider, tier) drifted.
 func TestProviderTierMaps_CrossSurfaceParity_AC8(t *testing.T) {
 	repoRoot := repoRootForTierTest(t)
 
