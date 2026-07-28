@@ -37940,7 +37940,7 @@ check(
 # UNCHANGED (left unresolved per explicit dispatch instruction — documentation
 # review is not proof of runtime behavior).
 #
-# Refused-write outcome (issue #544): a fourth outcome, the operator-executed
+# Refused-write outcome: a fourth outcome, the operator-executed
 # fallback, for the same env-provisioning write when the host runtime refuses
 # it. Checks the two literals `operator-executed fallback` and
 # `operator-action-required` at the canonical section and both skills; the
@@ -38017,12 +38017,8 @@ check(
     " divergent key name would desync the two sites' reconciliation",
 )
 
-# --- Regression seed (issue #544): refused-write outcome for the settings.json
-# provisioning write. Task-1 adds the outcome to the canonical section; Task-2
-# applies it at both skill sites. Both literals are absent from the tree today,
-# so this check fails until Task-1 and Task-2 land — see workspaces
-# 01-root-cause.md § Regression Test Approach. Task-3 extends this seed with
-# the refusal-vs-decline distinction, the security-load-bearing command
+# --- Refused-write outcome for the settings.json provisioning write, extended
+# with the refusal-vs-decline distinction, the security-load-bearing command
 # anchors, and the double-prohibition anchor.
 _S173_REFUSED_WRITE_LITERALS = ("operator-executed fallback", "operator-action-required")
 check(
@@ -38046,7 +38042,7 @@ check(
     f"skills/update/SKILL.md must contain both {_S173_REFUSED_WRITE_LITERALS!r}",
 )
 
-# --- AC-3: refusal-vs-decline distinction — a refusal never writes a decline
+# --- Refusal-vs-decline distinction — a refusal never writes a decline ------
 check(
     "suite173(refused-write-not-a-decline): canonical section states the"
     " refusal is not recorded as a decline",
@@ -38057,7 +38053,7 @@ check(
     " transient environment failure the operator never chose",
 )
 
-# --- AC-7: double prohibition, at the same footing as the two refused-write
+# --- Double prohibition, at the same footing as the two refused-write
 # literals above (no alternative write mechanism, and the agent must not
 # execute the emitted block) ------------------------------------------------
 _S173_NO_ALT_MECHANISM = "must not retry the write through any alternative mechanism"
@@ -38077,10 +38073,10 @@ check(
     f" {_S173_NO_AGENT_EXEC!r}",
 )
 
-# --- AC-6: security-load-bearing content of the emitted command block,
-# anchored on semantic lines (variable names, comparisons, function calls)
-# rather than on whitespace or formatting, so a benign reformat does not
-# break the suite but an edit that changes what the command DOES does ------
+# --- Security-load-bearing content of the emitted command block, anchored on
+# semantic lines (variable names, comparisons, function calls) rather than on
+# whitespace or formatting, so a benign reformat does not break the suite but
+# an edit that changes what the command DOES does ---------------------------
 _S173_CMD_SINGLE_PATH = re.compile(r'setdefault\(\s*"env"\s*,\s*\{\}\s*\)\[KEY\]\s*=\s*"2"')
 _S173_CMD_PERM_CMP = re.compile(
     r'before\.get\(\s*"permissions"\s*\)\s*or\s*\{\}\)\s*!=\s*\(written\.get\(\s*"permissions"\s*\)'
