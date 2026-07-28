@@ -63,6 +63,15 @@ The following are **forbidden** in any committed comment, regardless of surface:
 
 - References to `workspaces/` paths, pipeline phases/stages/steps, or task/issue IDs.
   (Exception: the file-header provenance line — see below.)
+- An acceptance-criterion ordinal (`AC-N`) used as a bare section-header comment
+  (`# --- AC-3: …`, `# AC-8 mapping) …`), in test files or anywhere else. The test name,
+  `check()`/assertion description string, or heading text already carries the meaning being
+  asserted; a comment whose only content is the AC ordinal restates nothing but the ephemeral
+  plan reference and goes stale the moment the plan is renumbered. Name the divider by what it
+  asserts instead (`# Control rubric's shape — exactly five columns, no empty cell`), never by
+  the criterion's ordinal. This is the same violation as a bare `Task-N` reference, just
+  subtler — an AC ordinal reads as content-shaped where a `Task-N` reference reads as an
+  obvious pipeline artifact, which is exactly why it slips through review more easily.
 - Session context (`// added in this run`, `// per operator instruction`).
 - Commented-out code. Version control preserves history; a dead code block serves no reader.
 - Ownerless `TODO` or `FIXME` with no issue reference and no resolution condition.

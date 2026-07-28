@@ -118,7 +118,7 @@ dispatch_norm = norm(dispatch_text)
 claude_s5_norm = norm(claude_s5)
 
 # ---------------------------------------------------------------------------
-# AC-1 — the canonical rule lives in exactly one file, no duplicate elsewhere
+# The canonical rule lives in exactly one file, no duplicate elsewhere
 # ---------------------------------------------------------------------------
 _AC1_CANONICAL_PHRASE = (
     "The dispatcher never bounds review scope. The contract always bounds write scope."
@@ -143,8 +143,8 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# AC-2 — a dispatch carries only: coordinates, task-scope decisions absent
-# from the board, and the return form — a closed list of exactly three items
+# A dispatch carries only: coordinates, task-scope decisions absent from the
+# board, and the return form — a closed list of exactly three items
 # ---------------------------------------------------------------------------
 _may_carry = slice_section(
     dispatch_text, "## What a dispatch may carry", ("\n## What a dispatch must not carry",)
@@ -183,9 +183,9 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# AC-3 — one two-halves formulation: review half never bounded by the
-# dispatcher (adversary/SEC-002 example named), write half bounded by the
-# recipient's own contract, by pointer only (no restated prose)
+# One two-halves formulation: review half never bounded by the dispatcher
+# (adversary/SEC-002 example named), write half bounded by the recipient's
+# own contract, by pointer only (no restated prose)
 # ---------------------------------------------------------------------------
 check(
     "task1(ac3): '## Two-halves rule' appears exactly once (single formulation)",
@@ -219,7 +219,7 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# AC-4 — the standard does not mention language on any line
+# The standard does not mention language on any line
 # ---------------------------------------------------------------------------
 _ac4_hits = [
     (i + 1, line)
@@ -233,7 +233,7 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# AC-5 — every control claim lives in a five-column rubric; no empty cell; no
+# Every control claim lives in a five-column rubric; no empty cell; no
 # bare '-' n/a; prose-only admitted; the mechanism's own limit is stated
 # ---------------------------------------------------------------------------
 _rubric = slice_section(dispatch_text, "## Control rubric", ("\n## Attribution",))
@@ -292,8 +292,8 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# AC-6 — three registration sites exist, none left unwritten, none dependent
-# on another
+# Three registration sites exist, none left unwritten, none dependent on
+# another
 # ---------------------------------------------------------------------------
 check(
     "task1(ac6): CLAUDE.md §5 gains exactly one bullet pointing at"

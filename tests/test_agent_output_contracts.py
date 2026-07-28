@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# tests/test_task2_output_contracts.py
+# tests/test_agent_output_contracts.py
 # Structural tests for the agent-authoring-standard change's per-agent
 # output-contract scope: per-agent output-contract language declarations
 # (13 agents), the `audit_coverage` self-declaration, qa.md's alignment
@@ -98,9 +98,9 @@ def git_show(ref: str, rel_path: str) -> str:
 print("=== Task-2: per-agent output contracts; the dispatcher stops bounding review scope ===")
 
 # =============================================================================
-# AC-1 / AC-2 — per-artifact language declared in each of the 13 agents' own
-# return/output section, and no declaration contradicts
-# docs/conventions.md § Document classification / CLAUDE.md §7.3
+# Per-artifact language declared in each of the 13 agents' own return/output
+# section, and no declaration contradicts docs/conventions.md § Document
+# classification / CLAUDE.md §7.3
 # =============================================================================
 # rel_path -> (required substrings, whether this agent is one of the two
 # permitted to declare an operator-facing artifact)
@@ -224,7 +224,7 @@ for rel_path, (substrings, may_be_operator_facing) in _LANGUAGE_AGENTS.items():
         )
 
 # =============================================================================
-# AC-3 — three named fences stay byte-identical to the tree state before this
+# Three named fences stay byte-identical to the tree state before this
 # scope's own commits
 # (agents/tester.md § "Status block from tester (pre-fix-regression mode)",
 # agents/adversary.md § "1. Identify the changed controls",
@@ -262,9 +262,9 @@ for rel_path, start_marker, end_markers in _FENCE_SPECS:
     )
 
 # =============================================================================
-# AC-4 — adversary's audit_coverage self-declaration: enforcer, failure
-# direction, and invoker declared; self-declaration/no-mechanical-check
-# disclaimer stated; presentational (not detective) mitigation named
+# adversary's audit_coverage self-declaration: enforcer, failure direction,
+# and invoker declared; self-declaration/no-mechanical-check disclaimer
+# stated; presentational (not detective) mitigation named
 # =============================================================================
 adversary_text = read(ADVERSARY)
 adversary_norm = norm(adversary_text)
@@ -307,9 +307,9 @@ check(
 )
 
 # =============================================================================
-# AC-5 — qa.md fully aligned with its own :95 statement; :44's removal
-# resolves by pointer to the orchestrator's canonical Case → routing table,
-# never a local re-definition
+# qa.md fully aligned with its own :95 statement; :44's removal resolves by
+# pointer to the orchestrator's canonical Case → routing table, never a
+# local re-definition
 # =============================================================================
 qa_text = read(QA)
 qa_norm = norm(qa_text)
@@ -359,7 +359,7 @@ check(
 )
 
 # =============================================================================
-# AC-6 — the review-scope-bounding instruction is removed from all five real
+# The review-scope-bounding instruction is removed from all five real
 # sites, in one commit; the Correction scope: field survives as a coordinate;
 # the anchor heading and two Suite-172 literals are preserved; what must NOT
 # be touched (buckets table, fail-safes, Stage-2 Blast radius mechanism)
@@ -433,11 +433,11 @@ check(
     "one or both Suite-172 precondition literals are missing from the section",
 )
 
-# AC-6d — everything else in the orchestrator's Correction-classification
-# section that was not licensed for change stays byte-identical to the tree
-# state before this scope's own commits: compare line-by-line, ignoring only
-# the two paragraphs explicitly named as licensed (Delta-scoped dispatch;
-# the carried-forward paragraph's "delta-scoped the same way" tail).
+# Everything else in the orchestrator's Correction-classification section
+# that was not licensed for change stays byte-identical to the tree state
+# before this scope's own commits: compare line-by-line, ignoring only the
+# two paragraphs explicitly named as licensed (Delta-scoped dispatch; the
+# carried-forward paragraph's "delta-scoped the same way" tail).
 _base_orch_slice = slice_section(
     git_show(BASE_SHA, "agents/orchestrator.md"),
     "### Correction-classification — selective panel re-firing",
@@ -466,7 +466,7 @@ check(
     else f"line count changed: base={len(_base_lines)}, current={len(_current_lines)}",
 )
 
-# AC-6e — the byte-consistency table now enumerates the five real sites
+# The byte-consistency table now enumerates the five real sites
 _patch_mode_text = read(PATCH_MODE)
 _byte_consistency_slice = slice_section(
     _patch_mode_text,
@@ -502,9 +502,9 @@ check(
     "the stale cross-reference clause still exists verbatim",
 )
 
-# AC-6f — the Stage-2 Blast radius mechanism is explicitly out of this
-# removal's scope and stays byte-identical to the tree state before this
-# scope's own commits
+# The Stage-2 Blast radius mechanism is explicitly out of this removal's
+# scope and stays byte-identical to the tree state before this scope's own
+# commits
 _base_patch_mode = git_show(BASE_SHA, "docs/patch-mode.md")
 
 

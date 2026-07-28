@@ -39631,8 +39631,8 @@ _s180_security = read(AGENTS_DIR / "security.md")
 _s180_testing_md = read(REPO_ROOT / "docs" / "testing.md")
 _s180_claude = read(REPO_ROOT / "CLAUDE.md")
 
-# --- AC-3: single pointer to the standard from each of the four named
-# consumers -- zero canonical prose duplicated (the duplication half is
+# Each of the four named consumers references the canonical standard by a
+# single pointer -- zero canonical prose duplicated (the duplication half is
 # already covered structurally by Suite 174's no-relocation check over
 # agents/_shared/*.md, since dispatch-contract.md is itself in that corpus).
 for _s180_file, _s180_text in (
@@ -39647,8 +39647,8 @@ for _s180_file, _s180_text in (
         f"{_s180_file} must carry a pointer to the canonical dispatch-contract.md standard",
     )
 
-# --- AC-3: control rubric's shape -- exactly the five named columns, no
-# empty data cell, no bare-dash n/a ------------------------------------------
+# Control rubric's shape -- exactly the five named columns, no empty data
+# cell, no bare-dash n/a ------------------------------------------------------
 _S180_RUBRIC_HEADER = "| Control | Enforcer | Failure direction | Invoker | Read at |"
 check(
     "suite180(ac3-rubric-header): dispatch-contract.md's Control rubric carries exactly the"
@@ -39674,7 +39674,7 @@ check(
     f"malformed rubric row(s): {_s180_bad_rubric_rows}",
 )
 
-# --- AC-3: language declared in the 14 output contracts ---------------------
+# Language declared in the 14 output contracts --------------------------------
 _S180_LANGUAGE_AGENTS = (
     "adversary", "architect", "delivery", "diagrammer", "gcp-cost-analyzer",
     "gcp-infra", "implementer", "plan-reviewer", "qa", "qa-plan", "reviewer",
@@ -39690,7 +39690,7 @@ check(
     f"expected 14 agents declaring '**Language.**', missing in: {_s180_missing_language}",
 )
 
-# --- AC-3: two-halves rule, single formulation, write-half by pointer only --
+# Two-halves rule, single formulation, write-half by pointer only ------------
 check(
     "suite180(ac3-two-halves-single): the two-halves rule's exact formulation exists"
     " ONLY in dispatch-contract.md, never restated elsewhere",
@@ -39721,10 +39721,10 @@ check(
     " Write-scope section rather than restate it",
 )
 
-# --- AC-3: absence of the review-scope-bounding instruction at its five
-# named sites, using the ORIGINAL literal phrasing this removal invalidated
-# (not the substring 'review ONLY', which false-positives on unrelated
-# phrases like 'SEC-002 design-review ONLY') -----------------------------
+# Absence of the review-scope-bounding instruction at its five named sites,
+# using the ORIGINAL literal phrasing this removal invalidated (not the
+# substring 'review ONLY', which false-positives on unrelated phrases like
+# 'SEC-002 design-review ONLY') ------------------------------------------
 _S180_BOUNDING_LITERALS = ("review ONLY the", "frozen/trusted", "never re-reviewed")
 for _s180_site_name, _s180_site_text in (
     ("docs/patch-mode.md", _s180_patch_mode),
@@ -39748,8 +39748,8 @@ check(
     " '### Correction-classification — selective panel re-firing' intact",
 )
 
-# --- AC-3: no threshold constant or prompt-content derivation over
-# payload_bytes in the hook body ---------------------------------------------
+# No threshold constant or prompt-content derivation over payload_bytes in
+# the hook body ----------------------------------------------------------------
 check(
     "suite180(ac3-payload-bytes-no-threshold): subagent-start.ts carries no threshold"
     " constant gating on payload_bytes",
@@ -39757,8 +39757,8 @@ check(
     "hooks/ts/bodies/subagent-start.ts must not introduce a payload_bytes threshold constant",
 )
 
-# --- AC-3: the Free-text field bound named exception's own limits, present
-# at BOTH sites, additive to (never in place of) the general clause ----------
+# The Free-text field bound named exception's own limits, present at BOTH
+# sites, additive to (never in place of) the general clause ------------------
 _S180_FREETEXT_LIMITS = (
     "≤280 chars",
     "ESCAPED as JSON string escapes, never stripped",
@@ -39784,9 +39784,9 @@ check(
     "agents/orchestrator.md must keep the general Free-text field bound clause intact",
 )
 
-# --- AC-4: every gate allowlist value appears literal in both gate-contract.md
-# and the orchestrator.md interpreter, plus the ship-retention precondition
-# and the override disposition obligation -----------------------------------
+# Every gate allowlist value appears literal in both gate-contract.md and
+# the orchestrator.md interpreter, plus the ship-retention precondition and
+# the override disposition obligation ------------------------------------------
 _S180_ALLOWLIST_VALUES = (
     "approve", "approve autonomous", "reject {reason}", "edit",
     "next", "next autonomous", "stop", "redo Task-{i}",
@@ -39816,11 +39816,11 @@ check(
     "agents/orchestrator.md must obligate a disposition entry on an override {reason} reply",
 )
 
-# --- AC-5: no-relocation check green for the three relocated entries, and
+# No-relocation check green for the three relocated manifest entries, and
 # suborch-mirror-invariant's sha256 unchanged despite an out-of-literal edit
 # elsewhere in docs/subagent-orchestration.md (both already independently
-# asserted per-entry by Suite 174 -- restated here as an explicit AC-5
-# mapping, not a duplicate mechanism) -----------------------------------------
+# asserted per-entry by Suite 174 -- restated here explicitly, not a
+# duplicate mechanism) ----------------------------------------------------------
 _s180_manifest = json.loads(_S174_MANIFEST_PATH.read_text(encoding="utf-8"))
 _s180_relocated_ids = {
     "leader-spawning-payload-contract", "leader-multitask-fanout",
@@ -39850,10 +39850,10 @@ check(
     " byte-identical to its manifest snapshot",
 )
 
-# --- AC-6: docs/testing.md registers Suite 180 with scope + declared limits
-# (self-ref deliberately NOT included -- registering a suite in the canonical
-# registry is a documentation edit alongside test authoring, mirroring the
-# Suite 155/156 rationale) ---------------------------------------------------
+# docs/testing.md registers Suite 180 with scope + declared limits (self-ref
+# deliberately NOT included -- registering a suite in the canonical registry
+# is a documentation edit alongside test authoring, mirroring the Suite
+# 155/156 rationale) ------------------------------------------------------------
 check(
     "suite180(ac6-registry): docs/testing.md registers 'Suite 180' and"
     " 'dispatch-standard-structural-guard'",
@@ -39861,9 +39861,8 @@ check(
     "docs/testing.md must register Suite 180 and the 'dispatch-standard-structural-guard' marker",
 )
 
-# --- AC-7: sole writer of the functional-clarity registration is named in
-# exactly one agent contract, and no other contract instructs writing or
-# repairing it ----------------------------------------------------------------
+# Sole writer of the checkpoint.confirmed event is named in exactly one
+# agent contract, and no other contract instructs writing or repairing it ----
 check(
     "suite180(ac7-sole-writer-declared): agents/leader.md declares itself the sole writer"
     " of the checkpoint.confirmed event",
@@ -39887,9 +39886,8 @@ check(
     f"unexpected write instruction for checkpoint.confirmed in: {_s180_writer_leak}",
 )
 
-# --- AC-8(a): REFERENCE_ONLY_AGENTS derives from the ref- prefix, a single
-# definition (already wired at module scope, restated here as an explicit
-# AC-8 mapping) ---------------------------------------------------------------
+# REFERENCE_ONLY_AGENTS derives from the ref- prefix, a single definition
+# (already wired at module scope, restated here as an explicit check) --------
 check(
     "suite180(ac8a-prefix-derived): REFERENCE_ONLY_AGENTS is derived from the 'ref-'"
     " filename prefix, not a hardcoded enumerated set",
@@ -39898,9 +39896,8 @@ check(
     f"expected 4 prefix-derived reference-only agents, found: {sorted(REFERENCE_ONLY_AGENTS)}",
 )
 
-# --- AC-8(b): no 'th:ref-*' name appears as a dispatch target anywhere in
-# agents/** or skills/** -- the compensating control for the prefix's
-# fail-open direction --------------------------------------------------------
+# No 'th:ref-*' name appears as a dispatch target anywhere in agents/** or
+# skills/** -- the compensating control for the prefix's fail-open direction -
 _s180_dispatch_target_re = re.compile(r"th:ref-[a-z-]+")
 _s180_dispatch_target_hits = []
 for _s180_dir in (AGENTS_DIR, SKILLS_DIR):
@@ -39915,7 +39912,7 @@ check(
     f"unexpected th:ref-* dispatch target(s): {_s180_dispatch_target_hits}",
 )
 
-# --- AC-8(c): Suite 19 checks 1-3 resolve over exactly four ref-*.md files --
+# Suite 19 checks 1-3 resolve over exactly four ref-*.md files ---------------
 check(
     "suite180(ac8c-four-ref-files): exactly four agents/ref-*.md reference files exist,"
     " all covered by Suite 19 checks 1-3 (frontmatter + orphan-agent exclusion)",
@@ -39923,9 +39920,8 @@ check(
     f"expected 4 agents/ref-*.md files, found {len(list(AGENTS_DIR.glob('ref-*.md')))}",
 )
 
-# --- AC-8(d): Roster<->agent-file bijection -- one row per agents/*.md file
-# excluding README.md and every ref-*.md, no extra row, no empty Objective
-# cell --------------------------------------------------------------------
+# Roster<->agent-file bijection -- one row per agents/*.md file excluding
+# README.md and every ref-*.md, no extra row, no empty Objective cell --------
 _s180_roster_lines = _s180_readme.splitlines()
 _s180_roster_start = next(
     (i for i, l in enumerate(_s180_roster_lines) if l.startswith("## Roster")), None
@@ -39973,15 +39969,8 @@ check(
     f"row(s) with empty Objective cell: {_s180_roster_empty_objective}",
 )
 
-# --- AC-8(d) retarget: Suite 2's Roster-shape check retargeted to six
-# columns -- see the RETARGETED block replacing the old Suite 2 checks above
-# (label + message now assert the literal six-column header) ---------------
-# (Assertion itself lives in the retargeted Suite 2 block; nothing further
-# to assert here — this comment anchors the AC-8d mapping for the six-column
-# retarget to its actual check location.)
-
-# --- AC-8(e): the :187-191 check extended to assert the literal read-only
-# prohibition, not just the two substrings 'tools'/'allowlist' -------------
+# The :187-191 check extended to assert the literal read-only prohibition,
+# not just the two substrings 'tools'/'allowlist' -----------------------------
 check(
     "suite180(ac8e-readonly-prohibition-literal): agents/README.md asserts the literal"
     " read-only prohibition (no Bash/Edit/Write beyond the agent's own workspace doc)",
@@ -39991,7 +39980,7 @@ check(
     " 'tools'/'allowlist' generically",
 )
 
-# --- AC-8: docs/testing.md declares the mechanism's own two named limits --
+# docs/testing.md declares the mechanism's own two named limits --------------
 _S180_DECLARED_LIMITS = (
     "the bijection and the non-empty cell are mechanical",
     "th:ref-*",

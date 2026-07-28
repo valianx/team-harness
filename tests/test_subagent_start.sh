@@ -3,48 +3,45 @@
 # Functional tests for hooks/ts/dist/subagent-start.cjs — the PreToolUse (Task)
 # breadcrumb writer that is the start-side twin of hooks/subagent-trace.sh.
 #
-# Asserts (Task-7, issue #452):
-#   - AC-1: a th:* subagent_type dispatch appends exactly one
+# Asserts:
+#   - A th:* subagent_type dispatch appends exactly one
 #     {"ts","event":"subagent.start","agent_type"} line to the resolved
 #     workspace's 00-subagent-trace.jsonl; a non-th:* dispatch writes nothing
 #     and exits 0.
-#   - AC-2: node runtime errors, malformed JSON, missing/wrong-typed fields,
+#   - node runtime errors, malformed JSON, missing/wrong-typed fields,
 #     an unreachable workspace path, and an oversize (SEC-07) payload all
 #     fail open — exit 0, empty stdout, no crash, dispatch never blocked.
 #
-# Also asserts (Section 4, T6c): hooks/ts/dist/subagent-trace.cjs (the
-# STOP-side twin, SubagentStop) writes its breadcrumb even under
-# TH_HOOK_PROFILE=minimal — the breadcrumb is non-suppressible, matching the
-# Bash oracle hooks/subagent-trace.sh (which has no profile gate at all).
+# Also asserts: hooks/ts/dist/subagent-trace.cjs (the STOP-side twin,
+# SubagentStop) writes its breadcrumb even under TH_HOOK_PROFILE=minimal —
+# the breadcrumb is non-suppressible, matching the Bash oracle
+# hooks/subagent-trace.sh (which has no profile gate at all).
 #
-# Also asserts (Section 5, Task-5 AC-5.1/5.3/5.4/5.5): the `project` key
-# stamped from a `TH-LANE: {project-key}` marker on the FIRST LINE of the
-# dispatch prompt (controlled header, mirrors checkpoint-guard's
-# TH-STATE-REF parse) —
-#   - AC-5.1: marker present on the first line + valid → `project` on the
+# Also asserts: the `project` key stamped from a `TH-LANE: {project-key}`
+# marker on the FIRST LINE of the dispatch prompt (controlled header,
+# mirrors checkpoint-guard's TH-STATE-REF parse) —
+#   - marker present on the first line + valid → `project` on the
 #     breadcrumb.
-#   - AC-5.3: marker absent → `project` omitted (backward-compat key set).
-#   - AC-5.4: marker present but out of the [a-z0-9-]{1,60} bound → `project`
+#   - marker absent → `project` omitted (backward-compat key set).
+#   - marker present but out of the [a-z0-9-]{1,60} bound → `project`
 #     omitted (never written unbounded).
-#   - AC-5.5: a well-shaped marker present LOWER in the prompt (not the first
+#   - a well-shaped marker present LOWER in the prompt (not the first
 #     line) is ignored — untrusted content per CLAUDE.md §6.6 cannot smuggle
 #     a project key onto the breadcrumb.
 #
-# Also asserts (Section 6, AC-1/AC-2/AC-5): `payload_bytes` — the
-# byte length of the dispatch prompt —
-#   - AC-1: every breadcrumb carries `payload_bytes`, ungated by any
-#     threshold.
-#   - AC-2: no threshold constant, comparison, or decision branch on
+# Also asserts: `payload_bytes` — the byte length of the dispatch prompt —
+#   - every breadcrumb carries `payload_bytes`, ungated by any threshold.
+#   - no threshold constant, comparison, or decision branch on
 #     `payload_bytes` exists in the hook body (static check on the source).
-#   - AC-5: the value is exactly the byte count and nothing else — no
-#     content beyond that count enters the record.
+#   - the value is exactly the byte count and nothing else — no content
+#     beyond that count enters the record.
 #
-# Also asserts (Section 7, AC-4/AC-5): docs/observability.md's
-# `### subagent.start` section documents `payload_bytes` — the line-schema
-# example includes the key, the visibility-only/no-ceiling posture is
-# stated, the Claude-Code-plugin-only coverage limitation is named without
-# overclaiming opencode coverage, and the content-boundary invariant (byte
-# count only, never the prompt itself) is stated.
+# Also asserts: docs/observability.md's `### subagent.start` section
+# documents `payload_bytes` — the line-schema example includes the key, the
+# visibility-only/no-ceiling posture is stated, the Claude-Code-plugin-only
+# coverage limitation is named without overclaiming opencode coverage, and
+# the content-boundary invariant (byte count only, never the prompt itself)
+# is stated.
 #
 # Usage: bash tests/test_subagent_start.sh
 # Exit code: 0 all cases pass, 1 otherwise.
@@ -117,7 +114,7 @@ EOF
 TRACE_FILE="$WORKDIR/workspaces/test-feature/00-subagent-trace.jsonl"
 
 # ---------------------------------------------------------------------------
-# Section 1 — AC-1: th:* dispatch writes the breadcrumb
+# Section 1 — th:* dispatch writes the breadcrumb
 # ---------------------------------------------------------------------------
 echo "--- Section 1: start-write (AC-1) ---"
 
@@ -160,7 +157,7 @@ if [ -f "$TRACE_FILE" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Section 2 — AC-1: non-th:* dispatch guard
+# Section 2 — non-th:* dispatch guard
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Section 2: non-th:* scope guard (AC-1) ---"
@@ -180,7 +177,7 @@ assert_true "non-th:* dispatch emits no stdout" "$r"
 assert_true "non-th:* dispatch does NOT write the trace file" "$r"
 
 # ---------------------------------------------------------------------------
-# Section 3 — AC-2: fail-open on known-bad inputs
+# Section 3 — fail-open on known-bad inputs
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Section 3: fail-open on known-bad inputs (AC-2) ---"
@@ -240,9 +237,9 @@ assert_true "oversize payload does NOT write the trace file" "$r"
 # ---------------------------------------------------------------------------
 # Section 4 — regression: subagent-trace.cjs (SubagentStop, the STOP-side
 # twin of this hook) breadcrumb is NON-SUPPRESSIBLE under
-# TH_HOOK_PROFILE=minimal (T6c). The Bash oracle (hooks/subagent-trace.sh)
-# has no hook-profile gate at all — the breadcrumb must fire unconditionally,
-# same as the start-side hook tested above. See docs/reasoning-checkpoint.md
+# TH_HOOK_PROFILE=minimal. The Bash oracle (hooks/subagent-trace.sh) has no
+# hook-profile gate at all — the breadcrumb must fire unconditionally, same
+# as the start-side hook tested above. See docs/reasoning-checkpoint.md
 # SEC-DR-002/004/005/007.
 # ---------------------------------------------------------------------------
 echo ""
@@ -286,13 +283,13 @@ print(json.dumps({'tool_name': 'SubagentStop', 'tool_input': {'agent_type': sys.
 fi
 
 # ---------------------------------------------------------------------------
-# Section 5 — Task-5 AC-5.1/5.3/5.4: `project` key from the TH-LANE marker
+# Section 5 — `project` key from the TH-LANE marker
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Section 5: project key from TH-LANE marker (AC-5.1/5.3/5.4) ---"
 
-# 5a. AC-5.1 — valid marker on the first line (controlled header) → project
-# stamped on the breadcrumb.
+# 5a. Valid marker on the first line (controlled header) → project stamped
+# on the breadcrumb.
 rm -f "$TRACE_FILE"
 payload="$(make_payload_with_prompt "th:implementer" $'TH-LANE: project-alpha\nYou are th:implementer.\nDo the work.')"
 out="$(cd "$WORKDIR" && echo "$payload" | node "$CJS" 2>/dev/null)"
@@ -315,7 +312,7 @@ else
     assert_true "AC-5.1: trace line has exactly {ts, event, agent_type, project, payload_bytes} keys" 0
 fi
 
-# 5b. AC-5.3 — marker absent → project omitted, backward-compat key set.
+# 5b. Marker absent → project omitted, backward-compat key set.
 rm -f "$TRACE_FILE"
 payload="$(make_payload_with_prompt "th:implementer" "You are th:implementer. Do the work.")"
 out="$(cd "$WORKDIR" && echo "$payload" | node "$CJS" 2>/dev/null)"
@@ -338,7 +335,7 @@ else
     assert_true "AC-5.3: trace line has exactly {ts, event, agent_type, payload_bytes} keys (backward-compat)" 0
 fi
 
-# 5c. AC-5.4 — marker present but out of the [a-z0-9-]{1,60} bound → omitted.
+# 5c. Marker present but out of the [a-z0-9-]{1,60} bound → omitted.
 for bad_value in "Project_Alpha" "has/slash" "$(python3 -c "print('a'*61)")"; do
     rm -f "$TRACE_FILE"
     payload="$(make_payload_with_prompt "th:implementer" "TH-LANE: ${bad_value}")"
@@ -357,11 +354,11 @@ for bad_value in "Project_Alpha" "has/slash" "$(python3 -c "print('a'*61)")"; do
     fi
 done
 
-# 5e. AC-5.5 — a valid, well-shaped TH-LANE marker that appears LOWER in the
-# prompt (not the first line) must be ignored: it is untrusted content per
+# 5e. A valid, well-shaped TH-LANE marker that appears LOWER in the prompt
+# (not the first line) must be ignored: it is untrusted content per
 # CLAUDE.md §6.6, not the dispatcher's own controlled header. Mirrors
-# checkpoint-guard's AC-4.5a (marker outside the controlled header is never
-# scanned).
+# checkpoint-guard's marker-outside-the-controlled-header case (see
+# tests/test_checkpoint_guard.sh, Case 30 / AC-4.5a).
 rm -f "$TRACE_FILE"
 payload="$(make_payload_with_prompt "th:implementer" $'You are th:implementer.\nTH-LANE: project-alpha\nDo the work.')"
 out="$(cd "$WORKDIR" && echo "$payload" | node "$CJS" 2>/dev/null)"
@@ -385,15 +382,15 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Section 6 — AC-1/AC-2/AC-5: payload_bytes visibility, no ceiling
+# Section 6 — payload_bytes visibility, no ceiling
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Section 6: payload_bytes (AC-1/AC-2/AC-5) ---"
 
-# 6a. AC-1/AC-5 — a real-size prompt yields payload_bytes equal to the exact
-# UTF-8 byte length of that prompt, nothing more and nothing less.
+# 6a. A real-size prompt yields payload_bytes equal to the exact UTF-8
+# byte length of that prompt, nothing more and nothing less.
 rm -f "$TRACE_FILE"
-PROMPT_TEXT="You are th:implementer. Implement Task-6 per 01-plan.md."
+PROMPT_TEXT="You are th:implementer. Implement the change described in 01-plan.md."
 EXPECTED_BYTES="$(printf '%s' "$PROMPT_TEXT" | wc -c | tr -d ' ')"
 payload="$(make_payload_with_prompt "th:implementer" "$PROMPT_TEXT")"
 out="$(cd "$WORKDIR" && echo "$payload" | node "$CJS" 2>/dev/null)"
@@ -411,10 +408,10 @@ else
     assert_true "AC-5: payload_bytes equals the prompt's exact byte length" 0
 fi
 
-# 6b. AC-2 — static check: no threshold constant, comparison, or decision
-# branch on payload_bytes in the hook body. The only conditional touching
-# the computed value is the fail-open null check, which this pattern does
-# not match.
+# 6b. Static check: no threshold constant, comparison, or decision branch
+# on payload_bytes in the hook body. The only conditional touching the
+# computed value is the fail-open null check, which this pattern does not
+# match.
 if command grep -qE 'payloadBytes\s*(>|<|>=|<=)' "$BODY_TS"; then r=0; else r=1; fi
 assert_true "AC-2: no size comparison operator applied to payloadBytes in the hook body" "$r"
 
@@ -422,7 +419,7 @@ if command grep -qE 'PAYLOAD_BYTES_(MAX|MIN|THRESHOLD|LIMIT|CAP)' "$BODY_TS"; th
 assert_true "AC-2: no payload_bytes threshold constant declared in the hook body" "$r"
 
 # ---------------------------------------------------------------------------
-# Section 7 — AC-4/AC-5: docs/observability.md documents the field
+# Section 7 — docs/observability.md documents the field
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Section 7: docs/observability.md § subagent.start documents payload_bytes (AC-4) ---"

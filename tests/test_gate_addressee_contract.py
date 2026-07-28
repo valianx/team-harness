@@ -137,8 +137,8 @@ events_schema_slice = slice_section(
 )
 
 # ---------------------------------------------------------------------------
-# AC-1 — addressee-per-surface: exactly three human-facing surfaces named,
-# every STAGE-GATE/Express/phase-transition return is DATA, not rendered prose
+# Addressee-per-surface: exactly three human-facing surfaces named, every
+# STAGE-GATE/Express/phase-transition return is DATA, not rendered prose
 # ---------------------------------------------------------------------------
 check(
     "gate-addressee(ac1): '## Voice' declares a per-surface addressee rule",
@@ -195,8 +195,8 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# AC-2 — allowlist, gate_nonce, mandatory STOP, and dual-record ownership
-# are unchanged across the addressee change
+# Allowlist, gate_nonce, mandatory STOP, and dual-record ownership are
+# unchanged across the addressee change
 # ---------------------------------------------------------------------------
 check(
     "gate-addressee(ac2): STAGE-GATE-1's four-item allowlist is unchanged",
@@ -255,8 +255,8 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# AC-3 — a mid-run operator decision is reported and routed via the leader
-# relay; no release is ever recorded without the gate's current gate_nonce
+# A mid-run operator decision is reported and routed via the leader relay;
+# no release is ever recorded without the gate's current gate_nonce
 # ---------------------------------------------------------------------------
 check(
     "gate-addressee(ac3): the attribution-required / synthesis-rejected"
@@ -278,9 +278,9 @@ for _name, _slice in (
     )
 
 # ---------------------------------------------------------------------------
-# AC-4 — gate-contract.md's STOP-block templates declare the leader as
-# renderer and the implementing orchestrator's gate data as the real,
-# possibly-conditional option set; the generic template is never substituted
+# gate-contract.md's STOP-block templates declare the leader as renderer and
+# the implementing orchestrator's gate data as the real, possibly-conditional
+# option set; the generic template is never substituted
 # ---------------------------------------------------------------------------
 stop_block_intro_slice = slice_section(
     gate_contract_text, "## STOP-block templates", ("\n**STAGE-GATE-1**",)
@@ -323,7 +323,7 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# AC-5 — removing the rendered phase-transition block drops no event; the
+# Removing the rendered phase-transition block drops no event; the
 # mandatory observability floor paragraph is unchanged
 # ---------------------------------------------------------------------------
 _MANDATORY_FLOOR_TEXT = (
@@ -364,9 +364,9 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# AC-6 — the eight fenced entries this scope touches keep modal-token
-# counts >= canonical; the non-fenced '## Voice' section loses no
-# prohibition on becoming a pointer
+# The eight fenced entries this scope touches keep modal-token counts >=
+# canonical; the non-fenced '## Voice' section loses no prohibition on
+# becoming a pointer
 # ---------------------------------------------------------------------------
 _FENCED_ENTRIES = (
     ("orch-gate-handling", ORCHESTRATOR),
@@ -415,7 +415,7 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# AC-7 — STAGE-GATE-3/Express gate data carries the real, criticals-count
+# STAGE-GATE-3/Express gate data carries the real, criticals-count
 # conditional option set; the leader renders exactly what it received
 # ---------------------------------------------------------------------------
 check(
@@ -435,7 +435,7 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# AC-8 — a bare `ship` while criticals are open is rejected; no half of the
+# A bare `ship` while criticals are open is rejected; no half of the
 # dual-record and no disposition entry is written
 # ---------------------------------------------------------------------------
 check(
@@ -447,7 +447,7 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# AC-9 — the attribution/rejection-of-synthesis floor and the
+# The attribution/rejection-of-synthesis floor and the
 # checkpoint-trust-transfer bound are preserved or strengthened
 # ---------------------------------------------------------------------------
 check(
@@ -473,9 +473,9 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# AC-10 — the gate-data contract enumerates every field a security decision
-# needs; omitting one is a contract violation; audit_coverage sits adjacent
-# to the independently-computed diff composition
+# The gate-data contract enumerates every field a security decision needs;
+# omitting one is a contract violation; audit_coverage sits adjacent to the
+# independently-computed diff composition
 # ---------------------------------------------------------------------------
 check(
     "gate-addressee(ac10): STAGE-GATE-3 gate data enumerates broke-it"
@@ -510,8 +510,8 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# AC-11 — the takeover path names its own renderer; the mandatory STOP
-# holds identically when no th:leader is in the loop
+# The takeover path names its own renderer; the mandatory STOP holds
+# identically when no th:leader is in the loop
 # ---------------------------------------------------------------------------
 takeover_gate_rendering_slice = slice_section(
     subagent_orch_text,
@@ -541,8 +541,8 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# AC-12 — a missing checkpoint.confirmed event is reported exactly once,
-# never in a loop; a headless run has a named terminal state
+# A missing checkpoint.confirmed event is reported exactly once, never in
+# a loop; a headless run has a named terminal state
 # ---------------------------------------------------------------------------
 check(
     "gate-addressee(ac12): a missing checkpoint.confirmed event triggers"
@@ -570,9 +570,9 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# AC-13 — checkpoint.confirmed is the sole authority for the clarity check
-# at every arrival, including recover; the two 00-state.md fields are named
-# a derived cache, never consulted in its place
+# checkpoint.confirmed is the sole authority for the clarity check at every
+# arrival, including recover; the two 00-state.md fields are named a
+# derived cache, never consulted in its place
 # ---------------------------------------------------------------------------
 check(
     "gate-addressee(ac13): the event is declared sole authority at every"
@@ -600,8 +600,8 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# AC-14 — the confirmatory-text field gets a named, additive exception to
-# the free-text field bound, written identically at both sites
+# The confirmatory-text field gets a named, additive exception to the
+# free-text field bound, written identically at both sites
 # ---------------------------------------------------------------------------
 _orch_freetext_slice = slice_section(
     orch_text,

@@ -89,8 +89,8 @@ _to_specialists = slice_section(
     ("\n## ",),
 )
 
-# AC-1 — no prior-agent summary requirement; no language directive; a
-# pointer to the board instead of a paraphrase.
+# No prior-agent summary requirement; no language directive; a pointer to
+# the board instead of a paraphrase.
 check(
     "return-borrowed-work(ac1-no-summary-requirement): To-specialists no longer requires"
     " a summary of the previous agent's status block",
@@ -122,8 +122,8 @@ check(
     f"missing '**Language.**' declaration(s) in: {_missing_lang}",
 )
 
-# AC-2 — Phase 3.8 dispatch carries coordinates + Scope only, no diff
-# summary, no per-task summaries, no enumeration of what to confirm.
+# Phase 3.8 dispatch carries coordinates + Scope only, no diff summary,
+# no per-task summaries, no enumeration of what to confirm.
 _phase38 = slice_section(orchestrator_text, "## Phase 3.8", ("\n## Phase 4a",))
 check(
     "return-borrowed-work(ac2-coordinates-and-scope): Phase 3.8's dispatch carries"
@@ -153,7 +153,7 @@ check(
     "docs/verification-packet.md must carry the literal 'Deviations from Architecture:' anchor",
 )
 
-# AC-3 — Dispatch invariants reaches the standard by pointer, NEVER >= 1.
+# Dispatch invariants reaches the standard by pointer, NEVER >= 1.
 _dispatch_invariants = slice_section(
     orchestrator_text, "## Dispatch invariants", ("\n## ",)
 )
@@ -170,9 +170,9 @@ check(
     "orchestrator.md § Dispatch invariants must keep NEVER >= 1",
 )
 
-# AC-4 — the seven named untouched sections stay present (byte-identity
-# itself is Suite 174's job; here we assert their headings still resolve,
-# mapping this task's own AC rather than re-running Suite 174's mechanism).
+# The seven named untouched sections stay present (byte-identity itself is
+# Suite 174's job; here we assert their headings still resolve, a check
+# distinct from re-running Suite 174's own mechanism).
 _S180_UNTOUCHED_HEADINGS = (
     "## Phase 3.5 — Acceptance Gate",
     "Phase 2-close",
@@ -193,7 +193,7 @@ check(
     "orchestrator.md must keep '## Phase Dispatch Reference' intact",
 )
 
-# AC-5 — TH-STATE-REF enforcement declared honestly (checkpoint-guard unwired).
+# TH-STATE-REF enforcement declared honestly (checkpoint-guard unwired).
 check(
     "return-borrowed-work(ac5-th-state-ref-honest): TH-STATE-REF's enforcement is"
     " declared honestly — checkpoint-guard unwired since v2.139.0, never blocking",
@@ -212,8 +212,8 @@ print("=== leader.md: dispatch-machinery-relocation commit (a04c10b) ===")
 # docs/reasoning-checkpoint.md, docs/discover-phase.md, docs/observability.md)
 # =============================================================================
 
-# AC-1 — leader.md carries no dispatch machinery; reaches discover-phase.md
-# and spec-coauthoring.md by pointer; direct modes still present.
+# leader.md carries no dispatch machinery; reaches discover-phase.md and
+# spec-coauthoring.md by pointer; direct modes still present.
 check(
     "dispatch-machinery-out(ac1-no-machinery-body): leader.md's relocated sections are"
     " stubs, not the full byte-preserved machinery",
@@ -242,10 +242,10 @@ check(
     "leader.md must keep '## Direct Modes' intact",
 )
 
-# AC-2/AC-3 — functional-clarity registration: checkpoint.confirmed event,
-# bounded operator words + provenance; leader is sole writer, orchestrator
-# reads/verifies only (the sole-writer half is also asserted by Suite 180
-# ac7 — restated here as this task's own explicit AC mapping).
+# Functional-clarity registration: checkpoint.confirmed event, bounded
+# operator words + provenance; leader is sole writer, orchestrator
+# reads/verifies only (the sole-writer half is also asserted by Suite 180's
+# ac7 check — restated here explicitly against leader.md's own prose).
 check(
     "dispatch-machinery-out(ac2-checkpoint-confirmed-event): leader.md appends a"
     " checkpoint.confirmed event with provenance",
@@ -260,8 +260,8 @@ check(
     "leader.md must declare sole-writer ownership of checkpoint.confirmed",
 )
 
-# AC-4 — relocated floors byte-preserved in ref-dispatch-machinery.md; new
-# file has valid reference frontmatter (byte-identity/frontmatter validity
+# Relocated floors byte-preserved in ref-dispatch-machinery.md; new file
+# has valid reference frontmatter (byte-identity/frontmatter validity
 # themselves are Suite 19/174's job; here we assert the file's own
 # self-description as a reference file, not a dispatchable agent).
 check(
@@ -279,8 +279,8 @@ check(
     " reference file",
 )
 
-# AC-5 — relocated-to-pointer classification retains all three named
-# security floors, reachable from leader.md.
+# Relocated-to-pointer classification retains all three named security
+# floors, reachable from leader.md.
 check(
     "dispatch-machinery-out(ac5-constraint-e-waiver): the constraint-E waiver remains"
     " reachable from leader.md",
@@ -300,8 +300,8 @@ check(
     "leader.md must keep the hotfix Tier-3 hard floor reachable",
 )
 
-# AC-6 — leader-boot-capability-check / leader-verify-real-scope stay
-# present (byte-identity is Suite 174's job over the manifest entry).
+# leader-boot-capability-check / leader-verify-real-scope stay present
+# (byte-identity is Suite 174's job over the manifest entry).
 check(
     "dispatch-machinery-out(ac6-boot-capability-check-present): leader.md's boot"
     " capability check section is intact",
@@ -309,9 +309,9 @@ check(
     "leader.md must keep its Boot capability check section",
 )
 
-# AC-7 — reasoning-checkpoint.md declares B1 attribution + failure
-# direction without contradicting the clarity-not-security framing; the two
-# schema mirrors declare the event as authority, the field as derived cache.
+# reasoning-checkpoint.md declares B1 attribution + failure direction
+# without contradicting the clarity-not-security framing; the two schema
+# mirrors declare the event as authority, the field as derived cache.
 check(
     "dispatch-machinery-out(ac7-attribution-failure-direction): "
     "reasoning-checkpoint.md declares the B1 attribution failure direction"
@@ -358,7 +358,7 @@ print("=== delivery.md: diff-cap-withdrawal commit (e781357) ===")
 
 _step9d = slice_section(delivery_text, "### Step 9d", ("\n### ", "\n## "))
 
-# AC-1 — no diff-length threshold blocks or splits delivery of any size.
+# No diff-length threshold blocks or splits delivery of any size.
 check(
     "diff-cap-withdrawal(ac1-no-hard-abort): Step 9d carries no unconditional"
     " length-based abort regardless of justification",
@@ -372,7 +372,7 @@ check(
     "delivery.md must not contain the withdrawn diff_lines>1000/diff_files>20 abort row",
 )
 
-# AC-2 — diff composition reported adjacent to audit_coverage, computed by
+# Diff composition reported adjacent to audit_coverage, computed by
 # delivery, never the auditor.
 check(
     "diff-cap-withdrawal(ac2-composition-computed-by-delivery): diff composition is"
@@ -390,7 +390,7 @@ check(
     "orchestrator.md's gate data must present diff_composition adjacent to audit_coverage",
 )
 
-# AC-3 — the soft 400-line/8-file threshold with justification is retained,
+# The soft 400-line/8-file threshold with justification is retained,
 # non-blocking.
 check(
     "diff-cap-withdrawal(ac3-soft-threshold-retained): the 400-line/8-file soft"
@@ -401,9 +401,9 @@ check(
     "delivery.md must retain the 400/8 soft threshold as non-blocking",
 )
 
-# AC-4 — deliv-critical-rules keeps NEVER>=4/unconditionally>=2; the only
-# change is the stale Phase 3.5/3.6 clause (byte-floor itself is Suite
-# 174's job; here we assert the specific textual correction).
+# deliv-critical-rules keeps NEVER>=4/unconditionally>=2; the only change
+# is the stale Phase 3.5/3.6 clause (byte-floor itself is Suite 174's job;
+# here we assert the specific textual correction).
 _critical_rules = slice_section(delivery_text, "## Critical Rules", ("\n## ",))
 check(
     "diff-cap-withdrawal(ac4-phase36-removed): the stale 'Phase 3.5 / 3.6' reference is"
@@ -419,9 +419,9 @@ check(
     "agents/delivery.md § Critical Rules must keep NEVER >= 4, unconditionally >= 2",
 )
 
-# AC-5 — delivery.md declares the language of each artifact it produces
-# (also covered by Suite 180's 14-agent language check — restated here as
-# this task's own explicit AC mapping).
+# delivery.md declares the language of each artifact it produces (also
+# covered by Suite 180's 14-agent language check — restated here explicitly
+# against delivery.md's own prose).
 check(
     "diff-cap-withdrawal(ac5-language-declared): agents/delivery.md declares the"
     " language of every artifact it produces",
@@ -437,7 +437,7 @@ print("=== README.md/agent-builder.md: authoring-standard commit (25f9911) ===")
 # Roster" (agents/README.md, agents/agent-builder.md)
 # =============================================================================
 
-# AC-1 — README.md states the standard as the authoring convention;
+# README.md states the standard as the authoring convention;
 # agent-builder.md consumes it.
 check(
     "authoring-standard(ac1-standard-named): README.md names the authoring standard"
@@ -452,8 +452,8 @@ check(
     "agents/agent-builder.md must reference README.md's authoring-standard section",
 )
 
-# AC-2 — the ref-*.md and _shared/*.md enumeration in README.md matches the
-# real tree.
+# The ref-*.md and _shared/*.md enumeration in README.md matches the real
+# tree.
 _real_ref_count = len(list(AGENTS_DIR.glob("ref-*.md")))
 _real_shared_count = len(list((AGENTS_DIR / "_shared").glob("*.md")))
 _readme_shared_enum = slice_section(readme_text, "Plus nine cross-cutting", ("\n## ",))
@@ -471,8 +471,8 @@ check(
     f"agents/README.md must enumerate exactly {_real_shared_count} _shared/*.md files",
 )
 
-# AC-3 — agent-builder.md reaches the standard by pointer, never
-# duplicating its canonical prose.
+# agent-builder.md reaches the standard by pointer, never duplicating its
+# canonical prose.
 check(
     "authoring-standard(ac3-no-restatement): agent-builder.md does not restate the"
     " objective-form rule's own prose, only references it",
@@ -480,11 +480,11 @@ check(
     "agents/agent-builder.md must point at the objective-form rule without restating it",
 )
 
-# AC-4 — Roster Objective column: second column, 27 rows, no empty cell,
-# Role intact, no Status column added (bijection/empty-cell already
-# asserted by Suite 180 ac8d — restated here as this task's own AC mapping,
-# plus the second-column-position and no-Status-column claims Suite 180
-# does not check).
+# Roster Objective column: second column, 27 rows, no empty cell, Role
+# intact, no Status column added (bijection/empty-cell already asserted by
+# Suite 180's ac8d check — restated here explicitly, plus the
+# second-column-position and no-Status-column claims Suite 180 does not
+# check).
 check(
     "authoring-standard(ac4-second-column): Objective is the second Roster column,"
     " immediately after Agent",
@@ -504,9 +504,9 @@ check(
     "agents/README.md's orchestrator row must name the takeover-path rendering fallback",
 )
 
-# AC-5 — objective form rule + delivery worked example (nine steps, one
-# owner, one objective, counted by lens not by step); :24 description=
-# objective; ref-prefix convention statement.
+# Objective form rule + delivery worked example (nine steps, one owner,
+# one objective, counted by lens not by step); :24 description= objective;
+# ref-prefix convention statement.
 check(
     "authoring-standard(ac5-delivery-worked-example): delivery is the written worked"
     " example for the per-lens counting rule",
@@ -533,9 +533,9 @@ check(
     "agents/agent-builder.md must be obligated to add a Roster row with Objective",
 )
 
-# AC-6 — the :28 read-only-prohibition bullet survives byte-preserved or
-# stronger (also asserted deterministically by Suite 180 ac8e — restated
-# here as this task's own explicit AC mapping).
+# The :28 read-only-prohibition bullet survives byte-preserved or stronger
+# (also asserted deterministically by Suite 180's ac8e check — restated
+# here explicitly against README.md's own prose).
 check(
     "authoring-standard(ac6-readonly-prohibition-survives): the read-only-agent"
     " prohibition bullet survives the Roster rewrite",
