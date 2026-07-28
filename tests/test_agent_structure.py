@@ -37940,6 +37940,19 @@ check(
 # UNCHANGED (left unresolved per explicit dispatch instruction — documentation
 # review is not proof of runtime behavior).
 #
+# Refused-write outcome (issue #544): a fourth outcome, the operator-executed
+# fallback, for the same env-provisioning write when the host runtime refuses
+# it. Checks the two literals `operator-executed fallback` and
+# `operator-action-required` at the canonical section and both skills; the
+# refusal-vs-decline distinction (no `nested_spawn_depth.declined` is recorded
+# on a refusal); the security-load-bearing content of the emitted command
+# block (the single JSON path written, the `permissions` subtree comparison
+# against the pre-write parse, the abort on an unparseable document, and the
+# atomic temp-file-and-rename helper used for the backup, the target, and the
+# restoration); and the double prohibition (no alternative write mechanism,
+# and the agent must not execute the emitted block) at the same footing as
+# the two literals.
+#
 # Marker: dispatch-cost-reduction
 # ---------------------------------------------------------------------------
 print()
@@ -38031,6 +38044,87 @@ check(
     " refused-write outcome",
     all(lit in _s173_update_skill for lit in _S173_REFUSED_WRITE_LITERALS),
     f"skills/update/SKILL.md must contain both {_S173_REFUSED_WRITE_LITERALS!r}",
+)
+
+# --- AC-3: refusal-vs-decline distinction — a refusal never writes a decline
+check(
+    "suite173(refused-write-not-a-decline): canonical section states the"
+    " refusal is not recorded as a decline",
+    "No `nested_spawn_depth.declined` is recorded" in _s173_canonical_slice,
+    f"docs/setup-update-model.md § {_S173_CANONICAL_ANCHOR} must state that no"
+    " `nested_spawn_depth.declined` is recorded on a refusal — conflating a"
+    " refusal with a decline would permanently suppress a future offer for a"
+    " transient environment failure the operator never chose",
+)
+
+# --- AC-7: double prohibition, at the same footing as the two refused-write
+# literals above (no alternative write mechanism, and the agent must not
+# execute the emitted block) ------------------------------------------------
+_S173_NO_ALT_MECHANISM = "must not retry the write through any alternative mechanism"
+_S173_NO_AGENT_EXEC = "the agent itself must not execute the fenced command below by any means"
+check(
+    "suite173(refused-write-no-alt-mechanism): canonical section prohibits"
+    " retrying the write through any alternative mechanism",
+    _S173_NO_ALT_MECHANISM in _s173_canonical_slice,
+    f"docs/setup-update-model.md § {_S173_CANONICAL_ANCHOR} must state that"
+    f" the step {_S173_NO_ALT_MECHANISM!r}",
+)
+check(
+    "suite173(refused-write-no-agent-exec): canonical section prohibits the"
+    " agent from executing the emitted command by any means",
+    _S173_NO_AGENT_EXEC in _s173_canonical_slice,
+    f"docs/setup-update-model.md § {_S173_CANONICAL_ANCHOR} must state that"
+    f" {_S173_NO_AGENT_EXEC!r}",
+)
+
+# --- AC-6: security-load-bearing content of the emitted command block,
+# anchored on semantic lines (variable names, comparisons, function calls)
+# rather than on whitespace or formatting, so a benign reformat does not
+# break the suite but an edit that changes what the command DOES does ------
+_S173_CMD_SINGLE_PATH = re.compile(r'setdefault\(\s*"env"\s*,\s*\{\}\s*\)\[KEY\]\s*=\s*"2"')
+_S173_CMD_PERM_CMP = re.compile(
+    r'before\.get\(\s*"permissions"\s*\)\s*or\s*\{\}\)\s*!=\s*\(written\.get\(\s*"permissions"\s*\)'
+)
+_S173_CMD_ABORT_UNPARSEABLE = 'sys.exit("ABORT: %s does not parse as JSON'
+_S173_CMD_ATOMIC_BACKUP = re.compile(r"write_600\(bak,\s*raw\)")
+_S173_CMD_ATOMIC_TARGET = re.compile(r"write_600\(path,\s*json\.dumps\(expected")
+_S173_CMD_ATOMIC_RESTORE = re.compile(r"write_600\(path,\s*open\(bak")
+
+check(
+    "suite173(refused-write-cmd-single-path): emitted command writes exactly"
+    " one JSON path, env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH",
+    bool(_S173_CMD_SINGLE_PATH.search(_s173_canonical_slice)),
+    "the emitted command must set only env.KEY = \"2\" — a command that sets"
+    " any other path would no longer match the single-JSON-path guarantee"
+    " step 5's post-write assertion depends on",
+)
+check(
+    "suite173(refused-write-cmd-perm-cmp): emitted command compares the"
+    " permissions subtree against the pre-write parse before accepting the"
+    " write as successful",
+    bool(_S173_CMD_PERM_CMP.search(_s173_canonical_slice)),
+    "the emitted command must compare before.get('permissions') against"
+    " written.get('permissions') — dropping this comparison would silently"
+    " widen access on a lost permissions.deny entry",
+)
+check(
+    "suite173(refused-write-cmd-abort-unparseable): emitted command aborts,"
+    " rather than falling back to an empty document, on an unparseable"
+    " settings.json",
+    _S173_CMD_ABORT_UNPARSEABLE in _s173_canonical_slice,
+    "the emitted command must abort (never fall back to {}) when the"
+    " existing file fails to parse as JSON",
+)
+check(
+    "suite173(refused-write-cmd-atomic-all-three): emitted command routes the"
+    " backup, the target write, and the restore all through the same atomic"
+    " temp-file-and-rename helper",
+    bool(_S173_CMD_ATOMIC_BACKUP.search(_s173_canonical_slice))
+    and bool(_S173_CMD_ATOMIC_TARGET.search(_s173_canonical_slice))
+    and bool(_S173_CMD_ATOMIC_RESTORE.search(_s173_canonical_slice)),
+    "the emitted command must call the atomic write helper for the backup,"
+    " the target write, AND the restore path — a direct write on any one of"
+    " the three would reintroduce a partially-written-file failure mode",
 )
 
 # --- AC-1b: the residual-seam amendment reconciles the closed exception ----
