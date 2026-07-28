@@ -76,6 +76,9 @@ fi
 echo
 echo "############################################################"
 echo "# Suite 4: hooks/ts/bodies/checkpoint-guard.ts — functional tests"
+echo "# Unwired from .claude-plugin/hooks.json since v2.139.0 (Claude Code plugin"
+echo "# mode); live consumer is the opencode runtime, registered via"
+echo "# hooks/ts/opencode-plugin.ts's teamHarnessPlugins() -> checkpointGuardPlugin()."
 echo "############################################################"
 run_ts_hook_suite "checkpoint-guard" "test_checkpoint_guard.sh"
 
@@ -211,12 +214,18 @@ fi
 echo
 echo "############################################################"
 echo "# Suite 16: hooks/ts/bodies/prepublish-guard.ts — bump-floor advisory (registry Suite 120)"
+echo "# Unwired from .claude-plugin/hooks.json since v2.139.0 (Claude Code plugin"
+echo "# mode); live consumer is the opencode runtime, registered via"
+echo "# hooks/ts/opencode-plugin.ts's teamHarnessPlugins() -> prepublishGuardPlugin()."
 echo "############################################################"
 run_ts_hook_suite "prepublish-bump-floor" "test_prepublish_bump_floor.sh"
 
 echo
 echo "############################################################"
 echo "# Suite 25: hooks/ts/bodies/prepublish-guard.ts — Check 2 command-execution (registry Suite 135)"
+echo "# Unwired from .claude-plugin/hooks.json since v2.139.0 (Claude Code plugin"
+echo "# mode); live consumer is the opencode runtime, registered via"
+echo "# hooks/ts/opencode-plugin.ts's teamHarnessPlugins() -> prepublishGuardPlugin()."
 echo "############################################################"
 run_ts_hook_suite "prepublish-guard" "test_prepublish_guard.sh"
 
@@ -229,6 +238,9 @@ run_ts_hook_suite "gcp-guard" "test_gcp_guard.sh"
 echo
 echo "############################################################"
 echo "# Suite 133: hooks/ts/bodies/worktree-guard.ts — worktree-guard-hook-behavior"
+echo "# Unwired from .claude-plugin/hooks.json since v2.139.0 (Claude Code plugin"
+echo "# mode); live consumer is the opencode runtime, registered via"
+echo "# hooks/ts/opencode-plugin.ts's teamHarnessPlugins() -> worktreeGuardPlugin()."
 echo "############################################################"
 run_ts_hook_suite "worktree-guard" "test_worktree_guard.sh"
 
@@ -237,15 +249,6 @@ echo "############################################################"
 echo "# Suite 136: hooks/run-ts-hook.sh — launcher-fail-closed-on-corrupt-artifact"
 echo "############################################################"
 run_ts_hook_suite "launcher-fail-closed" "test_launcher_fail_closed.sh"
-
-echo
-echo "############################################################"
-echo "# Suite 160: hooks/ts/bodies/gate-guard.ts — deterministic outward-action"
-echo "# order floor (issues #491/#495). Pre-fix regression (Phase 2.0): the"
-echo "# hook + its compiled artifact do not exist yet — FAILS until Task-2 of"
-echo "# the deterministic-gate-release-enforcement plan lands."
-echo "############################################################"
-run_ts_hook_suite "gate-guard" "test_gate_guard.sh"
 
 echo
 echo "############################################################"
@@ -457,6 +460,50 @@ else
         echo "dispatch-sequence-simulation: FAIL"
         FAILED=$((FAILED + 1))
     fi
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 182: dispatch-contract-standard (agents/_shared/dispatch-contract.md)"
+echo "############################################################"
+if python3 "$TESTS_DIR/test_dispatch_contract_standard.py"; then
+    echo "dispatch-contract-standard: PASS"
+else
+    echo "dispatch-contract-standard: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 183: gate-addressee-contract (structured gate data to th:leader)"
+echo "############################################################"
+if python3 "$TESTS_DIR/test_gate_addressee_contract.py"; then
+    echo "gate-addressee-contract: PASS"
+else
+    echo "gate-addressee-contract: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 184: agent-output-contracts (per-agent output-contract language)"
+echo "############################################################"
+if python3 "$TESTS_DIR/test_agent_output_contracts.py"; then
+    echo "agent-output-contracts: PASS"
+else
+    echo "agent-output-contracts: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 185: post-split-agent-contracts (agent-authoring-standard branch)"
+echo "############################################################"
+if python3 "$TESTS_DIR/test_post_split_agent_contracts.py"; then
+    echo "post-split-agent-contracts: PASS"
+else
+    echo "post-split-agent-contracts: FAIL"
+    FAILED=$((FAILED + 1))
 fi
 
 echo

@@ -69,8 +69,8 @@ A dispatch prompt MUST NOT carry:
   operator-facing presenter. Gate option menus belong to the presenter (`th:leader` in the
   normal path; the orchestrator's own fallback renderer in the takeover path — see
   `agents/_shared/gate-contract.md`), never to a specialist dispatch.
-- **New scope.** A dispatch never introduces work beyond what the board already declares —
-  scope lives on the board (`01-plan.md § Task List`, the approved AC set, the declared
+- A **scope-injection** — new work beyond what the board already declares.
+  Scope lives on the board (`01-plan.md § Task List`, the approved AC set, the declared
   `Files:`) and the dispatch points at it. When a dispatch prompt asks for work not
   derivable from the board, the recipient reports and routes the request back to the
   dispatcher rather than absorbing it silently as if it had always been in scope, or

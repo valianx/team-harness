@@ -124,8 +124,11 @@ _LANGUAGE_AGENTS: dict[str, tuple[tuple[str, ...], bool]] = {
          "Plan Ratification (Phase 1.5)", "operator's resolved language"),
         True,
     ),
+    # Retargeted (pipeline-dispatch-shape): "reviews/04-internal-review.md"
+    # dropped — that artifact belonged to the retired Internal Review (Phase
+    # 4.5) mode, which reviewer.md no longer declares.
     "agents/reviewer.md": (
-        ("review_body", "reply_body", "reviews/04-internal-review.md",
+        ("review_body", "reply_body",
          "no operator-language exception"),
         False,
     ),
@@ -450,7 +453,16 @@ _diff_lines = [
     for i, (a, b) in enumerate(zip(_base_lines, _current_lines))
     if a != b
 ]
-_allowed_changed_prefixes = ("**Delta-scoped dispatch", "**Carried-forward sub-verdicts")
+# Retargeted (pipeline-dispatch-shape): licenses a third paragraph — the
+# "Security never carried forward" fail-safe cites "the Phase 3.8 audit's"
+# staleness protection, retitled to "the Pre-Delivery Security Audit's" when
+# the standalone Phase 3.8 label retired (T2-AC-5). The paragraph's
+# substance (NEVER-carry-forward rule, bucket-2 trigger) is unchanged.
+_allowed_changed_prefixes = (
+    "**Delta-scoped dispatch",
+    "**Carried-forward sub-verdicts",
+    "**Security never carried forward",
+)
 _unexpected_diffs = [
     i
     for i in _diff_lines
@@ -516,12 +528,24 @@ def _blast_radius_r0_slice(text: str) -> str:
     )
 
 
+# Retargeted (pipeline-dispatch-shape): a later, unrelated-at-authorship-time
+# change legitimately touches ONE line inside this slice — "Phase 3.75 build
+# verification" became "the Phase 2.8 Freeze's build verification" when Phase
+# 3.75 was retired wholesale (its build-verification function absorbed into
+# the new Phase 2.8). This is the single licensed substitution; the check
+# still fails on any OTHER drift inside the slice.
+_S_RETIRED_PHASE375_OLD = "pattern as Phase 3.75 build verification."
+_S_RETIRED_PHASE375_NEW = "pattern as the Phase 2.8 Freeze's build verification."
 check(
     "task2(ac6f): docs/patch-mode.md's Stage-2 'Blast radius' R0/R1/R2 mechanism is"
-    " byte-identical to the pre-Task-2 tree (explicitly out of this removal's scope)",
+    " byte-identical to the pre-Task-2 tree, apart from the licensed Phase-3.75 retirement",
     bool(_blast_radius_r0_slice(_base_patch_mode))
-    and _blast_radius_r0_slice(_base_patch_mode) == _blast_radius_r0_slice(_patch_mode_text),
-    "the Stage-2 Blast radius mechanism changed, or could not be located in one of the trees",
+    and _blast_radius_r0_slice(_base_patch_mode).replace(
+        _S_RETIRED_PHASE375_OLD, _S_RETIRED_PHASE375_NEW
+    )
+    == _blast_radius_r0_slice(_patch_mode_text),
+    "the Stage-2 Blast radius mechanism changed beyond the licensed Phase-3.75 retirement,"
+    " or could not be located in one of the trees",
 )
 
 
@@ -539,14 +563,42 @@ def _orch_blast_radius_slice(text: str) -> str:
     )
 
 
+# Retargeted (pipeline-dispatch-shape): two licensed substitutions inside
+# this slice — "Phase-3.75 style" became "Phase 2.8 style" (Phase 3.75
+# retired, absorbed into the new Phase 2.8), and the R1 owner-lens candidate
+# list dropped "or `tester`" (Phase 3 no longer runs a tester dispatch — see
+# "Phase 3 — Verify"), replaced with a clause naming why `adversary` is never
+# an owner (it never bounces autonomously; its findings are operator input).
+# The check still fails on any OTHER drift inside the slice.
 _base_orch_full = git_show(BASE_SHA, "agents/orchestrator.md")
+_S_ORCH_LICENSED_SUBS = (
+    (
+        "run the frozen suite directly (Bash, Phase-3.75 style)",
+        "run the frozen suite directly (Bash, Phase 2.8 style)",
+    ),
+    (
+        "Re-dispatch ONLY the owner lens (`qa` or `tester`);",
+        "Re-dispatch ONLY the owner lens (`qa`, since `adversary` never bounces"
+        " autonomously — its findings are always operator input);",
+    ),
+)
+
+
+def _apply_licensed_subs(text: str) -> str:
+    for old, new in _S_ORCH_LICENSED_SUBS:
+        text = text.replace(old, new)
+    return text
+
+
 check(
     "task2(ac6f): agents/orchestrator.md's Case-A blast-radius ordering subsection (with its"
-    " structural-never-narrows fail-safe) is byte-identical to the pre-Task-2 tree",
+    " structural-never-narrows fail-safe) is byte-identical to the pre-Task-2 tree, apart from"
+    " the two licensed pipeline-dispatch-shape substitutions",
     bool(_orch_blast_radius_slice(_base_orch_full))
-    and _orch_blast_radius_slice(_base_orch_full) == _orch_blast_radius_slice(orchestrator_text),
-    "the Case-A blast-radius ordering subsection changed, or could not be located in one of"
-    " the trees",
+    and _apply_licensed_subs(_orch_blast_radius_slice(_base_orch_full))
+    == _orch_blast_radius_slice(orchestrator_text),
+    "the Case-A blast-radius ordering subsection changed beyond the two licensed"
+    " substitutions, or could not be located in one of the trees",
 )
 
 # =============================================================================

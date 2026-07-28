@@ -1900,25 +1900,28 @@ for ref in sorted(plausible_agent_refs):
 #    orchestrator.md) are in the canonical set.
 #    Canonical phases (per the Pipeline Flow ASCII art and Stage table):
 CANONICAL_PHASES = {
-    "0a", "0b", "1", "1.5a", "1.5", "1.6", "1.7", "1.8", "2.0", "2", "2.5", "2.6", "2.7", "3", "3.4", "3.5", "3.75", "3.8", "4", "4.5", "5", "6",
-    "4a", "4b",
+    "0a", "0b", "1", "1.5a", "1.5", "1.6", "1.7", "1.8", "2.0", "2", "2.5", "2.6", "2.7", "2.8", "3", "3.4", "3.5", "4", "5", "6",
     # 2.0 is the Bug-fix Pipeline regression-test phase (type: fix | hotfix only),
     # inserted between STAGE-GATE-1 and Phase 2. See ref-special-flows.md § Bug-fix Flow.
     # 2.6 is the Code-Hygiene Scan (deterministic, all types), sequenced between
     # sub-phases 2.5 and 2.7. See docs/code-hygiene-gate.md.
     # 2.7 is the Test Authoring sub-phase (Stage 2, pre-verify): tester writes AC tests
     # before the Phase 3 parallel verify block. Introduced by fix/phase3-tester-qa-race-condition.
-    # 3.75 is Build Verification, a sub-step of Verify running standalone after
-    # Phase 3.5 (Phase 3.6 was fully retired — no concurrent dispatch to pair with).
+    # 2.8 is Freeze (pipeline-dispatch-shape): absorbs the legacy standalone Phase 3.75 Build
+    # Verification plus a new base-advance reconcile, and is the single point that opens the
+    # fan governed by the re-open rule in Phase 3 — Verify. See agents/orchestrator.md § "Phase
+    # 2.8 — Freeze".
     # 1.7 is ux-reviewer enrich (frontend_scope: true only); executes after architect, before 1.5.
     # 1.8 is the Post-approval Plan-Review Offer (deferred, non-sensitive plans only); executes
     # after STAGE-GATE-1, before Phase 2.0/2. See agents/orchestrator.md § "Phase 1.8".
     # 3.4 is ux-reviewer validate (frontend_scope: true only); runs in the Phase 3 parallel block.
     # 1.5a is the deterministic Plan-Structure Scan (all types, non-self-authored plans),
     # sequenced before the Phase 1.5 qa-plan dispatch. See docs/plan-structure-gate.md.
-    # 4a/4b split Delivery into a local prepare step and a post-gate publish
-    # step so the outward-action release floor cannot deadlock. See the
-    # delivery-prepare sub-phase heading in agents/orchestrator.md.
+    # 3.75, 3.8, 4.5, 4a, 4b are retired (pipeline-dispatch-shape): Build Verification absorbed
+    # into 2.8; the Pre-Delivery Security Audit (3.8) collapsed into the Phase 3 parallel
+    # validation block; Internal Review (4.5) removed wholesale, no successor dispatch;
+    # Delivery's prepare/publish split (4a/4b) collapsed into one Phase 4, since the coordinator's
+    # own push-step precondition (not a separate publish phase) now guards the release floor.
 }
 # Scoped to the dev-pipeline spine only, not SPLIT_CORPUS — ref-special-flows.md
 # and ref-direct-modes.md host independently-numbered sub-flows (the docs
@@ -1937,7 +1940,11 @@ phase_mentions = set(re.findall(r"Phase\s+([0-9]+(?:\.[0-9]+)?[a-z]?)", _phase_n
 # now runs standalone ("Phase 3.6 no longer exists, so there is no concurrent
 # dispatch to pair with") — a retirement-explanation reference, not a typo or
 # a live phase. Excluded here the same way the "{N}" placeholder is excluded.
-_RETIRED_PHASE_MENTIONS_OK = {"3.6"}
+# pipeline-dispatch-shape (T7-AC-2): "3.75" and "4.5" are each mentioned exactly
+# once in orchestrator.md, both inside retirement-explanation sentences (Phase
+# 2.8 naming what it absorbed; STAGE-GATE-3's options table naming why no
+# override keyword exists) — the same pattern "3.6" was already excluded for.
+_RETIRED_PHASE_MENTIONS_OK = {"3.6", "3.75", "4.5"}
 unknown_phases = phase_mentions - CANONICAL_PHASES - {"N"} - _RETIRED_PHASE_MENTIONS_OK
 check(
     "orchestrator.md uses only canonical phase numbers",
@@ -9405,22 +9412,30 @@ print("=== Suite 43: pr-e-delivery-hardening — delivery flow hardening ===")
 
 # ---- file reads (suite-local) -----------------------------------------------
 _s43_delivery    = read(AGENTS_DIR / "delivery.md")
+_s43_delivery_mechanics = read(AGENTS_DIR / "_shared" / "delivery-mechanics.md")
 _s43_ghfallback  = read(AGENTS_DIR / "_shared" / "gh-fallback.md")
 _s43_testing_md  = read(REPO_ROOT / "docs" / "testing.md")
 _s43_costcaching = read(REPO_ROOT / "docs" / "cost-and-caching.md")
 _s43_self        = Path(__file__).read_text(encoding="utf-8")
 
 # ---- canonical anchors -------------------------------------------------------
-_S43_STEP2B_ANCHOR   = "### Step 2b — Active gh account capture"
+# Retargeted (pipeline-dispatch-shape, T7-AC-2, per T3-AC-2/T3-AC-6): Step 2b
+# (gh account capture) and Step 9e (CHANGELOG release cut) both moved from
+# delivery.md into the coordinator's own agents/_shared/delivery-mechanics.md
+# — the release cut to § 3, and the gh account capture to a diagnostic note
+# inside § 7 (Push), where the single-dispatch design's own timing (delivery
+# no longer splits into prepare/publish, so there is only one point that
+# needs a current gh account reading: right before the coordinator's push).
+_S43_STEP2B_ANCHOR   = "**Active gh account capture (diagnostic, never blocking).**"
 _S43_STEP90_ANCHOR   = "### Step 9.0 — Version sites (explicit enumeration)"
-_S43_STEP9E_ANCHOR   = "### Step 9e — CHANGELOG release cut"
+_S43_STEP9E_ANCHOR   = "## 3. `changelog.d/` assembly and the release cut"
 _S43_BLOCKED_ANCHOR  = "## status: blocked-pr-pending"
 _S43_SITES_ANCHOR    = "**team-harness's own version sites"
 
 # ---- slices ------------------------------------------------------------------
-_s43_step2b_slice   = _slice_section(_s43_delivery,   _S43_STEP2B_ANCHOR)
+_s43_step2b_slice   = _slice_section(_s43_delivery_mechanics, _S43_STEP2B_ANCHOR)
 _s43_step90_slice   = _slice_section(_s43_delivery,   _S43_STEP90_ANCHOR)
-_s43_step9e_slice   = _slice_section(_s43_delivery,   _S43_STEP9E_ANCHOR)
+_s43_step9e_slice   = _slice_section(_s43_delivery_mechanics, _S43_STEP9E_ANCHOR)
 _s43_blocked_slice  = _slice_section(_s43_ghfallback, _S43_BLOCKED_ANCHOR)
 _s43_sites_slice    = _slice_section(_s43_costcaching, _S43_SITES_ANCHOR)
 
@@ -9481,9 +9496,12 @@ _S43_STEP9E_DATE_ALTS   = ("<date>", "YYYY-MM-DD", "<YYYY")
 _S43_STEP9E_GATE_ALTS   = ("Step 9", "gated", "version bump")
 
 check(
-    "delivery-hardening(2/ac-2): delivery.md Step 9e anchor owns the CHANGELOG"
+    # Retargeted (pipeline-dispatch-shape, T7-AC-2, per T3-AC-6): Step 9e
+    # moved wholesale to delivery-mechanics.md § 3, executed by the
+    # coordinator rather than dispatched to delivery.md.
+    "delivery-hardening(2/ac-2): delivery-mechanics.md § 3 owns the CHANGELOG"
     " release cut — moves [Unreleased] to a versioned ## heading with date;"
-    " recreates empty [Unreleased]; step is gated on Step 9 version bump",
+    " recreates empty [Unreleased]; step is gated on the version bump",
     bool(_s43_step9e_slice)
     and all(t in _s43_step9e_slice for t in _S43_STEP9E_REQUIRED)
     and any(a in _s43_step9e_slice for a in _S43_STEP9E_HEADING_ALTS)
@@ -9501,26 +9519,27 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Check (3) / AC-3 — delivery.md Step 9b — reads CLAUDE.md §4 Golden Commands
-# as DoD source and declares "dod: no gates discovered" when all rows skip.
-# The step 9b slice is the existing Step 9b section; the check scans
-# delivery.md globally for the key tokens (Step 9b may not have a dedicated
-# anchor yet; we use the existing "Step 9b" label or slice from nearest heading).
-# Strategy: use global scan of delivery.md for the three key tokens:
-#   "CLAUDE.md" — reads the file
-#   "Golden Commands" — reads §4 specifically
-#   "dod: no gates discovered" — the required status line when all rows skip
+# Retargeted (pipeline-dispatch-shape, T7-AC-2, per T3-AC-2): Step 9b's DoD
+# check was narrowed from "read CLAUDE.md §4 Golden Commands and run every
+# discovered gate" to "check only delivery's own writes" — the implementation
+# surface (source, tests, build, lint) is now verified upstream at Phase 2.8
+# and Phase 3, and Step 9b cites that evidence via the suite-evidence ledger
+# rather than re-deriving gates from Golden Commands. The check below asserts
+# the narrowed scope and its own visibility rule.
 # ---------------------------------------------------------------------------
+_S43_STEP9B_NARROWED = "narrowed to delivery" + chr(39) + "s own writes"
 check(
-    "delivery-hardening(3/ac-3): delivery.md Step 9b reads CLAUDE.md §4 Golden"
-    " Commands as DoD source and emits 'dod: no gates discovered' when all rows skip",
-    "CLAUDE.md" in _s43_delivery
-    and "Golden Commands" in _s43_delivery
-    and "dod: no gates discovered" in _s43_delivery,
-    f"delivery.md missing one or more Step 9b DoD tokens;"
-    f" 'CLAUDE.md' present: {'CLAUDE.md' in _s43_delivery};"
-    f" 'Golden Commands' present: {'Golden Commands' in _s43_delivery};"
-    f" 'dod: no gates discovered' present: {'dod: no gates discovered' in _s43_delivery}",
+    "delivery-hardening(3/ac-3): delivery.md Step 9b is narrowed to delivery's"
+    " own writes, cites the suite-evidence ledger for the implementation"
+    " surface, and emits 'dod: delivery-writes-clean' when nothing is flagged",
+    _S43_STEP9B_NARROWED in _s43_delivery
+    and "00-suite-evidence.md" in _s43_delivery
+    and "dod: delivery-writes-clean" in _s43_delivery,
+    f"delivery.md missing one or more narrowed Step 9b tokens;"
+    f" narrowed-scope marker present: {_S43_STEP9B_NARROWED in _s43_delivery};"
+    f" '00-suite-evidence.md' present: {'00-suite-evidence.md' in _s43_delivery};"
+    f" 'dod: delivery-writes-clean' present:"
+    f" {'dod: delivery-writes-clean' in _s43_delivery}",
 )
 
 # ---------------------------------------------------------------------------
@@ -9538,9 +9557,13 @@ _S43_STEP2B_REQUIRED = ("gh api user", ".login", "gh_account")
 _S43_STEP2B_LIMIT_ALTS = ("known limitation", "operator", "by design")
 
 check(
-    "delivery-hardening(4/ac-4): delivery.md Step 2b anchor captures the active"
-    " gh account ('gh api user -q .login'), reports 'gh_account:' in the status"
-    " block, and documents the known limitation (operator-owned, by design)",
+    # Retargeted (pipeline-dispatch-shape, T7-AC-2, per T3-AC-2): the
+    # capture moved to delivery-mechanics.md § 7 (diagnostic, run once,
+    # immediately before the coordinator's own push) — the two-capture
+    # prepare/publish design has no successor since the mode split is gone.
+    "delivery-hardening(4/ac-4): delivery-mechanics.md § 7 captures the active"
+    " gh account ('gh api user -q .login'), reports 'gh_account:' in the"
+    " delivery summary, and documents this is diagnostic-only (never blocking)",
     bool(_s43_step2b_slice)
     and all(t in _s43_step2b_slice for t in _S43_STEP2B_REQUIRED)
     and any(a in _s43_step2b_slice for a in _S43_STEP2B_LIMIT_ALTS),
@@ -31503,34 +31526,44 @@ _s137_ref_direct = read(AGENTS_DIR / "ref-direct-modes.md")
 
 _S137_STOP_H2_H3 = ("\n### ", "\n## ", "\n---\n")
 
-# (a) delivery.md Step 11.4 — detection rule + `coderabbit:` status token
-_s137_delivery_slice = _slice_section(
-    _s137_delivery, "### Step 11.4 — Post-create mergeability + CI check", _S137_STOP_H2_H3
+# Retargeted (pipeline-dispatch-shape, T7-AC-2, per T3-AC-6/T3-AC-11): Step
+# 11.4 (the post-create mergeability+CI check that carried CodeRabbit
+# detection) moved wholesale to the coordinator's own
+# agents/_shared/delivery-mechanics.md § 9 ("Merge-state poll"), and
+# CodeRabbit detection was dropped there BY DESIGN, together with the
+# `coderabbit_configured` field it read (T3-AC-6: "the CodeRabbit detection
+# block is absent"). (a1)-(a4) below convert from asserting the three-signal
+# detection rule to asserting its clean, complete removal at its new home.
+_s137_deliv_mechanics = read(AGENTS_DIR / "_shared" / "delivery-mechanics.md")
+_s137_deliv_mechanics_s9 = _slice_section(
+    _s137_deliv_mechanics, "## 9. Merge-state poll", ("\n## ", "\n---\n")
 )
 check(
-    "s137(a1): delivery.md Step 11.4 anchor present",
-    bool(_s137_delivery_slice),
-    "'### Step 11.4 — Post-create mergeability + CI check' not found in agents/delivery.md",
+    "s137(a1): delivery-mechanics.md § 9 (successor to delivery.md Step 11.4) anchor present",
+    bool(_s137_deliv_mechanics_s9),
+    "'## 9. Merge-state poll' not found in agents/_shared/delivery-mechanics.md",
 )
 check(
-    "s137(a2): Step 11.4 states the three-signal CodeRabbit detection rule",
-    "coderabbit_configured: true" in _s137_delivery_slice
-    and ".coderabbit.yaml" in _s137_delivery_slice
-    and "statusCheckRollup" in _s137_delivery_slice,
-    "delivery.md Step 11.4 must state all three detection signals "
-    "(coderabbit_configured hint, .coderabbit.yaml/.yml file check, rollup check)",
+    "s137(a2): § 9 explicitly disclaims CodeRabbit detection, with no residual "
+    "three-signal rule or coderabbit_configured field",
+    "No CodeRabbit detection" in _s137_deliv_mechanics_s9
+    and "coderabbit_configured" not in _s137_deliv_mechanics_s9
+    and ".coderabbit.yaml" not in _s137_deliv_mechanics_s9,
+    "delivery-mechanics.md § 9 must explicitly disclaim CodeRabbit detection and "
+    "carry no residual coderabbit_configured/.coderabbit.yaml reference",
 )
 check(
-    "s137(a3): Step 11.4 status block declares the `coderabbit:` token",
-    "coderabbit: detected | not-detected | not-verified" in _s137_delivery_slice,
-    "delivery.md Step 11.4 must declare the 'coderabbit: detected | not-detected | not-verified' "
-    "status-block line",
+    "s137(a3): the retired `coderabbit:` status-block token is gone from § 9",
+    "coderabbit: detected | not-detected | not-verified" not in _s137_deliv_mechanics_s9,
+    "delivery-mechanics.md § 9 must not retain the retired "
+    "'coderabbit: detected | not-detected | not-verified' status-block line",
 )
 check(
-    "s137(a4): Step 11.4 fenced 'CI conclusion' mechanical rules are unchanged",
-    "Any check `PENDING` / `IN_PROGRESS` / `QUEUED`" in _s137_delivery_slice,
-    "the fenced 'CI conclusion (bundled from statusCheckRollup)' mechanical rules must remain "
-    "byte-identical inside Step 11.4 — this fix touches interpretive framing only",
+    "s137(a4): § 9 still states the CI-conclusion reporting rule (merge-state "
+    "poll's surviving mechanical content)",
+    "any `FAILURE`/`ERROR`/`TIMED_OUT`/`CANCELLED`" in _s137_deliv_mechanics_s9,
+    "delivery-mechanics.md § 9 must retain the CI failure/pending classification rule "
+    "that survives the CodeRabbit-detection removal",
 )
 
 # (b) tester.md module-test Phase 3 — single-condition gate + sole-security-layer statement
@@ -31579,23 +31612,24 @@ check(
     "'## Current State' schema block not found in agents/orchestrator.md",
 )
 check(
-    "s137(c2): schema block declares `coderabbit_configured`",
-    "coderabbit_configured:" in _s137_orch_slice,
-    "agents/orchestrator.md 00-state.md § Current State schema must declare "
-    "'coderabbit_configured'",
+    # Retargeted (pipeline-dispatch-shape, T7-AC-2, per T2-AC-10): the field
+    # is retired together with Phase 4.5, its sole consumer — the schema no
+    # longer declares it.
+    "s137(c2): schema block no longer declares the retired `coderabbit_configured` field",
+    "coderabbit_configured:" not in _s137_orch_slice,
+    "agents/orchestrator.md 00-state.md § Current State schema must not retain "
+    "the retired 'coderabbit_configured' field",
 )
 # Repoint (split): Classify is leader.md Phase 0a step "13. **Classify.**" and the
-# coderabbit_configured setter bullet follows it, before "14. **Bootstrap check**".
+# coderabbit_configured setter bullet used to follow it, before "14. **Bootstrap check**".
 _s137_classify_slice = _slice_section(
     _s137_orchestrator, "13. **Classify.**", ("\n14. **Bootstrap check**",)
 )
 check(
-    "s137(c3): Phase 0a Step 7 declares the deterministic coderabbit_configured setter",
+    "s137(c3): Phase 0a Step 7 no longer declares the retired coderabbit_configured setter",
     bool(_s137_classify_slice)
-    and "coderabbit_configured" in _s137_classify_slice
-    and ".coderabbit.yaml" in _s137_classify_slice
-    and ".coderabbit.yml" in _s137_classify_slice,
-    "agents/orchestrator.md Phase 0a Step 7 ('7. **Classify:**') must declare the "
+    and "coderabbit_configured" not in _s137_classify_slice,
+    "agents/orchestrator.md Phase 0a Step 7 ('7. **Classify:**') must not retain "
     "deterministic repo-root '.coderabbit.yaml'/'.coderabbit.yml' file-check setter bullet "
     "for 'coderabbit_configured'",
 )
@@ -33090,6 +33124,17 @@ _s145_orch = SPLIT_CORPUS
 _s145_claude_md = read(REPO_ROOT / "CLAUDE.md")
 _s145_testing_md = read(REPO_ROOT / "docs" / "testing.md")
 
+# Retargeted (pipeline-dispatch-shape, T7-AC-2/T7-AC-5): this suite's whole
+# subject — the Phase 4.5 Internal Review mode, its dual-pass A/B draft
+# mechanism, and their five-site write-contract agreement — was deleted
+# wholesale by T2-AC-9 (Phase 4.5 removed, no successor dispatch). The five
+# positive-presence checks below are converted to five absence checks: they
+# now verify the retirement is complete and clean at each of the same five
+# sites, rather than asserting content that no longer exists. This preserves
+# the suite's original protective value (catching a partial or silent
+# reintroduction of the retired mechanism at any one of the five sites)
+# instead of deleting the suite to turn it green.
+
 # --- Site 1: Read-Only Working-Tree Contract whitelist (reviewer.md) ---
 _S145_WHITELIST_ANCHOR = "## Read-Only Working-Tree Contract"
 _S145_WHITELIST_STOP = ("\n## Worktree Lifecycle for PR Reviews",)
@@ -33104,66 +33149,39 @@ check(
     "Contract' section",
 )
 check(
-    "suite145(site1-whitelist-enumeration): the whitelist enumerates all "
-    "four permitted writes (04-review.md plus the three internal-review "
-    "paths), each under the workspaces/ prefix",
-    all(
-        f"`workspaces/{{feature-name}}/reviews/{name}`" in _s145_whitelist_slice
-        for name in (
-            "04-review.md",
-            "04-internal-review.md",
-            "04-internal-review-A.md",
-            "04-internal-review-B.md",
-        )
-    ),
+    "suite145(site1-whitelist-retired): the whitelist enumerates ONLY "
+    "04-review.md — the three retired 04-internal-review*.md paths are gone",
+    f"`workspaces/{{feature-name}}/reviews/04-review.md`" in _s145_whitelist_slice
+    and "04-internal-review" not in _s145_whitelist_slice,
     "agents/reviewer.md Read-Only Working-Tree Contract whitelist must "
-    "enumerate 04-review.md and all three 04-internal-review*.md paths, "
-    "each under workspaces/{feature-name}/reviews/",
+    "enumerate 04-review.md only, with no surviving 04-internal-review*.md entry",
 )
 check(
     "suite145(site1-outside-workspaces-violation): the whitelist site "
     "declares any write outside the `workspaces/` prefix a contract "
-    "violation (AC-1's 'nothing outside the workspaces/ prefix')",
+    "violation (unchanged by the retirement)",
     "outside the `workspaces/` prefix" in _s145_whitelist_slice,
     "agents/reviewer.md Read-Only Working-Tree Contract must declare that "
     "any write outside the workspaces/ prefix is a contract violation",
 )
 
 # --- Site 2: reviewer internal-mode writer-identity prose (reviewer.md) ---
-_S145_MODE_ANCHOR = "### Internal Review (Phase 4.5 — advisory, no GitHub publish)"
-_S145_MODE_STOP = ("\n## Phase 0 — Parse Inline Data",)
-_s145_mode_slice = _slice_section(_s145_reviewer, _S145_MODE_ANCHOR, _S145_MODE_STOP)
 check(
-    "suite145(site2-reviewer-writes): the internal-mode prose states the "
-    "reviewer writes reviews/04-internal-review.md and the orchestrator "
-    "only surfaces the digest, never publishing it",
-    "The reviewer writes the output to "
-    "`workspaces/{feature-name}/reviews/04-internal-review.md`" in _s145_mode_slice
-    and "the orchestrator surfaces" in _s145_mode_slice,
-    "agents/reviewer.md Internal Review mode prose must state that the "
-    "reviewer writes 04-internal-review.md and the orchestrator only "
-    "surfaces the digest",
-)
-check(
-    "suite145(site2-without-publishing): the internal-mode prose states the "
-    "orchestrator surfaces the digest without publishing it anywhere "
-    "(AC-2's 'without publishing')",
-    "without publishing it anywhere" in _s145_mode_slice,
-    "agents/reviewer.md Internal Review mode prose must state the "
-    "orchestrator surfaces the digest without publishing it anywhere",
+    "suite145(site2-mode-retired): agents/reviewer.md no longer declares an "
+    "Internal Review (Phase 4.5) operating mode",
+    "Internal Review (Phase 4.5" not in _s145_reviewer,
+    "agents/reviewer.md must not retain an 'Internal Review (Phase 4.5 …)' "
+    "mode heading — the mode was removed wholesale with Phase 4.5",
 )
 
 # --- Site 3: reviewer status-block example (reviewer.md Return Protocol) ---
-_S145_STATUS_ANCHOR = "### Internal Review (Phase 4.5 — advisory)"
-_S145_STATUS_STOP = ("\n### Rules for the status block",)
-_s145_status_slice = _slice_section(_s145_reviewer, _S145_STATUS_ANCHOR, _S145_STATUS_STOP)
 check(
-    "suite145(site3-status-block): the reviewer's Internal Review status-"
-    "block example declares its own workspace output path",
+    "suite145(site3-status-block-retired): the reviewer's Return Protocol no "
+    "longer carries an Internal Review status-block example",
     "output: workspaces/{feature-name}/reviews/04-internal-review.md"
-    in _s145_status_slice,
-    "agents/reviewer.md Return Protocol Internal Review example must "
-    "declare `output: workspaces/{feature-name}/reviews/04-internal-review.md`",
+    not in _s145_reviewer,
+    "agents/reviewer.md Return Protocol must not retain the retired "
+    "Internal Review output: line",
 )
 
 # --- Site 4: orchestrator Artifact Verification table ---
@@ -33171,27 +33189,22 @@ _S145_TABLE_ANCHOR = "### Artifact Verification Protocol"
 _S145_TABLE_STOP = ("\n**Mechanic:**",)
 _s145_table_slice = _slice_section(_s145_orch, _S145_TABLE_ANCHOR, _S145_TABLE_STOP)
 check(
-    "suite145(site4-artifacts-table): the orchestrator's Artifact "
-    "Verification table maps the reviewer's Phase 4.5 internal mode to "
-    "reviews/04-internal-review.md",
-    "| `reviewer` | 4.5 (internal) | `reviews/04-internal-review.md` |"
-    in _s145_table_slice,
-    "agents/orchestrator.md Artifact Verification Protocol table "
-    "must map reviewer/4.5 (internal) to reviews/04-internal-review.md",
+    "suite145(site4-artifacts-table-retired): the orchestrator's Artifact "
+    "Verification table no longer maps a reviewer/4.5 (internal) row",
+    "4.5 (internal)" not in _s145_table_slice
+    and "reviews/04-internal-review.md" not in _s145_table_slice,
+    "agents/orchestrator.md Artifact Verification Protocol table must not "
+    "retain a reviewer/4.5 (internal) row mapping to the retired file",
 )
 
 # --- Site 5: orchestrator dual-review A/B per-pass draft paths ---
-_S145_AB_ANCHOR = "- **Per-pass draft paths:**"
-_S145_AB_STOP = ("\n- **Pre-gate positioning:**",)
-_s145_ab_slice = _slice_section(_s145_orch, _S145_AB_ANCHOR, _S145_AB_STOP)
 check(
-    "suite145(site5-dual-review-ab): the dual-review A/B section states "
-    "Pass A and Pass B each write their own draft file",
-    "Pass A writes `reviews/04-internal-review-A.md`" in _s145_ab_slice
-    and "Pass B writes `reviews/04-internal-review-B.md`" in _s145_ab_slice,
-    "agents/orchestrator.md dual-review 'Per-pass draft paths' bullet must "
-    "state Pass A writes 04-internal-review-A.md and Pass B writes "
-    "04-internal-review-B.md",
+    "suite145(site5-dual-review-ab-retired): the orchestrator no longer "
+    "declares Pass A/Pass B internal-review draft paths",
+    "reviews/04-internal-review-A.md" not in _s145_orch
+    and "reviews/04-internal-review-B.md" not in _s145_orch,
+    "agents/orchestrator.md must not retain the retired dual-review A/B "
+    "internal-review draft-path bullets",
 )
 
 # --- Negative assertion: no site anywhere claims the orchestrator writes
@@ -36431,18 +36444,31 @@ check(
     "agents/orchestrator.md must declare a working_branch field consumed by "
     "gate-guard",
 )
+# Retargeted (pipeline-dispatch-shape, T7-AC-2): Table 3 row 15 concedes the
+# structural mode: prepare/publish boundary is gone and gate-guard unwired —
+# the successor is the push step's own in-phase precondition, re-reading
+# gate3_release/gate_nonce immediately before the push, in the coordinator's
+# own agents/_shared/delivery-mechanics.md rather than in agents/delivery.md.
+_s162_delivery_mechanics = read(AGENTS_DIR / "_shared" / "delivery-mechanics.md")
 check(
-    "s162(inv-a-outward-actor): delivery.md's mode: publish is the sole "
-    "outward push/PR-create actor",
-    "mode: publish" in _s162_delivery and "gate3_release" in _s162_delivery,
-    "agents/delivery.md's mode: publish must be gated on gate3_release",
+    "s162(inv-a-outward-actor): delivery-mechanics.md's push step re-reads "
+    "gate3_release/gate_nonce as the sole in-phase precondition before the "
+    "outward push/PR-create",
+    "gate3_release` / `gate_nonce` re-read" in _s162_delivery_mechanics
+    and "confirm the bare literal `ship`" in _s162_delivery_mechanics
+    and "matching consumed `gate_nonce`" in _s162_delivery_mechanics,
+    "agents/_shared/delivery-mechanics.md's push-step precondition (a) must "
+    "re-read gate3_release, confirm the bare literal ship, and its matching "
+    "gate_nonce, before the push",
 )
 check(
-    "s162(inv-a-reorder-full): orchestrator.md splits Delivery into Phase 4a "
-    "(prepare) and Phase 4b (publish)",
-    "## Phase 4a — Delivery (prepare)" in _s162_orchestrator
-    and "## Phase 4b — Delivery (publish)" in _s162_orchestrator,
-    "agents/orchestrator.md must declare both Phase 4a and Phase 4b headings",
+    # Retargeted (pipeline-dispatch-shape, T7-AC-2): Phase 4a/4b collapsed
+    # into one Phase 4 — the split heading pair this assertion pinned no
+    # longer exists by design (T2-AC-9).
+    "s162(inv-a-reorder-full): orchestrator.md declares the single collapsed "
+    "Phase 4 — Delivery heading",
+    "## Phase 4 — Delivery" in _s162_orchestrator,
+    "agents/orchestrator.md must declare the single Phase 4 — Delivery heading",
 )
 check(
     "s162(inv-a-express-no-reorder): orchestrator.md's Express Lane Profile "
@@ -37057,21 +37083,21 @@ def _s171_slice(text, anchor, stop="\n## "):
     return text[i:j] if j > 0 else text[i:]
 
 
-# --- (a) The audit phase exists, positioned as its own section ---
-# pipeline-cost-slimdown (Task-1, 2026-07-21): the heading gained a
-# ", conditional" suffix — the audit itself is no longer unconditional
-# (the whole point of this PR).
+# Retargeted (pipeline-dispatch-shape, T7-AC-2, per T2-AC-5): Phase 3.8 no
+# longer exists as its own section — the audit relocated into the collapsed
+# Phase 3 parallel validation block, running concurrently with `qa` rather
+# than as a standalone phase. The anchor and its dependent slice below move
+# with it.
 check(
-    "s171(a-audit-section): orchestrator.md declares '## Phase 3.8 — "
-    "Pre-Delivery Security Audit (once per delivery group, conditional)'",
-    "## Phase 3.8 — Pre-Delivery Security Audit (once per delivery group, conditional)"
-    in _s171_orch,
+    "s171(a-audit-section): orchestrator.md declares '## Phase 3 — Verify "
+    "(parallel validation block)', the audit's new home",
+    "## Phase 3 — Verify (parallel validation block)" in _s171_orch,
     "the audit section header is the contract's anchor — its absence means the "
     "audit was never wired",
 )
 
 _s171_audit = _s171_slice(
-    _s171_orch, "## Phase 3.8 — Pre-Delivery Security Audit"
+    _s171_orch, "## Phase 3 — Verify (parallel validation block)"
 )
 
 # --- (b)/(c) pipeline-cost-slimdown (Task-1, 2026-07-21): the unconditional
@@ -37080,11 +37106,14 @@ _s171_audit = _s171_slice(
 # Rewritten from a two-lens (security-unconditional + adversary-conditional)
 # pin to a single-lens (adversary-only-conditional, no security at all) pin.
 check(
+    # Retargeted (pipeline-dispatch-shape, T7-AC-2): the exact phrasing
+    # moved with the audit's relocation into the Phase 3 block; the
+    # sole-lens/no-security-dispatch invariant it pins is unchanged.
     "s171(b-adversary-only-conditional): the audit dispatches `adversary`"
     " alone, conditional on `security_floor_applies == true` — no `security`"
-    " code-audit dispatch exists at Phase 3.8",
-    "`adversary`, dispatched exactly ONCE per delivery group when"
-    " `security_floor_applies == true`" in _s171_audit
+    " code-audit dispatch exists in the Phase 3 block",
+    "adversary` (Pre-Delivery Security Audit, when `security_floor_applies == true`)"
+    in _s171_audit
     and "**security**" not in _s171_audit
     and "`security` (unconditional)" not in _s171_audit,
     "the audit's sole lens must be `adversary`, conditional on the named"
@@ -37139,17 +37168,23 @@ for _s171_name, _s171_text in [
 
 # --- (h) findings are operator input; no iteration loop attached ---
 check(
+    # Retargeted (pipeline-dispatch-shape, T7-AC-2): wording moved from
+    # "Findings are operator input" to "Findings from `adversary` are
+    # operator input" when the audit relocated into the Phase 3 block.
     "s171(h-findings-operator-input): the audit declares findings operator "
     "input, never an iteration trigger",
-    "Findings are operator input, never an iteration trigger" in _s171_audit
+    "are operator input, never an iteration trigger" in _s171_audit
     and "NO bounce, NO patch iteration, NO re-dispatch loop" in _s171_audit,
     "the audit must state both the positive rule (operator disposes at "
     "STAGE-GATE-3) and the negative rule (no autonomous loop)",
 )
 check(
+    # Retargeted (pipeline-dispatch-shape, T7-AC-2): the amend-reaudit rule
+    # is now stated via "never more than one re-audit per amend cycle"
+    # rather than "re-run this audit ONCE" — same bound, new wording.
     "s171(i-amend-reaudit-once): the amend re-audit is bounded to ONCE, "
     "delta-scoped, operator-caused",
-    "re-run this audit ONCE over the amended diff" in _s171_audit
+    "never more than one re-audit per amend cycle" in _s171_audit
     and "never a re-audit the operator did not cause" in _s171_audit,
     "the only audit re-run is the single operator-caused amend re-audit",
 )
@@ -37168,11 +37203,14 @@ check(
 # --- (k) STAGE-GATE-3 carries the audit verdicts and records acceptance ---
 _s171_gate3 = _s171_slice(_s171_orch, "## STAGE-GATE-3 — End of Stage 3")
 check(
-    "s171(k-gate3-carries-audit): the STAGE-GATE-3 STOP block carries the "
-    "Phase 3.8 audit verdict lines",
-    "Security audit (Phase 3.8):" in _s171_gate3
+    # Retargeted (pipeline-dispatch-shape, T7-AC-2): the gate-data field
+    # label is now "Pre-Delivery Security Audit:" (the `security_audit`
+    # field value), not "Security audit (Phase 3.8):".
+    "s171(k-gate3-carries-audit): the STAGE-GATE-3 gate data carries the "
+    "Pre-Delivery Security Audit verdict lines",
+    "**Pre-Delivery Security Audit:**" in _s171_gate3
     and "not run (security_floor_applies: false)" in _s171_gate3,
-    "the STOP block must present both lenses' verdicts (or the reason a lens "
+    "the gate data must present both lenses' verdicts (or the reason a lens "
     "did not run) — the operator decides with them on the table",
 )
 check(
@@ -37184,12 +37222,17 @@ check(
     "— informed consent, never silent",
 )
 check(
-    "s171(m-amend-reruns-audit): the amend reply re-runs the audit "
-    "delta-scoped before re-presenting the gate",
-    "re-run the Phase 3.8 audit ONCE delta-scoped over the amended diff"
-    in _s171_gate3,
-    "the amend row must wire the single re-audit — otherwise an amended diff "
-    "ships against a stale audit",
+    # Retargeted (pipeline-dispatch-shape, T7-AC-2): the `amend` row no
+    # longer names "the Phase 3.8 audit" directly — it re-opens Phase 3
+    # itself (§ "Phase 3 — Verify" above), whose own "Re-audit on amend"
+    # paragraph is where the single re-audit is now defined. The wiring is
+    # the cross-reference, not a restated audit-specific sentence.
+    "s171(m-amend-reruns-audit): the amend reply re-opens Phase 3 (where the "
+    "single delta-scoped re-audit is defined) before re-presenting the gate",
+    "This re-opens Phase 2.8 → Phase 3 → STAGE-GATE-3 per the staleness "
+    "invariant" in _s171_gate3,
+    "the amend row must re-open Phase 3 — otherwise an amended diff ships "
+    "against a stale audit",
 )
 
 # --- (n) audit_status schema field: producer + consumer both stated ---
@@ -37202,23 +37245,31 @@ check(
     "preparation) declared at the schema site",
 )
 
-# --- (o) Phase 3 is tester+qa only; Case D and the security lenses left ---
+# Retargeted (pipeline-dispatch-shape, T7-AC-2, per T2-AC-5): this is a
+# genuine design reversal, not a rename — the earlier "pipeline-cost-
+# slimdown" design this suite pinned kept the audit as a standalone Phase
+# 3.8, deliberately excluded from Phase 3. T2-AC-5 collapses that standalone
+# phase INTO Phase 3 as a second concurrent lens. The assertion the suite
+# protects — no OTHER, retired code-audit path re-opens (the full `security`
+# agent, or a per-task Case D loop) — still holds and is what these two
+# checks now assert; the "Phase 3 excludes adversary" half is inverted by
+# design and cannot be preserved.
 check(
-    "s171(o-phase3-two-agents): Phase 3 header reads 'Test + Validate in "
-    "parallel' (tester + qa only)",
-    "## Phase 3 — Verify (Test + Validate in parallel)" in _s171_orch,
-    "Phase 3 must no longer advertise a security lens",
+    "s171(o-phase3-two-agents): Phase 3 header reads '(parallel validation "
+    "block)', the audit's collapsed home",
+    "## Phase 3 — Verify (parallel validation block)" in _s171_orch,
+    "Phase 3 must declare itself the parallel validation block that now "
+    "carries both qa and the (conditional) adversary audit",
 )
-_s171_p3 = _s171_slice(_s171_orch, "## Phase 3 — Verify (Test + Validate")
+_s171_p3 = _s171_slice(_s171_orch, "## Phase 3 — Verify (parallel validation block)")
 check(
     "s171(p-phase3-no-security-dispatch): the Phase 3 dispatch block lists "
-    "tester and qa, never security or adversary",
-    "- **tester** (run-only):" in _s171_p3
-    and "- **qa** (validate):" in _s171_p3
-    and "- **security**" not in _s171_p3
-    and "- **adversary**" not in _s171_p3,
-    "a security/adversary bullet in the Phase 3 dispatch block re-opens the "
-    "per-task dispatch this change retired",
+    "qa and adversary, never the retired full `security` code-audit agent",
+    "- **qa** (validate):" in _s171_p3
+    and "- **adversary** (when `security_floor_applies == true`):" in _s171_p3
+    and "- **security**" not in _s171_p3,
+    "a `security` bullet in the Phase 3 dispatch block re-opens the "
+    "unconditional code-audit dispatch this change retired",
 )
 check(
     "s171(q-no-case-d): the Case → routing table and the failure-brief "
@@ -37229,21 +37280,30 @@ check(
     "the loop itself",
 )
 check(
+    # Retargeted (pipeline-dispatch-shape, T7-AC-2): the note now names the
+    # audit by its own name rather than by the retired phase number.
     "s171(r-tier-table-note): the tier table's note states every tier "
     "receives the same audit",
-    "Every tier receives the same Phase 3.8 audit" in _s171_orch,
+    "Every tier receives the same Pre-Delivery Security Audit" in _s171_orch,
     "bug severity must never select a different security lens — the audit is "
     "uniform across tiers",
 )
 check(
-    "s171(s-checklist-row): the Phase Checklist template carries the 3.8 row",
-    "- [ ] 3.8 — Pre-Delivery Security Audit" in _s171_orch,
+    # Retargeted (pipeline-dispatch-shape, T7-AC-2, per T2-AC-5): there is
+    # no standalone 3.8 row to check — the audit is folded into the single
+    # Phase 3 checklist row, which names both lenses inline.
+    "s171(s-checklist-row): the Phase Checklist template's Phase 3 row names "
+    "both qa and the conditional adversary audit",
+    "- [ ] 3 — Verify (parallel validation block — qa + adversary if "
+    "security_floor_applies, one message)" in _s171_orch,
     "the checklist row is what recovery reads — its absence makes the audit "
     "invisible to /th:recover",
 )
 check(
+    # Retargeted (pipeline-dispatch-shape, T7-AC-2): the express-lane
+    # sentence now names the audit by name rather than by phase number.
     "s171(t-express-runs-audit): the express lane never skips the audit",
-    "it never skips the Phase 3.8 Pre-Delivery Security Audit" in _s171_orch,
+    "it never skips the Pre-Delivery Security Audit" in _s171_orch,
     "express must run the audit exactly as full — no lane carve-out",
 )
 
@@ -37283,28 +37343,40 @@ check(
     "a blocking adversary verdict re-opens the autonomous iteration loop",
 )
 
-# --- (z) delivery.md: prepare never pre-empts the operator; publish verifies ---
+# Retargeted (pipeline-dispatch-shape, T7-AC-2, per T3-AC-3/T3-AC-2): the
+# mode: prepare/publish split delivery.md carried is retired wholesale — one
+# `delivery` dispatch, running before the coordinator's push, never gated
+# on audit findings at all. The disposition-on-open-findings responsibility
+# these three checks pinned inside delivery.md moved to the orchestrator's
+# own STAGE-GATE-3 `ship`-reply handling (already covered by the passing
+# s171(l) check above) — the invariant is now structural (the write is
+# unconditional on `ship`) rather than a validate-then-error check delivery
+# itself performed, so these three checks assert the retirement is clean
+# instead of re-asserting logic that no longer lives in delivery.md.
 check(
-    "s171(z-delivery-prepare-never-aborts): delivery mode: prepare never "
-    "aborts on open audit findings",
-    "In `mode: prepare`, open findings NEVER abort" in _s171_del,
-    "a prepare-time abort on findings would pre-empt the operator's "
-    "STAGE-GATE-3 decision",
+    "s171(z-delivery-no-prepare-abort-logic): delivery.md carries no "
+    "mode: prepare/publish audit-findings abort logic",
+    "mode: prepare" not in _s171_del and "mode: publish" not in _s171_del,
+    "agents/delivery.md must not retain the retired mode: prepare/publish "
+    "split — delivery never gates on audit findings itself",
 )
 check(
-    "s171(aa-delivery-publish-disposition): delivery mode: publish requires "
-    "a matching disposition entry for open findings",
-    "**`mode: publish` only:**" in _s171_del
-    and "no matching `disposition` entry" in _s171_del,
-    "publish over open findings without a recorded acceptance is the silent "
-    "path this check closes",
+    "s171(aa-gate3-ship-writes-disposition-unconditionally): the disposition "
+    "write on open findings is unconditional at STAGE-GATE-3's ship row, "
+    "not a delivery-side validate-then-error check",
+    "additionally write a `disposition` entry to `00-decision-ledger.md` "
+    "recording the accepted finding verbatim" in _s171_gate3,
+    "the ship row must write the disposition unconditionally when findings "
+    "are open — the prior validate-then-error check has no successor because "
+    "the write can no longer be silently skipped",
 )
 check(
-    "s171(ab-delivery-audit-currency): delivery's Step 9b gate signals the "
-    "single amend re-audit, never a per-lens Phase-3 re-run",
-    "**Audit-currency gate.**" in _s171_del
-    and "never a per-lens Phase-3 re-run" in _s171_del,
-    "delivery must route staleness through the amend re-audit path",
+    "s171(ab-delivery-no-audit-currency-gate): delivery.md's Step 9b no "
+    "longer carries an audit-currency gate",
+    "**Audit-currency gate.**" not in _s171_del,
+    "delivery.md Step 9b was narrowed to delivery's own writes (T3-AC-2) — "
+    "audit staleness is now caught entirely by the tree-anchor precondition "
+    "before STAGE-GATE-3 presents, never by a post-hoc delivery-side gate",
 )
 
 # --- (ac) pipeline-lanes §7 canonical statement ---
@@ -38434,9 +38506,19 @@ check(
 # just the pointers Task-2 itself creates -----------------------------------
 _S174_INCOMING_ANCHORS = (
     ("agents/adversary.md", "agents/orchestrator.md", "Re-audit on amend"),
-    ("agents/adversary.md", "agents/orchestrator.md", "Phase 3.8"),
-    ("agents/delivery.md", "agents/orchestrator.md", "Phase 4b — Delivery (publish)"),
-    ("agents/delivery.md", "agents/orchestrator.md", "Phase 4a — Delivery (prepare)"),
+    # Retargeted (pipeline-dispatch-shape, T7-AC-2): adversary.md's own Phase
+    # 3.8 citation moved to STAGE-GATE-3 once the audit relocated into the
+    # Phase 3 parallel validation block — the old citation text no longer
+    # appears anywhere in orchestrator.md by design (T5-AC-1 residual-zero
+    # sweep), so this pin follows the citation, not the retired phase number.
+    ("agents/adversary.md", "agents/orchestrator.md", "STAGE-GATE-3"),
+    # Retargeted (pipeline-dispatch-shape, T7-AC-2): delivery.md no longer
+    # cites orchestrator.md's Phase 4a/4b — those phases were collapsed into
+    # one Phase 4, and delivery.md's own acceptance-evidence pointer now
+    # cites Phase 3.5 directly; the mechanical push-step citation moved to
+    # the coordinator's own delivery-mechanics.md.
+    ("agents/delivery.md", "agents/orchestrator.md", "Phase 3.5 — Acceptance Gate"),
+    ("agents/delivery.md", "agents/_shared/delivery-mechanics.md", "## 4. Staging and commit"),
     ("agents/delivery.md", "agents/orchestrator.md", "Express Lane Profile"),
     ("agents/leader.md", "agents/orchestrator.md", "Phase 1.8 — Post-approval Plan-Review Offer"),
     ("agents/leader.md", "agents/orchestrator.md", "Phase 1 — Design"),
@@ -38449,7 +38531,11 @@ _S174_INCOMING_ANCHORS = (
      "Single shared Phase-3 floor predicate"),
     ("agents/ref-special-flows.md", "agents/orchestrator.md", "Test-phase consolidation"),
     ("agents/_shared/gate-contract.md", "agents/orchestrator.md", "STAGE-GATE-1 — End of Stage 1"),
-    ("docs/dev-mode.md", "agents/orchestrator.md", "Phase 3.8 — Pre-Delivery Security Audit"),
+    # Retargeted (pipeline-dispatch-shape, T7-AC-2): the Pre-Delivery Security
+    # Audit dispatch is now described inside the collapsed Phase 3 parallel
+    # validation block, not a standalone Phase 3.8 — dev-mode.md's own
+    # citation moved with it.
+    ("docs/dev-mode.md", "agents/orchestrator.md", "Phase 3 — Verify"),
     ("docs/patch-mode.md", "agents/orchestrator.md", "If any agent fails → ITERATE"),
     ("docs/patch-mode.md", "agents/orchestrator.md",
      "Correction-classification — selective panel re-firing"),
@@ -38844,7 +38930,10 @@ _s176_orch_phase2entry = _s176_slice(
 _s176_orch_lane = _s176_slice(_s176_orchestrator, "### Intra-task execution-lane decomposition")
 _s176_orch_close = _s176_slice(_s176_orchestrator, "### Phase 2-close commit-integrity check (mandatory")
 _s176_orch_phase27 = _s176_slice(_s176_orchestrator, "## Phase 2.7 — Test Authoring")
-_s176_orch_phase4a_wb = _s176_slice(_s176_orchestrator, "**`working_branch` (producer for `gate-guard`, branch-in-place topology, AC-6).**")
+# Retargeted (pipeline-dispatch-shape, T7-AC-2): Phase 4a/4b collapsed into
+# one Phase 4 — this paragraph's own heading text dropped the ", AC-6)" suffix
+# during that rewrite; the paragraph itself (site 3 of 3) still lives here.
+_s176_orch_phase4a_wb = _s176_slice(_s176_orchestrator, "**`working_branch` (producer for `gate-guard`, branch-in-place topology).**")
 
 check(
     "suite176(orch-ac26-boot): boot Step 2 names itself producer site 1 of 3 and the orchestrator as sole writer",
@@ -38853,9 +38942,12 @@ check(
     "boot Step 2's working_branch paragraph must reconcile the three-site topology and name sole-writer status",
 )
 check(
-    "suite176(orch-ac26-phase4a): Phase 4a names itself producer site 3 of 3",
+    # Renamed from orch-ac26-phase4a (pipeline-dispatch-shape, T7-AC-2):
+    # Phase 4a/4b collapsed into one Phase 4 — the assertion is unchanged,
+    # only the id and prose follow the new phase name.
+    "suite176(orch-ac26-phase4): Phase 4 names itself producer site 3 of 3",
     "producer site 3 of the three `working_branch` sites" in _s176_orch_phase4a_wb,
-    "Phase 4a's working_branch paragraph must name itself site 3 of the reconciled three",
+    "Phase 4's working_branch paragraph must name itself site 3 of the reconciled three",
 )
 check(
     "suite176(orch-ac11-ac27): Phase 2 entry asserts (never unconditionally writes) working_branch,"
@@ -38919,32 +39011,44 @@ check(
     "Phase 2.7 close must re-run the same commit-integrity check over the tester's authoring dispatch",
 )
 
-# --- Consumer: agents/delivery.md Step 10.0 ---------------------------------
-_s176_deliv_step10 = _s176_slice(_s176_delivery, "### Step 10.0 — Stage and commit delivery files")
+# --- Consumer: agents/_shared/delivery-mechanics.md § 4 ---------------------
+# Retargeted (pipeline-dispatch-shape, T7-AC-2): Step 10.0 was Task-3's split
+# point — the staging/commit mechanic it described moved wholesale into the
+# coordinator-executed agents/_shared/delivery-mechanics.md § 4 ("Staging and
+# commit"), and its wording changed from an agent status-block vocabulary
+# ("status: blocked", "Do NOT stage or commit") to coordinator-prose ("STOP
+# and escalate to the operator") because this file is executed directly by
+# the coordinator, not dispatched to an agent that returns a status block.
+# The git add block itself was also deliberately rewritten (shorter inline
+# comments) as part of that same move, so the byte-for-byte pin re-baselines
+# at the new home's live text rather than freezing the pre-move wording.
+_s176_deliv_mechanics = read(AGENTS_DIR / "_shared" / "delivery-mechanics.md")
+_s176_deliv_mechanics_s4 = _s176_slice(_s176_deliv_mechanics, "## 4. Staging and commit")
 _S176_GIT_ADD_BLOCK = (
     "git add CLAUDE.md CHANGELOG.md\n"
-    "git add .claude-plugin/plugin.json .claude-plugin/marketplace.json"
-    "  # ONLY if version was bumped in Step 9 (skip if Step 9.0 skipped)\n"
-    "git add docs/                 # only if created/modified in Step 5b (docs/knowledge.md)"
-    " — never docs/specs/: no pipeline spec or acceptance matrix is ever staged into the product repo (see Step 9c)\n"
-    "git add README.md             # only if modified in Step 6\n"
-    "git add openapi/openapi.yaml  # only if updated in Step 8\n"
-    "git add changelog.d/{pr-slug}.md  # ALWAYS stage the fragment when one was written"
+    "git add .claude-plugin/plugin.json .claude-plugin/marketplace.json  # only if version bumped\n"
+    "git add docs/                 # only if delivery modified docs/knowledge.md — never docs/specs/\n"
+    "git add README.md             # only if delivery modified it\n"
+    "git add openapi/openapi.yaml  # only if updated\n"
+    "git add changelog.d/{pr-slug}.md  # always stage the fragment when one was written, pre-deletion"
 )
 
+_s176_deliv_mechanics_s4_flat = " ".join(_s176_deliv_mechanics_s4.split())
 check(
-    "suite176(deliv-ac23): Step 10.0 asserts the implementation diff is already committed via"
-    " git status --porcelain, blocking without staging on any uncommitted implementation path",
-    "git status --porcelain" in _s176_deliv_step10
-    and "status: blocked" in _s176_deliv_step10
-    and "Do NOT stage or commit anything" in _s176_deliv_step10
-    and "agents/implementer.md § Commit Contract" in _s176_deliv_step10,
-    "Step 10.0 must assert pre-commit via git status --porcelain and block-without-staging on failure",
+    "suite176(deliv-ac23): delivery-mechanics.md § 4 asserts the implementation diff is already"
+    " committed via git status --porcelain, stopping without staging on any uncommitted path",
+    "git status --porcelain" in _s176_deliv_mechanics_s4
+    and "STOP and escalate to the operator" in _s176_deliv_mechanics_s4_flat
+    and "Never stage or commit to close this gap silently" in _s176_deliv_mechanics_s4_flat
+    and "agents/implementer.md § Commit Contract" in _s176_deliv_mechanics_s4,
+    "delivery-mechanics.md § 4 must assert pre-commit via git status --porcelain and"
+    " stop-without-staging on failure",
 )
 check(
-    "suite176(deliv-ac24): Step 10.0's git add block is unchanged byte-for-byte (regression pin)",
-    _S176_GIT_ADD_BLOCK in _s176_delivery,
-    "the pre-existing git add staging list must not be altered by this task's addition",
+    "suite176(deliv-ac24): delivery-mechanics.md § 4's git add block is unchanged"
+    " byte-for-byte (regression pin, re-baselined at its new home)",
+    _S176_GIT_ADD_BLOCK in _s176_deliv_mechanics,
+    "the git add staging list at its new home must not be altered by an unrelated edit",
 )
 
 # --- output-template.md: retired over-claim, self-report successor (AC-22) --
@@ -39784,36 +39888,57 @@ check(
     "agents/orchestrator.md must keep the general Free-text field bound clause intact",
 )
 
-# Every gate allowlist value appears literal in both gate-contract.md and
-# the orchestrator.md interpreter, plus the ship-retention precondition and
-# the override disposition obligation ------------------------------------------
+# Retargeted (pipeline-dispatch-shape, T7-AC-2, per T2-AC-10/T2-AC-11): the
+# STAGE-GATE-2 allowlist (next/next autonomous/stop/redo Task-{i}) is retired
+# wholesale with STAGE-GATE-2 itself, and STAGE-GATE-3's `override {reason}`
+# option — together with the criticals_count-conditional ship-withholding and
+# its disposition obligation — belonged to the retired Phase 4.5 Internal
+# Review, which has no successor dispatch. Every SURVIVING allowlist value
+# appears literal in both gate-contract.md and the orchestrator.md
+# interpreter, plus the retired values' clean absence.
 _S180_ALLOWLIST_VALUES = (
     "approve", "approve autonomous", "reject {reason}", "edit",
-    "next", "next autonomous", "stop", "redo Task-{i}",
-    "ship", "amend", "abort", "override {reason}",
+    "ship", "amend", "abort",
+)
+_S180_RETIRED_ALLOWLIST_VALUES = (
+    "next autonomous", "redo Task-{i}",
 )
 for _s180_site_name, _s180_site_text in (
     ("agents/_shared/gate-contract.md", _s180_gate_contract),
     ("agents/orchestrator.md", _s180_orchestrator),
 ):
     _s180_missing_allow = [_v for _v in _S180_ALLOWLIST_VALUES if _v not in _s180_site_text]
+    _s180_retired_residue = [
+        _v for _v in _S180_RETIRED_ALLOWLIST_VALUES if _v in _s180_site_text
+    ]
     check(
-        f"suite180(ac4-allowlist-literal): {_s180_site_name} carries every gate allowlist"
-        " value literal",
-        not _s180_missing_allow,
-        f"{_s180_site_name} missing allowlist value(s): {_s180_missing_allow}",
+        f"suite180(ac4-allowlist-literal): {_s180_site_name} carries every surviving gate"
+        " allowlist value literal, with no retired STAGE-GATE-2 value residue",
+        not _s180_missing_allow and not _s180_retired_residue,
+        f"{_s180_site_name} missing allowlist value(s): {_s180_missing_allow};"
+        f" retired-value residue: {_s180_retired_residue}",
     )
-check(
-    "suite180(ac4-ship-retention-precondition): the ship-retention precondition"
-    " (criticals_count >= 1) appears literal in the orchestrator.md interpreter",
-    "criticals_count ≥ 1" in _s180_orchestrator or "criticals_count >= 1" in _s180_orchestrator,
-    "agents/orchestrator.md must state the criticals_count >= 1 precondition literal",
+# "no criticals_count-conditional withholding" is a legitimate retirement-
+# explanation mention elsewhere in the file — this check targets the `ship`
+# gate-data row specifically, not the whole file, so that mention does not
+# trip a false positive.
+_s180_ship_row = next(
+    (line for line in _s180_orchestrator.splitlines() if line.startswith("| `ship`")), ""
 )
 check(
-    "suite180(ac4-override-disposition-obligation): the disposition-entry obligation on"
-    " 'override' appears literal in the orchestrator.md interpreter",
-    "disposition" in _s180_orchestrator and "override {reason}" in _s180_orchestrator,
-    "agents/orchestrator.md must obligate a disposition entry on an override {reason} reply",
+    "suite180(ac4-ship-retention-precondition): STAGE-GATE-3's ship reply carries no"
+    " criticals_count-conditional retention — ship is never withheld on findings",
+    "criticals_count" not in _s180_ship_row
+    and "`ship` is never withheld on audit findings" in _s180_ship_row,
+    "agents/orchestrator.md's `ship` gate-data row must not retain a criticals_count"
+    " precondition, and must state ship is never withheld on audit findings",
+)
+check(
+    "suite180(ac4-disposition-obligation): the disposition-entry obligation on shipping"
+    " over open audit findings appears literal in the orchestrator.md interpreter",
+    "disposition" in _s180_orchestrator
+    and "recording the accepted finding verbatim" in _s180_orchestrator,
+    "agents/orchestrator.md must obligate a disposition entry on shipping over open findings",
 )
 
 # No-relocation check green for the three relocated manifest entries, and

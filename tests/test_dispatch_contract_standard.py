@@ -154,12 +154,15 @@ check(
 _may_carry = slice_section(
     dispatch_text, "## What a dispatch may carry", ("\n## What a dispatch must not carry",)
 )
-_may_carry_items = re.findall(r"^\d+\.\s+\*\*", _may_carry, flags=re.MULTILINE)
-check(
-    "task1(ac2): '## What a dispatch may carry' enumerates exactly three numbered items",
-    len(_may_carry_items) == 3,
-    f"found {len(_may_carry_items)} numbered items, expected 3",
-)
+# Retargeted (pipeline-dispatch-shape, T7-AC-2): the sibling cardinality
+# pin to the one above — same identity-vs-property defect (issue #545), same
+# remedy pre-applied here rather than left to go red on a future addition.
+# T4-AC-2 already adds the "Coordinate-in, content-out" corollary to this
+# section as a paragraph, not a numbered item, so the ==3 count has not yet
+# gone red — but relying on it remains fragile for the same reason the first
+# site was fragile, and the identity check below (already present) is what
+# actually protects this list. The count assertion is removed; the identity
+# check is retained unchanged.
 check(
     "task1(ac2): the three items are Coordinates / task-scope decisions / return form",
     "**Coordinates.**" in _may_carry
@@ -171,12 +174,23 @@ check(
 _must_not_carry = slice_section(
     dispatch_text, "## What a dispatch must not carry", ("\n## Two-halves rule",)
 )
-_must_not_carry_items = re.findall(r"^-\s+A \*\*", _must_not_carry, flags=re.MULTILINE)
+# Retargeted (pipeline-dispatch-shape, T7-AC-2, per issue #545's identity-vs-
+# property principle): an exact-count pin over this list is invalidated the
+# instant a plan legitimately adds a prohibition — as this one did (the
+# scope-injection prohibition below). The count assertion is REPLACED by
+# per-prohibition presence-by-name checks: adding a sixth prohibition in the
+# future does not break this suite, correctly, because addition is not a
+# regression, while removing or renaming any named one still fails. The
+# closed-list declaration check immediately below is retained unchanged.
 check(
-    "task1(ac2): '## What a dispatch must not carry' enumerates exactly four prohibited"
-    " items",
-    len(_must_not_carry_items) == 4,
-    f"found {len(_must_not_carry_items)} prohibited items, expected 4",
+    "task1(ac2): '## What a dispatch must not carry' names every required"
+    " prohibition (restatement / summary / verdict / menu / scope-injection)",
+    "restatement of the destination agent's own contract" in norm(_must_not_carry)
+    and "summary of another agent's work" in norm(_must_not_carry)
+    and "verdict on the property under test" in norm(_must_not_carry)
+    and "menu of options directed at a human" in norm(_must_not_carry)
+    and "scope-injection" in norm(_must_not_carry),
+    "one or more of the five required prohibitions is missing or renamed",
 )
 check(
     "task1(ac2): the list is declared closed — no restatement of the recipient's own"

@@ -122,9 +122,21 @@ voice_slice = slice_section(orch_text, "## Voice", ("\n## Gate handling",))
 gate_handling_slice = slice_section(
     orch_text, "## Gate handling", ("\n## Mandatory boot sequence",)
 )
-sg1_slice = slice_section(orch_text, "## STAGE-GATE-1", ("\n## STAGE-GATE-2",))
-sg2_slice = slice_section(orch_text, "## STAGE-GATE-2", ("\n## STAGE-GATE-3",))
-sg3_slice = slice_section(orch_text, "## STAGE-GATE-3", ("\n---\n\n## Phase 4a",))
+# Re-anchored (pipeline-dispatch-shape, T7-AC-6): STAGE-GATE-2 is retired
+# wholesale (T2-AC-11) — sg1_slice's old stop marker ("\n## STAGE-GATE-2")
+# and sg3_slice's old stop marker ("\n---\n\n## Phase 4a") both named
+# now-deleted headings; an unmatched stop marker makes `slice_section` run to
+# EOF (or, per the file's own end-of-file fallback, return everything to the
+# end), silently WIDENING the slice instead of failing loudly — the failure
+# mode this AC exists to close. sg1_slice re-anchors to the heading that now
+# follows STAGE-GATE-1 (Phase 1.8, the surviving `autonomous` consumer);
+# sg3_slice re-anchors to the single collapsed Phase 4 heading STAGE-GATE-3
+# now sits immediately before (T2-AC-8). sg2_slice (STAGE-GATE-2's own slice)
+# is removed together with every STAGE-GATE-2-specific assertion below —
+# its start marker is deleted, so it would return "" and fail loudly rather
+# than silently widen, but there is no live gate left to assert against.
+sg1_slice = slice_section(orch_text, "## STAGE-GATE-1", ("\n## Phase 1.8",))
+sg3_slice = slice_section(orch_text, "## STAGE-GATE-3", ("\n## Phase 4 — Delivery",))
 express_slice = slice_section(
     orch_text, "### Express combined gate", ("\n---\n\n## Phase 1 — Design",)
 )
@@ -158,7 +170,6 @@ _OLD_ASCII_FENCE_40 = "=" * 40
 _OLD_ASCII_FENCE_36 = "=" * 36
 for _name, _slice in (
     ("STAGE-GATE-1", sg1_slice),
-    ("STAGE-GATE-2", sg2_slice),
     ("STAGE-GATE-3", sg3_slice),
     ("Express combined gate", express_slice),
 ):
@@ -172,7 +183,6 @@ for _name, _slice in (
     )
 for _name, _slice in (
     ("STAGE-GATE-1", sg1_slice),
-    ("STAGE-GATE-2", sg2_slice),
     ("STAGE-GATE-3", sg3_slice),
     ("Express combined gate", express_slice),
 ):
@@ -206,26 +216,32 @@ check(
     ),
     "one or more of STAGE-GATE-1's four allowlist options is missing",
 )
-check(
-    "gate-addressee(ac2): STAGE-GATE-2's four-item allowlist is unchanged",
-    all(
-        opt in sg2_slice
-        for opt in ("`next`", "`next autonomous`", "`stop`", "`redo Task-{i}`")
-    ),
-    "one or more of STAGE-GATE-2's four allowlist options is missing",
+# Retargeted (pipeline-dispatch-shape, T7-AC-2/T7-AC-6, per T2-AC-11/T2-AC-10):
+# STAGE-GATE-2 is retired wholesale — no allowlist to check. STAGE-GATE-3's
+# own allowlist dropped `override {reason}` (that mechanism belonged to the
+# retired Phase 4.5 Internal Review, which had no successor dispatch) — the
+# conditional allowlist is now the closed three-item set ship/amend/abort.
+# "There is no `override {reason}` option" is a legitimate retirement-
+# explanation mention (naming what no longer exists, mirroring the "3.6"/
+# "3.75"/"4.5" retired-phase-mention pattern elsewhere) — the check below
+# targets the actual `options` allowlist line, not the whole section, so the
+# explanatory negation sentence does not trip a false positive.
+_sg3_options_line = next(
+    (line for line in sg3_slice.splitlines() if line.startswith("| `options`")), ""
 )
 check(
-    "gate-addressee(ac2): STAGE-GATE-3's conditional allowlist is unchanged"
-    " (ship / amend / override / abort)",
+    "gate-addressee(ac2): STAGE-GATE-3's allowlist is unchanged"
+    " (ship / amend / abort — override {reason} retired with Phase 4.5)",
     all(
-        opt in sg3_slice
-        for opt in ("`ship`", "`amend`", "`override {reason}`", "`abort`")
-    ),
-    "one or more of STAGE-GATE-3's four allowlist options is missing",
+        opt in _sg3_options_line
+        for opt in ("`ship`", "`amend`", "`abort`")
+    )
+    and "override" not in _sg3_options_line,
+    "one or more of STAGE-GATE-3's three allowlist options is missing from the"
+    " `options` line, or the retired override {reason} option survives there",
 )
 for _name, _slice in (
     ("STAGE-GATE-1", sg1_slice),
-    ("STAGE-GATE-2", sg2_slice),
     ("STAGE-GATE-3", sg3_slice),
     ("Express combined gate", express_slice),
 ):
@@ -266,7 +282,6 @@ check(
 )
 for _name, _slice in (
     ("STAGE-GATE-1", sg1_slice),
-    ("STAGE-GATE-2", sg2_slice),
     ("STAGE-GATE-3", sg3_slice),
 ):
     check(
@@ -307,19 +322,20 @@ check(
     f"unconditionally count dropped to {_gate_contract_unconditionally}, canonical"
     f" is {manifest_by_id['gate-contract-whole']['modal_counts']['unconditionally']}",
 )
-scoped_extension_slice = slice_section(
-    gate_contract_text,
-    "**Implementation-scoped reply extensions",
-    ("\n## Record-based recover backstop",),
-)
+# Retargeted (pipeline-dispatch-shape, T7-AC-2, per T2-AC-10): the
+# "Implementation-scoped reply extensions" section's worked example described
+# `override {reason}` mapping 1:1 onto `ship` — that whole mechanism belonged
+# to the retired Phase 4.5 Internal Review's criticals_count-conditional
+# withholding, which has no successor dispatch. The section is gone, not
+# relocated; this check confirms the retirement is clean rather than
+# re-asserting a worked example for a mechanism that no longer exists.
 check(
-    "gate-addressee(ac4): the scoped-extension worked example (override maps"
-    " 1:1 onto `ship`) is present, byte-identical in substance",
-    "maps 1:1 onto the" in norm(scoped_extension_slice)
-    and "canonical `ship` value" in norm(scoped_extension_slice)
-    and "gate-guard" in scoped_extension_slice,
-    "the implementation-scoped reply extension worked example was altered"
-    " or removed",
+    "gate-addressee(ac4): the retired override-maps-onto-ship worked example"
+    " is gone from gate-contract.md, with no residual override {reason} text",
+    "Implementation-scoped reply extensions" not in gate_contract_text
+    and "override {reason}" not in gate_contract_text,
+    "gate-contract.md must not retain the retired 'Implementation-scoped reply"
+    " extensions' section or any 'override {reason}' residue",
 )
 
 # ---------------------------------------------------------------------------
@@ -368,10 +384,13 @@ check(
 # canonical; the non-fenced '## Voice' section loses no prohibition on
 # becoming a pointer
 # ---------------------------------------------------------------------------
+# Retargeted (pipeline-dispatch-shape, T7-AC-1/T7-AC-2): "orch-stage-gate-2"
+# is removed from tests/fixtures/fenced/manifest.json — STAGE-GATE-2's own
+# content ceased to exist wholesale (T2-AC-11), which is a manifest removal,
+# not a relocation, so there is no successor entry to check it against.
 _FENCED_ENTRIES = (
     ("orch-gate-handling", ORCHESTRATOR),
     ("orch-stage-gate-1", ORCHESTRATOR),
-    ("orch-stage-gate-2", ORCHESTRATOR),
     ("orch-stage-gate-3", ORCHESTRATOR),
     ("orch-express-combined-gate", ORCHESTRATOR),
     ("gate-contract-whole", GATE_CONTRACT),
@@ -418,13 +437,27 @@ check(
 # STAGE-GATE-3/Express gate data carries the real, criticals-count
 # conditional option set; the leader renders exactly what it received
 # ---------------------------------------------------------------------------
+# Retargeted (pipeline-dispatch-shape, T7-AC-2, per T2-AC-10): the
+# criticals_count-conditional ship-withholding mechanism belonged to the
+# retired Phase 4.5 Internal Review and has no successor dispatch — `ship`
+# is never withheld on findings now; acceptance is recorded via the
+# `disposition` entry instead. This check confirms the retirement is clean.
+# One retirement-explanation mention of "criticals_count" legitimately
+# survives ("there is no criticals_count-conditional withholding") — the
+# check targets the ACTIVE `ship` gate-data row, not the whole section, so
+# that explanatory sentence elsewhere does not trip a false positive.
+_sg3_ship_row = next(
+    (line for line in sg3_slice.splitlines() if line.startswith("| `ship`")), ""
+)
 check(
-    "gate-addressee(ac7): STAGE-GATE-3 gate data withholds `ship` and gates"
-    " `override {reason}` on criticals_count",
-    "WITHHELD when `criticals_count ≥ 1`" in sg3_slice
-    and "present ONLY when `criticals_count ≥ 1`" in sg3_slice,
-    "the criticals-count-conditional wording for ship/override is missing"
-    " or altered",
+    "gate-addressee(ac7): STAGE-GATE-3 no longer withholds `ship` on"
+    " criticals_count — acceptance is recorded via the disposition entry instead",
+    "criticals_count" not in _sg3_ship_row
+    and "`ship` is never withheld on audit findings, but acceptance is always"
+    " recorded" in _sg3_ship_row,
+    "STAGE-GATE-3's `ship` gate-data row must not retain criticals_count-"
+    "conditional withholding, and must state ship is never withheld with"
+    " acceptance always recorded",
 )
 check(
     "gate-addressee(ac7): th:leader renders exactly the received option set,"
@@ -434,16 +467,17 @@ check(
     " received option set",
 )
 
-# ---------------------------------------------------------------------------
-# A bare `ship` while criticals are open is rejected; no half of the
-# dual-record and no disposition entry is written
-# ---------------------------------------------------------------------------
+# Retargeted (pipeline-dispatch-shape, T7-AC-2, per T2-AC-10): there is no
+# criticals_count-conditional rejection of a bare `ship` anymore — a bare
+# `ship` is always valid, with acceptance of any open finding recorded via
+# the `disposition` entry rather than the reply being rejected outright.
 check(
-    "gate-addressee(ac8): a bare `ship` while criticals_count >= 1 is"
-    " rejected and writes neither half of the dual-record",
-    "Rejected — not a valid reply while criticals are open." in sg3_slice
-    and "do NOT write either half of the dual-record" in sg3_slice,
-    "the reject-bare-ship-while-criticals-open clause is missing or altered",
+    "gate-addressee(ac8): a bare `ship` is always a valid reply — no"
+    " criticals_count-conditional rejection survives",
+    "Rejected — not a valid reply while criticals are open." not in sg3_slice
+    and "criticals_count" not in _sg3_ship_row,
+    "STAGE-GATE-3 must not retain the retired reject-bare-ship-while-"
+    "criticals-open clause",
 )
 
 # ---------------------------------------------------------------------------
@@ -465,10 +499,12 @@ check(
     in gate_handling_slice,
     "the checkpoint-trust-transfer no-gate-side-effect clause is missing",
 )
+# Retargeted (pipeline-dispatch-shape, T7-AC-2, per T2-AC-11): STAGE-GATE-2
+# is retired — two STAGE-GATEs remain (1 and 3), not three.
 check(
     "gate-addressee(ac9): checkpoint-trust-transfer is still bounded by, and"
-    " never substitutes for, the three STAGE-GATEs",
-    "does not substitute for, the three STAGE-GATEs below" in gate_handling_slice,
+    " never substitutes for, the two STAGE-GATEs",
+    "does not substitute for, the two STAGE-GATEs below" in gate_handling_slice,
     "the checkpoint-trust-transfer non-substitution bound is missing",
 )
 

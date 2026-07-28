@@ -5,7 +5,8 @@ tests/test_changelog_version_rules.py
 Suite 119 — changelog-version-rules
 
 Content-presence regression guard for the delivery changelog gate and
-SemVer discipline fixes (delivery.md Step 7 + Step 9.2; init.md §6.3).
+SemVer discipline fixes (delivery.md Step 7; agents/_shared/delivery-mechanics.md
+§ 1 — successor to delivery.md's retired Step 9.2, per T3-AC-6; init.md §6.3).
 
 Purpose: prevent silent reversion of the corrected instruction text introduced
 in fix/delivery-changelog-version-rules.  Every assertion fails when the
@@ -15,10 +16,10 @@ implementer's edits land.
 Asserts:
   (a) delivery.md Step 7 contains the internal-only no-fragment branch
       (phrases: "skipped (internal-only)" and "operator-facing").
-  (b) delivery.md Step 9.2 contains the PATCH-default rule
+  (b) delivery-mechanics.md § 1 contains the PATCH-default rule
       (phrase: "PATCH is the default") and the tight-MINOR trigger
-      (phrase: "new public/observable surface").
-  (c) delivery.md Step 9.2 contains the ESLint edge-case rule
+      (phrase: "New public/observable surface").
+  (c) delivery-mechanics.md § 1 contains the ESLint edge-case rule
       (phrase: "newly reject").
   (d) init.md §6.3 generated changelog bullet contains both the
       operator-facing gate and the internal-only no-entry branch
@@ -68,18 +69,30 @@ print()
 
 delivery_path = AGENTS_DIR / "delivery.md"
 init_path = AGENTS_DIR / "init.md"
+# Retargeted (pipeline-dispatch-shape, T7-AC-2, per T3-AC-6): the version-bump
+# rule content (old Step 9.2 — PATCH-default, MINOR trigger, ESLint edge case)
+# moved wholesale to the coordinator's own § 1, executed directly rather than
+# dispatched — see agents/_shared/delivery-mechanics.md § 1.
+delivery_mechanics_path = AGENTS_DIR / "_shared" / "delivery-mechanics.md"
 
 # --- Precondition guards (file existence) ----------------------------------
 delivery_exists = delivery_path.exists()
+delivery_mechanics_exists = delivery_mechanics_path.exists()
 init_exists = init_path.exists()
 
 check("agents/delivery.md exists", delivery_exists)
+check("agents/_shared/delivery-mechanics.md exists", delivery_mechanics_exists)
 check("agents/init.md exists", init_exists)
 
 if delivery_exists:
     delivery = read(delivery_path)
 else:
     delivery = ""
+
+if delivery_mechanics_exists:
+    delivery_mechanics = read(delivery_mechanics_path)
+else:
+    delivery_mechanics = ""
 
 if init_exists:
     init_md = read(init_path)
@@ -105,33 +118,34 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# (b) Step 9.2 — PATCH-default rule + tight-MINOR trigger
+# (b) delivery-mechanics.md § 1 — PATCH-default rule + tight-MINOR trigger
+#     (successor to delivery.md's old Step 9.2, moved by T3-AC-6)
 # ---------------------------------------------------------------------------
 print()
-print("--- (b) delivery.md Step 9.2: PATCH default + MINOR trigger ---")
+print("--- (b) delivery-mechanics.md § 1: PATCH default + MINOR trigger ---")
 
 check(
-    "delivery.md contains 'PATCH is the default' (Step 9.2 PATCH-default rule)",
-    "PATCH is the default" in delivery,
-    "phrase absent — Step 9.2 PATCH-default rule was not added or was reverted",
+    "delivery-mechanics.md contains 'PATCH is the default' (§ 1 PATCH-default rule)",
+    "PATCH is the default" in delivery_mechanics,
+    "phrase absent — § 1 PATCH-default rule was not added or was reverted",
 )
 
 check(
-    "delivery.md contains 'new public/observable surface' (Step 9.2 MINOR trigger)",
-    "new public/observable surface" in delivery,
-    "phrase absent — Step 9.2 MINOR trigger was not added or was reverted",
+    "delivery-mechanics.md contains 'New public/observable surface' (§ 1 MINOR trigger)",
+    "New public/observable surface" in delivery_mechanics,
+    "phrase absent — § 1 MINOR trigger was not added or was reverted",
 )
 
 # ---------------------------------------------------------------------------
-# (c) Step 9.2 — ESLint edge case
+# (c) delivery-mechanics.md § 1 — ESLint edge case
 # ---------------------------------------------------------------------------
 print()
-print("--- (c) delivery.md Step 9.2: ESLint edge case ---")
+print("--- (c) delivery-mechanics.md § 1: ESLint edge case ---")
 
 check(
-    "delivery.md contains 'newly reject' (Step 9.2 ESLint edge case)",
-    "newly reject" in delivery,
-    "phrase absent — Step 9.2 ESLint edge case rule was not added or was reverted",
+    "delivery-mechanics.md contains 'newly reject' (§ 1 ESLint edge case)",
+    "newly reject" in delivery_mechanics,
+    "phrase absent — § 1 ESLint edge case rule was not added or was reverted",
 )
 
 # ---------------------------------------------------------------------------

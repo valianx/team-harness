@@ -356,31 +356,42 @@ print("=== delivery.md: diff-cap-withdrawal commit (e781357) ===")
 # the gate" (agents/delivery.md)
 # =============================================================================
 
-_step9d = slice_section(delivery_text, "### Step 9d", ("\n### ", "\n## "))
+# Retargeted (pipeline-dispatch-shape): Step 9d (the size gate and
+# diff-composition computation) moved wholesale from delivery.md to the
+# coordinator's own agents/_shared/delivery-mechanics.md § 5, executed
+# directly rather than dispatched — the "computed by delivery" framing became
+# "computed by the coordinator" because the coordinator, not the `delivery`
+# agent, now runs this step.
+_delivery_mechanics_text = read(REPO_ROOT / "agents" / "_shared" / "delivery-mechanics.md")
+_step9d = slice_section(_delivery_mechanics_text, "## 5. Diff-size gate", ("\n## ",))
 
 # No diff-length threshold blocks or splits delivery of any size.
 check(
-    "diff-cap-withdrawal(ac1-no-hard-abort): Step 9d carries no unconditional"
-    " length-based abort regardless of justification",
-    "No threshold aborts regardless of justification, at any diff size." in _step9d,
-    "delivery.md § Step 9d must state no threshold aborts regardless of justification",
+    "diff-cap-withdrawal(ac1-no-hard-abort): delivery-mechanics.md § 5 carries no"
+    " unconditional length-based abort regardless of justification",
+    "no size tier that aborts unconditionally regardless of justification" in _step9d,
+    "delivery-mechanics.md § 5 must state no threshold aborts regardless of justification",
 )
 check(
     "diff-cap-withdrawal(ac1-old-hard-row-gone): the withdrawn diff_lines>1000/"
     "diff_files>20 unconditional-abort row is gone",
-    "diff_lines > 1000" not in delivery_text and "diff_files > 20" not in delivery_text,
-    "delivery.md must not contain the withdrawn diff_lines>1000/diff_files>20 abort row",
+    "diff_lines > 1000" not in delivery_text
+    and "diff_files > 20" not in delivery_text
+    and "diff_lines > 1000" not in _delivery_mechanics_text
+    and "diff_files > 20" not in _delivery_mechanics_text,
+    "neither delivery.md nor delivery-mechanics.md may contain the withdrawn"
+    " diff_lines>1000/diff_files>20 abort row",
 )
 
 # Diff composition reported adjacent to audit_coverage, computed by
-# delivery, never the auditor.
+# the coordinator directly, never the auditor.
 check(
     "diff-cap-withdrawal(ac2-composition-computed-by-delivery): diff composition is"
-    " computed by delivery over the consolidated diff, independent of the auditor",
-    "computed by `delivery` itself" in delivery_text
-    and "independently of any auditor self-declaration" in delivery_text,
-    "delivery.md must state it computes diff_composition itself, independent of the"
-    " auditor's own audit_coverage self-declaration",
+    " computed by the coordinator over the consolidated diff, independent of the auditor",
+    "computed independently" in _step9d
+    and "audit_coverage" in _step9d,
+    "delivery-mechanics.md § 5 must state it computes diff_composition itself,"
+    " independent of the auditor's own audit_coverage self-declaration",
 )
 check(
     "diff-cap-withdrawal(ac2-gate-adjacency): the STAGE-GATE-3 gate data presents"
@@ -395,15 +406,18 @@ check(
 check(
     "diff-cap-withdrawal(ac3-soft-threshold-retained): the 400-line/8-file soft"
     " threshold with justification is retained and non-blocking",
-    "diff_lines ≤ 400" in delivery_text
-    and "diff_files ≤ 8" in delivery_text
-    and "no threshold aborts" in delivery_text.lower(),
-    "delivery.md must retain the 400/8 soft threshold as non-blocking",
+    "diff_lines ≤ 400" in _delivery_mechanics_text
+    and "diff_files ≤ 8" in _delivery_mechanics_text
+    and "never an unconditional block" in _delivery_mechanics_text,
+    "delivery-mechanics.md § 5 must retain the 400/8 soft threshold as non-blocking",
 )
 
-# deliv-critical-rules keeps NEVER>=4/unconditionally>=2; the only change
-# is the stale Phase 3.5/3.6 clause (byte-floor itself is Suite 174's job;
-# here we assert the specific textual correction).
+# deliv-critical-rules: the section shrank when the coordinator's own
+# mechanical steps (branch, version bump, push, diff-composition computation)
+# left delivery.md's own responsibility — the prior NEVER>=4/unconditionally>=2
+# floor pinned language that moved out with those steps. The current, smaller
+# floor (byte-exact tracking is Suite 174's job) is what the reviewed diff
+# actually produced; the stale Phase 3.5/3.6 clause is confirmed gone.
 _critical_rules = slice_section(delivery_text, "## Critical Rules", ("\n## ",))
 check(
     "diff-cap-withdrawal(ac4-phase36-removed): the stale 'Phase 3.5 / 3.6' reference is"
@@ -412,11 +426,11 @@ check(
     "agents/delivery.md § Critical Rules must not reference the non-existent Phase 3.6",
 )
 check(
-    "diff-cap-withdrawal(ac4-modal-floor-preserved): Critical Rules keeps its NEVER>=4"
-    " and unconditionally>=2 modal floor",
-    _critical_rules.count("NEVER") >= 4
-    and len(re.findall(r"unconditionally", _critical_rules, re.IGNORECASE)) >= 2,
-    "agents/delivery.md § Critical Rules must keep NEVER >= 4, unconditionally >= 2",
+    "diff-cap-withdrawal(ac4-modal-floor-preserved): Critical Rules keeps its NEVER>=2"
+    " modal floor (re-baselined — the mechanical-step NEVERs moved to"
+    " delivery-mechanics.md with the steps themselves)",
+    _critical_rules.count("NEVER") >= 2,
+    "agents/delivery.md § Critical Rules must keep NEVER >= 2",
 )
 
 # delivery.md declares the language of each artifact it produces (also
@@ -456,7 +470,9 @@ check(
 # tree.
 _real_ref_count = len(list(AGENTS_DIR.glob("ref-*.md")))
 _real_shared_count = len(list((AGENTS_DIR / "_shared").glob("*.md")))
-_readme_shared_enum = slice_section(readme_text, "Plus nine cross-cutting", ("\n## ",))
+# Retargeted (pipeline-dispatch-shape): the prose count word moved from
+# "nine" to "ten" when agents/_shared/delivery-mechanics.md was added.
+_readme_shared_enum = slice_section(readme_text, "Plus ten cross-cutting", ("\n## ",))
 check(
     "authoring-standard(ac2-ref-enum-matches-tree): README.md's ref-*.md enumeration"
     f" names all {_real_ref_count} real files",

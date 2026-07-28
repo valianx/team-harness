@@ -217,7 +217,7 @@ reads as visibly implausible next to it.
 ## 6. The push-step precondition block (three conjuncts, none repairable in place)
 
 **Before pushing, ALL THREE conjuncts below must hold. Each is fail-closed and none is
-repaired in place — a failure re-opens process, it is never silently patched to unblock the
+repaired in place — a failure re-opens process, it is NEVER silently patched to unblock the
 push.**
 
 ### (a) `gate3_release` / `gate_nonce` re-read
@@ -291,6 +291,22 @@ named backstop for this whole residual, not a substitute for it.
 ---
 
 ## 7. Push
+
+**Active gh account capture (diagnostic, never blocking).** Immediately before the push,
+capture the account this push and the following `gh pr create` will attribute to:
+
+```bash
+gh_active_account="$(gh api user -q .login 2>/dev/null || echo "unknown")"
+```
+
+Report it in the delivery summary as `gh_account: <login>`. This closes wholesale-retired
+delivery.md's old two-capture design (once at `mode: prepare`, re-run fresh at `mode: publish`
+to cover an arbitrarily long STAGE-GATE-3 wait between the two) — with the split gone and the
+push now the coordinator's own single mechanical step immediately after the gate, one capture
+right here is current by construction. A wrong-account push is a known operational friction
+(the operator's own account may differ from the one `gh auth` currently holds) — this capture
+is diagnostic only, it never blocks the push; a `gh api user` failure logs `unknown` and
+proceeds.
 
 ```
 git push --set-upstream origin {branch-name}

@@ -65,9 +65,10 @@ Coordination is split across two agents. **`leader`** is the top-level session a
 
 Plus reference files (`ref-direct-modes.md`, `ref-special-flows.md`, `ref-intake-flows.md`, `ref-dispatch-machinery.md`) loaded on-demand by the coordination agents (`leader` and `orchestrator`). They are not invocable subagents — their `model` field is vestigial and not enforced by `/th:lint`. This is a naming convention, not an incidental fact: any `agents/ref-*.md` file is a lazy-loaded reference file, never a dispatchable agent — see "Objective column — authoring standard" below for the failure direction this convention closes.
 
-Plus nine cross-cutting snippets in `_shared/` (not invocable agents), installed to `~/.claude/agents/_shared/`:
+Plus ten cross-cutting snippets in `_shared/` (not invocable agents), installed to `~/.claude/agents/_shared/`:
 
 - `_shared/gh-fallback.md` — single source-of-truth fallback patterns for graceful degradation when the `gh` CLI is unavailable. Consumed by `delivery.md`, `leader.md`, `ref-special-flows.md`, and skills `issue.md`, `plan.md`, `design.md`, `define-ac.md`, `audit.md`, `review-pr.md` via cross-references.
+- `_shared/delivery-mechanics.md` — the coordinator's deterministic delivery half: version sites + MATCH check, branch naming, `changelog.d/` assembly + release cut, staging + commit, the diff-size gate, the three-conjunct push-step precondition, push, `gh pr create`, and the merge-state poll. Executed directly by the orchestrator at Phase 4 — never dispatched to `delivery.md`, which writes the prose half only.
 - `_shared/operational-rules.md` — cross-cutting voice, language register, git safety, and pipeline integrity rules. Referenced by all agent `## Voice` sections via `§ "Voice"` and `§ "Language register"`.
 - `_shared/dispatch-contract.md` — single source of truth for what a dispatch prompt may and must not carry, and for the two-halves scope rule (review scope is never bounded by the dispatcher; write scope is always bounded by the recipient's own contract). Consumed by `leader.md` and `orchestrator.md` by pointer, never restated inline.
 - `_shared/gate-contract.md` — the dual-record STAGE-GATE release contract: bare-literal gate fields, the no-repair invariant, and the STOP-block templates. Consumed by `orchestrator.md` and `leader.md`.
