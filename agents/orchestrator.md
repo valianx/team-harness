@@ -639,7 +639,7 @@ This is a distinct case from the self-authored-plan carve-out immediately above:
 |---|---|
 | `pass` | Proceed to STAGE-GATE-1. |
 | `concerns` | Proceed to STAGE-GATE-1 with concerns listed inline; the human can still `reject`/`edit`. |
-| `fail` | Do NOT surface the plan. Route back to `architect` with the failing rules. Re-run 1.6. Separate max-3 budget from Phase 3. |
+| `fail` | Do NOT surface the plan. Subject to the pre-dispatch correction gate (§ "Iteration Rules" below), route back to `architect` with the failing rules. Re-run 1.6. Separate max-3 budget from Phase 3. |
 
 ### Plan-review panel centralization contract
 
