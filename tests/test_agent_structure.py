@@ -242,7 +242,15 @@ checks_orch = [
     ("Phase 2.5", "Phase 2.5 — Constraint Reconciliation"),
     ("Phase 3.5", "Phase 3.5 — Acceptance Gate"),
     ("STAGE-GATE-1", "STAGE-GATE-1"),
-    ("STAGE-GATE-2", "STAGE-GATE-2"),
+    # RETARGETED (pipeline-dispatch-shape, bounded retired-identifier sweep):
+    # a bare `("STAGE-GATE-2", "STAGE-GATE-2")` presence pin used to sit here.
+    # STAGE-GATE-2 is retired (T2-AC-11) — the literal survives in `orch` only
+    # inside the retirement-explanation sentence below, so a presence pin
+    # here would be a false green asserting the opposite of reality (that
+    # STAGE-GATE-2 is a live phase/artifact like its siblings in this list).
+    # The correct assertion — absence of the heading plus the explicit
+    # retirement sentence — already exists a few lines down; removed here
+    # rather than duplicated.
     ("STAGE-GATE-3", "STAGE-GATE-3"),
     ("Stage 1 label", "Stage 1"),
     ("Stage 2 label", "Stage 2"),
@@ -260,7 +268,11 @@ checks_orch = [
     ("Stage 2 rounds concept", "Round 1"),
     ("Stage 2 parallel within round", "in parallel"),
     ("Stage 2 sequential fallback", "Sequential fallback"),
-    ("STAGE-GATE-2 partial-fail handling", "partial-fail"),
+    # Retargeted label only (pipeline-dispatch-shape): "partial-fail" is a
+    # `verdict` schema enumeration value (agents/orchestrator.md:1525),
+    # unrelated to the retired STAGE-GATE-2 round semantics the old label
+    # implied — the marker itself was never STAGE-GATE-2-specific.
+    ("verdict schema partial-fail value", "partial-fail"),
     ("STAGE-GATE-1 surfaces TL;DR inline", "TL;DR"),
     ("STAGE-GATE-1 surfaces Review Summary inline", "Review Summary"),
     ("STAGE-GATE-1 surfaces Task Summary inline", "Task Summary"),
@@ -985,7 +997,15 @@ check("orchestrator.md TL;DR section dogfoods consolidated rule (rewritten in pl
 # Per-phase update instructions for each of the 22 update points in §5.2.
 # Minimum set required by AC-2 of the intake: rows 1, 5/6, 8, 12, 14, 19, 22 of §5.2.
 # The assertion checks the phase section bodies, not just the index.
-for phase_label in ("Phase 0a", "Phase 1.6", "STAGE-GATE-1", "Phase 2 ", "Phase 3.5", "STAGE-GATE-2", "STAGE-GATE-3", "Phase 6"):
+# RETARGETED (pipeline-dispatch-shape, bounded retired-identifier sweep):
+# STAGE-GATE-2 dropped from this tuple — it is retired (T2-AC-11, Stage 2
+# collapsed to a single pass with no per-round gate), so it has no phase body
+# left to carry a TL;DR-rewrite instruction. The literal still appears
+# elsewhere in `orch` only inside the retirement-explanation sentence, which
+# would make `"STAGE-GATE-2" in orch` a false green for a phase body that no
+# longer exists — the same class of defect the waiting_gate_2 retarget below
+# already closes for the enum values.
+for phase_label in ("Phase 0a", "Phase 1.6", "STAGE-GATE-1", "Phase 2 ", "Phase 3.5", "STAGE-GATE-3", "Phase 6"):
     check(f"orchestrator.md {phase_label} body mentions TL;DR rewrite",
           phase_label in orch and "TL;DR" in orch,
           f"TL;DR rewrite instruction not found near {phase_label}")
@@ -11584,33 +11604,45 @@ check(
 # ---------------------------------------------------------------------------
 # Check (6) / AC-4 — deliver direct-mode gate.
 # orchestrator.md § Direct Modes (the fila `deliver`) must reference
-# STAGE-GATE-3 AND Phase 4.5 (internal review) so that the direct deliver
-# mode emits the gate before push/PR.
+# STAGE-GATE-3 so that the direct deliver mode emits the gate before push/PR,
+# and must NOT retain a reference to the retired Phase 4.5 Internal Review.
 #
-# Today: the deliver row says only "verify 02-implementation.md, 03-testing.md,
-# AND reviews/04-validation.md exist" — no gate, no Phase 4.5.  Check fails.
+# RETARGETED (pipeline-dispatch-shape, bounded retired-identifier sweep,
+# T7-AC-2 residual). The prior assertion checked "Phase 4.5" and "Internal
+# Review" against `_s48_orq` — a full-file read of orchestrator.md, not the
+# Direct Modes slice this check's own subject names — and passed only because
+# both literals coincidentally co-occur in an unrelated retirement-explaining
+# sentence elsewhere in the file (the Phase 4.5 Internal Review this plan
+# retires wholesale, T2-AC-9). Retargeted onto `_s48_direct_modes_slice` only,
+# and inverted to require the retired tokens' absence — the deliver row now
+# routes through a minimal orchestrator straight to STAGE-GATE-3, with no
+# surviving Phase 4.5/Internal Review gate to reference.
 # Tokens required in slice (the Direct Modes table):
 #   "deliver"      — the mode row identifier (already present, anchor check)
 #   "STAGE-GATE-3" — the gate being emitted
-#   "Phase 4.5"    — the internal review step run before the gate
+#   NOT "Phase 4.5" / "Internal Review" — the retired gate this plan removes
 # Note: the deliver row is inside the Direct Modes section; _slice_section
 # stops at the next heading so the slice covers the full modes table.
 # ---------------------------------------------------------------------------
 check(
-    "recover-dedup(6/ac-4): orchestrator.md § Direct Modes deliver row"
-    " references STAGE-GATE-3 + Phase 4.5 (gate before push/PR)",
+    "recover-dedup(6/ac-4/retargeted): orchestrator.md § Direct Modes deliver row"
+    " references STAGE-GATE-3 (gate before push/PR) and carries no surviving"
+    " reference to the retired Phase 4.5 Internal Review",
     bool(_s48_direct_modes_slice)
     and "deliver" in _s48_direct_modes_slice
     and "STAGE-GATE-3" in _s48_direct_modes_slice
-    and "Phase 4.5" in _s48_orq
-    and "Internal Review" in _s48_orq,
+    and "Phase 4.5" not in _s48_direct_modes_slice
+    and "Internal Review" not in _s48_direct_modes_slice,
     f"anchor '{_S48_DIRECT_MODES_ANCHOR}' missing from leader.md Direct Modes"
-    f" or deliver gate tokens absent;"
+    f" or deliver gate tokens absent/stale;"
     f" anchor present: {bool(_s48_direct_modes_slice)};"
     f" 'deliver' row present: {'deliver' in _s48_direct_modes_slice};"
     f" 'STAGE-GATE-3' in deliver row: {'STAGE-GATE-3' in _s48_direct_modes_slice};"
-    f" 'Phase 4.5' + 'Internal Review' in orchestrator.md: {'Phase 4.5' in _s48_orq and 'Internal Review' in _s48_orq}"
-    " — the deliver direct mode routes through a minimal orchestrator (Phase 4.5 Internal Review) with STAGE-GATE-3",
+    f" retired 'Phase 4.5'/'Internal Review' absent from deliver-row slice:"
+    f" {'Phase 4.5' not in _s48_direct_modes_slice and 'Internal Review' not in _s48_direct_modes_slice}"
+    " — the deliver direct mode routes through a minimal orchestrator to"
+    " STAGE-GATE-3, with no surviving reference to the retired Phase 4.5"
+    " Internal Review gate",
 )
 
 # ---------------------------------------------------------------------------
@@ -36631,13 +36663,26 @@ check(
     "Task-1 AC-2 (pending)",
 )
 
-# --- Task-2 AC-5: gate-guard wired as a PreToolUse hook entry --------------
+# --- Task-2 AC-5 (retired): gate-guard is permanently unwired (v2.139.0),
+# never a "pending" future wiring. RETARGETED (pipeline-dispatch-shape,
+# bounded retired-identifier sweep): the prior check ("gate-guard" in
+# _s161_hooks_json, a raw full-file substring test) was a false green — it
+# matched only the top-level "_comment" field's retirement explanation, never
+# an actual PreToolUse entry. Suite 117's structural
+# ac11-unwired-gate-guard-hooks-json check already owns the real invariant
+# (JSON-structural, scanning every event via invokes_launcher); this check is
+# retargeted to assert the same retirement rather than a still-anticipated
+# wiring the design superseded.
 check(
-    "s161(t2-ac5): .claude-plugin/hooks.json wires a `gate-guard` PreToolUse "
-    "entry",
-    "gate-guard" in _s161_hooks_json,
-    ".claude-plugin/hooks.json must wire a `gate-guard` hook entry — "
-    "Task-2 AC-5 (pending; hooks/ts/bodies/gate-guard.ts does not exist yet)",
+    "s161(t2-ac5/retired): .claude-plugin/hooks.json does not wire a "
+    "`gate-guard` PreToolUse entry (retired, not pending — v2.139.0)",
+    not any(
+        any(invokes_launcher(h.get("command", ""), "gate-guard") for h in entry.get("hooks", []))
+        for entry in json.loads(_s161_hooks_json).get("PreToolUse", [])
+    ),
+    ".claude-plugin/hooks.json must not wire a `gate-guard` hook entry — "
+    "gate-guard is permanently unwired (v2.139.0), never re-wired without a "
+    "deliberate decision",
 )
 
 # RETARGETED (pipeline-dispatch-shape, T7-AC-2 residual, genuine design
