@@ -46,8 +46,14 @@ CHECKPOINT_GUARD_TS = REPO_ROOT / "hooks" / "ts" / "bodies" / "checkpoint-guard.
 SUBAGENT_START_TS = REPO_ROOT / "hooks" / "ts" / "bodies" / "subagent-start.ts"
 
 # Injector candidates — the split authors these in Task-2/Task-3, not Task-7.
+# agents/ref-dispatch-machinery.md is a later addition (Task-5): the
+# "Lane-attribution header marker" clause that stamps TH-LANE relocated
+# there, byte-preserved, out of agents/leader.md (which keeps only a stub
+# pointer) -- an existence-style check like this one follows the content to
+# its new file rather than asserting ownership of the old one.
 ORCHESTRATOR_MD = REPO_ROOT / "agents" / "orchestrator.md"
 LEADER_MD = REPO_ROOT / "agents" / "leader.md"
+REF_DISPATCH_MACHINERY_MD = REPO_ROOT / "agents" / "ref-dispatch-machinery.md"
 
 results: list[tuple[bool, str]] = []
 pending: list[str] = []
@@ -144,11 +150,14 @@ else:
         "exact literal checkpoint-guard.ts parses — marker drift",
     )
 
-if not orchestrator_exists and not leader_exists:
+ref_dispatch_exists = REF_DISPATCH_MACHINERY_MD.exists()
+
+if not orchestrator_exists and not leader_exists and not ref_dispatch_exists:
     note_pending(
-        "agents/leader.md or agents/orchestrator.md carries TH-LANE: literal",
-        "neither file exists in this worktree yet (Task-2/3 not landed) — "
-        "see tests/evidence/nested-lane-probes.md",
+        "agents/leader.md, agents/orchestrator.md, or "
+        "agents/ref-dispatch-machinery.md carries TH-LANE: literal",
+        "none of the three files exist in this worktree yet (Task-2/3/5 "
+        "not landed) — see tests/evidence/nested-lane-probes.md",
     )
 else:
     lane_hits = []
@@ -158,9 +167,17 @@ else:
         lane_hits.append(
             ("agents/orchestrator.md", injector_carries(read(ORCHESTRATOR_MD), "TH-LANE"))
         )
+    if ref_dispatch_exists:
+        lane_hits.append(
+            (
+                "agents/ref-dispatch-machinery.md",
+                injector_carries(read(REF_DISPATCH_MACHINERY_MD), "TH-LANE"),
+            )
+        )
     check(
-        "at least one injector (leader.md spawn / orchestrator.md dispatch) "
-        "carries the identical TH-LANE: literal",
+        "at least one injector (leader.md spawn / orchestrator.md dispatch / "
+        "ref-dispatch-machinery.md relocated clause) carries the identical "
+        "TH-LANE: literal",
         any(ok for _, ok in lane_hits),
         f"checked {[name for name, _ in lane_hits]}, none carried the "
         "exact literal — marker drift",

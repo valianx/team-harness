@@ -54,18 +54,18 @@ Full probe definition: `tests/probe_lane_concurrency.md`.
 | (b) `TH-LANE` charset-bounded, no mis-pairing/injection across 2 lanes | 42/42 deterministic cases pass | CONFIRMED — deterministic test | `tests/test_subagent_start.sh` (Task-5) |
 | (b) N=2 LIVE concurrent orchestrators, disjoint `00-state.md` attribution, no cross-repo commit | not yet observed | **REQUIRES-LIVE-RUN** | `research/00-test-plan.md` MO-2 |
 | (c) Legacy top-level spawn traverses Bash (carve-out needed there) | confirmed by grep + programmatic byte-for-byte extraction | ANSWERED — code inspection | `agents/orchestrator.md:4040-4047` (pre-split); `hooks/ts/bodies/policy-block.ts` `LEGACY_TMUX_SPAWN_RAW` |
-| (c) Split-native leader→orchestrator spawn does NOT traverse Bash (zero exemptions needed there) | `agents/leader.md` dispatches `th:orchestrator` via the native `Task` tool ("Spawning an orchestrator — the payload contract"); no `Bash`-launched `claude` spawn exists on this path | ANSWERED — code inspection (Task-2/Task-3 landed) | `agents/leader.md § Spawning an orchestrator`, AC-6.4 |
+| (c) Split-native leader→orchestrator spawn does NOT traverse Bash (zero exemptions needed there) | `agents/leader.md` dispatches `th:orchestrator` via the native `Task` tool ("Spawning an orchestrator — the payload contract"); no `Bash`-launched `claude` spawn exists on this path | ANSWERED — code inspection (Task-2/Task-3 landed) | `agents/ref-dispatch-machinery.md § Spawning an orchestrator`, AC-6.4 |
 
 ## Marker byte-identity (AC-7.4, structural)
 
-A dedicated deterministic script, `tests/test_lane_marker_identity.py`, asserts that the marker literals `TH-STATE-REF:` and `TH-LANE:` are byte-identical between the parser side (`hooks/ts/bodies/checkpoint-guard.ts`, `hooks/ts/bodies/subagent-start.ts` — both landed, Task-4/Task-5) and the injector side (`agents/orchestrator.md`, `agents/leader.md` — Task-2/Task-3, now landed). The injector split is asymmetric by design: `agents/orchestrator.md` stamps `TH-STATE-REF` on specialist dispatches (cross-fire scoping), and `agents/leader.md` stamps `TH-LANE` on the orchestrator spawn (lane attribution) — the two hooks each read line 1 only, so the markers are emitted at different boundaries, never sharing a first line. Registered as Suite 151 in `docs/testing.md` (see below); wired into `tests/run-all.sh`.
+A dedicated deterministic script, `tests/test_lane_marker_identity.py`, asserts that the marker literals `TH-STATE-REF:` and `TH-LANE:` are byte-identical between the parser side (`hooks/ts/bodies/checkpoint-guard.ts`, `hooks/ts/bodies/subagent-start.ts` — both landed, Task-4/Task-5) and the injector side (`agents/orchestrator.md`, `agents/leader.md`/`agents/ref-dispatch-machinery.md` — Task-2/Task-3, now landed; the `TH-LANE`-stamping clause later relocated byte-preserved out of `agents/leader.md` into the new `agents/ref-dispatch-machinery.md`). The injector split is asymmetric by design: `agents/orchestrator.md` stamps `TH-STATE-REF` on specialist dispatches (cross-fire scoping), and `agents/leader.md`/`agents/ref-dispatch-machinery.md` stamps `TH-LANE` on the orchestrator spawn (lane attribution) — the two hooks each read line 1 only, so the markers are emitted at different boundaries, never sharing a first line. Registered as Suite 151 in `docs/testing.md` (see below); wired into `tests/run-all.sh`.
 
 | Check | OBSERVED | Status |
 |---|---|---|
 | Parser anchors `^TH-STATE-REF:` (checkpoint-guard.ts) | present | CONFIRMED — deterministic |
 | Parser anchors `^TH-LANE:` (subagent-start.ts) | present | CONFIRMED — deterministic |
 | Injector (`agents/orchestrator.md`) carries the identical `TH-STATE-REF:` literal | specialist-dispatch controlled header stamps `TH-STATE-REF: {docs_root}/00-state.md` | CONFIRMED — deterministic (Suite 151, 6/6) |
-| Injector (`agents/leader.md`) carries the identical `TH-LANE:` literal | orchestrator-spawn controlled header stamps `TH-LANE: {project}` (multi-project) | CONFIRMED — deterministic (Suite 151, 6/6) |
+| Injector (`agents/leader.md`/`agents/ref-dispatch-machinery.md`) carries the identical `TH-LANE:` literal | orchestrator-spawn controlled header stamps `TH-LANE: {project}` (multi-project) | CONFIRMED — deterministic (Suite 151, 6/6) |
 
 ## Summary — what still requires a live CC run / operator confirmation
 

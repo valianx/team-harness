@@ -1501,7 +1501,7 @@ Return the row in the status block as a single pipe-delimited line:
 initiative_row: | {project-slug} | {branch} | {version} | {#PR-number or PR-URL or —} | delivered |
 ```
 
-Do NOT resolve an `overview_path`, do NOT read or write `overview.md`, and do NOT run any on-completion reconcile — locating the file, writing each row, ordering lane completions, and the final all-`delivered` reconcile are `th:leader`'s responsibility (see `agents/leader.md § overview.md Template` and § Parallel Multi-Project Dispatch). Log `initiative_overview: deferred-to-leader (lane mode)` and continue.
+Do NOT resolve an `overview_path`, do NOT read or write `overview.md`, and do NOT run any on-completion reconcile — locating the file, writing each row, ordering lane completions, and the final all-`delivered` reconcile are `th:leader`'s responsibility (see `agents/ref-dispatch-machinery.md § overview.md Template` and § Parallel Multi-Project Dispatch). Log `initiative_overview: deferred-to-leader (lane mode)` and continue.
 
 **Single-writer model (why Delivery no longer writes `overview.md`).** `th:leader` is the only agent that writes `overview.md` — there is exactly one writer, always. An earlier revision had each per-lane Delivery run its own full-document read-modify-write of `overview.md` on the theory that per-project rows were concurrency-safe. That claim was false and self-contradictory: a full-document read-modify-write races on the entire file, not on a single row, so two concurrent lane writes — or a lane write overlapping a leader reconcile — can clobber a sibling's row or a reconcile in flight. The suppression model above replaces it: every lane returns its row data and `th:leader` serializes all writes.
 

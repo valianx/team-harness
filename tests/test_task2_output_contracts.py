@@ -526,10 +526,16 @@ check(
 
 
 def _orch_blast_radius_slice(text: str) -> str:
+    # End marker must occur AFTER the start marker in the document (a marker
+    # sitting before it makes tail.find() come up empty and the slice run
+    # silently to EOF instead of failing) -- "Default to `structural`" is
+    # part of the PRECEDING "Case -> routing table" subsection (line 1135),
+    # while "Scope." opens this one (line 1145); "KG read on error" closes
+    # it, right after the structural-never-narrows fail-safe paragraph.
     return slice_section(
         text,
         "**Scope.** Applies to Case A with `Blast radius: localized",
-        ("\n\n**Default to `structural`**",),
+        ("\n\n**KG read on error",),
     )
 
 

@@ -383,11 +383,11 @@ by the delivery agent at Step 11.7.
 - Obsidian: `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/overview.md`
 - Local: `{common-parent-of-sibling-repos}/{YYYY-MM-DD}_{initiative}/overview.md`
 
-Full template and section-ownership map: `agents/leader.md § overview.md Template`.
+Full template and section-ownership map: `agents/ref-dispatch-machinery.md § overview.md Template`.
 
 ## Initiative-level fan-out trace (parallel multi-project dispatch)
 
-When the leader fans out 2+ projects concurrently (see `agents/leader.md § Parallel Multi-Project Dispatch`), an **initiative-level** `00-execution-events` file is written in addition to each project's per-project trace. This file is separate from `overview.md` (which is NOT an events file) and from the per-project `00-execution-events.*` (which remain per-project, unchanged).
+When the leader fans out 2+ projects concurrently (see `agents/ref-dispatch-machinery.md § Parallel Multi-Project Dispatch`), an **initiative-level** `00-execution-events` file is written in addition to each project's per-project trace. This file is separate from `overview.md` (which is NOT an events file) and from the per-project `00-execution-events.*` (which remain per-project, unchanged).
 
 **Location:**
 - Obsidian: `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/00-execution-events.md`

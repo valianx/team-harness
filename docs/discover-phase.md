@@ -306,7 +306,7 @@ The join is idempotent: running the same project's pipeline twice updates its si
 
 ### 11.6 Repo-identity eligibility test — separate lanes vs same-repo batch (deterministic)
 
-Before th:leader multiplies orchestrators across what might be several projects, it runs a deterministic repo-identity test so it never spawns two lanes against what is actually one repository under two paths or names. Full contract: `agents/leader.md § Repo-identity verification and orchestrator multiplication (AC-2.7)`.
+Before th:leader multiplies orchestrators across what might be several projects, it runs a deterministic repo-identity test so it never spawns two lanes against what is actually one repository under two paths or names. Full contract: `agents/ref-dispatch-machinery.md § Repo-identity verification and orchestrator multiplication (AC-2.7)`.
 
 For each candidate project path `{p}`, read two signals:
 
@@ -316,7 +316,7 @@ git -C {p} remote get-url origin
 ```
 
 - **Eligible for separate lanes (multi-project fan-out) only when both signals are pairwise-distinct across every candidate path.** A distinct `git-common-dir` AND a distinct `origin` URL means these are genuinely different repositories, and each earns its own orchestrator lane.
-- **Same-repo fallback.** When two candidate paths resolve to the same `git-common-dir` OR the same `origin` URL, they are the SAME repository under two names. Do NOT route them through the multi-project initiative fan-out — route them through the same-repo multi-TASK batch contract instead (`agents/leader.md § Multi-Task fan-out`): one set of orchestrators, one per task, consolidated into a single delivery/PR. The multi-project fan-out is reserved for genuinely distinct repos; the batch contract is the correct home for multiple tasks inside one repo.
+- **Same-repo fallback.** When two candidate paths resolve to the same `git-common-dir` OR the same `origin` URL, they are the SAME repository under two names. Do NOT route them through the multi-project initiative fan-out — route them through the same-repo multi-TASK batch contract instead (`agents/ref-dispatch-machinery.md § Multi-Task fan-out`): one set of orchestrators, one per task, consolidated into a single delivery/PR. The multi-project fan-out is reserved for genuinely distinct repos; the batch contract is the correct home for multiple tasks inside one repo.
 
 The test is deterministic — it depends only on git metadata, never on directory names, which can collide or mislead. A sibling-directory layout under a generic root is a proposal aid only (filtered by the generic-root guard in §11.2), never a trigger; the `git-common-dir` + `origin` pair is the authoritative identity key. Per-lane worktree consequences of the eligibility result — each distinct repo is fetched and based against its OWN `origin/main` — are in `docs/worktree-discipline.md § Rule 6`.
 

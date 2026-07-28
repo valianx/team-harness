@@ -232,7 +232,7 @@ A milestone build is when one project is decomposed into milestones (M0…MN) an
 These two rules are the same constraint read from two directions:
 
 - **Anti-split invariant (single-task reading):** A single task is NEVER split across multiple delivery groups. The Operator-authority invariant above is the governing statement — no agent divides a task's plan or implementation on its own authority. A single task always belongs to exactly one group in `§ Delivery Grouping`.
-- **Consolidation default (multi-task reading):** A same-repo batch of independent tasks consolidates into ONE PR by default (`Delivery Grouping: all-tasks-one-pr`). The leader's `## Multi-Task fan-out` **Consolidation default** paragraph is the governing statement — all task branches merge into one `batch/<name>-verify` branch, the version bumps once, the changelog is one consolidated entry, and exactly one PR covers all batch work. Do NOT open one PR per batched task.
+- **Consolidation default (multi-task reading):** A same-repo batch of independent tasks consolidates into ONE PR by default (`Delivery Grouping: all-tasks-one-pr`). The leader's `agents/ref-dispatch-machinery.md § Multi-Task fan-out` **Consolidation default** paragraph is the governing statement — all task branches merge into one `batch/<name>-verify` branch, the version bumps once, the changelog is one consolidated entry, and exactly one PR covers all batch work. Do NOT open one PR per batched task.
 
 Read together: a task is never SPLIT across delivery groups (anti-split), and a same-repo batch consolidates INTO one PR by default (consolidation default). There is no contradiction — one rule prevents explosion outward (splitting a task across groups), the other prevents explosion inward (one PR per task in a batch). Neither rule claims a fixed "one task = one PR" identity; the actual task-to-PR mapping is declared per plan by `§ Delivery Grouping`.
 
@@ -331,7 +331,7 @@ Status values: `pending` → `implementing` → `complete`. One row per mileston
 
 ## Parallel Dispatch Flow (DEFAULT for 2+ tasks)
 
-Parallel dispatch is defined in the leader's **Multi-Task fan-out** section (`agents/leader.md`). It is the **default behavior** whenever the leader identifies 2+ tasks, regardless of entry point. **Scope note:** this is single-project, multi-task dispatch — ungated by a parallelism confirm. It is distinct from the multi-PROJECT initiative fan-out (`agents/leader.md § Parallel Multi-Project Dispatch`), which is scoped to ≥2 projects and IS confirm-gated.
+Parallel dispatch is defined in the leader's **Multi-Task fan-out** section (`agents/ref-dispatch-machinery.md`). It is the **default behavior** whenever the leader identifies 2+ tasks, regardless of entry point. **Scope note:** this is single-project, multi-task dispatch — ungated by a parallelism confirm. It is distinct from the multi-PROJECT initiative fan-out (`agents/ref-dispatch-machinery.md § Parallel Multi-Project Dispatch`), which is scoped to ≥2 projects and IS confirm-gated.
 
 **Entry points that lead here:**
 - `/th:plan plan-and-execute` → architect produces task breakdown → dispatch

@@ -202,7 +202,7 @@ through the filesystem is needed.
 ## Rule 6 — Per-lane worktree (th:leader fan-out)
 
 When th:leader fans out N orchestrator lanes — a same-repo multi-task batch, or a multi-project
-initiative (`agents/leader.md § Multi-Task fan-out`) — each lane runs in its OWN git worktree. Rules
+initiative (`agents/ref-dispatch-machinery.md § Multi-Task fan-out`) — each lane runs in its OWN git worktree. Rules
 1–5 apply per lane, with these lane-specific bindings:
 
 - **One worktree per lane, addressed by `git -C`.** Each lane's orchestrator operates inside its own

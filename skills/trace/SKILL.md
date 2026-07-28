@@ -515,7 +515,7 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
 ```
 Detect the `.md` variant first (Glob), then `.jsonl`, applying the same fence-extraction as every other mode above.
 
-The initiative-level fan-out events are written by the **leader** (`agents/leader.md § Parallel Multi-Project Dispatch`; `docs/observability.md § Initiative-level fan-out trace`), not by any orchestrator — the leader is the writer of its own initiative-level file and the reader-only aggregator of the per-lane traces below.
+The initiative-level fan-out events are written by the **leader** (`agents/ref-dispatch-machinery.md § Parallel Multi-Project Dispatch`; `docs/observability.md § Initiative-level fan-out trace`), not by any orchestrator — the leader is the writer of its own initiative-level file and the reader-only aggregator of the per-lane traces below.
 
 **Derivation.** Filter to `fanout.*` events. Group `fanout.lane.start` / `fanout.lane.end` pairs by `project` (matched on the shared `project` key). A lane with a `start` and no matching `end` is still running; a lane with both is closed, with `end.status` (`success`/`failed`/`iterating`) as its outcome. `fanout.converge` marks the region's closing boundary — its `lanes[]` array is the authoritative per-lane final status when present.
 

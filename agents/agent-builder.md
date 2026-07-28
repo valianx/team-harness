@@ -220,6 +220,7 @@ Every new worker agent MUST have these sections (checked by `/th:lint`):
 - [ ] `## Execution Log Protocol`
 - [ ] `## Return Protocol`
 - [ ] `description` frontmatter and Roster `Objective` cell both satisfy the objective-form and counting rules at `agents/README.md § "Objective column — authoring standard"` — read and apply that section; its prose is not restated here.
+- [ ] If the new agent dispatches other agents (a coordination-style worker, not a leaf specialist), its dispatch prompts follow `agents/_shared/dispatch-contract.md` — what a dispatch prompt may and must not carry, and the two-halves scope rule (review scope never bounded by the dispatcher; write scope always bounded by the recipient's own contract). Read and apply that file; do not re-derive or paraphrase its rule set here.
 
 Coordination agents (`leader`, `orchestrator`) are exempt from this check.
 

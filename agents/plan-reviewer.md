@@ -136,7 +136,7 @@ Run the rules in order. Each rule produces 0..N findings. The total set of findi
 
 ### Rule 1 — Delivery Grouping: default `all-tasks-one-pr` unless temporal-prod reason
 
-**Relationship to batch consolidation.** Delivery Grouping is the SPLIT-DIRECTION rule — it prevents a single logical change from being split into multiple PRs without a valid temporal-prod reason. It is COMPLEMENTARY to the leader's batch-consolidation default, not in tension with it. A same-repo batch of independent tasks consolidating into ONE PR (the `agents/leader.md § Multi-Task fan-out — Consolidation default`) is NOT a Rule 1 split — those tasks belong to different independent work items, not to one logical change being artificially divided. Rule 1 applies when a SINGLE plan or service's tasks are declared to ship as more than one PR.
+**Relationship to batch consolidation.** Delivery Grouping is the SPLIT-DIRECTION rule — it prevents a single logical change from being split into multiple PRs without a valid temporal-prod reason. It is COMPLEMENTARY to the leader's batch-consolidation default, not in tension with it. A same-repo batch of independent tasks consolidating into ONE PR (the `agents/ref-dispatch-machinery.md § Multi-Task fan-out — Consolidation default`) is NOT a Rule 1 split — those tasks belong to different independent work items, not to one logical change being artificially divided. Rule 1 applies when a SINGLE plan or service's tasks are declared to ship as more than one PR.
 
 **What to check:**
 
