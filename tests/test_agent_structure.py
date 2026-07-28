@@ -40595,6 +40595,197 @@ check(
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
+# architect.md's Closure Rubric + one-round anchored-edit dispatch discipline
+# (pipeline-dispatch-shape, T1-AC-1 .. T1-AC-5)
+#
+# Authored at Phase 2.7 (tester, authoring mode): confirmed absent from every
+# existing suite by a targeted grep ("closure rubric", "ownership.closure",
+# "removed-control") across tests/*.py before writing these checks.
+# ---------------------------------------------------------------------------
+_closure_rubric_section = _slice_section(
+    architect_md, "\n### Closure rubric", ("\n### Design Mode",)
+)
+check(
+    "architect(t1-ac1-closure-rubric-declared): architect.md declares a"
+    " closure rubric of exactly three tables (ownership closure, provenance,"
+    " removed-control), mandatory for feature/refactor/enhancement/fix"
+    " Tier 2-4 design dispatches",
+    "Mandatory output for `feature`, `refactor`, `enhancement`, and `fix`"
+    " Tier 2-4 design dispatches" in _closure_rubric_section
+    and "**Ownership closure**" in _closure_rubric_section
+    and "**Provenance**" in _closure_rubric_section
+    and "**Removed-control**" in _closure_rubric_section,
+    "agents/architect.md § Closure rubric must declare all three tables as"
+    " mandatory output for feature/refactor/enhancement/fix Tier 2-4"
+    " dispatches",
+)
+check(
+    "architect(t1-ac2-destination-and-forbidden-pattern): the closure rubric's"
+    " destination is reviews/01-plan-review.md under a ## Closure Rubric"
+    " heading, and it is named among the content forbidden inside 01-plan.md",
+    "Write it to `reviews/01-plan-review.md` under a `## Closure Rubric`"
+    " heading" in _closure_rubric_section
+    and "any of its three constituent tables" in architect_md
+    and "01-plan.md" in _slice_section(
+        architect_md, "\n## Forbidden output patterns", ("\n## ",)
+    ),
+    "agents/architect.md must write the rubric's destination as"
+    " reviews/01-plan-review.md § Closure Rubric, and § Forbidden output"
+    " patterns must name it among the content prohibited inside 01-plan.md",
+)
+check(
+    "architect(t1-ac3-one-round-complete-list): a correction round carries"
+    " the complete problem list in one dispatch, never one round per"
+    " findings batch, and the architect may state this expectation back to"
+    " a dispatcher sending a partial list",
+    "One-round, complete-list correction" in architect_md
+    and "never one round per findings batch" in architect_md
+    and "you may state this expectation back to the dispatcher" in architect_md,
+    "agents/architect.md must declare the one-round complete-list correction"
+    " discipline and the architect's ability to push back on a partial list",
+)
+check(
+    "architect(t1-ac4-anchored-edit-never-regeneration): revising an existing"
+    " artifact uses anchored Edit on the affected sections, never Write"
+    "-regeneration, naming regeneration as the measured failure mode it"
+    " replaces",
+    "Anchored `Edit`, never `Write`-regeneration" in architect_md
+    and "measured failure mode this rule replaces" in architect_md,
+    "agents/architect.md must require anchored Edit over whole-document"
+    " Write-regeneration and name regeneration as the failure mode replaced",
+)
+_plan_template_section = _slice_section(
+    architect_md, "\n### Full `01-plan.md` template", ("\n---\n",)
+)
+check(
+    "architect(t1-ac5-template-unchanged): the ### Full 01-plan.md template"
+    " section carries no Closure Rubric heading or section of its own — the"
+    " rubric's sole destination stays reviews/01-plan-review.md",
+    "Closure Rubric" not in _plan_template_section,
+    "agents/architect.md § Full 01-plan.md template must not gain a"
+    " closure-rubric section — the rubric lives only in"
+    " reviews/01-plan-review.md, never inside 01-plan.md itself",
+)
+
+# Marker: architect-closure-rubric-t1-ac1-5
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Iteration Rules -- cause vocabulary, pre-dispatch correction gate, and
+# remediation preference (pipeline-dispatch-shape, T2-AC-12/T2-AC-18/T2-AC-19)
+#
+# Authored at Phase 2.7 (tester, authoring mode): the implementer's own
+# closing note (02-implementation.md) does not name a dedicated test for
+# this content, and none of the four newly-wired contract suites cover it
+# either -- confirmed absent by a targeted grep before writing these checks.
+# ---------------------------------------------------------------------------
+_iter_rules = _slice_section(orchestrator_md, "\n## Iteration Rules", ("\n## Phase Timeouts",))
+
+# T2-AC-12: cause vocabulary + budget exclusion + event-schema field.
+check(
+    "iteration-rules(t2-ac12-cause-vocabulary): every iteration.start carries"
+    " a cause of operator or verification, and cause: operator is excluded"
+    " from the max-3 budget",
+    "carries a `cause` of `operator` or `verification`" in _iter_rules
+    and "EXCLUDED from the max-3 budget" in _iter_rules,
+    "agents/orchestrator.md § Iteration Rules must declare the two-value"
+    " cause vocabulary and the operator-cause budget exclusion",
+)
+check(
+    "iteration-rules(t2-ac12-schema-field): the iteration.start JSONL schema"
+    " table carries the cause field",
+    '| `cause` | conditional | `operator`/`verification` — required for'
+    " `iteration.start`" in orchestrator_md,
+    "the Execution Events JSONL schema table must declare the `cause` field"
+    " for iteration.start",
+)
+
+# T2-AC-18: the five-leg pre-dispatch gate, and its citation at BOTH gate
+# sites the AC names -- the Phase 1.6 gate table's fail row, and the Phase 3
+# combined verdict.
+_T2_AC18_LEGS = (
+    "Contradiction → escalate, do not dispatch.",
+    "Recurrence → escalate, do not dispatch.",
+    "Mechanical and enumerated → dispatch.",
+    "Mixed set → split.",
+    "A lens's own classification is an INPUT, never the authority.",
+)
+check(
+    "iteration-rules(t2-ac18-five-legs): the pre-dispatch gate states all"
+    " five legs (contradiction / recurrence / mechanical / mixed / lens-input"
+    "-not-authority)",
+    all(leg in _iter_rules for leg in _T2_AC18_LEGS),
+    f"one or more of the five pre-dispatch gate legs is missing: {_T2_AC18_LEGS}",
+)
+check(
+    "iteration-rules(t2-ac18-cross-round-index): the cross-round index is"
+    " built from the Panel Rounds row plus the iteration.start cause field,"
+    " with no third artifact introduced",
+    "no third is introduced" in _iter_rules
+    and "reviews/01-plan-review.md § Panel Rounds" in _iter_rules,
+    "the pre-dispatch gate's cross-round index must cite the two existing"
+    " artifacts (Panel Rounds row, iteration.start cause) and state that no"
+    " third artifact is introduced",
+)
+_phase3_fail_row = _slice_section(
+    orchestrator_md, "`pass` + `code_hygiene: pass` → Phase 3.5.", ("\n\n",)
+)
+check(
+    "iteration-rules(t2-ac18-phase3-cites-gate): the Phase 3 combined-verdict"
+    " fail row is subject to the pre-dispatch correction gate before any"
+    " correction round is dispatched",
+    "pre-dispatch correction gate" in _phase3_fail_row
+    and "Iteration Rules" in _phase3_fail_row,
+    "Phase 3's fail row must cite the pre-dispatch correction gate"
+    " (§ Iteration Rules) before dispatching a correction round",
+)
+_phase16_gate_table = _slice_section(
+    orchestrator_md, "\n| `verdict` | Action |", ("\n### Plan-review panel centralization",)
+)
+check(
+    "iteration-rules(t2-ac18-phase16-cites-gate): the Phase 1.6 gate table's"
+    " fail row is likewise subject to the pre-dispatch correction gate"
+    " before routing back to architect — T2-AC-18's own text requires the"
+    " discriminant stated at BOTH gate sites, not only Phase 3's",
+    "pre-dispatch" in _phase16_gate_table.lower()
+    or "iteration rules" in _phase16_gate_table.lower(),
+    "agents/orchestrator.md § Phase 1.6's gate table `fail` row does not cite"
+    " the pre-dispatch correction gate / § Iteration Rules — T2-AC-18 states"
+    " the discriminant must be stated at both gate sites (Phase 1.6's fail"
+    " row and Phase 3's combined verdict), but only Phase 3's row does so"
+    " today; a Stage-1 contradiction/recurrence finding at Phase 1.6 can be"
+    " auto-dispatched to `architect` without passing through the discernment"
+    " gate T2-AC-18 introduces",
+)
+
+# T2-AC-19: remediation preference (removal/replacement over addition),
+# composed with -- not weakening -- the existing named-successor rule.
+check(
+    "iteration-rules(t2-ac19-remediation-preference): closing a finding"
+    " prefers removing or replacing an existing element over adding a new"
+    " one, and a named cross-check is required when only addition is"
+    " possible",
+    "prefers removing or replacing an existing element over adding a new"
+    " one" in _iter_rules
+    and "named cross-check before the round closes" in _iter_rules,
+    "agents/orchestrator.md § Iteration Rules must state the"
+    " removal/replacement-over-addition preference and the named"
+    " pre-close cross-check requirement",
+)
+check(
+    "iteration-rules(t2-ac19-composes-with-successor-rule): the remediation"
+    " preference composes with, and does not weaken, the existing"
+    " no-removal-without-a-named-successor rule",
+    "does not weaken" in _iter_rules
+    and "no removal without a named successor" in _iter_rules,
+    "the remediation preference must state that it composes with, and does"
+    " not weaken, the existing 'no removal without a named successor' rule",
+)
+
+# Marker: iteration-rules-t2-ac12-18-19
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
