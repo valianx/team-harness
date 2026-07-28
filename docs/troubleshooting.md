@@ -85,7 +85,7 @@ Invoke the orchestrator as a subagent: `Agent(subagent_type='th:orchestrator', .
 
 **Cause:** Claude Code's subagent-nesting depth is configurable, not a permanent cap, via the `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` environment variable in `~/.claude/settings.json`. It defaults to unset, in which case a nested subagent does not retain the `Task` tool.
 
-**Fix:** Run `/th:setup` (or `/th:update` on an already-installed machine) — both provision `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: "2"` after an explicit confirmation. Restart the session (or start a new one) — the value resolves at session start and does not take effect mid-session. Until provisioned (or on decline), the `dispatch_handoff` relay remains fully functional. Full mechanism: `docs/setup-update-model.md § Architecture prerequisite: subagent nesting depth`.
+**Fix:** Run `/th:setup` (or `/th:update` on an already-installed machine) — both provision `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: "2"` after an explicit confirmation. Restart the session (or start a new one) — the value resolves at session start and does not take effect mid-session. Until provisioned (or on decline), the `dispatch_handoff` relay remains fully functional. If the write to `~/.claude/settings.json` itself is refused by the host runtime, the command degrades to the operator-executed fallback instead of retrying through another mechanism — see the same canonical section for that outcome and the exact command to run. Full mechanism: `docs/setup-update-model.md § Architecture prerequisite: subagent nesting depth`.
 
 ---
 

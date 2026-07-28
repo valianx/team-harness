@@ -129,9 +129,116 @@ This is the canonical mechanism both lifecycle commands implement identically. N
 3. **Present with a DIFFERENT value, and no decline previously recorded → its own gate, never a silent overwrite.** A present-but-different value (e.g. an operator who deliberately set `"1"` or `"3"`) is NOT treated as absent. Before writing, this gate discloses the exact current value read from the file (`env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` is currently set to "{current-value}"`), states the same blast radius as step 2, and asks whether to overwrite it with `"2"`. Only an explicit confirmation to THIS gate authorizes the write; the absent-value gate's text (step 2) must never be shown when a different value is already present — a reader of that text could otherwise infer no value is set. On decline, record the same durable decline as step 5 (an operator who kept a deliberately-different value has, in effect, declined "2") — this is never re-prompted once recorded.
 4. **On confirm (either gate) → write following the merge-write-whole-document contract already established for this class of file** (`docs/permission-provisioning.md § Merge-write-whole-document contract`): back up the existing `~/.claude/settings.json` to `settings.json.bak` at `0o600` from the moment of creation (skipped if the file does not yet exist). Read the target file: if it does not exist, start from `{}`; if it exists but fails to parse as JSON (corrupted file), **abort before writing** — no backup restore is needed since nothing was written yet — and report the failure naming the corrupted file and the exact parse error; never fall back to `{}` for an existing-but-unparseable file, since that would silently discard any `permissions.*` rules already present. Only when the file parses (or does not exist) does the write proceed: set only `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`; write the merged document to a temp file in the same directory at `0o600`, validate it parses as JSON, then rename it atomically over the target.
 5. **Post-write assertion (mandatory).** Re-read and re-parse the written file. Assert it differs from the pre-write parse in **exactly one** JSON path (`env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`), and that `permissions.allow`, `permissions.deny`, and `permissions.additionalDirectories` are identical element-for-element to the pre-write parse. On any other delta, restore the `.bak` and report the write as failed — never leave a partially-changed file in place. This guards specifically against a lost `permissions.deny` entry (deny-over-allow resolution means a dropped entry widens access without producing an error).
-6. **On decline (either gate) → record durably, never re-prompt.** Persist a single namespaced key under `~/.claude/.team-harness.json` (merge-write-whole-document, preserving every other key) recording that the operator declined this prerequisite. On every later run of either command, a recorded decline is treated the same as "nothing to offer" — report it as a row, never re-ask. This is the one closed exception `/th:update` needs to `~/.claude/.team-harness.json` — see [The residual seam: new operator keys](#the-residual-seam-new-operator-keys) for its scope.
-7. **After any write → never claim the value is live.** `env` in `settings.json` resolves at session start, so a write in the middle of a running session has no effect on that session. Report that a session restart is required before the value takes effect — the same restart-to-activate honesty this skill already applies to plugin reloads.
-8. **On decline, an aborted corrupted-file write, or a failed write → the functional path is preserved, not removed.** The `dispatch_handoff` relay (`docs/subagent-orchestration.md`) remains fully functional as the fallback when nesting is not provisioned. This mechanism buys back the cost of that relay; it does not gate correctness on adopting it.
+6. **Write refused by the host runtime → operator-executed fallback, never a retry via any alternative mechanism.** This outcome is distinct from an existing-but-unparseable file (step 4, which never even attempts the write) and from a post-write delta (step 5, which detects a problem after a write that did happen): here the write to `~/.claude/settings.json` itself is refused by the host runtime before it can complete. Nothing was written and the file is unchanged. No `nested_spawn_depth.declined` is recorded — a refusal by the environment is not a decision the operator made — so the next run of either command re-offers the provisioning gate because the key is still absent. The step must not retry the write through any alternative mechanism (another tool, a shell detour, or any other write path), and the agent itself must not execute the fenced command below by any means — not via Bash, not by writing it to a file and running it, not through any other tool: running that command IS the alternative mechanism the previous sentence forbids, because the target file governs `permissions.allow`, `permissions.deny`, and `permissions.additionalDirectories`, and routing around a host refusal to write it is evasion of a control, not a degradation. Instead, the operator receives a pointer to the file and heading below — never a reproduction of the block generated, retyped, or shortened by the agent — reads it, and runs it directly; the command's report row for this run carries the value `operator-action-required`, and the rest of the command's flow continues rather than stopping.
+
+**Operator-executed provisioning command**
+
+Transcribed verbatim from the single source of this block — never retyped, paraphrased, or shortened. Uses only `python3` and its standard library, the same probed dependency both commands already document; reproduces, in the operator's own execution context, the same guarantees the agent's own write path holds: `realpath` resolution before touching the target, a `0o600` backup, an explicit abort (never a traceback) on an unparseable or unexpected-shape document, a single JSON path set, one atomic temp-file-and-rename path for the backup, the target, and the restoration alike, and the same post-write assertion as step 5 above.
+
+```bash
+python3 - <<'PY'
+import json, os, sys, tempfile
+
+nominal = os.path.expanduser("~/.claude/settings.json")
+path    = os.path.realpath(nominal)
+bak     = path + ".bak"
+KEY     = "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH"
+
+def write_600(target, payload):
+    """Every write in this script goes through here: temp file at 0o600 in the
+    same directory, fsync, atomic rename. No path mutates the target in place."""
+    d = os.path.dirname(os.path.abspath(target))
+    os.makedirs(d, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(payload)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, target)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+def strip_key(doc):
+    d = json.loads(json.dumps(doc))
+    env = d.get("env")
+    if isinstance(env, dict):
+        env.pop(KEY, None)
+        if not env:
+            d.pop("env", None)
+    return d
+
+if path != nominal:
+    print("NOTE: %s resolves to %s. The resolved file is the one backed up and "
+          "written; the symlink itself is left in place." % (nominal, path))
+
+before, backed_up = {}, False
+if os.path.exists(path):
+    try:
+        raw = open(path, encoding="utf-8").read()
+        before = json.loads(raw)
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        sys.exit("ABORT: %s does not parse as JSON (%s). Nothing was written; "
+                 "repair the file by hand first." % (path, exc))
+    if not isinstance(before, dict) or not isinstance(before.get("env", {}), dict):
+        sys.exit("ABORT: %s has an unexpected shape (top level or 'env' is not an "
+                 "object). Nothing was written." % path)
+    try:
+        write_600(bak, raw)
+    except Exception as exc:
+        sys.exit("ABORT: the backup %s could not be written (%s). Nothing was "
+                 "written to %s." % (bak, exc, path))
+    backed_up = True
+
+expected = json.loads(json.dumps(before))
+expected.setdefault("env", {})[KEY] = "2"
+
+try:
+    write_600(path, json.dumps(expected, indent=2, ensure_ascii=False) + "\n")
+except Exception as exc:
+    sys.exit("WRITE FAILED: %s. Nothing was changed." % exc)
+
+written  = json.loads(open(path, encoding="utf-8").read())
+problems = []
+if (before.get("permissions") or {}) != (written.get("permissions") or {}):
+    problems.append("the permissions subtree changed")
+if written.get("env", {}).get(KEY) != "2":
+    problems.append("env.%s was not set" % KEY)
+if strip_key(before) != strip_key(written):
+    problems.append("a JSON path other than env.%s changed" % KEY)
+
+if problems:
+    if backed_up:
+        try:
+            write_600(path, open(bak, encoding="utf-8").read())
+            recovery = "Restored %s from %s." % (path, bak)
+        except Exception as exc:
+            recovery = ("RESTORE FAILED (%s) — %s still holds the previous "
+                        "content; recover by hand." % (exc, bak))
+    else:
+        recovery = ("%s did not exist before this run, so there is no backup to "
+                    "restore; delete it to return to the previous state." % path)
+    sys.exit("ASSERTION FAILED: %s. %s" % ("; ".join(problems), recovery))
+
+print('OK: env.%s = "2" written to %s' % (KEY, path))
+if backed_up:
+    print("Previous file backed up to %s — this is a single rolling backup and it "
+          "overwrote any earlier one." % bak)
+print("Restart Claude Code (or start a new session) for it to take effect.")
+PY
+```
+
+`settings.json.bak` is a single rolling backup shared with `docs/permission-provisioning.md § Merge-write-whole-document contract` step 2 — running the command above consumes whatever recovery snapshot a prior provisioning write left behind, the same way either write path already does. Its "preserves every other key" guarantee has two documented limits, named here so neither is mistaken for a regression: duplicate JSON keys in the existing document collapse to their last occurrence on the read/write round trip, and the target file's mode is normalized to `0o600` regardless of what it was set to before.
+
+This outcome is scoped to the subagent-nesting-depth mechanism specifically. `docs/permission-provisioning.md`'s two sites that also write `~/.claude/settings.json` from an agent — site A (`/th:setup` § 3a) and site B(a) (`agents/leader.md` Phase 0a Step 1g) — do not yet define a refused-write outcome of their own; this section is not a general fallback for every agent write to that file.
+
+7. **On decline (either gate) → record durably, never re-prompt.** Persist a single namespaced key under `~/.claude/.team-harness.json` (merge-write-whole-document, preserving every other key) recording that the operator declined this prerequisite. On every later run of either command, a recorded decline is treated the same as "nothing to offer" — report it as a row, never re-ask. This is the one closed exception `/th:update` needs to `~/.claude/.team-harness.json` — see [The residual seam: new operator keys](#the-residual-seam-new-operator-keys) for its scope.
+8. **After any write → never claim the value is live.** `env` in `settings.json` resolves at session start, so a write in the middle of a running session has no effect on that session. Report that a session restart is required before the value takes effect — the same restart-to-activate honesty this skill already applies to plugin reloads.
+9. **On decline, an aborted corrupted-file write, a refused write, or a failed write → the functional path is preserved, not removed.** The `dispatch_handoff` relay (`docs/subagent-orchestration.md`) remains fully functional as the fallback when nesting is not provisioned. This mechanism buys back the cost of that relay; it does not gate correctness on adopting it.
 
 **Never conflated with permission provisioning.** `docs/permission-provisioning.md`'s allowlist mechanism touches only `permissions.allow`, `permissions.deny`, and `permissions.additionalDirectories` — never `env`. This mechanism touches only `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` — never any key under `permissions`. Neither command establishes a general-purpose `env`-provisioning path; the JSON path above is the only one this mechanism ever writes.
 
