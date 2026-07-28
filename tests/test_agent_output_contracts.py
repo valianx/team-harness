@@ -21,7 +21,7 @@
 # available — byte-identical to what the plan requires stay untouched.
 #
 # Usage:
-#   python3 tests/test_task2_output_contracts.py
+#   python3 tests/test_agent_output_contracts.py
 # Exit code:
 #   0 if all cases pass, 1 otherwise.
 
