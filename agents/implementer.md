@@ -447,6 +447,8 @@ The `context7_consult` field is mandatory per `docs/context7-usage.md` §5 — e
 - `regression_test_passes: true | false` — the test at `02-regression-test.md` → `regression_test_path` now passes with your changes. Required on `status: success`. The orchestrator gates Phase 2 on this; `false` triggers iteration (subject to max-3).
 - `follow_ups_spotted: {N}` — count of `[FOLLOW-UP]` annotations you added to `02-implementation.md` § `## Follow-ups Spotted` (other issues you spotted but did NOT fix per the scope-discipline contract). Zero is a valid value.
 
+**Language.** `02-implementation.md` is an agentic-tier document (`docs/conventions.md § Document classification`): written in English throughout, no operator-language exception.
+
 Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.
 
 ---

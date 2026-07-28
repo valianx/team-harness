@@ -101,7 +101,7 @@ The events file is `00-execution-events.md` (obsidian mode) or `00-execution-eve
 
 Recovers ALL interrupted tasks from a multi-task batch (parallel dispatch via worktrees).
 
-1. Check for `00-leader-roster.md` (the leader's durable index — `agents/leader.md § 00-leader-roster.md`) at the resolved base path or, for an initiative, the initiative root. This is the primary source: the leader re-launches an orchestrator for any roster row still `RUNNING`/`FAILED` (`agents/leader.md § Multi-Task fan-out`). Fall back to the legacy `workspaces/batch-progress.md` when no roster is present.
+1. Check for `00-leader-roster.md` (the leader's durable index — `agents/leader.md § 00-leader-roster.md`) at the resolved base path or, for an initiative, the initiative root. This is the primary source: the leader re-launches an orchestrator for any roster row still `RUNNING`/`FAILED` (`agents/ref-dispatch-machinery.md § Multi-Task fan-out`). Fall back to the legacy `workspaces/batch-progress.md` when no roster is present.
 2. If neither is found → "No batch tracking found. Use `/th:recover {feature}` for single pipeline recovery."
 3. Read the roster (or `batch-progress.md`) — extract all tasks/lanes whose coarse `Status` is `RUNNING`/`FAILED` (roster) or `in_progress`/`iterating`/`blocked` (per-lane `00-state.md`). Read only the roster's coarse `Phase`/`Status`/`pending_gate` columns — never any orchestrator gate-release field.
 4. If none found → "All batch tasks are DONE or PENDING. Nothing to recover."

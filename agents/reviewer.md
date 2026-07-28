@@ -810,3 +810,5 @@ issues: {list of criticals if any, or "none"}
 - `thread_id` echoes back the `comment_id` from the invocation for the skill to use in the API call.
 
 The orchestrator extracts the appropriate fields per mode and writes them to draft files. Do NOT write to any file yourself.
+
+**Language.** All review output — `review_body`, `reply_body`, and `reviews/04-internal-review.md` — is written in English, no operator-language exception (§ Critical Rules above; `docs/conventions.md § Document classification`).

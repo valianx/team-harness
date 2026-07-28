@@ -243,10 +243,22 @@ identity.
 
 ## STOP-block templates
 
-At each STAGE-GATE the orchestrator returns a `gate_pending` status to `th:leader`, and
-`th:leader` presents the STOP block to the operator inline, pausing for an explicit reply it
-relays back to the orchestrator. Both agents reference the structural shape below — it is
-what `th:leader` presents and what the orchestrator interprets against the allowlist:
+At each STAGE-GATE the orchestrator returns `gate_pending` status DATA to `th:leader` —
+never a rendered STOP block — and `th:leader` renders the STOP block to the operator
+inline from that data, pausing for an explicit reply it relays back to the orchestrator.
+Both agents reference the structural shape below, but it is a GENERIC template: the
+implementing orchestrator's own gate-data contract (`agents/orchestrator.md §
+"STAGE-GATE-1"`/`"STAGE-GATE-2"`/`"STAGE-GATE-3"`/`"Express combined gate"`) supplies the
+REAL option set of each presentation, including its conditionality — for example,
+STAGE-GATE-3's `override {reason}` appearing only when `criticals_count ≥ 1`, and `ship`
+itself being withheld from the option set (not merely discouraged) under the same
+condition; see § "Implementation-scoped reply extensions" below for the worked example.
+Substituting the received option set with this generic placeholder — rendering the bare
+`ship`/`amend`/`abort` shape shown below when the data said the set was narrower or
+richer — is a contract violation, not a formatting choice: it is the exact failure
+`agents/leader.md § "Gate presentation protocol"` names when it instructs the leader to
+render "the STOP-block options the orchestrator returned," never a template of its own
+invention.
 
 **STAGE-GATE-1** — end of Stage 1 (mandatory, never skippable):
 

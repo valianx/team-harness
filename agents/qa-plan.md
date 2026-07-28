@@ -249,13 +249,12 @@ In the `plan-review` direct mode, the `ratify-plan` mode is reused as the **subs
 
 When the orchestrator re-fires you as part of a routed correction (bucket 1 "full panel" or bucket 3
 "coverage change, non-security" of the correction classifier), your dispatch carries a
-`**Correction scope:** localized {AC-IDs, section-names} | structural` field. For a `localized`
-scope, review ONLY the named changed AC/section + its blast radius — treat every other,
-already-passed AC/section as **frozen/trusted**: do not re-read it, do not re-run the coverage
-mapping or the soundness check against it, do not re-list it in your coverage table. A `structural`
-scope re-reviews the whole plan exactly as a first-round dispatch does. You still read `01-plan.md`
-and the correction text at dispatch start — the saving is fewer generation tokens and fewer re-read
-sections, never zero-read.
+`**Correction scope:** {AC-IDs, section-names}` field naming what changed — a coordinate, not a
+review bound. Per `agents/_shared/dispatch-contract.md § "The two-halves rule"`, the orchestrator
+never bounds your review scope: compute your own coverage-mapping scope from the coordinate, and
+re-run the full coverage table whenever your own judgment of the correction calls for it — no
+dispatch instruction excludes any AC/section from your own scope computation. You still read
+`01-plan.md` and the correction text at dispatch start — the saving is fewer generation tokens, never zero-read.
 
 **Carried forward on a security-surface touch (bucket 2).** When a correction is classified as
 bucket 2 (security-relevant surface touched), your `**Substance (qa):**` sub-verdict is carried
@@ -461,6 +460,8 @@ issues: {list of gaps or dropped AC, or "none"}
 **Mandatory tool-usage fields:**
 - `memory_consult` — count of Knowledge Graph queries made this run. Zero is a valid value.
 - `kg_save_candidates` — names of KG entities you propose the orchestrator persist (empty list `[]` is valid).
+
+**Language.** `00-acceptance-criteria.md` (define-ac) and your `reviews/04-validation.md` § Reconciliation Decisions append (reconcile) are agentic-tier: written in English. Your `## Plan Ratification (Phase 1.5)` section inside `01-plan.md` (ratify-plan) is part of an operator-facing document (`docs/conventions.md § Document classification`): body prose follows the operator's resolved language; structural elements (headers, field names, AC identifiers) stay English.
 
 Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.
 

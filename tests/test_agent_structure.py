@@ -68,8 +68,8 @@ def _read_or_empty(path: Path) -> str:
         return ""
 
 
-# The monolithic agents/orchestrator.md was split into ten files: the two
-# always-loaded spine files (leader.md, orchestrator.md), three read-on-demand
+# The monolithic agents/orchestrator.md was split into eleven files: the two
+# always-loaded spine files (leader.md, orchestrator.md), four read-on-demand
 # reference files (ref-*.md), and the shared cross-agent contract fragments
 # under _shared/. A check that used to assert "orchestrator.md contains X" is
 # a content-EXISTENCE check against the former monolith — its faithful
@@ -80,7 +80,19 @@ def _read_or_empty(path: Path) -> str:
 # did before this constant existed) for use by existence-style assertions.
 # Assertions that verify a specific file OWNS a piece of content (as opposed
 # to merely containing it) stay scoped to that single file's `read(...)`.
+#
+# ref-dispatch-machinery.md is placed BEFORE leader.md, not after orchestrator.md
+# with the other ref-*.md files: five sections relocated out of leader.md keep a
+# same-heading-text stub in leader.md (a one-line pointer to their new home), so
+# an existence check anchored on that exact heading text would otherwise match
+# the STUB (leader.md, shallow body) via first-match if leader.md preceded this
+# file in the corpus, instead of the byte-preserved full content this file now
+# owns. Placing it first makes `.find()`/`_slice_section`'s first match resolve
+# to the real content; it never collides with orchestrator.md (verified: none of
+# its headings duplicate any orchestrator.md heading), so the documented
+# leader->orchestrator relative order above is unaffected.
 _SPLIT_CORPUS_FILES = [
+    AGENTS_DIR / "ref-dispatch-machinery.md",
     AGENTS_DIR / "leader.md",
     AGENTS_DIR / "orchestrator.md",
     AGENTS_DIR / "ref-special-flows.md",
@@ -94,6 +106,7 @@ _SPLIT_CORPUS_FILES = [
     AGENTS_DIR / "_shared" / "apply-review-disposition.md",
     AGENTS_DIR / "_shared" / "finding-connection.md",
     AGENTS_DIR / "_shared" / "gh-fallback.md",
+    AGENTS_DIR / "_shared" / "dispatch-contract.md",
 ]
 
 SPLIT_CORPUS = "\n".join(_read_or_empty(p) for p in _SPLIT_CORPUS_FILES)
@@ -184,15 +197,36 @@ print()
 print("=== Suite 2: agents/README.md Roster ===")
 
 readme = read(AGENTS_DIR / "README.md")
+# EXTENDED, never a retarget (this check does not go false, it stays
+# insufficient): the two-substring check below survives the Roster's
+# Objective-column insertion regardless of what happens to the read-only
+# prohibition prose. Extended to also assert the prohibition's own literal,
+# converting a prose-only floor into a deterministic one.
 check(
     "agents/README.md mentions tools field",
     "tools" in readme.lower() and "allowlist" in readme.lower(),
     "tools / allowlist not documented in agents/README.md",
 )
 check(
-    "agents/README.md Roster has 5-column matrix",
-    "| Model | Effort | Tools" in readme or "Model + Effort + Tools" in readme,
-    "expected 'Model + Effort + Tools + Role' or similar header in Roster",
+    "agents/README.md states the read-only-agent prohibition literal (no Bash/Edit/Write"
+    " beyond the agent's own workspace doc)",
+    "MUST NOT include `Bash`, `Edit`, or `Write` beyond their own workspace doc" in readme,
+    "expected the literal read-only prohibition naming Bash/Edit/Write and 'their own"
+    " workspace doc' in agents/README.md",
+)
+# RETARGETED, never deleted: an `Objective` column was inserted before
+# `Model`, which leaves the OLD substring assertion ("| Model | Effort |
+# Tools") vacuously true (it still occurs later in the same header row)
+# while its own LABEL and FAILURE MESSAGE go stale -- claiming a
+# "5-column matrix" / "Model + Effort + Tools + Role" shape that no longer
+# describes the real 6-column header. Retargeted to the literal six-column
+# header, with the old label/message replaced rather than kept
+# alongside a now-misleading pair.
+check(
+    "agents/README.md Roster has 6-column matrix (Agent, Objective, Model, Effort, Tools, Role)",
+    "| Agent | Objective | Model | Effort | Tools (allowlist) | Role |" in readme,
+    "expected the literal 6-column header"
+    " '| Agent | Objective | Model | Effort | Tools (allowlist) | Role |' in the Roster",
 )
 
 # ---------------------------------------------------------------------------
@@ -1764,9 +1798,21 @@ check(
 #     (introducing "Phase 1.7" without wiring it in is silent UX breakage)
 print("=== Suite 19: Agent identity & cross-reference consistency ===")
 
-# Agents that legitimately have no .md file because they're reference files
-# (loaded on-demand by the orchestrator, not standalone agents)
-REFERENCE_ONLY_AGENTS = {"ref-direct-modes", "ref-special-flows", "ref-intake-flows"}
+# Agents that legitimately have no dispatchable identity because they are
+# lazy-loaded reference files (consumed on-demand by leader/orchestrator, never
+# invocable subagents). Derived from the `ref-` filename prefix — the same
+# semantics `skills/lint/SKILL.md` already uses to exclude these files from its
+# own agent-facing checks (see `skills/lint/SKILL.md:125`, `:128`, `:209`,
+# `:290`) — rather than a hand-maintained enumerated set. A hardcoded set fails
+# CLOSED (a new ref-*.md file breaks the build until registered, which is
+# exactly the mechanism that surfaced this correction); the prefix derivation
+# fails OPEN instead (a future ref-*.md silently excludes itself from the
+# Roster bijection and the Suite 19 orphan-agent check). Suite 180's
+# dispatch-target assertion is the compensating control for that direction:
+# no `th:ref-*` name may ever appear as a dispatch target in agents/**/
+# skills/** — see "Suite 180" below and `agents/README.md § "Objective column
+# — authoring standard"` for the authoring-convention half of this pair.
+REFERENCE_ONLY_AGENTS = {p.stem for p in AGENTS_DIR.glob("ref-*.md")}
 
 # Pipeline + standalone + reference agents that legitimately exist
 ALL_AGENT_FILES = sorted(p.stem for p in AGENTS_DIR.glob("*.md") if p.stem != "README")
@@ -35009,15 +35055,21 @@ check(
     "tier doc-body wording",
 )
 check(
+    # RETARGETED, never deleted: orchestrator.md's centralized "Language
+    # propagation" dispatch clause was intentionally removed in favor of a
+    # per-artifact declaration inside each of the 14 specialist output
+    # contracts' own Return Protocol. The forward pointer this check
+    # verifies now resolves to that mechanism, not to the removed section.
     "suite155(task5-ac7-forward-pointer-to-orchestrator): docs/"
-    "conventions.md points forward to 'agents/orchestrator.md § "
-    "Communication Protocol → Language propagation' as the "
-    "operationalized dispatch instruction (Task-5's half of the "
-    "cross-reference; the reverse pointer FROM orchestrator.md is "
-    "Task-4/Round 2, deferred)",
-    "agents/orchestrator.md" in _s155_conventions and "Language propagation" in _s155_conventions,
-    "docs/conventions.md must forward-reference orchestrator.md's "
-    "Language propagation section",
+    "conventions.md points forward to each specialist's own Return "
+    "Protocol § Language clause as the operationalized mechanism, not to "
+    "the removed orchestrator.md dispatch instruction",
+    "Return Protocol § Language" in _s155_conventions
+    and "agents/orchestrator.md § Communication Protocol → Language propagation"
+    not in _s155_conventions,
+    "docs/conventions.md must forward-reference the per-artifact Return "
+    "Protocol § Language mechanism, and must not cite the removed "
+    "orchestrator.md section",
 )
 
 # Self-referential guard (hygiene contract) -- mirrors the Suite 152/153
@@ -35715,55 +35767,65 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Task-4 AC-7 -- orchestrator.md § Communication Protocol -> Language
-# propagation becomes tier-aware: an operator-facing-tier clause and an
-# agentic-tier clause, cross-referenced to docs/conventions.md and
-# docs/voice-guide.md.
+# RETARGETED, never deleted: these three checks used to assert a per-dispatch
+# tier-aware "Language propagation" clause inside orchestrator.md's
+# "### To specialists". That clause was intentionally removed once
+# per-artifact language declarations replaced it inside each of the 14
+# specialist output contracts' own "## Return Protocol § Language" clause,
+# and `agents/_shared/dispatch-contract.md` deliberately carries no language
+# mention at all. The retarget below asserts the NEW state instead of the
+# superseded one: the centralized clause is gone (not merely absent by
+# accident), docs/conventions.md's pointer resolves to a real target rather
+# than the removed section, and the two-tier rule's rationale text
+# (operator-facing vs. agentic) survives intact in its one remaining
+# canonical home.
 # ---------------------------------------------------------------------------
-_s156_lang_prop_slice = _s156_slice(
-    _s156_orchestrator, "**Language propagation (tier-aware)"
+_s156_to_specialists_slice = _s156_slice(
+    _s156_orchestrator, "### To specialists — always include in every invocation:"
 )
 check(
-    "suite156(task4-ac7-tier-aware-clauses): orchestrator.md's Language "
-    "propagation instruction carries both an operator-facing-tier clause "
-    "and an agentic-tier clause",
-    bool(_s156_lang_prop_slice)
-    and "**Operator-facing tier**" in _s156_lang_prop_slice
-    and "**Agentic tier**" in _s156_lang_prop_slice,
-    "orchestrator.md § Language propagation must declare both tiers "
-    "explicitly",
+    "suite156(task4-ac7-tier-aware-clauses): orchestrator.md's To-specialists "
+    "section carries no per-dispatch Language propagation clause -- language "
+    "declaration moved to each specialist's own output contract",
+    "Language propagation" not in _s156_to_specialists_slice
+    and "Operator-facing tier" not in _s156_to_specialists_slice
+    and "Agentic tier" not in _s156_to_specialists_slice,
+    "orchestrator.md § To specialists must carry zero language directives -- "
+    "the tier-aware clause was removed in favor of per-artifact declarations; "
+    "a re-introduced clause here would duplicate what each agent's own Return "
+    "Protocol already declares",
 )
 check(
-    "suite156(task4-ac7-canonical-cross-ref): orchestrator.md's Language "
-    "propagation instruction cross-references both "
-    "docs/conventions.md § Document classification and docs/voice-guide.md",
-    "docs/conventions.md § Document classification" in _s156_lang_prop_slice
-    and "docs/voice-guide.md" in _s156_lang_prop_slice,
-    "orchestrator.md § Language propagation must cross-reference both "
-    "canonical sites",
+    "suite156(task4-ac7-canonical-cross-ref): docs/conventions.md's Two-tier "
+    "language rule no longer cross-references the removed orchestrator.md "
+    "dispatch-instruction section, and points at the per-artifact mechanism "
+    "instead",
+    "agents/orchestrator.md § Communication Protocol → Language propagation"
+    not in _s156_conventions
+    and "Return Protocol § Language" in _s156_conventions,
+    "docs/conventions.md § Two-tier language rule must not cite the removed "
+    "orchestrator.md section, and must point readers at each agent's own "
+    "Return Protocol § Language clause instead",
 )
 
 # ---------------------------------------------------------------------------
-# Cross-task closure -- Task-5 AC-7's reverse cross-reference (previously
-# deferred by Suite 155 pending Task-4/Round 2) is now closable:
-# docs/conventions.md's forward pointer to orchestrator.md, PLUS
-# orchestrator.md's Language propagation section now actually referencing
-# back to docs/conventions.md, together close the multi-site invariant.
+# Multi-site invariant closure (retargeted) -- the reverse cross-reference is
+# now closed against the CURRENT mechanism: docs/conventions.md forward-
+# references the per-artifact Language clause (not a stale orchestrator.md
+# anchor), and at least one of the 14 output contracts' own "**Language.**"
+# clauses cross-references docs/conventions.md § Document classification
+# back -- the reverse half of the same invariant, on the new endpoints.
 # ---------------------------------------------------------------------------
 check(
-    "suite156(task5-ac7-closure): the Task-5 AC-7 multi-site invariant is "
-    "now fully closed -- docs/conventions.md forward-references "
-    "orchestrator.md's Language propagation section AND orchestrator.md's "
-    "Language propagation section now references back to "
-    "docs/conventions.md and docs/voice-guide.md",
-    "agents/orchestrator.md" in _s156_conventions
-    and "Language propagation" in _s156_conventions
-    and bool(_s156_lang_prop_slice)
-    and "docs/conventions.md" in _s156_lang_prop_slice
-    and "docs/voice-guide.md" in _s156_lang_prop_slice,
-    "the forward (conventions.md -> orchestrator.md) and reverse "
-    "(orchestrator.md -> conventions.md/voice-guide.md) pointers must both "
-    "be present to close Task-5 AC-7",
+    "suite156(task5-ac7-closure): the multi-site language-rule invariant is "
+    "closed on the current mechanism -- docs/conventions.md forward-"
+    "references the per-artifact Language clause AND at least one output "
+    "contract's own Language clause references back to docs/conventions.md",
+    "Return Protocol § Language" in _s156_conventions
+    and "docs/conventions.md § Document classification" in read(AGENTS_DIR / "architect.md"),
+    "the forward (conventions.md -> each agent's Return Protocol § Language) "
+    "and reverse (an agent's Language clause -> docs/conventions.md) pointers "
+    "must both be present to close this invariant on the current design",
 )
 
 # Self-referential guard (hygiene contract) -- mirrors the Suite 152/153/155
@@ -36760,12 +36822,21 @@ check(
     "...HEAD locally, not a pushed remote branch",
 )
 check(
-    "s163(t5-ac2b): leader.md fetches the remote default branch fresh "
-    "before pinning a new branch's base, so the pre-push review's base "
-    "reference is not a stale local ref",
-    "git fetch origin main" in _s163_leader and "origin/main" in _s163_leader,
-    "agents/leader.md must fetch origin main fresh before basing a new "
-    "branch, keeping the pre-push review's base reference current",
+    # RETARGETED, never deleted: the single-task start-gate and Multi-Task
+    # fan-out sections that carry this literal relocated, byte-preserved,
+    # from agents/leader.md to the new agents/ref-dispatch-machinery.md (a
+    # stub pointer remains in leader.md). This is an existence-style check,
+    # not an ownership check (the SPLIT_CORPUS rationale at the top of this
+    # file), so it now reads the concatenated split corpus instead of
+    # leader.md alone -- the fresh-fetch requirement is unchanged, only its
+    # file moved.
+    "s163(t5-ac2b): the split corpus fetches the remote default branch "
+    "fresh before pinning a new branch's base, so the pre-push review's "
+    "base reference is not a stale local ref",
+    "git fetch origin main" in SPLIT_CORPUS and "origin/main" in SPLIT_CORPUS,
+    "the split corpus (agents/leader.md + agents/ref-dispatch-machinery.md) "
+    "must fetch origin main fresh before basing a new branch, keeping the "
+    "pre-push review's base reference current",
 )
 
 # --- reasoning-checkpoint.md contrasts gate-guard against checkpoint-guard -
@@ -38385,7 +38456,7 @@ _S174_INCOMING_ANCHORS = (
     ("docs/observability.md", "agents/orchestrator.md", "Flow Telemetry Emission"),
     ("docs/knowledge.md", "agents/orchestrator.md", "Workspaces: what you own"),
     ("docs/knowledge.md", "agents/leader.md", "Multi-Task fan-out"),
-    ("docs/knowledge.md", "agents/leader.md", "Consolidated delivery"),
+    ("docs/knowledge.md", "agents/ref-dispatch-machinery.md", "Consolidated delivery"),
     ("agents/ref-direct-modes.md", "agents/orchestrator.md",
      "Phase 1.8 — Post-approval Plan-Review Offer"),
     ("agents/tester.md", "agents/orchestrator.md", "Express Lane Profile"),
@@ -39532,6 +39603,414 @@ check(
 )
 
 # Marker: gate-field-contract
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 180 — dispatch-standard-structural-guard: the canonical
+# agents/_shared/dispatch-contract.md standard, its single-pointer consumers,
+# the control rubric's shape, the gate-allowlist literal contract, the
+# reference-only agent-set definition (prefix-derived, with its compensating
+# dispatch-target control), and the Roster<->agent-file bijection.
+#
+# Marker: dispatch-standard-structural-guard
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 180: dispatch-standard-structural-guard ===")
+
+_s180_dispatch_contract = read(AGENTS_DIR / "_shared" / "dispatch-contract.md")
+_s180_leader = read(AGENTS_DIR / "leader.md")
+_s180_orchestrator = read(AGENTS_DIR / "orchestrator.md")
+_s180_readme = read(AGENTS_DIR / "README.md")
+_s180_agent_builder = read(AGENTS_DIR / "agent-builder.md")
+_s180_gate_contract = read(AGENTS_DIR / "_shared" / "gate-contract.md")
+_s180_subagent_start_ts = read(REPO_ROOT / "hooks" / "ts" / "bodies" / "subagent-start.ts")
+_s180_patch_mode = read(REPO_ROOT / "docs" / "patch-mode.md")
+_s180_plan_reviewer = read(AGENTS_DIR / "plan-reviewer.md")
+_s180_qa_plan = read(AGENTS_DIR / "qa-plan.md")
+_s180_security = read(AGENTS_DIR / "security.md")
+_s180_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s180_claude = read(REPO_ROOT / "CLAUDE.md")
+
+# Each of the four named consumers references the canonical standard by a
+# single pointer -- zero canonical prose duplicated (the duplication half is
+# already covered structurally by Suite 174's no-relocation check over
+# agents/_shared/*.md, since dispatch-contract.md is itself in that corpus).
+for _s180_file, _s180_text in (
+    ("agents/leader.md", _s180_leader),
+    ("agents/orchestrator.md", _s180_orchestrator),
+    ("agents/README.md", _s180_readme),
+    ("agents/agent-builder.md", _s180_agent_builder),
+):
+    check(
+        f"suite180(ac3-pointer): {_s180_file} references agents/_shared/dispatch-contract.md",
+        "dispatch-contract.md" in _s180_text,
+        f"{_s180_file} must carry a pointer to the canonical dispatch-contract.md standard",
+    )
+
+# Control rubric's shape -- exactly the five named columns, no empty data
+# cell, no bare-dash n/a ------------------------------------------------------
+_S180_RUBRIC_HEADER = "| Control | Enforcer | Failure direction | Invoker | Read at |"
+check(
+    "suite180(ac3-rubric-header): dispatch-contract.md's Control rubric carries exactly the"
+    " five named columns",
+    _S180_RUBRIC_HEADER in _s180_dispatch_contract,
+    f"expected literal header {_S180_RUBRIC_HEADER!r} in agents/_shared/dispatch-contract.md",
+)
+_s180_rubric_slice = _slice_section(_s180_dispatch_contract, "## Control rubric", ("\n## ",))
+_s180_rubric_rows = [
+    _l
+    for _l in _s180_rubric_slice.splitlines()
+    if _l.startswith("|") and "---" not in _l and "| Control " not in _l
+]
+_s180_bad_rubric_rows = []
+for _s180_row in _s180_rubric_rows:
+    _s180_cells = [_c.strip() for _c in _s180_row.strip("|").split("|")]
+    if len(_s180_cells) != 5 or any(_c == "" or _c == "-" for _c in _s180_cells):
+        _s180_bad_rubric_rows.append(_s180_row)
+check(
+    "suite180(ac3-rubric-no-empty-cell): every rubric data row has exactly five non-empty"
+    " cells, with any n/a written as 'n/a — {why}' rather than a bare dash",
+    bool(_s180_rubric_rows) and not _s180_bad_rubric_rows,
+    f"malformed rubric row(s): {_s180_bad_rubric_rows}",
+)
+
+# Language declared in the 14 output contracts --------------------------------
+_S180_LANGUAGE_AGENTS = (
+    "adversary", "architect", "delivery", "diagrammer", "gcp-cost-analyzer",
+    "gcp-infra", "implementer", "plan-reviewer", "qa", "qa-plan", "reviewer",
+    "security", "tester", "ux-reviewer",
+)
+_s180_missing_language = [
+    _a for _a in _S180_LANGUAGE_AGENTS if "**Language.**" not in read(AGENTS_DIR / f"{_a}.md")
+]
+check(
+    "suite180(ac3-language-14): all 14 output contracts declare their own artifact's"
+    " language via a '**Language.**' clause",
+    len(_S180_LANGUAGE_AGENTS) == 14 and not _s180_missing_language,
+    f"expected 14 agents declaring '**Language.**', missing in: {_s180_missing_language}",
+)
+
+# Two-halves rule, single formulation, write-half by pointer only ------------
+check(
+    "suite180(ac3-two-halves-single): the two-halves rule's exact formulation exists"
+    " ONLY in dispatch-contract.md, never restated elsewhere",
+    "The dispatcher never bounds review scope. The contract always bounds write scope."
+    in _s180_dispatch_contract,
+    "agents/_shared/dispatch-contract.md must state the two-halves rule in this exact form",
+)
+_s180_two_halves_elsewhere = [
+    _f
+    for _f in AGENTS_DIR.glob("*.md")
+    if _f.name != "README.md"
+    and _f.resolve() != (AGENTS_DIR / "_shared" / "dispatch-contract.md").resolve()
+    and "The dispatcher never bounds review scope. The contract always bounds write scope."
+    in read(_f)
+]
+check(
+    "suite180(ac3-two-halves-no-restatement): no other agents/*.md file restates the"
+    " two-halves rule's exact formulation",
+    not _s180_two_halves_elsewhere,
+    f"unexpected restatement in: {[str(p) for p in _s180_two_halves_elsewhere]}",
+)
+check(
+    "suite180(ac3-write-half-pointer): dispatch-contract.md's write-half references"
+    " plan-consolidation.md by pointer, without restating its prose",
+    "agents/_shared/plan-consolidation.md" in _s180_dispatch_contract
+    and "Write-scope on" in _s180_dispatch_contract,
+    "dispatch-contract.md's write half must point at plan-consolidation.md's"
+    " Write-scope section rather than restate it",
+)
+
+# Absence of the review-scope-bounding instruction at its five named sites,
+# using the ORIGINAL literal phrasing this removal invalidated (not the
+# substring 'review ONLY', which false-positives on unrelated phrases like
+# 'SEC-002 design-review ONLY') ------------------------------------------
+_S180_BOUNDING_LITERALS = ("review ONLY the", "frozen/trusted", "never re-reviewed")
+for _s180_site_name, _s180_site_text in (
+    ("docs/patch-mode.md", _s180_patch_mode),
+    ("agents/orchestrator.md", _s180_orchestrator),
+    ("agents/plan-reviewer.md", _s180_plan_reviewer),
+    ("agents/qa-plan.md", _s180_qa_plan),
+    ("agents/security.md", _s180_security),
+):
+    _s180_found = [_lit for _lit in _S180_BOUNDING_LITERALS if _lit in _s180_site_text]
+    check(
+        f"suite180(ac3-bounding-absent): {_s180_site_name} carries none of the removed"
+        " review-scope-bounding literals",
+        not _s180_found,
+        f"{_s180_site_name} still contains: {_s180_found}",
+    )
+check(
+    "suite180(ac3-correction-classification-heading): the Correction-classification"
+    " heading resolves intact for its citers",
+    "### Correction-classification — selective panel re-firing" in _s180_orchestrator,
+    "agents/orchestrator.md must keep the heading"
+    " '### Correction-classification — selective panel re-firing' intact",
+)
+
+# No threshold constant or prompt-content derivation over payload_bytes in
+# the hook body ----------------------------------------------------------------
+check(
+    "suite180(ac3-payload-bytes-no-threshold): subagent-start.ts carries no threshold"
+    " constant gating on payload_bytes",
+    not re.search(r"(MAX_PAYLOAD|PAYLOAD_(LIMIT|THRESHOLD|CEILING))", _s180_subagent_start_ts),
+    "hooks/ts/bodies/subagent-start.ts must not introduce a payload_bytes threshold constant",
+)
+
+# The Free-text field bound named exception's own limits, present at BOTH
+# sites, additive to (never in place of) the general clause ------------------
+_S180_FREETEXT_LIMITS = (
+    "≤280 chars",
+    "ESCAPED as JSON string escapes, never stripped",
+    "escaped at the byte level",
+    "…[truncated]",
+    "secret prohibition",
+)
+for _s180_ft_file, _s180_ft_text in (
+    ("agents/orchestrator.md", _s180_orchestrator),
+    ("docs/observability.md", read(REPO_ROOT / "docs" / "observability.md")),
+):
+    _s180_ft_missing = [_l for _l in _S180_FREETEXT_LIMITS if _l not in _s180_ft_text]
+    check(
+        f"suite180(ac3-freetext-exception-limits): {_s180_ft_file} carries all five"
+        " Free-text field bound exception limits",
+        not _s180_ft_missing,
+        f"{_s180_ft_file} missing exception limit(s): {_s180_ft_missing}",
+    )
+check(
+    "suite180(ac3-freetext-general-clause-preserved): the general ≤120-char/no-narrative"
+    " clause is byte-preserved (Suite 156's own literals, unretargeted)",
+    "≤120 chars" in _s180_orchestrator and "never multi-sentence narrative prose" in _s180_orchestrator,
+    "agents/orchestrator.md must keep the general Free-text field bound clause intact",
+)
+
+# Every gate allowlist value appears literal in both gate-contract.md and
+# the orchestrator.md interpreter, plus the ship-retention precondition and
+# the override disposition obligation ------------------------------------------
+_S180_ALLOWLIST_VALUES = (
+    "approve", "approve autonomous", "reject {reason}", "edit",
+    "next", "next autonomous", "stop", "redo Task-{i}",
+    "ship", "amend", "abort", "override {reason}",
+)
+for _s180_site_name, _s180_site_text in (
+    ("agents/_shared/gate-contract.md", _s180_gate_contract),
+    ("agents/orchestrator.md", _s180_orchestrator),
+):
+    _s180_missing_allow = [_v for _v in _S180_ALLOWLIST_VALUES if _v not in _s180_site_text]
+    check(
+        f"suite180(ac4-allowlist-literal): {_s180_site_name} carries every gate allowlist"
+        " value literal",
+        not _s180_missing_allow,
+        f"{_s180_site_name} missing allowlist value(s): {_s180_missing_allow}",
+    )
+check(
+    "suite180(ac4-ship-retention-precondition): the ship-retention precondition"
+    " (criticals_count >= 1) appears literal in the orchestrator.md interpreter",
+    "criticals_count ≥ 1" in _s180_orchestrator or "criticals_count >= 1" in _s180_orchestrator,
+    "agents/orchestrator.md must state the criticals_count >= 1 precondition literal",
+)
+check(
+    "suite180(ac4-override-disposition-obligation): the disposition-entry obligation on"
+    " 'override' appears literal in the orchestrator.md interpreter",
+    "disposition" in _s180_orchestrator and "override {reason}" in _s180_orchestrator,
+    "agents/orchestrator.md must obligate a disposition entry on an override {reason} reply",
+)
+
+# No-relocation check green for the three relocated manifest entries, and
+# suborch-mirror-invariant's sha256 unchanged despite an out-of-literal edit
+# elsewhere in docs/subagent-orchestration.md (both already independently
+# asserted per-entry by Suite 174 -- restated here explicitly, not a
+# duplicate mechanism) ----------------------------------------------------------
+_s180_manifest = json.loads(_S174_MANIFEST_PATH.read_text(encoding="utf-8"))
+_s180_relocated_ids = {
+    "leader-spawning-payload-contract", "leader-multitask-fanout",
+    "leader-parallel-multiproject",
+}
+_s180_relocated_entries = [e for e in _s180_manifest if e["id"] in _s180_relocated_ids]
+check(
+    "suite180(ac5-relocated-entries-present): the three relocated manifest entries all"
+    " point at agents/ref-dispatch-machinery.md",
+    len(_s180_relocated_entries) == 3
+    and all(e["file"] == "agents/ref-dispatch-machinery.md" for e in _s180_relocated_entries),
+    f"expected 3 entries retargeted to agents/ref-dispatch-machinery.md, found:"
+    f" {[(e['id'], e['file']) for e in _s180_relocated_entries]}",
+)
+_s180_suborch_entry = next(
+    (e for e in _s180_manifest if e["id"] == "suborch-mirror-invariant"), None
+)
+check(
+    "suite180(ac5-suborch-mirror-sha-unchanged): suborch-mirror-invariant keeps its"
+    " recorded sha256 even though docs/subagent-orchestration.md was edited outside"
+    " that literal",
+    _s180_suborch_entry is not None
+    and _s174_slice(_s180_suborch_entry) != ""
+    and hashlib.sha256(_s174_slice(_s180_suborch_entry).encode("utf-8")).hexdigest()
+    == _s180_suborch_entry["sha256"],
+    "docs/subagent-orchestration.md's 'suborch-mirror-invariant' literal must remain"
+    " byte-identical to its manifest snapshot",
+)
+
+# docs/testing.md registers Suite 180 with scope + declared limits (self-ref
+# deliberately NOT included -- registering a suite in the canonical registry
+# is a documentation edit alongside test authoring, mirroring the Suite
+# 155/156 rationale) ------------------------------------------------------------
+check(
+    "suite180(ac6-registry): docs/testing.md registers 'Suite 180' and"
+    " 'dispatch-standard-structural-guard'",
+    "Suite 180" in _s180_testing_md and "dispatch-standard-structural-guard" in _s180_testing_md,
+    "docs/testing.md must register Suite 180 and the 'dispatch-standard-structural-guard' marker",
+)
+
+# Sole writer of the checkpoint.confirmed event is named in exactly one
+# agent contract, and no other contract instructs writing or repairing it ----
+check(
+    "suite180(ac7-sole-writer-declared): agents/leader.md declares itself the sole writer"
+    " of the checkpoint.confirmed event",
+    "You are the sole writer of this event; the orchestrator reads and verifies it, "
+    "never writes or repairs it." in _s180_leader,
+    "agents/leader.md must declare itself the sole writer of checkpoint.confirmed,"
+    " read-and-verify-only for the orchestrator",
+)
+_s180_other_agent_files = [
+    p for p in AGENTS_DIR.glob("*.md") if p.stem not in ("leader", "README")
+]
+_s180_writer_leak = [
+    str(p)
+    for p in _s180_other_agent_files
+    if re.search(r"append\s+(?:an?|one)?\s*`?checkpoint\.confirmed", read(p), re.IGNORECASE)
+]
+check(
+    "suite180(ac7-no-other-writer): no agent contract other than leader.md instructs"
+    " appending/writing the checkpoint.confirmed event",
+    not _s180_writer_leak,
+    f"unexpected write instruction for checkpoint.confirmed in: {_s180_writer_leak}",
+)
+
+# REFERENCE_ONLY_AGENTS derives from the ref- prefix, a single definition
+# (already wired at module scope, restated here as an explicit check) --------
+check(
+    "suite180(ac8a-prefix-derived): REFERENCE_ONLY_AGENTS is derived from the 'ref-'"
+    " filename prefix, not a hardcoded enumerated set",
+    REFERENCE_ONLY_AGENTS == {p.stem for p in AGENTS_DIR.glob("ref-*.md")}
+    and len(REFERENCE_ONLY_AGENTS) == 4,
+    f"expected 4 prefix-derived reference-only agents, found: {sorted(REFERENCE_ONLY_AGENTS)}",
+)
+
+# No 'th:ref-*' name appears as a dispatch target anywhere in agents/** or
+# skills/** -- the compensating control for the prefix's fail-open direction -
+_s180_dispatch_target_re = re.compile(r"th:ref-[a-z-]+")
+_s180_dispatch_target_hits = []
+for _s180_dir in (AGENTS_DIR, SKILLS_DIR):
+    for _s180_path in _s180_dir.rglob("*.md"):
+        _s180_matches = _s180_dispatch_target_re.findall(read(_s180_path))
+        if _s180_matches:
+            _s180_dispatch_target_hits.append((str(_s180_path), _s180_matches))
+check(
+    "suite180(ac8b-no-ref-dispatch-target): no 'th:ref-*' name appears as a dispatch"
+    " target anywhere in agents/** or skills/**",
+    not _s180_dispatch_target_hits,
+    f"unexpected th:ref-* dispatch target(s): {_s180_dispatch_target_hits}",
+)
+
+# Suite 19 checks 1-3 resolve over exactly four ref-*.md files ---------------
+check(
+    "suite180(ac8c-four-ref-files): exactly four agents/ref-*.md reference files exist,"
+    " all covered by Suite 19 checks 1-3 (frontmatter + orphan-agent exclusion)",
+    len(list(AGENTS_DIR.glob("ref-*.md"))) == 4,
+    f"expected 4 agents/ref-*.md files, found {len(list(AGENTS_DIR.glob('ref-*.md')))}",
+)
+
+# Roster<->agent-file bijection -- one row per agents/*.md file excluding
+# README.md and every ref-*.md, no extra row, no empty Objective cell --------
+_s180_roster_lines = _s180_readme.splitlines()
+_s180_roster_start = next(
+    (i for i, l in enumerate(_s180_roster_lines) if l.startswith("## Roster")), None
+)
+_s180_roster_end = next(
+    (
+        i
+        for i, l in enumerate(_s180_roster_lines)
+        if l.startswith("### Objective column")
+    ),
+    None,
+)
+_s180_roster_rows = (
+    [
+        l
+        for l in _s180_roster_lines[_s180_roster_start:_s180_roster_end]
+        if l.startswith("| `")
+    ]
+    if _s180_roster_start is not None and _s180_roster_end is not None
+    else []
+)
+_s180_roster_names = set()
+_s180_roster_empty_objective = []
+for _s180_row in _s180_roster_rows:
+    _s180_row_cells = [_c.strip() for _c in _s180_row.strip("|").split("|")]
+    _s180_name_match = re.match(r"`([a-z0-9-]+)`", _s180_row_cells[0]) if _s180_row_cells else None
+    if _s180_name_match:
+        _s180_roster_names.add(_s180_name_match.group(1))
+    if len(_s180_row_cells) < 2 or not _s180_row_cells[1].strip():
+        _s180_roster_empty_objective.append(_s180_row)
+_s180_expected_agent_names = {
+    p.stem for p in AGENTS_DIR.glob("*.md") if p.stem != "README" and p.stem not in REFERENCE_ONLY_AGENTS
+}
+check(
+    "suite180(ac8d-bijection): the Roster has exactly one row per agents/*.md file"
+    " (excluding README.md and every ref-*.md), no row without a file, no file"
+    " without a row",
+    _s180_roster_names == _s180_expected_agent_names,
+    f"Roster/file mismatch -- rows-not-files: {_s180_roster_names - _s180_expected_agent_names},"
+    f" files-not-rows: {_s180_expected_agent_names - _s180_roster_names}",
+)
+check(
+    "suite180(ac8d-no-empty-objective): no Roster row has an empty Objective cell",
+    not _s180_roster_empty_objective,
+    f"row(s) with empty Objective cell: {_s180_roster_empty_objective}",
+)
+
+# The :187-191 check extended to assert the literal read-only prohibition,
+# not just the two substrings 'tools'/'allowlist' -----------------------------
+check(
+    "suite180(ac8e-readonly-prohibition-literal): agents/README.md asserts the literal"
+    " read-only prohibition (no Bash/Edit/Write beyond the agent's own workspace doc)",
+    "MUST NOT include `Bash`, `Edit`, or `Write` beyond their own workspace doc"
+    in _s180_readme,
+    "agents/README.md must state the read-only prohibition literal, not just mention"
+    " 'tools'/'allowlist' generically",
+)
+
+# docs/testing.md declares the mechanism's own two named limits --------------
+_S180_DECLARED_LIMITS = (
+    "the bijection and the non-empty cell are mechanical",
+    "th:ref-*",
+)
+check(
+    "suite180(ac8-declared-limits): docs/testing.md's Suite 180 registration declares"
+    " the mechanism's own limits (bijection/non-empty-cell is mechanical, not a"
+    " correctness/uniqueness judgment; the dispatch-target check covers only the"
+    " th:ref-* invocation name)",
+    all(_l in _s180_testing_md for _l in _S180_DECLARED_LIMITS),
+    f"docs/testing.md must declare Suite 180's own limits: {_S180_DECLARED_LIMITS}",
+)
+
+# --- Self-referential guard (hygiene contract) -- mirrors the Suite 178/179
+# pattern -----------------------------------------------------------------
+_s180_own = read(Path(__file__))
+check(
+    "suite180(self-ref): test file contains 'Suite 180' and"
+    " 'dispatch-standard-structural-guard'",
+    "Suite 180" in _s180_own and "dispatch-standard-structural-guard" in _s180_own,
+    "test file must self-reference Suite 180 and the marker"
+    " 'dispatch-standard-structural-guard'",
+)
+check(
+    "suite180(hygiene): CLAUDE.md does NOT contain 'Suite 180' (§11 hygiene contract)",
+    "Suite 180" not in _s180_claude,
+    "CLAUDE.md must not mention Suite 180 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: dispatch-standard-structural-guard
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------

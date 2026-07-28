@@ -285,7 +285,7 @@ Full contract: [`agents/ref-special-flows.md`](../agents/ref-special-flows.md) �
 - `--serial` overrides the fan-out and forces sequential project execution.
 - Per-project STAGE-GATE-1/2/3 fire inside each project lane; the initiative level does not add additional gates.
 
-Full contract: [`agents/leader.md`](../agents/leader.md) § Parallel Multi-Project Dispatch.
+Full contract: [`agents/ref-dispatch-machinery.md`](../agents/ref-dispatch-machinery.md) § Parallel Multi-Project Dispatch.
 
 ---
 

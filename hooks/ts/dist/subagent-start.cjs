@@ -175,6 +175,13 @@ function extractProjectKey(prompt) {
   const candidate = match[1] ?? "";
   return PROJECT_KEY_RE.test(candidate) ? candidate : null;
 }
+function computePayloadBytes(prompt) {
+  try {
+    return typeof Buffer !== "undefined" ? Buffer.byteLength(prompt, "utf8") : new TextEncoder().encode(prompt).byteLength;
+  } catch {
+    return null;
+  }
+}
 var TRACE_FILENAME = "00-subagent-trace.jsonl";
 function isTHAgent(subagentType) {
   return subagentType.startsWith("th:");
@@ -197,6 +204,10 @@ function writeStart(input, writer) {
   const projectKey = extractProjectKey(prompt);
   if (projectKey !== null) {
     record["project"] = projectKey;
+  }
+  const payloadBytes = computePayloadBytes(prompt);
+  if (payloadBytes !== null) {
+    record["payload_bytes"] = payloadBytes;
   }
   const jsonLine = JSON.stringify(record);
   return writer.appendLine(workspace, TRACE_FILENAME + "\0" + jsonLine);

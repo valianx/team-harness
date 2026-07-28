@@ -102,6 +102,28 @@ carve-out" below for the sole exemption from the observability floor itself).
 Canonical source: `agents/orchestrator.md § "Free-text field bound"`; the two
 sites must not diverge.
 
+**Named exception — the `checkpoint.confirmed` confirmatory-text field, additive only.**
+The general clause above governs every OTHER free-text field unchanged. The field
+carrying the operator's own words in the `checkpoint.confirmed` event (the
+functional-clarity confirmation, `agents/orchestrator.md § "Gate handling § Checkpoint-trust-transfer"`)
+is a single named exception, additive to — never a replacement of — the general clause:
+≤280 chars (one confirmatory turn, not the surrounding conversation); quotes and
+`\n\r\t` are ESCAPED as JSON string escapes, never stripped, so the operator's exact
+characters survive; every backtick character is escaped at the byte level with its
+JSON unicode escape (code point U+0060) rather than left literal — this protects the
+` ```jsonl ` fence Obsidian mode wraps the trace in (§ "Dual-format lifecycle"), which
+the quote/whitespace escape alone does not — and is never neutralized or substituted,
+since altering the recorded characters inside the bound is exactly the stripping
+behaviour this exception exists to avoid; truncation beyond the 280-char bound is
+marked visibly with `…[truncated]`; the secret prohibition (§ "Secret prohibition") is
+unaffected — a confirmation carrying a credential records `provenance` and
+`withheld — secret prohibition` in place of the text. `provenance` itself is a closed
+enum, not free text, and is never subject to this bound. Without this reconciliation
+written at both sites — here and `agents/orchestrator.md § "Free-text field bound"`,
+which must not diverge — the field is not added. This exception is scoped to exactly
+this one field: the general `≤120 chars`/`never multi-sentence narrative prose` clause
+above is byte-preserved for every other free-text field.
+
 ## Placement in 00-execution-events
 
 `operation.*` events are written as additional JSONL lines within the existing
@@ -206,13 +228,25 @@ derivable from a single file.
 
 Line schema:
 ```json
-{"ts":"<ISO>","event":"subagent.start","agent_type":"th:<agent>","project":"<optional — bounded [a-z0-9-]{1,60}>"}
+{"ts":"<ISO>","event":"subagent.start","agent_type":"th:<agent>","project":"<optional — bounded [a-z0-9-]{1,60}>","payload_bytes":"<optional — byte length of the dispatch prompt>"}
 ```
 
 `agent_id` is intentionally absent — at PreToolUse time the runtime has not
 yet assigned one (it only becomes observable on the corresponding
 `SubagentStop` payload). Readers pair a `subagent.start` line with the next
 `subagent.stop` line carrying the same `agent_type` in file order.
+
+**`payload_bytes` (visibility, no ceiling).** The byte length of the dispatch
+prompt, measured with the same UTF-8 byte-counting the shim already uses for
+its own pre-parse size guard. No constant, comparison, or branch anywhere in
+`hooks/ts/bodies/subagent-start.ts` reads this value — it is purely
+observational, never a rejection or a warning threshold. A measurement error
+omits the field alone (fail-open, same posture as the rest of this hook);
+the record's other fields still land. Coverage: measured only on the Claude
+Code plugin path — there is no `subagent-start.opencode.ts` entry, so an
+opencode dispatch never gets this field. No content beyond the byte count —
+not the whole prompt, not a truncated excerpt, not any other derived value —
+ever enters the record.
 
 **`project` key (lane-scoped dispatch, bounded).** When the dispatching
 agent's prompt carries a `TH-LANE: {project-key}` line, this hook stamps a
@@ -349,11 +383,11 @@ by the delivery agent at Step 11.7.
 - Obsidian: `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/overview.md`
 - Local: `{common-parent-of-sibling-repos}/{YYYY-MM-DD}_{initiative}/overview.md`
 
-Full template and section-ownership map: `agents/leader.md § overview.md Template`.
+Full template and section-ownership map: `agents/ref-dispatch-machinery.md § overview.md Template`.
 
 ## Initiative-level fan-out trace (parallel multi-project dispatch)
 
-When the leader fans out 2+ projects concurrently (see `agents/leader.md § Parallel Multi-Project Dispatch`), an **initiative-level** `00-execution-events` file is written in addition to each project's per-project trace. This file is separate from `overview.md` (which is NOT an events file) and from the per-project `00-execution-events.*` (which remain per-project, unchanged).
+When the leader fans out 2+ projects concurrently (see `agents/ref-dispatch-machinery.md § Parallel Multi-Project Dispatch`), an **initiative-level** `00-execution-events` file is written in addition to each project's per-project trace. This file is separate from `overview.md` (which is NOT an events file) and from the per-project `00-execution-events.*` (which remain per-project, unchanged).
 
 **Location:**
 - Obsidian: `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/00-execution-events.md`
@@ -421,6 +455,9 @@ The following event types appear in `00-execution-events` in addition to the cor
 | `artifact.missing` | When an expected agent output file is absent after dispatch | `expected_file`, `agent`, `action` (`retry`/`escalate`) |
 | `stage2.hygiene` | When the Phase 2.6 code-hygiene scan completes (deterministic, orchestrator-run — see `docs/code-hygiene-gate.md § Layer 1`) | `verdict` (`pass`/`fail`), `extra.files` (int, on `fail`), `extra.count` (int, on `fail`) |
 | `plan_structure` | When the Phase 1.5a deterministic plan-structure scan completes, before any `qa-plan` dispatch (deterministic, orchestrator-run — see `docs/plan-structure-gate.md § 2`) | `verdict` (`pass`/`fail`), `extra.check`/`extra.detail` (on `fail`, the specific mechanical failure) |
+| `checkpoint.confirmed` | When `th:leader` obtains — or fails to obtain — the operator's live confirmation of the functional-clarity artifact at Discover Boundary B1, before spawning `th:orchestrator` (`docs/reasoning-checkpoint.md § "Attribution and failure direction"`) | `provenance` (`operator-live`/`leader-inferred`), the confirmatory text (named exception to the Free-text field bound, see below) |
+
+Note: `checkpoint.confirmed` is written exclusively by `th:leader`, on the same file it already initializes at Phase 0a (`agents/leader.md § Phase 0a`) — `th:orchestrator` reads and verifies the event but never writes or repairs it.
 
 Note: `gate` (human checkpoint) is distinct from `gate.pass` / `gate.fail` (automated agent-to-agent gates). The latter fire when the orchestrator evaluates a plan-review or acceptance-gate result without pausing for human input; the former fires when execution is suspended pending operator approval.
 

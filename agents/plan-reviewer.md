@@ -136,7 +136,7 @@ Run the rules in order. Each rule produces 0..N findings. The total set of findi
 
 ### Rule 1 — Delivery Grouping: default `all-tasks-one-pr` unless temporal-prod reason
 
-**Relationship to batch consolidation.** Delivery Grouping is the SPLIT-DIRECTION rule — it prevents a single logical change from being split into multiple PRs without a valid temporal-prod reason. It is COMPLEMENTARY to the leader's batch-consolidation default, not in tension with it. A same-repo batch of independent tasks consolidating into ONE PR (the `agents/leader.md § Multi-Task fan-out — Consolidation default`) is NOT a Rule 1 split — those tasks belong to different independent work items, not to one logical change being artificially divided. Rule 1 applies when a SINGLE plan or service's tasks are declared to ship as more than one PR.
+**Relationship to batch consolidation.** Delivery Grouping is the SPLIT-DIRECTION rule — it prevents a single logical change from being split into multiple PRs without a valid temporal-prod reason. It is COMPLEMENTARY to the leader's batch-consolidation default, not in tension with it. A same-repo batch of independent tasks consolidating into ONE PR (the `agents/ref-dispatch-machinery.md § Multi-Task fan-out — Consolidation default`) is NOT a Rule 1 split — those tasks belong to different independent work items, not to one logical change being artificially divided. Rule 1 applies when a SINGLE plan or service's tasks are declared to ship as more than one PR.
 
 **What to check:**
 
@@ -809,13 +809,15 @@ A label that is expected but absent means the panel is incomplete. The combined 
 ### Delta-scoped review — the `Correction scope:` field
 
 When the orchestrator re-fires you as part of a routed correction (buckets 1-3 of the correction
-classifier), your dispatch carries a `**Correction scope:** localized {AC-IDs, section-names} |
-structural` field. For a `localized` scope, review ONLY the named changed AC/section + its blast
-radius — treat every other, already-passed AC/section as **frozen/trusted**: do not re-read it, do
-not re-run any rule against it, do not re-list it as a fresh finding. A `structural` scope re-reviews
-the whole plan exactly as a first-round dispatch does. You still read `01-plan.md` and the
-correction text at dispatch start — the saving is fewer generation tokens and fewer re-read
-sections, never zero-read (`docs/patch-mode.md § Stateless-Dispatch Honesty`).
+classifier), your dispatch carries a `**Correction scope:** {AC-IDs, section-names}` field naming
+what changed — a coordinate, not a review bound. Per `agents/_shared/dispatch-contract.md § "The
+two-halves rule"`, the orchestrator never bounds your review scope: you compute your own review
+scope from the coordinate, and you review the whole plan whenever your own judgment of the
+correction calls for it — no dispatch instruction excludes any AC/section from your own scope
+computation. You still read `01-plan.md` and the correction text at dispatch start — the saving is fewer
+generation tokens, never zero-read (`docs/patch-mode.md § Stateless-Dispatch Honesty`). What makes
+a full-scope re-review affordable is the prompt-caching stable-prefix discipline, not a narrowed
+read.
 
 ### Carried-forward sub-verdicts
 
@@ -893,5 +895,7 @@ issues: {list of failing rule labels with the failing task or file, or "none"}
 ```
 
 The `verdict` field is what the orchestrator uses to gate STAGE-GATE-1. `status: success` means "the audit ran successfully", not "everything passes" — pay attention to `verdict` separately.
+
+**Language.** `reviews/01-plan-review.md` § Plan Review is an agentic-tier document (`docs/conventions.md § Document classification`): written in English throughout, no operator-language exception.
 
 Do NOT repeat the full workspaces content in your final message — it's already written to the file.

@@ -38,7 +38,7 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 - `xhigh` — used sparingly when a task sits between `high` and `max`.
 - `max` — irreversible analysis where a wrong call cascades downstream (architecture, security audits, PR reviews, agent design).
 
-The canonical `model` + `effort` matrix for the repo lives in `agents/README.md` and is enforced by `/th:lint`. When you create or modify an agent, update both files together — drift fails the check.
+The canonical `model` + `effort` matrix for the repo lives in `agents/README.md` and is enforced by `/th:lint`. When you create or modify an agent, update both files together — drift fails the check. Creating a new agent also earns it a new Roster row in `agents/README.md`, including an `Objective` cell that follows the form and counting rule at `agents/README.md § "Objective column — authoring standard"` — never duplicate that prose here, only apply it.
 
 ---
 
@@ -219,6 +219,8 @@ Every new worker agent MUST have these sections (checked by `/th:lint`):
 - [ ] `## Session Documentation`
 - [ ] `## Execution Log Protocol`
 - [ ] `## Return Protocol`
+- [ ] `description` frontmatter and Roster `Objective` cell both satisfy the objective-form and counting rules at `agents/README.md § "Objective column — authoring standard"` — read and apply that section; its prose is not restated here.
+- [ ] If the new agent dispatches other agents (a coordination-style worker, not a leaf specialist), its dispatch prompts follow `agents/_shared/dispatch-contract.md` — what a dispatch prompt may and must not carry, and the two-halves scope rule (review scope never bounded by the dispatcher; write scope always bounded by the recipient's own contract). Read and apply that file; do not re-derive or paraphrase its rule set here.
 
 Coordination agents (`leader`, `orchestrator`) are exempt from this check.
 

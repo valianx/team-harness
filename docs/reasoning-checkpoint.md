@@ -44,7 +44,9 @@ Add to `## Current State`:
 - functional_clarity_artifact: {<short functional statement> | null}
   # the confirmed functional statement; null until the operator confirms it
 - functional_clarity_confirmed: {true | false}
-  # true when the operator confirmed the functional clarity artifact
+  # DERIVED CACHE — the `checkpoint.confirmed` event in {events_file} is the sole
+  # authority (see "Attribution and failure direction" below); this field mirrors
+  # its `provenance` for convenience and is never consulted in place of the event
 ```
 
 These four fields coexist with the existing `discover_state`, `advance_signal`, and `survey_*` fields — they are complementary, not replacements. `checkpoint_advance_fresh` is the deterministic predicate the guard reads; `advance_signal` continues to record the specific form.
@@ -130,6 +132,12 @@ The Layer-1 sections above describe the pre-split monolithic orchestrator arming
 - **B3 (post-verify → next).** Inside the orchestrator the post-verify transition is governed by the hard **STAGE-GATE-2** (a mandatory human gate), which subsumes B3; the orchestrator arms no separate `postverify-next` boundary.
 
 The intra-privilege trust model still holds: the agent that writes the clarity fields (the orchestrator) is the same agent that dispatches the `architect`; a spurious value skips a functional-clarity pause, never a security control.
+
+### Attribution and failure direction (B1)
+
+The B1 clarity artifact is not self-attesting. `th:leader` appends a `checkpoint.confirmed` event to `{events_file}` (Phase 0a) carrying the operator's own confirmatory words — within the named exception to the Free-text field bound (`docs/observability.md § Free-text field bound`) — and a `provenance` field: `operator-live` (a fresh reply from the operator in this same conversation) or `leader-inferred` (the confirmation was derived from a skip marker or a routed-back re-ask that returned without a live reply). The event, not `functional_clarity_confirmed`/`functional_clarity_artifact` above, is the sole authority at every arrival, including a `/th:recover` re-entry — those two fields are a derived cache for quick reference and are never consulted in place of the event.
+
+**Failure direction.** Absent attribution — no `checkpoint.confirmed` event, or one carrying `leader-inferred` — is not silently treated as clarity-confirmed. The disposition is one routed-back ask, never a loop: `th:orchestrator` routes back to `th:leader` once, requesting an explicit operator confirmation; if no live reply returns, the run continues with `provenance: leader-inferred` recorded and visible at the next gate presentation. This never aborts the run and never re-asks a second time — consistent with the checkpoint's own posture (§ "Postura" above): it gates functional clarity, not security, so its failure direction is a pause-and-report, never a hard stop.
 
 ---
 

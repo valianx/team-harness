@@ -35,11 +35,19 @@
 // docs/observability.md). PreToolUse is the ONLY breadcrumb able to read
 // this marker — subagent-trace.ts (SubagentStop) has no prompt in its
 // payload; see that file's header comment for the stop-side residual.
+//
+// payload_bytes: the byte length of the dispatch prompt, stamped for
+// visibility only — no constant, comparison, or branch anywhere in this
+// module reads its value; a corrupted or oversized dispatch is never
+// rejected or flagged on this basis. The control is over CONTENT, not just
+// a size ceiling: only the byte count crosses into the record, never the
+// prompt itself (whole, truncated, or otherwise derived) — the same
+// content-boundary discipline as the project-key extraction above.
 
 import type { NormalizedInput } from "../shim/normalized-v1.js";
 
 // ---------------------------------------------------------------------------
-// project key extraction — TH-LANE marker (charset/length bounded, AC-5.4;
+// project key extraction — TH-LANE marker (charset/length bounded,
 // first-line-only, mirrors checkpoint-guard's extractStateRefHeader)
 // ---------------------------------------------------------------------------
 
@@ -59,6 +67,19 @@ function extractProjectKey(prompt: string): string | null {
   if (match === null) return null;
   const candidate = match[1] ?? "";
   return PROJECT_KEY_RE.test(candidate) ? candidate : null;
+}
+
+/** Byte length of the dispatch prompt. Returns null on any measurement
+ *  error so a failure here omits only this one field, never the rest of the
+ *  breadcrumb (fail-open, same posture as the rest of this hook). */
+function computePayloadBytes(prompt: string): number | null {
+  try {
+    return typeof Buffer !== "undefined"
+      ? Buffer.byteLength(prompt, "utf8")
+      : new TextEncoder().encode(prompt).byteLength;
+  } catch {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -113,9 +134,10 @@ export function writeStart(input: NormalizedInput, writer: SubagentStartWriter):
     return null;
   }
 
-  // Build the JSONL record — matches AC-1's exact field set, plus the
-  // optional `project` key (AC-5.1/5.3/5.4).
-  const record: Record<string, string> = {
+  // Build the JSONL record — `ts`/`event`/`agent_type` are always present,
+  // plus the optional `project` key and `payload_bytes` (visibility only —
+  // see the header comment).
+  const record: Record<string, string | number> = {
     ts: writer.now(),
     event: "subagent.start",
     agent_type: subagentType,
@@ -128,6 +150,11 @@ export function writeStart(input: NormalizedInput, writer: SubagentStartWriter):
   const projectKey = extractProjectKey(prompt);
   if (projectKey !== null) {
     record["project"] = projectKey;
+  }
+
+  const payloadBytes = computePayloadBytes(prompt);
+  if (payloadBytes !== null) {
+    record["payload_bytes"] = payloadBytes;
   }
 
   const jsonLine = JSON.stringify(record);

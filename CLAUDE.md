@@ -96,7 +96,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — the only CC install channel. Go installer binary (GH Release assets) — the only opencode install channel; it does not serve Claude Code. |
 
-**Current version:** `2.142.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.143.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
@@ -134,7 +134,7 @@ All commands run from the repo root.
 - **leader is the hub.** Skills never invoke agents directly — they build a task payload and route to `leader`. Exceptions: standalone utilities (`/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:update`).
 - **Workspaces as the shared board.** Agents communicate through files in `workspaces/{feature-name}/`; the operator uses it as a review surface. Never through return values. `workspaces/` is always git-ignored. `docs/conventions.md`.
 - **Dual-mode workspaces.** Local (`./workspaces/`) or Obsidian vault, via `logs-mode` in `~/.claude/.team-harness.json`. `docs/conventions.md`.
-- **Initiative layer (opt-in).** Groups per-project pipelines under an `overview.md` parent index; detect + confirm gate; parallel multi-project dispatch (v2.61.0) fans out Stage-2 lanes when ≥2 projects clear STAGE-GATE-1 (`--serial` always wins). Full contracts: `agents/leader.md § Parallel Multi-Project Dispatch`; `docs/discover-phase.md § 11`.
+- **Initiative layer (opt-in).** Groups per-project pipelines under an `overview.md` parent index; detect + confirm gate; parallel multi-project dispatch (v2.61.0) fans out Stage-2 lanes when ≥2 projects clear STAGE-GATE-1 (`--serial` always wins). Full contracts: `agents/ref-dispatch-machinery.md § Parallel Multi-Project Dispatch`; `docs/discover-phase.md § 11`.
 - **Two-tier document classification.** Operator-facing vs agentic. `docs/conventions.md § Document classification`.
 - **Status-block return protocol.** Agents finish with a compact status block; the orchestrator gates on it without re-reading full workspaces.
 - **Installer always overwrites embedded files.** Direct edits to `~/.claude/agents/*.md` are replaced on every install. Hash-match files are skipped. `docs/conventions.md` has the full contract.
@@ -165,6 +165,7 @@ All commands run from the repo root.
 - **Parallel batch implementation.** ADDITIVE items concurrently, consolidated into ONE PR. `docs/parallel-batch-implementation.md`.
 - **`/th:research-code` hybrid codebase-research flow.** `code-researcher` fans out per-file/module lanes; consolidator surfaces docs-vs-code conflicts. `agents/code-researcher.md`.
 - **Gated local permission provisioning.** Adds `additionalDirectories` via a gated Y/n; never touches outward-action rules. `docs/permission-provisioning.md`.
+- **Canonical dispatch contract.** One home for what a dispatch prompt may/must not carry and the two-halves scope rule (review scope never bounded by the dispatcher; write scope always bounded by the recipient's own contract). `agents/_shared/dispatch-contract.md`.
 
 **Architectural changes must be reviewed by the `architect` subagent before implementation.** Applies especially to: adding an agent, changing the pipeline flow, modifying the installer's contract with `~/.claude/` or `~/.claude.json`, introducing a new memory layer.
 
@@ -280,10 +281,9 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 ## 8. Architecture Decisions
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
 > Full history: see `docs/decisions.md`. Recent entries below.
-- **2026-07-15** — Lanes own cost/speed, floor stays orthogonal. → `docs/pipeline-lanes.md`
-- **2026-07-21** — Pre-Delivery Security Audit narrowed to `adversary` alone, conditional on `security_floor_applies`: the unconditional `security` code-audit dispatch is removed from Phase 3.8, and code-level review for a non-sensitive task is delegated to PR review (named generically, not tied to any specific configured tool). SEC-002 design-review (Phase 1.6), the `security_floor_applies` predicate, the Phase-2-close backstops, and Phase 4.5 internal review are unchanged. Also retires the Phase 3.6 `acceptance-checker` drift audit entirely (no replacement dispatch). → `agents/orchestrator.md § Phase 3.8`, `docs/dev-mode.md § Security Floor Non-Waivability`
 - **2026-07-27** — Implementation-diff commit ownership assigned explicitly (verifiable-contracts, #528): `implementer` commits its own diff, `tester` its own test diff, three-value vocabulary (`{sha}` / `lane-deferred` / `none — no source change`); orchestrator gates via a 7-conjunct Phase-2-close commit-integrity check anchored on a `base_sha` registered before each 1:1 dispatch. → `agents/implementer.md § "Commit Contract"`, `agents/orchestrator.md § "Phase 2-close commit-integrity check"`
 - **2026-07-27** — Gate-state contract (#530): the six named `00-state.md` fields (`gate1_release`, `gate2_release_last`, `gate3_release`, `gate_nonce`, `working_branch`, `worktree`) require bare-literal values (no annotation), enforced as prose contract only — no hook mechanism, since `gate-guard`/`checkpoint-guard` are unwired from Claude Code's `.claude-plugin/hooks.json` since v2.139.0 — plus the named "No gate-field repair" invariant. → `agents/_shared/gate-contract.md § "The dual-record release"`
+- **2026-07-27** — Canonical dispatch contract (#524): one home for what a dispatch prompt may/must not carry and a single two-halves rule (review scope never bounded by the dispatcher; write scope always bounded by the recipient's own contract, by pointer to `plan-consolidation.md`), asserted via a five-column control rubric instead of prose. → `agents/_shared/dispatch-contract.md`
 
 ## 9. Patterns & Conventions
 <!-- Populated by the delivery agent after each feature. Empty at init. -->

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.143.0] - 2026-07-28
+
+### Added
+- Canonical dispatch contract (`agents/_shared/dispatch-contract.md`) states the two-halves scope rule (review scope never bounded by the dispatcher; write scope always bounded by the recipient's own contract) and a five-column control rubric; consumed by pointer from `leader`, `orchestrator`, `agents/README.md`, and `agent-builder` — closes #524.
+- `agents/README.md`'s Roster gains an `Objective` column, one row per each of the 27 agents, plus a documented authoring standard for stating an agent's objective and counting it per lens rather than per step.
+- `payload_bytes` on the `subagent.start` breadcrumb reports the measured byte length of every dispatched prompt — visibility only, no threshold, no content beyond the count.
+- Suite 180 (`tests/test_agent_structure.py`) asserts the dispatch standard's own shape: single-pointer consumption, rubric completeness, per-artifact language declarations (14/14), the Roster↔agent-file bijection, and the `ref-*.md` prefix convention (never a dispatch target).
+
+### Changed
+- Gate rendering for STAGE-GATE-1/2/3 and the Express combined gate moves to `leader` on the normal execution path; `orchestrator` returns structured gate data — including the run's real, conditional option set — instead of rendering a STOP block itself, and keeps the rendered block only as a fallback on the takeover/opencode path.
+- `agents/delivery.md` Step 9d withdraws the hard 1000-line/20-file diff-size abort; an oversized diff now reports a computed mechanical/append-only-vs-substantive composition at the delivery gate, presented adjacent to the Phase 3.8 auditor's own `audit_coverage` self-declaration, instead of being blocked — closes #485.
+- The five sites that bounded a re-fired verifier's review to only the changed AC/section (`docs/patch-mode.md`, `agents/orchestrator.md`, `agents/plan-reviewer.md`, `agents/qa-plan.md`, `agents/security.md`) no longer carry that bound; a re-fired verifier now reviews full scope, with `**Correction scope:**` surviving as a coordinate rather than a ceiling.
+- The functional-clarity confirmation is now a `checkpoint.confirmed` trace event (with `provenance`) appended by `leader`, read as sole authority by `orchestrator` at every boot including recover; the two `00-state.md` cache fields are documented as derived cache, never consulted in place of the event — closes #524.
+- 14 agent output contracts each declare the language of every artifact they produce, replacing the orchestrator's own dispatch-time language directive — closes #524.
+- The leader's dispatch machinery (repo-identity verification, `overview.md` template, Roster schema/write discipline, spawn payload contract, fan-out and consolidated-delivery mechanics, parallel multi-project dispatch) relocates byte-preserved to a new `agents/ref-dispatch-machinery.md`; dead pointers to `docs/discover-phase.md` and `docs/spec-coauthoring.md` are restored — closes #524.
+- `agents/qa.md` no longer claims to define acceptance criteria standalone; its five stale references are aligned with `agents/qa-plan.md`, which already owns that work.
 ## [2.142.0] - 2026-07-27
 
 ### Removed
