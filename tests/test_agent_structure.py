@@ -38085,6 +38085,7 @@ _S173_CMD_ABORT_UNPARSEABLE = 'sys.exit("ABORT: %s does not parse as JSON'
 _S173_CMD_ATOMIC_BACKUP = re.compile(r"write_600\(bak,\s*raw\)")
 _S173_CMD_ATOMIC_TARGET = re.compile(r"write_600\(path,\s*json\.dumps\(expected")
 _S173_CMD_ATOMIC_RESTORE = re.compile(r"write_600\(path,\s*open\(bak")
+_S173_CMD_PROBLEMS_INIT = re.compile(r"^problems\s*=\s*\[\]\s*$", re.MULTILINE)
 
 check(
     "suite173(refused-write-cmd-single-path): emitted command writes exactly"
@@ -38121,6 +38122,15 @@ check(
     "the emitted command must call the atomic write helper for the backup,"
     " the target write, AND the restore path — a direct write on any one of"
     " the three would reintroduce a partially-written-file failure mode",
+)
+check(
+    "suite173(refused-write-cmd-single-assignment): emitted command"
+    " initializes problems = [] exactly once",
+    len(_S173_CMD_PROBLEMS_INIT.findall(_s173_canonical_slice)) == 1,
+    "a second problems = [] inserted anywhere before the final `if problems:`"
+    " gate would silently discard every problems.append(...) call that"
+    " precedes it, neutralizing the post-write assertion while every other"
+    " anchor in this suite still matches verbatim",
 )
 
 # --- AC-1b: the residual-seam amendment reconciles the closed exception ----
