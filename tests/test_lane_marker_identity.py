@@ -45,12 +45,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 CHECKPOINT_GUARD_TS = REPO_ROOT / "hooks" / "ts" / "bodies" / "checkpoint-guard.ts"
 SUBAGENT_START_TS = REPO_ROOT / "hooks" / "ts" / "bodies" / "subagent-start.ts"
 
-# Injector candidates — the split authors these in Task-2/Task-3, not Task-7.
-# agents/ref-dispatch-machinery.md is a later addition (Task-5): the
-# "Lane-attribution header marker" clause that stamps TH-LANE relocated
-# there, byte-preserved, out of agents/leader.md (which keeps only a stub
-# pointer) -- an existence-style check like this one follows the content to
-# its new file rather than asserting ownership of the old one.
+# Injector candidates: agents/orchestrator.md, agents/leader.md, and
+# agents/ref-dispatch-machinery.md (which holds the "Lane-attribution header
+# marker" clause that stamps TH-LANE, relocated there byte-preserved out of
+# agents/leader.md, which keeps only a stub pointer). An existence-style
+# check like this one follows the content to its current file rather than
+# asserting ownership of wherever it used to live.
 ORCHESTRATOR_MD = REPO_ROOT / "agents" / "orchestrator.md"
 LEADER_MD = REPO_ROOT / "agents" / "leader.md"
 REF_DISPATCH_MACHINERY_MD = REPO_ROOT / "agents" / "ref-dispatch-machinery.md"
