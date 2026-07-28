@@ -40,8 +40,10 @@ recorded as a PR-body/commit-trailer line — this is prose-only, reviewed by th
 that gate; no unwired hook enforces it mechanically.
 
 **Shipped default vs repo-local deferral.** No `skip-version` flag, or `skip-version: false`
-→ bump once at assembly (min one, max one). `skip-version: true` — set only when the
-consuming repository documents a repo-local versioning/release-deferral convention — skips
+→ bump once at assembly (min one, max one). team-harness itself does not use this escape
+hatch — its own `CLAUDE.md §6.3` documents the per-PR shipped default, not a deferral.
+`skip-version: true` — set only when the consuming repository documents a repo-local
+versioning/release-deferral convention — skips
 this whole section; `changelog.d/` assembly (§ 3) still runs, since the fragment itself was
 already written by `delivery`.
 
