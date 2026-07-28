@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.143.1] - 2026-07-28
+
+### Fixed
+- `/th:setup` and `/th:update` no longer order a write to `~/.claude/settings.json` they cannot complete when the host runtime refuses the agent's write: the canonical nesting-depth prerequisite (`docs/setup-update-model.md`) gains a sixth outcome that stops mandating the write, hands the operator a pointer (never a reproduction) to a fenced, CI-anchored `python3`-only command to run themselves, records the outcome as `operator-action-required` in both commands' report vocabulary, and lets the rest of the command complete without recording a durable decline — closes #544.
+- Suite 173 (`tests/test_agent_structure.py`) extended with 10 checks pinning the new outcome across all three contract sites (canonical section, both skill applications), the refusal-vs-decline distinction, the double prohibition (no alternative write mechanism, no agent execution of the emitted command), and four semantic anchors on the emitted command's security-relevant behavior.
+
 ## [2.143.0] - 2026-07-28
 
 ### Added
