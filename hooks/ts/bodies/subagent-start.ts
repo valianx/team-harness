@@ -47,7 +47,7 @@
 import type { NormalizedInput } from "../shim/normalized-v1.js";
 
 // ---------------------------------------------------------------------------
-// project key extraction — TH-LANE marker (charset/length bounded, AC-5.4;
+// project key extraction — TH-LANE marker (charset/length bounded,
 // first-line-only, mirrors checkpoint-guard's extractStateRefHeader)
 // ---------------------------------------------------------------------------
 
@@ -134,9 +134,9 @@ export function writeStart(input: NormalizedInput, writer: SubagentStartWriter):
     return null;
   }
 
-  // Build the JSONL record — matches AC-1's exact field set, plus the
-  // optional `project` key (AC-5.1/5.3/5.4) and `payload_bytes` (visibility
-  // only — see the header comment).
+  // Build the JSONL record — `ts`/`event`/`agent_type` are always present,
+  // plus the optional `project` key and `payload_bytes` (visibility only —
+  // see the header comment).
   const record: Record<string, string | number> = {
     ts: writer.now(),
     event: "subagent.start",
