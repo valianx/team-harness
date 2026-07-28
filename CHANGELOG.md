@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.144.0] - 2026-07-28
+
+### Added
+- A deterministic dispatch-sequence simulator (`tests/test_dispatch_sequence.py`, `tests/fixtures/dispatch-model.json`) asserts seven ordering properties of the pipeline's Stage-2/delivery shape against a 13-node model, with a negative canary and an opt-in behavioral leg.
+- `agents/_shared/dispatch-contract.md` names a scope-injection prohibition: a dispatch points at scope already on the board and never introduces new scope of its own.
+- `agents/architect.md` gains a closure rubric (ownership, provenance, removed-control tables in `reviews/01-plan-review.md`) and a one-round, anchored-edit dispatch discipline for correction rounds.
+
+### Changed
+- Stage 2 collapses to one sequence: a single `implementer` dispatch covers every task (one commit per task), a single `tester` dispatch follows, then `qa` and `adversary` (Pre-Delivery Security Audit) dispatch together in one parallel Phase 3 validation block over the frozen tree.
+- Delivery splits into a prose writer (`agents/delivery.md`) and a deterministic script (new `agents/_shared/delivery-mechanics.md`) the coordinator executes directly, replacing the old `mode: prepare`/`mode: publish` two-dispatch split with one dispatch preceded by STAGE-GATE-3.
+- The coordinator's new Phase 2.8 (Freeze) fetches the default branch and re-checks base-advance before every Phase 3 fan-out, closing a defect where the Pre-Delivery Security Audit could review a base that had since moved.
+- STAGE-GATE-3 repositions immediately before Phase 4 (Delivery), and the push step re-reads `gate3_release`/`gate_nonce` immediately before pushing rather than trusting an earlier record.
+- `agents/orchestrator.md § Iteration Rules` adds a pre-dispatch gate distinguishing a contradiction or a recurrence (escalate to the operator) from a mechanical, enumerated finding (dispatch a correction round), plus a removal-over-addition remediation preference.
+
+### Removed
+- STAGE-GATE-2, Phase 3.75 (Build Verification) and Phase 3.8 (Pre-Delivery Security Audit) as standalone sections, and Phase 4.5 (Internal Review) — each absorbed into the collapsed shape above, with the delivery-authored diff itself bounded by a verified post-gate write allowlist rather than a dedicated review lens.
+- The `coderabbit_configured`, `internal_review`, `criticals_count`, and `override {reason}` fields and options, whose consumers no longer exist.
+
 ## [2.143.0] - 2026-07-28
 
 ### Added

@@ -96,7 +96,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — the only CC install channel. Go installer binary (GH Release assets) — the only opencode install channel; it does not serve Claude Code. |
 
-**Current version:** `2.143.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.144.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
@@ -281,16 +281,16 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 ## 8. Architecture Decisions
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
 > Full history: see `docs/decisions.md`. Recent entries below.
-- **2026-07-27** — Implementation-diff commit ownership assigned explicitly (verifiable-contracts, #528): `implementer` commits its own diff, `tester` its own test diff, three-value vocabulary (`{sha}` / `lane-deferred` / `none — no source change`); orchestrator gates via a 7-conjunct Phase-2-close commit-integrity check anchored on a `base_sha` registered before each 1:1 dispatch. → `agents/implementer.md § "Commit Contract"`, `agents/orchestrator.md § "Phase 2-close commit-integrity check"`
-- **2026-07-27** — Gate-state contract (#530): the six named `00-state.md` fields (`gate1_release`, `gate2_release_last`, `gate3_release`, `gate_nonce`, `working_branch`, `worktree`) require bare-literal values (no annotation), enforced as prose contract only — no hook mechanism, since `gate-guard`/`checkpoint-guard` are unwired from Claude Code's `.claude-plugin/hooks.json` since v2.139.0 — plus the named "No gate-field repair" invariant. → `agents/_shared/gate-contract.md § "The dual-record release"`
+- **2026-07-27** — Gate-state contract (#530): six named `00-state.md` fields require bare-literal values (no annotation), prose-only enforcement (`gate-guard`/`checkpoint-guard` unwired since v2.139.0), plus the named "No gate-field repair" invariant. → `agents/_shared/gate-contract.md § "The dual-record release"`
 - **2026-07-27** — Canonical dispatch contract (#524): one home for what a dispatch prompt may/must not carry and a single two-halves rule (review scope never bounded by the dispatcher; write scope always bounded by the recipient's own contract, by pointer to `plan-consolidation.md`), asserted via a five-column control rubric instead of prose. → `agents/_shared/dispatch-contract.md`
+- **2026-07-28** — Pipeline dispatch shape collapsed: one `implementer` + one `tester` dispatch, `qa`+`adversary` fan out together in Phase 3; Phase 3.75/3.8 absorb into new Phase 2.8/Phase 3; Phase 4.5 retires (delivery diff bounded by a post-gate write allowlist instead). STAGE-GATE-3 moves immediately before Phase 4. → `agents/orchestrator.md § Phase 2.8`
 
 ## 9. Patterns & Conventions
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
 > Full history: see `docs/patterns.md`. Recent entries below.
-- **TTY prompt → stderr**: prompt to `os.Stderr`, read from `/dev/tty`/stdin; never write an O_RDONLY handle. → `cmd/install/update.go`
 - **Suite-run evidence ledger** (#532): append-only `docs/suite-evidence.md`-defined per-feature registry, one row per verification-command run; `tree_anchor` reused literally from `docs/verification-packet.md § 2`; strict full-tree-anchor equality (never a "relevant files" heuristic) decides skip-vs-rerun; closed writer list. → `docs/suite-evidence.md`, `agents/delivery.md § "Step 9b"`
 - **Shared-review-file write discipline** (#527): every panel writer (`plan-reviewer`, `qa-plan`, `security`, `adversary`) uses `Edit` (never `Write`) on an existing shared review file, `old_string` anchored to its own section, `replace_all` forbidden; orchestrator runs a header-survival snapshot/compare around each panel dispatch. → `agents/_shared/plan-consolidation.md § "Write-tool discipline (shared review files)"`
+- **Delivery split + retired-token sweep** (pipeline-dispatch-shape): `agents/delivery.md` (prose) + new `agents/_shared/delivery-mechanics.md` (coordinator's deterministic half — bump/branch/changelog-cut/stage/push/`gh pr create`), one dispatch, no `mode: prepare`/`publish` split; a retired-token sweep verifies zero *live* claims (a marker-adjacent mention — `retired`, `retargeted from` — is legitimate history), re-derived from the owning AC each round, never reused. → `agents/_shared/delivery-mechanics.md`
 
 - Self-documenting code first; comment WHY not WHAT; route genuine rationale to `/docs` not to inline comments — see `docs/code-comments.md`.
 
