@@ -302,10 +302,11 @@ gh_active_account="$(gh api user -q .login 2>/dev/null || echo "unknown")"
 ```
 
 Report it in the delivery summary as `gh_account: <login>`. This closes wholesale-retired
-delivery.md's old two-capture design (once at `mode: prepare`, re-run fresh at `mode: publish`
-to cover an arbitrarily long STAGE-GATE-3 wait between the two) — with the split gone and the
-push now the coordinator's own single mechanical step immediately after the gate, one capture
-right here is current by construction. A wrong-account push is a known operational friction
+delivery.md's old two-step capture design (once before the branch-prepare work, re-run fresh
+immediately before the push, to cover an arbitrarily long STAGE-GATE-3 wait between the two) —
+with the split gone and the push now the coordinator's own single mechanical step immediately
+after the gate, one capture right here is current by construction. A wrong-account push is a
+known operational friction
 (the operator's own account may differ from the one `gh auth` currently holds) — this capture
 is diagnostic only, it never blocks the push; a `gh api user` failure logs `unknown` and
 proceeds.
