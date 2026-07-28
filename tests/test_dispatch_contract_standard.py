@@ -77,18 +77,23 @@ _SELF_PATH = str(Path(__file__).resolve().relative_to(REPO_ROOT))
 
 
 def git_grep_count(pattern: str) -> tuple[int, list[str]]:
-    """Count of tracked files (repo-wide) containing an exact literal string.
-    Uses `git grep -F -l` so the check reflects the committed tree, matching
-    the convention Suite 174's no-relocation check already uses (read(path)
-    against tracked files, never an untracked scratch copy). Excludes this
-    test file's own path from the match list — a canary pattern is embedded
-    here as a Python string literal for comparison purposes, which would
-    otherwise self-match and produce a false "duplicated" count, the same
-    self-exclusion convention Suite 174's own meta-check and no-relocation
-    check already apply to their own source."""
+    """Count of tracked files containing an exact literal string, scoped to
+    everywhere "duplicated canonical prose" is a meaningful concept — i.e.
+    excludes the whole tests/ directory via a git pathspec, not just this
+    file's own path. A test file legitimately embeds a canonical phrase as a
+    Python string literal to compare against tree content (this file's own
+    _AC1_CANONICAL_PHRASE, or Suite 180's equivalent check in
+    test_agent_structure.py) — that is content-under-test, not the
+    duplicated agent-doc prose this check exists to catch. Uses
+    `git grep -F -l` so the check reflects the committed tree, matching the
+    convention Suite 174's no-relocation check already uses (read(path)
+    against tracked files, never an untracked scratch copy). The
+    _SELF_PATH filter is kept as a harmless defense-in-depth belt-and-braces
+    for this file's own path, redundant once the tests/ pathspec exclusion
+    is in place since _SELF_PATH already lives under tests/."""
     try:
         proc = subprocess.run(
-            ["git", "grep", "-F", "-l", pattern],
+            ["git", "grep", "-F", "-l", "--", pattern, ":(exclude)tests/"],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
