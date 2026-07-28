@@ -26,7 +26,7 @@ the consumer is about to check.
 | `exit_code` | The command's raw process exit code. |
 | `counts` | Free-form summary of the command's own reported counts (e.g. `passed:187 failed:0`). |
 | `agent` | The writer of this row — must be one of the closed list in § 3. |
-| `phase` | The pipeline phase the run belongs to (e.g. `Phase 3`, `Phase 3.75`, `Step 9b`, `Parallel Batch consolidation`). |
+| `phase` | The pipeline phase the run belongs to (e.g. `Phase 3`, `Phase 2.8`, `Step 9b`, `Parallel Batch consolidation`). |
 | `timestamp` | ISO timestamp of the run. |
 
 ### `tree_anchor`
@@ -50,8 +50,8 @@ enforced by consumer-side discipline (§ 4), not by any write-side control on th
 ## 3. Producer → consumer pairs (named)
 
 1. Producer `tester` (Phase 3, `agents/tester.md § Mode: verify-run`) → consumer `orchestrator`
-   (`agents/orchestrator.md § Phase 3.75 — Build Verification`).
-2. Producer `orchestrator` (`agents/orchestrator.md § Phase 3.75 — Build Verification`) → consumer
+   (`agents/orchestrator.md § Phase 2.8 — Freeze`).
+2. Producer `orchestrator` (`agents/orchestrator.md § Phase 2.8 — Freeze`) → consumer
    `delivery` (`agents/delivery.md § Step 9b — Definition of Done (DoD) checklist`, "Recorded-state
    gate").
 3. Producer AND consumer `orchestrator`, within its own consolidation loop
@@ -83,7 +83,7 @@ producer agent, and the row's timestamp in place of a fresh execution.
 
 ## 5. Out of scope — never a substitute for
 
-This registry never satisfies a security floor, a STAGE-GATE release, or the Phase 3.8
+This registry never satisfies a security floor, a STAGE-GATE release, or the
 Pre-Delivery Security Audit. Its scope is idempotent re-runs of a verification command only — it
 never stands in for a decision that requires reasoning about the diff's content, only for whether
 an already-checked command needs to run again against an unchanged tree.

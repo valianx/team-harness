@@ -60,6 +60,8 @@ Q-1 through Q-6 cover Part 1 (gh-fallback core). Q-7 through Q-10 cover §9.5 (R
 
 **Rationale:** `blocked-manual-push` is functionally a sub-state of STAGE-GATE-3 (the PR has not been opened yet). STAGE-GATE-3 is always a human gate per CLAUDE.md §14. The autonomy flag covers STAGE-GATE-2 only. This is consistent with the existing gate semantics.
 
+**2026-07-28 addendum (pipeline-dispatch-shape).** STAGE-GATE-2 is removed — Stage 2 runs as a single implementer pass over every task rather than a round-scheduled DAG, so the per-round gate this Q&A references no longer exists. `autonomous`/`approve autonomous` survive with a different consumer: skipping the Phase 1.8 post-approval plan-review offer. This addendum records the removal and its successor; the question and rationale above are left as the historical record of the decision as it stood at the time.
+
 ---
 
 ## Q-5 — Behavioural smoke test checklist

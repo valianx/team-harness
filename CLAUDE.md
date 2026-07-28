@@ -148,7 +148,7 @@ All commands run from the repo root.
 - **Pipeline observability is mandatory.** Every run produces `00-execution-events.jsonl`/`.md` and `00-pipeline-summary.md` (Tier 0 fixes exempt). Full contract: `docs/observability.md`.
 - **Documentation freshness via context7.** Verify third-party APIs before generating code. Mandatory triggers: `docs/context7-usage.md §2`.
 - **Bug-fix flow forces security review + regression test.** `type: fix`/`hotfix`. `agents/ref-special-flows.md § Bug-fix Flow`.
-- **Pre-delivery security audit — `adversary` alone, conditional (Phase 3.8).** `adversary` runs once per delivery group over the consolidated final diff when `security_floor_applies` holds; SEC-002 design-review (Phase 1.6) and PR review complete the floor — no unconditional in-pipeline code-audit dispatch. `agents/orchestrator.md § Phase 3.8`, `docs/dev-mode.md § Security Floor Non-Waivability`.
+- **Pre-delivery security audit — `adversary` alone, conditional, within Phase 3's parallel validation block.** `adversary` runs once per delivery group over the consolidated final diff when `security_floor_applies` holds, concurrently with `qa`, in one message, over the tree Phase 2.8 (Freeze) froze; SEC-002 design-review (Phase 1.6) and PR review complete the floor — no unconditional in-pipeline code-audit dispatch. `agents/orchestrator.md § "Phase 3 — Verify"`, `docs/dev-mode.md § Security Floor Non-Waivability`.
 - **Stage-2 code-hygiene gate (two-layer, mandatory for all types).** Deterministic pre-verify scan bounces work-narration comments; `qa`'s `## Code Hygiene` audit emits `code_hygiene: pass|fail` as a Phase 3 gate conjunction. Canonical pattern set: `docs/code-hygiene-gate.md`.
 - **Patch mode + selective verifier re-run.** Full contract: `docs/patch-mode.md`.
 - **Suite-run evidence.** Append-only, per-feature record of a verification-command run against a concrete tree state, so a downstream link can cite it instead of re-running. Canonical contract: `docs/suite-evidence.md`.
@@ -246,7 +246,7 @@ See `docs/voice-guide.md` for the full Bad/Good example and extended rationale.
 
 ### 7.2 Vocabulary — dev-natural verbs at the operator surface
 
-The three things a developer already knows how to ask for — a work plan, an implementation, a PR — map cleanly onto the three pipeline stages. The operator never learns `Phase 1.5`, `Phase 3.8`, or `STAGE-GATE-2`. Those are internal mechanics.
+The three things a developer already knows how to ask for — a work plan, an implementation, a PR — map cleanly onto the three pipeline stages. The operator never learns `Phase 1.5`, `Phase 2.8`, or `STAGE-GATE-3`. Those are internal mechanics.
 
 | Operator asks for | Maps to | Internal mechanics (operator never sees) |
 |---|---|---|

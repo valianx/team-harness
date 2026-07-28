@@ -132,15 +132,15 @@ When you run the installer interactively it asks: `Install mode [s/l]? [s]:` —
 | Agent | Standard model | Standard effort | Low-cost model | Low-cost effort | Notes |
 |---|---|---|---|---|---|
 | `leader` | opus | xhigh | sonnet | high | Top-level coordination (Intake/Specify/spec+AC/config); presents + relays gates, spawns one `orchestrator` per task. Reflects the post-split roster; the legacy Go matrix predates it. |
-| `orchestrator` | sonnet | xhigh | sonnet | high | Task-scoped execution engine; prepares and records all three STAGE-GATEs, so effort stays high in low-cost so gate logic executes correctly. Reflects the post-split roster; the legacy Go matrix predates it. |
+| `orchestrator` | sonnet | xhigh | sonnet | high | Task-scoped execution engine; prepares and records both STAGE-GATEs, so effort stays high in low-cost so gate logic executes correctly. Reflects the post-split roster; the legacy Go matrix predates it. |
 | `architect` | opus | xhigh | sonnet | high | Exhaustive design discovery (architecture + Work Plan + 8-bool classification + domain heuristics), gated at STAGE-GATE-1. Low-cost effort stays high to preserve depth-of-search; standard raises to xhigh to reflect the exhaustive discovery mandate. |
 | `agent-builder` | opus | max | sonnet | high | Agent/skill authoring; effort high preserves design depth. Human reviews the diff at PR time. |
-| `security` | opus | max | sonnet | high | Security audit; effort high is the cap. Human reads `reviews/04-security.md` at STAGE-GATE-2/3. |
-| `adversary` | opus | max | sonnet | high | Adversarial review; effort high is the cap. Human reads `reviews/04-adversary.md` at STAGE-GATE-2/3. Plugin-only for model-tier purposes (no cmd/install/ entry). |
+| `security` | opus | max | sonnet | high | Security audit; effort high is the cap. Human reads `reviews/04-security.md` at STAGE-GATE-1. |
+| `adversary` | opus | max | sonnet | high | Adversarial review; effort high is the cap. Human reads `reviews/04-adversary.md` at STAGE-GATE-3. Plugin-only for model-tier purposes (no cmd/install/ entry). |
 | `reviewer` | opus | max | sonnet | high | PR review gate; effort high preserves severity calibration. Human approves at STAGE-GATE-3. |
 | `reviewer-consolidator` | opus | high | sonnet | high | Multi-reviewer merge step; effort high preserves de-dup and contradiction detection quality. |
 | `qa-plan` | opus | high | sonnet | high | Pre-code AC work (ratify-plan, define-ac, reconcile); effort high retained — gates architect output. |
-| `qa` | sonnet | high | sonnet | high | Post-code AC validation; effort high retained — drives merge decision at STAGE-GATE-2/3. |
+| `qa` | sonnet | high | sonnet | high | Post-code AC validation; effort high retained — drives merge decision at STAGE-GATE-3. |
 | `plan-reviewer` | sonnet | medium | sonnet | medium | No change — already at the floor; gate role is inviolable. |
 | `gcp-cost-analyzer` | opus | high | sonnet | medium | Non-blocking advisory report; human decides on all output. |
 | `gcp-infra` | opus | xhigh | sonnet | medium | Irreversible-but-gated mutation planning (verb classification, blast-radius, reversibility, alternatives, runbook + rollback); gates: `gcp-guard.sh` + Phase 3.5 audit + STOP. Standard raises to xhigh; low-cost stays medium (gated output, human approves every apply). |
@@ -152,7 +152,7 @@ When you run the installer interactively it asks: `Install mode [s/l]? [s]:` —
 | `likec4-diagrammer` | sonnet | medium | sonnet | medium | No change — DSL validation catches errors. |
 | `d2-diagrammer` | sonnet | medium | sonnet | medium | No change — DSL validation catches errors. |
 | `translator` | haiku | medium | sonnet | medium | Haiku→sonnet upgrade in low-cost mode; glossary is the contextual anchor; human reviews diff at PR time. |
-| `delivery` | sonnet | medium | sonnet | medium | No change — mechanical; reviewer audits at Phase 4.5; human approves PR. |
+| `delivery` | sonnet | medium | sonnet | medium | No change — mechanical; human approves PR at STAGE-GATE-3. |
 | `mentor` | opus | high | sonnet | high | Teaching is analysis + synthesis; effort high preserves layered-pack depth. Human reads the pack before the tutoring session. |
 | `researcher` | haiku | medium | sonnet | medium | Post-decommission agent — not in Go installer lowCostMatrix. In low-cost mode, runs on sonnet (haiku→sonnet upgrade; mechanical role is still suitable). |
 | `research-consolidator` | sonnet | high | sonnet | medium | Post-decommission agent — not in Go installer lowCostMatrix. Effort drops to medium in low-cost; consolidation quality is reduced but the fail-open fail-safe applies. |

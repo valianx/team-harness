@@ -295,7 +295,7 @@ Used when the orchestrator dispatches you for **Phase 3** verify. This is a run-
 
 **This mode does NOT write new AC tests.** The AC tests already exist from Phase 2.7. Writing new tests in this mode would break the immutable-artifact invariant that allows `qa` and `security` to parallelize safely. If a test is missing for an AC, report it as a finding — do NOT write the missing test; that is a Phase 2.7 failure that must be corrected before verify can succeed.
 
-**Append a row to `{docs_root}/00-suite-evidence.md`** after the full-suite run above, per `docs/suite-evidence.md § 1` schema (`agent: tester`, `phase: Phase 3`) — this is the producer half of the pair consumed by `agents/orchestrator.md § Phase 3.75 — Build Verification`.
+**Append a row to `{docs_root}/00-suite-evidence.md`** after the full-suite run above, per `docs/suite-evidence.md § 1` schema (`agent: tester`, `phase: Phase 3`) — this is the producer half of the pair consumed by `agents/orchestrator.md § Phase 2.8 — Freeze`.
 
 **Scope — test files only.** NEVER modify production source code, configuration files, or documentation. This invariant is identical to all other tester modes. In run-only mode, test-file writes are restricted to updating `03-testing.md` (the workspace doc) — no new test files, no edits to existing test files.
 

@@ -194,7 +194,7 @@ The Discover phase emits `phase.start` and `phase.end` events with `phase: "0-di
 {"ts":"…","event":"phase.end","feature":"…","phase":"0-discover","agent":"leader","status":"success","duration_ms":…,"extra":{"discover_state":"closed","advance_signal":"keyword:planeá","survey_source":"asked"}}
 ```
 
-The Discover phase does NOT add a blocking item to the Phase Checklist — it is pre-Phase-0a conversational, not a phase that dispatches a subagent. It is recorded as a traced sub-step only (same precedent as Phase 3.75).
+The Discover phase does NOT add a blocking item to the Phase Checklist — it is pre-Phase-0a conversational, not a phase that dispatches a subagent. It is recorded as a traced sub-step only (same precedent as the Phase 2.8 Freeze).
 
 ---
 

@@ -103,13 +103,12 @@ Highlight:
 
 ## Refined `Status` value set
 
-The `Status` column in the no-args table uses a 7-value enum derived by cross-referencing `phase`, `status`, and `autonomous` fields from `00-state.md`. This lets users distinguish "waiting at a human gate" from "actively iterating" from "autonomous-running" at a glance.
+The `Status` column in the no-args table uses a 6-value enum derived by cross-referencing `phase`, `status`, and `autonomous` fields from `00-state.md`. This lets users distinguish "waiting at a human gate" from "actively iterating" from "autonomous-running" at a glance.
 
 | `/th:pipelines` shows | Derived from `00-state.md` |
 |---|---|
 | `waiting_gate_1` | `status: waiting` AND `phase: 1.6` (STAGE-GATE-1 emitted, no release yet) |
-| `waiting_gate_2` | `status: waiting` AND `phase: 3.75` AND `autonomous: false` (STAGE-GATE-2 between rounds) |
-| `waiting_gate_3` | `status: waiting` AND `phase: 4.5` (STAGE-GATE-3 emitted before Phase 5) |
+| `waiting_gate_3` | `status: waiting` AND `phase: 3.5` (STAGE-GATE-3 emitted immediately before Phase 4) |
 | `autonomous` | `status: in_progress` AND `autonomous: true` |
 | `iterating` | `status: iterating` (any phase) |
 | `complete` | `status: complete` |
@@ -170,7 +169,7 @@ Sort in-flight lanes first (most recently started first), then completed pairs (
 - each orchestrator's own `{State ref}/00-state.md` — for the live `Stage` / `Phase` / `Status` of that lane (a roster row may lag; the orchestrator's own file is fresher for its own fields).
 - each orchestrator's own `{State ref}/00-execution-events.{jsonl|md}` — for the per-lane cost (sum of `phase.end` `tokens`, fence-extracted in obsidian mode).
 
-**`pending_gate` is ADVISORY (never a gate-clear signal).** The `pending_gate` column is rendered verbatim from the roster's `pending_gate` field — a leader-maintained hint of which STAGE-GATE a lane is paused at. It is NEVER derived from a gate-clear inference: this renderer never reads `gate1_release` / `gate2_release_last` / `gate3_release` or any `stage.gate.release` event to decide gate status. The roster value is a tracking convenience, not an authoritative gate state (`agents/leader.md § 00-leader-roster.md`, where `pending_gate` is defined as ADVISORY; the leader that maintains it never records a gate and never derives gate status from a release field). Show it as-is; when the roster row's `pending_gate` is `—`, show `—`.
+**`pending_gate` is ADVISORY (never a gate-clear signal).** The `pending_gate` column is rendered verbatim from the roster's `pending_gate` field — a leader-maintained hint of which STAGE-GATE a lane is paused at. It is NEVER derived from a gate-clear inference: this renderer never reads `gate1_release` / `gate3_release` or any `stage.gate.release` event to decide gate status. The roster value is a tracking convenience, not an authoritative gate state (`agents/leader.md § 00-leader-roster.md`, where `pending_gate` is defined as ADVISORY; the leader that maintains it never records a gate and never derives gate status from a release field). Show it as-is; when the roster row's `pending_gate` is `—`, show `—`.
 
 **Cost rollup is READER-ONLY.** The per-lane cost is a reader-only aggregation of each orchestrator's OWN events file — summed from that lane's `phase.end` `tokens`. This renderer (and the leader, when it builds the same initiative rollup — `docs/observability.md § Reader-only initiative rollup`) never writes to any orchestrator's events file or `00-state.md`; the rollup is a pure read and never touches the gate seam.
 
@@ -295,21 +294,20 @@ Other event types (`phase.start`, other `phase.end`) are read for grouping purpo
 - Events with the same `ts` value to the second are rendered in file order.
 - The renderer does NOT re-sort by parsed timestamp — file order is authoritative.
 
-### Concurrent task grouping (round blocks)
+### Task grouping (single-pass block)
 
-When Stage 2 is active and multiple tasks run in parallel within a round, the JSONL receives interleaved `phase.start` / `phase.end` events. The renderer groups these into a single **round block**:
+Stage 2 is a single `implementer` pass over every task, each closing with its own commit — there are no rounds and no per-round gate. The renderer groups the JSONL's interleaved `phase.start` / `phase.end` events into one **pass block**:
 
-- **Round 1** opens at the first `stage.gate.release` with `stage: 1`.
-- **Round R+1** opens at each `stage.gate.release` with `stage: 2, after_round: R{R}`.
-- For each round, collect every `phase.end` event whose `phase` starts with `2-`, `2.5-`, `3-`, `3.5-`, or `3.75-` until the next `stage.gate` with `stage: 2` fires (or `pipeline.end` fires).
+- The block opens at the first `stage.gate.release` with `stage: 1`.
+- Collect every `phase.end` event whose `phase` starts with `2-`, `2.5-`, `2.6-`, `2.7-`, `2.8-`, `3-`, or `3.5-`, per task, until `pipeline.end` fires.
 
-Render each round as a single block:
+Render the pass as a single block:
 ```text
-Round R{R} ({N} tasks, started {ts}, closed {ts}):
-  Task-1: Phase 2 → Phase 3 → Phase 3.5 → Phase 3.75 [duration / status per phase]
-  Task-2: Phase 2 → Phase 3 → ... ↻ ITERATION 1 → Phase 3 → ...
+Implementation pass ({N} tasks, started {ts}, closed {ts}):
+  Task-1: Phase 2 (commit) — then, once for the whole pass: Phase 2.8 → Phase 3 → Phase 3.5
+  Task-2: Phase 2 (commit) → ... ↻ ITERATION 1 → Phase 3 → ...
 ```
-Tasks within a round are listed in ascending task identifier order, regardless of which finished first.
+Tasks are listed in ascending task identifier order, regardless of which finished first.
 
 ### Formatting conventions
 
@@ -371,20 +369,21 @@ Timeline
 ■ STAGE-GATE-1 EMITTED at 14:05:23 — verdict: pass
 → STAGE-GATE-1 RELEASED at 14:08:01 — decision: approved-autonomous
 
-Round R1 (2 tasks, started 14:08:02, closed 14:21:47):
-  Task-1: Phase 2 (1m 48s, success) → Phase 3 verify (2m 12s, pass) → Phase 3.5 (PASS) → Phase 3.75 (pass)
-  Task-2: Phase 2 (1m 21s, success) → Phase 3 verify (1m 55s, pass) → Phase 3.5 (PASS) → Phase 3.75 (pass)
+Implementation pass (3 tasks, started 14:08:02, closed 14:31:02):
+  Task-1: Phase 2 (1m 48s, success)
+  Task-2: Phase 2 (1m 21s, success)
+  Task-3: Phase 2 (2m 04s, success)
+▸ Phase 2.8 freeze — 41s — success — "build/lint pass, base up to date"
+▸ Phase 3 verify (qa + adversary) — 2m 12s — pass
+✗ Phase 3.5 acceptance-gate verdict: fail — "AC-3 missing null check" ↻ ITERATION 1 START
+  Task-3: Phase 2 (38s, success)
+▸ Phase 2.8 freeze — 22s — success
+▸ Phase 3 verify (qa + adversary) — 1m 41s — pass
+✓ Phase 3.5 acceptance-gate verdict: pass
 
-↷ STAGE-GATE-2 SKIPPED at 14:21:48 — reason: autonomous, after_round: R1
-
-Round R2 (1 task, started 14:21:49, closed 14:31:02):
-  Task-3: Phase 2 (2m 04s, success) → Phase 3 verify (1m 47s, fail) ↻ ITERATION 1 START — "AC-3 missing null check"
-        → Phase 2 (38s, success) → Phase 3 verify (1m 41s, pass) → Phase 3.5 (PASS) → Phase 3.75 (pass)
-
-▸ Phase 4 delivery — 22s — success — "branch feat/auth-jwt, version 1.5"
-▸ Phase 4.5 internal-review — 1m 12s — success — "0C / 2S / 1N"
 ■ STAGE-GATE-3 EMITTED at 14:33:18 — verdict: (none)
 → STAGE-GATE-3 RELEASED at 14:35:02 — decision: ship
+▸ Phase 4 delivery — 34s — success — "branch feat/auth-jwt, version 1.5, PR #482"
 ▸ Phase 5 github-update — 8s — success — "issue moved to In Review, PR #482"
 ▸ Phase 6 kg-save — 14s — success — "2 entities saved"
 --- PIPELINE END at 14:35:24 — status: success ---

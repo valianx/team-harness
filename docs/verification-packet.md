@@ -250,8 +250,8 @@ multi-run window, no window-close step, and no automatic trigger of any kind.
 **Denominator — verdict-doc-derived, not breadcrumb- or `phase.end`-derived.** The
 verifier-dispatch count is read from the workspace verdict docs — one dispatch per verifier
 per iteration verdict entry: `03-testing.md` run-only section (tester), `reviews/04-validation.md`
-(qa), `reviews/04-security.md` (security, Phase 3.8 audit), `reviews/04-adversary.md` /
-`reviews/04-adversary-amend.md` (adversary, Phase 3.8 audit), `reviews/04-ux-validation.md`
+(qa), `reviews/04-security.md` (security, Stage-1 design-review), `reviews/04-adversary.md` /
+`reviews/04-adversary-amend.md` (adversary, Pre-Delivery Security Audit), `reviews/04-ux-validation.md`
 (ux-reviewer validate). `00-subagent-trace.jsonl` breadcrumbs (`subagent.start`/
 `subagent.stop` pairs filtered by verifier `agent_type`) demote to upward-only enrichment: a
 breadcrumb-evidenced dispatch with no matching verdict entry is **ADDED** to the denominator
@@ -261,7 +261,7 @@ contract's own Task-1 fix is repairing.
 
 **Dispatch floor — exactly one derivation.** The floor is the should-have verifier set
 derived strictly from that run's `00-state.md` scope flags: `tester` run-only + `qa`
-unconditionally; + `security` unconditionally (Phase 3.8 audit, once per delivery group); +
+unconditionally; +
 `adversary` iff `security_floor_applies: true` (see `docs/pipeline-lanes.md § 7`); +
 `ux-reviewer` validate iff `frontend_scope: true`.
 The floor is **never** derived from

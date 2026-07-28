@@ -26,7 +26,7 @@ sees the trade-off instead of having to already know a flag exists.
 | Lane | Runs | Artifacts | Bright-line eligibility |
 |------|------|-----------|-------------------------|
 | **inline** | the leader (or one directly-dispatched `implementer`); NO orchestrator, NO branch, NO PR, NO pipeline artifacts — edit-in-tree; the resulting commit/push stays gated by `dev-guard` | none (state/events only if a workspace happens to already exist) | inline-eligible ONLY: answering questions, docs/markdown that is not shipped logic, version bumps, repo-meta that does not change runtime behavior |
-| **express** (TIER-0 express) | one lightweight orchestrator profile: self-authored (or minimal) one-line plan, ONE combined plan+delivery gate, ONE targeted test phase scoped to the diff, NO plan-review panel, NO internal review (Phase 4.5), scoped lint/build, minimal artifacts (state + events + plan), NO product-repo spec/matrix commit | minimal | express-MINIMUM (never inline): any product code or config/constant default that changes runtime behavior, or any sensitive path (express keeps the full security floor) |
+| **express** (TIER-0 express) | one lightweight orchestrator profile: self-authored (or minimal) one-line plan, ONE combined plan+delivery gate, ONE targeted test phase scoped to the diff, NO plan-review panel, scoped lint/build, minimal artifacts (state + events + plan), NO product-repo spec/matrix commit | minimal | express-MINIMUM (never inline): any product code or config/constant default that changes runtime behavior, or any sensitive path (express keeps the full security floor) |
 | **full** | today's gated flow (Design → plan-review → STAGE-GATE-1 → Implement → Verify → Delivery), plus the full-pipeline trims documented in `agents/orchestrator.md`. **Plan-review panel deferred-by-default:** for a non-sensitive, architect-authored plan, the plan-review panel (qa-plan ratification + plan-reviewer shape audit) does NOT dispatch pre-gate — the plan is presented directly at STAGE-GATE-1, and a post-approval offer (Phase 1.8) or the on-demand `/th:plan-review` skill runs the panel instead. A security-sensitive plan is unaffected — the SEC-002 security design-review, and the rest of the panel alongside it, still run pre-gate exactly as before (`agents/orchestrator.md §§ "Phase 1.5 — Plan Ratification" / "Phase 1.6 — Plan Review" / "Phase 1.8 — Post-approval Plan-Review Offer"`). | full | complex/multi-task/ambiguous/high-risk designs |
 
 **No lane is ever filtered out.** The leader always shows all three lanes at the offer, with a
@@ -371,7 +371,7 @@ zero-width characters, or false-authority framing embedded in the source content
 ## 7. Two-lens floor — the Pre-Delivery Security Audit
 
 Both security lenses run exactly ONCE per delivery group, at the Pre-Delivery Security Audit
-(`agents/orchestrator.md § "Phase 3.8 — Pre-Delivery Security Audit"`), over the consolidated
+(`agents/orchestrator.md § "Phase 3 — Verify"`), over the consolidated
 final diff of everything the group ships — never per task, never per patch iteration. `security`
 dispatches at the audit UNCONDITIONALLY — every delivery group, every lane that spawns an
 orchestrator, no predicate read at all. `adversary` dispatches at the same audit from the **single
@@ -521,14 +521,14 @@ handle is a gap, not a refinement.
 | Active-lane display contract | leader | `agents/leader.md` | lane offer + gate STOP headers |
 | Active-lane display contract | orchestrator | `agents/orchestrator.md` | phase-transition status blocks (Task-2) |
 | Two-lens floor (Pre-Delivery Security Audit: `security` unconditional; `adversary` via `security_floor_applies`) | canonical | `docs/pipeline-lanes.md` | § 7 |
-| Two-lens floor (Pre-Delivery Security Audit: `security` unconditional; `adversary` via `security_floor_applies`) | orchestrator | `agents/orchestrator.md` | § "Phase 3.8 — Pre-Delivery Security Audit" |
+| Two-lens floor (Pre-Delivery Security Audit: `security` unconditional; `adversary` via `security_floor_applies`) | orchestrator | `agents/orchestrator.md` | § "Phase 3 — Verify" |
 | Two-lens floor (waiver unit, unaffected by `adversary`'s narrower trigger) | leader offer | `agents/leader.md` | constraint-E confirm |
 | Root-cause provenance-tier taxonomy | canonical | `docs/pipeline-lanes.md` | § 11 |
 | Root-cause provenance tiers — classification site | leader | `agents/leader.md` | § Root-cause provenance tiers |
 | Root-cause provenance tiers — consumption site | architect | `agents/architect.md` | § Root-Cause Analysis Mode (Task-3) |
 | Outward-action release-floor invariant (`gate3_release ∈ {ship}` required before push/pr-create from a detected pipeline lane) | canonical | `agents/_shared/gate-contract.md` | § "Outward-action release floor" |
 | Outward-action release-floor invariant | enforcer (multi-topology lane detection) | `hooks/ts/bodies/gate-guard.ts` | `evaluate()` |
-| Outward-action release-floor invariant | orchestrator (full lane) | `agents/orchestrator.md` | Phase 4a (prepare) → STAGE-GATE-3 → Phase 4b (publish) |
+| Outward-action release-floor invariant | orchestrator (full lane) | `agents/orchestrator.md` | STAGE-GATE-3 → Phase 4 (delivery) |
 | Outward-action release-floor invariant | orchestrator (express lane) | `agents/orchestrator.md` | Express combined gate — "gate-guard on express" |
 | Outward-action release-floor invariant | docs | `docs/dev-mode.md` | § "Deterministic order floor (`gate-guard`)" |
 | Inline working posture: hard floors (sensitive excluded via § 2a / irreversible excluded / dev-guard untouched / no budget) + escalation signal list | canonical | `docs/pipeline-lanes.md` | § 2b |
