@@ -446,6 +446,21 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 181: dispatch-sequence-simulation (declared model + property checks)"
+echo "############################################################"
+if ! command -v python3 >/dev/null 2>&1; then
+    report_skip_or_fail "dispatch-sequence-simulation" "python3 not found — install Python 3 to run this suite"
+else
+    if python3 "$TESTS_DIR/test_dispatch_sequence.py"; then
+        echo "dispatch-sequence-simulation: PASS"
+    else
+        echo "dispatch-sequence-simulation: FAIL"
+        FAILED=$((FAILED + 1))
+    fi
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"
