@@ -61,31 +61,23 @@ Then retry `/plugin install th`.
 
 ---
 
-## Orchestrator runs inline instead of as subagent
+## Pipeline runs inline instead of dispatching specialists
 
-**Symptom:** When you ask Claude to do a task, it plans and implements inline in chat instead of creating a workspace and dispatching agents.
+**Symptom:** When you ask Claude to do a task, it plans and implements inline in chat instead of creating a workspace and dispatching specialist agents via `Task`.
 
-**Cause:** The dispatch rule is missing from `~/.claude/CLAUDE.md`. This rule tells Claude to invoke the orchestrator as a subagent.
+**Cause:** The dispatch rule is missing from `~/.claude/CLAUDE.md`. This rule states that the top-level agent IS the orchestrator, and that it dispatches specialists via `Task` rather than executing a specialist's role inline.
 
-**Fix:** Run `/th:setup` — it writes the dispatch rule automatically. Or manually add this to `~/.claude/CLAUDE.md`:
-
-```markdown
-<!-- orchestrator-dispatch-rule:start -->
-## orchestrator dispatch
-
-Invoke the orchestrator as a subagent: `Agent(subagent_type='th:orchestrator', ...)`. The orchestrator dispatches phase agents (th:architect, th:implementer, th:tester, th:qa, th:security, th:delivery, etc.) internally via Task. Do not execute the orchestrator role inline at top level — the orchestrator's contract is its system prompt, and inline execution weakens enforcement of pipeline gates.
-<!-- orchestrator-dispatch-rule:end -->
-```
+**Fix:** Run `/th:setup` — it writes the dispatch rule automatically. The managed block (`<!-- orchestrator-dispatch-rule:start -->` … `<!-- orchestrator-dispatch-rule:end -->`) is defined once, canonically, at `skills/setup/managed-blocks/orchestrator-dispatch-rule.md` — reproduce it from that file rather than a copy pasted here, so this page cannot drift from what `/th:setup` actually writes.
 
 ---
 
-## Orchestrator falls back to a relayed dispatch (`dispatch_handoff`)
+## A specialist loses `Task` one level deep
 
-**Symptom:** `th:orchestrator` cannot dispatch its own specialist agents directly and instead emits a `dispatch_handoff` block for the top-level session to relay.
+**Symptom:** a specialist leaf agent dispatched by `th:orchestrator` (or invoked one level deep from a skill wrapper or an `@`-mention inside an ongoing session) cannot itself use tools its own contract grants.
 
-**Cause:** Claude Code's subagent-nesting depth is configurable, not a permanent cap, via the `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` environment variable in `~/.claude/settings.json`. It defaults to unset, in which case a nested subagent does not retain the `Task` tool.
+**Cause:** Claude Code's subagent-nesting depth is configurable, not a permanent cap, via the `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` environment variable in `~/.claude/settings.json`. It defaults to unset, in which case a subagent one level deep does not retain the tools its own contract grants.
 
-**Fix:** Run `/th:setup` (or `/th:update` on an already-installed machine) — both provision `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: "2"` after an explicit confirmation. Restart the session (or start a new one) — the value resolves at session start and does not take effect mid-session. Until provisioned (or on decline), the `dispatch_handoff` relay remains fully functional. Full mechanism: `docs/setup-update-model.md § Architecture prerequisite: subagent nesting depth`.
+**Fix:** Run `/th:setup` (or `/th:update` on an already-installed machine) — both provision `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: "2"` after an explicit confirmation. Restart the session (or start a new one) — the value resolves at session start and does not take effect mid-session. This is depth headroom for a specialist leaf agent, not a coordinator-dispatch fallback: `th:orchestrator` is always the top-level session agent and never itself runs nested, so there is no second-coordinator handoff to relay. Full mechanism: `docs/setup-update-model.md § Architecture prerequisite: subagent nesting depth`; `docs/subagent-orchestration.md § "Nested-context dispatch — RETIRED protocol, retained provisioning"`.
 
 ---
 

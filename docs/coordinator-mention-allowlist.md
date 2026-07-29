@@ -67,9 +67,17 @@ reconciliation happened as part of Task-3's first file, ahead of the seam split)
 
 ## Seam-docs-reference
 
-Not yet reconciled at the time of this commit. This heading is a placeholder for the seam that
-completes it — see `02-implementation.md § "What remains"` in the coordinator-fusion workspace for
-the file list and per-file hit counts.
+| File:line | Mention | Rule | Reason |
+|---|---|---|---|
+| `docs/upstream-issue-draft.md:55` | "our harness detected the stripped tool via a boot probe and emitted a dispatch handoff for top-level Claude to relay; that specific workaround has since been retired" | R4 | Draft upstream issue for Anthropic, historical record of a scenario observed under the pre-fusion architecture; the sentence states the retirement rather than asserting it live. |
+| `docs/upstream-issue-draft.md:72` | "**Superseded, historical.** ... the specific nested-dispatch scenario that motivated this workaround no longer has a producer in our own architecture" | R4 | Same draft's own "Workaround we ship today" section, explicitly marked superseded and pointing to the current retirement note rather than describing a live mechanism. |
+
+No other survivors in this seam's 11 files (`docs/how-it-works.md`, `docs/agent-tree.md`,
+`docs/voice-guide.md`, `docs/install.md`, `docs/integration.md`, `docs/cost-and-caching.md`,
+`docs/opencode-model-config.md`, `docs/plugin-migration.md`, `docs/roadmap.md`,
+`docs/troubleshooting.md`) — every other mention was rewritten to the single coordinator (R1/R2/R3).
+
+**Finding, not fixed here (out of this seam's file ownership).** `skills/setup/managed-blocks/orchestrator-dispatch-rule.md` (Task-2, already committed) still carries a `FALLBACK — nested-context Task unavailability` paragraph describing `th:orchestrator` itself losing `Task` when invoked as a nested subagent and emitting a `dispatch_handoff` directive. This appears to contradict `docs/subagent-orchestration.md § "Nested-context dispatch — RETIRED protocol, retained provisioning"` (Task-3, already committed), which declares the entire `dispatch_handoff`/`blocked-no-dispatch` mechanism retired with no successor and states that a coordinator-dispatch case observed again is a contract defect (`status: blocked`), not a signal to resurrect the handoff. `docs/troubleshooting.md` and this file were reconciled against the `subagent-orchestration.md` framing (full retirement); the managed-block file was left untouched because it belongs to Task-2, not this task. Surfaced for the operator to reconcile.
 
 ## Seam-skills
 
