@@ -5,9 +5,9 @@ tests/test_lane_marker_identity.py
 Suite 151 — lane-marker-byte-identity
 
 AC-7.4 (`01-plan.md`): a structural test asserting byte-identity of the
-dispatch-marker literals `TH-STATE-REF` and `TH-LANE` between the PARSER
-side (the hook body that reads the marker) and the INJECTOR side (the agent
-prompt that stamps the marker into a dispatch payload's first line).
+dispatch-marker literal `TH-STATE-REF` between the PARSER side (the hook
+body that reads the marker) and the INJECTOR side (the coordinator's
+specialist-dispatch payload).
 
 Extraction is structural, not hand-duplicated: each parser's own anchored
 regex source (`^TH-STATE-REF:` / `^TH-LANE:`) is what proves the parser
@@ -15,28 +15,34 @@ recognizes that literal — this script does not separately assert "the
 parser looks for X" by re-typing X from memory, it greps the parser's own
 anchor and then checks the SAME literal appears in the injector.
 
-Task ordering note: this repo's plan (`01-plan.md` § Work Plan) makes
-Task-7 (this script) depend only on Task-4/5/6 (hooks), not on Task-2
-(the split itself, which authors `agents/leader.md` / `agents/orchestrator.md`
-— the injector side). When those files are absent, this script reports a
-distinct PENDING status (exit 0, never a false PASS) rather than silently
-skipping — see `tests/evidence/nested-lane-probes.md` § "Marker
-byte-identity" for the operator-facing record of this state. Once Task-2/3
-land in the same branch (both are part of the same all-tasks-one-pr
-delivery), this script starts asserting for real.
+`TH-LANE` retirement (coordinator-fusion). The `TH-LANE` INJECTOR — the
+controlled header a coordinator stamped when spawning a per-project lane
+under parallel multi-project dispatch — is retired along with that
+mechanism: multi-project sequencing is now serial, so no coordinator ever
+spawns a concurrent per-project lane to attribute. The PARSER
+(`subagent-start.ts`'s `TH_LANE_MARKER_RE`) is retained regardless — it
+fails open when no marker is present, so keeping it costs nothing and
+still matters if a future change reintroduces per-project concurrency.
+This suite's own leg inverts to match: it asserts NO current injector
+site stamps `TH-LANE:` (the expected, clean-retirement state) while still
+failing loudly if some site carries a near-miss marker that claims to be
+`TH-LANE` without matching the parser's exact anchored literal — a
+reintroduced injector with a drifted literal must not silently pass as
+correct just because this test stopped requiring its presence.
 
 Usage:
     python3 tests/test_lane_marker_identity.py
 Exit code:
-    0 if all checks PASS or the injector side is legitimately PENDING;
-    1 if any check FAILS (parser anchor missing, or injector present but
-      carrying a mismatched/absent marker literal).
+    0 if all checks PASS; 1 if any check FAILS (parser anchor missing, or
+    a site carries a near-miss TH-LANE-like marker that does not match the
+    parser's exact anchored literal).
 
 Marker: lane-marker-byte-identity
 """
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -45,18 +51,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 CHECKPOINT_GUARD_TS = REPO_ROOT / "hooks" / "ts" / "bodies" / "checkpoint-guard.ts"
 SUBAGENT_START_TS = REPO_ROOT / "hooks" / "ts" / "bodies" / "subagent-start.ts"
 
-# Injector candidates: agents/orchestrator.md, agents/leader.md, and
-# agents/ref-dispatch-machinery.md (which holds the "Lane-attribution header
-# marker" clause that stamps TH-LANE, relocated there byte-preserved out of
-# agents/leader.md, which keeps only a stub pointer). An existence-style
-# check like this one follows the content to its current file rather than
-# asserting ownership of wherever it used to live.
+# Candidate sites that could carry a reintroduced TH-LANE injector: the
+# coordinator's own dispatch contract and its lazy-loaded reference file
+# for multi-project sequencing.
 ORCHESTRATOR_MD = REPO_ROOT / "agents" / "orchestrator.md"
-LEADER_MD = REPO_ROOT / "agents" / "leader.md"
 REF_DISPATCH_MACHINERY_MD = REPO_ROOT / "agents" / "ref-dispatch-machinery.md"
 
 results: list[tuple[bool, str]] = []
-pending: list[str] = []
 
 
 def check(name: str, condition: bool, detail: str = "") -> None:
@@ -64,11 +65,6 @@ def check(name: str, condition: bool, detail: str = "") -> None:
     status = "PASS" if condition else "FAIL"
     suffix = f" — {detail}" if detail and not condition else ""
     print(f"  [{status}] {name}{suffix}")
-
-
-def note_pending(name: str, detail: str) -> None:
-    pending.append(name)
-    print(f"  [PENDING] {name} — {detail}")
 
 
 def read(path: Path) -> str:
@@ -80,17 +76,11 @@ def parser_anchors(text: str, canonical: str) -> bool:
     return f"^{canonical}:" in text
 
 
-def injector_carries(text: str, canonical: str) -> bool:
-    """True iff the injector's prompt text stamps the identical literal
-    '{canonical}:' (colon included, no substituted underscore/case drift)."""
-    return f"{canonical}:" in text
-
-
 print("=== Suite 151: lane-marker-byte-identity ===")
 print()
 
 # ---------------------------------------------------------------------------
-# Parser side (Task-4/Task-5, already landed — hard requirement).
+# Parser side — hard requirement, both markers.
 # ---------------------------------------------------------------------------
 cg_exists = CHECKPOINT_GUARD_TS.exists()
 ss_exists = SUBAGENT_START_TS.exists()
@@ -99,8 +89,7 @@ check("hooks/ts/bodies/subagent-start.ts exists", ss_exists)
 
 if not (cg_exists and ss_exists):
     print()
-    print("Parser-side hook files are missing — this is a hard failure "
-          "(Task-4/Task-5 are prerequisites of Task-7, not concurrent).")
+    print("Parser-side hook files are missing — this is a hard failure.")
     sys.exit(1)
 
 checkpoint_guard_src = read(CHECKPOINT_GUARD_TS)
@@ -116,7 +105,8 @@ check(
     "regression",
 )
 check(
-    "subagent-start.ts anchors ^TH-LANE: in its marker regex",
+    "subagent-start.ts anchors ^TH-LANE: in its marker regex (parser retained,"
+    " fails open, per docs/subagent-orchestration.md's retirement note)",
     lane_anchored,
     "TH_LANE_MARKER_RE's source no longer anchors on this literal — "
     "either the marker was renamed (update this test) or a real "
@@ -130,58 +120,45 @@ if not (state_ref_anchored and lane_anchored):
     sys.exit(1)
 
 # ---------------------------------------------------------------------------
-# Injector side (Task-2/Task-3 — may not exist yet in this branch).
+# Injector side — TH-STATE-REF: still stamped, hard requirement.
 # ---------------------------------------------------------------------------
-orchestrator_exists = ORCHESTRATOR_MD.exists()
-leader_exists = LEADER_MD.exists()
+orchestrator_src = read(ORCHESTRATOR_MD)
+check(
+    "agents/orchestrator.md carries the identical TH-STATE-REF: literal",
+    "TH-STATE-REF:" in orchestrator_src,
+    "orchestrator.md's specialist-dispatch payload does not stamp the "
+    "exact literal checkpoint-guard.ts parses — marker drift",
+)
 
-if not orchestrator_exists:
-    note_pending(
-        "agents/orchestrator.md carries TH-STATE-REF: literal",
-        "file does not exist in this worktree yet (Task-2 not landed) — "
-        "see tests/evidence/nested-lane-probes.md",
-    )
-else:
-    orchestrator_src = read(ORCHESTRATOR_MD)
-    check(
-        "agents/orchestrator.md carries the identical TH-STATE-REF: literal",
-        injector_carries(orchestrator_src, "TH-STATE-REF"),
-        "orchestrator.md's specialist-dispatch payload does not stamp the "
-        "exact literal checkpoint-guard.ts parses — marker drift",
-    )
+# ---------------------------------------------------------------------------
+# Injector side — TH-LANE: retired. Assert absence; fail on a near-miss
+# marker that does not match the parser's exact anchored literal, so a
+# reintroduced injector with a drifted literal cannot silently pass.
+# ---------------------------------------------------------------------------
+_NEAR_MISS_RE = re.compile(r"\bTH[-_]LANE\b", re.IGNORECASE)
 
-ref_dispatch_exists = REF_DISPATCH_MACHINERY_MD.exists()
-
-if not orchestrator_exists and not leader_exists and not ref_dispatch_exists:
-    note_pending(
-        "agents/leader.md, agents/orchestrator.md, or "
-        "agents/ref-dispatch-machinery.md carries TH-LANE: literal",
-        "none of the three files exist in this worktree yet (Task-2/3/5 "
-        "not landed) — see tests/evidence/nested-lane-probes.md",
-    )
-else:
-    lane_hits = []
-    if leader_exists:
-        lane_hits.append(("agents/leader.md", injector_carries(read(LEADER_MD), "TH-LANE")))
-    if orchestrator_exists:
-        lane_hits.append(
-            ("agents/orchestrator.md", injector_carries(read(ORCHESTRATOR_MD), "TH-LANE"))
+for _label, _path in (
+    ("agents/orchestrator.md", ORCHESTRATOR_MD),
+    ("agents/ref-dispatch-machinery.md", REF_DISPATCH_MACHINERY_MD),
+):
+    _text = read(_path)
+    _near_misses = _NEAR_MISS_RE.findall(_text)
+    _exact = "TH-LANE:" in _text
+    if not _near_misses:
+        check(f"{_label} carries no TH-LANE injector (clean retirement)", True)
+    elif _exact:
+        check(
+            f"{_label} reintroduces a TH-LANE injector matching the parser's exact"
+            " anchored literal",
+            True,
         )
-    if ref_dispatch_exists:
-        lane_hits.append(
-            (
-                "agents/ref-dispatch-machinery.md",
-                injector_carries(read(REF_DISPATCH_MACHINERY_MD), "TH-LANE"),
-            )
+    else:
+        check(
+            f"{_label} carries no near-miss TH-LANE-like marker with a drifted literal",
+            False,
+            f"found {_near_misses!r} without the exact 'TH-LANE:' anchor the parser"
+            " requires — a reintroduced injector with a drifted literal",
         )
-    check(
-        "at least one injector (leader.md spawn / orchestrator.md dispatch / "
-        "ref-dispatch-machinery.md relocated clause) carries the identical "
-        "TH-LANE: literal",
-        any(ok for _, ok in lane_hits),
-        f"checked {[name for name, _ in lane_hits]}, none carried the "
-        "exact literal — marker drift",
-    )
 
 # ---------------------------------------------------------------------------
 # Summary
@@ -190,7 +167,7 @@ print()
 passed = sum(1 for ok, _ in results if ok)
 failed = sum(1 for ok, _ in results if not ok)
 total = len(results)
-print(f"Results: {passed}/{total} passed, {failed} failed, {len(pending)} pending")
+print(f"Results: {passed}/{total} passed, {failed} failed")
 
 if failed:
     print()
@@ -199,13 +176,6 @@ if failed:
         if not ok:
             print(f"  - {name}")
     sys.exit(1)
-
-if pending:
-    print()
-    print("PENDING (not a failure — task-ordering gap, see "
-          "tests/evidence/nested-lane-probes.md):")
-    for name in pending:
-        print(f"  - {name}")
 
 print("No failing assertions.")
 sys.exit(0)
