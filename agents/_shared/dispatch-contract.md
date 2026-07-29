@@ -1,7 +1,7 @@
 # Dispatch contract
 <!-- Single source of truth for what a dispatch prompt may and must not carry,
      and for the two-halves scope rule (review scope vs. write scope).
-     Consumed by: agents/leader.md, agents/orchestrator.md (pointer only, never
+     Consumed by: agents/orchestrator.md (pointer only, never
      restated) — see agents/README.md § "Adding or modifying an agent" and
      agents/agent-builder.md § "Mandatory Sections Checklist" for where new
      agents pick this up.
@@ -11,11 +11,11 @@
 
 This file is the ONE canonical description of what a dispatch prompt may contain, what it
 must never contain, and the two-halves scope rule that governs review scope and write
-scope. `agents/leader.md` and `agents/orchestrator.md` — the two agents in this tree that
-write dispatch prompts to other agents — reference this file by section and never restate
-its prose. A second copy would diverge from this one the first time either is edited, and
-the no-relocation check (Suite 174) exists precisely to catch that kind of duplication
-across `agents/ref-*.md` and `agents/_shared/*.md` files.
+scope. `agents/orchestrator.md` — the sole agent in this tree that writes dispatch prompts
+to other agents — references this file by section and never restates its prose. A second
+copy would diverge from this one the first time either is edited, and the no-relocation
+check (Suite 174) exists precisely to catch that kind of duplication across
+`agents/ref-*.md` and `agents/_shared/*.md` files.
 
 ## What a dispatch may carry
 
@@ -72,9 +72,8 @@ A dispatch prompt MUST NOT carry:
   independent check. A verifier that already knows what conclusion it is meant to reach is
   not verifying.
 - A **menu of options directed at a human**, when the recipient is a specialist and not the
-  operator-facing presenter. Gate option menus belong to the presenter (`th:leader` in the
-  normal path; the orchestrator's own fallback renderer in the takeover path — see
-  `agents/_shared/gate-contract.md`), never to a specialist dispatch.
+  operator-facing presenter. Gate option menus belong to the coordinator, which presents
+  every gate directly (`agents/_shared/gate-contract.md`), never to a specialist dispatch.
 - A **scope-injection** — new work beyond what the board already declares.
   Scope lives on the board (`01-plan.md § Task List`, the approved AC set, the declared
   `Files:`) and the dispatch points at it. When a dispatch prompt asks for work not
@@ -128,7 +127,7 @@ an evasion of the rubric's intent.
 |---|---|---|---|---|
 | Canonical rule lives in exactly one file (this one) | Suite 174 no-relocation check | fail-closed — a duplicate in another `ref-*.md`/`_shared/*.md` file is flagged as a defect, not read as "still present, therefore fine" | `python3 tests/test_agent_structure.py` (`/th:lint`, `tests/run-all.sh`) | `tests/test_agent_structure.py:38121-38219` |
 | Consumers reference this file by section, never restate its prose | prose-only — no structural duplicate-content check runs per consumer today | n/a — declared limitation, not a gap this file can close alone | n/a — control not yet mechanically invoked | n/a — control new, no prior enforcement site |
-| Review-scope half: a dispatch carries a coordinate, never a bound | prose-only | fail-open toward more scrutiny — a verifier reading a dispatch with no bound reviews the whole artifact, which is the safe default this half is built on | the dispatching agent itself (`th:leader`, orchestrator), self-applied at prompt-construction time | n/a — control new, generalized from the removal this PR performs at its five prior sites |
+| Review-scope half: a dispatch carries a coordinate, never a bound | prose-only | fail-open toward more scrutiny — a verifier reading a dispatch with no bound reviews the whole artifact, which is the safe default this half is built on | the coordinator, self-applied at prompt-construction time | n/a — control new, generalized from the removal this PR performs at its five prior sites |
 | Write-scope half: bounded by the recipient's own contract, by pointer only | header-survival check (full-file-loss detection) + `Edit`-only-existing-file discipline (self-applied, not independently checked) | the header-survival check catches a full-file loss; a content corruption that leaves every heading intact is a residual the write-tool discipline names but does not mechanically detect | orchestrator (`agents/orchestrator.md § "Header-survival check (panel dispatch integrity)"`), around every panel dispatch on a shared review file | `agents/_shared/plan-consolidation.md:44`, `:60` |
 | Closed "may carry" / "must not carry" lists exclude any content outside the three permitted items, by construction | prose-only — verified by direct read, not a grep suite | n/a — a closed-list boundary is a structural property of this file's own text, checked by the reader (`qa` validate mode / plan-reviewer) at the acceptance-criteria level | `qa` (validate) / plan-reviewer, reading this file directly | n/a — control new, scoped to this file's own text |
 | Scope-injection rule: a dispatch never introduces new scope, only points at the board | prose-only — the recipient self-applies the report-and-route response | fail-safe toward escalation, never silent absorption or silent rejection — an out-of-board request always surfaces to the dispatcher | the dispatched recipient itself, on receiving an out-of-board request | n/a — control new, generalized from the recurring board-vs-dispatch drift this rule closes |
@@ -151,7 +150,7 @@ not cover.
 
 ## How to reference this file
 
-In `agents/leader.md` or `agents/orchestrator.md`, replace inline dispatch-content prose
+In `agents/orchestrator.md`, replace inline dispatch-content prose
 with a one-line cross-reference:
 
 ```
