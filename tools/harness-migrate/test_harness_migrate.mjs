@@ -989,104 +989,106 @@ console.log("\n=== Section 15: Ragged-tier resolution (AC-3, #424) ===");
 }
 
 // ---------------------------------------------------------------------------
-// Section 16: Installer-layer role override — leader display rename
-// (Task-3 AC-5, AC-6, AC-7)
+// Section 16: Installer-layer role override — orchestrator display rename
+// (Task-2 AC-5, AC-6, AC-7)
 // ---------------------------------------------------------------------------
 
-console.log("\n=== Section 16: Leader display rename (Task-3 AC-5, AC-6, AC-7) ===");
+console.log("\n=== Section 16: Orchestrator display rename (Task-2 AC-5, AC-6, AC-7) ===");
 
 {
-  // applyModeByRole applied directly to an already-projected leader file.
-  const leaderInput = `---
-name: leader
+  // applyModeByRole applied directly to an already-projected orchestrator file.
+  const orchestratorInput = `---
+name: orchestrator
 description: Coordinator.
 model: claude-opus-4-5
 tools: Read
 ---
 
-Leader body.
+Orchestrator body.
 `;
-  const projected = transformToOpencode("agents/leader.md", leaderInput, "/fake-repo").content;
+  const projected = transformToOpencode("agents/orchestrator.md", orchestratorInput, "/fake-repo").content;
 
-  // AC-5: the exported generic transform stays name: leader / mode: subagent
-  // for the leader (conformance-fixture-bound; unaffected by the role layer).
+  // AC-5: the exported generic transform stays name: orchestrator / mode:
+  // subagent for the orchestrator (conformance-fixture-bound; unaffected by
+  // the role layer).
   const { frontmatter: genericFm } = parseFrontmatter(projected);
   assert(
-    "AC-5: generic transformToOpencode leaves leader as name: leader",
-    genericFm["name"] === "leader"
+    "AC-5: generic transformToOpencode leaves orchestrator as name: orchestrator",
+    genericFm["name"] === "orchestrator"
   );
   assert(
-    "AC-5: generic transformToOpencode leaves leader as mode: subagent",
+    "AC-5: generic transformToOpencode leaves orchestrator as mode: subagent",
     genericFm["mode"] === "subagent"
   );
 
-  // Applying the role layer on top renames + re-modes the leader.
-  const roled = applyModeByRole(projected, "leader");
+  // Applying the role layer on top renames + re-modes the orchestrator.
+  const roled = applyModeByRole(projected, "orchestrator");
   const { frontmatter: roledFm } = parseFrontmatter(roled);
-  assert("Task-3 AC-1: role layer sets name: TH Leader", roledFm["name"] === "TH Leader");
-  assert("Task-3 AC-1: role layer sets mode: primary", roledFm["mode"] === "primary");
+  assert("Task-2 AC-1: role layer sets name: TH Orchestrator", roledFm["name"] === "TH Orchestrator");
+  assert("Task-2 AC-1: role layer sets mode: primary", roledFm["mode"] === "primary");
 
-  // Non-leader agents are returned unchanged by the role layer.
-  const orchestratorInput = `---
-name: orchestrator
+  // Every other agent is returned unchanged by the role layer.
+  const architectInput = `---
+name: architect
 model: sonnet
 tools: Read
 ---
 
-Orchestrator body.
+Architect body.
 `;
-  const orchestratorProjected = transformToOpencode("agents/orchestrator.md", orchestratorInput, "/fake-repo").content;
-  const orchestratorRoled = applyModeByRole(orchestratorProjected, "orchestrator");
+  const architectProjected = transformToOpencode("agents/architect.md", architectInput, "/fake-repo").content;
+  const architectRoled = applyModeByRole(architectProjected, "architect");
   assert(
-    "Task-3 AC-3: role layer leaves non-leader output byte-identical",
-    orchestratorRoled === orchestratorProjected
+    "Task-2 AC-3: role layer leaves non-orchestrator output byte-identical",
+    architectRoled === architectProjected
   );
 }
 
 {
-  // Full runTransform pipeline: leader.md gets the rename, a non-leader
-  // agent does not — exercised end to end through the real batch writer.
+  // Full runTransform pipeline: orchestrator.md gets the rename, a
+  // non-orchestrator agent does not — exercised end to end through the real
+  // batch writer.
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "hm-role-layer-"));
   try {
     const agentsDir = path.join(tmpDir, "agents");
     await fs.mkdir(agentsDir, { recursive: true });
 
     await fs.writeFile(
-      path.join(agentsDir, "leader.md"),
+      path.join(agentsDir, "orchestrator.md"),
       `---
-name: leader
+name: orchestrator
 description: Coordinator.
 model: claude-opus-4-5
 tools: Read
 ---
 
-Leader body.
+Orchestrator body.
 `,
       "utf8"
     );
-    await fs.writeFile(path.join(agentsDir, "orchestrator.md"), CC_AGENT_CONTENT.replace("test-agent", "orchestrator"), "utf8");
+    await fs.writeFile(path.join(agentsDir, "architect.md"), CC_AGENT_CONTENT.replace("test-agent", "architect"), "utf8");
 
     const manifest = await runTransform(DIRECTION_TO_OPENCODE, tmpDir, { dryRun: false });
-    const leaderItem = manifest.find((m) => m.source && m.source.includes("leader.md"));
+    const orchestratorItem = manifest.find((m) => m.source && m.source.includes("orchestrator.md"));
     assert(
-      "Task-3 AC-5: leader.md projected via runTransform",
-      leaderItem !== undefined && leaderItem.status === "projected"
+      "Task-2 AC-2: orchestrator.md projected via runTransform",
+      orchestratorItem !== undefined && orchestratorItem.status === "projected"
     );
-
-    const leaderOutput = await fs.readFile(path.join(tmpDir, ".opencode", "agents", "leader.md"), "utf8");
-    const { frontmatter: leaderOutFm } = parseFrontmatter(leaderOutput);
-    assert("Task-3 AC-5: runTransform output has name: TH Leader", leaderOutFm["name"] === "TH Leader");
-    assert("Task-3 AC-5: runTransform output has mode: primary", leaderOutFm["mode"] === "primary");
 
     const orchestratorOutput = await fs.readFile(path.join(tmpDir, ".opencode", "agents", "orchestrator.md"), "utf8");
     const { frontmatter: orchestratorOutFm } = parseFrontmatter(orchestratorOutput);
+    assert("Task-2 AC-2: runTransform output has name: TH Orchestrator", orchestratorOutFm["name"] === "TH Orchestrator");
+    assert("Task-2 AC-2: runTransform output has mode: primary", orchestratorOutFm["mode"] === "primary");
+
+    const architectOutput = await fs.readFile(path.join(tmpDir, ".opencode", "agents", "architect.md"), "utf8");
+    const { frontmatter: architectOutFm } = parseFrontmatter(architectOutput);
     assert(
-      "Task-3 AC-3: runTransform leaves non-leader name unchanged",
-      orchestratorOutFm["name"] === "orchestrator"
+      "Task-2 AC-3: runTransform leaves non-orchestrator name unchanged",
+      architectOutFm["name"] === "architect"
     );
     assert(
-      "Task-3 AC-3: runTransform leaves non-leader mode: subagent",
-      orchestratorOutFm["mode"] === "subagent"
+      "Task-2 AC-3: runTransform leaves non-orchestrator mode: subagent",
+      architectOutFm["mode"] === "subagent"
     );
   } finally {
     await fs.rm(tmpDir, { recursive: true, force: true });
@@ -1094,29 +1096,29 @@ Leader body.
 }
 
 {
-  // Round-trip: project the leader agent forward (generic + role layer), then
-  // project the result back to CC form. The inverse must restore the
-  // canonical CC name ("leader") rather than carry through the injected
-  // opencode display name ("TH Leader") — the defect found in the dual
-  // review of this feature.
-  const leaderInput = `---
-name: leader
+  // Round-trip: project the orchestrator agent forward (generic + role
+  // layer), then project the result back to CC form. The inverse must
+  // restore the canonical CC name ("orchestrator") rather than carry through
+  // the injected opencode display name ("TH Orchestrator") — the defect
+  // found in the dual review of this feature.
+  const orchestratorInput = `---
+name: orchestrator
 description: Coordinator.
 model: claude-opus-4-5
 tools: Read
 ---
 
-Leader body.
+Orchestrator body.
 `;
-  const forwardGeneric = transformToOpencode("agents/leader.md", leaderInput, "/fake-repo").content;
-  const forwardRoled = applyModeByRole(forwardGeneric, "leader");
+  const forwardGeneric = transformToOpencode("agents/orchestrator.md", orchestratorInput, "/fake-repo").content;
+  const forwardRoled = applyModeByRole(forwardGeneric, "orchestrator");
   const { frontmatter: forwardFm } = parseFrontmatter(forwardRoled);
-  assert("round-trip fixture: forward pass produced the injected display name", forwardFm["name"] === "TH Leader");
+  assert("round-trip fixture: forward pass produced the injected display name", forwardFm["name"] === "TH Orchestrator");
 
-  const back = transformToCC(".opencode/agents/leader.md", forwardRoled, "/fake-repo");
+  const back = transformToCC(".opencode/agents/orchestrator.md", forwardRoled, "/fake-repo");
   const { frontmatter: backFm } = parseFrontmatter(back.content);
-  assert("round-trip: inverse restores canonical name 'leader', not the injected 'TH Leader'", backFm["name"] === "leader");
-  assert("round-trip: inverse does not leak the injected display name", backFm["name"] !== "TH Leader");
+  assert("round-trip: inverse restores canonical name 'orchestrator', not the injected 'TH Orchestrator'", backFm["name"] === "orchestrator");
+  assert("round-trip: inverse does not leak the injected display name", backFm["name"] !== "TH Orchestrator");
 }
 
 // ---------------------------------------------------------------------------

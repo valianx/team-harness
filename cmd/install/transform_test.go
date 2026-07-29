@@ -150,17 +150,17 @@ func TestTransform_BlankModelSkipped(t *testing.T) {
 	}
 }
 
-// TestTransform_ModeByRole_Leader asserts the installer-layer mode-by-role
-// override: applying applyModeByRole to an already-transformed leader file
-// replaces mode: subagent with mode: primary AND renames the display name
-// to "TH Leader" (AC-12 / S-5; Task-3 AC-1).
+// TestTransform_ModeByRole_Orchestrator asserts the installer-layer
+// mode-by-role override: applying applyModeByRole to an already-transformed
+// orchestrator file replaces mode: subagent with mode: primary AND renames
+// the display name to "TH Orchestrator" (AC-12 / S-5; Task-2 AC-2).
 //
 // This test is deliberately separate from the conformance fixture — the generic
-// transform always injects mode: subagent and name: leader (fixture-bound /
+// transform always injects mode: subagent and name: orchestrator (fixture-bound /
 // migrate.mjs parity); the role override is an installer-specific
 // post-projection step.
-func TestTransform_ModeByRole_Leader(t *testing.T) {
-	input := "---\nname: leader\nmodel: opus\ntools: Read\n---\nBody.\n"
+func TestTransform_ModeByRole_Orchestrator(t *testing.T) {
+	input := "---\nname: orchestrator\nmodel: opus\ntools: Read\n---\nBody.\n"
 	transformed, err := transformToOpencode([]byte(input), TransformKindAgent)
 	if err != nil {
 		t.Fatalf("transform error: %v", err)
@@ -168,56 +168,56 @@ func TestTransform_ModeByRole_Leader(t *testing.T) {
 
 	// After the generic transform, mode should be subagent and name unchanged.
 	if !strings.Contains(string(transformed), "mode: subagent") {
-		t.Error("generic transform should set mode: subagent for leader")
+		t.Error("generic transform should set mode: subagent for orchestrator")
 	}
-	if !strings.Contains(string(transformed), "name: leader") {
-		t.Error("generic transform should carry name: leader unchanged")
+	if !strings.Contains(string(transformed), "name: orchestrator") {
+		t.Error("generic transform should carry name: orchestrator unchanged")
 	}
 
 	// Apply the mode-by-role override.
-	final, err := applyModeByRole(transformed, "leader")
+	final, err := applyModeByRole(transformed, "orchestrator")
 	if err != nil {
 		t.Fatalf("applyModeByRole error: %v", err)
 	}
 	if !strings.Contains(string(final), "mode: primary") {
-		t.Error("after applyModeByRole, leader should have mode: primary")
+		t.Error("after applyModeByRole, orchestrator should have mode: primary")
 	}
 	if strings.Contains(string(final), "mode: subagent") {
-		t.Error("after applyModeByRole, 'mode: subagent' should be replaced in leader")
+		t.Error("after applyModeByRole, 'mode: subagent' should be replaced in orchestrator")
 	}
-	if !strings.Contains(string(final), "name: TH Leader") {
-		t.Error("after applyModeByRole, leader should display as name: TH Leader")
+	if !strings.Contains(string(final), "name: TH Orchestrator") {
+		t.Error("after applyModeByRole, orchestrator should display as name: TH Orchestrator")
 	}
-	if strings.Contains(string(final), "name: leader\n") {
-		t.Error("after applyModeByRole, 'name: leader' should be replaced in leader")
+	if strings.Contains(string(final), "name: orchestrator\n") {
+		t.Error("after applyModeByRole, 'name: orchestrator' should be replaced in orchestrator")
 	}
 }
 
-// TestTransform_ModeByRole_NonLeader asserts that applyModeByRole leaves
-// non-leader agents unchanged (mode: subagent and name preserved).
-// orchestrator — the task-scoped execution engine — is a subagent, not the
-// primary, and must never inherit the leader's display rename.
-func TestTransform_ModeByRole_NonLeader(t *testing.T) {
-	input := "---\nname: orchestrator\nmodel: sonnet\ntools: Read\n---\nBody.\n"
+// TestTransform_ModeByRole_NonOrchestrator asserts that applyModeByRole
+// leaves every other agent unchanged (mode: subagent and name preserved).
+// architect must never inherit the coordinator's primary mode or display
+// rename — exactly one agent is ever promoted.
+func TestTransform_ModeByRole_NonOrchestrator(t *testing.T) {
+	input := "---\nname: architect\nmodel: sonnet\ntools: Read\n---\nBody.\n"
 	transformed, err := transformToOpencode([]byte(input), TransformKindAgent)
 	if err != nil {
 		t.Fatalf("transform error: %v", err)
 	}
 
-	final, err := applyModeByRole(transformed, "orchestrator")
+	final, err := applyModeByRole(transformed, "architect")
 	if err != nil {
 		t.Fatalf("applyModeByRole error: %v", err)
 	}
 
-	// Should still have mode: subagent and name: orchestrator.
+	// Should still have mode: subagent and name: architect.
 	if !strings.Contains(string(final), "mode: subagent") {
-		t.Error("non-leader agent should retain mode: subagent after applyModeByRole")
+		t.Error("non-orchestrator agent should retain mode: subagent after applyModeByRole")
 	}
-	if !strings.Contains(string(final), "name: orchestrator") {
-		t.Error("non-leader agent should retain its own name after applyModeByRole")
+	if !strings.Contains(string(final), "name: architect") {
+		t.Error("non-orchestrator agent should retain its own name after applyModeByRole")
 	}
-	if strings.Contains(string(final), "TH Leader") {
-		t.Error("non-leader agent must never receive the leader's TH Leader display name")
+	if strings.Contains(string(final), "TH Orchestrator") {
+		t.Error("non-orchestrator agent must never receive the coordinator's TH Orchestrator display name")
 	}
 }
 

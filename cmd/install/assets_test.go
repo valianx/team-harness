@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// TestEmbeddedAssets_AgentCount asserts exactly 27 invocable agent .md files
+// TestEmbeddedAssets_AgentCount asserts exactly 26 invocable agent .md files
 // under agents/. This is the AC-6 assertion: every agent in the canonical
 // roster must be present in the embedded FS. The count is a canary — if an
 // agent is added without updating this test, the test fails immediately,
@@ -15,7 +15,7 @@ import (
 // Note: agents/_shared/ contains cross-cutting snippets (not invocable agents)
 // and is intentionally excluded from the count.
 func TestEmbeddedAssets_AgentCount(t *testing.T) {
-	const wantAgents = 27 // expected count of invocable top-level agent .md files; canary against a silent embed regression
+	const wantAgents = 26 // expected count of invocable top-level agent .md files; canary against a silent embed regression
 	embedded := EmbeddedAssets()
 
 	var mdFiles []string
@@ -93,7 +93,7 @@ func TestEmbeddedAssets_AllExpectedAgents(t *testing.T) {
 	roster := []string{
 		"adversary", "agent-builder", "architect", "code-researcher",
 		"d2-diagrammer", "delivery", "diagrammer", "documenter", "gcp-cost-analyzer",
-		"gcp-infra", "implementer", "init", "leader", "likec4-diagrammer", "mentor",
+		"gcp-infra", "implementer", "init", "likec4-diagrammer", "mentor",
 		"orchestrator", "plan-reviewer", "qa", "qa-plan", "research-consolidator",
 		"researcher", "reviewer", "reviewer-consolidator", "security", "tester",
 		"translator", "ux-reviewer",

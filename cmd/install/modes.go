@@ -37,10 +37,8 @@ type AgentOverride struct {
 // Both are verified at test time by TestLowCostMatrixInvariants in modes_test.go.
 var lowCostMatrix = map[string]AgentOverride{
 	// Gate-makers, design heavyweights, acceptance auditors — effort: high
-	// leader (top-level coordinator) + orchestrator (task-scoped execution engine)
-	// are the successors of the removed monolithic orchestrator; both coordinate
-	// and gate, so both sit in the high tier.
-	"leader":                 {Model: "sonnet", Effort: "high"},
+	// orchestrator is the sole top-level coordinator (retired: the leader/
+	// orchestrator split, and the map entry that named it separately).
 	"orchestrator":           {Model: "sonnet", Effort: "high"},
 	"architect":             {Model: "sonnet", Effort: "high"},
 	"agent-builder":         {Model: "sonnet", Effort: "high"},

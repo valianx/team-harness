@@ -63,10 +63,10 @@ this is not a code signature. The Bash tool's own permission prompt, which
 the operator sees before this command executes, is the residual human
 checkpoint on top of that floor.
 
-## Standalone — never gated by the boot capability check
+## Standalone — never gated by pipeline dispatch
 
-This command is a standalone utility, not a pipeline dispatch. The
-leader's boot capability check gates orchestrator-spawning for pipeline
-work; it never gates a standalone utility. Run this command regardless of
-which runtime branch the boot check resolved, including a session where
-the boot check has not run at all.
+This command is a standalone utility, not a pipeline dispatch. There is no
+boot-time capability check gating it or any other standalone utility — that
+check verified a two-coordinator split that no longer exists, and retired
+with it. Run this command regardless of session state, including a fresh
+session where no development task has entered the pipeline yet.
