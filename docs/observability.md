@@ -38,7 +38,105 @@ the orchestrator emits pipeline friction events to `context-harness-mcp` via the
   TH emission is the construction-side floor. Neither side trusts the other alone.
 
 Full emission contract, the 8-event catalog, and the trigger map: see
-`agents/orchestrator.md § "Flow Telemetry Emission"`.
+`§ Flow Telemetry Emission` below.
+
+---
+
+## Flow Telemetry Emission
+
+This section is the coordinator's cross-user flow-event emission contract. Emission is
+**best-effort and non-blocking** — telemetry NEVER halts, fails, or delays a pipeline.
+
+### Config gate
+
+The orchestrator reads `flow_telemetry.enabled` from `~/.claude/.team-harness.json` at boot,
+alongside `logs-mode` and `language`.
+
+- **`flow_telemetry.enabled: true`** — emit flow events at the friction points listed below.
+- **`flow_telemetry.enabled: false` or key absent (default)** — emit nothing. Zero
+  `record_flow_event` calls are made. This is the factory default; telemetry is opt-in.
+
+### Emission contract
+
+When `flow_telemetry.enabled: true`, the orchestrator calls `mcp__memory__record_flow_event`
+once at each friction point listed below. The call is **fire-and-forget** — no return value is
+awaited, no error from this call propagates to the pipeline, and it is never retried.
+
+**Resilience rule (mirrors `agents/_shared/kg-write-policy.md` § "Failure modes"):**
+Any error on the `record_flow_event` call — CH server unreachable, tool absent, timeout,
+validation rejection — MUST be handled as follows:
+1. Log `flow-telemetry: unavailable` to the pipeline's `{events_file}` as a single
+   `operation.failed` event (same schema as other `operation.*` events).
+2. Continue the pipeline. The emission failure changes nothing about the pipeline outcome.
+
+### Event catalog (8 events — byte-identical to CH `internal/validate/flowevent.go`)
+
+The closed `event` enum and per-event field sets are an invariant shared with
+`context-harness-mcp/internal/validate/flowevent.go` (multi-site invariant — #404).
+Do NOT add or rename values without a coordinated two-repo change.
+
+**Common fields (every event):**
+
+| Field | Type | Constraint |
+|-------|------|------------|
+| `event` | string | One of the 8 values below |
+| `ts` | string | RFC3339 UTC — use `date -u +%Y-%m-%dT%H:%M:%SZ` or equivalent |
+| `project` | string | Bare repo name (e.g. `team-harness`). No path. |
+| `task_type` | string | `feature \| fix \| hotfix \| refactor \| enhancement \| docs \| research` |
+| `th_version` | string | Plugin semver (read from `.claude-plugin/plugin.json` `version` field) |
+
+**Closed `event` enum (8 values) and per-event fields:**
+
+| `event` | Per-event fields | Field constraints |
+|---------|-----------------|-------------------|
+| `guard.block` | `hook`, `reason`, `resolved` | `hook` ∈ {prepublish, dev, policy}; `reason` ∈ {over-bump, secret, outward}; `resolved` bool |
+| `gate.fail` | `gate`, `verdict` | `gate` ∈ {STAGE-GATE-1, STAGE-GATE-3, acceptance, plan-review}; `verdict` ∈ {fail, concerns} |
+| `verify.reject` | `agent`, `verdict` | `agent` ∈ {qa, tester}; `verdict` ∈ {fail, concerns} |
+| `iteration.loop` | `stage`, `iterations` | `stage` ∈ {1, 2, 3}; `iterations` int ≥ 2 |
+| `blocked` | `reason` | `reason` ∈ {no-dispatch, manual-push, guard, dependency} |
+| `scope.collapse` | `items_dropped` | `items_dropped` int ≥ 1 |
+| `mcp.unavailable` | `op` | `op` ∈ {read, write} |
+| `abandon` | `last_stage` | `last_stage` ∈ {1, 2, 3} |
+
+### Metadata-only construction rule
+
+Every payload MUST contain ONLY the fields from the catalog above — bounded enums, ints,
+booleans, a semver string, and a timestamp. The following are FORBIDDEN in any field value:
+- Diff content, code snippets, file paths containing a user identifier
+- AC text, commit message bodies, branch names containing personal prefixes
+- Secrets, tokens, credentials of any kind
+
+The CH Content Filter (`internal/validate.Run`) enforces this at ingest; the orchestrator
+enforces it by construction. Neither side relies solely on the other (defense in depth).
+
+### Emission trigger map
+
+| Friction point | `event` value | When to emit |
+|---------------|---------------|--------------|
+| A hook blocks an outward action | `guard.block` | When `dev-guard` or `policy-block` returns `deny` or `ask` and the operator does not override |
+| STAGE-GATE-1/3 operator rejects or requests edit | `gate.fail` | When the operator votes `rejected`/`edit`/`amend`/`abort` at any STAGE-GATE the orchestrator witnesses |
+| Plan-review verdicts `concerns` or `fail` | `gate.fail` | When `plan-reviewer` returns `concerns` or `fail` (gate: `plan-review`) |
+| Acceptance gate fails a verify round | `gate.fail` | When Phase 3.5 routes back to implementer (gate: `acceptance`) |
+| A verifier returns `fail` or `concerns` | `verify.reject` | When `qa` or `tester` returns a non-pass verdict |
+| An agent iterates (≥2 rounds) | `iteration.loop` | When Phase 3.5 has reached the 2nd iteration for a stage |
+| Pipeline reaches `blocked-no-dispatch` or `blocked-manual-push` | `blocked` | When dispatch is unavailable or push is blocked |
+| Operator or pipeline collapses scope | `scope.collapse` | When AC items are dropped from the plan during STAGE-GATE-1 edit review |
+| MCP memory server unavailable | `mcp.unavailable` | When a KG read/write call fails due to connectivity (op: read or write) |
+| Pipeline is abandoned by operator at any stage | `abandon` | When the operator explicitly aborts at any STAGE-GATE |
+
+### Example payload (gate.fail)
+
+```json
+{
+  "event": "gate.fail",
+  "ts": "2026-06-21T10:00:00Z",
+  "project": "team-harness",
+  "task_type": "feature",
+  "th_version": "2.117.2",
+  "gate": "STAGE-GATE-1",
+  "verdict": "fail"
+}
+```
 
 ---
 

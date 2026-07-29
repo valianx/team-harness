@@ -6,7 +6,12 @@ AC-2.7 automated cross-repo schema-identity guard.
 Fetches the canonical `event` enum + per-event field names from the merged
 context-harness-mcp `internal/validate/flowevent.go` (raw GitHub URL, pinned to the
 commit that merged PR-1) and asserts byte-identity with the enum/fields declared in
-`agents/orchestrator.md § Flow Telemetry Emission`.
+`docs/observability.md § Flow Telemetry Emission`.
+
+The invariant this suite enforces is schema identity between this repo and CH's
+`flowevent.go` — never file location. The catalog lives in `docs/observability.md`
+(not the always-loaded `agents/orchestrator.md`) because a dormant, opt-in feature's
+full schema does not belong in a prompt every pipeline pays to load.
 
 Network failure → SKIP with a clear warning so this test never false-reds CI offline.
 """
@@ -210,21 +215,21 @@ def _parse_ch_per_event_fields(source: str) -> dict[str, frozenset[str]]:
     return result
 
 
-def _slice_flow_emission_section(orchestrator_text: str) -> str:
+def _slice_flow_emission_section(observability_text: str) -> str:
     """
     Extract the content of '## Flow Telemetry Emission' up to the next ## heading
     or a --- boundary.  Returns empty string when the section is absent.
     """
     marker = "## Flow Telemetry Emission"
-    idx = orchestrator_text.find(marker)
+    idx = observability_text.find(marker)
     if idx == -1:
         return ""
-    section_end = len(orchestrator_text)
+    section_end = len(observability_text)
     for boundary in ["\n## ", "\n---\n"]:
-        pos = orchestrator_text.find(boundary, idx + len(marker))
+        pos = observability_text.find(boundary, idx + len(marker))
         if pos != -1:
             section_end = min(section_end, pos)
-    return orchestrator_text[idx:section_end]
+    return observability_text[idx:section_end]
 
 
 def _parse_th_enum(section: str) -> frozenset[str]:
@@ -334,23 +339,16 @@ def run_tests() -> int:
     """Return 0 on all pass, 1 on any failure, 2 on skip."""
     failures: list[str] = []
 
-    # The Flow Telemetry Emission catalog documents runtime emission behaviour
-    # across the whole pipeline; agents/orchestrator.md is the sole coordinator
-    # and the sole target. The retired agents/leader.md merge-in below is kept
-    # as a harmless no-op guard (the path never exists any more) rather than
-    # removed outright, so a future re-introduction of a second coordinator
-    # file would still be picked up without touching this test.
-    orchestrator_path = REPO_ROOT / "agents" / "orchestrator.md"
-    leader_path = REPO_ROOT / "agents" / "leader.md"
-    if not orchestrator_path.exists():
-        failures.append("agents/orchestrator.md not found")
+    # The Flow Telemetry Emission catalog lives in docs/observability.md, the
+    # canonical home for both observability planes (local + cross-user).
+    observability_path = REPO_ROOT / "docs" / "observability.md"
+    if not observability_path.exists():
+        failures.append("docs/observability.md not found")
         _report(failures)
         return 1
 
-    orchestrator_text = orchestrator_path.read_text(encoding="utf-8")
-    if leader_path.exists():
-        orchestrator_text = leader_path.read_text(encoding="utf-8") + "\n" + orchestrator_text
-    section = _slice_flow_emission_section(orchestrator_text)
+    observability_text = observability_path.read_text(encoding="utf-8")
+    section = _slice_flow_emission_section(observability_text)
 
     # -----------------------------------------------------------------------
     # Group A — TH-local checks (always run, no network required).
@@ -358,7 +356,7 @@ def run_tests() -> int:
 
     # A1: § Flow Telemetry Emission section exists.
     if not section:
-        failures.append("agents/orchestrator.md: '## Flow Telemetry Emission' section absent")
+        failures.append("docs/observability.md: '## Flow Telemetry Emission' section absent")
 
     # A2: TH enum matches the canonical set.
     th_enum = _parse_th_enum(section)
@@ -398,14 +396,14 @@ def run_tests() -> int:
     # A5: config gate documented (flow_telemetry.enabled).
     if "flow_telemetry.enabled" not in section:
         failures.append(
-            "agents/orchestrator.md § Flow Telemetry Emission: "
+            "docs/observability.md § Flow Telemetry Emission: "
             "'flow_telemetry.enabled' config gate not documented"
         )
 
     # A6: resilience / non-blocking contract documented.
     if "flow-telemetry: unavailable" not in section:
         failures.append(
-            "agents/orchestrator.md § Flow Telemetry Emission: "
+            "docs/observability.md § Flow Telemetry Emission: "
             "resilience log line 'flow-telemetry: unavailable' not documented"
         )
 
