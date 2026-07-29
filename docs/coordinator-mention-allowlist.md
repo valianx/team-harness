@@ -81,8 +81,16 @@ No other survivors in this seam's 11 files (`docs/how-it-works.md`, `docs/agent-
 
 ## Seam-skills
 
-Not yet reconciled at the time of this commit. Placeholder — see `02-implementation.md § "What
-remains"`.
+| File:line | Mention | Rule | Reason |
+|---|---|---|---|
+| `skills/setup/SKILL.md:345` | "FALLBACK — nested-context Task unavailability ... it emits a `dispatch_handoff` directive" | R5 | Byte-identical reproduction of the canonical managed block owned by Task-2 (`skills/setup/managed-blocks/orchestrator-dispatch-rule.md`), which this skill writes verbatim into `~/.claude/CLAUDE.md`. Not an independent claim — kept in lockstep with the source of truth rather than re-derived. |
+
+No other survivors in this seam's 14 files. `skills/recover/SKILL.md`, `skills/lint/SKILL.md`,
+`skills/pipelines/SKILL.md`, `skills/setup/SKILL.md` (rest), `skills/trace/SKILL.md`,
+`skills/inline/SKILL.md`, `skills/README.md`, `skills/audit/SKILL.md`,
+`skills/plan-review/SKILL.md`, `skills/apply-review/SKILL.md`, `skills/background/SKILL.md`,
+`skills/update/SKILL.md`, `skills/audit-security/SKILL.md`, `output-styles/developer-mode.md`
+were rewritten to the single coordinator (R1/R2/R3).
 
 ## Seam-root
 
