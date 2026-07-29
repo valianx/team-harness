@@ -3,7 +3,7 @@ name: pipelines
 description: Show current state of all pipelines in workspaces.
 ---
 
-Show the current state of all pipelines in workspaces. This is a standalone utility — does NOT route through the leader or any orchestrator; it is a pure read-only renderer.
+Show the current state of all pipelines in workspaces. This is a standalone utility — does NOT route through the orchestrator; it is a pure read-only renderer.
 
 ## Voice
 
@@ -51,9 +51,8 @@ Analyze the input: $ARGUMENTS
    - Last completed phase
    - Next action
    - Last updated timestamp
-3. Also check for `workspaces/batch-progress.md` — if found, read and include batch status
-4. **Scan worktrees** — run `git worktree list` to find active worktrees. For each worktree path, check if `workspaces/*/00-state.md` exists inside and extract the same fields
-5. **Verify live processes** — run `tmux list-sessions 2>/dev/null` (via WSL if on Windows: `wsl -e tmux list-sessions 2>/dev/null`). Map tmux session names to worktree/task names to determine which tasks have a live Claude Code process running
+3. **Scan worktrees** — run `git worktree list` to find active worktrees. For each worktree path, check if `workspaces/*/00-state.md` exists inside and extract the same fields
+4. **Verify live processes** — run `tmux list-sessions 2>/dev/null` (via WSL if on Windows: `wsl -e tmux list-sessions 2>/dev/null`). Map tmux session names to worktree/task names to determine which tasks have a live Claude Code process running
 
 ---
 
@@ -76,28 +75,13 @@ Pipeline Status
 - `DEAD` — worktree exists but no tmux session (process crashed or terminal closed)
 - `—` — not a worktree task (running in main session)
 
-### If batch found
-
-```
-Batch Status
-============
-
-| # | Task | Round | Phase | Status | Process | Branch | PR |
-|---|------|-------|-------|--------|---------|--------|----|
-| 1 | jwt-setup | 1 | — | DONE | — | feature/101-jwt | #15 |
-| 2 | token-service | 2 | — | DONE | — | feature/102-token | #16 |
-| 3 | login-endpoint | 3 | 3-verify | RUNNING | LIVE | feature/103-login | — |
-| 4 | refresh-flow | 3 | 2-implement | RUNNING | LIVE | feature/104-refresh | — |
-| 5 | middleware | 3 | — | RUNNING | DEAD | feature/105-mw | — |
-
-Progress: 2/5 DONE | 2 LIVE | 1 DEAD (needs /th:recover --batch)
-```
-
 Highlight:
-- `DEAD` process — needs recovery, suggest `/th:recover --batch`
+- `DEAD` process — needs recovery, suggest `/th:recover {feature-name}` for that worktree's own pipeline
 - `iterating` status — needs attention
-- `complete` / `DONE` status — done
+- `complete` status — done
 - Stale pipelines (last updated > 1h ago with status != complete) — mark as "stale?"
+
+**No cross-task batch table.** Each worktree's pipeline is independent — there is no roster or `batch-progress.md` index spanning several tasks any more (the Multi-Task fan-out that produced one has been retired; see `agents/ref-special-flows.md`). Two or more concurrent worktree pipelines each show up as their own row in the Pipeline Status table above.
 
 ---
 
@@ -160,30 +144,27 @@ Sort in-flight lanes first (most recently started first), then completed pairs (
 
 ---
 
-## Leader → orchestrator tree (roster-sourced, grouped by project)
+## Initiative tree (serial multi-project sequencing)
 
-**When rendered:** when the resolved workspaces path (or, for an initiative, the initiative root) contains a `00-leader-roster.md` — the leader's durable index of every orchestrator it has spawned (`agents/leader.md § 00-leader-roster.md`). The roster is the authoritative enumeration of the leader→orchestrator tree; the per-project `00-state.md` files supply the fine-grained phase/status, and each lane's own events file supplies the cost.
+**When rendered:** when the resolved workspaces path (or, for an initiative, the initiative root) contains an initiative-level `00-execution-events` file. There is no roster and no parallel fan-out to enumerate — one coordinator runs each project's Stage 1 → Stage 3 to completion, in sequence, before starting the next (`agents/ref-dispatch-machinery.md § Multi-project sequencing`). This renderer reads each project's own `00-state.md` directly — there is no separate index file to fall behind it.
 
-**Source (read-only, three files):**
-- `00-leader-roster.md` — the leader's index. One row per orchestrator: `Task/Project`, `State ref (docs_root)`, `Agent` (always `th:orchestrator`), `Phase`, `Status`, `pending_gate`. The leader is the sole writer; this renderer only reads it.
-- each orchestrator's own `{State ref}/00-state.md` — for the live `Stage` / `Phase` / `Status` of that lane (a roster row may lag; the orchestrator's own file is fresher for its own fields).
-- each orchestrator's own `{State ref}/00-execution-events.{jsonl|md}` — for the per-lane cost (sum of `phase.end` `tokens`, fence-extracted in obsidian mode).
+**Source (read-only, two files per project):**
+- each project's own `{project}/00-state.md` — for the live `Stage` / `Phase` / `Status` of that project.
+- the initiative-level `{initiative-root}/00-execution-events.{jsonl|md}` — for `initiative.start` / `project.start` / `project.end` / `initiative.converge` lifecycle events, so the renderer knows which project is currently running and which have completed.
 
-**`pending_gate` is ADVISORY (never a gate-clear signal).** The `pending_gate` column is rendered verbatim from the roster's `pending_gate` field — a leader-maintained hint of which STAGE-GATE a lane is paused at. It is NEVER derived from a gate-clear inference: this renderer never reads `gate1_release` / `gate3_release` or any `stage.gate.release` event to decide gate status. The roster value is a tracking convenience, not an authoritative gate state (`agents/leader.md § 00-leader-roster.md`, where `pending_gate` is defined as ADVISORY; the leader that maintains it never records a gate and never derives gate status from a release field). Show it as-is; when the roster row's `pending_gate` is `—`, show `—`.
+**Gate values are read directly from each project's own `00-state.md`, never inferred.** `gate1_release` / `gate3_release` come straight from that project's own state file — there is no advisory roster field standing in for them.
 
-**Cost rollup is READER-ONLY.** The per-lane cost is a reader-only aggregation of each orchestrator's OWN events file — summed from that lane's `phase.end` `tokens`. This renderer (and the leader, when it builds the same initiative rollup — `docs/observability.md § Reader-only initiative rollup`) never writes to any orchestrator's events file or `00-state.md`; the rollup is a pure read and never touches the gate seam.
+**Cost rollup is READER-ONLY.** The per-project cost is a reader-only aggregation of that project's OWN events file — summed from its `phase.end` `tokens`. This renderer never writes to any project's events file or `00-state.md`; the rollup is a pure read and never touches the gate seam.
 
 **Render (grouped by project — replaces the flat per-project rows for that initiative in the no-args view):**
 ```
-parent: {initiative}   (leader roster: {N} orchestrators)
-  ├─ {project-a}   Stage {N} / {phase}   {status}   gate: {pending_gate|—}   ~{K}K tok
-  └─ {project-b}   Stage {N} / {phase}   {status}   gate: {pending_gate|—}   ~{K}K tok
+parent: {initiative}   (serial — at most one project running at a time)
+  ├─ {project-a}   Stage {N} / {phase}   {status}   gate: {gate1_release|gate3_release|—}   ~{K}K tok
+  └─ {project-b}   Stage {N} / {phase}   {status}   gate: {gate1_release|gate3_release|—}   ~{K}K tok
 ```
-For a single-task run (N = 1, no initiative) the roster lives at the feature root; render the one orchestrator as a single tree row under `parent: {feature}`.
+Because execution is serial, at most one project is ever "running" at a time — there is no parallel-region rendering to reconcile. For a single-task run (no initiative) there is nothing to group; the feature renders as a single row in the flat table as today.
 
-**Live fan-out overlay (initiative-level `fanout.*` events).** When the initiative-level `00-execution-events` file (written by the leader — `docs/observability.md § Initiative-level fan-out trace`) has a `fanout.start` with no matching `fanout.converge`, overlay liveness onto the roster tree: read the most recent `fanout.start` → `fanout.lane.*` → `fanout.converge` sequence (JSONL-fence-extracted in obsidian mode). A `fanout.lane.start` with no matching `fanout.lane.end` for the same `project` is a running lane; a paired `fanout.lane.start`/`fanout.lane.end` is closed with `fanout.lane.end.status` (`success`/`failed`/`iterating`); a `fanout.converge` closes the fan-out. The roster remains the enumeration source — the fan-out events only add running/closed liveness.
-
-**Fail-soft.** No `00-leader-roster.md` → fall back silently to the flat per-project rows in the main Pipeline Status table (byte-identical to the pre-roster view). No initiative-level events file, no `fanout.*` events → render the roster tree without the liveness overlay. Any read/parse error → silently omit the tree and keep the flat table. This rendering is additive convenience, not a required view.
+**Fail-soft.** No initiative-level events file → fall back silently to the flat per-project rows in the main Pipeline Status table. Any read/parse error → silently omit the tree and keep the flat table. This rendering is additive convenience, not a required view.
 
 ---
 
@@ -219,9 +200,8 @@ If found, extract the same fields as regular workspaces.
 
 ## Actions (optional arguments)
 
-- **No args or `list`** — show the tables above (pipelines + batch + process status)
+- **No args or `list`** — show the tables above (pipelines + process status)
 - **`<feature-name>`** — show detailed narrative state for one feature (see `<feature-name>` mode below)
-- **`--batch`** — show only batch status with process verification
 - **`clean`** — list completed pipelines and ask user which to delete (also offers to remove completed worktrees)
 
 ---
@@ -245,12 +225,10 @@ The detailed mode renders a structured narrative for one feature. **It is read-o
    For raw events:          /th:trace {feature-name} --jsonl
    ```
 
-3. **Read `00-state.md`.** Render in this sequence:
-   - **TL;DR** — extract and render the `## TL;DR` section verbatim. If the section is absent (pipeline predates this feature), render: `TL;DR\n-----\n(not available — pipeline state predates the TL;DR section)`.
+3. **Read `00-state.md`.** `00-state.md § Current State` is fields only — narrative lives in the events file, and the recovery instruction is the `next_action` field (there is no `## TL;DR`, `## Hot Context`, or `## Recovery Instructions` section to extract; a pipeline written before this schema may still carry them — render verbatim if present, otherwise skip silently). Render in this sequence:
    - **Current State** — render the `## Current State` key-value block.
    - **Agent Results** — render the `## Agent Results` table. If the table body is empty (very early pipeline), render the header row and `(no agent results yet)`.
-   - **Hot Context** — render the `## Hot Context` bullets.
-   - **Recovery Instructions** — render ONLY if `status` is `paused`, `paused_for_amend`, `blocked`, or the `Process` column was `DEAD` in the no-args view. Otherwise hide — recovery hints are noise when the pipeline is healthy.
+   - **Next action** — render the `next_action` field verbatim as the recovery instruction, ONLY if `status` is `paused`, `paused_for_amend`, `blocked`, `blocked-incomplete`, or the `Process` column was `DEAD` in the no-args view. Otherwise hide — recovery hints are noise when the pipeline is healthy.
 
 4. **Read the events file.** Detect dual-format:
    1. Use Glob to check for `workspaces/{feature-name}/00-execution-events.md`. If found, use it.
@@ -320,12 +298,12 @@ Tasks are listed in ascending task identifier order, regardless of which finishe
 
 | Condition | Behaviour |
 |---|---|
-| `00-execution-events.md` and `00-execution-events.jsonl` both missing | TL;DR + Current State + Agent Results render normally. Timeline renders `(no events recorded — pre-refactor pipeline or trace not initialized)`. No crash. |
-| `pipeline_version: 1` or field absent | Stage column in no-args table shows `—`; Status uses the raw `status` value. In detailed view: TL;DR renders if present, otherwise `(not available — legacy pipeline, pipeline_version<2)`. Timeline degrades as above. |
+| `00-execution-events.md` and `00-execution-events.jsonl` both missing | Current State + Agent Results render normally. Timeline renders `(no events recorded — pre-refactor pipeline or trace not initialized)`. No crash. |
+| `pipeline_version: 1` or field absent | Stage column in no-args table shows `—`; Status uses the raw `status` value. Timeline degrades as above. |
 | `## Agent Results` empty | Renders the table header row + `(no agent results yet)`. |
 | Malformed JSONL line | Skip the line silently, count it. Surface as `Timeline (skipped N malformed events)` if any. |
 | `00-state.md` missing entirely | Output `No state file at workspaces/{feature-name}/00-state.md.` Exit cleanly. |
-| `## TL;DR` section absent in `00-state.md` | Render `TL;DR\n-----\n(not available — pipeline state predates the TL;DR section)`. |
+| `## TL;DR` / `## Hot Context` / `## Recovery Instructions` present in `00-state.md` | These sections were retired from the schema; a pipeline started before the retirement may still carry them — render verbatim if present, otherwise skip silently (no placeholder). |
 
 ### Example output
 
@@ -333,6 +311,8 @@ Tasks are listed in ascending task identifier order, regardless of which finishe
 Feature: auth-jwt
 =================
 
+Pipeline Summary
+----------------
 TL;DR
 -----
 - Now: Pipeline complete.
@@ -350,19 +330,15 @@ Agent Results
 -------------
 | Agent          | Phase                 | Status   | Summary                                     |
 |----------------|-----------------------|----------|---------------------------------------------|
-| leader          | 0a-intake             | success  | feature classified standard, 8 AC           |
+| orchestrator   | intake                | success  | feature classified standard, 8 AC           |
 | architect      | 1-design              | success  | 3 tasks, 11 AC                              |
 | implementer    | 2-implement (Task-1)    | success  | jwt issuance endpoint                       |
 | tester         | 3-verify (Task-3) iter 0| fail     | AC-3 null check missing in login.ts:42      |
 
-Hot Context
------------
-- DB uses soft-deletes; refresh-token table must follow same pattern.
-
 Timeline
 --------
 --- PIPELINE START at 13:58:14 ---
-▸ Phase 0a intake — 12s — success
+▸ Intake — 12s — success
 ▸ Phase 1 design (architect) — 2m 41s — success — "3 tasks, 11 AC"
 ✓ Phase 1.5 ratify-plan verdict: pass — "11/11 AC covered"
 ✓ Phase 1.6 plan-review verdict: pass — "0 findings"
@@ -393,7 +369,7 @@ Implementation pass (3 tasks, started 14:08:02, closed 14:31:02):
 
 ## Important
 
-- This skill does NOT route through the leader or any orchestrator
+- This skill does NOT route through the orchestrator
 - Read-only — never modifies workspaces
 - Works even if no `.gitignore` or CLAUDE.md exists
 - If `00-state.md` is missing but workspaces folder exists, report the folder as "no state file (legacy?)"
