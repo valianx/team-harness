@@ -122,29 +122,49 @@ check(
     f"missing '**Language.**' declaration(s) in: {_missing_lang}",
 )
 
-# Phase 3.8 dispatch carries coordinates + Scope only, no diff summary,
-# no per-task summaries, no enumeration of what to confirm.
-_phase38 = slice_section(orchestrator_text, "## Phase 3.8", ("\n## Phase 4a",))
-check(
-    "return-borrowed-work(ac2-coordinates-and-scope): Phase 3.8's dispatch carries"
-    " objective coordinates and a literal Scope field",
-    "{worktree_base}...HEAD" in _phase38 and "**Scope:** full" in _phase38,
-    "Phase 3.8 dispatch must carry {worktree_base}...HEAD and a literal '**Scope:** full'",
+# The audit dispatch carries coordinates + Scope only, no diff summary, no
+# per-task summaries, no enumeration of what to confirm.
+#
+# Retargeted: the audit no longer has a standalone `## Phase 3.8` section — it
+# collapsed into the single `## Phase 3 — Verify` parallel validation block, and
+# `## Phase 4a` (the old terminator) collapsed into `## Phase 4`. Both anchors
+# vanished, so the old slice resolved to the empty string and all three checks
+# below failed VACUOUSLY rather than on substance. Every property they guard
+# survived the move intact and is re-verified here at the new home. The
+# Deviations pointer in particular is not decorative: its absence was an accepted
+# `broke-it` finding on the preceding delivery, so this is the one mechanical
+# guard over a defect this project has already hit once.
+_audit_dispatch = slice_section(
+    orchestrator_text, "## Phase 3 — Verify", ("\n## Phase 3.5",)
 )
 check(
-    "return-borrowed-work(ac2-deviations-pointer): Phase 3.8's dispatch reaches"
+    "return-borrowed-work(ac2-coordinates-and-scope): the audit dispatch carries"
+    " objective coordinates and a literal Scope field",
+    "{worktree_base}...HEAD" in _audit_dispatch and "**Scope:** full" in _audit_dispatch,
+    "the Phase 3 audit dispatch must carry {worktree_base}...HEAD and a literal"
+    " '**Scope:** full'",
+)
+check(
+    "return-borrowed-work(ac2-deviations-pointer): the audit dispatch reaches"
     " Deviations from Architecture by pointer to a real anchor",
     '00-verify-packet.md § Implementation Summary → **Deviations from Architecture:**'
-    in _phase38,
-    "Phase 3.8 dispatch must point at the verify-packet's real Deviations anchor",
+    in _audit_dispatch,
+    "the Phase 3 audit dispatch must point at the verify-packet's real Deviations anchor",
 )
 check(
-    "return-borrowed-work(ac2-no-enumeration): Phase 3.8's dispatch states it carries no"
+    "return-borrowed-work(ac2-no-enumeration): the audit dispatch states it carries no"
     " diff summary, no per-task summaries, and no enumeration of what to confirm",
     "No diff summary, no per-task summaries, and no enumeration of what to confirm"
-    in _phase38,
-    "Phase 3.8 dispatch must explicitly disclaim diff summaries/per-task summaries/"
-    "confirm-enumeration",
+    in _audit_dispatch,
+    "the Phase 3 audit dispatch must explicitly disclaim diff summaries/per-task"
+    " summaries/confirm-enumeration",
+)
+check(
+    "return-borrowed-work(ac2-slice-non-empty): the retargeted audit-dispatch slice"
+    " actually resolves — a vacuous empty slice can never fail on substance",
+    len(_audit_dispatch) > 500,
+    "slice_section returned nothing for '## Phase 3 — Verify' — the three checks above"
+    " would pass or fail without reading any contract text",
 )
 check(
     "return-borrowed-work(ac2-deviations-anchor-real): docs/verification-packet.md's"
