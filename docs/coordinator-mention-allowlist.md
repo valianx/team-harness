@@ -77,7 +77,7 @@ No other survivors in this seam's 11 files (`docs/how-it-works.md`, `docs/agent-
 `docs/opencode-model-config.md`, `docs/plugin-migration.md`, `docs/roadmap.md`,
 `docs/troubleshooting.md`) — every other mention was rewritten to the single coordinator (R1/R2/R3).
 
-**Finding resolved (operator-directed fix, post-Task-3).** `skills/setup/managed-blocks/orchestrator-dispatch-rule.md` (Task-2, previously committed) carried a `FALLBACK — nested-context Task unavailability` paragraph describing `th:orchestrator` itself losing `Task` when invoked as a nested subagent and emitting a `dispatch_handoff` directive, contradicting `docs/subagent-orchestration.md § "Nested-context dispatch — RETIRED protocol, retained provisioning"` (Task-3), which declares the entire `dispatch_handoff`/`blocked-no-dispatch` mechanism retired with no successor. Both the canonical managed block and its byte-identical reproduction in `skills/setup/SKILL.md` are now reconciled to the `subagent-orchestration.md` retirement framing — see the seam-skills row below.
+**Finding resolved (operator-directed fix, post-Task-3).** `skills/setup/managed-blocks/orchestrator-dispatch-rule.md` (Task-2, previously committed) carried a `FALLBACK — nested-context Task unavailability` paragraph describing `th:orchestrator` itself losing `Task` when invoked as a nested subagent and emitting a `dispatch_handoff` directive, contradicting `docs/subagent-orchestration.md § "Nested-context dispatch — RETIRED protocol, retained provisioning"` (Task-3), which declares the entire `dispatch_handoff`/`blocked-no-dispatch` mechanism retired with no successor. The canonical managed block, its byte-identical reproduction in `skills/setup/SKILL.md`, and `cmd/install/global_claude_md.go`'s Go-rendered third carrier (found stale in a later pass — this note's original scope of "two Markdown carriers" was itself incomplete) are now all reconciled to the `subagent-orchestration.md` retirement framing — see the seam-skills row below.
 
 ## Seam-skills
 
@@ -91,6 +91,12 @@ No other survivors in this seam's 14 files. `skills/recover/SKILL.md`, `skills/l
 `skills/plan-review/SKILL.md`, `skills/apply-review/SKILL.md`, `skills/background/SKILL.md`,
 `skills/update/SKILL.md`, `skills/audit-security/SKILL.md`, `output-styles/developer-mode.md`
 were rewritten to the single coordinator (R1/R2/R3).
+
+## Cross-carrier addendum — `cmd/install/global_claude_md.go` (Task-2, bounded-patch fix)
+
+| File:line | Mention | Rule | Reason |
+|---|---|---|---|
+| `cmd/install/global_claude_md.go:29` | "No nested-handoff/takeover protocol. The `dispatch_handoff`/`blocked-no-dispatch` machinery ... is retired" | R4 | Third carrier of the same managed block (`skills/setup/managed-blocks/orchestrator-dispatch-rule.md`, `skills/setup/SKILL.md`), rendered as a Go string literal and written verbatim into every operator's `~/.claude/CLAUDE.md` by `ensureGlobalClaudeMD()`. Not part of any Task-3 seam (`cmd/install/**` is Task-2's file set) — recorded here as a cross-carrier addendum so the "Finding resolved" note above stays accurate about all three carriers, per the append protocol's own "no lane invents its own convention" rule extended to a third-party fix. States the retirement, matched for substance against the two Markdown carriers rather than diffed byte-for-byte (the Go source necessarily breaks backtick spans out of the raw string literal). |
 
 ## Seam-root
 
