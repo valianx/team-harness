@@ -66,7 +66,6 @@ def slice_section(text: str, start_marker: str, end_markers: tuple[str, ...]) ->
 
 
 orchestrator_text = read(AGENTS_DIR / "orchestrator.md")
-leader_text = read(AGENTS_DIR / "leader.md")
 delivery_text = read(AGENTS_DIR / "delivery.md")
 readme_text = read(AGENTS_DIR / "README.md")
 agent_builder_text = read(AGENTS_DIR / "agent-builder.md")
@@ -75,6 +74,8 @@ discover_phase_text = read(REPO_ROOT / "docs" / "discover-phase.md")
 observability_text = read(REPO_ROOT / "docs" / "observability.md")
 verification_packet_text = read(REPO_ROOT / "docs" / "verification-packet.md")
 ref_dispatch_machinery_text = read(AGENTS_DIR / "ref-dispatch-machinery.md")
+ref_intake_flows_text = read(AGENTS_DIR / "ref-intake-flows.md")
+ref_special_flows_text = read(AGENTS_DIR / "ref-special-flows.md")
 
 # =============================================================================
 # Commit 2b9325e — "return borrowed work — the auditor derives its own scope,
@@ -85,7 +86,7 @@ print("=== orchestrator.md: return-borrowed-work commit (2b9325e) ===")
 
 _to_specialists = slice_section(
     orchestrator_text,
-    "### To specialists — always include in every invocation:",
+    "### To specialists",
     ("\n## ",),
 )
 
@@ -185,9 +186,9 @@ check(
 )
 check(
     "return-borrowed-work(ac3-never-floor): Dispatch invariants keeps at least one"
-    " 'NEVER' modal token",
-    _dispatch_invariants.count("NEVER") >= 1,
-    "orchestrator.md § Dispatch invariants must keep NEVER >= 1",
+    " 'Never'/'NEVER' modal token",
+    _dispatch_invariants.lower().count("never") >= 1,
+    "orchestrator.md § Dispatch invariants must keep at least one modal 'never' token",
 )
 
 # The seven named untouched sections stay present (byte-identity itself is
@@ -201,83 +202,68 @@ _S180_UNTOUCHED_HEADINGS = (
     "## Plan-Structure Scan" if "## Plan-Structure Scan" in orchestrator_text else "plan_structure",
 )
 check(
-    "return-borrowed-work(ac4-phase35-untouched): '## Phase 3.5 — Acceptance Gate' still"
+    "return-borrowed-work(ac4-phase35-untouched): '## Phase 3.5 — Acceptance gate' still"
     " resolves in orchestrator.md",
-    "## Phase 3.5 — Acceptance Gate" in orchestrator_text,
-    "orchestrator.md must keep '## Phase 3.5 — Acceptance Gate' intact",
+    "## Phase 3.5 — Acceptance gate" in orchestrator_text,
+    "orchestrator.md must keep '## Phase 3.5 — Acceptance gate' intact",
 )
 check(
-    "return-borrowed-work(ac4-phase-dispatch-reference-untouched): '## Phase Dispatch"
-    " Reference' still resolves in orchestrator.md",
-    "Phase Dispatch Reference" in orchestrator_text,
-    "orchestrator.md must keep '## Phase Dispatch Reference' intact",
+    "return-borrowed-work(ac4-phase-dispatch-reference-untouched): the phase/agent"
+    " dispatch-reference table still resolves in orchestrator.md ('## Phase index',"
+    " the coordinator-fusion's renamed successor to '## Phase Dispatch Reference')",
+    "## Phase index" in orchestrator_text or "Phase Dispatch Reference" in orchestrator_text,
+    "orchestrator.md must keep the phase/agent dispatch-reference table intact, under"
+    " either its original or renamed heading",
 )
 
 # TH-STATE-REF enforcement declared honestly (checkpoint-guard unwired).
 check(
     "return-borrowed-work(ac5-th-state-ref-honest): TH-STATE-REF's enforcement is"
-    " declared honestly — checkpoint-guard unwired since v2.139.0, never blocking",
+    " declared honestly — checkpoint-guard unwired since v2.139.0, not a live gate"
+    " on this path",
     "checkpoint-guard" in orchestrator_text
-    and "unwired from Claude Code's" in orchestrator_text
-    and "never blocks a dispatch" in orchestrator_text,
-    "orchestrator.md must state checkpoint-guard is unwired and never blocks a dispatch",
+    and "unwired from the Claude Code plugin path since v2.139.0" in orchestrator_text
+    and "not a live gate on this path" in orchestrator_text,
+    "orchestrator.md must state checkpoint-guard is unwired and not a live gate on"
+    " this path",
 )
 
 print()
-print("=== leader.md: dispatch-machinery-relocation commit (a04c10b) ===")
+print("=== dispatch-machinery-out: retargeted for the coordinator fusion ===")
 
 # =============================================================================
-# Commit a04c10b — "dispatch machinery out, Discover pointers restored,
-# clarity recorded with provenance" (leader.md, ref-dispatch-machinery.md,
-# docs/reasoning-checkpoint.md, docs/discover-phase.md, docs/observability.md)
+# Originally commit a04c10b — "dispatch machinery out, Discover pointers
+# restored, clarity recorded with provenance" — asserted properties of the
+# retired agents/leader.md. The coordinator-fusion refactor retires
+# agents/leader.md entirely; its subject-matter splits three ways below,
+# per T4-AC-1b (an assertion is retired only when
+# its whole subject disappeared) and T4-AC-2 (a floor whose subject survives
+# is retargeted, never retired):
+#   - ac1 (Multi-Task fan-out pointer stub, Direct Modes section) — RETIRED.
+#     Multi-Task fan-out itself is retired with no successor
+#     (agents/ref-dispatch-machinery.md § "Multi-project sequencing" is
+#     serial-only), and the "## Direct Modes" section is retired in favor of
+#     the intent-routing table inside agents/orchestrator.md § Intake — there
+#     is no pointer-stub shape left to assert.
+#   - ac2 (checkpoint.confirmed + provenance) and ac5 (the three named
+#     security floors) — RETARGETED: their subject survives, now on
+#     agents/orchestrator.md (ac2) or the reference files it reads on demand
+#     (ac5), since one coordinator now does the work two agents used to split.
+#   - ac3 (sole-writer / reader-and-verifier split across two agents) — the
+#     TWO-AGENT distinction is retired: there is no second agent to hand a
+#     confirmation to, per docs/reasoning-checkpoint.md's own retirement note.
+#   - ac4 (agents/ref-dispatch-machinery.md exists as a reference file) and
+#     ac6 (Boot capability check) — ac4 is unaffected (no leader.md
+#     dependency); ac6 is RETIRED — agents/orchestrator.md § "No
+#     capability-check fallback" states there is no split to verify and no
+#     check to run, so the check's own subject is gone, not relocated.
 # =============================================================================
 
-# leader.md carries no dispatch machinery; reaches discover-phase.md and
-# spec-coauthoring.md by pointer; direct modes still present.
 check(
-    "dispatch-machinery-out(ac1-no-machinery-body): leader.md's relocated sections are"
-    " stubs, not the full byte-preserved machinery",
-    "Full contract:" in slice_section(leader_text, "## Multi-Task fan-out", ("\n---\n",))
-    or "agents/ref-dispatch-machinery.md" in slice_section(
-        leader_text, "## Multi-Task fan-out", ("\n---\n",)
-    ),
-    "leader.md's Multi-Task fan-out section must be a pointer stub, not full machinery",
-)
-check(
-    "dispatch-machinery-out(ac1-discover-phase-pointer): leader.md reaches"
-    " docs/discover-phase.md by pointer",
-    "docs/discover-phase.md" in leader_text,
-    "leader.md must reference docs/discover-phase.md",
-)
-check(
-    "dispatch-machinery-out(ac1-spec-coauthoring-pointer): leader.md reaches"
-    " docs/spec-coauthoring.md by pointer",
-    "docs/spec-coauthoring.md" in leader_text,
-    "leader.md must reference docs/spec-coauthoring.md",
-)
-check(
-    "dispatch-machinery-out(ac1-direct-modes-present): leader.md still carries its"
-    " Direct Modes section",
-    "## Direct Modes" in leader_text,
-    "leader.md must keep '## Direct Modes' intact",
-)
-
-# Functional-clarity registration: checkpoint.confirmed event, bounded
-# operator words + provenance; leader is sole writer, orchestrator
-# reads/verifies only (the sole-writer half is also asserted by Suite 180's
-# ac7 check — restated here explicitly against leader.md's own prose).
-check(
-    "dispatch-machinery-out(ac2-checkpoint-confirmed-event): leader.md appends a"
+    "dispatch-machinery-out(ac2-checkpoint-confirmed-event): orchestrator.md appends a"
     " checkpoint.confirmed event with provenance",
-    "checkpoint.confirmed" in leader_text and "provenance:" in leader_text,
-    "leader.md must append checkpoint.confirmed with a provenance field",
-)
-check(
-    "dispatch-machinery-out(ac3-sole-writer): leader.md declares itself the sole writer,"
-    " orchestrator read-and-verify only",
-    "You are the sole writer of this event; the orchestrator reads and verifies it, "
-    "never writes or repairs it." in leader_text,
-    "leader.md must declare sole-writer ownership of checkpoint.confirmed",
+    "checkpoint.confirmed" in orchestrator_text and "provenance:" in orchestrator_text,
+    "agents/orchestrator.md must append checkpoint.confirmed with a provenance field",
 )
 
 # Relocated floors byte-preserved in ref-dispatch-machinery.md; new file
@@ -299,34 +285,31 @@ check(
     " reference file",
 )
 
-# Relocated-to-pointer classification retains all three named security
-# floors, reachable from leader.md.
+# The three named security floors survive the fusion; they are reachable
+# from the reference files the single coordinator reads on demand rather
+# than from the retired agents/leader.md.
 check(
     "dispatch-machinery-out(ac5-constraint-e-waiver): the constraint-E waiver remains"
-    " reachable from leader.md",
-    "constraint-E waiver" in leader_text,
-    "leader.md must keep the constraint-E waiver reachable",
+    " reachable from the coordinator's reference files",
+    "constraint-E waiver" in ref_intake_flows_text,
+    "agents/ref-intake-flows.md must keep the constraint-E waiver reachable",
 )
 check(
     "dispatch-machinery-out(ac5-failclosed-ambiguous-sensitivity): the fail-closed"
-    " ambiguous-sensitivity rule remains reachable from leader.md",
-    "fail-closed" in leader_text and "sensitiv" in leader_text.lower(),
-    "leader.md must keep the fail-closed-on-ambiguous-sensitivity rule reachable",
+    " ambiguous-sensitivity rule remains reachable from orchestrator.md",
+    "fail-closed" in orchestrator_text and "sensitiv" in orchestrator_text.lower(),
+    "agents/orchestrator.md must keep the fail-closed-on-ambiguous-sensitivity rule"
+    " reachable",
 )
 check(
     "dispatch-machinery-out(ac5-hotfix-tier3-floor): the hotfix Tier-3 hard floor"
-    " remains reachable from leader.md",
-    "Tier 3 hard floor" in leader_text or "hotfix Tier-3 floor" in leader_text,
-    "leader.md must keep the hotfix Tier-3 hard floor reachable",
-)
-
-# leader-boot-capability-check / leader-verify-real-scope stay present
-# (byte-identity is Suite 174's job over the manifest entry).
-check(
-    "dispatch-machinery-out(ac6-boot-capability-check-present): leader.md's boot"
-    " capability check section is intact",
-    "Boot capability check" in leader_text,
-    "leader.md must keep its Boot capability check section",
+    " remains reachable from the coordinator's reference files",
+    "Tier 3 hard floor" in ref_intake_flows_text
+    or "Tier 3 hard floor" in ref_special_flows_text
+    or "hotfix Tier-3 floor" in ref_intake_flows_text
+    or "hotfix Tier-3 floor" in ref_special_flows_text,
+    "agents/ref-intake-flows.md or agents/ref-special-flows.md must keep the hotfix"
+    " Tier-3 hard floor reachable",
 )
 
 # reasoning-checkpoint.md declares B1 attribution + failure direction
@@ -415,10 +398,11 @@ check(
 )
 check(
     "diff-cap-withdrawal(ac2-gate-adjacency): the STAGE-GATE-3 gate data presents"
-    " diff_composition adjacent to audit_coverage",
+    " the diff composition adjacent to audit_coverage",
     "adjacent to" in orchestrator_text and "audit_coverage" in orchestrator_text
-    and "diff_composition" in orchestrator_text,
-    "orchestrator.md's gate data must present diff_composition adjacent to audit_coverage",
+    and ("diff_composition" in orchestrator_text or "diff composition" in orchestrator_text),
+    "orchestrator.md's gate data must present the diff composition adjacent to"
+    " audit_coverage",
 )
 
 # The soft 400-line/8-file threshold with justification is retained,

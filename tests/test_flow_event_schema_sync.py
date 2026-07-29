@@ -334,11 +334,12 @@ def run_tests() -> int:
     """Return 0 on all pass, 1 on any failure, 2 on skip."""
     failures: list[str] = []
 
-    # "orchestrator" was split into agents/leader.md (Phase 0a/0b intake+specify) and
-    # agents/orchestrator.md (Phase 1-6 execution). The Flow Telemetry Emission catalog
-    # documents runtime emission behaviour across the whole pipeline, so orchestrator.md
-    # is the natural target; merge in leader.md too so the section-slice search isn't
-    # blind to any Phase-0-adjacent content.
+    # The Flow Telemetry Emission catalog documents runtime emission behaviour
+    # across the whole pipeline; agents/orchestrator.md is the sole coordinator
+    # and the sole target. The retired agents/leader.md merge-in below is kept
+    # as a harmless no-op guard (the path never exists any more) rather than
+    # removed outright, so a future re-introduction of a second coordinator
+    # file would still be picked up without touching this test.
     orchestrator_path = REPO_ROOT / "agents" / "orchestrator.md"
     leader_path = REPO_ROOT / "agents" / "leader.md"
     if not orchestrator_path.exists():
