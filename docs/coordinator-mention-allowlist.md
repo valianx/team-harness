@@ -94,9 +94,15 @@ were rewritten to the single coordinator (R1/R2/R3).
 
 ## Seam-root
 
-Not yet reconciled at the time of this commit (this file itself is seam-root's own new artifact;
-`CLAUDE.md`, `README.md`, `CONTRIBUTING.md` remain). Placeholder — see `02-implementation.md §
-"What remains"`.
+| File:line | Mention | Rule | Reason |
+|---|---|---|---|
+| `CLAUDE.md § "14. Subagent Orchestration"` | "No nested-handoff/takeover protocol. The `dispatch_handoff`/`blocked-no-dispatch` machinery ... is retired" | R4 | States the retirement and points to the canonical retirement note; not a live-mechanism claim. |
+
+No other survivors in `CLAUDE.md`, `README.md`, `CONTRIBUTING.md` — all other mentions of the
+retired coordinator were rewritten to the single `orchestrator` (R1/R2/R3).
+`docs/coordinator-mention-allowlist.md` is this seam's own new artifact (`CLAUDE.md § Repo Map`
+entry pending seam-history's own pass, since `CLAUDE.md` itself is not the artifact's owner).
+`CLAUDE.md` measured 35782 bytes after reconciliation — under the 35 KB soft cap (T3-AC-7b).
 
 ## Seam-history
 
