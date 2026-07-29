@@ -1,124 +1,48 @@
 # Subagent Orchestration — Full Reference
 
-> Extracted from CLAUDE.md §14 to keep the main file under 40 KB. The routing table and escalation rules remain inline in CLAUDE.md. This file contains the nested-context limitation details, dispatch handoff protocol, and blocked-manual-push handling.
+> Extracted from CLAUDE.md §14 to keep the main file under 40 KB. The routing table and escalation rules remain inline in CLAUDE.md.
 
-## CC Top-Level Orchestration — Primary Path
+## CC Top-Level Orchestration — the only path
 
-The primary path for orchestration is the **CC native top-level agent** acting as orchestrator. On a correctly-provisioned CC session, the top-level agent has `Task` and dispatches leaf agents (th:architect, th:implementer, th:tester, th:qa, th:security, th:delivery) directly — no nested subagent, no `dispatch_handoff` round-trip. Whether a nested subagent (e.g. `th:orchestrator`) itself retains `Task` depends on Claude Code's subagent-nesting depth, which is **configurable, not a permanent cap**, via `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` in `~/.claude/settings.json` — it defaults to unset, and `/th:setup`/`/th:update` provision the value `"2"` (`docs/setup-update-model.md § Architecture prerequisite: subagent nesting depth`). Historical note: from Claude Code v2.1.172 through v2.1.216, nesting worked by default up to five layers deep with no configuration option — the M1 probe (2026-06-14) observed that window and does not describe the current default. Full contract: `docs/dev-mode.md`. The optional `developer-mode` output style (`/config` → Output style → `developer-mode`) provides a strong base-replacement floor (`keep-coding-instructions: false`).
+`th:orchestrator` IS the top-level Claude Code session agent — not a subagent spawned by anything.
+There is no second coordinator to hand off to and no `dispatch_handoff` round-trip on this path:
+the top-level agent has `Task` from the start of the session and dispatches leaf agents
+(`architect`, `implementer`, `tester`, `qa`, `security`, `adversary`, `plan-reviewer`, `delivery`,
+`ux-reviewer`, `diagrammer`, `gcp-cost-analyzer`, `gcp-infra`) directly. Full contract:
+`docs/dev-mode.md`. The optional `developer-mode` output style (`/config` → Output style →
+`developer-mode`) provides a strong base-replacement floor (`keep-coding-instructions: false`).
 
-## Nested-Context Dispatch — FALLBACK (opencode, or CC without the nesting prerequisite)
+## Nested-context dispatch — RETIRED protocol, retained provisioning
 
-The nested-handoff/takeover machinery below is the **fallback for any runtime or configuration where nesting depth is not provisioned** — opencode always (it has no analogous env var), or a CC session where `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` has not yet been set to `"2"`. On a CC session with the prerequisite provisioned, this machinery is not needed (the nested subagent retains `Task` directly).
+**The nested-handoff/takeover protocol below (dispatch_handoff schema, auto-takeover on
+`blocked-no-dispatch`, the Takeover Protocol) is RETIRED.** It existed to backstop one specific
+spawn: a top-level `leader` dispatching a second coordinator, `th:orchestrator`, as a nested
+subagent, and handling the case where that nested subagent lost its `Task` tool. The coordinator
+fusion removes that spawn entirely — `agents/orchestrator.md`'s Dispatch invariant #2 forbids
+dispatching any coordinator, including another copy of itself, with no exception clause — so the
+scenario this protocol existed to detect and recover from no longer has a producer. Nothing
+replaces it; the retirement is a genuine loss of subject, not a transfer.
 
-When `orchestrator` is invoked from a context where another agent is already active — for example, via an `@th:orchestrator` mention inside an ongoing agent session, via a skill that itself runs inside a parent agent, or via a chained orchestrator dispatch — and the running session has not provisioned depth-2 nesting, the harness strips the `Task` tool as its default-off behavior for that depth. The orchestrator cannot dispatch specialist agents and emits a `dispatch_handoff` directive instead.
+**What is retained, and why it is harmless.** Claude Code's subagent-nesting depth setting
+(`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` in `~/.claude/settings.json`, provisioned to `"2"` by
+`/th:setup`/`/th:update` — `docs/setup-update-model.md § "Architecture prerequisite: subagent
+nesting depth"`) stays provisioned. It is depth headroom, not a mechanism bound to the retired
+spawn: it costs nothing when unused, and it still matters for the orthogonal case of a specialist
+leaf agent itself being invoked from a context one level deep (a skill wrapper, an `@`-mention
+inside an ongoing session) — that specialist still needs to reach the tools its own contract
+grants. Historical note: from Claude Code v2.1.172 through v2.1.216, nesting worked by default up
+to five layers deep with no configuration option — the M1 probe (2026-06-14) observed that window
+and does not describe the current default.
 
-**When this triggers:** any path where the orchestrator is NOT the first agent started from the user's top-level session.
-
-**Correct invocation patterns:**
-- From an interactive Claude Code session: type `@th:orchestrator <task>` directly — this is top-level and the `Task` tool is available.
-- From a skill: skills route to the orchestrator via `Task(subagent_type=orchestrator, ...)` from top-level — this works correctly.
-- From another agent: the other agent must emit a `dispatch_handoff` block back to top-level Claude, which then takes over per the protocol below.
-
-**What to expect when the limitation triggers:** the orchestrator emits a "Dispatch handoff" response with a human-readable summary followed by a JSON block. Top-level Claude reads the summary, dispatches the named agent directly, and continues the pipeline — no user action needed.
-
-## dispatch_handoff Schema
-
-The `dispatch_handoff` JSON block is the canonical machine-readable payload the orchestrator writes when the boot probe fails (nested context). The orchestrator produces it; top-level Claude consumes it. This section is the single source of truth for all 8 fields — the producer references this schema by name and does not enumerate fields inline.
-
-```json
-{
-  "schema_version": "1",
-  "next_dispatch": {
-    "agent": "th:architect"
-  },
-  "type": null,
-  "phase": "0a-intake",
-  "autonomy": {
-    "granted": false
-  },
-  "round": null,
-  "state_ref": null,
-  "probe_error": "<literal harness error message>"
-}
-```
-
-| Field | Type | Boot (no `00-state.md`) | Mid-pipeline |
-|-------|------|------------------------|--------------|
-| `schema_version` | string | required | required |
-| `next_dispatch.agent` | string (prefixed, e.g. `th:architect`) | required — value is `th:architect`; NEVER `th:orchestrator` | required — the phase agent read from `00-state.md`; NEVER `th:orchestrator` |
-| `type` | string\|null | `null` (task type not yet classified at boot) — **`type: null` does NOT mean security is skipped**: when resuming from a boot handoff with unknown type, top-level Claude MUST re-classify (Phase 0a Step 7) before applying the type-gated manifest; security defaults to RUN when type is unknown. See Takeover Protocol step 4 — boot type=null forces Phase 0a classification before the type-gated manifest applies. | `feature` \| `fix` \| `hotfix` \| `refactor` \| `enhancement` \| `docs` |
-| `phase` | string | required — `0a-intake` or `1-design` | required — id of the current phase (e.g. `2-implement`) |
-| `autonomy.granted` | boolean | required | required |
-| `round` | string\|null | `null` | `R1` \| `R2` \| … when applicable |
-| `state_ref` | string\|null | `null` (no workspace yet) | path to `00-state.md` |
-| `probe_error` | string | required — the literal harness error message from the failed `Task` call | required |
-
-**Worked example — mid-pipeline handoff (Phase 2, `type: fix`):**
-
-```json
-{
-  "schema_version": "1",
-  "next_dispatch": {
-    "agent": "th:implementer"
-  },
-  "type": "fix",
-  "phase": "2-implement",
-  "autonomy": {
-    "granted": true
-  },
-  "round": "R1",
-  "state_ref": "workspaces/my-feature/00-state.md",
-  "probe_error": "Tool 'Task' is not available in this context."
-}
-```
-
-## Auto-Takeover on `blocked-no-dispatch`
-
-**Universal rule (applies regardless of how the orchestrator was invoked):**
-
-When the `orchestrator` subagent returns a response containing **"Dispatch handoff — top-level Claude takes over now"**, or when an existing `workspaces/{feature}/00-state.md` has `status: blocked-no-dispatch`, top-level Claude **MUST** take over dispatch immediately. This is not a user-decision point — the user already authorised the pipeline; the nested-context Task strip is a runtime detour, not a new authorisation.
-
-**Handoff payload (canonical).** The orchestrator emits a structured JSON `dispatch_handoff` block in its response (and embeds the same block in `00-state.md` § `## Handoff`). Top-level Claude parses that JSON to extract the variable fields — `next_dispatch.agent`, `phase`, `autonomy`, `round`, `state_ref`, `probe_error` — and follows the static protocol below. Treat the JSON as ground truth; if any prose contradicts it, JSON wins. The `next_dispatch.agent` value is stored in **prefixed** form (e.g. `th:architect`) — use it verbatim for `Task(subagent_type=…)`; strip `th:` only when deriving the agent's file path (step 3).
-
-## Takeover Protocol (static, identical for every handoff)
-
-**Gate rendering on this path.** No `th:leader` is in the loop here — top-level Claude is running as the takeover dispatcher, not `th:leader`. Every STAGE-GATE (and the Express combined gate) is therefore rendered by the orchestrator itself, exactly as `agents/orchestrator.md § "Gate handling"` names as the takeover-path fallback: instead of the leader-consumed gate DATA it returns on the normal path, the orchestrator returns its own fully-rendered STOP block, built from `agents/_shared/gate-contract.md § "STOP-block templates"` directly. Top-level Claude presents that already-rendered block to the operator verbatim and relays the reply back to the orchestrator — it does not re-render or reformat it. The mandatory STOP still holds identically on this path: STAGE-GATE-1 and STAGE-GATE-3 are never skipped, the same allowlist and dual-record rules apply, and the `gate-guard` outward-action floor still fires against whatever `gate3_release` the orchestrator records (see the "Outward-action release floor" gate below). Without a renderer identified here, a dispatch that reaches a gate on this path would have no consumer for gate data at all — naming the orchestrator as its own fallback renderer is what closes that gap.
-
-**Takeover Pipeline Manifest (gate manifest) — read this first.** This manifest enumerates the inviolable gates that a takeover MUST NOT skip. It is a **gate manifest**, not the ordered phase sequence — the complete, ordered list of phases lives in the **Phase Dispatch table** in `agents/orchestrator.md`; read that table as the authoritative phase sequence. Read each gate's detailed contract (the agent `.md` and the matching `agents/orchestrator.md` / `agents/ref-special-flows.md` phase section) as you reach it — do NOT read them all up front. skipping any gate is a defect, not a shortcut; completing every item is the obligation. The takeover is not a lighter path: the same full-stage compliance that the `orchestrator-dispatch-rule` block requires for normal dispatch ("Full pipeline is the default… Do not skip stages") applies equally here.
-
-Inviolable gates (annotate `dispatch_handoff.type` to determine which items apply):
-
-- **STAGE-GATE-1** — mandatory human approval before implementation begins. `[all types]`
-- **Phase 1.6 plan-review** — inviolable plan review (`reviews/01-plan-review.md` with `**Combined verdict:**`). `[all types]` — **Note:** the orchestrator does NOT self-execute the plan-review panel inline in nested context. If the `plan-reviewer` Task invocation fails with a nesting refusal, the orchestrator emits a `dispatch_handoff` directed at `th:plan-reviewer`; top-level Claude dispatches the real subagent. The inline-fallback that previously existed in `agents/orchestrator.md` was retired (v2.48+): it pre-dated this protocol, contradicted Dispatch invariant #2 ("no degraded mode"), and could silently skip the security design-review. The same applies to Phase 1.7 (`ux-reviewer`): no inline self-execution — always dispatch_handoff.
-- **Phase 2.0 regression-test-first** — tester authors a failing test before any source change. `[fix/hotfix only]` (Tier 2-4; Tier 1 conditional skip). Read `agents/ref-special-flows.md § Bug-fix Flow` for the full tier system.
-- **Phase 2.6 code-hygiene scan** — deterministic `git diff` + `grep -E` scan against the canonical pattern set, run before Phase 2.7. `[all types]`. Never skip this gate on the takeover path — see `docs/code-hygiene-gate.md § Layer 1` for the pinned command and the bounded-patch re-dispatch contract on violations.
-- **Phase 3 verify** — `tester` + `qa` run in parallel. `[all types]`. Security agent also runs (`security-always`): `[fix/hotfix Tier 3+]` (Tier 2 skips unless path-pattern auto-escalation applies). Read `agents/ref-special-flows.md § Tier System` when `type: fix/hotfix`. **When `type` is null in a boot handoff, classify first (see step 4); security defaults to RUN until type is resolved.** `qa`'s `code_hygiene: pass | fail` field (`docs/code-hygiene-gate.md § Layer 2`) is a conjunction of the Phase 3 pass condition — a `fail` bounces back to `implementer` even when every AC passes.
-- **Observability** — `00-execution-events.{jsonl|md}` + `00-pipeline-summary.md` + `00-state.md` updated at every phase transition. `[all types]`. Every `phase.end` event MUST include a `tokens` field (integer total). In takeover, `Task()` does not expose `total_tokens` in its result — apply the heuristic (`duration_min × 1500` for opus-heavy phases, `× 800` for sonnet-heavy) and emit `tokens_estimated: true`. The escape `"tokens": 0` is forbidden. Top-level Claude inherits this same fallback from the orchestrator's Phase Transition Protocol (see step 6 below and `agents/orchestrator.md § Phase Transition Protocol`).
-- **Phase 3.5 Acceptance Gate** — re-reads the verify artifacts; routes back to `implementer` when any AC is missing a passing test. `[all types]`
-- **STAGE-GATE-3** — mandatory human approval before push; autonomy never covers this gate. `[all types]`
-- **Outward-action release floor (`gate-guard`)** — the deterministic PreToolUse `Bash` hook that denies a `git push`/`gh pr create` from a detected pipeline lane unless `gate3_release ∈ {ship}` is recorded for that lane (`agents/_shared/gate-contract.md § "Outward-action release floor"`; `docs/dev-mode.md § "Deterministic order floor (gate-guard)"`). `[all types]`. This hook fires unconditionally regardless of whether the dispatching agent is a real `th:orchestrator` subagent or top-level Claude itself acting as the takeover dispatcher — it reads `00-state.md`, not `subagent_type` — so the takeover/inline path is covered by construction, with no separate carve-out to keep in sync. This matters precisely because the takeover path is the LEAST-supervised dispatch site in this repo: no `th:orchestrator` subagent is running to self-police delivery sequencing, which is exactly the class of site where a deterministic hook floor — not agent discipline alone — has to hold. It is the same lesson this repo's own recurring `multi-site-contract-all-execution-paths-must-match` pattern (`docs/knowledge.md`) already generalizes from prior contract-drift incidents between sibling execution paths.
-- **KG passive capture** — `delivery` agent persists one `process-insight` node (best-effort). `[all types]`
-- **Publish Gate (review path)** — when the takeover/inline path (top-level Claude after Task-strip) handles a review operation, any GitHub-write verb (POST fresh review, PUT update-body, POST reply, dismiss) is subject to the same preview-and-confirm Publish Gate defined in `agents/ref-direct-modes.md § Publish Gate (preview-and-confirm)`. The gate is bound to the ACTION, not to the execution site: present the full draft to the operator and wait for explicit approval before executing any write verb. There is no execution path that bypasses this gate — not even in takeover context. `[review direct mode]`
-
-1. Do NOT ask the user "should I take over?" The directive in the orchestrator's response is itself the authorisation.
-2. Do NOT re-invoke `@th:orchestrator` or any skill that routes via `Task(subagent_type=orchestrator, ...)` — that recreates the nested context and the boot probe will fail again.
-3. Parse `dispatch_handoff.next_dispatch.agent` from the JSON — the value is in **prefixed** form (e.g. `th:architect`). If `state_ref` is set, read that state file (`## Current State` + `## Agent Results` + `## Handoff`). To read the agent's contract file, **strip the `th:` prefix** to derive the on-disk path (`th:architect` → `agents/architect.md`); team-harness agents are flat so a prefix-strip suffices (a plugin subagent in a subfolder would map `:`→`/`). For plugin installs (no repo clone), `agents/…` and `docs/…` paths resolve under `~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/` — resolve `<highest-version>` to the highest semver directory present. Consult the Takeover Pipeline Manifest above for the ordered set of stages to complete; read each stage's detailed contract as you reach it (lazy-load).
-4. **Consume-side guard (check before dispatch):** If `next_dispatch.agent == th:orchestrator`, the handoff is malformed — dispatching `th:orchestrator` recreates the nested context that caused the Task strip. Do NOT dispatch `th:orchestrator`. Instead, dispatch the phase agent from `00-state.md` (read `## Current State` to determine the current phase and its owning agent), or `th:architect` if no workspace exists (boot case). Log this correction as a `dispatch.blocked` event with `reason: malformed-handoff-agent` before continuing.
-
-   **Type-null classify-first (fail-closed):** If `dispatch_handoff.type` is `null` or not in the valid enum (`feature` | `fix` | `hotfix` | `refactor` | `enhancement` | `docs`), top-level Claude MUST run the full Phase 0a Step 7 classification (type + security-sensitive + bug_tier) against the original operator request BEFORE applying the type-gated manifest. While type is unknown, security defaults to RUN — do not skip security on the assumption that the task is non-sensitive. Emit an `operation.*` event (or `dispatch.blocked` with `reason: type-null-classify-first`) for traceability before re-entering the manifest with the resolved type.
-
-   Once the guard passes (and type is resolved if it was null), dispatch the named agent directly via `Task(subagent_type={next_dispatch.agent}, ...)` from the top-level session — use the value verbatim (it is already prefixed, e.g. `th:architect`; do NOT add `th:` again). Parse the returned status block. Update `state_ref` (TL;DR + Current State + Agent Results) per the orchestrator's checkpointing protocol. Iterate per the orchestrator contract (max 3 iterations on `failed`/`blocked`).
-5. Continue through the remaining phases of the pipeline (Phase 3 verifies in parallel: `tester` + `qa` + `security` when sensitive; Phase 3.5 acceptance-gate; Phase 4 `delivery`). Respect gate semantics:
-   - **STAGE-GATE-3** (before push in Stage 3): always stop and ask the user — autonomy never covers this gate.
-6. Top-level Claude still inherits the "you NEVER write code/tests/docs" contract during the takeover — dispatch agents for each phase, do not write `02-implementation.md` / `03-testing.md` / `reviews/04-validation.md` / `reviews/04-security.md` inline. Delivery info goes to `00-state.md`.
-7. Mirror PR-level progress into `01-plan.md § Task List` (Status field + AC checkbox) at each PR transition.
-8. Report to the user only at pipeline completion, at a mandatory STAGE-GATE, or when a non-recoverable failure needs human input.
-
-This rule applies to **every** entry mode: `@th:orchestrator` mention, skill routing (`/issue`, `/recover`, `/plan`, `/design`, `/deliver`, `/validate`, `/research`, `/spike`, `/test`, etc.), or another agent's referral. The `blocked-no-dispatch` state is the system's documented self-healing path — leaving it open for the user to resolve manually defeats the purpose.
+**If a coordinator-dispatch case is ever observed again** (Claude Code's native agent-selector
+bypassing this file's own routing, or a future runtime change), that is a defect in the contract's
+own terms — `status: blocked`, per Dispatch invariant #2 — not a signal to resurrect the retired
+handoff apparatus. The full retired schema and protocol are preserved in git history at this
+file's pre-fusion revision for anyone reconstructing the mechanism's prior shape.
 
 ## Session-Scoped Config Override Protocol
 
-th:leader supports per-session overrides of a closed whitelist of config keys. The operator states the override in chat; th:leader applies it for that pipeline run only.
+`th:orchestrator` supports per-session overrides of a closed whitelist of config keys. The operator states the override in chat; the coordinator applies it for that pipeline run only.
 
 ### Step order (load-bearing)
 
@@ -147,7 +71,7 @@ Follows `agents/_shared/output-template.md`: silent on success (events file only
 
 ### `/recover` behavior
 
-On recovery, the resolved config is re-read from `00-state.md` § Current State — the chat is not re-parsed. th:leader logs `operation.success` with detail `override re-applied from 00-state.md`. If the operator re-states an override during recovery, it is treated as a new session override for the resumed run.
+On recovery, the resolved config is re-read from `00-state.md` § Current State — the chat is not re-parsed. The coordinator logs `operation.success` with detail `override re-applied from 00-state.md`. If the operator re-states an override during recovery, it is treated as a new session override for the resumed run.
 
 ### Collision guarantee
 
@@ -174,8 +98,8 @@ On recovery, the resolved config is re-read from `00-state.md` § Current State 
 - Touching `bin/install.sh`, `bin/install.ps1`, or any file under `cmd/install/` → route to `architect` first (installer contract with `~/.claude/` and `~/.claude.json` is load-bearing).
 - Adding/removing an agent → route to `architect` + `agent-builder`; also update `README.md` agent roster and the system diagram.
 - Hook changes or MCP server changes → flag for `security` review (both execute with the user's privileges).
-- Changing the orchestrator pipeline → architecture review mandatory; update `agents/leader.md` + `agents/orchestrator.md` + `agents/ref-direct-modes.md` + `agents/ref-special-flows.md` atomically.
+- Changing the coordinator's pipeline → architecture review mandatory; update `agents/orchestrator.md` + `agents/ref-direct-modes.md` + `agents/ref-special-flows.md` atomically.
 
 ## `blocked-manual-push` Handling
 
-When the `delivery` agent returns `status: blocked-manual-push`, th:orchestrator emits a STOP block with the compare URL and `workspaces/{feature}/inputs/pr-body.md` path. The operator opens the PR manually, then replies `pr opened #N`. th:orchestrator records the PR number in `00-state.md` and continues to Phase 5. This is distinct from `blocked-no-dispatch`: no auto-takeover, just a manual-action pause. See `agents/_shared/gh-fallback.md` § "`status: blocked-manual-push`" for the full protocol.
+When the `delivery` agent returns `status: blocked-manual-push`, `th:orchestrator` emits a STOP block with the compare URL and `workspaces/{feature}/inputs/pr-body.md` path. The operator opens the PR manually, then replies `pr opened #N`. `th:orchestrator` records the PR number in `00-state.md` and continues to Phase 5 — a manual-action pause, not a dispatch failure. See `agents/_shared/gh-fallback.md` § "`status: blocked-manual-push`" for the full protocol.

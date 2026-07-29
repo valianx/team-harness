@@ -96,7 +96,7 @@ the ordinary single-session flow, `delivery`'s own teardown attempt (Step 11.4b)
 **same-session best-effort**: it only removes the worktree when the PR is somehow already merged
 by the time delivery runs (e.g., an auto-merge landed mid-session). The **durable reaper** for the
 general case — a worktree whose PR merges in a later session, which is the common case — is the
-**preflight sweep at `th:leader`'s boot** (Rule 7 below). The Rule 4 teardown protocol itself is
+**preflight sweep at `th:orchestrator`'s Intake step 1a** (Rule 7 below). The Rule 4 teardown protocol itself is
 not removed by this correction; it is still the exact sequence both the same-session best-effort
 and the boot-time sweep execute once their own gate condition is met.
 
@@ -199,29 +199,23 @@ through the filesystem is needed.
 
 ---
 
-## Rule 6 — Per-lane worktree (th:leader fan-out)
+## Rule 6 — Per-lane worktree — RETIRED for coordinator fan-out; worktree-per-project survives serially
 
-When th:leader fans out N orchestrator lanes — a same-repo multi-task batch, or a multi-project
-initiative (`agents/ref-dispatch-machinery.md § Multi-Task fan-out`) — each lane runs in its OWN git worktree. Rules
-1–5 apply per lane, with these lane-specific bindings:
-
-- **One worktree per lane, addressed by `git -C`.** Each lane's orchestrator operates inside its own
-  worktree path; git operations target it explicitly with `git -C {worktree-path} …` rather than
-  relying on a shared process cwd — lanes run concurrently and cannot share a working directory.
-- **Base = the lane repo's freshly-updated `origin/main`.** Before creating a lane's worktree,
-  `git fetch origin main` in that lane's repository, then
-  `git worktree add -b {branch} {path} origin/main` (Round 1) — or the completed dependency branch
-  for a Round N task. In a multi-project initiative each project is a distinct repository (proven by
-  the repo-identity test, `docs/discover-phase.md § 11.6`), so "the lane repo's `origin/main`" is
-  per-repo: fetch and base each lane against its OWN origin, never against a sibling project's.
-- **STOP-on-unfamiliar-WIP, per lane.** The Rule 1 start-gate and the Rule 2 no-silent-reuse check
-  run independently for each lane's target path and branch
-  (`agents/leader.md § The fan-out mechanic → Pre-launch collision check`). An existing worktree or
-  branch at any lane's target is a per-lane STOP — surface it and wait for the operator; never
-  silently reuse or overwrite one lane's target because the other lanes were clean.
-- **Plan declares each lane's worktree (Rule 5).** Every lane records its `worktree` /
-  `worktree_branch` / `worktree_base` in its OWN orchestrator `00-state.md`, so teardown after each
-  lane's PR merges (Rule 3/4) is a deterministic lookup, not a filesystem search.
+**The coordinator-level fan-out this rule gated is retired.** It described two mechanisms that no
+longer exist: a same-repo multi-task batch spawning one orchestrator instance per task (retired —
+`agents/ref-dispatch-machinery.md § "What left this file"` names the multi-task fan-out and its
+consolidator removed, measured at 0.6% of runs, both operator overrides), and a multi-project
+initiative spawning one orchestrator instance per project concurrently. The latter survives only
+as a **serial** sequence inside the single coordinator (`agents/ref-dispatch-machinery.md §
+"Multi-project sequencing"`) — one project runs to completion before the next starts, so there is
+no concurrent-lane collision class for this rule's per-lane STOP-on-unfamiliar-WIP check to guard
+against. Each project may still use its own worktree, because each is a genuinely distinct
+repository (proven by the repo-identity test, `agents/ref-dispatch-machinery.md § "Repo-identity
+verification"`) — Rules 1–5 apply to that worktree exactly as they do to any single-project run,
+with no lane-specific binding needed since nothing runs concurrently. Intra-task parallelism
+(`agents/orchestrator.md § "Intra-task lane decomposition"`) is a different mechanism entirely and
+was never governed by this rule: its lanes share ONE worktree and branch, with the coordinator as
+sole committer of the consolidated result.
 
 ---
 
@@ -229,12 +223,11 @@ initiative (`agents/ref-dispatch-machinery.md § Multi-Task fan-out`) — each l
 
 `delivery`'s Step 11.4b teardown is a same-session best-effort (see Rule 3's correction above) — it
 almost never fires, because the PR it just opened is rarely merged before its own run ends. The
-**durable reaper** is this Rule 7's preflight sweep, run by `th:leader` at boot, before it fans out
-into `th:orchestrator` (`agents/leader.md § Phase 0a`) — the first point in ANY later session that
+**durable reaper** is this Rule 7's preflight sweep, run by `th:orchestrator` at Intake step 1a (`agents/orchestrator.md § "Intake"`) — the first point in ANY later session that
 runs after a previous session's PR could have merged.
 
 This rule is the **canonical, single source of truth** for the worktree-sweep safety predicate.
-`agents/leader.md` (the boot-time preflight sweep) and `agents/delivery.md` Step 11.4b (the
+`agents/orchestrator.md § "Intake"` (the preflight sweep) and `agents/delivery.md` Step 11.4b (the
 same-session teardown) each REFERENCE this rule by pointer — neither re-derives or duplicates the
 predicate, the allow-list, or the action/report table. A divergence between what either site does
 and what is written here is a defect in that site, not an allowed variation.
@@ -447,7 +440,7 @@ computable path, never "stale-undetectable").
 
 **3. Holder identification.** A `holder` file inside the lock directory, one `key=value` per line:
 `pid=<acquiring shell's PID>`, `host=<hostname>`, `epoch=<acquisition epoch-seconds>`,
-`holder=<th:leader-preflight-sweep | delivery:<feature>>`. `pid`/`host` are diagnostic only — for
+`holder=<orchestrator-preflight-sweep | delivery:<feature>>`. `pid`/`host` are diagnostic only — for
 the report line when a lock is found already held — not the operative liveness signal: the "holder"
 is an ephemeral LLM-agent process with no reliable heartbeat (the shell that ran `mkdir` exits once
 that command returns, so `kill -0 <pid>` is not reliable). The operative liveness signal is the
@@ -492,7 +485,7 @@ decision is made either way.
 
 **Residual closure — honest, not overclaimed.** Acquiring the lock immediately before the final
 re-check and holding it through `git worktree remove` fully CLOSES the TOCTOU window for
-COOPERATING processes: two `th:leader`/`delivery` instances that both follow this protocol
+COOPERATING processes: two `orchestrator`/`delivery` instances that both follow this protocol
 serialize — one acquires, the other's `mkdir` fails (`EEXIST`), so it skips that worktree, reports,
 and retries next boot; the two can never both be inside the re-check-to-remove window for the same
 worktree at the same time. The sweeper-vs-sweeper race that originally motivated the atomicity
@@ -545,37 +538,23 @@ bypass a hook to force a removal through.
 
 ### Composition with Rule 6
 
-The sweep runs per-repo, at the point where `th:leader` touches that repo, respecting Rule 6's
+The sweep runs per-repo, at the point where `th:orchestrator` touches that repo, respecting Rule 6's
 per-lane isolation: a sibling project in a multi-project initiative is a distinct repository, and
 the sweep never runs against a repo other than the one it is currently evaluating.
 
 ---
 
-## Capability cache — operator-confirmed, version-pinned
+## Capability cache — RETIRED
 
-The leader+orchestrator split is opt-in on confirmed evidence: it runs only after the operator has
-confirmed, live, that this Claude Code build supports the nested-subagent gate-messaging round-trip
-(M3). That confirmation is recorded as the **capability-cache field**, subject to two floors
-(`agents/leader.md § Boot capability check (AC-2.6)`). It gates worktree-lane fan-out transitively —
-no orchestrator spawns until it passes, so no per-lane worktree (Rule 6) is ever created on an
-unconfirmed or version-drifted environment.
-
-- **OPERATOR-CONFIRMED.** The `probe_result: PASS` value lives in the **Operator confirmation**
-  section of `tests/evidence/nested-lane-probes.md`, filled ONLY by the operator via the gated
-  `/th:setup` step — never written by an agent. An agent may read it; it may never author or advance
-  it.
-- **Version-PINNED (version-invalidation floor, AC-10.3).** The confirmation is pinned to the
-  specific CC `version` it was recorded against. th:leader's boot capability check reads the running
-  CC version and INVALIDATES the cached confirmation on any version drift — a PASS recorded on an
-  older CC build does not carry forward. If the running version cannot be determined, the
-  version-match is treated as FAILED; never assume a match.
-- **On invalidation → hard-STOP + re-confirmation; NO monolith fallback.** When the version-pin
-  fails (or the confirmation is absent), th:leader does NOT spawn an orchestrator and does NOT run the
-  pipeline inline as a monolith. It STOPS with a single operator-facing error directing the operator
-  to upgrade Claude Code and re-confirm via `/th:setup`. A silent monolith fallback is deliberately
-  not provided — it would mask that the split is not actually running. Non-gated direct modes
-  (research, translate, diagram, define-ac, security audit) never spawn an orchestrator and are
-  unaffected by this floor.
+**This entire mechanism is retired, not reduced.** It gated a prior two-coordinator design: a
+`th:leader` that would not spawn a second-coordinator `th:orchestrator` subagent until the
+operator had confirmed, live, that the running Claude Code build supported the nested-subagent
+gate-messaging round-trip (M3), version-pinned and re-invalidated on drift. The coordinator
+fusion removes the spawn this cache gated — `th:orchestrator` is the top-level session agent and
+never dispatches another coordinator (`agents/orchestrator.md § "Dispatch invariants"` #2,
+`agents/orchestrator.md § "No capability-check fallback"`) — so there is no nested-subagent
+round-trip left to probe, no capability cache to consult, and no version-pin to invalidate.
+Nothing replaces this mechanism; the retirement is a genuine loss of subject.
 
 ---
 
