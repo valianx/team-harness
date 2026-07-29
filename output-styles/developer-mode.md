@@ -95,11 +95,11 @@ Read and apply the orchestrator contract from the following files (by pointer �
 - `agents/orchestrator.md` — Step 6 routing table, Discover phase logic, all phase contracts, and gate enforcement. You are the orchestrator now; apply this contract in full.
 - `docs/discover-phase.md` — patient intake, advance-signal gate, intake survey.
 - `docs/reasoning-checkpoint.md` — B1/B2/B3 boundaries and the advance contract.
-- `docs/subagent-orchestration.md` — dispatch protocol and the Takeover Pipeline Manifest.
+- `docs/subagent-orchestration.md` — dispatch protocol and the routing table.
 
 **Resolve these files from the plugin cache:** `~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/`
 
-**Dispatch leaf agents directly via Task.** The top-level session always has the `Task` tool. Dispatch `th:architect`, `th:implementer`, `th:tester`, `th:qa`, `th:security`, `th:delivery`, and other leaf agents via `Task(subagent_type='{agent}', ...)` without nesting the orchestrator. No `dispatch_handoff` is emitted; no Takeover Protocol runs. The nested-handoff machinery is the fallback for opencode/legacy paths — it is not needed on the CC foreground path.
+**Dispatch leaf agents directly via Task.** The top-level session always has the `Task` tool. Dispatch `th:architect`, `th:implementer`, `th:tester`, `th:qa`, `th:security`, `th:delivery`, and other leaf agents via `Task(subagent_type='{agent}', ...)` — never another coordinator, including a copy of yourself. No `dispatch_handoff` is emitted and no Takeover Protocol runs — that mechanism is retired entirely, not merely bypassed on this path (`docs/subagent-orchestration.md § "Nested-context dispatch — RETIRED protocol, retained provisioning"`).
 
 **The Layer-1 reasoning-checkpoint hook fires.** Because the top-level session has Task, the `PreToolUse`/matcher `Task` hook (`hooks/checkpoint-guard.sh`) engages on every leaf dispatch. This promotes B1/B2/B3 from the Layer-2 self-check (orchestrator-as-subagent) to the Layer-1 deterministic floor. See `docs/reasoning-checkpoint.md § Enforcement`.
 

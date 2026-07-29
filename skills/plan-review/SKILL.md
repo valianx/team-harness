@@ -10,7 +10,7 @@ name: plan-review
 
 ## Mode 1 — Feature name provided
 
-1. Pass to the `leader` agent:
+1. Pass to the `orchestrator` agent:
    ```text
    Direct Mode Task:
    - Mode: plan-review
@@ -29,8 +29,8 @@ name: plan-review
 
 ## Important
 
-- Always invoke the `leader` agent — do NOT invoke agents directly
-- The leader dispatches the plan-review panel (`qa-plan` + conditional `security` + `plan-reviewer`) directly, with no orchestrator and no STAGE-GATE — see `agents/ref-direct-modes.md § "Plan Review Mode"`
+- Always invoke the `orchestrator` agent — do NOT invoke agents directly
+- The orchestrator dispatches the plan-review panel (`qa-plan` + conditional `security` + `plan-reviewer`) directly, in this standalone direct mode, with no STAGE-GATE — see `agents/ref-direct-modes.md § "Plan Review Mode"`
 - Reuses the same panel and the same `reviews/01-plan-review.md` artifact the in-pipeline Stage 1 deferred-by-default offer (`agents/orchestrator.md § "Phase 1.8 — Post-approval Plan-Review Offer"`) would run — no duplicated dispatch logic, no second review file
 - Requires an existing `01-plan.md` — run `/th:design` or `/th:plan` first if none exists
 - Output: combined verdict printed inline + full report at `workspaces/{feature-name}/reviews/01-plan-review.md § Plan Review`
