@@ -106,7 +106,97 @@ entry pending seam-history's own pass, since `CLAUDE.md` itself is not the artif
 
 ## Seam-history
 
-Not yet reconciled at the time of this commit. Placeholder — see `02-implementation.md § "What
-remains"`. Every entry this seam adds is expected to be R4 by construction (changelog and
-decisions are historical record by definition), but each still needs its own row rather than a
-blanket exemption, so the check has something concrete to match against.
+Every entry below is R4 by construction (changelog, decisions, and acceptance-matrix records are
+historical record by definition) — prose is unchanged, no pointer is reapointed.
+
+### `CHANGELOG.md` (57 mentions)
+
+| File:line | Mention (truncated) | Rule | Reason |
+|---|---|---|---|
+| `CHANGELOG.md:31` | "Canonical dispatch contract (`agents/_shared/dispatch-contract.md`) states the two-halves ..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:37` | "Gate rendering for STAGE-GATE-1/2/3 and the Express combined gate moves to `leader` on the..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:40` | "The functional-clarity confirmation is now a `checkpoint.confirmed` trace event (with `pro..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:42` | "The leader's dispatch machinery (repo-identity verification, `overview.md` template, Roste..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:73` | "**Subagent-nesting-depth prerequisite provisioned from both lifecycle commands.** `/th:set..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:75` | "**Per-agent MCP tool grants trimmed to what each body actually invokes.** `agents/leader.m..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:78` | "**Fenced-surface guard for the pipeline's Class-B control surface** (`tests/test_agent_str..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:91` | "`acceptance-checker` agent fully retired: the Phase 3.6 Acceptance Check dispatch and ever..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:113` | "Stage-1 plan-review panel (`qa-plan` ratification + `plan-reviewer` shape audit) is now de..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:143` | "`agents/leader.md` wires the posture: Step 6 intent row (e) `inline-working-posture-toggle..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:144` | "Structural Suite 169 (`inline-working-posture`) in `tests/test_agent_structure.py`: § 2b ..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:176` | "`agents/_shared/gate-contract.md § "Outward-action release floor"` — the canonical clau..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:181` | "`agents/leader.md` documents the no-pre-declaration invariant (a spawn payload never carri..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:197` | "`docs/worktree-discipline.md` gains **Rule 7 — Boot-time preflight sweep**, the canonica..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:210` | "Added a shared output-verbosity contract (`docs/output-contract-patterns.md`, compact mirr..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:211` | "Removed the documented Spanish report-body exception for `security`/`reviewer`/`adversary`..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:216` | "Made the leader's boot capability check runtime-aware: the Claude Code branch is byte-iden..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:218` | "Fixed a round-trip defect in the harness-migrate CC↔opencode transform: converting `agen..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:222` | "Durable `TH Leader` display rename for the opencode-installed leader agent (`name: TH Lead..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:235` | "`agents/architect.md` now declares a `scope_frozen` boundary at the approach checkpoint an..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:237` | "`/th:release` no longer dispatches the orchestrator/delivery agent: the release cut (both ..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:238` | "`agents/leader.md` § Lane classification gains a standing directive: simple/mechanical wo..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:248` | "`agents/leader.md`, `agents/orchestrator.md`, and `agents/_shared/gate-contract.md` — th..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:251` | "Split the pipeline coordinator into two agents. `th:leader` is the top-level session agent..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:252` | "STAGE-GATEs are now leader-mediated. The `th:orchestrator` prepares and records each gate ..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:266` | "Agent model re-tiering: `adversary` and `reviewer` move `opus → sonnet`, and `acceptance..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:273` | "Structural suite: model-pin assertions for `acceptance-checker`, `translator` (suite92) an..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:287` | "The `ui-wireframe` plan-stage sketch is now delivered as a standalone, self-contained HTML..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:313` | "Phase 3.6 conditional re-run guard now watches `02-implementation.md` in addition to `01-p..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:332` | "**Acceptance-checker narrowed to drift-only, scheduled concurrently with Build Verificatio..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:438` | "`skills/recover/SKILL.md`: added explicit switch arms for the four blocked statuses the or..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:570` | "`acceptance-checker`: clarified that `fail` verdict routes back to implementer/architect w..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:784` | "`agents/init.md`, `agents/acceptance-checker.md`, `agents/translator.md`: flip `model: son..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:786` | "`agents/acceptance-checker.md`: `effort: medium` → `effort: high` — only agent catchin..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:787` | "`agents/README.md`: roster effort cells (architect/gcp-infra → `xhigh`, acceptance-check..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:788` | "`agents/README.md`: roster rows, "Earn the model" prose, per-agent 3-criteria justificatio..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:790` | "`tests/test_agent_structure.py` Suite 92: `model: haiku` pin assertions added for `init`, ..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:833` | "Direct-mode agents (qa, security, and 10 others: acceptance-checker, architect, delivery, ..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:1001` | "Sketch required-reading consumption contract: `implementer`, `tester`, and `qa` must read ..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:1017` | "`tests/test_agent_structure.py` Suite 82 — 28 structural assertions for the plan-sketche..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:1023` | "`agents/acceptance-checker.md` — Step 3.6 added: delivered surface vs plan sketches diff..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:1240` | "**Developer mode — top-level orchestrator with a precondition model.** Pipelines run ONL..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:1269` | "**Reasoning checkpoint** — deterministic 3-boundary gate that blocks phase dispatch unti..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:1314` | "Orchestrator nested-context inline-fallback no longer self-runs or defers the Stage-1 plan..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:1522` | "Closed four fail-open security vectors in the Bug-fix Pipeline (PR B — pipeline-flows-ha..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:1528` | "Repaired the nested-dispatch takeover / handoff contract: bound `{next-agent}` to an expli..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:1593` | "Selective mid-pipeline KG reads on error and security-finding writes: the orchestrator now..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:1605` | "Takeover-protocol references in the managed `nested-dispatch-takeover` block are now plugi..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:1666` | "New managed block `nested-dispatch-takeover` written to `~/.claude/CLAUDE.md` by `/th:setu..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:1982` | "**Orchestrator nested-context limitation documented** (`CLAUDE.md` §14, `agents/th-orches..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:2254` | "BREAKING (contract, not behavior): `agents/orchestrator.md` "Dispatch-blocked exit" — th..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:2286` | "**Orchestrator boot probe + dispatch-blocked exit (`agents/orchestrator.md`).** Replaced t..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:2287` | "**Auto-takeover on `blocked-no-dispatch` (universal, no user prompt).** The orchestrator's..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:2419` | "**Tool allowlist per agent (capability scoping).** Every agent's frontmatter now declares ..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:2444` | "**Top-level `README.md`**: corrected counts ("18 agents, 30 skills" → "16 agents, 27 ski..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:2464` | "**Phase 3.6 (acceptance-checker) is now conditional.** Runs only when `complexity: complex..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+| `CHANGELOG.md:2473` | "**New `acceptance-checker` agent (sonnet@medium).** Independent reviewer invoked between P..." | R4 | Historical CHANGELOG entry (Keep-a-Changelog format; past entries are never rewritten) describing pre-fusion architecture at the time it was true. |
+
+### `docs/specs/opencode-runtime-aware-boot/acceptance-matrix.md` (12 mentions)
+
+| File:line | Mention (truncated) | Rule | Reason |
+|---|---|---|---|
+| `docs/specs/opencode-runtime-aware-boot/acceptance-matrix.md:5` | "Task-1 AC-1 ... `tests/test_leader_orchestrator_split.sh` `AC-2.6-floor-literal` PASS ... `agents/leader.md:65,73` PASS" | R4 | Historical acceptance-record for a past feature's verification rounds; line anchors into `agents/leader.md` are point-in-time citations of a file that existed then, never reapointed. |
+| `docs/specs/opencode-runtime-aware-boot/acceptance-matrix.md:6` | "Task-1 AC-2 ... `agents/leader.md:77-81` PASS" | R4 | Same as above. |
+| `docs/specs/opencode-runtime-aware-boot/acceptance-matrix.md:7` | "Task-1 AC-3 ... `agents/leader.md:66` PASS" | R4 | Same as above. |
+| `docs/specs/opencode-runtime-aware-boot/acceptance-matrix.md:8` | "Task-1 AC-4 ... `agents/leader.md:67-68` PASS" | R4 | Same as above. |
+| `docs/specs/opencode-runtime-aware-boot/acceptance-matrix.md:9` | "Task-1 AC-5 ... `agents/leader.md:69` PASS" | R4 | Same as above. |
+| `docs/specs/opencode-runtime-aware-boot/acceptance-matrix.md:10` | "Task-1 AC-6 ... `agents/leader.md:67` PASS" | R4 | Same as above. |
+| `docs/specs/opencode-runtime-aware-boot/acceptance-matrix.md:11` | "Task-1 AC-7 ... `agents/leader.md:71,66` PASS" | R4 | Same as above. |
+| `docs/specs/opencode-runtime-aware-boot/acceptance-matrix.md:12` | "Task-1 AC-8 ... `tests/test_leader_orchestrator_split.sh:390-448` PASS" | R4 | Same as above. |
+| `docs/specs/opencode-runtime-aware-boot/acceptance-matrix.md:20` | "Task-3 AC-2 | CC form retains `name: leader`; never affected" | R4 | Same as above. |
+| `docs/specs/opencode-runtime-aware-boot/acceptance-matrix.md:21` | "Task-3 AC-3 | Non-leader agents unchanged, no second primary" | R4 | Same as above. |
+| `docs/specs/opencode-runtime-aware-boot/acceptance-matrix.md:22` | "Task-3 AC-4 | `agents/leader.md` frontmatter stays `name: leader`" | R4 | Same as above. |
+| `docs/specs/opencode-runtime-aware-boot/acceptance-matrix.md:27` | "**Combined: 21/21 PASS.** ... adversary finding at `agents/leader.md:67` closed via bounded patch" | R4 | Same as above. |
+
+### `docs/decisions.md` (1 mention)
+
+| File:line | Mention | Rule | Reason |
+|---|---|---|---|
+| `docs/decisions.md:10` | "Also retires the Phase 3.6 `acceptance-checker` drift audit entirely (no replacement dispatch)." | R4 | A 2026-07-21 decision entry naming a mechanism this migration is unrelated to (`acceptance-checker` had already been retired by a prior PR); historical record, prose intact. |
+
+### `docs/specs/stage2-code-hygiene-gate/acceptance-matrix.md` — no survivor
+
+The one grep hit (`comment-leader-filter` at line 10) is a hygiene-gate pattern-fixture name — an
+unrelated token collision, not a mention of the retired coordinator. Verified by reading the row:
+it names a test fixture about comment-prefix filtering, with no connection to `th:leader` or any
+retired mechanism. No allowlist entry needed; not touched.
