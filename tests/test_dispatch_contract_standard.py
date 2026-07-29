@@ -8,7 +8,7 @@
 # acceptance criteria, against the tree state produced so far. It
 # deliberately does NOT assert the cross-file, whole-tree checks
 # (single-pointer-from-five-consumers, zero canonical-prose duplication
-# across agents/leader.md and agents/orchestrator.md, language declared in
+# in agents/orchestrator.md, language declared in
 # the output contracts, the review-scope-absence check across the other
 # named files) — those depend on the standard's remaining consumer files
 # landing first and are deferred to the consolidated structural suite
