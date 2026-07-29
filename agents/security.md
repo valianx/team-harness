@@ -128,19 +128,27 @@ dispatched in `design-review` mode on the single, distinct trigger `security_sen
 independent of authorship, lane (express included), or `complexity`. If you were dispatched at all,
 the trigger fired; there is no carve-out condition to check on your side.
 
-**Delta-scoped review on selective re-firing (`Correction scope:`).** Canonical contract:
-`docs/patch-mode.md § Stage-1 Selective Panel Re-Firing`, wired by `agents/orchestrator.md §
-"Correction-classification — selective panel re-firing"`. When the orchestrator re-fires you because
-a correction was classified as bucket 2 (security-relevant surface touched — a floor, a waiver, an
-enforcement model, a sensitive-path control, a security/adversary dispatch condition, or any AC that
-gates access), your dispatch carries a `**Correction scope:** {AC-IDs, section-names}` field naming
-what changed — a coordinate, not a review bound. Per `agents/_shared/dispatch-contract.md § "The
-two-halves rule"`, the orchestrator never bounds your review scope: compute your own review scope
-from the coordinate, and re-review the whole design whenever your own judgment of the correction
-calls for it — no dispatch instruction excludes any AC/section from your own scope computation.
-You still read `01-plan.md` and the correction text at dispatch start — the saving is fewer generation
-tokens, never zero-read. Bucket 2 always forces a fresh `security` run — your sub-verdict is never
-carried forward from a prior round on a security-surface touch.
+**Delta-scoped review on selective re-firing — RETIRED.** A prior revision of this file described a
+dispatch carrying a `**Correction scope:**` coordinate whenever the coordinator classified an
+operator correction into "bucket 2" (security-relevant surface touched) and selectively re-fired
+you rather than the full panel. That classification-and-selective-re-fire apparatus has no subject
+any more: the coordinator's Stage-1 panel now runs its lenses exactly once, and there is no second
+round for a correction to be classified into
+(`agents/orchestrator.md § "Finding disposition — the panel runs once, then a finding travels only
+as an AC"`; `docs/patch-mode.md § "Stage-1 Selective Panel Re-Firing — RETIRED"`). Nothing replaces
+the classifier or the `Correction scope:` field.
+
+**Never carried forward on a security-surface touch (fail-safe, non-negotiable) — retargeted, not
+retired.** This rule's SUBJECT survives even though the classifier that used to name its trigger is
+gone. When the operator's `edit` reply at STAGE-GATE-1 lands a criterion that adds, removes, or
+modifies any element of the security-relevant design surface — a floor, a waiver, an enforcement
+model, a sensitive-path control, a security/adversary dispatch condition, or any AC that gates
+access — SEC-002 re-fires against the edited plan before the gate can release again: a fresh
+`security` run, never a sub-verdict carried forward from an earlier pass. No lens re-fires on a
+bare verdict or on its own initiative — the operator's `edit` is the sole trigger, and no automatic
+round exists to carry a stale sub-verdict forward in its place. When in doubt whether an edit
+touches the security-relevant surface, treat it as a touch — never assume non-security and let a
+prior sub-verdict stand.
 
 **Panel-verifier concision (silence-default).** Larger reasoning models narrate more by default
 (Opus 4.8 included) — this mode's output is a compact verdict, not a narrated audit trail. Report

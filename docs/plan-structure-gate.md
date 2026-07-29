@@ -5,9 +5,11 @@
 > execution site that dispatches or consumes this contract. Mirrors `docs/code-hygiene-gate.md`
 > one-for-one (two layers, fixed check set, site enumeration, byte-consistency rule) — that file
 > is the template this one follows structurally; the two gates check unrelated properties (plan
-> shape vs. comment hygiene) and share no command or pattern set. Sibling to `docs/patch-mode.md
-> § Stage-1 Selective Panel Re-Firing` (the iteration mechanics this gate's Layer-1 scan feeds
-> bucket 5 of).
+> shape vs. comment hygiene) and share no command or pattern set. **Formerly sibling to
+> `docs/patch-mode.md § "Stage-1 Selective Panel Re-Firing"` as a bucket-5 feeder — that
+> classifier is retired (`docs/patch-mode.md § "Stage-1 Selective Panel Re-Firing — RETIRED"`),
+> so this file no longer feeds anything; `plan_structure` is a standalone Layer-1 gate consumed
+> only where § 5 below names a consumer.**
 
 ---
 
@@ -127,7 +129,6 @@ gate by construction — see `docs/knowledge.md` node
 | Layer 1 scan — skip condition (self-authored-plan carve-out) | scan-site A2 | `agents/orchestrator.md` | `## Phase 1.5 — Plan Ratification` § "Skip when — self-authored-plan panel carve-out" |
 | `plan_structure` PRODUCER | producer B1 | `agents/orchestrator.md` | `## Phase 1.5a` verdict-handling table |
 | `plan_structure` CONSUMER — Phase 1.5 gate | consumer C1 | `agents/orchestrator.md` | `## Phase 1.5a` (blocks `qa-plan` dispatch on `fail`) |
-| `plan_structure` CONSUMER — correction classifier bucket 5 | consumer C2 | `docs/patch-mode.md` | § Stage-1 Selective Panel Re-Firing, bucket 5 (shape/consistency-only) |
 | Layer 2 judgment scope | judgment | `agents/qa-plan.md` | § Ratify-Plan (judgment-layer-only scope, Task-4 scope) |
 | Observability | event | `agents/orchestrator.md` (event enum) + `docs/observability.md` | `plan_structure` |
 
@@ -140,6 +141,6 @@ every other row in the same change is the failure mode this gate exists to preve
 
 See `docs/code-hygiene-gate.md` for the structural template this file mirrors (two-layer
 deterministic + judgment pattern, site-enumeration table, byte-consistency rule) — the two gates
-check unrelated properties and share no command or pattern set. See `docs/patch-mode.md § Stage-1
-Selective Panel Re-Firing` for how this gate's `plan_structure` verdict feeds the correction
-classifier's bucket 5.
+check unrelated properties and share no command or pattern set. This gate no longer feeds a
+correction classifier — `docs/patch-mode.md § "Stage-1 Selective Panel Re-Firing — RETIRED"` names
+why bucket 5 (and every other bucket) is retired.
