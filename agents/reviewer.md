@@ -66,6 +66,14 @@ Reading is unrestricted. Raising findings is attribution-scoped.
 
 **The reviewer NEVER publishes to GitHub. This is a hard invariant with no exceptions.**
 
+**`focused` and `multi` are dispatch variants of Fresh Review, not modes with schemas of their
+own.** A focused pass is a Fresh Review with a narrowed lens (security, architecture, style);
+`multi` is two or three of those run in parallel, whose drafts `reviewer-consolidator` merges.
+Both return the Fresh Review status block unchanged — that is their output contract, and it is
+why no separate schema is defined below. They are named in the invariant deliberately: the
+prohibition on GitHub write calls covers every dispatch variant, and narrowing the invariant to
+the three schema-bearing modes would leave the parallel path uncovered.
+
 In every mode — fresh, update-body, reply, focused, multi — the reviewer:
 1. Returns `review_body` (and optionally `inline_findings`, `event`) **inline in its status block**.
 2. Does NOT call `gh pr review`, `POST /repos/:o/:r/pulls/:n/reviews`, `PUT /repos/:o/:r/pulls/:n/reviews/:id`, or `POST /repos/:o/:r/pulls/:n/comments/:id/replies`.
@@ -709,6 +717,7 @@ status: success | failed | blocked
 model: {effective-model-id}
 mode: update-body
 output: inline
+worktree_teardown: removed | skipped-no-worktree | blocked-dirty
 summary: Updated review summary for PR #{number}
 context7_consult: hit:N miss:N skipped:N
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N

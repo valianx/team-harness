@@ -493,7 +493,7 @@ Branch creation, version bump + MATCH check, `changelog.d/` assembly + release c
 
 1. **Rule 7 condition 1 (not the main tree, not another session's active worktree) — structurally satisfied.** This step only ever acts on the worktree registered in THIS session's own `00-state.md § Current State → worktree:` field — never the repository's main tree, and never a worktree belonging to a different, still-active session.
 2. **Rule 7 condition 2 (pipeline provenance) — structurally satisfied.** The targeted worktree is, by construction, the one this same delivery session created and worked in, and is registered in this session's own `00-state.md` — the authoritative provenance signal.
-3. **Rule 7 condition 3 (merged AND no commits ahead of the merge point) — evaluated explicitly, both sub-conditions AND-ed, regardless of which branch of the merged-determination OR resolved "merged".** The PR was confirmed merged — via the coordinator's merge-state poll (`agents/_shared/delivery-mechanics.md § 9`) recorded in `00-state.md § Delivery` showing merged, OR the operator explicitly confirming merge via STAGE-GATE-3 ship — **AND** `git -C <path> rev-list origin/main..HEAD` is empty. A merge signal alone does not prove no work would be lost: it does not catch a follow-up commit landed in this worktree *after* the merge (e.g., a later review-fix session reusing the same branch per Rule 3's documented pattern, where `gh pr view` still reports the *prior* PR as merged while `HEAD` carries new, unmerged commits). If the merge signal is present but `rev-list` is non-empty, treat the worktree as **unmerged** for this gate — do NOT proceed to teardown; log `worktree_teardown: skipped: commits-ahead-of-merge-point` and report `— commits ahead of merge point` (mirrors Rule 7's action/report table).
+3. **Rule 7 condition 3 (merged AND no commits ahead of the merge point) — evaluated explicitly, both sub-conditions AND-ed, regardless of which branch of the merged-determination OR resolved "merged".** The PR was confirmed merged — via the coordinator's merge-state poll (`agents/_shared/delivery-mechanics.md § 9`) recorded in `00-state.md § Delivery` showing merged, OR the operator explicitly confirming merge via STAGE-GATE-3 ship — **AND** `git -C "$worktree_path" rev-list origin/main..HEAD` is empty. A merge signal alone does not prove no work would be lost: it does not catch a follow-up commit landed in this worktree *after* the merge (e.g., a later review-fix session reusing the same branch per Rule 3's documented pattern, where `gh pr view` still reports the *prior* PR as merged while `HEAD` carries new, unmerged commits). If the merge signal is present but `rev-list` is non-empty, treat the worktree as **unmerged** for this gate — do NOT proceed to teardown; log `worktree_teardown: skipped: commits-ahead-of-merge-point` and report `— commits ahead of merge point` (mirrors Rule 7's action/report table).
 4. **Rule 7 condition 4 (clean beyond the mode-only allow-list) — evaluated in the Teardown protocol's step 1 below.**
 
 When `worktree: null`, this step is a **no-op** — log `worktree_teardown: skipped: branch-in-place` and continue.
@@ -509,17 +509,17 @@ Read the `worktree:` field from `00-state.md § Current State` to get `<path>`.
 **1. Check for uncommitted changes (mode-only diffs are not "dirty"):**
 
 ```bash
-git -C <path> status --porcelain
+git -C "$worktree_path" status --porcelain
 ```
 
-If the output is empty, the worktree is clean — proceed to step 1b. If output exists, apply the mode-only allow-list defined in `docs/worktree-discipline.md § Rule 7` (referenced here, not redefined): a modified path is mode-only, and does not count as dirty, only when BOTH `git -C <path> diff --numstat` and `git -C <path> diff --cached --numstat` show `0\t0` for that path (e.g., an executable-bit flip on `hooks/sketch-guard.sh`). Any non-zero numstat, any untracked (`??`) path, or any deleted path is a content change and blocks teardown.
+If the output is empty, the worktree is clean — proceed to step 1b. If output exists, apply the mode-only allow-list defined in `docs/worktree-discipline.md § Rule 7` (referenced here, not redefined): a modified path is mode-only, and does not count as dirty, only when BOTH `git -C "$worktree_path" diff --numstat` and `git -C "$worktree_path" diff --cached --numstat` show `0\t0` for that path (e.g., an executable-bit flip on `hooks/sketch-guard.sh`). Any non-zero numstat, any untracked (`??`) path, or any deleted path is a content change and blocks teardown.
 
 - Every modified path is mode-only → treat the worktree as clean. Proceed to step 1b.
 - Any modified path carries a content change, or an untracked/deleted path exists → **STOP**. Do not remove. Surface to the operator:
 ```
 STOP: worktree <path> has uncommitted changes — teardown blocked.
 Inspect with: cd <path> && git status
-Options: (A) commit or stash, then re-run teardown; (B) discard with `git -C <path> checkout .`, then teardown; (C) keep for inspection and remove manually.
+Options: (A) commit or stash, then re-run teardown; (B) discard with `git -C "$worktree_path" checkout .`, then teardown; (C) keep for inspection and remove manually.
 ```
 Log `worktree_teardown: blocked: dirty-worktree` and exit this step. Do NOT proceed.
 
@@ -531,7 +531,7 @@ Log `worktree_teardown: blocked: dirty-worktree` and exit this step. Do NOT proc
 Once the lock is held, this step's Gate evaluated condition 3 once, before the Teardown protocol began — time has passed since then (this same step's condition-4 check, at minimum). Per `docs/worktree-discipline.md § Rule 7`'s Atomicity discipline (referenced here, not redefined — retained as an internal defense layered under the lock), re-run the ancestry check with no other Bash call interleaved between this re-check and step 2's `git worktree remove`:
 
 ```bash
-git -C <path> rev-list origin/main..HEAD
+git -C "$worktree_path" rev-list origin/main..HEAD
 ```
 
 - Empty output → condition 3 still holds. Proceed to step 2, still holding the lock.
@@ -555,11 +555,11 @@ git worktree list
 Check that `<path>` no longer appears in the output. If it still appears, do NOT force-remove yet — the apparent failure may be the documented Windows file-lock quirk (#57767), or it may be git correctly REFUSING to delete a tree that became dirty after step 1's check (e.g., a human edit landed while this step ran; note the lock was already released at step 2b, so it offers no protection here). Per the force-repair safety check specified canonically in `docs/worktree-discipline.md § Rule 7`'s Action-and-report table (referenced here, not redefined), collapse the re-check and the repair into **one single Bash tool invocation** — a shell conditional, not two separate agent-issued tool calls:
 
 ```bash
-porcelain="$(git -C <path> status --porcelain)"
+porcelain="$(git -C "$worktree_path" status --porcelain)"
 tainted="$(printf '%s\n' "$porcelain" | awk '{code=substr($0,1,2); if (code=="??" || code ~ /D/) print}')"
 if [ -z "$porcelain" ] || { [ -z "$tainted" ] && \
-    [ -z "$(git -C <path> diff --numstat | awk '$1!=0||$2!=0')" ] && \
-    [ -z "$(git -C <path> diff --cached --numstat | awk '$1!=0||$2!=0')" ]; }; then
+    [ -z "$(git -C "$worktree_path" diff --numstat | awk '$1!=0||$2!=0')" ] && \
+    [ -z "$(git -C "$worktree_path" diff --cached --numstat | awk '$1!=0||$2!=0')" ]; }; then
   git worktree prune; git worktree remove --force <path>; git worktree list
 else
   echo "ABORT: worktree became dirty since last check, not force-removing"
@@ -1063,7 +1063,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 
 **The early `mode: knowledge-capture` dispatch returns a narrower status block** — `mode: knowledge-capture`, `output` pointing at `00-state.md § Delivery — Knowledge Capture`, its own `commit:` value (§ "Commit Contract" above), and the fields relevant to it only (`context7_consult`, `kg_hit_used`, `tools`, `issues`); the `dod`/`worktree_teardown`/`release_tag`/`kg_passive_capture`/`obsidian_interlink`/`initiative_overview` fields below belong to the post-gate dispatch's own best-effort tail and are omitted from the early dispatch's status block, not reported as `n/a`.
 
-```
+```text
 agent: delivery
 mode: knowledge-capture | (post-gate — omit this field, the historical default)
 status: success | failed | blocked

@@ -9,6 +9,16 @@ TESTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 FAILED=0
 
+# Resolve one Python interpreter for the suites that need it. `python3` is absent on Windows
+# installs that ship `py` or `python`, so a bare `python3` reports "not found" on a machine
+# that has Python — and the project requires every script to work on Windows, macOS and Linux.
+# Empty when no interpreter exists at all, which the callers treat as skip-or-fail.
+PY=""
+for _candidate in python3 python; do
+    if command -v "$_candidate" >/dev/null 2>&1; then PY="$_candidate"; break; fi
+done
+if [ -z "$PY" ] && command -v py >/dev/null 2>&1; then PY="py -3"; fi
+
 # Suites 15/17/18/19/20 require node/npm/bun. A green run must mean "verified",
 # never "not checked" — TH_REQUIRE_RUNTIMES=1 (set in CI) converts a missing-runtime
 # SKIP into a FAIL. Unset/0 (local dev) preserves the graceful skip. go/python3
@@ -466,7 +476,9 @@ echo
 echo "############################################################"
 echo "# Suite 182: dispatch-contract-standard (agents/_shared/dispatch-contract.md)"
 echo "############################################################"
-if python3 "$TESTS_DIR/test_dispatch_contract_standard.py"; then
+if [ -z "$PY" ]; then
+    report_skip_or_fail "dispatch-contract-standard" "no Python interpreter found (tried python3, python, py -3)"
+elif $PY "$TESTS_DIR/test_dispatch_contract_standard.py"; then
     echo "dispatch-contract-standard: PASS"
 else
     echo "dispatch-contract-standard: FAIL"
@@ -477,7 +489,9 @@ echo
 echo "############################################################"
 echo "# Suite 183: gate-addressee-contract (structured gate data to th:leader)"
 echo "############################################################"
-if python3 "$TESTS_DIR/test_gate_addressee_contract.py"; then
+if [ -z "$PY" ]; then
+    report_skip_or_fail "gate-addressee-contract" "no Python interpreter found (tried python3, python, py -3)"
+elif $PY "$TESTS_DIR/test_gate_addressee_contract.py"; then
     echo "gate-addressee-contract: PASS"
 else
     echo "gate-addressee-contract: FAIL"
@@ -488,7 +502,9 @@ echo
 echo "############################################################"
 echo "# Suite 184: agent-output-contracts (per-agent output-contract language)"
 echo "############################################################"
-if python3 "$TESTS_DIR/test_agent_output_contracts.py"; then
+if [ -z "$PY" ]; then
+    report_skip_or_fail "agent-output-contracts" "no Python interpreter found (tried python3, python, py -3)"
+elif $PY "$TESTS_DIR/test_agent_output_contracts.py"; then
     echo "agent-output-contracts: PASS"
 else
     echo "agent-output-contracts: FAIL"
@@ -499,7 +515,9 @@ echo
 echo "############################################################"
 echo "# Suite 185: post-split-agent-contracts (agent-authoring-standard branch)"
 echo "############################################################"
-if python3 "$TESTS_DIR/test_post_split_agent_contracts.py"; then
+if [ -z "$PY" ]; then
+    report_skip_or_fail "post-split-agent-contracts" "no Python interpreter found (tried python3, python, py -3)"
+elif $PY "$TESTS_DIR/test_post_split_agent_contracts.py"; then
     echo "post-split-agent-contracts: PASS"
 else
     echo "post-split-agent-contracts: FAIL"

@@ -252,7 +252,7 @@ The three things a developer already knows how to ask for — a work plan, an im
 |---|---|---|
 | "give me the work plan" / "design X" | Stage 1 — Analysis | Intake / Specify / Design / Plan Ratification / Plan Review / STAGE-GATE-1 |
 | "implement it" | Stage 2 — Implementation | Implementer / Tester / QA / Security / Acceptance Gate / Acceptance Checker |
-| "open the PR" / "ship it" | Stage 3 — Delivery | Delivery / Internal Review / STAGE-GATE-3 / KG capture |
+| "open the PR" / "ship it" | Stage 3 — Delivery | STAGE-GATE-3 / Delivery / KG capture |
 
 **Rule:** operator-visible status blocks, STOP-block templates, install prompts, error messages, and skill help text use dev-natural verbs (`plan`, `implement`, `validate`, `review`, `recover`, `ship`). Phase numbers and gate identifiers appear only in contributor surfaces (this `CLAUDE.md`, `agents/*.md` instructional sections, workspace doc templates internal to the pipeline state machine).
 

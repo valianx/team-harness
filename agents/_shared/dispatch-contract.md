@@ -43,14 +43,20 @@ conclusion the dispatcher is handing down, it is the thing `adversary`'s own
 break-the-design method is built to attack.
 
 **Coordinate-in, content-out.** A value travels inline in the dispatch prompt exactly when
-it IS a coordinate under item 1 above — a sha, a tree anchor, a suite verdict, a diff range.
-It never travels inline when it is a conclusion someone reached about that coordinate — a
-findings classification, a review verdict's rationale, a recommendation. The second kind is
-written to its durable home (`01-plan.md`, `00-state.md`, a review file) and the dispatch
-points at that home instead. The test is mechanical, not judgment-based: could the recipient
-have derived this value from the coordinates alone, or does it encode someone's conclusion?
-A sha, a tree anchor, or a suite verdict travels inline because it IS the coordinate; a
-findings classification is written to the board and pointed at.
+it IS a coordinate under item 1 above — a sha, a tree anchor, a diff range, the command a
+suite was run with, the suite-evidence row that records a run. It never travels inline when
+it is a conclusion someone reached about that coordinate — a findings classification, a
+review verdict's rationale, a recommendation. The second kind is written to its durable home
+(`01-plan.md`, `00-state.md`, a review file) and the dispatch points at that home instead.
+The test is mechanical, not judgment-based: could the recipient have derived this value from
+the coordinates alone, or does it encode someone's conclusion?
+
+**A suite VERDICT is content, not a coordinate — and this distinction is load-bearing.** The
+run is identified by its command and its tree anchor; the verdict is that run's outcome, and
+handing a verifier "the suite passed" pre-biases the judgement the verifier was dispatched to
+make. Point at the suite-evidence row; let the recipient read the verdict there. A sha, a
+tree anchor, or a suite-evidence row travels inline because it IS the coordinate; a verdict
+or a findings classification is written to the board and pointed at.
 
 ## What a dispatch must not carry
 

@@ -74,17 +74,20 @@ fi
 
 echo "$RAW_RESPONSE" > /tmp/dispatch-sequence-behavioral-response.json 2>/dev/null || true
 
-JSON="$(echo "$RAW_RESPONSE" | sed -n '/{/,/}/p' | head -c 4000)"
+JSON="$(printf '%s' "$RAW_RESPONSE" | sed -n '/{/,/}/p' | head -c 4000)"
 
+# The payload is a model reply, so it reaches Python on stdin and the field name
+# as argv — never spliced into the source string, where a quote or backslash
+# would break the literal or execute as code.
 get_field() {
-    python3 -c "
+    printf '%s' "$JSON" | python3 -c '
 import json, sys
 try:
-    d = json.loads('''$JSON''')
-    print(d.get('$1', 'MISSING'))
-except Exception as e:
-    print('PARSE_ERROR')
-" 2>/dev/null
+    d = json.loads(sys.stdin.read())
+    print(d.get(sys.argv[1], "MISSING"))
+except Exception:
+    print("PARSE_ERROR")
+' "$1" 2>/dev/null
 }
 
 IMPL_COUNT="$(get_field implementer_dispatch_count)"

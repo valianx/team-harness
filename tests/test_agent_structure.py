@@ -36901,10 +36901,15 @@ check(
     "outward push/PR-create",
     "gate3_release` / `gate_nonce` re-read" in _s162_delivery_mechanics
     and "confirm the bare literal `ship`" in _s162_delivery_mechanics
-    and "matching consumed `gate_nonce`" in _s162_delivery_mechanics,
+    # The nonce source is the release EVENT, never the state field: recording the
+    # release consumes gate_nonce, so the live field is null and a "matching
+    # consumed gate_nonce" read against it can never succeed. The earlier form of
+    # this assertion pinned that unsatisfiable phrasing.
+    and "Read the nonce from the release EVENT" in _s162_delivery_mechanics
+    and "stage.gate.release" in _s162_delivery_mechanics,
     "agents/_shared/delivery-mechanics.md's push-step precondition (a) must "
-    "re-read gate3_release, confirm the bare literal ship, and its matching "
-    "gate_nonce, before the push",
+    "re-read gate3_release, confirm the bare literal ship, and take the nonce "
+    "from the stage.gate.release event rather than the consumed state field",
 )
 check(
     # Retargeted (pipeline-dispatch-shape, T7-AC-2): Phase 4a/4b collapsed
@@ -39521,7 +39526,10 @@ _s176_deliv_mechanics_s4 = _s176_slice(_s176_deliv_mechanics, "## 4. Staging and
 # text" precedent already used once for this exact block's prior move.
 _S176_GIT_ADD_BLOCK = (
     "git add CLAUDE.md CHANGELOG.md\n"
-    "git add .claude-plugin/plugin.json .claude-plugin/marketplace.json  # only if version bumped\n"
+    "# Every version site § 1 RESOLVED, not a fixed pair. § 1's resolution order can land on\n"
+    "# package.json, pyproject.toml, Cargo.toml or a declared multi-site list; staging only the\n"
+    "# plugin manifests leaves a generic repo's bumped version uncommitted.\n"
+    "git add {each resolved version site from § 1}   # only if version bumped\n"
     "git add docs/constraints.md docs/testing.md  # only if this dispatch's CLAUDE.md §10/§11\n"
     "                                              # auto-offload wrote them — NEVER docs/specs/,\n"
     "                                              # and NEVER docs/knowledge.md / docs/decisions.md /\n"
@@ -39531,7 +39539,7 @@ _S176_GIT_ADD_BLOCK = (
     "                                              # Capture\") and are never staged here\n"
     "git add README.md             # only if delivery modified it\n"
     "git add openapi/openapi.yaml  # only if updated\n"
-    "git add changelog.d/{pr-slug}.md  # always stage the fragment when one was written, pre-deletion"
+    "git add changelog.d/{pr-slug}.md  # ONLY when the fragment is tracked in HEAD — see below"
 )
 
 _s176_deliv_mechanics_s4_flat = " ".join(_s176_deliv_mechanics_s4.split())

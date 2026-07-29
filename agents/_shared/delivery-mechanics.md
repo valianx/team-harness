@@ -109,9 +109,12 @@ silently drops commits.
 
 - If on `main` (or the prior branch's PR is `MERGED`/`CLOSED`): fetch and fast-forward
   `main` (`git fetch origin main && git checkout main && git pull --ff-only origin main`),
-  then create `feature/{issue-number}-{feature-name}` (with a linked issue) or
-  `feature/{feature-name}` (without one). If the name collides with a prior delivery, append
-  `-v2`, `-v3`, etc.
+  then create `{prefix}/{issue-number}-{feature-name}` (with a linked issue) or
+  `{prefix}/{feature-name}` (without one), where `{prefix}` is derived from the change
+  `type` — `feature`/`enhancement` → `feat`, `fix`/`hotfix` → `fix`, `refactor` →
+  `refactor`, `docs` → `docs`, anything else → `chore`. These are the only prefixes the
+  repository's working agreements admit; **`feature/` is not one of them.** If the name
+  collides with a prior delivery, append `-v2`, `-v3`, etc.
 - If already on a feature/fix/hotfix branch with an `OPEN` PR or no PR at all: use it as-is.
 - **Multi-group deliveries** (`§ Delivery Grouping` declares N > 1 groups with a valid split
   reason): open and merge serially — group N+1 branches from the updated `main` only after
@@ -160,7 +163,10 @@ gap silently.
 path below is a fully-qualified file, never a directory prefix:
 ```
 git add CLAUDE.md CHANGELOG.md
-git add .claude-plugin/plugin.json .claude-plugin/marketplace.json  # only if version bumped
+# Every version site § 1 RESOLVED, not a fixed pair. § 1's resolution order can land on
+# package.json, pyproject.toml, Cargo.toml or a declared multi-site list; staging only the
+# plugin manifests leaves a generic repo's bumped version uncommitted.
+git add {each resolved version site from § 1}   # only if version bumped
 git add docs/constraints.md docs/testing.md  # only if this dispatch's CLAUDE.md §10/§11
                                               # auto-offload wrote them — NEVER docs/specs/,
                                               # and NEVER docs/knowledge.md / docs/decisions.md /
@@ -170,12 +176,25 @@ git add docs/constraints.md docs/testing.md  # only if this dispatch's CLAUDE.md
                                               # Capture") and are never staged here
 git add README.md             # only if delivery modified it
 git add openapi/openapi.yaml  # only if updated
-git add changelog.d/{pr-slug}.md  # always stage the fragment when one was written, pre-deletion
+git add changelog.d/{pr-slug}.md  # ONLY when the fragment is tracked in HEAD — see below
 ```
 
-If version was bumped, verify BOTH `.claude-plugin/plugin.json` AND
-`.claude-plugin/marketplace.json` are staged (`git diff --cached .claude-plugin/`) — if
-either is missing, stop and fix before committing. Never stage unrelated files.
+**The changelog fragment, stated precisely because the naive form fails.** § 3 deletes every
+`changelog.d/*.md` fragment as part of the release cut, and § 3 runs BEFORE this section.
+Two cases, and they need opposite handling:
+
+- **Fragment tracked in `HEAD`** (written by an earlier delivery, assembled and deleted by
+  this one): `git add changelog.d/{pr-slug}.md` stages the DELETION, which is what must be
+  committed. Correct.
+- **Fragment created and consumed inside this same dispatch** (never committed): the path is
+  now neither on disk nor in the index, and `git add` fails with a pathspec error. Do NOT
+  stage it — there is nothing to record, since its content already moved into `CHANGELOG.md`.
+
+Determine which case applies with `git ls-files --error-unmatch changelog.d/{pr-slug}.md`
+before staging; never let a pathspec error abort the delivery.
+
+If version was bumped, verify EVERY resolved site from § 1 is staged (`git diff --cached --name-only`
+must list each one) — if any is missing, stop and fix before committing. Never stage unrelated files.
 
 **Commit** (conventional commits):
 ```
@@ -205,11 +224,16 @@ large, unsplit diff; a line-count ceiling never substitutes for that judgment.
 **Diff composition (unconditional — computed regardless of whether the size gate flagged).**
 Classify every changed file:
 
-- **Mechanical/append-only** — a delivery-authored housekeeping path (`CLAUDE.md`,
+- **Mechanical** — a delivery-authored housekeeping path, and nothing else (`CLAUDE.md`,
   `CHANGELOG.md`, `changelog.d/*`, `docs/**`, `README.md`, `.claude-plugin/plugin.json`,
-  `.claude-plugin/marketplace.json`, `openapi/openapi.*`), OR any file whose diff is pure
-  addition (zero deleted lines).
+  `.claude-plugin/marketplace.json`, `openapi/openapi.*`).
 - **Substantive** — every other file.
+
+**Pure addition is NOT a mechanical signal.** A newly added production source file also has
+zero deleted lines, so an append-only shortcut would classify the most substantive change a
+diff can contain as housekeeping — undercounting exactly the surface this breakdown exists to
+show beside `audit_coverage`, which is what lets the operator judge an implausible `full`
+coverage claim. Classification is by PATH, never by deletion count.
 
 ```bash
 mechanical_files=$(git diff origin/main...HEAD --numstat | awk '
@@ -240,9 +264,14 @@ push.**
 
 ### (a) `gate3_release` / `gate_nonce` re-read
 
-Re-read `gate3_release` from `00-state.md § Current State` immediately before this push,
-confirm the bare literal `ship` together with its matching consumed `gate_nonce`, and abort
-otherwise. The "No gate-field repair" invariant (`agents/_shared/gate-contract.md § "The
+Re-read `gate3_release` from `00-state.md § Current State` immediately before this push and
+confirm the bare literal `ship`. **Read the nonce from the release EVENT, not from the state
+field.** Recording the release consumes `gate_nonce` — it is invalid the instant the release
+is written (`agents/_shared/gate-contract.md § "The dual-record release"`), so the live field
+is null and cannot be matched against anything. The consumed value survives in the other half
+of the dual record: the `stage.gate.release` line in `{events_file}`, which carries `stage`,
+`decision` and `gate_nonce` (the consumed value). Confirm that event's nonce is the one this
+gate issued, and abort otherwise. The "No gate-field repair" invariant (`agents/_shared/gate-contract.md § "The
 dual-record release"`) applies here without exception: a malformed or absent field is never
 repaired to unblock the push.
 
@@ -448,8 +477,9 @@ after 3 attempts → terminal-undetermined.
 `failing`; any `PENDING`/`IN_PROGRESS`/`QUEUED` (none failing) → `pending` — reported as
 `CI: pending — check with gh pr checks`, never polled to a conclusion. This step closes the
 instant it has reported URL, number, merge state, and CI state — it does not wait for CI to
-resolve, per the design rationale in `01-plan.md § Proposed Approach → "Close without waiting
-for CI"`.
+resolve. The reason is durable and does not depend on a per-run workspace artifact: the merge
+state is known the instant the PR exists, the CI conclusion is not, and the conclusion only
+gates the merge — which is the operator's own, later action.
 
 **On `CONFLICTING`:** append a one-line offer (never an automatic action) — "To resolve:
 rebase the branch on the current base and resolve conflicts, then re-push." Never perform the

@@ -49,13 +49,20 @@ caller also runs the untracked-file guard described there).
 tree_anchor="$(git rev-parse HEAD)"
 if [ -n "$(git status --porcelain)" ]; then
   # Tracked, uncommitted changes (staged + unstaged), workspaces/ excluded (always git-ignored).
-  dirty_diff="$(git diff HEAD --binary -- . ':!workspaces')"
-  # Untracked paths -- git diff never reports these; their CONTENT (not just their names)
-  # is folded into the same hash so a rename-with-same-name cannot alias a genuinely
-  # different file to the same anchor.
-  untracked_content="$(git ls-files --others --exclude-standard -z \
-    | xargs -0 -I{} cat {} 2>/dev/null)"
-  dirty_hash="$(printf '%s' "${dirty_diff}${untracked_content}" | sha256sum | cut -d' ' -f1)"
+  # Untracked paths -- git diff never reports these. Each one contributes its PATH, its
+  # BYTE LENGTH, and its CONTENT, in sorted path order. All three are load-bearing:
+  # concatenating contents alone is ambiguous (two files holding "X" and "Y" hash the same
+  # as one holding "XY" beside an empty one), and omitting the path lets a rename alias a
+  # different tree to the same anchor. The length prefix is what makes the framing
+  # unambiguous without relying on a delimiter that could occur inside a file.
+  dirty_hash="$( {
+      git diff HEAD --binary -- . ':!workspaces'
+      git ls-files --others --exclude-standard -z | sort -z \
+        | while IFS= read -r -d '' p; do
+            printf '%s\n%s\n' "$p" "$(wc -c <"$p" 2>/dev/null || echo 0)"
+            cat -- "$p" 2>/dev/null
+          done
+    } | sha256sum | cut -d' ' -f1)"
   tree_anchor="${tree_anchor}+${dirty_hash}"
 fi
 echo "${tree_anchor}"

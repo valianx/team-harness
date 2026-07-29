@@ -454,8 +454,8 @@
     "file": "agents/_shared/delivery-mechanics.md",
     "mode": "heading",
     "anchor": "## 6. The push-step precondition block (three conjuncts, none repairable in place)",
-    "sha256": "4946c9159ca05b6a0bba83aacd7cffb5a1960c3d09810cb55abe2d00d4abf632",
-    "length": 6272,
+    "sha256": "d73a4454d1e7d59ef7cb2293ae87e80bd6d1046f50c642613ee17bac7c14bd7e",
+    "length": 6766,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -499,8 +499,8 @@
     "file": "agents/delivery.md",
     "mode": "heading",
     "anchor": "## Return Protocol",
-    "sha256": "cde8d89b76b6269c507c389366b86e1a4e688ccc8aa5d99f316d6fb068d2c6bb",
-    "length": 3385,
+    "sha256": "44ecdf7217fbb8ec2200b91139e2c572aa0465de7b1fc5a4c108f2e7bbc1ebf3",
+    "length": 3389,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,

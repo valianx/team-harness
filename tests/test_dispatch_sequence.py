@@ -88,17 +88,32 @@ def simulate(model: dict) -> list[dict]:
     closed: set[str] = set()
     group_started: dict[str, bool] = {}
 
-    for node in order:
-        group = node.get("concurrency_group")
-        if group and group_started.get(group):
-            # Already opened this concurrency group in this pass — start concurrently.
-            trace.append({"event": "start", "id": node["id"], "phase": node["phase"]})
+    for n in order:
+        if n["id"] in closed:
+            continue
+        group = n.get("concurrency_group")
+        if group:
+            # Every member of the group whose predecessors have all closed starts
+            # before any member ends. The trace has to EXPRESS the concurrency,
+            # not merely carry its label: emitting end immediately after start
+            # produces a strictly serial trace in which a serialized lens chain
+            # is indistinguishable from a genuine fan-out.
+            cohort = [
+                m for m in order
+                if m.get("concurrency_group") == group
+                and m["id"] not in closed
+                and all(p in closed for p in m["predecessors"])
+            ]
         else:
-            trace.append({"event": "start", "id": node["id"], "phase": node["phase"]})
+            cohort = [n]
+
+        for m in cohort:
+            trace.append({"event": "start", "id": m["id"], "phase": m["phase"]})
+        for m in cohort:
+            trace.append({"event": "end", "id": m["id"], "phase": m["phase"]})
+            closed.add(m["id"])
             if group:
                 group_started[group] = True
-        trace.append({"event": "end", "id": node["id"], "phase": node["phase"]})
-        closed.add(node["id"])
 
     return trace
 
@@ -141,6 +156,17 @@ def assert_properties(model: dict, trace: list[dict], label: str) -> dict[str, b
     lens_groups = {n.get("concurrency_group") for n in lens_nodes}
     lenses_share_one_group = len(lens_groups) == 1 and None not in lens_groups
     out["lenses_after_tester_same_group"] = lens_starts_after_tester and lenses_share_one_group and len(lens_nodes) >= 2
+
+    # Property 2b — the lenses are mutually INDEPENDENT: no validation lens names
+    # another lens among its predecessors. Property 2 above checks the group
+    # label and the ordering against tester; neither can see a serialized
+    # qa -> adversary chain that keeps the label, because a chain still starts
+    # after tester and still shares one group. This is the check that binds the
+    # fan-out to behaviour rather than to a declaration.
+    lens_ids = {n["id"] for n in lens_nodes}
+    out["lenses_mutually_independent"] = bool(lens_nodes) and all(
+        not (lens_ids & set(n["predecessors"])) for n in lens_nodes
+    )
 
     # Property 3 — acceptance gate runs exactly once; delivery starts after
     # STAGE-GATE-3.
@@ -193,6 +219,10 @@ check(
     props["lenses_after_tester_same_group"],
 )
 check(
+    "s181(ac3b): the validation lenses are mutually independent — no lens names another lens as a predecessor",
+    props["lenses_mutually_independent"],
+)
+check(
     "s181(ac4): acceptance gate runs exactly once; delivery starts after STAGE-GATE-3",
     props["acceptance_once_delivery_after_gate3"],
 )
@@ -226,6 +256,29 @@ check(
     "s181(ac7-canary): mutating the model into a serial lens chain flips the concurrency-group property to FAIL",
     mutated_props["lenses_after_tester_same_group"] is False,
     "canary did not go red — the property check is vacuous",
+)
+
+# Second canary — serialize the lenses while KEEPING the concurrency-group label
+# on both. The canary above also strips the label, so it only proves a
+# label-removal is caught. This one is the mutation a label-only check cannot
+# see: adversary depends on qa's completion, yet both still declare the same
+# group and both still start after tester. Property 2 stays green here by
+# construction; Property 2b is what must go red.
+labelled_serial = copy.deepcopy(model)
+node(labelled_serial, "adversary-audit")["predecessors"] = ["qa-validate"]
+labelled_serial_props = assert_properties(
+    labelled_serial, simulate(labelled_serial), "serialized-but-still-labelled model"
+)
+
+check(
+    "s181(ac7-canary-b): serializing the lenses while keeping the group label flips the independence property to FAIL",
+    labelled_serial_props["lenses_mutually_independent"] is False,
+    "canary did not go red — the independence check cannot see a labelled serial chain",
+)
+check(
+    "s181(ac7-canary-b2): that same labelled serial chain still satisfies the group/ordering property — proving 2b is not redundant with 2",
+    labelled_serial_props["lenses_after_tester_same_group"] is True,
+    "the group property already caught it, so the two checks are redundant — re-examine",
 )
 
 # ---------------------------------------------------------------------------

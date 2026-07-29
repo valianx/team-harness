@@ -338,6 +338,7 @@ After `delivery` returns `status: success` at Phase 4, and before Phase 5, run t
 - [ ] STAGE-GATE-1 — Human review, recorded by you (mandatory stop)
 - [ ] 1.8 — Post-approval Plan-Review Offer (leader-relayed checkpoint, no dual-record; only when plan_review_status: deferred and gate1_release: approved — see Phase 1.8)
 - [ ] 2 — Implement (single pass, all tasks, one commit per task)
+- [ ] 2.5 — Constraint Reconciliation (conditional — only when Phase 2 returned `[CONSTRAINT-DISCOVERED]`/`[SCOPE-DRIFT]` annotations; triage trivial vs non-trivial, see Phase 2.5)
 - [ ] 2.6 — Code-Hygiene Scan (deterministic, no dispatch)
 - [ ] 2.7 — Test Authoring (tester, authoring + suite run, one dispatch)
 - [ ] 2.75 — Knowledge Capture (delivery, mode: knowledge-capture — docs/knowledge.md, docs/decisions.md, docs/patterns.md, pre-gate, one dispatch)
@@ -1436,7 +1437,7 @@ construction. Neither side relies solely on the other (defense in depth).
 | Friction point | `event` value | When to emit |
 |---------------|---------------|--------------|
 | A hook blocks an outward action | `guard.block` | When `dev-guard` or `policy-block` returns `deny` or `ask` and the operator does not override |
-| STAGE-GATE-1/2/3 operator rejects or requests edit | `gate.fail` | When the operator votes `rejected`/`edit`/`amend`/`abort` at any STAGE-GATE you witness |
+| STAGE-GATE-1/3 operator rejects or requests edit | `gate.fail` | When the operator votes `rejected`/`edit`/`amend`/`abort` at any STAGE-GATE you witness |
 | Plan-review verdicts `concerns` or `fail` | `gate.fail` | When `plan-reviewer` returns `concerns` or `fail` (gate: `plan-review`) |
 | Acceptance gate fails a verify round | `gate.fail` | When Phase 3.5 routes back to implementer (gate: `acceptance`) |
 | A verifier returns `fail` or `concerns` | `verify.reject` | When `qa` or `tester` returns a non-pass verdict |
@@ -1615,8 +1616,13 @@ You emit one OS-native toast at the close of each of your four stages, independe
 |---|---|---|---|
 | 1 (analysis) | Phase 1.6, before STAGE-GATE-1 STOP | `Pipeline {feature} · Stage 1 (analysis) complete` | `... FAILED` |
 | 2 (implementation batch) | Phase 2, the single implementer pass, closes | `Pipeline {feature} · Stage 2 (implementation batch) complete` | `... FAILED` |
-| 3 (verify) | Phase 2.8 (Freeze) closes | `Pipeline {feature} · Stage 3 (verify) complete` | `... FAILED` |
-| 4 (delivery) | Phase 3.5 (Acceptance Gate), before STAGE-GATE-3 STOP | `Pipeline {feature} · Stage 4 (delivery) complete` | `... FAILED`/`... BLOCKED` |
+| 3 (freeze) | Phase 2.8 (Freeze) closes | `Pipeline {feature} · frozen, verification starting` | `... FAILED` |
+| 4 (ship decision) | Phase 3.5 (Acceptance Gate), before STAGE-GATE-3 STOP | `Pipeline {feature} · ready for your ship decision` | `... FAILED`/`... BLOCKED` |
+
+**A notification never claims work that has not run.** Rows 3 and 4 fire at the points where
+the operator needs to look — the tree is frozen, and the ship decision is pending — not at the
+completion of verify or delivery, neither of which has happened yet at those points. The fire
+points are correct; the labels say what is actually true there.
 
 **Idempotency:** before firing, structurally count (JSON parse, never grep) prior `stage.notify` events with the same `stage` in `{events_file}`; if non-zero, skip and append `stage.notify.skipped (reason: already-fired)`. Never use `grep -c` on the JSONL for this check — an unanchored substring match can false-positive on summary text that happens to contain the event name. Use a structural parse instead, one call-site per stage:
 
