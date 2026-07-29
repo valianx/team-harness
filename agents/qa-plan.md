@@ -82,6 +82,14 @@ Used standalone to define acceptance criteria for a feature or issue, outside th
 
 Used between Phase 1 (Design) and Phase 2 (Implementation) to confirm that the architect's Work Plan covers every AC **before** any code is written. This is the cheapest loop guard in the pipeline: catch coverage gaps before they cost an implementer + tester + qa cycle.
 
+**Implicated-element field (structural, T5-AC-7).** Every finding you write into `reviews/01-plan-review.md § Plan Ratification` names the plan elements it implicates, structurally — the AC identifier(s) (`T{n}-AC-{m}`) and any fenced manifest entry key or task `Notes:` reference the gap touches. This feeds `agents/orchestrator.md § Iteration Rules`'s pre-dispatch correction gate (recurrence detection) — see that section for the consumer contract; this file only produces the field.
+
+**Every finding, not only the coverage-gap ones.** This mode also emits AC-testability and
+sketch-consistency findings; they carry the same structural field. The orchestrator's
+recurrence gate intersects implicated-element sets across rounds to detect a correction that
+relocated a problem rather than closing it — a finding class exempted from the field is
+invisible to that gate, which is the failure the field exists to prevent.
+
 **Judgment-layer scope only (Layer 2 of the plan-structure gate).** This mode audits exactly two
 properties a fixed script cannot express: coverage completeness (AC ↔ Work Plan mapping, below) and
 AC-testability soundness (below). The four mechanical checks — AC-count-vs-`### Summary`-table

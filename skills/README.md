@@ -50,7 +50,7 @@ When a skill dispatches `Task(subagent_type=orchestrator, ...)`, the orchestrato
 2. Read `agents/orchestrator.md` for the per-phase contract and the agent contract file — derive the file path by stripping the `th:` prefix from `next_dispatch.agent` (e.g. `th:architect` → `agents/architect.md`).
 3. Dispatch `{next-agent}` directly via `Task(subagent_type={next-agent}, ...)` from the top-level session — `{next-agent}` is the prefixed value from `next_dispatch.agent` (e.g. `th:architect`), used verbatim.
 4. Continue through the remaining phases, dispatching each agent in sequence (or in parallel where the contract specifies, e.g. `tester` + `qa` + `security` in Phase 3). Update `00-state.md` after every transition.
-5. Respect gates: STAGE-GATE-2 between PRs is silent iff `autonomous: true`; STAGE-GATE-3 always asks the user before push.
+5. Respect gates: STAGE-GATE-1 and STAGE-GATE-3 are the only two gates in this pipeline, and neither is ever silent — STAGE-GATE-3 always asks the user before push, regardless of `autonomous`.
 6. **Do NOT** ask the user "should I take over?", **do NOT** re-invoke `@th:orchestrator` (it recreates the nested context), and **do NOT** write the agents' workspaces inline — top-level Claude still inherits the orchestrator's "you NEVER write code/tests/docs" contract during the takeover.
 
 This contract is universal across every routing skill. The full directive lives in `agents/orchestrator.md` § "Dispatch-blocked exit" and in `CLAUDE.md` § 14 "Subagent Orchestration" — both are authoritative.

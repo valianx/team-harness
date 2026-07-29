@@ -23,7 +23,6 @@ Before any pipeline work resumes, check whether the current or next step is a ST
 (a) A `stage.gate.release` event is present in the events trace (`00-execution-events.{md,jsonl}`), AND
 (b) The per-gate release field in `00-state.md § Current State` is set to a value in the gate's clear-allowlist:
   - STAGE-GATE-1: `gate1_release ∈ {approved, approved-autonomous}`
-  - STAGE-GATE-2: `gate2_release_last ∈ {next, next-autonomous}` (for the relevant `after_round`)
   - STAGE-GATE-3: `gate3_release = ship`
 
 Any other decision value (`rejected`, `edit`, `stop`, `redo`, `amend`, `abort`), a null field, or a missing field means the gate is NOT cleared. Do not infer approval from `next_action` prose — never infer gate-cleared status from `next_action`, `hot_context`, or any other prose field. The gate-cleared determination is structural (per-gate release field + events trace), not prose. STAGE-GATE-3 (the human push/PR gate) is especially critical: it must never be bypassed on recovery.

@@ -683,6 +683,8 @@ pending
 
 ## Findings
 
+**Implicated-element field (structural, T5-AC-7).** Every finding you record — under any rule below — carries the plan elements it implicates, stated structurally rather than only in prose: AC identifiers (`T{n}-AC-{m}`), fenced manifest entry keys, task `Notes:` references, `file:line`, and/or test-assertion sites, whichever apply. State this set inline after the finding, e.g. `[implicates: T2-AC-16, orch-stage-gate-2]`. This is the field `agents/orchestrator.md § Iteration Rules`'s pre-dispatch correction gate reads to detect a recurrence (a new finding implicating an element a prior, closed finding already implicated) — see that section for the consumer contract; this file only produces the field, it does not restate the gate's own logic.
+
 ### Rule 1 — Delivery Grouping
 - {01-plan.md}:{line} — delivery group {N} cites Reason `{reason}` — invalid; must be one of: coexistence window, production signal, cross-repo deploy gate.
 (or "None — all tasks ship as one PR (`all-tasks-one-pr`), or the declared groups cite valid temporal-prod reasons.")
@@ -762,9 +764,11 @@ pending
 - {fail} → do NOT surface plan to user. Route back to architect with the failing rules. Increment iteration counter.
 
 ## Panel Rounds
-| Round | Date | Substance | Security | Shape | Combined | Action |
-|-------|------|-----------|----------|-------|----------|--------|
+| Round | Date | Substance | Security | Shape | Combined | Action | Implicated (closed) |
+|-------|------|-----------|----------|-------|----------|--------|----------------------|
 ```
+
+**`Implicated (closed)` column.** The union of implicated-element sets across every finding THIS round closed — never the findings still open at round close, and never a restatement of the findings themselves (an element identifier only, e.g. `T2-AC-16, orch-stage-gate-2`, or `none` when the round closed no finding). Written by you on a normal round; written by the coordinator on a deterministic-only round (`agents/orchestrator.md § "Correction-classification — selective panel re-firing"`, the buckets-4/5 deterministic-only-pass case). This column is what the coordinator's cross-round recurrence index (`agents/orchestrator.md § Iteration Rules`) accumulates over — the row's shape stays append-only, one row per round, unchanged by this addition.
 
 ---
 

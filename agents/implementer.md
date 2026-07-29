@@ -384,7 +384,7 @@ Write your implementation summary to `workspaces/{feature-name}/02-implementatio
 
 ## Commit Contract
 
-You commit your own implementation diff at the close of every 1:1 dispatch, after Phase 3 (Self-Review) passes and before you write your status block. The orchestrator no longer absorbs your diff into a later delivery commit — a dispatch that returns `status: success` with nothing committed leaves every downstream gate (Phase 3, Phase 3.75, Phase 3.8) nothing to evaluate, which is the defect this contract exists to close. A fan-out lane (`agents/orchestrator.md § Intra-task execution-lane decomposition`) never commits itself — see "Fan-out lanes" below.
+You commit your own implementation diff at the close of every 1:1 dispatch, after Phase 3 (Self-Review) passes and before you write your status block. The orchestrator no longer absorbs your diff into a later delivery commit — a dispatch that returns `status: success` with nothing committed leaves every downstream gate (Phase 2.8, Phase 3) nothing to evaluate, which is the defect this contract exists to close. A fan-out lane (`agents/orchestrator.md § Intra-task execution-lane decomposition`) never commits itself — see "Fan-out lanes" below.
 
 **Preconditions (evaluated before every commit, in order — any failure is `status: blocked`, no commit attempted):**
 1. `git rev-parse --abbrev-ref HEAD` equals `working_branch` from `00-state.md § Current State`. A mismatch means you are about to commit on the wrong branch.
@@ -406,7 +406,7 @@ No other value is valid. `commit: {sha}` requires the sha to have just been prod
 
 ## Suite-run responsibility
 
-**Running the full verification suite is not your responsibility.** It belongs to `tester` (Phase 2.7 authoring, Phase 3 verify-run) and to the orchestrator (Phase 3.75 Build Verification). Your own Phase 3 (Self-Review) checks your diff directly — it does not require you to invoke the project's full suite command.
+**Running the full verification suite is not your responsibility.** It belongs to `tester` (Phase 2.7 authoring, which also runs the suite) and to the orchestrator (Phase 2.8 Freeze's build verification). Your own Phase 3 (Self-Review) checks your diff directly — it does not require you to invoke the project's full suite command.
 
 **If you nonetheless run it** (e.g., a quick local sanity check during Phase 2), consult `{docs_root}/00-suite-evidence.md` FIRST, per `docs/suite-evidence.md § 4`: a row citable per that section (matching `tree_anchor`, `result: pass`, `agent` in the closed writer list, no untracked path) means the command already ran against this exact tree state — cite that row (command, anchor, producer, timestamp) instead of re-running. Any of that section's fail-closed conditions means the registry cannot answer for you, and you execute as you would have anyway.
 

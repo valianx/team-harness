@@ -38,8 +38,25 @@ A dispatch may also hand the recipient an **affirmation to invert** — a claim,
 an earlier stage, that the recipient's own method exists to attack or falsify. This is
 permitted and is not a restatement of the recipient's contract: it is the recipient's own
 raw material. The canonical example is `adversary` receiving the Stage-1 SEC-002
-design-review verdict at Phase 3.8 — the verdict is not a conclusion the dispatcher is
-handing down, it is the thing `adversary`'s own break-the-design method is built to attack.
+design-review verdict within the Phase 3 parallel validation block — the verdict is not a
+conclusion the dispatcher is handing down, it is the thing `adversary`'s own
+break-the-design method is built to attack.
+
+**Coordinate-in, content-out.** A value travels inline in the dispatch prompt exactly when
+it IS a coordinate under item 1 above — a sha, a tree anchor, a diff range, the command a
+suite was run with, the suite-evidence row that records a run. It never travels inline when
+it is a conclusion someone reached about that coordinate — a findings classification, a
+review verdict's rationale, a recommendation. The second kind is written to its durable home
+(`01-plan.md`, `00-state.md`, a review file) and the dispatch points at that home instead.
+The test is mechanical, not judgment-based: could the recipient have derived this value from
+the coordinates alone, or does it encode someone's conclusion?
+
+**A suite VERDICT is content, not a coordinate — and this distinction is load-bearing.** The
+run is identified by its command and its tree anchor; the verdict is that run's outcome, and
+handing a verifier "the suite passed" pre-biases the judgement the verifier was dispatched to
+make. Point at the suite-evidence row; let the recipient read the verdict there. A sha, a
+tree anchor, or a suite-evidence row travels inline because it IS the coordinate; a verdict
+or a findings classification is written to the board and pointed at.
 
 ## What a dispatch must not carry
 
@@ -58,6 +75,13 @@ A dispatch prompt MUST NOT carry:
   operator-facing presenter. Gate option menus belong to the presenter (`th:leader` in the
   normal path; the orchestrator's own fallback renderer in the takeover path — see
   `agents/_shared/gate-contract.md`), never to a specialist dispatch.
+- A **scope-injection** — new work beyond what the board already declares.
+  Scope lives on the board (`01-plan.md § Task List`, the approved AC set, the declared
+  `Files:`) and the dispatch points at it. When a dispatch prompt asks for work not
+  derivable from the board, the recipient reports and routes the request back to the
+  dispatcher rather than absorbing it silently as if it had always been in scope, or
+  rejecting it outright as though it were simply invalid — a request outside the board is a
+  routing problem, not a yes/no decision for the recipient to make alone.
 
 The list above is closed, mirroring the closed "may carry" list before it: coordinates,
 task-scope decisions absent from the board, and the return form are the only permitted
@@ -107,6 +131,7 @@ an evasion of the rubric's intent.
 | Review-scope half: a dispatch carries a coordinate, never a bound | prose-only | fail-open toward more scrutiny — a verifier reading a dispatch with no bound reviews the whole artifact, which is the safe default this half is built on | the dispatching agent itself (`th:leader`, orchestrator), self-applied at prompt-construction time | n/a — control new, generalized from the removal this PR performs at its five prior sites |
 | Write-scope half: bounded by the recipient's own contract, by pointer only | header-survival check (full-file-loss detection) + `Edit`-only-existing-file discipline (self-applied, not independently checked) | the header-survival check catches a full-file loss; a content corruption that leaves every heading intact is a residual the write-tool discipline names but does not mechanically detect | orchestrator (`agents/orchestrator.md § "Header-survival check (panel dispatch integrity)"`), around every panel dispatch on a shared review file | `agents/_shared/plan-consolidation.md:44`, `:60` |
 | Closed "may carry" / "must not carry" lists exclude any content outside the three permitted items, by construction | prose-only — verified by direct read, not a grep suite | n/a — a closed-list boundary is a structural property of this file's own text, checked by the reader (`qa` validate mode / plan-reviewer) at the acceptance-criteria level | `qa` (validate) / plan-reviewer, reading this file directly | n/a — control new, scoped to this file's own text |
+| Scope-injection rule: a dispatch never introduces new scope, only points at the board | prose-only — the recipient self-applies the report-and-route response | fail-safe toward escalation, never silent absorption or silent rejection — an out-of-board request always surfaces to the dispatcher | the dispatched recipient itself, on receiving an out-of-board request | n/a — control new, generalized from the recurring board-vs-dispatch drift this rule closes |
 
 **Limit of the mechanism, stated and not hidden.** This rubric makes an omission visible —
 an empty cell, a missing row — it does not detect an incorrect entry. A `prose-only` value

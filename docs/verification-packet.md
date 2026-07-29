@@ -28,6 +28,61 @@ header field is the versioning mechanism, not the filename.
 
 ---
 
+## 1a. Tree-anchor algorithm (canonical — the ONLY place this command is defined)
+
+**This is the single, canonical definition of "the dirty-diff hash" / "tree anchor" cited
+throughout this project (`agents/orchestrator.md` — the Phase 2.8 fan-open recording, the
+STAGE-GATE-3 precondition, and the Phase 3 staleness-invariant note; `agents/_shared/delivery-mechanics.md
+§ 6(c)`; `docs/suite-evidence.md § 4`). Every one of those sites CITES this section by
+pointer — none of them re-derives or restates the command.**
+
+A plain `git rev-parse HEAD` is not sufficient on a dirty branch: it says nothing about
+uncommitted changes, and `git diff` on its own never reports untracked paths (a new file
+left uncommitted would otherwise leave a prior anchor looking unchanged over a tree that in
+fact changed — the exact gap `docs/suite-evidence.md § 4`'s own independent guard exists to
+backstop, since this algorithm alone cannot see a file it was never told to hash unless the
+caller also runs the untracked-file guard described there).
+
+**Concrete command (Bash, coordinator-self-applied — reproducible, not a description):**
+
+```bash
+tree_anchor="$(git rev-parse HEAD)"
+if [ -n "$(git status --porcelain)" ]; then
+  # Tracked, uncommitted changes (staged + unstaged), workspaces/ excluded (always git-ignored).
+  # Untracked paths -- git diff never reports these. Each one contributes its PATH, its
+  # BYTE LENGTH, and its CONTENT, in sorted path order. All three are load-bearing:
+  # concatenating contents alone is ambiguous (two files holding "X" and "Y" hash the same
+  # as one holding "XY" beside an empty one), and omitting the path lets a rename alias a
+  # different tree to the same anchor. The length prefix is what makes the framing
+  # unambiguous without relying on a delimiter that could occur inside a file.
+  dirty_hash="$( {
+      git diff HEAD --binary -- . ':!workspaces'
+      git ls-files --others --exclude-standard -z | sort -z \
+        | while IFS= read -r -d '' p; do
+            printf '%s\n%s\n' "$p" "$(wc -c <"$p" 2>/dev/null || echo 0)"
+            cat -- "$p" 2>/dev/null
+          done
+    } | sha256sum | cut -d' ' -f1)"
+  tree_anchor="${tree_anchor}+${dirty_hash}"
+fi
+echo "${tree_anchor}"
+```
+
+**Anchor equality** is a plain string comparison of the full `tree_anchor` value (`{sha}` alone
+on a clean tree, `{sha}+{dirty_hash}` on a dirty one) — never a partial or SHA-prefix match.
+
+**This algorithm alone is still not a complete guard.** It hashes whatever untracked content
+exists AT THE MOMENT IT RUNS — it cannot detect a file that did not exist yet when the anchor
+was FIRST recorded (Phase 2.8) but exists by the time a LATER comparison runs, unless that
+later comparison also re-runs this same command fresh. Every site that compares against a
+previously-recorded anchor (STAGE-GATE-3 preparation, the push-step precondition) MUST
+re-run this command fresh at comparison time, never reuse a stale `dirty_hash` — and the
+push-step site additionally runs the independent `git status --porcelain` guard
+(`agents/_shared/delivery-mechanics.md § 6(c)`, mirroring `docs/suite-evidence.md § 4`) as a
+second, unconditional check, regardless of what this comparison alone would have concluded.
+
+---
+
 ## 2. Packet content contract
 
 **Hard cap: ≤120 lines / ~2-3K tokens.** A packet that cannot fit the cap is a signal the
@@ -36,7 +91,7 @@ silently.
 
 | Section | Content | Source |
 |---|---|---|
-| **Header** | `Feature:`, `Task identifier:`, `Built:` (ISO timestamp), `Packet version: N`, `Tree anchor:` (`git rev-parse HEAD`, plus a dirty-tree diff hash when uncommitted changes exist — same anchor mechanic as the recorded-state gate, `agents/orchestrator.md § Phase 3`), `Base ref:` (the task's recorded base, e.g. `origin/main`) | orchestrator |
+| **Header** | `Feature:`, `Task identifier:`, `Built:` (ISO timestamp), `Packet version: N`, `Tree anchor:` (computed per § 1a's canonical algorithm — never re-derived inline), `Base ref:` (the task's recorded base, e.g. `origin/main`) | orchestrator |
 | **Scope** | `type`, `bug_tier`, `security_sensitive`, `frontend_scope`, `complexity` | `00-state.md` |
 | **Changed files** | Table: path + `new`\|`modify` + one-line role, plus `git diff --stat` output | implementer status block + `git diff --stat` |
 | **Implementation summary** | Implementer status-block summary; `Deviations from Architecture` copied verbatim (or `"none"`); surviving `[CONSTRAINT-DISCOVERED]` annotations verbatim (or `"none"`) | `02-implementation.md` |
@@ -250,8 +305,8 @@ multi-run window, no window-close step, and no automatic trigger of any kind.
 **Denominator — verdict-doc-derived, not breadcrumb- or `phase.end`-derived.** The
 verifier-dispatch count is read from the workspace verdict docs — one dispatch per verifier
 per iteration verdict entry: `03-testing.md` run-only section (tester), `reviews/04-validation.md`
-(qa), `reviews/04-security.md` (security, Phase 3.8 audit), `reviews/04-adversary.md` /
-`reviews/04-adversary-amend.md` (adversary, Phase 3.8 audit), `reviews/04-ux-validation.md`
+(qa), `reviews/04-security.md` (security, Stage-1 design-review), `reviews/04-adversary.md` /
+`reviews/04-adversary-amend.md` (adversary, Pre-Delivery Security Audit), `reviews/04-ux-validation.md`
 (ux-reviewer validate). `00-subagent-trace.jsonl` breadcrumbs (`subagent.start`/
 `subagent.stop` pairs filtered by verifier `agent_type`) demote to upward-only enrichment: a
 breadcrumb-evidenced dispatch with no matching verdict entry is **ADDED** to the denominator
@@ -261,7 +316,7 @@ contract's own Task-1 fix is repairing.
 
 **Dispatch floor — exactly one derivation.** The floor is the should-have verifier set
 derived strictly from that run's `00-state.md` scope flags: `tester` run-only + `qa`
-unconditionally; + `security` unconditionally (Phase 3.8 audit, once per delivery group); +
+unconditionally; +
 `adversary` iff `security_floor_applies: true` (see `docs/pipeline-lanes.md § 7`); +
 `ux-reviewer` validate iff `frontend_scope: true`.
 The floor is **never** derived from

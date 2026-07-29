@@ -519,7 +519,7 @@ The initiative-level fan-out events are written by the **leader** (`agents/ref-d
 
 **Derivation.** Filter to `fanout.*` events. Group `fanout.lane.start` / `fanout.lane.end` pairs by `project` (matched on the shared `project` key). A lane with a `start` and no matching `end` is still running; a lane with both is closed, with `end.status` (`success`/`failed`/`iterating`) as its outcome. `fanout.converge` marks the region's closing boundary — its `lanes[]` array is the authoritative per-lane final status when present.
 
-**Advisory pending-gate (from the roster, never a gate-clear signal).** When a `00-leader-roster.md` sits at the initiative root (`agents/leader.md § 00-leader-roster.md`), read each lane's `pending_gate` field from its roster row and render it as-is. This column is ADVISORY — a leader-maintained hint of which STAGE-GATE a lane is paused at. It is NEVER derived from a gate-clear inference: this skill never reads `gate1_release` / `gate2_release_last` / `gate3_release` or any `stage.gate.release` event to decide gate status. When no roster is present, or a row's `pending_gate` is `—`, render `—`.
+**Advisory pending-gate (from the roster, never a gate-clear signal).** When a `00-leader-roster.md` sits at the initiative root (`agents/leader.md § 00-leader-roster.md`), read each lane's `pending_gate` field from its roster row and render it as-is. This column is ADVISORY — a leader-maintained hint of which STAGE-GATE a lane is paused at. It is NEVER derived from a gate-clear inference: this skill never reads `gate1_release` / `gate3_release` or any `stage.gate.release` event to decide gate status. When no roster is present, or a row's `pending_gate` is `—`, render `—`.
 
 **Render:**
 ```text

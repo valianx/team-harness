@@ -64,20 +64,18 @@ Full contract: [`docs/discover-phase.md`](./discover-phase.md).
 | Phase 2.0 — (bug-fix only) | — | — (see Bug-fix pipeline) |
 | Phase 2 — Implementation | implementer | code, `02-implementation.md` |
 | Phase 2.5 — Constraint Reconciliation | qa | keep/amend/drop decision when a hidden constraint surfaces |
-| Phase 2.7 — Test Authoring | tester (authoring mode) | `03-testing.md` (authoring section); must complete before Phase 3 |
-| Phase 3 — Verify | tester (run-only), qa, security* (parallel) | `03-testing.md` (verify section), `reviews/04-validation.md`, `reviews/04-security.md` |
+| Phase 2.7 — Test Authoring | tester (authoring + suite run, one dispatch) | `03-testing.md` (authoring section); must complete before Phase 2.8 |
+| Phase 2.8 — Freeze | th:orchestrator | build/lint, verification packet, fan-open tree anchor, base-advance reconcile |
+| Phase 3 — Verify (parallel validation block) | qa, adversary* (one message, concurrent) | `reviews/04-validation.md`, `reviews/04-adversary.md` |
 | Phase 3.5 — Acceptance Gate | th:orchestrator | re-routes to implementer if any AC is missing a passing test (max 3 loops) |
-| Phase 3.75 — Build Verification | th:orchestrator | build/lint commands; retry implementer once if fail |
-| **STAGE-GATE-2** | operator | Per-round approval (skipped when operator granted `approve-autonomous` at GATE-1) |
-| Phase 4 — Delivery | delivery | CHANGELOG entry, version bump, branch, commit |
-| Phase 4.5 — Internal Review | reviewer | advisory top-3 issues |
-| **STAGE-GATE-3** | operator | Final ship/amend/abort |
+| **STAGE-GATE-3** | operator | Final ship/amend/abort; immediately before Phase 4 |
+| Phase 4 — Delivery | delivery + th:orchestrator (mechanics) | CHANGELOG entry, version bump, branch, commit, push, PR |
 | Phase 5 — GitHub Update | th:orchestrator + delivery | PR opened on GitHub post-STAGE-GATE-3 (`Fixes #N`, labels) |
 | Phase 6 — KG Capture | th:orchestrator | `process-insight` node written to Memory MCP |
 
-*`security` dispatched only when `security-sensitive: true`. `ux-reviewer` dispatched when `frontend_scope: true`.
+*`adversary` dispatched only when `security_floor_applies: true` (derived from `security-sensitive: true`). `ux-reviewer` dispatched when `frontend_scope: true`.
 
-**STAGE-GATE-1** is mandatory and cannot be skipped. **STAGE-GATE-3** is mandatory and cannot be skipped. **STAGE-GATE-2** fires **per-round** (once per round of tasks, between rounds) and is skipped when the operator granted `approve-autonomous` at GATE-1. A "round" is all tasks that share the same dependency depth; independent tasks run in parallel within a round, and STAGE-GATE-2 fires once when the whole round completes — not once per task.
+**STAGE-GATE-1** is mandatory and cannot be skipped. **STAGE-GATE-3** is mandatory and cannot be skipped, and is the only other gate in this pipeline — there is no per-round gate in this shape, since Phase 2 runs as a single implementer pass over every task rather than a round-scheduled DAG of dispatches.
 
 **Phase ordering note.** Phase 1.7 executes before Phase 1.5 in time (assigned a higher number for observability-identity continuity — the phase-number sequence tracks identity, not execution order). Phase 2.7 (test authoring) must complete before Phase 3 (verify).
 
@@ -119,8 +117,8 @@ The bug-fix pipeline is tier-classified at Phase 0a to calibrate ceremony to sev
 | **0** | Trivial/Cosmetic | Skipped | Skipped | tester only (suite no-regress; no full audit) | **None** — no workspaces created |
 | **1** | Docs/Trivial | Skipped — one-sentence prose plan | Conditional skip when no behavior change | tester (no-regress suite) only | Yes — minimal |
 | **2** | Light fix | Architect `mode: light-root-cause`, ≤30 lines | Mandatory | tester + qa | Yes — full |
-| **3** | Standard fix (default) | Architect `mode: full-root-cause`, 1 page max | Mandatory | tester + qa (security at the Phase 3.8 audit) | Yes — full |
-| **4** | Critical/Security | `mode: full-root-cause` + mandatory `mcp__memory__search_nodes` Prior Art query | Mandatory | tester + qa (security at the Phase 3.8 audit, extended analysis) | Yes — full + prior-art |
+| **3** | Standard fix (default) | Architect `mode: full-root-cause`, 1 page max | Mandatory | tester + qa (`adversary` joins the Phase 3 fan when `security_floor_applies`) | Yes — full |
+| **4** | Critical/Security | `mode: full-root-cause` + mandatory `mcp__memory__search_nodes` Prior Art query | Mandatory | tester + qa (`adversary` joins the Phase 3 fan when `security_floor_applies`, extended analysis) | Yes — full + prior-art |
 
 **Tier 0 — no workspaces.** Tier 0 is the genuinely-lite path for trivially cosmetic changes (typo in a comment, whitespace in README, CHANGELOG typo). The implementer makes the fix, runs tests, and opens the PR. No `workspaces/` folder is created. The PR review is the only gate. Auto-classifies when all of: single file touched, ≤5 lines changed, docs/comment/whitespace-only path, no test paths, no system-level files (`agents/*.md`, `skills/*.md`, `cmd/install/*.go`). Auto-promotes to Tier 1+ if any rule breaks during implementation.
 
@@ -291,9 +289,9 @@ Full contract: [`agents/ref-dispatch-machinery.md`](../agents/ref-dispatch-machi
 
 ## Acceptance gate (Phase 3.5)
 
-**When to use.** Fires automatically between Phase 3 (Verify) and STAGE-GATE-2 for every PR in every pipeline.
+**When to use.** Fires automatically after Phase 3 (Verify) and before STAGE-GATE-3, for every PR in every pipeline.
 
-Phase 3.5 is th:orchestrator re-reading the three verify artifacts (`03-testing.md`, `reviews/04-validation.md`, `reviews/04-security.md`) and the original AC list. If any AC from `01-plan.md § Task List` is missing a passing test or has an unresolved security finding, Phase 3.5 routes back to the `implementer` for a targeted fix before the gate opens. STAGE-GATE-2 never opens on a partial-pass.
+Phase 3.5 is th:orchestrator re-reading the verify artifacts (`03-testing.md`, `reviews/04-validation.md`) and the original AC list. If any AC from `01-plan.md § Task List` is missing a passing test, Phase 3.5 routes back to the `implementer` for a targeted fix before the gate opens. STAGE-GATE-3 never opens on a partial-pass.
 
 ---
 

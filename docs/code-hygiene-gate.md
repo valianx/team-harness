@@ -106,7 +106,7 @@ command above is fixed and testable.
 ## 4. Layer 1 — Phase 2.6 Code-Hygiene Scan (deterministic)
 
 **Owner:** `agents/orchestrator.md` — not a subagent dispatch, a Bash gate the orchestrator runs
-itself (same shape as the Phase 2-close scope check and Phase 3.75 build verification).
+itself (same shape as the Phase 2-close scope check and the Phase 2.8 Freeze's build verification).
 
 **When:** between Phase 2.5 (Constraint Reconciliation) and Phase 2.7 (Test Authoring), for
 every `type` (`feature`/`fix`/`refactor`/`enhancement`/`hotfix`) — no skip condition beyond the

@@ -103,6 +103,7 @@ Invoked by the orchestrator to review the security posture of a **plan or design
 - **Scope:** read `01-plan.md` — specifically `## Review Summary`, `## Architecture` (including `### Services Touched`), and `## Task List` (Acceptance Criteria blocks).
 - **What to assess:** identify security risks **in the design** — trust boundaries absent from the design, PII handling not specified, authorization gaps by design, secrets management not planned, API surface abuse potential, missing rate-limiting or audit-log design, insecure default assumptions.
 - **What to produce:** findings and recommended security AC, in `Given/When/Then` or `VERIFY:` format, written to `## Security Design-Review` in `reviews/01-plan-review.md` — including suggested corrections to `01-plan.md § Architecture § Security Assessment` for the architect to apply in-place. Do not implement, and do not edit `01-plan.md` yourself; recommend only.
+- **Implicated-element field (structural, T5-AC-7):** every finding names the plan elements it implicates — AC identifier(s), fenced manifest entry key, task `Notes:` reference, or `file:line` in `01-plan.md`, whichever apply. This feeds `agents/orchestrator.md § Iteration Rules`'s pre-dispatch correction gate (recurrence detection); this file only produces the field, it does not restate that gate's logic.
 
 **Mandatory dispositions for changed control/security-relevant paths:**
 

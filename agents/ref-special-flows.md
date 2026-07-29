@@ -188,7 +188,7 @@ Two modes: `plan` (analysis only) and `plan-and-execute` (analysis + full pipeli
 
 **Milestone build disambiguation.** A `type: plan` single-repo milestone build is a third, distinct consumer for `01-plan.md`. The architect writes the milestone decomposition INTO `01-plan.md` (Work Plan with milestones M0…MN). This is NOT `01-planning.md` (multi-task batch). See the milestone-build section below for the full contract.
 
-Inside each task dispatched by `plan-and-execute`, the spawned `th:orchestrator` runs the full single-feature pipeline (Stage 1 → STAGE-GATE-1 → Stage 2 → STAGE-GATE-2 between tasks → Stage 3 → STAGE-GATE-3), which DOES produce its own `01-plan.md` for that task's own sub-tasks — each orchestrator witnesses its own gates independently. The `th:leader` tracks task boundaries via the multi-task progress tracker (`00-leader-roster.md`) — it never fires or witnesses STAGE-GATE-1/2/3 itself, at the batch level or otherwise. **No double-gating.**
+Inside each task dispatched by `plan-and-execute`, the spawned `th:orchestrator` runs the full single-feature pipeline (Stage 1 → STAGE-GATE-1 → Stage 2 → Stage 3 → STAGE-GATE-3), which DOES produce its own `01-plan.md` for that task's own sub-tasks — each orchestrator witnesses its own gates independently. The `th:leader` tracks task boundaries via the multi-task progress tracker (`00-leader-roster.md`) — it never fires or witnesses STAGE-GATE-1/3 itself, at the batch level or otherwise. **No double-gating.**
 
 ### Planning phase (both modes)
 
@@ -367,7 +367,7 @@ The canonical Tier table, Tier 0 auto-detection rules, auto-classification signa
 - **Tier 0 (Trivial/Cosmetic):** no workspaces, no gates (PR review is the only gate), implementer runs inline. No `00-state.md`, no `01-plan.md`, no workspaces folder.
 - **Tier 1 (Docs/Trivial):** workspaces created; architect skipped; Tier 1 regression-test conditional skip — only when no behavior change; tester only (suite no-regress) at Phase 3.
 - **Tier 2 (Light fix):** architect dispatched in light-root-cause mode; regression test mandatory; tester + qa at Phase 3.
-- **Tier 3 (Standard fix):** architect dispatched in full-root-cause mode; regression test mandatory; tester + qa at Phase 3; security at the Phase 3.8 audit.
+- **Tier 3 (Standard fix):** architect dispatched in full-root-cause mode; regression test mandatory; tester + qa at Phase 3; security at the Pre-Delivery Security Audit (within Phase 3).
 - **Tier 4 (Critical/Security):** same as Tier 3 plus mandatory KG prior-art query (`mcp__memory__search_nodes`) and extended security analysis.
 
 **Auto-classification signals (canonical definition in `leader.md § "Bug tier"`):**
@@ -427,7 +427,7 @@ The Tier 1 candidate skips Phase 2.0 ONLY when ALL of these conditions hold (can
 - Signal 2: `src/auth/middleware.ts` is a security-sensitive path → forces minimum Tier 3.
 - Signal 3: none.
 - Classification: `bug_tier: 3` (path priority > keyword priority; sensitive path wins over the typo hint). The keyword `unauthorized` would normally trigger Tier 4, but here it appears as part of the error-message text being fixed, not as the bug class; the architect can promote to Tier 4 in Phase 1 if root-cause analysis reveals the underlying logic is actually broken.
-- Pipeline: the orchestrator dispatches architect with `mode: full-root-cause`. `01-root-cause.md` full template (Prior Art optional). Phase 2.0 mandatory. Phase 2 (implementer fixes the typo). Phase 3 (tester + qa) + the Phase 3.8 audit (security + adversary — defense-in-depth on sensitive path). ~7 agent runs total. If the architect surfaces a tier-promote, the operator decides between Tier 3 and Tier 4.
+- Pipeline: the orchestrator dispatches architect with `mode: full-root-cause`. `01-root-cause.md` full template (Prior Art optional). Phase 2.0 mandatory. Phase 2 (implementer fixes the typo). Phase 2.7 (tester) then Phase 3's parallel validation block (qa + adversary — the Pre-Delivery Security Audit, defense-in-depth on a sensitive path). ~7 agent runs total. If the architect surfaces a tier-promote, the operator decides between Tier 3 and Tier 4.
 
 ### Full workspaces artifact set (type: fix)
 
@@ -466,7 +466,7 @@ Every bug-fix pipeline produces the backbone artifacts; the tier modulates which
 | 2.5 Reconcile | orchestrator + qa-plan (reconcile) | — | Same as feature flow |
 | 2.6 Code-Hygiene Scan | orchestrator (no dispatch) | `stage2.hygiene` trace event | Same as feature flow — deterministic scan, `[all types]`. See `docs/code-hygiene-gate.md § Layer 1` for the pinned command; not replicated here. |
 | **2.7 Test Authoring** | tester (mode: authoring) | `03-testing.md` (authoring section completed) | **When Phase 2.0 ran** (`bug_tier` 2-4, or `bug_tier: 1` with a regression test required): AC-test authoring pre-verify — the SAME tester contract Phase 2.0 started resumes here, completing the remaining AC tests from the `§ Test Plan` already written at Phase 2.0 (T2-AC-4), no re-derivation. **When Phase 2.0 was skipped** (`bug_tier: 1` no-behavior-change, `pre_fix_test_status: skipped`): there is no prior `§ Test Plan` to resume from — this dispatch authors the AC-test coverage plan directly from `01-plan.md § Task List`, equivalent to the feature-flow Phase 2.7 contract. Either way, runs suite once to confirm green. Still a distinct Phase Checklist row and event pair from Phase 2.0 — the consolidation (when it applies) is at the content level, not a checklist merge. |
-| 3 Verify | tester (run-only) + qa | `03-testing.md`, `reviews/04-validation.md` | The tester is run-only in Phase 3: executes the frozen suite (authored in Phase 2.7), confirms no regressions, does NOT write new AC tests. Tier 1: tester (run-only, suite no-regress) + qa (simplified). Tier 2-4: tester (run-only) + qa. `qa` and tester parallelize over an immutable artifact — no race condition. Security runs at the Phase 3.8 Pre-Delivery Security Audit, once per delivery group (Tier 4 carries the extended-analysis instruction there). |
+| 3 Verify | qa (+ adversary when `security_floor_applies`) | `reviews/04-validation.md` | The suite itself already ran once, at Phase 2.7 — there is no second, run-only tester dispatch here. Tier 1: qa (simplified). Tier 2-4: qa. `qa` and `adversary` (when dispatched) run in one message, concurrent, over the frozen tree Phase 2.8 produced. Security runs at the Pre-Delivery Security Audit, within this same parallel block, once per delivery group (Tier 4 carries the extended-analysis instruction there). |
 | 3.5 Acceptance gate | orchestrator | — | Same as feature flow; regression test must still be in suite (Tier 2-4) or `regression_test_status: skipped` confirmed (Tier 1). Gate also checks assertion-content match: authored assertion patterns from `02-regression-test.md` must still be present in the actual test file at `regression_test_path` — a weakened/replaced assertion body fails the gate (see orchestrator.md Phase 3.5 Step 6). |
 | 4 Delivery | delivery | `00-state.md § Delivery` | CHANGELOG `### Fixed`, PR title `fix(area):`, Bug Report section in PR body, `Fixes #N` |
 | 4.5 Internal review | reviewer (mode: internal) | — | Conditional per diff-size gate |
@@ -556,10 +556,8 @@ The Hotfix sub-flow is a tighter variant of the Bug-fix Flow for trivially scope
 - Phase 2.0 (Regression Test) — **still mandatory**. The operator override "regression test is mandatory always" applies to hotfixes too.
 - Phase 2 (Implementation) — scope-discipline contract still applies.
 - Phase 3 (Verify) — `security` agent still runs always for hotfix. This is a direct consequence of the Tier 3 hard floor: `type: hotfix` is pinned to Tier 3 minimum at Phase 0a Step 7 in `leader.md` (the hotfix Tier 3 floor rule), so the Tier-gated dispatch table always routes every hotfix to the Phase 3 `security` agent (Tier 3 row). "security runs always for hotfix" and "security runs for every Tier 3+ fix" are the same statement — the hotfix pin makes them equivalent.- Phase 3.5 (Acceptance Gate) — same.
-- Phase 3.75 (Build Verification) — runs normally (hotfix code must still compile).
-- STAGE-GATE-2 — irrelevant in practice (hotfix is typically 1 PR / 1 round).
+- Phase 2.8 (Freeze, including Build Verification) — runs normally (hotfix code must still compile).
 - Phase 4 (Delivery) — same `### Fixed` routing; PR title gains `(hotfix)` suffix.
-- Phase 4.5 (Internal Review) — **SKIPPED** for hotfix + single-file fix (the only exception to mandatory Phase 4.5; speed override). For multi-file hotfixes, Phase 4.5 runs.
 - STAGE-GATE-3 — always mandatory.
 - Phases 5 (GitHub Update) and 6 (KG Save) — same.
 
@@ -602,7 +600,7 @@ When `type: refactor`:
 4. **Verify** — tester runs **existing tests first** before writing new ones. If existing tests fail → the refactor broke something. New tests only for structural improvements (e.g., new module boundaries).
 5. **Delivery** — as normal, gated by STAGE-GATE-3.
 
-The key difference: existing passing tests are the safety net. If they break, the refactor is wrong. **The 3-stage gates still apply**: STAGE-GATE-1 (human approves the refactor plan), STAGE-GATE-2 between tasks in autonomous-skippable interactive mode, STAGE-GATE-3 before push.
+The key difference: existing passing tests are the safety net. If they break, the refactor is wrong. **The 2-gate flow still applies**: STAGE-GATE-1 (human approves the refactor plan), STAGE-GATE-3 before push.
 
 ---
 
@@ -1129,9 +1127,9 @@ When the user explicitly says "simple", "just implement", "skip design", "no tes
 
 **Operator-declared ONLY.** The leader NEVER sets `fast_mode`/`lane: express` on its own via this trigger — only a literal `--fast` in the operator's request maps to it through this alias. It is the developer's discretionary lightweight path for very small changes: a version bump, a one-line edit, a trivial copy tweak, or any express-eligible product-code change (`docs/pipeline-lanes.md § 2` bright line). It complements User-Initiated Simple Mode — Simple Mode is granular keyword skipping ("skip design", "skip tests"); `--fast` is a single named profile with a fixed skip-set (the express profile). Applies to any `type`.
 
-**Skips (= what the express profile skips, restated here for the alias's own self-containment):** Phase 1 Design (no `architect`; the orchestrator emits a one-sentence prose plan into `01-plan.md`, same surface as `type: hotfix`); plan ratification (Phase 1.5) and plan review (Phase 1.6), folded into the deterministic self-check and STAGE-GATE-1/2/3, folded into ONE combined plan+delivery gate; the `qa` and `security` agents at Phase 3 (`security` skipped ONLY when non-sensitive — see "Security override" below); Internal Review (Phase 4.5). Full phase-by-phase mechanics: `agents/orchestrator.md § "Express Lane Profile"` — this section states the alias mapping only, never a second copy of the mechanics.
+**Skips (= what the express profile skips, restated here for the alias's own self-containment):** Phase 1 Design (no `architect`; the orchestrator emits a one-sentence prose plan into `01-plan.md`, same surface as `type: hotfix`); plan ratification (Phase 1.5) and plan review (Phase 1.6), folded into the deterministic self-check and STAGE-GATE-1/STAGE-GATE-3, folded into ONE combined plan+delivery gate; the `qa` and `adversary` agents at Phase 3 (`adversary` skipped ONLY when non-sensitive — see "Security override" below). Full phase-by-phase mechanics: `agents/orchestrator.md § "Express Lane Profile"` — this section states the alias mapping only, never a second copy of the mechanics.
 
-**Keeps — floors that `--fast` can NEVER skip:** Specify (Phase 0b); Implement (Phase 2); the Code-Hygiene Scan (Phase 2.6); the `tester` agent at Phase 3 (ONE targeted test phase scoped to the diff); Build Verification (Phase 3.75, scoped to the diff); the express combined gate (the single operator round-trip that replaces STAGE-GATE-1/2/3 — never itself skippable); the native `dev-guard` push prompt; Delivery (Phase 4 — branch, commit, PR, minimal artifacts).
+**Keeps — floors that `--fast` can NEVER skip:** Specify (Phase 0b); Implement (Phase 2); the Code-Hygiene Scan (Phase 2.6); the `tester` agent at Phase 3 (ONE targeted test phase scoped to the diff); the Freeze's build verification (Phase 2.8, scoped to the diff); the express combined gate (the single operator round-trip that replaces STAGE-GATE-1/STAGE-GATE-3 — never itself skippable); the native `dev-guard` push prompt; Delivery (Phase 4 — branch, commit, PR, minimal artifacts).
 
 **Security design-review carve-out (SEC-002) — restated verbatim from the express profile's own SEC-DR5-01 fold-in, never a second, independently-drifting statement.** `--fast` skips Phase 1.6's PANEL (plan-reviewer audit + qa-plan ratification) in general, but the security design-review is NOT skipped when the task is security-sensitive (path match, semantic keyword match, `[security: required]`, or `type: hotfix` on a security-sensitive path). When the carve-out fires, the `security` agent is dispatched in design-review mode within Phase 1.6, BEFORE the express combined gate — exactly as `lane: full` runs it before STAGE-GATE-1. This carve-out is additive to the Tier 3+ hotfix floor — `type: hotfix` still gets its Phase 3 security run via the floor and additionally gets the Phase 1.6 design-review when on a sensitive path. Full definition: `agents/orchestrator.md § "Phase 1.6 is inviolable"` and `§ "Security on express (SEC-DR5-01)"`, and `leader.md § "Fast mode"` in Phase 0a.
 
@@ -1154,39 +1152,35 @@ Every special flow that skips phases must explicitly document which artifact ver
   - `architect` → `research/00-research.md`. The leader verifies `research/00-research.md` exists and is non-empty after the architect returns. On termination, verifies `## Residual Gaps` section is present.
   - **Per-round re-dispatch (gap-closure loop):** after each follow-up round, the same artifact verification sequence repeats — researcher lanes → consolidator (amended `research/00-research.md`) → architect (re-synthesized `research/00-research.md`). The leader also verifies the `## Coverage gaps` fenced block is present in `research/00-research.md` after the consolidator and architect return, and that `research_round` in `00-state.md` matches the current loop iteration.
 - **Artifact verification skipped for:** `implementer` (not dispatched), `tester` (not dispatched), `qa` (not dispatched), `security` (not dispatched), `delivery` (not dispatched).
-- **Phase 4.5:** not applicable (Phases 3-4 skipped entirely).
-- **Phase 3.75 (build verification):** not applicable (no implementation to build).
+- **Not applicable:** Phases 3-4 (Phase 3.5, Phase 2.8's build verification) — no implementation to build.
 
 ### Spike Flow
 
 - **Phases skipped:** 1 (design), 3-5 (verify, delivery, GitHub update).
 - **Artifact verification runs for:** `implementer` → `02-implementation.md`. The orchestrator verifies `02-implementation.md` exists after the implementer returns.
 - **Artifact verification skipped for:** `architect` (not dispatched), `tester` (not dispatched), `qa` (not dispatched), `security` (not dispatched), `delivery` (not dispatched).
-- **Phase 4.5:** not applicable (Phases 3-4 skipped entirely).
-- **Phase 3.75 (build verification):** not applicable (no verify stage).
+- **Not applicable:** Phases 3-4 (Phase 3.5, Phase 2.8's build verification) — no verify stage.
 
 ### Hotfix sub-flow
 
 - **Phases skipped:** Phase 1 (no architect, no `01-root-cause.md`).
-- **Artifact verification runs for:** all agents that ARE dispatched — `tester` (Phase 2.0 → `02-regression-test.md`, Phase 3 → `03-testing.md`), `implementer` (Phase 2 → `02-implementation.md`), `qa` (Phase 3 → `reviews/04-validation.md`), `security` (Phase 3 → `reviews/04-security.md`), `delivery` (Phase 4).
+- **Artifact verification runs for:** all agents that ARE dispatched — `tester` (Phase 2.0 → `02-regression-test.md`, Phase 2.7 → `03-testing.md`), `implementer` (Phase 2 → `02-implementation.md`), `qa` (Phase 3 → `reviews/04-validation.md`), `security` (Phase 1.6/Phase 3 → `reviews/04-security.md`), `delivery` (Phase 4).
 - **Artifact verification skipped for:** `architect` (not dispatched — Phase 1 skipped).
-- **Phase 4.5 (Internal Review):** SKIPPED for `type: hotfix` AND single-file fix (speed override — the only exception to mandatory Phase 4.5). For hotfixes with multi-file scope, Phase 4.5 runs normally.
-- **Phase 3.75 (Build Verification):** runs normally (hotfix code must still compile).
+- **Phase 2.8's build verification:** runs normally (hotfix code must still compile).
 
 ### Simple Mode (user-initiated)
 
 - **Phases skipped:** only what the user requested (see above).
 - **Artifact verification runs for:** all agents that ARE dispatched in the remaining phases.
 - **Artifact verification skipped for:** agents in phases the user explicitly skipped.
-- **Phase 4.5:** runs normally if verify and delivery phases are not skipped. If the user says "just implement" (skip Design + Verify), Phase 4.5 is not applicable.
-- **Phase 3.75 (Build Verification):** runs if Phase 3 (verify) runs; skipped if the user skipped verify.
+- **Phase 2.8's build verification:** runs if Phase 3 (verify) runs; skipped if the user skipped verify.
 
 ### Fast Mode (--fast, operator-declared) — `lane: express`
 
-- **Phases skipped:** 1 (Design — no `architect`), 1.5, 1.6 (folded into the deterministic self-check, unless `security_sensitive: true` forces the SEC-002 design-review — see `agents/orchestrator.md § "Security on express (SEC-DR5-01)"`), STAGE-GATE-1/2/3 (replaced by the express combined gate); Phase 3 `qa` (never runs on express) + `security` (unless a sensitive path / `[security: required]` forces security, via the single shared Phase-3 floor predicate, T2-AC-10); 4.5.
+- **Phases skipped:** 1 (Design — no `architect`), 1.5, 1.6 (folded into the deterministic self-check, unless `security_sensitive: true` forces the SEC-002 design-review — see `agents/orchestrator.md § "Security on express (SEC-DR5-01)"`), STAGE-GATE-1/STAGE-GATE-3 (replaced by the express combined gate); Phase 3 `qa` (never runs on express) + `security` (unless a sensitive path / `[security: required]` forces security, via the single shared Phase-3 floor predicate, T2-AC-10).
 - **Artifact verification runs for:** `implementer` → `02-implementation.md`; `tester` → `03-testing.md` (ONE targeted authoring+run dispatch, scoped to the diff); `delivery` (Phase 4, minimal artifacts). The orchestrator verifies each exists after the agent returns.
-- **Artifact verification skipped for:** `architect` (not dispatched — one-sentence prose plan in `01-plan.md` instead, unless the plan is architect-authored per the self-authored-plan carve-out's own boundary), `qa` (not dispatched), `security` (not dispatched, unless the sensitive-path override fires), `reviewer` (not dispatched — folded into the combined gate).
-- **Phase 3.75 (Build Verification):** runs, scoped to the diff — the change must still build and the suite must pass.
+- **Artifact verification skipped for:** `architect` (not dispatched — one-sentence prose plan in `01-plan.md` instead, unless the plan is architect-authored per the self-authored-plan carve-out's own boundary), `qa` (not dispatched), `security` (not dispatched, unless the sensitive-path override fires).
+- **Phase 2.8's build verification:** runs, scoped to the diff — the change must still build and the suite must pass.
 
 ---
 

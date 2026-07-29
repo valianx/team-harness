@@ -74,7 +74,7 @@ When scanning a feature folder for docs to link, the scan recurses one level int
 | `01-root-cause.md` (and `01-root-cause*.md`) | Bug-fix flow knowledge-tier doc — the research-equivalent artifact for fix pipelines (fix flows have no `00-research`) |
 
 **Everything else is excluded:**
-- Process/verification docs under `reviews/`: `reviews/04-validation.md`, `reviews/04-security.md`, `reviews/01-ux-review.md`, `reviews/04-ux-validation.md`, `reviews/04-adversary.md`, `reviews/04-review.md`, `reviews/04-internal-review.md`
+- Process/verification docs under `reviews/`: `reviews/04-validation.md`, `reviews/04-security.md`, `reviews/01-ux-review.md`, `reviews/04-ux-validation.md`, `reviews/04-adversary.md`, `reviews/04-review.md`
 - Process/verification docs at the feature root: `02-implementation.md`, `02-documentation.md`, `03-testing.md`, `03-regression-tests.md`, `05-diagram.*`, `00-acceptance-criteria.md`
 - Plumbing: `00-state.md`, `00-execution-events.md`, `00-execution-events.jsonl`, `session.json`
 - The feature-index note itself (`{feature_dir}.md`) — excluded to avoid self-reference

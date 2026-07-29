@@ -79,7 +79,7 @@ Every committed artefact is in English: `README.md`, all files under `docs/`, `a
 - **`agents/leader.md` live chat.** The leader replies in the operator's resolved language, determined by the 4-level precedence chain above — never a hardcoded language. For the current operator this resolves to Spanish; that is one operator's instance, not the rule.
 - **`agents/leader.md` Step 6 intent-detection routing table.** The table matches intent patterns in the operator's resolved language so the operator's own phrasing routes correctly. Illustrative patterns in the table may show Spanish alongside English as the current operator's instance — the table is not restricted to a fixed pair of languages.
 
-No other committed artefact carries a language exception. `agents/security.md`, `agents/reviewer.md`, and `agents/adversary.md` report bodies — and their `reviews/04-security.md`, `reviews/04-internal-review.md`, `reviews/04-adversary.md` outputs — are English; see § Operator-Supplied Content Boundary below.
+No other committed artefact carries a language exception. `agents/security.md`, `agents/reviewer.md`, and `agents/adversary.md` report bodies — and their `reviews/04-security.md`, `reviews/04-adversary.md` outputs — are English; see § Operator-Supplied Content Boundary below.
 
 **`agents/translator.md` example glossary tables** are domain illustrations, not operator copy. Out of scope for this guide.
 
@@ -102,7 +102,7 @@ Outside the operator-facing tier and the two §7.3 exceptions (leader live chat,
 | `00-task-intake.md` Original Description block | Operator-quoted | Whatever the operator said |
 | Prose body content in operator-facing-tier workspace docs (`01-plan.md`, `sketches/*`, `01-root-cause.md`) | Agent | **Operator's resolved language** (structural elements stay English — see `docs/conventions.md § Document classification` two-tier rule) |
 | Prose body content in agentic-tier workspace docs (analyses, rationales, summaries, insights, narrative verdicts) | Agent | English |
-| Prose body content in committed agent reports — `reviews/04-security.md`, `reviews/04-internal-review.md`, `reviews/04-adversary.md` | Agent | English |
+| Prose body content in committed agent reports — `reviews/04-security.md`, `reviews/04-adversary.md` | Agent | English |
 | Status-block `summary:` of every agent (including security, reviewer) | Agent | English (machine-parseable, always) |
 | Prose anywhere else (committed) | Agent | English (per §7.3) |
 

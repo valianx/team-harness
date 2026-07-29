@@ -324,11 +324,14 @@ check(
 
 # Check F009-2: recover/SKILL.md references the per-gate release field names
 # These fields are what the predicate reads to verify gate-cleared status.
-_GATE_FIELD_TOKENS = ("gate1_release", "gate2_release_last", "gate3_release")
+# Retargeted (pipeline-dispatch-shape, T7-AC-2, per T2-AC-11): gate2_release_last
+# was the STAGE-GATE-2 field; STAGE-GATE-2 is retired wholesale, leaving two
+# gates (gate1_release, gate3_release), not three.
+_GATE_FIELD_TOKENS = ("gate1_release", "gate3_release")
 
 check(
     "F009-2: skills/recover/SKILL.md § Recover Safety Rules references"
-    " per-gate release field names (gate1_release, gate2_release_last, gate3_release)",
+    " per-gate release field names (gate1_release, gate3_release)",
     bool(_s85_recover_safety_slice) and all(
         t in _s85_recover_safety_slice for t in _GATE_FIELD_TOKENS
     ),
@@ -384,10 +387,11 @@ check(
 )
 
 # Check F009-5: orchestrator.md Current State schema defines gate release fields
-# The schema section must declare gate1_release, gate2_release_last, gate3_release.
+# The schema section must declare gate1_release, gate3_release (gate2_release_last
+# retired with STAGE-GATE-2, per T2-AC-11).
 check(
     "F009-5: agents/orchestrator.md § Current State schema defines"
-    " per-gate release fields (gate1_release, gate2_release_last, gate3_release)",
+    " per-gate release fields (gate1_release, gate3_release)",
     bool(_s85_orch_current_state_slice) and all(
         t in _s85_orch_current_state_slice for t in _GATE_FIELD_TOKENS
     ),
@@ -397,7 +401,7 @@ check(
         f" '{t}': {t in _s85_orch_current_state_slice};"
         for t in _GATE_FIELD_TOKENS
     )
-    + " implementer must add gate1_release/gate2_release_last/gate3_release to the Current State schema",
+    + " implementer must add gate1_release/gate3_release to the Current State schema",
 )
 
 

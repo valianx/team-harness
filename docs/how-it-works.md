@@ -35,21 +35,21 @@ You tell th:leader: `@th:leader give me the work plan for this task: add a daily
 
 The architect reads `docs/knowledge.md`, the codebase, and any prior workspaces; produces `01-plan.md` — a single merged document with `§ Architecture` (the design proposal) and `§ Task List` (one section per task, with Given/When/Then acceptance criteria, plus a `§ Delivery Grouping` declaring how tasks map to PRs). It also writes plan sketches (`sketches/api-contract.md`, `sketches/data-model.md`, etc.) when the change touches those surfaces. `qa-plan` runs Phase 1.5 to confirm every AC maps to a Work Plan step, writing to `reviews/01-plan-review.md § Plan Ratification`. `plan-reviewer` runs Phase 1.6 to audit the plan-shape; its verdict is written to `reviews/01-plan-review.md § Plan Review` (`**Combined verdict:**`), and a one-line `**Reviews:**` attestation is reflected back into `01-plan.md`'s title block — the plan itself stays clean.
 
-You receive **STAGE-GATE-1** — a STOP block with the TL;DR, the human-review decisions, and the Task table. `hooks/sketch-guard.sh` validates that required sketches are present before the gate opens. Reply `approve` (per-task stops in Stage 2) or `approve autonomous` (skip the per-task stops).
+You receive **STAGE-GATE-1** — a STOP block with the TL;DR, the human-review decisions, and the Task table. `hooks/sketch-guard.sh` validates that required sketches are present before the gate opens. Reply `approve` or `approve autonomous` (skips the Phase 1.8 post-approval plan-review offer).
 
-### Stage 2 — Implementation (one task at a time)
+### Stage 2 — Implementation (single pass, all tasks)
 
-Tasks run in parallel rounds computed from their `Depends on:` field (round 1 is everything with no dependencies). For each task:
+Every task runs in one `implementer` dispatch, in the order its `Depends on:` field implies — this is execution order within the single pass, not a set of separate dispatches. Each task closes with its own commit. For each task:
 
 - The `implementer` writes code strictly scoped to that task's `Files:`. If a hidden constraint surfaces, it annotates the constraint and Phase 2.5 **Constraint Reconciliation** decides keep / amend / drop.
 - The `tester` writes tests, the `qa` validates against the AC list, `security` audits if the change is security-sensitive — all in parallel.
 - The Acceptance Gate (Phase 3.5) re-reads the three artifacts; if any AC is missing a passing test it routes back to the implementer.
 
-**STAGE-GATE-2** fires **per-round** (once per round of tasks, between rounds) — unless you granted autonomy at GATE-1.
+Stage 2 is a single implementer pass over every task (one commit per task) — there is no per-round gate; STAGE-GATE-3, below, is the only gate after STAGE-GATE-1.
 
 ### Stage 3 — Delivery
 
-`delivery` updates the CHANGELOG, bumps the version, creates the feature branch, commits with conventional messages (Phase 4). Phase 4.5 **Internal Review** runs the `reviewer` advisory-mode on the freshly-pushed diff and surfaces the top 3 issues.
+STAGE-GATE-3, immediately before delivery: the operator ships, amends, or aborts, seeing a version/CHANGELOG-entry preview and the Pre-Delivery Security Audit's findings. On `ship`, `delivery` writes the PR body and CHANGELOG entry text, and the coordinator bumps the version, creates the feature branch, commits, pushes, and opens the PR.
 
 **STAGE-GATE-3** is your final stop — reply `ship` / `amend` / `abort`. On `ship`, the orchestrator proceeds to Phase 5 (GitHub Update): the PR is opened on GitHub with `Fixes #N` and labels. The PR is NOT opened during the Phase 4 commit step — STAGE-GATE-3 must complete first.
 
@@ -84,8 +84,8 @@ The Bug-fix Pipeline is **tier-classified** at Phase 0a (Classify) so trivial bu
 | **0** | Trivial/Cosmetic | Skipped | Skipped | tester only (suite no-regress; no full audit) | **None** — no `workspaces/` folder created |
 | **1** | Docs/Trivial | Skipped — one-sentence prose plan | Conditional skip when no behavior change | tester (suite no-regress) only | Yes — minimal |
 | **2** | Light fix | Architect with `mode: light-root-cause`, ≤30 lines | Mandatory | tester + qa | Yes — full |
-| **3** | Standard fix | Architect with `mode: full-root-cause`, 1 pg max | Mandatory | tester + qa (security at the Phase 3.8 audit) | Yes — full |
-| **4** | Critical/Security | Architect with `mode: full-root-cause` + mandatory `## Prior Art` (`mcp__memory__search_nodes`) | Mandatory | tester + qa (security at the Phase 3.8 audit, extended analysis) | Yes — full + prior-art |
+| **3** | Standard fix | Architect with `mode: full-root-cause`, 1 pg max | Mandatory | tester + qa (security at the Pre-Delivery Security Audit) | Yes — full |
+| **4** | Critical/Security | Architect with `mode: full-root-cause` + mandatory `## Prior Art` (`mcp__memory__search_nodes`) | Mandatory | tester + qa (security at the Pre-Delivery Security Audit, extended analysis) | Yes — full + prior-art |
 
 **Tier 0 — no workspaces.** Genuinely cosmetic changes (typo in a comment, whitespace in README, CHANGELOG typo): the implementer makes the fix, runs tests, and opens the PR. No `00-state.md`, no `01-plan.md`, no workspaces folder. The PR review is the only gate. Auto-classifies when all of: single file, ≤5 lines changed, docs/comment/whitespace-only path, no test paths, no system-level files (`agents/*.md`, `skills/*.md`, `cmd/install/*.go`). Declare explicitly with `[TIER: 0]`.
 

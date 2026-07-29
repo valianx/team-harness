@@ -52,7 +52,7 @@ After a localized patch, the orchestrator re-runs only the verifier(s) whose dom
 | B (design) | `plan-reviewer` only | all verifiers |
 | C (criteria) | all verifiers (criteria changes always touch everything) | all verifiers |
 
-**No security-lens re-run exists in this table.** `security` and `adversary` do not participate in Phase-3 patch iterations: they run exactly ONCE per delivery group at the Pre-Delivery Security Audit (`agents/orchestrator.md § "Phase 3.8 — Pre-Delivery Security Audit"`), over the consolidated final diff, after all patch iterations have closed — so no patch can stale their verdict and no patch triggers their re-dispatch. Their findings are disposed by the operator at STAGE-GATE-3, never routed into this table. The audit's position is itself the staleness protection: nothing ships that the audit did not see, and the only re-audit is the single operator-caused amend re-run (`agents/orchestrator.md § "Re-audit on amend"`).
+**No security-lens re-run exists in this table.** `security` and `adversary` do not participate in Phase-3 patch iterations: they run exactly ONCE per delivery group at the Pre-Delivery Security Audit (`agents/orchestrator.md § "Phase 3 — Verify"`), over the consolidated final diff, after all patch iterations have closed — so no patch can stale their verdict and no patch triggers their re-dispatch. Their findings are disposed by the operator at STAGE-GATE-3, never routed into this table. The audit's position is itself the staleness protection: nothing ships that the audit did not see, and the only re-audit is the single operator-caused amend re-run (`agents/orchestrator.md § "Re-audit on amend"`).
 
 ## Cost-Ordered Patch-Iteration Re-Run Sequencing
 
@@ -84,7 +84,7 @@ owner must close before R2 is eligible.
 
 - **R0 — Deterministic test gate (always first, cheapest).** Before dispatching any reasoning
   lens, the orchestrator runs the frozen suite deterministically — a direct Bash run, the same
-  pattern as Phase 3.75 build verification. Red is a confirmed regression: append a Case A brief
+  pattern as the Phase 2.8 Freeze's build verification. Red is a confirmed regression: append a Case A brief
   entry (`Blast radius: localized {failing test IDs}`), bounce to the producer immediately, and
   spend zero lens tokens. Green enables R1.
 - **R1 — Owner-lens re-verification (delta-scoped).** With R0 green, re-dispatch ONLY the owner

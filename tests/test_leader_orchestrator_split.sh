@@ -297,16 +297,20 @@ assert_not_contains "AC-2.2-no-copy-b" "$ORCHESTRATOR" '## Record-based recover 
 assert_not_contains "AC-2.2-no-copy-c" "$ORCHESTRATOR" '## .agents/leader\.md' \
     "orchestrator.md does not copy gate-contract.md's leader-boundary section verbatim"
 
-# AC-2.2: owns all three STAGE-GATEs.
+# AC-2.2: owns both surviving STAGE-GATEs.
+# Retargeted (pipeline-dispatch-shape, T7-AC-2, per T2-AC-11): STAGE-GATE-2
+# is retired wholesale — orchestrator.md's one surviving mention is a
+# negation sentence ("No round, no STAGE-GATE-2") explaining its own absence,
+# not an ownership claim, so the g2 assertion (and the gate2_release_last
+# field it wrote) are removed rather than left to pass on that vacuous
+# string match.
 assert_contains "AC-2.2-g1" "$ORCHESTRATOR" 'STAGE-GATE-1' "orchestrator.md owns STAGE-GATE-1"
-assert_contains "AC-2.2-g2" "$ORCHESTRATOR" 'STAGE-GATE-2' "orchestrator.md owns STAGE-GATE-2"
 assert_contains "AC-2.2-g3" "$ORCHESTRATOR" 'STAGE-GATE-3' "orchestrator.md owns STAGE-GATE-3"
 
 # AC-2.2: emits/witnesses/records the dual-record — the schema tokens that
 # were forbidden in leader.md must be PRESENT in orchestrator.md (the seam is
-# welded here, not absent everywhere).
+# welded here, not absent everywhere). gate2_release_last has no successor.
 assert_contains "AC-2.2-field1" "$ORCHESTRATOR" 'gate1_release' "orchestrator.md writes gate1_release"
-assert_contains "AC-2.2-field2" "$ORCHESTRATOR" 'gate2_release_last' "orchestrator.md writes gate2_release_last"
 assert_contains "AC-2.2-field3" "$ORCHESTRATOR" 'gate3_release' "orchestrator.md writes gate3_release"
 assert_contains "AC-2.2-event" "$ORCHESTRATOR" 'stage\.gate\.release' "orchestrator.md appends stage.gate.release"
 

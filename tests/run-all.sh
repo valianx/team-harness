@@ -9,6 +9,16 @@ TESTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 FAILED=0
 
+# Resolve one Python interpreter for the suites that need it. `python3` is absent on Windows
+# installs that ship `py` or `python`, so a bare `python3` reports "not found" on a machine
+# that has Python — and the project requires every script to work on Windows, macOS and Linux.
+# Empty when no interpreter exists at all, which the callers treat as skip-or-fail.
+PY=""
+for _candidate in python3 python; do
+    if command -v "$_candidate" >/dev/null 2>&1; then PY="$_candidate"; break; fi
+done
+if [ -z "$PY" ] && command -v py >/dev/null 2>&1; then PY="py -3"; fi
+
 # Suites 15/17/18/19/20 require node/npm/bun. A green run must mean "verified",
 # never "not checked" — TH_REQUIRE_RUNTIMES=1 (set in CI) converts a missing-runtime
 # SKIP into a FAIL. Unset/0 (local dev) preserves the graceful skip. go/python3
@@ -76,6 +86,9 @@ fi
 echo
 echo "############################################################"
 echo "# Suite 4: hooks/ts/bodies/checkpoint-guard.ts — functional tests"
+echo "# Unwired from .claude-plugin/hooks.json since v2.139.0 (Claude Code plugin"
+echo "# mode); live consumer is the opencode runtime, registered via"
+echo "# hooks/ts/opencode-plugin.ts's teamHarnessPlugins() -> checkpointGuardPlugin()."
 echo "############################################################"
 run_ts_hook_suite "checkpoint-guard" "test_checkpoint_guard.sh"
 
@@ -211,12 +224,18 @@ fi
 echo
 echo "############################################################"
 echo "# Suite 16: hooks/ts/bodies/prepublish-guard.ts — bump-floor advisory (registry Suite 120)"
+echo "# Unwired from .claude-plugin/hooks.json since v2.139.0 (Claude Code plugin"
+echo "# mode); live consumer is the opencode runtime, registered via"
+echo "# hooks/ts/opencode-plugin.ts's teamHarnessPlugins() -> prepublishGuardPlugin()."
 echo "############################################################"
 run_ts_hook_suite "prepublish-bump-floor" "test_prepublish_bump_floor.sh"
 
 echo
 echo "############################################################"
 echo "# Suite 25: hooks/ts/bodies/prepublish-guard.ts — Check 2 command-execution (registry Suite 135)"
+echo "# Unwired from .claude-plugin/hooks.json since v2.139.0 (Claude Code plugin"
+echo "# mode); live consumer is the opencode runtime, registered via"
+echo "# hooks/ts/opencode-plugin.ts's teamHarnessPlugins() -> prepublishGuardPlugin()."
 echo "############################################################"
 run_ts_hook_suite "prepublish-guard" "test_prepublish_guard.sh"
 
@@ -229,6 +248,9 @@ run_ts_hook_suite "gcp-guard" "test_gcp_guard.sh"
 echo
 echo "############################################################"
 echo "# Suite 133: hooks/ts/bodies/worktree-guard.ts — worktree-guard-hook-behavior"
+echo "# Unwired from .claude-plugin/hooks.json since v2.139.0 (Claude Code plugin"
+echo "# mode); live consumer is the opencode runtime, registered via"
+echo "# hooks/ts/opencode-plugin.ts's teamHarnessPlugins() -> worktreeGuardPlugin()."
 echo "############################################################"
 run_ts_hook_suite "worktree-guard" "test_worktree_guard.sh"
 
@@ -237,15 +259,6 @@ echo "############################################################"
 echo "# Suite 136: hooks/run-ts-hook.sh — launcher-fail-closed-on-corrupt-artifact"
 echo "############################################################"
 run_ts_hook_suite "launcher-fail-closed" "test_launcher_fail_closed.sh"
-
-echo
-echo "############################################################"
-echo "# Suite 160: hooks/ts/bodies/gate-guard.ts — deterministic outward-action"
-echo "# order floor (issues #491/#495). Pre-fix regression (Phase 2.0): the"
-echo "# hook + its compiled artifact do not exist yet — FAILS until Task-2 of"
-echo "# the deterministic-gate-release-enforcement plan lands."
-echo "############################################################"
-run_ts_hook_suite "gate-guard" "test_gate_guard.sh"
 
 echo
 echo "############################################################"
@@ -441,6 +454,73 @@ if bash "$TESTS_DIR/test_bin_tty_behavioral.sh"; then
     echo "bin-tty-guard-behavioral: PASS"
 else
     echo "bin-tty-guard-behavioral: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 181: dispatch-sequence-simulation (declared model + property checks)"
+echo "############################################################"
+if ! command -v python3 >/dev/null 2>&1; then
+    report_skip_or_fail "dispatch-sequence-simulation" "python3 not found — install Python 3 to run this suite"
+else
+    if python3 "$TESTS_DIR/test_dispatch_sequence.py"; then
+        echo "dispatch-sequence-simulation: PASS"
+    else
+        echo "dispatch-sequence-simulation: FAIL"
+        FAILED=$((FAILED + 1))
+    fi
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 182: dispatch-contract-standard (agents/_shared/dispatch-contract.md)"
+echo "############################################################"
+if [ -z "$PY" ]; then
+    report_skip_or_fail "dispatch-contract-standard" "no Python interpreter found (tried python3, python, py -3)"
+elif $PY "$TESTS_DIR/test_dispatch_contract_standard.py"; then
+    echo "dispatch-contract-standard: PASS"
+else
+    echo "dispatch-contract-standard: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 183: gate-addressee-contract (structured gate data to th:leader)"
+echo "############################################################"
+if [ -z "$PY" ]; then
+    report_skip_or_fail "gate-addressee-contract" "no Python interpreter found (tried python3, python, py -3)"
+elif $PY "$TESTS_DIR/test_gate_addressee_contract.py"; then
+    echo "gate-addressee-contract: PASS"
+else
+    echo "gate-addressee-contract: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 184: agent-output-contracts (per-agent output-contract language)"
+echo "############################################################"
+if [ -z "$PY" ]; then
+    report_skip_or_fail "agent-output-contracts" "no Python interpreter found (tried python3, python, py -3)"
+elif $PY "$TESTS_DIR/test_agent_output_contracts.py"; then
+    echo "agent-output-contracts: PASS"
+else
+    echo "agent-output-contracts: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 185: post-split-agent-contracts (agent-authoring-standard branch)"
+echo "############################################################"
+if [ -z "$PY" ]; then
+    report_skip_or_fail "post-split-agent-contracts" "no Python interpreter found (tried python3, python, py -3)"
+elif $PY "$TESTS_DIR/test_post_split_agent_contracts.py"; then
+    echo "post-split-agent-contracts: PASS"
+else
+    echo "post-split-agent-contracts: FAIL"
     FAILED=$((FAILED + 1))
 fi
 

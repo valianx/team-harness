@@ -9,7 +9,7 @@ color: cyan
 
 This file is read on-demand by `th:leader` when executing a direct mode. It is NOT part of its system prompt.
 
-**Role mapping (post-split, see `agents/leader.md` and `agents/orchestrator.md`).** Every direct mode in this file is dispatched directly by `th:leader` — none of them carry a STAGE-GATE, so `th:leader` runs them without preparing, presenting, or relaying a gate. Where this file cross-references full-pipeline mechanics (Phase 2.7, Phase 4.5, the pipeline's Phase 4.5 internal review) those pointers resolve to `agents/orchestrator.md`, since that content now lives there.
+**Role mapping (post-split, see `agents/leader.md` and `agents/orchestrator.md`).** Every direct mode in this file is dispatched directly by `th:leader` — none of them carry a STAGE-GATE, so `th:leader` runs them without preparing, presenting, or relaying a gate. Where this file cross-references full-pipeline mechanics (Phase 2.7, the Dual-Review Convergence contract) those pointers resolve to `agents/orchestrator.md`, since that content now lives there.
 
 **LAZY-LOAD DIRECTIVE — consumers read only the section they need.** Do NOT read this entire file on every invocation. Locate the top-level section heading for the active mode (e.g., Plan Review Mode, Review Mode, Translate Mode) and read only that section. Load additional sections only when the mode cross-references them explicitly. Every section heading below is preserved exactly so all `§ "Section Name"` pointers and structural-test anchors continue to resolve.
 
@@ -301,7 +301,7 @@ Action required: operator reviews both bodies and decides the final verdict.
 The system cannot auto-resolve this disagreement. Resume with the chosen verdict.
 ```
 
-**Pipeline call site:** The SDD pipeline's Phase 4.5 internal review (`agents/orchestrator.md § Phase 4.5 — Internal Review`) reuses this same convergence contract for its pre-STAGE-GATE-3 dual-review pass. The `skills/review-pr` Phase 3.1 standalone path and the pipeline Phase 4.5 path are the two call sites of this contract.
+**Call site:** the `skills/review-pr` Phase 3.1 standalone path is this contract's call site. The SDD pipeline no longer has a pre-STAGE-GATE-3 internal-review phase of its own (that phase was retired — its coverage is delegated to PR review, per `CLAUDE.md § 8`); this convergence contract survives here for `/th:review-pr`'s own on-demand dual-pass option.
 
 ## Read-Only Working-Tree Guard
 

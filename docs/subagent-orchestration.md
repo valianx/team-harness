@@ -109,7 +109,6 @@ Inviolable gates (annotate `dispatch_handoff.type` to determine which items appl
 
    Once the guard passes (and type is resolved if it was null), dispatch the named agent directly via `Task(subagent_type={next_dispatch.agent}, ...)` from the top-level session — use the value verbatim (it is already prefixed, e.g. `th:architect`; do NOT add `th:` again). Parse the returned status block. Update `state_ref` (TL;DR + Current State + Agent Results) per the orchestrator's checkpointing protocol. Iterate per the orchestrator contract (max 3 iterations on `failed`/`blocked`).
 5. Continue through the remaining phases of the pipeline (Phase 3 verifies in parallel: `tester` + `qa` + `security` when sensitive; Phase 3.5 acceptance-gate; Phase 4 `delivery`). Respect gate semantics:
-   - **STAGE-GATE-2** (between PRs in Stage 2): if `dispatch_handoff.autonomy.granted` is `true`, skip silently; otherwise stop and ask the user.
    - **STAGE-GATE-3** (before push in Stage 3): always stop and ask the user — autonomy never covers this gate.
 6. Top-level Claude still inherits the "you NEVER write code/tests/docs" contract during the takeover — dispatch agents for each phase, do not write `02-implementation.md` / `03-testing.md` / `reviews/04-validation.md` / `reviews/04-security.md` inline. Delivery info goes to `00-state.md`.
 7. Mirror PR-level progress into `01-plan.md § Task List` (Status field + AC checkbox) at each PR transition.

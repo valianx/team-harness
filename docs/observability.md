@@ -210,7 +210,7 @@ denominator ground truth).** The per-run parity line
 narrower role than the reconciliation backstop above: the parity line's dispatch
 denominator is grounded in the workspace verdict docs (`03-testing.md` run-only
 section, `reviews/04-validation.md`, `reviews/04-security.md`,
-`reviews/04-adversary.md` / `reviews/04-adversary-amend.md` — the Phase 3.8 audit reports,
+`reviews/04-adversary.md` / `reviews/04-adversary-amend.md` — the Pre-Delivery Security Audit reports,
 `reviews/04-ux-validation.md`), and breadcrumbs are consulted only to ADD a
 breadcrumb-evidenced dispatch that has no matching verdict entry, classified
 telemetry-missing. A dispatch's breadcrumb pair being absent never removes it from,
@@ -422,7 +422,7 @@ Each event carries a `project` key so `/trace` can group events by lane and rend
 
 **Columns:** `Task/Project`, `State ref (docs_root)`, `Agent` (always `th:orchestrator`), `Phase`, `Status`, `pending_gate`. `Phase`/`Status` are the coarse fields the leader reads from each orchestrator's `00-state.md § Current State` (never a gate-release field). This is what makes the roster the leader→orchestrator **tree source**: it names each orchestrator, points at its `docs_root` (the `State ref`), and carries its coarse position.
 
-**`pending_gate` is ADVISORY.** The `pending_gate` column is a leader-maintained hint of which STAGE-GATE a lane is paused at, used only to drive the leader's gate-presentation/routing behaviour. It is **never a gate-clear signal** and nothing downstream treats a roster row as authoritative for gate status — the leader that writes it never reads or writes any orchestrator's `gate1_release`/`gate2_release_last`/`gate3_release` field or any `stage.gate.release` event; it presents each gate to the operator inline and relays the decision back, but never records a gate-release. Renderers surface `pending_gate` verbatim and must never infer a gate-clear from it.
+**`pending_gate` is ADVISORY.** The `pending_gate` column is a leader-maintained hint of which STAGE-GATE a lane is paused at, used only to drive the leader's gate-presentation/routing behaviour. It is **never a gate-clear signal** and nothing downstream treats a roster row as authoritative for gate status — the leader that writes it never reads or writes any orchestrator's `gate1_release`/`gate3_release` field or any `stage.gate.release` event; it presents each gate to the operator inline and relays the decision back, but never records a gate-release. Renderers surface `pending_gate` verbatim and must never infer a gate-clear from it.
 
 ### Reader-only initiative rollup
 
@@ -589,6 +589,8 @@ Documented in the "Additional pipeline event types" table above. Emitted by the 
 ### Correction-classification + routing record (`reviews/01-plan-review.md § Panel Rounds`)
 
 When a corrected plan re-enters Phase 1.5/1.6, the orchestrator classifies the correction into one of 5 buckets (broad-structural, security-relevant surface, non-security coverage change, editorial/operator-decided reduction, shape/consistency-only — `docs/patch-mode.md § "The correction classifier"`) and routes only the lens(es) that bucket requires. This classification and routing decision is recorded as a `§ Panel Rounds` row in `reviews/01-plan-review.md` — a workspace document, not a new event-file field — naming the bucket, which lens(es) fired, and which sub-verdicts were carried forward. The record is read-only audit detail for a decision already made deterministically by the ordered, first-match-wins classification rules; it does not itself gate anything.
+
+**`Implicated (closed)` column.** The row additionally carries the union of implicated-element sets (AC identifiers, fenced manifest entry keys, task `Notes:` references, `file:line`, test-assertion sites) across every finding that round closed — never the still-open findings, never a restatement of the finding text itself. `plan-reviewer` writes this column on a normal round; the orchestrator writes it on a deterministic-only round (buckets 4/5, no LLM lens re-fires). This is the producer half of the pre-dispatch correction gate's recurrence check (`agents/orchestrator.md § Iteration Rules`): the gate accumulates this column across rounds into a cross-round index, and a new finding whose implicated-element set intersects that index is a recurrence, mechanically — a set intersection, not a judgment call. The three Stage-1 lens contracts (`agents/security.md`, `agents/qa-plan.md`, `agents/plan-reviewer.md`) are this column's producers; each states the requirement in its own findings format.
 
 ### Carried-forward sub-verdict labeling
 
