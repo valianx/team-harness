@@ -26,7 +26,7 @@ next_action: {what to do next}      # the successor to a prose recovery section
 total_tokens: N
 ```
 
-**Intake classification** — the orchestrator produces these, at intake, and they are never re-derived downstream.
+**Intake classification** — the orchestrator produces the initial values at intake. `security_sensitive` is monotonic: the named plan and Phase-2-close backstops may escalate `false → true`, but no downstream step may change `true → false`. The other fields are never re-derived downstream.
 ```
 security_sensitive: true|false
 frontend_scope: true|false
@@ -100,6 +100,7 @@ regression_test_status: failing|passing|skipped|null
 plan_review_status: not-applicable|deferred|reviewed-pass|reviewed-concerns|skipped|null
 audit_status: pending|done|unavailable|null  # set at Phase 3: pending on dispatch, done on report, unavailable after a second audit failure. STAGE-GATE-3 states it in the block; it is not a machine-checked precondition — the tree anchor is the only one (agents/orchestrator.md § STAGE-GATE-3)
 code_hygiene: pass|fail|null                # docs/code-hygiene-gate.md
+verification_base_ref: origin/main|{dep-branch}|{commit}  # resolved once at Phase 2 entry; copied into the verification packet
 open_findings: [{id, disposition}]|[]       # dispositions live in 00-decision-ledger.md
 ```
 
@@ -122,6 +123,8 @@ working_branch: {branch}|null
 
 `working_branch` has three producer sites and only the orchestrator writes any of them. **Worktree topology:** copied from `worktree_branch` at branch establishment. **Branch-in-place:** `null` until Phase 2 entry, which creates the branch and writes the field. **Phase 4:** a defensive backstop only, for the case it is somehow still `null`. It is set before any lane reaches its outward push.
 
+`verification_base_ref` has one producer: Phase 2 entry. Phase 2.6, Phase 2 close, Freeze, the frozen diff, and the verification packet all consume that exact literal. The packet mirrors it; it never produces it.
+
 Live consumers, so it is never treated as documentation: the record-based recover backstop, the operator reading the file, and the executable branch comparisons in `implementer`, `tester`, and the Phase-2-close commit-integrity check. On the Claude Code plugin path no wired hook reads it — `gate-guard` and `checkpoint-guard` are both unwired. `opencode`'s own plugin wiring registers `checkpoint-guard` independently; that is outside this contract's scope.
 
 **Checkpoint fields.**
@@ -142,6 +145,44 @@ permission_provisioning_decline: obsidian|cross-repo|both|null   # session-scope
 > The `#` annotations above are documentation for the agent authoring the real file. They are never written into `00-state.md`.
 
 **Dropped field:** `skip_delivery` — batch-lane mode retired with the fan-out.
+
+## Phase Checklist — canonical shape
+
+Write this complete skeleton on the first state write. Preserve rows across transitions; mutate only the marker and an optional parenthetical outcome. A lane-authorized skip uses `[~skipped: reason]`, never deletion.
+
+```markdown
+## Phase Checklist
+- [ ] 1 Design
+- [ ] 1.0 Approach checkpoint
+- [ ] 1.5a Plan-structure scan
+- [ ] 1.5 Plan ratification
+- [ ] 1.6 Plan review
+- [ ] 1.8 Post-approval offer
+- [ ] 2.0 Regression test authoring
+- [ ] 2 Implementation
+- [ ] 2.5 Constraint reconciliation
+- [ ] 2.6 Code-hygiene scan
+- [ ] 2.7 Test authoring
+- [ ] 2.8 Freeze
+- [ ] 3 Verify
+- [ ] 3.5 Acceptance
+- [ ] 4 Delivery
+- [ ] 5 GitHub update
+- [ ] 6 Close
+```
+
+## Agent Results — canonical shape
+
+The table is a bounded snapshot keyed by `(agent, phase)`. A same-key return replaces its row; it never appends a duplicate. Use `(no agent results yet)` until the first dispatch returns.
+
+```markdown
+## Agent Results
+| Agent | Phase | Status | Verdict | Output | Iteration |
+|---|---|---|---|---|---|
+| (no agent results yet) | — | — | — | — | — |
+```
+
+`Verdict` is `pass|concerns|fail|clean|risks-found|broke-it|could-not-break|n-a`; `Output` is the relative artifact path or `none`; `Iteration` is `N` or `n-a`. Additional verdict-bearing fields such as `incomplete_on_changed_control` stay in the owning artifact and event payload, not in an ad-hoc table column.
 
 ## Execution events (canonical observability — mandatory)
 
@@ -252,7 +293,7 @@ After every phase transition, update `00-state.md`. This is the orchestrator's p
 
 1. **Append the event first.** `phase.start` before dispatch, `phase.end` after the agent returns (with `tokens`, `duration_ms`, `tools`, `model`, `effort`), `gate` when a gate is reached. **First, because events are append-only and must reflect real time** — backfilling later loses timestamp accuracy.
    **Token tracking is mandatory.** Every `phase.end` carries `tokens`: from the call result metadata when available, otherwise estimated (`duration_min × 1500` opus-heavy, `× 800` sonnet-heavy) with `tokens_estimated: true`. **`"tokens": 0` is forbidden.**
-2. **Update `00-state.md`** — the `§ Current State` fields, the completed phase `[x]`, and the `§ Agent Results` row **upserted by `(agent, phase)` key**: overwrite in place on a same-key re-run across iterations, never append a duplicate. A new row appears only for a genuinely new key, so `tester` and `qa` at Phase 3 each keep their own current verdict and are never collapsed to one last-writer-wins value.
+2. **Update `00-state.md`** — the `§ Current State` fields, the completed phase `[x]`, and the `§ Agent Results` row **upserted by `(agent, phase)` key**: overwrite in place on a same-key re-run across iterations, never append a duplicate. A new row appears only for a genuinely new key, so `qa` and `adversary` at Phase 3 each keep their own current verdict and are never collapsed to one last-writer-wins value.
    *Narrative sections are gone.* There is no TL;DR to rewrite, no Hot Context to overwrite, and no prose recovery section: the events file carries the narrative and the `next_action` field carries the recovery instruction.
 3. **Only then dispatch.**
 

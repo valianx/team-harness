@@ -55,8 +55,9 @@ issue-ID narration, and session-context phrasing.
 ### 3.1 Fixed scan command (pinned, copy verbatim)
 
 Both layers reference this exact command as the ground truth for "what counts as a violation."
-Run against the packet's `Base ref` (`00-verify-packet.md § Base ref`), scoped to the task's
-diff:
+Run against `verification_base_ref` from `00-state.md`, scoped to the task's diff. Before
+invoking the pinned command, set `BASE_REF` to that exact state literal; the shell variable
+is an invocation alias, not a second source:
 
 ```bash
 set -o pipefail
@@ -117,7 +118,7 @@ existing operator-declared fast-path mechanisms.
 | Result | Action |
 |---|---|
 | Clean (final `grep` exits `1`) | Emit a structural trace event only (`stage2.hygiene`, `verdict: pass`) — **never operator-facing prose**. Advance to Phase 2.7. |
-| Violations found (final `grep` exits `0`) | Emit `stage2.hygiene` (`verdict: fail`, `extra: {files, count}`). Write a `failure-brief.md` iteration entry with `Blast radius: localized {file:line, ...}`. Re-dispatch `implementer` under the BOUNDED-PATCH contract (`agents/implementer.md § BOUNDED-PATCH contract`). Rebuild the verification packet. Re-run the scan only (not the full verify block). |
+| Violations found (final `grep` exits `0`) | Emit `stage2.hygiene` (`verdict: fail`, `extra: {files, count}`). Write a `failure-brief.md` iteration entry with `Blast radius: localized {file:line, ...}`. Re-dispatch `implementer` under the BOUNDED-PATCH contract (`agents/implementer.md § BOUNDED-PATCH contract`). Re-run the scan only; the verification packet does not exist yet. |
 | Command error (final `grep` exits `2`+, or `git diff` itself failed) | Escalate — do not advance and do not silently treat as clean. Surface to the operator. |
 
 **Iteration budget:** shares the existing max-3 cap for Case A (implementation) bounces —
@@ -136,7 +137,7 @@ exclusion in § 2 covers committed `.md` files under `docs/`/`agents/`/`skills/`
 `reviews/04-validation.md`, in addition to the existing per-AC verdicts.
 
 **Scan target:** the same task-diff resolution `qa` already uses for AC evidence
-(`git diff --name-only` against the packet's `Base ref`) — no additional tree read.
+(`git diff --name-only` against state `verification_base_ref`) — no additional tree read.
 
 **What it audits (requires judgment; NOT expressible as a fixed grep pattern):**
 
