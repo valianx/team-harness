@@ -68,32 +68,28 @@ def _read_or_empty(path: Path) -> str:
         return ""
 
 
-# The monolithic agents/orchestrator.md was split into eleven files: the two
-# always-loaded spine files (leader.md, orchestrator.md), four read-on-demand
-# reference files (ref-*.md), and the shared cross-agent contract fragments
-# under _shared/. A check that used to assert "orchestrator.md contains X" is
-# a content-EXISTENCE check against the former monolith — its faithful
-# translation post-split is "X exists somewhere in the split corpus", not
-# "X exists in leader.md or orchestrator.md alone". SPLIT_CORPUS concatenates
-# the full corpus (spine first, in the original leader->orchestrator order, so
-# existing anchor-based first-match slicing keeps resolving the same way it
-# did before this constant existed) for use by existence-style assertions.
-# Assertions that verify a specific file OWNS a piece of content (as opposed
-# to merely containing it) stay scoped to that single file's `read(...)`.
+# The monolithic agents/orchestrator.md was split into ten files: the one
+# always-loaded spine file (orchestrator.md, the sole coordinator since the
+# coordinator-fusion migration retired the second, leader.md), four
+# read-on-demand reference files (ref-*.md), and the shared cross-agent
+# contract fragments under _shared/. A check that used to assert
+# "orchestrator.md contains X" is a content-EXISTENCE check against the former
+# monolith — its faithful translation post-split is "X exists somewhere in
+# the split corpus", not "X exists in orchestrator.md alone". SPLIT_CORPUS
+# concatenates the full corpus (spine first, so existing anchor-based
+# first-match slicing keeps resolving the same way it did before this
+# constant existed) for use by existence-style assertions. Assertions that
+# verify a specific file OWNS a piece of content (as opposed to merely
+# containing it) stay scoped to that single file's `read(...)`.
 #
-# ref-dispatch-machinery.md is placed BEFORE leader.md, not after orchestrator.md
-# with the other ref-*.md files: five sections relocated out of leader.md keep a
-# same-heading-text stub in leader.md (a one-line pointer to their new home), so
-# an existence check anchored on that exact heading text would otherwise match
-# the STUB (leader.md, shallow body) via first-match if leader.md preceded this
-# file in the corpus, instead of the byte-preserved full content this file now
-# owns. Placing it first makes `.find()`/`_slice_section`'s first match resolve
-# to the real content; it never collides with orchestrator.md (verified: none of
-# its headings duplicate any orchestrator.md heading), so the documented
-# leader->orchestrator relative order above is unaffected.
+# ref-dispatch-machinery.md stays first in the list (pre-fusion ordering
+# preserved rather than reshuffled): with a single spine file and no
+# duplicate heading text between it and orchestrator.md (verified), there is
+# no first-match collision left to protect against — the historical stub-vs-
+# real-content risk this ordering used to guard was leader.md's shallow
+# pointer stubs, which no longer exist.
 _SPLIT_CORPUS_FILES = [
     AGENTS_DIR / "ref-dispatch-machinery.md",
-    AGENTS_DIR / "leader.md",
     AGENTS_DIR / "orchestrator.md",
     AGENTS_DIR / "ref-special-flows.md",
     AGENTS_DIR / "ref-intake-flows.md",
@@ -143,7 +139,8 @@ def parse_frontmatter(text: str) -> dict[str, str]:
 print("=== Suite 1: Tool allowlist per agent ===")
 
 EXPECTED_AGENTS = [
-    "leader", "orchestrator", "architect", "agent-builder", "security", "reviewer",
+    # coordinator-fusion: "leader" retired — orchestrator is the sole coordinator
+    "orchestrator", "architect", "agent-builder", "security", "reviewer",
     "reviewer-consolidator",
     "qa", "qa-plan", "gcp-cost-analyzer", "gcp-infra", "init", "implementer", "tester",
     "plan-reviewer", "diagrammer", "likec4-diagrammer",
@@ -1980,7 +1977,7 @@ check(
 print("=== Suite 19: Agent identity & cross-reference consistency ===")
 
 # Agents that legitimately have no dispatchable identity because they are
-# lazy-loaded reference files (consumed on-demand by leader/orchestrator, never
+# lazy-loaded reference files (consumed on-demand by the orchestrator, never
 # invocable subagents). Derived from the `ref-` filename prefix — the same
 # semantics `skills/lint/SKILL.md` already uses to exclude these files from its
 # own agent-facing checks (see `skills/lint/SKILL.md:125`, `:128`, `:209`,
@@ -2033,7 +2030,7 @@ for agent_file in ALL_AGENT_FILES:
 orchestrator_md_v19 = orchestrator_md  # reuse from Suite 18 (already read)
 expected_in_orchestrator = {
     name for name in ALL_AGENT_FILES if name not in REFERENCE_ONLY_AGENTS
-} - {"leader", "orchestrator"}  # the split spine files don't list themselves
+} - {"orchestrator"}  # the sole coordinator doesn't list itself
 for agent_name in sorted(expected_in_orchestrator):
     # Must appear either in the Your Team table OR be named in the "Standalone
     # agents" callout.
@@ -2077,8 +2074,8 @@ for ref in sorted(plausible_agent_refs):
         f"agents/{ref}.md does not exist — rename in CLAUDE.md or restore the file",
     )
 
-# 5. Phase numbers mentioned in the core dev-pipeline spine (leader.md +
-#    orchestrator.md) are in the canonical set.
+# 5. Phase numbers mentioned in the core dev-pipeline spine (orchestrator.md,
+#    the sole coordinator) are in the canonical set.
 #    Canonical phases (per the Pipeline Flow ASCII art and Stage table):
 CANONICAL_PHASES = {
     "0a", "0b", "1", "1.5a", "1.5", "1.6", "1.7", "1.8", "2.0", "2", "2.5", "2.6", "2.7", "2.75", "2.8", "3", "3.4", "3.5", "4", "5", "6",
@@ -2114,9 +2111,7 @@ CANONICAL_PHASES = {
 # /review-pr standalone Phase 3.1) that legitimately reuse phase numbers
 # outside the dev-pipeline's own canonical set — they are a different
 # numbering scheme, not a typo of this one.
-_phase_number_source = (
-    read(AGENTS_DIR / "leader.md") + "\n" + read(AGENTS_DIR / "orchestrator.md")
-)
+_phase_number_source = read(AGENTS_DIR / "orchestrator.md")
 # Extract `Phase X` mentions, case-insensitive.
 phase_mentions = set(re.findall(r"Phase\s+([0-9]+(?:\.[0-9]+)?[a-z]?)", _phase_number_source))
 # pipeline-cost-slimdown (Task-1/Task-6): "3.6" was fully retired from
@@ -2522,32 +2517,33 @@ policy_checks = [
 for label, condition in policy_checks:
     check(f"docs/kg-content-policy.md: {label}", condition)
 
-# --- session lifecycle: session_start owned by leader.md (Phase 0a), session_end
-# owned by orchestrator.md (Phase 6) — per agents/_shared/kg-write-policy.md
-# § "Session attribution". These two frontmatter checks read each file
-# directly rather than `orch` (= SPLIT_CORPUS): `orch.split("---", 2)[1]`
-# resolves to leader.md's frontmatter block (leader.md is first in
-# _SPLIT_CORPUS_FILES), not orchestrator.md's, so a check anchored on that
-# slice silently validates the wrong file's frontmatter.
+# --- session lifecycle: one coordinator now owns both session_start (Intake
+# step 2) and session_end (Phase 6) — per agents/_shared/kg-write-policy.md
+# § "Session attribution". Retargeted post-fusion: the prior split had
+# leader.md own session_start and orchestrator.md own session_end, each
+# requiring its own frontmatter slice so a check anchored on the wrong file
+# would not silently validate the other one's grant. One file, one
+# frontmatter block now — both grants live in the same `tools:` line.
 
-_leader_frontmatter = read(AGENTS_DIR / "leader.md").split("---", 2)[1]
 _orch_frontmatter = read(AGENTS_DIR / "orchestrator.md").split("---", 2)[1]
 
 orch_session_checks = [
-    ("leader.md frontmatter declares mcp__memory__session_start (session open)",
-     "mcp__memory__session_start" in _leader_frontmatter),
+    ("orchestrator.md frontmatter declares mcp__memory__session_start (session open)",
+     "mcp__memory__session_start" in _orch_frontmatter),
     ("orchestrator.md frontmatter declares mcp__memory__session_end (session close)",
      "mcp__memory__session_end" in _orch_frontmatter),
-    ("Phase 0a calls session_start before search_nodes",
-     "session_start" in orch and "1b" in orch),
-    ("Phase 0a writes session.json",
+    ("Intake calls session_start before the knowledge-graph query step",
+     "session_start" in orch
+     and orch.find("session_start(project, working_dir)") < orch.find("Query the knowledge graph")),
+    ("Intake writes session.json",
      "session.json" in orch),
-    ("Phase 6 closes session with session_end",
-     "session_end" in orch and "Close the KG session" in orch),
+    ("Phase 6 closes the session with session_end",
+     "session_end" in orch and "## Phase 6 — Close the session" in orch),
     ("session_start failure is non-blocking",
-     "unavailable, skipping attribution" in orch or "session-management errors" in orch),
-    # Repoint (split): session.json now stores the KG session_id derived from
-    # session_start(project, working_dir) — the started_at field was retired.
+     "Unavailable → log and continue" in orch or "session-management errors" in orch),
+    # Repoint (split, then again post-fusion): session.json stores the KG
+    # session_id derived from session_start(project, working_dir) — the
+    # started_at field was retired.
     ("session.json schema documented (session_id + project + working_dir)",
      "session_id" in orch and "working_dir" in orch and "project" in orch),
 ]
@@ -4918,7 +4914,8 @@ else:
 # --- (rollout) Target agents reference output-template.md ---
 
 _TARGET_AGENTS = [
-    "leader", "orchestrator", "delivery", "init", "architect",
+    # coordinator-fusion: "leader" retired — orchestrator is the sole coordinator
+    "orchestrator", "delivery", "init", "architect",
     "implementer", "tester", "qa", "security",
 ]
 for _agent_name in _TARGET_AGENTS:
@@ -12657,71 +12654,41 @@ check(
 )
 
 # -----------------------------------------------------------------------
-# (b) PRESENCE assertions — dispatch_handoff wiring must appear in BOTH
-#     the plan-review region and the ux-reviewer region after the fix.
-#     Pre-fix: these wording strings do NOT exist in those regions → FAIL.
-#
-#     Strategy: slice each phase's region by its section header so an
-#     ambient dispatch_handoff elsewhere in the file cannot produce a
-#     false-green.  The region extends from the section header to the
-#     next "---" horizontal rule or next "##" section header, whichever
-#     comes first.
+# (b) RETIRED (coordinator-fusion). The original (b1)/(b2) asserted that a
+#     nested orchestrator — dispatched BY a second coordinator (`leader`) and
+#     missing `Task` — emits a `dispatch_handoff` for plan-reviewer/ux-reviewer
+#     rather than self-executing the review. That entire scenario's producer
+#     is gone: `agents/orchestrator.md § "No capability-check fallback"`
+#     states the orchestrator IS the top-level session agent, never dispatched
+#     nested by another coordinator, and `docs/subagent-orchestration.md §
+#     "Nested-context dispatch — RETIRED protocol, retained provisioning"`
+#     retires the whole dispatch_handoff/blocked-no-dispatch mechanism with no
+#     successor. Retargeted, not retired outright: what survives is the
+#     contract-violation disposition itself — a coordinator-dispatch case
+#     observed again is `status: blocked`, never a signal to resurrect the
+#     handoff — asserted once, tree-wide, rather than per-phase (there is no
+#     more Phase-1.6-specific vs Phase-1.7-specific nested handling to
+#     distinguish once the shared scenario they both handled has no producer).
 # -----------------------------------------------------------------------
 
-def _slice_section(text: str, start_marker: str, stop_markers: tuple[str, ...]) -> str:
-    """Return the substring from start_marker to the first stop_marker found after it."""
-    idx = text.find(start_marker)
-    if idx == -1:
-        return ""
-    tail = text[idx:]
-    end = len(tail)
-    for stop in stop_markers:
-        pos = tail.find(stop, len(start_marker))
-        if pos != -1 and pos < end:
-            end = pos
-    return tail[:end]
-
-_PHASE16_HEADER = "### Inline fallback when Task subagent invocation is not available"
-_PHASE17_HEADER = "### ux-reviewer fallback"
-
-# Post-fix, the inline-fallback headers will be replaced; the new region
-# will carry "dispatch_handoff" instead.  Both absence assertions above
-# already catch the stale *content* of those blocks; the presence
-# assertions below verify the *replacement* content is wired.
-# We anchor the presence check to the surrounding Phase 1.6 / 1.7 prose
-# rather than the (now-absent) stale headers, so the region still resolves
-# correctly post-fix.
-
-_PHASE16_ANCHOR = "### Dispatch-blocked exit (nested-context Task unavailability)"
-_PHASE17_ANCHOR = "### Dispatch-blocked exit (nested-context Task unavailability)"
-
-_STOP_MARKERS = ("\n## ", "\n---\n", "\n### Phase 1.5", "\n### Phase 1.6", "\n### Phase 2")
-
-_phase16_region = _slice_section(_orch_s51, _PHASE16_ANCHOR, _STOP_MARKERS)
-_phase17_region = _slice_section(_orch_s51, _PHASE17_ANCHOR, _STOP_MARKERS)
-
-# (b1) Fase 1.6: the plan-review region must reference dispatch_handoff
-#      directing top-level Claude to run plan-reviewer as a real subagent.
 check(
-    "Suite 51(b1): orchestrator.md Phase 1.6 region references 'dispatch_handoff'"
-    " for plan-reviewer nested-context handling",
-    "dispatch_handoff" in _phase16_region,
-    "orchestrator.md Phase 1.6 region (from '### Phase 1.6 — Plan Review' to next "
-    "section boundary) does not contain 'dispatch_handoff' — "
-    "the nested-context handling must emit a dispatch_handoff to plan-reviewer, "
-    "not self-execute the audit inline; add the handoff directive in that section",
+    "Suite 51(b): orchestrator.md declares no nested-coordinator fallback and"
+    " no split to verify — the scenario the retired dispatch_handoff wiring"
+    " existed to detect (a nested orchestrator missing Task) has no producer",
+    "## No capability-check fallback" in _orch_s51
+    and "There is no monolith fallback and there is no split to verify" in _orch_s51,
+    "orchestrator.md must state the 'No capability-check fallback' contract —"
+    " one coordinator runs this file end to end, so the nested-dispatch_handoff"
+    " scenario Suite 51 originally guarded against cannot recur",
 )
-
-# (b2) Fase 1.7: the ux-reviewer region must reference dispatch_handoff
-#      directing top-level Claude to run ux-reviewer as a real subagent.
 check(
-    "Suite 51(b2): orchestrator.md Phase 1.7 region references 'dispatch_handoff'"
-    " for ux-reviewer nested-context handling",
-    "dispatch_handoff" in _phase17_region,
-    "orchestrator.md Phase 1.7 region (from '### Phase 1.7' to next section boundary) "
-    "does not contain 'dispatch_handoff' — "
-    "the nested-context handling must emit a dispatch_handoff to ux-reviewer, "
-    "not self-execute the enrich review inline; add the handoff directive in that section",
+    "Suite 51(b): a coordinator-dispatch case observed again is a contract"
+    " violation (status: blocked), never a signal to resurrect the retired"
+    " handoff apparatus",
+    "that is a contract violation regardless of any check: stop and report"
+    " `status: blocked`" in _orch_s51,
+    "orchestrator.md must state that an apparent need to dispatch another"
+    " coordinator is a contract violation, not a case for dispatch_handoff",
 )
 
 # -----------------------------------------------------------------------
@@ -12930,6 +12897,25 @@ check(
     "phase number when adding the Test Authoring sub-phase",
 )
 
+# Shared helper — anchored region slicing with a tuple of possible stop
+# markers, the first one found wins. Used by every suite from here on that
+# needs a section scoped to more than one possible boundary (a 2-level
+# heading structure, or a horizontal rule that may or may not precede the
+# next heading). Distinct from the 2-arg `_slice_section` defined earlier
+# (Suite ~32 onward), which takes a single implicit stop convention.
+def _slice_section(text: str, start_marker: str, stop_markers: tuple[str, ...]) -> str:
+    """Return the substring from start_marker to the first stop_marker found after it."""
+    idx = text.find(start_marker)
+    if idx == -1:
+        return ""
+    tail = text[idx:]
+    end = len(tail)
+    for stop in stop_markers:
+        pos = tail.find(stop, len(start_marker))
+        if pos != -1 and pos < end:
+            end = pos
+    return tail[:end]
+
 # ---------------------------------------------------------------------------
 # Suite 54 — Read-Only Working-Tree Guard for review/direct-review mode (#238)
 # ---------------------------------------------------------------------------
@@ -12956,7 +12942,16 @@ _s54_l2 = _slice_section(_ref_direct, "### Layer 2 — Deny-tools", _S54_HEAD_ST
 _s54_l3 = _slice_section(_ref_direct, "### Layer 3 — Tree-verify", _S54_HEAD_STOPS)
 _s54_rev = _slice_section(_reviewer, "Read-Only Working-Tree Contract", _S54_SEC_STOPS)
 _s54_con = _slice_section(_consolidator, "Read-Only Working-Tree Contract", _S54_SEC_STOPS)
-_s54_dm = _slice_section(read(AGENTS_DIR / "leader.md"), "## Direct Modes", ("\n## ",))
+# Repoint (post-fusion): the old leader.md "## Direct Modes" table (one row
+# per mode, each with a short description) is gone — orchestrator.md now
+# carries a single one-line pointer into ref-direct-modes.md (§ "Where things
+# live"), and ref-direct-modes.md itself carries full prose per mode instead
+# of table rows. There is no longer a single "review row" that names the
+# guard inline; the guard is co-located as a sibling top-level section in the
+# same file the review-mode pointer routes to.
+_S54_REVIEW_POINTER_ROW = (
+    "diagram, likec4, d2, review, translate, plan-review modes | `agents/ref-direct-modes.md`"
+)
 
 # (a) ref-direct-modes.md contains the ## Read-Only Working-Tree Guard block
 check(
@@ -13004,12 +12999,19 @@ check(
     "reviewer-consolidator.md § Read-Only Working-Tree Contract must contain 'NEVER' + 'source files' "
     "AND name '.claude/pr-review-*' as its sole permitted write zone — all within the section",
 )
-# (g) orchestrator.md § Direct Modes review row references the guard (sliced to the Direct Modes section)
+# (g) orchestrator.md's review-mode pointer routes to ref-direct-modes.md,
+#     which carries the Read-Only Working-Tree Guard as a sibling section —
+#     the guard is reachable from the review-mode entry point by virtue of
+#     living in the same document, not by an inline cross-reference phrase.
 check(
-    "Suite 54(g): orchestrator.md § Direct Modes review row references the read-only guard",
-    _s54_dm != "" and ("Read-only guard" in _s54_dm or "Read-Only Working-Tree Guard" in _s54_dm or "read-only guard" in _s54_dm),
-    "leader.md § Direct Modes (sliced) does not reference the read-only guard — "
-    "the review row must point to ref-direct-modes.md § Read-Only Working-Tree Guard (AC-4)",
+    "Suite 54(g): orchestrator.md's review-mode pointer routes to"
+    " ref-direct-modes.md, which also carries the read-only guard",
+    _S54_REVIEW_POINTER_ROW in orchestrator_md
+    and "## Review Mode" in _ref_direct
+    and "## Read-Only Working-Tree Guard" in _ref_direct,
+    "orchestrator.md must point review mode at ref-direct-modes.md, and that"
+    " file must carry both '## Review Mode' and '## Read-Only Working-Tree"
+    " Guard' as sibling sections so the guard is reachable from the pointer",
 )
 
 # ---------------------------------------------------------------------------
@@ -13027,30 +13029,28 @@ print("=== Suite 53: origin/main fetch guard (process-security, #240) ===")
 _s53_orchestrator = SPLIT_CORPUS
 _s53_delivery = read(AGENTS_DIR / "delivery.md")
 _s53_deliv_mechanics = read(REPO_ROOT / "agents" / "_shared" / "delivery-mechanics.md")
+_s53_worktree_discipline = read(REPO_ROOT / "docs" / "worktree-discipline.md")
 
+# RETARGETED (coordinator-fusion, T4-AC-1b/T4-AC-2): both the "#### 4a.
+# Determine base branch" sub-step (under the old "Parallel Dispatch"
+# heading — the Multi-Task fan-out mechanism, retired wholesale per
+# Task-3's ref-special-flows.md) and the standalone "**Worktree branch
+# base:**" paragraph are gone from orchestrator.md. Verified: Multi-Task
+# fan-out's own retirement is the ratified, plan-approved removal that took
+# the "Round 1 base branch" sub-step with it (not a silent content loss);
+# the still-live "## Parallel batch implementation (opt-in)" section that
+# replaces it delegates worktree creation to `docs/worktree-discipline.md`
+# rules 1, 2, 5 by pointer rather than restating the guard inline — the
+# same pointer-over-restatement pattern `agents/_shared/delivery-mechanics.md
+# § 2` already uses for the branch-creation guard (see Suite 53(c) below).
+# The SEC-DR-3 guarantee itself (fetch origin/main, never base off a
+# potentially-stale local main) survives verbatim in
+# docs/worktree-discipline.md's own Rule 1, worded differently
+# ("It is not sufficient to branch from local `main`") rather than with the
+# retired literal "never from the active local branch".
 _S53_STOPS = ("\n#### ", "\n### ", "\n## ", "\n---\n")
-_s53_orch_4a = _slice_section(_s53_orchestrator, "#### 4a. Determine base branch", _S53_STOPS)
-_s53_orch_wt = _slice_section(_s53_orchestrator, "**Worktree branch base:**", ("\n\n",))
-# RETARGETED (pipeline-dispatch-shape, T7-AC-2 residual, Suite-171 relocation
-# pattern): Task-3 moved branch creation out of delivery.md's own "Step 3.3"
-# (deleted along with the mode: prepare/publish split) into the coordinator's
-# own deterministic procedure, `agents/_shared/delivery-mechanics.md § 2`.
-# The literal wording changed (no "origin/main" ref literal, no "never from
-# the active local branch" sentence) but the SEC-DR-3 guarantee is preserved
-# by different, equally-rigorous means: `git fetch origin main` followed by
-# `git checkout main && git pull --ff-only origin main` BEFORE branching —
-# the `--ff-only` flag hard-fails (rather than silently succeeding) if local
-# `main` has diverged from origin, which is at least as protective as
-# branching directly off the `origin/main` ref.
+_s53_wt_rule1 = _slice_section(_s53_worktree_discipline, "## Rule 1", _S53_STOPS)
 _s53_deliv_mechanics_s2 = _slice_section(_s53_deliv_mechanics, "## 2. Branch naming", ("\n---\n",))
-
-
-def _s53_guard(slice_text):
-    return (
-        "git fetch origin main" in slice_text
-        and "origin/main" in slice_text
-        and "never from the active local branch" in slice_text
-    )
 
 
 def _s53_guard_mechanics(slice_text):
@@ -13066,18 +13066,27 @@ def _s53_guard_mechanics(slice_text):
 
 
 check(
-    "Suite 53(a): orchestrator.md § Parallel Dispatch 4a bases Round 1 from origin/main, never the active local branch",
-    _s53_guard(_s53_orch_4a),
-    "§ Parallel Dispatch '#### 4a. Determine base branch' must, within its own section, require "
-    "'git fetch origin main', base from 'origin/main', and state 'never from the active local branch' — "
-    "a mutant that drops the fetch or neuters the intent is caught here (SEC-DR-3 / #240).",
+    "Suite 53(a): orchestrator.md's surviving worktree-fan-out section"
+    " (Parallel batch implementation) delegates worktree creation to"
+    " docs/worktree-discipline.md by pointer, never restating the guard"
+    " (the retired Multi-Task fan-out's own '4a. Determine base branch'"
+    " sub-step took its Round-1-specific wording with it)",
+    "docs/worktree-discipline.md" in _s53_orchestrator
+    and "## Parallel batch implementation" in _s53_orchestrator,
+    "orchestrator.md must still carry '## Parallel batch implementation' and"
+    " point it at docs/worktree-discipline.md for worktree creation rules",
 )
 check(
-    "Suite 53(b): orchestrator.md worktree-base paragraph bases from origin/main, never the active local branch",
-    _s53_guard(_s53_orch_wt),
-    "The '**Worktree branch base:**' paragraph must require 'git fetch origin main', base from "
-    "'origin/main', and state 'never from the active local branch' — the worktree spawn must not "
-    "regress to basing from the active local branch (SEC-DR-3 / #240).",
+    "Suite 53(b): docs/worktree-discipline.md Rule 1 requires 'git fetch"
+    " origin main' before branching and states it is not sufficient to"
+    " branch from local main — the surviving SEC-DR-3 guarantee, reworded",
+    "git fetch origin main" in _s53_wt_rule1
+    and "origin/main" in _s53_wt_rule1
+    and "not sufficient to branch from local `main`" in _s53_wt_rule1,
+    "docs/worktree-discipline.md § Rule 1 must require 'git fetch origin"
+    " main', base from 'origin/main', and state that branching from local"
+    " main is not sufficient — the worktree spawn must not regress to"
+    " basing from a potentially-stale local branch (SEC-DR-3 / #240)",
 )
 check(
     "Suite 53(c): delivery-mechanics.md § 2 syncs main from origin before branching, never from a stale local main",
@@ -21827,6 +21836,7 @@ _s93_delivery       = read(AGENTS_DIR / "delivery.md")
 _s93_reviewer       = read(AGENTS_DIR / "reviewer.md")
 _s93_claude         = read(REPO_ROOT / "CLAUDE.md")
 _s93_testing_md     = read(REPO_ROOT / "docs" / "testing.md")
+_s93_worktree_discipline = read(REPO_ROOT / "docs" / "worktree-discipline.md")
 _s93_changelog_frag_path = REPO_ROOT / "changelog.d" / "feat-worktree-discipline.md"
 _s93_changelog_frag = read(_s93_changelog_frag_path) if _s93_changelog_frag_path.exists() else ""
 # Delivery assembles the fragment into CHANGELOG.md and deletes it; check the durable location.
@@ -22139,13 +22149,22 @@ check(
     "delivery.md § Step 11.4b must STOP when the worktree has uncommitted changes "
     "(dirty → STOP, not remove)",
 )
+# RETARGETED (coordinator-fusion, T4-AC-1b/T4-AC-2): the "never from the
+# active local branch" literal left orchestrator.md along with the retired
+# Multi-Task fan-out's "4a. Determine base branch" sub-step and the
+# standalone "Worktree branch base:" paragraph — see Suite 53's own retarget
+# note above. The surviving guarantee is docs/worktree-discipline.md's own
+# Rule 1 wording ("not sufficient to branch from local `main`"), which Suite
+# 53(b) now asserts directly; this pin is retargeted onto that same wording
+# rather than a since-removed literal orchestrator.md never restated.
 check(
-    "suite93(ac7-suite53-preserved): orchestrator.md contains 'never from the active local branch' "
-    "at least twice (Suite 53 pin — preserved across this PR)",
-    _s93_orchestrator.count("never from the active local branch") >= 2,
-    "orchestrator.md must contain 'never from the active local branch' at least 2 times "
-    "— Suite 53 anchors both the '#### 4a. Determine base branch' section and the "
-    "'**Worktree branch base:**' paragraph; any edit that drops one occurrence breaks Suite 53",
+    "suite93(ac7-suite53-preserved): docs/worktree-discipline.md Rule 1 states"
+    " the not-sufficient-to-branch-from-local-main guarantee (Suite 53's"
+    " surviving guard, retargeted off the retired Multi-Task fan-out wording)",
+    "not sufficient to branch from local `main`" in _s93_worktree_discipline,
+    "docs/worktree-discipline.md § Rule 1 must state that branching from"
+    " local main is not sufficient — the surviving SEC-DR-3 guarantee Suite"
+    " 53 now anchors directly",
 )
 
 # --- AC-8: plugin.json + marketplace.json both at v2.88.0 or later (floor pin) ---
@@ -23822,7 +23841,7 @@ _S94_AGENTS = [
     "gcp-infra",
     "reviewer",
     "diagrammer",
-    "leader",
+    # coordinator-fusion: "leader" retired — orchestrator is the sole coordinator
     "orchestrator",
 ]
 
