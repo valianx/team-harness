@@ -337,6 +337,12 @@ After every dispatch returning `success`, verify the expected doc exists on disk
 | `architect` | 1 | `reviews/01-closure-rubric.md` (Tier 2-4 only) |
 | `delivery` | 4 | `inputs/pr-body-draft.md` + the lane-specific Acceptance Matrix |
 
+For `adversary`, resolve the expected path from the current dispatch/status
+block's exact `audit_run`: `initial` maps to `reviews/04-adversary.md` and
+`amend-N` maps to `reviews/04-adversary-amend-{N}.md`. Never glob for an amend
+report or select the greatest suffix. If the exact current report is absent,
+verification fails even when an older amend report exists.
+
 Exists and non-empty → proceed. Otherwise append `artifact.missing` (`action: retry`) and re-dispatch **exactly once** with an explicit "your artifact was not found" instruction. A second failure → `artifact.missing` (`action: escalate`), `status: blocked`. This is the `artifact-missing` failure kind (`agents/ref-pipeline.md § Failures`).
 
 **No agent in the table above is exempt.** `qa-plan` in ratify mode writes `reviews/01-plan-review.md § Plan Ratification` per the panel contract (`agents/_shared/plan-consolidation.md § "Section-ownership map"`), so its row is verified like any other. An exemption would only apply to an agent producing no artifact at all, and the table lists none.

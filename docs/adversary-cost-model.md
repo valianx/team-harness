@@ -18,11 +18,15 @@ Blended baseline: approximately **1.52M tokens per run**, **8 dispatches**, and 
 The current pipeline dispatches `adversary`:
 
 - once over the consolidated frozen delivery diff when `security_floor_applies`;
-- once more for each operator-requested `amend`, scoped to the amendment dependency closure;
+- once more for each operator-requested `amend` cycle that later resumes delivery
+  with `ship`, scoped to the amendment dependency closure;
 - never from autonomous patch iterations;
+- never for an abandoned or still-pending amend cycle;
 - never on a non-sensitive run.
 
-This removes dispatch-count multiplication by task and verifier round. The remaining count depends on operator amendments, not an assumed fraction of tasks that change controls.
+This removes dispatch-count multiplication by task and verifier round. The
+remaining count is one initial audit plus one re-audit for each amend cycle that
+actually resumes delivery, not one for every requested amend.
 
 ## Static context reduction
 

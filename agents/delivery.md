@@ -146,11 +146,12 @@ When operator-facing, write `changelog.d/{pr-slug}.md`:
 
 Use one bullet per observable outcome, not one bullet per service, file, task,
 or implementation layer. A small change with one outcome gets exactly one bullet.
-Each bullet is one sentence, physically one Markdown line, and at most 140
-characters: no continuation lines or following explanatory paragraphs. Name what
-changed for the operator; omit architecture, rationale, tests, file lists, and
-version mechanics. When several services jointly produce one behavior, describe
-that behavior once.
+Each final emitted bullet is one sentence, physically one Markdown line, and at
+most 140 characters after any `Fixes #{issue}` suffix is appended: reserve suffix
+space and rewrite the sentence if needed; never truncate it. Use no continuation
+lines or following explanatory paragraphs. Name what changed for the operator;
+omit architecture, rationale, tests, file lists, and version mechanics. When
+several services jointly produce one behavior, describe that behavior once.
 
 Inside a release section, emit only standard Keep a Changelog subsection headings
 and their bullets. Never add `Note`, `Context`, `Summary`, or migration headings,
@@ -159,7 +160,8 @@ text before or after the bullets. If operator action is required, express it as
 its own concise outcome bullet and put detail in canonical docs or the PR body.
 
 For `fix` and `hotfix`, append `Fixes #{issue}` only when the issue number is
-already recorded. Keep one bullet on one line; rationale belongs in the PR body.
+already recorded. The suffixed line must still satisfy the 140-character cap;
+rationale belongs in the PR body.
 
 Derive `{pr-slug}` from the feature name: lowercase, replace non-alphanumeric
 runs with `-`, trim `-`, and require `[a-z0-9-]+`. Never edit CHANGELOG.md; the

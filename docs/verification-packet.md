@@ -344,13 +344,17 @@ counting it any other way would let emission loss impersonate packet acceptance.
 `agents/ref-pipeline.md § Pipeline Summary Protocol` — the `## Verification Packet`
 section of `00-pipeline-summary.md`): the three-bucket breakdown above, and verifier catch
 rates read from the workspace verdict documents, not from `phase.end` telemetry — adversarial
-break count from the current adversary report (`reviews/04-adversary.md` or the greatest
-`reviews/04-adversary-amend-{N}.md` suffix), qa AC-fail rate from
+break count from the report matching the current dispatch/status block's exact `audit_run`
+(`initial` → `reviews/04-adversary.md`; `amend-N` →
+`reviews/04-adversary-amend-{N}.md`), qa AC-fail rate from
 `reviews/04-validation.md § AC Coverage Results`, drift flags from
 `reviews/04-validation.md § Drift Analysis` — each compared against the June 2026 baseline recorded
 in the pipeline-validation research workspace (`02-june-empirical-analysis.md`, referenced
 by pointer — not duplicated here). These artifacts exist deterministically whenever the
 verifier ran.
+
+If that exact adversary report is missing, report its metrics as unavailable.
+Never fall back to an older amend report or select the greatest suffix.
 
 **Ownership and rollback — operator-owned, no automatic trigger.** Parity data accumulates
 in every full-pipeline summary; the OPERATOR evaluates it against the June 2026 baseline

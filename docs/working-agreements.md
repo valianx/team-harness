@@ -10,14 +10,17 @@
   assembles it into the versioned CHANGELOG section in the **same PR**. Leaving fragments for a
   later release cut is allowed only when the repository explicitly declares `skip-version` or a
   grouped batch/fallback flow. Fragment format: a standard Keep-a-Changelog subsection block (`### Added`,
-  `### Changed`, `### Fixed`, `### Security`) with one operator-visible outcome per bullet,
-  capped at 140 characters. A small one-outcome change gets exactly one bullet; every bullet
-  is one sentence on one physical Markdown line, with no continuation or explanatory paragraph.
+  `### Changed`, `### Fixed`, `### Deprecated`, `### Removed`, `### Security`) with one
+  operator-visible outcome per bullet. The final emitted bullet, including any `Fixes #{issue}`
+  suffix, is capped at 140 characters; reserve suffix space and rewrite rather than truncate.
+  A small one-outcome change gets exactly one bullet; every bullet is one sentence on one
+  physical Markdown line, with no continuation or explanatory paragraph.
   Never enumerate services, files, tasks, tests, or implementation layers when they jointly
   produce one outcome. Release sections contain only standard subsection headings and bullets:
   no free-standing notes, context, summaries, HTML comments, blockquotes, footnotes, or
-  postscripts. Assembly copies entry text verbatim and never expands it. Slug rule: lowercase branch
-  name with non-alphanumeric characters replaced by hyphens, matching `[a-z0-9-]+`. Direct
+  postscripts. Assembly copies entry text verbatim and never expands it. Derive `{pr-slug}` from
+  the resolved feature name, not the branch name: lowercase it, replace non-alphanumeric runs
+  with `-`, trim `-`, and require `[a-z0-9-]+` (`feat/foo` with feature `foo` yields `foo`). Direct
   `## [Unreleased]` edits are acceptable as a fallback when `changelog.d/` cannot be used (e.g.,
   pre-convention repos).
 - Update tracked documentation when the operator explicitly requests it, when shipped behavior
