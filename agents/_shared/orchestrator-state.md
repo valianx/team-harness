@@ -17,6 +17,7 @@ pipeline_version: 2
 lane: inline|express|full            # resolved at intake; docs/pipeline-lanes.md § 2
 type: feature|fix|refactor|hotfix|enhancement
 phase: 1|1.5|1.6|2.0|2|2.5|2.6|2.7|2.8|3|3.5|4|5|6
+subphase: approach-check|structure-scan|post-approval-offer|null   # the within-phase steps: 1.0-approach-check, 1.5a, 1.8
 stage: 1|2|3
 status: in_progress|waiting|iterating|paused|paused_for_amend|complete|blocked|blocked-incomplete|verified
 iteration: N/3
@@ -277,7 +278,7 @@ After every dispatch returning `success`, verify the expected doc exists on disk
 
 Exists and non-empty → proceed. Otherwise append `artifact.missing` (`action: retry`) and re-dispatch **exactly once** with an explicit "your artifact was not found" instruction. A second failure → `artifact.missing` (`action: escalate`), `status: blocked`. This is the `artifact-missing` failure kind (`agents/orchestrator.md § Failures`).
 
-Agents that produce no file — `qa-plan` in ratify mode returns a verdict in its status block only — are exempt.
+**No agent in the table above is exempt.** `qa-plan` in ratify mode writes `reviews/01-plan-review.md § Plan Ratification` per the panel contract (`agents/_shared/plan-consolidation.md § "Section-ownership map"`), so its row is verified like any other. An exemption would only apply to an agent producing no artifact at all, and the table lists none.
 
 ### Final sanity check
 

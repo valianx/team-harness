@@ -173,11 +173,23 @@ recover backstop"):
 | STAGE-GATE-1 | `gate1_release` | `∈ {approved, approved-autonomous}` | `rejected`, `edit`, `null`/missing |
 | STAGE-GATE-3 | `gate3_release` | `= ship` | `amend`, `abort`, `null`/missing |
 
-Clearing a gate against this table is necessary but not sufficient on its own: recording
-the release additionally requires the operator's reply to carry the `gate_nonce` currently
-pending for that gate (§ "The dual-record release" above) — a reply that clears this
-table's allowlist but carries a stale or missing nonce is still not recorded; it is
-treated as ambiguous (§ "Ambiguous-gate-reply rule").
+Clearing a gate against this table is necessary but not sufficient on its own: the reply
+must also be attributable to the presentation whose `gate_nonce` is currently pending
+(§ "The dual-record release" above). **Attribution is the coordinator's job, not the
+operator's typing.** The operator answers with the words the STOP block offers — `approve`,
+`ship`, `reject {reason}` — and the coordinator records the pending nonce alongside the
+decision. A reply is not recorded, and is treated as ambiguous (§ "Ambiguous-gate-reply
+rule"), when it cannot be attributed to that presentation: it arrived before the gate
+existed, or a later re-presentation has already superseded the nonce it was answering.
+
+**Never require the reply to contain the nonce literally.** Every STOP-block template in
+this contract offers bare decision words, so a requirement to transcribe a token would make
+an operator who follows the instructions exactly produce an invalid reply — and a
+re-presentation would offer the same instructions again, which is a loop with no exit. The
+nonce is a freshness and ordering token, not a secret and not an authentication factor
+(stated above): ordering is established by *when the reply arrived relative to the pending
+presentation*, which the coordinator observes directly and the operator cannot forge by
+omitting a string.
 
 **Bare-literal field values.** Each of the five gate-state fields —
 `gate1_release`, `gate3_release`, `gate_nonce`,
