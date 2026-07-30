@@ -198,6 +198,54 @@ Full contract: docs/dev-mode.md.
 
 ---
 
+## What gets a test
+
+A test in this repository asserts a **property of executable code or of a
+machine-readable artifact, evaluated by running it**. Hooks, the Go installer,
+the shell bootstrap scripts, the TypeScript gate bodies, and the JSON/YAML
+manifests all qualify: they have inputs, outputs, and exit codes, so a failure
+names a real defect.
+
+Agent and skill prose does **not** qualify. A test may not assert that a
+Markdown file contains a wording, a section heading, a token, a line count, or a
+byte-exact snapshot.
+
+**The diagnostic question:** *if this test failed, would the cheapest way to make
+it green be to add or reword a sentence?* If yes, it is a text assertion and it
+does not get registered.
+
+Concretely, none of these may be added as a test:
+
+- presence of a phrase, heading, table row, or modal verb (`MUST`, `NEVER`) in an agent or skill file
+- byte-exact or hash snapshots of prose blocks
+- counts — of sections, checks, enumerated items, or cross-references
+- cross-file wording parity between two Markdown files
+- a check whose oracle is a `grep` over prose
+- a behavioral test whose pass condition is the model **self-reporting** that it followed a rule
+- a test pinned to an architecture that no longer ships
+
+**Why the prohibition is absolute rather than case-by-case.** A text assertion is
+a useful canary and a harmful contract, and it cannot be both at once. Once
+registered, it inverts the direction of authority: the specification stops
+governing the prose and the prose starts serving the check. Development then
+drifts toward whatever makes the search succeed — sentences get added because a
+test wants them, wordings get frozen because a snapshot pins them, and a
+contradiction can sit in a file while every check passes, because presence was
+the only thing ever measured. A previous corpus of ~46,000 lines of these
+assertions was deleted for exactly this reason; it had begun deciding designs.
+
+**What replaces them.** Prose contracts are enforced by *reading* — the agent's
+own file states its contract, a reviewer agent reads the artifact, and the
+operator reads the result. That is a judgement task, and it stays one. When a
+prose rule genuinely needs mechanical enforcement, the correct move is to make it
+unnecessary: scope the tool so the forbidden action is unavailable, or move the
+deterministic part into code that can be executed and asserted.
+
+`grep` remains a valid **enumerator** — use it freely to find work. It is not a
+valid **decider**.
+
+---
+
 ## Contributing
 
 Contributions are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the
