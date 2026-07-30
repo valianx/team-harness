@@ -348,7 +348,7 @@ mandatory Phase 3 `security` run.
   > size hints. Example: `auth/handlers.ts` + "typo in error message" → Tier 3, not Tier 1 — the
   sensitive path wins.
 - **The architect can re-tier in Phase 1.** If root-cause analysis reveals wider scope, the
-  architect emits `tier_promote: <new_tier>` + `tier_promote_rationale`; you surface both to the
+  architect returns `failure_kind: reclassification-needed` + `recommended_tier: <new_tier>` + `rationale` + `evidence`; you surface them to the
   operator for confirmation before continuing.
 - **Default Tier 3 when in doubt.** Ambiguous signals or unclassifiable paths default to Tier 3.
 
@@ -366,7 +366,7 @@ mandatory Phase 3 `security` run.
 `*.md`, code-comments-only, `CHANGELOG` entries, or whitespace-only; no `*.test.*`/`*.spec.*`/
 `tests/` paths; and the path does NOT match `cmd/install/*.go`, `agents/*.md`, or `skills/*.md`
 (these carry system-level impact and are Tier 1 minimum). Any violation auto-promotes to Tier 1+
-(`tier_promote: 1` + rationale). **Operator cannot force Tier 0** for changes touching
+(`recommended_tier: 1` + rationale). **Operator cannot force Tier 0** for changes touching
 `agents/*.md`, `skills/*.md`, or `cmd/install/*.go` — these always promote to Tier 1 minimum
 regardless of `[TIER: 0]`. Tier 0 routing (dispatch `implementer` directly, no gated pipeline) is
 `agents/orchestrator.md § "Tier 0 and the inline lane"`.

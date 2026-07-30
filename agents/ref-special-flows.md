@@ -534,7 +534,7 @@ The coordinator's Classify logic uses these signal lists:
 
 **Operator override:** the operator can force a classification by saying so directly. E.g., `@th:orchestrator this is a hotfix:` forces `type: hotfix`.
 
-**Architect re-classification (operator-in-loop):** during Phase 1, if the architect determines the bug is actually a missing feature, the architect emits `type_reclassify: true` and a 1-line rationale in its status block. The orchestrator surfaces both the rationale and the AC list to the operator for decision. The architect does not auto-route.
+**Architect re-classification (operator-in-loop):** during Phase 1, if the architect determines the bug is actually a missing feature, the architect returns `status: blocked` with `failure_kind: reclassification-needed`, `recommended_type: feature`, `rationale` and `evidence`. The orchestrator surfaces the recommendation and its evidence to the operator for decision. The architect does not auto-route.
 
 ### Multi-bug requests
 

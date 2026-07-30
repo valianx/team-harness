@@ -89,7 +89,7 @@ The Bug-fix Pipeline is **tier-classified** at Phase 0a (Classify) so trivial bu
 
 **Tier 0 — no workspaces.** Genuinely cosmetic changes (typo in a comment, whitespace in README, CHANGELOG typo): the implementer makes the fix, runs tests, and opens the PR. No `00-state.md`, no `01-plan.md`, no workspaces folder. The PR review is the only gate. Auto-classifies when all of: single file, ≤5 lines changed, docs/comment/whitespace-only path, no test paths, no system-level files (`agents/*.md`, `skills/*.md`, `cmd/install/*.go`). Declare explicitly with `[TIER: 0]`.
 
-The architect can re-tier in Phase 1 via `tier_promote: <new_tier>` if codebase analysis reveals the scope is wider than the initial classification — operator-in-loop. Default is Tier 3 when signals are ambiguous (conservative).
+The architect can recommend a re-tier in Phase 1 via `failure_kind: reclassification-needed` + `recommended_tier: <new_tier>` if codebase analysis reveals the scope is wider than the initial classification — operator-in-loop. Default is Tier 3 when signals are ambiguous (conservative).
 
 Full flow definition: [`agents/ref-special-flows.md`](../agents/ref-special-flows.md) § Bug-fix Flow § Tier System.
 

@@ -409,7 +409,7 @@ A task section MAY declare `Lane-decomposable: yes` plus a `seams:` map and a `f
 
 - **`seams:`** — a map of named seam → file subset. Every file in the task's `Files:` list belongs to exactly one seam or to `frozen-contracts:`; seams are disjoint by construction — no file appears in two seams.
 - **`frozen-contracts:`** — files or symbols EVERY seam may READ but NO seam may MODIFY (a shared interface, a schema, an invariant token declared in more than one file). Declaring a frozen-contract is what makes the seams safe to run concurrently: as long as no lane touches it, sibling lanes cannot conflict.
-- **Absent or `no` (the default)** — the task is tightly-coupled; Stage 2 dispatches it 1:1 to a single implementer exactly as today. This is the correct default for any task whose files share symbols, whose seams are not clean, or whose scope cannot be confidently partitioned at plan time.
+- **Absent or `no` (the default)** — the task is tightly-coupled; it stays inside Stage 2's **base dispatch**, the single implementer pass that carries every non-decomposed task in dependency order. It does not get a dispatch of its own: there is never one dispatch per task (`agents/orchestrator.md § Scheduler`). This is the correct default for any task whose files share symbols, whose seams are not clean, or whose scope cannot be confidently partitioned at plan time.
 
 **When to mark `yes` (all must hold):**
 - The task's `Files:` list has independent, file-disjoint seams nameable NOW, at plan time — not a heuristic split by directory the orchestrator would have to guess.
@@ -423,7 +423,7 @@ A task section MAY declare `Lane-decomposable: yes` plus a `seams:` map and a `f
 
 **Never declare `Lane-decomposable: yes` for a tightly-coupled task "just in case."** A wrong `yes` risks the orchestrator dispatching seams that turn out to need the same frozen-contract mutated. The seam-not-disjoint fallback catches this (a lane discovers it must modify a declared frozen-contract, returns `status: blocked, reason: seam-not-disjoint`, and the orchestrator aborts the fan-out and re-dispatches the whole task monolithically) — but the fallback is a safety net, not a substitute for a correct plan-time declaration.
 
-**Dispatch-time gate is owned by the orchestrator, not this agent.** Declaring `Lane-decomposable: yes` is necessary but not sufficient for fan-out — the orchestrator's Stage 2 dispatch gate additionally requires the task's file count to meet `LANE_DECOMPOSE_MIN_FILES` and the declared seams to be genuinely disjoint. A task that declares `yes` but stays under threshold, or whose seams are not disjoint, dispatches 1:1, unchanged.
+**Dispatch-time gate is owned by the orchestrator, not this agent.** Declaring `Lane-decomposable: yes` is necessary but not sufficient for fan-out — the orchestrator's Stage 2 dispatch gate additionally requires the task's file count to meet `LANE_DECOMPOSE_MIN_FILES` and the declared seams to be genuinely disjoint. A task that declares `yes` but stays under threshold, or whose seams are not disjoint, falls back into the base dispatch with every other non-decomposed task — never into a dispatch of its own.
 
 ### Research Mode
 
@@ -467,11 +467,11 @@ Used when the orchestrator dispatches you for Phase 1 of the Bug-fix Flow (`type
 | `full-root-cause` (Tier 3) | `bug_tier: 3` | Full template (see below). `## Prior Art` is **optional** — include it only when a relevant prior `process-insight` is known (operator hint or KG query result). | 1 page maximum: ≤80 lines of markdown body (excluding tables and the TL;DR). plan-reviewer Rule 7 flags `>120 lines` as `concerns`. |
 | `full-root-cause` (Tier 4) | `bug_tier: 4` | Full template + **mandatory `## Prior Art`** section. Invoke `mcp__memory__search_nodes` with 1-3 semantic queries derived from the failure mode (e.g., `"auth bypass middleware"`, `"token leak logger"`). List relevant prior `process-insight` nodes with one-line summaries. If no relevant prior art is found, write `## Prior Art\nNo prior art found in the knowledge graph for this failure mode.` — the empty section is mandatory because its presence signals the agent looked. | 1 page maximum: ≤80 lines of markdown body (excluding tables and the TL;DR), `## Prior Art` excluded from the cap (≤15 additional lines). |
 
-**Tier-promote protocol (architect-recommends-operator-decides).** If during codebase analysis you discover the scope of the fix is wider than the tier classification suggests, do NOT auto-route. Instead emit `tier_promote: <new_tier>` and a 1-line `tier_promote_rationale` in your status block. The orchestrator surfaces both to the operator for the decision. You do NOT proceed beyond the current Phase 1. Examples that justify a tier promotion:
+**Tier-promote protocol (architect-recommends-operator-decides).** If during codebase analysis you discover the scope of the fix is wider than the tier classification suggests, do NOT auto-route. Return `status: blocked` with `failure_kind: reclassification-needed`, `recommended_tier: <new_tier>`, `rationale` and `evidence` — the same shape as a type re-classification, because it is the same situation: the classification you were dispatched under is wrong and only the operator can change it. The orchestrator surfaces it to the operator for the decision. You do NOT proceed beyond the current Phase 1. Examples that justify a tier promotion:
 - Tier 2 → Tier 3 — codebase analysis reveals the bug is in `src/auth/middleware.ts`, not the `.github/workflows/` config the operator originally mentioned. Sensitive path forces Tier 3 minimum.
 - Tier 3 → Tier 4 — analysis reveals the bug is a permission-check bypass with a CVE-like signature (e.g., a missing JWT signature verification). Triggers extended security review and mandatory prior-art query.
 
-**Tier-promote is mutually exclusive with type-reclassify.** If you discover the bug is a feature gap AND a tier-promote candidate, return `type_reclassify: true` only (the orchestrator re-routes to feature flow, where tier is irrelevant). Do NOT set both fields in the same status block.
+**`recommended_tier` and `recommended_type` are mutually exclusive.** If the bug is a feature gap AND a tier-promote candidate, return `recommended_type: feature` only — re-routing to feature flow makes tier irrelevant. Never set both in one status block.
 
 **Scope-freeze declaration (root-cause mode).** Root-cause mode is single-pass and has no separate approach-checkpoint STOP, so its "approach checkpoint" is the point where you emit your final status block after writing `01-root-cause.md` and `01-plan.md`. Declare `scope_frozen: {files: N, services: [...], ac: N}` there, derived from `## Scope of Fix` (`files` = the `Files to modify:` count), `## Services Touched` (`services`), and the `## Task List` AC union (`ac`) — same field, same no-extra-dispatch rule as Design Mode. On a later re-dispatch with a wider scope than this frozen boundary, apply the same expansion classification described above (`new-information` vs `known-at-freeze`, with a one-line rationale) — the mechanism is identical across both modes, only the source sections of the boundary differ.
 
@@ -1652,9 +1652,11 @@ agent: architect
 mode: design | research | audit | planning | root-cause | consolidation
 sub_mode: light-root-cause | full-root-cause | null   # set only when mode: root-cause; null/omit otherwise
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/{01-plan|01-root-cause|00-research|00-audit|01-planning}.md
 summary: {1-2 sentence summary of what was designed/researched/planned/diagnosed}
+classification: {touches_http_api: b, touches_ui: b, touches_data_model: b, touches_cli: b, touches_public_lib_api: b, touches_async_messaging: b, destructive: b, spans_multiple_services: b, changes_security_control: b}   # design/root-cause mode, all nine, bare true|false; the coordinator validates and transcribes (it never authors a value)
 approach_freedom: high | low   # design mode only: high = material alternatives exist; low = one clear approach; orchestrator gates on this
 approach_alternatives: [alt1, alt2]   # design mode, approach_freedom:high only; omit when low
 scope_frozen: {files: N, services: [svc1, svc2], ac: N}   # design/root-cause mode: declared at the approach checkpoint, derived from the plan just written; no extra dispatch
@@ -1662,9 +1664,10 @@ scope_expansion: new-information | known-at-freeze | null   # design/root-cause 
 scope_expansion_rationale: {1-line}   # mandatory when scope_expansion is non-null; omit otherwise
 confidence: N   # design mode only: 1-10 single-pass confidence; mirrors ### Confidence Score in the plan
 spec_seed_dissent: true | false   # design mode only: true when seeded approach was deficient and ### Architect Dissent on Seed was written; false or omit otherwise
-type_reclassify: false | true   # set to true only in root-cause mode when the bug is actually a feature gap; omit the line otherwise
-tier_promote: 2 | 3 | 4 | null   # set only in root-cause mode when the scope is wider than the initial classification; null/omit otherwise
-tier_promote_rationale: {1-line}  # mandatory when tier_promote is non-null; omit otherwise
+recommended_type: feature | null      # root-cause mode: the bug is actually a feature gap. Pair with failure_kind: reclassification-needed
+recommended_tier: 2 | 3 | 4 | null    # root-cause mode: the scope is wider than the dispatched tier. Pair with failure_kind: reclassification-needed
+rationale: {1-line}                   # mandatory when either recommended_* is non-null; omit otherwise
+evidence: [{file:line} — {what it shows}, ...]   # mandatory when either recommended_* is non-null; omit otherwise
 regression_test_kind: unit | integration | e2e | null   # set in root-cause mode from the Regression Test Approach section; omit the line in other modes
 root_cause_provenance_tier: T1 | T2 | T3 | null   # root-cause mode only: echoed from the orchestrator's dispatch payload when a candidate root-cause artifact was supplied; null when none
 provenance_verification: freshness-only | plausibility-blast-radius-pass | independent-derivation-fallback | n/a   # root-cause mode only: the verification path actually applied, scaled by root_cause_provenance_tier
@@ -1682,8 +1685,9 @@ issues: {list of blockers, or "none"}
 
 **Field semantics (root-cause mode only):**
 - `sub_mode: light-root-cause | full-root-cause` — declares which abbreviated/full template was produced. `light-root-cause` for `bug_tier: 2`; `full-root-cause` for `bug_tier: 3` (Prior Art optional) and `bug_tier: 4` (Prior Art mandatory). The orchestrator and the plan-reviewer use this to gate Rule 7's size/shape check.
-- `type_reclassify: true` — you determined the reported bug is actually a feature gap. Pair with `status: blocked` and a 1-line rationale in `summary`. Do NOT write `01-root-cause.md` or `01-plan.md` when this fires — the orchestrator surfaces the recommendation to the operator for decision.
-- `tier_promote: <new_tier>` — you determined the scope is wider than the initial tier classification. Pair with `tier_promote_rationale: <1-line>` and `status: blocked`. Do NOT proceed beyond the current Phase 1; the orchestrator surfaces the recommendation to the operator for decision. Mutually exclusive with `type_reclassify: true` — set at most one of them per run.
+- **`recommended_type` / `recommended_tier` — one shape for both re-classifications.** Both say the same thing: the classification you were dispatched under is wrong, and only the operator can change it. Both return `status: blocked` with `failure_kind: reclassification-needed`, plus `rationale` and `evidence`. Set **at most one** per run — they are mutually exclusive, and `recommended_type: feature` wins when both would apply (re-routing to feature flow makes tier irrelevant). Write NO artifact when either fires: not `01-root-cause.md`, not `01-plan.md`, not a partial annotation. Neither carries a retry budget, because what is missing is a decision.
+
+  The older `type_reclassify: true` / `tier_promote: N` / `tier_promote_rationale:` fields are retired. They encoded the same two cases in a second, differently-shaped contract with the recommendation buried in `summary` prose, which left the coordinator parsing prose for a value it needed structurally. Do not emit them.
 - `regression_test_kind: unit | integration | e2e` — the layer at which the bug can be deterministically reproduced. Copied from the `## Regression Test Approach` section's `Test layer:` field. Used by the orchestrator to dispatch the tester at Phase 2.0 with the correct framework context. **Operator override rejected the `manual-repro-script` value** — regression test is mandatory always, no manual fallback.
 - `root_cause_provenance_tier: T1 | T2 | T3 | null` — echoed from the orchestrator's dispatch payload when a candidate root-cause artifact was supplied (per `docs/pipeline-lanes.md § Root-cause provenance tiers`); `null` when no artifact was handed to you (the common case, run independent derivation as before).
 - `provenance_verification: freshness-only | plausibility-blast-radius-pass | independent-derivation-fallback | n/a` — the verification path actually applied: `freshness-only` for T1; `plausibility-blast-radius-pass` for a T2/T3 artifact that passed both checks and was consumed; `independent-derivation-fallback` for a T2/T3 artifact that failed either check and was rejected; `n/a` when `root_cause_provenance_tier` is `null`.

@@ -95,21 +95,27 @@ Runtime facts, not advice.
 
 One taxonomy for everything that can go wrong, so the budget question is answered by classification rather than by whichever local rule you happen to recall. **Classify first, then act.** A retry against the wrong budget either burns an iteration on a transport hiccup or silently grants a defective specialist unlimited attempts.
 
-| `failure_kind` | What actually happened | Owner | Budget | On exhaustion |
+**Each kind names an observable cause, never a symptom.** `status: failed` is a symptom — it tells you a dispatch did not succeed and nothing about which budget applies. The kind is what carries that information, which is why the specialist declares it and you never infer it.
+
+| `failure_kind` | The observable cause | Owner | Budget | On exhaustion |
 |---|---|---|---|---|
-| `transport` | The `Task` call errored — the harness failed, no specialist result was ever produced | you | retry exactly once | STOP the phase; report the harness's **literal** error message, never paraphrased. No workaround that bypasses the specialist |
-| `specialist-failed` | The specialist ran and returned `status: failed` | the specialist | re-dispatch once, carrying its own `failure-brief.md` | STOP with the brief surfaced verbatim |
-| `artifact-missing` | A required output file is absent, empty, or unparseable, while the dispatch reported success | the owning specialist | re-dispatch once | STOP; never author the missing artifact yourself |
+| `transport` | The `Task` call itself errored — the harness failed and no specialist result was ever produced | you | retry exactly once | STOP the phase; report the harness's **literal** error message, never paraphrased. No workaround that bypasses the specialist |
+| `invalid-return` | A result came back, but its status block is unusable: a required field absent, a value not of the declared type, two mutually exclusive fields both set | the specialist | re-dispatch once, naming the specific field | STOP; never repair the block or infer the missing value |
+| `artifact-missing` | A required output **file** is absent, empty, or unparseable while the dispatch reported success | the owning specialist | re-dispatch once | STOP; never author the missing artifact yourself |
+| `execution-failed` | The specialist ran, hit an internal error it cannot classify further, and says so | the specialist | re-dispatch once, carrying its own `failure-brief.md` | STOP with the brief surfaced verbatim |
 | `verification-negative` | A verifying lens returned `fail`/`concerns` over real work — the pipeline produced a defect | implementer | counts against the **max-3** iteration budget | escalate with a `git stash` safety snapshot |
 | `build-or-lint` | A build or lint command exited non-zero at Phase 2.8 | implementer | **max 2** attempts, a budget separate from max-3 | `status: blocked` with the full output |
 | `hygiene-fail` | `qa` returned `code_hygiene: fail` | implementer | shares the **max-3** iteration budget | as `verification-negative` |
-| `scope-expansion` | The work exceeds the frozen scope boundary | architect | **max 2**, a budget separate from max-3 | back to the gate for an operator decision |
 | `contradiction` | The finding cannot be resolved without a decision that is not yours | **operator** | no budget — never becomes a correction round | escalate in the same presentation as any fixable items |
-| `reclassification-needed` | The task is not the type it was dispatched as (a bug that is a feature gap, a tier that is wrong) | **operator** | no budget | STOP with the recommended type and the evidence; never auto-route |
+| `reclassification-needed` | The task is not the type or tier it was dispatched as | **operator** | no budget | STOP with `recommended_type`/`recommended_tier` and the evidence; never auto-route |
 
-**Two invariants across the table.** (a) The three separate budgets — max-3 iterations, max-2 build/lint, max-2 scope-expansion — never draw from each other; a kind consumes only its own. (b) The last two kinds have no budget at all, because the blocker is a missing decision and additional attempts cannot produce one. Spending an iteration on either is the failure mode this table exists to prevent.
+`execution-failed` is the residual kind, not the default one. Reach for it only when none of the specific causes above fits — a specialist that returns it for something the table already names has under-classified, which is `invalid-return`.
 
-**Every specialist reports its kind.** A status block with `status: failed` or `status: blocked` carries `failure_kind: <one of the above>`. A returned failure with no kind is itself `artifact-missing` — re-dispatch once asking for the classification, and never guess it on the specialist's behalf: the whole point is that the agent that hit the failure is the one that knows which it was.
+**Scope expansion is a transition, not a failure.** A `scope_expansion: new-information` return is a *successful* classification of something genuinely unknowable at freeze time; the work continues at a re-frozen boundary. It carries its own max-2 bound (§ Scope freeze) and it never appears here, because a kind in this table answers "what went wrong" and nothing went wrong. `known-at-freeze` is the one that surfaces to the operator, and it does so as a lightweight STOP, still not as a failure.
+
+**Three invariants across the table.** (a) The separate budgets — max-3 iterations, max-2 build/lint — never draw from each other; a kind consumes only its own. (b) The last two kinds have no budget at all, because the blocker is a missing decision and additional attempts cannot produce one. Spending an iteration on either is the failure mode this table exists to prevent. (c) Nothing an **operator** asks for is a failure of any kind: an operator ruling, edit or change of direction is a transition, and it never consumes a budget in this table.
+
+**Every specialist reports its kind.** A status block with `status: failed` or `status: blocked` carries `failure_kind: <one of the above>`. A returned failure with no kind is `invalid-return` — the missing thing is a field, not a file. Re-dispatch once naming the field, and never guess the kind on the specialist's behalf: the whole point is that the agent that hit the failure is the one that knows which it was.
 
 ## Gates
 
@@ -336,9 +342,9 @@ Two columns only, because two facts are all you need: when to call it, and what 
 4. Dispatch with the `TH-STATE-REF: {docs_root}/00-state.md` controlled first line.
 5. On return set `checkpoint_boundary: null`. Once-per-pipeline entry gate — later Phase 1 re-dispatches run unblocked. Never a STAGE-GATE, never waives a security floor.
 
-**Approach checkpoint (always runs for `mode: design`).** Checklist row `1.0-approach-check`. `approach_freedom: low` → auto-confirm, mark `[~auto-confirmed]`, continue. `high` → present `### Proposed Approach` + `approach_alternatives` to the operator for confirm or direction-change; a direction-change re-dispatches the architect and counts against the max-3 budget. Advisory, not a STAGE-GATE — no dual-record.
+**Approach checkpoint (always runs for `mode: design`).** Checklist row `1.0-approach-check`. `approach_freedom: low` → auto-confirm, mark `[~auto-confirmed]`, continue. `high` → present `### Proposed Approach` + `approach_alternatives` to the operator for confirm or direction-change; a direction-change re-dispatches the architect as a `cause: operator` round, which does **not** consume the max-3 budget (§ Iteration rules — the operator's own decision is a transition, never a correction of a pipeline defect). Advisory, not a STAGE-GATE — no dual-record.
 
-**`type_reclassify: true` or `tier_promote: N` in the status block** → halt before Phase 1.5, surface the rationale and AC list with the documented options, wait for the decision, record it. Never auto-route.
+**`failure_kind: reclassification-needed` in the status block** (carrying `recommended_type: feature` or `recommended_tier: N`, plus `rationale` and `evidence`) → halt before Phase 1.5, surface the recommendation, the rationale and the evidence with the documented options, wait for the decision, record it. Never auto-route, and never charge this against an iteration budget — it has none (§ Failures).
 
 ### Scope-freeze convergence gate
 
@@ -469,7 +475,7 @@ Gate data: `feature`, `lane`, `review_summary` (verbatim `## Review Summary`), `
 |---|---|
 | `approve` | `autonomous: false`, `gate1_release: approved`, release event. `plan_review_status: deferred` → Phase 1.8 next; otherwise Phase 2.0/2 |
 | `approve autonomous` | `autonomous: true`, `autonomous_granted_at: STAGE-GATE-1`, `gate1_release: approved-autonomous`. If deferred, also set `plan_review_status: skipped` in the same write and append `plan_review.offer_declined` (`reason: "autonomous"`) — Phase 1.8 never fires |
-| `reject {reason}` | `gate1_release: rejected`. Classify the correction below — do **not** unconditionally re-run the whole of Stage 1. Counts toward max-3 |
+| `reject {reason}` | `gate1_release: rejected`. Classify the correction below — do **not** unconditionally re-run the whole of Stage 1. A `cause: operator` round: budget-neutral, it does not consume max-3 |
 | `edit` | `gate1_release: edit`. Pause. On the next `approve`, classify before re-preparing. Distinct from the invariant-3(b) operator-dictated direct edit above: this `edit` reply pauses for a correction round through `architect`; a direct edit is a literal transcription you perform yourself on the operator's exact words, and is never inferred from this reply alone |
 
 Ambiguous reply → record neither half; re-surface the allowlist.
@@ -554,15 +560,21 @@ Phase 2 dispatches `implementer` by the tree below. The rule being enforced is *
 
 ```
 Phase 2 scheduler
-├── default: the whole task set                  → ONE implementer dispatch
-│     `Depends on:` orders the work INSIDE that dispatch; the implementer
-│     works through every task in dependency order in one continuous pass
-│     and commits once per task as its edits close.
-└── a task that qualifies for lane decomposition → N seam implementers for
-      that task (§ Intra-task lane decomposition), then one consolidation.
-      Non-qualifying tasks stay in the single dispatch above.
-      Any qualification doubt → fall back to the single dispatch.
+├── BASE DISPATCH — one implementer carrying every non-decomposed task.
+│     `Depends on:` orders the work INSIDE this dispatch; the implementer
+│     works through its tasks in dependency order in one continuous pass
+│     and commits once per task as its edits close. This dispatch always
+│     exists unless every task was decomposed out of it.
+└── SUBSTITUTION — a task that qualifies for lane decomposition is REMOVED
+      from the base dispatch and replaced by N seam implementers plus one
+      consolidation (§ Intra-task lane decomposition). Qualifying means:
+      `Lane-decomposable: yes` in the plan AND the file count meets
+      LANE_DECOMPOSE_MIN_FILES AND the declared seams are genuinely
+      disjoint. Any doubt on any conjunct → the task stays in the base
+      dispatch.
 ```
+
+Read the tree as substitution, not addition: a decomposable task is *moved out* of the base dispatch, never given a second one alongside it. **No task ever receives an automatic dispatch of its own** — that is the invariant, and the dispatch count is whatever the substitutions leave behind.
 
 Either shape ships the task as one plan, one implementation record, one commit set, one PR — the fan-out is an execution detail inside the task, never a division of its deliverable.
 
@@ -606,7 +618,7 @@ All three run before Phase 3. Two share `docs/pipeline-lanes.md § 2a` as their 
 
 **1. Scope check (`fix`/`hotfix` only).** `git diff --name-only`; every changed non-test file appears in `01-root-cause.md § Scope of Fix` or carries a `[SCOPE-DRIFT]` annotation. Otherwise back to implementer or architect (max-3).
 
-**2. Re-tier gate (`fix`/`hotfix` only).** Diff against the sensitive-path list; any match forces `tier_promote: 3` and re-enters Phase 2.0. The audit itself needs no promotion — `adversary` dispatches on `security_floor_applies` regardless of tier.
+**2. Re-tier gate (`fix`/`hotfix` only).** Diff against the sensitive-path list; any match forces the tier to 3 and re-enters Phase 2.0. This is your own deterministic re-tier from the diff, not the architect's `recommended_tier` recommendation — it needs no operator decision because the sensitive-path list decided it. The audit itself needs no promotion — `adversary` dispatches on `security_floor_applies` regardless of tier.
 
 **3. `security_sensitive` backstop — every type.** Deterministic, code-level, and **independent of the upstream classification**: it exists to catch what that classification missed, and neither substitutes for the other.
 
