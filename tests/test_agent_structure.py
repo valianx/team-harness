@@ -37776,8 +37776,13 @@ check(
 print()
 print("=== Suite 169: inline working posture (opt-in, operator-declared) ===")
 
+# Repoint (post-fusion): the § 2b companion block that used to live in
+# leader.md now lives in agents/ref-intake-flows.md (migrated verbatim); the
+# Step-6-equivalent intent row and the posture re-arm rule live in
+# orchestrator.md's own Intent routing table and Intake section. Union both
+# so anchors resolve regardless of which of the two files now carries them.
 _s169_lanes = read(REPO_ROOT / "docs" / "pipeline-lanes.md")
-_s169_leader = read(AGENTS_DIR / "leader.md")
+_s169_leader = read(AGENTS_DIR / "ref-intake-flows.md") + "\n" + SPLIT_CORPUS
 _s169_skill = _read_or_empty(SKILLS_DIR / "inline" / "SKILL.md")
 _s169_readme = read(SKILLS_DIR / "README.md")
 _s169_claude = read(REPO_ROOT / "CLAUDE.md")
