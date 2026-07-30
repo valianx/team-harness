@@ -40840,6 +40840,21 @@ _S187_PLACEHOLDER_DESTINATIONS = {
     "skills/baz/SKILL.md", "docs/auth.md",
 }
 
+# Permanently-retired filenames with no successor — `agents/leader.md` and
+# `agents/acceptance-checker.md` (coordinator-fusion; agent deleted, never
+# coming back under this name) and `skills/release/SKILL.md` (per-pr-version-bump
+# refactor, 2026-07-17). A historical mention naming one of these by name (e.g.
+# "the suite used to test `agents/leader.md` § ..." or a dated allowlist
+# inventory row) is not a dangling pointer — it is exactly the R4 class Suite
+# 186 (`tests/test_coordinator_mention_residual.py`) and
+# `docs/coordinator-mention-allowlist.md` already track and require a stated
+# reason for. Re-flagging the same "does not exist" fact here would duplicate
+# that check without adding information; scoped narrowly to these three
+# filenames only, so an unrelated broken pointer still fails loudly.
+_S187_RETIRED_NO_SUCCESSOR_DESTINATIONS = {
+    "agents/leader.md", "agents/acceptance-checker.md", "skills/release/SKILL.md",
+}
+
 _s187_file_cache: dict[str, str] = {}
 
 
@@ -40869,6 +40884,8 @@ for _s187_path in _s187_scan_files:
             continue  # workspace-artifact template basename, not a repo pointer
         if _s187_dst_path in _S187_PLACEHOLDER_DESTINATIONS:
             continue  # illustrative/target-repo placeholder, never resolvable here
+        if _s187_dst_path in _S187_RETIRED_NO_SUCCESSOR_DESTINATIONS:
+            continue  # permanently retired, tracked by Suite 186 + the allowlist instead
         _s187_checked += 1
         _s187_dst_file = REPO_ROOT / _s187_dst_path
         if not _s187_dst_file.exists():

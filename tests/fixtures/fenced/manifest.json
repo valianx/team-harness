@@ -474,8 +474,8 @@
     "file": "agents/architect.md",
     "mode": "heading",
     "anchor": "### Step 1 \u2014 Record the classification block",
-    "sha256": "47b7bbbfb05e36762c7a144a92da13d22ea42ce66ef717137f0c567f735aeda7",
-    "length": 5975,
+    "sha256": "46cbb98ef231596b0d9f45891a576aedfec328363c68f0e5273081bfa01ba5f7",
+    "length": 5968,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -863,8 +863,8 @@
     "id": "gate-contract-whole",
     "file": "agents/_shared/gate-contract.md",
     "mode": "file",
-    "sha256": "25b35b4ebe4a9920d9264b5e324de45dd6b232cbbc13a6bdb183d0f85c9a974a",
-    "length": 29068,
+    "sha256": "a622f05638d78bc6bdc67287723445d0e3e7d377f6570aa5a11abffd47b99941",
+    "length": 29046,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
