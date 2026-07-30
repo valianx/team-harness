@@ -236,7 +236,7 @@ the same conversation, with no hand-off:
    path, options, and the `gate_nonce`.
 3. **Interpret and record** — read the operator's reply against the gate's closed
    allowlist (see § "Ambiguous-gate-reply rule" when the reply does not map cleanly),
-   verify it carries the `gate_nonce` currently pending, then **record** both halves of
+   verify it is attributable to the presentation whose `gate_nonce` is currently pending — the coordinator's own observation, never a token the operator typed, then **record** both halves of
    the dual-record atomically — consuming the nonce — and route.
 
 The orchestrator is the single **preparer, presenter and recorder** of every gate, and the

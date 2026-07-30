@@ -35,7 +35,8 @@ This closes the set of panel *outcomes*, not the set of files under `reviews/`. 
 | `## Review Summary`, `## Architecture` (Work Plan, Services Touched, assessments), `## Task List` (task sections, AC text, Files, Delivery Grouping) | `01-plan.md` | architect | author; on amend, reconcile-in-place (overwrite superseded canonical fields so each appears exactly once) |
 | Closure rubric (ownership closure, provenance, removed-control) | `reviews/01-closure-rubric.md` | architect | author; rewrite in place on amend |
 | `## Plan Ratification (Phase 1.5)` | `reviews/01-plan-review.md` | qa-plan (ratify-plan) | append in place; replace any prior copy; when a ratification gap changes a canonical field or AC, edit that field in the plan body in place — do not append a second value |
-| `## Plan Review` header + `## Summary` rules table + `**Combined verdict:**` | `reviews/01-plan-review.md` | plan-reviewer | append in place; replace any prior copy |
+| `## Plan Review` header + `## Summary` rules table + `## Findings` + `## Recommendation to orchestrator` + `**Combined verdict:**` | `reviews/01-plan-review.md` | plan-reviewer | append in place; replace any prior copy |
+| `## Panel Rounds` | `reviews/01-plan-review.md` | plan-reviewer | append one row per round, never rewrite prior rows |
 | `## Plan Review` sub-verdict `**Substance (qa):**` | `reviews/01-plan-review.md` | qa-plan (panel) | replace own labelled line in place |
 | `## Plan Review` sub-verdict `**Security design-review (security):**` | `reviews/01-plan-review.md` | security (panel) | replace own labelled line in place |
 | `## Security Design-Review` (top-level skeleton section, condition-gated) | `reviews/01-plan-review.md` | security (panel) | fill the skeleton's own `**Verdict:**` line in place; the worst-of combine reads the `## Plan Review` sub-verdict above, not this section |
@@ -58,11 +59,11 @@ Every writer's permitted edit to `01-plan.md` is enumerated below. A writer not 
 | ux-reviewer | AC additions appended to `## Task List` (per-task AC block, contiguous numbering after the architect's last AC) — narrative stays in `reviews/01-ux-review.md` | Phase 1.7 (enrich, Stage 1, before ratification) |
 | qa-plan, security, tester, implementer, and everyone else | NONE | — |
 
-(The Stage-2 mechanisms — `[CONSTRAINT-DISCOVERED]` annotations by the implementer/architect and orchestrator-applied amendments after Phase 2.5 — are out of scope for this table; they are unchanged.)
+(Stage-2 `[CONSTRAINT-DISCOVERED]` annotations are placed in `## Task List` by the **orchestrator**, transcribing an implementer's `constraint_discovered` status-block field — the implementer never writes `01-plan.md`. The orchestrator's post-Phase-2.5 amendments are the other Stage-2 write. Both are out of scope for the table above.)
 
 ## Write-tool discipline (shared review files)
 
-This section governs `Edit`/`Write` usage on `reviews/01-plan-review.md` — the panel's shared, multi-writer review artifact (`plan-reviewer`, `qa-plan`, `security`, `adversary` all write into it). It is a rule of the panel as a whole, not an exception carved out for one agent.
+This section governs `Edit`/`Write` usage on `reviews/01-plan-review.md` — the panel's shared, multi-writer review artifact (`plan-reviewer`, `qa-plan` and `security` write into it; `adversary` does **not** — it owns no section here and writes only `reviews/04-adversary.md`). It is a rule of the panel as a whole, not an exception carved out for one agent.
 
 **The rule.** Every panel agent uses `Edit` on a review file that already exists. `Write` is reserved for the initial creation of the agent's own review file — never for a file that already exists, never for a file owned by another agent, never for a shared file. When `reviews/01-plan-review.md` already exists (created by whichever panel agent ran first this round), every subsequent writer edits it in place with `Edit`; none of them re-`Write`s it whole.
 

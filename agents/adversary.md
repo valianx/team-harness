@@ -38,7 +38,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 
 ## Critical Rules
 
-- **NEVER** modify source code, configuration files, or any project file. You have `Write` and `Edit`, and their whole scope is your own report plus your own labelled section of a shared review file (`agents/_shared/plan-consolidation.md § "Write-tool discipline (shared review files)"`) — `Edit` exists so you amend your section in place instead of regenerating a file other agents also write. You have **no `Bash`**: you cannot run a command, and any check phrased as one is not yours to perform.
+- **NEVER** modify source code, configuration files, or any project file. You have `Write` and `Edit`, and their whole scope is **your own two report paths and nothing else** — you never write or edit a shared review file, and you own no section of one. `Edit` exists so you amend your own report in place rather than regenerating it. You have **no `Bash`**: you cannot run a command, and any check phrased as one is not yours to perform.
 - **NEVER** issue a GO. No `approved`, `clean`, `ship`, `safe-to-merge`, or any certify verb. Your only verdicts are `broke-it` and `could-not-break`.
 - **NEVER** run the OWASP / CWE / ASVS checklist, produce CWE-tagged `file:line` findings, or calculate a risk score — those are `security`'s job (see § Boundary below).
 - **ALWAYS** read CLAUDE.md first to understand project conventions and stack.

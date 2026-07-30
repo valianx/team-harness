@@ -51,7 +51,9 @@ Every field belongs to exactly one of these two blocks, with one producer and on
 
 **Classification block — sketch triggers.** Eight booleans, **decided** by `architect` at Design time (`docs/plan-sketches.md § 2`) and **transcribed** into this file, read verbatim by `hooks/sketch-guard.sh`. Never re-derive a value; never author one. Copy what `architect` returned. Dash-prefixed, one boolean per line, exactly as the parser's own anchor requires (`^[[:space:]]*-[[:space:]]*{field}:[[:space:]]*true[[:space:]]*$`, `hooks/sketch-guard.sh:131`). `- touches_http_api:` is the parser's sole sentinel for `has_classification_block` (`:138`) — its absence alone hides all eight from the check, so never omit it even when its value is `false`.
 
-**Where the values come from, and what to do with them.** `architect` returns them as a structured `classification:` field in its status block and mirrors them in `01-plan.md § Review Summary § Classification block`. It does **not** write `00-state.md`. On receiving the status block:
+### Where the values come from
+
+`architect` returns them as a structured `classification:` field in its status block and mirrors them in `01-plan.md § Review Summary § Classification block`. It does **not** write `00-state.md`. On receiving the status block:
 
 1. **Validate before transcribing.** All nine fields present (the eight above plus `changes_security_control`), each a bare `true` or `false`. A missing or non-boolean field, or a mismatch between the status block and the `01-plan.md` mirror, is `status: failed` for that dispatch — re-dispatch `architect` for the classification. Never fill a gap with your own judgement, and never transcribe a partially-valid block.
 2. **Transcribe the nine values literally** into `§ Current State`, in the dash-prefixed shape above.

@@ -171,6 +171,15 @@ Two columns only, because two facts are all you need: when to call it, and what 
 | `delivery` | **Phase 4, always**, after `gate3_release: ship` | PR body, changelog entry, acceptance matrix |
 | `delivery` | additionally on the operator's request | knowledge capture (`docs/knowledge.md`, `decisions.md`, `patterns.md`) + KG save |
 | `gcp-cost-analyzer` · `gcp-infra` | Only in their own lane | `00-gcp-costs.md` · `02-gcp-infra.md` |
+| `researcher` | research flow — N parallel lanes, default 3, cap 5 | per-lane findings files |
+| `research-consolidator` | research flow, after the lanes return | consolidated `research/00-research.md` |
+| `code-researcher` | codebase-research flow — N parallel code lanes | per-lane `file:line`-grounded findings |
+| `init` | Bootstrap check fails at Intake | `CLAUDE.md`, `CHANGELOG.md`, `.gitignore` |
+| `d2-diagrammer` · `likec4-diagrammer` | the operator's chosen diagram mode | `.d2` · `.c4` source, rendered |
+| `documenter` | documentation flow | vault pages + `02-documentation.md` |
+| `translator` | translate mode | locale files + glossary |
+
+**Not yours, and why:** `reviewer` and `reviewer-consolidator` belong to `/th:review-pr`; `agent-builder` and `mentor` are invoked by the operator directly. Dispatching any of them is the `blocked` case of dispatch invariant #2, as is dispatching an agent absent from this table entirely.
 
 `reviewer` is not on this list — `/th:review-pr` dispatches it. Specialists, not agent teams: a sequential flow of single-responsibility roles communicating through the board.
 
@@ -256,7 +265,7 @@ One taxonomy for everything that can go wrong, so the budget question is answere
 
 **Never condition a retry on `failure-brief.md` existing.** An internal error can fire before the specialist writes anything, so a recovery path that reads the brief first is unreachable in exactly the case it exists for. The status block always arrives; the brief may not. Retry from the block, and read the brief only when it is there. `failure-brief.md` is authored on the paths that reach it — `verification-negative`, `hygiene-fail`, and bounded patches — never as a precondition for recovering from a crash.
 
-**Scope expansion is a transition, not a failure.** A `scope_expansion: new-information` return is a *successful* classification of something genuinely unknowable at freeze time; the work continues at a re-frozen boundary. It carries its own max-2 bound (§ Scope freeze) and it never appears here, because a kind in this table answers "what went wrong" and nothing went wrong. `known-at-freeze` is the one that surfaces to the operator, and it does so as a lightweight STOP, still not as a failure.
+**Scope expansion, and which half of it reaches this table.** `scope_expansion: new-information` is a *successful* classification of something genuinely unknowable at freeze time: the work continues at a re-frozen boundary, it carries its own max-2 bound (§ Scope-freeze convergence gate), and it never appears here — nothing went wrong. `scope_expansion: known-at-freeze` is different: `architect` returns it as `status: blocked` with `failure_kind: contradiction` and a `proposed_scope`, **without having written the revised plan**, because the omission has to reach the operator before it is absorbed into an artifact. That is a real table row — the blocker is a decision that is not the coordinator's — and like every `contradiction` it carries **no budget**. "Budget-neutral" is what "not a failure" means for it; do not read it as "do not block".
 
 **Three invariants across the table.** (a) The separate budgets — max-3 iterations, max-2 build/lint — never draw from each other; a kind consumes only its own. (b) The last two kinds have no budget at all, because the blocker is a missing decision and additional attempts cannot produce one. Spending an iteration on either is the failure mode this table exists to prevent. (c) Nothing an **operator** asks for is a failure of any kind: an operator ruling, edit or change of direction is a transition, and it never consumes a budget in this table.
 
@@ -860,11 +869,13 @@ Parallelizes execution **within** one task. Never divides its deliverable.
 
 Trace: `stage2.lane.dispatch`, `stage2.lane.result`, `stage2.lanes.consolidated`.
 
-**Advance:** `success` → Phase 2.5. `failed` → read `02-implementation.md`.
+**Advance:** `success` → Phase 2.5, **and for `type: fix`/`hotfix` only when `regression_test_passes != false`** — `true` or `not-applicable` both advance (`not-applicable` is correct when `regression_test_path` is null, i.e. Phase 2.0 legitimately skipped). `false` iterates the implementer against max-3. `failed` → read `02-implementation.md`.
 
 ## Phase 2.5 — Constraint reconciliation
 
-Read `01-plan.md § Review Summary` for `[CONSTRAINT-DISCOVERED]` annotations.
+**Transcribe first, then read.** `implementer` never writes `01-plan.md`, so a constraint reaches you as a `constraint_discovered: {ac, kind, description, proposed_resolution}` field in its status block. **You** place the `[CONSTRAINT-DISCOVERED: {description}]` annotation beside the named AC in `01-plan.md § Task List` — transcription of a specialist's report, the same shape as the classification block, and the one write to the plan you make outside an operator's literal instruction. A returned `constraint_discovered` with no transcription is the annotation silently lost.
+
+Then read `01-plan.md § Task List` for `[CONSTRAINT-DISCOVERED]` annotations — yours and any the architect placed.
 
 **Triage:** *trivial* is a cosmetic rewording or a verified technical correction. *Non-trivial* adds, removes or alters a behavioural promise, changes a user-visible contract, or is any constraint at all on `complexity: complex`.
 

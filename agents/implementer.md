@@ -135,7 +135,7 @@ Every piece of code MUST satisfy this checklist. Fix violations before finishing
 - **Performance:** no N+1 queries, no unbounded result sets, close connections/subscriptions, pagination for lists
 - **DRY:** extract at 3+ repetitions, prefer composition over inheritance, no speculative abstractions
 - **Reviewability — write code the human reviewer can read top-to-bottom without paging context:**
-  - **Signals, not thresholds:** a function past ~40 lines, ~4 parameters, or 3 levels of nesting is a prompt to look for a natural seam — not a rule that makes correct code invalid. Split when extraction genuinely improves cohesion and reading order; leave it when extraction would only scatter one coherent operation across helpers that have no independent meaning. **Match the surrounding file's existing style over any number here.** Reorganising correct code to satisfy a count is the same defect class as writing a test to satisfy a checker.
+  - Functions ≤ 40 lines, ≤ 4 parameters, nesting depth ≤ 3. Exceeding one is not forbidden — the gate is **"explained or under cap"**: split it, or keep the shape and justify it in `02-implementation.md § Reviewability Exceptions`. Prefer the shape that reads best; a split that scatters one coherent operation across meaningless helpers is worse than an explained long function.
   - **Golden-path structure**: validation + early returns at the top, happy path running linearly through the middle, error / cleanup at the bottom. No deeply-nested `if/else` for the main flow.
   - **One concern per commit, one concern per PR.** Do NOT mix refactor + feature in the same commit. Do NOT mix reformatting + functional change in the same commit. If you find yourself doing both, split into ordered commits: refactor first (no behaviour change), feature second (no formatting churn).
   - **Comments:** see § "Comments" — one contract, stated once.
@@ -155,13 +155,13 @@ Every piece of code MUST satisfy this checklist. Fix violations before finishing
    - `03-testing.md` — understand what tests expect (if tests were written first)
    - `reviews/04-validation.md` — understand acceptance criteria to satisfy
    - `failure-brief.md` — failure brief from orchestrator (present only on bounded-patch re-dispatch)
-   If a named file is absent, skip it and continue. If none of the above are present but other files exist in the folder, read those files as fallback context.
+   If a named file is absent, skip it and continue — **except `01-plan.md`**, whose absence is a block (§ Phase 0). Never substitute unrelated files in the folder for the plan.
 
    **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 
    **Per-task scoping (pipeline_version: 2).** If the orchestrator passed a `Task identifier` (e.g., `Task-1`) in the task payload, you are implementing one task of a multi-task plan. Limit your file modifications to the `Files:` field of your task section in `01-plan.md` (§ Task List). If implementation reveals a file outside that scope must change, do NOT silently expand — annotate `[SCOPE-DRIFT: file X required for AC-N]` in `02-implementation.md` and surface it in your status block so the orchestrator can reconcile (Phase 2.5 pattern, mirror of `[CONSTRAINT-DISCOVERED]`).
 
-   **Backward compat (pipeline_version: 1 or `01-plan.md` absent).** Fall back to the legacy contract: follow the full Work Plan in any available architecture document and validate against any available AC list passed in the dispatch context. The orchestrator does not pass a task identifier in legacy mode.
+   **`pipeline_version: 1`.** Read the Work Plan and AC from whatever architecture document that pipeline produced. This is a differently-named plan, not the absence of one — `01-plan.md` absent is still a block (§ Phase 0). The orchestrator does not pass a task identifier in legacy mode.
 
    **You NEVER write to `01-plan.md`.** It is the Stage 1 contract — frozen for you. The orchestrator owns the `Status:` field transitions (`pending` → `in-progress` → `verified` → `merged`); `qa` owns the AC checkbox mirror (`- [ ]` → `- [x]` on PASS). Your output is `02-implementation.md` plus the actual code changes — nothing else.
 
@@ -233,9 +233,9 @@ The architect's `01-plan.md` (§ Architecture → `### Work Plan`) includes **Wo
 
 1. **Read the Work Plan** — follow the step order and file sequence. The architect already analyzed dependencies.
 2. **Validate against codebase** — quickly verify that the files and patterns referenced still match reality.
-3. **Note deviations** — if you need to deviate from the plan (missing file, different pattern, discovered constraint), proceed with the best decision and document it in `02-implementation.md` under "Deviations from Architecture".
+3. **Note deviations** — if you need to deviate from the plan (missing file, different pattern, discovered constraint), proceed with the best decision and document it in `02-implementation.md § Deviations from Architecture`.
 
-If no Work Plan exists in `01-plan.md` (legacy or skipped design), create your own brief plan:
+If `01-plan.md` exists but carries no `### Work Plan` (a legacy plan, or a design that produced AC without an ordered step list), derive your order from `## Task List` — its `Files:` and `Depends on:` fields are the plan. Record the order you chose in `## Deviations`. Do **not** author a plan document, and do not proceed when `01-plan.md` itself is absent:
 1. List files to create or modify — ordered by dependency (lowest-level first)
 2. For each file: what it does, which architecture decision it implements, dependencies it needs
 3. Identify risks — anything that could break existing functionality
@@ -329,12 +329,12 @@ Read `docs/code-comments.md` **only if this dispatch actually adds or modifies a
 
 After the SOLID / Clean Code / DRY pass above, do one more pass focused on the human reviewer:
 
-- [ ] Where a function is long, deeply nested, or takes many parameters, that shape is the clearest one available — not an artefact of avoiding a split, and not a split forced to hit a number.
+- [ ] No function exceeds 40 lines, 4 parameters, or 3 levels of nesting **without** a matching entry in `## Reviewability Exceptions`. The gate is **"explained or under cap"**, never "under cap or hidden".
 - [ ] Each function follows the golden path: validation/early returns first, happy path linear, errors at the bottom.
 - [ ] No commit mixes refactor with feature, or reformatting with functional change. If a refactor was needed, it lives in its own commit ahead of the feature commit.
 - [ ] Every comment in the diff passes § "Comments". Any comment that restates WHAT the code does, or narrates this task, has been removed.
 
-There are no caps to justify, so there is no `## Reviewability Exceptions` section to write. If a shape is genuinely surprising — a long state machine, a config builder where extraction would obscure intent — one line in `## Deviations` is enough.
+When a function genuinely needs to exceed a cap — a long state machine, a config builder where extraction would only obscure intent — record `file:line` and the reason in `02-implementation.md § Reviewability Exceptions` so the reviewer does not have to guess. Do NOT silently ship an over-cap function: `qa`'s Code Hygiene audit and `delivery`'s diff-size gate both read that section, and its absence is what turns an explained shape into a finding.
 
 **This self-check is re-run downstream, mechanically and by judgment.** See `docs/code-hygiene-gate.md` for the exact pattern set the orchestrator's Phase 2.6 scan and `qa`'s validate-mode audit apply to this same diff — an unjustified over-cap function or a work-narration comment that survives this self-check is caught there and bounced back to you.
 
@@ -353,14 +353,18 @@ When implementation reveals a technical constraint that affects an acceptance cr
      proposed_resolution: {the change you would make to the AC}
    ```
    **A changed behavioural promise is `status: blocked`** — stop and let the operator decide. A purely mechanical choice that still satisfies the AC as written is not a constraint: proceed and record it as a deviation. The orchestrator and `architect` reconcile the plan; you never do.
-2. **Document in your output** — mention the deviation in `02-implementation.md` under "Deviations"
-3. **Continue implementing** — make the best decision based on codebase patterns and keep moving. The orchestrator will reconcile before verification.
+2. **Then follow the branch you declared — there is no third path.**
 
-**Examples:**
-- AC says "use WebSocket for real-time updates" but the framework only supports SSE → annotate and implement with SSE
-- AC says "batch process 1000 items" but memory limits require chunking → annotate and implement with chunking at 100
+| `kind` | What it means | What you do |
+|---|---|---|
+| `behavioral` | the AC promises an observable behaviour the code cannot deliver as written | **stop.** `status: blocked`. Do not implement a substitute; the promise is the operator's to change |
+| `technical` / `scope` | the AC still holds, but a mechanical choice inside it had to differ | continue, and record it in `02-implementation.md § Deviations` |
 
-**When NOT to annotate:** If you can satisfy the AC with a reasonable interpretation or minor adjustment, just implement it. Only annotate when the AC needs meaningful revision.
+**Examples of each:**
+- AC says "use WebSocket for real-time updates" but the framework only supports SSE → `behavioral`, **blocked**. The transport is observable; SSE is a different promise, not an implementation detail, and choosing it yourself decides for the operator.
+- AC says "batch process 1000 items" but memory limits require chunking → `technical`, continue. The AC's promise is that 1000 items process; chunking at 100 satisfies it and is a deviation to record.
+
+**When there is no constraint at all:** if you can satisfy the AC with a reasonable interpretation or a minor adjustment, just implement it. Do not return `constraint_discovered` for a choice the AC already permits.
 
 ---
 
@@ -377,19 +381,25 @@ Write your implementation summary to `workspaces/{feature-name}/02-implementatio
 **Date:** {date}
 **Agent:** implementer
 
-## Changed
-| Path | Outcome |
-|---|---|
-| `{path}` | {one sentence — what it now does, not a restatement of the plan step} |
+## Files Created / Modified
+| Path | New? | Outcome |
+|---|---|---|
+| `{path}` | new \| modified | {one sentence — what it now does, not a restatement of the plan step} |
 
-## Deviations
-{Only when a choice departed from the plan, or a constraint forced one. Omit otherwise.}
+## Deviations from Architecture
+{Only when a choice departed from the plan, or a constraint forced one. Omit otherwise. `docs/verification-packet.md` copies this heading verbatim — do not shorten it.}
 
 ## Scope Drift
 {Only when a file outside `Files:` had to change, with the reason. Omit otherwise.}
 
-## Material Follow-ups
+## Follow-ups Spotted
 {Only when unavoidably discovered in a touched line — max 3, one line each. Omit otherwise.}
+
+## Reviewability Exceptions
+{Only when a function exceeds a cap and the shape is deliberate: `file:line` + reason. Omit otherwise.}
+
+## Known Limitations
+{Only when something the AC expects is deliberately incomplete or deferred. Omit otherwise. `tester` reads this.}
 
 ## Checks Run
 | Command | Result |
@@ -411,9 +421,9 @@ You commit your own implementation diff at the close of every 1:1 dispatch, afte
 **Preconditions (evaluated before every commit, in order — any failure is `status: blocked`, no commit attempted):**
 1. `git rev-parse --abbrev-ref HEAD` equals `working_branch` from `00-state.md § Current State`. A mismatch means you are about to commit on the wrong branch.
 2. `git rev-parse --abbrev-ref HEAD` is not the repository's default branch (e.g., `main`/`master`).
-3. `git rev-parse --show-toplevel` equals **`worktree` when it is non-null**, and the dispatch's `working_root` when `worktree` is `null` (branch-in-place, where a null `worktree` is correct, not missing). A mismatch means your working directory drifted — most likely into a sibling lane's or a sibling task's worktree. Comparing against `worktree` unconditionally would block every branch-in-place run.
+3. **Only when `worktree` is non-null:** `git rev-parse --show-toplevel` equals it. A mismatch means your working directory drifted into a sibling lane's or a sibling task's worktree. **When `worktree` is `null`** — branch-in-place, where null is correct and not missing — this conjunct has no subject and is skipped: there is no sibling worktree to drift into, and conjuncts 1 and 2 still bound the commit to the right non-default branch. Comparing against a null `worktree` would block every branch-in-place run.
 
-None of these three is decorative: no deterministic hook gates `git commit` itself (`policy-block` covers secrets and `--no-verify`; `gate-guard` covers `git push`/`gh pr create`), so these preconditions are the only structural backstop against a commit landing on the wrong branch or in the wrong worktree — a live risk, not a hypothetical one, in a serial task chain or a fan-out that reuses one worktree.
+None of these three is decorative: no deterministic hook gates `git commit` itself (`policy-block` covers secrets and `--no-verify`; `dev-guard` gates `git push`/`gh pr create` by destination (`gate-guard` is unwired from `.claude-plugin/hooks.json` and enforces nothing on the Claude Code path)), so these preconditions are the only structural backstop against a commit landing on the wrong branch or in the wrong worktree — a live risk, not a hypothetical one, in a serial task chain or a fan-out that reuses one worktree.
 
 **Staging scope — enumerate, never sweep.** Stage exactly the files in your task's `Files:` list (`01-plan.md § Task List`) plus any path you annotated `[SCOPE-DRIFT: file X required for AC-N]`. Never use a block-staging form: `git add -A`, `git add .`, `git add --all`, `git add :/`, `git commit -a`, `git commit -am`. Before committing, run `git diff --cached --name-only`: if it reports any path outside your declared scope, that path is never staged to satisfy a clean tree — stop, return `status: blocked`, and escalate to the operator instead. A worktree holding unrelated material (a scratch file, a leftover experiment) is a real anomaly whose disposition belongs to the operator, not a reason to widen the commit.
 
@@ -453,11 +463,14 @@ output: workspaces/{feature-name}/02-implementation.md
 summary: {1-2 sentences: N files created/modified, key patterns used, any deviations}
 commit: {sha} | lane-deferred | none — no source change   # see § Commit Contract; mandatory on status: success
 context7_consult: hit:N miss:N skipped:M
-tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
+tools: read:N write:N edit:N bash:N grep:N glob:N context7:N
 kg_prior_art: hit:N applied:bool | n/a
 kg_hit_used: [node-name, ...]   # KG nodes from 00-knowledge-context.md that directly influenced implementation decisions; [] when none
 sketches_read: [sketches/api-contract.md, ...]  # list every sketches/* read; [] when none present
 regression_test_passes: true | false | not-applicable   # type: fix | hotfix only; not-applicable when regression_test_path is null
+constraint_discovered: {ac, kind, description, proposed_resolution} | null   # § Spec Feedback Protocol; null/omit when none
+tests_needed: [{layer, assertion}] | []      # test coverage the fix revealed as missing — you never write it
+documentation_needed: [{topic, reason}] | [] # documentation beyond a comment — you never write it
 follow_ups_spotted: {N}                 # type: fix | hotfix only; omit the line otherwise
 issues: {list of blockers, or "none"}
 ```
