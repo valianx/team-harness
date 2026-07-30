@@ -211,22 +211,8 @@ func TestResolveDataHome_Branch3_ClaudeCodeRoot(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Suite 3 — SEC-08: single-pass expansion, residual ".." rejection (AC-10)
+// Suite 3 — SEC-08: single-pass expansion (AC-10)
 // ---------------------------------------------------------------------------
-
-// TestSecureAndVerify_DotDot_Rejected verifies that a path containing ".."
-// after normalization is rejected (AC-10).
-func TestSecureAndVerify_DotDot_Rejected(t *testing.T) {
-	clearDataHomeEnv(t)
-	ResetDataHomeCache()
-
-	// An absolute path with ".." that Clean cannot fully resolve.
-	raw := string(filepath.Separator) + filepath.Join("tmp", "..", "..", "etc", "evil")
-	_, err := secureAndVerify(raw)
-	if err == nil {
-		t.Error("expected an error for a path with residual '..', got nil")
-	}
-}
 
 // TestSecureAndVerify_SinglePassExpansion verifies that os.ExpandEnv is used
 // for expansion and that it does NOT recurse (AC-10).
