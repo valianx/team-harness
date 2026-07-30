@@ -645,7 +645,7 @@ assert_ask "git push origin V1.2.3 (uppercase-V semver tag literal)" "$TMP" "$(m
 rm -rf "$TMP"
 
 # force push by FLAG (-f, --force, --force-with-lease) -> ASK, never
-# allow. policy-block independently denies the flagged form (double floor).
+# allow. dev-guard is the sole registered owner of outward git policy.
 echo
 echo "--- force push by flag -> ASK (never allow) ---"
 TMP=$(make_tmp)
@@ -655,8 +655,7 @@ TMP=$(make_tmp)
 assert_ask "git push --force-with-lease origin feat/x" "$TMP" "$(make_payload 'git push --force-with-lease origin feat/x')"
 rm -rf "$TMP"
 
-# force by refspec prefix ('+') or --mirror -> ASK. dev-guard
-# self-covers this form; policy-block (flag-only) does not.
+# force by refspec prefix ('+') or --mirror -> ASK.
 echo
 echo "--- force by '+' refspec prefix / --mirror -> ASK (dev-guard self-covers) ---"
 TMP=$(make_tmp)
@@ -2108,8 +2107,7 @@ rm -rf "$TMP"
 # The combined worst case: an unenumerated runner PLUS the
 # per-subcommand-binary dispatcher form, on a force push. dev-guard still
 # only reaches ask (never allow — binaryCaseExact is unconditionally false
-# on this path); gate-guard/policy-block's unconditional deny is verified
-# separately in test_gate_guard.sh/test_policy_block.sh.
+# on this path).
 TMP=$(make_tmp)
 assert_ask "flock /tmp/x \$(git --exec-path)/git-push --force origin main (unenumerated runner + dispatcher form + force) -> ask" \
     "$TMP" "$(make_payload 'flock /tmp/x $(git --exec-path)/git-push --force origin main')"

@@ -244,7 +244,7 @@ set -euo pipefail
 PROJECT="<project-id>"   # explicit, never relies on the ambient default at apply time
 ```
 
-Script-safety conventions (enforced here AND by the `gcp-guard.sh` hook + `policy-block.sh`):
+Script-safety conventions (owned by this agent contract; `gcp-guard` separately gates gcloud verb classes and `policy-block` scans only provider-shaped credentials):
 
 - **Header:** `#!/usr/bin/env bash` + `set -euo pipefail` on every generated script.
 - **Explicit `--project`** on every `gcloud` command — never rely on the ambient config at apply time.

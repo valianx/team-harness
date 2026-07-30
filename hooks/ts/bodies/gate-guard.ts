@@ -7,7 +7,7 @@
 // injected-reader shape.
 //
 // Decision set is {none, deny} ONLY — this hook never emits `ask`.
-// Fail mode: no lane resolves -> `none` (defers to dev-guard/policy-block);
+// Fail mode: no lane resolves -> `none` (defers to dev-guard);
 // a lane resolves -> fail-CLOSED (any post-resolution read fault denies,
 // same as an explicit non-ship value).
 //
@@ -197,7 +197,7 @@ function gatherCandidatePaths(reader: GateGuardReader): string[] {
 // resolve. Accepted residual (honest-developer threat model, docs/dev-mode.md
 // § "Threat model"): in-lane work pushed from a renamed branch escapes this
 // correlation — a plain-readable circumvention outside the floor's scope;
-// force pushes remain covered by dev-guard/policy-block regardless.
+// force pushes remain covered by dev-guard regardless.
 // ---------------------------------------------------------------------------
 
 function laneCorrelates(
@@ -223,7 +223,7 @@ function laneCorrelates(
 // ---------------------------------------------------------------------------
 // Governing-lane resolution — mtime-selection over candidates (newest
 // first), returning the first one that correlates. Returns null when no
-// candidate exists or none correlates, deferring to dev-guard/policy-block
+// candidate exists or none correlates, deferring to dev-guard
 // rather than denying a manual push.
 // ---------------------------------------------------------------------------
 

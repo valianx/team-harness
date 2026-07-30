@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.2] - 2026-07-30
+
+### Changed
+- Reduced `policy-block` to two high-confidence boundaries: catastrophic recursive deletion and
+  provider-shaped credentials. Git workflow, SQL text, reads, filenames, config edits and
+  probabilistic secret detection now defer to their actual owners instead of blocking tool calls.
+- Replaced the 1,372-line policy fixture matrix with a focused boundary suite, shrinking the
+  compiled hook from roughly 56 KB to 9.6 KB.
+
 ## [3.0.1] - 2026-07-30
 
 ### Fixed

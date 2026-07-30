@@ -13,30 +13,13 @@
 #   oracle is the permission-gate contract, not any implementation's output.
 #
 # Findings covered:
-#   F-015  policy-block: Windows backslash path denial
 #   F-016  dev-guard:    escape-aware command extraction (compound quoted command)
 #   F-010  checkpoint-guard: obsidian logs-mode state-file resolution
 #   F-018  checkpoint-guard: multi-workspace selection (active over alphabetical)
 #   F-008  dev-guard: ClickUp MCP outward-write gate (runtime execution)
 #
-# RETIRED at the hook Bash->TS cutover (issue #446): F-002 (policy-block's
-# bash-native python3-masked degraded floor) and the M3a/M3b/M3c
-# "dual-path parity" section — both tested the retired Bash body's OWN
-# fallback when python3 was absent from PATH, a concept with no TS
-# equivalent (Node has no python3 dependency to degrade from). The
-# python3-available regression guards these sections carried (F002-6,
-# F016-3) are preserved below, converted to the TS artifact; the remaining
-# M3a/M3b/M3c coverage (egress read guard, config-anti-weakening, --no-verify
-# tokenizer) is exercised unconditionally by tests/test_policy_block.sh
-# (Suite 1), which has no degraded-path split to begin with.
-#
 # Structural (F-008, F-038, F-009, A1, Lint Check 8) findings are in
 #   its own structural counterpart, since retired.
-#
-# Note on secret patterns in tests:
-#   Token literals in this file are split across variables to prevent the
-#   policy-block gate from blocking CI writes of this test file itself.
-#   The assembled payloads exercise the hook's runtime detection correctly.
 #
 # Usage:
 #   bash tests/test_hook_gates_hardening.sh
@@ -46,11 +29,10 @@
 set -u
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-POLICY_HOOK="$REPO_ROOT/hooks/ts/dist/policy-block.cjs"
 DEV_GUARD_HOOK="$REPO_ROOT/hooks/ts/dist/dev-guard.cjs"
 CHECKPOINT_HOOK="$REPO_ROOT/hooks/ts/dist/checkpoint-guard.cjs"
 
-for h in "$POLICY_HOOK" "$DEV_GUARD_HOOK" "$CHECKPOINT_HOOK"; do
+for h in "$DEV_GUARD_HOOK" "$CHECKPOINT_HOOK"; do
     if [ ! -f "$h" ]; then
         echo "ERROR: $h not found — run 'npm --prefix hooks/ts run build'"
         exit 1
@@ -148,48 +130,6 @@ make_tmp_with_marker() {
     mkdir -p "$tmp/.claude"
     echo "$tmp"
 }
-
-# ---------------------------------------------------------------------------
-# ============================================================================
-# F-015: Windows backslash path denial in policy-block
-# SPEC: Write/Edit targeting Windows backslash paths must be DENIED.
-# ============================================================================
-echo
-echo "############################################################"
-echo "# F-015: policy-block Windows backslash path denial"
-echo "############################################################"
-
-# Case F015-1: C:\Users\x\.ssh\id_rsa (Windows-style absolute backslash path) → DENY
-echo
-echo "=== F-015-1: Write C:\\Users\\x\\.ssh\\id_rsa (backslash) -> EXACT DENY ==="
-# JSON double-backslash represents a single backslash in the JSON string value.
-OUT_F015_1=$(printf '%s\n' '{"tool_name":"Write","tool_input":{"file_path":"C:\\Users\\x\\.ssh\\id_rsa"}}' | node "$POLICY_HOOK" 2>/dev/null || true)
-assert_exact_deny "F015-1: Write C:\\Users\\x\\.ssh\\id_rsa (backslash .ssh path) -> deny" "$OUT_F015_1"
-
-# Case F015-2: D:\app\.env (backslash .env path) → DENY
-echo
-echo "=== F-015-2: Write D:\\app\\.env (backslash) -> EXACT DENY ==="
-OUT_F015_2=$(printf '%s\n' '{"tool_name":"Write","tool_input":{"file_path":"D:\\app\\.env"}}' | node "$POLICY_HOOK" 2>/dev/null || true)
-assert_exact_deny "F015-2: Write D:\\app\\.env (backslash .env path) -> deny" "$OUT_F015_2"
-
-# Case F015-3: ..\secrets.yaml (relative backslash path) → DENY
-echo
-echo "=== F-015-3: Write ..\\secrets.yaml (relative backslash) -> EXACT DENY ==="
-OUT_F015_3=$(printf '%s\n' '{"tool_name":"Write","tool_input":{"file_path":"..\\secrets.yaml"}}' | node "$POLICY_HOOK" 2>/dev/null || true)
-assert_exact_deny "F015-3: Write ..\\secrets.yaml (relative backslash) -> deny" "$OUT_F015_3"
-
-# Case F015-5: forward-slash control still denies (regression guard)
-echo
-echo "=== F-015-5 (regression guard): /home/u/.ssh/id_rsa (forward-slash) still DENIES ==="
-OUT_F015_5=$(printf '%s\n' '{"tool_name":"Write","tool_input":{"file_path":"/home/u/.ssh/id_rsa"}}' | node "$POLICY_HOOK" 2>/dev/null || true)
-assert_exact_deny "F015-5: /home/u/.ssh/id_rsa (forward-slash) -> deny (regression guard)" "$OUT_F015_5"
-
-# Case F015-6: non-sensitive backslash path is NOT denied
-echo
-echo "=== F-015-6: Write C:\\src\\app.py (non-sensitive backslash) -> NODECISION ==="
-OUT_F015_6=$(printf '%s\n' '{"tool_name":"Write","tool_input":{"file_path":"C:\\src\\app.py","content":"x=1"}}' | node "$POLICY_HOOK" 2>/dev/null || true)
-assert_nodecision "F015-6: C:\\src\\app.py (non-sensitive backslash) -> nodecision (not over-denied)" "$OUT_F015_6"
-
 
 # ---------------------------------------------------------------------------
 # ============================================================================
@@ -490,14 +430,6 @@ TMP_F008_RT3=$(make_tmp_with_marker)
 F008_RT3_PAYLOAD='{"tool_name":"mcp__claude_ai_ClickUp__clickup_get_task","tool_input":{}}'
 OUT_F008_RT3=$( ( HOME="$TMP_F008_RT3" node "$DEV_GUARD_HOOK" <<< "$F008_RT3_PAYLOAD" 2>/dev/null ) || true )
 assert_nodecision "F008-RT-3: ClickUp read tool (get_task) -> nodecision (write gate does not over-match reads)" "$OUT_F008_RT3"
-
-
-# ---------------------------------------------------------------------------
-# M3a/M3b/M3c "dual-path parity" (bash-degraded path) RETIRED at the hook
-# Bash->TS cutover (issue #446) — see header note. Their coverage (egress
-# read guard, config-anti-weakening, --no-verify tokenizer including SEC-001
-# evasion forms) is exercised unconditionally by tests/test_policy_block.sh
-# (Suite 1).
 
 # ---------------------------------------------------------------------------
 # Summary
