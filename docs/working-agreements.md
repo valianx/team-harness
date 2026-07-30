@@ -11,8 +11,10 @@
   later release cut is allowed only when the repository explicitly declares `skip-version` or a
   grouped batch/fallback flow. Fragment format: a standard Keep-a-Changelog subsection block (`### Added`,
   `### Changed`, `### Fixed`, `### Security`) with one operator-visible outcome per bullet,
-  capped at 140 characters. Never enumerate services, files, tasks, tests, or implementation
-  layers when they jointly produce one outcome. Slug rule: lowercase branch
+  capped at 140 characters. A small one-outcome change gets exactly one bullet; every bullet
+  is one sentence on one physical Markdown line, with no continuation or explanatory paragraph.
+  Never enumerate services, files, tasks, tests, or implementation layers when they jointly
+  produce one outcome. Assembly copies entry text verbatim and never expands it. Slug rule: lowercase branch
   name with non-alphanumeric characters replaced by hyphens, matching `[a-z0-9-]+`. Direct
   `## [Unreleased]` edits are acceptable as a fallback when `changelog.d/` cannot be used (e.g.,
   pre-convention repos).

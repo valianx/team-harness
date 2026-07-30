@@ -11,16 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Reduced the Adversary prompt by approximately 75% while preserving full frozen-diff coverage,
-  per-control attempts, reachable-precondition evidence, separation from the Stage-1 security
-  review, and operator disposition at STAGE-GATE-3.
-- Removed duplicate project, packet, web, and Knowledge Graph context reads from the audit path and
-  connected its per-control output guidance to the coordinator dispatch.
-- Made a completed `could-not-break` attempt neutral and non-certifying; only material evidence or
-  coverage gaps now set `incomplete_on_changed_control` and surface `concerns`.
-- Replaced stale round fields with explicit `initial | amend-N` audit identities and recoverable,
-  non-overwriting report paths.
-- Limited changelog and tracked-documentation updates to one canonical operator-visible outcome.
+- Reduced Adversary context by 75% while preserving full diff coverage, per-control attempts, and evidence requirements.
+- Limited changelog and documentation updates to concise, canonical operator-visible outcomes.
 
 ## [3.1.1] - 2026-07-30
 
