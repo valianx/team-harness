@@ -953,9 +953,22 @@ Files: `tests/fixtures/dispatch-model.json` (new), `tests/test_dispatch_sequence
 
 File: `tests/test_dispatch_contract_standard.py` (pre-existing, wired into `tests/run-all.sh` for the first time by the pipeline-dispatch-shape plan, T7-AC-7). Structural tests for the canonical dispatch contract (`agents/_shared/dispatch-contract.md`) and its registration sites. Two cardinality assertions in this file were retargeted from exact-count pins to presence-by-name checks (T7-AC-2's invalidation-by-addition case): the `## What a dispatch may carry`/`## What a dispatch must not carry` sections each gained an item under this plan (T4-AC-1's scope-injection prohibition, T4-AC-2's coordinate-in/content-out corollary), which a `len(...) == N` pin would have broken on every legitimate future addition — the retarget asserts each required item present by name instead, retaining the closed-list declaration check unchanged. Pure text/file reads — no network, no agent invocation, no paid spend.
 
-### Suite 183 — gate-addressee-contract
+### Suite 183 — RETIRED (coordinator-fusion, T4-AC-1a)
 
-File: `tests/test_gate_addressee_contract.py` (pre-existing, wired into `tests/run-all.sh` for the first time by the pipeline-dispatch-shape plan, T7-AC-7). Structural tests for the gate-addressee/gate-data change: STAGE-GATE-1/3 and the Express combined gate return structured gate DATA to `th:leader` rather than a pre-rendered ASCII block. Retargeted for this plan (T7-AC-6): STAGE-GATE-2 is retired wholesale (T2-AC-11), so its own slice and every STAGE-GATE-2-scoped assertion are removed; the two slice terminators that named now-deleted headings (`sg1_slice`'s stop at `\n## STAGE-GATE-2`, `sg3_slice`'s stop at `\n---\n\n## Phase 4a`) are re-anchored to the headings that now follow (`## Phase 1.8`, `## Phase 4 — Delivery`) — an unretargeted terminator would have silently WIDENED the slice and kept reporting PASS rather than failing loudly. STAGE-GATE-3's own allowlist, ship-retention precondition, and reject-bare-ship clause are retargeted to their post-T2-AC-10 shape (`override {reason}` and `criticals_count`-conditional withholding retired, no successor). Pure text/file/JSON reads — no network, no agent invocation, no paid spend.
+`tests/test_gate_addressee_contract.py` asserted the gate-addressee/gate-data split: STAGE-GATE-1/3
+and the Express combined gate return structured gate DATA to a second coordinator (`th:leader`),
+which renders the STOP block, while the implementing orchestrator keeps its own rendering only as
+a nested-takeover fallback. The coordinator-fusion migration retires that split in full — one
+coordinator now prepares, presents (renders the STOP block directly to the operator, inline, in
+the same turn) and records every gate itself (`agents/_shared/gate-contract.md § "Prepare, present,
+record — one agent, one turn"`) — so this suite's entire subject disappeared, not merely its
+literal anchors. The floor properties it also touched (a fresh single-use `gate_nonce` at every
+presentation, the dual-record atomicity, the closed per-gate allowlists, STAGE-GATE-1/3's
+unconditional non-skippability, STAGE-GATE-3's mandatory security-decision field enumeration) are
+not uniquely evidenced here: they are asserted directly in `agents/_shared/gate-contract.md`'s own
+already-reconciled prose (frozen, Task-3-owned) and in `tests/test_agent_structure.py`'s own
+overlapping suites (`gate_nonce` at its Task-1 AC-2/inv-b checks). File deleted; `tests/run-all.sh`
+no longer invokes it.
 
 ### Suite 184 — agent-output-contracts
 

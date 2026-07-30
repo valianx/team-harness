@@ -487,19 +487,6 @@ fi
 
 echo
 echo "############################################################"
-echo "# Suite 183: gate-addressee-contract (structured gate data to th:leader)"
-echo "############################################################"
-if [ -z "$PY" ]; then
-    report_skip_or_fail "gate-addressee-contract" "no Python interpreter found (tried python3, python, py -3)"
-elif $PY "$TESTS_DIR/test_gate_addressee_contract.py"; then
-    echo "gate-addressee-contract: PASS"
-else
-    echo "gate-addressee-contract: FAIL"
-    FAILED=$((FAILED + 1))
-fi
-
-echo
-echo "############################################################"
 echo "# Suite 184: agent-output-contracts (per-agent output-contract language)"
 echo "############################################################"
 if [ -z "$PY" ]; then
