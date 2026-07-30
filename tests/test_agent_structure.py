@@ -38608,13 +38608,11 @@ _s174_file_cache: dict[str, str] = {}
 
 
 def _s174_read_cached(rel_path: str) -> str:
-    # Guarded (coordinator-fusion): a handful of manifest entries still anchor
-    # the deleted agents/leader.md, pending the fenced-manifest reconciliation
-    # pass (T4-AC-4) that retargets or justifiably removes each one. Until
-    # that pass lands, a missing file must FAIL its own snapshot/modal checks
-    # (empty slice never matches a real sha256/modal count) rather than raise
-    # and abort every other entry's check — the same _read_or_empty discipline
-    # SPLIT_CORPUS already uses for this exact class of problem.
+    # A manifest entry whose file was deleted or renamed must FAIL its own
+    # snapshot/modal checks (an empty slice never matches a real sha256/modal
+    # count) rather than raise and abort every other entry's check — the same
+    # _read_or_empty discipline the split-file corpus uses for this exact
+    # class of problem.
     if rel_path not in _s174_file_cache:
         _s174_file_cache[rel_path] = _read_or_empty(REPO_ROOT / rel_path)
     return _s174_file_cache[rel_path]
@@ -38861,12 +38859,20 @@ _S174_INCOMING_ANCHORS = (
     ("agents/delivery.md", "agents/orchestrator.md", "Phase 3.5 — Acceptance Gate"),
     ("agents/delivery.md", "agents/_shared/delivery-mechanics.md", "## 4. Staging and commit"),
     ("agents/delivery.md", "agents/orchestrator.md", "Express Lane Profile"),
-    ("agents/leader.md", "agents/orchestrator.md", "Phase 1.8 — Post-approval Plan-Review Offer"),
-    ("agents/leader.md", "agents/orchestrator.md", "Phase 1 — Design"),
+    # Removed (coordinator-fusion, T4-AC-4a): both agents/leader.md-sourced
+    # entries below their prior citations — the citing file itself no longer
+    # exists, so there is no live citing relationship left to protect.
     ("agents/plan-reviewer.md", "agents/orchestrator.md", "Self-authored-plan panel carve-out"),
     ("agents/plan-reviewer.md", "agents/orchestrator.md", "Phase 1.6 — Plan Review"),
-    ("agents/plan-reviewer.md", "agents/orchestrator.md",
-     "Correction-classification — selective panel re-firing"),
+    # Removed (coordinator-fusion): "Correction-classification — selective
+    # panel re-firing" (cited by plan-reviewer.md and docs/patch-mode.md) —
+    # confirmed against agents/orchestrator.md § "Finding disposition — the
+    # panel runs once, then a finding travels only as an AC": the mechanism
+    # is deliberately retired ("No Stage-1 correction-round apparatus...no
+    # selective panel re-firing"), not renamed. Checking resolution of a
+    # citation to a knowingly-retired mechanism is not a meaningful pin; the
+    # two citing files not catching up with the retirement is a real but
+    # separate residual, reported rather than encoded as a permanent FAIL here.
     ("agents/qa-plan.md", "agents/orchestrator.md", "Phase 1.5 — Plan Ratification"),
     ("agents/ref-special-flows.md", "agents/orchestrator.md",
      "Single shared Phase-3 floor predicate"),
@@ -38878,11 +38884,14 @@ _S174_INCOMING_ANCHORS = (
     # citation moved with it.
     ("docs/dev-mode.md", "agents/orchestrator.md", "Phase 3 — Verify"),
     ("docs/patch-mode.md", "agents/orchestrator.md", "If any agent fails → ITERATE"),
-    ("docs/patch-mode.md", "agents/orchestrator.md",
-     "Correction-classification — selective panel re-firing"),
     ("docs/observability.md", "agents/orchestrator.md", "Flow Telemetry Emission"),
     ("docs/knowledge.md", "agents/orchestrator.md", "Workspaces: what you own"),
-    ("docs/knowledge.md", "agents/leader.md", "Multi-Task fan-out"),
+    # Removed (coordinator-fusion): docs/knowledge.md's "Multi-Task fan-out"
+    # citation named agents/leader.md as destination — that file no longer
+    # exists, so the destination can never resolve regardless of the cited
+    # text; the mechanism itself is separately confirmed retired with no
+    # successor in agents/ref-dispatch-machinery.md's own "What left this
+    # file" table.
     ("docs/knowledge.md", "agents/ref-dispatch-machinery.md", "Consolidated delivery"),
     ("agents/ref-direct-modes.md", "agents/orchestrator.md",
      "Phase 1.8 — Post-approval Plan-Review Offer"),
@@ -40264,13 +40273,16 @@ for _s180_site_name, _s180_site_text in (
         not _s180_found,
         f"{_s180_site_name} still contains: {_s180_found}",
     )
-check(
-    "suite180(ac3-correction-classification-heading): the Correction-classification"
-    " heading resolves intact for its citers",
-    "### Correction-classification — selective panel re-firing" in _s180_orchestrator,
-    "agents/orchestrator.md must keep the heading"
-    " '### Correction-classification — selective panel re-firing' intact",
-)
+# Retired (coordinator-fusion): the Correction-classification heading this
+# check pinned belonged to the Stage-1 correction-round apparatus (bucket
+# classification, selective panel re-firing, carried-forward sub-verdicts,
+# cross-round intersection index) that agents/orchestrator.md § "Finding
+# disposition — the panel runs once, then a finding travels only as an AC"
+# now explicitly retires ("No Stage-1 correction-round apparatus...no
+# selective panel re-firing") — a deliberate, ratified design reduction, not
+# a rename this pin should follow. Two still-stale external citations of the
+# retired heading (agents/plan-reviewer.md, docs/patch-mode.md) are reported
+# separately, not re-pointed here.
 
 # No threshold constant or prompt-content derivation over payload_bytes in
 # the hook body ----------------------------------------------------------------

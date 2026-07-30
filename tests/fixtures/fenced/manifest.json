@@ -3,9 +3,9 @@
     "id": "orch-gate-handling",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "## Gate handling \u2014 you prepare and record; th:leader presents and relays",
-    "sha256": "dd7e2a16b2811daed78638109c44bc9821baff252bad0ee80cb068f1b26ababc",
-    "length": 5503,
+    "anchor": "## Gates",
+    "sha256": "c4bf0b2e250bfa903c9a14ff6393d1c660872f7ec97f604ac877ab0faef3747c",
+    "length": 2729,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -18,9 +18,9 @@
     "id": "orch-no-capability-fallback",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "### No capability-check fallback",
-    "sha256": "a856207deb4cfaef2900395024b47164ae1f7affa7cb4f02607081c875a5f8dc",
-    "length": 501,
+    "anchor": "## No capability-check fallback",
+    "sha256": "9a33a740be8b7bf7e3e5ee1485add528200d357f397536f5990132c014d4ebf7",
+    "length": 602,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -34,12 +34,12 @@
     "file": "agents/orchestrator.md",
     "mode": "heading",
     "anchor": "## Dispatch invariants (read first, never weaken)",
-    "sha256": "1c833f4168205717b6336879cd72813b4403f6ab1600ee66145fc3b4220cf713",
-    "length": 4043,
+    "sha256": "5d5ef96fa4f767c2bc4a85429e96032be67cf8f8830cb75da1785331338602f6",
+    "length": 4125,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
-      "NEVER": 1,
+      "NEVER": 0,
       "unconditionally": 0,
       "non-waivable": 0
     }
@@ -48,9 +48,9 @@
     "id": "orch-artifact-verification",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "### Artifact Verification Protocol",
-    "sha256": "36ec6f7e16506d1ff057dee667c1ab5c2f63c776b9ec478569e72be155e3f1ff",
-    "length": 1395,
+    "anchor": "### Artifact verification",
+    "sha256": "8a6fb0805442d533250fba2fda628db8ea425f37e4db5055be496a735976843c",
+    "length": 1105,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -63,9 +63,9 @@
     "id": "orch-final-sanity-check",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "### Final Pipeline Sanity Check",
-    "sha256": "ce9846813d78f7dbb37016a95e864d1631d9fb1239c82a2fafa5645eb8a99302",
-    "length": 983,
+    "anchor": "### Final sanity check",
+    "sha256": "fd8cc40c9a955972c0af90c6e6f28927af775e4945b695f40aabc39af0e66f68",
+    "length": 742,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -78,24 +78,24 @@
     "id": "orch-security-on-express",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "### Security on express (SEC-DR5-01 \u2014 mandatory, stated directly, never inferred)",
-    "sha256": "6a699356b2b14ab025cc5e162b836faa0cffc43fd824c7222986066ebc7dcc20",
-    "length": 1487,
+    "anchor": "### Security on express \u2014 stated directly, never inferred",
+    "sha256": "4b2e4acc446df5f48a598243de2791400c1449a0388bd679cc735b8ac4538914",
+    "length": 704,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
       "NEVER": 0,
       "unconditionally": 0,
-      "non-waivable": 1
+      "non-waivable": 0
     }
   },
   {
     "id": "orch-express-combined-gate",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "### Express combined gate (replaces STAGE-GATE-1 and STAGE-GATE-3)",
-    "sha256": "c2902e8726d6f3b45d95ef29792b60430dd3495e8c7a7b3ab26702e2c4b84aad",
-    "length": 4430,
+    "anchor": "### The combined gate",
+    "sha256": "64301fe5dee180f1b3a02549fed1c1d06bd369f4fa4e75a0a9753866ee982196",
+    "length": 2130,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -107,25 +107,26 @@
   {
     "id": "orch-gate-guard-express",
     "file": "agents/orchestrator.md",
-    "mode": "heading",
-    "anchor": "### `gate-guard` on express (no reorder, no deadlock \u2014 AC-5)",
-    "sha256": "2c88bea619d9e0f205b3c159ba3e07641a54cabf9377be54d7bce6897da072d2",
-    "length": 867,
+    "mode": "literal",
+    "sha256": "96c217ddd54f074d086558ed4abe5e683b607bb642c8bdd8ac1971b99b4bc828",
+    "length": 217,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
       "NEVER": 0,
       "unconditionally": 0,
       "non-waivable": 0
-    }
+    },
+    "start": "**No reorder, no deadlock.**",
+    "end": "\n\n## Pipeline flow"
   },
   {
     "id": "orch-plan-structure-scan",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "## Phase 1.5a \u2014 Plan-Structure Scan (deterministic, T2-AC-14)",
-    "sha256": "adde934992bbd10d5611b42a614ba9cebbe4c8e5a6444c2fa84f15dff0b90cc6",
-    "length": 2530,
+    "anchor": "## Phase 1.5a \u2014 Plan-structure scan (deterministic)",
+    "sha256": "88bf9c6191a74bbca36a4b5a2a57a72f3d6fe110c22602b174d98698fdf04eb6",
+    "length": 1135,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -138,12 +139,12 @@
     "id": "orch-phase16-plan-review",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "## Phase 1.6 \u2014 Plan Review (Stage 1 closing gate)",
-    "sha256": "1dbab61a5e5cf4d8122a3b5ef0c247111f84c20b806835061505b6a2cfb15203",
-    "length": 11146,
+    "anchor": "## Phase 1.6 \u2014 Plan Review",
+    "sha256": "814019ad4987190499c78ebeedde5dcf42131693696d66e1efaa8b1d74d21e62",
+    "length": 4631,
     "modal_counts": {
       "MUST NOT": 0,
-      "MUST": 1,
+      "MUST": 0,
       "NEVER": 0,
       "unconditionally": 0,
       "non-waivable": 0
@@ -153,24 +154,9 @@
     "id": "orch-stage-gate-1",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "## STAGE-GATE-1 \u2014 End of Stage 1 (mandatory human review)",
-    "sha256": "59f1c70951bb0344591ec36bf1321eefd4e3dd107b7a6f53095f881dcabe3bb1",
-    "length": 13220,
-    "modal_counts": {
-      "MUST NOT": 0,
-      "MUST": 0,
-      "NEVER": 1,
-      "unconditionally": 1,
-      "non-waivable": 0
-    }
-  },
-  {
-    "id": "orch-phase2close-backstop",
-    "file": "agents/orchestrator.md",
-    "mode": "heading",
-    "anchor": "### Phase 2-close `security_sensitive` backstop (all task types, mandatory, before Phase 3)",
-    "sha256": "70704ef6ebe9af179f08ec79cba92021b29d27e1eee02610fae31b99b94d61c2",
-    "length": 10904,
+    "anchor": "## STAGE-GATE-1",
+    "sha256": "be2c41ce0eac6d11928fa91efa493900090fc02882a34134faebb372e4890dc5",
+    "length": 5464,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -180,12 +166,28 @@
     }
   },
   {
+    "id": "orch-phase2close-backstop",
+    "file": "agents/orchestrator.md",
+    "mode": "literal",
+    "sha256": "16bc2268bccb15be317e1aa974be264a7b572917a98b04ad931d71029648e64a",
+    "length": 3583,
+    "modal_counts": {
+      "MUST NOT": 0,
+      "MUST": 0,
+      "NEVER": 0,
+      "unconditionally": 1,
+      "non-waivable": 0
+    },
+    "start": "**3. `security_sensitive` backstop",
+    "end": "\n\n### Commit-integrity check"
+  },
+  {
     "id": "orch-phase26-code-hygiene",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "## Phase 2.6 \u2014 Code-Hygiene Scan",
-    "sha256": "a702f4e2d383dcfa2b7b0bdf7628d31ac9fdf77013bfcfe656c80deba6ab10c9",
-    "length": 1817,
+    "anchor": "## Phase 2.6 \u2014 Code-hygiene scan",
+    "sha256": "1b66aa6a754609e6d0c775d5fb5788bdcae5b2acc56e0f9d803cd2da1b8d3137",
+    "length": 910,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -198,13 +200,13 @@
     "id": "orch-phase3-floor-predicate",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "### Single shared Phase-3 floor predicate (T2-AC-10)",
-    "sha256": "b9728ddecbce407da3504496a22d163c788c324e2936f5698303afa6c1597a66",
-    "length": 4443,
+    "anchor": "### The single floor predicate",
+    "sha256": "b8b42088f71b1d0396f61d84099dd97c6a4fb918061f14533c1a8c077abaaa59",
+    "length": 1215,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
-      "NEVER": 1,
+      "NEVER": 0,
       "unconditionally": 0,
       "non-waivable": 0
     }
@@ -213,9 +215,9 @@
     "id": "orch-phase35-acceptance-gate",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "## Phase 3.5 \u2014 Acceptance Gate (MANDATORY before Delivery)",
-    "sha256": "c4f1ae92810d3c208d6aebc1361c5c01d33d2c077ad0c6f2dbb77e12a1e7204d",
-    "length": 2344,
+    "anchor": "## Phase 3.5 \u2014 Acceptance gate",
+    "sha256": "4342a1f264f948e58a758e81646742c4ddf2e86fd3f85a7992cc0e32d5786cb8",
+    "length": 1860,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -228,9 +230,9 @@
     "id": "orch-kg-write-audit",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "### KG write on Pre-Delivery Security Audit findings",
-    "sha256": "910a3ce2a7d5b6287bf47202a7f081ce6471e8016af32979e1b0348adaee4675",
-    "length": 2004,
+    "anchor": "### Knowledge write on audit findings",
+    "sha256": "c564feef908eb3b2535548d4782daf43fc0aebeee3935d8dce573433a1589a3f",
+    "length": 920,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -243,13 +245,13 @@
     "id": "orch-stage-gate-3",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "## STAGE-GATE-3 \u2014 End of Stage 3 (mandatory human approval before push)",
-    "sha256": "12e4ad767740fb4bd25f36cb320f693f7e49a9283fe714298895014d972a013b",
-    "length": 5701,
+    "anchor": "## STAGE-GATE-3",
+    "sha256": "e4fd936843e97b0534dab1d6d0db60ba27ce76530dd97f510d13117dcc4fbd76",
+    "length": 3414,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
-      "NEVER": 1,
+      "NEVER": 0,
       "unconditionally": 0,
       "non-waivable": 0
     }
@@ -258,13 +260,13 @@
     "id": "orch-autonomous-mode",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "## Autonomous Mode",
-    "sha256": "e2702da3cedb7c7cf96cd940aad5a9bf4979980bdd947f7fe3806fa4eabb9213",
-    "length": 930,
+    "anchor": "## Autonomous mode",
+    "sha256": "6f0d8d8ec3f907871cf18d52475912982b83286ecec73a80dc4576b76e3f86b6",
+    "length": 703,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
-      "NEVER": 1,
+      "NEVER": 0,
       "unconditionally": 0,
       "non-waivable": 0
     }
@@ -273,9 +275,9 @@
     "id": "orch-stage-gate-reconciliation",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "### Stage-gate reconciliation backstop (self-healing emission)",
-    "sha256": "d6b3384fd564e05f8932b8ad2717fa2cc5fb7158d8f8dd2eff49fbf9e66ee512",
-    "length": 387,
+    "anchor": "### Reconciliation backstop",
+    "sha256": "2a3422464ed162f6833c39c6297c1d41ba9415ee4ace9db7175abdba2dc2e96c",
+    "length": 318,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -288,74 +290,14 @@
     "id": "orch-to-specialists",
     "file": "agents/orchestrator.md",
     "mode": "heading",
-    "anchor": "### To specialists \u2014 always include in every invocation:",
-    "sha256": "1f8f67c542ea3f201727199f5d5e2c0984347097f5cecedaaccc0ef991d482ed",
-    "length": 2651,
+    "anchor": "### To specialists",
+    "sha256": "4e98130aac13069bdd515ba4fecd3f1339ad66f903054dd02f01bcec9610bf69",
+    "length": 1423,
     "modal_counts": {
       "MUST NOT": 0,
-      "MUST": 1,
+      "MUST": 0,
       "NEVER": 0,
       "unconditionally": 1,
-      "non-waivable": 0
-    }
-  },
-  {
-    "id": "leader-gate-mediation",
-    "file": "agents/leader.md",
-    "mode": "heading",
-    "anchor": "## Gate mediation \u2014 you present gates inline and relay decisions with attribution",
-    "sha256": "78088f4c0e2a9d73f9e39f3647ce6c41a70002e1948be42885730d53dcc8bb0a",
-    "length": 5234,
-    "modal_counts": {
-      "MUST NOT": 0,
-      "MUST": 0,
-      "NEVER": 0,
-      "unconditionally": 0,
-      "non-waivable": 0
-    }
-  },
-  {
-    "id": "leader-gate-presentation-protocol",
-    "file": "agents/leader.md",
-    "mode": "heading",
-    "anchor": "### Gate presentation protocol (your gate-facing behaviour)",
-    "sha256": "f38687f4c8547fe02999c2ef202a42103b32d2a493dd249487388233a4d844b1",
-    "length": 3941,
-    "modal_counts": {
-      "MUST NOT": 0,
-      "MUST": 0,
-      "NEVER": 0,
-      "unconditionally": 0,
-      "non-waivable": 0
-    }
-  },
-  {
-    "id": "leader-boot-capability-check",
-    "file": "agents/leader.md",
-    "mode": "heading",
-    "anchor": "## Boot capability check (AC-2.6)",
-    "sha256": "2967bc3303c7acc21df03610d654158cb5ffbbcc51f9a1a87533c1ff711c1e90",
-    "length": 7002,
-    "modal_counts": {
-      "MUST NOT": 0,
-      "MUST": 0,
-      "NEVER": 2,
-      "unconditionally": 0,
-      "non-waivable": 0
-    }
-  },
-  {
-    "id": "leader-dispatch-invariants",
-    "file": "agents/leader.md",
-    "mode": "heading",
-    "anchor": "## Dispatch invariants (read first, never weaken)",
-    "sha256": "75bd50b994b377378efe7264e696e4e638cc1ec3d7fee105c56a69b6ea291b97",
-    "length": 3435,
-    "modal_counts": {
-      "MUST NOT": 0,
-      "MUST": 1,
-      "NEVER": 1,
-      "unconditionally": 0,
       "non-waivable": 0
     }
   },
@@ -363,9 +305,9 @@
     "id": "leader-repo-identity-verification",
     "file": "agents/ref-dispatch-machinery.md",
     "mode": "heading",
-    "anchor": "## Repo-identity verification and orchestrator multiplication (AC-2.7)",
-    "sha256": "4fa19395385b2d117fba23296fe1276a78e83e7ed9fb7550b95d221c5372614f",
-    "length": 2591,
+    "anchor": "## Repo-identity verification",
+    "sha256": "31f00883cf1256a21780a552c619667b8ec80b03cf8e27a76451ece8bb26822c",
+    "length": 432,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -376,56 +318,59 @@
   },
   {
     "id": "leader-verify-real-scope",
-    "file": "agents/leader.md",
-    "mode": "heading",
-    "anchor": "### Step 1.5 \u2014 Verify real scope of external reports",
-    "sha256": "72fc03be10c122c1f3a453ea439b9792c9b3bb8f67a761edb76b0713da1569e1",
-    "length": 650,
+    "file": "agents/orchestrator.md",
+    "mode": "literal",
+    "sha256": "b03bf5c69feaa88e140f44e5daa1a97a9ab5b2a7f558fab84ecb87c139a399f3",
+    "length": 533,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
       "NEVER": 0,
       "unconditionally": 0,
       "non-waivable": 0
-    }
+    },
+    "start": "**1.5 \u2014 Verify the real scope of an external report.**",
+    "end": "\n\n**2 \u2014"
   },
   {
     "id": "leader-spawning-payload-contract",
     "file": "agents/ref-dispatch-machinery.md",
-    "mode": "heading",
-    "anchor": "## Spawning an orchestrator \u2014 the payload contract",
-    "sha256": "a76b4f3f088686f593009daa2d0e2fa6f5c7366493621b1c2eacb97eeba1fa00",
-    "length": 4050,
+    "mode": "literal",
+    "sha256": "cc181d052b766b0db630013b3db4906d7cde1ebd2d035f13f4804dec817942a7",
+    "length": 117,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
       "NEVER": 0,
       "unconditionally": 0,
       "non-waivable": 0
-    }
+    },
+    "start": "| The coordinator spawn-payload contract | there is no spawn",
+    "end": "\n"
   },
   {
     "id": "leader-multitask-fanout",
     "file": "agents/ref-dispatch-machinery.md",
-    "mode": "heading",
-    "anchor": "## Multi-Task fan-out (same-repo, single project, 2+ tasks) \u2014 DEFAULT for 2+ tasks",
-    "sha256": "3c2483a0ab3fadb5080fcc3b7552b91002178e0fc6ecee5304ee943c73bf992a",
-    "length": 6321,
+    "mode": "literal",
+    "sha256": "e1f2dfc903bf5290c0a62c716d08eb5d5f0cb3d2ce7dfc91e1feeb6fec4bd8f5",
+    "length": 204,
     "modal_counts": {
       "MUST NOT": 0,
-      "MUST": 1,
+      "MUST": 0,
       "NEVER": 0,
       "unconditionally": 0,
       "non-waivable": 0
-    }
+    },
+    "start": "| Multi-Task fan-out and its consolidator contract |",
+    "end": "\n"
   },
   {
     "id": "leader-parallel-multiproject",
     "file": "agents/ref-dispatch-machinery.md",
     "mode": "heading",
-    "anchor": "## Parallel Multi-Project Dispatch (initiative, N \u2265 2 distinct repos)",
-    "sha256": "43f9522c87be39930a31eb59bd264874ad43ab63e46006dbe3715b1220497492",
-    "length": 3628,
+    "anchor": "## Multi-project sequencing",
+    "sha256": "ad7cc6f287c0b27604056b2714c897dff09a2f1a8fc0c0d2014d3f974043168e",
+    "length": 1929,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -499,8 +444,8 @@
     "file": "agents/delivery.md",
     "mode": "heading",
     "anchor": "## Return Protocol",
-    "sha256": "44ecdf7217fbb8ec2200b91139e2c572aa0465de7b1fc5a4c108f2e7bbc1ebf3",
-    "length": 3389,
+    "sha256": "f34a741915cc3936fdcb9c99748346c22f2ec7e919580dfe88c8c4a25c46e785",
+    "length": 3382,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -574,8 +519,8 @@
     "file": "agents/architect.md",
     "mode": "heading",
     "anchor": "### Channel 3 \u2014 Stale external-report scope (architect \u2192 plan)",
-    "sha256": "2c2382584c6bba3c9bc31a04b6a6dfc12547f5da09f8cbad294b2fa8c5ce3333",
-    "length": 1217,
+    "sha256": "215915a0dfd19ab1bb0cf3cf4eed1576ca85c5828ce7d22289de908dd56af499",
+    "length": 1232,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -589,8 +534,8 @@
     "file": "agents/architect.md",
     "mode": "heading",
     "anchor": "## Return Protocol",
-    "sha256": "1f8ffed7efc1cb7c111acdf1d1bc71948fa5b3280df8ae358f95a05ddabb073f",
-    "length": 7378,
+    "sha256": "a0ff8b3db28d2957a138a618aa1bfc978114b89069d4225cc401b918ffa53a33",
+    "length": 7388,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -664,8 +609,8 @@
     "file": "CLAUDE.md",
     "mode": "heading",
     "anchor": "## 5. Architectural Conventions",
-    "sha256": "647ce204de3d542fc2958e412c9553e06a9c5f4c587cf3fbb6a87adfcc6eb6c2",
-    "length": 8536,
+    "sha256": "2dea1cf6ca347afef039af6d9edd150f8f04b5a91131e8bb24604443c738a740",
+    "length": 8566,
     "modal_counts": {
       "MUST NOT": 1,
       "MUST": 1,
@@ -724,8 +669,8 @@
     "file": "CLAUDE.md",
     "mode": "heading",
     "anchor": "### 6.6 Untrusted content & prompt-injection floor",
-    "sha256": "5758988da85dc69ef2377469cca1ebf0235a2729b60c5ba207d9c4c3e73e5a69",
-    "length": 2550,
+    "sha256": "bb1c1fa3b93649ad2ab6c2830befcedcf157a8c8ae43893f0afebcd5e538714d",
+    "length": 2557,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -754,11 +699,11 @@
     "file": "CLAUDE.md",
     "mode": "heading",
     "anchor": "## 14. Subagent Orchestration",
-    "sha256": "e33d4de3758fe04688b38c8b8394168af3ebc17c04cda79a99f694104d971f7f",
-    "length": 2044,
+    "sha256": "c8204edc882737b619ad1caeee5d8ea9da5952f10101d5953c04896541bd5009",
+    "length": 1857,
     "modal_counts": {
       "MUST NOT": 0,
-      "MUST": 1,
+      "MUST": 0,
       "NEVER": 0,
       "unconditionally": 1,
       "non-waivable": 0
@@ -784,8 +729,8 @@
     "file": "docs/pipeline-lanes.md",
     "mode": "heading",
     "anchor": "## 2a. What counts as a sensitive path (type-agnostic)",
-    "sha256": "2274ad6dc9939bc5e5e4c867f1f6e02582de280357f93243cc9ea87767bfafd4",
-    "length": 3104,
+    "sha256": "67a4856df6a970c0504f9dd79e79bb1cc0d49e7615ef66b5f6565e2192cfc348",
+    "length": 3017,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -829,8 +774,8 @@
     "file": "docs/dev-mode.md",
     "mode": "heading",
     "anchor": "## Security Floor Non-Waivability (SEC-DR-3)",
-    "sha256": "c16d7c7ddd9f2773349a59ef2ab8c3067c23797efb869fd7a73b13306f3c9b9b",
-    "length": 1177,
+    "sha256": "69cbc8515ae7fdede6c70ed72875b4bd1258e88e81b454346823f7883c62ddc4",
+    "length": 1227,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -918,8 +863,8 @@
     "id": "gate-contract-whole",
     "file": "agents/_shared/gate-contract.md",
     "mode": "file",
-    "sha256": "2b0cbe7a056876214f5b40dbb44425a41c3519af07b7888148beda20e441eb38",
-    "length": 29669,
+    "sha256": "25b35b4ebe4a9920d9264b5e324de45dd6b232cbbc13a6bdb183d0f85c9a974a",
+    "length": 29068,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -932,8 +877,8 @@
     "id": "kg-write-policy-whole",
     "file": "agents/_shared/kg-write-policy.md",
     "mode": "file",
-    "sha256": "23ca1989200ec5cb59cf7351477d6dfb48bbb7ced19241586ff1fd788a9d7f67",
-    "length": 10809,
+    "sha256": "6c56cf1098899c71b967ef0e252321f476ff5a0246ff387b76df5d4f6190dc8e",
+    "length": 10783,
     "modal_counts": {
       "MUST NOT": 0,
       "MUST": 0,
@@ -960,11 +905,11 @@
     "id": "managed-block-orch-dispatch-whole",
     "file": "skills/setup/managed-blocks/orchestrator-dispatch-rule.md",
     "mode": "file",
-    "sha256": "db68aac2d87c1da3c6513059e8115f7a120f54f481704b3ac8d2afe958d1bc1e",
-    "length": 8320,
+    "sha256": "efca0c49ba7787ae59febaa08f9b96fc2b4c9b3a1bc01ee5393fb623478276a4",
+    "length": 8080,
     "modal_counts": {
       "MUST NOT": 0,
-      "MUST": 1,
+      "MUST": 0,
       "NEVER": 0,
       "unconditionally": 1,
       "non-waivable": 1
