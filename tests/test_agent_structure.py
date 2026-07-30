@@ -38402,7 +38402,6 @@ _s173_setup_model = read(REPO_ROOT / "docs" / "setup-update-model.md")
 _s173_perm_prov = read(REPO_ROOT / "docs" / "permission-provisioning.md")
 _s173_setup_skill = read(SKILLS_DIR / "setup" / "SKILL.md")
 _s173_update_skill = read(SKILLS_DIR / "update" / "SKILL.md")
-_s173_leader = read(AGENTS_DIR / "leader.md")
 _s173_claude = read(REPO_ROOT / "CLAUDE.md")
 _s173_suborch = read(REPO_ROOT / "docs" / "subagent-orchestration.md")
 _s173_troubleshooting = read(REPO_ROOT / "docs" / "troubleshooting.md")
@@ -38501,29 +38500,20 @@ check(
     " the two mechanisms disjoint",
 )
 
-# --- AC-8: leader.md boot-check message names cause + remedy, without
-# touching the fenced version-floor STOP text -------------------------------
-_S173_BOOT_ANCHOR = "## Boot capability check (AC-2.6)"
-_s173_boot_slice = _slice_section(_s173_leader, _S173_BOOT_ANCHOR, _S173_STOP_H2)
-check(
-    "suite173(ac8-boot-check-names-cause): leader.md boot-check message names"
-    " the env var, the value, and both lifecycle commands",
-    _S173_ENV_KEY in _s173_boot_slice
-    and '"2"' in _s173_boot_slice
-    and "/th:setup" in _s173_boot_slice
-    and "/th:update" in _s173_boot_slice,
-    f"agents/leader.md § {_S173_BOOT_ANCHOR} must name {_S173_ENV_KEY}, the"
-    ' value "2", and both /th:setup and /th:update as the remedy',
-)
-check(
-    "suite173(ac8-fenced-version-floor-untouched): the pre-existing CC"
-    " version-floor STOP text is preserved verbatim",
-    "This version of team-harness requires Claude Code" in _s173_boot_slice
-    and "v2.1.199" in _s173_boot_slice,
-    f"agents/leader.md § {_S173_BOOT_ANCHOR} must still contain the original"
-    " v2.1.199 version-floor STOP message — Task-5 may only add a second,"
-    " distinct message, never replace the first",
-)
+# RETIRED (coordinator-fusion, T4-AC-1b). Both checks asserted content of the
+# "## Boot capability check (AC-2.6)" section — the two-coordinator handoff
+# verification (leader confirming it could resume a dormant orchestrator
+# subagent, floored at Claude Code >= v2.1.199) and its cause/remedy message
+# for the subagent-nesting-depth prerequisite. orchestrator.md's own "##
+# No capability-check fallback" section states this explicitly: "A prior
+# revision of this contract carried a boot-time check that verified two
+# coordinators could hand off to each other and STOPped rather than degrade
+# to a single agent running the pipeline inline — that check's subject no
+# longer exists, so it is not carried forward." One coordinator runs the
+# file end to end with no handoff to verify, so there is no boot-time
+# capability check left to name a cause/remedy for, and no v2.1.199 floor
+# tied to that specific handoff scenario to preserve. Not relocated —
+# genuinely retired, per the file's own retirement note.
 
 # --- AC-14: nesting framed as configurable at every Class-A site, and the
 # stale exclusive-opencode framing is gone -----------------------------------
@@ -38653,8 +38643,15 @@ _s174_file_cache: dict[str, str] = {}
 
 
 def _s174_read_cached(rel_path: str) -> str:
+    # Guarded (coordinator-fusion): a handful of manifest entries still anchor
+    # the deleted agents/leader.md, pending the fenced-manifest reconciliation
+    # pass (T4-AC-4) that retargets or justifiably removes each one. Until
+    # that pass lands, a missing file must FAIL its own snapshot/modal checks
+    # (empty slice never matches a real sha256/modal count) rather than raise
+    # and abort every other entry's check — the same _read_or_empty discipline
+    # SPLIT_CORPUS already uses for this exact class of problem.
     if rel_path not in _s174_file_cache:
-        _s174_file_cache[rel_path] = read(REPO_ROOT / rel_path)
+        _s174_file_cache[rel_path] = _read_or_empty(REPO_ROOT / rel_path)
     return _s174_file_cache[rel_path]
 
 
@@ -39085,7 +39082,9 @@ for _s175_path in sorted(AGENTS_DIR.glob("*.md")):
 
 # --- Regression pins: the agents corrected by this task keep zero unused
 # grants (the trim this task performed does not regress on a future edit) ---
-for _s175_fixed_agent in ("leader", "adversary"):
+# coordinator-fusion: "leader" retired — orchestrator absorbed its checks,
+# already covered by the glob loop above.
+for _s175_fixed_agent in ("adversary",):
     _s175_text = read(AGENTS_DIR / f"{_s175_fixed_agent}.md")
     _s175_unused_fixed = _s175_unused_mcp_grants(
         _s175_frontmatter_block(_s175_text), _s175_body(_s175_text)
