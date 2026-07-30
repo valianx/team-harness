@@ -103,9 +103,7 @@ If the file you are about to overwrite is already very large (>30 KB or >800 lin
 
    **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 
-3. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
-
-3. **Ensure `.gitignore` includes `workspaces`** — check and add `/workspaces` if missing.
+3. **The workspace must already exist.** The orchestrator creates it before dispatching you, and `.gitignore` coverage is its concern, not yours — editing `.gitignore` would be touching product configuration, which your boundary forbids. If the folder is absent, do not create it: return `status: blocked` with `failure_kind: artifact-missing` and the path you looked for.
 
 4. **Write your output** to the appropriate file based on operating mode (see below).
 
@@ -557,7 +555,7 @@ Structurally identical to the feature-flow plan schema (see "Design Mode — Pla
 
 **Root-Cause classification.** Because root-cause mode's `01-plan.md § Review Summary` inherits the same `### Classification block` subsection as Design mode ("Structurally identical" above), it carries the same nine values — including `changes_security_control: true|false` — set per "Phase 2 — Plan Sketches (Design Mode) § Step 1" (the "(Design Mode)" heading label is historical; the mandate there explicitly covers `fix` Tier 2-4, i.e., every root-cause dispatch that reaches the classification step). Apply the same fail-closed default and the same diff-grounded justification requirement for a `false` declaration on a `security_sensitive: true` bug fix — a mischaracterized regression fix is exactly the kind of change the field exists to catch.
 
-**Minimum task list size:** even for a trivial fix, the `## Task List` section contains at minimum 4 lines (reproduce, root-cause confirm, regression test, fix, verify). `01-plan.md` is always produced for a `type: fix` dispatch, never stripped.
+**Required capabilities, not a line count.** The `## Task List` covers three things, which may be combined into as few tasks as the fix genuinely needs: **confirm the mechanism**, **apply the correction**, **verify the result** — plus authoring the regression test when one is required (§ "Regression Test Approach"). A trivial fix may close all of them in one task; a line minimum would only pad it, which fights the point of a light root-cause. `01-plan.md` is always produced for a `type: fix` dispatch, never stripped.
 
 `type: hotfix` is not your concern: you are never dispatched for it (see the mode's own preamble above). The hotfix plan is authored inline by the coordinator, which owns that flow end to end — `agents/ref-special-flows.md § Hotfix sub-flow` is its single authority. Describing a mode you are never dispatched into creates a second source that drifts from the first.
 
@@ -837,7 +835,14 @@ The scope-freeze gate fires ONLY on re-dispatch — never on the initial design 
 - **`known-at-freeze`** — the wider scope was knowable from the information available at the original freeze point (a file you could have named, a service you could have identified) but was missed or under-scoped at the time. Surfaces to the operator as a lightweight STOP rather than being silently re-planned.
 - **`new-information`** — the wider scope became visible only through discovery genuinely unavailable at freeze time (a hidden coupling, an undocumented dependency, a defect only visible once implementation started). Allowed to proceed; the orchestrator counts it against its own bounded scope-expansion budget (max 2) — tracking that budget is the orchestrator's responsibility, not yours.
 
-Declare `scope_expansion: new-information | known-at-freeze` plus a one-line `scope_expansion_rationale` in your status block, and re-declare `scope_frozen` with the new boundary — the plan you just wrote re-freezes the scope for any subsequent re-dispatch.
+Classify **before writing anything**, and let the classification decide whether you may write at all:
+
+| Classification | Condition | May you write the plan? | Return |
+|---|---|---|---|
+| `new-information` | genuinely unknowable at the freeze point | **yes** — write it, then re-declare `scope_frozen` at the new boundary | `status: success` |
+| `known-at-freeze` | knowable when the scope was frozen — a planning miss | **no** | `status: blocked`, `failure_kind: contradiction`, plus `proposed_scope: {files: N, services: [...], ac: N}` |
+
+On `known-at-freeze` the point is to show the operator the omission before it is absorbed. Writing the plan first and asking afterwards presents a mutated artifact as the basis for the decision, which is the opposite of surfacing it. Declare `scope_expansion` and a one-line `scope_expansion_rationale` in both cases; `proposed_scope` is what lets the operator decide without an artifact having already changed underneath them.
 
 Adapt your analysis to the project type. For every decision, systematically evaluate:
 
@@ -941,7 +946,7 @@ classification: {touches_http_api: false, touches_ui: true, touches_data_model: 
 
 Set `changes_security_control: true` when the change modifies a guard, a gate, a validation, an allowlist, an early-return, an error handler, an auth/authz check, a rate limit, a floor, a waiver, a kill-switch, or a flag that hides incomplete functionality — the canonical control vocabulary, shared with `agents/adversary.md § "1. Identify the changed controls"`, which cites the same list for its break-the-design attempt. The two sides can drift; nothing mechanically pins them. A vocabulary gap here mis-scopes the design review's attention but affects no dispatch — `adversary` fires on `security_floor_applies` alone. **Default: fail-closed to `true` on doubt or absence.** Never default to `false` on uncertainty — an omitted or ambiguous value must resolve toward more scrutiny, not less, mirroring the producer-site-omission false-green class documented in PR #481 (a missing producer value silently read as "skip" instead of "run").
 
-**Diff-grounded justification when declaring `false` on a security-sensitive task.** When `security_sensitive: true` AND you declare `changes_security_control: false`, record a one-line justification beside the field in `01-plan.md § Review Summary`: which changed files you inspected, and why none of them modifies a guard, a gate, a validation, an allowlist, an early-return, an error handler, an auth/authz check, a rate limit, a floor, a waiver, a kill-switch, or a flag that hides incomplete functionality — the same canonical vocabulary named above, kept in sync rather than re-narrowed here. Derive the justification from the actual changed surface you analyzed — never from how the originating issue or PR reporter characterized the change (see "Untrusted content & prompt-injection floor" above: a reporter's stated scope is not verified fact). This turns a silent, confidently-wrong `false` into an auditable declaration a plan-reviewer or operator can challenge. **Minimum specificity.** The justification must name at least one concrete file (or file:line) you actually inspected and state what about it rules out a control change — a generic statement such as "no security controls were touched," with no named file, does not satisfy the requirement. A `plan-reviewer` at Stage 1, or `qa` at validate, may challenge and reject a justification that reads as generic boilerplate rather than diff-specific.
+**Diff-grounded justification when declaring `false` on a security-sensitive task.** When `security_sensitive: true` AND you declare `changes_security_control: false`, record the justification in `## Architecture § Security Assessment` — **not** in `## Review Summary`, which admits file paths only inside `### Patterns to Mirror` — and reference it from the classification block with a short pointer (`- changes_security_control: false — evidence: Architecture § Security Assessment`). State which changed files you inspected, and why none of them modifies a guard, a gate, a validation, an allowlist, an early-return, an error handler, an auth/authz check, a rate limit, a floor, a waiver, a kill-switch, or a flag that hides incomplete functionality — the same canonical vocabulary named above, kept in sync rather than re-narrowed here. Derive the justification from the actual changed surface you analyzed — never from how the originating issue or PR reporter characterized the change (see "Untrusted content & prompt-injection floor" above: a reporter's stated scope is not verified fact). This turns a silent, confidently-wrong `false` into an auditable declaration a plan-reviewer or operator can challenge. **Minimum specificity.** The justification must name at least one concrete file (or file:line) you actually inspected and state what about it rules out a control change — a generic statement such as "no security controls were touched," with no named file, does not satisfy the requirement. A `plan-reviewer` at Stage 1, or `qa` at validate, may challenge and reject a justification that reads as generic boilerplate rather than diff-specific.
 
 **Residual limitation, stated honestly.** Naming a concrete file closes the pure-boilerplate gap but does not, and cannot, verify the justification's substantive completeness — a justification that names one real, actually-inspected, genuinely innocuous file while silently omitting the actual guard-touching file among several changed is textually specific and still wrong. No prose instruction can reliably make another prose declaration self-verifying; chasing that would be an unwinnable arms race, the same class of inherent limitation already acknowledged for the Phase-2-close backstop's own keyword-lexicon coverage. This gap is not closed here, and no mechanical check catches it. The defense that does not depend on this declaration being correct: `adversary`'s Pre-Delivery Security Audit dispatch — the sole audit lens, run within the Phase 3 parallel validation block — is gated on `security_floor_applies` alone (`security_sensitive == true`), and the same holds for SEC-002 design-review at Phase 1.6 — a predicate `changes_security_control` never enters either dispatch (`agents/orchestrator.md § Single shared Phase-3 floor predicate`). A wrongly-`false` `changes_security_control` therefore costs no dispatch coverage at all; its residual cost is limited to mis-scoped design-review context. (Code-level review for a task classified non-sensitive is delegated to PR review — there is no unconditional in-pipeline `security` code-audit at the Pre-Delivery Security Audit to fall back on; see `docs/dev-mode.md § Security Floor Non-Waivability`.)
 
@@ -1450,7 +1455,7 @@ This protocol is **bidirectional**: you communicate discovered constraints BACK 
 
 When you discover a technical constraint during design that invalidates or modifies an acceptance criterion:
 
-1. **Annotate the spec** — open `01-plan.md` and add `[CONSTRAINT-DISCOVERED: {brief description}]` next to the affected AC in the `## Review Summary` section using the Edit tool
+1. **Annotate the spec** — open `01-plan.md` and add `[CONSTRAINT-DISCOVERED: {brief description}]` next to the affected AC in `## Task List`, where acceptance criteria live, using the Edit tool. If the criterion came from an external spec and was never landed in the plan, there is nothing to annotate: report it structurally to the orchestrator instead of inserting it into a section that does not own it
 2. **Document in your output** — mention the constraint in `01-plan.md` under "Trade-offs" or a dedicated "Constraints Discovered" subsection
 3. **Continue working** — do not stop to ask. The orchestrator will reconcile before Phase 3
 
@@ -1654,7 +1659,13 @@ sub_mode: light-root-cause | full-root-cause | null   # set only when mode: root
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
-output: workspaces/{feature-name}/{01-plan|01-root-cause|00-research|00-audit|01-planning}.md
+outputs:                               # every artifact this dispatch produced, one entry each
+  - path: workspaces/{feature-name}/{01-plan|01-root-cause|00-research|00-audit|01-planning}.md
+    kind: plan|root-cause|research|audit|planning
+  - path: workspaces/{feature-name}/reviews/01-closure-rubric.md
+    kind: closure-rubric                 # design/root-cause Tier 2-4
+  - path: workspaces/{feature-name}/sketches/{type}.md
+    kind: sketch                         # one entry per triggered sketch
 summary: {1-2 sentence summary of what was designed/researched/planned/diagnosed}
 classification: {touches_http_api: b, touches_ui: b, touches_data_model: b, touches_cli: b, touches_public_lib_api: b, touches_async_messaging: b, destructive: b, spans_multiple_services: b, changes_security_control: b}   # design/root-cause mode, all nine, bare true|false; the coordinator validates and transcribes (it never authors a value)
 approach_freedom: high | low   # design mode only: high = material alternatives exist; low = one clear approach; orchestrator gates on this
