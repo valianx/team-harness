@@ -21,7 +21,6 @@
 
 from __future__ import annotations
 
-import ast
 import io
 import json
 import re
@@ -29,7 +28,7 @@ import sys
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Stdout encoding guard (mirrors test_agent_structure.py)
+# Stdout encoding guard
 # ---------------------------------------------------------------------------
 if sys.stdout.encoding and sys.stdout.encoding.lower().startswith("cp"):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
@@ -43,23 +42,23 @@ HOOKS_DIR = REPO_ROOT / "hooks"
 PLUGIN_DIR = REPO_ROOT / ".claude-plugin"
 
 # ---------------------------------------------------------------------------
-# Constants — single source of truth imported from the structural suite.
-# Mirror verbatim; any divergence from test_agent_structure.py is a defect.
+# Constants — this file is their single source of truth. They were previously
+# mirrored from tests/test_agent_structure.py, which has been retired; the
+# mirror-integrity check that guarded the copy is gone with it because there is
+# no longer a second copy to diverge from. Keep these two lists correct here.
 # ---------------------------------------------------------------------------
 
-# Mirror of test_agent_structure.py READ_ONLY_AGENTS.
 # These agents MUST NOT carry Bash in their frontmatter tools:.
-# Source of truth: tests/test_agent_structure.py READ_ONLY_AGENTS — asserted
-# equal at runtime by check_0_mirror_integrity() below, never eyeballed.
+# A read-only agent gaining Bash is a trust-boundary regression, which is why
+# the list is declared rather than derived.
 READ_ONLY_AGENTS = {
     "architect", "security", "qa", "qa-plan",
     "plan-reviewer", "mentor", "adversary",
 }
 
-# Mirror of test_agent_structure.py EXPECTED_AGENTS.
-# Check 2 scopes web-facing detection to this set of real agent files only.
-# Source of truth: tests/test_agent_structure.py EXPECTED_AGENTS — asserted
-# equal at runtime by check_0_mirror_integrity() below, never eyeballed.
+# The full agent roster. Check 2 scopes web-facing detection to this set of
+# real agent files only; check_0_roster_reachability() below fails when a name
+# here no longer resolves to a file.
 EXPECTED_AGENTS = [
     "orchestrator", "architect", "agent-builder", "security", "reviewer",
     "reviewer-consolidator",
@@ -143,7 +142,7 @@ def read(path: Path) -> str:
 
 def parse_frontmatter(text: str) -> dict[str, str]:
     """Extract the YAML frontmatter block as a flat key→value dict.
-    Mirrors test_agent_structure.py parse_frontmatter verbatim."""
+    Deliberately minimal — a flat scan is all Checks 1 and 2 need."""
     if not text.startswith("---"):
         return {}
     end = text.find("\n---", 3)
@@ -175,57 +174,42 @@ def repo_rel(path: Path) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Check 0 — mirror-integrity: EXPECTED_AGENTS/READ_ONLY_AGENTS asserted equal
-# to their declared source of truth, not eyeballed. Without this, Check 1/2
-# silently skip any agent file their own local copy has fallen out of sync
-# with (a missing file is treated as "not our concern here" by design), so
-# `run-all.sh` stays green whether the mirror is current or stale — this
-# check closes exactly that gap by parsing the source file's own module-level
-# assignments and failing loudly on any divergence.
+# Check 0 — roster reachability: every name in EXPECTED_AGENTS/READ_ONLY_AGENTS
+# resolves to a real file under agents/. The two lists are now declared here
+# (see above) rather than mirrored from another suite, so there is no second
+# copy left to diverge from. What remains worth checking is that neither list
+# names an agent that no longer exists: Check 1 and Check 2 both treat a
+# missing agent file as "not our concern", so a stale name silently removes
+# that agent from the scan while the run stays green. Reachability is a
+# property of the filesystem and fails loudly.
 # ---------------------------------------------------------------------------
 
-def _read_source_of_truth() -> tuple[list[str], set[str]]:
-    """Parse tests/test_agent_structure.py's own EXPECTED_AGENTS/READ_ONLY_AGENTS
-    module-level assignments via ast, never a regex over its source text."""
-    source_path = REPO_ROOT / "tests" / "test_agent_structure.py"
-    tree = ast.parse(read(source_path), filename=str(source_path))
-    values: dict[str, object] = {}
-    for node in tree.body:
-        if (
-            isinstance(node, ast.Assign)
-            and len(node.targets) == 1
-            and isinstance(node.targets[0], ast.Name)
-            and node.targets[0].id in ("EXPECTED_AGENTS", "READ_ONLY_AGENTS")
-        ):
-            values[node.targets[0].id] = ast.literal_eval(node.value)
-    return values["EXPECTED_AGENTS"], values["READ_ONLY_AGENTS"]
-
-
-def check_0_mirror_integrity() -> int:
+def check_0_roster_reachability() -> int:
     """Return count of FAIL findings."""
     before = len(findings)
-    truth_expected, truth_readonly = _read_source_of_truth()
 
-    if list(EXPECTED_AGENTS) != list(truth_expected):
+    for name in sorted(set(EXPECTED_AGENTS) | set(READ_ONLY_AGENTS)):
+        if not (AGENTS_DIR / f"{name}.md").is_file():
+            finding(
+                "FAIL",
+                "check-0",
+                f"roster names '{name}' but agents/{name}.md does not exist —"
+                " Checks 1 and 2 skip a missing file, so this name silently"
+                " drops out of the scan instead of failing it",
+            )
+
+    unknown = set(READ_ONLY_AGENTS) - set(EXPECTED_AGENTS)
+    if unknown:
         finding(
             "FAIL",
             "check-0",
-            "EXPECTED_AGENTS diverges from tests/test_agent_structure.py's own"
-            f" EXPECTED_AGENTS — mirror: {EXPECTED_AGENTS!r}; source of truth:"
-            f" {truth_expected!r}",
-        )
-    if set(READ_ONLY_AGENTS) != set(truth_readonly):
-        finding(
-            "FAIL",
-            "check-0",
-            "READ_ONLY_AGENTS diverges from tests/test_agent_structure.py's own"
-            f" READ_ONLY_AGENTS — mirror: {sorted(READ_ONLY_AGENTS)!r}; source of"
-            f" truth: {sorted(truth_readonly)!r}",
+            f"READ_ONLY_AGENTS contains {sorted(unknown)!r}, absent from"
+            " EXPECTED_AGENTS — the read-only tier must be a subset of the roster",
         )
 
     if len(findings) == before:
-        print("  [PASS] check-0 — EXPECTED_AGENTS and READ_ONLY_AGENTS both equal their"
-              " source of truth")
+        print("  [PASS] check-0 — every rostered agent resolves to a real file and"
+              " the read-only tier is a subset of the roster")
     return len(findings) - before
 
 
@@ -240,7 +224,7 @@ def check_1_readonly_bash() -> int:
     for agent_name in READ_ONLY_AGENTS:
         path = AGENTS_DIR / f"{agent_name}.md"
         if not path.exists():
-            # Missing agent is a structural issue caught by test_agent_structure.py;
+            # A missing agent file is reported by check_0_roster_reachability();
             # not our concern here — skip silently.
             continue
         fm = parse_frontmatter(read(path))
@@ -709,8 +693,8 @@ def main() -> None:
     print("=== Suite 12: security self-scan ===")
     print()
 
-    print("--- Check 0: agent-set mirror asserted equal to its source of truth ---")
-    check_0_mirror_integrity()
+    print("--- Check 0: rostered agents resolve to real files ---")
+    check_0_roster_reachability()
     print()
 
     print("--- Check 1: read-only tier excludes Bash ---")

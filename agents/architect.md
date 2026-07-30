@@ -216,17 +216,38 @@ The plan opens with `## Review Summary` so the human can scan tasks, decisions, 
 **Tasks:** {N} | **Services:** {comma-separated list} | **Estimated complexity:** standard|complex
 
 ### Decisions for human review
-- **{short label}** — {one-sentence context}. → decided as {X} | → open question
+- **{short label}** — {one-sentence context}. {Your reasoning in one sentence}. → decided as {X} | → open question
 - ...
 (or "- No human-judgement decisions required — all trade-offs follow established project patterns. → decided")
+
+### Architect Dissent on Seed
+<!-- Mandatory when spec_seed_dissent: true; OMIT entirely when no seed or no dissent -->
+> {1-2 sentences: what the seed proposed and why it is deficient.}
+> {The approach actually taken, with rationale.}
+> {Any open question for the operator if the fork is genuinely ambiguous.}
+
+### Proposed Approach
+{1 paragraph: the chosen approach and, when approach_freedom:high, the material alternatives (one sentence each).}
+
+### Confidence Score
+**Confidence:** N/10 (single-pass)
+- {factor name}: {one sentence on how this factor influenced the score}
+- {factor name}: {one sentence on how this factor influenced the score}
+
+### Patterns to Mirror
+- `{path}:{line}` — {what pattern to copy}
+(or "- No in-repo pattern to mirror — this introduces a new surface. → noted")
 
 ### Risks
 | Risk | Severity | Mitigation |
 |------|----------|------------|
-| ... | ... | ... |
+| {risk} | {high/medium/low} | {mitigation} |
 
 ### Trade-offs
-- {trade-off 1}
+- Chose X over Y because {reason}
+
+### Real-vs-Stated Scope
+<!-- External-report tasks only (GitHub issue, issue/PR comment, ClickUp). OMIT for direct operator requests. -->
 
 ### Classification block
 - touches_http_api: true|false
@@ -253,11 +274,19 @@ For each multi-site invariant, list **every** site where it must hold. Fence sit
 
 ## Architecture
 
+### Documentation Consulted
+- {Library}@{version}: {one-line summary of what was confirmed or changed by the docs}.
+- {Library}@{version}: context7 unavailable — used training knowledge as of model cutoff.
+(or "No third-party libraries verified — this change is pure {repo} code.")
+
 ### Current State
 {Brief description of existing architecture relevant to this feature}
 
-### Proposed Approach
-{Key architectural decisions with rationale}
+### Key Decisions
+{The architectural decisions and their rationale, at implementation depth. This is the
+detailed counterpart to `## Review Summary § Proposed Approach`, which states the chosen
+approach in one paragraph for the operator. Never repeat the heading `### Proposed Approach`
+here — one heading, one meaning, one location.}
 
 ### Services Touched
 {list of services, one per line}
@@ -1504,15 +1533,19 @@ Write your analysis to `workspaces/{feature-name}/01-plan.md`.
 
 The eight blocks below must fit inside the ≤50-line budget together. When a block wants more room than that leaves it, the block is too detailed for this section — move the detail to `## Architecture` and leave the summary with the decision. The budget is the constraint that forces this section to stay a digest; it is never satisfied by dropping a required block.
 
-The Review Summary contains:
+The Review Summary contains the blocks below, in this order — the same order and the same set as the canonical template. Seven are always present; three are conditional and omitted entirely when their condition does not hold.
+
 1. An opening paragraph (≤5 sentences) — what is being proposed, how many services it touches, how many tasks it decomposes into and how many PRs they ship as, and the principal risk (or "no risk worth flagging").
 2. `### Decisions for human review` (3-5 bullets, hard cap 7) — decisions that genuinely require human judgement, each ending with `→ decided as X` or `→ open question`.
-3. `### Proposed Approach` — one paragraph: the chosen approach and, when `approach_freedom: high`, the material alternatives.
-4. `### Confidence Score` — a single self-assessed score (see contract below).
-5. `### Patterns to Mirror` — real in-repo `file:line` references (see contract below).
-6. `### Risks` — a table of risks, severities, and mitigations.
-7. `### Trade-offs` — the key trade-offs made.
-8. `### Real-vs-Stated Scope` *(external-report tasks only)* — the stated-vs-real scope table produced by Channel 3 (see Spec Feedback Protocol). Omit this block for direct operator requests.
+3. `### Architect Dissent on Seed` *(conditional — only when `spec_seed_dissent: true`)*.
+4. `### Proposed Approach` — one paragraph: the chosen approach and, when `approach_freedom: high`, the material alternatives. The implementation-depth counterpart lives in `## Architecture § Key Decisions`; this heading appears exactly once in the plan, here.
+5. `### Confidence Score` — a single self-assessed score (see contract below).
+6. `### Patterns to Mirror` — real in-repo `file:line` references (see contract below).
+7. `### Risks` — a table of risks, severities, and mitigations.
+8. `### Trade-offs` — the key trade-offs made.
+9. `### Real-vs-Stated Scope` *(conditional — external-report tasks only)* — the stated-vs-real scope table produced by Channel 3 (see Spec Feedback Protocol). Omit for direct operator requests.
+10. `### Classification block` — the nine values from "Phase 2 — Plan Sketches § Step 1". Mandatory for `feature`, `refactor`, `enhancement`, and `fix` Tier 2-4; the coordinator fails the dispatch when it is absent.
+11. `### Multi-site invariants` *(conditional — only when the plan introduces or modifies an invariant living in more than one file)*.
 
 ### Confidence Score & Patterns to Mirror
 
@@ -1576,120 +1609,10 @@ If you find yourself with 0 bullets to list, write a single bullet `- No human-j
 
 ### Full `01-plan.md` template
 
-```markdown
-# Plan: {feature-name}
-**Date:** {date}
-**Agent:** architect
+**There is exactly one template, and it is not here.** See `### Design Mode — Plan Output (01-plan.md)` above — that fenced block is the canonical schema for every design and root-cause dispatch, and it is the only one.
 
-## Review Summary
+A second full template used to live at this position. The two drifted in both directions: this copy omitted `### Classification block` and `### Multi-site invariants`, the copy above omitted `### Confidence Score`, `### Patterns to Mirror`, `### Architect Dissent on Seed` and `### Documentation Consulted`, so neither satisfied the content requirements stated in this file and a plan could be fully compliant with one while failing the other. Both are now folded into the single block above.
 
-> {One paragraph: what this feature does, how many services it touches, how many tasks it decomposes into and how many PRs they ship as, and the principal risk.}
-
-**Tasks:** {N} | **Services:** {comma-separated list} | **Estimated complexity:** standard|complex
-
-### Decisions for human review
-- **{short label}** — {one-sentence context}. {Your reasoning in one sentence}. → decided as {X} | → open question
-- ...
-(or "- No human-judgement decisions required — all trade-offs follow established project patterns. → decided")
-
-### Architect Dissent on Seed
-<!-- Mandatory when spec_seed_dissent: true; OMIT entirely when no seed or no dissent -->
-> {1-2 sentences: what the seed proposed and why it is deficient.}
-> {The approach actually taken, with rationale.}
-> {Any open question for the operator if the fork is genuinely ambiguous.}
-
-### Proposed Approach
-{1 paragraph: the chosen approach and, when approach_freedom:high, the material alternatives (one sentence each).}
-
-### Confidence Score
-**Confidence:** N/10 (single-pass)
-- {factor name}: {one sentence on how this factor influenced the score}
-- {factor name}: {one sentence on how this factor influenced the score}
-
-### Patterns to Mirror
-- `{path}:{line}` — {what pattern to copy}
-(or "- No in-repo pattern to mirror — this introduces a new surface. → noted")
-
-### Risks
-| Risk | Severity | Mitigation |
-|------|----------|------------|
-| {risk} | {high/medium/low} | {mitigation} |
-
-### Trade-offs
-- Chose X over Y because {reason}
-
-## Architecture
-
-### Documentation Consulted
-- {Library}@{version}: {one-line summary of what was confirmed or changed by the docs}.
-- {Library}@{version}: context7 unavailable — used training knowledge as of model cutoff.
-(or "No third-party libraries verified — this change is pure {repo} code.")
-
-### Current State
-{Brief description of existing architecture relevant to this feature}
-
-### Proposed Approach
-{Key architectural decisions with rationale}
-
-### Services Touched
-{list of services, one per line}
-
-### Security Assessment
-| Risk | Severity | Mitigation |
-|------|----------|------------|
-| {risk} | {high/medium/low} | {mitigation} |
-
-### Performance Assessment
-| Concern | Impact | Mitigation |
-|---------|--------|------------|
-| {concern} | {high/medium/low} | {mitigation} |
-
-### Accessibility Requirements (frontend/fullstack)
-- [ ] {Requirement}
-
-### Work Plan
-Ordered implementation steps. The implementer follows this sequence.
-
-| # | Step | Files | Action | Depends on |
-|---|------|-------|--------|------------|
-| 1 | {title} | {files to create/modify} | {what to do and why} | — |
-| 2 | {title} | {files to create/modify} | {what to do and why} | Step 1 |
-
-**Notes:** {any cross-cutting concerns, order rationale, or risks the implementer should know}
-
-## Task List
-
-### Summary
-
-| Task | Service | Files | AC count | Depends on |
-|------|---------|-------|----------|------------|
-| Task-1 | {service} | {N} | {N} | none |
-
-### Delivery Grouping
-
-Default (single repo, no temporal-prod reason): all tasks ship as ONE PR.
-
-  Grouping: all-tasks-one-pr
-
-OR, N serial groups with the `PR | Tasks | Base | Reason | Repo` schema (see "Design Mode — Plan Output" above for the full table example). `Repo` is an **optional** column — no group is required to declare it; absence (or an omitted column) means every group is the primary repository, unchanged from before this column existed. A group whose `Repo` differs from the primary is a secondary, cross-repo group exempt from the base-must-be-`main` check.
-
-### Task-1: {imperative title}
-
-- **Service:** {service-name}
-- **Title:** `{conventional-commit-style PR title}`
-- **Status:** pending
-- **Branch (suggested):** `feat/{kebab-case-name}`
-- **Worktree:** `{absolute worktree path | null}` — branch `{branch name | null}`, base `{origin/main | <dep-branch> | null}`
-- **Files:**
-  - `{path}` (new|modify)
-- **Depends on:** {Task-N | none}
-- **Notes:** {anything the implementer should know}
-
-#### Acceptance Criteria
-
-- [ ] **AC-1**: Given {context}, When {action}, Then {observable result}.
-- [ ] **AC-2**: VERIFY: {non-behavioural assertion}.
-```
 
 ---
 
