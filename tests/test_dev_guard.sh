@@ -520,7 +520,18 @@ assert_ask "true&&git push origin main — && chain before verb" "$TMP" "$(make_
 assert_ask "(gh pr merge 123 --squash) — subshell-wrapped merge" "$TMP" "$(make_payload '(gh pr merge 123 --squash)')"
 assert_ask "true&&gh pr create --title x --body y — && chain before gh pr create" "$TMP" "$(make_payload 'true&&gh pr create --title x --body y')"
 assert_ask "(gh issue create --title x) — subshell-wrapped issue create" "$TMP" "$(make_payload '(gh issue create --title x)')"
-assert_ask "( git push) — bare push closing a subshell, glued ) trailing (B2)" "$TMP" "$(make_payload '( git push)')"
+# Parser-recognition case, deliberately run in a NON-GIT directory. The property under
+# test is that `( git push)` is RECOGNISED as a push despite the glued `(` and `)` — not
+# what destination it resolves to. Asserting ASK from the repo root made the outcome depend
+# on whether the branch had an upstream: with none, resolution fails and any recognised push
+# falls to the fail-closed ASK; once the branch is pushed, the same command correctly
+# resolves to a non-default branch and returns ALLOW, turning this assertion red for a
+# reason that has nothing to do with parsing. In a non-git directory resolution always
+# fails, so ASK isolates recognition (an unrecognised command would be nodecision).
+_dg_parse_notgit=$(mktemp -d)
+assert_ask_in_dir "( git push) — bare push closing a subshell, glued ) trailing (B2)" "$_dg_parse_notgit" "$TMP" \
+    "$(make_payload '( git push)')"
+rm -rf "$_dg_parse_notgit"
 rm -rf "$TMP"
 
 # Leading-boundary widening must NOT gate a read-only verb wrapped in a subshell.
