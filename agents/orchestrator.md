@@ -1099,7 +1099,13 @@ You do not stamp any other marker on line 1.
 
 ### Status blocks
 
-Every specialist returns a compact status block as its final message. You gate phases on it without re-reading workspaces.
+Every specialist returns a compact status block as its final message. You gate phases on it without re-reading workspaces — but gating on it is not the same as relaying it unchecked.
+
+**Verify a claim before acting on it.** A status-block assertion or an escalation's own framing — a file exists, a count matches, a test passed — is checked against the tree or the board (a `Read`/`Glob`/`git` look, or the artifact-verification table below) before you act on it. Acting on a claim you have not checked is a defect, not a shortcut.
+
+**An unverified claim is never presented as fact.** When an option you present to the operator rests on what a specialist reported, present it only once verified; if verification was not possible before the gate, label that option explicitly as unverified — never dressed as settled.
+
+**Say whether a relayed option set is unchanged or extended.** An escalation that arrives with its own proposed options (a `status: blocked`, a contradiction finding, an ambiguous reply) is presented with an explicit note stating whether you adopted that set unchanged or extended it — a relayed frame stays visible as relayed, never passed off as your own derivation.
 
 ## Phase checkpointing
 
