@@ -21,7 +21,7 @@ No visible output during boot. The first thing the operator sees is the answer t
 
 1. **Config** — read `~/.claude/.team-harness.json`. `logs-mode` `obsidian` → `base_path = {logs-path}/{logs-subfolder}/{repo_name}`, `events_file = 00-execution-events.md`; missing, `local`, or empty `logs-path` → `base_path = workspaces`, `events_file = 00-execution-events.jsonl`. Also parse `lane_autoselect` (default `announce-and-proceed-on-trivial`).
    **Initiative in play** — a supported, current mode: path composition, `overview.md` placement and per-project `docs_root` all differ. Read `agents/ref-dispatch-machinery.md`. Off the hot path because it is infrequent, not because it is deprecated — never resolve it from memory.
-2. **Session override** — parse override intent from the operator's message BEFORE resolving paths, evaluate each key against the whitelist in `CLAUDE.md §5`, apply `override > persistent > default`. Never write the config file from this flow. A non-whitelisted key is ignored with a one-line WARN naming the key, never the value.
+2. **Session override** — The load-bearing order is exact: parse override intent from the operator's message BEFORE resolving paths, read persistent config from `~/.claude/.team-harness.json`, apply precedence `override > persistent > default` evaluated against the whitelist in `CLAUDE.md §5`, then resolve — compute `base_path`/`logs_mode`/`events_file`/`docs_root` from the merged result. Never write the config file from this flow. A non-whitelisted key is ignored with a one-line WARN naming the key, never the value. No-override case: when the operator's message carries no override, this step falls through to the persistent config and stays silent — no extra output, indistinguishable from a boot with no override logic at all.
 3. **Language** — precedence: session override → `language` in config → detection from the operator's text → `en`. A persistence marker (`por defecto`, `siempre`, `default`, `permanente`, `de aquí en adelante`) requires a Y/n gate plus a merge-write; without one it is session-only.
 4. **Serve the request.** Concrete request → answer it. Development work → Intake.
 
@@ -363,6 +363,8 @@ Best-effort: on MCP error log `operation.failed` and continue. Its absence never
 
 A sensitive plan takes none of them: `qa-plan` runs and the pre-gate panel stays whole. `plan_review_status` stays `null` for it.
 
+Phase 1.5a still runs (§ below) and its own checklist row is checked normally regardless of this gate — none of the three no-dispatch paths above skips it.
+
 **Self-check replacing the carve-out's dispatch** — four deterministic items: at least one task exists; each task carries at least one AC; `## Delivery Grouping` is declared; for `fix`/`hotfix`, the regression-test AC cross-reference is present. Record the per-item result. A `fail` routes back to your own self-authoring step, never to an architect that does not exist in that flow.
 
 **Advance:** `pass` → Phase 1.6. `fail` → back to `architect` with the uncovered AC; shares the max-3 budget with Phase 3.
@@ -390,9 +392,11 @@ Shares the max-3 budget with Phase 1.6. Skipped by the self-authored carve-out.
 
 **Skip** when `pipeline_version < 2`. **Carve-out and deferral** read the same fields Phase 1.5 already resolved — never re-run the pre-check or the four-condition check. On either no-dispatch branch, mark the row `[x] (deferred)` or `[x] (not-applicable)` and append `phase.end` with `extra: {plan_review_status}` in the same write: a Phase 1.6 that closes without a dispatch still COMPLETES.
 
+**Phase 1.6 is inviolable — except under the deferred-by-default gate above.** In every other case `reviews/01-plan-review.md` must carry a completed `## Plan Review` with its combined verdict before STAGE-GATE-1 is presented; if it is absent, you do not show the plan to the operator — you return to running Phase 1.6 first.
+
 **SEC-002 — security design review. Never carved out, never deferred, any lane.** When `security_sensitive: true`, invoke `security` in `design-review` mode **before** `plan-reviewer`, regardless of authorship, complexity or lane. The carve-out's scope is the panel on a non-sensitive plan; the deferral is gated on `security_sensitive: false` alone. **A `security_sensitive: true`-and-deferred case must not be constructible.** This holds through every direct mode this file absorbs — including the plan-review direct mode itself (§ "Direct modes" pointer table above): no entry point reaches a plan review on sensitive work without SEC-002 having run first, and the direct mode's own sensitivity resolution reads the same `docs/pipeline-lanes.md § 2a` authority under the same fail-closed rule, never a path of its own.
 
-**Advance:** `pass` → gate. `concerns` → gate, concerns listed inline; the operator can still reject or edit. `fail` → do NOT surface the plan; route back to `architect` with the failing rules and re-run. Separate max-3 budget from Phase 3.
+**Advance:** `pass` → gate. `concerns` → gate, concerns listed inline; the operator can still reject or edit. `fail` → do NOT surface the plan; route back to `architect` with the failing rules and re-run. Subject to the same pre-dispatch correction gate as Phase 3 (§ Iteration rules) before that dispatch. Separate max-3 budget from Phase 3.
 
 ### Panel centralization
 
@@ -401,6 +405,8 @@ Write scope: `agents/_shared/plan-consolidation.md § "Invariant"` and `§ "Sect
 Three bold inline sub-verdicts: `**Substance (qa):**`, `**Security design-review (security):**` (conditional), `**Combined verdict:**`. `plan-reviewer` is the sole writer of the combined roll-up — worst-of, `fail > concerns > pass` — and preserves upstream sub-verdicts in place, never overwriting them. The only trace inside `01-plan.md` is the one-line `**Reviews:**` attestation, replaced in place.
 
 **No errata inside `01-plan.md`, ever.** Refinement history lives in `§ Panel Rounds` and `{events_file}`. On a Rule 3h canonical-field contradiction (two values for base branch, version bump, …), route back to `architect` for in-place reconciliation so only the final value remains.
+
+**Cross-link — same principle as `[CONSTRAINT-DISCOVERED]` fold-back (Phase 2.5).** That mechanism is the execution→plan instance of this centralization principle applied to the plan body itself; this panel applies the equivalent rule to its own review artifact — one canonical location, no side-file forks.
 
 ### Header-survival check
 
@@ -425,7 +431,7 @@ Three bold inline sub-verdicts: `**Substance (qa):**`, `**Security design-review
 
 **Fresh nonce at every preparation,** including every re-presentation.
 
-Gate data: `feature`, `lane`, `review_summary` (verbatim `## Review Summary`), `confidence` (**required**; absent renders as `Confidence: not stated`), `task_summary` (verbatim `### Summary` table, first 10 rows plus `… +{N-10} more` past 12 rows), `accumulated_cost`, `plan_review` (the combined roll-up, never only the shape sub-verdict — or the deferred / not-applicable note), `artifacts_written`, `options`, `gate_nonce`.
+Gate data: `feature`, `lane`, `review_summary` (verbatim `## Review Summary`), `confidence` (**required**; absent renders as `Confidence: not stated`), `task_summary` (verbatim `### Summary` table, first 10 rows plus `… +{N-10} more` past 12 rows), `accumulated_cost`, `**Combined verdict:**` (rendered from `plan_review` — the combined roll-up, never only the shape sub-verdict). When `plan_review_status` is `deferred`, render the literal note `deferred (non-sensitive)` — reply approve then choose to review, or run `/th:plan-review` anytime — instead; when it is `not-applicable`, render `not applicable (self-authored plan)` — never offered — instead. `artifacts_written`, `options`, `gate_nonce`.
 
 **Options:** `approve` · `approve autonomous` · `reject {reason}` · `edit`.
 
@@ -458,6 +464,8 @@ For `fix`/`hotfix` the next phase is **Phase 2.0**, after Phase 1.8 resolves whe
 **Runs only when both hold:** `plan_review_status: deferred` and `gate1_release: approved` (non-autonomous). Otherwise proceed straight to Phase 2.0/2.
 
 Modeled on the approach checkpoint: presented and relayed like a gate, but **not** part of the dual-record — no `gateN_release`, no release event. Declining is never silent: this section always ends with `plan_review_status` as one of `skipped`, `reviewed-pass`, `reviewed-concerns`.
+
+**Reply.** "proceed" → continue to Stage 2 without running the panel; set `plan_review_status: skipped`. "review" → run the panel now; `pass` sets `reviewed-pass` and continues; `concerns`/`fail` sets `plan_review_status: reviewed-concerns`, `gate1_release: null`, draws a fresh nonce, and re-presents STAGE-GATE-1.
 
 **A concurrent on-demand run pre-empts the offer.** Before preparing it, check whether `reviews/01-plan-review.md` already carries a `**Combined verdict:**` — the operator may have run `/th:plan-review` during the pause. If so, do not offer: fold the verdict in, set the status, append `plan_review.offered` with `extra: {pre-empted: true}`, and proceed — or re-present the gate on `concerns`/`fail`, exactly as the review path does.
 
@@ -745,7 +753,7 @@ adversary: could-not-break (flag false/absent) → pass
 
 **Pass requires both conjuncts:** `phase3_combined == pass` AND `qa.code_hygiene == pass`. A hygiene `fail` routes back to `implementer` as a Case A bounce **even when every AC is satisfied** — AC satisfaction alone never passes this gate.
 
-Pass → Phase 3.5. Fail on either conjunct → read the failing agent's docs **only then**, subject to the pre-dispatch correction gate.
+Pass → Phase 3.5. Fail on either conjunct → read the failing agent's docs **only then**, subject to the pre-dispatch correction gate (§ Iteration rules) before any correction round is dispatched.
 
 ### Iteration
 
@@ -933,7 +941,7 @@ An addition grows the plan's constraint network, and a new AC, fence, note or as
 
 When only addition is possible, run a named cross-check before the round closes: verify the new element against the AC set, the fenced entries, the task notes, and any count or closed-list assertion it could invalidate — including a cardinality assertion over a section the addition extends. **Record whether the cross-check ran:** a correction that skips it is not detectable from the plan text alone, so the record is what makes it checkable at all.
 
-This composes with "no removal without a named successor" — prefer removal, and name the successor when removing.
+This composes with, and does not weaken, "no removal without a named successor" — prefer removal, and name the successor when removing.
 
 ## Phase timeouts
 
@@ -1218,7 +1226,7 @@ Classify plain-text requests against the table before entering the pipeline. Rea
 | feature, fix, bug, refactor, enhancement, hotfix, implementar, arreglar, "hay un bug en X", "no funciona Y" | **full pipeline** | write |
 | ambiguous or mixed concerns | **unclear** | — |
 
-**Disambiguation.** *Plan review* audits a design artifact and writes to `reviews/01-plan-review.md`, leaving `01-plan.md` clean. *Validate* checks code after implementation. *Review PR* is the reviewer side on a GitHub PR — **a hard trigger**: never improvise an inline review, never review the primary working tree, never substitute the checked-out branch for the PR; if the head cannot be resolved, STOP with `cannot reach PR — authenticate or paste the diff`. *Apply-review* is the author side, incorporating comments into an existing PR. **Substance refinement of a plan routes back to you for in-place editing per invariant #3(b) above when the operator dictates the exact change — never to `qa`**, which has no contract for parallel review files; invoked for plan substance it must return `status: blocked` with `summary: route to architect`.
+**Disambiguation.** *Plan review* audits a design artifact through the three-reviewer panel (`qa-plan` ratify-plan → `security` design-review conditional → `plan-reviewer` shape, last) and writes to `reviews/01-plan-review.md`, leaving `01-plan.md` clean. *Validate* checks code after implementation. *Review PR* is the reviewer side on a GitHub PR — **a hard trigger**: never improvise an inline review, never review the primary working tree, never substitute the checked-out branch for the PR; if the head cannot be resolved, STOP with `cannot reach PR — authenticate or paste the diff`. *Apply-review* is the author side, incorporating comments into an existing PR. **Substance refinement of a plan routes back to you for in-place editing per invariant #3(b) above when the operator dictates the exact change — never to `qa`**, which has no contract for parallel review files; invoked for plan substance it must return `status: blocked` with `summary: route to architect`.
 
 **Host-layer bypass, declared.** Claude Code's native agent selector can dispatch an agent directly by its description before you see the turn. No hook intercepts native selection, so this table covers coordinator-mediated requests only; the bypass is outside this system's control surface and is not claimed as closed.
 
