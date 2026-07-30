@@ -185,7 +185,7 @@ treated as ambiguous (§ "Ambiguous-gate-reply rule").
 as a bare literal: the value carries no second token delimited by a space on
 the same line, no trailing nonce, attribution, justification, or condition
 appended after it. Every reader of these fields — the record-based recover
-backstop above, `agents/orchestrator.md § Current State`, and the executable
+backstop above, `agents/_shared/orchestrator-state.md § Current State`, and the executable
 `working_branch`/`worktree` comparisons this contract's consumers install in
 `implementer` and `tester` — matches the first equal line by strict string
 equality, so a value carrying any annotation stops matching the instant one
