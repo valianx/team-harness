@@ -63,7 +63,7 @@ Every writer's permitted edit to `01-plan.md` is enumerated below. A writer not 
 
 ## Write-tool discipline (shared review files)
 
-This section governs `Edit`/`Write` usage on `reviews/01-plan-review.md` — the panel's shared, multi-writer review artifact (`plan-reviewer`, `qa-plan` and `security` write into it; `adversary` does **not** — it owns no section here and writes only `reviews/04-adversary.md`). It is a rule of the panel as a whole, not an exception carved out for one agent.
+This section governs `Edit`/`Write` usage on `reviews/01-plan-review.md` — the panel's shared, multi-writer review artifact (`plan-reviewer`, `qa-plan` and `security` write into it; `adversary` does **not** — it owns no section here and writes only its `reviews/04-adversary.md` or `reviews/04-adversary-amend-{N}.md` report). It is a rule of the panel as a whole, not an exception carved out for one agent.
 
 **The rule.** Every panel agent uses `Edit` on a review file that already exists. `Write` is reserved for the initial creation of the agent's own review file — never for a file that already exists, never for a file owned by another agent, never for a shared file. When `reviews/01-plan-review.md` already exists (created by whichever panel agent ran first this round), every subsequent writer edits it in place with `Edit`; none of them re-`Write`s it whole.
 

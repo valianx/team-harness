@@ -306,7 +306,7 @@ multi-run window, no window-close step, and no automatic trigger of any kind.
 verifier-dispatch count is read from the workspace verdict docs — one dispatch per verifier
 per iteration verdict entry: `03-testing.md` authoring result (tester), `reviews/04-validation.md`
 (qa), `reviews/04-adversary.md` /
-`reviews/04-adversary-amend.md` (adversary, Pre-Delivery Security Audit), `reviews/04-ux-validation.md`
+`reviews/04-adversary-amend-{N}.md` (adversary, Pre-Delivery Security Audit), `reviews/04-ux-validation.md`
 (ux-reviewer validate). `00-subagent-trace.jsonl` breadcrumbs (`subagent.start`/
 `subagent.stop` pairs filtered by verifier `agent_type`) demote to upward-only enrichment: a
 breadcrumb-evidenced dispatch with no matching verdict entry is **ADDED** to the denominator
@@ -344,7 +344,8 @@ counting it any other way would let emission loss impersonate packet acceptance.
 `agents/ref-pipeline.md § Pipeline Summary Protocol` — the `## Verification Packet`
 section of `00-pipeline-summary.md`): the three-bucket breakdown above, and verifier catch
 rates read from the workspace verdict documents, not from `phase.end` telemetry — adversarial
-break count from `reviews/04-adversary.md`, qa AC-fail rate from
+break count from the current adversary report (`reviews/04-adversary.md` or the greatest
+`reviews/04-adversary-amend-{N}.md` suffix), qa AC-fail rate from
 `reviews/04-validation.md § AC Coverage Results`, drift flags from
 `reviews/04-validation.md § Drift Analysis` — each compared against the June 2026 baseline recorded
 in the pipeline-validation research workspace (`02-june-empirical-analysis.md`, referenced
@@ -356,7 +357,7 @@ in every full-pipeline summary; the OPERATOR evaluates it against the June 2026 
 whenever desired — there is no cross-run aggregation, window, or scheduled evaluation point
 owned by the contract itself. Rollback is a one-line contract flip shipped as a normal PR:
 the packet-first ladder default in the Phase-3 verifier Session Context Protocols
-(`agents/{qa,adversary,ux-reviewer}.md` — §4 Step 1) flips back to the full
+(`agents/{qa,adversary,ux-reviewer}.md` — packet-first read protocol) flips back to the full
 input-manifest read as the unconditional default (the §4 Step 3 fail-open fallback becomes
 the primary path), and the orchestrator's packet build (§1) and digest-dispatch (§3) steps
 are suspended until the schema (§2) is enriched. No clause in this contract computes this

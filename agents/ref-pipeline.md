@@ -1045,7 +1045,7 @@ Runs after every `implementer`/`tester` dispatch returns `success`, and **again 
 
 Every tier receives the same audit. Bug severity never selects a different security lens: the audit reviews the consolidated final diff regardless of tier. At `bug_tier: 4` on a sensitive task the dispatch carries the extended-analysis instruction against `01-root-cause.md ## Prior Art`.
 
-**What each dispatch carries.** `qa`: where the implementation record is; for `fix`/`hotfix`, validate the reproduction-no-longer-bug and regression-test-exists criteria and set their flags. `adversary`: `audit_required: true`, the worktree path, `docs_root`, the exact `{docs_root}/inputs/00-frozen.diff` path, a pointer to `01-plan.md § Task List`, `**Scope:** full`, the SEC-002 design-review verdict, an affirmation to invert, and a pointer to the packet's deviations field. **No diff summary, no per-task summaries, no enumeration of what to confirm** — the frozen artifact is the scope it reads.
+**What each dispatch carries.** `qa`: where the implementation record is; for `fix`/`hotfix`, validate the reproduction-no-longer-bug and regression-test-exists criteria and set their flags. `adversary`: `audit_required: true`, the worktree path, `docs_root`, the exact `{docs_root}/inputs/00-frozen.diff` path, a pointer to `01-plan.md § Task List`, `Scope: full`, `audit_run: initial`, the SEC-002 design-review pointer and Stage-1 sensitivity timing, an affirmation to invert, a pointer to the packet's deviations field, and `Adversary output budget (format guidance): ~800 + 600×(in-scope changed-control count) tokens`. **No diff summary, no per-task summaries, no enumeration of what to confirm** — the frozen artifact is the scope it reads. The budget controls presentation only; it never caps controls or findings.
 
 ### The audit never iterates
 
@@ -1053,7 +1053,7 @@ Every tier receives the same audit. Bug severity never selects a different secur
 
 A `broke-it` break is surfaced in full — finding, `file:line`, impact. Shipping over it needs **no override keyword**; `ship` stays valid, but the release appends a `disposition` entry to `00-decision-ledger.md` recording the accepted finding verbatim. A `could-not-break` carrying `incomplete_on_changed_control: true` is surfaced the same way and never silently treated as clean, with the same ledger entry on acceptance.
 
-**Re-audit on amend is the only re-run.** When the gate records `amend` and the operator later replies `ship`, the staleness invariant re-opens Freeze → Phase 3, and `adversary` re-runs **delta-scoped** (`**Scope:** localized {files changed since the prior audit}`) alongside `qa` — never a fresh full pass, never more than one re-audit per amend cycle, never a re-audit the operator did not cause.
+**Re-audit on amend is the only re-run.** When the gate records `amend` and the operator later replies `ship`, the staleness invariant re-opens Freeze → Phase 3, and `adversary` re-runs **delta-scoped** (`Scope: localized {files changed since the prior audit}`) alongside `qa` — never a fresh full pass and never a re-audit the operator did not cause. Set `audit_run: amend-N`, where `N` is one plus the greatest existing `reviews/04-adversary-amend-{N}.md` suffix (or `1` when none exists); the output path uses the same `N`. A materially uncertain dependency closure makes the agent escalate its analytical scope to `full`, without changing the dispatch's audit-run identity.
 
 **Infrastructure failure is not a verdict.** `failed`/`blocked` is re-dispatched once; a second failure presents `audit: unavailable (adversary)` at the gate and the operator decides with that stated. **The audit is never silently skipped:** a required audit with no report is stated in the block, never omitted.
 
@@ -1098,12 +1098,12 @@ An Adversary `broke-it` or incomplete attempt remains operator-disposed at the c
 ```
 phase3_combined = worst-of(qa_verdict, adversary_verdict)
 severity: fail > concerns > pass
-adversary: could-not-break (flag false/absent) → pass
-           could-not-break (incomplete_on_changed_control: true) → concerns
+adversary: could-not-break (complete attempt; flag false/absent) → pass
+           could-not-break (material evidence/coverage unavailable; incomplete_on_changed_control: true) → concerns
            broke-it → concerns, never fail — operator-disposed, never an autonomous block
 ```
 
-`incomplete_on_changed_control: true` is an explicit declaration that the absence of a found break is not proof of soundness: it must never compute as a clean pass, and is never autonomously escalated to `fail` either.
+Every `could-not-break` is explicitly non-certifying. `incomplete_on_changed_control: true` has the narrower operational meaning that at least one changed control could not be substantively attempted because material evidence or coverage was unavailable; only that condition maps the negative result to `concerns`. It is never autonomously escalated to `fail`.
 
 **`fail` requires at least one open `critical` or `high` finding from `qa`.** Below that the verdict caps at `concerns` and proceeds with findings inline — never `fail` on severity-less grounds. Same floor as Phase 1.6, shared rather than restated.
 
@@ -1152,7 +1152,7 @@ Security findings are **not** checked here: the audit ran inside the Phase 3 blo
 | `bump_override` | `{level} — <reason>`, present **only** when the computed version sits above the mechanical SemVer floor for the diff |
 | `options`, `gate_nonce` | the closed allowlist; fresh nonce |
 
-**Present `audit_coverage` adjacent to the diff composition.** Coverage is an auditor self-declaration; the composition you computed independently. Side by side, an implausible `full` claim against a large substantive diff is visible rather than taken on faith. **Surface `incomplete_on_changed_control` explicitly** — never infer it from `open_breaks` being empty: a `could-not-break` carrying it is unproven, not clean.
+**Present `audit_coverage` adjacent to the diff composition.** Coverage is an auditor self-declaration; the composition you computed independently. Side by side, an implausible `full` claim against a large substantive diff is visible rather than taken on faith. **Surface `incomplete_on_changed_control` explicitly** — never infer it from `open_breaks` being empty. The flag means material evidence or coverage was unavailable, not merely that a changed control resisted the attack.
 
 Before presenting, write the exact issue/version/file-map/diff/size/suite coordinates used
 for this gate into `00-state.md § Current State` using

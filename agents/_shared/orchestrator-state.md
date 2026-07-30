@@ -331,7 +331,7 @@ After every dispatch returning `success`, verify the expected doc exists on disk
 | `tester` | 2.0 | `02-regression-test.md` |
 | `tester` | 2.7 | `03-testing.md` |
 | `qa` | 3 | `reviews/04-validation.md` |
-| `adversary` | 3 | `reviews/04-adversary.md` |
+| `adversary` | 3 | initial: `reviews/04-adversary.md`; operator amend `N`: `reviews/04-adversary-amend-{N}.md` |
 | `qa-plan` | 1.5 | `reviews/01-plan-review.md § Plan Ratification` |
 | `plan-reviewer` | 1.6 | `reviews/01-plan-review.md § Plan Review` |
 | `architect` | 1 | `reviews/01-closure-rubric.md` (Tier 2-4 only) |
