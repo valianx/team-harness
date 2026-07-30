@@ -142,6 +142,15 @@ Populate the rubric from the plan's own content — it is a structural index ove
 
 You MUST write a single `01-plan.md` file that contains both the architecture proposal and the task list. This file is the contract for Stage 2: the implementer reads the `## Task List` section for its task's `Files:` and `Acceptance Criteria:` fields, the qa validates each task against the AC block of that task, and the `plan-reviewer` agent (Phase 1.6) audits it against the plan-shape rules.
 
+**Tracked-documentation minimum.** Add README or `docs/**` paths to the Work Plan
+only when the approved behavior would make an existing canonical document
+factually false, or when a new public contract/operator workflow has no canonical
+documentation. Update the single closest source of truth; do not create or update
+one page per service, mirror the same explanation across documents, add release
+notes to reference docs, or plan documentation for internal refactors. Cross-links
+may point to the canonical page but must not copy its prose. Changelog and version
+assembly are Delivery concerns and never appear as implementation tasks.
+
 #### Default: delivery grouping
 
 **The pipeline never divides one task's plan or implementation.** One task = one plan = one implementation = one approved delivery. If scope looks too large for one task, SURFACE it to the operator as a `### Decisions for human review` item — never split a plan or implementation on your own authority. Splitting scope into multiple workspaces is the operator's call. (Canonical: `agents/ref-special-flows.md § "Operator-authority invariant"`.)

@@ -144,6 +144,12 @@ When operator-facing, write `changelog.d/{pr-slug}.md`:
 - {One-line past-tense operator-visible change}.
 ```
 
+Use one bullet per observable outcome, not one bullet per service, file, task,
+or implementation layer. Cap the bullet at 140 characters. Name what changed
+for the operator; omit architecture, rationale, tests, file lists, and version
+mechanics. When several services jointly produce one behavior, describe that
+behavior once.
+
 For `fix` and `hotfix`, append `Fixes #{issue}` only when the issue number is
 already recorded. Keep one bullet on one line; rationale belongs in the PR body.
 

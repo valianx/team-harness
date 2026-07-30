@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   coverage gaps now set `incomplete_on_changed_control` and surface `concerns`.
 - Replaced stale round fields with explicit `initial | amend-N` audit identities and recoverable,
   non-overwriting report paths.
+- Limited changelog and tracked-documentation updates to one canonical operator-visible outcome.
 
 ## [3.1.1] - 2026-07-30
 

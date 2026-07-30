@@ -10,10 +10,16 @@
   assembles it into the versioned CHANGELOG section in the **same PR**. Leaving fragments for a
   later release cut is allowed only when the repository explicitly declares `skip-version` or a
   grouped batch/fallback flow. Fragment format: a standard Keep-a-Changelog subsection block (`### Added`,
-  `### Changed`, `### Fixed`, `### Security`) with one-line entries. Slug rule: lowercase branch
+  `### Changed`, `### Fixed`, `### Security`) with one operator-visible outcome per bullet,
+  capped at 140 characters. Never enumerate services, files, tasks, tests, or implementation
+  layers when they jointly produce one outcome. Slug rule: lowercase branch
   name with non-alphanumeric characters replaced by hyphens, matching `[a-z0-9-]+`. Direct
-  Direct `## [Unreleased]` edits are acceptable as a fallback when `changelog.d/` cannot be used (e.g.,
+  `## [Unreleased]` edits are acceptable as a fallback when `changelog.d/` cannot be used (e.g.,
   pre-convention repos).
+- Update tracked documentation only when shipped behavior would make its canonical source
+  factually false, or a new public contract/operator workflow otherwise has no documentation.
+  Change the single closest source of truth; do not duplicate the same explanation per service
+  or add implementation/release narrative to reference documentation.
 - If §3 Tech Stack or §4 Golden Commands of CLAUDE.md changed, update those sections in the same
   PR — do not let CLAUDE.md drift from the repo.
 - If the change establishes a decision, pattern, or constraint that future work must respect,
