@@ -331,11 +331,17 @@ After every dispatch returning `success`, verify the expected doc exists on disk
 | `tester` | 2.0 | `02-regression-test.md` |
 | `tester` | 2.7 | `03-testing.md` |
 | `qa` | 3 | `reviews/04-validation.md` |
-| `adversary` | 3 | `reviews/04-adversary.md` |
+| `adversary` | 3 | initial: `reviews/04-adversary.md`; operator amend `N`: `reviews/04-adversary-amend-{N}.md` |
 | `qa-plan` | 1.5 | `reviews/01-plan-review.md § Plan Ratification` |
 | `plan-reviewer` | 1.6 | `reviews/01-plan-review.md § Plan Review` |
 | `architect` | 1 | `reviews/01-closure-rubric.md` (Tier 2-4 only) |
 | `delivery` | 4 | `inputs/pr-body-draft.md` + the lane-specific Acceptance Matrix |
+
+For `adversary`, resolve the expected path from the current dispatch/status
+block's exact `audit_run`: `initial` maps to `reviews/04-adversary.md` and
+`amend-N` maps to `reviews/04-adversary-amend-{N}.md`. Never glob for an amend
+report or select the greatest suffix. If the exact current report is absent,
+verification fails even when an older amend report exists.
 
 Exists and non-empty → proceed. Otherwise append `artifact.missing` (`action: retry`) and re-dispatch **exactly once** with an explicit "your artifact was not found" instruction. A second failure → `artifact.missing` (`action: escalate`), `status: blocked`. This is the `artifact-missing` failure kind (`agents/ref-pipeline.md § Failures`).
 

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-07-30
+
+### Changed
+
+- Reduced Adversary context by 75% while preserving full diff coverage, per-control attempts, and evidence requirements.
+- Limited changelog and documentation updates to concise, canonical, size-bounded operator-visible outcomes.
+
 ## [3.1.1] - 2026-07-30
 
 ### Fixed
@@ -163,10 +170,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`open_findings` as a live state field — NOT removed, kept with a schema and a named reader.** The reader is the Recover safety contract: on `/th:recover`, an entry with no matching `disposition` row in `00-decision-ledger.md` surfaces as an unresolved carry-over.
 - **`checkpoint_advance_fresh` — NOT removed, retained.** Its attestation premise (a second coordinator confirming B1 and propagating that confirmation) retired with the fusion; the field itself stays live because `hooks/ts/bodies/checkpoint-guard.ts` still denies an opencode `th:architect` dispatch while `checkpoint_boundary: intake-plan` is armed. Rewriting that hook's advance contract is a deferred, separate follow-up.
 - **`TH-LANE` injector — NOT removed in full, only the injector.** The parser is retained and fails open onto the same breadcrumb `subagent-trace` already produces; the injector had no subject left once intra-task lanes replaced project-keyed concurrent lanes.
-
-Version bump: `3.0.0` across `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`'s
-`plugins[0].version`, and `CLAUDE.md §3` (marketplace.json's own top-level schema version,
-`1.1.0`, is untouched).
 
 ## [2.144.0] - 2026-07-28
 
@@ -2276,14 +2279,6 @@ Version bump: `3.0.0` across `.claude-plugin/plugin.json`, `.claude-plugin/marke
 - `/th-update` now always overwrites every team-harness file under `~/.claude/` — the `--force` flag is removed from the operator surface and always passed to the installer internally. The skill's purpose is "sync to released bytes," so conflict gating was friction rather than safety. Operators who customize agents should fork the repo or contribute upstream — local hand-edits to `~/.claude/agents/*.md` are out of scope.
 
 ## [2.4.0] - 2026-05-22
-
-<!-- The following entries accumulated in [Unreleased] across PR #26 / PR #27 / PR #28
-and earlier work, and were not promoted to their version sections when their PRs
-shipped. A follow-up CHANGELOG hygiene PR will split them into the correct
-[2.2.0] / [2.1.0] / earlier sections. They are intentionally NOT included under
-[2.3.0] (the curl-installer release) below — that section contains only the
-curl-installer feature work, matching Keep-a-Changelog's "one subheading per
-section per version" expectation. -->
 
 ### Added
 

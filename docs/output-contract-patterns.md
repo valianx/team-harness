@@ -90,10 +90,10 @@ Patch/verify round narratives live in exactly one place: `failure-brief.md`. Eve
 that discusses an iteration references it by ID (`Iteration {N}`) and does not retell what
 happened in that round.
 
-**Canonical vehicle to imitate:** `agents/adversary.md` § Failure Brief — the section's
-5-10 line per-iteration contract (`## Iteration {N} — adversary — {timestamp}`, root-cause type,
-blast radius, breaks found, required changes). This is the shape every other agent's
-iteration-reference points back to; no other file restates the round's content.
+**Canonical vehicle:** `failure-brief.md` itself. Each iteration owns one compact entry;
+consumers point to its iteration ID and do not duplicate root cause, blast radius, failures,
+or required changes. `adversary` does not participate in autonomous patch iterations and
+reports only the frozen surface for its current `audit_run`.
 
 Consumers of this ban (`security`, `adversary`, `reviewer`, `reviewer-consolidator`, `qa`,
 `tester`, `delivery`, `plan-reviewer`, the orchestrator's `00-state.md` and
