@@ -10,7 +10,7 @@ itself lives only here (multi-site invariant, `01-plan.md`).
 86K/run) because each verifier re-read the same workspace narrative independently, with no
 shared-read mechanism across separate agent contexts. The packet applies the same
 build-once-read-many shape already used for `00-knowledge-context.md`
-(`agents/orchestrator.md § "Intake"`) to the Stage-2 verify block.
+(`agents/ref-pipeline.md § "Intake"`) to the Stage-2 verify block.
 
 ---
 
@@ -19,7 +19,7 @@ build-once-read-many shape already used for `00-knowledge-context.md`
 **Who:** the orchestrator, never a leaf agent.
 
 **When:** Phase 2.8 Freeze — after tester authoring, hygiene, build, lint, and frozen-diff
-creation succeed, before Phase 3 is launched. See `agents/orchestrator.md § Phase 2.8`.
+creation succeed, before Phase 3 is launched. See `agents/ref-pipeline.md § Phase 2.8`.
 
 **Where:** `{docs_root}/00-verify-packet.md` — one file per task, overwritten in place on
 every rebuild. **Never create a `00-verify-packet-v2.md` sibling** — the `Packet version`
@@ -30,7 +30,7 @@ header field is the versioning mechanism, not the filename.
 ## 1a. Tree-anchor algorithm (canonical — the ONLY place this command is defined)
 
 **This is the single, canonical definition of "the dirty-diff hash" / "tree anchor" cited
-throughout this project (`agents/orchestrator.md` — the Phase 2.8 fan-open recording, the
+throughout this project (`agents/ref-pipeline.md` — the Phase 2.8 fan-open recording, the
 STAGE-GATE-3 precondition, and the Phase 3 staleness-invariant note; `agents/_shared/delivery-mechanics.md
 § 6(c)`; `docs/suite-evidence.md § 4`). Every one of those sites CITES this section by
 pointer — none of them re-derives or restates the command.**
@@ -236,7 +236,7 @@ packet_integrity: ok | stale | mismatch | n-a
 ```
 
 The orchestrator propagates these into the `phase.end` event's `tools.packet` object (see
-`agents/orchestrator.md § "tools propagation"`).
+`agents/ref-pipeline.md § "tools propagation"`).
 
 ---
 
@@ -337,11 +337,11 @@ line as `UNMEASURABLE` — never as parity. N=0 always reads UNMEASURABLE, never
 
 **Telemetry-missing ALWAYS counts as fallback-signal, never as acceptance.** A backfilled
 event structurally cannot carry packet telemetry (the reconciliation backstop derives only
-`duration_ms` from breadcrumbs — see `agents/orchestrator.md § "Reconciliation backstop"`), so
+`duration_ms` from breadcrumbs — see `agents/ref-pipeline.md § "Reconciliation backstop"`), so
 counting it any other way would let emission loss impersonate packet acceptance.
 
 **What each run reports** (via the Task-1 `## Cost` checkpoint contract in
-`agents/orchestrator.md § Pipeline Summary Protocol` — the `## Verification Packet`
+`agents/ref-pipeline.md § Pipeline Summary Protocol` — the `## Verification Packet`
 section of `00-pipeline-summary.md`): the three-bucket breakdown above, and verifier catch
 rates read from the workspace verdict documents, not from `phase.end` telemetry — adversarial
 break count from `reviews/04-adversary.md`, qa AC-fail rate from

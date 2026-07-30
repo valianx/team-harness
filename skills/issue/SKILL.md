@@ -1,6 +1,7 @@
 ---
 name: issue
-description: Fetch a GitHub issue and route it through the pipeline.
+description: Fetch a GitHub issue and explicitly activate the gated pipeline.
+disable-model-invocation: true
 ---
 
 Analyze the input: $ARGUMENTS
@@ -27,6 +28,9 @@ name: issue
    - `needs-specify: false` — if the issue already has structured AC (Given/When/Then or checkboxes) and clear scope
 5. Pass ALL the issue data to the `orchestrator` agent:
    ```
+   Pipeline Activation: explicit
+   Activation Source: live operator invocation of /th:issue
+
    GitHub Issue Task:
    - Issue: #{number}
    - URL: {repo_url}/issues/{number}
@@ -53,6 +57,9 @@ name: issue
    - `needs-specify: false` — if the issue already has structured AC (Given/When/Then or checkboxes) and clear scope
 5. Pass ALL issues as a batch to the `orchestrator` agent:
    ```
+   Pipeline Activation: explicit
+   Activation Source: live operator invocation of /th:issue
+
    GitHub Issue Batch (N tasks):
 
    --- Task 1 ---

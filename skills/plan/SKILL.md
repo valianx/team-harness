@@ -1,6 +1,7 @@
 ---
 name: plan
 description: Break a broad scope into parallel tasks with dispatch labels.
+disable-model-invocation: true
 ---
 
 Analyze the input: $ARGUMENTS
@@ -16,6 +17,15 @@ Before processing the input, determine if the user wants **plan only** or **plan
 - **`plan`** (default) — if none of the above keywords are present
 
 Use the detected mode in the payload below. When in doubt, ask the user: "Do you want to just create the task breakdown (plan), or also implement each task (plan-and-execute)?"
+
+For `plan-and-execute` only, prepend:
+
+```text
+Pipeline Activation: explicit
+Activation Source: live operator invocation of /th:plan plan-and-execute
+```
+
+Plain `plan` mode remains direct and never carries this marker.
 
 ---
 name: plan

@@ -133,17 +133,17 @@ Alternatively, type `/th-update` inside opencode. The command instructs the agen
 
 ## Quick start
 
-After install, open Claude Code. The top-level session agent is **`th:orchestrator`** — the operator's single point of contact. You drive the pipeline by talking to it directly (no `@mention` needed); it frames the request and runs the gated execution pipeline itself. The entry points are:
+After install, open Claude Code. The top-level session agent is **`th:orchestrator`** — the operator's single point of contact. Talking to it directly stays lightweight; start the gated flow explicitly when you want its stages and specialist reviews. The entry points are:
 
-- `th:orchestrator` — the top-level session agent; just describe what you want
+- `th:orchestrator` — direct conversation, inspection, review, and bounded changes
+- `/th:pipeline <request>` — activate the gated multi-agent pipeline
 - `/th:setup` — configure logs-mode, vault path, and verify MCP connectivity
 - `/th:update` — update to the latest release
 
 ```
-give me the work plan for this task: <description>
-implement it
-open the PR
-recover <feature>
+explain how the auth middleware works
+/th:pipeline add export-to-CSV to invoices
+/th:recover export-to-csv
 ```
 
 Learn mode (explain a codebase, library, or concept with a layered teaching pack):
@@ -154,13 +154,13 @@ Learn mode (explain a codebase, library, or concept with a layered teaching pack
 /th:learn how does the LLM work in this ADK project --resume
 ```
 
-> **`th:orchestrator` is the canonical entry point.** Skills like `/th:design`, `/th:deliver`, `/th:recover` are optional shortcuts that route through the same coordination flow under the hood. See [`docs/agent-tree.md`](./docs/agent-tree.md) for how `th:orchestrator` and the leaf specialists relate at runtime.
+> **`th:orchestrator` is the canonical entry point.** It starts in lightweight direct mode. Use `/th:pipeline {request}` when you want the gated multi-agent flow; skills such as `/th:design` and `/th:deliver` remain direct shortcuts, while `/th:recover` resumes an existing pipeline. See [`docs/agent-tree.md`](./docs/agent-tree.md) for the runtime relationship.
 
 ---
 
 ## Orchestrator disposition
 
-The top-level session agent is **`th:orchestrator`** — no marker file or activation command required. It frames each request and runs the full pipeline automatically (architect → implementer → tester/qa/security → delivery), welding all three stage gates inside its own transcript. A deterministic gate (`hooks/dev-guard.sh`) fires unconditionally on every outward, irreversible action and gates by destination: pushing to a non-default branch on `origin` (no force, no default-branch destination) proceeds without a prompt, while pushing to the default branch, tag pushes, force pushes, `gh pr create`/`merge`/`review`/`comment`, `gh issue create`/`edit`/`comment`, ClickUp outward writes, and GitHub API writes still require explicit operator approval at the point of execution.
+The top-level session agent is **`th:orchestrator`**. Its small startup kernel handles conversation, inspection, review, and bounded reversible changes directly. It loads the gated pipeline (architect → implementer → tester/qa/security → delivery) only after a live `/th:pipeline`, an explicit request to start one, or `/th:recover` for persisted state. A deterministic gate (`hooks/dev-guard.sh`) still governs outward actions independently of either posture.
 
 Full contract: docs/dev-mode.md.
 

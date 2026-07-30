@@ -7,19 +7,19 @@ best-effort post-PR tail — PR body text, CHANGELOG entry text, README/CLAUDE.m
 memory updates, worktree teardown, release-tag verification, KG passive capture, obsidian
 interlinking, and initiative-overview data — see `agents/delivery.md`. `docs/knowledge.md`,
 `docs/decisions.md`, and `docs/patterns.md` capture is a SEPARATE, earlier `delivery` dispatch
-(`mode: knowledge-capture`, before this file's procedures ever run — `agents/orchestrator.md
+(`mode: knowledge-capture`, before this file's procedures ever run — `agents/ref-pipeline.md
 § "Phase 2.75 — Knowledge Capture"`), not part of the prose half this file assumes has already
 returned. That post-gate tail stays with `delivery` deliberately: every one of those steps
 already tolerates running before its trigger condition holds (a PR not yet merged, no
 initiative context) by logging a named `skipped:` outcome — there is no ordering conflict to
-resolve by relocating them. `agents/orchestrator.md § Phase 4 — Delivery` points here by
+resolve by relocating them. `agents/ref-pipeline.md § Phase 4 — Delivery` points here by
 reference; do not re-derive or paraphrase this file's procedures inline there.
 
 **Why this split exists, and why it lives in `_shared/` rather than inline in
-`agents/orchestrator.md`.** A step with one mechanically correct answer belongs to the
+`agents/ref-pipeline.md`.** A step with one mechanically correct answer belongs to the
 coordinator; a step needing judgment belongs to the lens that judges it. This file is read
 once, at Phase 4 — never at boot, unlike anything inlined directly into
-`agents/orchestrator.md`, which every dispatch pays for. Same pattern as
+`agents/ref-pipeline.md`, which is loaded only for an active pipeline. Same pattern as
 `agents/_shared/dispatch-contract.md` and `agents/_shared/gate-contract.md`.
 
 **Ordering — this file's procedures run in the order listed**, immediately after
@@ -29,7 +29,7 @@ returned with its prose artifacts on disk (`README.md`, `CLAUDE.md`,
 `03-testing.md`, and the PR-body draft at `workspaces/{feature-name}/inputs/pr-body-draft.md`).
 `docs/knowledge.md`, `docs/decisions.md`, and `docs/patterns.md` are produced earlier, by
 `delivery`'s own pre-gate `mode: knowledge-capture` dispatch
-(`agents/orchestrator.md § "Phase 2.75 — Knowledge Capture"`), and are already committed by the
+(`agents/ref-pipeline.md § "Phase 2.75 — Knowledge Capture"`), and are already committed by the
 time this file's procedures run — never staged or written here.
 
 ---
@@ -42,7 +42,7 @@ version change is detected in the diff that this run did not author, treat it as
 unauthorized bump: do NOT proceed until the change is reverted or the operator confirms it
 intentional. An over-bump above the mechanical SemVer floor (e.g. a MINOR applied to a
 PATCH-floor diff) requires a `bump-override: {level} — <reason>` justification, surfaced at
-STAGE-GATE-3 (`agents/orchestrator.md § "STAGE-GATE-3"`, `bump_override` gate-data field) and
+STAGE-GATE-3 (`agents/ref-pipeline.md § "STAGE-GATE-3"`, `bump_override` gate-data field) and
 recorded as a PR-body/commit-trailer line — this is prose-only, reviewed by the operator at
 that gate; no unwired hook enforces it mechanically.
 
@@ -172,7 +172,7 @@ git add docs/constraints.md docs/testing.md  # only if this dispatch's CLAUDE.md
                                               # and NEVER docs/knowledge.md / docs/decisions.md /
                                               # docs/patterns.md, which are committed pre-gate by
                                               # delivery's own mode: knowledge-capture dispatch
-                                              # (agents/orchestrator.md § "Phase 2.75 — Knowledge
+                                              # (agents/ref-pipeline.md § "Phase 2.75 — Knowledge
                                               # Capture") and are never staged here
 git add README.md             # only if delivery modified it
 git add openapi/openapi.yaml  # only if updated
@@ -250,7 +250,7 @@ substantive_files=$(( diff_files - mechanical_files ))
 
 Report `diff_composition: {total_lines, total_files, mechanical_files, substantive_files}` at
 STAGE-GATE-3 preparation, adjacent to the Pre-Delivery Security Audit's own `audit_coverage`
-self-declaration (`agents/orchestrator.md § "STAGE-GATE-3"`) — computed independently, so a
+self-declaration (`agents/ref-pipeline.md § "STAGE-GATE-3"`) — computed independently, so a
 self-declared `full` coverage claim against a diff whose `substantive_files` count is large
 reads as visibly implausible next to it.
 
@@ -288,7 +288,7 @@ fetch would read a ref last refreshed at Phase 2.8 and could return `0` on a bas
 since advanced, failing open on exactly the defect this leg exists to catch.
 
 A non-zero count — even after STAGE-GATE-3 recorded `ship` — re-opens Phase 2.8 → Phase 3 →
-STAGE-GATE-3 (`agents/orchestrator.md § "Phase 2.8 — Freeze"`) and is never resolved by a
+STAGE-GATE-3 (`agents/ref-pipeline.md § "Phase 2.8 — Freeze"`) and is never resolved by a
 merge or rebase that continues to the push.
 
 **The pre-existing `origin/{branch-name}` divergence leg is removed, not retained beside
@@ -330,7 +330,7 @@ CHANGELOG.md, changelog.d/**
 {the three declared version sites, per § 1}
 docs/knowledge.md — restricted to the `[kg]` bullet-append ONLY (Phase 6's own
                      mechanically-generated write, one line per saved KG entity;
-                     agents/orchestrator.md § "Phase 6 — Knowledge Save"; no other
+                     agents/ref-pipeline.md § "Phase 6 — Knowledge Save"; no other
                      content is allowlisted here)
 README.md
 CLAUDE.md §3, §8, §9
@@ -339,7 +339,7 @@ CLAUDE.md §3, §8, §9
 `docs/decisions.md` and `docs/patterns.md` are REMOVED from this allowlist (security-hardening
 round, C1) — they are no longer post-gate writes at all. Their content is produced and
 committed earlier, by `delivery`'s pre-gate `mode: knowledge-capture` dispatch
-(`agents/orchestrator.md § "Phase 2.75 — Knowledge Capture"`), inside the tree the fan audits;
+(`agents/ref-pipeline.md § "Phase 2.75 — Knowledge Capture"`), inside the tree the fan audits;
 a change to either path detected at THIS check now correctly fails closed like any other
 out-of-allowlist path, rather than passing silently as it did before this round.
 

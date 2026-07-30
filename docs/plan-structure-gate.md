@@ -38,13 +38,13 @@ now owns everything a script CAN decide, leaving only genuine judgment on the mo
 
 ## 2. Layer 1 — Phase 1.5a Plan-Structure Scan (deterministic)
 
-**Owner:** `agents/orchestrator.md` — not a subagent dispatch, a Bash gate the orchestrator runs
+**Owner:** `agents/ref-pipeline.md` — not a subagent dispatch, a Bash gate the orchestrator runs
 itself (same shape as the Phase 2.6 Code-Hygiene Scan and the Phase 2-close scope/backstop
 checks).
 
 **When:** immediately before any Phase 1.5 `qa-plan` dispatch, for every plan that reaches Phase
 1.5 — i.e., every plan that does NOT take the self-authored-plan panel carve-out
-(`agents/orchestrator.md § "Phase 1.5 — Plan Ratification"`, T2-AC-2). A self-authored plan
+(`agents/ref-pipeline.md § "Phase 1.5 — Plan Ratification"`, T2-AC-2). A self-authored plan
 (hotfix / Tier-1-fix / express one-line plan) is a fixed 3-4 line task list with no
 `### Summary` table, no multi-task DAG, and no cross-task `Files:` field to check — the
 carve-out's own deterministic self-check item "at least one task exists" already covers the
@@ -125,12 +125,12 @@ gate by construction — see `docs/knowledge.md` node
 
 | Invariant | Site class | File | Anchor / field |
 |---|---|---|---|
-| Layer 1 scan — primary dispatch path | scan-site A1 | `agents/orchestrator.md` | `## Phase 1.5a — Plan-Structure Scan` |
-| Layer 1 scan — skip condition (self-authored-plan carve-out) | scan-site A2 | `agents/orchestrator.md` | `## Phase 1.5 — Plan Ratification` § "Skip when — self-authored-plan panel carve-out" |
-| `plan_structure` PRODUCER | producer B1 | `agents/orchestrator.md` | `## Phase 1.5a` verdict-handling table |
-| `plan_structure` CONSUMER — Phase 1.5 gate | consumer C1 | `agents/orchestrator.md` | `## Phase 1.5a` (blocks `qa-plan` dispatch on `fail`) |
+| Layer 1 scan — primary dispatch path | scan-site A1 | `agents/ref-pipeline.md` | `## Phase 1.5a — Plan-Structure Scan` |
+| Layer 1 scan — skip condition (self-authored-plan carve-out) | scan-site A2 | `agents/ref-pipeline.md` | `## Phase 1.5 — Plan Ratification` § "Skip when — self-authored-plan panel carve-out" |
+| `plan_structure` PRODUCER | producer B1 | `agents/ref-pipeline.md` | `## Phase 1.5a` verdict-handling table |
+| `plan_structure` CONSUMER — Phase 1.5 gate | consumer C1 | `agents/ref-pipeline.md` | `## Phase 1.5a` (blocks `qa-plan` dispatch on `fail`) |
 | Layer 2 judgment scope | judgment | `agents/qa-plan.md` | § Ratify-Plan (judgment-layer-only scope, Task-4 scope) |
-| Observability | event | `agents/orchestrator.md` (event enum) + `docs/observability.md` | `plan_structure` |
+| Observability | event | `agents/ref-pipeline.md` (event enum) + `docs/observability.md` | `plan_structure` |
 
 **Rule for any future edit to this contract:** touching one row of this table without touching
 every other row in the same change is the failure mode this gate exists to prevent.

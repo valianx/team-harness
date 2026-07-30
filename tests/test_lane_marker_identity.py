@@ -52,9 +52,10 @@ CHECKPOINT_GUARD_TS = REPO_ROOT / "hooks" / "ts" / "bodies" / "checkpoint-guard.
 SUBAGENT_START_TS = REPO_ROOT / "hooks" / "ts" / "bodies" / "subagent-start.ts"
 
 # Candidate sites that could carry a reintroduced TH-LANE injector: the
-# coordinator's own dispatch contract and its lazy-loaded reference file
-# for multi-project sequencing.
-ORCHESTRATOR_MD = REPO_ROOT / "agents" / "orchestrator.md"
+# active pipeline dispatch contract and its lazy-loaded reference file for
+# multi-project sequencing. The lightweight startup kernel carries neither
+# pipeline dispatch payload.
+REF_PIPELINE_MD = REPO_ROOT / "agents" / "ref-pipeline.md"
 REF_DISPATCH_MACHINERY_MD = REPO_ROOT / "agents" / "ref-dispatch-machinery.md"
 
 results: list[tuple[bool, str]] = []
@@ -122,11 +123,11 @@ if not (state_ref_anchored and lane_anchored):
 # ---------------------------------------------------------------------------
 # Injector side — TH-STATE-REF: still stamped, hard requirement.
 # ---------------------------------------------------------------------------
-orchestrator_src = read(ORCHESTRATOR_MD)
+pipeline_src = read(REF_PIPELINE_MD)
 check(
-    "agents/orchestrator.md carries the identical TH-STATE-REF: literal",
-    "TH-STATE-REF:" in orchestrator_src,
-    "orchestrator.md's specialist-dispatch payload does not stamp the "
+    "agents/ref-pipeline.md carries the identical TH-STATE-REF: literal",
+    "TH-STATE-REF:" in pipeline_src,
+    "ref-pipeline.md's specialist-dispatch payload does not stamp the "
     "exact literal checkpoint-guard.ts parses — marker drift",
 )
 
@@ -138,7 +139,7 @@ check(
 _NEAR_MISS_RE = re.compile(r"\bTH[-_]LANE\b", re.IGNORECASE)
 
 for _label, _path in (
-    ("agents/orchestrator.md", ORCHESTRATOR_MD),
+    ("agents/ref-pipeline.md", REF_PIPELINE_MD),
     ("agents/ref-dispatch-machinery.md", REF_DISPATCH_MACHINERY_MD),
 ):
     _text = read(_path)

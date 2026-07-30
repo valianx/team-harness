@@ -209,7 +209,7 @@ internal mechanics into shipped code, but does not affect correctness).
 **Stage-2 enforcement (mechanical + judgment).** The `comment-rot` lens above runs at Stage-3
 review (advisory, non-blocking). `docs/code-hygiene-gate.md` documents the Stage-2 enforcement
 layer that turns this guide's §4 forbidden-cruft list into a blocking gate: a deterministic
-pre-verify scan (`agents/orchestrator.md § Phase 2.6`) plus a judgment audit
+pre-verify scan (`agents/ref-pipeline.md § Phase 2.6`) plus a judgment audit
 (`agents/qa.md § Code Hygiene`) — see that file for the canonical pattern set and the full
 execution-site enumeration.
 

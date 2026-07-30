@@ -311,7 +311,7 @@ The agent cannot reliably attach local files. `clickup_attach_task_file` accepts
 
 ### Closing a ClickUp-originated task — mandatory
 
-Any task that originated from ClickUp — started via `task <id>`, or routed from a ClickUp task into the team-harness pipeline (see `agents/orchestrator.md` Step 6c "route task" intent) — MUST be closed with a functional comment on that ClickUp task when the work completes. The comment describes what was done in terms of the effect for the user / SAC / operations, following the rules in § "Comments". This is not optional: a ClickUp-originated task left without a closing comment is incomplete work.
+Any task that originated from ClickUp — started via `task <id>`, or routed from a ClickUp task into the team-harness pipeline (see `agents/ref-pipeline.md` Step 6c "route task" intent) — MUST be closed with a functional comment on that ClickUp task when the work completes. The comment describes what was done in terms of the effect for the user / SAC / operations, following the rules in § "Comments". This is not optional: a ClickUp-originated task left without a closing comment is incomplete work.
 
 When the task is routed through the pipeline, the orchestrator persists the originating task reference in `00-state.md § Current State` (`clickup_task_id` and `clickup_task_url`) at intake, so the closing comment can be posted at delivery (Phase 5) even after context compaction or a recovery resume.
 
@@ -320,7 +320,7 @@ When the task is routed through the pipeline, the orchestrator persists the orig
 - It is functional, not implementation detail.
 - PR or branch references are secondary, on a trailing line.
 
-When the task ran through the full pipeline, the orchestrator's Phase 5 (GitHub Update) carries the equivalent obligation for the ClickUp origin — see `agents/orchestrator.md` § "Phase 5 — GitHub Update". The principal contract lives here in the skill; the orchestrator reference exists so the pipeline honors it when the origin is a ClickUp task rather than a GitHub issue.
+When the task ran through the full pipeline, the orchestrator's Phase 5 (GitHub Update) carries the equivalent obligation for the ClickUp origin — see `agents/ref-pipeline.md` § "Phase 5 — GitHub Update". The principal contract lives here in the skill; the orchestrator reference exists so the pipeline honors it when the origin is a ClickUp task rather than a GitHub issue.
 
 ## Transient-error retry policy
 

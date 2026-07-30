@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-07-30
+
+### Added
+
+- Added the operator-only `/th:pipeline` command as the canonical entry to the gated Team Harness
+  flow, distinct from the read-only `/th:pipelines` status command.
+
+### Changed
+
+- Made direct conversation, inspection, review, and bounded reversible changes the default startup
+  posture. Broad or sensitive direct work now recommends pipeline activation instead of silently
+  entering one.
+- Split the coordinator into an 881-word startup kernel and a lazy-loaded pipeline reference of
+  roughly 20.7K words. Activation and execution load only the sections needed for the current
+  transition.
+- Preserved `/th:issue`, `/th:recover`, and `/th:plan` `plan-and-execute` as explicit compatibility
+  entries to the gated flow.
+
 ## [3.0.3] - 2026-07-30
 
 ### Changed
@@ -69,7 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MAJOR/breaking.** The two-agent pipeline coordinator (`th:leader` top-level session agent +
   `th:orchestrator` per-task subagent) is fused into one: the top-level agent IS `th:orchestrator`,
   dispatching every specialist directly and never dispatching another coordinator, including a copy
-  of itself. `agents/orchestrator.md § Intake` / `§ Specify` / `§ Intent routing` absorb Intake,
+  of itself. `agents/ref-pipeline.md § Intake` / `§ Specify` / `§ Intent routing` absorb Intake,
   Discover framing, Specify, and the direct-mode specialist dispatch — the function the original
   two-agent framing omitted.
 - Multi-project initiative mode is retained, but sequencing is now serial: `agents/ref-dispatch-machinery.md § "Multi-project sequencing"` runs one project at a time; reopening parallel dispatch requires changing the coordinator's own no-self-dispatch invariant in a plan, never a local exception.
@@ -88,7 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   snapshots, section counts, cross-file wording parity, a `grep` oracle, a model self-reporting
   compliance, and a test pinned to a retired architecture. `grep` stays a valid enumerator and is
   not a valid decider.
-- **A central failure taxonomy** (`agents/orchestrator.md § Failures`): nine observable causes, each
+- **A central failure taxonomy** (`agents/ref-pipeline.md § Failures`): nine observable causes, each
   with an owner, a retry budget and a next transition. Every specialist status block now carries
   `failure_kind` when it fails or blocks — 35 templates across 24 agents. Two kinds
   (`contradiction`, `reclassification-needed`) carry no budget at all, because the blocker is a
@@ -147,7 +165,7 @@ Version bump: `3.0.0` across `.claude-plugin/plugin.json`, `.claude-plugin/marke
 - Delivery splits into a prose writer (`agents/delivery.md`) and a deterministic script (new `agents/_shared/delivery-mechanics.md`) the coordinator executes directly, replacing the old `mode: prepare`/`mode: publish` two-dispatch split with one dispatch preceded by STAGE-GATE-3.
 - The coordinator's new Phase 2.8 (Freeze) fetches the default branch and re-checks base-advance before every Phase 3 fan-out, closing a defect where the Pre-Delivery Security Audit could review a base that had since moved.
 - STAGE-GATE-3 repositions immediately before Phase 4 (Delivery), and the push step re-reads `gate3_release`/`gate_nonce` immediately before pushing rather than trusting an earlier record.
-- `agents/orchestrator.md § Iteration Rules` adds a pre-dispatch gate distinguishing a contradiction or a recurrence (escalate to the operator) from a mechanical, enumerated finding (dispatch a correction round), plus a removal-over-addition remediation preference.
+- `agents/ref-pipeline.md § Iteration Rules` adds a pre-dispatch gate distinguishing a contradiction or a recurrence (escalate to the operator) from a mechanical, enumerated finding (dispatch a correction round), plus a removal-over-addition remediation preference.
 
 ### Removed
 - STAGE-GATE-2, Phase 3.75 (Build Verification) and Phase 3.8 (Pre-Delivery Security Audit) as standalone sections, and Phase 4.5 (Internal Review) — each absorbed into the collapsed shape above, with the delivery-authored diff itself bounded by a verified post-gate write allowlist rather than a dedicated review lens.
@@ -238,7 +256,7 @@ Version bump: `3.0.0` across `.claude-plugin/plugin.json`, `.claude-plugin/marke
 ## [2.136.0] - 2026-07-21
 
 ### Added
-- Stage-1 plan-review panel (`qa-plan` ratification + `plan-reviewer` shape audit) is now deferred-by-default for a non-sensitive, architect-authored plan: the panel no longer dispatches pre-gate, `STAGE-GATE-1` presents a `deferred (non-sensitive)` note instead of a combined verdict, and a new post-approval **Phase 1.8 — Post-approval Plan-Review Offer** (leader-relayed checkpoint, no dual-record) lets the operator run the panel on demand or proceed. New `/th:plan-review` skill routes to the existing `plan-review` direct mode for on-demand invocation at any time. The deterministic Phase 1.5a structural scan still always runs. The `SEC-002` security design-review floor is unaffected — it remains non-deferrable on every lane, reaffirmed with an explicit statement and locked by a new regression test. Canonical: `agents/orchestrator.md § Phase 1.5/1.6/1.8`, `agents/_shared/gate-contract.md`.
+- Stage-1 plan-review panel (`qa-plan` ratification + `plan-reviewer` shape audit) is now deferred-by-default for a non-sensitive, architect-authored plan: the panel no longer dispatches pre-gate, `STAGE-GATE-1` presents a `deferred (non-sensitive)` note instead of a combined verdict, and a new post-approval **Phase 1.8 — Post-approval Plan-Review Offer** (leader-relayed checkpoint, no dual-record) lets the operator run the panel on demand or proceed. New `/th:plan-review` skill routes to the existing `plan-review` direct mode for on-demand invocation at any time. The deterministic Phase 1.5a structural scan still always runs. The `SEC-002` security design-review floor is unaffected — it remains non-deferrable on every lane, reaffirmed with an explicit statement and locked by a new regression test. Canonical: `agents/ref-pipeline.md § Phase 1.5/1.6/1.8`, `agents/_shared/gate-contract.md`.
 
 ## [2.135.1] - 2026-07-21
 
@@ -250,7 +268,7 @@ Version bump: `3.0.0` across `.claude-plugin/plugin.json`, `.claude-plugin/marke
 ## [2.135.0] - 2026-07-20
 
 ### Added
-- Pre-Delivery Security Audit (orchestrator Phase 3.8): `security` and `adversary` now run exactly ONCE per delivery group, over the consolidated final diff, after Acceptance Check and before Delivery prepare — `security` unconditionally, `adversary` when `security_floor_applies` (`security_sensitive == true`, fail-closed). Findings are presented verbatim in the STAGE-GATE-3 STOP block and disposed by the operator: `ship` stays available with open findings (acceptance recorded in the decision ledger), `amend` triggers a single delta-scoped re-audit, `abort` halts. New `00-state.md` field `audit_status` gates STAGE-GATE-3 preparation. Canonical: `agents/orchestrator.md § Phase 3.8`, `docs/pipeline-lanes.md § 7`.
+- Pre-Delivery Security Audit (orchestrator Phase 3.8): `security` and `adversary` now run exactly ONCE per delivery group, over the consolidated final diff, after Acceptance Check and before Delivery prepare — `security` unconditionally, `adversary` when `security_floor_applies` (`security_sensitive == true`, fail-closed). Findings are presented verbatim in the STAGE-GATE-3 STOP block and disposed by the operator: `ship` stays available with open findings (acceptance recorded in the decision ledger), `amend` triggers a single delta-scoped re-audit, `abort` halts. New `00-state.md` field `audit_status` gates STAGE-GATE-3 preparation. Canonical: `agents/ref-pipeline.md § Phase 3.8`, `docs/pipeline-lanes.md § 7`.
 - Cost-ordered Phase-3 verify re-run sequencing: a patch-mode re-run now runs the cheap, deterministic R0 test gate first, attributes each remaining failure to its owning lens by brief header, re-dispatches only the owner lens (R1), then confirms with a single delta-scoped dispatch of the non-owner lens (R2) — scoped to Case A localized iterations over `tester`/`qa`. Canonical contract: `docs/patch-mode.md`, wired into `agents/orchestrator.md`; cross-referenced from `docs/pipeline-lanes.md § 7`.
 - `docs/dev-mode.md § "Threat model — honest-developer disposition"` — CLAUDE.md §6.6's threat-model statement (disposition-boundary vs. adversarial-boundary distinction) relocated to its full form here, with a short pointer left in CLAUDE.md, as part of the CLAUDE.md §7b size-hygiene remediation below.
 - Suite 171 (`tests/test_agent_structure.py`): structural contract for the audit model — dispatch semantics, single-computation-site predicate, negative-residue sweeps, gate presentation, and cross-file coordination. Registered in `docs/testing.md`.
@@ -430,7 +448,7 @@ Version bump: `3.0.0` across `.claude-plugin/plugin.json`, `.claude-plugin/marke
 ### Added
 
 - Gated local permission provisioning for the obsidian workspace and cross-repo work surfaces (#462): `/th:setup` § 3a offers to write `Edit`/`Write` rules (double-slash `//` anchor) plus an `additionalDirectories` entry for the obsidian vault to `~/.claude/settings.json`; the orchestrator's Phase 0a Step 1g re-offers the same obsidian rules on existing installs and offers scoped rules for declared cross-repo work-surface paths to `.claude/settings.local.json`. Every write is gated by an explicit Y/n, merge-write-whole-document, and reported; already-provisioned rules are a silent pass-through; outward-action rules (push/PR/API) are never touched. See `docs/permission-provisioning.md`.
-- Dispatch-time intra-task execution-lane decomposition (#454): the architect may declare `Lane-decomposable: yes` with file-disjoint `seams:` and read-only `frozen-contracts:` for an oversized task; the orchestrator's Stage-2 dispatch gate fans out that task's EXECUTION into up to `LANE_CAP` (5) fresh-context implementer lanes when the task's file count meets `LANE_DECOMPOSE_MIN_FILES` (8), capped at `GLOBAL_ROUND_CONCURRENCY_CAP` (6) concurrent implementer subagents per round. A lane that must modify a frozen-contract returns `status: blocked, reason: seam-not-disjoint`, triggering a monolithic re-dispatch of the whole task — never a silent stop. The task's DELIVERABLE (plan, commit set, PR) is never divided; only EXECUTION may fan out. See `agents/orchestrator.md § Phase 2 — Implementation → Intra-task execution-lane decomposition` and `docs/parallel-batch-implementation.md § Intra-task lane fan-out`.
+- Dispatch-time intra-task execution-lane decomposition (#454): the architect may declare `Lane-decomposable: yes` with file-disjoint `seams:` and read-only `frozen-contracts:` for an oversized task; the orchestrator's Stage-2 dispatch gate fans out that task's EXECUTION into up to `LANE_CAP` (5) fresh-context implementer lanes when the task's file count meets `LANE_DECOMPOSE_MIN_FILES` (8), capped at `GLOBAL_ROUND_CONCURRENCY_CAP` (6) concurrent implementer subagents per round. A lane that must modify a frozen-contract returns `status: blocked, reason: seam-not-disjoint`, triggering a monolithic re-dispatch of the whole task — never a silent stop. The task's DELIVERABLE (plan, commit set, PR) is never divided; only EXECUTION may fan out. See `agents/ref-pipeline.md § Phase 2 — Implementation → Intra-task execution-lane decomposition` and `docs/parallel-batch-implementation.md § Intra-task lane fan-out`.
 
 ### Changed
 
@@ -489,7 +507,7 @@ Version bump: `3.0.0` across `.claude-plugin/plugin.json`, `.claude-plugin/marke
 - `english_learning` is decoupled from `language: en` in both the Bash and TS `session-start` hook bodies (and the regenerated TS dist): skills no longer force-write `language: en` when English-learning mode is enabled, making immersion mode opt-in and independent of response language.
 - Reserved "PR" for the GitHub pull request across the pipeline (issue #444). The plan's decomposition unit is renamed from `PR-N` to `Task-N` (`agents/architect.md § Task List`, `plan-reviewer`, `qa`, `qa-plan`, `implementer`, `orchestrator`, `delivery`, `ref-special-flows`, and the relevant docs/skills). The `PR identifier` dispatch token becomes `Task identifier`; per-PR AC/scoping language becomes per-task. A new `### Delivery Grouping` field on `01-plan.md § Task List` declares how tasks map to PRs (default: `all-tasks-one-pr`); the fixed "one task = one PR" identity is dropped in favor of this explicit field. `plan-reviewer` Rule 1 now audits Delivery Grouping instead of "one PR per service"; Rule 9's base check targets the grouping. Every `gh pr` / "pull request" / `/review-pr` occurrence is byte-unchanged; `agents/ref-direct-modes.md` and `docs/opencode-model-config.md` are excluded from the rename (verified GitHub-sense only).
 - De-marketplaced the shipped version-bump default (item 5). The shipped `delivery`/`orchestrator` flow no longer defaults to `skip-version: true`; `delivery` bumps the project version once per PR at assembly unless the consuming repository documents its own repo-local versioning/release deferral convention (a generic escape hatch). The plugin-distribution batching machinery (`/th:release`, `changelog.d/`, `version.d/`, the three-site bump, and the cache-invalidation rationale) is relocated to team-harness's own `CLAUDE.md §6.3` and `docs/cost-and-caching.md`, framed explicitly as an internal distribution rule of this repository. `skills/release/SKILL.md` is documented as team-harness-internal release tooling.
-- Disambiguated multi-task vs multi-project dispatch scoping. Single-project multi-TASK dispatch (`agents/orchestrator.md § Multi-Task Orchestration`) is explicitly parallel-by-default and ungated by a parallelism confirm; the multi-PROJECT initiative fan-out (`§ Parallel Multi-Project Dispatch`) is explicitly scoped to ≥2 projects and stays confirm-gated. Removes the "never/always/automatic" vocabulary collision that made the running agent default conservative (ask + go sequential) for a single-repo multi-task scope. No gate was deleted.
+- Disambiguated multi-task vs multi-project dispatch scoping. Single-project multi-TASK dispatch (`agents/ref-pipeline.md § Multi-Task Orchestration`) is explicitly parallel-by-default and ungated by a parallelism confirm; the multi-PROJECT initiative fan-out (`§ Parallel Multi-Project Dispatch`) is explicitly scoped to ≥2 projects and stays confirm-gated. Removes the "never/always/automatic" vocabulary collision that made the running agent default conservative (ask + go sequential) for a single-repo multi-task scope. No gate was deleted.
 - Enforced the always-run decomposition analysis (Step 9) with three valid outcomes — one atomic task, N independent tasks (Multi-Task Orchestration), or an oversized-cohesive task surfaced to the operator — and reconciled it with the operator-authority invariant via an explicit decomposition-vs-division distinction (`agents/ref-special-flows.md § Operator-authority invariant`).
 
 ### Fixed
@@ -614,7 +632,7 @@ Version bump: `3.0.0` across `.claude-plugin/plugin.json`, `.claude-plugin/marke
 - **Flow telemetry emission (v2.118.0):** `agents/orchestrator.md` gains a new `## Flow Telemetry Emission` section defining the 8-event pipeline friction signal catalog (`guard.block`, `gate.fail`, `verify.reject`, `iteration.loop`, `blocked`, `scope.collapse`, `mcp.unavailable`, `abandon`). When `flow_telemetry.enabled: true` in `~/.claude/.team-harness.json` (default: false), the orchestrator emits best-effort, metadata-only payloads to `context-harness-mcp` via `mcp__memory__record_flow_event` at existing friction points. Any emission error logs `flow-telemetry: unavailable` and the pipeline continues unchanged (emission is non-blocking). The event enum is a multi-site invariant byte-identical to `context-harness-mcp/internal/validate/flowevent.go` (coordinated two-repo change required to add or rename values).
 - **`flow_telemetry.enabled` config key:** `skills/setup/SKILL.md` adds Step 4f and a `flow-telemetry` intent route so operators can opt in to flow telemetry via `/th:setup flow-telemetry` or the full interactive setup. The key defaults to `false`; absence means OFF. Stored namespaced as `{"flow_telemetry": {"enabled": true}}` in `~/.claude/.team-harness.json` via the existing merge-write-whole-document contract (no other keys destroyed).
 - **Two-plane observability documentation:** `docs/observability.md` gains a `## Two observability planes` section that explicitly documents the **local** plane (`00-execution-events.{jsonl|md}`, always active, unchanged) as separate from the **cross-user** flow-event plane (opt-in telemetry channel). The local plane schema and all existing sections are unchanged.
-- **AC-2.7 cross-repo schema-identity guard (Suite 127):** `tests/test_flow_event_schema_sync.py` is a new standalone test that fetches `context-harness-mcp/internal/validate/flowevent.go` (raw GitHub URL pinned to the merged PR-1 commit) and asserts byte-identity between the CH event enum and the catalog in `agents/orchestrator.md § Flow Telemetry Emission`. On network failure the test emits a clear warning and exits 0 (SKIP) so it never false-reds CI in offline environments. Together with CH's runtime `flow_event_rejected` relay (AC-1.9), schema drift is caught both statically in CI and at runtime in Axiom.
+- **AC-2.7 cross-repo schema-identity guard (Suite 127):** `tests/test_flow_event_schema_sync.py` is a new standalone test that fetches `context-harness-mcp/internal/validate/flowevent.go` (raw GitHub URL pinned to the merged PR-1 commit) and asserts byte-identity between the CH event enum and the catalog in `agents/ref-pipeline.md § Flow Telemetry Emission`. On network failure the test emits a clear warning and exits 0 (SKIP) so it never false-reds CI in offline environments. Together with CH's runtime `flow_event_rejected` relay (AC-1.9), schema drift is caught both statically in CI and at runtime in Axiom.
 
 ### Fixed
 
@@ -894,8 +912,8 @@ Version bump: `3.0.0` across `.claude-plugin/plugin.json`, `.claude-plugin/marke
 - `worktree:` declaration block added to the `01-plan.md` PR output template in `agents/architect.md` (rule 5: plan declares the worktree).
 
 ### Changed
-- `agents/orchestrator.md § Multi-Task Orchestration Step 4b` — added pre-launch collision check (rule 2): before `git worktree add`, verify no worktree path or branch of the target name exists; STOP and ask the operator on collision (never silently reuse, #51596).
-- `agents/orchestrator.md § Multi-Task Orchestration Step 6 Cleanup` — worktree teardown removed from this step; re-anchored to PR merge in `delivery.md` (rule 3: finished means PR merged; worktree lives through review).
+- `agents/ref-pipeline.md § Multi-Task Orchestration Step 4b` — added pre-launch collision check (rule 2): before `git worktree add`, verify no worktree path or branch of the target name exists; STOP and ask the operator on collision (never silently reuse, #51596).
+- `agents/ref-pipeline.md § Multi-Task Orchestration Step 6 Cleanup` — worktree teardown removed from this step; re-anchored to PR merge in `delivery.md` (rule 3: finished means PR merged; worktree lives through review).
 - `agents/delivery.md` — added Step 11.4b: post-merge worktree teardown (rules 3+4). Reads `worktree:` from `00-state.md`; clean → `git worktree remove` + `git worktree prune` + verify-absent in `git worktree list`; dirty → STOP. `worktree_teardown:` added to the delivery status block.
 - `agents/reviewer.md` — PR reviews now use an isolated worktree (create on review start → compare against base → remove on review completion); `worktree_teardown:` field added to the fresh-review status block; teardown trigger (review complete) documented alongside the implement worktree's trigger (PR merge) in `docs/worktree-discipline.md § Reviewing a PR`.
 - `CLAUDE.md §5` — added a tight pointer bullet for the worktree discipline with the start-gate decision, the U1 boundary statement, and a link to `docs/worktree-discipline.md`.

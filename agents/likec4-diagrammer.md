@@ -282,7 +282,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: likec4-diagrammer
 status: success | failed | blocked
-failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature}/diagram.c4
 views: {list of view names}

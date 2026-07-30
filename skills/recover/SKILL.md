@@ -1,9 +1,10 @@
 ---
 name: recover
 description: Resume an interrupted pipeline from where it left off.
+disable-model-invocation: true
 ---
 
-Recover an interrupted pipeline from where it left off. Routes to the **orchestrator** (the top-level session agent) with full recovery context. The orchestrator re-reads its own `00-state.md § Current State` dual-record on resume and returns a `gate_pending` for any un-cleared STAGE-GATE, which it prepares and presents to the operator inline in the same operation — no second agent relays the decision (`agents/orchestrator.md § orchestrator-recover`). This skill records nothing and presents no gate itself.
+Recover an interrupted pipeline from where it left off. Routes to the **orchestrator** (the top-level session agent) with full recovery context. The orchestrator re-reads its own `00-state.md § Current State` dual-record on resume and returns a `gate_pending` for any un-cleared STAGE-GATE, which it prepares and presents to the operator inline in the same operation — no second agent relays the decision (`agents/ref-pipeline.md § orchestrator-recover`). This skill records nothing and presents no gate itself.
 
 Analyze the input: $ARGUMENTS
 
@@ -27,7 +28,7 @@ Before any pipeline work resumes, check whether the current or next step is a ST
 
 Any other decision value (`rejected`, `edit`, `stop`, `redo`, `amend`, `abort`), a null field, or a missing field means the gate is NOT cleared. Do not infer approval from `next_action` prose — never infer gate-cleared status from `next_action` or any other prose field. The gate-cleared determination is structural (per-gate release field + events trace), not prose. STAGE-GATE-3 (the human push/PR gate) is especially critical: it must never be bypassed on recovery.
 
-**Single writer, single presenter.** This skill is read-only: it runs the structural check above ONLY to surface which gate is un-cleared, so the operator sees the right context before the orchestrator resumes — it never records a release and presents no gate itself. The un-cleared determination is prepared inside that pipeline's own `th:orchestrator`, which re-reads its own `00-state.md § Current State` dual-record on resume and returns a `gate_pending` for any un-cleared STAGE-GATE (`agents/orchestrator.md § orchestrator-recover`), presenting it to the operator inline and recording the release itself once a decision arrives — there is no second agent to relay through.
+**Single writer, single presenter.** This skill is read-only: it runs the structural check above ONLY to surface which gate is un-cleared, so the operator sees the right context before the orchestrator resumes — it never records a release and presents no gate itself. The un-cleared determination is prepared inside that pipeline's own `th:orchestrator`, which re-reads its own `00-state.md § Current State` dual-record on resume and returns a `gate_pending` for any un-cleared STAGE-GATE (`agents/ref-pipeline.md § orchestrator-recover`), presenting it to the operator inline and recording the release itself once a decision arrives — there is no second agent to relay through.
 
 **Rule 2 — Idempotency: skip completed phases; de-dup events structurally.**
 The Phase Checklist (`## Phase Checklist` in `00-state.md`) is the authoritative record of progress. Phases already marked `[x]` MUST be skipped — do not re-dispatch a completed phase. To de-dup `phase.*`/`kg_write` appends on resume, use a structural lookup (JSON parse of the events trace, not regex) to detect already-emitted events before appending new ones. This prevents duplicate events and double-persisted KG nodes.

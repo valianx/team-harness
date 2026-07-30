@@ -167,7 +167,7 @@ The outward-action gate is `ask`-class, not `deny`-class. When `dev-guard` retur
 
 - **Do not assume `ask` stops under a broad Bash auto-allow.** If the operator's session runs with a blanket `Bash` allow, `--dangerously-skip-permissions`, or any posture that auto-satisfies `ask` prompts, an `ask` is auto-answered and the outward action proceeds with no human in the loop. The gate did its job (it issued `ask`); the session's permission posture is what determined whether that `ask` actually halted.
 - **Do not assume `ask` stops under a non-interactive or bridged posture.** In a headless / `-p` / bridged / relay session there may be no interactive operator to answer the prompt; how the runtime handles an unanswered `ask` is a session-posture property outside the gate's control.
-- **The coordinator's gate presentation must not oversell this.** When `th:orchestrator` presents a lane's STAGE-GATE to the operator inline and records the decision itself (`agents/orchestrator.md § "Gates"` — "Ask-class caveat"), the presentation is a request for a human decision, not a claim that anything is being mechanically "halted." The coordinator does not know the session's permission posture and must not imply a guarantee the `ask`-class gate does not make.
+- **The coordinator's gate presentation must not oversell this.** When `th:orchestrator` presents a lane's STAGE-GATE to the operator inline and records the decision itself (`agents/ref-pipeline.md § "Gates"` — "Ask-class caveat"), the presentation is a request for a human decision, not a claim that anything is being mechanically "halted." The coordinator does not know the session's permission posture and must not imply a guarantee the `ask`-class gate does not make.
 - **Nested coordination is structural, not string-policed.** The coordinator uses native task dispatch. `policy-block` no longer tries to recognize `claude --dangerously-skip-permissions` inside arbitrary shell text; that heuristic was evadable and retained a large legacy-tmux exception without creating a security boundary.
 
 ---
@@ -176,7 +176,7 @@ The outward-action gate is `ask`-class, not `deny`-class. When `dev-guard` retur
 
 The ask-class caveat has a direct consequence for how STAGE-GATE-3 — the human push/PR gate — is surfaced and released by the single coordinator. Its residual is unchanged from the prior two-coordinator split: it is a property of the `ask`-class outward-action gate itself, not of how many agents mediate the presentation.
 
-**(a) The coordinator presents STAGE-GATE-3 inline and records the operator's decision itself.** STAGE-GATE-3 is prepared, presented and recorded by the same `th:orchestrator` that owns the task, inline — in the operator's main conversation, the only reliably reachable channel (`agents/orchestrator.md § "Gates"`). Because the outward-action `ask` does not itself guarantee a stop (it can be auto-satisfied), the presentation must be an active, unmissable interactive surface that names two things: the gate (`STAGE-GATE-3`), and the decision the operator is being asked to make. A passive breadcrumb the operator might scroll past is insufficient — the human decision is the actual control here. The deterministic floor on the actual push/PR remains `dev-guard`'s native `ask`, not this presentation; the presentation is what routes the operator to that decision.
+**(a) The coordinator presents STAGE-GATE-3 inline and records the operator's decision itself.** STAGE-GATE-3 is prepared, presented and recorded by the same `th:orchestrator` that owns the task, inline — in the operator's main conversation, the only reliably reachable channel (`agents/ref-pipeline.md § "Gates"`). Because the outward-action `ask` does not itself guarantee a stop (it can be auto-satisfied), the presentation must be an active, unmissable interactive surface that names two things: the gate (`STAGE-GATE-3`), and the decision the operator is being asked to make. A passive breadcrumb the operator might scroll past is insufficient — the human decision is the actual control here. The deterministic floor on the actual push/PR remains `dev-guard`'s native `ask`, not this presentation; the presentation is what routes the operator to that decision.
 
 **(b) Anti-pattern: broad Bash auto-allow + lane mode.** Running a multi-lane fan-out under a blanket `Bash` auto-allow (or any posture that auto-answers `ask`) is an anti-pattern: it removes the human from the STAGE-GATE-3 outward-action prompt, so a lane's delivery push/merge could proceed without the operator ever entering the gate. The operator releases STAGE-GATE-3 by replying to the coordinator's inline presentation, which records the release directly, and recover's STAGE-GATE-3 clear-allowlist requires `gate3_release = ship` (`skills/recover/SKILL.md § Rule 1`). The broad auto-allow posture defeats the interactive stop this design depends on.
 
@@ -232,16 +232,16 @@ The orchestrator disposition is a **signal of routing topology** — the same ca
 The following security mechanisms run **input-independent** and are NOT waivable:
 
 - **HI-2 (discover-phase.md §3):** the security floor non-waivability invariant. No disposition signal can bypass the security gate. The gate fires whenever `security_sensitive: true` is set, regardless of session state.
-- **Path-pattern auto-escalation (`agents/orchestrator.md § "13 — Classify"`, deriving from `docs/pipeline-lanes.md § 2a`):** sets `security_sensitive: true` based on file paths touched by the PR. This runs on the diff, not on the session state.
+- **Path-pattern auto-escalation (`agents/ref-pipeline.md § "13 — Classify"`, deriving from `docs/pipeline-lanes.md § 2a`):** sets `security_sensitive: true` based on file paths touched by the PR. This runs on the diff, not on the session state.
 - **Bug-fix forcing rule:** for `type: fix` and `type: hotfix`, `security_sensitive: true` is forced. On a sensitive task the non-waivable floor is: SEC-002 design-review at Stage 1, plus `adversary` at the Pre-Delivery Security Audit (within Phase 3); code-level audit is delegated to PR review, referred to generically (not dependent on any specific configured tool).
 
 ---
 
-## Triage Safety-Bias (SEC-DR-1)
+## Explicit activation boundary
 
-The general agent's default disposition ("be helpful / make progress") is replaced — not just supplemented — by the output style. Before taking any action:
+Direct work is the startup disposition. A live `/th:pipeline`, explicit current-turn operator request, or `/th:recover` is required before loading or entering the gated flow.
 
-**TRIAGE INVARIANT — FAIL-CLOSED:** before ANY ambiguity about whether a task requires the pipeline → enter the pipeline or ask for confirmation; NEVER treat ambiguity as a license to handle the task inline without gates.
+Ambiguity never auto-activates the pipeline. Broad, sensitive, irreversible, or verification-dependent work stops before the risky action, recommends activation, and waits. This is a routing boundary; `dev-guard` and the security floors remain independent.
 
 **Phase Checklist enforcement:** no Phase Checklist item may be marked `[~skipped: reason]` unless the skip is authorised by an operator-declared tier (`[TIER: 0]`, `[TIER: 1]`, `--fast`) or the bug-fix tier system. Marking a gate as skipped without authorisation is a contract violation.
 
@@ -257,11 +257,12 @@ On the CC foreground path (top-level, `Task` available), the Layer-1 hook fires 
 
 ## Role Adoption
 
-When the orchestrator disposition is active, the top-level agent reads and applies the following files (by pointer — the output style body does not duplicate their content):
+At startup the coordinator reads no gated contract. Resolve these files only at their trigger:
 
-- `agents/orchestrator.md` — intake, Discover phase, classification and routing, all phase contracts and gate enforcement.
-- `docs/discover-phase.md` — patient intake, advance-signal gate, intake survey.
-- `docs/reasoning-checkpoint.md` — B1/B2/B3 boundaries and advance contract.
+- `agents/orchestrator.md` — lightweight direct kernel.
+- `agents/ref-pipeline.md` — activation sections and current phase after `/th:pipeline`.
+- `docs/discover-phase.md` — only after activation reaches Intake.
+- `docs/reasoning-checkpoint.md` — only when an active pipeline reaches B1/B2/B3.
 - `docs/subagent-orchestration.md` — the retired nested-handoff protocol and its retained provisioning.
 
 Resolve these from the plugin cache: `~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/`
@@ -293,7 +294,7 @@ A gate or floor that does the WRONG thing on a plain, readable, non-obfuscated i
 
 Only that obfuscation-evasion residual of string-matching gates is a documented, disclosed limitation — not chased through pipeline iterations, and outside this threat model — recorded honestly where it lives.
 
-A limitation qualifies as "documented, not chased" only when it is BOTH (a) disclosed in-place where it lives, AND (b) scoped out through a legitimate mechanism — the architectural-inevitability limit for the string-matching-gate case is the canonical example. (A previously-tracked second example, the mid-iteration classification-timing gap in the retired per-task Phase-3 security dispatch, is addressed by the Pre-Delivery Security Audit's positional design: `adversary` reviews the consolidated final diff once per delivery group when `security_floor_applies` holds, so a control introduced by any patch iteration on a sensitive task is reviewed regardless of which iteration introduced it. This coverage is scoped to `security_floor_applies == true`, not classification-independent — code-level review on a non-sensitive task is delegated to PR review — `agents/orchestrator.md § "Phase 3 — Verify"`.) Cross-ref: this file's "Residual static-resolution limits" section.
+A limitation qualifies as "documented, not chased" only when it is BOTH (a) disclosed in-place where it lives, AND (b) scoped out through a legitimate mechanism — the architectural-inevitability limit for the string-matching-gate case is the canonical example. (A previously-tracked second example, the mid-iteration classification-timing gap in the retired per-task Phase-3 security dispatch, is addressed by the Pre-Delivery Security Audit's positional design: `adversary` reviews the consolidated final diff once per delivery group when `security_floor_applies` holds, so a control introduced by any patch iteration on a sensitive task is reviewed regardless of which iteration introduced it. This coverage is scoped to `security_floor_applies == true`, not classification-independent — code-level review on a non-sensitive task is delegated to PR review — `agents/ref-pipeline.md § "Phase 3 — Verify"`.) Cross-ref: this file's "Residual static-resolution limits" section.
 
 This disposition is narrowly scoped to the residual class described above. It does NOT license skipping any real in-scope finding, does NOT weaken or waive any floor, and does NOT change when or whether the SEC-002 design-review or `adversary` dispatch — security floors stay non-waivable.
 

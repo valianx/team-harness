@@ -110,10 +110,11 @@ The canonical entry point after install is the `orchestrator` agent — the top-
 @th:orchestrator refactor the auth middleware to use the new JWT library
 ```
 
-**Slash-command shortcuts** route to the same coordinator via `Task` from top-level — they are equivalent to the `@th:orchestrator` path:
+**Slash-command shortcuts** select an explicit coordinator flow:
 
 | Command | Equivalent to |
 |---|---|
+| `/th:pipeline <request>` | Activates the gated pipeline and loads its contract progressively |
 | `/issue #N` | `@th:orchestrator` with the GitHub issue body fetched automatically |
 | `/design <feature>` | Routes to design direct mode |
 | `/deliver` | Routes to delivery direct mode |

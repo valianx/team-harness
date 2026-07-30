@@ -82,7 +82,7 @@ Used standalone to define acceptance criteria for a feature or issue, outside th
 
 Used between Phase 1 (Design) and Phase 2 (Implementation) to confirm that the architect's Work Plan covers every AC **before** any code is written. This is the cheapest loop guard in the pipeline: catch coverage gaps before they cost an implementer + tester + qa cycle.
 
-**Implicated-element field (structural, T5-AC-7).** Every finding you write into `reviews/01-plan-review.md § Plan Ratification` names the plan elements it implicates, structurally — the AC identifier(s) (`T{n}-AC-{m}`) and any fenced manifest entry key or task `Notes:` reference the gap touches. This feeds `agents/orchestrator.md § "Iteration rules"`'s pre-dispatch correction gate (recurrence detection) — see that section for the consumer contract; this file only produces the field.
+**Implicated-element field (structural, T5-AC-7).** Every finding you write into `reviews/01-plan-review.md § Plan Ratification` names the plan elements it implicates, structurally — the AC identifier(s) (`T{n}-AC-{m}`) and any fenced manifest entry key or task `Notes:` reference the gap touches. This feeds `agents/ref-pipeline.md § "Iteration rules"`'s pre-dispatch correction gate (recurrence detection) — see that section for the consumer contract; this file only produces the field.
 
 **Every finding, not only the coverage-gap ones.** This mode also emits AC-testability and
 sketch-consistency findings; they carry the same structural field. The orchestrator's
@@ -103,7 +103,7 @@ This mode is dispatched only after Phase 1.5a already returned `plan_structure: 
 **Self-authored-plan panel carve-out (awareness).** The orchestrator does not dispatch you at all
 for a plan that is self-authored (hotfix / Tier-1-fix / `lane: express` one-line plan), single-task,
 `complexity: standard`, and `security_sensitive: false` — a deterministic self-check stands in for
-this mode in that case (`agents/orchestrator.md § "Phase 1.5 — Plan Ratification"`). SEC-002
+this mode in that case (`agents/ref-pipeline.md § "Phase 1.5 — Plan Ratification"`). SEC-002
 (the `security` design-review) is never carved out by this condition — it is a distinct trigger
 gated on `security_sensitive: true` alone, independent of authorship or lane.
 
@@ -113,7 +113,7 @@ architect-authored plan (any `complexity`, any task count) when `security_sensit
 (`plan_review_status: deferred`) — a default-skip-but-offered case, not the always-skip carve-out
 above. This changes nothing about how you run in `ratify-plan` mode WHEN dispatched: pre-gate on a
 sensitive plan, at the post-approval offer, or via an on-demand `/th:plan-review` run all invoke you
-identically. See `agents/orchestrator.md § "Phase 1.5 — Plan Ratification"` and
+identically. See `agents/ref-pipeline.md § "Phase 1.5 — Plan Ratification"` and
 `§ "Phase 1.8 — Post-approval Plan-Review Offer"` for the orchestrator-side gating.
 
 - **Trigger:** orchestrator invokes with `mode: ratify-plan`
@@ -169,7 +169,7 @@ identically. See `agents/orchestrator.md § "Phase 1.5 — Plan Ratification"` a
 ```
 agent: qa-plan
 status: success | failed | blocked
-failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}
 mode: ratify-plan
 verdict: pass | fail
@@ -221,7 +221,7 @@ Used between Phase 2 (Implementation) and Phase 3 (Verify) when the implementer 
 ```
 agent: qa-plan
 status: success | failed | blocked
-failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}
 mode: reconcile
 verdict: clean | amendments | drops
@@ -449,7 +449,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: qa-plan
 mode: define-ac | ratify-plan | reconcile
 status: success | failed | blocked
-failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/{00-acceptance-criteria|01-plan}.md
 summary: {1-2 sentences: N/N AC covered (or: AC defined, or: constraints reconciled)}

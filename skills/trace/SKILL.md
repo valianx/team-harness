@@ -62,7 +62,7 @@ workspaces/{feature-name}/00-execution-events.md    (obsidian mode)
 workspaces/{feature-name}/00-execution-events.jsonl  (local mode)
 ```
 
-These are written by the **orchestrator** during pipeline runs (see `agents/orchestrator.md` → "Execution Events JSONL" + "Pipeline Summary Protocol"). The initiative-level file (see "Initiative region rendering" below) is written by the same orchestrator. If either per-feature file is missing, the pipeline ran before observability was wired up or was interrupted before the orchestrator could write it.
+These are written by the **orchestrator** during pipeline runs (see `agents/ref-pipeline.md` → "Execution Events JSONL" + "Pipeline Summary Protocol"). The initiative-level file (see "Initiative region rendering" below) is written by the same orchestrator. If either per-feature file is missing, the pipeline ran before observability was wired up or was interrupted before the orchestrator could write it.
 
 ---
 

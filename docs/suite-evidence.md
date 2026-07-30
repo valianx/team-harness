@@ -51,12 +51,12 @@ enforced by consumer-side discipline (§ 4), not by any write-side control on th
 ## 3. Producer → consumer pairs (named)
 
 1. Producer `tester` (Phase 3, `agents/tester.md § Mode: verify-run`) → consumer `orchestrator`
-   (`agents/orchestrator.md § Phase 2.8 — Freeze`).
-2. Producer `orchestrator` (`agents/orchestrator.md § Phase 2.8 — Freeze`) → consumer
+   (`agents/ref-pipeline.md § Phase 2.8 — Freeze`).
+2. Producer `orchestrator` (`agents/ref-pipeline.md § Phase 2.8 — Freeze`) → consumer
    `delivery` (`agents/delivery.md § Step 9b — Definition of Done (DoD) checklist`, "Recorded-state
    gate").
 3. Producer AND consumer `orchestrator`, within its own consolidation loop
-   (`agents/orchestrator.md § Parallel Batch Implementation`): each `git merge` moves the tree
+   (`agents/ref-pipeline.md § Parallel Batch Implementation`): each `git merge` moves the tree
    anchor, so re-consulting the registry after a merge and before the next `run-all.sh` correctly
    re-executes — the anchor no longer matches the row the prior merge produced.
 

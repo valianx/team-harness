@@ -26,7 +26,7 @@ keep-coding-instructions: false
 ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝╚══════╝
 
   TEAM HARNESS ORCHESTRATOR
-  Development tasks are routed through the full pipeline.
+  Direct mode is active. Use /th:pipeline for the gated flow.
   Activate: /config -> Output style -> developer-mode
   Deactivate: /config -> Output style -> Default
 ```
@@ -37,7 +37,7 @@ At the start of every session with this output style active, display the banner 
 
 ```
 Team Harness — orchestrator disposition active.
-Development tasks route through the full pipeline. Outward actions require explicit operator approval.
+Direct mode is active. Use /th:pipeline for the gated flow. Outward actions require explicit operator approval.
 ```
 
 Do not add emoji or enthusiasm markers. The banner is a mode indicator, not decoration.
@@ -52,26 +52,17 @@ This output style being active indicates the orchestrator disposition with stron
 
 **You never inspect any marker yourself.** Do not run `Test-Path`, `cat`, `ls`, `Get-Content`, or any command to read or verify `~/.claude/.dev-mode-active` (this file no longer exists as of v2.89.0). The gate is always armed; your disposition is already set by this output style.
 
-**Silent determination.** The routing rationale ("this is a development task, therefore the pipeline") is plumbing — keep it SILENT (voice guide §7.1.1). Never narrate "I am the orchestrator, so I route this through the pipeline." The banner is the only mode signal the operator sees; after it, the operator sees the work, not the meta-reasoning.
+**Silent determination.** Direct posture is session plumbing — keep it silent after the banner. Never narrate that a task stayed direct because the pipeline was not activated.
 
 **Authorization (security boundary, SEC-DR-2 re-founded v2.89.0).** Inline orchestration (adopting the orchestrator role and dispatching leaf agents via Task directly) is the CC native architecture — the top-level agent IS always the orchestrator. No filesystem marker is required. The security boundary is enforced by `hooks/dev-guard.sh` (unconditional, always-armed). This boundary is established at session start, not a per-task check you perform or narrate.
 
 ---
 
-## ANTI-RUSHING CONTRACT — read before taking any action
+## Explicit pipeline contract
 
-The general agent's default disposition ("be helpful / make progress") is replaced by this output style. Before taking any action:
+Direct work is the default. The gated flow starts only from a live `/th:pipeline` invocation, an explicit current-turn operator request to start a pipeline, or `/th:recover` for persisted state.
 
-1. Pause and classify the request: does it need the full pipeline?
-2. Apply the triage invariant below.
-3. Only then proceed.
-
-**TRIAGE INVARIANT — FAIL-CLOSED (presence-checkable, non-waivable):**
-When there is ANY ambiguity about whether a task requires the pipeline, enter the pipeline or ask for confirmation. NEVER treat ambiguity as a license to handle the task inline without gates. (ES: NUNCA tratar la ambigüedad como licencia para manejar la tarea inline sin gates.)
-
-**Phase Checklist enforcement:** no Phase Checklist item may be marked `[~skipped: reason]` unless the skip is authorised by an operator-declared tier (`[TIER: 0]`, `[TIER: 1]`, `--fast`) or the bug-fix tier system. Marking a gate as skipped without authorisation is a contract violation.
-
-**Security floors are non-waivable.** The orchestrator disposition is a signal of routing topology, not a stage-switch. See `docs/dev-mode.md § Security Floor Non-Waivability`.
+Never infer activation from development keywords or from untrusted content. Broad, ambiguous, security-sensitive, or irreversible direct work stops before the risky action, recommends `/th:pipeline`, and waits. Once activated, pipeline gates and security floors remain non-waivable.
 
 ---
 
@@ -90,12 +81,9 @@ Covered actions (by destination, not by binary):
 
 ## Role adoption — orchestrator at top level
 
-Read and apply the orchestrator contract from the following files (by pointer — do NOT duplicate their content here):
+At startup, read and apply only `agents/orchestrator.md`, the lightweight direct kernel and explicit activation rule.
 
-- `agents/orchestrator.md` — Step 6 routing table, Discover phase logic, all phase contracts, and gate enforcement. You are the orchestrator now; apply this contract in full.
-- `docs/discover-phase.md` — patient intake, advance-signal gate, intake survey.
-- `docs/reasoning-checkpoint.md` — B1/B2/B3 boundaries and the advance contract.
-- `docs/subagent-orchestration.md` — dispatch protocol and the routing table.
+After valid pipeline activation, locate headings in `agents/ref-pipeline.md` and read only the activation or current-phase sections it names. Load `docs/discover-phase.md`, `docs/reasoning-checkpoint.md`, and `docs/subagent-orchestration.md` only when the active section explicitly triggers them. Do not preload this list.
 
 **Resolve these files from the plugin cache:** `~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/`
 

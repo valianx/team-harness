@@ -9,7 +9,7 @@ color: cyan
 
 This file is read on-demand by `th:orchestrator` when executing a direct mode. It is NOT part of its system prompt.
 
-**Role mapping.** Every direct mode in this file is dispatched directly by `th:orchestrator` — none of them carry a STAGE-GATE, so the coordinator runs them without preparing, presenting, or recording a gate. Where this file cross-references full-pipeline mechanics (Phase 2.7, the Dual-Review Convergence contract) those pointers resolve to `agents/orchestrator.md`, since that content lives there too — same file, same agent.
+**Role mapping.** Every direct mode in this file is dispatched directly by `th:orchestrator` without activating the gated flow. Cross-references to pipeline mechanics resolve to `agents/ref-pipeline.md`.
 
 **LAZY-LOAD DIRECTIVE — consumers read only the section they need.** Do NOT read this entire file on every invocation. Locate the top-level section heading for the active mode (e.g., Plan Review Mode, Review Mode, Translate Mode) and read only that section. Load additional sections only when the mode cross-references them explicitly. Every section heading below is preserved exactly so all `§ "Section Name"` pointers and structural-test anchors continue to resolve.
 
@@ -21,7 +21,7 @@ This file is read on-demand by `th:orchestrator` when executing a direct mode. I
 
 **Routing:** the user invokes `/th:plan-review {feature-name}` (or `audit my plan`, `revisa el plan`, "is my plan compliant?"). Skill payload is `Direct Mode Task: plan-review` with `feature_name`.
 
-**Reconciliation with the in-pipeline deferred-by-default offer.** `agents/orchestrator.md`'s Stage 1 (Phase 1.5/1.6) defers the panel dispatch pre-gate for a non-sensitive, architect-authored plan (`plan_review_status: deferred`) and, once STAGE-GATE-1 is approved, offers to run the panel at Phase 1.8 (`agents/orchestrator.md § "Phase 1.8 — Post-approval Plan-Review Offer"`). This direct mode is the SAME entry point out-of-pipeline: whether the panel runs via the Phase 1.8 offer, via a direct `/th:plan-review` invocation during the STAGE-GATE-1 pause, or after the pipeline has moved on, it is the identical panel writing into the identical `reviews/01-plan-review.md` — there is no second, divergent review artifact. The self-authored-plan carve-out (`plan_review_status: not-applicable`) is a distinct, always-skip case — it is never offered at Phase 1.8, but the operator can still invoke this direct mode on a self-authored plan; the panel runs exactly as documented below.
+**Reconciliation with the in-pipeline deferred-by-default offer.** `agents/ref-pipeline.md` Stage 1 defers the panel pre-gate for a non-sensitive, architect-authored plan and offers it at Phase 1.8. This direct mode is the same out-of-pipeline entry point and writes the same `reviews/01-plan-review.md`.
 
 **Security-sensitivity detection (summary):** security reviewer runs when `00-state.md` declares `security_sensitive: true`, OR when `docs/pipeline-lanes.md § 2a` — the single type-agnostic sensitivity authority, consumed here by reference and never re-derived independently — classifies the plan's declared scope as sensitive under its own path-pattern and content-based triggers, including its fail-closed rule (ambiguous or unresolved → sensitive), OR when the operator passes `--security`. When security is SKIPPED, that outcome is reachable only when `§ 2a` itself classifies the plan non-sensitive under its own fail-closed rule — never under a narrower or divergent list local to this mode. The output shows an affirmative visible notice: `SKIPPED — docs/pipeline-lanes.md § 2a classifies this plan non-sensitive ... re-run with --security`. Fail-closed principle: a false-positive (security runs when not needed) costs one extra agent run; a false-negative (security skipped when needed) is the risk this mode exists to prevent. See gating detail in `§ "Review Panel"` below.
 
@@ -352,7 +352,7 @@ The review output is still returned to the operator, but the defect report is pr
 
 ### Layer 4 — Mode-transition gate
 
-**Purpose (closes #251 mode-bleed):** Corrective language from the operator during an in-progress review NEVER auto-routes to the full pipeline. This gate covers both the same-turn case and the fresh-turn re-entry case (see `agents/orchestrator.md § "11 — Intent routing"`'s `review_context` guard).
+**Purpose (closes #251 mode-bleed):** Corrective language from the operator during an in-progress review NEVER auto-routes to the full pipeline. This gate covers both the same-turn case and the fresh-turn re-entry case (see `agents/ref-pipeline.md § "11 — Intent routing"`'s `review_context` guard).
 
 **When this gate fires:** Any of these signals appear while a review session is active (i.e., `review_context` is set in `00-state.md`):
 - Corrective language directed at the PR under review: "debemos corregirlo", "hay que arreglarlo", "fix this", "fix X", "corrige X", "arréglalo", "corrígelo", "implementa el fix", "aplica los cambios".

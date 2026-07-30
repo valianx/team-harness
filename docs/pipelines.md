@@ -8,13 +8,13 @@ Regenerate this index whenever a flow's home changes. Do not edit a flow's behav
 
 ## The pipeline
 
-The single gated flow: Design → Implementation → Verify → Delivery, with a human gate at the end of analysis and another before publication. Its authoritative definition — phase sequence, trigger conditions, gate mechanics — is `agents/orchestrator.md`.
+The opt-in gated flow is Design → Implementation → Verify → Delivery, with a human gate at the end of analysis and another before publication. `/th:pipeline` activates it; its authoritative lazy-loaded definition is `agents/ref-pipeline.md`.
 
 | What you want to know | Authoritative home |
 |---|---|
-| Phase sequence and what advances it | `agents/orchestrator.md` |
+| Phase sequence and what advances it | `agents/ref-pipeline.md` |
 | Gate mechanics: dual record, STOP templates, ambiguous reply, nonce | `agents/_shared/gate-contract.md` |
-| Which specialist is called when, and what its return must contain | `agents/orchestrator.md § "Your Team"` |
+| Which specialist is called when, and what its return must contain | `agents/ref-pipeline.md § "Your Team"` |
 | What a dispatch may and must not carry | `agents/_shared/dispatch-contract.md` |
 | Lane model (inline / express / full) and its cost estimate | `docs/pipeline-lanes.md` |
 | Intake: lane classification, bug tier, provenance tiers | `agents/ref-intake-flows.md` |
@@ -56,7 +56,7 @@ Non-gated modes the coordinator runs directly: diagram, likec4, d2, review, tran
 
 ## PR review
 
-Review of an existing GitHub PR is a standalone, dispatch-by-`gh`-data skill, never a coordinator-owned pipeline phase — `/th:review-pr` is the hard trigger (`agents/orchestrator.md § "11 — Intent routing"`). Its worktree-at-head-SHA gather, tier classification, multi-agent dispatch and decision menu are defined once in `skills/review-pr/SKILL.md`, with the read-only working-tree contract and the multi-reviewer convergence rounds in `agents/ref-direct-modes.md`. Not duplicated here.
+Review of an existing GitHub PR is a standalone, dispatch-by-`gh`-data skill, never a coordinator-owned pipeline phase — `/th:review-pr` is the hard trigger (`agents/ref-pipeline.md § "11 — Intent routing"`). Its worktree-at-head-SHA gather, tier classification, multi-agent dispatch and decision menu are defined once in `skills/review-pr/SKILL.md`, with the read-only working-tree contract and the multi-reviewer convergence rounds in `agents/ref-direct-modes.md`. Not duplicated here.
 
 ## When `gh` is absent or unauthenticated
 

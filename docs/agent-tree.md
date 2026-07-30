@@ -33,7 +33,7 @@ meta (outside any pipeline run):  agent-builder  ── authors new agents and s
 
 | Agent | Tier | Dispatched by | Owns gates? |
 |---|---|---|---|
-| `th:orchestrator` | coordination + execution | — (top-level session agent) | Yes — prepares + records all three STAGE-GATEs |
+| `th:orchestrator` | lightweight direct coordination; gated execution after activation | — (top-level session agent) | Yes, only during an active pipeline |
 | `architect` | analysis | orchestrator (or research/design direct mode) | No |
 | `qa-plan` | analysis | orchestrator (ratify / define-ac direct) | No |
 | `plan-reviewer` | analysis | orchestrator | No |
@@ -54,8 +54,8 @@ meta (outside any pipeline run):  agent-builder  ── authors new agents and s
 
 ## Invariants
 
-- **Exactly one coordinator node.** `th:orchestrator` never spawns another orchestrator — a specialist it dispatches is always a leaf agent, never itself a coordinator, and no exception clause exists (`agents/orchestrator.md § Dispatch invariants`).
+- **Exactly one coordinator node.** `th:orchestrator` never spawns another orchestrator. The small kernel stays direct until `/th:pipeline`; the activated contract retains the specialist-only dispatch invariant (`agents/ref-pipeline.md § Dispatch invariants`).
 - **Gate state has a single writer.** The orchestrator prepares each STAGE-GATE, presents its STOP block to the operator inline, and records the release (the dual-record: the `gateN_release` field in `00-state.md` plus the `stage.gate.release` event) in the same operation — no second agent relays or forges any part of it (`agents/_shared/gate-contract.md § "The dual-record release"`).
 - **Direct modes have no STAGE-GATE** — the orchestrator dispatches those specialists itself, with no pipeline `00-state.md` created.
 
-See also: `docs/how-it-works.md` (end-to-end flow), `docs/pipelines.md` (stage/phase mechanics), `agents/orchestrator.md` (the coordination contract), `docs/reasoning-checkpoint.md`.
+See also: `docs/how-it-works.md`, `agents/orchestrator.md` (startup kernel), `agents/ref-pipeline.md` (gated contract), and `docs/reasoning-checkpoint.md`.

@@ -52,14 +52,14 @@ After a localized patch, the orchestrator re-runs only the verifier(s) whose dom
 | B (design) | `plan-reviewer` only | all verifiers |
 | C (criteria) | all verifiers (criteria changes always touch everything) | all verifiers |
 
-**No security-lens re-run exists in this table.** `security` and `adversary` do not participate in Phase-3 patch iterations: they run exactly ONCE per delivery group at the Pre-Delivery Security Audit (`agents/orchestrator.md § "Phase 3 — Verify"`), over the consolidated final diff, after all patch iterations have closed — so no patch can stale their verdict and no patch triggers their re-dispatch. Their findings are disposed by the operator at STAGE-GATE-3, never routed into this table. The audit's position is itself the staleness protection: nothing ships that the audit did not see, and the only re-audit is the single operator-caused amend re-run (`agents/orchestrator.md § "Re-audit on amend"`).
+**No security-lens re-run exists in this table.** `security` and `adversary` do not participate in Phase-3 patch iterations: they run exactly ONCE per delivery group at the Pre-Delivery Security Audit (`agents/ref-pipeline.md § "Phase 3 — Verify"`), over the consolidated final diff, after all patch iterations have closed — so no patch can stale their verdict and no patch triggers their re-dispatch. Their findings are disposed by the operator at STAGE-GATE-3, never routed into this table. The audit's position is itself the staleness protection: nothing ships that the audit did not see, and the only re-audit is the single operator-caused amend re-run (`agents/ref-pipeline.md § "Re-audit on amend"`).
 
 ## Cost-Ordered Patch-Iteration Re-Run Sequencing
 
 > Extends the Selective Verifier Re-Run table above (§ "Selective Verifier Re-Run") with an
 > ordering layer: WHICH verifiers re-run per Case is unchanged; this section fixes the ORDER and
 > the gating between them within one iteration. Wired at
-> `agents/orchestrator.md § "Cost-ordered re-run — R0 → R1 → R2"` (inserted after the Case →
+> `agents/ref-pipeline.md § "Cost-ordered re-run — R0 → R1 → R2"` (inserted after the Case →
 > routing table in `§ "Iteration"`); cross-referenced at `docs/pipeline-lanes.md § 7`.
 
 **Scope.** Applies to Case A with `Blast radius: localized {IDs}`. `Blast radius:
@@ -74,7 +74,7 @@ combined-verdict formula they feed.
 ### Owner attribution — by brief header, not by Case letter
 
 The **finding-owner** is the lens named in the `## Iteration {N} — {agent}` header of the
-`failure-brief.md` entry (`agents/orchestrator.md § "Iteration"`) — the lens
+`failure-brief.md` entry (`agents/ref-pipeline.md § "Iteration"`) — the lens
 that raised the blocking finding — NOT the Case letter, which only routes the producer.
 **Case → producer; brief author → owner.** Multi-owner: when more than one lens appealed in
 iteration N, the owner set is the set of `{agent}` values across that iteration's headers; every
@@ -95,7 +95,7 @@ owner must close before R2 is eligible.
 - **R2 — Single consolidated final-state confirmation (delta-scoped, non-owner lens).** With
   every owner closed, the orchestrator issues exactly ONE delta-scoped dispatch of the non-owner
   lens over the final patched state — NOT a fresh full base pass. The combined verdict is computed
-  over both lenses' final verdicts with the unchanged formula (`agents/orchestrator.md § "Gate —
+  over both lenses' final verdicts with the unchanged formula (`agents/ref-pipeline.md § "Gate —
   combined verdict"`). A fail on any lens in R2 opens a new iteration (counts against max-3).
 
 **How R2 differs from a fresh base pass.** The base pass runs both lenses in parallel, each
@@ -114,7 +114,7 @@ A structural change is never narrowed to a localized patch's R1/R2 shape.
 | Site | File | Anchor |
 |------|------|--------|
 | Canonical contract | `docs/patch-mode.md` (this file) | § Cost-Ordered Patch-Iteration Re-Run Sequencing |
-| Orchestrator wiring | `agents/orchestrator.md` | § "Cost-ordered re-run — R0 → R1 → R2" |
+| Orchestrator wiring | `agents/ref-pipeline.md` | § "Cost-ordered re-run — R0 → R1 → R2" |
 | Cross-reference | `docs/pipeline-lanes.md` | § 7 |
 
 A future edit to the sequencing rule at one site without the other two desynchronizes the
@@ -160,7 +160,7 @@ removes the Stage-1 correction-round apparatus this mechanism was iteration mach
 panel's lenses now run exactly once, a `fail` presents its finding verbatim at STAGE-GATE-1
 rather than withholding the plan, and a finding travels into implementation only by becoming an
 AC of its owning task through the operator's `edit` reply
-(`agents/orchestrator.md § "Finding disposition — the panel runs once, then a finding travels
+(`agents/ref-pipeline.md § "Finding disposition — the panel runs once, then a finding travels
 only as an AC"`). There is no second round for this mechanism to classify, so bucket
 classification, selective re-firing, carried-forward sub-verdicts, and the cross-round
 intersection index all lose their subject. Nothing replaces them.

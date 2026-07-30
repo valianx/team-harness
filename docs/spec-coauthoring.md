@@ -99,7 +99,7 @@ When `00-spec-seed.md` is written, the orchestrator sets in `00-state.md § Curr
 
 ### 3.1 Specify step 5 payload
 
-The coordinator adds to the architect dispatch (alongside the existing 9 fields, `agents/orchestrator.md § "Specify"`):
+The coordinator adds to the architect dispatch (alongside the existing 9 fields, `agents/ref-pipeline.md § "Specify"`):
 
 - **`spec_seed` (pointer):** `"00-spec-seed.md present — read it as your primary prior before codebase exploration"` (or `"no spec seed — standard mode"` when `spec_seed_present: false`)
 - **`scope_hint`:** the `survey_scope_hint` value from `00-state.md` (or `null`)
