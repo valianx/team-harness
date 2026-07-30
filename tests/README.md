@@ -52,7 +52,7 @@ Editing agent prose is **not** a trigger. No suite reads it.
 
 ## Adding a new test
 
-- New `policy-block` pattern → an `assert_deny` / `assert_allow` line with a one-line name.
+- New `policy-block` boundary → one deny case and one nearby no-decision case; do not add workflow-policy fixtures.
 - New hook decision path → a payload case in that hook's suite.
 - New installer behaviour → a Go test under `cmd/install/`.
 - New agent file → nothing to do; `test_agent_frontmatter.py` picks it up automatically and fails immediately if the YAML does not parse.

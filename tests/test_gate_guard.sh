@@ -27,7 +27,7 @@
 #           correlation only) -> same deny/none contract as worktree (F-1).
 #   AC-9  — force-push, BOTH sub-forms (flags AND `+refspec`), deny
 #           INCONDITIONAL over gate3_release, but ONLY in-lane; no lane
-#           resolved -> defers (dev-guard/policy-block remain the floor
+#           resolved -> defers (dev-guard remains the outward-action owner
 #           outside a detected pipeline lane).
 #   AC-10 — decision set is {none, deny} ONLY — implicitly asserted by every
 #           case below (an unexpected "ask"/"allow" output fails the
@@ -315,14 +315,14 @@ assert_deny "AC-9: in-lane, ship, -f flag -> deny (unconditional)" \
     "$TMP" "$(push_payload 'git push -f origin feat/deterministic-gate-release-enforcement')"
 assert_deny "AC-9: in-lane, ship, --force-with-lease flag -> deny (unconditional)" \
     "$TMP" "$(push_payload 'git push --force-with-lease origin feat/deterministic-gate-release-enforcement')"
-assert_deny "AC-9: in-lane, ship, '+refspec' form -> deny (unconditional; policy-block does not match this sub-form)" \
+assert_deny "AC-9: in-lane, ship, '+refspec' form -> deny (unconditional)" \
     "$TMP" "$(push_payload 'git push origin +feat/deterministic-gate-release-enforcement:main')"
 assert_nodecision "AC-9 (control): in-lane, ship, NO force -> none (ordinary git handling stays frictionless)" \
     "$TMP" "$(push_payload 'git push origin feat/deterministic-gate-release-enforcement')"
 rm -rf "$TMP"
 
 echo
-echo "--- AC-9: no lane resolved, force-push still defers (dev-guard/policy-block remain the floor) ---"
+echo "--- AC-9: no lane resolved, force-push defers to dev-guard ---"
 TMP=$(mktemp -d)
 make_branch_in_place_repo "$TMP" "unrelated-manual-branch"
 make_lane_state "$TMP" "$(lane_fields null feat/deterministic-gate-release-enforcement null)"

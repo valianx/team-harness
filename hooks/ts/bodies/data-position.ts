@@ -1,6 +1,6 @@
 // hooks/ts/bodies/data-position.ts
 // Shared inert-data-span redactor for command-position gates
-// (policy-block.ts, prepublish-guard.ts, dev-guard.ts). Independent module —
+// (prepublish-guard.ts and dev-guard.ts). Independent module —
 // hooks/ts/bodies/command-lexer.ts is fenced surface and is never imported
 // from or modified by this file (see HEREDOC_INERT_SINKS below for why its
 // membership criterion is copied literally instead of imported).
@@ -15,8 +15,7 @@
 // never reaches a shell that would execute it.
 //
 // Mechanism: `redactInertDataSpans` is a single-pass, bounded, non-
-// backtracking lexical scan (mirrors normalizeLexicalNoise's bounded-scan
-// discipline below in policy-block.ts, and command-lexer.ts::scanCommand's
+// backtracking lexical scan (mirrors command-lexer.ts::scanCommand's
 // quote/escape state machine, documented byte-for-byte identical — see
 // `readToken` below) that identifies command-string spans that are (a)
 // delimited as literal-or-non-expandable data, (b) consumed by a simple
@@ -31,7 +30,7 @@
 // What holds the security of this design, and what does not: the offset-
 // preserving substitution can only REMOVE a raw-string match or ADD one that
 // straddles a marked span (fail-safe: over-denial, never under-denial for
-// policy-block/prepublish-guard) — it never relocates or splices matches
+// prepublish-guard) — it never relocates or splices matches
 // across non-contiguous fragments. The load-bearing claim is the SOUNDNESS
 // OF THE PREDICATE (steps 3-4 below): that HEREDOC_INERT_SINKS membership,
 // literal/non-expandable delimitation, and output-destination-is-not-an-
@@ -653,7 +652,7 @@ function computeSinkFlags(commands: CommandRecord[]): boolean[] {
  * the two-byte sequence `>(`/`<(` appearing anywhere in the input.
  *
  * Frozen contract: this signature is depended on, unmodified, by
- * policy-block.ts, prepublish-guard.ts, and dev-guard.ts.
+ * prepublish-guard.ts and dev-guard.ts.
  */
 export function redactInertDataSpans(cmd: string): string {
   if (cmd.length > MAX_INPUT_LENGTH) return cmd;
