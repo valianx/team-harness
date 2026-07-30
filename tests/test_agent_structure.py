@@ -40178,7 +40178,6 @@ print()
 print("=== Suite 180: dispatch-standard-structural-guard ===")
 
 _s180_dispatch_contract = read(AGENTS_DIR / "_shared" / "dispatch-contract.md")
-_s180_leader = read(AGENTS_DIR / "leader.md")
 _s180_orchestrator = read(AGENTS_DIR / "orchestrator.md")
 _s180_readme = read(AGENTS_DIR / "README.md")
 _s180_agent_builder = read(AGENTS_DIR / "agent-builder.md")
@@ -40196,7 +40195,7 @@ _s180_claude = read(REPO_ROOT / "CLAUDE.md")
 # already covered structurally by Suite 174's no-relocation check over
 # agents/_shared/*.md, since dispatch-contract.md is itself in that corpus).
 for _s180_file, _s180_text in (
-    ("agents/leader.md", _s180_leader),
+    # coordinator-fusion: "leader" retired — orchestrator absorbed its checks
     ("agents/orchestrator.md", _s180_orchestrator),
     ("agents/README.md", _s180_readme),
     ("agents/agent-builder.md", _s180_agent_builder),
@@ -40444,16 +40443,23 @@ check(
 
 # Sole writer of the checkpoint.confirmed event is named in exactly one
 # agent contract, and no other contract instructs writing or repairing it ----
+# Repoint (post-fusion): the prior split (leader writes, orchestrator reads
+# and verifies only) collapsed to one coordinator that does both in the same
+# file — "Recording the checkpoint" (the write) and "the sole authority" read
+# (§ Checkpoint-trust-transfer) are both orchestrator.md's own sections now,
+# so there is no separate reader-only role left to distinguish.
 check(
-    "suite180(ac7-sole-writer-declared): agents/leader.md declares itself the sole writer"
-    " of the checkpoint.confirmed event",
-    "You are the sole writer of this event; the orchestrator reads and verifies it, "
-    "never writes or repairs it." in _s180_leader,
-    "agents/leader.md must declare itself the sole writer of checkpoint.confirmed,"
-    " read-and-verify-only for the orchestrator",
+    "suite180(ac7-sole-writer-declared): agents/orchestrator.md documents"
+    " itself recording the checkpoint.confirmed event and reading it as the"
+    " sole authority",
+    "Recording the checkpoint" in _s180_orchestrator
+    and "append one `checkpoint.confirmed` event" in _s180_orchestrator
+    and "the sole authority" in _s180_orchestrator,
+    "agents/orchestrator.md must document recording checkpoint.confirmed and"
+    " reading it back as the sole authority for the functional-clarity check",
 )
 _s180_other_agent_files = [
-    p for p in AGENTS_DIR.glob("*.md") if p.stem not in ("leader", "README")
+    p for p in AGENTS_DIR.glob("*.md") if p.stem not in ("orchestrator", "README")
 ]
 _s180_writer_leak = [
     str(p)
@@ -40461,7 +40467,7 @@ _s180_writer_leak = [
     if re.search(r"append\s+(?:an?|one)?\s*`?checkpoint\.confirmed", read(p), re.IGNORECASE)
 ]
 check(
-    "suite180(ac7-no-other-writer): no agent contract other than leader.md instructs"
+    "suite180(ac7-no-other-writer): no agent contract other than orchestrator.md instructs"
     " appending/writing the checkpoint.confirmed event",
     not _s180_writer_leak,
     f"unexpected write instruction for checkpoint.confirmed in: {_s180_writer_leak}",
