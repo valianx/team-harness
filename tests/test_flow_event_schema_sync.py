@@ -407,19 +407,13 @@ def run_tests() -> int:
             "resilience log line 'flow-telemetry: unavailable' not documented"
         )
 
-    # A7: self-referential guard — this test file contains Suite 127.
-    this_file_text = Path(__file__).read_text(encoding="utf-8")
-    for token in ["Suite 127", "flow-event-schema-sync"]:
-        if token not in this_file_text:
-            failures.append(f"tests/test_flow_event_schema_sync.py: missing self-ref token '{token}'")
-
-    # A8: docs/testing.md registers this suite.
-    testing_md = REPO_ROOT / "docs" / "testing.md"
-    if testing_md.exists():
-        testing_text = testing_md.read_text(encoding="utf-8")
-        for token in ["Suite 127", "flow-event-schema-sync"]:
-            if token not in testing_text:
-                failures.append(f"docs/testing.md: missing registry token '{token}'")
+    # A7/A8 — RETIRED. They asserted that this file and docs/testing.md each
+    # contained the literals "Suite 127" and "flow-event-schema-sync". Both were
+    # prose-presence assertions: the only way to fail was to rename or reorganise
+    # a document, and the cheapest way to pass was to paste the token back — which
+    # is what makes them the wrong shape (README.md § "What gets a test"). Neither
+    # ever verified anything about flow-event schema sync, which is what this
+    # suite exists to check. Retired when the registry they policed was rewritten.
 
     # A9: docs/observability.md documents the cross-user plane as SEPARATE.
     obs_path = REPO_ROOT / "docs" / "observability.md"
