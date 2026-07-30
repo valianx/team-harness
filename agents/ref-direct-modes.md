@@ -409,6 +409,8 @@ Check the `Submode` / `Mode` field in the task payload:
 
 The skill already passed all data inline. Extract:
 - PR number, title, body, author, base/head branches, additions/deletions, URL
+- Reviewed head SHA, base SHA, merge-base SHA, and context hash
+- Commit list and structured conversation context
 - Linked issue (number, title, body, labels) or "none"
 - Changed files list
 - Full diff (may be truncated if >3000 lines)
@@ -426,6 +428,11 @@ Title: {title}
 Author: {author}
 Base: {base}
 Head: {head}
+Reviewed Head SHA: {reviewed_head_sha}
+Base SHA: {reviewed_base_sha}
+Merge Base SHA: {reviewed_merge_base_sha}
+Context Hash: {context_hash}
+Commits: {commit list}
 Additions: +{N}
 Deletions: -{N}
 URL: {url}
@@ -436,6 +443,7 @@ Issue Body: {body} or "N/A"
 Issue Labels: {labels} or "N/A"
 Has Policy: {true|false}
 Review Policy: {verbatim content of .team-harness/review-policy.md, or omit when Has Policy: false}
+Conversation Context: {structured ledger rendered by the skill}
 Changed Files:
 {file list}
 Full Diff:
@@ -494,6 +502,7 @@ Invoked when the skill ran 2+ parallel focused reviewers and needs the drafts me
 Extract from the payload:
 - `Focuses:` list (e.g., `["security","architecture","style"]`)
 - PR metadata (number, title, author, URL)
+- `Reviewed Head SHA` and `Context Hash`
 
 Invoke `reviewer-consolidator` via Task tool, passing:
 ```
@@ -502,6 +511,8 @@ PR: #{number}
 Title: {title}
 Author: {author}
 URL: {url}
+Reviewed Head SHA: {reviewed_head_sha}
+Context Hash: {context_hash}
 Draft Files: .claude/pr-review-draft-{focus}.md per focus
 Inline Files: .claude/pr-review-inline-{focus}.json per focus
 ```

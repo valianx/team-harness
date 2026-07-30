@@ -6,11 +6,12 @@ Verification suite for the parts of this repo that execute. It is deliberately *
 
 ## Why this exists
 
-Three surfaces have inputs, outputs, and exit codes, so a failure names a real defect:
+Four surfaces have inputs, outputs, and exit codes, so a failure names a real defect:
 
 - **Hook and gate logic** — the TypeScript bodies in `hooks/ts/bodies/` (compiled to `dist/*.cjs`, run via `hooks/run-ts-hook.sh`) plus `hooks/sketch-guard.sh`. Feed a payload, assert the decision.
 - **Machine-readable structure** — YAML frontmatter that must parse, JSON manifests that must have a given shape, allowlists that must stay disjoint.
 - **The installer and bootstrap scripts** — Go code and shell entry points with real filesystem effects.
+- **Deterministic skill helpers** — executable helpers such as `/review-pr` context capture, where snapshot identity and comparison have machine-verifiable behavior.
 
 Agent and skill prose is not on that list, and that is deliberate. A corpus of ~46,000 lines asserting the presence and wording of prose was deleted because it inverted authority: a failing literal search made adding a sentence the cheapest fix, so the prose came to serve the check instead of the other way round. Prose contracts are enforced by review — see `docs/testing.md § "(iii)"`.
 
