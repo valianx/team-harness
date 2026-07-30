@@ -40916,6 +40916,61 @@ check(
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
+# Suite 188 — docs/pipelines.md pointer-integrity (coordinator-fusion, T4-AC-8)
+#
+# Every section docs/pipelines.md's "Flow variants" locator table cites must
+# resolve to a real `^## ` heading inside agents/ref-special-flows.md — the
+# single named home that table's own intro sentence declares ("Each variant
+# is defined once, in agents/ref-special-flows.md, under the section named
+# here. This table is a locator, not a summary."). Declared residual (AC-8's
+# own "reverse leg"): this does not check the other direction — a heading in
+# ref-special-flows.md the locator table never cites is not flagged.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 188: docs/pipelines.md pointer-integrity ===")
+
+_s188_pipelines = read(REPO_ROOT / "docs" / "pipelines.md")
+_s188_special_flows = read(AGENTS_DIR / "ref-special-flows.md")
+_s188_special_flows_headings = set(re.findall(r"^## .+$", _s188_special_flows, re.MULTILINE))
+
+_s188_table_start = _s188_pipelines.find("## Flow variants")
+_s188_table_end = _s188_pipelines.find("\n## ", _s188_table_start + 1)
+_s188_table_slice = _s188_pipelines[_s188_table_start:_s188_table_end]
+_S188_HEADING_CITATION_RE = re.compile(r"`(## [^`]+)`")
+_s188_cited_headings = _S188_HEADING_CITATION_RE.findall(_s188_table_slice)
+
+# A cited heading may be a shortened prefix of the real one (the real heading
+# carries an additional parenthetical qualifier, e.g. "## Hotfix sub-flow"
+# citing the real "## Hotfix sub-flow (type: hotfix)") — match on prefix, not
+# exact equality, since the locator table's own stated job is a short name,
+# not a byte-exact copy.
+_s188_broken = [
+    h for h in _s188_cited_headings
+    if not any(real.startswith(h) for real in _s188_special_flows_headings)
+]
+check(
+    "suite188(ac8a-locator-resolves): every section docs/pipelines.md's Flow variants"
+    " table cites resolves to a real heading in agents/ref-special-flows.md",
+    bool(_s188_cited_headings) and not _s188_broken,
+    f"cited {len(_s188_cited_headings)} section(s), broken: {_s188_broken}",
+)
+check(
+    "suite188(self-ref): test file contains 'Suite 188'",
+    "Suite 188" in read(Path(__file__)),
+    "test file must self-reference Suite 188",
+)
+check(
+    "suite188(registry): docs/testing.md registers 'Suite 188' and"
+    " 'pipelines-pointer-integrity'",
+    "Suite 188" in _read_or_empty(REPO_ROOT / "docs" / "testing.md")
+    and "pipelines-pointer-integrity" in _read_or_empty(REPO_ROOT / "docs" / "testing.md"),
+    "docs/testing.md must register Suite 188 and the 'pipelines-pointer-integrity' marker",
+)
+
+# Marker: pipelines-pointer-integrity
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
