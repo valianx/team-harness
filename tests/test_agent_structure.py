@@ -40685,16 +40685,21 @@ check(
 # this content, and none of the four newly-wired contract suites cover it
 # either -- confirmed absent by a targeted grep before writing these checks.
 # ---------------------------------------------------------------------------
-_iter_rules = _slice_section(orchestrator_md, "\n## Iteration Rules", ("\n## Phase Timeouts",))
+_iter_rules = _slice_section(orchestrator_md, "\n## Iteration rules", ("\n## Phase timeouts",))
 
 # T2-AC-12: cause vocabulary + budget exclusion + event-schema field.
+# Literal retargeted to the fused file's own condensed wording -- verified
+# against `git show 70550d1:agents/orchestrator.md` that the two-value cause
+# vocabulary and the operator-cause exclusion both survive; only the
+# notation (pipe-alternative instead of prose) and the emphasis case
+# (bold "excluded" instead of ALL-CAPS) changed.
 check(
     "iteration-rules(t2-ac12-cause-vocabulary): every iteration.start carries"
     " a cause of operator or verification, and cause: operator is excluded"
     " from the max-3 budget",
-    "carries a `cause` of `operator` or `verification`" in _iter_rules
-    and "EXCLUDED from the max-3 budget" in _iter_rules,
-    "agents/orchestrator.md § Iteration Rules must declare the two-value"
+    "carries `cause: operator | verification`" in _iter_rules
+    and "excluded**, because the round executes a decision" in _iter_rules,
+    "agents/orchestrator.md § Iteration rules must declare the two-value"
     " cause vocabulary and the operator-cause budget exclusion",
 )
 check(
@@ -40714,7 +40719,11 @@ _T2_AC18_LEGS = (
     "Recurrence → escalate, do not dispatch.",
     "Mechanical and enumerated → dispatch.",
     "Mixed set → split.",
-    "A lens's own classification is an INPUT, never the authority.",
+    # Casing retargeted to the fused prose's own wording (lowercase "input";
+    # the emphasis fell to normal case during the rewrite) -- the sentence
+    # and its discernment rule are otherwise byte-identical to the pre-fusion
+    # source, verified against `git show 70550d1:agents/orchestrator.md`.
+    "A lens's own classification is an input, never the authority.",
 )
 check(
     "iteration-rules(t2-ac18-five-legs): the pre-dispatch gate states all"
@@ -40733,20 +40742,29 @@ check(
     " artifacts (Panel Rounds row, iteration.start cause) and state that no"
     " third artifact is introduced",
 )
+# Anchor retargeted: the pre-fusion markdown table collapsed into a single
+# "Pass → Phase 3.5. Fail on either conjunct → ..." prose line. Confirmed
+# unique in the corpus before anchoring.
 _phase3_fail_row = _slice_section(
-    orchestrator_md, "`pass` + `code_hygiene: pass` → Phase 3.5.", ("\n\n",)
+    orchestrator_md, "Pass → Phase 3.5.", ("\n\n",)
 )
 check(
     "iteration-rules(t2-ac18-phase3-cites-gate): the Phase 3 combined-verdict"
     " fail row is subject to the pre-dispatch correction gate before any"
     " correction round is dispatched",
     "pre-dispatch correction gate" in _phase3_fail_row
-    and "Iteration Rules" in _phase3_fail_row,
+    and "Iteration rules" in _phase3_fail_row,
     "Phase 3's fail row must cite the pre-dispatch correction gate"
-    " (§ Iteration Rules) before dispatching a correction round",
+    " (§ Iteration rules) before dispatching a correction round",
 )
+# Anchor retargeted: the pre-fusion `| verdict | Action |` table collapsed
+# into the prose "**Advance:** `pass` → gate. ... `fail` → do NOT surface the
+# plan..." line. Confirmed unique in the corpus before anchoring.
 _phase16_gate_table = _slice_section(
-    orchestrator_md, "\n| `verdict` | Action |", ("\n### Plan-review panel centralization",)
+    orchestrator_md,
+    "do NOT surface the plan; route back to `architect` with the failing"
+    " rules and re-run.",
+    ("\n\n",),
 )
 check(
     "iteration-rules(t2-ac18-phase16-cites-gate): the Phase 1.6 gate table's"
@@ -40755,29 +40773,40 @@ check(
     " discriminant stated at BOTH gate sites, not only Phase 3's",
     "pre-dispatch" in _phase16_gate_table.lower()
     or "iteration rules" in _phase16_gate_table.lower(),
-    "agents/orchestrator.md § Phase 1.6's gate table `fail` row does not cite"
-    " the pre-dispatch correction gate / § Iteration Rules — T2-AC-18 states"
+    "agents/orchestrator.md § Phase 1.6's `fail` advance line does not cite"
+    " the pre-dispatch correction gate / § Iteration rules — T2-AC-18 states"
     " the discriminant must be stated at both gate sites (Phase 1.6's fail"
-    " row and Phase 3's combined verdict), but only Phase 3's row does so"
-    " today; a Stage-1 contradiction/recurrence finding at Phase 1.6 can be"
-    " auto-dispatched to `architect` without passing through the discernment"
-    " gate T2-AC-18 introduces",
+    " row and Phase 3's combined verdict), but only the base pre-fusion"
+    " revision did so at both; a Stage-1 contradiction/recurrence finding at"
+    " Phase 1.6 can be auto-dispatched to `architect` without passing"
+    " through the discernment gate T2-AC-18 introduces",
 )
 
 # T2-AC-19: remediation preference (removal/replacement over addition),
 # composed with -- not weakening -- the existing named-successor rule.
+# Literal retargeted to the fused heading's own wording -- verified against
+# `git show 70550d1:agents/orchestrator.md` that the property (prefer
+# removal/replacement over addition; a named cross-check when only addition
+# is possible) survives; only the sentence framing was condensed into a
+# section heading.
 check(
     "iteration-rules(t2-ac19-remediation-preference): closing a finding"
-    " prefers removing or replacing an existing element over adding a new"
-    " one, and a named cross-check is required when only addition is"
-    " possible",
-    "prefers removing or replacing an existing element over adding a new"
-    " one" in _iter_rules
+    " prefers removal or replacement over addition, and a named cross-check"
+    " is required when only addition is possible",
+    "Remediation prefers removal or replacement over addition" in _iter_rules
     and "named cross-check before the round closes" in _iter_rules,
-    "agents/orchestrator.md § Iteration Rules must state the"
+    "agents/orchestrator.md § Iteration rules must state the"
     " removal/replacement-over-addition preference and the named"
     " pre-close cross-check requirement",
 )
+# NOT retargeted -- genuine content loss, confirmed against the pre-fusion
+# source (`git show 70550d1:agents/orchestrator.md`): that revision reads
+# "This composes with, and does not weaken, 'no removal without a named
+# successor'..."; the current line reads only "This composes with 'no
+# removal without a named successor' -- prefer removal, and name the
+# successor when removing." The explicit non-weakening disclaimer this AC
+# requires has no successor anywhere in the current file. Left failing
+# intentionally rather than loosened to match the loss.
 check(
     "iteration-rules(t2-ac19-composes-with-successor-rule): the remediation"
     " preference composes with, and does not weaken, the existing"
