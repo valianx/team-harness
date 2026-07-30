@@ -5152,25 +5152,38 @@ def _slice_bullet_section(text, anchor):
 # ---------------------------------------------------------------------------
 # Anchor A: agents/orchestrator.md "### Session-scoped config override"
 # ---------------------------------------------------------------------------
-# Repoint (split): the override contract moved to leader.md as a bold inline
-# paragraph (no longer a ### heading); the restoration added the "The
-# load-bearing order is exact:" block within the same slice.
-_ORCH_ANCHOR = "**Session-scoped config override.**"
+# Retargeted (coordinator-fusion): the override contract now lives as item 2
+# of the numbered "## Boot (silent)" list, condensed from the two paragraphs
+# the pre-fusion agents/leader.md carried ("**Session-scoped config
+# override.**" summary paragraph plus a second, detailed "The load-bearing
+# order is exact:" paragraph). Anchoring on the whole "## Boot (silent)"
+# section rather than a since-removed bold-paragraph marker, since the
+# surviving content spans the section's numbered items 1-4 plus its two
+# trailing sentences (unique-directory guarantee, /th:recover re-read).
+_ORCH_ANCHOR = "## Boot (silent)"
 _ovr = _slice_section(_s32_orch, _ORCH_ANCHOR)
 
 check(
     "override(anchor-orch): agents/orchestrator.md contains"
-    " '### Session-scoped config override' section",
+    " the '## Boot (silent)' section (current home of the override contract)",
     bool(_ovr),
     f"anchor '{_ORCH_ANCHOR}' not found in orchestrator.md"
-    " -- override(a/a2/b/c/c2/d-v/e/e2/f/h/i/i2) checks will fail",
+    " -- override(a/a2/b/c/c2/d-v/e2/f/h/i/i2) checks will fail",
 )
 
-# (a) All four sequence tokens present in _ovr AND in order.
-# Repoint (split): the ordered 4-step sequence lives in the restored
-# "The load-bearing order is exact:" block; the earlier override paragraph
-# also mentions "apply precedence" out of order, so scope the ordering check
-# to that block (presence stays scoped to the whole override slice).
+# (a)/(a2) NOT retargeted -- genuine content loss, confirmed against the
+# pre-fusion source (`git show 70550d1:agents/leader.md`). That revision's
+# second paragraph opens "The load-bearing order is exact:" and explicitly
+# enumerates all four steps as labeled, ordered items: (1) parse override,
+# (2) read persistent, (3) apply precedence, (4) then resolve -- compute
+# base_path/logs_mode/events_file/docs_root from the merged result. The
+# fused "## Boot (silent)" item 2 keeps steps (1) and (3) as prose ("parse
+# override intent... BEFORE resolving paths... apply `override > persistent
+# > default`") but drops the explicit "read persistent" and "then resolve"
+# labels and their enumerated ordering entirely -- confirmed absent anywhere
+# in the fused corpus (grepped every SPLIT_CORPUS file). Left failing
+# intentionally rather than loosened to match the loss; agents/orchestrator.md
+# is Task-1's frozen file, so this is reported, not fixed, here.
 _A_TOKENS = ("parse override", "read persistent", "apply precedence", "then resolve")
 _a_tokens_in_slice = bool(_ovr) and all(t in _ovr for t in _A_TOKENS)
 _a_order_slice = _ovr[_ovr.find("The load-bearing order is exact:"):] if "The load-bearing order is exact:" in _ovr else ""
@@ -5205,14 +5218,16 @@ check(
     " literal 'override > persistent > default'",
 )
 
-# (c) Scope guard: "NEVER writes" AND "~/.claude/.team-harness.json" in slice.
+# (c) Scope guard: "Never write" AND "~/.claude/.team-harness.json" in slice.
+# Casing retargeted -- the fused prose reads "Never write the config file
+# from this flow." (title case, not ALL-CAPS); substance unchanged.
 check(
     "override(c): orchestrator.md § override declares"
-    " NEVER writes ~/.claude/.team-harness.json",
+    " it never writes ~/.claude/.team-harness.json",
     bool(_ovr)
-    and "NEVER write" in _ovr  # repoint (split): corpus says "You NEVER write …"
+    and "Never write" in _ovr
     and "~/.claude/.team-harness.json" in _ovr,
-    f"anchor '{_ORCH_ANCHOR}' slice missing 'NEVER write'"
+    f"anchor '{_ORCH_ANCHOR}' slice missing 'Never write'"
     " and/or '~/.claude/.team-harness.json'",
 )
 
@@ -5241,13 +5256,20 @@ check(
     " whitelist/overridable reference",
 )
 
-# (e) "Output Discipline" AND "output-template.md" in slice.
+# (e) "Output Discipline" AND "output-template.md" -- relocated out of the
+# Boot slice into orchestrator.md's own dedicated "## Output Discipline"
+# section, which now states the general rule once ("Boot, config load, and
+# MCP verify are silent on success") rather than repeating it per numbered
+# Boot item. Checked against the whole corpus rather than the narrow Boot
+# slice; the cross-reference still applies to Boot by the section's own
+# governing sentence.
 check(
-    "override(e): orchestrator.md § override references"
-    " Output Discipline (output-template.md)",
-    bool(_ovr) and "Output Discipline" in _ovr and "output-template.md" in _ovr,
-    f"anchor '{_ORCH_ANCHOR}' slice missing 'Output Discipline'"
-    " and/or 'output-template.md'",
+    "override(e): orchestrator.md references"
+    " Output Discipline (output-template.md), applying to Boot by its own governing sentence",
+    "Output Discipline" in _s32_orch and "output-template.md" in _s32_orch
+    and "Boot, config load, and MCP verify are silent on success" in _s32_orch,
+    "orchestrator.md must reference Output Discipline (output-template.md)"
+    " and state that Boot/config-load/MCP-verify are silent on success",
 )
 
 # (e2) "operation.success" OR "silent" in slice.
@@ -5258,19 +5280,35 @@ check(
     f"anchor '{_ORCH_ANCHOR}' slice missing 'operation.success' or 'silent'",
 )
 
-# (f) "/recover" AND "00-state.md" AND ("re-apply" OR "re-applied") in slice.
+# (f) "/th:recover" AND "00-state.md" AND ("re-apply"/"re-applied"/"re-read")
+# in slice. "re-read" accepted as an equivalent: the fused text reads
+# "re-read the resolved config from `00-state.md`" -- since the stored value
+# is already the fully-merged (applied) result, re-reading it IS the
+# re-application; no separate re-apply step exists to name.
 check(
-    "override(f): orchestrator.md § override documents /recover re-applies"
-    " override from 00-state.md",
+    "override(f): orchestrator.md § override documents /th:recover re-reading"
+    " the already-applied override from 00-state.md",
     bool(_ovr)
-    and "/th:recover" in _ovr  # repoint (split): corpus uses the "/th:recover" form
+    and "/th:recover" in _ovr
     and "00-state.md" in _ovr
-    and ("re-apply" in _ovr or "re-applied" in _ovr),
+    and ("re-apply" in _ovr or "re-applied" in _ovr or "re-read" in _ovr),
     f"anchor '{_ORCH_ANCHOR}' slice missing '/th:recover', '00-state.md',"
-    " or 're-apply'/'re-applied'",
+    " or 're-apply'/'re-applied'/'re-read'",
 )
 
-# (h) No-override / fall-through + silent in slice.
+# (h) NOT retargeted -- genuine (minor) content loss, confirmed against the
+# pre-fusion source. `git show 70550d1:agents/leader.md` carries an explicit
+# named sentence: "**No-override case:** when the operator says nothing
+# relevant, the boot falls through to the persistent config and is silent —
+# no extra output, no chatter — indistinguishable from a boot with no
+# override logic at all." No equivalent sentence survives anywhere in the
+# fused corpus (grepped for "fall through"/"falls through"/"no-override").
+# The general "## Boot (silent)" heading and its "No visible output during
+# boot" sentence structurally cover the same ground (every boot step is
+# silent on success, override present or not), so the guarantee itself is
+# not broken -- but the specific named case and its "indistinguishable from
+# no override logic at all" reassurance have no successor. Left failing
+# intentionally; agents/orchestrator.md is Task-1's frozen file.
 check(
     "override(h): orchestrator.md § override documents no-override case"
     " as silent (fall-through, no extra output)",
@@ -5286,12 +5324,21 @@ check(
     " + silent description",
 )
 
-# (i) "base_path" AND "docs_root" AND "before" in slice.
+# (i) Retargeted: "docs_root" no longer co-occurs with "base_path" inside the
+# Boot slice (Boot resolves base_path; the docs_root formula moved to
+# Intake's own workspace-folder step). Checked against the whole corpus for
+# the literal formula "docs_root = {base_path}" — a stronger, more precise
+# proof of the dependency than the original loose three-substring
+# co-occurrence check, since it asserts docs_root is DEFINED IN TERMS OF
+# base_path rather than merely appearing in the same slice. The
+# override-ordering "before" (override parsed before paths resolve) stays
+# scoped to the Boot slice, where it is still stated.
 check(
-    "override(i): orchestrator.md § override documents base_path resolved"
-    " before composing docs_root",
-    bool(_ovr) and "base_path" in _ovr and "docs_root" in _ovr and "before" in _ovr.lower(),
-    f"anchor '{_ORCH_ANCHOR}' slice missing 'base_path', 'docs_root', or 'before'",
+    "override(i): orchestrator.md documents base_path resolved before"
+    " composing docs_root (docs_root is defined in terms of base_path)",
+    "docs_root = {base_path}" in _s32_orch and "before" in _ovr.lower(),
+    "orchestrator.md must define docs_root = {base_path}/... and the Boot"
+    " section must state override parsing happens before path resolution",
 )
 
 # (i2) The date+feature prefix pattern AND ("unique" OR "collision") in slice.
