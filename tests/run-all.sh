@@ -74,6 +74,20 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 3b: review context snapshot helper — behavioral tests"
+echo "############################################################"
+if [ -n "$PY" ] && $PY "$TESTS_DIR/test_review_context.py"; then
+    echo "review-context: PASS"
+elif [ -z "$PY" ]; then
+    echo "review-context: FAIL (Python 3 not found)"
+    FAILED=$((FAILED + 1))
+else
+    echo "review-context: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 echo "# Suite 4: hooks/ts/bodies/checkpoint-guard.ts — functional tests"
 echo "# Unwired from .claude-plugin/hooks.json since v2.139.0 (Claude Code plugin"
 echo "# mode); live consumer is the opencode runtime, registered via"

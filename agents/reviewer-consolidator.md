@@ -47,6 +47,7 @@ The orchestrator invokes you with one of two input sets:
 - Optional security draft: `.claude/pr-review-security.md` (present when `Has Security draft: true` in dispatch)
 - The list of focuses that ran (e.g., `["security", "architecture", "style"]`)
 - PR metadata (number, title, author, URL) for the consolidated header
+- `Reviewed Head SHA` and `Context Hash` for the immutable review snapshot
 
 **Single-reviewer path (when only one reviewer ran but qa/security also ran):**
 - Reviewer draft: `.claude/pr-review-draft.md`
@@ -54,8 +55,11 @@ The orchestrator invokes you with one of two input sets:
 - Optional qa draft: `.claude/pr-review-qa.md`
 - Optional security draft: `.claude/pr-review-security.md`
 - PR metadata (number, title, author, URL)
+- `Reviewed Head SHA` and `Context Hash`
 
 Read each file using the Read tool. All files are in `.claude/` in the current working directory. Check file existence before reading — a missing file means that agent was not dispatched (skip cleanly).
+
+Every `reviewer` draft must contain a `Reviewed head` value matching the supplied `Reviewed Head SHA`. If a reviewer draft omits it or reports another SHA, return `status: failed`, `failure_kind: stale-context`; never merge mixed snapshots. QA and security drafts inherit the frozen worktree supplied by the coordinator and need not repeat the field.
 
 **When only one draft file exists** (no qa, no security, single reviewer): skip consolidation entirely. Copy or rename that file to `.claude/pr-review-final.md` and return immediately.
 
@@ -129,6 +133,7 @@ The consolidated `review_body` MUST have this structure (in English):
 ## Coordinated Review
 
 {Tier-aware header: e.g., "Multi-review (security / architecture / style) + QA + Security" or "Review + Security", depending on which agents ran}
+Reviewed head: `{reviewed_head_sha}`
 {N} criticals, {M} suggestions.
 
 ## Findings by Focus
@@ -187,6 +192,8 @@ status: success | failed
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}
 output: .claude/pr-review-final.md        # or suffixed path when in convergence pass
+reviewed_head_sha: {exact SHA supplied in the dispatch}
+context_hash: {exact context hash supplied in the dispatch}
 consolidated_sources: [{reviewer/focus1}, {reviewer/focus2}, ..., {qa}, {security}]
 critical_count: {N}
 suggestion_count: {N}
@@ -205,6 +212,8 @@ status: success | failed
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}
 output: .claude/pr-review-final.md
+reviewed_head_sha: {exact SHA supplied in the dispatch}
+context_hash: {exact context hash supplied in the dispatch}
 consolidated_sources: [{reviewer/focus1}, {reviewer/focus2}, ..., {qa}, {security}]
 critical_count: {N}
 suggestion_count: {N}

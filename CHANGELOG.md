@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-07-30
+
+### Changed
+
+- Bound PR reviews to immutable head, base, merge-base, commit, and conversation snapshots.
+- Preserved paginated review threads and prior review history while preventing stale draft publication.
+
 ## [3.3.0] - 2026-07-30
 
 ### Changed
