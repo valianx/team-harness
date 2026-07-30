@@ -185,7 +185,7 @@ Every Phase-3 verifier's Session Context Protocol follows this ladder:
    ≤30 lines) — this read is what makes an AC-substance edit, same-count reword included,
    visible with zero rebuild machinery.
 1. **Read `00-verify-packet.md` for implementation context.** Changed files, deviations,
-   test artifact, pointers — never AC (§2 states the packet carries none).
+   evidence map, pointers — never AC (§2 states the packet carries none).
 2. **Depth-on-demand (never forbidden):** open a full workspace document ONLY when (a) an
    AC references context the packet does not explain, (b) evidence beyond the packet is
    needed (deviation detail, root-cause chain, prior findings), or (c) the integrity
@@ -282,7 +282,7 @@ code tree.
   AC-baselining verifier reads them live from `01-plan.md § Task List` (§4 Step 0).
 - The integrity check **fails toward MORE reading for the facts it anchors** — tree state,
   changed-file existence, and the git-derived scan-target list (§4). The packet's narrative
-  fields (implementation summary, deviations, test artifact) are protected by the
+  fields (implementation summary, deviations, evidence map) are protected by the
   authority-scoping rule (§2) instead of an anchor: no verdict rests on them as sole
   evidence, so a truncated or divergent narrative can misdirect navigation but cannot
   change a verdict's evidence base.

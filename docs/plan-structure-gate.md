@@ -17,7 +17,7 @@
 
 Before this gate existed, plan-ratification (`qa-plan`, Phase 1.5) carried both mechanical checks
 (does the AC count match the summary table, are cross-references dangling) and genuine judgment
-(is coverage complete, is each AC testable) in one `opus`-tier dispatch — mechanical work
+(can the plan satisfy each AC, is each AC evidentiary-sound) in one large dispatch — mechanical work
 masquerading as reasoning. A round-3 `qa-plan` run shipped a stale AC count (25 vs the true 31)
 precisely because no deterministic scan cross-checked the table against the actual AC blocks; a
 fixed script cannot miscount the way a judgment pass under context pressure can. This gate closes
@@ -27,7 +27,7 @@ that gap with two complementary layers, mirroring `docs/code-hygiene-gate.md § 
   structural checks over `01-plan.md` itself, before any `qa-plan` dispatch. No judgment, no model
   call — a script decides.
 - **Layer 2 — judgment, holistic, in-ratification.** `qa-plan` (mode: `ratify-plan`) audits
-  coverage completeness and AC-testability soundness — properties a fixed check cannot express.
+  AC soundness and plan capability — properties a fixed check cannot express.
 
 Both layers consume the same check set and the same operational definitions defined in this
 file — one source of truth, never two independently-maintained copies. Right-sizing `qa-plan`
@@ -91,17 +91,16 @@ boundary the orchestrator's Phase 1.5 dispatch already assumes).
 
 **What it audits (requires judgment; NOT expressible as a fixed check):**
 
-1. **Coverage completeness.** Every feature-level AC (from the operator-facing spec / `01-plan.md
-   § Review Summary`) is covered by at least one task-level AC in `§ Task List` — a semantic
-   match, not a string match, since a task AC can satisfy a feature AC with different wording.
-2. **AC-testability soundness.** Each task-level AC's Given/When/Then or `VERIFY:` statement is
-   internally sound and actually tests the claim it makes — not vacuous, not circular, not
-   testing an unrelated property under the AC's stated name.
+1. **AC soundness.** Each task-level AC describes an observable outcome or a meaningful
+   acceptance-significant invariant and admits appropriate `test`, `command`, or `inspection`
+   evidence under `agents/_shared/ac-evidence.md`.
+2. **Plan capability.** At least one plan step would genuinely produce each AC's outcome. Merely
+   restating the criterion, naming a file, or promising a test is not semantic coverage.
 
 Layer 1's four mechanical checks are explicitly OUT of `qa-plan`'s scope after this gate exists —
 re-checking them in Layer 2 would be the exact duplicated-maintenance seam this two-layer split
 exists to remove. `qa-plan`'s ratification table in `reviews/01-plan-review.md § Plan Ratification`
-covers coverage + testability only; it does not restate the AC count or the cross-reference check.
+covers AC soundness + plan capability only; it does not restate the AC count or cross-reference check.
 
 ---
 

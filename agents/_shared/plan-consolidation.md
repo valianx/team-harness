@@ -34,7 +34,7 @@ This closes the set of panel *outcomes*, not the set of files under `reviews/`. 
 |---|---|---|---|
 | `## Review Summary`, `## Architecture` (Work Plan, Services Touched, assessments), `## Task List` (task sections, AC text, Files, Delivery Grouping) | `01-plan.md` | architect | author; on amend, reconcile-in-place (overwrite superseded canonical fields so each appears exactly once) |
 | Closure rubric (ownership closure, provenance, removed-control) | `reviews/01-closure-rubric.md` | architect | author; rewrite in place on amend |
-| `## Plan Ratification (Phase 1.5)` | `reviews/01-plan-review.md` | qa-plan (ratify-plan) | append in place; replace any prior copy; when a ratification gap changes a canonical field or AC, edit that field in the plan body in place — do not append a second value |
+| `## Plan Ratification (Phase 1.5)` | `reviews/01-plan-review.md` | qa-plan (ratify-plan) | replace own section in place; surface any required plan/AC correction to `architect` — qa-plan never edits the plan body |
 | `## Plan Review` header + `## Summary` rules table + `## Findings` + `## Recommendation to orchestrator` + `**Combined verdict:**` | `reviews/01-plan-review.md` | plan-reviewer | append in place; replace any prior copy |
 | `## Panel Rounds` | `reviews/01-plan-review.md` | plan-reviewer | append one row per round, never rewrite prior rows |
 | `## Plan Review` sub-verdict `**Substance (qa):**` | `reviews/01-plan-review.md` | qa-plan (panel) | replace own labelled line in place |
