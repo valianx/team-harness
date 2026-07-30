@@ -44,7 +44,7 @@ checks).
 
 **When:** immediately before any Phase 1.5 `qa-plan` dispatch, for every plan that reaches Phase
 1.5 — i.e., every plan that does NOT take the self-authored-plan panel carve-out
-(`agents/orchestrator.md § "Self-authored-plan panel carve-out"`, T2-AC-2). A self-authored plan
+(`agents/orchestrator.md § "Phase 1.5 — Plan Ratification"`, T2-AC-2). A self-authored plan
 (hotfix / Tier-1-fix / express one-line plan) is a fixed 3-4 line task list with no
 `### Summary` table, no multi-task DAG, and no cross-task `Files:` field to check — the
 carve-out's own deterministic self-check item "at least one task exists" already covers the

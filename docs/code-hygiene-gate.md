@@ -121,7 +121,7 @@ existing operator-declared fast-path mechanisms.
 | Command error (final `grep` exits `2`+, or `git diff` itself failed) | Escalate — do not advance and do not silently treat as clean. Surface to the operator. |
 
 **Iteration budget:** shares the existing max-3 cap for Case A (implementation) bounces —
-see `agents/orchestrator.md § If any agent fails → ITERATE`.
+see `agents/orchestrator.md § "Iteration"`.
 
 **`workspaces/` exclusion is structural, not filtered.** The workspaces directory is git-ignored
 (local mode) or lives outside the repository entirely (obsidian mode) — it never appears in
@@ -186,7 +186,7 @@ false-green gate by construction — see `docs/knowledge.md` node
 | `code_hygiene` PRODUCER | producer B1 | `agents/qa.md` | `## Code Hygiene` audit + Return Protocol `code_hygiene:` field |
 | `code_hygiene` CONSUMER — Phase 3 gate | consumer C1 | `agents/orchestrator.md` | `### Phase 3` worst-of combined verdict (conjunction) |
 | `code_hygiene` CONSUMER — Phase 3.5 gate | consumer C2 | `agents/orchestrator.md` | `## Phase 3.5 — Acceptance Gate` (defensive re-assertion) |
-| `code_hygiene` CONSUMER — iteration routing | consumer C3 | `agents/orchestrator.md` | `### If any agent fails → ITERATE` (Case A) |
+| `code_hygiene` CONSUMER — iteration routing | consumer C3 | `agents/orchestrator.md` | `### Iteration` (Case A) |
 | Observability | event | `agents/orchestrator.md` (event enum) + `docs/observability.md` | `stage2.hygiene` |
 
 **Rule for any future edit to this contract:** touching one row of this table without touching

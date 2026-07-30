@@ -58,9 +58,9 @@ After a localized patch, the orchestrator re-runs only the verifier(s) whose dom
 
 > Extends the Selective Verifier Re-Run table above (§ "Selective Verifier Re-Run") with an
 > ordering layer: WHICH verifiers re-run per Case is unchanged; this section fixes the ORDER and
-> the gating between them within one iteration. Wired at `agents/orchestrator.md § "If any agent
-> fails → ITERATE"` (the R0/R1/R2 subsection, inserted after the Case → routing table);
-> cross-referenced at `docs/pipeline-lanes.md § 7`.
+> the gating between them within one iteration. Wired at
+> `agents/orchestrator.md § "Cost-ordered re-run — R0 → R1 → R2"` (inserted after the Case →
+> routing table in `§ "Iteration"`); cross-referenced at `docs/pipeline-lanes.md § 7`.
 
 **Scope.** Applies to Case A with `Blast radius: localized {IDs}`. `Blast radius:
 structural` never narrows — see "Structural fail-safe" below.
@@ -74,7 +74,7 @@ combined-verdict formula they feed.
 ### Owner attribution — by brief header, not by Case letter
 
 The **finding-owner** is the lens named in the `## Iteration {N} — {agent}` header of the
-`failure-brief.md` entry (`agents/orchestrator.md § "If any agent fails → ITERATE"`) — the lens
+`failure-brief.md` entry (`agents/orchestrator.md § "Iteration"`) — the lens
 that raised the blocking finding — NOT the Case letter, which only routes the producer.
 **Case → producer; brief author → owner.** Multi-owner: when more than one lens appealed in
 iteration N, the owner set is the set of `{agent}` values across that iteration's headers; every
@@ -114,7 +114,7 @@ A structural change is never narrowed to a localized patch's R1/R2 shape.
 | Site | File | Anchor |
 |------|------|--------|
 | Canonical contract | `docs/patch-mode.md` (this file) | § Cost-Ordered Patch-Iteration Re-Run Sequencing |
-| Orchestrator wiring | `agents/orchestrator.md` | § "If any agent fails → ITERATE" — R0/R1/R2 subsection |
+| Orchestrator wiring | `agents/orchestrator.md` | § "Cost-ordered re-run — R0 → R1 → R2" |
 | Cross-reference | `docs/pipeline-lanes.md` | § 7 |
 
 A future edit to the sequencing rule at one site without the other two desynchronizes the

@@ -234,7 +234,7 @@ packet_integrity: ok | stale | mismatch | n-a
 ```
 
 The orchestrator propagates these into the `phase.end` event's `tools.packet` object (see
-`agents/orchestrator.md § Populating the tools field on phase.end`).
+`agents/orchestrator.md § "tools propagation"`).
 
 ---
 
@@ -337,7 +337,7 @@ line as `UNMEASURABLE` — never as parity. N=0 always reads UNMEASURABLE, never
 
 **Telemetry-missing ALWAYS counts as fallback-signal, never as acceptance.** A backfilled
 event structurally cannot carry packet telemetry (the reconciliation backstop derives only
-`duration_ms` from breadcrumbs — see `agents/orchestrator.md § Execution Events JSONL`), so
+`duration_ms` from breadcrumbs — see `agents/orchestrator.md § "Reconciliation backstop"`), so
 counting it any other way would let emission loss impersonate packet acceptance.
 
 **What each run reports** (via the Task-1 `## Cost` checkpoint contract in
