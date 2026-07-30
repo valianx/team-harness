@@ -1,9 +1,9 @@
 # Verification Packet — Canonical Contract
 
 This document is the **single source of truth** for `00-verify-packet.md`, the shared,
-build-once-read-many artifact that Stage-2 verifiers (`tester` run-only, `qa`, `security`,
-`adversary`, `ux-reviewer` validate) read first instead of independently re-reading the
-full workspace document set. Agent files reference this contract by pointer — the schema
+build-once-read-many artifact that Phase-3 verifiers (`qa`, conditional `adversary`,
+`ux-reviewer` validate) read first instead of independently re-reading the full workspace
+document set. Agent files reference this contract by pointer — the schema
 itself lives only here (multi-site invariant, `01-plan.md`).
 
 **Origin.** The Stage-2 verify block measured 2.8M tokens across 40 June 2026 runs (median
@@ -18,9 +18,8 @@ build-once-read-many shape already used for `00-knowledge-context.md`
 
 **Who:** the orchestrator, never a leaf agent.
 
-**When:** Phase 2.7 close — after the tester's authoring status block returns
-`status: success` and after the A1-F3/A1-F4 browser-readiness checks, before Phase 3 is
-launched. See `agents/orchestrator.md § Phase 2.7`.
+**When:** Phase 2.8 Freeze — after tester authoring, hygiene, build, lint, and frozen-diff
+creation succeed, before Phase 3 is launched. See `agents/orchestrator.md § Phase 2.8`.
 
 **Where:** `{docs_root}/00-verify-packet.md` — one file per task, overwritten in place on
 every rebuild. **Never create a `00-verify-packet-v2.md` sibling** — the `Packet version`
@@ -91,12 +90,12 @@ silently.
 
 | Section | Content | Source |
 |---|---|---|
-| **Header** | `Feature:`, `Task identifier:`, `Built:` (ISO timestamp), `Packet version: N`, `Tree anchor:` (computed per § 1a's canonical algorithm — never re-derived inline), `Base ref:` (the task's recorded base, e.g. `origin/main`) | orchestrator |
+| **Header** | `Feature:`, `Task identifier:`, `Built:` (ISO timestamp), `Packet version: N`, `Tree anchor:` (computed per § 1a's canonical algorithm — never re-derived inline), `Base ref:` (copied from state `verification_base_ref`), `Frozen diff:` (`inputs/00-frozen.diff`) | orchestrator |
 | **Scope** | `type`, `bug_tier`, `security_sensitive`, `frontend_scope`, `complexity` | `00-state.md` |
 | **Changed files** | Table: path + `new`\|`modify` + one-line role, plus `git diff --stat` output | implementer status block + `git diff --stat` |
 | **Implementation summary** | Implementer status-block summary; `Deviations from Architecture` copied verbatim (or `"none"`); surviving `[CONSTRAINT-DISCOVERED]` annotations verbatim (or `"none"`) | `02-implementation.md` |
 | **Test artifact** | Phase 2.7 suite result, tests added, AC→test map; `regression_test_path` + status for the bug-fix flow | `03-testing.md` (authoring section) |
-| **Full-document pointers** | Explicit paths to `01-plan.md`, `02-implementation.md`, `03-testing.md`, `reviews/04-security.md` (when later written), `01-root-cause.md` (fix flow), `sketches/*` | — the depth-on-demand escape hatch (§4) |
+| **Full-document pointers** | Explicit paths to `01-plan.md`, `02-implementation.md`, `03-testing.md`, `inputs/00-frozen.diff`, `reviews/01-plan-review.md` (when present), `01-root-cause.md` (fix flow), `sketches/*` | — the depth-on-demand escape hatch (§4) |
 
 ### No AC section
 
@@ -125,6 +124,7 @@ therefore misdirect navigation but can never change a verdict's evidence base.
 **Feature:** {feature-name}  **Task identifier:** {Task-N}
 **Built:** {ISO timestamp}  **Packet version:** {N}
 **Tree anchor:** {sha [+ dirty-diff-hash]}  **Base ref:** {origin/main}
+**Frozen diff:** inputs/00-frozen.diff
 
 ## Scope
 type: {feature|fix|hotfix|refactor|enhancement} | bug_tier: {0-4|n-a} | security_sensitive: {true|false} | frontend_scope: {true|false} | complexity: {simple|standard|complex}
@@ -149,7 +149,8 @@ regression_test_path: {path or "n/a"}
 - 01-plan.md
 - 02-implementation.md
 - 03-testing.md
-- reviews/04-security.md (when written)
+- inputs/00-frozen.diff
+- reviews/01-plan-review.md (when present)
 - 01-root-cause.md (fix flow only)
 - sketches/* (if present)
 ```
@@ -166,23 +167,21 @@ verification packet: {docs_root}/00-verify-packet.md (version {N}, tree anchor {
 digest: changed files {N}, deviations {yes|no}
 ```
 
-The packet survives recovery/compaction (it is a file, not prompt context) and is
-observable by the operator. The existing per-verifier dispatch fields (file lists,
+The packet and its `inputs/00-frozen.diff` review surface survive recovery/compaction (they
+are files, not prompt context) and are observable by the operator. The existing per-verifier dispatch fields (file lists,
 per-mode instructions, regression-test instructions) are unchanged and additive to this.
 
 ---
 
 ## 4. Read contract — packet-first, depth-on-demand
 
-Every Stage-2 verifier's Session Context Protocol follows this ladder:
+Every Phase-3 verifier's Session Context Protocol follows this ladder:
 
 0. **Live AC read (mandatory, never replaced by the packet).** Every verifier whose
    verdict baselines on AC live-reads the per-task AC block from `01-plan.md § Task List`
    at dispatch time, before or alongside the packet read. AC-baselining verifiers: `qa`
-   (per-AC verdict), `tester` run-only (AC→test mapping confirmation), `ux-reviewer`
-   validate (UI/UX AC), `adversary` (when attacking AC/plan controls as written). `security`
-   does not baseline its verdict on AC (its scan target is code + scope flags) and needs no
-   AC read. The AC block for one task is small (§-scoped, typically
+   (per-AC verdict), `ux-reviewer` validate (UI/UX AC), and `adversary` when attacking
+   AC/plan controls as written. The AC block for one task is small (§-scoped, typically
    ≤30 lines) — this read is what makes an AC-substance edit, same-count reword included,
    visible with zero rebuild machinery.
 1. **Read `00-verify-packet.md` for implementation context.** Changed files, deviations,
@@ -199,19 +198,22 @@ Every Stage-2 verifier's Session Context Protocol follows this ladder:
 
 ### Integrity spot-check (mandatory, cheap)
 
-Every verifier performs this 2-point check before trusting the packet as sufficient:
+Every verifier performs the checks its grant can support before trusting the packet:
 
-1. The packet's `Tree anchor` matches `git rev-parse HEAD` / current working-tree state.
-2. At least one packet-listed changed file exists on disk.
+1. Read-verifiable floor for all agents: `Tree anchor` is non-empty and every packet-listed
+   changed file resolves on disk.
+2. Bash-capable agents additionally compare the anchor with the current working-tree state.
+   Read-only agents do not claim this comparison; the orchestrator owns it at Freeze and every
+   staleness trigger.
 
 **On ANY mismatch:** treat the packet as stale. Escalate to the full-manifest read. Report
 `packet_integrity: stale` (tree anchor / file-existence failure) or `packet_integrity:
 mismatch` (scan-target failure — see §5). There is no AC-count point — the packet carries
 no AC (§2).
 
-### Git-anchored scan-target list (security, qa)
+### Git-anchored scan-target list (qa)
 
-For verifiers whose contract scans changed SOURCE FILES (`security`, `qa`), the
+For verifiers whose contract scans changed SOURCE FILES with Bash (`qa`), the
 **authoritative scan-target list is derived from git at scan time**, not from the packet:
 
 ```
@@ -225,7 +227,7 @@ under-reports changed files would otherwise pass integrity silently and narrow t
 scope. The packet replaces workspace-doc reads only — it never replaces or narrows the
 changed-file list a scan-contract verifier resolves.
 
-### Status-block telemetry (all Stage-2 verifiers)
+### Status-block telemetry (all Phase-3 verifiers)
 
 ```
 packet_used: true | false | absent
@@ -246,10 +248,8 @@ explicitly per agent so the floor is auditable, not implied:
 
 | Agent | Preserved read (unaffected by the packet) |
 |---|---|
-| `security` | Phase 1 discovery scan AND reads of the changed SOURCE FILES themselves — the scan target is code, not the packet |
 | `qa` | Source-code reads for file:line AC evidence; the mandatory sketch reads (`qa.md` Phase 0 step 3) |
-| `tester` (run-only) | Suite execution; `02-regression-test.md` (fix flow) |
-| `adversary` | `reviews/04-security.md` — its zero-overlap, GO-seeking-vs-break-seeking contract stays a mandatory independent read |
+| `adversary` | `inputs/00-frozen.diff` and `reviews/01-plan-review.md § Security Design-Review` when present — its zero-overlap contract stays a mandatory independent read |
 | `ux-reviewer` (validate) | `reviews/01-ux-review.md` — the Stage-1 UI/UX AC baseline stays a mandatory read |
 
 ---
@@ -304,8 +304,8 @@ multi-run window, no window-close step, and no automatic trigger of any kind.
 
 **Denominator — verdict-doc-derived, not breadcrumb- or `phase.end`-derived.** The
 verifier-dispatch count is read from the workspace verdict docs — one dispatch per verifier
-per iteration verdict entry: `03-testing.md` run-only section (tester), `reviews/04-validation.md`
-(qa), `reviews/04-security.md` (security, Stage-1 design-review), `reviews/04-adversary.md` /
+per iteration verdict entry: `03-testing.md` authoring result (tester), `reviews/04-validation.md`
+(qa), `reviews/04-adversary.md` /
 `reviews/04-adversary-amend.md` (adversary, Pre-Delivery Security Audit), `reviews/04-ux-validation.md`
 (ux-reviewer validate). `00-subagent-trace.jsonl` breadcrumbs (`subagent.start`/
 `subagent.stop` pairs filtered by verifier `agent_type`) demote to upward-only enrichment: a
@@ -315,9 +315,9 @@ as telemetry-missing — breadcrumb absence can never **shrink** the count. The 
 contract's own Task-1 fix is repairing.
 
 **Dispatch floor — exactly one derivation.** The floor is the should-have verifier set
-derived strictly from that run's `00-state.md` scope flags: `tester` run-only + `qa`
-unconditionally; +
-`adversary` iff `security_floor_applies: true` (see `docs/pipeline-lanes.md § 7`); +
+derived strictly from that run's `00-state.md` scope flags: `tester` authoring unconditionally; +
+`qa` iff `lane: full`; +
+`adversary` iff the orchestrator's derived security floor evaluates true; +
 `ux-reviewer` validate iff `frontend_scope: true`.
 The floor is **never** derived from
 `00-state.md § Agent Results` (the did-dispatch record) — a silently-skipped verifier must
@@ -343,8 +343,8 @@ counting it any other way would let emission loss impersonate packet acceptance.
 **What each run reports** (via the Task-1 `## Cost` checkpoint contract in
 `agents/orchestrator.md § Pipeline Summary Protocol` — the `## Verification Packet`
 section of `00-pipeline-summary.md`): the three-bucket breakdown above, and verifier catch
-rates read from the workspace verdict documents, not from `phase.end` telemetry — security
-findings by severity from `reviews/04-security.md`, qa AC-fail rate from
+rates read from the workspace verdict documents, not from `phase.end` telemetry — adversarial
+break count from `reviews/04-adversary.md`, qa AC-fail rate from
 `reviews/04-validation.md § AC Coverage Results`, drift flags from
 `reviews/04-validation.md § Drift Analysis` — each compared against the June 2026 baseline recorded
 in the pipeline-validation research workspace (`02-june-empirical-analysis.md`, referenced
@@ -355,8 +355,8 @@ verifier ran.
 in every full-pipeline summary; the OPERATOR evaluates it against the June 2026 baseline
 whenever desired — there is no cross-run aggregation, window, or scheduled evaluation point
 owned by the contract itself. Rollback is a one-line contract flip shipped as a normal PR:
-the packet-first ladder default in the five verifier Session Context Protocols
-(`agents/{qa,security,adversary,tester,ux-reviewer}.md` — §4 Step 1) flips back to the full
+the packet-first ladder default in the Phase-3 verifier Session Context Protocols
+(`agents/{qa,adversary,ux-reviewer}.md` — §4 Step 1) flips back to the full
 input-manifest read as the unconditional default (the §4 Step 3 fail-open fallback becomes
 the primary path), and the orchestrator's packet build (§1) and digest-dispatch (§3) steps
 are suspended until the schema (§2) is enriched. No clause in this contract computes this

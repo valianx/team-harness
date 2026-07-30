@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [3.0.1] - 2026-07-30
+## [3.0.2] - 2026-07-30
 
 ### Changed
 - Reduced `policy-block` to two high-confidence boundaries: catastrophic recursive deletion and
@@ -15,6 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   probabilistic secret detection now defer to their actual owners instead of blocking tool calls.
 - Replaced the 1,372-line policy fixture matrix with a focused boundary suite, shrinking the
   compiled hook from roughly 56 KB to 9.6 KB.
+
+## [3.0.1] - 2026-07-30
+
+### Fixed
+
+- Stage-1 review verdicts now always reach the operator gate; only an operator `reject` or `edit`
+  creates a revised plan and one fresh review pass.
+- Express acceptance no longer consumes QA-only artifacts, and late Tier-3 promotion proves a
+  regression against the base revision instead of asking fixed code to reproduce the pre-fix state.
+- Phase-2 diff consumers share one state-owned base reference, and Freeze writes the exact diff
+  artifact that the read-only Adversary agent reviews.
+- Security-floor and nonce handling now have one owner each: the orchestrator derives audit
+  dispatch without persisting a duplicate predicate, and operators never type a gate nonce.
 
 ## [3.0.0] - 2026-07-30
 

@@ -55,30 +55,49 @@ issue-ID narration, and session-context phrasing.
 ### 3.1 Fixed scan command (pinned, copy verbatim)
 
 Both layers reference this exact command as the ground truth for "what counts as a violation."
-Run against the packet's `Base ref` (`00-verify-packet.md § Base ref`), scoped to the task's
-diff:
+Run against `verification_base_ref` from `00-state.md`, scoped to the task's diff. Before
+invoking the pinned command, set `BASE_REF` to that exact state literal; the shell variable
+is an invocation alias, not a second source:
 
 ```bash
-set -o pipefail
-git diff --unified=0 "${BASE_REF}"...HEAD -- . \
-  ':(exclude)*.md' ':(exclude)*.markdown' \
-  ':(exclude)*.rst' ':(exclude)*.txt' ':(exclude)*.adoc' \
-| grep -E '^\+' \
-| grep -v '^\+\+\+' \
-| grep -E '^\+[[:space:]]*(//|/\*|\*|#|<!--|--|;)' \
-| grep -E \
-  -e 'workspaces/' \
-  -e 'Phase [0-9]' \
-  -e 'Stage [0-9]' \
-  -e 'Step [0-9]' \
-  -e 'STAGE-GATE' \
-  -e 'per Step' \
-  -e 'added for issue' \
-  -e 'issue #[0-9]' \
-  -e 'task-[0-9]' \
-  -e 'per operator instruction' \
-  -e 'in this run' \
-  -e 'workspace note'
+code_hygiene_scan() {
+  local diff_file status
+  local -a pipeline_status
+  diff_file="$(mktemp)" || return 2
+  if ! git diff --unified=0 "${BASE_REF}"...HEAD -- . \
+    ':(exclude)*.md' ':(exclude)*.markdown' \
+    ':(exclude)*.rst' ':(exclude)*.txt' ':(exclude)*.adoc' \
+    >"${diff_file}"; then
+    rm -f "${diff_file}"
+    return 2
+  fi
+
+  set -o pipefail
+  grep -E '^\+' "${diff_file}" \
+  | grep -v -E '^\+\+\+' \
+  | grep -E '^\+[[:space:]]*(//|/\*|\*|#|<!--|--|;)' \
+  | grep -E \
+    -e 'workspaces/' \
+    -e 'Phase [0-9]' \
+    -e 'Stage [0-9]' \
+    -e 'Step [0-9]' \
+    -e 'STAGE-GATE' \
+    -e 'per Step' \
+    -e 'added for issue' \
+    -e 'issue #[0-9]' \
+    -e 'task-[0-9]' \
+    -e 'per operator instruction' \
+    -e 'in this run' \
+    -e 'workspace note'
+  pipeline_status=("${PIPESTATUS[@]}")
+  rm -f "${diff_file}"
+  for status in "${pipeline_status[@]}"; do
+    (( status >= 2 )) && return 2
+  done
+  (( pipeline_status[3] == 0 )) && return 0
+  return 1
+}
+code_hygiene_scan
 ```
 
 **Pipe stages, in order:** (1) diff against base, prose extensions excluded via pathspec; (2)
@@ -86,13 +105,11 @@ added lines only (`^+`); (3) drop the `+++` file-header line; (4) comment-leader
 this is the operational definition from § 2, mechanized; (5) the canonical work-narration
 alternation.
 
-**Exit-code contract.** The final `grep` exits `1` (no lines matched) on a clean diff, `0` (lines
-matched) on a violation, or `2`+ on a genuine error (malformed regex, missing file). Treat exit
-`2`+ as an **escalation**, never a silent pass — a broken command must not be misread as "no
-violations found." Because `git diff` sits at the head of the pipe, the pinned command opens with
-`set -o pipefail` so a failing `git diff` propagates as a pipeline failure instead of feeding empty
-input to the downstream `grep` chain, which would otherwise read "zero matches" and mask the real
-failure as a false-clean scan.
+**Exit-code contract.** The function exits `1` (no lines matched) on a clean diff, `0` (lines
+matched) on a violation, or `2`+ on a genuine error (failed diff, malformed regex, missing file).
+Treat exit `2`+ as an **escalation**, never a silent pass — a broken command must not be misread
+as "no violations found." The diff is materialized and checked before the filter pipeline runs;
+every `PIPESTATUS` entry is checked before the final grep's `0`/`1` is interpreted.
 
 **File:line resolution.** The pinned command above resolves WHICH lines violate the pattern set;
 resolving the exact `file:line` for the failure brief is a standard unified-diff line-tracking
@@ -117,7 +134,7 @@ existing operator-declared fast-path mechanisms.
 | Result | Action |
 |---|---|
 | Clean (final `grep` exits `1`) | Emit a structural trace event only (`stage2.hygiene`, `verdict: pass`) — **never operator-facing prose**. Advance to Phase 2.7. |
-| Violations found (final `grep` exits `0`) | Emit `stage2.hygiene` (`verdict: fail`, `extra: {files, count}`). Write a `failure-brief.md` iteration entry with `Blast radius: localized {file:line, ...}`. Re-dispatch `implementer` under the BOUNDED-PATCH contract (`agents/implementer.md § BOUNDED-PATCH contract`). Rebuild the verification packet. Re-run the scan only (not the full verify block). |
+| Violations found (final `grep` exits `0`) | Emit `stage2.hygiene` (`verdict: fail`, `extra: {files, count}`). Write a `failure-brief.md` iteration entry with `Blast radius: localized {file:line, ...}`. Re-dispatch `implementer` under the BOUNDED-PATCH contract (`agents/implementer.md § BOUNDED-PATCH contract`). Re-run the scan only; the verification packet does not exist yet. |
 | Command error (final `grep` exits `2`+, or `git diff` itself failed) | Escalate — do not advance and do not silently treat as clean. Surface to the operator. |
 
 **Iteration budget:** shares the existing max-3 cap for Case A (implementation) bounces —
@@ -136,7 +153,7 @@ exclusion in § 2 covers committed `.md` files under `docs/`/`agents/`/`skills/`
 `reviews/04-validation.md`, in addition to the existing per-AC verdicts.
 
 **Scan target:** the same task-diff resolution `qa` already uses for AC evidence
-(`git diff --name-only` against the packet's `Base ref`) — no additional tree read.
+(`git diff --name-only` against state `verification_base_ref`) — no additional tree read.
 
 **What it audits (requires judgment; NOT expressible as a fixed grep pattern):**
 
