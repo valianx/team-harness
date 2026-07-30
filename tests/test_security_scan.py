@@ -68,10 +68,8 @@ EXPECTED_AGENTS = [
 
 # ---------------------------------------------------------------------------
 # Check 5 — detector-file allowlist (skipped wholesale).
-# These files hold secret regex literals and/or concrete test fixtures; a
-# naive scan would false-FAIL the clean tree. The allowlist is the required
-# mitigation — entropy-only detection is NOT sufficient because
-# tests/test_policy_block.sh holds full-value concrete fixtures.
+# These files hold secret regex literals and/or constructed test fixtures; a
+# naive scan would false-FAIL the clean tree.
 # ---------------------------------------------------------------------------
 DETECTOR_FILE_ALLOWLIST = {
     "hooks/ts/bodies/policy-block.ts",
@@ -81,7 +79,8 @@ DETECTOR_FILE_ALLOWLIST = {
 
 # ---------------------------------------------------------------------------
 # Check 5 — high-confidence secret patterns (class-anchored, not concrete).
-# Reused verbatim from hooks/ts/bodies/policy-block.ts HIGH_CONFIDENCE_SECRETS.
+# Repository-scan patterns. This scanner and the pre-tool guard have different
+# input boundaries, so this list is maintained independently.
 # Each pattern requires a non-trivial concrete VALUE after its prefix —
 # a bare regex shell like the AKIA prefix alone does NOT match.
 # ---------------------------------------------------------------------------
@@ -110,7 +109,7 @@ HIGH_CONFIDENCE_SECRETS = [
 
 # ---------------------------------------------------------------------------
 # Check 5 — .env.example-style placeholder allowlist.
-# Mirrors hooks/ts/bodies/policy-block.ts EGRESS_READ_ALLOWLIST naming convention.
+# Placeholder-file convention for the repository scan.
 # Files matching these name suffixes are placeholders, not real secrets.
 # ---------------------------------------------------------------------------
 PLACEHOLDER_SUFFIXES = (".env.example", ".env.sample", ".env.template")

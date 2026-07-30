@@ -1,6 +1,6 @@
 // hooks/ts/bodies/command-lexer.ts
-// Shared command analyzer for hooks/ts/bodies/dev-guard.ts, gate-guard.ts and
-// policy-block.ts — see agents/_shared/gate-contract.md § "Outward-action
+// Shared command analyzer for hooks/ts/bodies/dev-guard.ts and gate-guard.ts
+// — see agents/_shared/gate-contract.md § "Outward-action
 // release floor" (Invariant F/G). Single source of truth: bundled into all
 // three .cjs artifacts by esbuild, never imported at .cjs-to-.cjs runtime
 // (parity with entry/*.ts importing CONTROL_CHAR_RE from bodies/
@@ -191,9 +191,8 @@ export interface ClassifiedCommand {
 
 // ---------------------------------------------------------------------------
 // Tokenizer — single linear scan, bounded recursion, no backtracking regex
-// over the command body (no ReDoS). Mirrors normalizeLexicalNoise's
-// bounded-scan discipline (hooks/ts/bodies/policy-block.ts) and
-// shellSplit's quote-state-machine shape, extended with taint tracking and
+// over the command body (no ReDoS). Uses shellSplit's quote-state-machine
+// shape, extended with taint tracking and
 // opaque command-substitution spans.
 // ---------------------------------------------------------------------------
 
@@ -318,7 +317,7 @@ function consumeBacktickSubstitution(cmd: string, startI: number, state: ScanSta
 }
 
 // Inside double quotes only `$`/backtick still expand (glob/brace/tilde do
-// not) — mirrors shellSplit's dquote escape rules (policy-block.ts).
+// not) — mirrors shellSplit's dquote escape rules.
 function stepDoubleQuote(cmd: string, i: number, state: ScanState): number {
   const ch = cmd[i];
   if (ch === '"') {
@@ -469,7 +468,7 @@ const SHELL_C_FLAG_RE = /^-[A-Za-z]*c[A-Za-z]*$/;
 // context — when in doubt, exclude; a wrong exclusion only costs a
 // fail-safe over-ask, never a bypass. File-write (`tee`, `ln`) does not
 // disqualify — this analyzer's threat is command execution, not file
-// targeting (a separate concern owned by policy-block's own rules).
+// targeting.
 // This is a small, closed, long-stable category by KIND — unlike the
 // enumeration it replaces, it does not need a new entry every time a new
 // wrapper/runner binary is invented; the tool only needs to genuinely pass

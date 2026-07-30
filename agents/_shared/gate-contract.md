@@ -51,7 +51,7 @@ branch-in-place topology, then denies the outward action unless the resolved lan
 denies only when a governing lane actually *resolves*. When no lane resolves — a manual
 push by the developer, an inline (no-orchestrator) session, an unrelated repository —
 `gate-guard` defers (`decision: none`) and the action proceeds exactly as it did before
-this design, under whatever floor already applied (`dev-guard`, `policy-block`). Stating
+this design, under the outward-action floor already applied by `dev-guard`. Stating
 this plainly is a deliberate correction: an earlier draft of this contract described the
 floor as covering every outward action unconditionally, which overstated it — the floor
 closes the ORDER gap only for a push/pr-create that `gate-guard` can attribute to a
@@ -59,7 +59,7 @@ detected pipeline lane.
 
 **Detection is parse-based, via the shared command analyzer.** `gate-guard`'s
 covered-verb detection resolves the executed command through the same shared analyzer
-`dev-guard` and `policy-block` consume (`hooks/ts/bodies/command-lexer.ts::analyzeCommand`
+`dev-guard` consumes (`hooks/ts/bodies/command-lexer.ts::analyzeCommand`
 + `classifyCoveredAction`) — recursive wrapper resolution plus per-subcommand-binary
 basename equivalence, not a boundary-character-class regex over the literal string. A
 covered verb reconstructed through a wrapper (`bash -c "git push …"`) or invoked via its
@@ -110,20 +110,11 @@ shadowing `git` binary earlier on `PATH`, and `ssh`-remote execution — an atta
 controlling any of those already has code execution in the session or on the target
 host.
 
-This clause layers on top of two pre-existing floors that this design does **not**
-change:
-
-- `policy-block`'s unconditional flag-based force-push deny
-  (`hooks/ts/bodies/policy-block.ts:295`), which applies in every context, pipeline or
-  not.
-- `dev-guard`'s outside-lane `ask` on a `+`-prefixed refspec
-  (`hooks/ts/bodies/dev-guard.ts:551-553`), destination-only, with no lane-state read.
-
-`gate-guard` only **adds** a layer over both — it replaces neither. Non-redundancy
-rationale: (i) it gives `gate-guard` its own self-sufficient in-lane guarantee that does
-not depend on a sibling hook's regex never changing; (ii) it is the only hook that
-closes the `+refspec` sub-form for the in-lane case — `policy-block`'s flag-only regex
-does not match a bare `+`-prefix, and `dev-guard`'s handling of it is destination-only.
+`dev-guard` remains the registered outward-action owner. It routes force flags,
+`+`-prefixed refspecs and other non-benign push forms to `ask`, destination-aware and
+without reading lane state. `policy-block` intentionally owns no git workflow policy.
+The unwired `gate-guard` body retains its self-contained in-lane deny semantics only as
+historical code; it does not strengthen the live Claude Code or OpenCode path.
 
 This design never touches or works around server-side branch protections; mutating
 `gh api` writes remain `ask` under `dev-guard`, unchanged. The philosophy this design

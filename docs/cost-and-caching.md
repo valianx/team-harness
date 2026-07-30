@@ -111,8 +111,8 @@ The implementer combines a cold agent prompt with task-specific workspace and re
 
 | Metric | Before | After | Delta |
 |---|---:|---:|---:|
-| `agents/implementer.md` size | 43,959 bytes | 14,674 bytes | −29,285 bytes (−66.6%) |
-| `agents/implementer.md` words | 6,576 | 2,086 | −4,490 words (−68.3%) |
+| `agents/implementer.md` size | 43,959 bytes | 14,832 bytes | −29,127 bytes (−66.3%) |
+| `agents/implementer.md` words | 6,576 | 2,105 | −4,471 words (−68.0%) |
 | Stack guardrails | included on every dispatch | 1,455-byte conditional reference | removed from unrelated stacks |
 
 The larger dynamic saving comes from knowledge loading. `docs/knowledge.md` was previously a mandatory full read (154,506 bytes at measurement time). The implementer now consumes the task-scoped `00-knowledge-context.md` when present or at most three grep-selected entries / 80 lines. Exact token savings vary by task and cache state, so this table reports bytes rather than fabricating a token total.

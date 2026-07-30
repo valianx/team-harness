@@ -9,7 +9,7 @@ runtime only; see `docs/lifecycle.md`).
 | File | Purpose |
 |---|---|
 | `run-ts-hook.sh` | Fail-closed launcher — invoked by `.claude-plugin/hooks.json` for every gate below. No gate logic of its own: execs `node hooks/ts/dist/<name>.cjs`. Emits an explicit deny envelope when node or the `.cjs` artifact is missing for a deny-floor hook; silent exit 0 for the advisory and observational hooks. See § Launcher contract below. |
-| `hooks/ts/bodies/policy-block.ts` | PreToolUse policy gate logic. Blocks destructive Bash commands and writes to sensitive files. Always-on (never gated by `TH_HOOK_PROFILE`). |
+| `hooks/ts/bodies/policy-block.ts` | Minimal PreToolUse safety guard. Blocks catastrophic recursive deletion and provider-shaped credentials only. Always-on. |
 | `hooks/ts/bodies/dev-guard.ts` | PreToolUse outward-action gate logic (`git push`, `gh pr ...`, ClickUp writes). Always-on. |
 | `hooks/ts/bodies/gcp-guard.ts` | PreToolUse gcloud verb-classifying gate logic. Always-on. |
 | `hooks/ts/bodies/worktree-guard.ts` | PreToolUse worktree advisory gate logic. Fail-open by contract. |
@@ -258,32 +258,22 @@ Adds `Stop` on top of `default-quiet` — fires every time Claude finishes a tur
 
 `~/.claude/settings.json` also accepts `"agentPushNotifEnabled": true`. This is a **separate notification channel** that uses Anthropic's push infrastructure — it does not go through `hooks/`. If you have it on AND a verbose hook preset, you may get duplicate notifications per event (one toast via hook, one push via Anthropic). Pick one channel or accept the duplication consciously.
 
-## Policy gate (`policy-block`)
+## Minimal safety guard (`policy-block`)
 
-The `PreToolUse` hook routes through `policy-block` (via `run-ts-hook.sh`). It reads the tool call JSON from stdin, evaluates it against a denylist, and returns a hook decision that either lets the call proceed (default) or blocks it with a clear reason.
+The `PreToolUse` hook routes `Bash|Write|Edit|NotebookEdit` through `policy-block`.
+It returns `deny` only for two narrow, high-confidence boundaries:
 
-**What it blocks (Bash):**
-- `rm -rf` (in any flag order, case-insensitive) targeting `/`, `~`, `$HOME`, or a bare wildcard `*`.
-- `git push --force`, `git push -f`, `git push --force-with-lease`.
-- `git reset --hard`.
-- `git clean -f` (any variant).
-- `git commit / rebase / push --no-verify` (bypasses pre-commit hooks).
-- Destructive SQL through shell: `DROP TABLE/DATABASE/SCHEMA`, `TRUNCATE TABLE`.
+- recursive deletion targeting `/`, `~`, `$HOME`, or a bare wildcard;
+- provider-shaped credentials or a private-key header in write content or an
+  obvious Bash carrier (`curl`/`wget` payloads, `tee`, `export`/`env`, commit text).
 
-**What it blocks (Write / Edit / NotebookEdit):**
-- Writes to `.env`, `.env.<anything>` (except `.example`, `.sample`, `.template`).
-- `*.pem`, `id_rsa*`, `id_ed25519*`, `id_ecdsa*`, `id_dsa*`.
-- Anything under `.ssh/`.
-- `.aws/credentials`, `.aws/config`.
-- `credentials.json`, `secrets.{yaml,yml,json,toml}`.
+Everything else produces no decision. In particular, this guard does not police
+force-push, reset/clean, hook flags, SQL text, reads, sensitive filenames, lint
+configuration, JWT/Bearer strings, or entropy guesses. Git/GitHub outward actions
+belong to `dev-guard`; code-quality choices belong to review and agent contracts.
 
-**What it does NOT do:**
-- It is not a sandbox. A determined LLM can obfuscate its way around (e.g., split `rm -rf /` across variables). The point is to catch accidents and force visibility on intent — the reviewer remains the last line of defense.
-- It does not read files or call external services. The check is purely pattern-matching on the tool call.
-
-**Bypassing for a specific case.** If you genuinely need a denied command (e.g., a one-off cleanup script), run it manually outside Claude. Editing `hooks/ts/bodies/policy-block.ts` to scope an exception is also fine, but commit the exception (and rebuild `dist/policy-block.cjs`) so the rest of the team sees it.
-
-**Performance.** Single node process per invocation (regex match, no external dependency). Timeout is 5s.
+**Performance.** One node process, bounded regex checks, no external dependency.
+Timeout is 5s.
 
 ## Pre-publish gate (`prepublish-guard`)
 
