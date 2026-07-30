@@ -325,7 +325,7 @@ function runNoAssetAdvisory(reader, pluginOrigin, pluginHead) {
 function runVersionSiteCheck(reader, changed, sites) {
   if (!sites.pluginBumped || !sites.marketBumped) {
     return deny(
-      "prepublish-guard: a distributed asset (agents/|skills/|hooks/) changed, but all three version sites (.claude-plugin/plugin.json, .claude-plugin/marketplace.json, CLAUDE.md \xA73) must be bumped vs origin/main. Bump all three to the same X.Y.Z and re-push. See CLAUDE.md \xA76.3 and agents/delivery.md Step 9. Push blocked."
+      "prepublish-guard: a distributed asset (agents/|skills/|hooks/) changed, but all three version sites (.claude-plugin/plugin.json, .claude-plugin/marketplace.json, CLAUDE.md \xA73) must be bumped vs origin/main. Bump all three to the same X.Y.Z and re-push. See CLAUDE.md \xA76.3 and agents/_shared/delivery-mechanics.md \xA71. Push blocked."
     );
   }
   if (sites.claudeHead && !sites.claudeBumped) {
@@ -362,7 +362,7 @@ function resolveOverBump(reader, floor, actual) {
     return null;
   }
   return deny(
-    `prepublish-guard: version bump level exceeds the mechanical SemVer floor for this diff. The changed shipped paths (agents/|skills/|hooks/) only warrant a ${floor} bump, but a ${actual} was applied. If this over-bump is intentional (e.g. a fix + new surface in the same PR), add a commit trailer or push option: bump-override: ${actual} \u2014 <reason>. See CLAUDE.md \xA76.3 and agents/delivery.md Step 9. Push blocked.`
+    `prepublish-guard: version bump level exceeds the mechanical SemVer floor for this diff. The changed shipped paths (agents/|skills/|hooks/) only warrant a ${floor} bump, but a ${actual} was applied. If this over-bump is intentional (e.g. a fix + new surface in the same PR), add a commit trailer or push option: bump-override: ${actual} \u2014 <reason>. See CLAUDE.md \xA76.3 and agents/_shared/delivery-mechanics.md \xA71. Push blocked.`
   );
 }
 function runBumpFloorSubstage(reader, changed, pluginOrigin, pluginHead) {

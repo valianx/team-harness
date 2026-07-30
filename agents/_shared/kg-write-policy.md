@@ -1,10 +1,10 @@
 # KG write-time policy
 <!-- Single source of truth for KG write-time content-policy + dedup gates.
-     Consumed by: agents/ref-pipeline.md (Phase 6 Knowledge Save + Phase 3
-     security-finding writes) and agents/delivery.md (Step 11.5 passive capture).
+     Consumed by: agents/ref-pipeline.md (explicit knowledge save + Phase 3
+     security-finding writes).
      Read-only agents (qa, tester, security, architect) do NOT reference this —
      they never call create_nodes; they emit kg_save_candidates instead.
-     Edit here; the two writers reference this file by section.
+     Edit here; the orchestrator's two write sites reference this file by section.
      Full normative policy: docs/kg-content-policy.md. -->
 
 ## When this applies
@@ -85,8 +85,8 @@ top-3 result:
   outcome. |
 | Otherwise | Proceed to Gate 2. |
 
-For security-finding writes, the intended type is `error` or `pattern`; for delivery
-passive capture, the intended type is `process-insight`.
+For security-finding writes, the intended type is `error` or `pattern`; for an
+explicit reusable process learning, the intended type is `process-insight`.
 
 **Gate 2 — Dedup (`search_nodes` pre-flight).**
 

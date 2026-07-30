@@ -198,15 +198,15 @@ The Discover phase does NOT add a blocking item to the Phase Checklist — it is
 
 ---
 
-## 9. PR body — `Intake survey:` line (HI-3 surfacing)
+## 9. PR body — retired `Intake survey:` line
 
-The delivery agent includes a conditional `Intake survey:` line in the PR body (Step 11.2) whenever `survey_source` is not null:
+The former Delivery contract copied intake mechanics into every PR body:
 
 ```
 **Intake survey:** forma={full|fast}, esfuerzo={thorough|quick|agent-decides}, autonomía={manual|autonomous}, scope-hint="{text or none}", fuente={asked|confirmed|inferred}
 ```
 
-This line appears in the `## Main change` section, immediately below the one-sentence main-change description. It is conditional: omit entirely when `survey_source: null` (Discover was bypassed before the survey ran).
+That publication behavior is retired. The survey remains pipeline state and trace evidence; it is not product-change information and no longer spends PR-body or Delivery context.
 
 **Prohibition:** the `Intake survey:` line MUST NOT include `security_sensitive`, any gate status flag, or any field not in the enumeration above. No line in the PR may be read as attributing a security decision to the operator.
 

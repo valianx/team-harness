@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.1] - 2026-07-30
+
+### Fixed
+
+- Reconciled Delivery to one post-gate prose dispatch and a coordinator-owned publication path,
+  eliminating retired knowledge capture, impossible pre-PR cleanup, and post-gate writes rejected
+  by the release allowlist.
+
+### Changed
+
+- Reduced the Delivery prompt from roughly 12.8K to 1.6K words and removed automatic KG, memory,
+  README, OpenAPI, Obsidian, worktree, tag, and CI-wait work from its hot path.
+- Removed the remaining changelog/delivery prose-presence test so contract wording is governed by
+  review rather than literal-search fixtures.
+
 ## [3.1.0] - 2026-07-30
 
 ### Added

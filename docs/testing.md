@@ -62,7 +62,6 @@ Everything below has inputs, outputs, and exit codes.
 | `test_security_scan.py` | Read-only-tier agents carrying `Bash`, web-facing agents missing the §6.6 injection preamble, `hooks/*.sh` injection anti-patterns, hook-manifest command form, concrete secrets in shipped assets, and roster reachability |
 | `test_permission_disjointness.py` | The permission-allowlist disjointness invariant (#18312 floor) |
 | `test_flow_event_schema_sync.py` | Cross-repo flow-event schema sync |
-| `test_changelog_version_rules.py` | Version-site and changelog discipline |
 | `test_lane_marker_identity.py` | Lane-marker byte identity |
 
 **Installer, runtime, and tooling.**

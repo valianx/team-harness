@@ -240,7 +240,7 @@ Read together: a task is never SPLIT across delivery groups (anti-split), and a 
 
 **Genuine blocker (the only non-opt-out reason for separate PRs in a same-repo batch).** Absent an operator opt-out, the coordinator splits a batch into separate PRs ONLY for: (a) an UNRESOLVABLE merge conflict between task branches at consolidation Step 5a; or (b) a temporal-prod / cross-repo deploy reason from the plan-reviewer's existing closed list — `coexistence window`, `production signal`, `cross-repo deploy gate` (see `agents/plan-reviewer.md § Rule 1`). No new blocker categories exist.
 
-**Same delivery flow alignment.** The consolidated batch ships via the same delivery flow and the same PR lifecycle as a single task — the same `delivery` agent (dispatched by the consolidator orchestrator), the same review → merge → worktree-teardown lifecycle (teardown on PR merge per `docs/worktree-discipline.md` Rule 3). There is no separate batch-delivery path. The only structural difference is that delivery operates on the `batch/<name>-verify` integration branch (Step 5a) rather than a single task branch.
+**Same delivery flow alignment.** The consolidated batch ships through the same single Delivery prose dispatch and coordinator publication mechanics as a single task, with the same review → merge → next-session preflight-sweep lifecycle (`docs/worktree-discipline.md` Rule 7). There is no separate batch-delivery path. The only structural difference is that publication operates on the `batch/<name>-verify` integration branch (Step 5a) rather than a single-task branch.
 
 **Stage files are FLAT, whole-task documents.** `02-implementation.md`, `03-testing.md`, `reviews/04-security.md`, and `reviews/04-validation.md` cover the ENTIRE build in one file each — no per-milestone subsections. One workspace: one commit per milestone (in dependency order), accumulated on the single feature branch.
 
@@ -456,7 +456,7 @@ Every bug-fix pipeline produces the backbone artifacts; the tier modulates which
 | `03-testing.md` | Yes — suite no-regress only | Yes | Yes | Yes | tester's post-fix verification |
 | `reviews/04-validation.md` | Yes — Tier 1 simplified template (≤15 lines, no per-AC table) | Yes — default bug-fix contract | Yes — default bug-fix contract | Yes — default bug-fix contract | qa validation |
 | `reviews/04-security.md` | **No** | **No** | **Yes (mandatory)** | **Yes (mandatory + extended analysis)** | security agent — see "Why security is tier-gated" below |
-| `00-state.md § Delivery` | Yes | Yes | Yes | Yes | delivery agent appends this section |
+| `00-state.md § Delivery` | Yes | Yes | Yes | Yes | delivery writes prose coordinates; coordinator appends publication coordinates |
 
 **Why security is tier-gated.** PR #50 set `security-sensitive: true` for every bug as a defense-in-depth override. The Tier System refines that override: security runs for every Tier 3+ bug (Tier 4 includes extended analysis cross-referencing prior art), and Tier 1 / Tier 2 fixes skip security because the impacted scope is non-functional (docs, dev-tooling, test infra). The auto-escalation rule guarantees that any fix touching a security-sensitive path (`auth/**`, `middleware/**`, `api/**`, etc.) lands at Tier 3+ at classification time — so a Tier 1 / Tier 2 run cannot accidentally bypass security on sensitive paths. Many bugs have non-obvious security implications (input-validation bugs that are actually injection, race conditions that are TOCTOU vulnerabilities, error-handling bugs that leak information); the path-pattern auto-escalation captures these without forcing security on every typo-in-docs fix.
 
@@ -542,13 +542,13 @@ Routes through existing `plan-and-execute` flow. Each bug is one sub-task in `01
 
 ### KG process-insight semantics for bugs
 
-`agents/ref-pipeline.md` Phase 6 reuses the existing `process-insight` schema. Content shifts semantically: the observation describes the **failure mode learned**, not the feature shipped. Example good capture: `nestjs-typeorm-decimal-stringification — TypeORM returns decimal columns as strings; arithmetic on the returned value produces string concatenation. Discovered while fixing aggregation-totals-mismatch in zippy-commission-api.`
+When the operator explicitly requests a knowledge save after a bug pipeline, reuse the existing `process-insight` schema. The observation describes the **failure mode learned**, not the feature shipped. Example good capture: `nestjs-typeorm-decimal-stringification — TypeORM returns decimal columns as strings; arithmetic on the returned value produces string concatenation. Discovered while fixing aggregation-totals-mismatch in zippy-commission-api.`
 
 ---
 
 ## Hotfix sub-flow (type: hotfix)
 
-The Hotfix sub-flow is a tighter variant of the Bug-fix Flow for trivially scoped defects with urgency markers. **Phase 1 (Root-Cause Analysis) is skipped entirely** — no architect dispatch, no `01-root-cause.md`. Everything else from the Bug-fix Flow is preserved, including Phase 2.0 (mandatory regression test), Phase 4 delivery routing (`### Fixed` CHANGELOG, `fix(area): ... (hotfix)` PR title), and Phase 6 (KG save). The Phase 4 PR title appends `(hotfix)` to signal urgency to the reviewer.
+The Hotfix sub-flow is a tighter variant of the Bug-fix Flow for trivially scoped defects with urgency markers. **Phase 1 (Root-Cause Analysis) is skipped entirely** — no architect dispatch, no `01-root-cause.md`. Everything else from the Bug-fix Flow is preserved, including Phase 2.0 (mandatory regression test), Phase 4 delivery routing (`### Fixed` CHANGELOG, `fix(area): ... (hotfix)` PR title), and Phase 6 session close. Entity save remains explicit-only. The Phase 4 PR title appends `(hotfix)` to signal urgency to the reviewer.
 
 **Tier 3 hard floor for hotfix:** a hotfix is pinned to Tier 3 minimum at Classify (see `agents/ref-intake-flows.md § "Bug Tier"` for the full hotfix floor rule). Because every hotfix is Tier 3+, the security agent runs for every hotfix — "security always runs for hotfix" is a direct consequence of this pin. The hotfix Tier 3 floor and the security-always contract are the same rule stated from two angles; they are consistent by construction.
 ### Skipped phases (relative to type: fix)
@@ -1126,7 +1126,7 @@ When the user explicitly says "simple", "just implement", "skip design", "no tes
    - "just implement" → skip Design + Verify, proceed from Specify → Implement → Delivery
    - "simple" → skip Design, still run Verify (tests + qa)
 3. **Never skip Specify (Phase 0b)** — the spec is always needed, even for simple tasks
-4. **Never skip Delivery (Phase 4)** — every change needs a branch, commit, and PR
+4. **Never skip Delivery (Phase 4)** — every change needs publication prose plus coordinator branch, commit, and PR mechanics
 5. **Log the skip** in `00-state.md` under Hot Context: "User requested skip: {what was skipped}"
 
 ---
@@ -1139,7 +1139,7 @@ When the user explicitly says "simple", "just implement", "skip design", "no tes
 
 **Skips (= what the express profile skips, restated here for the alias's own self-containment):** Phase 1 Design (no `architect`; the orchestrator emits a one-sentence prose plan into `01-plan.md`, same surface as `type: hotfix`); plan ratification (Phase 1.5) and plan review (Phase 1.6), folded into the deterministic self-check and STAGE-GATE-1/STAGE-GATE-3, folded into ONE combined plan+delivery gate; the `qa` and `adversary` agents at Phase 3 (`adversary` skipped ONLY when non-sensitive — see "Security override" below). Full phase-by-phase mechanics: `agents/ref-pipeline.md § "Express lane — a delta on the full flow"` — this section states the alias mapping only, never a second copy of the mechanics.
 
-**Keeps — floors that `--fast` can NEVER skip:** Specify (Phase 0b); Implement (Phase 2); the Code-Hygiene Scan (Phase 2.6); the `tester` agent at Phase 3 (ONE targeted test phase scoped to the diff); the Freeze's build verification (Phase 2.8, scoped to the diff); the express combined gate (the single operator round-trip that replaces STAGE-GATE-1/STAGE-GATE-3 — never itself skippable); the native `dev-guard` push prompt; Delivery (Phase 4 — branch, commit, PR, minimal artifacts).
+**Keeps — floors that `--fast` can NEVER skip:** Specify (Phase 0b); Implement (Phase 2); the Code-Hygiene Scan (Phase 2.6); the `tester` agent at Phase 3 (ONE targeted test phase scoped to the diff); the Freeze's build verification (Phase 2.8, scoped to the diff); the express combined gate (the single operator round-trip that replaces STAGE-GATE-1/STAGE-GATE-3 — never itself skippable); the native `dev-guard` push prompt; Delivery (Phase 4 — minimal publication prose plus coordinator branch, commit, and PR mechanics).
 
 **Security design-review carve-out (SEC-002) — restated verbatim from the express profile's own SEC-DR5-01 fold-in, never a second, independently-drifting statement.** `--fast` skips Phase 1.6's PANEL (plan-reviewer audit + qa-plan ratification) in general, but the security design-review is NOT skipped when the task is security-sensitive (path match, semantic keyword match, `[security: required]`, or `type: hotfix` on a security-sensitive path). When the carve-out fires, the `security` agent is dispatched in design-review mode within Phase 1.6, BEFORE the express combined gate — exactly as `lane: full` runs it before STAGE-GATE-1. This carve-out is additive to the Tier 3+ hotfix floor — `type: hotfix` still gets its Phase 3 security run via the floor and additionally gets the Phase 1.6 design-review when on a sensitive path. Full definition: `agents/ref-pipeline.md § "Phase 1.6 is inviolable"` and `§ "Security on express — stated directly, never inferred"`.
 

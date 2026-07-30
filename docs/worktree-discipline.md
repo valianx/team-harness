@@ -88,17 +88,10 @@ branch — the objective, queryable merge event. "Finished" is not:
 The worktree stays alive through review. Review-fix commits go into the same worktree on the same
 branch — never into a new branch or a separate patch PR.
 
-**Teardown ownership (corrected — see Rule 7).** An earlier version of this rule stated that
-teardown "fires in the delivery agent, post-merge." That is aspirational, not what actually
-happens: `delivery` opens the PR in Phase 4 and its own run ends before a human or CI merges it —
-`delivery` has no live trigger for a merge event that happens after its own session is over. In
-the ordinary single-session flow, `delivery`'s own teardown attempt (Step 11.4b) is a
-**same-session best-effort**: it only removes the worktree when the PR is somehow already merged
-by the time delivery runs (e.g., an auto-merge landed mid-session). The **durable reaper** for the
-general case — a worktree whose PR merges in a later session, which is the common case — is the
-**preflight sweep at `th:orchestrator`'s Intake step 1a** (Rule 7 below). The Rule 4 teardown protocol itself is
-not removed by this correction; it is still the exact sequence both the same-session best-effort
-and the boot-time sweep execute once their own gate condition is met.
+**Teardown ownership (see Rule 7).** Delivery performs no post-PR tail and never touches
+worktrees. The durable reaper is the **preflight sweep at `th:orchestrator` Intake step 1a**,
+which handles a worktree whose PR merged after the originating session ended. Rule 4 remains the
+exact removal protocol used once Rule 7's safety predicate clears.
 
 ---
 
@@ -194,8 +187,8 @@ lookup rather than a search:
 ```
 
 `null` values are valid for single-session tasks that run branch-in-place. When the worktree
-field is populated, delivery reads it directly to know which path to verify and remove. No search
-through the filesystem is needed.
+field is populated, the coordinator and later preflight sweep use it as the durable coordinate.
+No filesystem search is needed.
 
 ---
 
@@ -221,16 +214,13 @@ sole committer of the consolidated result.
 
 ## Rule 7 — Boot-time preflight sweep: the durable worktree reaper
 
-`delivery`'s Step 11.4b teardown is a same-session best-effort (see Rule 3's correction above) — it
-almost never fires, because the PR it just opened is rarely merged before its own run ends. The
-**durable reaper** is this Rule 7's preflight sweep, run by `th:orchestrator` at Intake step 1a (`agents/ref-pipeline.md § "Intake"`) — the first point in ANY later session that
-runs after a previous session's PR could have merged.
+The **durable reaper** is this Rule 7's preflight sweep, run by `th:orchestrator` at Intake step
+1a (`agents/ref-pipeline.md § "Intake"`) — the first point in any later session that runs after a
+previous session's PR could have merged.
 
 This rule is the **canonical, single source of truth** for the worktree-sweep safety predicate.
-`agents/ref-pipeline.md § "Intake"` (the preflight sweep) and `agents/delivery.md` Step 11.4b (the
-same-session teardown) each REFERENCE this rule by pointer — neither re-derives or duplicates the
-predicate, the allow-list, or the action/report table. A divergence between what either site does
-and what is written here is a defect in that site, not an allowed variation.
+`agents/ref-pipeline.md § "Intake"` references this rule by pointer and never re-derives or
+duplicates the predicate, allow-list, or action/report table. A divergence is a defect.
 
 ### The safety predicate — four cumulative conditions
 
@@ -313,8 +303,8 @@ non-forced `git worktree remove` fails: `git worktree prune` then `git worktree 
 <path>` (Rule 4's "Windows file-lock caveat"). Rule 4's own text does not check WHY the initial
 removal failed before escalating to `--force` — for a human executing Rule 4's protocol manually,
 that is an acceptable simplification (the human can read the actual git error before deciding
-whether to force). For THIS rule's sweep — and for `agents/delivery.md` Step 11.4b, which mirrors
-this same safeguard — there is no human in the loop: an unattended, agent-executed force-removal
+whether to force). For THIS rule's sweep there is no human in the loop: an unattended,
+agent-executed force-removal
 cannot tell a genuine Windows file-lock quirk apart from git correctly REFUSING to delete a tree
 that became dirty after the sweep's last check (e.g., a human's uncommitted edit landing in the
 window this rule's own Atomicity discipline and Lock protocol below disclose as still open). Blindly
@@ -440,7 +430,7 @@ computable path, never "stale-undetectable").
 
 **3. Holder identification.** A `holder` file inside the lock directory, one `key=value` per line:
 `pid=<acquiring shell's PID>`, `host=<hostname>`, `epoch=<acquisition epoch-seconds>`,
-`holder=<orchestrator-preflight-sweep | delivery:<feature>>`. `pid`/`host` are diagnostic only — for
+`holder=orchestrator-preflight-sweep`. `pid`/`host` are diagnostic only — for
 the report line when a lock is found already held — not the operative liveness signal: the "holder"
 is an ephemeral LLM-agent process with no reliable heartbeat (the shell that ran `mkdir` exits once
 that command returns, so `kill -0 <pid>` is not reliable). The operative liveness signal is the
@@ -485,7 +475,7 @@ decision is made either way.
 
 **Residual closure — honest, not overclaimed.** Acquiring the lock immediately before the final
 re-check and holding it through `git worktree remove` fully CLOSES the TOCTOU window for
-COOPERATING processes: two `orchestrator`/`delivery` instances that both follow this protocol
+COOPERATING processes: two orchestrator preflight sweeps that both follow this protocol
 serialize — one acquires, the other's `mkdir` fails (`EEXIST`), so it skips that worktree, reports,
 and retries next boot; the two can never both be inside the re-check-to-remove window for the same
 worktree at the same time. The sweeper-vs-sweeper race that originally motivated the atomicity

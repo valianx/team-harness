@@ -117,7 +117,7 @@ orchestrator's rich `phase.end` events:
   per-turn noise the `ultra-quiet` preset removed. No pipeline-phase meaning.
 - `PostToolUse` fires after every successful tool call. Pipeline tester/qa/security
   already validate tool output at stage boundaries; a generic hook duplicates that.
-- `SessionEnd` overlaps `/th:save-session` + delivery KG capture; the payload
+- `SessionEnd` overlaps `/th:save-session` and the orchestrator's explicit session close; the payload
   offers no pipeline-phase signal and cannot affect termination.
 
 ### `TH_HOOK_PROFILE` (minimal/standard/strict)

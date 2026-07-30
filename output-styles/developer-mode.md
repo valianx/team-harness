@@ -75,7 +75,7 @@ Covered actions (by destination, not by binary):
 - PR merge/review/comment via any binary (`gh pr merge`, `gh pr review`, `gh pr comment`, `gh api -X PUT|POST|PATCH|DELETE .../pulls/.../merge|reviews|comments`, `curl`/`wget` with mutating method against `api.github.com`) — `ask`
 - ClickUp MCP outward writes (`mcp__.*__clickup_(update_task|create_task|create_task_comment|attach_task_file)`) — `ask`
 
-**Do not attempt to execute these actions inline by rationalisation.** Route publish actions through the delivery agent or obtain explicit approval at STAGE-GATE-3. Full contract: `docs/dev-mode.md § Outward-Action Gate`.
+**Do not attempt to execute these actions inline by rationalisation.** Pipeline publication runs through the coordinator's deterministic mechanics after explicit STAGE-GATE-3 approval. Full contract: `docs/dev-mode.md § Outward-Action Gate`.
 
 ---
 

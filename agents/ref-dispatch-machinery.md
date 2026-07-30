@@ -57,7 +57,9 @@ Projects are separate only when both signals are **pairwise-distinct** across al
 
 ## overview.md — you are the sole writer
 
-No specialist ever writes this file. `delivery` returns its project's row data (branch, version, PR number and URL, status) in its status block; you write the row. Every write passes through your hand.
+No specialist ever writes this file. After your own Phase-4 mechanics create or update the
+PR, you already hold the branch, resolved version, PR number/URL, and delivery outcome; use
+those coordinates to write the row directly. Every write passes through your hand.
 
 ### Template (obsidian shown; local omits the obsidian-only frontmatter keys)
 
@@ -101,7 +103,7 @@ Transcribed verbatim from the previous revision of this file rather than re-deri
 | Frontmatter (`updated`, `projects`) | you (create/join) | intake; append project slug if absent |
 | `## Review Summary` | you | at creation; editable on operator request |
 | `## Functional Description` | you | at creation; reconciled after every project's Design/STAGE-GATE-1 (you learn of this from your own per-project tracking, then re-read that project's `01-plan.md` — a public artifact, never a dual-record field) |
-| `## Projects` table rows | you (all rows) | you at intake (initial row); you again when a lane's `delivery` returns branch/version/PR/status `delivered` in its status block |
+| `## Projects` table rows | you (all rows) | at intake (initial row); again after your Phase-4 mechanics resolve branch/version/PR/status |
 | `## Big-Picture Plan` | you | intake; reconciled after every project's Design/STAGE-GATE-1 |
 
 **Row schema.** Each `## Projects` row is `{project-slug} | {branch or —} | {version or —} | {#N / URL or —} | {planning|in-progress|delivered}` — one row per project, keyed by `project-slug`, never a second row for the same project.

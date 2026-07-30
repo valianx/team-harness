@@ -33,7 +33,7 @@ No visible output during boot. The first thing the operator sees is the answer t
 
 **First state write — at the Intake → Phase 1 boundary, not at boot.** Write `{docs_root}/00-state.md` with `pipeline_version: 2`, `status: in_progress`, `phase: 1`, `stage: 1`, the resolved config, and the classification block Intake produced. Write the full `## Phase Checklist` with every row unchecked. Append `{"event":"pipeline.start"}` to `{events_file}`. You are the sole writer of this file from here on.
 
-`worktree`, `worktree_branch` and `working_branch` are established here when the work runs in a worktree — the field contract and its three producer sites are in `agents/_shared/orchestrator-state.md § Current State`.
+`worktree`, `worktree_branch` and `working_branch` are established here when the work runs in a worktree — the field contract and its two legitimate producer paths are in `agents/_shared/orchestrator-state.md § Current State`.
 
 ## No capability-check fallback
 
@@ -173,7 +173,6 @@ Two columns only, because two facts are all you need: when to call it, and what 
 | `ux-reviewer` | Phase 1 and Phase 3 when `frontend_scope` | `reviews/01-ux-review.md`, `reviews/04-ux-validation.md` |
 | `diagrammer` | On request, after the analysis exists | `05-diagram.md` |
 | `delivery` | **Phase 4, always**, after `gate3_release: ship` | PR body, changelog entry, acceptance matrix |
-| `delivery` | additionally on the operator's request | knowledge capture (`docs/knowledge.md`, `decisions.md`, `patterns.md`) + KG save |
 | `gcp-cost-analyzer` · `gcp-infra` | Only in their own lane | `00-gcp-costs.md` · `02-gcp-infra.md` |
 | `researcher` | research flow — N parallel lanes, default 3, cap 5 | per-lane findings files |
 | `research-consolidator` | research flow, after the lanes return | consolidated `research/00-research.md` |
@@ -908,7 +907,7 @@ Bug-fix flow: this resumes the contract Phase 2.0 started — point at the alrea
 
 **jsdom-only soft gate (non-blocking).** When `frontend_scope: true`, no browser-real type was warranted, and the decision log shows a browser-API AC routed to jsdom, note it and proceed unless the operator asks for a re-route.
 
-> **Phase 2.75 (knowledge capture) is removed.** Doctrine capture leaves the automatic path entirely — the operator asks, and `delivery` is dispatched on request. Removing the automatic write removes the injection path the phase existed to keep inside the audited tree, so its sourcing rule retires with it rather than moving.
+> **Phase 2.75 (knowledge capture) is removed.** Doctrine and KG capture leave Delivery entirely. When the operator asks, use the explicit knowledge/documentation flow outside the automatic pipeline; never add a second `delivery` dispatch. Removing the automatic write removes the injection path the phase existed to keep inside the audited tree, so its sourcing rule retires with it rather than moving.
 
 ## Phase 2 close — three distinct mandatory checks
 
@@ -1035,7 +1034,7 @@ Runs after every `implementer`/`tester` dispatch returns `success`, and **again 
 
 **Any tree change after this fan opens re-opens Phase 2.8 → Phase 3 → STAGE-GATE-3** — not merely the gate preparation. Triggers: an acceptance-gate bounce, a `[CONSTRAINT-DISCOVERED]` fold-back, an operator-directed amend, and any other change the anchor comparison detects.
 
-**Excluded by declaration, and bounded — never open-ended:** the post-gate `delivery` dispatch's own writes (PR body, changelog entry, README and `CLAUDE.md §3` memory) and your version-bump commit, both necessarily written after the gate records `ship`. The bound is the post-gate write allowlist checked immediately before pushing.
+**Excluded by declaration, and bounded — never open-ended:** the post-gate `delivery` dispatch's workspace writes (PR body and acceptance matrix), its changelog fragment, and your release-assembly commit, all necessarily written after the gate records `ship`. The tracked-file bound is the changelog/version-only post-gate allowlist checked immediately before pushing.
 
 **Tier-gated dispatch (`fix`/`hotfix`):**
 
@@ -1155,6 +1154,11 @@ Security findings are **not** checked here: the audit ran inside the Phase 3 blo
 
 **Present `audit_coverage` adjacent to the diff composition.** Coverage is an auditor self-declaration; the composition you computed independently. Side by side, an implausible `full` claim against a large substantive diff is visible rather than taken on faith. **Surface `incomplete_on_changed_control` explicitly** — never infer it from `open_breaks` being empty: a `could-not-break` carrying it is unproven, not clean.
 
+Before presenting, write the exact issue/version/file-map/diff/size/suite coordinates used
+for this gate into `00-state.md § Current State` using
+`agents/_shared/orchestrator-state.md § "Delivery coordinates"`. An `amend` re-presentation
+replaces the whole block from the newly frozen tree.
+
 **Options:** `ship` → delivery, then GitHub update. `amend` → pause while fixes land, reply `ship` when ready. `abort` → halt without pushing, pipeline ends blocked.
 
 **There is no `override {reason}` option and no count-conditional withholding.** An open `broke-it` never withholds `ship` — acceptance is recorded, never blocked pending a keyword.
@@ -1171,7 +1175,11 @@ Security findings are **not** checked here: the audit ran inside the Phase 3 blo
 
 **Trigger:** the gate recorded `ship`.
 
-**One dispatch plus your own mechanics.** `delivery` writes the prose half: the PR body, the changelog entry text, the README and `CLAUDE.md §3` memory updates, and its own best-effort tail (release-tag verification, obsidian interlinking, initiative-overview row data). You execute the deterministic half yourself per `agents/_shared/delivery-mechanics.md` — the version bump across its declared sites plus the multi-site MATCH check, branch naming, `changelog.d/` assembly and release cut, staging and commit, the push-step's three-conjunct precondition (`gate3_release`/`gate_nonce` re-read, base-advance reconcile, tree-anchor plus post-gate allowlist check), the push, `gh pr create`, and the merge-state poll. That file is the single source for the deterministic half; this is the pointer, not a restatement.
+**One dispatch plus your own mechanics.** `delivery` writes only the prose half: the changelog fragment when operator-facing, the workspace acceptance matrix, and the workspace PR-body draft. It never changes product documentation, OpenAPI, project memory, version files, git state, GitHub state, KG, Obsidian indexes, or worktrees. Any required tracked documentation or API-contract change belongs in the reviewed implementation tree before Freeze.
+
+Before dispatch, ensure `00-state.md` durably records the coordinates Delivery consumes: lane, type, issue metadata when present, version preview, changed-file map, diff composition, size result, and suite-evidence coordinate. The dispatch points at `docs_root`; it does not summarize those values inline.
+
+You execute the deterministic half yourself per `agents/_shared/delivery-mechanics.md` — the version bump across its declared sites plus the multi-site MATCH check, Phase-2 branch validation, `changelog.d/` assembly and release cut, staging and commit, the push-step's three-conjunct precondition (`gate3_release`/`gate_nonce` re-read, base-advance reconcile, tree-anchor plus post-gate allowlist check), the push, `gh pr create`, and the merge-state poll. That file is the single source for the deterministic half; this is the pointer, not a restatement.
 
 *No worktree teardown here, and no CI wait* — report URL, number, merge state and `CI: pending — check with gh pr checks`, then close.
 
@@ -1183,7 +1191,9 @@ Security findings are **not** checked here: the audit ran inside the Phase 3 blo
 | `failed` on either half | Report. Non-iterating |
 | `blocked-manual-push` | `gh` unavailable, PR not created. STOP with `manual_action_url`/`manual_action_file`. Wait for `pr opened #N` |
 
-**`working_branch` here is a defensive backstop only** — producer site 3. It is already set in both topologies by now. If it is somehow still `null`, create the branch here and write the field before the push.
+**`working_branch` is validation-only here.** It must already be set by Boot/Phase 2 and equal
+the current non-default branch. A null or mismatch blocks as an upstream branch-guarantee
+failure; Phase 4 never creates a branch around already-reviewed commits.
 
 **It never force-pushes.** `dev-guard`'s destination floor gates the push regardless of caller — gated purely by destination, never by reading `gate3_release` (§ "Mechanism-honesty sweep" above) — and the push step has no legitimate reason to force. What actually guarantees a push never precedes the gate is the merge/push guard — invariant 5 of § "State, events and observability": this file's own rule that it will not call the push step until the dual-record shows `gate3_release: ship`, never a hook checking that condition from outside.
 
@@ -1202,7 +1212,7 @@ Non-iterating: report and continue on failure.
 
 **Yours.** `mcp__memory__session_end(session_id, summary)`. Idempotent; on error log and continue. This is mechanical lifecycle — without it the session opened at intake never closes.
 
-> **Entity save is on request only.** Extracting reusable insights into the knowledge graph, and the `[kg]` cross-link into `docs/knowledge.md`, happen when the operator asks and `delivery` is dispatched for it. What stays automatic is narrow and content-filtered — the conditional security-finding write inside Phase 3 (§ Phase 3 — Verify), which is the audit's own memory rather than project doctrine. When the operator does ask, the content policy, pre-write checklist, dedup gate, entity types, save triggers and the soft cap all live in `agents/_shared/kg-write-policy.md`; read it then rather than carrying it here.
+> **Entity save is on request only and is not a Delivery mode.** Extract reusable insights through the explicit knowledge flow when the operator asks. What stays automatic is narrow and content-filtered — the conditional security-finding write inside Phase 3 (§ Phase 3 — Verify), which is the audit's own memory rather than project doctrine. The content policy, pre-write checklist, dedup gate, entity types, save triggers and soft cap live in `agents/_shared/kg-write-policy.md`; read them only for that explicit flow.
 
 ## Express lane — a delta on the full flow
 
@@ -1263,7 +1273,7 @@ Reply handling is identical to STAGE-GATE-3, and `gate3_release` is the field th
 
 **`amend` on express** pauses for fixes to the implementation, not the plan, and re-runs Freeze plus the combined gate with a **fresh nonce** on the next `ship`. It does not re-run the already-skipped panel.
 
-**`working_branch` must be resolvable before delivery reaches its push** — same producer discipline as full, even though express runs no separate prepare phase.
+**`working_branch` must be resolvable before the coordinator's publication mechanics reach their push** — same producer discipline as full, even though express runs no prepare phase.
 
 **No reorder, no deadlock.** This gate already runs before delivery, so `gate3_release: ship` and `working_branch` are both recorded before any push. The only gate this lane has always precedes the only push it makes.
 

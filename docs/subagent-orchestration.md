@@ -85,7 +85,9 @@ On recovery, the resolved config is re-read from `00-state.md` § Current State 
 | Installer changes, hooks refactor, cross-platform fixes | `architect` → `implementer` | Architecture note + code changes |
 | Tests (if/when introduced) | `tester` | Test plan + tests with factory mocks |
 | Acceptance criteria + validation against AC | `qa` | AC list / validation report |
-| Docs, CHANGELOG, version bump, branch, commit, PR | `delivery` | Docs + CHANGELOG + commit + PR |
+| Required product/API docs | `implementer` or `documenter`, before Freeze | Reviewed tracked docs |
+| Publication prose | `delivery` | Changelog fragment + acceptance matrix + PR-body draft |
+| Version, branch, commit, push, PR | coordinator mechanics | Published change + PR |
 | PR review | `reviewer` | Inline review, approve/request-changes |
 | Security review of hooks, installer, or MCP (elevated privileges on user's machine) | `security` | OWASP/CWE-aligned report |
 | Visualize agent flow | `diagrammer` / `likec4-diagrammer` / `d2-diagrammer` | Diagram file + preview |
@@ -102,4 +104,4 @@ On recovery, the resolved config is re-read from `00-state.md` § Current State 
 
 ## `blocked-manual-push` Handling
 
-When the `delivery` agent returns `status: blocked-manual-push`, `th:orchestrator` emits a STOP block with the compare URL and `workspaces/{feature}/inputs/pr-body.md` path. The operator opens the PR manually, then replies `pr opened #N`. `th:orchestrator` records the PR number in `00-state.md` and continues to Phase 5 — a manual-action pause, not a dispatch failure. See `agents/_shared/gh-fallback.md` § "`status: blocked-manual-push`" for the full protocol.
+When the coordinator's deterministic mechanics return `status: blocked-manual-push`, `th:orchestrator` emits a STOP block with the compare URL and `workspaces/{feature}/inputs/pr-body-draft.md` path. The operator opens the PR manually, then replies `pr opened #N`. `th:orchestrator` records the PR number in `00-state.md` and continues to Phase 5 — a manual-action pause, not a delivery-agent failure. See `agents/_shared/gh-fallback.md` § "`status: blocked-manual-push`" for the full protocol.

@@ -116,7 +116,7 @@ This is a manual smoke test. No automated suite covers agent/skill prose — see
 
 ## Release process
 
-The release flow is operator-side. `delivery` bumps the `version` constant in `cmd/install/main.go` and adds a `[X.Y.Z]` block to `CHANGELOG.md`, but does **not** run `git tag` — the human decides when to publish.
+The release flow is operator-side. The coordinator's deterministic publication mechanics bump the declared version sites and add a `[X.Y.Z]` block to `CHANGELOG.md`; Delivery only drafts publication prose. Neither path runs `git tag` — the human decides when to publish.
 
 After a PR merges:
 

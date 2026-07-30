@@ -290,5 +290,5 @@ a repository whose spec is `openapi.yaml` or `openapi.yml` keeps `.yaml`/`.yml`.
 
 This boundary invariant is referenced by format-preservation guards in:
 - `agents/implementer.md` — Session Context Protocol, conditional-evidence step
-- `agents/delivery.md` — Step 8 (Update OpenAPI)
+- `agents/ref-pipeline.md` — tracked OpenAPI changes must be implemented and reviewed before Phase 2.8 Freeze
 - `agents/architect.md` — api-contract skeleton quality note
