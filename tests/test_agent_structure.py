@@ -37936,11 +37936,15 @@ _s172_testing = read(REPO_ROOT / "docs" / "testing.md")
 _s172_self = Path(__file__).read_text(encoding="utf-8")
 
 # --- AC-1/AC-3/AC-9: plan_review_status field + deferral event + STOP note --
+# Retargeted: the "Verification and review status" code block dropped
+# spaces around every `|` in its enum values (a block-wide compact-notation
+# reformat, confirmed unrelated to this field specifically -- every sibling
+# field in the same block lost its spaces too) -- same six-value vocabulary.
 check(
     "s172(state-field): 00-state.md schema declares plan_review_status with "
     "the not-applicable/deferred/reviewed-pass/reviewed-concerns/skipped vocabulary",
     "plan_review_status:" in _s172_orch
-    and "not-applicable | deferred | reviewed-pass | reviewed-concerns | skipped | null"
+    and "not-applicable|deferred|reviewed-pass|reviewed-concerns|skipped|null"
     in _s172_orch,
     "agents/orchestrator.md must declare plan_review_status in the "
     "00-state.md § Current State schema with its full value vocabulary "
@@ -37955,6 +37959,16 @@ check(
     "agents/orchestrator.md must name the three plan_review.* trace events "
     "in its Execution Events JSONL schema",
 )
+# NOT retargeted -- genuine content loss, confirmed against the pre-fusion
+# source. `git show 70550d1:agents/orchestrator.md`'s gate-data table row
+# rendered the actual operator-facing status strings verbatim: `status:
+# "deferred (non-sensitive)" — reply approve then choose to review, or run
+# /th:plan-review anytime` and `status: "not applicable (self-authored
+# plan)" — never offered`. The fused gate-data description compresses this
+# to "the deferred / not-applicable note" -- a description OF the note,
+# not the note's own text. Neither literal string survives anywhere in the
+# corpus (grepped every agents/*.md and agents/_shared/*.md file). Left
+# failing intentionally; agents/orchestrator.md is Task-1's frozen file.
 check(
     "s172(gate1-deferred-note): STAGE-GATE-1 STOP block renders a deferred-"
     "review note instead of a combined verdict when plan_review_status is "
@@ -37973,20 +37987,40 @@ check(
 )
 
 # --- AC-1/AC-3: the deferral gate itself + SEC-002 non-deferrability --------
+# Retargeted: the verbose prose paragraph collapsed into a "Three no-dispatch
+# paths" table row ("Deferred by default | architect-authored AND not
+# sensitive | plan_review_status: deferred, ..."). Same three conditions
+# (architect-authored, non-sensitive) and same recorded outcome, in a table
+# cell instead of a bold-labeled paragraph.
 check(
     "s172(defer-gate): Phase 1.5 documents the deferred-by-default gate for "
     "an architect-authored, non-sensitive plan",
-    "Deferred-by-default — architect-authored, non-sensitive plan" in _s172_orch,
+    "Deferred by default | architect-authored AND not sensitive" in _s172_orch,
     "agents/orchestrator.md § Phase 1.5 must document the deferred-by-"
     "default gate",
 )
 check(
+    # Retargeted: word order changed ("Never carved out, never deferred, any
+    # lane" vs "never carved out, on any lane, and never deferred") -- same
+    # three-part claim.
     "s172(sec002-never-deferred): Phase 1.6 states SEC-002 is never carved "
     "out AND never deferred",
-    "never carved out, on any lane, and never deferred" in _s172_orch,
+    "Never carved out, never deferred, any lane" in _s172_orch,
     "agents/orchestrator.md § Phase 1.6 must reaffirm SEC-002 is never "
     "deferred by the new gate",
 )
+# NOT retargeted -- genuine content loss, confirmed against the pre-fusion
+# source. `git show 70550d1:agents/orchestrator.md` states: "**Phase 1.6 is
+# inviolable — except under the deferred-by-default gate above.**... In
+# every OTHER case... `reviews/01-plan-review.md` MUST exist with a `##
+# Plan Review` + `**Combined verdict:**` before you emit STAGE-GATE-1. If
+# absent in one of those cases, you do NOT show the plan to the operator —
+# you return to executing Phase 1.6 first." This explicit guarantee — the
+# coordinator must not present STAGE-GATE-1 without a completed review,
+# except under the two named exceptions — has no successor anywhere in the
+# fused corpus (grepped for "inviolable", "MUST exist", "do NOT show the
+# plan"). Left failing intentionally; agents/orchestrator.md is Task-1's
+# frozen file.
 check(
     "s172(inviolable-amended): 'Phase 1.6 is inviolable' is amended to "
     "except the deferred-by-default gate",
@@ -37997,6 +38031,19 @@ check(
 )
 
 # --- AC-2: Phase 1.5a runs regardless of the deferral gate -----------------
+# NOT retargeted -- genuine content loss, confirmed against the pre-fusion
+# source. `git show 70550d1:agents/orchestrator.md`'s deferred-by-default
+# paragraph explicitly reassured: "Phase 1.5a still runs (see below) and its
+# own checklist row is checked normally regardless of this gate." The fused
+# "Three no-dispatch paths" table row for the deferred case says nothing
+# about Phase 1.5a at all, and Phase 1.5a's own section only names ONE skip
+# condition ("Skipped by the self-authored carve-out") -- a reader can infer
+# by elimination that the deferred-by-default path does not skip it, but the
+# explicit reassurance that used to close that inference gap is gone. The
+# "Bounce to `architect` under the BOUNDED-PATCH contract" leg still exists
+# verbatim in the Phase 1.5a violations row; it is the specific
+# deferral-unaffected framing that is missing. Left failing intentionally;
+# agents/orchestrator.md is Task-1's frozen file.
 check(
     "s172(1.5a-unaffected): Phase 1.5a (deterministic Plan-Structure Scan) "
     "runs regardless of the deferred-by-default gate and still bounces to "
@@ -38009,14 +38056,31 @@ check(
 )
 
 # --- AC-5/AC-6: Phase 1.8 post-approval offer -------------------------------
+# Retargeted: heading case changed ("Post-approval plan-review offer",
+# sentence case) and "NOT part of the dual-record schema" reworded to "not**
+# part of the dual-record" (bold markdown instead of ALL-CAPS, "schema"
+# dropped) -- same claim (no gateN_release, no release event).
 check(
-    "s172(phase18-exists): Phase 1.8 — Post-approval Plan-Review Offer is "
+    "s172(phase18-exists): Phase 1.8 — Post-approval plan-review offer is "
     "documented as a leader-relayed checkpoint, not a dual-record gate",
-    "## Phase 1.8 — Post-approval Plan-Review Offer" in _s172_orch
-    and "NOT part of the dual-record schema" in _s172_orch,
+    "## Phase 1.8 — Post-approval plan-review offer" in _s172_orch
+    and "not** part of the dual-record" in _s172_orch,
     "agents/orchestrator.md must carry the Phase 1.8 section as a "
     "leader-relayed, non-dual-record checkpoint",
 )
+# NOT retargeted -- genuine content loss, confirmed against the pre-fusion
+# source. `git show 70550d1:agents/orchestrator.md`'s Phase 1.8 section
+# carried the full rendered checkpoint template (the "Reply with: - "proceed"
+# → continue to Stage 2 without running the panel - "review" → run the
+# panel now..." block) and the explicit reply-handling table (`proceed` →
+# set skipped; `review` → run the panel, then on concerns/fail set
+# `plan_review_status: reviewed-concerns`, `gate1_release: null`, generate a
+# fresh nonce, and re-present STAGE-GATE-1). The fused Phase 1.8 section
+# (9 lines, down from ~40) states only the outcome vocabulary
+# (`skipped`/`reviewed-pass`/`reviewed-concerns`) without the dialogue that
+# produces it -- no quoted "proceed"/"review" string appears anywhere in the
+# corpus (grepped). Left failing intentionally; agents/orchestrator.md is
+# Task-1's frozen file.
 check(
     "s172(phase18-allowlist): Phase 1.8 offers exactly 'proceed'/'review' "
     "and routes review's pass/concerns outcomes correctly",
@@ -38027,12 +38091,16 @@ check(
     "agents/orchestrator.md § Phase 1.8 must document the proceed/review "
     "allowlist and the concerns/fail re-presentation path",
 )
+# Retargeted: the autonomous-skip behaviour relocated out of Phase 1.8's own
+# section into STAGE-GATE-1's `approve autonomous` reply-table row (single
+# source of truth instead of duplicated in both places) -- confirmed the
+# same two facts (Phase 1.8 never fires; plan_review_status: skipped is
+# recorded in the same write) are stated there.
 check(
     "s172(phase18-autonomous-skip): approve autonomous skips Phase 1.8 and "
     "records plan_review_status: skipped",
-    "skips this section entirely" in _s172_orch
-    and "this offer never fires" in _s172_orch
-    and "set `plan_review_status: skipped` at that same recording step" in _s172_orch,
+    "also set `plan_review_status: skipped` in the same write" in _s172_orch
+    and "Phase 1.8 never fires" in _s172_orch,
     "agents/orchestrator.md must state that approve autonomous skips "
     "Phase 1.8 entirely and records plan_review_status: skipped",
 )
@@ -38044,26 +38112,45 @@ check(
 )
 
 # --- AC-4: correction-classification precondition generalized --------------
+# Retargeted (subject retired, not lost): the entire "Correction-classification
+# — selective panel re-firing" procedure this AC's precondition would have
+# lived in is itself retired -- `docs/patch-mode.md § "Stage-1 Selective
+# Panel Re-Firing — RETIRED"` and orchestrator.md's own "No Stage-1
+# correction-round apparatus" paragraph both declare it explicitly ("This is
+# a reduction — a subject... removed, not a mechanism added in its place").
+# With no bucket-classification procedure left to gate, the specific
+# "does this precondition apply when the panel never ran" question is moot
+# by construction: every Phase 1.6 `fail` (deferred or not) now takes the
+# same single path (present the finding verbatim, route back to architect).
+# Checking the retirement statement itself rather than a precondition inside
+# a section that no longer exists.
 check(
     "s172(correction-precondition): the correction-classification procedure "
-    "states it does not apply while the panel has never run (deferred)",
-    "this procedure does not apply" in _s172_orch
-    and "plan_review_status: deferred" in _s172_orch,
-    "agents/orchestrator.md's Correction-classification section must state "
-    "the panel-ran precondition",
+    "is retired, so its panel-never-ran precondition is moot by construction",
+    "No Stage-1 correction-round apparatus" in _s172_orch
+    and "a subject" in _s172_orch
+    and "removed, not a mechanism added in its place" in _s172_orch,
+    "agents/orchestrator.md's Phase 1.6 must state the Stage-1"
+    " correction-round apparatus is retired (the panel-ran precondition this"
+    " AC names has no subject left to gate)",
 )
 
 # --- AC-7: skill + direct-mode reconciliation + carve-out distinctness -----
+# Retargeted: the coordinator's name is "orchestrator" post-fusion, not
+# "leader" -- a surviving "leader" mention here would itself be the defect
+# (a stale reference to the retired coordinator), not evidence of correct
+# routing. skills/plan-review/SKILL.md correctly routes to `orchestrator`
+# with zero "leader" mentions (grepped).
 check(
     "s172(skill-exists): skills/plan-review/SKILL.md exists with frontmatter "
-    "name: plan-review and routes to the leader",
+    "name: plan-review and routes to the orchestrator",
     _s172_skill.startswith("---")
     and parse_frontmatter(_s172_skill).get("name", "").strip() == "plan-review"
-    and "leader" in _s172_skill
+    and "orchestrator" in _s172_skill
     and "Direct Mode Task" in _s172_skill
     and "Mode: plan-review" in _s172_skill,
     "skills/plan-review/SKILL.md must exist, declare name: plan-review, and "
-    "route a Direct Mode Task: plan-review payload to the leader",
+    "route a Direct Mode Task: plan-review payload to the orchestrator",
 )
 check(
     "s172(skill-readme-entry): skills/README.md routing line lists "
