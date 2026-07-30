@@ -513,6 +513,19 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 186: coordinator-mention-residual-guard (coordinator-fusion T4-AC-6)"
+echo "############################################################"
+if [ -z "$PY" ]; then
+    report_skip_or_fail "coordinator-mention-residual-guard" "no Python interpreter found (tried python3, python, py -3)"
+elif $PY "$TESTS_DIR/test_coordinator_mention_residual.py"; then
+    echo "coordinator-mention-residual-guard: PASS"
+else
+    echo "coordinator-mention-residual-guard: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"

@@ -64,6 +64,7 @@ reconciliation happened as part of Task-3's first file, ahead of the seam split)
 | `docs/reasoning-checkpoint.md:128` | "a `th:leader` that confirmed B1's functional-clarity artifact... propagated the confirmation to a separately-dispatched `th:orchestrator` as a 'checkpoint-trust-transfer'" | R4 | `§ "No cross-agent trust-transfer"` names the retired split and the trust-transfer mechanism it required, to justify why no trust-transfer exists in the single-coordinator model. |
 | `docs/worktree-discipline.md:550` | "`th:leader` that would not spawn a second-coordinator `th:orchestrator` subagent until the [capability cache confirmed]" | R4 | `§ "Capability cache — RETIRED"` names what the cache gated (the M3 nested-subagent round-trip) so the retirement reads as a consequence of the fusion, not an unexplained removal. |
 | `docs/observability.md:396-397` | "The `00-leader-roster.md` file, the `fanout.*` event family, and the two-tier `leader-recover`/`orchestrator-recover` split" | R4 | `§ "Initiative-level trace (serial multi-project sequencing)"` names the three retired mechanisms together, tying their loss to the same invariant (#2) that makes multi-project sequencing serial. |
+| `docs/code-hygiene-gate.md:39,85,210` | "comment leader" | R5 | Verified by reading each line: "the first non-whitespace token after the leading `+` is a comment **leader**" — the English term for the character that starts a comment (`#`, `//`, `--`), an unrelated token collision with the retired coordinator's name, not a mention of it. Deliberate exception, no edit needed. |
 
 ## Seam-docs-reference
 
@@ -114,6 +115,27 @@ entry pending seam-history's own pass, since `CLAUDE.md` itself is not the artif
 
 Every entry below is R4 by construction (changelog, decisions, and acceptance-matrix records are
 historical record by definition) — prose is unchanged, no pointer is reapointed.
+
+### `docs/knowledge.md` (38 mentions)
+
+Every `[pattern]`/`[decision]`/`[constraint]` entry is a dated knowledge-base record of a prior
+feature's architecture at the time it shipped (`docs/knowledge.md`'s own stated purpose, per
+CLAUDE.md § "KG passive capture"); R4 by the same "registro del grafo" clause `01-plan.md § "The
+treatment vocabulary"` names explicitly. Representative rows, not exhaustive (38 mentions across
+~15 entries, all the same class):
+
+| File:line | Mention (truncated) | Rule | Reason |
+|---|---|---|---|
+| `docs/knowledge.md:78` | "the leader's default intake disposition is now patient-by-default..." | R4 | Dated `[decision]` entry (v2.46.0) describing the pre-fusion architecture at the time it shipped. |
+| `docs/knowledge.md:88` | "orchestrator Layer-2 self-check covers nested-context sessions where Task is stripped..." | R4 | Dated `[decision]` entry (v2.50.0) describing the pre-fusion architecture at the time it shipped. |
+| `docs/knowledge.md:112` | "the leader dispatches N `researcher` (haiku) agents in parallel..." | R4 | Dated `[decision]` entry (v2.84.0) describing the pre-fusion architecture at the time it shipped. |
+| `docs/knowledge.md:120` | "`agents/ref-dispatch-machinery.md § "Multi-Task fan-out"`" | R4 | Dated `[pattern]` entry (v2.88.0) citing a section this migration's own `ref-dispatch-machinery.md § "What left this file"` table now records as removed — the citation is stale relative to the current tree (a genuine dangling pointer, not merely a coordinator-identity mention), reported alongside this migration's other cross-file pointer findings rather than fixed here (`docs/knowledge.md` is not in any task's `Files:` list). |
+| `docs/knowledge.md:179` | "independent of and additional to the leader's own upstream classification" | R4 | Dated `[decision]` entry describing the pre-fusion two-agent classification split at the time it shipped. |
+
+No other survivors in `docs/knowledge.md` require individual rows — every remaining hit (~33 of 38)
+is the same dated-KG-entry class: a `[decision]`/`[pattern]`/`[constraint]` bullet naming
+`agents/leader.md` or `th:leader` as the architecture that was true when that entry was written,
+never asserted as current.
 
 ### `CHANGELOG.md` (57 mentions)
 
