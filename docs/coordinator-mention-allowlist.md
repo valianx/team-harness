@@ -222,6 +222,33 @@ never asserted as current.
 |---|---|---|---|
 | `docs/decisions.md:10` | "Also retires the Phase 3.6 `acceptance-checker` drift audit entirely (no replacement dispatch)." | R4 | A 2026-07-21 decision entry naming a mechanism this migration is unrelated to (`acceptance-checker` had already been retired by a prior PR); historical record, prose intact. |
 
+### `docs/testing.md` (Task-4, ~94 mentions across the per-suite registry)
+
+`docs/testing.md`'s own stated purpose (`§1`) is a canonical registry of what each NAMED suite
+asserted, one entry per suite, written at the suite's own authoring date — the same "describes a
+past state at the time it was true" shape as `CHANGELOG.md`, never rewritten to describe the
+current tree. Every surviving `leader`/family-B mention checked is a suite-description sentence
+naming the file/anchor that suite's checks targeted when the suite was written (frequently
+pre-fusion `agents/leader.md` or `agents/acceptance-checker.md`), not a live claim about the current
+architecture. Representative rows, not exhaustive (all the same class):
+
+| File:line | Mention (truncated) | Rule | Reason |
+|---|---|---|---|
+| `docs/testing.md:56` (Suite 34) | "`plan-reviewer` is the sole writer of the header + combined verdict" | R4 | Describes the panel-centralization contract Suite 34 asserted when written; the panel model is unchanged, only the coordinator identity is. |
+| `docs/testing.md:85` (Suite 39 — RETIRED) | "a top-level `leader` dispatching a second coordinator, `th:orchestrator`, as a nested subagent" | R4 | States the retired scenario the suite used to test, explicitly framed as retired in the same entry (this migration's own retirement note, not a live claim). |
+| `docs/testing.md:126` (Suite 48) | "`leader.md § Direct Modes` deliver row" / "`leader.md § Phase 0a` --fast skip-set" | R4 | Names the file the suite's checks read against at authoring time (2026-05-31, pre-fusion); the suite's live disposition is separately stated in its own "Retargeted" paragraph below it. |
+| `docs/testing.md:136` (Suite 56) | "anchored to ... `leader.md` and `"## Postura"` in `docs/reasoning-checkpoint.md`" | R4 | Names the pre-fusion anchor the suite's checks read at authoring time (v2.5x); not a claim that `leader.md` exists today. |
+| `docs/testing.md:172-181` (Suite 69 — RETIRED) | "`00-leader-roster.md` file... nothing replaces them" | R4 | This migration's own retirement note, quoted verbatim from `docs/observability.md`, explicitly framed as retired. |
+| `docs/testing.md:191,266,286` (Suites 72/89/92) | "`leader.md` declares a PR-review intent row..." / "`agents/leader.md § Direct Modes` table contains a `learn` row" | R4 | Names the pre-fusion file each suite's checks targeted at authoring time (v2.6x–v2.8x); the suite descriptions are point-in-time records of what shipped then, never rewritten. |
+
+No individual row for the remainder (~80 of ~94 hits across dozens of per-suite entries from Suite
+34 through the tail of the registry) — every one checked is the same class: a suite-description
+sentence naming a file or anchor that suite's own checks targeted at its authoring date, several
+explicitly pre-dating this migration by many months. A small number of **live, currently-wrong
+cross-references** were found in this same pass and are NOT R4 — those are genuine Suite 187
+dangling-pointer defects, fixed directly in `docs/testing.md` rather than allowlisted (they assert
+a *current* section that does not resolve, not a historical mention of a retired file).
+
 ### `docs/specs/stage2-code-hygiene-gate/acceptance-matrix.md` — no survivor
 
 The one grep hit (`comment-leader-filter` at line 10) is a hygiene-gate pattern-fixture name — an
