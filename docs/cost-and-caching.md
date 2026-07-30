@@ -105,6 +105,20 @@ The pipeline's larger agent prompts (orchestrator, architect, the verifier agent
 
 **To reproduce this measurement on a future density pass:** diff `wc -c CLAUDE.md` before and after the cut and run `bash tests/run-all.sh`. There is no longer a mechanical fenced-surface check — read the control-bearing sections yourself before and after, and treat any softened modal verb or shrunk enumeration as a defect in the cut.
 
+## Measured reductions — implementer context budget
+
+The implementer combines a cold agent prompt with task-specific workspace and repository reads. Its density pass preserves the control-bearing scope, commit, constraint, sketch, and status contracts while moving stack-specific facts behind an on-demand reference.
+
+| Metric | Before | After | Delta |
+|---|---:|---:|---:|
+| `agents/implementer.md` size | 43,959 bytes | 14,832 bytes | −29,127 bytes (−66.3%) |
+| `agents/implementer.md` words | 6,576 | 2,105 | −4,471 words (−68.0%) |
+| Stack guardrails | included on every dispatch | 1,455-byte conditional reference | removed from unrelated stacks |
+
+The larger dynamic saving comes from knowledge loading. `docs/knowledge.md` was previously a mandatory full read (154,506 bytes at measurement time). The implementer now consumes the task-scoped `00-knowledge-context.md` when present or at most three grep-selected entries / 80 lines. Exact token savings vary by task and cache state, so this table reports bytes rather than fabricating a token total.
+
+The behavioral budget is equally important: successful tool work is silent, each input is read once, analogous-code discovery stops at two examples per changed concern, and Context7 is limited to changed third-party API surfaces.
+
 ## Known issue — TTL regression
 
 Claude Code issue 46829 (https://github.com/anthropics/claude-code/issues/46829) documents a regression in which the default cache TTL silently dropped from 1 hour to 5 minutes for a period in early 2026, inflating cache-creation cost by roughly 20–32% on subscription plans. The issue was closed as "not planned." Periodically confirm the `cache_read_input_tokens` ratio (via the statusline `current_usage` object) is consistent with expected behavior; a sudden drop in hit rate can indicate a TTL regression of this kind.

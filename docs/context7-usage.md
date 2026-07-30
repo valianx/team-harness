@@ -33,7 +33,7 @@ The frontmatter `tools:` of an agent declares capability. These rules say *when*
 
 | Agent | Mandatory trigger | Skip when |
 |---|---|---|
-| **implementer** | Before generating code that imports or configures any third-party library detected in `package.json` / `go.mod` / `pyproject.toml` / equivalent. | The library is purely internal to this repo. |
+| **implementer** | Before adding an import, changing configuration, or changing a call to a third-party API. Maximum two libraries and one focused query per library per dispatch. | Internal code, unchanged library calls, and established local wrappers. |
 | **architect** | Phase 1 (Design): for every framework / library you cite as a Decision in `01-architecture.md`. | The library only appears in the discarded-alternatives list. |
 | **tester** | Before generating tests that use the project's test runner or coverage tool (Jest, Vitest, PyTest, Go test, c8, istanbul, etc.). | The change touches only test fixtures with no runner-specific syntax. |
 | **security** | Phase 0 — verify the latest OWASP Top 10 / CWE Top 25 versions. | Never skip — this gate is the model behavior. |
@@ -75,7 +75,7 @@ Score the response before using it:
 | Verdict | What you see | What to do |
 |---|---|---|
 | **hit** | Response mentions the version detected in the project AND the specific API/option you asked about. | Use it. Cite in `## Documentation Consulted`. |
-| **miss** | Response is empty / generic / talks about a different version. | Retry **once** with a different topic. If still empty, fall back. |
+| **miss** | Response is empty / generic / talks about a different version. | Retry **once** with a different topic. The implementer has one retry total across its dispatch; if that budget is spent, fall back. |
 | **n/a** | Library is not on context7 (returns no resolution from `resolve-library-id`). | Fall back to training knowledge. Do not retry. |
 
 **Fallback contract.** When you fall back, you MUST document it in your workspace doc:

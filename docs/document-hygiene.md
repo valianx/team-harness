@@ -41,4 +41,4 @@ See `docs/decisions.md` for the full log. Recent entries kept inline below.
 | `docs/constraints.md` | Constraints overflow (constraint + detail) | delivery agent (auto-offload) |
 | `docs/testing.md` | Testing conventions overflow (convention + description) | delivery agent (auto-offload) |
 
-The delivery agent creates overflow files on first offload. Agents read `docs/knowledge.md` before every task; overflow files are read on-demand when the CLAUDE.md pointer section is relevant.
+The delivery agent creates overflow files on first offload. Agents that require project knowledge consume task-relevant entries. The implementer uses `00-knowledge-context.md` when present or a bounded grep fallback; it never reads `docs/knowledge.md` in full. Overflow files remain on-demand when the CLAUDE.md pointer section is relevant.
