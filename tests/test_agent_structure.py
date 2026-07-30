@@ -37053,7 +37053,6 @@ print("=== Suite 163: deterministic-gate-release-enforcement (gap-closure) ===")
 _s163_gate_contract = read(AGENTS_DIR / "_shared" / "gate-contract.md")
 _s163_gate_guard_ts = read(HOOKS_DIR / "ts" / "bodies" / "gate-guard.ts")
 _s163_orchestrator = read(AGENTS_DIR / "orchestrator.md")
-_s163_leader = read(AGENTS_DIR / "leader.md")
 _s163_reasoning_checkpoint = read(REPO_ROOT / "docs" / "reasoning-checkpoint.md")
 _s163_claude = read(REPO_ROOT / "CLAUDE.md")
 
@@ -37189,26 +37188,22 @@ check(
     "sub-phase distinction has no successor to assert",
 )
 
-# --- leader.md never carries a gate decision in a spawn payload, and the ---
-# relay text names the exact attribution triple -----------------------------
-check(
-    "s163(t4-ac1): leader.md's dispatch-invariant rule forbids any "
-    "pre-declared gate decision in an orchestrator's spawn payload",
-    "spawn payload never carries a gate decision" in _s163_leader
-    and "standing approval" in _s163_leader,
-    "agents/leader.md must declare that the spawn payload never carries a "
-    "gate decision and reject any pre-declared standing approval",
-)
-check(
-    "s163(t4-ac2): leader.md's relay text carries the operator's verbatim "
-    "words, the nonce, and the leader-relayed-operator provenance marker "
-    "together",
-    "verbatim" in _s163_leader
-    and "leader-relayed-operator" in _s163_leader
-    and "gate_nonce" in _s163_leader,
-    "agents/leader.md must document relaying the verbatim reply with the "
-    "nonce and the leader-relayed-operator provenance marker",
-)
+# RETIRED (coordinator-fusion, T4-AC-1b). Both checks asserted properties of
+# a RELAY: leader.md forwarding the operator's reply to a second coordinator,
+# tagged with a `leader-relayed-operator` provenance marker so the recipient
+# could distinguish a live reply from one synthesized elsewhere. That relay
+# is gone by construction — `agents/_shared/gate-contract.md § "Prepare,
+# present, record — one agent, one turn"` states plainly that the single
+# coordinator now prepares, presents, and records every gate itself, "in the
+# same conversation, with no hand-off," and names the removal explicitly:
+# "This removes the hand-off the prior two-agent flow relied on, and with it
+# the audited-relay property that flow provided." The subject of both checks
+# (a relay to disclaim, a provenance marker to carry) has no referent left to
+# assert against — not relocated, retired. The surviving property — a
+# decision originates only in the operator's own reply to that exact gate
+# presentation, never synthesized or pre-declared — is asserted directly in
+# agents/orchestrator.md's own "## Gates" section (Suite 51/54's own
+# neighbourhood) rather than through a relay-specific check here.
 
 # RETARGETED (pipeline-dispatch-shape, T7-AC-2 residual, Suite-171 relocation
 # pattern): Phase 4.5's pre-push review role is retired wholesale — the
