@@ -803,8 +803,7 @@ manual_action_url: https://github.com/{owner}/{repo}/compare/main...{branch}?exp
 summary: PR not created automatically (gh unavailable). Operator paste required.
 ```
 
-The orchestrator's `blocked-manual-push` handling (analogous to
-`blocked-no-dispatch`):
+The orchestrator's `blocked-manual-push` handling:
 1. Emit a one-paragraph STOP block with the URL and file path.
 2. Wait for operator reply (`pr opened #N` → continue; `abort` → mark pipeline
    blocked).

@@ -42,7 +42,7 @@ The orchestrator does not dispatch you for a plan that is self-authored (hotfix 
 — all four conditions together. In that case a deterministic self-check (at least one task exists,
 each task carries ≥1 AC, `## Delivery Grouping` is declared, and — for `type: fix`/`hotfix` — the
 regression-test AC cross-reference is present) stands in for both Phase 1.5 (`qa-plan`) and Phase
-1.6 (you); see `agents/orchestrator.md § "Self-authored-plan panel carve-out"`. You are never
+1.6 (you); see `agents/orchestrator.md § "Phase 1.5 — Plan Ratification"`. You are never
 dispatched to approve your own absence — this is orchestrator-side gating, not a decision you make.
 
 **SEC-002 is never carved out by this condition.** When `security_sensitive: true`, the orchestrator
@@ -683,7 +683,7 @@ pending
 
 ## Findings
 
-**Implicated-element field (structural, T5-AC-7).** Every finding you record — under any rule below — carries the plan elements it implicates, stated structurally rather than only in prose: AC identifiers (`T{n}-AC-{m}`), fenced manifest entry keys, task `Notes:` references, `file:line`, and/or test-assertion sites, whichever apply. State this set inline after the finding, e.g. `[implicates: T2-AC-16, orch-stage-gate-2]`. This is the field `agents/orchestrator.md § Iteration Rules`'s pre-dispatch correction gate reads to detect a recurrence (a new finding implicating an element a prior, closed finding already implicated) — see that section for the consumer contract; this file only produces the field, it does not restate the gate's own logic.
+**Implicated-element field (structural, T5-AC-7).** Every finding you record — under any rule below — carries the plan elements it implicates, stated structurally rather than only in prose: AC identifiers (`T{n}-AC-{m}`), fenced manifest entry keys, task `Notes:` references, `file:line`, and/or test-assertion sites, whichever apply. State this set inline after the finding, e.g. `[implicates: T2-AC-16, orch-stage-gate-2]`. This is the field `agents/orchestrator.md § "Iteration rules"`'s pre-dispatch correction gate reads to detect a recurrence (a new finding implicating an element a prior, closed finding already implicated) — see that section for the consumer contract; this file only produces the field, it does not restate the gate's own logic.
 
 ### Rule 1 — Delivery Grouping
 - {01-plan.md}:{line} — delivery group {N} cites Reason `{reason}` — invalid; must be one of: coexistence window, production signal, cross-repo deploy gate.
@@ -768,7 +768,7 @@ pending
 |-------|------|-----------|----------|-------|----------|--------|----------------------|
 ```
 
-**`Implicated (closed)` column.** The union of implicated-element sets across every finding THIS round closed — never the findings still open at round close, and never a restatement of the findings themselves (an element identifier only, e.g. `T2-AC-16, orch-stage-gate-2`, or `none` when the round closed no finding). Written by you on a normal round; written by the coordinator on a deterministic-only round (`agents/orchestrator.md § "Correction-classification — selective panel re-firing"`, the buckets-4/5 deterministic-only-pass case). This column is what the coordinator's cross-round recurrence index (`agents/orchestrator.md § Iteration Rules`) accumulates over — the row's shape stays append-only, one row per round, unchanged by this addition.
+**`Implicated (closed)` column.** The union of implicated-element sets across every finding THIS round closed — never the findings still open at round close, and never a restatement of the findings themselves (an element identifier only, e.g. `T2-AC-16, orch-stage-gate-2`, or `none` when the round closed no finding). You write it on every round: the full panel re-runs whenever Phase 1.6 fails and routes back (no selective, lens-by-lens re-fire exists any more — see "Stage-1 Selective Panel Re-Firing — RETIRED" below), so there is no coordinator-authored deterministic-only row to distinguish from your own. This column is what the coordinator's cross-round recurrence index (`agents/orchestrator.md § "Iteration rules"`) accumulates over — the row's shape stays append-only, one row per round, unchanged by this addition.
 
 ---
 
@@ -803,58 +803,23 @@ A label that is expected but absent means the panel is incomplete. The combined 
 
 ---
 
-## Stage-1 Selective Panel Re-Firing (delta-scoped review + carried-forward verdicts)
+## Stage-1 Selective Panel Re-Firing — RETIRED
 
-> Canonical contract: `docs/patch-mode.md § Stage-1 Selective Panel Re-Firing`. Wired by
-> `agents/orchestrator.md § "Correction-classification — selective panel re-firing"`. This section
-> documents your half of the mechanism — how you behave when re-fired with a `Correction scope:`
-> dispatch, and how you compute the combined verdict when fewer than all lenses re-fire.
+**This entire mechanism is retired, not reduced.** It used to classify an operator correction that
+reopened Stage 1 into one of five buckets and selectively re-fire only the panel lenses each bucket
+implicated, carrying the rest forward with an explicit label under a `**Correction scope:**` field.
+The coordinator fusion removes the Stage-1 correction-round apparatus this was iteration machinery
+for: on a Phase 1.6 `fail`, the full panel re-runs — `qa-plan`, `security` when sensitive, and you —
+and you present your verdict exactly once per round, never waiting for a selective re-fire. Bucket
+classification, delta-scoped review, carried-forward sub-verdicts, and the combined-verdict
+recomputation over a mixed fresh/carried set all lose their subject. Nothing replaces them. Full
+retirement note: `docs/patch-mode.md § "Stage-1 Selective Panel Re-Firing — RETIRED"`.
 
-### Delta-scoped review — the `Correction scope:` field
-
-When the orchestrator re-fires you as part of a routed correction (buckets 1-3 of the correction
-classifier), your dispatch carries a `**Correction scope:** {AC-IDs, section-names}` field naming
-what changed — a coordinate, not a review bound. Per `agents/_shared/dispatch-contract.md § "The
-two-halves rule"`, the orchestrator never bounds your review scope: you compute your own review
-scope from the coordinate, and you review the whole plan whenever your own judgment of the
-correction calls for it — no dispatch instruction excludes any AC/section from your own scope
-computation. You still read `01-plan.md` and the correction text at dispatch start — the saving is fewer
-generation tokens, never zero-read (`docs/patch-mode.md § Stateless-Dispatch Honesty`). What makes
-a full-scope re-review affordable is the prompt-caching stable-prefix discipline, not a narrowed
-read.
-
-### Carried-forward sub-verdicts
-
-When fewer than all three lenses re-fire, preserve the non-firing lenses' most recent sub-verdict
-AND open-findings ledger in `reviews/01-plan-review.md`, labeled EXPLICITLY:
-
-```
-(carried forward from round N — surface unchanged this round)
-```
-
-— never silently presented as fresh. This applies equally to `**Substance (qa):**` and `**Security
-design-review (security):**` when either lens does not re-fire this round.
-
-### Combined-verdict recomputation
-
-Recompute `**Combined verdict:**` as **worst-of over {fresh sub-verdicts} ∪ {carried-forward
-sub-verdicts}**, preserving each lens's own severity→verdict mapping (a carried `security`
-`risks-found` still maps to `fail`; a carried `qa` `fail` still maps to `fail`). Never recompute from
-fresh sub-verdicts alone when a carried-forward one exists — the worst-of union always includes
-both sets.
-
-**`security` is NEVER carried forward on a security-surface touch (fail-safe, non-negotiable).**
-When the correction touched the security-relevant surface (bucket 2 of the correction classifier —
-a floor, a waiver, an enforcement model, a sensitive-path control, a security/adversary dispatch
-condition, or any AC that gates access), the orchestrator always dispatches a fresh `security` run;
-you never label a `security` sub-verdict as carried-forward in that case. This is the Stage-1 analog
-of the existing Phase-3 "security-verdict staleness re-gate" (`agents/orchestrator.md § "If any
-agent fails → ITERATE"`).
-
-**Deterministic-only rounds (buckets 4/5).** When no LLM lens re-fires at all, the orchestrator —
-not you — records the `§ Panel Rounds` row for that round ("deterministic-only pass, all
-sub-verdicts carried forward from round N, combined verdict unchanged"). You are simply not
-dispatched in that case.
+**What survives, restated on its own terms rather than as a bucket.** `security` is never carried
+forward on a security-surface touch: `agents/security.md` retains its own no-carry-forward rule for
+the case where an operator `edit` lands a criterion on the security-relevant design surface — see
+that file for the current statement. You emit your verdict once per round and do not wait for a
+re-fire.
 
 ---
 

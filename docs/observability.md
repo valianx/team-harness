@@ -197,13 +197,13 @@ the one-JSON-object-per-line invariant, and it never removes an event —
 every `phase.*`/`gate.*` event this schema requires still fires unchanged,
 regardless of how compact its optional free-text fields are (see "Tier 0
 carve-out" below for the sole exemption from the observability floor itself).
-Canonical source: `agents/orchestrator.md § "Free-text field bound"`; the two
+Canonical source: `agents/orchestrator.md § "Free-text bound"`; the two
 sites must not diverge.
 
 **Named exception — the `checkpoint.confirmed` confirmatory-text field, additive only.**
 The general clause above governs every OTHER free-text field unchanged. The field
 carrying the operator's own words in the `checkpoint.confirmed` event (the
-functional-clarity confirmation, `agents/orchestrator.md § "Gate handling § Checkpoint-trust-transfer"`)
+functional-clarity confirmation, `agents/orchestrator.md § "Checkpoint-trust-transfer"`)
 is a single named exception, additive to — never a replacement of — the general clause:
 ≤280 chars (one confirmatory turn, not the surrounding conversation); quotes and
 `\n\r\t` are ESCAPED as JSON string escapes, never stripped, so the operator's exact
@@ -217,7 +217,7 @@ marked visibly with `…[truncated]`; the secret prohibition (§ "Secret prohibi
 unaffected — a confirmation carrying a credential records `provenance` and
 `withheld — secret prohibition` in place of the text. `provenance` itself is a closed
 enum, not free text, and is never subject to this bound. Without this reconciliation
-written at both sites — here and `agents/orchestrator.md § "Free-text field bound"`,
+written at both sites — here and `agents/orchestrator.md § "Free-text bound"`,
 which must not diverge — the field is not added. This exception is scoped to exactly
 this one field: the general `≤120 chars`/`never multi-sentence narrative prose` clause
 above is byte-preserved for every other free-text field.
@@ -292,7 +292,7 @@ proof that a `th:*` boundary occurred.
 
 **Reconciliation source (kept unconditionally, repurposed).** `00-subagent-trace.jsonl`
 is retained unconditionally and read by the orchestrator's stage-gate reconciliation
-backstop (`agents/orchestrator.md § Stage-gate reconciliation backstop`) as the
+backstop (`agents/orchestrator.md § "Reconciliation backstop"`) as the
 backfill source for a `phase.end` gap: the paired `subagent.start`/`subagent.stop`
 lines for the missing phase's `agent_type`, matched by the pipeline's time window,
 supply the `duration_ms` for the backfilled event. This is its primary value —
@@ -626,9 +626,10 @@ narrative for a given round lives exclusively in `failure-brief.md`.
 exemption from that floor) and it does not change what `00-pipeline-summary.md`
 derives from the trace.
 
-Canonical source: `agents/orchestrator.md § "Phase Transition Protocol"` (the
-upsert mechanic) and `§ "Agent Results"` / `§ "Hot Context"` (the schema
-templates); the two sites must not diverge.
+Canonical source: `agents/orchestrator.md § "Transition protocol — atomic, all three steps, never
+partial"` (the upsert mechanic) and `§ "Agent Results"` (the schema template — the narrative "Hot
+Context" section this upsert once also maintained is retired, per that same section's own note);
+the two sites must not diverge.
 
 ## Active-lane observability surface
 
@@ -636,7 +637,7 @@ The three-lane execution model (`inline`/`express`/`full`, canonical contract: `
 
 ### `lane` field — `00-state.md` + status-block/STOP-header echo
 
-`lane` is a `00-state.md § Current State` field (`inline | express | full`), resolved by the coordinator itself at Classify — `--fast`, `[TIER: N]`, and Simple-Mode keywords all resolve to a lane value there, so the coordinator never re-derives lane from a legacy flag downstream. The orchestrator echoes `Lane: {lane}` as the first line of every phase-transition status block and every STAGE-GATE / express-combined-gate STOP block header (`agents/orchestrator.md § "Lane: line"`, canonical visibility contract at `docs/pipeline-lanes.md § 8`).
+`lane` is a `00-state.md § Current State` field (`inline | express | full`), resolved by the coordinator itself at Classify — `--fast`, `[TIER: N]`, and Simple-Mode keywords all resolve to a lane value there, so the coordinator never re-derives lane from a legacy flag downstream. The orchestrator echoes `Lane: {lane}` as the first line of every phase-transition status block and every STAGE-GATE / express-combined-gate STOP block header — canonical visibility contract at `docs/pipeline-lanes.md § 8`.
 
 **Honest scope — not (yet) a discrete `phase.end` JSONL key.** `lane` lives in the state file and in the human-facing status-block/STOP-block text; the `phase.end` schema (§ "Execution Events JSONL" above) does not currently stamp its own `lane` key. A reader who needs the running lane for a given phase reads `00-state.md` alongside `{events_file}`, the same way `stage`/`phase` are already cross-read together with the trace.
 
@@ -648,33 +649,23 @@ The three-lane execution model (`inline`/`express`/`full`, canonical contract: `
 
 ### No `budget` config key, no `budget_pending` event
 
-An earlier design iteration proposed a hard token-budget config key (`budget`) with a budget-driven STOP (constraint C). It was evaluated and removed before this contract shipped — a budget-STOP that could recommend `inline` on a sensitive path was identified as a fail-open security vector (a pre-flight budget check reaching a security recommendation before the security-relevant classification ran); see `docs/pipeline-lanes.md § 9 "Historical note — constraint C removed"` for the full rationale. This observability contract documents the trace and config surface exactly as shipped: **no `budget` key exists in `~/.claude/.team-harness.json`, and no `budget_pending` (or equivalent) event exists in the `event` enum** (§ "Execution Events JSONL" § Schema above). The only cost-visibility surface remains the existing read-only `## Cost` rollup (§ "Cost rollup" below) — a render of `phase.end` tokens, never a gate, never a STOP.
+An earlier design iteration proposed a hard token-budget config key (`budget`) with a budget-driven STOP (constraint C). It was evaluated and removed before this contract shipped — a budget-STOP that could recommend `inline` on a sensitive path was identified as a fail-open security vector (a pre-flight budget check reaching a security recommendation before the security-relevant classification ran); see `docs/pipeline-lanes.md § "Historical note — constraint C removed"` for the full rationale. This observability contract documents the trace and config surface exactly as shipped: **no `budget` key exists in `~/.claude/.team-harness.json`, and no `budget_pending` (or equivalent) event exists in the `event` enum** (§ "Execution Events JSONL" § Schema above). The only cost-visibility surface remains the existing read-only `## Cost` rollup (§ "Cost rollup" below) — a render of `phase.end` tokens, never a gate, never a STOP.
 
 ### Security floor unaffected by lane
 
-`security_floor_applies` — the single shared Phase-3 predicate that dispatches `security` + `adversary` on a sensitive path — is computed from `security_sensitive` alone; no lane, trim, flag, or env var changes its evaluation (`agents/orchestrator.md § "Preserves the 'unless sensitive' guard..."`). This is a trace-observable invariant: a sensitive-path run's `phase.end` events show the same `security`/`adversary` phase entries on `lane: express` as on `lane: full`, and the express combined-gate STOP block surfaces the same verdicts inline rather than omitting them (`docs/pipeline-lanes.md § 7 "Two-lens floor"`).
+`security_floor_applies` — the single shared Phase-3 predicate that dispatches `security` + `adversary` on a sensitive path — is computed from `security_sensitive` alone; no lane, trim, flag, or env var changes its evaluation (`agents/orchestrator.md § "The single floor predicate"`). This is a trace-observable invariant: a sensitive-path run's `phase.end` events show the same `security`/`adversary` phase entries on `lane: express` as on `lane: full`, and the express combined-gate STOP block surfaces the same verdicts inline rather than omitting them (`docs/pipeline-lanes.md § "Two-lens floor"`).
 
-## Stage-1 selective panel re-firing — observability surface
-
-Stage-1 selective panel re-firing (canonical contract: `docs/patch-mode.md § Stage-1 Selective Panel Re-Firing`) reduces cost on plan-review re-dispatches after an operator correction. Like the active-lane surface above, everything documented here is a read-only trace/audit addition over the existing Phase 1.5/1.6 gate model — no new enforcement key, no new verdict value, no change to what "pass" means at STAGE-GATE-1.
+## Phase 1.5a structural scan — observability surface
 
 ### `plan_structure` event (Phase 1.5a, deterministic)
 
 Documented in the "Additional pipeline event types" table above. Emitted by the orchestrator itself (never a subagent dispatch) at Phase 1.5a, before any `qa-plan` ratify-plan dispatch, for every plan that does not take the self-authored-plan carve-out. Same shape as `stage2.hygiene`: a structural trace event carrying a `verdict`, never operator-facing prose on the clean path. `verdict: pass` proceeds to `qa-plan`; `verdict: fail` bounces to `architect` under the BOUNDED-PATCH contract with `extra.check`/`extra.detail` naming the specific mechanical failure. The four Layer-1 checks (AC-count-vs-summary reconciliation, dangling `T{n}-AC-{m}` cross-references, DAG acyclicity, cross-task file-disjointness) are defined canonically in `docs/plan-structure-gate.md § 2` — this file does not re-derive or paraphrase that check set.
 
-### Correction-classification + routing record (`reviews/01-plan-review.md § Panel Rounds`)
+### Stage-1 Selective Panel Re-Firing — RETIRED
 
-When a corrected plan re-enters Phase 1.5/1.6, the orchestrator classifies the correction into one of 5 buckets (broad-structural, security-relevant surface, non-security coverage change, editorial/operator-decided reduction, shape/consistency-only — `docs/patch-mode.md § "The correction classifier"`) and routes only the lens(es) that bucket requires. This classification and routing decision is recorded as a `§ Panel Rounds` row in `reviews/01-plan-review.md` — a workspace document, not a new event-file field — naming the bucket, which lens(es) fired, and which sub-verdicts were carried forward. The record is read-only audit detail for a decision already made deterministically by the ordered, first-match-wins classification rules; it does not itself gate anything.
+**This entire observability surface is retired, not reduced.** It used to trace a correction-bucket classification (broad-structural, security-relevant surface, non-security coverage change, editorial/operator-decided reduction, shape/consistency-only) that selectively re-fired only the implicated panel lens(es), plus a `§ Panel Rounds` `Implicated (closed)` column and a carried-forward sub-verdict label for the lenses that did not re-fire. The coordinator fusion removes the Stage-1 correction-round apparatus this traced: on a Phase 1.6 `fail`, the full panel re-runs — `qa-plan`, `security` when sensitive, `plan-reviewer` — and each presents its verdict exactly once, never carrying one forward. Bucket classification, the routing record, and carried-forward labeling all lose their subject. Nothing replaces them. Full retirement note: `docs/patch-mode.md § "Stage-1 Selective Panel Re-Firing — RETIRED"`.
 
-**`Implicated (closed)` column.** The row additionally carries the union of implicated-element sets (AC identifiers, fenced manifest entry keys, task `Notes:` references, `file:line`, test-assertion sites) across every finding that round closed — never the still-open findings, never a restatement of the finding text itself. `plan-reviewer` writes this column on a normal round; the orchestrator writes it on a deterministic-only round (buckets 4/5, no LLM lens re-fires). This is the producer half of the pre-dispatch correction gate's recurrence check (`agents/orchestrator.md § Iteration Rules`): the gate accumulates this column across rounds into a cross-round index, and a new finding whose implicated-element set intersects that index is a recurrence, mechanically — a set intersection, not a judgment call. The three Stage-1 lens contracts (`agents/security.md`, `agents/qa-plan.md`, `agents/plan-reviewer.md`) are this column's producers; each states the requirement in its own findings format.
-
-### Carried-forward sub-verdict labeling
-
-When fewer than all lenses re-fire, each non-firing lens's most recent sub-verdict and its open-findings ledger are carried forward into `reviews/01-plan-review.md` and explicitly labelled `(carried forward from round N — surface unchanged this round)` — never silently presented as fresh. The combined verdict is recomputed as worst-of over {fresh sub-verdicts} ∪ {carried-forward sub-verdicts}, preserving each lens's own severity→verdict mapping. A `security` sub-verdict is never carried forward when the correction touched the security-relevant surface (bucket 2 always forces a fresh `security` run) — the Stage-1 analog of the existing Phase-3 security-verdict staleness re-gate (`agents/orchestrator.md § "If any agent fails → ITERATE"`). Full mechanism: `docs/patch-mode.md § "Carried-forward sub-verdicts + combined-verdict recomputation"`.
-
-### No new enforcement key
-
-This entire surface is additive trace/audit detail over an existing enforcement model: `plan_structure: pass/fail` is a structural gate that already existed in shape (mirrors `stage2.hygiene`, itself already documented above); the correction-bucket routing changes WHICH lens re-fires, never WHETHER Phase 1.5/1.6 must reach a combined verdict before STAGE-GATE-1; and the combined-verdict recomputation rule (worst-of over fresh ∪ carried-forward) preserves the existing `pass`/`concerns`/`fail` semantics — it introduces no new verdict value and no new config key.
+**What survives.** The `plan_structure` event above is unaffected — Phase 1.5a's deterministic scan runs regardless. The cross-round recurrence check's producer column (`Implicated (closed)`) is now written by `plan-reviewer` on every round, since the full panel always re-runs — see `agents/orchestrator.md § "Iteration rules"` for the consumer contract.
 
 ## Cost rollup
 
