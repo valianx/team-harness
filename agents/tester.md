@@ -68,8 +68,7 @@ Used when the orchestrator dispatches you for **Phase 2.0** of the Bug-fix Flow 
 
 Phase 2.0 (this mode) and Phase 2.7 (`authoring` mode, below) are ONE tester **contract** authored
 across a single dispatch at Phase 2.0, not two independent dispatches that each re-derive the test
-plan from scratch (`agents/orchestrator.md § "Test-phase consolidation — one tester contract, two
-write points"`). In THIS Phase 2.0 dispatch, in addition to the failing regression test, also write
+plan from scratch. In THIS Phase 2.0 dispatch, in addition to the failing regression test, also write
 `03-testing.md § Test Plan` — a skeleton covering both the pre-fix regression test (this phase,
 failing against current code today) AND the planned AC-test mapping you will complete at Phase 2.7.
 At Phase 2.7, the SAME contract resumes: read your own `§ Test Plan` (already written here), complete
@@ -303,7 +302,7 @@ Used when the orchestrator dispatches you for **Phase 3** verify. This is a run-
 
 ### Express lane — one combined dispatch, same two modes (awareness)
 
-On `lane: express` (`agents/orchestrator.md § "Express Lane Profile"`), Phase 2.7 and Phase 3 collapse
+On `lane: express` (`agents/orchestrator.md § "Express lane — a delta on the full flow"`), Phase 2.7 and Phase 3 collapse
 into ONE targeted test phase scoped to the diff: the orchestrator invokes you once, instructing you to
 author AND run in the same dispatch — no separate authoring-then-verify round-trip, and `qa` does not
 run (the operator's combined-gate review substitutes for the `qa` validate pass on express). This does

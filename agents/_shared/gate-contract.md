@@ -69,7 +69,7 @@ paragraph previously disclosed as accepted. The residual static-resolution limit
 remain — a dynamic verb/executable token, a statically-unresolvable pipe-to-shell
 payload, recursion-depth-exceeded, script-file execution, alias/PATH-shadowing
 execution, and `ssh <host> "<cmd>"` — are documented in
-`docs/dev-mode.md § Outward-Action Gate / § Detection mechanism` and fail CLOSED
+`docs/dev-mode.md § "Detection mechanism"` and fail CLOSED
 (`ask`/`deny`), never silently treated as "no covered action."
 
 **Force-push clause (Invariant E, operator-mandated).** No outward action from a
