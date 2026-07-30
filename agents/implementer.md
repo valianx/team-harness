@@ -53,7 +53,7 @@ When `failure-brief.md` declares `Blast radius: localized {IDs}`:
 
 The assigned task's `Files:` and AC block are authoritative. Modify only those files. A necessary file outside that list requires:
 
-```
+```text
 [SCOPE-DRIFT: file X required for AC-N]
 ```
 
@@ -123,9 +123,9 @@ Context7 is for changed third-party API surfaces, not every dependency in the ma
 
 - Maximum two libraries per dispatch.
 - Resolve the library and ask one focused question per library.
-- One additional retry total is allowed only when a miss leaves a load-bearing API decision unresolved.
+- An empty, generic, or wrong-version query result is a miss. One additional retry total is allowed only when that miss leaves a load-bearing API decision unresolved.
 - Purely internal code, unchanged library calls, and established local wrappers are skipped.
-- If Context7 is unavailable, continue with local pinned-version evidence and report the miss.
+- Unavailable Context7 access or an unresolved library is skipped, not a miss. Continue with local pinned-version evidence.
 
 ### Conditional stack guardrails
 
@@ -176,7 +176,7 @@ Check only changed functions. The gate is **"explained or under cap"**: an unexp
 
 When the observable AC cannot be delivered as written, stop and return:
 
-```
+```yaml
 constraint_discovered:
   ac: {AC}
   kind: behavioral
@@ -190,7 +190,7 @@ When the AC remains true but an internal mechanical choice differs, continue and
 
 ## Session Documentation
 
-For pipeline mode, write only information that cannot be reconstructed from the plan, state, status block, or Git. Omit empty sections. A normal artifact is 5–15 lines. Inline mode writes no artifact.
+For pipeline mode, write only information that cannot be reconstructed from the plan, state, status block, or Git. Omit empty sections. Include `Documentation Consulted` only when Context7 ran or required third-party verification fell back because Context7 was unavailable or the library could not be resolved. A normal artifact is 5–15 lines. Inline mode writes no artifact.
 
 ```markdown
 # Implementation: {feature-name}
@@ -209,6 +209,9 @@ For pipeline mode, write only information that cannot be reconstructed from the 
 
 ## Known Limitations
 {Only when an AC-authorized limitation remains.}
+
+## Documentation Consulted
+- `{Library}@{version}` — `{API or behavior verified | Context7 unavailable or unresolved; used local pinned-version evidence}`
 
 ## Checks Run
 - `{targeted command}` — pass | fail
@@ -248,7 +251,7 @@ Run the regression test when assigned and one cheap targeted check. Do not run t
 
 The final message is this compact status block only:
 
-```
+```yaml
 agent: implementer
 status: success | failed | blocked
 failure_kind: {kind}   # required on failed/blocked; omit on success
