@@ -800,7 +800,7 @@ Guarantee a working branch distinct from the default branch exists. Worktree top
 
 **Assert, never unconditionally write, `working_branch`.** Worktree: verify non-null, equal to `git rev-parse --abbrev-ref HEAD`, distinct from the default branch — assert only. Branch-in-place: after creating the branch, write the field **only** because boot left it `null`.
 
-**Resolve `verification_base_ref` once here, before any diff consumer runs.** Use non-null `worktree_base`; otherwise use the canonical Base branch from `01-plan.md`. Verify it resolves with `git rev-parse --verify` and persist the literal ref in `00-state.md`. An absent or unresolvable base blocks Phase 2. Every Phase-2 diff consumer and Freeze use this field; the verification packet later copies it and never becomes its producer.
+**Resolve the verification baseline once here, before any diff consumer runs.** Use non-null `worktree_base`; otherwise use the canonical Base branch from `01-plan.md`. Persist that literal as `verification_base_source_ref`, resolve it with `git rev-parse --verify "${verification_base_source_ref}^{commit}"`, and persist the resulting full commit SHA as `verification_base_ref`. An absent or unresolvable base blocks Phase 2. Every Phase-2 diff consumer and Freeze use only the immutable SHA; the source ref exists solely for Freeze's movement check. The verification packet later copies the SHA and never becomes its producer.
 
 **Register `base_sha` before EVERY `implementer`/`tester` dispatch.** `git rev-parse HEAD`, recorded as an attribute of that dispatch's `phase.start`. This is the external baseline the commit-integrity check anchors against — without it a dispatch that produced nothing could report a stale-but-ancestor sha and pass a bare ancestry check trivially.
 
@@ -922,44 +922,59 @@ All three run before Phase 3. Two share `docs/pipeline-lanes.md § 2a` as their 
 *Header exclusion is positional, never content-based.* A removed `--`-style comment and a real `--- a/path` header can be byte-identical in isolation; no single-line regex separates them, and each more-specific pattern only narrows the collision. The `awk` state machine tracks position instead: `--- `/`+++ ` count as headers only between a `diff --git` line and that file's first `@@`. After a `@@`, every `+`/`-` line is unconditionally content. This closes the disguise class structurally — a file's own text becomes hunk lines, never format-control lines, which git generates itself.
 
 ```bash
-set -o pipefail
-git diff "${verification_base_ref}"...HEAD \
-| awk '
-  /^diff --git / { in_headers = 1; next }
-  in_headers && /^--- / { next }
-  in_headers && /^\+\+\+ / { in_headers = 0; next }
-  /^@@/ { in_headers = 0; next }
-  /^[+-]/ { print }
-' \
-| grep -iE \
-  -e 'auth(entication|entic|oriz(e|ation))' \
-  -e '\blogin\b' \
-  -e '\bcredential' \
-  -e '\bpassword\b' \
-  -e 'permission' \
-  -e 'role[_-]?(based|check)' \
-  -e '\bacl\b' \
-  -e '\bsecret' \
-  -e 'api[_-]?key' \
-  -e 'private[_-]?key' \
-  -e '\bpayment' \
-  -e 'card[_-]?number' \
-  -e '\bbilling\b' \
-  -e '\bstripe\b' \
-  -e '\bpii\b' \
-  -e '\bssn\b' \
-  -e 'social[_-]?security' \
-  -e 'personal[_-]?data' \
-  -e '\bsql\b' \
-  -e 'exec\(' \
-  -e 'eval\(' \
-  -e 'deserialize' \
-  -e 'template[_-]?inject'
+security_content_scan() {
+  local diff_file status
+  local -a pipeline_status
+  diff_file="$(mktemp)" || return 2
+  if ! git diff "${verification_base_ref}"...HEAD >"${diff_file}"; then
+    rm -f "${diff_file}"
+    return 2
+  fi
+
+  set -o pipefail
+  awk '
+    /^diff --git / { in_headers = 1; next }
+    in_headers && /^--- / { next }
+    in_headers && /^\+\+\+ / { in_headers = 0; next }
+    /^@@/ { in_headers = 0; next }
+    /^[+-]/ { print }
+  ' "${diff_file}" \
+  | grep -iE \
+    -e 'auth(entication|entic|oriz(e|ation))' \
+    -e '\blogin\b' \
+    -e '\bcredential' \
+    -e '\bpassword\b' \
+    -e 'permission' \
+    -e 'role[_-]?(based|check)' \
+    -e '\bacl\b' \
+    -e '\bsecret' \
+    -e 'api[_-]?key' \
+    -e 'private[_-]?key' \
+    -e '\bpayment' \
+    -e 'card[_-]?number' \
+    -e '\bbilling\b' \
+    -e '\bstripe\b' \
+    -e '\bpii\b' \
+    -e '\bssn\b' \
+    -e 'social[_-]?security' \
+    -e 'personal[_-]?data' \
+    -e '\bsql\b' \
+    -e 'exec\(' \
+    -e 'eval\(' \
+    -e 'deserialize' \
+    -e 'template[_-]?inject'
+  pipeline_status=("${PIPESTATUS[@]}")
+  rm -f "${diff_file}"
+  for status in "${pipeline_status[@]}"; do
+    (( status >= 2 )) && return 2
+  done
+  (( pipeline_status[1] == 0 )) && return 0
+  return 1
+}
+security_content_scan
 ```
 
-*Exit codes.* `1` = clean, `0` = a trigger hit on an added or removed line, `2`+ = a genuine error and an **escalation**, never a silent pass. The `awk` stage sits mid-pipe and always exits `0`, so under `pipefail` the rightmost non-zero exit is still the keyword `grep`'s.
-
-*Disclosed limitation — `pipefail` and an empty diff.* When `git diff` fails outright before emitting anything (unresolvable base ref, shallow clone, permissions), `grep` receives empty input and exits its own `1`, indistinguishable from a clean diff. Pre-existing, shared verbatim with the sibling hygiene pipeline. The fail-closed rule below is the compensating control.
+*Exit codes.* `1` = clean, `0` = a trigger hit on an added or removed line, `2`+ = a genuine error and an **escalation**, never a silent pass. The function materializes the diff first and returns `2` if `git diff` fails, so an empty downstream match can no longer mask a diff failure. It inspects every `PIPESTATUS` entry before interpreting the final grep's `0`/`1`, so a downstream no-match cannot mask an earlier filter error.
 
 *Disclosed limitation — lexicon coverage.* The keyword list is intentionally narrow and does not catch every camelCase control identifier (`requireAuth(`, `authGuard`, `isAdmin`, `hasRole`). The path-pattern check and the upstream classification remain the primary defenses for that residual.
 
@@ -1003,7 +1018,7 @@ Runs after every `implementer`/`tester` dispatch returns `success`, and **again 
 
 **5 — Record the fan-open tree anchor** in the same write, computed per `docs/verification-packet.md § 1a`. This is what the gate preparation and the pre-push check compare against.
 
-**6 — Base-advance reconcile.** `git fetch origin {default-branch}`, then `git rev-list --count HEAD..origin/{default-branch}`. **The fetch is this leg's own** — nothing else in this contract refreshes that ref, so a count without it could read a stale ref and return `0` on a base that has advanced, failing open on exactly the defect this catches. A non-zero count **STOPS**: report it and do not proceed until a re-run reads zero. Never resolved by you merging or rebasing on your own authority. This is the earliest fetch in the pipeline.
+**6 — Selected-base movement reconcile.** Read `verification_base_source_ref`; never substitute the default branch. When it is an `origin/{branch}` ref, run `git fetch origin {branch}` first so the comparison cannot use a stale remote-tracking ref. Re-resolve the source with `git rev-parse --verify "${verification_base_source_ref}^{commit}"` and compare that full SHA for exact equality with immutable `verification_base_ref`. An unresolvable source or any mismatch **STOPS**: report it and do not proceed until the task is deliberately re-planned from the new base. Never rewrite the baseline, merge, or rebase on your own authority. For a remote source this is the earliest fetch in the pipeline; local dependency branches and commit literals are checked without inventing a remote counterpart.
 
 **Rebuild triggers:** any iteration re-dispatch (rebuild steps 3–6 after the patch, before re-running verifiers), or a non-empty `git diff --name-only` against the packet's anchor at dispatch time. A re-open is a fresh Freeze, not a partial one.
 

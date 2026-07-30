@@ -100,7 +100,8 @@ regression_test_status: failing|passing|skipped|null
 plan_review_status: not-applicable|deferred|reviewed-pass|reviewed-concerns|skipped|null
 audit_status: pending|done|unavailable|null  # set at Phase 3: pending on dispatch, done on report, unavailable after a second audit failure. STAGE-GATE-3 states it in the block; it is not a machine-checked precondition — the tree anchor is the only one (agents/orchestrator.md § STAGE-GATE-3)
 code_hygiene: pass|fail|null                # docs/code-hygiene-gate.md
-verification_base_ref: origin/main|{dep-branch}|{commit}  # resolved once at Phase 2 entry; copied into the verification packet
+verification_base_source_ref: origin/main|{dep-branch}|{commit}  # selected base ref; re-resolved at Freeze to detect movement
+verification_base_ref: {full commit object ID}             # immutable Phase-2 baseline; copied into the verification packet
 open_findings: [{id, disposition}]|[]       # dispositions live in 00-decision-ledger.md
 ```
 
@@ -123,7 +124,7 @@ working_branch: {branch}|null
 
 `working_branch` has three producer sites and only the orchestrator writes any of them. **Worktree topology:** copied from `worktree_branch` at branch establishment. **Branch-in-place:** `null` until Phase 2 entry, which creates the branch and writes the field. **Phase 4:** a defensive backstop only, for the case it is somehow still `null`. It is set before any lane reaches its outward push.
 
-`verification_base_ref` has one producer: Phase 2 entry. Phase 2.6, Phase 2 close, Freeze, the frozen diff, and the verification packet all consume that exact literal. The packet mirrors it; it never produces it.
+`verification_base_source_ref` and `verification_base_ref` have one producer site: Phase 2 entry. The source field preserves the selected branch or commit so Freeze can detect movement; the base field is the full commit SHA resolved from that source and is never rewritten. Phase 2.6, Phase 2 close, Freeze, the frozen diff, and the verification packet all consume the immutable SHA. The packet mirrors it; it never produces it.
 
 Live consumers, so it is never treated as documentation: the record-based recover backstop, the operator reading the file, and the executable branch comparisons in `implementer`, `tester`, and the Phase-2-close commit-integrity check. On the Claude Code plugin path no wired hook reads it — `gate-guard` and `checkpoint-guard` are both unwired. `opencode`'s own plugin wiring registers `checkpoint-guard` independently; that is outside this contract's scope.
 
