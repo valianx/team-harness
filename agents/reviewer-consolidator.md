@@ -184,6 +184,7 @@ When the orchestrator runs a convergence pass, it dispatches this agent twice in
 ```
 agent: reviewer-consolidator
 status: success | failed
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: .claude/pr-review-final.md        # or suffixed path when in convergence pass
 consolidated_sources: [{reviewer/focus1}, {reviewer/focus2}, ..., {qa}, {security}]
@@ -201,6 +202,7 @@ issues: {list of blockers, or "none"}
 ```
 agent: reviewer-consolidator
 status: success | failed
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: .claude/pr-review-final.md
 consolidated_sources: [{reviewer/focus1}, {reviewer/focus2}, ..., {qa}, {security}]

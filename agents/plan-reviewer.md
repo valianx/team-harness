@@ -838,6 +838,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: plan-reviewer
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 verdict: pass | concerns | fail
 output: workspaces/{feature-name}/reviews/01-plan-review.md § Plan Review

@@ -204,6 +204,7 @@ implementation details become concrete, but it resumes from this skeleton rather
 agent: tester
 mode: pre-fix-regression
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/02-regression-test.md + 03-testing.md § Test Plan
 regression_test_path: {test-file-path}
@@ -269,6 +270,7 @@ If newly authored tests fail, diagnose and fix the tests before returning (max 3
 agent: tester
 mode: authoring
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/03-testing.md
 summary: {1-2 sentences: N tests authored, N ACs covered, suite green}
@@ -987,6 +989,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: tester
 mode: default | pre-fix-regression | authoring | verify-run | review | coverage-config | test-infra | module-test
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/{03-testing|02-regression-test}.md   # null when pre_fix_test_status: skipped
 summary: {1-2 sentences: N tests, N passed, N failed, coverage %}

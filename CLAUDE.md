@@ -113,15 +113,14 @@ All commands run from the repo root.
 | Install plugin | `/plugin marketplace add valianx/team-harness` then `/plugin install th` then `/th:setup` |
 | Build installer from source (contributors) | `go run ./cmd/install` |
 | Validate agents/skills health | `/th:lint` inside Claude Code |
-| Run security self-scan (5-check MVP) | `/th:audit-security` inside Claude Code |
-| Run security self-scan directly | `python3 tests/test_security_scan.py` |
-| Run free verification suite (policy-block + structure + frontmatter) | `bash tests/run-all.sh` |
+| Run security self-scan | `/th:audit-security` inside Claude Code |
+| Run free verification suite (hooks, gates, frontmatter, security scan) | `bash tests/run-all.sh` |
 | Run policy-block functional tests | `bash tests/test_policy_block.sh` |
-| Run the security self-scan | `python3 tests/test_security_scan.py` |
+| Run security self-scan directly | `python3 tests/test_security_scan.py` |
 | Run agent YAML frontmatter validator | `uv run --with PyYAML python tests/test_agent_frontmatter.py` |
-| Run behavioral suite (`claude -p`, ~$1/run) | `bash tests/run-behavioral.sh` |
+| Run deterministic behavioral suite (no model calls, no cost) | `bash tests/run-behavioral.sh` |
 
-**Not applicable:** typecheck, unit test of agent prompt behaviour, e2e, build, dev server, migrations, deploy. See `docs/testing.md` for the full suite registry and scope.
+**Not applicable:** typecheck, unit test of agent prompt behaviour, e2e, build, dev server, migrations, deploy. See `docs/testing.md` for per-suite scope, and README.md § "What gets a test" for what may be registered at all.
 
 ---
 

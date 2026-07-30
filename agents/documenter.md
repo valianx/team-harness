@@ -251,6 +251,7 @@ End every run with a status block:
 ```
 agent: documenter
 status: success | blocked | failed
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/02-documentation.md
 vault_path: {vault path used}

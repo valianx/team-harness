@@ -169,6 +169,7 @@ identically. See `agents/orchestrator.md § "Phase 1.5 — Plan Ratification"` a
 ```
 agent: qa-plan
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 mode: ratify-plan
 verdict: pass | fail
@@ -220,6 +221,7 @@ Used between Phase 2 (Implementation) and Phase 3 (Verify) when the implementer 
 ```
 agent: qa-plan
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 mode: reconcile
 verdict: clean | amendments | drops
@@ -447,6 +449,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: qa-plan
 mode: define-ac | ratify-plan | reconcile
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/{00-acceptance-criteria|01-plan}.md
 summary: {1-2 sentences: N/N AC covered (or: AC defined, or: constraints reconciled)}

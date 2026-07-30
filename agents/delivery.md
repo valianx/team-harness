@@ -1067,6 +1067,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: delivery
 mode: knowledge-capture | (post-gate — omit this field, the historical default)
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/00-state.md § Delivery — Knowledge Capture (mode: knowledge-capture) | § Delivery (post-gate)
 summary: {1-2 sentences: what was documented, PR-body draft location, CLAUDE.md sections updated}

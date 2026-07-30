@@ -102,7 +102,7 @@ One taxonomy for everything that can go wrong, so the budget question is answere
 | `transport` | The `Task` call itself errored — the harness failed and no specialist result was ever produced | you | retry exactly once | STOP the phase; report the harness's **literal** error message, never paraphrased. No workaround that bypasses the specialist |
 | `invalid-return` | A result came back, but its status block is unusable: a required field absent, a value not of the declared type, two mutually exclusive fields both set | the specialist | re-dispatch once, naming the specific field | STOP; never repair the block or infer the missing value |
 | `artifact-missing` | A required output **file** is absent, empty, or unparseable while the dispatch reported success | the owning specialist | re-dispatch once | STOP; never author the missing artifact yourself |
-| `execution-failed` | The specialist ran, hit an internal error it cannot classify further, and says so | the specialist | re-dispatch once, carrying its own `failure-brief.md` | STOP with the brief surfaced verbatim |
+| `execution-failed` | The specialist ran, hit an internal error it cannot classify further, and says so | the specialist | re-dispatch once, carrying the literal error plus its `summary` and `issues` | STOP with those surfaced verbatim |
 | `verification-negative` | A verifying lens returned `fail`/`concerns` over real work — the pipeline produced a defect | implementer | counts against the **max-3** iteration budget | escalate with a `git stash` safety snapshot |
 | `build-or-lint` | A build or lint command exited non-zero at Phase 2.8 | implementer | **max 2** attempts, a budget separate from max-3 | `status: blocked` with the full output |
 | `hygiene-fail` | `qa` returned `code_hygiene: fail` | implementer | shares the **max-3** iteration budget | as `verification-negative` |
@@ -110,6 +110,8 @@ One taxonomy for everything that can go wrong, so the budget question is answere
 | `reclassification-needed` | The task is not the type or tier it was dispatched as | **operator** | no budget | STOP with `recommended_type`/`recommended_tier` and the evidence; never auto-route |
 
 `execution-failed` is the residual kind, not the default one. Reach for it only when none of the specific causes above fits — a specialist that returns it for something the table already names has under-classified, which is `invalid-return`.
+
+**Never condition a retry on `failure-brief.md` existing.** An internal error can fire before the specialist writes anything, so a recovery path that reads the brief first is unreachable in exactly the case it exists for. The status block always arrives; the brief may not. Retry from the block, and read the brief only when it is there. `failure-brief.md` is authored on the paths that reach it — `verification-negative`, `hygiene-fail`, and bounded patches — never as a precondition for recovering from a crash.
 
 **Scope expansion is a transition, not a failure.** A `scope_expansion: new-information` return is a *successful* classification of something genuinely unknowable at freeze time; the work continues at a re-frozen boundary. It carries its own max-2 bound (§ Scope freeze) and it never appears here, because a kind in this table answers "what went wrong" and nothing went wrong. `known-at-freeze` is the one that surfaces to the operator, and it does so as a lightweight STOP, still not as a failure.
 
@@ -191,14 +193,28 @@ next_action: {what to do next}      # the successor to a prose recovery section
 total_tokens: N
 ```
 
-**Classification** — produced at intake, never re-derived downstream.
+**Intake classification** — you produce these, at intake, and they are never re-derived downstream.
 ```
 security_sensitive: true|false
-changes_security_control: true|false|null   # informational; NOT a dispatch predicate (§ Phase 3)
 frontend_scope: true|false
 bug_tier: 0|1|2|3|4|null
 bug_tier_source: auto|operator|architect-promote|null
 ```
+
+**Design classification** — `architect` produces these at Design time; you transcribe them (next block). They do not exist at intake and you never author a value for them.
+```
+touches_http_api: true|false
+touches_ui: true|false
+touches_data_model: true|false
+touches_cli: true|false
+touches_public_lib_api: true|false
+touches_async_messaging: true|false
+destructive: true|false
+spans_multiple_services: true|false
+changes_security_control: true|false   # informational; NOT a dispatch predicate (§ Phase 3)
+```
+
+Every field belongs to exactly one of these two blocks, with one producer and one production phase. `changes_security_control` sits in the second: it is a property of the designed change, so it cannot be known at intake. Before Design closes it is simply **absent** — never `null` standing in for "not yet decided", because an absent field and a decided-`false` field must not look alike to a reader. `security_floor_applies` derives from `security_sensitive` alone (§ Phase 3), so nothing gated is waiting on the second block.
 
 **Classification block — sketch triggers.** Eight booleans, **decided** by `architect` at Design time (`docs/plan-sketches.md § 2`) and **transcribed by you** into this file, read verbatim by `hooks/sketch-guard.sh`. You never re-derive a value; you never author one. You copy what `architect` returned. Dash-prefixed, one boolean per line, exactly as the parser's own anchor requires (`^[[:space:]]*-[[:space:]]*{field}:[[:space:]]*true[[:space:]]*$`, `hooks/sketch-guard.sh:131`). `- touches_http_api:` is the parser's sole sentinel for `has_classification_block` (`:138`) — its absence alone hides all eight from the check, so never omit it even when its value is `false`.
 
@@ -813,7 +829,7 @@ Pass → Phase 3.5. Fail on either conjunct → read the failing agent's docs **
 
 **Rebuild the verification packet before re-running verifiers** — every re-dispatch is a staleness trigger.
 
-**Read `failure-brief.md` only**, never the full workspace docs. The failing agent appends its actionable summary there.
+**Read `failure-brief.md` only**, never the full workspace docs. The failing agent appends its actionable summary there. When the brief does not exist — an `execution-failed` that fired before the agent wrote anything — read the status block's `summary`, `issues` and literal error instead, and do not treat the absent file as a second failure.
 
 ```markdown
 ## Iteration {N} — {agent} — {YYYY-MM-DD HH:MM}
@@ -1329,7 +1345,7 @@ Lane classification is **the one classification system**; `--fast`, `[TIER: N]` 
 ### 14–17
 
 14. **Bootstrap check** (skip for `research`/`plan`/`spike`) — verify `CLAUDE.md`, `CHANGELOG.md`, and `.gitignore` covering `/workspaces`. Any missing → dispatch `init` directly.
-15. **Decomposition analysis — always run, never skipped.** Evaluate whether the scope is N independent tasks. Three valid outcomes: one atomic task; **N independent tasks → one plan carrying N tasks, ordered by the DAG and implemented in the single Phase 2 dispatch, consolidated into one PR**; one cohesive-but-oversized task → surface it to the operator rather than force a split. *One atomic task is a result of running the analysis, never a bypass of it.*
+15. **Decomposition analysis — always run, never skipped.** Evaluate whether the scope is N independent tasks. Three valid outcomes: one atomic task; **N independent tasks → one plan carrying N tasks, ordered by the DAG and implemented through the Phase 2 base dispatch — with any qualifying task substituted out into seam fan-out (§ Scheduler) — consolidated into one PR**; one cohesive-but-oversized task → surface it to the operator rather than force a split. *One atomic task is a result of running the analysis, never a bypass of it.*
 16. **Test-pipeline auto-detection** and spike/docs type routing — route per `agents/ref-special-flows.md`.
 17. **Announce the classification**, then Specify.
 

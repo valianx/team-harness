@@ -161,6 +161,7 @@ nothing further; do not pad a clean verdict with narrative paragraphs.
 ```
 agent: security
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 mode: design-review
 security_design_verdict: clean | risks-found
@@ -242,6 +243,7 @@ No security findings in the scanned diff and changed files.
 ```
 agent: security
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 mode: pr-review-security
 output: .claude/pr-review-security.md
@@ -954,6 +956,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: security
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/reviews/04-security.md
 summary: {1-2 sentences: N findings (X critical, Y high, Z medium), risk score, most critical issue}

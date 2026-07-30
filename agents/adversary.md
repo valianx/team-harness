@@ -256,6 +256,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: adversary
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 mode: pipeline-adversary
 output: workspaces/{feature-name}/reviews/04-adversary.md (or 04-adversary-amend.md)

