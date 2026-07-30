@@ -40798,6 +40798,124 @@ check(
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
+# Suite 187 — dangling-pointer guard (coordinator-fusion, T4-AC-7a/b)
+#
+# Every `path` or `path § "Section"` pointer inside agents/**/*.md and
+# docs/**/*.md must resolve: the file must exist, and a quoted section must
+# match a real heading (or a substring of one) inside it. Declared residual
+# (AC-7b): a numbered section citation (`§ 2a`, `§ 5`) carries no title to
+# match against and is out of this check's scope — only a quoted/titled
+# section citation is verified.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 187: dangling-pointer guard (agents/**, docs/**) ===")
+
+_S187_POINTER_RE = re.compile(r"`([a-zA-Z0-9_./-]+\.md)(?: § ([^`]+))?`")
+_S187_NUMERIC_SECTION_RE = re.compile(r"^\d+[a-z]?\.?$", re.IGNORECASE)
+# Repo-relative pointers only — a bare workspace-artifact basename like
+# `00-state.md`, `01-plan.md`, or `overview.md` names a per-feature file
+# inside `workspaces/{feature}/`, never a resolvable repo path, and is not
+# what this check is for (it would false-FAIL on every such template mention).
+_S187_REPO_TOP_DIRS = ("agents/", "docs/", "skills/", "hooks/", "tests/", "cmd/", "tools/",
+                       ".claude-plugin/")
+_S187_REPO_ROOT_FILES = {"CLAUDE.md", "README.md", "CONTRIBUTING.md", "CHANGELOG.md"}
+
+
+def _s187_is_repo_pointer(path_str: str) -> bool:
+    return path_str in _S187_REPO_ROOT_FILES or path_str.startswith(_S187_REPO_TOP_DIRS)
+
+
+# Known illustrative/target-repo placeholder destinations — never resolvable
+# in team-harness's own tree by design, so a genuine "does not exist" hit for
+# one of these is not a defect: `docs/glossary.md`/`docs/constraints.md`/
+# `docs/testing-guide.md`/`docs/providers/alps.md` describe files an agent
+# creates or reads inside the OPERATOR's target project, never this repo's
+# own docs/; `agents/foo.md`/`agents/bar.md`/`agents/new.md`/
+# `skills/baz/SKILL.md` are docs/testing.md's own fixture-example names for a
+# structural-guard test scenario; `docs/auth.md` is context-harness-mcp's own
+# doc, quoted for a cross-repo key-naming note in docs/integration.md.
+_S187_PLACEHOLDER_DESTINATIONS = {
+    "docs/glossary.md", "docs/constraints.md", "docs/testing-guide.md",
+    "docs/providers/alps.md", "agents/foo.md", "agents/bar.md", "agents/new.md",
+    "skills/baz/SKILL.md", "docs/auth.md",
+}
+
+_s187_file_cache: dict[str, str] = {}
+
+
+def _s187_read(rel_path: str) -> str:
+    if rel_path not in _s187_file_cache:
+        _s187_file_cache[rel_path] = _read_or_empty(REPO_ROOT / rel_path)
+    return _s187_file_cache[rel_path]
+
+
+# docs/knowledge.md (dated KG entries citing a since-removed file, by design
+# never reapointed — R4) and docs/specs/** (forward-looking feature specs
+# that legitimately cite a not-yet-built skill/agent file) are excluded from
+# the scan corpus: both classes are expected to cite a path that does not
+# resolve TODAY, for reasons unrelated to a broken live contract.
+_s187_scan_files = [
+    p for p in list(AGENTS_DIR.rglob("*.md")) + list((REPO_ROOT / "docs").rglob("*.md"))
+    if p.name != "knowledge.md" and "specs" not in p.relative_to(REPO_ROOT).parts
+]
+_s187_broken: list[str] = []
+_s187_checked = 0
+for _s187_path in _s187_scan_files:
+    _s187_rel = _s187_path.relative_to(REPO_ROOT).as_posix()
+    _s187_text = read(_s187_path)
+    for _s187_match in _S187_POINTER_RE.finditer(_s187_text):
+        _s187_dst_path, _s187_section = _s187_match.group(1), _s187_match.group(2)
+        if not _s187_is_repo_pointer(_s187_dst_path):
+            continue  # workspace-artifact template basename, not a repo pointer
+        if _s187_dst_path in _S187_PLACEHOLDER_DESTINATIONS:
+            continue  # illustrative/target-repo placeholder, never resolvable here
+        _s187_checked += 1
+        _s187_dst_file = REPO_ROOT / _s187_dst_path
+        if not _s187_dst_file.exists():
+            _s187_broken.append(f"{_s187_rel} -> {_s187_dst_path} (file does not exist)")
+            continue
+        if not _s187_section:
+            continue
+        # Collapse whitespace first — a citation wrapped across a markdown
+        # source line break carries an embedded '\n   ' that a real heading
+        # never does, and a naive substring match would false-FAIL on the
+        # wrap alone.
+        _s187_section_norm = re.sub(r"\s+", " ", _s187_section).strip()
+        _s187_section_stripped = _s187_section_norm.strip('"').strip("'").rstrip("\\").strip()
+        if _S187_NUMERIC_SECTION_RE.match(_s187_section_stripped):
+            continue  # numbered-section citation — declared out of scope (AC-7b)
+        _s187_section_head = _s187_section_stripped.split(" — ")[0].split(", ")[0]
+        _s187_dst_text = re.sub(r"\s+", " ", _s187_read(_s187_dst_path))
+        if _s187_section_head.replace("`", "") not in _s187_dst_text.replace("`", ""):
+            _s187_broken.append(
+                f"{_s187_rel} -> {_s187_dst_path} § {_s187_section_head!r} (no matching section)"
+            )
+
+check(
+    "suite187(ac7a-dangling-pointer): every `path` / `path § \"Section\"` pointer in"
+    " agents/** and docs/** resolves to an existing file and section",
+    not _s187_broken,
+    f"{len(_s187_broken)} of {_s187_checked} pointer(s) checked are broken (showing up to 40):"
+    f" {_s187_broken[:40]}",
+)
+check(
+    "suite187(self-ref): test file contains 'Suite 187' and"
+    " 'coordinator-mention-residual-guard' is registered separately (own suite)",
+    "Suite 187" in read(Path(__file__)),
+    "test file must self-reference Suite 187",
+)
+check(
+    "suite187(registry): docs/testing.md registers 'Suite 187'"
+    " and 'dangling-pointer-guard'",
+    "Suite 187" in _read_or_empty(REPO_ROOT / "docs" / "testing.md")
+    and "dangling-pointer-guard" in _read_or_empty(REPO_ROOT / "docs" / "testing.md"),
+    "docs/testing.md must register Suite 187 and the 'dangling-pointer-guard' marker",
+)
+
+# Marker: dangling-pointer-guard
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
