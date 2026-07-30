@@ -14,7 +14,9 @@
   capped at 140 characters. A small one-outcome change gets exactly one bullet; every bullet
   is one sentence on one physical Markdown line, with no continuation or explanatory paragraph.
   Never enumerate services, files, tasks, tests, or implementation layers when they jointly
-  produce one outcome. Assembly copies entry text verbatim and never expands it. Slug rule: lowercase branch
+  produce one outcome. Release sections contain only standard subsection headings and bullets:
+  no free-standing notes, context, summaries, HTML comments, blockquotes, footnotes, or
+  postscripts. Assembly copies entry text verbatim and never expands it. Slug rule: lowercase branch
   name with non-alphanumeric characters replaced by hyphens, matching `[a-z0-9-]+`. Direct
   `## [Unreleased]` edits are acceptable as a fallback when `changelog.d/` cannot be used (e.g.,
   pre-convention repos).

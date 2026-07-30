@@ -125,7 +125,8 @@ deduplicating subsection headers — append it to `## [Unreleased]`, then delete
 fragment file (the directory itself may remain). Reject any fragment filename containing a
 path separator or `..` before reading it (path-traversal guard); fragment slugs must match
 `[a-z0-9-]+`. Copy entry text verbatim: assembly may order and deduplicate headings,
-but must not reflow, expand, explain, or split a bullet.
+but must not reflow, expand, explain, split a bullet, or add notes around the
+assembled content.
 
 **Promote `[Unreleased]` to a versioned release.** Collect everything under
 `## [Unreleased]`. If empty (no entries, no fragments assembled), skip the cut. Otherwise

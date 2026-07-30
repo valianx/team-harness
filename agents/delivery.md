@@ -152,6 +152,12 @@ changed for the operator; omit architecture, rationale, tests, file lists, and
 version mechanics. When several services jointly produce one behavior, describe
 that behavior once.
 
+Inside a release section, emit only standard Keep a Changelog subsection headings
+and their bullets. Never add `Note`, `Context`, `Summary`, or migration headings,
+free-standing prose, HTML comments, blockquotes, footnotes, postscripts, or other
+text before or after the bullets. If operator action is required, express it as
+its own concise outcome bullet and put detail in canonical docs or the PR body.
+
 For `fix` and `hotfix`, append `Fixes #{issue}` only when the issue number is
 already recorded. Keep one bullet on one line; rationale belongs in the PR body.
 
