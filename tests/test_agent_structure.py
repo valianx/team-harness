@@ -37319,13 +37319,21 @@ _s171_audit = _s171_slice(
 # Rewritten from a two-lens (security-unconditional + adversary-conditional)
 # pin to a single-lens (adversary-only-conditional, no security at all) pin.
 check(
-    # Retargeted (pipeline-dispatch-shape, T7-AC-2): the exact phrasing
-    # moved with the audit's relocation into the Phase 3 block; the
-    # sole-lens/no-security-dispatch invariant it pins is unchanged.
+    # Retargeted (coordinator-fusion): confirmed against
+    # `git show 70550d1:agents/orchestrator.md`, whose Phase 3 opening line
+    # read "`adversary` (Pre-Delivery Security Audit, when
+    # `security_floor_applies == true`)". The fused prose condenses this to
+    # "`adversary` when `security_floor_applies`" -- the "Pre-Delivery
+    # Security Audit" name and the "== true" comparison are dropped from
+    # this specific sentence, but both survive at length elsewhere in the
+    # tree (agents/adversary.md's own trigger description, checked
+    # separately by s171(x) below) and the substantive invariant this check
+    # exists to pin -- adversary is the sole conditional lens, no
+    # unconditional security dispatch -- is unchanged.
     "s171(b-adversary-only-conditional): the audit dispatches `adversary`"
-    " alone, conditional on `security_floor_applies == true` — no `security`"
+    " alone, conditional on `security_floor_applies` — no `security`"
     " code-audit dispatch exists in the Phase 3 block",
-    "adversary` (Pre-Delivery Security Audit, when `security_floor_applies == true`)"
+    "`adversary` when `security_floor_applies`"
     in _s171_audit
     and "**security**" not in _s171_audit
     and "`security` (unconditional)" not in _s171_audit,
@@ -37333,9 +37341,13 @@ check(
     " predicate — a `security` dispatch of any form must not appear",
 )
 check(
+    # Retargeted: "== true" dropped throughout the fused corpus wherever a
+    # boolean predicate is read in a "when X" conditional (the comparison is
+    # implicit); the property this check pins -- the predicate is read by
+    # name, never re-derived inline -- is unchanged.
     "s171(c-adversary-predicate-by-name): the audit dispatches adversary on "
-    "`security_floor_applies == true`, read by name",
-    "when `security_floor_applies == true`" in _s171_audit,
+    "`security_floor_applies`, read by name",
+    "when `security_floor_applies`" in _s171_audit,
     "adversary's audit dispatch must read the single named predicate — never "
     "an inline re-derivation",
 )
@@ -37381,13 +37393,17 @@ for _s171_name, _s171_text in [
 
 # --- (h) findings are operator input; no iteration loop attached ---
 check(
-    # Retargeted (pipeline-dispatch-shape, T7-AC-2): wording moved from
-    # "Findings are operator input" to "Findings from `adversary` are
-    # operator input" when the audit relocated into the Phase 3 block.
+    # Retargeted (coordinator-fusion): the ALL-CAPS emphasis on the negative
+    # rule ("NO bounce, NO patch iteration, NO re-dispatch loop") was
+    # normalized to sentence case and one word changed ("patch loop" for
+    # "patch iteration") -- confirmed against
+    # `git show 70550d1:agents/orchestrator.md` that all four named
+    # properties (no bounce, no patch loop, no re-dispatch, no worst-of
+    # gate) still appear, just re-cased.
     "s171(h-findings-operator-input): the audit declares findings operator "
     "input, never an iteration trigger",
     "are operator input, never an iteration trigger" in _s171_audit
-    and "NO bounce, NO patch iteration, NO re-dispatch loop" in _s171_audit,
+    and "No bounce, no patch loop, no re-dispatch, no worst-of gate" in _s171_audit,
     "the audit must state both the positive rule (operator disposes at "
     "STAGE-GATE-3) and the negative rule (no autonomous loop)",
 )
@@ -37414,46 +37430,59 @@ check(
 )
 
 # --- (k) STAGE-GATE-3 carries the audit verdicts and records acceptance ---
-_s171_gate3 = _s171_slice(_s171_orch, "## STAGE-GATE-3 — End of Stage 3")
+# Anchor retargeted: the heading is "## STAGE-GATE-3" (no "— End of Stage 3"
+# suffix) -- unchanged in substance, confirmed present.
+_s171_gate3 = _s171_slice(_s171_orch, "## STAGE-GATE-3")
 check(
-    # Retargeted (pipeline-dispatch-shape, T7-AC-2): the gate-data field
-    # label is now "Pre-Delivery Security Audit:" (the `security_audit`
-    # field value), not "Security audit (Phase 3.8):".
+    # Retargeted: the gate-data presentation moved from bold-labeled prose
+    # ("**Pre-Delivery Security Audit:**") to a `| Field | Value |` table row
+    # (`| security_audit | verdict (...) |`) as part of a broader STOP-block
+    # table redesign -- the operator still sees the same information,
+    # including the exact "not run (security_floor_applies: false)" reason
+    # string, just rendered as a table cell rather than a bold label.
     "s171(k-gate3-carries-audit): the STAGE-GATE-3 gate data carries the "
-    "Pre-Delivery Security Audit verdict lines",
-    "**Pre-Delivery Security Audit:**" in _s171_gate3
+    "security_audit verdict field with its not-run reason",
+    "`security_audit`" in _s171_gate3
     and "not run (security_floor_applies: false)" in _s171_gate3,
     "the gate data must present both lenses' verdicts (or the reason a lens "
     "did not run) — the operator decides with them on the table",
 )
 check(
+    # Retargeted: same guarantee, reworded -- confirmed against
+    # `git show 70550d1:agents/orchestrator.md`'s "Any broke-it break is
+    # surfaced in full... shipping with an open broke-it requires no
+    # override keyword — ship stays valid — but the release appends a
+    # disposition entry..." The fused text states the same two-part rule
+    # (ship never withheld; acceptance always recorded) in one sentence.
     "s171(l-ship-records-acceptance): shipping over open audit findings "
     "records the acceptance in the decision ledger, without withholding ship",
-    "`ship` is never withheld on audit findings, but acceptance is always "
-    "recorded" in _s171_gate3,
+    "An open `broke-it` never withholds `ship` — acceptance is recorded, "
+    "never blocked pending a keyword." in _s171_gate3,
     "ship must stay valid on open findings AND the acceptance must be recorded "
     "— informed consent, never silent",
 )
 check(
-    # Retargeted (pipeline-dispatch-shape, T7-AC-2): the `amend` row no
-    # longer names "the Phase 3.8 audit" directly — it re-opens Phase 3
-    # itself (§ "Phase 3 — Verify" above), whose own "Re-audit on amend"
-    # paragraph is where the single re-audit is now defined. The wiring is
-    # the cross-reference, not a restated audit-specific sentence.
+    # Retargeted: "Freeze"/"this gate" are the fused file's own informal
+    # names for Phase 2.8 and STAGE-GATE-3 respectively (both defined
+    # earlier in the same file) -- same re-open chain, shorter names.
     "s171(m-amend-reruns-audit): the amend reply re-opens Phase 3 (where the "
     "single delta-scoped re-audit is defined) before re-presenting the gate",
-    "This re-opens Phase 2.8 → Phase 3 → STAGE-GATE-3 per the staleness "
-    "invariant" in _s171_gate3,
+    "Re-opens Freeze → Phase 3 → this gate" in _s171_gate3,
     "the amend row must re-open Phase 3 — otherwise an amended diff ships "
     "against a stale audit",
 )
 
 # --- (n) audit_status schema field: producer + consumer both stated ---
+# Retargeted: the "Verification and review status" code block dropped its
+# leading "- " bullet dash (a block-wide reformat, confirmed unrelated to
+# this field specifically -- the sibling fields in the same block lost the
+# dash too), and the comment compressed "never prepared while this field is
+# `pending`" to "never prepared while pending" -- same claim, fewer words.
 check(
     "s171(n-audit-status-field): 00-state.md schema declares audit_status "
     "with the gate-preparation consumer stated inline",
-    "- audit_status:" in _s171_orch
-    and "never prepared while this field is `pending`" in _s171_orch,
+    "audit_status:" in _s171_orch
+    and "never prepared while pending" in _s171_orch,
     "audit_status needs a live producer (the audit) and consumer (gate "
     "preparation) declared at the schema site",
 )
@@ -37476,10 +37505,15 @@ check(
 )
 _s171_p3 = _s171_slice(_s171_orch, "## Phase 3 — Verify (parallel validation block)")
 check(
+    # Retargeted: the dispatch bullets ("- **qa** (validate):" / "- **adversary**
+    # (when ...):") became inline prose labels ("`qa`: ..." / "`adversary`:
+    # ..." under "**What each dispatch carries.**") -- same two-agent
+    # dispatch shape, reformatted from a bulleted list to a labeled
+    # paragraph. Absence of a `security` dispatch is unchanged.
     "s171(p-phase3-no-security-dispatch): the Phase 3 dispatch block lists "
     "qa and adversary, never the retired full `security` code-audit agent",
-    "- **qa** (validate):" in _s171_p3
-    and "- **adversary** (when `security_floor_applies == true`):" in _s171_p3
+    "`qa`: where the implementation record is" in _s171_p3
+    and "`adversary`: **coordinates only**" in _s171_p3
     and "- **security**" not in _s171_p3,
     "a `security` bullet in the Phase 3 dispatch block re-opens the "
     "unconditional code-audit dispatch this change retired",
@@ -37493,30 +37527,35 @@ check(
     "the loop itself",
 )
 check(
-    # Retargeted (pipeline-dispatch-shape, T7-AC-2): the note now names the
-    # audit by its own name rather than by the retired phase number.
+    # Retargeted: the proper name "Pre-Delivery Security Audit" is dropped
+    # from this specific sentence (it survives at length elsewhere in the
+    # tree -- agents/adversary.md, docs/pipeline-lanes.md § 7,
+    # docs/dev-mode.md); the uniformity claim itself ("the same audit,
+    # regardless of tier") is what this AC actually protects and is intact.
     "s171(r-tier-table-note): the tier table's note states every tier "
     "receives the same audit",
-    "Every tier receives the same Pre-Delivery Security Audit" in _s171_orch,
+    "Every tier receives the same audit" in _s171_orch,
     "bug severity must never select a different security lens — the audit is "
     "uniform across tiers",
 )
 check(
-    # Retargeted (pipeline-dispatch-shape, T7-AC-2, per T2-AC-5): there is
-    # no standalone 3.8 row to check — the audit is folded into the single
-    # Phase 3 checklist row, which names both lenses inline.
-    "s171(s-checklist-row): the Phase Checklist template's Phase 3 row names "
+    # Retargeted: orchestrator.md no longer spells out the Phase Checklist
+    # template's row text verbatim (it derives rows from the Phase index
+    # table at write time, per § "First state write"). The Phase index
+    # table's own Phase-3 row is the current authoritative source and names
+    # both `qa` and the conditional `adversary` audit.
+    "s171(s-checklist-row): the Phase index table's Phase 3 row names "
     "both qa and the conditional adversary audit",
-    "- [ ] 3 — Verify (parallel validation block — qa + adversary if "
-    "security_floor_applies, one message)" in _s171_orch,
+    "| 3 Verify | `qa` + `adversary` when the floor applies |" in _s171_orch,
     "the checklist row is what recovery reads — its absence makes the audit "
     "invisible to /th:recover",
 )
 check(
-    # Retargeted (pipeline-dispatch-shape, T7-AC-2): the express-lane
-    # sentence now names the audit by name rather than by phase number.
+    # Retargeted: the proper name is dropped from this sentence too (same
+    # class as check r above); the substantive claim -- express never skips
+    # the audit -- is unchanged.
     "s171(t-express-runs-audit): the express lane never skips the audit",
-    "it never skips the Pre-Delivery Security Audit" in _s171_orch,
+    "never skips the audit" in _s171_orch,
     "express must run the audit exactly as full — no lane carve-out",
 )
 
