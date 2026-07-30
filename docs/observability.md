@@ -460,7 +460,7 @@ When the `initiative` field in `00-state.md` is set, the coordinator also
 maintains a parent-level `overview.md` at the initiative root. This file is
 **not an events file** and does not contain pipeline observability data. It is
 a living index — one row per project, updated by the coordinator at intake and
-by the delivery agent at Step 11.7.
+again after its own Phase-4 mechanics resolve branch, version, PR, and status.
 
 **What it is:**
 - A snapshot of the current state of the initiative (project rows with branch /
@@ -541,7 +541,7 @@ Note: the `lane` field on `research.lane.skipped` names a **research fan-out lan
 
 ## kg_write event
 
-`kg_write` is a **sibling event** (peer of `phase.*` / `gate.*` / `operation.*`) emitted by the orchestrator after each Knowledge Graph write batch. Unlike `operation.*`, which models a single discrete operation, a KG write site may attempt multiple writes in one batch; `kg_write` carries per-batch counters (`attempted`, `succeeded`) and a per-write `writes[]` array so `/th:trace` can aggregate across all three write sites.
+`kg_write` is a **sibling event** (peer of `phase.*` / `gate.*` / `operation.*`) emitted by the orchestrator after each Knowledge Graph write batch. Unlike `operation.*`, which models a single discrete operation, a KG write site may attempt multiple writes in one batch; `kg_write` carries per-batch counters (`attempted`, `succeeded`) and a per-write `writes[]` array so `/th:trace` can aggregate the explicit knowledge-save and narrow security-finding sites.
 
 **Shape:**
 
@@ -550,8 +550,8 @@ Note: the `lane` field on `research.lane.skipped` names a **research fan-out lan
   "ts":        "<ISO-8601 with timezone>",
   "event":     "kg_write",
   "feature":   "<kebab-case, matches workspaces folder>",
-  "phase":     "6-knowledge-save | 3-verify | 4-delivery",
-  "site":      "phase6-knowledge-save | security-finding | delivery-passive-capture",
+  "phase":     "explicit-knowledge-save | 3-verify",
+  "site":      "explicit-knowledge-save | security-finding",
   "attempted": "<int — writes attempted in this batch>",
   "succeeded": "<int — writes that completed with create_nodes/add_observations>",
   "writes": [
@@ -571,7 +571,7 @@ Note: the `lane` field on `research.lane.skipped` names a **research fan-out lan
 | `event` | always | Literal `"kg_write"`. One type, no state suffixes. |
 | `feature` | always | Kebab-case, matches the workspaces folder |
 | `phase` | always | Pipeline phase where the write occurs |
-| `site` | always | Discriminator for the write site. Closed vocabulary: `phase6-knowledge-save`, `security-finding`, `delivery-passive-capture` |
+| `site` | always | Discriminator for the current write site. Closed vocabulary: `explicit-knowledge-save`, `security-finding`. Trace readers may accept retired values for historical workspaces but producers never emit them. |
 | `attempted` | always | Count of writes attempted. `0` when the site decided nothing to write (e.g., no reusable learning) |
 | `succeeded` | always | Count of effective writes (`create_nodes` / `add_observations` returned without error). Always `≤ attempted` |
 | `writes` | always | Array, one entry per attempted write. `length == attempted`. Empty array `[]` when `attempted == 0` |
@@ -589,7 +589,7 @@ Note: the `lane` field on `research.lane.skipped` names a **research fan-out lan
 | `skipped:malformed-call` | The tool call failed due to a non-existent tool name or malformed arguments (not infrastructure). This is the exact code for the renamed-tool class of bug. | tool-not-found, invalid args, schema rejection by the MCP not caused by connectivity or policy |
 | `skipped:policy-filtered` | The content-policy filter or an MCP `policy/*` return discarded the write. | Content-policy drop, MCP `policy/<code>` response |
 
-**Why a sibling event, not `operation.end`:** `operation.*` models one discrete operation with three states (`started` / `success` / `failed`) and no counters. A Phase 6 batch may write up to 5 nodes, with some `ok` and others `skipped:policy-filtered` in the same run. Forcing that into `operation.end` would require either one event per node (multiplies noise) or adding counters to `operation.*` (breaks its single-operation schema for every non-KG use). A sibling event `kg_write` with `attempted` / `succeeded` / `writes[]` expresses the batch in one line without contaminating `operation.*`. This does NOT violate the "no parallel KG-namespaced events" rule in the orchestrator — that rule prohibits a **family** with state suffixes (`kg.started` / `kg.success` / `kg.failed`); `kg_write` is a **single event type** with no suffixes. See the orchestrator's "Emitting kg_write events" subsection for the full rationale and the explicit exception.
+**Why a sibling event, not `operation.end`:** `operation.*` models one discrete operation with three states (`started` / `success` / `failed`) and no counters. A write batch may create several nodes, with some `ok` and others `skipped:policy-filtered` in the same run. Forcing that into `operation.end` would require either one event per node (multiplies noise) or adding counters to `operation.*` (breaks its single-operation schema for every non-KG use). A sibling event `kg_write` with `attempted` / `succeeded` / `writes[]` expresses the batch in one line without contaminating `operation.*`. This does NOT violate the "no parallel KG-namespaced events" rule in the orchestrator — that rule prohibits a **family** with state suffixes (`kg.started` / `kg.success` / `kg.failed`); `kg_write` is a **single event type** with no suffixes.
 
 ## 00-state.md bounded snapshot (`§ Agent Results` + `§ Hot Context`)
 

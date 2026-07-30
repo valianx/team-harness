@@ -133,7 +133,7 @@ Consequence: neither the advance signal nor any survey answer constitutes a waiv
 
 ### HI-3 — Attributable choices
 
-Every survey answer is logged in `00-state.md § Current State` (the 7 fields in §7 below) and surfaced in the PR body via the `Intake survey:` line (§9 below). The PR body line propagates only: `forma`, `esfuerzo`, `autonomía`, `scope-hint`, `fuente`. It **never** includes `security_sensitive` or any gate status — no PR line may be read as attributing a security waiver to the operator.
+Every survey answer is logged in `00-state.md § Current State` (the 7 fields in §7 below) and in the execution trace. Survey data is coordination evidence only: the automatic pipeline does not copy it into Delivery context or the PR body. It never alters `security_sensitive` or any gate status, and no publication artifact may imply that a survey answer waived a security decision.
 
 ### HI-5 — Recoverable post-compaction
 
@@ -198,17 +198,12 @@ The Discover phase does NOT add a blocking item to the Phase Checklist — it is
 
 ---
 
-## 9. PR body — `Intake survey:` line (HI-3 surfacing)
+## 9. State and trace only
 
-The delivery agent includes a conditional `Intake survey:` line in the PR body (Step 11.2) whenever `survey_source` is not null:
-
-```
-**Intake survey:** forma={full|fast}, esfuerzo={thorough|quick|agent-decides}, autonomía={manual|autonomous}, scope-hint="{text or none}", fuente={asked|confirmed|inferred}
-```
-
-This line appears in the `## Main change` section, immediately below the one-sentence main-change description. It is conditional: omit entirely when `survey_source: null` (Discover was bypassed before the survey ran).
-
-**Prohibition:** the `Intake survey:` line MUST NOT include `security_sensitive`, any gate status flag, or any field not in the enumeration above. No line in the PR may be read as attributing a security decision to the operator.
+Survey data remains in `00-state.md` and the execution trace for recovery and
+attribution. It is not product-change information and is never an automatic
+PR-body or Delivery input. `security_sensitive`, gate status, and all other
+classification fields remain independent of the survey.
 
 ---
 

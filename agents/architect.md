@@ -268,7 +268,7 @@ For each multi-site invariant, list **every** site where it must hold. Fence sit
 | {name of invariant} | {site label} | `{path}` | `{section heading or field name}` |
 | {name of invariant} | {site label — fenced: MUST NOT change} | `{path}` | `{section heading or field name}` |
 
-**Why this block exists:** delivery Step 9.4a reads this table and verifies that every listed site contains a consistent value. A site absent from this table is invisible to the delivery cross-site MATCH check. See `agents/delivery.md` Step 9.0 for the worked example with version-literal sites.
+**Why this block exists:** the implementer uses this table to update every declared site atomically, and the coordinator's deterministic delivery mechanics verify the final MATCH set. A site absent from this table is invisible to that check. See `agents/_shared/delivery-mechanics.md § 1` for the version-literal example.
 
 ## Architecture
 
@@ -377,13 +377,13 @@ Stacked PRs within the SAME repository (a group's Base = a sibling group's branc
 | `pending` | architect (initial write) | every task starts here at Phase 1 design completion |
 | `in-progress` | orchestrator | Phase 2 (implementation) starts for this task |
 | `verified` | orchestrator | Phase 3.5 acceptance gate PASS for this task (Stage 2 internal milestone) |
-| `merged` | delivery | Phase 4 (delivery) completes — the PR carrying this task is opened and pushed to remote |
+| `merged` | orchestrator | Phase 4 publication mechanics complete — the PR carrying this task is opened and pushed to remote |
 | `blocked` | orchestrator | a hard dependency is not satisfied or a `[CONSTRAINT-DISCOVERED]` annotation blocks progress |
 
 The AC checkboxes (`- [ ]`) follow the same self-describing principle: `qa` marks an AC as `- [x]` when it returns PASS in `reviews/04-validation.md` for the corresponding iteration. A FAIL keeps the box unchecked; the box only becomes `- [x]` on a definitive PASS. This is the **only** write `qa` is allowed to make on `01-plan.md` (§ Task List).
 
 **Write scope (hard rule for all agents).** The `## Task List` section of `01-plan.md` is the Stage 1 contract. After STAGE-GATE-1 release, the only mutations allowed are:
-- `Status:` field on a task header (orchestrator, delivery).
+- `Status:` field on a task header (orchestrator only).
 - AC checkbox `- [ ]` → `- [x]` (qa, on PASS).
 - Nothing else. Files, AC text, dependencies, Split reason, Cleanup PR/Base PR, Title, Branch, Notes — frozen.
 
@@ -868,11 +868,11 @@ An invariant lives in more than one file when a single logical constraint (a ver
 
 **Whenever your design introduces or modifies such an invariant:**
 
-1. Enumerate the **full site-set** — every file and anchor where the invariant must hold. A site you omit is invisible to the delivery cross-site MATCH check (Step 9.4a) and to the implementer.
-2. **Fence sites that MUST NOT change.** Mark them in the `### Multi-site invariants` table in `## Review Summary`. This tells the implementer which sites are frozen and tells delivery which fenced sites to verify are unmodified.
+1. Enumerate the **full site-set** — every file and anchor where the invariant must hold. A site you omit is invisible to the coordinator's delivery MATCH check and to the implementer.
+2. **Fence sites that MUST NOT change.** Mark them in the `### Multi-site invariants` table in `## Review Summary`. This tells the implementer which sites are frozen and tells the coordinator which fenced sites to verify are unmodified.
 3. **Apply the discipline reflexively.** The `### Multi-site invariants` block in `01-plan.md § Review Summary` IS itself a multi-site invariant: if it names a site that the implementer must edit, the implementer edits ALL sites in the same concern-commit (not piecemeal). The table is the source-of-truth for that atomicity requirement.
 
-The worked example is `agents/delivery.md` Step 9.0: the version-site enumeration table lists every canonical version-literal site explicitly and fences off the top-level marketplace schema version so delivery never modifies it accidentally.
+The worked example is `agents/_shared/delivery-mechanics.md § 1`: the version-site enumeration table lists every canonical version-literal site explicitly and fences off the top-level marketplace schema version so publication mechanics never modify it accidentally.
 
 #### PostgreSQL high-volume time-series table (transactions, events, audit logs)
 

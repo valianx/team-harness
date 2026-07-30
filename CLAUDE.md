@@ -96,7 +96,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — the only CC install channel. Go installer binary (GH Release assets) — the only opencode install channel; it does not serve Claude Code. |
 
-**Current version:** `3.1.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `3.1.1` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
@@ -142,8 +142,8 @@ All commands run from the repo root.
 - **Single config file — `~/.claude/.team-harness.json`.** Skills MUST NOT create their own config files; use namespaced keys. Every write is a merge, never a partial payload. `docs/conventions.md`.
 - **Cross-platform first.** All scripts and agents must work on Windows, macOS, and Linux.
 - **KG content is technical-only.** Never store personal data, preferences, tokens, or stakeholder names. `docs/kg-content-policy.md`.
-- **KG passive capture on delivery.** `delivery` persists one `process-insight` node per completed task (Step 11.5). Best-effort: unreachable MCP or no learning → log and skip.
-- **Delivery post-create check (Step 11.4).** Queries merge state + CI after `gh pr create`; `CONFLICTING`/failing-CI reported explicitly. `agents/delivery.md`.
+- **Knowledge capture is explicit.** Delivery never writes KG or project doctrine. Reusable insights are saved only when the operator invokes the knowledge flow; the conditional Phase-3 security-finding write remains the narrow automatic exception.
+- **Delivery post-create check.** The coordinator's deterministic mechanics query merge state and take one CI snapshot after `gh pr create`; they never wait for CI. `agents/_shared/delivery-mechanics.md § 9`.
 - **Pipeline observability is mandatory.** Every run produces `00-execution-events.jsonl`/`.md` and `00-pipeline-summary.md` (Tier 0 fixes exempt). Full contract: `docs/observability.md`.
 - **Documentation freshness via context7.** Verify third-party APIs before generating code. Mandatory triggers: `docs/context7-usage.md §2`.
 - **Bug-fix flow forces security review + regression test.** `type: fix`/`hotfix`. `agents/ref-special-flows.md § Bug-fix Flow`.
@@ -251,7 +251,7 @@ The three things a developer already knows how to ask for — a work plan, an im
 |---|---|---|
 | "give me the work plan" / "design X" | Stage 1 — Analysis | Intake / Specify / Design / Plan Ratification / Plan Review / STAGE-GATE-1 |
 | "implement it" | Stage 2 — Implementation | Implementer / Tester / QA / Security / Acceptance Gate / Acceptance Checker |
-| "open the PR" / "ship it" | Stage 3 — Delivery | STAGE-GATE-3 / Delivery / KG capture |
+| "open the PR" / "ship it" | Stage 3 — Delivery | STAGE-GATE-3 / delivery prose / coordinator publication mechanics |
 
 **Rule:** operator-visible status blocks, STOP-block templates, install prompts, error messages, and skill help text use dev-natural verbs (`plan`, `implement`, `validate`, `review`, `recover`, `ship`). Phase numbers and gate identifiers appear only in contributor surfaces (this `CLAUDE.md`, `agents/*.md` instructional sections, workspace doc templates internal to the pipeline state machine).
 
@@ -271,30 +271,30 @@ Every committed artefact is in English. Workspace docs split by tier: operator-f
 
 ## 7b. Document Hygiene
 
-CLAUDE.md is a quick-reference surface — it points to `docs/`, not duplicates it. If CLAUDE.md exceeds **35 KB**, the delivery agent must offload the largest non-structural section to `docs/` before committing. Hard cap: **40 KB**.
+CLAUDE.md is a quick-reference surface — it points to `docs/`, not duplicates it. Any planned edit must keep it below **40 KB**; above **35 KB**, the editing scope must include offloading the largest non-structural section to `docs/` before Phase 2.8 Freeze.
 
 See `docs/document-hygiene.md` for section-size rules, overflow targets, and what-belongs-where tables.
 
 ---
 
 ## 8. Architecture Decisions
-<!-- Populated by the delivery agent after each feature. Empty at init. -->
+<!-- Updated in the reviewed implementation tree when a feature establishes a durable decision. Empty at init. -->
 > Full history: see `docs/decisions.md`. Recent entries below.
 - **2026-07-27** — Gate-state contract (#530): six named `00-state.md` fields require bare-literal values (no annotation), prose-only enforcement (`gate-guard`/`checkpoint-guard` unwired since v2.139.0), plus the named "No gate-field repair" invariant. → `agents/_shared/gate-contract.md § "The dual-record release"`
 - **2026-07-27** — Canonical dispatch contract (#524): one home for what a dispatch prompt may/must not carry and a single two-halves rule (review scope never bounded by the dispatcher; write scope always bounded by the recipient's own contract, by pointer to `plan-consolidation.md`), asserted via a five-column control rubric instead of prose. → `agents/_shared/dispatch-contract.md`
 - **2026-07-28** — Pipeline dispatch shape collapsed: one `implementer` + one `tester` dispatch, `qa`+`adversary` fan out together in Phase 3; Phase 3.75/3.8 absorb into new Phase 2.8/Phase 3; Phase 4.5 retires (delivery diff bounded by a post-gate write allowlist instead). STAGE-GATE-3 moves immediately before Phase 4. → `agents/ref-pipeline.md § Phase 2.8`
 
 ## 9. Patterns & Conventions
-<!-- Populated by the delivery agent after each feature. Empty at init. -->
+<!-- Updated in the reviewed implementation tree when a feature establishes a durable pattern. Empty at init. -->
 > Full history: see `docs/patterns.md`. Recent entries below.
-- **Suite-run evidence ledger** (#532): append-only `docs/suite-evidence.md`-defined per-feature registry, one row per verification-command run; `tree_anchor` reused literally from `docs/verification-packet.md § 2`; strict full-tree-anchor equality (never a "relevant files" heuristic) decides skip-vs-rerun; closed writer list. → `docs/suite-evidence.md`, `agents/delivery.md § "Step 9b"`
+- **Suite-run evidence ledger** (#532): append-only `docs/suite-evidence.md`-defined per-feature registry, one row per verification-command run; `tree_anchor` reused literally from `docs/verification-packet.md § 2`; strict full-tree-anchor equality (never a "relevant files" heuristic) decides skip-vs-rerun; closed writer list. → `docs/suite-evidence.md`, `agents/ref-pipeline.md § "Phase 2.8 — Freeze"`
 - **Shared-review-file write discipline** (#527): every panel writer (`plan-reviewer`, `qa-plan`, `security`, `adversary`) uses `Edit` (never `Write`) on an existing shared review file, `old_string` anchored to its own section, `replace_all` forbidden; orchestrator runs a header-survival snapshot/compare around each panel dispatch. → `agents/_shared/plan-consolidation.md § "Write-tool discipline (shared review files)"`
 - **Delivery split + retired-token sweep** (pipeline-dispatch-shape): `agents/delivery.md` (prose) + new `agents/_shared/delivery-mechanics.md` (coordinator's deterministic half — bump/branch/changelog-cut/stage/push/`gh pr create`), one dispatch, no `mode: prepare`/`publish` split; a retired-token sweep verifies zero *live* claims (a marker-adjacent mention — `retired`, `retargeted from` — is legitimate history), re-derived from the owning AC each round, never reused. → `agents/_shared/delivery-mechanics.md`
 
 - Self-documenting code first; comment WHY not WHAT; route genuine rationale to `/docs` not to inline comments — see `docs/code-comments.md`.
 
 ## 10. Known Constraints
-<!-- Populated by the delivery agent after each feature. Empty at init. -->
+<!-- Updated in the reviewed implementation tree when a feature establishes a durable constraint. Empty at init. -->
 - **`VERSION` pre-check best-effort**: unsigned; MITM can suppress an update (binary SHA256 is the floor). (SEC-OC-U-01, Low)
 - **opencode needs restart for asset changes**: hot-reload is experimental-only (issues #10899/#8751).
 

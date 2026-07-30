@@ -122,11 +122,28 @@ worktree_base: origin/main|{dep-branch}|null
 working_branch: {branch}|null
 ```
 
-`working_branch` has three producer sites and only the orchestrator writes any of them. **Worktree topology:** copied from `worktree_branch` at branch establishment. **Branch-in-place:** `null` until Phase 2 entry, which creates the branch and writes the field. **Phase 4:** a defensive backstop only, for the case it is somehow still `null`. It is set before any lane reaches its outward push.
+`working_branch` has two legitimate producer paths and only the orchestrator writes either. **Worktree topology:** copied from `worktree_branch` at branch establishment. **Branch-in-place:** `null` until Phase 2 entry, which creates the branch and writes the field. Phase 4 only validates it; a null or mismatched value is an upstream failure, never permission to create a late branch around reviewed commits.
 
 `verification_base_source_ref` and `verification_base_ref` have one producer site: Phase 2 entry. The source field preserves the selected branch or commit so Freeze can detect movement; the base field is the full commit SHA resolved from that source and is never rewritten. Phase 2.6, Phase 2 close, Freeze, the frozen diff, and the verification packet all consume the immutable SHA. The packet mirrors it; it never produces it.
 
 Live consumers, so it is never treated as documentation: the record-based recover backstop, the operator reading the file, and the executable branch comparisons in `implementer`, `tester`, and the Phase-2-close commit-integrity check. On the Claude Code plugin path no wired hook reads it — `gate-guard` and `checkpoint-guard` are both unwired. `opencode`'s own plugin wiring registers `checkpoint-guard` independently; that is outside this contract's scope.
+
+**Delivery coordinates — written by the coordinator during STAGE-GATE-3 preparation.**
+```
+delivery_issue: {number, title, labels, project}|null
+delivery_version_preview: {old}->{new}|not-bumped|null
+delivery_changed_files: [{path}, ...]|[]
+delivery_diff_composition: {total_lines, total_files, mechanical_files, substantive_files}|null
+delivery_size_result: within-bounds|flagged|null
+delivery_size_justification: {workspace pointer}|null
+delivery_suite_evidence: {00-suite-evidence.md row coordinate}|null
+```
+
+These are coordinates, not verdicts. They persist the exact inputs already used to present
+STAGE-GATE-3 so the one Delivery dispatch does not rediscover the diff, query GitHub, or ask
+the coordinator for a prose summary. The coordinator is the sole writer. On every
+re-presentation after `amend`, replace the entire block from the newly frozen tree; never
+carry a prior preview or file map forward.
 
 **Checkpoint fields.**
 ```
@@ -318,7 +335,7 @@ After every dispatch returning `success`, verify the expected doc exists on disk
 | `qa-plan` | 1.5 | `reviews/01-plan-review.md § Plan Ratification` |
 | `plan-reviewer` | 1.6 | `reviews/01-plan-review.md § Plan Review` |
 | `architect` | 1 | `reviews/01-closure-rubric.md` (Tier 2-4 only) |
-| `delivery` | 4 | the delivery section of `00-state.md` |
+| `delivery` | 4 | `inputs/pr-body-draft.md` + the lane-specific Acceptance Matrix |
 
 Exists and non-empty → proceed. Otherwise append `artifact.missing` (`action: retry`) and re-dispatch **exactly once** with an explicit "your artifact was not found" instruction. A second failure → `artifact.missing` (`action: escalate`), `status: blocked`. This is the `artifact-missing` failure kind (`agents/ref-pipeline.md § Failures`).
 

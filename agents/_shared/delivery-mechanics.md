@@ -2,18 +2,11 @@
 
 This file is the single source of truth for the mechanical, one-correct-answer half of
 delivery: every step here is executed by the orchestrator directly (Bash/`gh`/`git`), never
-dispatched to a subagent. `delivery` (the subagent) owns the prose half AND its own
-best-effort post-PR tail — PR body text, CHANGELOG entry text, README/CLAUDE.md §3/§8/§9
-memory updates, worktree teardown, release-tag verification, KG passive capture, obsidian
-interlinking, and initiative-overview data — see `agents/delivery.md`. `docs/knowledge.md`,
-`docs/decisions.md`, and `docs/patterns.md` capture is a SEPARATE, earlier `delivery` dispatch
-(`mode: knowledge-capture`, before this file's procedures ever run — `agents/ref-pipeline.md
-§ "Phase 2.75 — Knowledge Capture"`), not part of the prose half this file assumes has already
-returned. That post-gate tail stays with `delivery` deliberately: every one of those steps
-already tolerates running before its trigger condition holds (a PR not yet merged, no
-initiative context) by logging a named `skipped:` outcome — there is no ordering conflict to
-resolve by relocating them. `agents/ref-pipeline.md § Phase 4 — Delivery` points here by
-reference; do not re-derive or paraphrase this file's procedures inline there.
+dispatched to a subagent. `delivery` owns only the prose half: changelog fragment text, the
+workspace acceptance matrix, and the PR-body draft. It runs once after STAGE-GATE-3 records
+`ship`; it has no prepare mode, knowledge-capture mode, post-PR tail, or post-merge cleanup.
+`agents/ref-pipeline.md § Phase 4 — Delivery` points here by reference; do not re-derive or
+paraphrase this file's procedures inline there.
 
 **Why this split exists, and why it lives in `_shared/` rather than inline in
 `agents/ref-pipeline.md`.** A step with one mechanically correct answer belongs to the
@@ -23,14 +16,11 @@ once, at Phase 4 — never at boot, unlike anything inlined directly into
 `agents/_shared/dispatch-contract.md` and `agents/_shared/gate-contract.md`.
 
 **Ordering — this file's procedures run in the order listed**, immediately after
-STAGE-GATE-3 records `gate3_release: ship` and the `delivery` subagent's post-gate dispatch has
-returned with its prose artifacts on disk (`README.md`, `CLAUDE.md`,
-`changelog.d/{pr-slug}.md`, the Acceptance Matrix appended to `reviews/04-validation.md` or
-`03-testing.md`, and the PR-body draft at `workspaces/{feature-name}/inputs/pr-body-draft.md`).
-`docs/knowledge.md`, `docs/decisions.md`, and `docs/patterns.md` are produced earlier, by
-`delivery`'s own pre-gate `mode: knowledge-capture` dispatch
-(`agents/ref-pipeline.md § "Phase 2.75 — Knowledge Capture"`), and are already committed by the
-time this file's procedures run — never staged or written here.
+STAGE-GATE-3 records `gate3_release: ship` and the single `delivery` dispatch returns with
+`changelog.d/{pr-slug}.md` when applicable, the workspace Acceptance Matrix, and
+`workspaces/{feature-name}/inputs/pr-body-draft.md`. Product documentation, OpenAPI, and
+memory files are part of the reviewed implementation tree or are absent; Phase 4 never
+authors them.
 
 ---
 
@@ -101,25 +91,24 @@ at each site.
 
 ---
 
-## 2. Branch naming
+## 2. Branch validation
 
-Base is always `main`, never a sibling branch. Stacked PRs (child branch off a parent PR's
-branch) are PROHIBITED — GitHub's async re-targeting on parent-merge races serial merges and
-silently drops commits.
+Phase 2 already established `working_branch` before any implementation dispatch. Phase 4
+validates that decision; it never creates, switches, pulls, merges, or rebases a branch after
+review.
 
-- If on `main` (or the prior branch's PR is `MERGED`/`CLOSED`): fetch and fast-forward
-  `main` (`git fetch origin main && git checkout main && git pull --ff-only origin main`),
-  then create `{prefix}/{issue-number}-{feature-name}` (with a linked issue) or
-  `{prefix}/{feature-name}` (without one), where `{prefix}` is derived from the change
-  `type` — `feature`/`enhancement` → `feat`, `fix`/`hotfix` → `fix`, `refactor` →
-  `refactor`, `docs` → `docs`, anything else → `chore`. These are the only prefixes the
-  repository's working agreements admit; **`feature/` is not one of them.** If the name
-  collides with a prior delivery, append `-v2`, `-v3`, etc.
-- If already on a feature/fix/hotfix branch with an `OPEN` PR or no PR at all: use it as-is.
-- **Multi-group deliveries** (`§ Delivery Grouping` declares N > 1 groups with a valid split
-  reason): open and merge serially — group N+1 branches from the updated `main` only after
-  group N's PR lands, and is rebased on `main` before merging.
-- Never commit directly to `main`.
+Require all of the following:
+
+- `working_branch` is non-null and equals `git branch --show-current`;
+- it is not the repository's default branch;
+- it uses the prefix resolved at Phase 2 (`feat`, `fix`, `refactor`, `docs`, or `chore`);
+- no `MERGED` or `CLOSED` PR already owns the same head/base pair; and
+- multi-group delivery is on the exact group branch declared by the approved plan.
+
+Any mismatch is an upstream branch-guarantee failure: STOP and return to Phase 2 entry. Never
+"repair" it by creating a late branch around already-reviewed commits. Stacked PRs remain
+prohibited; serial groups branch from the newly updated base only after the previous group
+lands.
 
 ---
 
@@ -157,50 +146,43 @@ any OTHER path remaining means the implementation diff was never committed — S
 escalate to the operator, naming the uncommitted paths. Never stage or commit to close this
 gap silently.
 
-**Stage — explicit paths only, never a directory sweep.** `git add docs/` staged the entire
-`docs/` tree (contradicting its own prior comment) and would sweep unrelated content
-(`docs/specs/`, `docs/dev-mode.md`, anything else dirty under `docs/`) into this commit. Every
-path below is a fully-qualified file, never a directory prefix:
+**Stage — explicit paths only, never a directory sweep.** Phase 4 stages only the release
+cut, the current changelog fragment state, and resolved version sites. The acceptance matrix and PR-body draft live under the
+gitignored workspace; every other tracked artifact was committed before Freeze.
 ```
-git add CLAUDE.md CHANGELOG.md
+git add CHANGELOG.md          # only when § 3 changed it
 # Every version site § 1 RESOLVED, not a fixed pair. § 1's resolution order can land on
 # package.json, pyproject.toml, Cargo.toml or a declared multi-site list; staging only the
 # plugin manifests leaves a generic repo's bumped version uncommitted.
 git add {each resolved version site from § 1}   # only if version bumped
-git add docs/constraints.md docs/testing.md  # only if this dispatch's CLAUDE.md §10/§11
-                                              # auto-offload wrote them — NEVER docs/specs/,
-                                              # and NEVER docs/knowledge.md / docs/decisions.md /
-                                              # docs/patterns.md, which are committed pre-gate by
-                                              # delivery's own mode: knowledge-capture dispatch
-                                              # (agents/ref-pipeline.md § "Phase 2.75 — Knowledge
-                                              # Capture") and are never staged here
-git add README.md             # only if delivery modified it
-git add openapi/openapi.yaml  # only if updated
-git add changelog.d/{pr-slug}.md  # ONLY when the fragment is tracked in HEAD — see below
+git add -- changelog.d/{pr-slug}.md  # when it still exists or a tracked deletion remains — see below
 ```
 
-**The changelog fragment, stated precisely because the naive form fails.** § 3 deletes every
-`changelog.d/*.md` fragment as part of the release cut, and § 3 runs BEFORE this section.
-Two cases, and they need opposite handling:
+**The changelog fragment, stated precisely because the naive form fails.** Resolve its state
+after § 3:
 
-- **Fragment tracked in `HEAD`** (written by an earlier delivery, assembled and deleted by
-  this one): `git add changelog.d/{pr-slug}.md` stages the DELETION, which is what must be
-  committed. Correct.
-- **Fragment created and consumed inside this same dispatch** (never committed): the path is
-  now neither on disk nor in the index, and `git add` fails with a pathspec error. Do NOT
-  stage it — there is nothing to record, since its content already moved into `CHANGELOG.md`.
+- **Still exists** (`skip-version: true` or no release cut): stage the file. This includes a
+  newly created fragment; leaving it untracked would make the push precondition fail.
+- **Absent but tracked in `HEAD`** (an older fragment assembled and deleted by § 3): stage
+  the deletion with `git add -- changelog.d/{pr-slug}.md`.
+- **Absent and never tracked** (created and consumed in this same Phase 4): do not stage the
+  vanished path; its content is already in `CHANGELOG.md`.
 
-Determine which case applies with `git ls-files --error-unmatch changelog.d/{pr-slug}.md`
-before staging; never let a pathspec error abort the delivery.
+Use a file-existence check followed by
+`git ls-files --error-unmatch -- changelog.d/{pr-slug}.md`; never let an expected pathspec
+miss abort publication.
 
 If version was bumped, verify EVERY resolved site from § 1 is staged (`git diff --cached --name-only`
 must list each one) — if any is missing, stop and fix before committing. Never stage unrelated files.
 
 **Commit** (conventional commits):
 ```
-git commit -m "docs({feature_name}): add documentation, changelog, and version bump for <summary>"   # version bumped
-git commit -m "docs({feature_name}): add documentation and changelog for <summary>"                  # version skipped
+git commit -m "chore(release): bump <version> for {feature_name}"   # version bumped
+git commit -m "docs(changelog): record {feature_name}"              # version skipped, changelog changed
 ```
+
+When neither version nor CHANGELOG nor a surviving changelog fragment changed, there is no
+Phase-4 commit. Do not create an empty commit merely to preserve a historical delivery shape.
 
 ---
 
@@ -215,7 +197,7 @@ diff_files=$(git diff origin/main...HEAD --name-only | wc -l)
 | Condition | Action |
 |---|---|
 | `diff_lines ≤ 400` AND `diff_files ≤ 8` | Pass. |
-| Either cap exceeded | Read `02-implementation.md § Reviewability Exceptions`. If present, proceed and flag it for the PR body (feeds `delivery`'s Step 9d-equivalent drafting). Otherwise STOP — this is never an unconditional block: document the justification (split preferred, or a stated reason) before proceeding. |
+| Either cap exceeded | Read `02-implementation.md § Reviewability Exceptions`. If present, proceed and persist the justification in Delivery coordinates for the PR body. Otherwise STOP — this is never an unconditional block: document the justification (split preferred, or a stated reason) before proceeding. |
 
 There is no size tier that aborts unconditionally regardless of justification — the
 composition breakdown below, presented at STAGE-GATE-3, is what lets the operator judge a
@@ -224,9 +206,8 @@ large, unsplit diff; a line-count ceiling never substitutes for that judgment.
 **Diff composition (unconditional — computed regardless of whether the size gate flagged).**
 Classify every changed file:
 
-- **Mechanical** — a delivery-authored housekeeping path, and nothing else (`CLAUDE.md`,
-  `CHANGELOG.md`, `changelog.d/*`, `docs/**`, `README.md`, `.claude-plugin/plugin.json`,
-  `.claude-plugin/marketplace.json`, `openapi/openapi.*`).
+- **Mechanical** — only `CHANGELOG.md`, `changelog.d/*`, and the exact version sites
+  resolved in § 1.
 - **Substantive** — every other file.
 
 **Pure addition is NOT a mechanical signal.** A newly added production source file also has
@@ -235,18 +216,10 @@ diff can contain as housekeeping — undercounting exactly the surface this brea
 show beside `audit_coverage`, which is what lets the operator judge an implausible `full`
 coverage claim. Classification is by PATH, never by deletion count.
 
-```bash
-mechanical_files=$(git diff origin/main...HEAD --numstat | awk '
-  {
-    file=$3
-    is_housekeeping = (file ~ /^(CLAUDE\.md|CHANGELOG\.md|changelog\.d\/|docs\/|README\.md|\.claude-plugin\/(plugin|marketplace)\.json|openapi\/openapi\.)/)
-    is_append_only = ($1 != "-" && $2 == 0)
-    if (is_housekeeping || is_append_only) count++
-  }
-  END { print count+0 }
-')
-substantive_files=$(( diff_files - mechanical_files ))
-```
+Count paths by exact set membership against that rule. Do not use line shape, extension,
+directory-wide documentation allowlists, or an "append-only" shortcut. In particular,
+README, CLAUDE.md, `docs/**`, OpenAPI, source, tests, and agent contracts are substantive
+unless one exact path is also a resolved version site.
 
 Report `diff_composition: {total_lines, total_files, mechanical_files, substantive_files}` at
 STAGE-GATE-3 preparation, adjacent to the Pre-Delivery Security Audit's own `audit_coverage`
@@ -327,42 +300,22 @@ the **post-gate write allowlist** below:
 
 ```
 CHANGELOG.md, changelog.d/**
-{the three declared version sites, per § 1}
-docs/knowledge.md — restricted to the `[kg]` bullet-append ONLY (Phase 6's own
-                     mechanically-generated write, one line per saved KG entity;
-                     agents/ref-pipeline.md § "Phase 6 — Knowledge Save"; no other
-                     content is allowlisted here)
-README.md
-CLAUDE.md §3, §8, §9
+{the declared version sites, restricted to the exact version field resolved in § 1}
 ```
 
-`docs/decisions.md` and `docs/patterns.md` are REMOVED from this allowlist (security-hardening
-round, C1) — they are no longer post-gate writes at all. Their content is produced and
-committed earlier, by `delivery`'s pre-gate `mode: knowledge-capture` dispatch
-(`agents/ref-pipeline.md § "Phase 2.75 — Knowledge Capture"`), inside the tree the fan audits;
-a change to either path detected at THIS check now correctly fails closed like any other
-out-of-allowlist path, rather than passing silently as it did before this round.
-
 Any changed path OUTSIDE this allowlist fails closed — re-open Phase 2.8 → Phase 3 →
-STAGE-GATE-3. `agents/**`, `docs/dev-mode.md`, and `CLAUDE.md` §5/§6/§7 are explicitly OFF
-this allowlist — every contract-statement surface stating this project's security floors is
-never eligible for a silent post-gate pass.
+STAGE-GATE-3. Outside an exact resolved version-field update, README, CLAUDE.md, AGENTS.md,
+`docs/**`, OpenAPI, product code, tests, and agent contracts are all outside the allowlist.
+A required change to one of those surfaces must land before Freeze and pass the normal
+verification fan.
 
 Derive the changed-path set the same way the tree anchor itself is derived — per
 `docs/verification-packet.md § 1a`'s canonical algorithm, never re-derived or paraphrased
 here.
 
-**Residual, stated at its true width — narrowed by this round (C1), not eliminated.** This
-check classifies PATHS, not authorship and not content — every byte inside an allowlisted path
-ships unread by construction. Before this round, that included the whole of `docs/knowledge.md`,
-`docs/decisions.md`, and `docs/patterns.md`, none of which carried a section restriction; those
-two files are now removed from the allowlist entirely (moved pre-gate), and `docs/knowledge.md`
-is now restricted to a single, mechanically-generated `[kg]` bullet line per KG entity —
-content already passed through the KG write-time content filter (`docs/kg-content-policy.md`)
-before it reaches this check, not free-form prose. The remaining residual is narrower but not
-zero: the `CLAUDE.md` section restriction is still a hunk-header scan, coarser than a semantic
-diff — a floor-weakening sentence smuggled inside an allowed §8/§9 row would still pass it. PR
-review is the named backstop for this remaining residual, not a substitute for it.
+**Residual.** This check classifies paths, not authorship or semantic content. The remaining
+allowlist is intentionally limited to release assembly: changelog paths and version sites.
+PR review remains the content backstop for those release artifacts.
 
 ---
 
@@ -375,11 +328,9 @@ capture the account this push and the following `gh pr create` will attribute to
 gh_active_account="$(gh api user -q .login 2>/dev/null || echo "unknown")"
 ```
 
-Report it in the delivery summary as `gh_account: <login>`. This closes wholesale-retired
-delivery.md's old two-step capture design (once before the branch-prepare work, re-run fresh
-immediately before the push, to cover an arbitrarily long STAGE-GATE-3 wait between the two) —
-with the split gone and the push now the coordinator's own single mechanical step immediately
-after the gate, one capture right here is current by construction. A wrong-account push is a
+Report it in the delivery summary as `gh_account: <login>`. The push is now the
+coordinator's own single mechanical step immediately after the gate, so one capture
+right here is current by construction. A wrong-account push is a
 known operational friction
 (the operator's own account may differ from the one `gh auth` currently holds) — this capture
 is diagnostic only, it never blocks the push; a `gh api user` failure logs `unknown` and
@@ -435,9 +386,9 @@ gh pr create --base main \
   --body "$(cat workspaces/{feature-name}/inputs/pr-body-draft.md)"
 ```
 
-Labels/project come from the linked GitHub issue when one exists (delivery's Step 2
-detection); omit `--project` if no board exists. `Closes #{number}`/`Fixes #{number}` is
-inside the draft body already — never synthesize a number when no issue is linked.
+Labels/project come from issue coordinates already captured during Intake in `00-state.md`;
+omit either flag when its value is absent. `Closes #{number}`/`Fixes #{number}` is inside the
+draft body already — never synthesize a number when no issue is linked.
 
 **When `has_gh: false`:** use the Tier B fallback chain (`agents/_shared/gh-fallback.md`).
 When neither `gh` nor a token is available, emit the compare URL and body file and report

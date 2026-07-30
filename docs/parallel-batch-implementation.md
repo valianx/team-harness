@@ -97,7 +97,7 @@ Item-local files (those only one item touches) ride along in that item's merge a
 
 ### Version + CHANGELOG
 
-Done ONCE, after all items are merged and the full suite is green, by the delivery agent. Items do not bump the version individually. Open the PR only when every item branch is merged and `run-all.sh` is green on the integration branch.
+Done ONCE, after all items are merged and the full suite is green, by the coordinator's publication mechanics. Items do not bump the version individually. Open the PR only when every item branch is merged and `run-all.sh` is green on the integration branch.
 
 ### Evolution from the splice method
 

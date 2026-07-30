@@ -276,7 +276,7 @@ CLAUDE.md is a quick-reference surface — it tells agents *where to look*, not 
 
 ### 7.1 File size cap
 
-**CLAUDE.md must stay under 40 KB.** Claude Code warns above this threshold and performance degrades. The delivery agent checks file size after every update; if CLAUDE.md exceeds 35 KB, it must offload the largest non-structural section to `docs/` before committing.
+**CLAUDE.md must stay under 40 KB.** Claude Code warns above this threshold and performance degrades. Any planned edit must check the resulting size; above 35 KB, that same reviewed change offloads the largest non-structural section to `docs/` before Phase 2.8 Freeze.
 
 ### 7.2 Section size rules
 
@@ -287,7 +287,7 @@ CLAUDE.md is a quick-reference surface — it tells agents *where to look*, not 
 | Known Constraints (§10) | 10 | `docs/constraints.md` |
 | Testing Conventions (§11) | 10 | `docs/testing.md` |
 
-When a section exceeds its limit, the delivery agent extracts older entries to the overflow file and replaces the section body with a pointer:
+When a section exceeds its limit, the agent responsible for that reviewed documentation change extracts older entries to the overflow file and replaces the section body with a pointer:
 
 ```
 See `docs/decisions.md` for the full log. Recent entries kept inline below.
@@ -307,26 +307,26 @@ See `docs/decisions.md` for the full log. Recent entries kept inline below.
 
 | File | Content | Updated by |
 |------|---------|-----------|
-| `docs/knowledge.md` | Flat bullets with tag prefixes — the agent pre-read file | delivery agent |
-| `docs/decisions.md` | Architecture decisions overflow (date + decision + rationale) | delivery agent (auto-offload) |
-| `docs/patterns.md` | Patterns overflow (pattern + example path) | delivery agent (auto-offload) |
-| `docs/constraints.md` | Constraints overflow (constraint + detail) | delivery agent (auto-offload) |
-| `docs/testing.md` | Testing conventions overflow (convention + description) | delivery agent (auto-offload) |
+| `docs/knowledge.md` | Flat bullets with tag prefixes — the agent pre-read file | explicit knowledge flow |
+| `docs/decisions.md` | Architecture decisions overflow (date + decision + rationale) | agent editing CLAUDE.md |
+| `docs/patterns.md` | Patterns overflow (pattern + example path) | agent editing CLAUDE.md |
+| `docs/constraints.md` | Constraints overflow (constraint + detail) | agent editing CLAUDE.md |
+| `docs/testing.md` | Testing conventions overflow (convention + description) | agent editing CLAUDE.md |
 
-The delivery agent creates overflow files on first offload. Agents read `docs/knowledge.md` before every task; overflow files are read on-demand when the CLAUDE.md pointer section is relevant.
+The agent performing the reviewed CLAUDE.md edit creates overflow files on first offload. Agents consume bounded, task-relevant knowledge; overflow files are read on demand when the CLAUDE.md pointer section is relevant.
 ```
 
 **8. Architecture Decisions**
-<!-- Populated by delivery agent after each feature. Leave empty at init. -->
+<!-- Updated in the reviewed implementation tree when a feature establishes a durable decision. Leave empty at init. -->
 
 **9. Patterns & Conventions**
-<!-- Populated by delivery agent after each feature. Leave empty at init. -->
+<!-- Updated in the reviewed implementation tree when a feature establishes a durable pattern. Leave empty at init. -->
 
 **10. Known Constraints**
-<!-- Populated by delivery agent after each feature. Leave empty at init. -->
+<!-- Updated in the reviewed implementation tree when a feature establishes a durable constraint. Leave empty at init. -->
 
 **11. Testing Conventions**
-<!-- Populated by delivery agent after each feature. Leave empty at init. -->
+<!-- Updated in the reviewed implementation tree when a feature changes testing conventions. Leave empty at init. -->
 
 **12. Interfaces & Contracts** *(backend/fullstack only)*
 - HTTP endpoints location and how to add new ones
@@ -370,7 +370,9 @@ Include a routing table based on the detected project type.
 | Feature implementation (write code) | `implementer` | Production code following architecture proposal |
 | Test strategy and implementation | `tester` | Test plan + tests with factory mocks |
 | Acceptance criteria and validation | `qa` | QA checklist + validation report |
-| Documentation + version + commit + push | `delivery` | Docs + CHANGELOG + version bump + commit + push |
+| Required product/API documentation | `implementer` or `documenter`, before Freeze | Reviewed tracked documentation |
+| Publication prose | `delivery` | Changelog fragment + acceptance matrix + PR-body draft |
+| Version + commit + push + PR | coordinator mechanics | Deterministic publication actions |
 
 Escalation rules:
 - Requirements unclear → ask user
@@ -434,7 +436,7 @@ Check if `docs/knowledge.md` exists. If not, create it:
 ```
 
 **Rules:**
-- Do NOT add content — the delivery agent populates it later
+- Do NOT add content — explicit knowledge flows populate it later
 - Do NOT modify an existing `docs/knowledge.md`
 
 ### 4.4 — Scaffold `.gitattributes` EOL pinning (If Missing)

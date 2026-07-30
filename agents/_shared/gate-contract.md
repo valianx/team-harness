@@ -285,7 +285,7 @@ options are.
   or a stated absence when no audit lens ran (security_floor_applies: false)}
 
  Reply with:
-   - "ship"   → proceed to Delivery, then GitHub Update and Knowledge Save
+   - "ship"   → proceed to Delivery, GitHub Update, and session close
    - "amend"  → pause for local fixes, then "ship"
    - "abort"  → halt without pushing
 ====================================

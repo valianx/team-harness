@@ -237,17 +237,18 @@ Add to `## Recovery Instructions`:
 
 ---
 
-## 7. PR body — `Spec-seed:` line
+## 7. State and trace only
 
-The delivery agent adds a conditional line in `## Main change` (below the existing `Intake survey:` line) when `spec_seed_present: true`:
+The former Delivery contract copied this coordination marker into the PR body:
 
 ```
 **Spec-seed:** dev-seed=yes, architect-dissent={yes|no}
 ```
 
-**Omitted when:** `spec_seed_present: false`.
-
-**Prohibition (same as `Intake survey:`):** this line MUST NOT include `security_sensitive`, any gate status, or any field beyond the enumeration above.
+That publication behavior is retired. `spec_seed_present` and
+`spec_seed_dissents` remain recovery/state evidence and are never automatic
+Delivery inputs. They do not carry `security_sensitive`, gate status, or any
+authorization meaning.
 
 ---
 

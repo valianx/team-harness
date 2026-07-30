@@ -155,8 +155,7 @@ These are written by the **orchestrator** during pipeline runs (see `agents/ref-
        context7_skipped: [.[] | .tools.context7.skipped // 0] | add,
        memory_search:    [.[] | .tools.memory.search_nodes // 0] | add,
        memory_open:      [.[] | .tools.memory.open_nodes   // 0] | add,
-       kg_candidates:    [.[] | .tools.kg_save_candidates // []] | flatten | unique,
-       kg_passive:       [.[] | .tools.kg_passive_capture] | map(select(.)) | first
+       kg_candidates:    [.[] | .tools.kg_save_candidates // []] | flatten | unique
      })
    ' workspaces/{feature-name}/00-execution-events.jsonl
    ```
@@ -176,14 +175,13 @@ These are written by the **orchestrator** during pipeline runs (see `agents/ref-
      context7: {N} hit, {M} miss, {K} skipped   ({hit_pct}% hit rate excluding skipped)
      memory:   {N} search_nodes, {M} open_nodes
      KG save candidates surfaced: {N} unique ({list})
-     KG passive capture (delivery): {written|skipped|failed|—}
    ```
 
 4. If `jq` is not available, fall back to printing only the `## Tool Effectiveness` section of the summary.
 
 ### KG write-integrity rollup
 
-After the Tool Effectiveness table, append a KG write-integrity rollup that aggregates all `kg_write` events in the trace. This rollup covers all three write sites (`phase6-knowledge-save`, `security-finding`, `delivery-passive-capture`) and is format-agnostic: for `.md` traces, extract the JSONL fence before aggregating; for `.jsonl` traces, read directly.
+After the Tool Effectiveness table, append a KG write-integrity rollup that aggregates all `kg_write` events in the trace. Current producers use `explicit-knowledge-save` and `security-finding`; aggregate retired site values too so historical workspaces remain readable. For `.md` traces, extract the JSONL fence before aggregating; for `.jsonl` traces, read directly.
 
 **Output format:**
 
@@ -266,7 +264,7 @@ If neither `jq` nor `python3` is available, print:
 KG writes: trace present, install jq or python3 for the rollup
 ```
 
-**Integration in `--tools` Totals block:** append the rollup line after `KG passive capture (delivery):` in the Totals section:
+**Integration in `--tools` Totals block:** append the rollup after `KG save candidates surfaced:` in the Totals section:
 ```
 KG writes (all sites): N attempted, M succeeded{breakdown}
 ```

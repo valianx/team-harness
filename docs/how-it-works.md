@@ -45,7 +45,7 @@ Stage 2 is a single implementer pass over every task (one commit per task) — t
 
 ### Stage 3 — Delivery
 
-STAGE-GATE-3, immediately before delivery: the operator ships, amends, or aborts, seeing a version/CHANGELOG-entry preview and the Pre-Delivery Security Audit's findings. On `ship`, `delivery` writes the PR body and CHANGELOG entry text, and the coordinator bumps the version, creates the feature branch, commits, pushes, and opens the PR.
+STAGE-GATE-3, immediately before delivery: the operator ships, amends, or aborts, seeing a version/CHANGELOG-entry preview and the Pre-Delivery Security Audit's findings. On `ship`, `delivery` writes the PR body and CHANGELOG entry text, and the coordinator validates the Phase-2 branch, bumps the version, commits, pushes, and opens the PR.
 
 **STAGE-GATE-3** is your final stop — reply `ship` / `amend` / `abort`. On `ship`, the orchestrator proceeds to Phase 5 (GitHub Update): the PR is opened on GitHub with `Fixes #N` and labels. The PR is NOT opened during the Phase 4 commit step — STAGE-GATE-3 must complete first.
 

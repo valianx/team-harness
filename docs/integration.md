@@ -8,7 +8,7 @@ This document describes the end-to-end integration between **team-harness** (the
 
 **team-harness** is a Claude Code plugin that turns the chat into a Spec-Driven Development pipeline. It dispatches specialized subagents (architect, implementer, tester, qa, security, delivery) that coordinate across three mandatory stages. Between pipeline runs, agents need a place to store and retrieve technical memory — patterns discovered, errors fixed, architectural decisions made.
 
-**context-harness-mcp** is the server that provides that memory. It is a Go-based MCP (Model Context Protocol) server backed by Postgres with pgvector for semantic search, ONNX embeddings computed locally, and a content filter (gitleaks + taxonomy) that enforces the write-time content policy. It exposes 16 MCP tools that the orchestrator (discovery-time reads, Phase 6 knowledge-save) and the delivery agent call on a running pipeline's behalf.
+**context-harness-mcp** is the server that provides that memory. It is a Go-based MCP (Model Context Protocol) server backed by Postgres with pgvector for semantic search, ONNX embeddings computed locally, and a content filter (gitleaks + taxonomy) that enforces the write-time content policy. It exposes 16 MCP tools used by the orchestrator for discovery-time reads, explicit knowledge saves, session lifecycle, and narrow security-finding writes. Delivery does not access it.
 
 The seam between the two products is a single HTTP endpoint and a `mcpServers.memory` entry in `~/.claude.json`. Nothing else crosses the boundary at runtime.
 
@@ -18,8 +18,7 @@ Claude Code
     └── team-harness plugin
             │
             ├── orchestrator (discovery-time KG session open + prior-art read;
-            │                 Phase 6 knowledge-save + security-finding writes)
-            ├── delivery agent (Step 11.5 passive capture)
+            │                 explicit knowledge-save + security-finding writes)
             └── any agent reading the KG (search_nodes, open_nodes, read_graph)
                         │
                         │  HTTP (MCP protocol)
@@ -148,7 +147,7 @@ It writes the `mcpServers.memory` entry into `~/.claude.json`, writes `~/.claude
 
 Re-run `/th:setup` — it re-runs the smoke test and reports connectivity status. A passing smoke test confirms the `read_graph` call returns without error.
 
-To verify a full KG write, run any pipeline to completion. The first write occurs at Phase 6 (Knowledge Save). After the pipeline completes, run:
+To verify a full KG write, explicitly ask the orchestrator to save a reusable decision, pattern, or constraint from a substantive run. Automatic project-doctrine capture at Delivery is retired. After the save completes, run:
 
 ```
 /th:trace <feature-name>
@@ -162,7 +161,7 @@ The trace output includes `kg_write` events with `attempted` / `succeeded` count
 @th:orchestrator give me the work plan for this task: <your task description>
 ```
 
-The first pipeline run exercises the full integration: the orchestrator reads relevant KG prior art during discovery, and writes reusable learning at Phase 6 after delivery.
+The first pipeline run exercises session lifecycle and relevant KG prior-art reads during discovery. Reusable learning is written only when explicitly requested; Critical/High security findings retain their narrow automatic write site.
 
 ---
 
@@ -201,7 +200,7 @@ All content written to the KG must comply with the policy in `docs/kg-content-po
 - **No secrets.** API keys, tokens, bearer credentials, and internal IPs are forbidden, even in observation text.
 - **No absolute user paths.** Paths like `C:/Users/<name>/...` are not portable and must not be persisted.
 - **Date-anchor all state claims.** Observations about "current" state must include an explicit date (`As of 2026-05-29, ...`). Undated "currently" claims rot.
-- **Write-time enforcement.** The orchestrator's content filter (Phase 6, delivery Step 11.5, and the security-finding write site) applies the policy before calling `create_nodes` or `add_observations`. The context-harness-mcp server applies a defense-in-depth filter (gitleaks + taxonomy) on the server side.
+- **Write-time enforcement.** The orchestrator's content filter applies at the explicit knowledge-save flow and the narrow security-finding write site before calling `create_nodes` or `add_observations`. The context-harness-mcp server applies a defense-in-depth filter (gitleaks + taxonomy) on the server side.
 
 Full policy reference: `docs/kg-content-policy.md`
 
@@ -245,9 +244,9 @@ If `/th:setup` reports a connectivity failure on the smoke test:
 3. For authenticated deployments, confirm the bearer token in the `headers` block is current
 4. Run `mcp__memory__doctor` from within a Claude Code session to get the server's own health report
 
-### Smoke test passes but no writes on first pipeline
+### Smoke test passes but a pipeline writes nothing
 
-The smoke test (`read_graph`) only validates transport. A write is first exercised at Phase 6 of the pipeline. If Phase 6 shows `attempted: 0` in the trace, the orchestrator found no reusable learning to persist from that run — this is expected for trivial tasks. Run a substantive pipeline (a feature with architectural decisions or a bug fix with a root cause) to exercise the write path.
+The smoke test (`read_graph`) only validates transport. Ordinary pipeline completion intentionally performs no project-doctrine write. Explicitly request a knowledge save after a substantive task to exercise that path; a Critical/High security finding may also exercise the narrow automatic write site.
 
 ---
 
