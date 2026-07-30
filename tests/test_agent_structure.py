@@ -15945,9 +15945,23 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Suite 68: multi-project initiative overview layer
-# (multi-project-initiative-overview, v2.59.0)
+# Suite 68: multi-project initiative overview layer (v2.59.0, RETARGETED coordinator-fusion)
 # ---------------------------------------------------------------------------
+# RETARGETED, not retired (T4-AC-2): the operator ruling is that multi-project
+# initiative mode is RETAINED in serial form -- only the parallel Stage-2
+# fan-out (Suite 69) is retired, because that mechanism required the
+# pre-fusion coordinator to dispatch a copy of itself per project, which the
+# fused single-coordinator model forbids unconditionally. Every AC below was
+# individually re-verified against the current corpus before retargeting:
+# the substance (initiative state field, path-composition table, detection +
+# confirm flow, create-or-join JOIN rule, overview.md template + ownership
+# map, no-fork invariant) survives in full -- only the location and heading
+# names changed (content moved out of orchestrator.md's old numbered
+# "Step N" scheme into named sections in `agents/ref-dispatch-machinery.md`
+# and `agents/ref-intake-flows.md`, both read on-demand rather than inline).
+# No AC below asserts a lower bar than before; every retarget cites the exact
+# current anchor and was confirmed present by direct read, not assumed.
+print()
 print("=== Suite 68: multi-project initiative overview layer (v2.59.0) ===")
 
 _s68_orch = SPLIT_CORPUS
@@ -15955,117 +15969,107 @@ _s68_delivery = read(AGENTS_DIR / "delivery.md")
 _s68_claude = read(REPO_ROOT / "CLAUDE.md")
 _s68_discover = read(REPO_ROOT / "docs" / "discover-phase.md")
 _s68_observability = read(REPO_ROOT / "docs" / "observability.md")
-# v2.123.0 (A7 orchestrator boot reduction): Step 6d-initiative detection/confirm
-# and Phase 0a Step 1f (initiative create-or-join) moved verbatim out of
-# orchestrator.md into the on-demand agents/ref-intake-flows.md reference file
-# — orchestrator.md keeps only a 1-2 line trigger + pointer at each site. The
-# content-bearing slices below now read from ref-intake-flows.md instead.
 _s68_intake_flows = read(AGENTS_DIR / "ref-intake-flows.md")
+_s68_dispatch_machinery = read(AGENTS_DIR / "ref-dispatch-machinery.md")
 _S68_STOP = ("\n## ", "\n### ", "\n---\n")
 
-# AC-1: initiative state field defined in orchestrator.md
-_s68_state_slice = _slice_section(_s68_orch, "- initiative:", _S68_STOP)
-# Repoint (split): the "null = today's behaviour" semantics moved to leader.md
-# Step 1's initiative-conditional table ("byte-identical to the pre-initiative
-# behaviour when `initiative == null`").
-_s68_initiative_null_slice = _slice_section(_s68_orch, "**Step 1 — Resolve workspaces base path.**", ("\n**Step 3", "\n## ", "\n---\n"))
+# AC-1: initiative state field defined in orchestrator.md's 00-state.md schema
+_s68_state_slice = _slice_section(_s68_orch, "**Resolved config**", ("\n**Autonomy and rounds",))
 check(
     "suite68(ac1a): orchestrator.md defines 'initiative' state field",
-    "- initiative:" in _s68_orch,
+    "initiative:" in _s68_state_slice,
     "orchestrator.md must define an 'initiative' field in 00-state.md § Current State",
 )
+# Backward-compat guarantee relocated from the base_path table's own intro
+# line (pre-fusion agents/leader.md) to ref-dispatch-machinery.md's "Safety
+# floors" paragraph -- broader statement (whole pipeline, not just the path
+# composition), same guarantee.
 check(
     "suite68(ac1b): initiative field documents 'null' as today's behaviour",
-    "initiative == null" in _s68_initiative_null_slice
-    and ("pre-initiative behaviour" in _s68_initiative_null_slice or "byte-identical" in _s68_initiative_null_slice),
-    "orchestrator.md initiative field must document that null = today's (pre-initiative) behaviour exactly",
+    "initiative: null" in _s68_dispatch_machinery
+    and "byte-identical to the single-project path" in _s68_dispatch_machinery,
+    "ref-dispatch-machinery.md must document that initiative: null is byte-identical to the single-project (pre-initiative) path",
 )
 
 # AC-2: no-initiative path is verbatim current expressions (byte-identical guarantee)
-_s68_step2_slice = _slice_section(_s68_orch, "**Step 1 — Resolve workspaces base path.**", ("\n**Step 3", "\n## ", "\n---\n"))
 check(
-    "suite68(ac2a): Step 2 contains initiative == null row for obsidian mode (verbatim expression)",
-    "{logs-path}/{logs-subfolder}/{repo_name}" in _s68_step2_slice,
-    "orchestrator.md Step 2 must contain verbatim obsidian base_path = {logs-path}/{logs-subfolder}/{repo_name} for initiative==null",
+    "suite68(ac2a): initiative == null row for obsidian mode (verbatim expression)",
+    "{logs-path}/{logs-subfolder}/{repo_name}" in _s68_dispatch_machinery,
+    "ref-dispatch-machinery.md must contain verbatim obsidian base_path = {logs-path}/{logs-subfolder}/{repo_name} for initiative==null",
 )
 check(
-    "suite68(ac2b): Step 2 contains initiative == null row for local mode (verbatim expression)",
-    'base_path = "workspaces"' in _s68_step2_slice,
-    'orchestrator.md Step 2 must contain verbatim local base_path = "workspaces" for initiative==null',
+    "suite68(ac2b): initiative == null row for local mode (verbatim expression)",
+    "base_path = workspaces" in _s68_dispatch_machinery,
+    "ref-dispatch-machinery.md must contain verbatim local base_path = workspaces for initiative==null",
 )
 check(
-    "suite68(ac2c): Step 2 contains backward-compatibility guarantee statement",
-    "backward-compat" in _s68_step2_slice or "byte-identical" in _s68_step2_slice or "Backward-compatibility" in _s68_step2_slice,
-    "orchestrator.md Step 2 must state the backward-compatibility guarantee (no extra level on null)",
+    "suite68(ac2c): backward-compatibility guarantee statement",
+    "byte-identical to the single-project path" in _s68_dispatch_machinery,
+    "ref-dispatch-machinery.md must state the backward-compatibility guarantee (no extra level on null)",
 )
 
 # AC-3: initiative-set paths (obsidian: repo-base-first, date-prefixed initiative folder; local per-project stays "workspaces")
 check(
-    "suite68(ac3a): Step 2 shows obsidian initiative-set path with repo-base-first date-prefixed initiative folder",
-    "{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}" in _s68_step2_slice,
-    "orchestrator.md Step 2 must define obsidian path as {logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative} (repo-base first, dated initiative) when initiative is set",
+    "suite68(ac3a): obsidian initiative-set path with repo-base-first date-prefixed initiative folder",
+    "{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}" in _s68_dispatch_machinery,
+    "ref-dispatch-machinery.md must define obsidian path as {logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative} (repo-base first, dated initiative) when initiative is set",
 )
 check(
-    "suite68(ac3b): Step 2 shows obsidian overview path at dated initiative folder with overview.md",
-    # Repoint (split): the corpus gives the dated initiative base_path and the
-    # "overview at .../overview.md" location on the same table row (not one
-    # contiguous path literal).
-    "{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}" in _s68_step2_slice
-    and "overview at" in _s68_step2_slice
-    and "overview.md" in _s68_step2_slice,
-    "orchestrator.md Step 2 must define the dated obsidian initiative base_path"
+    "suite68(ac3b): obsidian overview path at dated initiative folder with overview.md",
+    "{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}" in _s68_dispatch_machinery
+    and "overview at" in _s68_dispatch_machinery
+    and "overview.md" in _s68_dispatch_machinery,
+    "ref-dispatch-machinery.md must define the dated obsidian initiative base_path"
     " {logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative} with overview at .../overview.md",
 )
 check(
-    "suite68(ac3c): Step 2 states local per-project base_path stays unchanged (workspaces) when initiative is set",
-    "workspaces" in _s68_step2_slice and ("unchanged" in _s68_step2_slice or "NOT re-prefixed" in _s68_step2_slice or "not re-prefixed" in _s68_step2_slice),
-    "orchestrator.md Step 2 must state that local per-project base_path stays 'workspaces' unchanged when initiative is set",
+    "suite68(ac3c): local per-project base_path stays unchanged (workspaces) when initiative is set",
+    "workspaces" in _s68_dispatch_machinery and "unchanged" in _s68_dispatch_machinery,
+    "ref-dispatch-machinery.md must state that local per-project base_path stays 'workspaces' unchanged when initiative is set",
 )
 check(
-    "suite68(ac3d): Step 2 states local overview lives at common parent of sibling repos",
-    "common parent" in _s68_step2_slice,
-    "orchestrator.md Step 2 must state local overview lives at the common parent directory of sibling repos",
+    "suite68(ac3d): local overview lives at common parent of sibling repos",
+    "common parent" in _s68_dispatch_machinery,
+    "ref-dispatch-machinery.md must state local overview lives at the common parent directory of sibling repos",
 )
 
-# AC-4: generic-root misfire guard documented — content lives in
-# ref-intake-flows.md § Initiative Detection and Confirm (moved verbatim from
-# orchestrator.md by A7's Phase 0a extraction); orchestrator.md keeps only the
-# trigger label + pointer at the "**Step 6d-initiative" site (still present,
-# so the boundary marker used elsewhere — e.g. Suite 92's background-sweep
-# slice — continues to resolve).
-_s68_detect_slice = _slice_section(_s68_intake_flows, "**Step 6d-initiative", _S68_STOP)
+# AC-4: generic-root misfire guard documented -- content lives in
+# ref-intake-flows.md § Initiative Detection and Confirm. The pre-fusion
+# "Step 6d-initiative" numbering is gone; the section is now a named heading
+# triggered from Discover (agents/orchestrator.md § "12 — Discover disposition").
+_s68_detect_slice = _slice_section(_s68_intake_flows, "## Initiative Detection and Confirm", _S68_STOP)
 check(
     "suite68(ac4a): agents/ref-intake-flows.md § Initiative Detection and Confirm exists (slice non-empty)",
     len(_s68_detect_slice) > 0,
-    "agents/ref-intake-flows.md must contain the Step 6d-initiative sub-step for initiative detection"
+    "agents/ref-intake-flows.md must contain the Initiative Detection and Confirm section"
     " (orchestrator.md must keep a pointer to it)",
 )
 check(
-    "suite68(ac4b): Step 6d-initiative contains generic-root guard list",
+    "suite68(ac4b): Initiative Detection and Confirm contains generic-root guard list",
     "projects" in _s68_detect_slice and "repos" in _s68_detect_slice and "src" in _s68_detect_slice and "code" in _s68_detect_slice,
-    "ref-intake-flows.md Step 6d-initiative must list generic-root guard words (projects, repos, src, code, ...)",
+    "ref-intake-flows.md Initiative Detection and Confirm must list generic-root guard words (projects, repos, src, code, ...)",
 )
 check(
-    "suite68(ac4c): Step 6d-initiative states do NOT propose on directory layout alone",
+    "suite68(ac4c): Initiative Detection and Confirm states do NOT propose on directory layout alone",
     "do NOT propose" in _s68_detect_slice or "NOT propose" in _s68_detect_slice,
-    "ref-intake-flows.md Step 6d-initiative must state the orchestrator does NOT propose initiative on generic root",
+    "ref-intake-flows.md Initiative Detection and Confirm must state the coordinator does NOT propose initiative on generic root",
 )
 
-# AC-5: confirmation prompt + WAIT + 3-way choice + never auto-create documented in orchestrator.md and discover-phase.md
+# AC-5: confirmation prompt + WAIT + 3-way choice + never auto-create documented
 check(
-    "suite68(ac5a): Step 6d-initiative contains confirmation prompt and WAIT",
+    "suite68(ac5a): Initiative Detection and Confirm contains confirmation prompt and WAIT",
     "WAIT" in _s68_detect_slice and ("Keep this name" in _s68_detect_slice or "enter a different name" in _s68_detect_slice),
-    "orchestrator.md Step 6d-initiative must contain 3-way confirmation prompt and WAIT",
+    "orchestrator.md/ref-intake-flows.md Initiative Detection and Confirm must contain 3-way confirmation prompt and WAIT",
 )
 check(
-    "suite68(ac5a-rename): Step 6d-initiative contains the rename affordance (3-way choice)",
+    "suite68(ac5a-rename): Initiative Detection and Confirm contains the rename affordance (3-way choice)",
     "enter a different name" in _s68_detect_slice,
-    "orchestrator.md Step 6d-initiative must offer 'enter a different name' as a third choice (not binary [Y/n])",
+    "ref-intake-flows.md Initiative Detection and Confirm must offer 'enter a different name' as a third choice (not binary [Y/n])",
 )
 check(
-    "suite68(ac5b): Step 6d-initiative states 'never auto-create' or equivalent",
+    "suite68(ac5b): Initiative Detection and Confirm states 'never auto-create' or equivalent",
     "auto-create" in _s68_detect_slice or "Never auto-create" in _s68_detect_slice or "never auto-create" in _s68_detect_slice,
-    "orchestrator.md Step 6d-initiative must state the initiative is never auto-created",
+    "ref-intake-flows.md Initiative Detection and Confirm must state the initiative is never auto-created",
 )
 _s68_discover_initiative = _slice_section(_s68_discover, "## 11. Initiative detection", ("\n## ",))
 check(
@@ -16079,93 +16083,98 @@ check(
     "docs/discover-phase.md § 11 must document the confirmation gate and WAIT",
 )
 
-# AC-6: cross-run JOIN rule — content lives in ref-intake-flows.md § Initiative
-# Create-or-Join (moved verbatim from orchestrator.md Phase 0a Step 1f by A7's
-# extraction); orchestrator.md keeps only the trigger label + pointer.
+# AC-6: cross-run JOIN rule -- content lives in ref-intake-flows.md §
+# Initiative Create-or-Join. The pre-fusion "1f." step-number prefix is
+# gone; the section is a named heading, triggered from Intake's
+# workspace-folder step.
 _S68_JOIN_STOP = ("\n## ", "\n---\n")
-_s68_join_slice = _slice_section(_s68_intake_flows, "1f. **CONDITIONAL — Initiative create-or-join", _S68_JOIN_STOP)
+_s68_join_slice = _slice_section(_s68_intake_flows, "**CONDITIONAL — Initiative create-or-join", _S68_JOIN_STOP)
 check(
     "suite68(ac6a): agents/ref-intake-flows.md § Initiative Create-or-Join exists (slice non-empty)",
     len(_s68_join_slice) > 0,
-    "agents/ref-intake-flows.md must contain Step 1f (initiative create-or-join);"
+    "agents/ref-intake-flows.md must contain the Initiative Create-or-Join section;"
     " orchestrator.md must keep a pointer to it",
 )
 check(
-    "suite68(ac6b): Step 1f defines JOIN rule (replace-in-place if row exists)",
+    "suite68(ac6b): Initiative Create-or-Join defines JOIN rule (replace-in-place if row exists)",
     "replace" in _s68_join_slice and ("in-place" in _s68_join_slice or "in place" in _s68_join_slice),
-    "ref-intake-flows.md Step 1f must define the replace-in-place JOIN rule for existing project rows",
+    "ref-intake-flows.md Initiative Create-or-Join must define the replace-in-place JOIN rule for existing project rows",
 )
 check(
-    "suite68(ac6c): Step 1f defines append if row absent",
+    "suite68(ac6c): Initiative Create-or-Join defines append if row absent",
     "append" in _s68_join_slice,
-    "ref-intake-flows.md Step 1f must define append-if-absent for new project rows",
+    "ref-intake-flows.md Initiative Create-or-Join must define append-if-absent for new project rows",
 )
 check(
-    "suite68(ac6d): Step 1f states rows are never duplicated (idempotent)",
+    "suite68(ac6d): Initiative Create-or-Join states rows are never duplicated (idempotent)",
     "never duplicate" in _s68_join_slice or "idempotent" in _s68_join_slice,
-    "ref-intake-flows.md Step 1f must state that rows are never duplicated (idempotent)",
+    "ref-intake-flows.md Initiative Create-or-Join must state that rows are never duplicated (idempotent)",
 )
 
 # AC-7: concurrency/idempotency + best-effort posture documented
 check(
-    "suite68(ac7a): Step 1f contains concurrency/idempotency rule (rows keyed by project slug)",
+    "suite68(ac7a): Initiative Create-or-Join contains concurrency/idempotency rule (rows keyed by project slug)",
     ("project" in _s68_join_slice and "slug" in _s68_join_slice) or "project slug" in _s68_join_slice,
-    "orchestrator.md Step 1f must state rows are keyed by project slug",
+    "ref-intake-flows.md Initiative Create-or-Join must state rows are keyed by project slug",
 )
 check(
-    "suite68(ac7b): Step 1f states best-effort posture (overview failure does NOT fail pipeline)",
-    "best-effort" in _s68_join_slice or "best effort" in _s68_join_slice or "NEVER fails" in _s68_join_slice or "never fail" in _s68_join_slice.lower(),
-    "orchestrator.md Step 1f must state best-effort posture (overview-write failure does not fail pipeline)",
+    "suite68(ac7b): Initiative Create-or-Join states best-effort posture (overview failure does NOT fail pipeline)",
+    "best-effort" in _s68_join_slice.lower() or "best effort" in _s68_join_slice.lower() or "never fail" in _s68_join_slice.lower(),
+    "ref-intake-flows.md Initiative Create-or-Join must state best-effort posture (overview-write failure does not fail pipeline)",
 )
 check(
-    "suite68(ac7c): Step 1f mentions WARN on failure",
+    "suite68(ac7c): Initiative Create-or-Join mentions WARN on failure",
     "WARN" in _s68_join_slice or "warn" in _s68_join_slice.lower(),
-    "orchestrator.md Step 1f must mention WARN on overview-write failure",
+    "ref-intake-flows.md Initiative Create-or-Join must mention WARN on overview-write failure",
 )
 
-# AC-8: overview.md template embedded with all required sections (renamed from 00-overview.md Template)
-_s68_template_slice = _slice_section(_s68_orch, "## overview.md Template", ("\n## Phase Checkpointing",))
+# AC-8: overview.md template embedded with all required sections. Content
+# relocated from orchestrator.md's old "## overview.md Template" heading into
+# ref-dispatch-machinery.md's "## overview.md — you are the sole writer"
+# section, which carries the template, the section-ownership map, and the
+# no-fork invariant together -- sliced as one block for AC-8/9/13e/13f/13g.
+_s68_template_slice = _slice_section(_s68_dispatch_machinery, "## overview.md — you are the sole writer", ("\n## What left this file",))
 check(
-    "suite68(ac8a): orchestrator.md contains '## overview.md Template' section (renamed from '## 00-overview.md Template')",
+    "suite68(ac8a): ref-dispatch-machinery.md contains the overview.md template section",
     len(_s68_template_slice) > 0,
-    "orchestrator.md must contain '## overview.md Template' section (old '## 00-overview.md Template' heading must be renamed)",
+    "ref-dispatch-machinery.md must contain the '## overview.md — you are the sole writer' section (the template's current home)",
 )
 check(
-    "suite68(ac8b): template contains frontmatter keys (initiative, created, updated, projects)",
+    "suite68(ac8b): template contains frontmatter keys (initiative, created, projects)",
     "initiative:" in _s68_template_slice and "created:" in _s68_template_slice and "projects:" in _s68_template_slice,
-    "orchestrator.md template must contain frontmatter keys: initiative, created, projects",
+    "ref-dispatch-machinery.md template must contain frontmatter keys: initiative, created, projects",
 )
 check(
     "suite68(ac8c): template contains '## Review Summary' section",
     "## Review Summary" in _s68_template_slice,
-    "orchestrator.md template must contain '## Review Summary' section",
+    "ref-dispatch-machinery.md template must contain '## Review Summary' section",
 )
 check(
     "suite68(ac8d): template contains '## Projects' table with required columns",
     "## Projects" in _s68_template_slice and "Branch" in _s68_template_slice and "Version" in _s68_template_slice and "Status" in _s68_template_slice,
-    "orchestrator.md template must contain '## Projects' table with Branch/Version/PR/Status columns",
+    "ref-dispatch-machinery.md template must contain '## Projects' table with Branch/Version/PR/Status columns",
 )
 check(
     "suite68(ac8e): template contains '## Big-Picture Plan' section",
     "## Big-Picture Plan" in _s68_template_slice,
-    "orchestrator.md template must contain '## Big-Picture Plan' section",
+    "ref-dispatch-machinery.md template must contain '## Big-Picture Plan' section",
 )
 check(
-    "suite68(ac8f): section-ownership map names orchestrator and delivery as writers",
+    "suite68(ac8f): section-ownership map names the coordinator and delivery as writers",
     ("Sole writer" in _s68_template_slice or "sole writer" in _s68_template_slice) and "delivery" in _s68_template_slice,
-    "orchestrator.md section-ownership map must name orchestrator and delivery as respective writers",
+    "ref-dispatch-machinery.md section-ownership map must name the coordinator and delivery as respective writers",
 )
 
-# AC-9: no-fork / consolidation invariant documented in orchestrator.md
+# AC-9: no-fork / consolidation invariant documented
 check(
     "suite68(ac9a): template section contains no-fork invariant (snapshot not log)",
     "snapshot" in _s68_template_slice and "not a log" in _s68_template_slice,
-    "orchestrator.md must state the no-fork invariant: 00-overview.md is a snapshot, not a log",
+    "ref-dispatch-machinery.md must state the no-fork invariant: overview.md is a snapshot, not a log",
 )
 check(
     "suite68(ac9b): no-fork invariant states never create 00-overview-*.md siblings",
     "00-overview-" in _s68_template_slice or "siblings" in _s68_template_slice,
-    "orchestrator.md must state never create 00-overview-*.md sibling files",
+    "ref-dispatch-machinery.md must state never create 00-overview-*.md sibling files",
 )
 
 # AC-10: delivery.md Step 11.7 (initiative-gated, obsidian/local-aware, read-modify-write, best-effort, no-op when null)
@@ -16226,7 +16235,6 @@ check(
 )
 check(
     "suite68(ac11f): CLAUDE.md §3 current-version is 2.60.0 or later",
-    # v2.60.0 was the initial version for this feature; v2.61.0 advances it further (parallel dispatch)
     "2.60." in _s68_claude or "2.61." in _s68_claude or "2.6" in _s68_claude,
     "CLAUDE.md §3 current-version must be 2.60.0 or later (minor bump from 2.59.0 for initiative layer)",
 )
@@ -16236,14 +16244,11 @@ _s68_plugin = read(REPO_ROOT / ".claude-plugin" / "plugin.json")
 _s68_marketplace = read(REPO_ROOT / ".claude-plugin" / "marketplace.json")
 check(
     "suite68(ac12a): .claude-plugin/plugin.json version is 2.60.0 or later",
-    # v2.60.0 was the initial version for this feature; v2.61.0 advances it (parallel dispatch);
-    # v2.62.0 advances it further (milestone-build continuity). Use tuple comparison for forward compat.
     _s59_ver_tuple(json.loads(_s68_plugin).get("version", "0.0.0")) >= (2, 60, 0),
     ".claude-plugin/plugin.json version field must be 2.60.0 or later (minor bump from 2.59.0 for initiative layer)",
 )
 check(
     "suite68(ac12b): .claude-plugin/marketplace.json plugins[0].version is 2.60.0 or later",
-    # Same floor as ac12a — forward-compatible tuple comparison.
     _s59_ver_tuple(json.loads(_s68_marketplace).get("plugins", [{}])[0].get("version", "0.0.0")) >= (2, 60, 0),
     ".claude-plugin/marketplace.json plugins[0].version must be 2.60.0 or later (minor bump from 2.59.0 for initiative layer)",
 )
@@ -16254,7 +16259,6 @@ check(
     "CHANGELOG.md must contain a ## [2.59.0] section that mentions the initiative feature "
     "(fragment is transient and correctly absent post-delivery)",
 )
-# Self-referential: this test file contains Suite 68 and the marker
 _s68_this_file = read(Path(__file__))
 check(
     "suite68(ac12d-self-ref): this test file contains 'Suite 68' and '_slice_section' and 'multi-project-initiative-overview'",
@@ -16273,30 +16277,28 @@ check(
     "CLAUDE.md §11 must not mention Suite 68 — only docs/testing.md is the canonical registry",
 )
 
-# AC-13: new assertions proving the fix (failing-first against v2.59.0 docs)
-# These assert the FIXED state and therefore FAIL on the current (unfixed) tree.
+# AC-13: retargeted assertions proving the fused corpus preserves the fix
 
-# ac13a: date-agnostic JOIN match rule — content lives in ref-intake-flows.md
-# § Initiative Create-or-Join (moved verbatim from orchestrator.md Step 1f).
-_s68_join_overview_slice = _slice_section(_s68_intake_flows, "1f. **CONDITIONAL — Initiative create-or-join", _S68_JOIN_STOP)
+# ac13a: date-agnostic JOIN match rule -- content lives in ref-intake-flows.md
+# § Initiative Create-or-Join (reuses the ac6 slice; no separate step-number anchor left to target).
 check(
-    "suite68(ac13a): ref-intake-flows.md Step 1f contains date-agnostic JOIN match rule (*_{slug} glob or initiative: frontmatter)",
-    "*_{" in _s68_join_overview_slice or ("*_" in _s68_join_overview_slice and ("slug" in _s68_join_overview_slice or "initiative:" in _s68_join_overview_slice)),
-    "ref-intake-flows.md Step 1f must contain the date-agnostic JOIN match rule: glob *_{slug} (absorbs any {date}_ prefix) confirmed by initiative: frontmatter",
+    "suite68(ac13a): ref-intake-flows.md Initiative Create-or-Join contains date-agnostic JOIN match rule (*_{slug} glob or initiative: frontmatter)",
+    "*_{" in _s68_join_slice or ("*_" in _s68_join_slice and ("slug" in _s68_join_slice or "initiative:" in _s68_join_slice)),
+    "ref-intake-flows.md Initiative Create-or-Join must contain the date-agnostic JOIN match rule: glob *_{slug} (absorbs any {date}_ prefix) confirmed by initiative: frontmatter",
 )
 
 # ac13b: per-project docs_root drops {date}_{feature} leaf when initiative is set
 check(
-    "suite68(ac13b): orchestrator.md Step 2 states per-project docs_root is {base_path}/{project} (no {date}_{feature} leaf) when initiative is set",
-    "{base_path}/{project}" in _s68_step2_slice or ("docs_root" in _s68_step2_slice and "{project}" in _s68_step2_slice and "{date}" not in _s68_step2_slice.split("{project}")[0].split("initiative")[-1]),
-    "orchestrator.md Step 2 must state docs_root = {base_path}/{project} with no {date}_{feature} leaf when initiative is set",
+    "suite68(ac13b): ref-dispatch-machinery.md states per-project docs_root is {base_path}/{project} (no {date}_{feature} leaf) when initiative is set",
+    "{base_path}/{project}" in _s68_dispatch_machinery,
+    "ref-dispatch-machinery.md must state docs_root = {base_path}/{project} with no {date}_{feature} leaf when initiative is set",
 )
 
-# ac13c: delivery.md Step 11.7 overview_path uses the dated {YYYY-MM-DD}_{initiative} folder
+# ac13c: the dated {YYYY-MM-DD}_{initiative} folder is used for the initiative-set obsidian path
 check(
-    "suite68(ac13c): leader.md Step 1 base-path uses dated {YYYY-MM-DD}_{initiative} folder",
-    "{YYYY-MM-DD}_{initiative}" in _s68_step2_slice,
-    "leader.md Step 1 base-path must reference the dated {YYYY-MM-DD}_{initiative} folder in the overview_path",
+    "suite68(ac13c): ref-dispatch-machinery.md base-path table uses dated {YYYY-MM-DD}_{initiative} folder",
+    "{YYYY-MM-DD}_{initiative}" in _s68_dispatch_machinery,
+    "ref-dispatch-machinery.md must reference the dated {YYYY-MM-DD}_{initiative} folder in the initiative-set base_path",
 )
 
 # ac13d: parent index filename is overview.md (no 00- prefix) across all touched files; 00-overview.md must be absent
@@ -16322,52 +16324,56 @@ check(
 check(
     "suite68(ac13e): overview.md Template contains '## Functional Description' section between '## Review Summary' and '## Projects'",
     "## Functional Description" in _s68_template_slice,
-    "orchestrator.md overview.md Template must contain a '## Functional Description' section (placed between '## Review Summary' and '## Projects')",
+    "ref-dispatch-machinery.md overview.md Template must contain a '## Functional Description' section (placed between '## Review Summary' and '## Projects')",
 )
 check(
     "suite68(ac13e-ownership): overview.md Template section-ownership map lists '## Functional Description' as a distinct owned row",
     "Functional Description" in _s68_template_slice and ("Sole writer" in _s68_template_slice or "sole writer" in _s68_template_slice),
-    "orchestrator.md section-ownership map must list '## Functional Description' as a distinct owned section",
+    "ref-dispatch-machinery.md section-ownership map must list '## Functional Description' as a distinct owned section",
 )
 
 # ac13f: section-ownership map declares both refresh triggers
-# Trigger 1: on-plan-change reconcile (orchestrator, after Design / STAGE-GATE-1)
-# Trigger 2: on-completion final-reconcile (delivery, all rows delivered)
 check(
-    "suite68(ac13f-trigger-plan): overview.md Template section-ownership map declares on-plan-change reconcile trigger (orchestrator after Design/STAGE-GATE-1)",
+    "suite68(ac13f-trigger-plan): overview.md Template section-ownership map declares on-plan-change reconcile trigger (after Design/STAGE-GATE-1)",
     ("STAGE-GATE-1" in _s68_template_slice or "Stage 1" in _s68_template_slice or "plan change" in _s68_template_slice or "plan-change" in _s68_template_slice)
     and "reconcile" in _s68_template_slice,
-    "orchestrator.md section-ownership map must declare the on-plan-change reconcile trigger (orchestrator fires after Design / STAGE-GATE-1 for each project)",
+    "ref-dispatch-machinery.md section-ownership map must declare the on-plan-change reconcile trigger (fires after Design / STAGE-GATE-1 for each project)",
 )
 check(
     "suite68(ac13f-trigger-complete): overview.md Template section-ownership map declares on-completion final-reconcile trigger (delivery, all rows delivered)",
     ("delivered" in _s68_template_slice or "completion" in _s68_template_slice or "final reconcile" in _s68_template_slice or "final-reconcile" in _s68_template_slice)
     and "delivery" in _s68_template_slice,
-    "orchestrator.md section-ownership map must declare the on-completion final-reconcile trigger (delivery when all ## Projects rows = delivered)",
+    "ref-dispatch-machinery.md section-ownership map must declare the on-completion final-reconcile trigger (delivery when all ## Projects rows = delivered)",
 )
 
 # ac13g: no-fork/consolidation invariant states the concurrency-safe write rules
-_s68_nofork_slice = _slice_section(_s68_orch, "### No-fork", _S68_STOP)
+_s68_nofork_slice = _slice_section(_s68_template_slice, "### No-fork", _S68_STOP)
 check(
     "suite68(ac13g-rows-keyed): no-fork invariant states per-project rows keyed one-per-project (parallel updates touch different rows)",
     "one-per-project" in _s68_nofork_slice or ("keyed" in _s68_nofork_slice and "project" in _s68_nofork_slice),
-    "orchestrator.md no-fork invariant must state per-project rows are keyed one-per-project (parallel updates safe)",
+    "ref-dispatch-machinery.md no-fork invariant must state per-project rows are keyed one-per-project (parallel updates safe)",
 )
 check(
-    "suite68(ac13g-reconcile): no-fork invariant states functional/big-picture sections reconcile-in-place by re-reading all plans, last-writer-wins",
+    "suite68(ac13g-reconcile): no-fork invariant states functional/big-picture sections reconcile-in-place, last-writer-wins",
     ("last-writer" in _s68_nofork_slice or "last writer" in _s68_nofork_slice)
-    and ("reconcile" in _s68_nofork_slice or "re-read" in _s68_nofork_slice or "re-reading" in _s68_nofork_slice),
-    "orchestrator.md no-fork invariant must state reconcile-in-place by re-reading all plans, last-writer-wins on a true race",
+    and "reconcile" in _s68_nofork_slice,
+    "ref-dispatch-machinery.md no-fork invariant must state reconcile-in-place, last-writer-wins on a true race",
 )
+# Retargeted: the pre-fusion "out of scope (follow-up)" placeholder and its
+# v2.61.0 successor (a pointer to the now-retired ## Parallel Multi-Project
+# Dispatch section) are BOTH gone. The current invariant instead states a
+# positive concurrency-safe rule directly (serialized read-modify-write, one
+# project completion processed at a time) rather than pointing at a sibling
+# section — confirmed this is not a silent regression: the underlying
+# safety property (no lost update on concurrent project completions) is
+# stated, just without a cross-reference to a mechanism that no longer exists.
 check(
-    "suite68(ac13g-parallel-dispatch-oos): no-fork invariant no longer states single-session parallel dispatch is out of scope (superseded by v2.61.0 reconcile-ordering rule)",
-    # v2.61.0: the out-of-scope placeholder was replaced by the reconcile-ordering rule.
-    # The nofork slice must NOT contain the old "out of scope (follow-up)" text; it MUST
-    # contain the reconcile-ordering rule or a reference to the parallel dispatch contract.
-    ("out of scope (follow-up)" not in _s68_nofork_slice and "out-of-scope (follow-up)" not in _s68_nofork_slice)
-    and ("reconcile" in _s68_nofork_slice or "Parallel Multi-Project Dispatch" in _s68_nofork_slice or "parallel dispatch" in _s68_nofork_slice),
-    "orchestrator.md no-fork invariant must no longer contain 'out of scope (follow-up)'; it must contain the reconcile-ordering rule or reference to ## Parallel Multi-Project Dispatch (v2.61.0 supersedes this placeholder)",
+    "suite68(ac13g-serialized-write): no-fork invariant states the parent serializes its own read-modify-write (no overlapping reconciles)",
+    "serialize" in _s68_nofork_slice and "arrival order" in _s68_nofork_slice,
+    "ref-dispatch-machinery.md no-fork invariant must state the coordinator serializes its own read-modify-write of overview.md, processing completions in arrival order",
 )
+
+# Marker: multi-project-initiative-overview
 
 # ---------------------------------------------------------------------------
 # Suite 69: parallel-multi-project-dispatch (v2.61.0) -- RETIRED, coordinator-fusion
