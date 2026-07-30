@@ -744,9 +744,11 @@ Per-site regression pinning the multi-site (a) reconciliation: after the dev-gua
 
 ### Suite 12 — security-self-scan
 
-5 checks (one per security check). REPORT-only scanner that audits the repo's shipped assets (`agents/`, `skills/`, `hooks/`, `.claude-plugin/`) for security invariants. File: `tests/test_security_scan.py`. Wired as Suite 12 in `tests/run-all.sh`. Provides positive (red-on-regression) fixtures for all five checks (AC-9). All checks exit 0 on the v2.91.0 clean tree (AC-6).
+6 checks (one per security check, plus the agent-set mirror-integrity check added by coordinator-fusion T4-AC-5). REPORT-only scanner that audits the repo's shipped assets (`agents/`, `skills/`, `hooks/`, `.claude-plugin/`) for security invariants. File: `tests/test_security_scan.py`. Wired as Suite 12 in `tests/run-all.sh`. Provides positive (red-on-regression) fixtures for all five original checks (AC-9). All checks exit 0 on the current clean tree (AC-6).
 
-Check 1 (FAIL) — read-only-tier agent (`READ_ONLY_AGENTS` set: `architect, security, qa, qa-plan, acceptance-checker, plan-reviewer, mentor`) carrying `Bash` in frontmatter `tools:`. The `READ_ONLY_AGENTS` set is mirrored verbatim from `test_agent_structure.py:86` (single source of truth). Only `Bash` is flagged; `Write`/`Edit` are permitted (read-only agents author workspace docs).
+Check 0 (FAIL) — `EXPECTED_AGENTS`/`READ_ONLY_AGENTS`, mirrored verbatim from `test_agent_structure.py`'s own module-level assignments (parsed via `ast`, never eyeballed), are asserted EQUAL to their source of truth at runtime. Closes the pre-existing gap where Check 1/2 silently skip any agent name their local copy is missing a file for (`if not path.exists(): continue`) — without this check, `run-all.sh` stayed green whether the mirror was current or stale.
+
+Check 1 (FAIL) — read-only-tier agent (`READ_ONLY_AGENTS` set: `architect, security, qa, qa-plan, plan-reviewer, mentor, adversary`) carrying `Bash` in frontmatter `tools:`. The `READ_ONLY_AGENTS` set is mirrored verbatim from `test_agent_structure.py`'s own `READ_ONLY_AGENTS` (single source of truth), asserted equal by Check 0. Only `Bash` is flagged; `Write`/`Edit` are permitted (read-only agents author workspace docs).
 
 Check 2 (FAIL) — agent whose frontmatter `tools:` grants `WebFetch` or `WebSearch` but whose body lacks the `## Untrusted content & prompt-injection floor` heading (§6.6 prompt-injection defense). Web-facing agents are derived strictly from frontmatter `tools:` over `EXPECTED_AGENTS` only — never from a body grep — so `reviewer.md` (carries the preamble but no web grant) and prose references in `ref-*.md` are not candidates.
 

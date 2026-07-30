@@ -21,6 +21,7 @@
 
 from __future__ import annotations
 
+import ast
 import io
 import json
 import re
@@ -46,26 +47,26 @@ PLUGIN_DIR = REPO_ROOT / ".claude-plugin"
 # Mirror verbatim; any divergence from test_agent_structure.py is a defect.
 # ---------------------------------------------------------------------------
 
-# Mirror of test_agent_structure.py READ_ONLY_AGENTS (line 86).
+# Mirror of test_agent_structure.py READ_ONLY_AGENTS.
 # These agents MUST NOT carry Bash in their frontmatter tools:.
-# Source of truth: tests/test_agent_structure.py:86
-# pipeline-cost-slimdown (Task-6): acceptance-checker is fully retired —
-# dropped from this mirror to stay in sync with the source of truth.
+# Source of truth: tests/test_agent_structure.py READ_ONLY_AGENTS — asserted
+# equal at runtime by check_0_mirror_integrity() below, never eyeballed.
 READ_ONLY_AGENTS = {
     "architect", "security", "qa", "qa-plan",
-    "plan-reviewer", "mentor",
+    "plan-reviewer", "mentor", "adversary",
 }
 
 # Mirror of test_agent_structure.py EXPECTED_AGENTS.
 # Check 2 scopes web-facing detection to this set of real agent files only.
-# Source of truth: tests/test_agent_structure.py:76-83
+# Source of truth: tests/test_agent_structure.py EXPECTED_AGENTS — asserted
+# equal at runtime by check_0_mirror_integrity() below, never eyeballed.
 EXPECTED_AGENTS = [
-    "leader", "orchestrator", "architect", "agent-builder", "security", "reviewer",
+    "orchestrator", "architect", "agent-builder", "security", "reviewer",
     "reviewer-consolidator",
     "qa", "qa-plan", "gcp-cost-analyzer", "gcp-infra", "init", "implementer", "tester",
     "plan-reviewer", "diagrammer", "likec4-diagrammer",
     "d2-diagrammer", "translator", "delivery", "mentor",
-    "researcher", "research-consolidator",
+    "researcher", "research-consolidator", "code-researcher", "adversary",
 ]
 
 # ---------------------------------------------------------------------------
@@ -171,6 +172,61 @@ def repo_rel(path: Path) -> str:
         return path.relative_to(REPO_ROOT).as_posix()
     except ValueError:
         return str(path)
+
+
+# ---------------------------------------------------------------------------
+# Check 0 — mirror-integrity: EXPECTED_AGENTS/READ_ONLY_AGENTS asserted equal
+# to their declared source of truth, not eyeballed. Without this, Check 1/2
+# silently skip any agent file their own local copy has fallen out of sync
+# with (a missing file is treated as "not our concern here" by design), so
+# `run-all.sh` stays green whether the mirror is current or stale — this
+# check closes exactly that gap by parsing the source file's own module-level
+# assignments and failing loudly on any divergence.
+# ---------------------------------------------------------------------------
+
+def _read_source_of_truth() -> tuple[list[str], set[str]]:
+    """Parse tests/test_agent_structure.py's own EXPECTED_AGENTS/READ_ONLY_AGENTS
+    module-level assignments via ast, never a regex over its source text."""
+    source_path = REPO_ROOT / "tests" / "test_agent_structure.py"
+    tree = ast.parse(read(source_path), filename=str(source_path))
+    values: dict[str, object] = {}
+    for node in tree.body:
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id in ("EXPECTED_AGENTS", "READ_ONLY_AGENTS")
+        ):
+            values[node.targets[0].id] = ast.literal_eval(node.value)
+    return values["EXPECTED_AGENTS"], values["READ_ONLY_AGENTS"]
+
+
+def check_0_mirror_integrity() -> int:
+    """Return count of FAIL findings."""
+    before = len(findings)
+    truth_expected, truth_readonly = _read_source_of_truth()
+
+    if list(EXPECTED_AGENTS) != list(truth_expected):
+        finding(
+            "FAIL",
+            "check-0",
+            "EXPECTED_AGENTS diverges from tests/test_agent_structure.py's own"
+            f" EXPECTED_AGENTS — mirror: {EXPECTED_AGENTS!r}; source of truth:"
+            f" {truth_expected!r}",
+        )
+    if set(READ_ONLY_AGENTS) != set(truth_readonly):
+        finding(
+            "FAIL",
+            "check-0",
+            "READ_ONLY_AGENTS diverges from tests/test_agent_structure.py's own"
+            f" READ_ONLY_AGENTS — mirror: {sorted(READ_ONLY_AGENTS)!r}; source of"
+            f" truth: {sorted(truth_readonly)!r}",
+        )
+
+    if len(findings) == before:
+        print("  [PASS] check-0 — EXPECTED_AGENTS and READ_ONLY_AGENTS both equal their"
+              " source of truth")
+    return len(findings) - before
 
 
 # ---------------------------------------------------------------------------
@@ -653,6 +709,10 @@ def main() -> None:
     print("=== Suite 12: security self-scan ===")
     print()
 
+    print("--- Check 0: agent-set mirror asserted equal to its source of truth ---")
+    check_0_mirror_integrity()
+    print()
+
     print("--- Check 1: read-only tier excludes Bash ---")
     check_1_readonly_bash()
     print()
@@ -678,7 +738,7 @@ def main() -> None:
     # ---------------------------------------------------------------------------
     fails = [f for f in findings if f[0] == "FAIL"]
     warns = [f for f in findings if f[0] == "WARN"]
-    passes = 5 - len({f[1] for f in fails})  # approximate: checks without FAIL findings
+    passes = 6 - len({f[1] for f in fails})  # approximate: checks without FAIL findings
 
     print("=" * 60)
     print(f"  security self-scan: {len(fails)} FAIL / {len(warns)} WARN")
