@@ -18,7 +18,7 @@ the top-level agent has `Task` from the start of the session and dispatches leaf
 `blocked-no-dispatch`, the Takeover Protocol) is RETIRED.** It existed to backstop one specific
 spawn: a top-level `leader` dispatching a second coordinator, `th:orchestrator`, as a nested
 subagent, and handling the case where that nested subagent lost its `Task` tool. The coordinator
-fusion removes that spawn entirely — `agents/orchestrator.md`'s Dispatch invariant #2 forbids
+fusion removes that spawn entirely — `agents/ref-pipeline.md`'s Dispatch invariant #2 forbids
 dispatching any coordinator, including another copy of itself, with no exception clause — so the
 scenario this protocol existed to detect and recover from no longer has a producer. Nothing
 replaces it; the retirement is a genuine loss of subject, not a transfer.
@@ -98,7 +98,7 @@ On recovery, the resolved config is re-read from `00-state.md` § Current State 
 - Touching `bin/install.sh`, `bin/install.ps1`, or any file under `cmd/install/` → route to `architect` first (installer contract with `~/.claude/` and `~/.claude.json` is load-bearing).
 - Adding/removing an agent → route to `architect` + `agent-builder`; also update `README.md` agent roster and the system diagram.
 - Hook changes or MCP server changes → flag for `security` review (both execute with the user's privileges).
-- Changing the coordinator's pipeline → architecture review mandatory; update `agents/orchestrator.md` + `agents/ref-direct-modes.md` + `agents/ref-special-flows.md` atomically.
+- Changing the coordinator's pipeline → architecture review mandatory; update `agents/ref-pipeline.md` + affected shared/direct references atomically. Activation-boundary changes also update `agents/orchestrator.md`.
 
 ## `blocked-manual-push` Handling
 

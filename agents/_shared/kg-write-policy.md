@@ -1,6 +1,6 @@
 # KG write-time policy
 <!-- Single source of truth for KG write-time content-policy + dedup gates.
-     Consumed by: agents/orchestrator.md (Phase 6 Knowledge Save + Phase 3
+     Consumed by: agents/ref-pipeline.md (Phase 6 Knowledge Save + Phase 3
      security-finding writes) and agents/delivery.md (Step 11.5 passive capture).
      Read-only agents (qa, tester, security, architect) do NOT reference this —
      they never call create_nodes; they emit kg_save_candidates instead.

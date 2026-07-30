@@ -10,8 +10,8 @@ commit that merged PR-1) and asserts byte-identity with the enum/fields declared
 
 The invariant this suite enforces is schema identity between this repo and CH's
 `flowevent.go` — never file location. The catalog lives in `docs/observability.md`
-(not the always-loaded `agents/orchestrator.md`) because a dormant, opt-in feature's
-full schema does not belong in a prompt every pipeline pays to load.
+because a dormant, opt-in feature's full schema does not belong in either the
+startup kernel or every active pipeline phase.
 
 Network failure → SKIP with a clear warning so this test never false-reds CI offline.
 """

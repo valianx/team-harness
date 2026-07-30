@@ -26,7 +26,9 @@ Convention: parse arguments, build a task payload, route to the `orchestrator` a
 
 ## Routing
 
-- **Routes to orchestrator** (default for pipeline work): `/th:issue`, `/th:plan`, `/th:design`, `/th:plan-review`, `/th:research`, `/th:learn`, `/th:spike`, `/th:test`, `/th:test-cross-browser`, `/th:test-pipeline`, `/th:validate`, `/th:define-ac`, `/th:security`, `/th:audit`, `/th:review-pr`, `/th:deliver`, `/th:diagram`, `/th:likec4-diagram`, `/th:d2-diagram`, `/th:translate`, `/th:bootstrap`, `/th:recover`, `/th:eval`, `/th:gcp-costs`, `/th:cross-repo`, `/th:inline` (operator-only session toggle, `disable-model-invocation: true`).
+- **Explicit gated activation:** `/th:pipeline` (operator-only, `disable-model-invocation: true`).
+- **Explicit compatibility activation:** `/th:issue`, `/th:plan` in `plan-and-execute` mode, and `/th:recover` for persisted state.
+- **Routes to the direct orchestrator kernel:** plain `/th:plan`, `/th:design`, `/th:plan-review`, `/th:research`, `/th:learn`, `/th:spike`, `/th:test`, `/th:test-cross-browser`, `/th:test-pipeline`, `/th:validate`, `/th:define-ac`, `/th:security`, `/th:audit`, `/th:review-pr`, `/th:deliver`, `/th:diagram`, `/th:likec4-diagram`, `/th:d2-diagram`, `/th:translate`, `/th:bootstrap`, `/th:eval`, `/th:gcp-costs`, `/th:cross-repo`, `/th:inline`.
 - **Standalone** (no orchestrator involvement): `/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:background`, `/th:update`, `/th:report-issue`, `/th:hookify`, `/th:save-session`, `/th:resume-session`, `/th:todo`, `/th:mcp-optimize`.
 - **Standalone complex skills** (no slash-command entry point, triggered by description matching): `obsidian-markdown`, `obsidian-bases`, `json-canvas`, `obsidian-cli`.
 

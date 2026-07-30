@@ -7,7 +7,7 @@ color: cyan
 
 # orchestrator — Initiative Machinery Reference
 
-Read on demand by `th:orchestrator`. Not part of its system prompt, never dispatched via `Task`. It holds what the prompt delegates by pointer so the same content is not stated twice. Voice, the untrusted-content floor, gates, intake, Specify, recovery and output discipline all stay in `agents/orchestrator.md` and are not duplicated here.
+Read on demand by `th:orchestrator`. Not part of its system prompt, never dispatched via `Task`. Direct routing and safety stay in `agents/orchestrator.md`; active-pipeline gates, Intake, Specify, recovery, and output contracts live in `agents/ref-pipeline.md`.
 
 Everything in this file applies only when `initiative != null`. On the single-project path — the overwhelming majority of runs — none of it is read.
 
@@ -41,7 +41,7 @@ Projects are separate only when both signals are **pairwise-distinct** across al
 
 ## Multi-project sequencing
 
-**One project at a time.** Each project runs its own Stage 1 → Stage 3 to completion inside this same agent, in sequence. You never spawn a copy of yourself to run a lane — `agents/orchestrator.md § "Dispatch invariants"` #2 forbids it without exception, and that invariant is absolute here too: no case in this section constructs a dispatch of another coordinator, including another copy of yourself. Serial execution is the **derived consequence** of that absolute invariant, not an independent policy stated a second time — reopening parallelism means changing the invariant itself, in a plan, never a local exception carved out of this section.
+**One project at a time.** Each project runs its own Stage 1 → Stage 3 to completion inside this same agent, in sequence. You never spawn a copy of yourself to run a lane — `agents/ref-pipeline.md § "Dispatch invariants"` #2 forbids it without exception, and that invariant is absolute here too: no case in this section constructs a dispatch of another coordinator, including another copy of yourself. Serial execution is the **derived consequence** of that absolute invariant, not an independent policy stated a second time — reopening parallelism means changing the invariant itself, in a plan, never a local exception carved out of this section.
 
 **Eligibility.** Read `overview.md § Projects` for status and `§ Big-Picture Plan` for A-blocks-B sequencing and shared-contract-in-flux exclusions. Exclude `deferred`, `blocked`, `delivered`. Never proceed across an in-flux shared contract.
 
@@ -121,4 +121,4 @@ Transcribed verbatim from the previous revision of this file rather than re-deri
 | `00-leader-roster.md` schema and write discipline | the roster tracked coordinator instances; there is one coordinator, running each project in its own turn, so there is nothing to track across instances |
 | The coordinator spawn-payload contract | there is no spawn — Intake writes the board directly, in this same agent |
 | Multi-Task fan-out and its consolidator contract | measured at 0.6% of runs, and those were operator overrides. Two independent tasks run as two sessions on two worktrees, consolidated by the operator |
-| `functional_clarity_confirmed` propagation | it was a payload field carried from one coordinator to another; it is now a `checkpoint.confirmed` event this same agent reads from its own events file (`agents/orchestrator.md § Gates`) |
+| `functional_clarity_confirmed` propagation | it was a payload field carried from one coordinator to another; it is now a `checkpoint.confirmed` event this same agent reads from its own events file (`agents/ref-pipeline.md § Gates`) |

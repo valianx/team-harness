@@ -1,33 +1,29 @@
 # How it works
 
-Team-harness turns Claude Code into a Spec-Driven Development pipeline. Every feature runs through three stages with mandatory human gates between them. State lives in files (`workspaces/{feature}/`) so any session — yours, a teammate's, tomorrow's — can resume cold by reading them.
+Team Harness starts as a lightweight direct assistant and offers an explicit Spec-Driven Development pipeline. Pipeline state lives in `workspaces/{feature}/`, so an activated run can resume cold.
 
 ---
 
 ## Entry point: talk to th:orchestrator
 
-**`th:orchestrator` is the top-level session agent and your single point of contact.** You drive the entire lifecycle by talking to it conversationally — design, implementation, delivery, and recovery all enter through the same agent. It owns Intake, Discover/framing, Specify, spec + AC co-authoring, the gated pipeline (Design → Delivery), and the direct dispatch of specialists for the lighter non-gated modes (research, docs, mentor, and similar). It prepares and records all three STAGE-GATEs itself, in the same operation that presents the STOP block inline in your conversation — no second agent relays your decision. The full runtime agent tree is in [`docs/agent-tree.md`](./agent-tree.md).
+**`th:orchestrator` is the top-level session agent and your single point of contact.** Its 881-word kernel handles conversation, inspection, review, and bounded reversible work directly. It does not load pipeline stages, gates, workspace contracts, or delivery mechanics at startup.
 
-Phrasings that route correctly:
+Start the gated flow explicitly:
 
-```
-@th:orchestrator give me the work plan for this task: <description>   # → Stage 1 design
-@th:orchestrator implement it                                          # → Stage 2 implementation
-@th:orchestrator open the PR                                           # → Stage 3 delivery + push
-@th:orchestrator recover <feature>                                     # → resume from 00-state.md
+```text
+/th:pipeline add a daily reports endpoint
+/th:recover daily-reports
 ```
 
-The intake step classifies the natural-language request and routes it to the right pipeline or direct mode — design, implementation, verify, delivery, plan-review, validate, deliver, research, and others. Verbs such as `design`, `give me the plan`, `implement`, `open the PR`, `validate`, `review the plan`, `research`, and `recover` map to specific phases. The intent-detection patterns are bilingual; the operator can use either English or Spanish at the chat layer, but repo artefacts (this doc included) are written in English.
+`/th:pipeline` is singular and mutating; `/th:pipelines` remains the read-only status renderer. Once activated, the coordinator reads `agents/ref-pipeline.md` by heading: activation sections first, then only the current phase. Gate replies continue the active run without repeating the command.
 
-**Skills (slash commands) are optional shortcuts.** Skills like `/design`, `/deliver`, `/recover`, `/issue`, `/research`, `/th:pipelines` exist and work, but they all route into the same `th:orchestrator` front door under the hood. They give you a deterministic entry point (no intent-detection step) and a few extras like `/design #5` fetching GitHub issue #5 automatically — but the conversational `@th:orchestrator` path covers everything.
-
-Pick whichever feels more natural. The rest of this doc uses the conversational form.
+Broad, ambiguous, sensitive, or irreversible direct work is never silently upgraded. The coordinator recommends `/th:pipeline` and waits; the operator may activate it or narrow the direct scope.
 
 ---
 
 ## The pipeline
 
-You tell th:orchestrator: `@th:orchestrator give me the work plan for this task: add a daily reports endpoint`.
+You invoke `/th:pipeline add a daily reports endpoint`.
 
 ### Stage 1 — Analysis
 
@@ -124,7 +120,7 @@ Each row is a real failure mode encountered and patched. See [`docs/knowledge.md
 ## What ships
 
 - **Agents.** 26 agents. The coordination agent — `orchestrator` (top-level session agent) — plus the specialists: `architect`, `implementer`, `tester`, `qa`, `qa-plan`, `plan-reviewer`, `delivery`, `reviewer`, `reviewer-consolidator`, `security`, `ux-reviewer`, `diagrammer`, `likec4-diagrammer`, `d2-diagrammer`, `documenter`, `translator`, `gcp-cost-analyzer`, `gcp-infra`, `init`, `agent-builder`, `mentor`, `researcher`, `research-consolidator`, `code-researcher`, `adversary`. How they relate at runtime: [`docs/agent-tree.md`](./agent-tree.md). Full roster, model tier (opus / sonnet / haiku), and effort matrix: [`agents/README.md`](../agents/README.md).
-- **Skills** (slash commands). Most route through `th:orchestrator`; standalone utilities include `/lint`, `/th:pipelines`, `/th:kg`, `/tmux`, `/th-update`, and `/background`. Common routed entries: `/design`, `/plan`, `/recover`, `/deliver`, `/review-pr`, `/issue`. `/background` launches a background `claude -p` headless session for eligible long-running tasks — it does not route through th:orchestrator.
+- **Skills** (slash commands). `/th:pipeline` explicitly activates the gated flow; most others route through the direct kernel. Standalone utilities include `/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:update`, and `/th:background`. Common routed entries include `/th:design`, `/th:plan`, `/th:recover`, `/th:deliver`, `/th:review-pr`, and `/th:issue`. `/th:background` launches a background `claude -p` headless session for eligible long-running tasks — it does not route through `th:orchestrator`.
 - **Hooks.** Registered boundary hooks are intentionally narrow: `policy-block` blocks catastrophic recursive deletion and provider-shaped credentials; `dev-guard` gates Git/GitHub/ClickUp outward actions; `gcp-guard` classifies mutating gcloud verbs. Additional retained hook bodies may be unwired; `.claude-plugin/hooks.json` is the authority. Notification scripts are optional. Full catalog: [`hooks/README.md`](../hooks/README.md).
 - **External Memory MCP** server. Semantic memory across projects. The server (`context-harness-mcp` or any MCP-compatible service) lives outside this repo. Reference: [`docs/kg-content-policy.md`](./kg-content-policy.md).
 

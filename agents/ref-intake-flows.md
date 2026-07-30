@@ -9,13 +9,13 @@ color: cyan
 
 This file is read on-demand by `th:orchestrator` during Intake and Classify. It is NOT part of the coordinator's core system prompt.
 
-**LAZY-LOAD DIRECTIVE — consumers read only the section they need.** Do NOT read this entire file on every invocation. Each section below is triggered by its own condition in `agents/orchestrator.md § Intake` (a 1-2 line trigger + pointer replaces the full body at the original site) — locate the top-level section heading for the active trigger and read only that section. Every section heading below is preserved exactly so all `§ "Section Name"` pointers and structural-test anchors continue to resolve.
+**LAZY-LOAD DIRECTIVE — consumers read only the section they need.** Do NOT read this entire file on every invocation. Each section below is triggered by its own condition in `agents/ref-pipeline.md § Intake` (a 1-2 line trigger + pointer replaces the full body at the original site) — locate the top-level section heading for the active trigger and read only that section. Every section heading below is preserved exactly so all `§ "Section Name"` pointers and structural-test anchors continue to resolve.
 
 ---
 
 ## Milestone Continuity
 
-Triggered from `agents/orchestrator.md § Intake` (the workspace-folder step), before composing a fresh `docs_root`.
+Triggered from `agents/ref-pipeline.md § Intake` (the workspace-folder step), before composing a fresh `docs_root`.
 
 **Milestone-continuity detect-and-continue (multi-milestone `type: plan` builds only).** Before composing a fresh `docs_root`, run this check: if the incoming task is a milestone execution (e.g., "implement M0", "build M2") that belongs to an existing plan, detect the plan workspace by identity and resume the SAME plan workspace instead of creating a new top-level sibling.
 
@@ -44,7 +44,7 @@ This reuses the #283/#285 identity-keyed-resolution pattern: the plan workspace 
 
 ## Initiative Create-or-Join
 
-Triggered from `agents/orchestrator.md § Intake` (the workspace-folder step), only when `initiative` is non-null in `00-state.md`.
+Triggered from `agents/ref-pipeline.md § Intake` (the workspace-folder step), only when `initiative` is non-null in `00-state.md`.
 
 **CONDITIONAL — Initiative create-or-join (only when `initiative` is non-null in `00-state.md`).** If `initiative == null`, this step is a complete no-op — skip silently. Otherwise:
 
@@ -76,7 +76,7 @@ Branch-at-Design is the current git branch if already on a feature branch, or `�
 
 ## Initiative Detection and Confirm
 
-Triggered from `agents/orchestrator.md § Intake` (the Discover-disposition step), during Discover, after framing and before the intake survey.
+Triggered from `agents/ref-pipeline.md § Intake` (the Discover-disposition step), during Discover, after framing and before the intake survey.
 
 **Initiative detection + confirm (runs during Discover, after framing, before the intake survey).**
 
@@ -108,7 +108,7 @@ Then WAIT. Do NOT auto-advance. Do NOT set `initiative` or create any folder bef
 
 ## Language and English-Learning Intent Handling
 
-Triggered from `agents/orchestrator.md § "11 — Intent routing"`, when the intent matches a `language-set` or `english-learning-set` row (the intent-pattern table itself stays in `agents/orchestrator.md`).
+Triggered from `agents/ref-pipeline.md § "11 — Intent routing"`, when the intent matches a `language-set` or `english-learning-set` row. The startup kernel's direct-routing table stays in `agents/orchestrator.md`.
 
 **Language-set intent handling.** When the intent matches a `language-set` row:
 
@@ -139,7 +139,7 @@ Triggered from `agents/orchestrator.md § "11 — Intent routing"`, when the int
 
 ## ClickUp Conversational Intents
 
-Triggered from `agents/orchestrator.md § "11 — Intent routing"`, when the utterance contains a ClickUp task identifier.
+Triggered from `agents/ref-pipeline.md § "11 — Intent routing"`, when the utterance contains a ClickUp task identifier.
 
 **ClickUp conversational intents (MCP-direct, no pipeline).**
 
@@ -162,7 +162,7 @@ intent — pipeline routing applies).
 | "cambia/cambiá el estado de task \<id\|name\> a \<status\>" / "set state of task \<id\|name\> to \<status\>" / "set status of task \<id\|name\> to \<status\>" | `clickup_update_task` | Before calling `clickup_update_task`, render a preview block showing the target task id and the new status value, then wait for explicit operator approval (edit/cancel vocabulary as in `skills/clickup/SKILL.md § "Comment preview gate"`). Pass status verbatim from operator (no enum validation — see Status pass-through note). |
 | "cerrame/cierra/close task \<id\|name\>" / "close task \<id\|name\>" | `clickup_update_task` | Before calling `clickup_update_task`, confirm with the operator: "Set task \<id\> to closed — proceed? [Y/n]". Default status `closed`. If MCP rejects, prompt operator for the workspace's actual closed-status name. |
 | "marca/marcá task \<id\|name\> como \<state\>" / "mark task \<id\|name\> as \<state\>" | `clickup_update_task` | Before calling `clickup_update_task`, render a preview block showing the target task id and the new state, then wait for explicit operator approval. Pass `<state>` verbatim. |
-| "rutea/ruteá task \<id\|name\> al pipeline" / "route task \<id\|name\> to pipeline" / "open task \<id\|name\> in the pipeline" | none (delegation) | Equivalent to `/th:clickup task <id>`. Run the skill's `task <id>` flow inline, then route the handoff payload back into `agents/orchestrator.md § "13 — Classify"` as full pipeline. Record `clickup_task_id` (the routed `<id>`) and `clickup_task_url` (`https://app.clickup.com/t/<id>`) in `00-state.md § Current State` at intake, so Phase 5 can post the mandatory functional closing comment even after compaction/recovery. |
+| "rutea/ruteá task \<id\|name\> al pipeline" / "route task \<id\|name\> to pipeline" / "open task \<id\|name\> in the pipeline" | none (delegation) | Equivalent to `/th:clickup task <id>`. Run the skill's `task <id>` flow inline, then route the handoff payload back into `agents/ref-pipeline.md § "13 — Classify"` as full pipeline. Record `clickup_task_id` (the routed `<id>`) and `clickup_task_url` (`https://app.clickup.com/t/<id>`) in `00-state.md § Current State` at intake, so Phase 5 can post the mandatory functional closing comment even after compaction/recovery. |
 | "muestra/mostrá task \<id\|name\>" / "show task \<id\|name\>" | `clickup_get_task` | Read-only; print summary. |
 
 **Name-vs-ID resolution.** When the operator references a task by name (not ID):
@@ -186,7 +186,7 @@ status name. No hardcoded enum.
 
 ## Lane Classification (constraints A-E)
 
-Triggered from `agents/orchestrator.md § "13 — Classify"`, for every development task, regardless
+Triggered from `agents/ref-pipeline.md § "13 — Classify"`, for every development task, regardless
 of `type`.
 
 **Canonical contract:** `docs/pipeline-lanes.md`. This section is the operational summary of
@@ -293,7 +293,7 @@ posture active or not, in this order:
 
 ## Bug Tier
 
-Triggered from `agents/orchestrator.md § "13 — Classify"`, only when `type: fix` or
+Triggered from `agents/ref-pipeline.md § "13 — Classify"`, only when `type: fix` or
 `type: hotfix`.
 
 **When it runs:** only when `type: fix` or `type: hotfix`. The tier determines how much of the
@@ -320,7 +320,7 @@ security runs at Phase 3 for every hotfix because every hotfix is Tier 3 minimum
 
 **Signal 2 — File-path patterns** (deterministic). Evaluate against codebase-investigation
 results when paths are known. The same path list is re-evaluated as a deterministic re-tier GATE
-at your Phase 2-close scope check (`agents/orchestrator.md § "Phase 2 close"`) — a Tier 0/1
+at your Phase 2-close scope check (`agents/ref-pipeline.md § "Phase 2 close"`) — a Tier 0/1
 candidate whose diff touches a security-sensitive path there is force-promoted to Tier 3 with a
 mandatory Phase 3 `security` run.
 - **Tier 1 paths:** `*.md`, `LICENSE`, `CHANGELOG*`, `docs/**/*`, code-comments-only changes.
@@ -369,7 +369,7 @@ mandatory Phase 3 `security` run.
 (`recommended_tier: 1` + rationale). **Operator cannot force Tier 0** for changes touching
 `agents/*.md`, `skills/*.md`, or `cmd/install/*.go` — these always promote to Tier 1 minimum
 regardless of `[TIER: 0]`. Tier 0 routing (dispatch `implementer` directly, no gated pipeline) is
-`agents/orchestrator.md § "Tier 0 and the inline lane"`.
+`agents/ref-pipeline.md § "Tier 0 and the inline lane"`.
 
 **Tier 1 conditional regression-test skip — ALL must hold:** tier is `1`; all touched paths are
 `*.md`/`LICENSE`/`CHANGELOG*`/comments/non-functional strings (**UI strings are Tier 2
@@ -404,7 +404,7 @@ via [TIER: N]`.
 
 ## Root-Cause Provenance Tiers
 
-Triggered from `agents/orchestrator.md § "Phase 1 — Design"`, only for a `type: fix` dispatch at
+Triggered from `agents/ref-pipeline.md § "Phase 1 — Design"`, only for a `type: fix` dispatch at
 Tier 2-4 (a `root-cause` architect mode dispatch, which runs on the full lane) where a candidate
 root-cause artifact already exists — prior `/th:research-code` output from this run, a spec-seed
 prior citing `file:line`, or a linked investigation from an issue/comment.

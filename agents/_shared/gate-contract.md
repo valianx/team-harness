@@ -12,14 +12,14 @@
 <!-- Single source of truth for the STAGE-GATE mechanism: the dual-record release,
      the record-based recover backstop, the STOP-block templates, and the single
      preparer + presenter + recorder flow.
-     Consumed by: agents/orchestrator.md — IMPLEMENTS/RECORDS this contract for its
+     Consumed by: agents/ref-pipeline.md — IMPLEMENTS/RECORDS this contract for its
      three STAGE-GATEs; it is the sole agent that prepares, presents and records
      a gate.
      Edit here; the coordinator references this file by section. -->
 
 ## Ownership — single source, never copied
 
-This file is the ONE canonical description of the gate mechanism. `agents/orchestrator.md`
+This file is the ONE canonical description of the gate mechanism. `agents/ref-pipeline.md`
 **implements and references** it — the three STAGE-GATEs it welds internally follow the
 rules below verbatim. No other agent file may copy, restate, or fork this contract.
 Duplicating it re-imports the drift risk this design closes: a second copy would diverge
@@ -30,7 +30,7 @@ exactly one prompt in the system recording the dual-record schema; the single-co
 model keeps that same one-prompt property for the schema itself, even though the relay it
 used to audit no longer exists).
 
-`agents/orchestrator.md` is the only agent that ever reads this file. It presents every
+The active coordinator, through `agents/ref-pipeline.md`, is the only agent that ever reads this file. It presents every
 gate directly to the operator and records both halves of the dual-record itself — there is
 no second agent in the loop to reference the STOP-block templates or allowlists for its own,
 separate presentation duty.
@@ -245,7 +245,7 @@ strengthening). The deterministic floor for irreversible outward actions remains
 At each STAGE-GATE the orchestrator renders the STOP block directly to the operator
 inline, pausing for an explicit reply in that same conversation. The shape below is a
 GENERIC template: the orchestrator's own gate-data contract
-(`agents/orchestrator.md § "STAGE-GATE-1"`/`"STAGE-GATE-3"`/`"Express combined gate"`)
+(`agents/ref-pipeline.md § "STAGE-GATE-1"`/`"STAGE-GATE-3"`/`"Express combined gate"`)
 supplies the REAL option set of each presentation, including its conditionality.
 Substituting the real option set with this generic placeholder — rendering the bare
 `ship`/`amend`/`abort` shape shown below when the actual presentation's set is narrower or
@@ -261,7 +261,7 @@ options are.
 ========================================
  {Review Summary + Confidence band + Task Summary + accumulated cost
   + combined verdict, or a deferred-review note when the plan-review panel
-  was deferred pre-gate (agents/orchestrator.md § "Phase 1.5 — Plan
+  was deferred pre-gate (agents/ref-pipeline.md § "Phase 1.5 — Plan
   Ratification" / § "Phase 1.6 — Plan Review")}
 
  Reply with:
@@ -272,7 +272,7 @@ options are.
 ========================================
 ```
 
-**Deferred-review variant (no allowlist or dual-record change).** When the implementing orchestrator's `plan_review_status` is `deferred` or `not-applicable`, the `{...}` placeholder above renders a one-line deferred-review note instead of a combined verdict — see `agents/orchestrator.md § "STAGE-GATE-1 — End of Stage 1"` for the exact rendering. This substitutes CONTENT inside the placeholder only: the allowlist, the nonce mechanics, and the dual-record fields this file governs are unchanged — a deferred-review presentation clears and records exactly like any other STAGE-GATE-1 presentation.
+**Deferred-review variant (no allowlist or dual-record change).** When the implementing orchestrator's `plan_review_status` is `deferred` or `not-applicable`, the `{...}` placeholder above renders a one-line deferred-review note instead of a combined verdict — see `agents/ref-pipeline.md § "STAGE-GATE-1 — End of Stage 1"` for the exact rendering. This substitutes CONTENT inside the placeholder only: the allowlist, the nonce mechanics, and the dual-record fields this file governs are unchanged — a deferred-review presentation clears and records exactly like any other STAGE-GATE-1 presentation.
 
 **STAGE-GATE-3** — end of Stage 3 (mandatory, never skippable, regardless of
 `autonomous`):
@@ -448,7 +448,7 @@ allowlist value.
 
 ## How to reference this file
 
-In `agents/orchestrator.md`, replace inline gate-mechanism prose with a one-line
+In `agents/ref-pipeline.md`, replace inline gate-mechanism prose with a one-line
 cross-reference at each STAGE-GATE section:
 
 ```

@@ -262,7 +262,7 @@ When invoked by the coordinator via Task tool, your **FINAL message** must be a 
 agent: mentor
 mode: learn
 status: success | failed | blocked
-failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}
 output: {path to 00-teaching-pack-{topic-slug}.md, or "none" when no pack was produced}
 summary: {1-2 sentences: scope set covered, answer delivered in chat, pack produced or not}

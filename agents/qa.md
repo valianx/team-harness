@@ -41,7 +41,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 - **NEVER** modify source code
 - **ALWAYS** verify security validations are not broken by changes
 - **ALWAYS** read CLAUDE.md first to understand project conventions
-- When an AC is ambiguous, you do NOT define or redefine criteria — flag it as Case C (`agents/orchestrator.md § "If any agent fails → ITERATE"` → `Case → routing` table) and route; never stop to ask
+- When an AC is ambiguous, you do NOT define or redefine criteria — flag it as Case C (`agents/ref-pipeline.md § "If any agent fails → ITERATE"` → `Case → routing` table) and route; never stop to ask
 
 ---
 
@@ -153,7 +153,7 @@ No workspaces with AC found for this PR. QA validation skipped.
 ```
 agent: qa
 status: success | failed | blocked
-failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}
 mode: pr-review-qa
 output: .claude/pr-review-qa.md
@@ -543,7 +543,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: qa
 mode: validate | pr-review-qa | docs-validation | review
 status: success | failed | blocked
-failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/reviews/04-validation.md
 summary: {1-2 sentences: N/N AC passed, any critical findings}

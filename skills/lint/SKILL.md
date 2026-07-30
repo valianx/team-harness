@@ -121,14 +121,14 @@ name: lint
 
 Cross-reference the orchestrator's team table against actual agent files.
 
-1. **Read `agents/orchestrator.md`** and extract the team table (the `| Agent | Role |` table)
+1. **Read `agents/ref-pipeline.md § Your Team`** and extract the team table
 2. **List all `.md` files in `agents/`** (excluding `orchestrator.md` and `ref-*.md` reference files)
 3. **Cross-check:**
    - For each agent in the team table → verify a corresponding `.md` file exists in `agents/`
-   - For each agent `.md` file (excluding orchestrator.md, ref-*.md) → verify it appears in either the team table OR the "Standalone agents" note (in `agents/orchestrator.md`)
+   - For each agent `.md` file (excluding orchestrator.md, ref-*.md) → verify it appears in either the team table OR its "Standalone agents" note
    - Report: agents in table but missing file, agents with file but not in table/standalone note
 4. **Workspace-doc conflicts:** Extract the `Workspace doc` column from the team table. Check for duplicate output files (two agents writing to the same workspace doc). Report any duplicates.
-5. **Direct modes coherence:** Read the intent-routing table in `agents/orchestrator.md § Intake → "11 — Intent routing"`. For each agent referenced in the routing table, verify it exists as a file in `agents/`.
+5. **Direct modes coherence:** Read `agents/orchestrator.md § Direct routing`. For each specialist named there, verify it exists as a file in `agents/`.
 
 Result:
 - **PASS** if all cross-references are consistent and no workspace doc conflicts

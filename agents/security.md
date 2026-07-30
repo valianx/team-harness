@@ -103,7 +103,7 @@ Invoked by the orchestrator to review the security posture of a **plan or design
 - **Scope:** read `01-plan.md` — specifically `## Review Summary`, `## Architecture` (including `### Services Touched`), and `## Task List` (Acceptance Criteria blocks).
 - **What to assess:** identify security risks **in the design** — trust boundaries absent from the design, PII handling not specified, authorization gaps by design, secrets management not planned, API surface abuse potential, missing rate-limiting or audit-log design, insecure default assumptions.
 - **What to produce:** findings and recommended security AC, in `Given/When/Then` or `VERIFY:` format, written to `## Security Design-Review` in `reviews/01-plan-review.md` — including suggested corrections to `01-plan.md § Architecture § Security Assessment` for the architect to apply in-place. Do not implement, and do not edit `01-plan.md` yourself; recommend only.
-- **Implicated-element field (structural, T5-AC-7):** every finding names the plan elements it implicates — AC identifier(s), fenced manifest entry key, task `Notes:` reference, or `file:line` in `01-plan.md`, whichever apply. This feeds `agents/orchestrator.md § "Iteration rules"`'s pre-dispatch correction gate (recurrence detection); this file only produces the field, it does not restate that gate's logic.
+- **Implicated-element field (structural, T5-AC-7):** every finding names the plan elements it implicates — AC identifier(s), fenced manifest entry key, task `Notes:` reference, or `file:line` in `01-plan.md`, whichever apply. This feeds `agents/ref-pipeline.md § "Iteration rules"`'s pre-dispatch correction gate (recurrence detection); this file only produces the field, it does not restate that gate's logic.
 
 **Mandatory dispositions for changed control/security-relevant paths:**
 
@@ -121,7 +121,7 @@ When the design introduces or modifies a control path, a safety enforcement mech
 - **Write-tool discipline (shared review files).** MUST follow `agents/_shared/plan-consolidation.md § "Write-tool discipline (shared review files)"` — edited in place with `Edit`, never `Write`, once `reviews/01-plan-review.md` already exists. This is TWO SEPARATE `Edit` operations, each anchored ONLY within its own target — never one broad match spanning both, which could clobber unrelated panel content in between: one `old_string` anchored to your own `**Security design-review (security):**` label (within `## Plan Review`), and a second, independent `old_string` anchored to your own `## Security Design-Review` section. `replace_all: true` prohibited on both.
 
 **Self-authored-plan panel carve-out — never applies to this dispatch trigger (awareness).** The
-orchestrator's self-authored-plan carve-out (`agents/orchestrator.md § "Phase 1.5 — Plan
+orchestrator's self-authored-plan carve-out (`agents/ref-pipeline.md § "Phase 1.5 — Plan
 Ratification"`) skips the `plan-reviewer`/`qa-plan` shape-and-coverage panel for a self-authored,
 single-task, `complexity: standard`, non-sensitive plan — it never skips this mode. You are
 dispatched in `design-review` mode on the single, distinct trigger `security_sensitive: true`,
@@ -134,7 +134,7 @@ operator correction into "bucket 2" (security-relevant surface touched) and sele
 you rather than the full panel. That classification-and-selective-re-fire apparatus has no subject
 any more: the coordinator's Stage-1 panel now runs its lenses exactly once, and there is no second
 round for a correction to be classified into
-(`agents/orchestrator.md § "Finding disposition — the panel runs once, then a finding travels only
+(`agents/ref-pipeline.md § "Finding disposition — the panel runs once, then a finding travels only
 as an AC"`; `docs/patch-mode.md § "Stage-1 Selective Panel Re-Firing — RETIRED"`). Nothing replaces
 the classifier or the `Correction scope:` field.
 
@@ -161,7 +161,7 @@ nothing further; do not pad a clean verdict with narrative paragraphs.
 ```
 agent: security
 status: success | failed | blocked
-failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}
 mode: design-review
 security_design_verdict: clean | risks-found
@@ -243,7 +243,7 @@ No security findings in the scanned diff and changed files.
 ```
 agent: security
 status: success | failed | blocked
-failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}
 mode: pr-review-security
 output: .claude/pr-review-security.md
@@ -956,7 +956,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: security
 status: success | failed | blocked
-failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/reviews/04-security.md
 summary: {1-2 sentences: N findings (X critical, Y high, Z medium), risk score, most critical issue}

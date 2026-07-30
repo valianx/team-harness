@@ -299,7 +299,7 @@ pass('module-load: sessionEnforcementPlugin is exported');
 // =========================================================================
 // (b) S-2 DIRECTIVE SNAPSHOT — byte-identity guard for the refactor
 // composeSessionDirectives({}) must return an array whose first element
-// is the exact orchestrator disposition string (unchanged by the refactor).
+// is the current orchestrator disposition string shared with Claude Code.
 // This is the guard that Suite 15 (TS parity) and this suite
 // cover on the CC side — here we assert it directly on the shared function.
 // =========================================================================
@@ -343,8 +343,8 @@ pass('module-load: sessionEnforcementPlugin is exported');
         const EXPECTED_TOKENS = [
             'orchestrator disposition is active',
             'SILENT',
-            'pipeline',
-            'fail-closed',
+            'Direct conversation',
+            '/th:pipeline',
         ];
         let allPresent = true;
         for (const tok of EXPECTED_TOKENS) {

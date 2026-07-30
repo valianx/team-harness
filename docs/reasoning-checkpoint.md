@@ -2,7 +2,7 @@
 
 The reasoning checkpoint is a reusable gate that the coordinator applies at three pipeline boundaries to ensure the operator has provided a fresh advance signal **and** a confirmed functional-clarity artifact before any phased dispatch proceeds.
 
-This document is the authoritative contract, referenced by `agents/orchestrator.md` (the Discover B1 confirmation, the Phase 1 B1 arming, and the B2/B3 disposition — all in the same agent and the same `00-state.md`).
+This document is the authoritative contract, read by `agents/ref-pipeline.md` only after an activated run reaches B1, B2, or B3.
 
 ---
 
@@ -119,7 +119,7 @@ When the orchestrator runs as a subagent (nested context), the `Task` tool is st
 
 **Declared limitation.** The self-check is as deterministic as the orchestrator's discipline in following its own contract. It is NOT a harness-level floor. It can be weakened by context drift in a way that the Layer-1 hook cannot. PR-A delivers both layers and marks which layer applies in each context. The degradation from Layer 1 to Layer 2 is a loss of pedagogical rigor, not a security regression.
 
-**Security floors do not degrade in nested context.** The degradation from Layer 1 (hook) to Layer 2 (self-check) affects only the determinism of the functional-clarity gate. Security floors — HI-2, path-pattern auto-escalation (`security_sensitive: true`), the bug-fix forcing rule, and all gates in `agents/orchestrator.md § "13 — Classify"` and `ref-special-flows.md` — run on their own deterministic path and are NOT weakened by the nested-context fallback. Even in a nested-context session where the checkpoint runs as a self-check, every security gate fires as designed.
+**Security floors do not degrade in nested context.** The degradation from Layer 1 (hook) to Layer 2 (self-check) affects only the determinism of the functional-clarity gate. Security floors — HI-2, path-pattern auto-escalation (`security_sensitive: true`), the bug-fix forcing rule, and all gates in `agents/ref-pipeline.md § "13 — Classify"` and `ref-special-flows.md` — run on their own deterministic path and are NOT weakened by the nested-context fallback. Even in a nested-context session where the checkpoint runs as a self-check, every security gate fires as designed.
 
 **Example — this pipeline.** The orchestrator of the team-harness pipeline that produced this document ran as a subagent. Its `Task` tool was stripped. The checkpoint ran as a Layer-2 self-check. The Layer-1 hook was not engaged because there was no `Task` to intercept. Security gates were unaffected.
 
@@ -145,7 +145,7 @@ The B1 clarity artifact is not self-attesting. The coordinator appends a `checkp
 
 Skip markers (`--fast`, `[TIER: N]`, `@th:orchestrator this is a hotfix:`) bypass the reasoning checkpoint at all three boundaries. The bypass is an explicit opt-out, not a loophole. It preserves the same semantics as the pre-existing Discover gate bypass (`docs/discover-phase.md §3.1`).
 
-A skip marker does NOT bypass security gates. `--fast` still inherits every security carve-out defined in `agents/orchestrator.md § "13 — Classify"` (SEC-002 and the path-pattern auto-escalation). This invariant holds at B1, B2, and B3.
+A skip marker does NOT bypass security gates. `--fast` still inherits every security carve-out defined in `agents/ref-pipeline.md § "13 — Classify"` (SEC-002 and the path-pattern auto-escalation). This invariant holds at B1, B2, and B3.
 
 ---
 

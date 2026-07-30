@@ -1,6 +1,6 @@
 # Orchestrator state, events and observability
-<!-- Consumed by: agents/orchestrator.md, which is the sole writer of every file described here.
-     Read on demand at the three points named in agents/orchestrator.md § "State, events and
+<!-- Consumed by: agents/ref-pipeline.md, through the active orchestrator, which is the sole writer of every file described here.
+     Read on demand at the three points named in agents/ref-pipeline.md § "State, events and
      observability" — never preloaded at boot. Edit here; the orchestrator references this file
      by section and never restates its content. -->
 
@@ -47,7 +47,7 @@ spans_multiple_services: true|false
 changes_security_control: true|false   # informational; NOT a dispatch predicate
 ```
 
-Every field belongs to exactly one of these two blocks, with one producer and one production phase. `changes_security_control` sits in the second: it is a property of the designed change, so it cannot be known at intake. Before Design closes it is simply **absent** — never `null` standing in for "not yet decided", because an absent field and a decided-`false` field must not look alike to a reader. `security_floor_applies` derives from `security_sensitive` alone (`agents/orchestrator.md § Phase 3`), so nothing gated is waiting on the second block.
+Every field belongs to exactly one of these two blocks, with one producer and one production phase. `changes_security_control` sits in the second: it is a property of the designed change, so it cannot be known at intake. Before Design closes it is simply **absent** — never `null` standing in for "not yet decided", because an absent field and a decided-`false` field must not look alike to a reader. `security_floor_applies` derives from `security_sensitive` alone (`agents/ref-pipeline.md § Phase 3`), so nothing gated is waiting on the second block.
 
 **Classification block — sketch triggers.** Eight booleans, **decided** by `architect` at Design time (`docs/plan-sketches.md § 2`) and **transcribed** into this file, read verbatim by `hooks/sketch-guard.sh`. Never re-derive a value; never author one. Copy what `architect` returned. Dash-prefixed, one boolean per line, exactly as the parser's own anchor requires (`^[[:space:]]*-[[:space:]]*{field}:[[:space:]]*true[[:space:]]*$`, `hooks/sketch-guard.sh:131`). `- touches_http_api:` is the parser's sole sentinel for `has_classification_block` (`:138`) — its absence alone hides all eight from the check, so never omit it even when its value is `false`.
 
@@ -72,7 +72,7 @@ Every field belongs to exactly one of these two blocks, with one producer and on
 
 When the sketch verifier cannot read this state at all (missing file, unparseable), it fails **open** and reports `pass` with no distinguishing signal (`hooks/sketch-guard.sh:28-30`) — a silent-pass failure mode, not a silent-block one. Writing the block correctly, every run, is what keeps that fail-open path from ever being exercised in practice.
 
-**Resolved config** — from `agents/orchestrator.md § Boot`.
+**Resolved config** — from `agents/ref-pipeline.md § Boot`.
 ```
 logs_mode: local|obsidian
 events_file: 00-execution-events.jsonl|00-execution-events.md
@@ -98,14 +98,14 @@ lane_decomposition: {...}|null              # docs/parallel-batch-implementation
 regression_test_path: {path}|null
 regression_test_status: failing|passing|skipped|null
 plan_review_status: not-applicable|deferred|reviewed-pass|reviewed-concerns|skipped|null
-audit_status: pending|done|unavailable|null  # set at Phase 3: pending on dispatch, done on report, unavailable after a second audit failure. STAGE-GATE-3 states it in the block; it is not a machine-checked precondition — the tree anchor is the only one (agents/orchestrator.md § STAGE-GATE-3)
+audit_status: pending|done|unavailable|null  # set at Phase 3: pending on dispatch, done on report, unavailable after a second audit failure. STAGE-GATE-3 states it in the block; it is not a machine-checked precondition — the tree anchor is the only one (agents/ref-pipeline.md § STAGE-GATE-3)
 code_hygiene: pass|fail|null                # docs/code-hygiene-gate.md
 verification_base_source_ref: origin/main|{dep-branch}|{commit}  # selected base ref; re-resolved at Freeze to detect movement
 verification_base_ref: {full commit object ID}             # immutable Phase-2 baseline; copied into the verification packet
 open_findings: [{id, disposition}]|[]       # dispositions live in 00-decision-ledger.md
 ```
 
-**`open_findings` — kept, with a schema and a named reader, never left as an unread promise.** The reader is the Recover safety contract: on `/th:recover`, any entry present with no matching `disposition` row in `00-decision-ledger.md` is surfaced to the operator as an unresolved carry-over before the next gate is prepared. An entry is written only by the orchestrator, only when a finding lands as a task AC or when `agents/orchestrator.md § "Finding disposition"` records it as accepted-without-AC — never populated speculatively, and never treated as the transport for a finding that has not gone through that disposition path.
+**`open_findings` — kept, with a schema and a named reader, never left as an unread promise.** The reader is the Recover safety contract: on `/th:recover`, any entry present with no matching `disposition` row in `00-decision-ledger.md` is surfaced to the operator as an unresolved carry-over before the next gate is prepared. An entry is written only by the orchestrator, only when a finding lands as a task AC or when `agents/ref-pipeline.md § "Finding disposition"` records it as accepted-without-AC — never populated speculatively, and never treated as the transport for a finding that has not gone through that disposition path.
 
 **Gate fields — bare literals, never repaired.** Contract: `agents/_shared/gate-contract.md § "The dual-record release"` and its no-gate-field-repair invariant. The six named fields carrying this invariant are `gate1_release`, `gate3_release`, `gate_nonce`, `working_branch`, `worktree`, and `checkpoint_boundary` — every one a bare literal in the real file, with no second space-delimited token ever trailing a value.
 ```
@@ -320,7 +320,7 @@ After every dispatch returning `success`, verify the expected doc exists on disk
 | `architect` | 1 | `reviews/01-closure-rubric.md` (Tier 2-4 only) |
 | `delivery` | 4 | the delivery section of `00-state.md` |
 
-Exists and non-empty → proceed. Otherwise append `artifact.missing` (`action: retry`) and re-dispatch **exactly once** with an explicit "your artifact was not found" instruction. A second failure → `artifact.missing` (`action: escalate`), `status: blocked`. This is the `artifact-missing` failure kind (`agents/orchestrator.md § Failures`).
+Exists and non-empty → proceed. Otherwise append `artifact.missing` (`action: retry`) and re-dispatch **exactly once** with an explicit "your artifact was not found" instruction. A second failure → `artifact.missing` (`action: escalate`), `status: blocked`. This is the `artifact-missing` failure kind (`agents/ref-pipeline.md § Failures`).
 
 **No agent in the table above is exempt.** `qa-plan` in ratify mode writes `reviews/01-plan-review.md § Plan Ratification` per the panel contract (`agents/_shared/plan-consolidation.md § "Section-ownership map"`), so its row is verified like any other. An exemption would only apply to an agent producing no artifact at all, and the table lists none.
 

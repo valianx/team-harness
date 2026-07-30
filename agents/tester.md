@@ -204,7 +204,7 @@ implementation details become concrete, but it resumes from this skeleton rather
 agent: tester
 mode: pre-fix-regression
 status: success | failed | blocked
-failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/02-regression-test.md + 03-testing.md § Test Plan
 regression_test_path: {test-file-path}
@@ -270,7 +270,7 @@ If newly authored tests fail, diagnose and fix the tests before returning (max 3
 agent: tester
 mode: authoring
 status: success | failed | blocked
-failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/03-testing.md
 summary: {1-2 sentences: N tests authored, N ACs covered, suite green}
@@ -296,7 +296,7 @@ Used when the orchestrator dispatches you for **Phase 3** verify. This is a run-
 
 **This mode does NOT write new AC tests.** The AC tests already exist from Phase 2.7. Writing new tests in this mode would break the immutable-artifact invariant that allows `qa` and `security` to parallelize safely. If a test is missing for an AC, report it as a finding — do NOT write the missing test; that is a Phase 2.7 failure that must be corrected before verify can succeed.
 
-**Append a row to `{docs_root}/00-suite-evidence.md`** after the full-suite run above, per `docs/suite-evidence.md § 1` schema (`agent: tester`, `phase: Phase 3`) — this is the producer half of the pair consumed by `agents/orchestrator.md § Phase 2.8 — Freeze`.
+**Append a row to `{docs_root}/00-suite-evidence.md`** after the full-suite run above, per `docs/suite-evidence.md § 1` schema (`agent: tester`, `phase: Phase 3`) — this is the producer half of the pair consumed by `agents/ref-pipeline.md § Phase 2.8 — Freeze`.
 
 **Scope — test files only.** NEVER modify production source code, configuration files, or documentation. This invariant is identical to all other tester modes. In run-only mode, test-file writes are restricted to updating `03-testing.md` (the workspace doc) — no new test files, no edits to existing test files.
 
@@ -304,7 +304,7 @@ Used when the orchestrator dispatches you for **Phase 3** verify. This is a run-
 
 ### Express lane — one combined dispatch, same two modes (awareness)
 
-On `lane: express` (`agents/orchestrator.md § "Express lane — a delta on the full flow"`), Phase 2.7 and Phase 3 collapse
+On `lane: express` (`agents/ref-pipeline.md § "Express lane — a delta on the full flow"`), Phase 2.7 and Phase 3 collapse
 into ONE targeted test phase scoped to the diff: the orchestrator invokes you once, instructing you to
 author AND run in the same dispatch — no separate authoring-then-verify round-trip, and `qa` does not
 run (the operator's combined-gate review substitutes for the `qa` validate pass on express). This does
@@ -989,7 +989,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: tester
 mode: default | pre-fix-regression | authoring | verify-run | review | coverage-config | test-infra | module-test
 status: success | failed | blocked
-failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/{03-testing|02-regression-test}.md   # null when pre_fix_test_status: skipped
 summary: {1-2 sentences: N tests, N passed, N failed, coverage %}

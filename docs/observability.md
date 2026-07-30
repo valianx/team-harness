@@ -197,13 +197,13 @@ the one-JSON-object-per-line invariant, and it never removes an event —
 every `phase.*`/`gate.*` event this schema requires still fires unchanged,
 regardless of how compact its optional free-text fields are (see "Tier 0
 carve-out" below for the sole exemption from the observability floor itself).
-Canonical source: `agents/orchestrator.md § "Free-text bound"`; the two
+Canonical source: `agents/ref-pipeline.md § "Free-text bound"`; the two
 sites must not diverge.
 
 **Named exception — the `checkpoint.confirmed` confirmatory-text field, additive only.**
 The general clause above governs every OTHER free-text field unchanged. The field
 carrying the operator's own words in the `checkpoint.confirmed` event (the
-functional-clarity confirmation, `agents/orchestrator.md § "Checkpoint-trust-transfer"`)
+functional-clarity confirmation, `agents/ref-pipeline.md § "Checkpoint-trust-transfer"`)
 is a single named exception, additive to — never a replacement of — the general clause:
 ≤280 chars (one confirmatory turn, not the surrounding conversation); quotes and
 `\n\r\t` are ESCAPED as JSON string escapes, never stripped, so the operator's exact
@@ -217,7 +217,7 @@ marked visibly with `…[truncated]`; the secret prohibition (§ "Secret prohibi
 unaffected — a confirmation carrying a credential records `provenance` and
 `withheld — secret prohibition` in place of the text. `provenance` itself is a closed
 enum, not free text, and is never subject to this bound. Without this reconciliation
-written at both sites — here and `agents/orchestrator.md § "Free-text bound"`,
+written at both sites — here and `agents/ref-pipeline.md § "Free-text bound"`,
 which must not diverge — the field is not added. This exception is scoped to exactly
 this one field: the general `≤120 chars`/`never multi-sentence narrative prose` clause
 above is byte-preserved for every other free-text field.
@@ -292,7 +292,7 @@ proof that a `th:*` boundary occurred.
 
 **Reconciliation source (kept unconditionally, repurposed).** `00-subagent-trace.jsonl`
 is retained unconditionally and read by the orchestrator's stage-gate reconciliation
-backstop (`agents/orchestrator.md § "Reconciliation backstop"`) as the
+backstop (`agents/ref-pipeline.md § "Reconciliation backstop"`) as the
 backfill source for a `phase.end` gap: the paired `subagent.start`/`subagent.stop`
 lines for the missing phase's `agent_type`, matched by the pipeline's time window,
 supply the `duration_ms` for the backfilled event. This is its primary value —
@@ -487,7 +487,7 @@ Full template and section-ownership map: `agents/ref-dispatch-machinery.md § "o
 
 **No parallel coordinator fan-out exists.** The coordinator fusion retires the multi-task
 fan-out with its consolidator and the parallel multi-project dispatch that spawned one
-orchestrator instance per project — `agents/orchestrator.md § "Dispatch invariants"` #2 forbids
+orchestrator instance per project — `agents/ref-pipeline.md § "Dispatch invariants"` #2 forbids
 dispatching any coordinator, including another copy of itself, with no exception clause, and
 `agents/ref-dispatch-machinery.md § "Multi-project sequencing"` names serial execution as the
 derived consequence of that invariant, not an independent policy. One project runs to completion
@@ -533,7 +533,7 @@ The following event types appear in `00-execution-events` in addition to the cor
 | `plan_structure` | When the Phase 1.5a deterministic plan-structure scan completes, before any `qa-plan` dispatch (deterministic, orchestrator-run — see `docs/plan-structure-gate.md § 2`) | `verdict` (`pass`/`fail`), `extra.check`/`extra.detail` (on `fail`, the specific mechanical failure) |
 | `checkpoint.confirmed` | When `th:orchestrator` obtains — or fails to obtain — the operator's live confirmation of the functional-clarity artifact at Discover Boundary B1, before dispatching `architect` (`docs/reasoning-checkpoint.md § "Attribution and failure direction"`) | `provenance` (`operator-live`/`inferred`), the confirmatory text (named exception to the Free-text field bound, see below) |
 
-Note: `checkpoint.confirmed` is written exclusively by `th:orchestrator`, on the same file it already initializes at Intake (`agents/orchestrator.md § "Intake"`). On a later `/th:recover`, the same agent reads and verifies the event but never repairs it.
+Note: `checkpoint.confirmed` is written exclusively by `th:orchestrator`, on the same file it already initializes at Intake (`agents/ref-pipeline.md § "Intake"`). On a later `/th:recover`, the same agent reads and verifies the event but never repairs it.
 
 Note: `gate` (human checkpoint) is distinct from `gate.pass` / `gate.fail` (automated agent-to-agent gates). The latter fire when the orchestrator evaluates a plan-review or acceptance-gate result without pausing for human input; the former fires when execution is suspended pending operator approval.
 
@@ -626,7 +626,7 @@ narrative for a given round lives exclusively in `failure-brief.md`.
 exemption from that floor) and it does not change what `00-pipeline-summary.md`
 derives from the trace.
 
-Canonical source: `agents/orchestrator.md § "Transition protocol — atomic, all three steps, never
+Canonical source: `agents/ref-pipeline.md § "Transition protocol — atomic, all three steps, never
 partial"` (the upsert mechanic) and `§ "Agent Results"` (the schema template — the narrative "Hot
 Context" section this upsert once also maintained is retired, per that same section's own note);
 the two sites must not diverge.
@@ -653,7 +653,7 @@ An earlier design iteration proposed a hard token-budget config key (`budget`) w
 
 ### Security floor unaffected by lane
 
-`security_floor_applies` — the single shared Phase-3 predicate that dispatches `security` + `adversary` on a sensitive path — is computed from `security_sensitive` alone; no lane, trim, flag, or env var changes its evaluation (`agents/orchestrator.md § "The single floor predicate"`). This is a trace-observable invariant: a sensitive-path run's `phase.end` events show the same `security`/`adversary` phase entries on `lane: express` as on `lane: full`, and the express combined-gate STOP block surfaces the same verdicts inline rather than omitting them (`docs/pipeline-lanes.md § "Two-lens floor"`).
+`security_floor_applies` — the single shared Phase-3 predicate that dispatches `security` + `adversary` on a sensitive path — is computed from `security_sensitive` alone; no lane, trim, flag, or env var changes its evaluation (`agents/ref-pipeline.md § "The single floor predicate"`). This is a trace-observable invariant: a sensitive-path run's `phase.end` events show the same `security`/`adversary` phase entries on `lane: express` as on `lane: full`, and the express combined-gate STOP block surfaces the same verdicts inline rather than omitting them (`docs/pipeline-lanes.md § "Two-lens floor"`).
 
 ## Phase 1.5a structural scan — observability surface
 
@@ -665,7 +665,7 @@ Documented in the "Additional pipeline event types" table above. Emitted by the 
 
 **This entire observability surface is retired, not reduced.** It used to trace a correction-bucket classification (broad-structural, security-relevant surface, non-security coverage change, editorial/operator-decided reduction, shape/consistency-only) that selectively re-fired only the implicated panel lens(es), plus a `§ Panel Rounds` `Implicated (closed)` column and a carried-forward sub-verdict label for the lenses that did not re-fire. The coordinator fusion removes the Stage-1 correction-round apparatus this traced: on a Phase 1.6 `fail`, the full panel re-runs — `qa-plan`, `security` when sensitive, `plan-reviewer` — and each presents its verdict exactly once, never carrying one forward. Bucket classification, the routing record, and carried-forward labeling all lose their subject. Nothing replaces them. Full retirement note: `docs/patch-mode.md § "Stage-1 Selective Panel Re-Firing — RETIRED"`.
 
-**What survives.** The `plan_structure` event above is unaffected — Phase 1.5a's deterministic scan runs regardless. The cross-round recurrence check's producer column (`Implicated (closed)`) is now written by `plan-reviewer` on every round, since the full panel always re-runs — see `agents/orchestrator.md § "Iteration rules"` for the consumer contract.
+**What survives.** The `plan_structure` event above is unaffected — Phase 1.5a's deterministic scan runs regardless. The cross-round recurrence check's producer column (`Implicated (closed)`) is now written by `plan-reviewer` on every round, since the full panel always re-runs — see `agents/ref-pipeline.md § "Iteration rules"` for the consumer contract.
 
 ## Cost rollup
 
@@ -725,12 +725,12 @@ as a conservative blended estimate and mark the result with `(~)`.
 
 The orchestrator appends a `## Cost` section to the pipeline summary at each of
 the 4 mandatory checkpoints (STAGE-GATE-1 emission, Stage-2 close, every
-`iteration.start`, `pipeline.complete`/`end` — see `agents/orchestrator.md`
+`iteration.start`, `pipeline.complete`/`end` — see `agents/ref-pipeline.md`
 § Pipeline Summary Protocol → "When to rewrite"); rewriting at every other
 phase transition is best-effort. The section derives entirely from the
 `phase.end` events in `00-execution-events.{md,jsonl}` — it is a render of the
 trace, not an independent source. The Final Pipeline Sanity Check fails closed
-on a missing `## Cost` section (`agents/orchestrator.md` § Final Pipeline
+on a missing `## Cost` section (`agents/ref-pipeline.md` § Final Pipeline
 Sanity Check, step 6).
 
 **Schema:**
@@ -777,11 +777,11 @@ Sanity Check, step 6).
 3. Classify the agent's model tier using the following priority order:
    - **Primary path — `event.model` field.** When the `phase.end` event itself carries a
      `model` field (propagated verbatim from the agent's status block — see
-     `agents/orchestrator.md` § "Populating the `model`/`effort` fields on `phase.end`"),
+     `agents/ref-pipeline.md` § "Populating the `model`/`effort` fields on `phase.end`"),
      classify directly from it: `opus` when `model` starts with `claude-opus` or equals
      `opus`; `sonnet` otherwise. This is the authoritative source once populated — it
      reflects what the agent actually ran under, including under a session model override
-     (`agents/orchestrator.md` § "Session model override"), which frontmatter cannot express.
+     (`agents/ref-pipeline.md` § "Session model override"), which frontmatter cannot express.
    - **Fallback path — read frontmatter `model:` field.** When `event.model` is absent (the
      event predates this field, or the agent instance had not yet adopted it), locate
      `agents/{agent}.md` and read its YAML frontmatter `model:` field. Classify as `opus`
@@ -810,7 +810,7 @@ line, and similar prose) MUST carry a source tag: `(measured YYYY-MM, n=N)`
 when backed by a real measurement sample, or `(estimate)` when it is not. An
 untagged figure is indistinguishable from a stale guess — the ratify-plan
 figure drifted over 10× from its documented "~3-5K tokens" before the June
-2026 measurement caught it (see `agents/orchestrator.md § Phase 1.5`). Tag
+2026 measurement caught it (see `agents/ref-pipeline.md § Phase 1.5`). Tag
 every figure at the time it is written, and re-tag it when a new measurement
 supersedes the old one.
 
@@ -853,11 +853,11 @@ Every `phase.end` event MUST include a `tokens` field (integer). When `Agent()`/
 
 ### model / effort fields on phase.end
 
-Every leaf agent's status block declares its effective model on a `model:` line (mandatory) and, when known, its effective effort level on an `effort:` line (optional) — see `agents/_shared/output-template.md` § "Status block — common fields". The orchestrator propagates both verbatim onto the corresponding `phase.end` event's `model` / `effort` fields, using the same propagation mechanism already used for `tools` (see `agents/orchestrator.md` § "Populating the `model`/`effort` fields on `phase.end`"). Both fields are optional at the schema level — legacy events and events from agents that have not yet reported the fields simply omit them, and classification falls through to frontmatter/static-list inference (see § Derivation rule below).
+Every leaf agent's status block declares its effective model on a `model:` line (mandatory) and, when known, its effective effort level on an `effort:` line (optional) — see `agents/_shared/output-template.md` § "Status block — common fields". The orchestrator propagates both verbatim onto the corresponding `phase.end` event's `model` / `effort` fields, using the same propagation mechanism already used for `tools` (see `agents/ref-pipeline.md` § "Populating the `model`/`effort` fields on `phase.end`"). Both fields are optional at the schema level — legacy events and events from agents that have not yet reported the fields simply omit them, and classification falls through to frontmatter/static-list inference (see § Derivation rule below).
 
-This is the field that makes a session model override (`agents/orchestrator.md` § "Session model override") observable in the trace: the frontmatter `model:` in `agents/{agent}.md` is only the agent's *default*; `event.model` on a given `phase.end` is what that specific dispatch actually ran under.
+This is the field that makes a session model override (`agents/ref-pipeline.md` § "Session model override") observable in the trace: the frontmatter `model:` in `agents/{agent}.md` is only the agent's *default*; `event.model` on a given `phase.end` is what that specific dispatch actually ran under.
 
-**Session model override — distinct from the config-override whitelist.** The session model override (an operator utterance such as "use the bigger model for analysis this session") is recorded exclusively in `00-state.md § Current State` and applies only to analysis-tier dispatches (`architect`, the plan-review panel, consolidators) for the current session — it is never written to `~/.claude/.team-harness.json`. This is a **separate mechanism** from the session-scoped config override whitelist (CLAUDE.md §5), which governs `logs-mode`, `logs-path`, `logs-subfolder`, and `clickup.workspace_id`, and which continues to explicitly EXCLUDE `model`. The two must not be conflated: the config whitelist is about persisted-vs-session config keys reachable from `/th:setup`; the session model override is a dispatch-time-only instruction that never touches config and is discarded at session end. Full mechanism: `agents/orchestrator.md` § "Session model override".
+**Session model override — distinct from the config-override whitelist.** The session model override (an operator utterance such as "use the bigger model for analysis this session") is recorded exclusively in `00-state.md § Current State` and applies only to analysis-tier dispatches (`architect`, the plan-review panel, consolidators) for the current session — it is never written to `~/.claude/.team-harness.json`. This is a **separate mechanism** from the session-scoped config override whitelist (CLAUDE.md §5), which governs `logs-mode`, `logs-path`, `logs-subfolder`, and `clickup.workspace_id`, and which continues to explicitly EXCLUDE `model`. The two must not be conflated: the config whitelist is about persisted-vs-session config keys reachable from `/th:setup`; the session model override is a dispatch-time-only instruction that never touches config and is discarded at session end. Full mechanism: `agents/ref-pipeline.md` § "Session model override".
 
 ### kg_write write-integrity rollup
 

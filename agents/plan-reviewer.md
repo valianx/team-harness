@@ -42,7 +42,7 @@ The orchestrator does not dispatch you for a plan that is self-authored (hotfix 
 — all four conditions together. In that case a deterministic self-check (at least one task exists,
 each task carries ≥1 AC, `## Delivery Grouping` is declared, and — for `type: fix`/`hotfix` — the
 regression-test AC cross-reference is present) stands in for both Phase 1.5 (`qa-plan`) and Phase
-1.6 (you); see `agents/orchestrator.md § "Phase 1.5 — Plan Ratification"`. You are never
+1.6 (you); see `agents/ref-pipeline.md § "Phase 1.5 — Plan Ratification"`. You are never
 dispatched to approve your own absence — this is orchestrator-side gating, not a decision you make.
 
 **SEC-002 is never carved out by this condition.** When `security_sensitive: true`, the orchestrator
@@ -58,7 +58,7 @@ a distinct, default-skip-but-offered case (`plan_review_status: deferred`), not 
 carve-out above. It changes nothing about how you run WHEN you are dispatched: you still audit
 `01-plan.md` against the plan-shape rules exactly as documented in this file, whether that dispatch
 happens pre-gate (a plan that turns out sensitive), at the post-approval offer, or via an on-demand
-`/th:plan-review` run. See `agents/orchestrator.md § "Phase 1.6 — Plan Review"` and
+`/th:plan-review` run. See `agents/ref-pipeline.md § "Phase 1.6 — Plan Review"` and
 `§ "Phase 1.8 — Post-approval Plan-Review Offer"` for the orchestrator-side gating; this is
 orchestrator-side dispatch scheduling, not a decision you make or a change to your own procedure.
 
@@ -687,7 +687,7 @@ pending
 
 ## Findings
 
-**Implicated-element field (structural, T5-AC-7).** Every finding you record — under any rule below — carries the plan elements it implicates, stated structurally rather than only in prose: AC identifiers (`T{n}-AC-{m}`), fenced manifest entry keys, task `Notes:` references, `file:line`, and/or test-assertion sites, whichever apply. State this set inline after the finding, e.g. `[implicates: T2-AC-16, orch-stage-gate-2]`. This is the field `agents/orchestrator.md § "Iteration rules"`'s pre-dispatch correction gate reads to detect a recurrence (a new finding implicating an element a prior, closed finding already implicated) — see that section for the consumer contract; this file only produces the field, it does not restate the gate's own logic.
+**Implicated-element field (structural, T5-AC-7).** Every finding you record — under any rule below — carries the plan elements it implicates, stated structurally rather than only in prose: AC identifiers (`T{n}-AC-{m}`), fenced manifest entry keys, task `Notes:` references, `file:line`, and/or test-assertion sites, whichever apply. State this set inline after the finding, e.g. `[implicates: T2-AC-16, orch-stage-gate-2]`. This is the field `agents/ref-pipeline.md § "Iteration rules"`'s pre-dispatch correction gate reads to detect a recurrence (a new finding implicating an element a prior, closed finding already implicated) — see that section for the consumer contract; this file only produces the field, it does not restate the gate's own logic.
 
 ### Rule 1 — Delivery Grouping
 - {01-plan.md}:{line} — delivery group {N} cites Reason `{reason}` — invalid; must be one of: coexistence window, production signal, cross-repo deploy gate.
@@ -772,7 +772,7 @@ pending
 |-------|------|-----------|----------|-------|----------|--------|----------------------|
 ```
 
-**`Implicated (closed)` column.** The union of implicated-element sets across every finding THIS round closed — never the findings still open at round close, and never a restatement of the findings themselves (an element identifier only, e.g. `T2-AC-16, orch-stage-gate-2`, or `none` when the round closed no finding). You write it on every round: the full panel re-runs whenever Phase 1.6 fails and routes back (no selective, lens-by-lens re-fire exists any more — see "Stage-1 Selective Panel Re-Firing — RETIRED" below), so there is no coordinator-authored deterministic-only row to distinguish from your own. This column is what the coordinator's cross-round recurrence index (`agents/orchestrator.md § "Iteration rules"`) accumulates over — the row's shape stays append-only, one row per round, unchanged by this addition.
+**`Implicated (closed)` column.** The union of implicated-element sets across every finding THIS round closed — never the findings still open at round close, and never a restatement of the findings themselves (an element identifier only, e.g. `T2-AC-16, orch-stage-gate-2`, or `none` when the round closed no finding). You write it on every round: the full panel re-runs whenever Phase 1.6 fails and routes back (no selective, lens-by-lens re-fire exists any more — see "Stage-1 Selective Panel Re-Firing — RETIRED" below), so there is no coordinator-authored deterministic-only row to distinguish from your own. This column is what the coordinator's cross-round recurrence index (`agents/ref-pipeline.md § "Iteration rules"`) accumulates over — the row's shape stays append-only, one row per round, unchanged by this addition.
 
 ---
 
@@ -840,7 +840,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: plan-reviewer
 status: success | failed | blocked
-failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}
 verdict: pass | concerns | fail
 output: workspaces/{feature-name}/reviews/01-plan-review.md § Plan Review

@@ -12,7 +12,7 @@ This document is the full contract. `CLAUDE.md §5` carries a one-line pointer t
 
 ## 1. Disposición predeterminada (default intake disposition)
 
-When intent routing (`agents/orchestrator.md § "11 — Intent routing"`) routes a request as `full pipeline`, the coordinator does NOT proceed immediately to Classify and Phase 1 (Design). Discovery ALWAYS runs first, and entry into planning is ALWAYS gated by an explicit operator confirmation.
+When `/th:pipeline` or an explicit live operator request activates the gated flow, the coordinator does not proceed immediately to Classify and Phase 1. Discovery runs first, and entry into planning remains gated by explicit operator confirmation.
 
 **HARD RULE — no silent advance into planning.** The coordinator never transitions from intake to Phase 1 without first: (a) framing the task back to the operator — a 1–2 line restatement of what was understood plus the tentative pipeline shape / affected services; (b) asking any clarifying questions needed to gather the context required to plan well; and (c) emitting the planning-confirmation prompt and WAITING for an explicit advance response. An advance signal present in the operator's INITIAL message (e.g. `armá el plan`, `dale`, `analizá`) does NOT pre-satisfy this gate — the prompt is still shown and a fresh response is awaited. The ONLY bypass is an explicit operator-declared skip marker (§3.1).
 
@@ -119,13 +119,13 @@ Use `AskUserQuestion` where available. Where not available (e.g., takeover conte
 
 ### HI-1 + HI-4 — Depth DIAL, not stage switch
 
-The survey is a **depth dial**. Every gate still runs. "never simple, all dev runs full pipeline" (`agents/orchestrator.md § "11 — Intent routing"`) remains literally true. No survey answer can mark a Phase Checklist item as skipped unless the tier/`--fast` rules already authorize that skip today.
+The survey is a **depth dial** inside an already activated pipeline. Every applicable gate still runs. No survey answer can mark a Phase Checklist item as skipped unless the tier/`--fast` rules already authorize that skip.
 
-`survey_pipeline_shape: fast` maps exactly to `--fast` and inherits all its carve-outs, including the security design-review carve-out SEC-002 (`agents/orchestrator.md § "Express lane"`). The survey does NOT introduce a new or more permissive semantics for `fast` — it is a strict alias for the operator-declared `--fast` marker.
+`survey_pipeline_shape: fast` maps exactly to `--fast` and inherits all its carve-outs, including the security design-review carve-out SEC-002 (`agents/ref-pipeline.md § "Express lane"`). The survey does NOT introduce a new or more permissive semantics for `fast` — it is a strict alias for the operator-declared `--fast` marker.
 
 ### HI-2 — Security floors are non-surveyable
 
-The survey **never writes `security_sensitive`**. That field is written ONLY by Classify's path-pattern auto-escalation (`agents/orchestrator.md § "13 — Classify"`) and the bug-fix forcing rule.
+The survey **never writes `security_sensitive`**. That field is written ONLY by Classify's path-pattern auto-escalation (`agents/ref-pipeline.md § "13 — Classify"`) and the bug-fix forcing rule.
 
 The path-pattern auto-escalation is **input-independent** of every survey answer. Its result depends solely on the file paths touched (`auth/**`, `middleware/**`, `api/**`, `db/**`, `security/**`, `crypto/**`, `session/**`), never on `survey_pipeline_shape`, `survey_effort`, or `survey_iteration_autonomy`. Even if the survey records `shape=fast, effort=quick`, a task touching `auth/**` still gets `security-sensitive: true` + Tier 3 minimum — the escalation result is the same whether the survey capture runs before or after it.
 
@@ -244,7 +244,7 @@ The `survey_scope_hint` captured in §5 above is passed to the architect regardl
 
 - **HI-E2-1 — Prior, not order.** The seed is a strong prior for the architect, not a mandate. The architect evaluates alternatives the seed did not consider and dissents when the seeded approach is deficient.
 - **HI-E2-2 — No security fields from seed.** `security_sensitive` and all gate-status fields remain input-independent of seed content. HI-2 (§6) applies unchanged.
-- **HI-E2-3 — No GATE skipped; the plan-review panel's own deferred-by-default policy is orthogonal.** `spec_seed_present: true` never marks any Phase Checklist item as skipped, and it never skips a GATE — STAGE-GATE-1 always runs, regardless of the seed. Specify (Phase 0b) and Design (Phase 1) always run in full. Whether ratify-plan (1.5) and plan-review (1.6) dispatch pre-gate or defer is governed exclusively by the deferred-by-default policy in `agents/orchestrator.md §§ "Phase 1.5 — Plan Ratification" / "Phase 1.6 — Plan Review"` (architect-authored + `security_sensitive: false` → deferred, offered post-approval at Phase 1.8; `security_sensitive: true` → run in full, unchanged) — `spec_seed_present` never widens or narrows that gate.
+- **HI-E2-3 — No GATE skipped; the plan-review panel's own deferred-by-default policy is orthogonal.** `spec_seed_present: true` never marks any Phase Checklist item as skipped, and it never skips a GATE — STAGE-GATE-1 always runs, regardless of the seed. Specify (Phase 0b) and Design (Phase 1) always run in full. Whether ratify-plan (1.5) and plan-review (1.6) dispatch pre-gate or defer is governed exclusively by the deferred-by-default policy in `agents/ref-pipeline.md §§ "Phase 1.5 — Plan Ratification" / "Phase 1.6 — Plan Review"` (architect-authored + `security_sensitive: false` → deferred, offered post-approval at Phase 1.8; `security_sensitive: true` → run in full, unchanged) — `spec_seed_present` never widens or narrows that gate.
 - **HI-E2-4 — Recoverable.** `spec_seed_present` and `spec_seed_dissents` are plain-text key:value fields in `00-state.md § Current State`; `00-spec-seed.md` is human-readable prose. Both survive context compaction without re-interrogating the manifest.
 
 ---
@@ -324,7 +324,7 @@ The test is deterministic — it depends only on git metadata, never on director
 
 ## 12. Background research sweep (non-blocking, narrow trigger)
 
-The coordinator may launch a parallel haiku research fan-out during Discover when a genuine external knowledge gap is detected. This is the background research sweep in `agents/orchestrator.md § "Intake"`.
+The coordinator may launch a parallel haiku research fan-out during Discover when a genuine external knowledge gap is detected. This is the background research sweep in `agents/ref-pipeline.md § "Intake"`.
 
 ### 12.1 Trigger conditions (ALL must hold)
 
