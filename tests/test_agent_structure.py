@@ -8168,179 +8168,41 @@ check(
 #   (11)         : self-referential guard -- Suite 39 in CLAUDE.md §11 + this file
 # ---------------------------------------------------------------------------
 print()
-print("=== Suite 39: pr-a-takeover-contract ===")
+print("=== Suite 39: pr-a-takeover-contract (RETIRED, coordinator-fusion) ===")
 
-# ---- file reads (suite-local variables) ------------------------------------
-_s39_orch_text = SPLIT_CORPUS
-_s39_suborch_text  = read(REPO_ROOT / "docs" / "subagent-orchestration.md")
-_s39_setup_text    = read(SKILLS_DIR / "setup" / "SKILL.md")
+# RETIRED (coordinator-fusion, T4-AC-1a/AC-1b/AC-2). Checks (1)-(6) and (10)
+# below asserted properties of the nested-dispatch takeover mechanism itself
+# (the dispatch_handoff schema, the "## Takeover Protocol" section, the
+# "### Dispatch-blocked exit" never-th:orchestrator binding, the
+# nested-dispatch-takeover managed block). docs/subagent-orchestration.md §
+# "Nested-context dispatch — RETIRED protocol, retained provisioning" states
+# this explicitly and unconditionally: "The nested-handoff/takeover protocol
+# below (dispatch_handoff schema, auto-takeover on blocked-no-dispatch, the
+# Takeover Protocol) is RETIRED... Nothing replaces it; the retirement is a
+# genuine loss of subject, not a transfer." The scenario it backstopped (a
+# top-level leader dispatching a second coordinator, th:orchestrator, as a
+# nested subagent that then loses Task) has no producer once the coordinator
+# fusion forbids dispatching any coordinator, including a copy of itself,
+# with no exception clause (Dispatch invariant #2). Every subject these
+# checks name — the schema fields, the section headers, the guard wording —
+# is retired with no successor, so per T4-AC-1b these are retired outright,
+# not retargeted.
+#
+# What survives, retargeted rather than retired: (a) the §13→§14 stale
+# cross-reference sweep (a general hygiene property unrelated to whether the
+# takeover mechanism itself is retired — CLAUDE.md's Subagent Orchestration
+# section is still §14), and (b) the managed-block-absence check, which
+# already asserted absence and needed no change.
+
 _s39_skills_rm_text = read(SKILLS_DIR / "README.md")
-_s39_claude_text   = read(REPO_ROOT / "CLAUDE.md")
-_s39_self_text     = read(Path(__file__).resolve())
-
-# ---- anchors ---------------------------------------------------------------
-_S39_ORCH_EXIT_ANCHOR   = "### Dispatch-blocked exit"
-_S39_TAKEOVER_ANCHOR    = "## Takeover Protocol"
-_S39_SCHEMA_ANCHOR      = "## dispatch_handoff Schema"
-_S39_SETUP_NDT_ANCHOR   = "<!-- nested-dispatch-takeover:start -->"
-
-# ---- slices ----------------------------------------------------------------
-_s39_orch_exit_slice    = _slice_section(_s39_orch_text,    _S39_ORCH_EXIT_ANCHOR)
-_s39_takeover_slice     = _slice_section(_s39_suborch_text, _S39_TAKEOVER_ANCHOR)
-_s39_schema_slice       = _slice_section(_s39_suborch_text, _S39_SCHEMA_ANCHOR)
-# v2.89.0: nested-dispatch-takeover.md is retired (file deleted). Return empty
-# string; the AC-8 assertion below now asserts the file is ABSENT.
+_s39_self_text = read(Path(__file__).resolve())
 _s39_ndt_path = SKILLS_DIR / "setup" / "managed-blocks" / "nested-dispatch-takeover.md"
-_s39_ndt_canonical_text = _s39_ndt_path.read_text(encoding="utf-8") if _s39_ndt_path.exists() else ""
-_s39_setup_ndt_slice    = _s39_ndt_canonical_text
-
-# 8 field names that the consumer reads (AC-3)
-_S39_SCHEMA_FIELDS = (
-    "schema_version",
-    "next_dispatch.agent",
-    "type",
-    "phase",
-    "autonomy.granted",
-    "round",
-    "state_ref",
-    "probe_error",
-)
 
 # ---------------------------------------------------------------------------
-# Check (1) / AC-1 -- orchestrator.md § Dispatch-blocked exit:
-# The binding of {next-agent} must explicitly name the never-th:orchestrator rule.
-# Asserts: "th:architect" (boot case), "00-state.md" (mid-pipeline source),
-# and "NEVER" + "th:orchestrator" (the prohibited value).
-# ---------------------------------------------------------------------------
-_S39_AC1_TOKENS = (
-    "th:architect",
-    "00-state.md",
-    "NEVER",
-)
-check(
-    "takeover-contract(1/ac-1): orchestrator.md § 'Dispatch-blocked exit'"
-    " binds {next-agent} with th:architect (boot), 00-state.md (mid-pipeline),"
-    " and NEVER th:orchestrator rule",
-    bool(_s39_orch_exit_slice)
-    and all(t in _s39_orch_exit_slice for t in _S39_AC1_TOKENS)
-    and "th:orchestrator" in _s39_orch_exit_slice,
-    f"anchor '{_S39_ORCH_EXIT_ANCHOR}' missing or binding tokens absent:"
-    f" need {_S39_AC1_TOKENS} + 'th:orchestrator' (the prohibited value)",
-)
-
-# ---------------------------------------------------------------------------
-# Check (2) / AC-2 -- subagent-orchestration.md § Takeover Protocol:
-# Consume-side guard must state that th:orchestrator == malformed handoff
-# and instruct dispatching the phase agent / th:architect instead.
-# ---------------------------------------------------------------------------
-_S39_AC2_TOKENS = (
-    "th:orchestrator",
-    "malformed",
-    "th:architect",
-)
-check(
-    "takeover-contract(2/ac-2): docs/subagent-orchestration.md § 'Takeover Protocol'"
-    " contains consume-side guard: if next_dispatch.agent == th:orchestrator"
-    " => malformed => dispatch phase agent / th:architect",
-    bool(_s39_takeover_slice)
-    and all(t in _s39_takeover_slice for t in _S39_AC2_TOKENS)
-    and "malformed" in _s39_takeover_slice,
-    f"anchor '{_S39_TAKEOVER_ANCHOR}' missing or guard tokens absent: {_S39_AC2_TOKENS}",
-)
-
-# ---------------------------------------------------------------------------
-# Check (3a) / AC-3 -- subagent-orchestration.md: ## dispatch_handoff Schema section exists
+# Check (a) -- skills/README.md: cross-reference must say §14, not §13
 # ---------------------------------------------------------------------------
 check(
-    "takeover-contract(3a/ac-3): docs/subagent-orchestration.md has"
-    " a '## dispatch_handoff Schema' section",
-    bool(_s39_schema_slice),
-    f"anchor '{_S39_SCHEMA_ANCHOR}' not found in docs/subagent-orchestration.md",
-)
-
-# ---------------------------------------------------------------------------
-# Check (3b) / AC-3 -- same section: ```json fenced block present
-# ---------------------------------------------------------------------------
-check(
-    "takeover-contract(3b/ac-3): docs/subagent-orchestration.md"
-    " § 'dispatch_handoff Schema' contains a ```json fenced block",
-    "```json" in _s39_schema_slice,
-    "No ```json fenced block found in the dispatch_handoff Schema section",
-)
-
-# ---------------------------------------------------------------------------
-# Check (3c) / AC-3 -- same section: all 8 field names enumerated
-# ---------------------------------------------------------------------------
-check(
-    "takeover-contract(3c/ac-3): docs/subagent-orchestration.md"
-    " § 'dispatch_handoff Schema' enumerates all 8 required field names"
-    f" {_S39_SCHEMA_FIELDS}",
-    bool(_s39_schema_slice)
-    and all(f in _s39_schema_slice for f in _S39_SCHEMA_FIELDS),
-    f"One or more field names missing from the dispatch_handoff Schema section:"
-    f" need {_S39_SCHEMA_FIELDS}",
-)
-
-# ---------------------------------------------------------------------------
-# Check (4) / AC-4 -- orchestrator.md § Dispatch-blocked exit:
-# Must instruct appending a dispatch.blocked event with reason + action,
-# covering the boot-inline case.
-# ---------------------------------------------------------------------------
-_S39_AC4_TOKENS = (
-    "dispatch.blocked",
-    "reason",
-    "action",
-)
-check(
-    "takeover-contract(4/ac-4): orchestrator.md § 'Dispatch-blocked exit'"
-    " instructs appending a dispatch.blocked event with reason + action"
-    " (including boot-inline case)",
-    bool(_s39_orch_exit_slice)
-    and all(t in _s39_orch_exit_slice for t in _S39_AC4_TOKENS),
-    f"anchor '{_S39_ORCH_EXIT_ANCHOR}' missing or dispatch.blocked emit tokens absent:"
-    f" {_S39_AC4_TOKENS}",
-)
-
-# ---------------------------------------------------------------------------
-# Check (5) / AC-5 -- orchestrator.md § Dispatch-blocked exit:
-# Must reference the schema by canonical name (not enumerate fields inline).
-# ---------------------------------------------------------------------------
-check(
-    "takeover-contract(5/ac-5): orchestrator.md § 'Dispatch-blocked exit'"
-    " references the canonical schema by name"
-    " ('dispatch_handoff Schema')",
-    bool(_s39_orch_exit_slice)
-    and "dispatch_handoff Schema" in _s39_orch_exit_slice,
-    f"anchor '{_S39_ORCH_EXIT_ANCHOR}' missing or canonical schema name"
-    " 'dispatch_handoff Schema' not referenced in the exit section",
-)
-
-# ---------------------------------------------------------------------------
-# Check (6) / AC-6 -- subagent-orchestration.md § Takeover Protocol:
-# The manifest must be relabeled as gate-manifest + carry a pointer to the
-# Phase Dispatch table in orchestrator.md.
-# Asserts one of: "gate manifest", "gate-manifest", "gates" near "Phase Dispatch".
-# ---------------------------------------------------------------------------
-check(
-    "takeover-contract(6/ac-6): docs/subagent-orchestration.md § 'Takeover Protocol'"
-    " relabels the manifest as gate-manifest and includes a pointer to the"
-    " Phase Dispatch table in agents/orchestrator.md",
-    bool(_s39_takeover_slice)
-    and (
-        "gate manifest" in _s39_takeover_slice.lower()
-        or "gate-manifest" in _s39_takeover_slice.lower()
-    )
-    and "Phase Dispatch" in _s39_takeover_slice,
-    f"anchor '{_S39_TAKEOVER_ANCHOR}' missing or gate-manifest relabel / Phase Dispatch"
-    " pointer absent from the Takeover Protocol section",
-)
-
-# ---------------------------------------------------------------------------
-# Check (7) / AC-7 -- skills/README.md: cross-reference must say §14, not §13
-# ---------------------------------------------------------------------------
-_s39_skills_rm_slice = _slice_section(_s39_skills_rm_text, "nested-dispatch-takeover")
-check(
-    "takeover-contract(7/ac-7): skills/README.md references"
+    "takeover-contract(a): skills/README.md references"
     " '§ 14 \"Subagent Orchestration\"' (not § 13)",
     '§ 14' in _s39_skills_rm_text
     and '§ 13 "Subagent Orchestration"' not in _s39_skills_rm_text,
@@ -8349,7 +8211,7 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Check (8) / AC-7 -- repo-wide grep: §13 "Subagent Orchestration" absent from
+# Check (b) -- repo-wide grep: §13 "Subagent Orchestration" absent from
 # every .md file in the repo (excluding CHANGELOG.md).
 # ---------------------------------------------------------------------------
 _S39_FORBIDDEN_XREF = '§ 13 "Subagent Orchestration"'
@@ -8370,72 +8232,36 @@ def _find_stale_xrefs(repo_root: Path, needle: str) -> list[str]:
 
 _s39_stale_xref_hits = _find_stale_xrefs(REPO_ROOT, _S39_FORBIDDEN_XREF)
 check(
-    "takeover-contract(8/ac-7): repo-wide grep -- no .md file (excl. CHANGELOG.md)"
+    "takeover-contract(b): repo-wide grep -- no .md file (excl. CHANGELOG.md)"
     f" contains '{_S39_FORBIDDEN_XREF}'",
     len(_s39_stale_xref_hits) == 0,
     f"Stale §13 cross-reference found in: {_s39_stale_xref_hits}",
 )
 
 # ---------------------------------------------------------------------------
-# Check (9) / AC-8 — v2.89.0 SEC-DR-2 re-founding:
-# The nested-dispatch-takeover managed block is RETIRED. Its canonical file
-# must not exist. The never-th:orchestrator guard is now documented in
-# docs/subagent-orchestration.md (AC-2) only; the operator-facing managed block
-# is removed (dispatch is unconditional on the CC path; takeover is opencode-only).
+# Check (c) — the nested-dispatch-takeover managed block is RETIRED. Its
+# canonical file must not exist.
 # ---------------------------------------------------------------------------
 check(
-    "takeover-contract(9/ac-8-v289): nested-dispatch-takeover managed block RETIRED"
+    "takeover-contract(c): nested-dispatch-takeover managed block RETIRED"
     " — skills/setup/managed-blocks/nested-dispatch-takeover.md does NOT exist",
     not _s39_ndt_path.exists(),
     "skills/setup/managed-blocks/nested-dispatch-takeover.md must NOT exist"
-    " — retired in v2.89.0 (disposition is unconditional; takeover machinery is opencode-only docs)",
+    " — retired (the whole takeover mechanism has no successor)",
 )
 
 # ---------------------------------------------------------------------------
-# Check (10) / AC-12 -- subagent-orchestration.md § dispatch_handoff Schema:
-# The `type` field row must carry a neutralizing note that type:null (boot)
-# does NOT mean security is skipped.
-# ---------------------------------------------------------------------------
-_S39_AC12_TOKENS = (
-    "null",
-    "security",
-)
-check(
-    "takeover-contract(10/ac-12): docs/subagent-orchestration.md"
-    " § 'dispatch_handoff Schema' type row carries note that"
-    " type: null (boot) does NOT mean security skipped",
-    bool(_s39_schema_slice)
-    and all(t in _s39_schema_slice for t in _S39_AC12_TOKENS)
-    and (
-        "security" in _s39_schema_slice.lower()
-        and "null" in _s39_schema_slice
-        and (
-            "not" in _s39_schema_slice.lower()
-            or "NO" in _s39_schema_slice
-        )
-    ),
-    f"dispatch_handoff Schema section missing or type:null security-note absent:"
-    f" need {_S39_AC12_TOKENS} + negation phrase ('not' / 'NO')",
-)
-
-# ---------------------------------------------------------------------------
-# Check (11) -- self-referential guard:
-# docs/testing.md (canonical registry) must register "Suite 39" + marker
-# "pr-a-takeover-contract". This file must contain the literal "Suite 39".
-# Re-pointed from CLAUDE.md to docs/testing.md (pr-claude-md-hygiene).
-# Does NOT read CLAUDE.md for the Suite literal — no fallback or 'or' permitted.
+# Check (d) -- self-referential guard:
+# docs/testing.md (canonical registry) must record Suite 39's retirement.
+# This file must contain the literal "Suite 39".
 # ---------------------------------------------------------------------------
 _s39_testing_md = read(REPO_ROOT / "docs" / "testing.md")
 check(
-    "takeover-contract(11/self-ref):"
-    " docs/testing.md canonical registry names 'Suite 39' and this file defines it"
-    " (self-referential guard -- pr-a-takeover-contract)",
+    "takeover-contract(d/self-ref):"
+    " docs/testing.md canonical registry names 'Suite 39' and this file defines it",
     "Suite 39" in _s39_testing_md
-    and "Suite 39" in _s39_self_text
-    and "pr-a-takeover-contract" in _s39_self_text,
-    "Suite 39 not registered in docs/testing.md canonical registry"
-    " or marker literal 'pr-a-takeover-contract' missing in this file"
-    " -- implementer must complete docs/testing.md; tester must not remove the marker",
+    and "Suite 39" in _s39_self_text,
+    "Suite 39 not registered in docs/testing.md canonical registry",
 )
 
 
@@ -13198,11 +13024,15 @@ if _s55_checkpoint_task_entry:
 
 # -- (4) AC-A5: orchestrator.md self-check for all 3 boundaries + nested-context limitation --
 _s55_orch_6d = _s55_checkpoint
-_s55_orch_6d_b1 = read(AGENTS_DIR / "leader.md")
+# Repoint (post-fusion): "Step 6d" was leader.md's own numbering; the same
+# checkpoint-B1 disposition now lives in orchestrator.md's Intake step
+# "12 — Discover disposition, checkpoint B1" (single coordinator, one Intake
+# sequence rather than a separate leader-owned step).
+_s55_orch_6d_b1 = _s55_orch
 check(
-    "Suite 55(4a): orchestrator.md Step 6d names Reasoning Checkpoint B1",
-    "Reasoning Checkpoint B1" in _s55_orch_6d_b1 or "checkpoint_boundary: intake-plan" in _s55_orch_6d_b1,
-    "orchestrator.md Step 6d does not reference Reasoning Checkpoint B1 / intake-plan",
+    "Suite 55(4a): orchestrator.md Intake step 12 names checkpoint B1 (intake-plan)",
+    "checkpoint B1" in _s55_orch_6d_b1 or "checkpoint_boundary: intake-plan" in _s55_orch_6d_b1,
+    "orchestrator.md Intake step 12 does not reference checkpoint B1 / intake-plan",
 )
 check(
     "Suite 55(4b): orchestrator.md Step 6d names Reasoning Checkpoint B2 (research-next)",
@@ -13285,11 +13115,21 @@ for _b in ("B1", "B2", "B3"):
         _b in _s55_checkpoint and "security" in _s55_checkpoint.lower(),
         f"docs/reasoning-checkpoint.md does not assert HI-2 non-waivable at boundary {_b}",
     )
-_s55_orch_6d_hi2 = _slice_section(read(AGENTS_DIR / "leader.md"), "HI-2 inviolable at B1", _STOP_SECTION)
+# Repoint (post-fusion): leader.md's own bold lead-in "HI-2 inviolable at B1."
+# doesn't survive verbatim as a label, but its substance does, unchanged, in
+# orchestrator.md's Intake step 12: "A skip marker bypasses this checkpoint
+# but never a security floor." — sliced to that step so an ambient "never"/
+# "security" elsewhere in the file cannot produce a false green.
+_S55_STEP12_STOPS = ("\n### 13", "\n## ")
+_s55_orch_6d_hi2 = _slice_section(_s55_orch, "### 12 — Discover disposition, checkpoint B1", _S55_STEP12_STOPS)
 check(
-    "Suite 55(8c): orchestrator.md Step 6d declares HI-2 inviolable at B1 (skip marker never waives security gate)",
-    "HI-2 inviolable at B1" in _s55_orch_6d_hi2 and "security" in _s55_orch_6d_hi2.lower() and ("never" in _s55_orch_6d_hi2.lower() or "NEVER" in _s55_orch_6d_hi2),
-    "orchestrator.md Step 6d does not declare HI-2 inviolable (skip marker is never a security waiver)",
+    "Suite 55(8c): orchestrator.md Intake step 12 declares the skip-marker"
+    " never waives a security floor (HI-2's substance, post-fusion)",
+    "checkpoint B1" in _s55_orch_6d_hi2
+    and "security floor" in _s55_orch_6d_hi2.lower()
+    and "never" in _s55_orch_6d_hi2.lower(),
+    "orchestrator.md Intake step 12 does not declare that a skip marker"
+    " bypasses the checkpoint but never a security floor",
 )
 
 # -- (9) SEC-AC-2: strict parsing + intra-privilege trust + no security fields in hook --
@@ -13600,45 +13440,64 @@ check(
     "Layer 4 must state that the global routing rule is neutralized within review context",
 )
 
-# --- (b) Step 6a-pre gate in orchestrator.md (review_context guard) ---
+# --- (b) "### 11 — Intent routing" guard in orchestrator.md (review_context guard) ---
 
-_s57_step6pre = _slice_section(read(AGENTS_DIR / "leader.md"), "`review_context` guard (before the intent table", _S57_STOP_HEADS)
+# Repoint (post-fusion): leader.md's old "Step 6a-pre" numbering is gone —
+# the guard lives in orchestrator.md's Intake step "### 11 — Intent
+# routing", in the "Before the table, every turn" paragraph. That paragraph
+# is now a lighter entry-point summary; the execution detail it points at
+# (the Layer-4 clearing instruction) stays in ref-direct-modes.md's own
+# Layer 4 section, which back-references this exact section by name
+# (`agents/ref-direct-modes.md:355`) — the same split-content, cross-
+# referenced pattern this fused contract uses throughout. b3/b4 below check
+# the union of both slices rather than requiring the full round-trip inside
+# orchestrator.md's own summary paragraph alone.
+_S57_STEP11_STOPS = ("\n### 12", "\n## ")
+_s57_step6pre = _slice_section(_s57_orch, "### 11 — Intent routing", _S57_STEP11_STOPS)
+_s57_step6pre_and_l4 = _s57_step6pre + "\n" + _s57_l4
 
 check(
-    "Suite 57(b1): orchestrator.md contains 'Step 6a-pre' (review_context guard) section",
+    "Suite 57(b1): orchestrator.md contains '### 11 — Intent routing' (review_context guard) section",
     bool(_s57_step6pre),
-    "Step 6a-pre section missing from orchestrator.md — the review_context guard must live "
-    "in the Step 6 intent-classification flow, not only in ref-direct-modes.md (SEC-DR-1)",
+    "orchestrator.md must contain '### 11 — Intent routing' — the review_context guard must live "
+    "in the Intent routing intake step, not only in ref-direct-modes.md (SEC-DR-1)",
 )
 check(
-    "Suite 57(b2): Step 6a-pre section consults review_context before mapping to full pipeline",
+    "Suite 57(b2): Intent routing section consults review_context before mapping to full pipeline",
     "review_context" in _s57_step6pre and "full pipeline" in _s57_step6pre,
-    "Step 6a-pre must check review_context AND reference full pipeline routing within its section",
+    "Intent routing must check review_context AND reference full pipeline routing within its section",
 )
 check(
-    "Suite 57(b3): Step 6a-pre routes corrective language to mode-transition gate",
-    "mode-transition gate" in _s57_step6pre or "Layer 4" in _s57_step6pre,
-    "Step 6a-pre must route corrective language to the mode-transition gate (Layer 4), not full pipeline",
+    "Suite 57(b3): Intent routing routes corrective language to the mode-transition gate"
+    " (orchestrator.md's own paragraph, or ref-direct-modes.md's Layer 4 it cross-references)",
+    "mode-transition" in _s57_step6pre_and_l4 and "gate" in _s57_step6pre_and_l4,
+    "Intent routing (or the Layer 4 section it points at) must route corrective language to the"
+    " mode-transition gate, not full pipeline",
 )
 check(
-    "Suite 57(b3b): Step 6a-pre explicitly covers fresh/new conversational turns (SEC-DR-1 re-entry seam)",
-    # Repoint (split): the leader.md guard fires "before the intent table, every
-    # turn" (which covers fresh/new turns), and ref-direct-modes.md § Layer 4
-    # names the "fresh-turn re-entry case" explicitly.
-    ("fresh turn" in _s57_step6pre.lower() or "fresh turns" in _s57_step6pre.lower()
-     or "new conversational turn" in _s57_step6pre.lower()
-     or "re-entry seam" in _s57_step6pre.lower()
-     or "every turn" in _s57_step6pre.lower()
+    "Suite 57(b3b): Intent routing explicitly covers fresh/new conversational turns (SEC-DR-1 re-entry seam)",
+    # Repoint (split, then again post-fusion): the guard fires "before the
+    # table, every turn" (a superset of fresh/new turns), and
+    # ref-direct-modes.md § Layer 4 names the "fresh-turn re-entry case"
+    # explicitly.
+    ("fresh turn" in _s57_step6pre_and_l4.lower() or "fresh turns" in _s57_step6pre_and_l4.lower()
+     or "new conversational turn" in _s57_step6pre_and_l4.lower()
+     or "re-entry seam" in _s57_step6pre_and_l4.lower()
+     or "every turn" in _s57_step6pre_and_l4.lower()
      or "fresh-turn re-entry" in _s57_l4.lower()),
-    "Step 6a-pre must state that fresh/new conversational turns are intercepted before the "
-    "intent table classifies them as full pipeline (SEC-DR-1 / CWE-863) — without this, "
+    "Intent routing (or Layer 4) must state that fresh/new conversational turns are intercepted"
+    " before the intent table classifies them as full pipeline (SEC-DR-1 / CWE-863) — without this, "
     "the re-entry seam is undocumented and removal goes undetected",
 )
 check(
-    "Suite 57(b4): Step 6a-pre documents the review_context lifecycle (write + clear)",
-    "review_context" in _s57_step6pre
-    and ("lifecycle" in _s57_step6pre or ("write" in _s57_step6pre and "clear" in _s57_step6pre)),
-    "Step 6a-pre must document when review_context is written and cleared (lifecycle)",
+    "Suite 57(b4): the review_context lifecycle (write + clear) is documented across Intent"
+    " routing and the Layer 4 section it cross-references",
+    "review_context" in _s57_step6pre_and_l4
+    and ("lifecycle" in _s57_step6pre_and_l4
+         or ("write" in _s57_step6pre_and_l4 or "set" in _s57_step6pre_and_l4.lower())
+         and "clear" in _s57_step6pre_and_l4),
+    "Intent routing plus Layer 4 together must document when review_context is written/set"
+    " and cleared (lifecycle)",
 )
 
 # --- (c) Layer 5 — branch-author guard in ref-direct-modes.md ---

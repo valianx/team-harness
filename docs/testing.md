@@ -74,9 +74,20 @@ check("label", "expected-token" in _slice, "detail message")
 
 13 checks. Asserts all four guardrails of the review-pipeline-guardrails feature structurally using the `_slice_section` anchor idiom (same as Suites 36/37): (1) `## Scope Discipline` section in `reviewer.md` — tokens `In scope` / `Out of scope` / `attribution` / `Fuera de alcance`; cross-refs in Patterns & Consistency and Tests; `### Fuera de alcance` in the `review_body` template; (2) `### AI-Authored PR Review Lens` in `reviewer.md` — `Existence check` / `Plausible-but-wrong` / `Vacuous-test` / `CRITICAL` / `context7`; (3) context7 grant in frontmatter — `mcp__context7__resolve-library-id` + `mcp__context7__query-docs`; (4) `## No-Publish Invariant` — `NEVER` / `publishes` / `draft` / `operator`; (5) repoint guard — `gh-fallback.md § Policy` absent from `reviewer.md` AND `## Policy` absent from `gh-fallback.md`; (6) attribution guard in `reviewer-consolidator.md § Verdict rule` — `Attribution guard` / `out-of-scope` / `Fuera de alcance` / `any-CHANGES_REQUESTED`; (7) behavioral step in `SKILL.md § Step 1.6` — `best-effort` / `isCrossRepository` / `no-command` / `timeout`; (8) fork-exclusion gate — `isCrossRepository` + `fork` + `skipped:fork`; (9) `ref-direct-modes.md § Review Mode` — `No-publish invariant` + `NEVER`; (10) self-referential guard — literal `Suite 38` in `docs/testing.md` and in the test file itself. A missing anchor always produces failure (slice returns empty string → token check fails; no false-green possible). Self-referential guard asserts `Suite 38` literal in `docs/testing.md` (canonical registry) and `review-pipeline-guardrails` marker in the test file.
 
-### Suite 39 — pr-a-takeover-contract
+### Suite 39 — RETIRED (coordinator-fusion, T4-AC-1a)
 
-11 checks. Asserts the nested-dispatch takeover contract hardening (PR A of the pipeline-flows-hardening programme): (1) `orchestrator.md § Dispatch-blocked exit` — never-th:orchestrator binding with `th:architect` (boot), `00-state.md` (mid-pipeline), `NEVER` guard; (2) `subagent-orchestration.md § Takeover Protocol` — consume-side guard: if `next_dispatch.agent == th:orchestrator` it is malformed → dispatch phase agent / `th:architect` instead; (3a-3c) `subagent-orchestration.md § dispatch_handoff Schema` — section exists, contains a `json` fenced block, all 8 required fields (`schema_version`, `next_dispatch.agent`, `type`, `phase`, `autonomy.granted`, `round`, `state_ref`, `probe_error`); (4) `orchestrator.md § Dispatch-blocked exit` — `dispatch.blocked` event emitted with `reason` + `action`; (5) schema referenced by canonical name; (6) gate-manifest relabel + Phase Dispatch pointer in Takeover Protocol; (7-8) `skills/README.md` references `§ 14` (not the stale §13 reference) and the stale cross-reference string is absent repo-wide; (9) `skills/setup/SKILL.md` nested-dispatch-takeover block — never-th:orchestrator reinforcement; (10) `dispatch_handoff Schema` type row carries `type: null` security note; (11) self-referential guard — `Suite 39` in `docs/testing.md` (canonical registry) and `pr-a-takeover-contract` marker in test file. All anchor-scoped (anti-false-green: missing anchor → empty slice → check fails).
+Was: `pr-a-takeover-contract`, 11 checks asserting the nested-dispatch takeover contract hardening
+(PR A of the pipeline-flows-hardening programme) — the dispatch_handoff schema, the
+`orchestrator.md § Dispatch-blocked exit` never-th:orchestrator binding, the
+`subagent-orchestration.md § Takeover Protocol` consume-side guard, and the gate-manifest relabel.
+`docs/subagent-orchestration.md § "Nested-context dispatch — RETIRED protocol, retained
+provisioning"` now states this mechanism is retired with no successor: the scenario it backstopped
+(a top-level `leader` dispatching a second coordinator, `th:orchestrator`, as a nested subagent that
+then loses `Task`) has no producer once no coordinator ever dispatches another coordinator,
+including a copy of itself. 4 checks retained, retargeted rather than retired since their subject
+is a general hygiene property independent of the takeover mechanism's own retirement: the §13→§14
+stale cross-reference sweep (`skills/README.md` and repo-wide), the nested-dispatch-takeover managed
+block's continued absence, and this suite's own registration self-reference.
 
 ### Suite 40 — pr-b-security-failopen
 
