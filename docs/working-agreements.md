@@ -20,12 +20,14 @@
   name with non-alphanumeric characters replaced by hyphens, matching `[a-z0-9-]+`. Direct
   `## [Unreleased]` edits are acceptable as a fallback when `changelog.d/` cannot be used (e.g.,
   pre-convention repos).
-- Update tracked documentation only when shipped behavior would make its canonical source
-  factually false, or a new public contract/operator workflow otherwise has no documentation.
-  Change the single closest source of truth; do not duplicate the same explanation per service
-  or add implementation/release narrative to reference documentation. Preserve the nearest local
-  format. The default budget is one existing section and at most 20 added nonblank lines, or
-  80 total lines for a necessary new document. A plan may exceed it only through
+- Update tracked documentation when the operator explicitly requests it, when shipped behavior
+  would make its canonical source factually false, or when a new public contract/operator workflow
+  otherwise has no documentation. Every document must name a concrete audience and purpose.
+  Change the single closest source of truth and create a new page only when no existing page serves
+  that purpose; do not duplicate the same explanation per service or add implementation/release
+  narrative to reference documentation. Preserve the nearest local format. The default budget is
+  one existing section and at most 20 added nonblank lines, or 80 total lines for a necessary new
+  document. A plan may exceed it only through
   `Documentation budget: extended — {reason}; max {N} lines`. With no local format, use one title,
   a one-sentence purpose, and only task-oriented sections; omit introductions, conclusions, FAQs,
   architecture tours, repeated facts, and examples not required to use the changed behavior.

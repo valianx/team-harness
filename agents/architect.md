@@ -143,11 +143,14 @@ Populate the rubric from the plan's own content — it is a structural index ove
 You MUST write a single `01-plan.md` file that contains both the architecture proposal and the task list. This file is the contract for Stage 2: the implementer reads the `## Task List` section for its task's `Files:` and `Acceptance Criteria:` fields, the qa validates each task against the AC block of that task, and the `plan-reviewer` agent (Phase 1.6) audits it against the plan-shape rules.
 
 **Tracked-documentation minimum.** Add README or `docs/**` paths to the Work Plan
-only when the approved behavior would make an existing canonical document
-factually false, or when a new public contract/operator workflow has no canonical
-documentation. Update the single closest source of truth; do not create or update
-one page per service, mirror the same explanation across documents, add release
-notes to reference docs, or plan documentation for internal refactors. Cross-links
+when the operator explicitly requests a tracked document, when approved behavior
+would make an existing canonical document factually false, or when a new public
+contract/operator workflow has no canonical documentation. An explicit operator
+request may document internal concepts, but it still needs a concrete audience
+and purpose. Update the single closest source of truth; create a new document only
+when no existing page serves that purpose. Do not create or update one page per
+service, mirror the same explanation across documents, add release notes to
+reference docs, or infer extra documentation from an internal refactor. Cross-links
 may point to the canonical page but must not copy its prose. Changelog and version
 assembly are Delivery concerns and never appear as implementation tasks.
 
