@@ -6448,12 +6448,20 @@ check(
 # Anchor C: agents/orchestrator.md "### Plan-review panel centralization contract"
 # (Covers AC-6, AC-7)
 # ---------------------------------------------------------------------------
-_ORCH_PR_ANCHOR = "### Plan-review panel centralization contract"
+# Retargeted (coordinator-fusion): the heading shortened from "### Plan-review
+# panel centralization contract" to "### Panel centralization" -- confirmed
+# by direct read that the underlying content (write-scope pointer, the three
+# bold-inline sub-verdicts, the worst-of roll-up, the no-errata rule) is
+# present in the shorter section; see the per-check comments below for the
+# two pieces that did NOT survive (the explicit [CONSTRAINT-DISCOVERED]
+# cross-link paragraph, check 19) and one that changed shape rather than
+# being a pure rename (the STAGE-GATE-1 field literal, check 36).
+_ORCH_PR_ANCHOR = "### Panel centralization"
 _orch_pr = _slice_section(_s34_orch, _ORCH_PR_ANCHOR)
 
 check(
     "plan-review(anchor-orch): agents/orchestrator.md contains"
-    " '### Plan-review panel centralization contract' section",
+    " the '### Panel centralization' section",
     bool(_orch_pr),
     f"anchor '{_ORCH_PR_ANCHOR}' not found in orchestrator.md"
     " -- plan-review checks (14)(15)(16)(17)(18)(19) will all fail",
@@ -6568,6 +6576,10 @@ _c18_sliceable = bool(_orch_pr) and (
     # Repoint (split): the single-sliceable-block property is carried by the
     # "bold-inline-label sub-verdicts" landing in the single canonical reviews file.
     or "bold-inline-label" in _orch_pr.lower()
+    # Retargeted: the fused prose drops the hyphenation ("Three bold inline
+    # sub-verdicts" instead of "carries three bold-inline-label
+    # sub-verdicts") -- same property, unhyphenated wording.
+    or "bold inline sub-verdicts" in _orch_pr.lower()
 )
 check(
     "plan-review(18/ac-6d): orchestrator.md centralization contract slice"
@@ -6584,6 +6596,19 @@ check(
 
 # Check (19) -- AC-6(e): cross-link to [CONSTRAINT-DISCOVERED] fold-back
 # (Phase 2.5 / qa reconcile).
+# NOT retargeted -- genuine content loss, confirmed against the pre-fusion
+# source (`git show 70550d1:agents/orchestrator.md`). That revision carried
+# an explicit paragraph here: "**Cross-link — same principle as
+# `[CONSTRAINT-DISCOVERED]` fold-back (Phase 2.5).** The
+# `[CONSTRAINT-DISCOVERED]` mechanism... is the execution→plan instance of
+# this centralization principle applied to the plan body itself; the
+# plan-review panel applies the equivalent rule to its own review artifact."
+# `[CONSTRAINT-DISCOVERED]` survives as a mechanism elsewhere in the fused
+# file (Phase 2.5 itself still uses it), but this specific explanatory
+# cross-link -- drawing the parallel that motivates the Rule-3h
+# canonical-field-contradiction handling right here -- has no successor
+# anywhere in the corpus (grepped every SPLIT_CORPUS file). Left failing
+# intentionally; agents/orchestrator.md is Task-1's frozen file.
 _c19_constraint_discovered = bool(_orch_pr) and (
     "[CONSTRAINT-DISCOVERED]" in _orch_pr
     or "CONSTRAINT-DISCOVERED" in _orch_pr
@@ -6604,20 +6629,29 @@ check(
     ),
 )
 
-# Check (20) -- AC-7: orchestrator.md Step 6 disambiguation reflects three-way panel
+# Check (20) -- AC-7: orchestrator.md Intake disambiguation reflects three-way panel
 # while preserving distinction from `validate` and substance-refinement.
-# HARDENED (AC-6 of fix-agent-builder-and-diagram-routing, 2026-06-09):
-# Previously used a positional `find("revisar") + [-200:+1800]` window, which slides
-# whenever Step 6a rows are added above or below the revisar row.  Replaced with an
-# anchor-scoped _slice_section bounded by the literal "**Disambiguation —" line
-# (the existing disambiguation block header in orchestrator.md).  Missing anchor →
-# empty slice → all sub-checks fail (no false-green).  This is behavior-preserving:
-# the same tokens (plan-review / validate / panel) are asserted, just via a stable
-# structural anchor instead of a brittle positional offset.
-_C20_DISAMB_ANCHOR = "**Disambiguation —"
+# Retargeted (coordinator-fusion): the heading shortened from
+# "**Disambiguation — `validate` vs `plan-review` vs `review-pr` vs substance
+# refinement.**" to a bare "**Disambiguation.**" (period, no dash, no
+# trailing route list); the paragraph itself condensed the ~7-bullet
+# breakdown into one dense sentence per route. "Plan review" (space,
+# sentence case) replaces the "plan-review" (hyphenated) token, and
+# "Validate" (sentence case) replaces "validate" -- both accepted
+# case/form-insensitively since they name the same routes.
+# NOT retargeted (genuine content loss, reported below): the "three-reviewer
+# panel (qa-plan ratify-plan → security design-review conditional →
+# plan-reviewer shape, last)" breakdown that motivated why plan-review is
+# distinct from validate/review-pr has no successor at this specific site --
+# the panel's existence is still documented in Phase 1.6's own "### Panel
+# centralization" section, but the disambiguation callout that explained it
+# HERE, at the point a reader needs the distinction, is gone. Confirmed via
+# grep: no form of "panel"/"three-reviewer"/"three way" appears anywhere in
+# Intake's "### 11 — Intent routing" subsection.
+_C20_DISAMB_ANCHOR = "**Disambiguation.**"
 _c20_disamb_slice = _slice_section(_s34_orch, _C20_DISAMB_ANCHOR)
-_c20_plan_review_in_window = "plan-review" in _c20_disamb_slice
-_c20_validate_in_window = "validate" in _c20_disamb_slice  # validate route still present in same block
+_c20_plan_review_in_window = "plan-review" in _c20_disamb_slice or "Plan review" in _c20_disamb_slice
+_c20_validate_in_window = "validate" in _c20_disamb_slice.lower()
 _c20_three_way_in_window = (
     "three reviewer" in _c20_disamb_slice.lower()
     or "three-way" in _c20_disamb_slice.lower()
@@ -6626,13 +6660,13 @@ _c20_three_way_in_window = (
     or "panel" in _c20_disamb_slice.lower()
 )
 check(
-    "plan-review(20/ac-7): orchestrator.md Step 6 disambiguation"
-    " (anchor-scoped slice from '**Disambiguation —' block)"
+    "plan-review(20/ac-7): orchestrator.md Intake disambiguation"
+    " (anchor-scoped slice from '**Disambiguation.**' block)"
     " reflects the three-way panel for plan-review"
     " while preserving distinct route for 'validate'",
     _c20_plan_review_in_window and _c20_validate_in_window and _c20_three_way_in_window,
     (
-        f"orchestrator.md '**Disambiguation —' anchor slice:"
+        f"orchestrator.md '**Disambiguation.**' anchor slice:"
         f" plan_review={_c20_plan_review_in_window},"
         f" validate_distinct={_c20_validate_in_window},"
         f" three_way_or_panel={_c20_three_way_in_window}"
@@ -7062,7 +7096,19 @@ check(
 
 # Check (36) -- AC-3: STAGE-GATE-1 section in orchestrator.md reads
 # **Combined verdict:** (the roll-up), NOT only "Plan-reviewer verdict".
-# The anchor is the existing "## STAGE-GATE-1" heading.
+# The anchor is the existing "## STAGE-GATE-1" heading (unchanged by the
+# fusion). NOT retargeted -- genuine regression of an already-fixed,
+# ratified bug (this AC itself, "pr-h-ac3", exists because a prior fix
+# corrected exactly this ambiguity). `git show 70550d1:agents/orchestrator.md`
+# has a gate-data table row whose description literally renders
+# "**Combined verdict:** `pass|concerns|fail` (the roll-up, never only the
+# plan-reviewer's own sub-verdict)". The fused prose collapsed the table row
+# to "`plan_review` (the combined roll-up, never only the shape sub-verdict
+# — or the deferred / not-applicable note)" -- keeping the SUBSTANCE (it is
+# the roll-up, not a sub-verdict) but dropping the literal "**Combined
+# verdict:**" field label the STOP block is supposed to render to the
+# operator. Left failing intentionally; agents/orchestrator.md is Task-1's
+# frozen file.
 _GATE1_ANCHOR = "## STAGE-GATE-1"
 _orch_gate1 = _slice_section(_s34_orch, _GATE1_ANCHOR)
 _c36_gate_reads_combined = bool(_orch_gate1) and (
