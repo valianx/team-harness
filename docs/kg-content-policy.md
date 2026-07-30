@@ -120,7 +120,7 @@ If a developer's work spans contexts that should not cross-leak (e.g., a persona
 
 ## How the policy is applied
 
-- **At write time**: the `orchestrator` must filter content against this policy before calling `create_nodes` / `add_observations`. If an observation falls in the forbidden zone, it is omitted silently; if it falls in the gray zone, it is omitted by default. Write-time filter coverage spans two sites: the explicit knowledge-save flow and `KG-write-on-security-findings` (Phase 3 — the orchestrator writes Critical/High security findings from `security`'s `kg_save_candidates`). Both are governed by this policy; automatic Delivery process-insight capture is retired.
+- **At write time**: the `orchestrator` must filter content against this policy before calling `create_nodes` / `add_observations`. If an observation falls in the forbidden zone, it is omitted silently; if it falls in the gray zone, it is omitted by default. Write-time filter coverage spans two sites: the explicit knowledge-save flow and the Phase 3 audit-finding write (the orchestrator persists `adversary`'s `broke-it` findings or `kg_save_candidates`). Both are governed by this policy; automatic Delivery process-insight capture is retired.
 - **On export**: `export.py` trusts that the local KG already complies — it performs no curation of its own.
 - **On import**: `import.py` trusts that the source file already complies — no filtering either.
 
@@ -142,7 +142,7 @@ All KG content is written in **English**, regardless of the conversation languag
 **Version**: 0.1 (initial draft, 2026-04-22).
 
 **Implementation status**:
-- ✅ Filter wired into the orchestrator's explicit knowledge-save flow and Phase 3 security-finding write site.
+- ✅ Filter wired into the orchestrator's explicit knowledge-save flow and Phase 3 audit-finding write site (`site: security-finding`).
 - ✅ Backend-agnostic — applies to any MCP server registered as `mcpServers.memory`. For `context-harness-mcp`: the server-side `internal/validate/` Content Filter enforces a subset (size + secrets + taxonomy) at write time as defense-in-depth.
 
 This policy is **normative for humans and agents**. The orchestrator's filter is the first line of defense at write time.

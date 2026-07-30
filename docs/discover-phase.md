@@ -133,7 +133,7 @@ Consequence: neither the advance signal nor any survey answer constitutes a waiv
 
 ### HI-3 — Attributable choices
 
-Every survey answer is logged in `00-state.md § Current State` (the 7 fields in §7 below) and surfaced in the PR body via the `Intake survey:` line (§9 below). The PR body line propagates only: `forma`, `esfuerzo`, `autonomía`, `scope-hint`, `fuente`. It **never** includes `security_sensitive` or any gate status — no PR line may be read as attributing a security waiver to the operator.
+Every survey answer is logged in `00-state.md § Current State` (the 7 fields in §7 below) and in the execution trace. Survey data is coordination evidence only: the automatic pipeline does not copy it into Delivery context or the PR body. It never alters `security_sensitive` or any gate status, and no publication artifact may imply that a survey answer waived a security decision.
 
 ### HI-5 — Recoverable post-compaction
 
@@ -198,17 +198,12 @@ The Discover phase does NOT add a blocking item to the Phase Checklist — it is
 
 ---
 
-## 9. PR body — retired `Intake survey:` line
+## 9. State and trace only
 
-The former Delivery contract copied intake mechanics into every PR body:
-
-```
-**Intake survey:** forma={full|fast}, esfuerzo={thorough|quick|agent-decides}, autonomía={manual|autonomous}, scope-hint="{text or none}", fuente={asked|confirmed|inferred}
-```
-
-That publication behavior is retired. The survey remains pipeline state and trace evidence; it is not product-change information and no longer spends PR-body or Delivery context.
-
-**Prohibition:** the `Intake survey:` line MUST NOT include `security_sensitive`, any gate status flag, or any field not in the enumeration above. No line in the PR may be read as attributing a security decision to the operator.
+Survey data remains in `00-state.md` and the execution trace for recovery and
+attribution. It is not product-change information and is never an automatic
+PR-body or Delivery input. `security_sensitive`, gate status, and all other
+classification fields remain independent of the survey.
 
 ---
 

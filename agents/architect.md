@@ -383,7 +383,7 @@ Stacked PRs within the SAME repository (a group's Base = a sibling group's branc
 The AC checkboxes (`- [ ]`) follow the same self-describing principle: `qa` marks an AC as `- [x]` when it returns PASS in `reviews/04-validation.md` for the corresponding iteration. A FAIL keeps the box unchecked; the box only becomes `- [x]` on a definitive PASS. This is the **only** write `qa` is allowed to make on `01-plan.md` (§ Task List).
 
 **Write scope (hard rule for all agents).** The `## Task List` section of `01-plan.md` is the Stage 1 contract. After STAGE-GATE-1 release, the only mutations allowed are:
-- `Status:` field on a task header (orchestrator, delivery).
+- `Status:` field on a task header (orchestrator only).
 - AC checkbox `- [ ]` → `- [x]` (qa, on PASS).
 - Nothing else. Files, AC text, dependencies, Split reason, Cleanup PR/Base PR, Title, Branch, Notes — frozen.
 

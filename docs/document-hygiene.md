@@ -41,4 +41,4 @@ See `docs/decisions.md` for the full log. Recent entries kept inline below.
 | `docs/constraints.md` | Constraints overflow (constraint + detail) | agent editing CLAUDE.md |
 | `docs/testing.md` | Testing conventions overflow (convention + description) | agent editing CLAUDE.md |
 
-The agent performing the reviewed CLAUDE.md edit creates overflow files on first offload. Agents that require project knowledge consume task-relevant entries. The implementer uses `00-knowledge-context.md` when present or a bounded grep fallback; it never reads `docs/knowledge.md` in full. Overflow files remain on demand when the CLAUDE.md pointer section is relevant.
+The agent performing the reviewed CLAUDE.md edit creates overflow files on first offload. Agents that require project knowledge consume only task-relevant entries supplied by the coordinator; when none are available, the implementer uses a bounded grep fallback and never reads `docs/knowledge.md` in full. Overflow files remain on demand when the CLAUDE.md pointer section is relevant.

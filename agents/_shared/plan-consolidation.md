@@ -42,7 +42,7 @@ This closes the set of panel *outcomes*, not the set of files under `reviews/`. 
 | `## Security Design-Review` (top-level skeleton section, condition-gated) | `reviews/01-plan-review.md` | security (panel) | fill the skeleton's own `**Verdict:**` line in place; the worst-of combine reads the `## Plan Review` sub-verdict above, not this section |
 | `**Reviews:**` attestation line (plan title block) | `01-plan.md` | plan-reviewer | replace own labelled line in place, once per panel round |
 | AC checkboxes in `## Task List` | `01-plan.md` | qa (validate) | checkbox flip only — no `## Validation Outcome` fold-in; the plan stays in final state pre-implementation, the verdict lives in `reviews/04-validation.md`, progress is read off the checkboxes and `Status:` |
-| `Status:` field on task headers | `01-plan.md` | orchestrator / delivery | field edit in place |
+| `Status:` field on task headers | `01-plan.md` | orchestrator | field edit in place |
 | Canonical fields (base, version, scope) when changed by the operator at STAGE-GATE-1 | `01-plan.md` | orchestrator | overwrite superseded values in place so only the operator's final values remain |
 
 ## Write-scope on `01-plan.md` (closed list)

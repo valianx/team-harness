@@ -2,8 +2,8 @@
 <!-- Single source of truth for KG write-time content-policy + dedup gates.
      Consumed by: agents/ref-pipeline.md (explicit knowledge save + Phase 3
      security-finding writes).
-     Read-only agents (qa, tester, security, architect) do NOT reference this —
-     they never call create_nodes; they emit kg_save_candidates instead.
+     Leaf agents do NOT reference this — they never call create_nodes. Adversary
+     and other audit lenses emit kg_save_candidates for the orchestrator instead.
      Edit here; the orchestrator's two write sites reference this file by section.
      Full normative policy: docs/kg-content-policy.md. -->
 

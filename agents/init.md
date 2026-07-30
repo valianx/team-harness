@@ -436,7 +436,7 @@ Check if `docs/knowledge.md` exists. If not, create it:
 ```
 
 **Rules:**
-- Do NOT add content — the delivery agent populates it later
+- Do NOT add content — explicit knowledge flows populate it later
 - Do NOT modify an existing `docs/knowledge.md`
 
 ### 4.4 — Scaffold `.gitattributes` EOL pinning (If Missing)

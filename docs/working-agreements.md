@@ -6,13 +6,13 @@
 
 ## Post-work (deliverables for any user-facing change)
 
-- Write a CHANGELOG fragment to `changelog.d/{pr-slug}.md` (preferred) rather than editing
-  `## [Unreleased]` inline. Each PR writes one file; no two PRs in the same session can conflict.
-  The coordinator's deterministic publication mechanics assemble all fragments into the versioned
-  CHANGELOG section at release cut. Fragment format: a standard Keep-a-Changelog subsection block (`### Added`,
+- For the shipped default, Delivery writes `changelog.d/{pr-slug}.md` and the coordinator
+  assembles it into the versioned CHANGELOG section in the **same PR**. Leaving fragments for a
+  later release cut is allowed only when the repository explicitly declares `skip-version` or a
+  grouped batch/fallback flow. Fragment format: a standard Keep-a-Changelog subsection block (`### Added`,
   `### Changed`, `### Fixed`, `### Security`) with one-line entries. Slug rule: lowercase branch
   name with non-alphanumeric characters replaced by hyphens, matching `[a-z0-9-]+`. Direct
-  `## [Unreleased]` edits are acceptable as a fallback when `changelog.d/` cannot be used (e.g.,
+  Direct `## [Unreleased]` edits are acceptable as a fallback when `changelog.d/` cannot be used (e.g.,
   pre-convention repos).
 - If §3 Tech Stack or §4 Golden Commands of CLAUDE.md changed, update those sections in the same
   PR — do not let CLAUDE.md drift from the repo.

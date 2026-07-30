@@ -335,7 +335,7 @@ After every dispatch returning `success`, verify the expected doc exists on disk
 | `qa-plan` | 1.5 | `reviews/01-plan-review.md § Plan Ratification` |
 | `plan-reviewer` | 1.6 | `reviews/01-plan-review.md § Plan Review` |
 | `architect` | 1 | `reviews/01-closure-rubric.md` (Tier 2-4 only) |
-| `delivery` | 4 | the delivery section of `00-state.md` |
+| `delivery` | 4 | `inputs/pr-body-draft.md` + the lane-specific Acceptance Matrix |
 
 Exists and non-empty → proceed. Otherwise append `artifact.missing` (`action: retry`) and re-dispatch **exactly once** with an explicit "your artifact was not found" instruction. A second failure → `artifact.missing` (`action: escalate`), `status: blocked`. This is the `artifact-missing` failure kind (`agents/ref-pipeline.md § Failures`).
 

@@ -43,7 +43,6 @@ You may write only:
 - `{docs_root}/reviews/04-validation.md § Acceptance Matrix` on `lane: full`;
 - `{docs_root}/03-testing.md § Acceptance Matrix` on `lane: express`;
 - `{docs_root}/inputs/pr-body-draft.md`;
-- `{docs_root}/00-state.md § Delivery`; and
 - `changelog.d/{pr-slug}.md` when the change is operator-facing.
 
 Do not modify:
@@ -261,22 +260,13 @@ Success records `dod: delivery-writes-clean`. A mismatch is
 `status: failed`, `failure_kind: invalid-return`; fix your own artifact once
 before returning.
 
-### 7. Record workspace output
+### 7. Return publication coordinates
 
-Replace or append `{docs_root}/00-state.md § Delivery`:
-
-```markdown
-## Delivery
-**Agent:** delivery
-**PR title:** {title}
-**PR body:** inputs/pr-body-draft.md
-**Acceptance matrix:** {relative path}
-**Changelog fragment:** {path | skipped: internal-only}
-**DoD:** delivery-writes-clean
-```
-
-Branch, commit, version resolution, PR URL, merge state, and CI state are appended
-later by the coordinator. Do not predict them.
+Return the PR title, PR-body path, matrix path, changelog-fragment result, and
+DoD through the Return Protocol. Do not write `00-state.md`: the coordinator is
+its sole writer and upserts these values into `§ Delivery` without replacing
+branch, commit, version, PR URL, merge-state, or CI fields already present on a
+rerun.
 
 ## Failure behavior
 
@@ -297,7 +287,7 @@ status: success | failed | blocked
 failure_kind: {kind}   # mandatory on failed/blocked; omit on success
 model: {effective-model-id}
 effort: {effective-effort-level}
-output: {docs_root}/00-state.md § Delivery
+output: {docs_root}/inputs/pr-body-draft.md
 summary: {one sentence}
 pr_title: {title}
 pr_body: {docs_root}/inputs/pr-body-draft.md

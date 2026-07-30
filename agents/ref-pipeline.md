@@ -1183,11 +1183,11 @@ You execute the deterministic half yourself per `agents/_shared/delivery-mechani
 
 *No worktree teardown here, and no CI wait* — report URL, number, merge state and `CI: pending — check with gh pr checks`, then close.
 
-**Order:** the prose dispatch runs **before** your mechanics. It needs the version and changelog preview already computed for the gate — reuse it, never recompute — to write an accurate PR body; you then commit its output alongside your own writes in the single delivery commit, before the push precondition block runs.
+**Order:** the prose dispatch runs **before** your mechanics. It needs the version and changelog preview already computed for the gate — reuse it, never recompute — to write an accurate PR body. On return, upsert only its `pr_title`, `pr_body`, `acceptance_matrix`, `changelog_fragment`, and `dod` values into `00-state.md § Delivery`; preserve every coordinator-owned key already present. You then commit the tracked changelog output alongside your own writes in the single delivery commit, before the push precondition block runs.
 
 | Outcome | Action |
 |---|---|
-| `success`, mechanics complete | Update `00-state.md` with branch, version, PR URL, `working_branch`. Proceed to Phase 5 |
+| `success`, mechanics complete | Upsert branch, commit, version, PR URL, merge state, CI snapshot, and `working_branch` in `00-state.md`; never replace the Delivery prose keys. Proceed to Phase 5 |
 | `failed` on either half | Report. Non-iterating |
 | `blocked-manual-push` | `gh` unavailable, PR not created. STOP with `manual_action_url`/`manual_action_file`. Wait for `pr opened #N` |
 

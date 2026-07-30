@@ -285,7 +285,7 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 - **2026-07-28** — Pipeline dispatch shape collapsed: one `implementer` + one `tester` dispatch, `qa`+`adversary` fan out together in Phase 3; Phase 3.75/3.8 absorb into new Phase 2.8/Phase 3; Phase 4.5 retires (delivery diff bounded by a post-gate write allowlist instead). STAGE-GATE-3 moves immediately before Phase 4. → `agents/ref-pipeline.md § Phase 2.8`
 
 ## 9. Patterns & Conventions
-<!-- Populated by the delivery agent after each feature. Empty at init. -->
+<!-- Updated in the reviewed implementation tree when a feature establishes a durable pattern. Empty at init. -->
 > Full history: see `docs/patterns.md`. Recent entries below.
 - **Suite-run evidence ledger** (#532): append-only `docs/suite-evidence.md`-defined per-feature registry, one row per verification-command run; `tree_anchor` reused literally from `docs/verification-packet.md § 2`; strict full-tree-anchor equality (never a "relevant files" heuristic) decides skip-vs-rerun; closed writer list. → `docs/suite-evidence.md`, `agents/ref-pipeline.md § "Phase 2.8 — Freeze"`
 - **Shared-review-file write discipline** (#527): every panel writer (`plan-reviewer`, `qa-plan`, `security`, `adversary`) uses `Edit` (never `Write`) on an existing shared review file, `old_string` anchored to its own section, `replace_all` forbidden; orchestrator runs a header-survival snapshot/compare around each panel dispatch. → `agents/_shared/plan-consolidation.md § "Write-tool discipline (shared review files)"`
@@ -294,7 +294,7 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 - Self-documenting code first; comment WHY not WHAT; route genuine rationale to `/docs` not to inline comments — see `docs/code-comments.md`.
 
 ## 10. Known Constraints
-<!-- Populated by the delivery agent after each feature. Empty at init. -->
+<!-- Updated in the reviewed implementation tree when a feature establishes a durable constraint. Empty at init. -->
 - **`VERSION` pre-check best-effort**: unsigned; MITM can suppress an update (binary SHA256 is the floor). (SEC-OC-U-01, Low)
 - **opencode needs restart for asset changes**: hot-reload is experimental-only (issues #10899/#8751).
 
