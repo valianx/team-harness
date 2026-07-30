@@ -16370,306 +16370,46 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Suite 69: parallel-multi-project-dispatch (v2.61.0)
+# Suite 69: parallel-multi-project-dispatch (v2.61.0) -- RETIRED, coordinator-fusion
 # ---------------------------------------------------------------------------
-print("=== Suite 69: parallel-multi-project-dispatch (v2.61.0) ===")
+# RETIRED (coordinator-fusion, T4-AC-1a/AC-1b). Every AC below asserted a
+# property of the parallel multi-project fan-out mechanism itself -- the
+# "## Parallel Multi-Project Dispatch" section, its eligibility-detection
+# contract, its fan-out confirm gate, its N-concurrent-lane gate semantics,
+# its fanout.* observability event family, its safety-floor paragraph, and
+# its v2.61.0 packaging. `docs/observability.md § "Initiative-level trace
+# (serial multi-project sequencing)"` states this explicitly and
+# unconditionally: "No parallel coordinator fan-out exists. The coordinator
+# fusion retires the multi-task fan-out with its consolidator and the
+# parallel multi-project dispatch that spawned one orchestrator instance per
+# project... The `00-leader-roster.md` file, the `fanout.*` event family, and
+# the two-tier `leader-recover`/`orchestrator-recover` split below all lose
+# their subject with that retirement -- nothing replaces them." The scenario
+# this suite tested (N eligible projects fanning out to N concurrent
+# orchestrator-lane dispatches) has no producer: `agents/orchestrator.md §
+# "Dispatch invariants"` #2 forbids dispatching any coordinator, including a
+# copy of itself, with no exception clause, and
+# `agents/ref-dispatch-machinery.md § "Multi-project sequencing"` names
+# serial execution -- one project running Stage 1 through Stage 3 to
+# completion inside the same agent before the next starts -- as the derived
+# consequence of that invariant. Every subject this suite's checks named is
+# retired with no successor, so per T4-AC-1b these are retired outright, not
+# retargeted. Multi-project mode itself is RETAINED in serial form -- see
+# Suite 68 (multi-project initiative overview layer), which is retargeted
+# rather than retired.
+#
+# Self-referential guard retained (docs/testing.md canonical registry must
+# record the retirement) -- same precedent as Suite 39's check (d).
+print()
+print("=== Suite 69: parallel-multi-project-dispatch (RETIRED, coordinator-fusion) ===")
 
-_s69_orch = SPLIT_CORPUS
-_s69_delivery = read(AGENTS_DIR / "delivery.md")
-_s69_claude = read(REPO_ROOT / "CLAUDE.md")
-_s69_observability = read(REPO_ROOT / "docs" / "observability.md")
 _s69_testing_md = read(REPO_ROOT / "docs" / "testing.md")
-_s69_plugin_json = read(REPO_ROOT / ".claude-plugin" / "plugin.json")
-_s69_marketplace_json = read(REPO_ROOT / ".claude-plugin" / "marketplace.json")
-# Top-level section stop: stop only at next ## heading or --- (not ### — subsections are inside the section)
-_S69_TOP_STOP = ("\n## Special Flows", "\n## Phase Checkpointing", "\n## Multi-Task Orchestration")
-# Subsection stop: stop at next ### or ## heading or ---
-_S69_STOP = ("\n## ", "\n### ", "\n---\n")
-
-# AC-1: orchestrator.md contains '## Parallel Multi-Project Dispatch' section
-# Use a newline-prefixed anchor so we match the heading, not an inline code reference
-# Capture the ENTIRE section (all subsections) by stopping only at the next ## heading
-_s69_fanout_slice = _slice_section(_s69_orch, "\n## Parallel Multi-Project Dispatch", _S69_TOP_STOP)
+_s69_self_text = read(Path(__file__).resolve())
 check(
-    "suite69(ac1-section-exists): orchestrator.md contains '## Parallel Multi-Project Dispatch' section",
-    "\n## Parallel Multi-Project Dispatch" in _s69_orch,
-    "orchestrator.md must contain a '## Parallel Multi-Project Dispatch' section",
-)
-# fan-out at Stage 2: per-project Stage 1 serial + concurrent Stage-2 lanes + re-convergence
-check(
-    "suite69(ac1-stage1-serial): fan-out section states Stage 1 runs serially per-project",
-    "Stage 1" in _s69_fanout_slice and ("serial" in _s69_fanout_slice or "independently" in _s69_fanout_slice),
-    "orchestrator.md ## Parallel Multi-Project Dispatch must state Stage 1 runs serially/independently per-project",
-)
-check(
-    "suite69(ac1-stage2-concurrent): fan-out section states Stage-2 implement+verify work fans out concurrently",
-    ("Stage-2" in _s69_fanout_slice or "Stage 2" in _s69_fanout_slice) and ("concurrent" in _s69_fanout_slice or "fans out" in _s69_fanout_slice),
-    "orchestrator.md ## Parallel Multi-Project Dispatch must state Stage-2 implement+verify fans out concurrently",
-)
-check(
-    "suite69(ac1-reconverge): fan-out section states re-convergence for ACCEPTANCE+STAGE-GATE-3+delivery",
-    "re-convergence" in _s69_fanout_slice or "re-converge" in _s69_fanout_slice or "converge" in _s69_fanout_slice,
-    "orchestrator.md ## Parallel Multi-Project Dispatch must state re-convergence for per-project ACCEPTANCE/STAGE-GATE-3/delivery",
-)
-
-# AC-2: DEPRECATED (split) — the multi-project mechanism was redesigned to
-# "one th:orchestrator instance per project" (th:leader multiplies orchestrators).
-# The old "in-message concurrent Task calls", "no Workflow tool required", and
-# "no nested-dispatch required" reassurances describe a removed mechanism and
-# have no target in the current corpus. Removed per Bucket 3 #66-68.
-
-# AC-3: eligibility-detection contract documented
-_s69_elig_slice = _slice_section(_s69_orch, "**Eligibility-detection contract**", _S69_STOP)
-check(
-    "suite69(ac3-eligibility-section): eligibility-detection contract section exists",
-    len(_s69_elig_slice) > 0,
-    "orchestrator.md must contain '### Eligibility-detection contract' section",
-)
-check(
-    "suite69(ac3-deferred): eligibility contract excludes 'deferred' projects",
-    "deferred" in _s69_elig_slice,
-    "orchestrator.md eligibility contract must exclude deferred projects",
-)
-check(
-    "suite69(ac3-blocked): eligibility contract excludes 'blocked' projects",
-    "blocked" in _s69_elig_slice,
-    "orchestrator.md eligibility contract must exclude blocked projects",
-)
-check(
-    "suite69(ac3-delivered): eligibility contract excludes 'delivered' projects",
-    "delivered" in _s69_elig_slice,
-    "orchestrator.md eligibility contract must exclude delivered projects",
-)
-check(
-    "suite69(ac3-a-blocks-b): eligibility contract excludes A-blocks-B sequencing",
-    "A-blocks-B" in _s69_elig_slice or "a-blocks-b" in _s69_elig_slice.lower() or "A blocks B" in _s69_elig_slice,
-    "orchestrator.md eligibility contract must exclude A-blocks-B sequenced projects",
-)
-check(
-    "suite69(ac3-contract-in-flux): eligibility contract excludes shared-contract-in-flux pairs",
-    "in-flux" in _s69_elig_slice or "in flux" in _s69_elig_slice or "contract" in _s69_elig_slice,
-    "orchestrator.md eligibility contract must exclude shared-contract-in-flux pairs",
-)
-
-# AC-4: fan-out confirm gate documented + --serial-always-wins
-_s69_gate_slice = _slice_section(_s69_orch, "**Fan-out confirm gate", _S69_STOP)
-check(
-    "suite69(ac4-gate-section): fan-out confirm gate section exists",
-    len(_s69_gate_slice) > 0,
-    "orchestrator.md must contain '### Fan-out confirm gate' section",
-)
-check(
-    # The rewritten gate box says "same mechanic as 'Repo-identity verification'
-    # above, scoped here to ≥2 projects" rather than repeating the wait
-    # instruction verbatim — the "wait for explicit confirmation" text lives in
-    # the referenced Multi-Task fan-out section of the same doc; check the full
-    # merged doc rather than just this section's narrow slice.
-    "suite69(ac4-wait): fan-out confirm gate states WAIT for operator approval",
-    "WAIT" in _s69_orch or "wait for explicit confirmation" in _s69_orch or "wait for confirmation" in _s69_orch,
-    "orchestrator.md fan-out confirm gate must state WAIT for explicit operator approval",
-)
-check(
-    "suite69(ac4-serial-choice): fan-out confirm gate lists 'serial' as a choice",
-    '"serial"' in _s69_gate_slice or "'serial'" in _s69_gate_slice or "serial" in _s69_gate_slice,
-    "orchestrator.md fan-out confirm gate must list 'serial' as a reply choice",
-)
-check(
-    "suite69(ac4-serial-wins): --serial / one-at-a-time always wins and bypasses gate",
-    ("--serial" in _s69_gate_slice or "serial" in _s69_gate_slice) and ("always wins" in _s69_gate_slice or "absolute" in _s69_gate_slice or "overrides" in _s69_gate_slice),
-    "orchestrator.md must state --serial / 'one at a time' always wins and bypasses the fan-out gate",
-)
-
-# AC-5: gate semantics with N concurrent projects
-# REWORDED BY THE SPLIT (genuine design change, not just a text move): under the
-# gate-blindness/witness-recorder-sole-writer contract each project now runs in its own
-# orchestrator subagent instance with its own 00-state.md, so no single agent can honestly
-# weld a "batched" STAGE-GATE-3 across N separate transcripts anymore — STAGE-GATE-2 and
-# STAGE-GATE-3 both moved from "batched at re-convergence" to "stays per-project, each
-# welded inside that project's own orchestrator". ac5-sg3-batched / ac5-per-project-delivery
-# below are updated to assert the new per-project design; ac5-gate-semantics-section anchor
-# updated for the bold-paragraph reformat (### heading -> **bold** paragraph).
-_s69_gate_sem_slice = _slice_section(_s69_orch, "**Gate semantics with N concurrent projects.**", _S69_STOP)
-check(
-    "suite69(ac5-gate-semantics-section): gate semantics section exists",
-    len(_s69_gate_sem_slice) > 0,
-    "orchestrator.md must contain a 'Gate semantics with N concurrent projects' section",
-)
-check(
-    "suite69(ac5-sg1-per-project): STAGE-GATE-1 stays per-project and serial",
-    "STAGE-GATE-1" in _s69_gate_sem_slice and ("per-project" in _s69_gate_sem_slice or "per project" in _s69_gate_sem_slice) and ("serial" in _s69_gate_sem_slice or "never batched" in _s69_gate_sem_slice),
-    "orchestrator.md gate semantics must state STAGE-GATE-1 stays per-project and serial (never batched across projects)",
-)
-check(
-    "suite69(ac5-sg3-batched): STAGE-GATE-3 stays per-project, welded inside its own orchestrator",
-    "STAGE-GATE-3" in _s69_gate_sem_slice and "per-project" in _s69_gate_sem_slice,
-    "orchestrator.md gate semantics must state STAGE-GATE-3 stays per-project (welded inside each project's own orchestrator — no cross-project batching)",
-)
-check(
-    "suite69(ac5-per-project-delivery): per-project delivery, independent of other lanes",
-    # Repoint (split): the delivery gate is STAGE-GATE-3, which the gate-semantics
-    # paragraph states "also stay[s] per-project" and whose lane "never blocks
-    # sibling lanes" — i.e. per-project delivery, independent of other lanes.
-    "per-project" in _s69_gate_sem_slice
-    and ("delivery" in _s69_gate_sem_slice or "STAGE-GATE-3" in _s69_gate_sem_slice),
-    "orchestrator.md gate semantics must state each project's delivery and gate approval happens independently",
-)
-check(
-    "suite69(ac5-failure-isolation): one lane fail does not block sibling lanes",
-    ("does NOT block" in _s69_gate_sem_slice or "does not block" in _s69_gate_sem_slice.lower()
-     or "never blocks" in _s69_gate_sem_slice.lower() or "isolated" in _s69_gate_sem_slice
-     or "isolation" in _s69_gate_sem_slice),
-    "orchestrator.md gate semantics must state one lane's fail/iteration does not block sibling lanes (failure isolation)",
-)
-
-# AC-6: reconcile-ordering rule replaced the out-of-scope line in overview.md Template
-_s69_nofork_slice = _slice_section(_s69_orch, "### No-fork", _S69_STOP)
-check(
-    "suite69(ac6-oos-line-gone): out-of-scope line no longer present in no-fork invariant",
-    "out of scope (follow-up)" not in _s69_nofork_slice and "out-of-scope (follow-up)" not in _s69_nofork_slice,
-    "orchestrator.md no-fork invariant must no longer contain the 'out of scope (follow-up)' line — it has been superseded by the reconcile-ordering rule",
-)
-check(
-    "suite69(ac6-reconcile-ordering): reconcile-ordering rule present in no-fork invariant",
-    "reconcile-ordering" in _s69_nofork_slice or "at most one" in _s69_nofork_slice or "arrival order" in _s69_nofork_slice,
-    "orchestrator.md no-fork invariant must contain the reconcile-ordering rule (parent performs at most one overview read-modify-write at a time, arrival order)",
-)
-check(
-    "suite69(ac6-keyed-rows-confirmed): keyed-row rule confirmed present (no regression)",
-    "one-per-project" in _s69_nofork_slice or ("keyed" in _s69_nofork_slice and "project" in _s69_nofork_slice),
-    "orchestrator.md no-fork invariant must still state per-project rows are keyed one-per-project (no regression)",
-)
-check(
-    "suite69(ac6-last-writer-wins-confirmed): last-writer-wins rule confirmed present (no regression)",
-    "last-writer" in _s69_nofork_slice or "last writer" in _s69_nofork_slice,
-    "orchestrator.md no-fork invariant must still state last-writer-wins on a true race (no regression)",
-)
-
-# AC-7: observability — per-project traces unchanged + initiative-level fan-out trace
-_s69_obs_fanout_slice = _slice_section(_s69_observability, "## Initiative-level fan-out trace", _S69_STOP)
-check(
-    "suite69(ac7-obs-section): docs/observability.md contains initiative-level fan-out trace section",
-    len(_s69_obs_fanout_slice) > 0,
-    "docs/observability.md must contain '## Initiative-level fan-out trace' section",
-)
-check(
-    "suite69(ac7-fanout-start): fanout.start event documented in observability",
-    "fanout.start" in _s69_obs_fanout_slice or "fanout.start" in _s69_observability,
-    "docs/observability.md must document the fanout.start event",
-)
-check(
-    "suite69(ac7-lane-start): fanout.lane.start event documented in observability",
-    "fanout.lane.start" in _s69_obs_fanout_slice or "lane.start" in _s69_obs_fanout_slice,
-    "docs/observability.md must document the fanout.lane.start event",
-)
-check(
-    "suite69(ac7-lane-end): fanout.lane.end event documented in observability",
-    "fanout.lane.end" in _s69_obs_fanout_slice or "lane.end" in _s69_obs_fanout_slice,
-    "docs/observability.md must document the fanout.lane.end event",
-)
-check(
-    "suite69(ac7-converge): fanout.converge event documented in observability",
-    "fanout.converge" in _s69_obs_fanout_slice or "converge" in _s69_obs_fanout_slice,
-    "docs/observability.md must document the fanout.converge event",
-)
-check(
-    "suite69(ac7-project-key): each fan-out event carries a 'project' key",
-    "project" in _s69_obs_fanout_slice and "key" in _s69_obs_fanout_slice,
-    "docs/observability.md must state each fan-out event carries a 'project' key",
-)
-check(
-    "suite69(ac7-pipelines-rendering): /th:pipelines parent-with-lane-children representation documented",
-    "pipelines" in _s69_obs_fanout_slice or "/th:pipelines" in _s69_obs_fanout_slice,
-    "docs/observability.md must document the /th:pipelines parent-with-lane-children rendering",
-)
-check(
-    "suite69(ac7-orch-obs): orchestrator.md fan-out section documents observability",
-    "Observability" in _s69_fanout_slice or "observability" in _s69_fanout_slice or "00-execution-events" in _s69_fanout_slice,
-    "orchestrator.md ## Parallel Multi-Project Dispatch must document the observability surface",
-)
-
-# AC-8: backward-compatibility floor + safety floors
-_s69_safety_slice = _slice_section(_s69_orch, "**Safety floors:**", _S69_STOP)
-check(
-    "suite69(ac8-safety-section): safety floors section exists",
-    len(_s69_safety_slice) > 0,
-    "orchestrator.md must contain a 'Safety floors' section under ## Parallel Multi-Project Dispatch",
-)
-check(
-    "suite69(ac8-initiative-null-gate): backward-compat floor: all new behaviour gated on initiative != null",
-    "initiative != null" in _s69_fanout_slice or "initiative: null" in _s69_fanout_slice or "initiative == null" in _s69_fanout_slice or "initiative: null" in _s69_safety_slice,
-    "orchestrator.md must state all new behaviour is gated on initiative != null (backward-compat floor)",
-)
-check(
-    # "--serial always wins" now lives in the Fan-out confirm gate paragraph
-    # (line 477) rather than being repeated in the Safety floors paragraph —
-    # check the whole ## Parallel Multi-Project Dispatch slice, not just the
-    # narrow Safety floors sub-slice.
-    "suite69(ac8-serial-floor): safety floors state --serial always wins",
-    "--serial" in _s69_fanout_slice and "always wins" in _s69_fanout_slice,
-    "orchestrator.md safety floors must state --serial always wins (operator can force serial)",
-)
-check(
-    "suite69(ac8-security-unchanged): safety floors state security per-lane unchanged",
-    "security" in _s69_safety_slice and ("unchanged" in _s69_safety_slice or "per-lane" in _s69_safety_slice or "each lane" in _s69_safety_slice),
-    "orchestrator.md safety floors must state security gates run per-lane unchanged",
-)
-check(
-    "suite69(ac8-in-flux-exclusion): safety floors state never parallelize across in-flux shared contract",
-    "in-flux" in _s69_safety_slice or "in flux" in _s69_safety_slice or "shared contract" in _s69_safety_slice,
-    "orchestrator.md safety floors must state never parallelize across an in-flux shared contract",
-)
-
-# AC-9: packaging complete
-# v2.61.0 was the initial deployment of parallel multi-project dispatch; forward-compatible
-# floor check so future version bumps (e.g. v2.62.0) continue to satisfy this guard.
-check(
-    "suite69(ac9-plugin-json): plugin.json version is 2.61.0",
-    _s59_ver_tuple(json.loads(_s69_plugin_json).get("version", "0.0.0")) >= (2, 61, 0),
-    "plugin.json version must be 2.61.0 or later",
-)
-check(
-    "suite69(ac9-marketplace-json): marketplace.json plugins[0].version is 2.61.0",
-    _s59_ver_tuple(json.loads(_s69_marketplace_json).get("plugins", [{}])[0].get("version", "0.0.0")) >= (2, 61, 0),
-    "marketplace.json plugins[0].version must be 2.61.0 or later",
-)
-check(
-    "suite69(ac9-claude-version): CLAUDE.md §3 version is 2.61.0",
-    _s59_ver_tuple(_s59_claude_current_version(_s69_claude)) >= (2, 61, 0),
-    "CLAUDE.md §3 must show version 2.61.0 or later",
-)
-check(
-    "suite69(ac9-claude-bullet): CLAUDE.md §5 contains parallel dispatch bullet",
-    "Parallel Multi-Project Dispatch" in _s69_claude or "parallel multi-project dispatch" in _s69_claude.lower() or "parallel" in _s69_claude and "fan-out" in _s69_claude,
-    "CLAUDE.md §5 must contain a bullet referencing the parallel multi-project dispatch contract",
-)
-# The changelog.d fragment is assembled into CHANGELOG.md and DELETED at delivery,
-# so assert the DURABLE CHANGELOG.md [2.61.0] entry, not the transient fragment.
-_s69_changelog = read(REPO_ROOT / "CHANGELOG.md")
-check(
-    "suite69(ac9-changelog-version): CHANGELOG.md contains the 2.61.0 release section",
-    "## [2.61.0]" in _s69_changelog,
-    "CHANGELOG.md must contain a '## [2.61.0]' release section (fragment assembled at delivery)",
-)
-check(
-    "suite69(ac9-changelog-added): CHANGELOG.md 2.61.0 section documents parallel multi-project dispatch",
-    "parallel multi-project dispatch" in _s69_changelog.lower(),
-    "CHANGELOG.md must document the parallel multi-project dispatch feature",
-)
-_s69_this_file = read(Path(__file__))
-check(
-    "suite69(ac9-self-ref): this test file contains 'Suite 69', '_slice_section', and 'parallel-multi-project-dispatch'",
-    "Suite 69" in _s69_this_file and "_slice_section" in _s69_this_file and "parallel-multi-project-dispatch" in _s69_this_file,
-    "test file must contain 'Suite 69', '_slice_section', and 'parallel-multi-project-dispatch'",
-)
-check(
-    "suite69(ac9-registry): docs/testing.md registers Suite 69 and parallel-multi-project-dispatch",
-    "Suite 69" in _s69_testing_md and "parallel-multi-project-dispatch" in _s69_testing_md,
-    "docs/testing.md must register Suite 69 and the 'parallel-multi-project-dispatch' marker",
-)
-check(
-    "suite69(ac9-hygiene): CLAUDE.md does NOT contain 'Suite 69'",
-    "Suite 69" not in _s69_claude,
-    "CLAUDE.md §11 must not mention Suite 69 — only docs/testing.md is the canonical registry",
+    "suite69(self-ref): docs/testing.md canonical registry names 'Suite 69'"
+    " and this file defines it",
+    "Suite 69" in _s69_testing_md and "Suite 69" in _s69_self_text,
+    "Suite 69's retirement must be recorded in docs/testing.md canonical registry",
 )
 
 # Marker: parallel-multi-project-dispatch
