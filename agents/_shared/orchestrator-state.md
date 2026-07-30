@@ -98,7 +98,7 @@ lane_decomposition: {...}|null              # docs/parallel-batch-implementation
 regression_test_path: {path}|null
 regression_test_status: failing|passing|skipped|null
 plan_review_status: not-applicable|deferred|reviewed-pass|reviewed-concerns|skipped|null
-audit_status: pending|done|unavailable|null  # STAGE-GATE-3 is never prepared while pending
+audit_status: pending|done|unavailable|null  # set at Phase 3: pending on dispatch, done on report, unavailable after a second audit failure. STAGE-GATE-3 states it in the block; it is not a machine-checked precondition — the tree anchor is the only one (agents/orchestrator.md § STAGE-GATE-3)
 code_hygiene: pass|fail|null                # docs/code-hygiene-gate.md
 open_findings: [{id, disposition}]|[]       # dispositions live in 00-decision-ledger.md
 ```
