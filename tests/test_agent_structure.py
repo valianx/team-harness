@@ -36710,7 +36710,9 @@ _s162_policy_block_ts = read(HOOKS_DIR / "ts" / "bodies" / "policy-block.ts")
 _s162_run_ts_hook = read(HOOKS_DIR / "run-ts-hook.sh")
 _s162_orchestrator = read(AGENTS_DIR / "orchestrator.md")
 _s162_delivery = read(AGENTS_DIR / "delivery.md")
-_s162_leader = read(AGENTS_DIR / "leader.md")
+# Repoint (post-fusion): leader.md no longer relays the gate_nonce from a
+# second coordinator — orchestrator.md itself generates, embeds, and
+# disclaims it in the same turn ("not a secret").
 _s162_dev_mode = read(REPO_ROOT / "docs" / "dev-mode.md")
 _s162_pipeline_lanes = read(REPO_ROOT / "docs" / "pipeline-lanes.md")
 _s162_subagent_orch = read(REPO_ROOT / "docs" / "subagent-orchestration.md")
@@ -36855,11 +36857,11 @@ check(
     "and the Express combined gate",
 )
 check(
-    "s162(inv-b-carrier): leader.md carries gate_nonce unmodified through the "
-    "relay, never treating it as an authentication factor",
-    "gate_nonce" in _s162_leader
-    and "not a secret" in _s162_leader,
-    "agents/leader.md must carry gate_nonce verbatim and disclaim it as a "
+    "s162(inv-b-carrier): orchestrator.md declares gate_nonce a freshness"
+    " token, never an authentication factor (no relay to disclaim post-fusion)",
+    "gate_nonce" in _s162_orchestrator
+    and "not a secret" in _s162_orchestrator,
+    "agents/orchestrator.md must carry gate_nonce and disclaim it as a "
     "freshness token, not a secret",
 )
 
