@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.3] - 2026-07-30
+
+### Changed
+
+- Reduced the implementer prompt by roughly 69% while preserving its scope, commit, constraint,
+  sketch, and return contracts.
+- Replaced full `docs/knowledge.md` reads with task-scoped knowledge, bounded analogous-code
+  discovery, conditional stack guidance, and a changed-API-only Context7 budget.
+- Made successful implementation work silent and removed unconsumed follow-up, test-request, and
+  documentation-request reporting paths.
+
 ## [3.0.1] - 2026-07-30
 
 ### Fixed

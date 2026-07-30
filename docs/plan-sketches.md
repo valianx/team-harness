@@ -289,6 +289,6 @@ of a repository's own OpenAPI file. A repository whose spec is `openapi.json` ke
 a repository whose spec is `openapi.yaml` or `openapi.yml` keeps `.yaml`/`.yml`.
 
 This boundary invariant is referenced by format-preservation guards in:
-- `agents/implementer.md` — Phase 0 Step 3b
+- `agents/implementer.md` — Session Context Protocol, conditional-evidence step
 - `agents/delivery.md` — Step 8 (Update OpenAPI)
 - `agents/architect.md` — api-contract skeleton quality note

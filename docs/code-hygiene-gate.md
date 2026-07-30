@@ -10,9 +10,9 @@
 
 ## 1. Why two layers
 
-`agents/implementer.md § Best Practices — Non-Negotiable → Reviewability` already states the
-comment contract (WHY-only, no work-narration, caps on function size). Until this gate existed,
-compliance depended entirely on the generator's own self-review — no downstream check ever
+`agents/implementer.md § Comments` and `§ Best Practices — Non-Negotiable → Reviewability`
+state the producer contract (WHY-only comments, no work-narration, explained cap exceptions).
+Until this gate existed, compliance depended entirely on the generator's own self-review — no downstream check ever
 re-verified it. This gate closes that loop with two complementary layers:
 
 - **Layer 1 — deterministic, mechanical, pre-verify.** A fixed `git diff` + `grep -E` scan that
@@ -48,7 +48,7 @@ they require judgment a fixed pattern set cannot express.
 
 ## 3. Work-narration patterns (canonical set)
 
-The set the implementer contract already forbids (`agents/implementer.md` Reviewability bullet):
+The set the implementer contract already forbids (`agents/implementer.md § Comments`):
 references to `workspaces/` paths, pipeline phase/stage/step tokens used as narration, task- or
 issue-ID narration, and session-context phrasing.
 

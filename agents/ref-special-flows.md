@@ -510,7 +510,7 @@ Every bug-fix pipeline produces the backbone artifacts; the tier modulates which
 
 ### Implementer scope-discipline contract (for `type: fix` / `type: hotfix`)
 
-Documented inline in `agents/implementer.md` under `## Scope discipline for type: fix and type: hotfix (Bug-fix Mode)`. Zero tangential refactors. Spotted issues go to `## Follow-ups Spotted`, not into the diff. The `[SCOPE-DRIFT: file X required for AC-N]` annotation pattern (existing for feature flow) routes back to the architect to update `01-root-cause.md` and re-run Phase 1.6.
+Documented inline in `agents/implementer.md § Scope contract`. Zero tangential refactors or adjacent-issue exploration. Incidental issues remain untouched; `[SCOPE-DRIFT: file X required for AC-N]` is reserved for a file required to satisfy the assigned AC and routes back to the architect to update `01-root-cause.md` and re-run Phase 1.6.
 
 ### Plan-reviewer Rules 7 + 8 (gated on `type: fix | hotfix`)
 

@@ -460,9 +460,6 @@ When deletions dominate (deletions > 2× additions, or the change is relocation-
 - [x] Tests: {command} → PASS ({N} passed)
 - [x] Build: {command} → PASS  (or "n/a" if no build step)
 
-## Follow-ups (spotted during this fix — not addressed here) (conditional — present only if `02-implementation.md` has a `## Follow-ups Spotted` section; omit otherwise)
-{paste the contents of `## Follow-ups Spotted` from `02-implementation.md`, one bullet per follow-up with file:line + description}
-
 ## Size justification (conditional — present only if the coordinator's size gate flagged the diff, per `agents/_shared/delivery-mechanics.md § 5`)
 {paste the size_justification the coordinator handed you in the dispatch payload, or omit this section entirely if the diff was within the 400 lines / 8 files caps}
 
