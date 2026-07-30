@@ -26,10 +26,10 @@ This document covers ONE parallelism mechanism: an operator-authorized batch of 
 
 | Mechanism | Axis | Unit of fan-out | Gate | Canonical source |
 |---|---|---|---|---|
-| Inter-task DAG scheduler | tasks within one plan | one implementer per task | none — parallel-by-default, `Depends on:` rounds | `agents/orchestrator.md § Phase 2 — Implementation → Stage 2 scheduler (DAG by Depends on:)` |
-| Parallel Multi-Project Dispatch | projects within one initiative | one implement+verify lane per project | operator confirm gate (`parallel` / `serial`) | `agents/ref-dispatch-machinery.md § Parallel Multi-Project Dispatch` |
+| Inter-task DAG scheduler | tasks within one plan | the base dispatch carries every non-decomposed task, in `Depends on:` order | none | `agents/orchestrator.md § "Scheduler — never one dispatch per task"` |
+| ~~Parallel Multi-Project Dispatch~~ — **RETIRED** | projects within one initiative | — | — | Retired with the coordinator fusion: fanning out per-project lanes required the coordinator to dispatch a copy of itself. Successor: serial, `agents/ref-dispatch-machinery.md § "Multi-project sequencing"` |
 | Batch Implementation (this document) | independent items across an operator-authorized batch | one implementer per item, own worktree | operator authorization + the 5 preconditions in `## When this applies` | this document |
-| **Intra-task execution-lane decomposition** | **files WITHIN one already-approved task** | **one implementer lane per architect-declared, file-disjoint seam** | **`Lane-decomposable: yes` in `01-plan.md` AND `Files:` count ≥ `LANE_DECOMPOSE_MIN_FILES` (8) AND ≥2 disjoint seams** | `agents/orchestrator.md § Phase 2 — Implementation → Intra-task execution-lane decomposition` |
+| **Intra-task lane decomposition** | **files WITHIN one already-approved task** | **one implementer lane per architect-declared, file-disjoint seam** | **`Lane-decomposable: yes` in `01-plan.md` AND `Files:` count ≥ `LANE_DECOMPOSE_MIN_FILES` (8) AND ≥2 disjoint seams** | `agents/orchestrator.md § Phase 2 — Implementation → Intra-task execution-lane decomposition` |
 
 **Intra-task execution-lane decomposition, in brief.** A task's architect-declared `seams:` (disjoint file subsets) and `frozen-contracts:` (shared files/symbols no seam may modify) let the orchestrator fan out ONE task's implementation into up to `LANE_CAP` (5) fresh-context implementer lanes at dispatch time, capped globally at `GLOBAL_ROUND_CONCURRENCY_CAP` (6) concurrent implementer subagents per round (summing inter-task DAG parallelism and intra-task lanes). A lane that discovers it must modify a frozen-contract returns `status: blocked, reason: seam-not-disjoint`; the orchestrator aborts the fan-out and re-dispatches the whole task monolithically — never a silent stop. The DELIVERABLE (plan, commit set, PR) is never divided; only EXECUTION may fan out into bounded lanes — the reader downstream of Phase 2 sees one task, one `02-implementation.md`, one commit set, exactly as the 1:1 path. Full gate mechanics, trace events, and the `00-state.md` schema live at `agents/orchestrator.md § Phase 2 — Implementation → Intra-task execution-lane decomposition`.
 
@@ -51,9 +51,9 @@ Concurrent implementers never contend on the same working tree because each hold
 
 ## Concurrent implementer fan-out
 
-Dispatch N implementers in parallel via concurrent `Task` calls in the parent orchestrator session. This is the same in-message mechanism already used for `tester + qa` at Phase 3 and for project lanes in `## Parallel Multi-Project Dispatch`.
+Dispatch N implementers in parallel via concurrent `Task` calls in the parent orchestrator session. This is the same in-message mechanism already used for `qa + adversary` at Phase 3.
 
-Cap the concurrency at `batch_concurrency` (default 5) using the eager slot-fill wave model from `agents/ref-dispatch-machinery.md § Multi-Task fan-out`: fill all available slots immediately, and as each item finishes open the slot to the next queued item. This mirrors the Stage-1 planning fan-out (N architects + N plan-reviewers) on the implementation side.
+Cap the concurrency at `batch_concurrency` (default 5) using an eager slot-fill wave model: fill all available slots immediately, and as each item finishes open the slot to the next queued item. This mirrors the Stage-1 planning fan-out (N architects + N plan-reviewers) on the implementation side.
 
 **Commit ownership per item (`agents/implementer.md § Commit Contract`).** An item's implementer commits and reports `commit: {sha}` for any item-LOCAL diff — before the item's in-worktree verify runs. This is the standard 1:1 case, never `lane-deferred`: `lane-deferred` is reserved for intra-task execution-lane decomposition, where multiple lanes share ONE worktree and branch (see the mechanism-comparison table above). Each item in this batch holds its own isolated worktree and its own branch, so no lane index-race exists here — the item's own committed sha is what `git merge <item-branch>` (below) merges into the integration branch at consolidation. An item whose entire contribution is **shared-serial only** (see "Edit-class split" below) — nothing item-local to commit — has no item-worktree diff to commit: it reports `commit: none — no source change` instead of a fabricated sha. Reserved shared-serial content must never be written inside an item's own worktree to manufacture a commit; it is spliced centrally by the orchestrator at consolidation, per the Edit-class split below.
 
@@ -65,8 +65,8 @@ Every file an item touches MUST be declared in that item's `01-plan.md` with its
 
 | Class | Examples | Where edited | Reconciliation |
 |-------|----------|--------------|----------------|
-| **item-local** | new skill/agent/script/doc file; the item's own pre-reserved suite block in `tests/test_agent_structure.py`; the item's own new `docs/` file | inside the item's worktree — no other item touches the same file | wholesale `git checkout <item-branch> -- <item-local-paths>` into the consolidation tree |
-| **shared-serial** | `tests/test_agent_structure.py` overall (other items' suite blocks); `docs/testing.md` registry rows; `README.md` / `skills/README.md` listings; `.claude-plugin/plugin.json` + `marketplace.json`; `CHANGELOG.md` / `changelog.d/` entries | NEVER edited inside the worktree — the item declares its reserved insertion block in its plan and does not touch the file | orchestrator extracts each item's added block and splices all blocks centrally in reserved order at consolidation |
+| **item-local** | new skill/agent/script/doc file; the item's own new test file; the item's own new `docs/` file | inside the item's worktree — no other item touches the same file | wholesale `git checkout <item-branch> -- <item-local-paths>` into the consolidation tree |
+| **shared-serial** | any test file two items both touch; `docs/testing.md` rows; `README.md` / `skills/README.md` listings; `.claude-plugin/plugin.json` + `marketplace.json`; `CHANGELOG.md` / `changelog.d/` entries | NEVER edited inside the worktree — the item declares its reserved insertion block in its plan and does not touch the file | orchestrator extracts each item's added block and splices all blocks centrally in reserved order at consolidation |
 
 **The invariant:** a shared-serial file is never edited in an item's worktree. An item that needs to contribute to a shared-serial file declares its reserved insertion block in the plan (`01-plan.md` § Files, with class: `shared-serial`, content: `<the exact insertion>`). The orchestrator performs the splice centrally.
 
@@ -110,7 +110,7 @@ The first batch (PR #338) consolidated by hand-splicing each item's added lines 
 ### Per-item (in the worktree)
 
 ```bash
-python3 tests/test_agent_structure.py
+bash tests/run-all.sh
 ```
 
 Run this directly in the item's worktree. Do NOT run `bash tests/run-all.sh` concurrently across items. The reason: `run-all.sh` chains `checkpoint-guard.sh` on stdin; concurrent invocations contend on stdin and orphan bash process trees on Windows, leaving zombie processes and incomplete test output (confirmed platform constraint on Windows 11).
@@ -127,7 +127,7 @@ bash tests/run-all.sh
 
 Run the full suite exactly once. This is the mandatory safety net. It covers:
 
-- All structural checks (`test_agent_structure.py` — the concatenated suite blocks run together).
+- The full verification suite (`bash tests/run-all.sh`).
 - `policy-block.sh` secret-scan of all new content.
 - Agent frontmatter validation across all modified agents.
 
@@ -135,7 +135,7 @@ The consolidated full-suite run is the gate that separates the parallel implemen
 
 ## Consolidator role and directives
 
-Consolidation is owned by a SINGLE designated consolidator — a dedicated consolidator orchestrator, never a worker subagent and never split across actors. The consolidator is the only writer of shared-serial files; parallel implementers never reconcile each other's work. The single-owner rule exists because concurrent implementers can contaminate even a notionally-isolated shared file — observed live, two worktrees' copies of `tests/test_agent_structure.py` cross-contaminated, each commit carrying the other item's suite block.
+Consolidation is owned by a SINGLE designated consolidator — a dedicated consolidator orchestrator, never a worker subagent and never split across actors. The consolidator is the only writer of shared-serial files; parallel implementers never reconcile each other's work. The single-owner rule exists because concurrent implementers can contaminate even a notionally-isolated shared file — observed live, two worktrees' copies of the same test file cross-contaminated, each commit carrying the other item's block.
 
 Four directives:
 

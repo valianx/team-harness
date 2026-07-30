@@ -134,9 +134,9 @@ func TestScanForSecrets_HighConfidence_TenClasses(t *testing.T) {
 // does not trigger the scanner.
 func TestScanForSecrets_CleanInput_NoMatch(t *testing.T) {
 	cases := []string{
-		`{"component":"leader","op":"install"}`,
+		`{"component":"orchestrator","op":"install"}`,
 		`{"configKeys":["logs-mode","logs-path"]}`,
-		`{"files":["{config_root}/agents/leader.md"]}`,
+		`{"files":["{config_root}/agents/orchestrator.md"]}`,
 		"",
 		"just plain text with no secrets",
 		"sk-but-too-short",

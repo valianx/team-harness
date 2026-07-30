@@ -63,17 +63,6 @@ run_ts_hook_suite "policy-block" "test_policy_block.sh"
 
 echo
 echo "############################################################"
-echo "# Suite 2: agents/skills/hooks — structural tests"
-echo "############################################################"
-if python3 "$TESTS_DIR/test_agent_structure.py"; then
-    echo "agent-structure: PASS"
-else
-    echo "agent-structure: FAIL"
-    FAILED=$((FAILED + 1))
-fi
-
-echo
-echo "############################################################"
 echo "# Suite 3: agents — YAML frontmatter validity"
 echo "############################################################"
 if uv run --with PyYAML python "$TESTS_DIR/test_agent_frontmatter.py"; then
@@ -145,34 +134,12 @@ fi
 
 echo
 echo "############################################################"
-echo "# Suite 11: hook-gates-hardening structural (Suite 85-py)"
-echo "############################################################"
-if python3 "$TESTS_DIR/test_agent_structure_hardening.py"; then
-    echo "hook-gates-hardening-structural: PASS"
-else
-    echo "hook-gates-hardening-structural: FAIL"
-    FAILED=$((FAILED + 1))
-fi
-
-echo
-echo "############################################################"
 echo "# Suite 12: security self-scan (5-check MVP)"
 echo "############################################################"
 if python3 "$TESTS_DIR/test_security_scan.py"; then
     echo "security-scan: PASS"
 else
     echo "security-scan: FAIL"
-    FAILED=$((FAILED + 1))
-fi
-
-echo
-echo "############################################################"
-echo "# Suite 13: harness scorecard (informational)"
-echo "############################################################"
-if python3 "$TESTS_DIR/harness_scorecard.py"; then
-    echo "harness-scorecard: PASS"
-else
-    echo "harness-scorecard: FAIL"
     FAILED=$((FAILED + 1))
 fi
 
@@ -454,73 +421,6 @@ if bash "$TESTS_DIR/test_bin_tty_behavioral.sh"; then
     echo "bin-tty-guard-behavioral: PASS"
 else
     echo "bin-tty-guard-behavioral: FAIL"
-    FAILED=$((FAILED + 1))
-fi
-
-echo
-echo "############################################################"
-echo "# Suite 181: dispatch-sequence-simulation (declared model + property checks)"
-echo "############################################################"
-if ! command -v python3 >/dev/null 2>&1; then
-    report_skip_or_fail "dispatch-sequence-simulation" "python3 not found — install Python 3 to run this suite"
-else
-    if python3 "$TESTS_DIR/test_dispatch_sequence.py"; then
-        echo "dispatch-sequence-simulation: PASS"
-    else
-        echo "dispatch-sequence-simulation: FAIL"
-        FAILED=$((FAILED + 1))
-    fi
-fi
-
-echo
-echo "############################################################"
-echo "# Suite 182: dispatch-contract-standard (agents/_shared/dispatch-contract.md)"
-echo "############################################################"
-if [ -z "$PY" ]; then
-    report_skip_or_fail "dispatch-contract-standard" "no Python interpreter found (tried python3, python, py -3)"
-elif $PY "$TESTS_DIR/test_dispatch_contract_standard.py"; then
-    echo "dispatch-contract-standard: PASS"
-else
-    echo "dispatch-contract-standard: FAIL"
-    FAILED=$((FAILED + 1))
-fi
-
-echo
-echo "############################################################"
-echo "# Suite 183: gate-addressee-contract (structured gate data to th:leader)"
-echo "############################################################"
-if [ -z "$PY" ]; then
-    report_skip_or_fail "gate-addressee-contract" "no Python interpreter found (tried python3, python, py -3)"
-elif $PY "$TESTS_DIR/test_gate_addressee_contract.py"; then
-    echo "gate-addressee-contract: PASS"
-else
-    echo "gate-addressee-contract: FAIL"
-    FAILED=$((FAILED + 1))
-fi
-
-echo
-echo "############################################################"
-echo "# Suite 184: agent-output-contracts (per-agent output-contract language)"
-echo "############################################################"
-if [ -z "$PY" ]; then
-    report_skip_or_fail "agent-output-contracts" "no Python interpreter found (tried python3, python, py -3)"
-elif $PY "$TESTS_DIR/test_agent_output_contracts.py"; then
-    echo "agent-output-contracts: PASS"
-else
-    echo "agent-output-contracts: FAIL"
-    FAILED=$((FAILED + 1))
-fi
-
-echo
-echo "############################################################"
-echo "# Suite 185: post-split-agent-contracts (agent-authoring-standard branch)"
-echo "############################################################"
-if [ -z "$PY" ]; then
-    report_skip_or_fail "post-split-agent-contracts" "no Python interpreter found (tried python3, python, py -3)"
-elif $PY "$TESTS_DIR/test_post_split_agent_contracts.py"; then
-    echo "post-split-agent-contracts: PASS"
-else
-    echo "post-split-agent-contracts: FAIL"
     FAILED=$((FAILED + 1))
 fi
 

@@ -1,15 +1,15 @@
 ---
 name: ref-special-flows
-description: Reference file for leader/orchestrator special flows (research, spike, plan, parallel dispatch, refactor, docs, simple). Read on-demand by th:leader or th:orchestrator — not a standalone agent.
+description: Reference file for the coordinator's special flows (research, spike, plan, parallel dispatch, refactor, docs, simple). Read on-demand by th:orchestrator — not a standalone agent.
 model: opus
 color: cyan
 ---
 
-# leader / orchestrator — Special Flows Reference
+# orchestrator — Special Flows Reference
 
-This file is read on-demand by `th:leader` or `th:orchestrator` when executing a special flow. It is NOT part of either agent's system prompt.
+This file is read on-demand by `th:orchestrator` when executing a special flow. It is NOT part of its system prompt.
 
-**Role mapping (post-split, see `agents/leader.md` and `agents/orchestrator.md`).** This file names the two split agents explicitly per role: **`th:leader`** owns intake, Discover, classification (including bug-tier classification, Phase 0a Step 7), the always-run decomposition analysis (Step 9/14), and multi-task/multi-project dispatch (spawning `th:orchestrator` instances); **`th:orchestrator`** owns everything from Design (Phase 1) onward — plan-review, STAGE-GATEs, implementation, verify, delivery, and the intra-task DAG/lane-fan-out mechanics. File-path pointers resolve the same way: classification/intake references → `agents/leader.md`; phase/gate/delivery references → `agents/orchestrator.md`.
+**One coordinator, all phases.** `th:orchestrator` owns intake, Discover, classification (including bug-tier classification), the always-run decomposition analysis, Design onward — plan-review, STAGE-GATEs, implementation, verify, delivery, and the intra-task DAG/lane-fan-out mechanics — in a single agent and a single `00-state.md`. Every classification/intake pointer below resolves to `agents/orchestrator.md` or `agents/ref-intake-flows.md`; every phase/gate/delivery pointer resolves to `agents/orchestrator.md`. A prior revision of this file split these across a retired `agents/leader.md` and `agents/orchestrator.md` — that split, and the multi-task/multi-project dispatch that spawned a separate `th:orchestrator` instance per task or project, are both retired (see § "Parallel Dispatch Flow" and § "Milestone-Build Flow" below for what replaces them).
 
 **LAZY-LOAD DIRECTIVE — consumers read only the section they need.** Do NOT read this entire file on every invocation. Locate the top-level section heading for the active flow (e.g., Bug-fix Flow, Research Flow, Docs Flow) and read only that section. Load additional sections only when the flow cross-references them explicitly. Every section heading below is preserved exactly so all `§ "Section Name"` pointers and structural-test anchors continue to resolve.
 
@@ -40,7 +40,7 @@ When the user asks to investigate, compare technologies, evaluate a migration, o
      e. **All gates are mandatory:** STAGE-GATE-1, Phase 3 (verify), STAGE-GATE-3. The Phase Gate Prerequisites (§ Phase Checkpointing in `orchestrator.md`) enforce this mechanically.
      f. If the architect produced a `01-plan.md` during the research session (e.g., the operator asked for a plan before deciding to implement), that plan enters the normal ratification flow (Phase 1.5 → 1.6 → STAGE-GATE-1). It does NOT bypass design review.
    - **Discard:** clean up workspaces, mark pipeline as `complete` with `summary: research discarded by operator`.
-   - **Investigate further — bounded gap-closure loop (leader-owned):** After each consolidation+synthesis round, the leader reads the `## Coverage gaps` fenced block from `research/00-research.md` and evaluates the gate:
+   - **Investigate further — bounded gap-closure loop (coordinator-owned):** After each consolidation+synthesis round, the coordinator reads the `## Coverage gaps` fenced block from `research/00-research.md` and evaluates the gate:
 
      **Gate condition (ALL must hold):** `(≥1 gap with material:true AND web_closeable:true)` AND `research_round < 3`.
 
@@ -88,7 +88,7 @@ When the operator asks to investigate how the codebase works, trace a flow in re
    | 2 | **By concern** | The question is cross-cutting and a directory split would fragment it (e.g., "how is error-handling done?") | One concern per lane: `auth`, `data/persistence`, `error-handling`, `config`, `transport` — each lane greps the whole repo for its concern |
    | 3 | **By question facet** | The question is a single compound question ("does X cause Y, and is Z safe?") | One sub-question per lane, each scoped to the files that answer it |
 
-   **Non-overlap rule (mandatory):** The leader states each lane's boundary (its path-set or concern) explicitly in the dispatch. Boundaries MUST partition the search space — no two lanes own the same file for the same purpose. Overlap wastes sonnet spend and produces duplicate findings the consolidator then has to dedup.
+   **Non-overlap rule (mandatory):** The coordinator states each lane's boundary (its path-set or concern) explicitly in the dispatch. Boundaries MUST partition the search space — no two lanes own the same file for the same purpose. Overlap wastes sonnet spend and produces duplicate findings the consolidator then has to dedup.
 
    **Default scope:** current repo. **Cross-repo scope:** when the operator passes ≥2 repo paths (`--multi-repo`), repo is the outermost partition key. Each lane is scoped to ONE repo. A lane that spans two repos is only valid when the question explicitly addresses a cross-repo seam, in which case that seam is its own dedicated lane.
 
@@ -102,7 +102,7 @@ When the operator asks to investigate how the codebase works, trace a flow in re
 9. **Present** the research report to the user
 10. **Ask** the user how to proceed (implement, discard, or investigate further)
 11. **Act on user's choice** — same options as Research Flow (implement → full pipeline reclassification; discard → clean up; investigate further → bounded gap-closure loop below).
-12. **Bounded gap-closure loop (leader-owned) — extended gate:** After each consolidation + synthesis round, the leader reads the `## Coverage gaps` fenced block from `research/00-research.md` and evaluates the gate:
+12. **Bounded gap-closure loop (coordinator-owned) — extended gate:** After each consolidation + synthesis round, the coordinator reads the `## Coverage gaps` fenced block from `research/00-research.md` and evaluates the gate:
 
     **Gate condition (ANY must hold, AND round cap must not be reached):**
     `((≥1 gap with material:true AND web_closeable:true) OR (≥1 gap with material:true AND code_closeable:true)) AND research_round < 3`.
@@ -138,7 +138,7 @@ When the operator asks to investigate how the codebase works, trace a flow in re
 | Dimension | `/th:research-code --multi-repo` | `/th:cross-repo` |
 |-----------|----------------------------------|-----------------|
 | **Purpose** | Evidence-gathering research: "what does this code actually do, across these repos?" | Flow/invariant auditor: "does this system obey its contracts and invariants?" |
-| **Route** | Routes through the leader (this flow); produces one consolidated `research/00-research.md` | Standalone skill; does NOT route through the leader; uses tmux fan-out |
+| **Route** | Routes through the coordinator (this flow); produces one consolidated `research/00-research.md` | Standalone skill; does NOT route through the coordinator; uses tmux fan-out |
 | **Output** | One `research/00-research.md` with hybrid evidence + conflict detection + gap-closure loop | Per-repo architect+security+qa+tester audits; `00-consolidated.md`; profile/contract validation |
 | **Agents** | `code-researcher` (sonnet) + optional `researcher` (haiku) + `research-consolidator` + `architect` | `architect`, `security`, `qa`, `tester` (per repo); separate workspaces per repo |
 | **When to use** | "How does the retry logic work across the gateway and the worker services?" | "Does the payment service honor the idempotency contract declared in the API profile?" |
@@ -183,12 +183,12 @@ Two modes: `plan` (analysis only) and `plan-and-execute` (analysis + full pipeli
 
 | File | Mode | Consumer | Purpose |
 |---|---|---|---|
-| `01-planning.md` | planning mode (`/th:plan`, `/th:plan plan-and-execute`) | leader (multi-task dispatch) | break a broad scope into N parallel tasks |
+| `01-planning.md` | planning mode (`/th:plan`, `/th:plan plan-and-execute`) | coordinator (single-plan, multi-task dispatch) | break a broad scope into N tasks in one plan |
 | `01-plan.md` | design mode (normal pipeline) + **milestone build** (single-repo `type: plan`) | implementer + qa + plan-reviewer | merged architecture + task list (§ Architecture + § Task List); milestone-build home |
 
 **Milestone build disambiguation.** A `type: plan` single-repo milestone build is a third, distinct consumer for `01-plan.md`. The architect writes the milestone decomposition INTO `01-plan.md` (Work Plan with milestones M0…MN). This is NOT `01-planning.md` (multi-task batch). See the milestone-build section below for the full contract.
 
-Inside each task dispatched by `plan-and-execute`, the spawned `th:orchestrator` runs the full single-feature pipeline (Stage 1 → STAGE-GATE-1 → Stage 2 → Stage 3 → STAGE-GATE-3), which DOES produce its own `01-plan.md` for that task's own sub-tasks — each orchestrator witnesses its own gates independently. The `th:leader` tracks task boundaries via the multi-task progress tracker (`00-leader-roster.md`) — it never fires or witnesses STAGE-GATE-1/3 itself, at the batch level or otherwise. **No double-gating.**
+**`plan-and-execute` no longer spawns one orchestrator per task.** A prior revision had each task dispatched by `plan-and-execute` run as its own `th:orchestrator` instance, each witnessing its own STAGE-GATE-1/3 independently, tracked by a separate `th:leader` progress roster. That model required the coordinator to dispatch another coordinator, which the fused contract forbids absolutely, with no exception for this mode (`agents/orchestrator.md § "Dispatch invariants"` #2). `plan-and-execute` now feeds the SAME single-coordinator, single-plan model as § "Multi-Task Handling" above: the tasks `01-planning.md` broke out become `01-plan.md § Task List` rows, and one `th:orchestrator` runs Stage 1 → STAGE-GATE-1 → Stage 2 → Stage 3 → STAGE-GATE-3 once, over the whole set — never once per task.
 
 ### Planning phase (both modes)
 
@@ -213,7 +213,7 @@ Inside each task dispatched by `plan-and-execute`, the spawned `th:orchestrator`
 
 A milestone build is when one project is decomposed into milestones (M0…MN) and the operator executes each milestone as a step of the plan. This is the **one-build-one-workspace model**: one task = one plan (`01-plan.md`) = one workspace, shipping under the default `all-tasks-one-pr` Delivery Grouping as ONE PR (opened only when ALL milestones are complete).
 
-**Governing invariant:** a build is identified by IDENTITY, never the date. Neither `th:leader` nor `th:orchestrator` may create a new plan or workspace because the date changed. No code path may branch "new date → new workspace."
+**Governing invariant:** a build is identified by IDENTITY, never the date. `th:orchestrator` never creates a new plan or workspace because the date changed. No code path may branch "new date → new workspace."
 
 **Milestone definition.** A milestone is an internal unit of work-division WITHIN ONE TASK that maps to ONE COMMIT on the single feature branch. Milestones are NOT deliverables and NOT PRs — they are commit-sized steps that (a) produce a clean granular history and (b) can be PARALLELIZED when independent. The task ships as ONE PR at the end after all milestones are complete.
 
@@ -221,9 +221,9 @@ A milestone build is when one project is decomposed into milestones (M0…MN) an
 
 **Stage files are FLAT, whole-task, and there is exactly ONE set per workspace.** No suffix of ANY kind is permitted on a stage filename. This prohibits not only per-milestone suffixes (`02-implementation-m{N}.md`) and `{NN}_{milestone}/` child folders, but ALSO any "second-cycle" / "second delivery cycle" suffix such as `02b-implementation.md`, `03b-testing.md`, `04b-*.md`. There is no "second delivery cycle" convention in team-harness — inventing an undocumented file-naming convention is itself a defect. One task = one workspace = one set of stage files (`02-implementation.md`, `03-testing.md`, `reviews/04-security.md`, `reviews/04-validation.md`), each whole-task. A second PR or a second pass within the same workspace REUSES these flat files; it never mints a parallel suffixed set.
 
-**Operator-authority invariant — the pipeline never divides a task.** A single task's plan and its implementation are NEVER autonomously divided by the pipeline — not into multiple delivery groups, not into multiple stage-cycles, not into multiple workspaces. Dividing a scope into multiple workspaces is the OPERATOR's responsibility and decision. If the architect or `th:leader` judges a scope too large for one task, it SURFACES that judgment to the operator (a decision in `01-plan.md § Review Summary → ### Decisions for human review`, or a STAGE-GATE STOP) — the operator decides whether to split into multiple workspaces. No agent splits a task's plan or implementation on its own authority.
+**Operator-authority invariant — the pipeline never divides a task.** A single task's plan and its implementation are NEVER autonomously divided by the pipeline — not into multiple delivery groups, not into multiple stage-cycles, not into multiple workspaces. Dividing a scope into multiple workspaces is the OPERATOR's responsibility and decision. If the architect or the coordinator judges a scope too large for one task, it SURFACES that judgment to the operator (a decision in `01-plan.md § Review Summary → ### Decisions for human review`, or a STAGE-GATE STOP) — the operator decides whether to split into multiple workspaces. No agent splits a task's plan or implementation on its own authority.
 
-**Reconciling clause — decomposition vs division.** This invariant governs DIVISION of a single task; it does NOT prohibit the leader's always-run decomposition analysis (`agents/leader.md` Phase 0a (decomposition analysis)). A scope that decomposes into genuinely-independent tasks is identified by that analysis and handed to leader's Multi-Task fan-out, which consolidates the result into one PR by default — that is not "dividing a task." Decomposition operates at the TASK-IDENTIFICATION axis (finding independent tasks up front, always run, autonomous); this invariant governs the DELIVERY axis (never fragment one already-identified task, never mint separate operator-facing workspaces without operator sign-off). The two are complementary, not in tension.
+**Reconciling clause — decomposition vs division.** This invariant governs DIVISION of a single task; it does NOT prohibit the coordinator's always-run decomposition analysis (`agents/orchestrator.md § "14–17"`). A scope that decomposes into genuinely-independent tasks is identified by that analysis and becomes N rows of the SAME `01-plan.md § Task List`, implemented in the coordinator's single Phase 2 dispatch and consolidated into one PR by default — that is not "dividing a task." Decomposition operates at the TASK-IDENTIFICATION axis (finding independent tasks up front, always run, autonomous); this invariant governs the DELIVERY axis (never fragment one already-identified task, never mint separate operator-facing workspaces without operator sign-off). The two are complementary, not in tension.
 
 **Third parallelism axis — intra-task execution-lane fan-out (distinct from both of the above).** The lane-decomposition mechanism (`agents/orchestrator.md § Phase 2 — Implementation → Intra-task execution-lane decomposition`) is a THIRD, narrower axis, distinct from both TASK-IDENTIFICATION (the decomposition analysis above) and the inter-task DAG scheduler (`Depends on:` rounds, `agents/orchestrator.md` Stage-2 scheduler): it fans out the EXECUTION of a SINGLE already-approved, already-undivided task into bounded parallel implementer lanes — one per architect-declared, file-disjoint seam — when the task's `Files:` count meets `LANE_DECOMPOSE_MIN_FILES` and its seams are genuinely disjoint. The DELIVERABLE (plan, commit set, PR) is never divided; only EXECUTION may fan out into bounded lanes, capped at `LANE_CAP` per task and `GLOBAL_ROUND_CONCURRENCY_CAP` per round — a task whose lanes fan out still ships as exactly one plan, one implementation record, one commit set, one PR. Full contract, caps, and the seam-not-disjoint fallback: `agents/orchestrator.md § Phase 2 — Implementation → Intra-task execution-lane decomposition` and `docs/parallel-batch-implementation.md § Intra-task lane fan-out`.
 
@@ -232,13 +232,13 @@ A milestone build is when one project is decomposed into milestones (M0…MN) an
 These two rules are the same constraint read from two directions:
 
 - **Anti-split invariant (single-task reading):** A single task is NEVER split across multiple delivery groups. The Operator-authority invariant above is the governing statement — no agent divides a task's plan or implementation on its own authority. A single task always belongs to exactly one group in `§ Delivery Grouping`.
-- **Consolidation default (multi-task reading):** A same-repo batch of independent tasks consolidates into ONE PR by default (`Delivery Grouping: all-tasks-one-pr`). The leader's `agents/ref-dispatch-machinery.md § Multi-Task fan-out` **Consolidation default** paragraph is the governing statement — all task branches merge into one `batch/<name>-verify` branch, the version bumps once, the changelog is one consolidated entry, and exactly one PR covers all batch work. Do NOT open one PR per batched task.
+- **Consolidation default (multi-task reading):** A same-repo batch of independent tasks consolidates into ONE PR by default (`Delivery Grouping: all-tasks-one-pr`). `docs/parallel-batch-implementation.md` is the governing statement — all tasks land on one branch inside the single coordinator's one Phase 2 dispatch, the version bumps once, the changelog is one consolidated entry, and exactly one PR covers all batch work. Do NOT open one PR per batched task.
 
 Read together: a task is never SPLIT across delivery groups (anti-split), and a same-repo batch consolidates INTO one PR by default (consolidation default). There is no contradiction — one rule prevents explosion outward (splitting a task across groups), the other prevents explosion inward (one PR per task in a batch). Neither rule claims a fixed "one task = one PR" identity; the actual task-to-PR mapping is declared per plan by `§ Delivery Grouping`.
 
-**Operator opt-out.** The operator — and only the operator — may override the consolidation default by requesting separate PRs ("keep them as separate PRs" / "separate PRs"). On opt-out, each task ships as its own PR via serial merge (open Task-N+1's PR only after Task-N's PR lands on fresh `main`; never stacked). Neither `th:leader` nor the consolidator `th:orchestrator` chooses separate PRs on its own authority.
+**Operator opt-out.** The operator — and only the operator — may override the consolidation default by requesting separate PRs ("keep them as separate PRs" / "separate PRs"). On opt-out, each task ships as its own PR via serial merge (open Task-N+1's PR only after Task-N's PR lands on fresh `main`; never stacked). The coordinator never chooses separate PRs on its own authority.
 
-**Genuine blocker (the only non-opt-out reason for separate PRs in a same-repo batch).** Absent an operator opt-out, the consolidator `th:orchestrator` splits a batch into separate PRs ONLY for: (a) an UNRESOLVABLE merge conflict between task branches at consolidation Step 5a; or (b) a temporal-prod / cross-repo deploy reason from the plan-reviewer's existing closed list — `coexistence window`, `production signal`, `cross-repo deploy gate` (see `agents/plan-reviewer.md § Rule 1`). No new blocker categories exist.
+**Genuine blocker (the only non-opt-out reason for separate PRs in a same-repo batch).** Absent an operator opt-out, the coordinator splits a batch into separate PRs ONLY for: (a) an UNRESOLVABLE merge conflict between task branches at consolidation Step 5a; or (b) a temporal-prod / cross-repo deploy reason from the plan-reviewer's existing closed list — `coexistence window`, `production signal`, `cross-repo deploy gate` (see `agents/plan-reviewer.md § Rule 1`). No new blocker categories exist.
 
 **Same delivery flow alignment.** The consolidated batch ships via the same delivery flow and the same PR lifecycle as a single task — the same `delivery` agent (dispatched by the consolidator orchestrator), the same review → merge → worktree-teardown lifecycle (teardown on PR merge per `docs/worktree-discipline.md` Rule 3). There is no separate batch-delivery path. The only structural difference is that delivery operates on the `batch/<name>-verify` integration branch (Step 5a) rather than a single task branch.
 
@@ -280,14 +280,14 @@ The `02-implementation.md`, `03-testing.md`, `reviews/04-security.md`, and `revi
 
 ### Milestone execution: detect-and-continue by identity
 
-When the operator says "implement M0" (or "build M1", "execute milestone X"), the leader:
+When the operator says "implement M0" (or "build M1", "execute milestone X"), the coordinator:
 
 1. Extracts the plan identity slug from the task description.
 2. Runs the date-agnostic glob + frontmatter confirm (identical to the initiative JOIN rule) to locate the plan workspace by identity.
 3. On confirmed match: resumes the SAME plan workspace as `docs_root` — this is the detect-and-continue path. No new top-level sibling workspace is created; no `{NN}_{milestone-slug}/` sub-folder is nested.
 4. On no match: treats the task as a standalone pipeline (normal behavior).
 
-The detect-and-continue check runs in `leader.md` **Phase 0a** before composing a fresh `docs_root`. Milestone execution continues inside the plan's workspace instead of minting a sibling `{date}_{feature}` folder.
+The detect-and-continue check runs in `agents/ref-intake-flows.md § "Milestone Continuity"` before composing a fresh `docs_root`. Milestone execution continues inside the plan's workspace instead of minting a sibling `{date}_{feature}` folder.
 
 ### Independent milestones: parallelization + convergence
 
@@ -329,63 +329,73 @@ Status values: `pending` → `implementing` → `complete`. One row per mileston
 
 ---
 
-## Parallel Dispatch Flow (DEFAULT for 2+ tasks)
+## Multi-Task Handling (DEFAULT for 2+ tasks in one project)
 
-Parallel dispatch is defined in the leader's **Multi-Task fan-out** section (`agents/ref-dispatch-machinery.md`). It is the **default behavior** whenever the leader identifies 2+ tasks, regardless of entry point. **Scope note:** this is single-project, multi-task dispatch — ungated by a parallelism confirm. It is distinct from the multi-PROJECT initiative fan-out (`agents/ref-dispatch-machinery.md § Parallel Multi-Project Dispatch`), which is scoped to ≥2 projects and IS confirm-gated.
+**No separate coordinator instance per task.** A prior revision of this section described the
+coordinator fanning out one `th:orchestrator` instance per task, each in its own worktree, later
+consolidated by a second agent. That mechanism — Multi-Task fan-out and its consolidator — is
+retired (measured at 0.6% of runs, both instances operator overrides;
+`agents/ref-dispatch-machinery.md § "What left this file"`). The coordinator never dispatches
+another coordinator, including another copy of itself
+(`agents/orchestrator.md § "Dispatch invariants"` #2, absolute, no exception).
+
+**What replaces it: N tasks in ONE plan, ONE Phase 2 dispatch.** The always-run decomposition
+analysis (`agents/orchestrator.md § "14–17"`) identifies genuinely independent tasks up front; the
+architect writes them as `01-plan.md § Task List` rows ordered by their `Depends on:` DAG, and
+Phase 2 is **exactly one `implementer` dispatch covering every task** — never one per task
+(`agents/orchestrator.md § "Scheduler — one dispatch, DAG order inside it"`). Intra-task file-level
+parallelism, when a single task's own scope is large enough, uses
+`agents/orchestrator.md § "Intra-task lane decomposition"` — implementer lanes sharing ONE worktree
+and branch, consolidated by the coordinator as sole committer. One plan, one pipeline run, one PR
+by default (`Delivery Grouping: all-tasks-one-pr`).
 
 **Entry points that lead here:**
-- `/th:plan plan-and-execute` → architect produces task breakdown → dispatch
-- `/th:issue #1 #2 #3` → multiple issues → dispatch
-- User requests batch/parallel work → leader runs Specify + a planning-mode `architect` dispatch → fan-out
-- leader identifies broad scope needing breakdown → auto plan-and-execute → fan-out
+- `/th:plan plan-and-execute` → architect produces task breakdown → one plan, N tasks
+- `/th:issue #1 #2 #3` → multiple issues → one plan, N tasks
+- User requests batch/parallel work → coordinator runs Specify + a planning-mode `architect` dispatch
+- coordinator identifies broad scope needing breakdown → auto plan-and-execute
 
-When multiple tasks exist:
-1. The leader reads `01-planning.md` for dependency info (if available) or analyzes dependencies itself
-2. Follows the **Multi-Task Orchestration** flow (dependency analysis → rounds → hooks + inotifywait → event-driven monitoring)
-3. Each worktree runs a full pipeline via `/th:issue #{number}`
+### Ordering within the single Phase 2 dispatch
 
-### Branching strategy
-
-Tasks in later rounds depend on code from earlier rounds. Use **branch-from-parent**:
-- Round 1 tasks branch from `main`
-- Round 2 tasks branch from Round 1's feature branch (not main)
-- When Round 1's PR merges, Round 2's PRs auto-rebase cleanly
-
-This mirrors how human teams work with dependent features.
+Tasks in later DAG positions depend on code from earlier ones. The implementer works through every
+task in dependency order in one continuous pass inside the same worktree and branch, committing
+once per task as its edits close — there is no per-round branch-from-parent, because there is no
+per-round worktree to branch. This mirrors how a single developer works through a dependency-ordered
+stack of commits on one branch.
 
 ---
 
 ## Bug-fix Flow
 
-When `type: fix` is classified (Phase 0a Step 7, by `th:leader`), the spawned `th:orchestrator` runs the **Bug-fix Pipeline** — the same 3-stage shell as feature flow, with type-specific content shifts. The pipeline is **tier-classified (1-4)** based on bug content keywords, impacted file paths, and operator override. The tier determines which artifacts are produced and which agents run: Tier 1 (docs/trivial) skips the architect entirely and conditionally skips the pre-fix regression test; Tier 2 (light) uses an abbreviated root-cause + tester + qa; Tier 3 (standard, the PR #50 default) runs the full pipeline + security; Tier 4 (critical/security) adds mandatory prior-art memory query and extended security analysis. The "security runs always for bugs" rule from PR #50 is preserved for Tier 3+; auto-escalation favors high-tier signals so any fix touching a security-sensitive path lands at Tier 3+ regardless of the operator's hint.
+When `type: fix` is classified (Classify, by `th:orchestrator`), the same coordinator runs the **Bug-fix Pipeline** — the same 3-stage shell as feature flow, with type-specific content shifts. The pipeline is **tier-classified (1-4)** based on bug content keywords, impacted file paths, and operator override. The tier determines which artifacts are produced and which agents run: Tier 1 (docs/trivial) skips the architect entirely and conditionally skips the pre-fix regression test; Tier 2 (light) uses an abbreviated root-cause + tester + qa; Tier 3 (standard, the PR #50 default) runs the full pipeline + security; Tier 4 (critical/security) adds mandatory prior-art memory query and extended security analysis. The "security runs always for bugs" rule from PR #50 is preserved for Tier 3+; auto-escalation favors high-tier signals so any fix touching a security-sensitive path lands at Tier 3+ regardless of the operator's hint.
 
 ### Tier System (4 tiers)
 
-The canonical Tier table, Tier 0 auto-detection rules, auto-classification signals (Signal 1/2/3), Tier 1 regression-test conditional skip, auto-escalation rules, and worked examples are defined in `leader.md § "Bug tier"` (Phase 0a Step 7). That is the single authoritative source — the leader runs classification at Phase 0a Step 7 and `[TIER: 0]` operator override is defined there. See `leader.md § "Bug tier"` for the complete Tier table, all signal definitions, the auto-escalation rules, and worked examples. The summary below covers only the Bug-fix Pipeline flow behavior; all Tier-classification decisions are governed by the canonical source.
+The canonical Tier table, Tier 0 auto-detection rules, auto-classification signals (Signal 1/2/3), Tier 1 regression-test conditional skip, auto-escalation rules, and worked examples are defined in `agents/ref-intake-flows.md § "Bug Tier"` (Classify). That is the single authoritative source — the coordinator runs classification at Classify and `[TIER: 0]` operator override is defined there. See `agents/ref-intake-flows.md § "Bug Tier"` for the complete Tier table, all signal definitions, the auto-escalation rules, and worked examples. The summary below covers only the Bug-fix Pipeline flow behavior; all Tier-classification decisions are governed by the canonical source.
 
-**Quick reference — Tier names and Pipeline effects (see `leader.md § "Bug tier"` for the authoritative table):**
+**Quick reference — Tier names and Pipeline effects (see `agents/ref-intake-flows.md § "Bug Tier"` for the authoritative table):**
 - **Tier 0 (Trivial/Cosmetic):** no workspaces, no gates (PR review is the only gate), implementer runs inline. No `00-state.md`, no `01-plan.md`, no workspaces folder.
 - **Tier 1 (Docs/Trivial):** workspaces created; architect skipped; Tier 1 regression-test conditional skip — only when no behavior change; tester only (suite no-regress) at Phase 3.
 - **Tier 2 (Light fix):** architect dispatched in light-root-cause mode; regression test mandatory; tester + qa at Phase 3.
 - **Tier 3 (Standard fix):** architect dispatched in full-root-cause mode; regression test mandatory; tester + qa at Phase 3; security at the Pre-Delivery Security Audit (within Phase 3).
 - **Tier 4 (Critical/Security):** same as Tier 3 plus mandatory KG prior-art query (`mcp__memory__search_nodes`) and extended security analysis.
 
-**Auto-classification signals (canonical definition in `leader.md § "Bug tier"`):**
+**Auto-classification signals (canonical definition in `agents/ref-intake-flows.md § "Bug Tier"`):**
 - **Signal 1 — Keywords in the bug report:** high-tier triggers (escalate to Tier 4): `auth`, `injection`, `xss`, `csrf`, `secret`, `token`, `permission`, `bypass`, `vulnerability`, `cve`, `leak`, `exposed`, `unauthorized`. Low-tier hints (Tier 1 candidate): `typo`, `trivial`, `quick fix`, `cosmetic`, `whitespace`.
 - **Signal 2 — File-path patterns:** security-sensitive paths (force Tier 3+, `security-sensitive: true`): `auth/**`, `middleware/**`, `api/**`, `db/**`, `security/**`, `crypto/**`, `session/**`, any path with `auth` or `permission` in name. File-path patterns drive the re-tier GATE at Phase 2 close.
 - **Signal 3 — Operator override:** `[TIER: 0|1|2|3|4]` forces declared tier; `[regression-test: required]` forces Tier 2 minimum; `[security: required]` forces Tier 3 minimum.
 
 **Auto-escalation rules:** high-tier signal sobrescribes lower-tier classification. Path priority > keyword priority > size hints. Default: Tier 3 when in doubt (conservative).
 
-**`type: hotfix` Tier 3 floor:** a hotfix is always Tier 3 minimum — auto-classification MUST NOT assign a hotfix a tier below 3. The override-clamp (`[TIER: 0/1/2]` on a hotfix) is silently raised to Tier 3. See `leader.md § "Bug tier"` for the full floor rule.
+**`type: hotfix` Tier 3 floor:** a hotfix is always Tier 3 minimum — auto-classification MUST NOT assign a hotfix a tier below 3. The override-clamp (`[TIER: 0/1/2]` on a hotfix) is silently raised to Tier 3. See `agents/ref-intake-flows.md § "Bug Tier"` for the full floor rule.
 
 **Auto-promotion Tier 1 → Tier 2:** a Tier 1 candidate is auto-promoted to Tier 2 when any condition for the regression-test skip fails (e.g., UI strings, test-fixture changes). The promotion is recorded in `00-state.md` and announced to the operator.
 
-**Worked examples:** see `leader.md § "Bug tier"` § Worked examples for the complete set. Representative cases: Tier 0 (typo in CHANGELOG, no workspaces); Tier 1 (docs string fix, no architect); Tier 2 (config change, light root-cause); Tier 3 (production code bug, full pipeline); Tier 4 (auth bypass — security-escalation example with Signal 1 + Signal 2 combined).
+**Worked examples:** see `agents/ref-intake-flows.md § "Bug Tier"` § Worked examples for the complete set. Representative cases: Tier 0 (typo in CHANGELOG, no workspaces); Tier 1 (docs string fix, no architect); Tier 2 (config change, light root-cause); Tier 3 (production code bug, full pipeline); Tier 4 (auth bypass — security-escalation example with Signal 1 + Signal 2 combined).
 
 #### Tier 1 regression-test conditional skip
 
-The Tier 1 candidate skips Phase 2.0 ONLY when ALL of these conditions hold (canonical definition in `leader.md § "Bug tier"`): Tier is `1`; all touched paths are docs/comments/non-functional strings; no test paths touched; operator did NOT declare `[regression-test: required]`. Otherwise the candidate is auto-promoted to Tier 2. The conditional skip is recorded in `00-state.md` as `regression_test_status: skipped`.
+The Tier 1 candidate skips Phase 2.0 ONLY when ALL of these conditions hold (canonical definition in `agents/ref-intake-flows.md § "Bug Tier"`): Tier is `1`; all touched paths are docs/comments/non-functional strings; no test paths touched; operator did NOT declare `[regression-test: required]`. Otherwise the candidate is auto-promoted to Tier 2. The conditional skip is recorded in `00-state.md` as `regression_test_status: skipped`.
 
 #### Worked examples
 
@@ -454,14 +464,14 @@ Every bug-fix pipeline produces the backbone artifacts; the tier modulates which
 
 | Phase | Owner | Output | Notes |
 |---|---|---|---|
-| 0a Intake | leader | `00-state.md` initial | KG session start, KG query, CLAUDE.md read, type classified as `fix`, `bug_tier` classified (1-4), `security-sensitive: true` forced for Tier 3+ |
-| 0b Specify | leader | Spec context (bug-report format) passed inline to architect; architect incorporates into `01-plan.md` § Review Summary | Reported behaviour / Expected behaviour / Reproduction steps / Environment / AC (AC-1 reproduction-no-longer-bug, AC-2 regression-test-exists for Tier 2-4; Tier 1 uses implicit "cited issue is fixed") |
-| 0.5 Bootstrap | leader | — | Same as feature flow |
+| 0a Intake | orchestrator | `00-state.md` initial | KG session start, KG query, CLAUDE.md read, type classified as `fix`, `bug_tier` classified (1-4), `security-sensitive: true` forced for Tier 3+ |
+| 0b Specify | orchestrator | Spec context (bug-report format) passed inline to architect; architect incorporates into `01-plan.md` § Review Summary | Reported behaviour / Expected behaviour / Reproduction steps / Environment / AC (AC-1 reproduction-no-longer-bug, AC-2 regression-test-exists for Tier 2-4; Tier 1 uses implicit "cited issue is fixed") |
+| 0.5 Bootstrap | orchestrator | — | Same as feature flow |
 | 1 Root-cause | architect (mode: root-cause + sub-mode) | `01-root-cause.md` (Tier 2-4 only) | **Tier 1: skipped.** Tier 2: `mode: light-root-cause`, ≤30 lines. Tier 3: `mode: full-root-cause`, 1 pg max. Tier 4: `mode: full-root-cause` + mandatory `## Prior Art`. |
 | 1.5 Plan ratification | qa-plan (mode: ratify-plan) | append to `01-root-cause.md` | Usually skipped for `type: fix` (≤3 AC) |
 | 1.6 Plan review | plan-reviewer | `reviews/01-plan-review.md § Plan Review` | Rules 1-6 plus Rules 7 + 8 (gated on `type: fix \| hotfix`). For Tier 1: Rule 7 is no-op (no `01-root-cause.md`); Rule 8 conditional on Phase 2.0 run |
 | STAGE-GATE-1 | orchestrator | STOP block | Plan-reviewer verdict + TL;DR from `01-root-cause.md` + Task Summary from `01-plan.md` (§ Task List). Tier 1: one-sentence prose plan replaces TL;DR copy |
-| **2.0 Regression Test** | tester (mode: pre-fix-regression) | `02-regression-test.md` + `03-testing.md § Test Plan` (Tier 2-4 mandatory; Tier 1 conditional skip) | Tier 1 with no-behavior-change: skipped (`pre_fix_test_required: false`). Tier 2-4: mandatory, no fallback. **Consolidated with Phase 2.7 into one tester contract (T2-AC-4):** this dispatch also authors `03-testing.md § Test Plan` in full (regression test + the AC-test coverage plan Phase 2.7 will complete) — see `agents/orchestrator.md § "Test-phase consolidation"`. The pre-fix ordering is unchanged: the regression test still fails against current code before the implementer runs. |
+| **2.0 Regression Test** | tester (mode: pre-fix-regression) | `02-regression-test.md` + `03-testing.md § Test Plan` (Tier 2-4 mandatory; Tier 1 conditional skip) | Tier 1 with no-behavior-change: skipped (`pre_fix_test_required: false`). Tier 2-4: mandatory, no fallback. **Consolidated with Phase 2.7 into one tester contract (T2-AC-4):** this dispatch also authors `03-testing.md § Test Plan` in full (regression test + the AC-test coverage plan Phase 2.7 will complete) — see `agents/tester.md § "Test-phase consolidation"`. The pre-fix ordering is unchanged: the regression test still fails against current code before the implementer runs. |
 | 2 Implement | implementer | `02-implementation.md` | Scope-discipline contract: zero tangential refactors |
 | 2.5 Reconcile | orchestrator + qa-plan (reconcile) | — | Same as feature flow |
 | 2.6 Code-Hygiene Scan | orchestrator (no dispatch) | `stage2.hygiene` trace event | Same as feature flow — deterministic scan, `[all types]`. See `docs/code-hygiene-gate.md § Layer 1` for the pinned command; not replicated here. |
@@ -478,7 +488,7 @@ Every bug-fix pipeline produces the backbone artifacts; the tier modulates which
 
 **Why this slots between STAGE-GATE-1 and Phase 2.** The human at STAGE-GATE-1 approves the approach (root-cause + regression-test plan). After approval, the tester writes the failing test. The implementer is dispatched at Phase 2 with a test that is already failing. The contract: "make this test pass without breaking the rest." This is the cleanest test-driven bug-fix pattern.
 
-**Test-phase consolidation (T2-AC-4).** This dispatch is the FIRST half of one tester contract shared with Phase 2.7 — the tester writes the failing regression test AND the full `03-testing.md § Test Plan` (covering the AC-test coverage Phase 2.7 will complete) in this same dispatch, so the Phase 2.7 dispatch resumes from an already-written plan instead of re-deriving AC coverage from a cold start. See `agents/orchestrator.md § "Test-phase consolidation"` for the full mechanics. The pre-fix ordering (this test fails against current code before Phase 2) and the pre-Phase-3 immutable-artifact guarantee (AC tests frozen at Phase 2.7, before Phase 3 opens) are both unchanged.
+**Test-phase consolidation (T2-AC-4).** This dispatch is the FIRST half of one tester contract shared with Phase 2.7 — the tester writes the failing regression test AND the full `03-testing.md § Test Plan` (covering the AC-test coverage Phase 2.7 will complete) in this same dispatch, so the Phase 2.7 dispatch resumes from an already-written plan instead of re-deriving AC coverage from a cold start. See `agents/tester.md § "Test-phase consolidation"` for the full mechanics. The pre-fix ordering (this test fails against current code before Phase 2) and the pre-Phase-3 immutable-artifact guarantee (AC tests frozen at Phase 2.7, before Phase 3 opens) are both unchanged.
 
 **Operator override (rejects the architect's documented exit hatch):** **Regression test is mandatory always, no exceptions, no fallback.** The architect's design doc proposed a manual-repro-script fallback for race/timing/environment-dependent bugs. The fallback is **rejected**. If the tester cannot author a regression test, the pipeline blocks with `status: blocked` and surfaces to the operator. There is no exit hatch.
 
@@ -504,7 +514,7 @@ Documented inline in `agents/implementer.md` under `## Scope discipline for type
 
 ### Plan-reviewer Rules 7 + 8 (gated on `type: fix | hotfix`)
 
-Documented in `agents/plan-reviewer.md`. Fire only when the leader's spawn payload declares `type: fix` or `type: hotfix`:
+Documented in `agents/plan-reviewer.md`. Fire only when the coordinator's classification declares `type: fix` or `type: hotfix`:
 
 - **Rule 7** — `01-root-cause.md` declares a `## Regression Test Approach` section with Test layer (unit / integration / e2e), Test scaffold, Failing assertion. Size cap on `01-root-cause.md` ≤120 lines (>120 = `concerns` finding).
 - **Rule 8** — every PR in `01-plan.md` (§ Task List) has an AC referencing the regression test path: `VERIFY: regression test exists at <path>` (or `<TBD-Phase-2.0>` before Phase 2.0 runs).
@@ -517,14 +527,14 @@ Documented in `agents/plan-reviewer.md`. Fire only when the leader's spawn paylo
 
 ### Type classification — auto-detect bug-fix vs hotfix
 
-The leader's Phase 0a Step 7 classification logic uses these signal lists:
+The coordinator's Classify logic uses these signal lists:
 
 - **`fix`** — request describes broken/incorrect behaviour; keywords: `bug`, `solucionar`, `arreglar`, `corregir`, `fixear`, `debuguear`, `regresión`, `error en`, `no funciona`, `está rompiendo`, GitHub label `bug`.
 - **`hotfix`** — all signals of `fix` PLUS urgency markers (`hotfix`, `urgente`, `crítico`, `production down`, `usuarios afectados`) AND scope ≤2 files (inferred from Phase 0b Step 1) AND single causal site described by operator.
 
-**Operator override:** the operator can force a classification by saying so directly. E.g., `@th:leader this is a hotfix:` forces `type: hotfix`.
+**Operator override:** the operator can force a classification by saying so directly. E.g., `@th:orchestrator this is a hotfix:` forces `type: hotfix`.
 
-**Architect re-classification (operator-in-loop):** during Phase 1, if the architect determines the bug is actually a missing feature, the architect emits `type_reclassify: true` and a 1-line rationale in its status block. The orchestrator surfaces both the rationale and the AC list to the operator for decision. The architect does not auto-route.
+**Architect re-classification (operator-in-loop):** during Phase 1, if the architect determines the bug is actually a missing feature, the architect returns `status: blocked` with `failure_kind: reclassification-needed`, `recommended_type: feature`, `rationale` and `evidence`. The orchestrator surfaces the recommendation and its evidence to the operator for decision. The architect does not auto-route.
 
 ### Multi-bug requests
 
@@ -540,7 +550,7 @@ Routes through existing `plan-and-execute` flow. Each bug is one sub-task in `01
 
 The Hotfix sub-flow is a tighter variant of the Bug-fix Flow for trivially scoped defects with urgency markers. **Phase 1 (Root-Cause Analysis) is skipped entirely** — no architect dispatch, no `01-root-cause.md`. Everything else from the Bug-fix Flow is preserved, including Phase 2.0 (mandatory regression test), Phase 4 delivery routing (`### Fixed` CHANGELOG, `fix(area): ... (hotfix)` PR title), and Phase 6 (KG save). The Phase 4 PR title appends `(hotfix)` to signal urgency to the reviewer.
 
-**Tier 3 hard floor for hotfix:** a hotfix is pinned to Tier 3 minimum at Phase 0a Step 7 classification (see `leader.md § Bug tier` for the full hotfix floor rule). Because every hotfix is Tier 3+, the security agent runs for every hotfix — "security always runs for hotfix" is a direct consequence of this pin. The hotfix Tier 3 floor and the security-always contract are the same rule stated from two angles; they are consistent by construction.
+**Tier 3 hard floor for hotfix:** a hotfix is pinned to Tier 3 minimum at Classify (see `agents/ref-intake-flows.md § "Bug Tier"` for the full hotfix floor rule). Because every hotfix is Tier 3+, the security agent runs for every hotfix — "security always runs for hotfix" is a direct consequence of this pin. The hotfix Tier 3 floor and the security-always contract are the same rule stated from two angles; they are consistent by construction.
 ### Skipped phases (relative to type: fix)
 
 - Phase 1 — no architect dispatch, no `01-root-cause.md`.
@@ -555,7 +565,7 @@ The Hotfix sub-flow is a tighter variant of the Bug-fix Flow for trivially scope
 
 - Phase 2.0 (Regression Test) — **still mandatory**. The operator override "regression test is mandatory always" applies to hotfixes too.
 - Phase 2 (Implementation) — scope-discipline contract still applies.
-- Phase 3 (Verify) — `security` agent still runs always for hotfix. This is a direct consequence of the Tier 3 hard floor: `type: hotfix` is pinned to Tier 3 minimum at Phase 0a Step 7 in `leader.md` (the hotfix Tier 3 floor rule), so the Tier-gated dispatch table always routes every hotfix to the Phase 3 `security` agent (Tier 3 row). "security runs always for hotfix" and "security runs for every Tier 3+ fix" are the same statement — the hotfix pin makes them equivalent.- Phase 3.5 (Acceptance Gate) — same.
+- Phase 3 (Verify) — `security` agent still runs always for hotfix. This is a direct consequence of the Tier 3 hard floor: `type: hotfix` is pinned to Tier 3 minimum at Classify (the hotfix Tier 3 floor rule), so the Tier-gated dispatch table always routes every hotfix to the Phase 3 `security` agent (Tier 3 row). "security runs always for hotfix" and "security runs for every Tier 3+ fix" are the same statement — the hotfix pin makes them equivalent.- Phase 3.5 (Acceptance Gate) — same.
 - Phase 2.8 (Freeze, including Build Verification) — runs normally (hotfix code must still compile).
 - Phase 4 (Delivery) — same `### Fixed` routing; PR title gains `(hotfix)` suffix.
 - STAGE-GATE-3 — always mandatory.
@@ -612,7 +622,7 @@ A dedicated pipeline for achieving **80% branch coverage service-wide**. Decompo
 
 ### Phase 0 --- Analyze & Decompose
 
-**Owner:** leader
+**Owner:** coordinator
 
 1. **Resolve target** --- use service path from skill (or cwd). Validate it contains source code.
 2. **Detect stack** --- read `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, etc. Detect test framework from config files (`jest.config.*`, `vitest.config.*`, `pytest.ini`, etc.).
@@ -641,7 +651,7 @@ A dedicated pipeline for achieving **80% branch coverage service-wide**. Decompo
 
 ### Phase 1 --- Blocker Round
 
-**Owner:** leader dispatches, tester agent executes
+**Owner:** coordinator dispatches, tester agent executes
 
 **These tasks MUST complete before any parallel test task starts.**
 
@@ -686,7 +696,7 @@ Test-Pipeline Task:
 
 ### Phase 2 --- Parallel Test Round
 
-**Owner:** leader dispatches via Multi-Task fan-out
+**Owner:** coordinator dispatches via the single Phase 2 implementer dispatch
 
 **Reuses existing parallel dispatch mechanism:** worktrees + tmux, max 5 concurrent, eager slot-filling, Stop hooks + inotifywait.
 
@@ -744,7 +754,7 @@ Reuse Multi-Task Orchestration Steps 1-6 exactly:
 
 #### Internal fix loop
 
-Each tester agent has its own fix loop (max 3 attempts). If a module fails after 3 internal attempts, it reports `status: failed`. The leader records it in `batch-progress.md` but does NOT re-launch automatically.
+Each tester agent has its own fix loop (max 3 attempts). If a module fails after 3 internal attempts, it reports `status: failed`. The coordinator records it in `batch-progress.md` but does NOT re-launch automatically.
 
 #### Gap iteration (re-launched from Phase 3)
 
@@ -755,7 +765,7 @@ When Phase 3 sends tasks back:
 
 ### Phase 3 --- Coverage Gate
 
-**Owner:** leader
+**Owner:** coordinator
 
 **⚠️ THE 80% BRANCH COVERAGE GATE IS NON-NEGOTIABLE. 79.99% IS A FAILURE. THERE IS NO "CLOSE ENOUGH".**
 
@@ -812,7 +822,7 @@ When Phase 3 sends tasks back:
 
 ### Phase 4 --- Consolidation & Report
 
-**Owner:** leader
+**Owner:** coordinator
 
 1. **Merge per-module results** --- aggregate: tests created, tests passing, coverage, security findings from all `03-testing.md` files.
 
@@ -888,10 +898,10 @@ When Phase 3 sends tasks back:
 
 ```
 workspaces/
-  test-pipeline/                        # leader coordination
+  test-pipeline/                        # coordinator coordination
     00-state.md                         # pipeline checkpoint
-    00-execution-events.jsonl           # event trace (leader only, local mode)
-    00-execution-events.md              # event trace (leader only, obsidian mode)
+    00-execution-events.jsonl           # event trace (coordinator only, local mode)
+    00-execution-events.md              # event trace (coordinator only, obsidian mode)
     01-plan.md                          # service analysis & task list (§ Review Summary + § Task List)
     batch-progress.md                   # multi-task tracking
     05-consolidation.md                 # final merged report
@@ -1072,7 +1082,7 @@ workspaces/{feature-name}/
 
 ### Observability events for documentation pipeline
 
-The leader appends observability events to `00-execution-events` at each phase transition. Required events per phase:
+The coordinator appends observability events to `00-execution-events` at each phase transition. Required events per phase:
 
 | Phase | Event | When |
 |-------|-------|------|
@@ -1105,7 +1115,7 @@ This skips Phases 0, 1, 3 and the DOC-GATE. The caller is responsible for resear
 
 ## User-Initiated Simple Mode
 
-**Only the user can request simple mode.** The leader NEVER auto-classifies as simple.
+**Only the user can request simple mode.** The coordinator NEVER auto-classifies as simple.
 
 When the user explicitly says "simple", "just implement", "skip design", "no tests needed", or equivalent:
 
@@ -1123,15 +1133,15 @@ When the user explicitly says "simple", "just implement", "skip design", "no tes
 
 ## Fast Mode (`--fast`) — strict alias for `lane: express` (T2-AC-6)
 
-**`--fast` is not a second, coexisting skip-profile — it IS the express lane.** Per `docs/pipeline-lanes.md § 10` and `agents/orchestrator.md § "Express Lane Profile"`, the legacy fixed skip-set documented below is the SAME profile the leader dispatches as `lane: express` — there is exactly ONE classification system (the three lanes), and `--fast` is one operator-declared entry point into it, never a parallel mechanism with its own independent skip logic. `[TIER: 1]` and Simple-Mode's granular keyword skips resolve into the same lane; only the entry surface differs (a literal `--fast`, a `[TIER: 1]` tag, or explicit keywords).
+**`--fast` is not a second, coexisting skip-profile — it IS the express lane.** Per `docs/pipeline-lanes.md § 10` and `agents/orchestrator.md § "Express lane — a delta on the full flow"`, the legacy fixed skip-set documented below is the SAME profile the coordinator dispatches as `lane: express` — there is exactly ONE classification system (the three lanes), and `--fast` is one operator-declared entry point into it, never a parallel mechanism with its own independent skip logic. `[TIER: 1]` and Simple-Mode's granular keyword skips resolve into the same lane; only the entry surface differs (a literal `--fast`, a `[TIER: 1]` tag, or explicit keywords).
 
-**Operator-declared ONLY.** The leader NEVER sets `fast_mode`/`lane: express` on its own via this trigger — only a literal `--fast` in the operator's request maps to it through this alias. It is the developer's discretionary lightweight path for very small changes: a version bump, a one-line edit, a trivial copy tweak, or any express-eligible product-code change (`docs/pipeline-lanes.md § 2` bright line). It complements User-Initiated Simple Mode — Simple Mode is granular keyword skipping ("skip design", "skip tests"); `--fast` is a single named profile with a fixed skip-set (the express profile). Applies to any `type`.
+**Operator-declared ONLY.** The coordinator NEVER sets `fast_mode`/`lane: express` on its own via this trigger — only a literal `--fast` in the operator's request maps to it through this alias. It is the developer's discretionary lightweight path for very small changes: a version bump, a one-line edit, a trivial copy tweak, or any express-eligible product-code change (`docs/pipeline-lanes.md § 2` bright line). It complements User-Initiated Simple Mode — Simple Mode is granular keyword skipping ("skip design", "skip tests"); `--fast` is a single named profile with a fixed skip-set (the express profile). Applies to any `type`.
 
-**Skips (= what the express profile skips, restated here for the alias's own self-containment):** Phase 1 Design (no `architect`; the orchestrator emits a one-sentence prose plan into `01-plan.md`, same surface as `type: hotfix`); plan ratification (Phase 1.5) and plan review (Phase 1.6), folded into the deterministic self-check and STAGE-GATE-1/STAGE-GATE-3, folded into ONE combined plan+delivery gate; the `qa` and `adversary` agents at Phase 3 (`adversary` skipped ONLY when non-sensitive — see "Security override" below). Full phase-by-phase mechanics: `agents/orchestrator.md § "Express Lane Profile"` — this section states the alias mapping only, never a second copy of the mechanics.
+**Skips (= what the express profile skips, restated here for the alias's own self-containment):** Phase 1 Design (no `architect`; the orchestrator emits a one-sentence prose plan into `01-plan.md`, same surface as `type: hotfix`); plan ratification (Phase 1.5) and plan review (Phase 1.6), folded into the deterministic self-check and STAGE-GATE-1/STAGE-GATE-3, folded into ONE combined plan+delivery gate; the `qa` and `adversary` agents at Phase 3 (`adversary` skipped ONLY when non-sensitive — see "Security override" below). Full phase-by-phase mechanics: `agents/orchestrator.md § "Express lane — a delta on the full flow"` — this section states the alias mapping only, never a second copy of the mechanics.
 
 **Keeps — floors that `--fast` can NEVER skip:** Specify (Phase 0b); Implement (Phase 2); the Code-Hygiene Scan (Phase 2.6); the `tester` agent at Phase 3 (ONE targeted test phase scoped to the diff); the Freeze's build verification (Phase 2.8, scoped to the diff); the express combined gate (the single operator round-trip that replaces STAGE-GATE-1/STAGE-GATE-3 — never itself skippable); the native `dev-guard` push prompt; Delivery (Phase 4 — branch, commit, PR, minimal artifacts).
 
-**Security design-review carve-out (SEC-002) — restated verbatim from the express profile's own SEC-DR5-01 fold-in, never a second, independently-drifting statement.** `--fast` skips Phase 1.6's PANEL (plan-reviewer audit + qa-plan ratification) in general, but the security design-review is NOT skipped when the task is security-sensitive (path match, semantic keyword match, `[security: required]`, or `type: hotfix` on a security-sensitive path). When the carve-out fires, the `security` agent is dispatched in design-review mode within Phase 1.6, BEFORE the express combined gate — exactly as `lane: full` runs it before STAGE-GATE-1. This carve-out is additive to the Tier 3+ hotfix floor — `type: hotfix` still gets its Phase 3 security run via the floor and additionally gets the Phase 1.6 design-review when on a sensitive path. Full definition: `agents/orchestrator.md § "Phase 1.6 is inviolable"` and `§ "Security on express (SEC-DR5-01)"`, and `leader.md § "Fast mode"` in Phase 0a.
+**Security design-review carve-out (SEC-002) — restated verbatim from the express profile's own SEC-DR5-01 fold-in, never a second, independently-drifting statement.** `--fast` skips Phase 1.6's PANEL (plan-reviewer audit + qa-plan ratification) in general, but the security design-review is NOT skipped when the task is security-sensitive (path match, semantic keyword match, `[security: required]`, or `type: hotfix` on a security-sensitive path). When the carve-out fires, the `security` agent is dispatched in design-review mode within Phase 1.6, BEFORE the express combined gate — exactly as `lane: full` runs it before STAGE-GATE-1. This carve-out is additive to the Tier 3+ hotfix floor — `type: hotfix` still gets its Phase 3 security run via the floor and additionally gets the Phase 1.6 design-review when on a sensitive path. Full definition: `agents/orchestrator.md § "Phase 1.6 is inviolable"` and `§ "Security on express — stated directly, never inferred"`.
 
 **Security override (hard, non-negotiable — must never contradict "never waivable on express/full," `docs/pipeline-lanes.md § 5`).** A security-sensitive path (`auth/**`, `middleware/**`, `api/**`, `db/**`, `security/**`, `crypto/**`, `session/**`, or any path containing `auth`/`permission`) or `[security: required]` forces the `security` agent to run at Phase 3 regardless of `--fast` — and, when the path is sensitive, `adversary` runs alongside it from the SAME single shared Phase-3 floor predicate `agents/orchestrator.md § "Single shared Phase-3 floor predicate"` computes (T2-AC-10) — never a second, `--fast`-specific security condition that could drift from that predicate. For `type: fix | hotfix`, the tier-driven security floor (Tier 3+) is also preserved. `--fast` never bypasses security on sensitive code, on any type, under any override; the orchestrator announces the override when it fires. This statement is the express-lane floor stated from the `--fast` alias's own angle — it is never a second, independently-maintained security-override rule; drift between this paragraph and `docs/pipeline-lanes.md § 5` / `§ 7` is a contract violation (see `docs/pipeline-lanes.md § 12` site-enumeration table).
 
@@ -1147,10 +1157,10 @@ Every special flow that skips phases must explicitly document which artifact ver
 
 - **Phases skipped:** 2-5 (implementation, verify, delivery, GitHub update).
 - **Artifact verification runs for:**
-  - `researcher` lanes (N parallel) → `workspaces/{feature}/research/research-findings-{angle}.md` per lane. The leader gates on each lane's status block. Missing or `findings: 0` lanes record a `research.lane.skipped` event (fail-open, not a failure).
-  - `research-consolidator` → `workspaces/{feature}/research/00-research.md` (or `research/research-findings-consolidated.md` for docs-flow). The leader verifies the consolidated findings file exists before dispatching the architect. Checks `material_closeable_gaps` in the consolidator status block for gate evaluation.
-  - `architect` → `research/00-research.md`. The leader verifies `research/00-research.md` exists and is non-empty after the architect returns. On termination, verifies `## Residual Gaps` section is present.
-  - **Per-round re-dispatch (gap-closure loop):** after each follow-up round, the same artifact verification sequence repeats — researcher lanes → consolidator (amended `research/00-research.md`) → architect (re-synthesized `research/00-research.md`). The leader also verifies the `## Coverage gaps` fenced block is present in `research/00-research.md` after the consolidator and architect return, and that `research_round` in `00-state.md` matches the current loop iteration.
+  - `researcher` lanes (N parallel) → `workspaces/{feature}/research/research-findings-{angle}.md` per lane. The coordinator gates on each lane's status block. Missing or `findings: 0` lanes record a `research.lane.skipped` event (fail-open, not a failure).
+  - `research-consolidator` → `workspaces/{feature}/research/00-research.md` (or `research/research-findings-consolidated.md` for docs-flow). The coordinator verifies the consolidated findings file exists before dispatching the architect. Checks `material_closeable_gaps` in the consolidator status block for gate evaluation.
+  - `architect` → `research/00-research.md`. The coordinator verifies `research/00-research.md` exists and is non-empty after the architect returns. On termination, verifies `## Residual Gaps` section is present.
+  - **Per-round re-dispatch (gap-closure loop):** after each follow-up round, the same artifact verification sequence repeats — researcher lanes → consolidator (amended `research/00-research.md`) → architect (re-synthesized `research/00-research.md`). The coordinator also verifies the `## Coverage gaps` fenced block is present in `research/00-research.md` after the consolidator and architect return, and that `research_round` in `00-state.md` matches the current loop iteration.
 - **Artifact verification skipped for:** `implementer` (not dispatched), `tester` (not dispatched), `qa` (not dispatched), `security` (not dispatched), `delivery` (not dispatched).
 - **Not applicable:** Phases 3-4 (Phase 3.5, Phase 2.8's build verification) — no implementation to build.
 
@@ -1177,7 +1187,7 @@ Every special flow that skips phases must explicitly document which artifact ver
 
 ### Fast Mode (--fast, operator-declared) — `lane: express`
 
-- **Phases skipped:** 1 (Design — no `architect`), 1.5, 1.6 (folded into the deterministic self-check, unless `security_sensitive: true` forces the SEC-002 design-review — see `agents/orchestrator.md § "Security on express (SEC-DR5-01)"`), STAGE-GATE-1/STAGE-GATE-3 (replaced by the express combined gate); Phase 3 `qa` (never runs on express) + `security` (unless a sensitive path / `[security: required]` forces security, via the single shared Phase-3 floor predicate, T2-AC-10).
+- **Phases skipped:** 1 (Design — no `architect`), 1.5, 1.6 (folded into the deterministic self-check, unless `security_sensitive: true` forces the SEC-002 design-review — see `agents/orchestrator.md § "Security on express — stated directly, never inferred"`), STAGE-GATE-1/STAGE-GATE-3 (replaced by the express combined gate); Phase 3 `qa` (never runs on express) + `security` (unless a sensitive path / `[security: required]` forces security, via the single shared Phase-3 floor predicate, T2-AC-10).
 - **Artifact verification runs for:** `implementer` → `02-implementation.md`; `tester` → `03-testing.md` (ONE targeted authoring+run dispatch, scoped to the diff); `delivery` (Phase 4, minimal artifacts). The orchestrator verifies each exists after the agent returns.
 - **Artifact verification skipped for:** `architect` (not dispatched — one-sentence prose plan in `01-plan.md` instead, unless the plan is architect-authored per the self-authored-plan carve-out's own boundary), `qa` (not dispatched), `security` (not dispatched, unless the sensitive-path override fires).
 - **Phase 2.8's build verification:** runs, scoped to the diff — the change must still build and the suite must pass.
@@ -1194,10 +1204,10 @@ This section defines which task types and tiers produce a classification block a
 | `fix` Tier 2-4 | Yes — architect root-cause mode records in `00-state.md`; defaults false unless fix touches a contract surface | Yes (minimum AC in `§ Task List`) | Rare — only if the fix modifies a contract surface (e.g., the fix adds an endpoint); booleans default false | Yes — no-op pass when all-false |
 | `fix` Tier 1 / `hotfix` | No architect → orchestrator records all-false block when it self-authors `01-plan.md` | Yes (minimum 4-line AC) | None (all-false by orchestrator self-author) | Yes — no-op pass (empty required set) |
 | `fix` Tier 0 / `docs` Tier 0 | **Exempt** — no workspace (CLAUDE.md §5 observability exemption) | n/a | n/a | Not invoked (no `00-state.md`) |
-| `docs` flow (Tier ≥1) | Architect docs-research mode → leader records all-false block (docs do not touch product contracts) | Yes (minimum AC in `§ Task List`) | None | Yes — no-op pass |
+| `docs` flow (Tier ≥1) | Architect docs-research mode → coordinator records all-false block (docs do not touch product contracts) | Yes (minimum AC in `§ Task List`) | None | Yes — no-op pass |
 | Research / Spike | No — architect does not produce `01-plan.md` § Task List with per-task AC | n/a | n/a | Not invoked (research/spike have no STAGE-GATE-1) |
 
-**Recording contract for self-authored plans (fix Tier 1 / hotfix / docs):** when the orchestrator (or, for `docs` flow, the leader) self-authors `01-plan.md`, it MUST add the `### Classification block` subsection to `## Review Summary` with all seven booleans set to `false`. This satisfies the plan-reviewer Rule 11 classification-block check and ensures `sketch-guard.sh` receives a valid state file at STAGE-GATE-1.
+**Recording contract for self-authored plans (fix Tier 1 / hotfix / docs):** when the orchestrator self-authors `01-plan.md` (including for `docs` flow), it MUST add the `### Classification block` subsection to `## Review Summary` with all seven booleans set to `false`. This satisfies the plan-reviewer Rule 11 classification-block check and ensures `sketch-guard.sh` receives a valid state file at STAGE-GATE-1.
 
 **Fast Mode:** the architect is not dispatched — the orchestrator writes a one-sentence prose plan. Classification block: all-false (same as self-authored path above). Sketch-guard: invoked as a no-op pass. `sketches/*`: none produced.
 

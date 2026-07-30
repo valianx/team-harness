@@ -159,9 +159,9 @@ const INJECTED_MODE_VALUES = new Set(["primary", "subagent", "all"]);
  * `mode` (which CC frontmatter simply omits), `name` is required in both
  * formats — so the inverse (transformToCC) cannot drop it; it must restore
  * the canonical CC name derived from the source filename (mirrors
- * applyModeByRole's "leader" -> "TH Leader" forward rename).
+ * applyModeByRole's "orchestrator" -> "TH Orchestrator" forward rename).
  */
-const INJECTED_NAME_VALUES = new Set(["TH Leader"]);
+const INJECTED_NAME_VALUES = new Set(["TH Orchestrator"]);
 
 /** Writable-prefix allowlist: directories the transform is permitted to write into,
  *  relative to the repo root (forward-slash normalized, no trailing slash). */
@@ -1105,24 +1105,23 @@ function transformToOpencode(filePath, content, repoRoot) {
 
 /**
  * applyModeByRole mirrors cmd/install/transform.go::applyModeByRole: the
- * leader agent (the top-level coordinator) receives mode: "primary" and
- * displays as "TH Leader" in the opencode agent picker; every other agent —
- * including orchestrator, the task-scoped execution engine — is returned
- * unchanged. Applied as a POST-PROJECTION step in runTransform, ON TOP OF
- * the generic transformToOpencode output, and deliberately NOT part of the
- * transform-conformance.json fixture (which binds only the generic
- * mapping, so transformToOpencode's exported output stays name: leader /
- * mode: subagent for the leader).
+ * orchestrator agent (the top-level coordinator) receives mode: "primary" and
+ * displays as "TH Orchestrator" in the opencode agent picker; every other
+ * agent is returned unchanged. Applied as a POST-PROJECTION step in
+ * runTransform, ON TOP OF the generic transformToOpencode output, and
+ * deliberately NOT part of the transform-conformance.json fixture (which
+ * binds only the generic mapping, so transformToOpencode's exported output
+ * stays name: orchestrator / mode: subagent for the orchestrator).
  */
 function applyModeByRole(content, agentName) {
-  if (agentName !== "leader") {
+  if (agentName !== "orchestrator") {
     // No change needed — the generic transform already set mode: subagent.
     return content;
   }
 
   const { frontmatter: fm, body } = parseFrontmatter(content);
   fm["mode"] = "primary";
-  fm["name"] = "TH Leader";
+  fm["name"] = "TH Orchestrator";
   return serializeFrontmatter(fm, body);
 }
 
@@ -1204,7 +1203,7 @@ function transformToCC(filePath, content, repoRoot) {
 
   if (surface === "agent") {
     // name: restore the canonical CC name (filename-derived) when the current
-    // value is a known injected display-name artifact (e.g. "TH Leader");
+    // value is a known injected display-name artifact (e.g. "TH Orchestrator");
     // otherwise carry it through unchanged. See INJECTED_NAME_VALUES.
     if (fm["name"] !== undefined) {
       projected["name"] = INJECTED_NAME_VALUES.has(String(fm["name"]))
@@ -1396,7 +1395,7 @@ async function runTransform(direction, repoRoot, options = {}) {
     // Installer-layer role override (mirrors
     // manifest_registry.go::opencodeRuntimeTransform): applied as a SEPARATE
     // post-projection step so the fixture-bound transformToOpencode output
-    // stays name: leader / mode: subagent for the leader.
+    // stays name: orchestrator / mode: subagent for the orchestrator.
     if (direction === DIRECTION_TO_OPENCODE && transformed.surface === "agent") {
       const agentName = path.basename(srcPath, ".md");
       transformed = { ...transformed, content: applyModeByRole(transformed.content, agentName) };

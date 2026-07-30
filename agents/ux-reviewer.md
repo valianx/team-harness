@@ -34,7 +34,7 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 
 ---
 
-**Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the leader's resolved base or the session-start directive's announced base — never the repo-local default.
+**Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the coordinator's resolved base or the session-start directive's announced base — never the repo-local default.
 
 ## Operating Modes
 
@@ -190,6 +190,7 @@ Only `critical` findings block delivery. Everything else is a recommendation —
 agent: ux-reviewer
 mode: enrich | validate
 status: success | blocked | failed
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/{01-ux-review|04-ux-validation}.md
 findings: {critical: N, high: N, medium: N, suggestion: N}

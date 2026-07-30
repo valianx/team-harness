@@ -3,7 +3,7 @@ name: trace
 description: Show pipeline observability for a single feature.
 ---
 
-Show pipeline observability for a single feature. This is a standalone read-only skill — does NOT route through the leader or any orchestrator and NEVER modifies state (no Edit, no Write, no JSONL append).
+Show pipeline observability for a single feature. This is a standalone read-only skill — does NOT route through the orchestrator and NEVER modifies state (no Edit, no Write, no JSONL append).
 
 ## Voice
 
@@ -62,7 +62,7 @@ workspaces/{feature-name}/00-execution-events.md    (obsidian mode)
 workspaces/{feature-name}/00-execution-events.jsonl  (local mode)
 ```
 
-These are written by the **orchestrator** during pipeline runs (see `agents/orchestrator.md` → "Execution Events JSONL" + "Pipeline Summary Protocol"). The initiative-level fan-out file (see "Parallel region rendering" below) is written by the **leader**. If either per-feature file is missing, the pipeline ran before observability was wired up or was interrupted before the orchestrator could write it.
+These are written by the **orchestrator** during pipeline runs (see `agents/orchestrator.md` → "Execution Events JSONL" + "Pipeline Summary Protocol"). The initiative-level file (see "Initiative region rendering" below) is written by the same orchestrator. If either per-feature file is missing, the pipeline ran before observability was wired up or was interrupted before the orchestrator could write it.
 
 ---
 
@@ -439,7 +439,7 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
    - **Static opus-agent fallback** (only when both paths above are
      unavailable): `architect`, `security`, `adversary`, `qa-plan`,
      `ux-reviewer`, `reviewer`, `reviewer-consolidator`, `agent-builder`,
-     `mentor`, `gcp-infra`, `gcp-cost-analyzer`, `leader`, `orchestrator` → `opus`.
+     `mentor`, `gcp-infra`, `gcp-cost-analyzer`, `orchestrator` → `opus`.
      This list MUST match `docs/observability.md § Derivation rule` verbatim
      — do not edit one without the other.
    - **No "all others → sonnet" default.** When none of the three paths
@@ -489,24 +489,25 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
    it declares `initiative: {name}`, resolve the initiative-level
    `00-execution-events` trace at the initiative root — detect the `.md` variant
    first (Glob), then `.jsonl`, applying the same fence-extraction used by every
-   other mode (source paths and derivation in "Parallel region rendering
-   (fan-out)" below). Filter to `fanout.*` events; when a
-   `fanout.start`/`fanout.converge` pair is present, sum token counts across all
-   lanes' own `{project}/00-execution-events.*` files (each lane keeps its full
+   other mode (source paths and derivation in "Initiative region rendering
+   (serial multi-project sequencing)" below). Filter to `initiative.start` /
+   `project.start` / `project.end` / `initiative.converge` events; when an
+   `initiative.start` is present, sum token counts across all projects' own
+   `{project}/00-execution-events.*` files (each project keeps its full
    per-phase trace) to produce one initiative-level cost figure, appended below
    the per-feature cost table with the header
-   `Initiative cost rollup — {initiative}`. This is a pure read of each lane's
-   OWN events file — it never writes to any lane's events file or `00-state.md`
-   and never touches the gate seam.
-   **Fail-soft:** no `initiative` field, no initiative-level events file, no
-   `fanout.*` events, or a read/parse error → omit the rollup silently; the
-   per-feature cost output is unaffected.
+   `Initiative cost rollup — {initiative}`. This is a pure read of each
+   project's OWN events file — it never writes to any project's events file or
+   `00-state.md` and never touches the gate seam.
+   **Fail-soft:** no `initiative` field, no initiative-level events file, or a
+   read/parse error → omit the rollup silently; the per-feature cost output is
+   unaffected.
 
 ---
 
-## Parallel region rendering (fan-out)
+## Initiative region rendering (serial multi-project sequencing)
 
-**When rendered:** in default mode (no flag), after the `00-pipeline-summary.md` printout, when the feature's `00-state.md` declares `initiative: {name}` and an initiative-level `00-execution-events` file exists (`docs/observability.md § Initiative-level fan-out trace`). No new flag — this is additive output on the existing default-mode invocation.
+**When rendered:** in default mode (no flag), after the `00-pipeline-summary.md` printout, when the feature's `00-state.md` declares `initiative: {name}` and an initiative-level `00-execution-events` file exists (`docs/observability.md § "Initiative-level trace (serial multi-project sequencing)"`). No new flag — this is additive output on the existing default-mode invocation.
 
 **Source:** the initiative-level file lives at the initiative root, not inside `workspaces/{feature-name}/`:
 ```text
@@ -515,29 +516,29 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
 ```
 Detect the `.md` variant first (Glob), then `.jsonl`, applying the same fence-extraction as every other mode above.
 
-The initiative-level fan-out events are written by the **leader** (`agents/ref-dispatch-machinery.md § Parallel Multi-Project Dispatch`; `docs/observability.md § Initiative-level fan-out trace`), not by any orchestrator — the leader is the writer of its own initiative-level file and the reader-only aggregator of the per-lane traces below.
+The initiative-level lifecycle events are written by the **orchestrator** — the same coordinator that runs every project's own pipeline, one project at a time, to completion (`agents/ref-dispatch-machinery.md § Multi-project sequencing`; `docs/observability.md § "Initiative-level trace (serial multi-project sequencing)"`). There is no separate roster and no parallel fan-out to enumerate.
 
-**Derivation.** Filter to `fanout.*` events. Group `fanout.lane.start` / `fanout.lane.end` pairs by `project` (matched on the shared `project` key). A lane with a `start` and no matching `end` is still running; a lane with both is closed, with `end.status` (`success`/`failed`/`iterating`) as its outcome. `fanout.converge` marks the region's closing boundary — its `lanes[]` array is the authoritative per-lane final status when present.
+**Derivation.** Filter to `initiative.start` / `project.start` / `project.end` / `initiative.converge` events. `initiative.start` carries `eligible_projects[]`. A `project.start` with no matching `project.end` for the same `project` is the currently running project — because execution is serial, at most one project is ever running at a time. A paired `project.start`/`project.end` is closed, with `project.end.status` (`success`/`failed`/`iterating`) as its outcome. `initiative.converge` marks that every eligible project has run, with its `projects[]` array as the authoritative per-project final status.
 
-**Advisory pending-gate (from the roster, never a gate-clear signal).** When a `00-leader-roster.md` sits at the initiative root (`agents/leader.md § 00-leader-roster.md`), read each lane's `pending_gate` field from its roster row and render it as-is. This column is ADVISORY — a leader-maintained hint of which STAGE-GATE a lane is paused at. It is NEVER derived from a gate-clear inference: this skill never reads `gate1_release` / `gate3_release` or any `stage.gate.release` event to decide gate status. When no roster is present, or a row's `pending_gate` is `—`, render `—`.
+**Gate values are read directly from each project's own `00-state.md`,** never from a roster or any advisory field: `gate1_release` / `gate3_release` come straight from that project's own state file.
 
 **Render:**
 ```text
-Parallel region — {initiative}
+Initiative — {initiative}  (serial — at most one project running at a time)
 =============================
-fanout.start  {ts}  eligible: {eligible_projects joined by ", "}  cap: {cap}
+initiative.start  {ts}  eligible: {eligible_projects joined by ", "}
 
-  {project-a}   {ts_start} → {ts_end | "running"}   {status}   gate: {pending_gate|—}
-  {project-b}   {ts_start} → {ts_end | "running"}   {status}   gate: {pending_gate|—}
+  {project-a}   {ts_start} → {ts_end | "running"}   {status}   gate: {gate1_release|gate3_release|—}
+  {project-b}   {ts_start} → {ts_end | "not started"}   —   gate: —
 
-fanout.converge  {ts | "(not yet — region still open)"}
+initiative.converge  {ts | "(not yet — projects still pending)"}
 ```
 
-Lanes render side-by-side in `eligible_projects[]` order (not start-time order), so the same project always occupies the same row across repeated invocations while a region is open.
+Projects render in `eligible_projects[]` order (not start-time order), so the same project always occupies the same row across repeated invocations while the initiative is in progress.
 
-**`--cost` interaction (reader-only rollup).** Executed by `--cost` mode step 6 above — the initiative-level trace is resolved during `--cost` execution, not only default-mode rendering. When a `fanout.start`/`fanout.converge` pair is present, `--cost` sums token counts across all lanes' own `{project}/00-execution-events.*` files (each lane keeps its full per-phase trace) to produce one initiative-level cost figure, appended below the per-feature cost table with the header `Initiative cost rollup — {initiative}`. This is a pure read of each lane's OWN events file — the same reader-only aggregation the leader performs (`docs/observability.md § Reader-only initiative rollup`); it never writes to any lane's events file or `00-state.md` and never touches the gate seam.
+**`--cost` interaction (reader-only rollup).** Executed by `--cost` mode step 6 above — the initiative-level trace is resolved during `--cost` execution, not only default-mode rendering. When an `initiative.start` is present, `--cost` sums token counts across all projects' own `{project}/00-execution-events.*` files (each project keeps its full per-phase trace) to produce one initiative-level cost figure, appended below the per-feature cost table with the header `Initiative cost rollup — {initiative}`. This is a pure read of each project's OWN events file — it never writes to any project's events file or `00-state.md` and never touches the gate seam.
 
-**Fail-soft.** No `initiative` field, no initiative-level events file, no `fanout.*` events, or a read/parse error → omit this section silently. It never blocks or degrades any other mode.
+**Fail-soft.** No `initiative` field, no initiative-level events file, or a read/parse error → omit this section silently. It never blocks or degrades any other mode.
 
 ---
 
@@ -575,6 +576,6 @@ Lanes render side-by-side in `eligible_projects[]` order (not start-time order),
 
 ## Narration Exemption
 
-This skill is **exempt** from the output-discipline silence rules. The operator invoked `/th:trace` specifically to see pipeline observability internals — surfacing phase names, event counts, tool usage, and timing is the explicit purpose of this skill. The narration lint (`tests/test_agent_structure.py` Suite 31) does not scan this file.
+This skill is **exempt** from the output-discipline silence rules. The operator invoked `/th:trace` specifically to see pipeline observability internals — surfacing phase names, event counts, tool usage, and timing is the explicit purpose of this skill. The narration lint does not apply to this file.
 
 `/th:pipelines <feature>` is the deep narrative; `/th:trace <feature>` is the rollup. They read the same events file (`.md` or `.jsonl` depending on mode) plus, in `/th:trace`'s case, the rendered summary MD.

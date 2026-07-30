@@ -314,13 +314,13 @@ Reads the `prepublish_check` key from `~/.claude/.team-harness.json`. If declare
 timeout 90s bash -lc "$prepublish_check"
 ```
 
-**Recommended value for team-harness:** `python3 tests/test_agent_structure.py` (the structural suite — completes in a few seconds).
+**Recommended value for team-harness:** `bash tests/run-all.sh` (the full verification suite), or `python3 tests/test_security_scan.py` for a faster pre-publish check.
 
 **To enable:** add `prepublish_check` to `~/.claude/.team-harness.json`:
 
 ```json
 {
-  "prepublish_check": "python3 tests/test_agent_structure.py"
+  "prepublish_check": "python3 tests/test_security_scan.py"
 }
 ```
 

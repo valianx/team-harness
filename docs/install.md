@@ -102,27 +102,25 @@ After installing, two optional scaffolds are available via `/th:bootstrap`:
 
 ## Invoking the bug-fix and feature pipelines
 
-The canonical entry point after install is the `leader` agent. Type `@th:leader <task>` in your Claude Code session:
+The canonical entry point after install is the `orchestrator` agent — the top-level Claude Code session agent, not a subagent spawned by anything. Type `@th:orchestrator <task>` in your Claude Code session:
 
 ```
-@th:leader fix the pagination bug in the users list
-@th:leader add an export-to-CSV feature to the invoices page
-@th:leader refactor the auth middleware to use the new JWT library
+@th:orchestrator fix the pagination bug in the users list
+@th:orchestrator add an export-to-CSV feature to the invoices page
+@th:orchestrator refactor the auth middleware to use the new JWT library
 ```
 
-**Slash-command shortcuts** route to the same leader via `Task` from top-level — they are equivalent to the `@th:leader` path:
+**Slash-command shortcuts** route to the same coordinator via `Task` from top-level — they are equivalent to the `@th:orchestrator` path:
 
 | Command | Equivalent to |
 |---|---|
-| `/issue #N` | `@th:leader` with the GitHub issue body fetched automatically |
+| `/issue #N` | `@th:orchestrator` with the GitHub issue body fetched automatically |
 | `/design <feature>` | Routes to design direct mode |
 | `/deliver` | Routes to delivery direct mode |
 | `/recover <feature>` | Resumes an interrupted pipeline |
 | `/th:pipelines` | Shows current pipeline state |
 
-**Anti-pattern — do NOT invoke `@th:orchestrator` from inside another agent's active context.** When another agent is already running, the Claude Code harness strips the `Task` tool as an anti-recursion safety. The orchestrator cannot dispatch specialist agents from that context.
-
-**What happens if you hit the limitation:** the orchestrator emits a "Dispatch handoff" block. Top-level Claude reads the summary and takes over dispatch automatically per `CLAUDE.md §14` — no manual intervention required.
+**No nested-coordinator dispatch exists to trip an anti-recursion limit.** The orchestrator has `Task` from the start of the session and dispatches every specialist (`architect`, `implementer`, `tester`, `qa`, `security`, and the rest) directly, as a leaf agent — never another coordinator, never itself. There is no second coordinator to hand off to and no dispatch-handoff round-trip on this path (`docs/subagent-orchestration.md`).
 
 ---
 

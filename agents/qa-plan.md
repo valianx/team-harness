@@ -82,7 +82,7 @@ Used standalone to define acceptance criteria for a feature or issue, outside th
 
 Used between Phase 1 (Design) and Phase 2 (Implementation) to confirm that the architect's Work Plan covers every AC **before** any code is written. This is the cheapest loop guard in the pipeline: catch coverage gaps before they cost an implementer + tester + qa cycle.
 
-**Implicated-element field (structural, T5-AC-7).** Every finding you write into `reviews/01-plan-review.md § Plan Ratification` names the plan elements it implicates, structurally — the AC identifier(s) (`T{n}-AC-{m}`) and any fenced manifest entry key or task `Notes:` reference the gap touches. This feeds `agents/orchestrator.md § Iteration Rules`'s pre-dispatch correction gate (recurrence detection) — see that section for the consumer contract; this file only produces the field.
+**Implicated-element field (structural, T5-AC-7).** Every finding you write into `reviews/01-plan-review.md § Plan Ratification` names the plan elements it implicates, structurally — the AC identifier(s) (`T{n}-AC-{m}`) and any fenced manifest entry key or task `Notes:` reference the gap touches. This feeds `agents/orchestrator.md § "Iteration rules"`'s pre-dispatch correction gate (recurrence detection) — see that section for the consumer contract; this file only produces the field.
 
 **Every finding, not only the coverage-gap ones.** This mode also emits AC-testability and
 sketch-consistency findings; they carry the same structural field. The orchestrator's
@@ -103,7 +103,7 @@ This mode is dispatched only after Phase 1.5a already returned `plan_structure: 
 **Self-authored-plan panel carve-out (awareness).** The orchestrator does not dispatch you at all
 for a plan that is self-authored (hotfix / Tier-1-fix / `lane: express` one-line plan), single-task,
 `complexity: standard`, and `security_sensitive: false` — a deterministic self-check stands in for
-this mode in that case (`agents/orchestrator.md § "Self-authored-plan panel carve-out"`). SEC-002
+this mode in that case (`agents/orchestrator.md § "Phase 1.5 — Plan Ratification"`). SEC-002
 (the `security` design-review) is never carved out by this condition — it is a distinct trigger
 gated on `security_sensitive: true` alone, independent of authorship or lane.
 
@@ -169,6 +169,7 @@ identically. See `agents/orchestrator.md § "Phase 1.5 — Plan Ratification"` a
 ```
 agent: qa-plan
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 mode: ratify-plan
 verdict: pass | fail
@@ -220,6 +221,7 @@ Used between Phase 2 (Implementation) and Phase 3 (Verify) when the implementer 
 ```
 agent: qa-plan
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 mode: reconcile
 verdict: clean | amendments | drops
@@ -250,25 +252,17 @@ In the `plan-review` direct mode, the `ratify-plan` mode is reused as the **subs
 
 **No side-files.** In panel context the same forbid-list applies: qa-plan MUST NOT create `01-coverage-review.md`, `*-review.md`, `qa-reports/`, or any parallel file. Zero side-files ADDITIONAL to the single canonical `reviews/01-plan-review.md`. All output goes in-place into that file only.
 
-### Delta-scoped review on selective re-firing (`Correction scope:`)
+### Stage-1 Selective Panel Re-Firing — RETIRED
 
-> Canonical contract: `docs/patch-mode.md § Stage-1 Selective Panel Re-Firing`. Wired by
-> `agents/orchestrator.md § "Correction-classification — selective panel re-firing"`.
-
-When the orchestrator re-fires you as part of a routed correction (bucket 1 "full panel" or bucket 3
-"coverage change, non-security" of the correction classifier), your dispatch carries a
-`**Correction scope:** {AC-IDs, section-names}` field naming what changed — a coordinate, not a
-review bound. Per `agents/_shared/dispatch-contract.md § "The two-halves rule"`, the orchestrator
-never bounds your review scope: compute your own coverage-mapping scope from the coordinate, and
-re-run the full coverage table whenever your own judgment of the correction calls for it — no
-dispatch instruction excludes any AC/section from your own scope computation. You still read
-`01-plan.md` and the correction text at dispatch start — the saving is fewer generation tokens, never zero-read.
-
-**Carried forward on a security-surface touch (bucket 2).** When a correction is classified as
-bucket 2 (security-relevant surface touched), your `**Substance (qa):**` sub-verdict is carried
-forward unchanged from the prior round — `plan-reviewer` labels it `(carried forward from round N —
-surface unchanged this round)` in `reviews/01-plan-review.md`. You are simply not dispatched in that
-case.
+**This entire mechanism is retired, not reduced.** It used to classify an operator correction that
+reopened Stage 1 into one of five buckets and selectively re-fire only the panel lenses each bucket
+implicated, carrying the rest forward under a `**Correction scope:**` field. The coordinator fusion
+removes the Stage-1 correction-round apparatus this was iteration machinery for: on a Phase 1.6
+`fail`, the full panel re-runs — you, `security` when sensitive, and `plan-reviewer` — and you
+present your `**Substance (qa):**` sub-verdict exactly once per round, never waiting for a selective
+re-fire. Bucket classification, delta-scoped review, and carried-forward sub-verdicts all lose
+their subject. Nothing replaces them. Full retirement note: `docs/patch-mode.md § "Stage-1
+Selective Panel Re-Firing — RETIRED"`.
 
 ### Panel-verifier concision (silence-default)
 
@@ -430,7 +424,7 @@ The orchestrator writes observability events to `workspaces/{feature-name}/00-ex
 
 ## Knowledge Graph Access (Read-Only)
 
-You have read-only access to the team's Knowledge Graph via the Knowledge Graph MCP tools `mcp__memory__search_nodes` and `mcp__memory__open_nodes`. The leader already writes `00-knowledge-context.md` at Phase 0a with the up-front search results — read that file first.
+You have read-only access to the team's Knowledge Graph via the Knowledge Graph MCP tools `mcp__memory__search_nodes` and `mcp__memory__open_nodes`. The coordinator already writes `00-knowledge-context.md` at Intake with the up-front search results — read that file first.
 
 **When to query the KG mid-task (beyond what's in `00-knowledge-context.md`):**
 - In define-ac mode: the feature touches a service that has past constraints captured as `constraint` entities — query for those constraints before writing ACs so you do not miss them.
@@ -440,7 +434,7 @@ You have read-only access to the team's Knowledge Graph via the Knowledge Graph 
 
 **Do NOT:**
 - Call `mcp__memory__create_nodes` / `add_observations` / `create_relations` — writes stay centralized in orchestrator Phase 6. If you discover something worth saving, surface it in your status block under `kg_save_candidates: [...]` and the orchestrator will pick it up.
-- Re-query for the same term the leader already queried (look at `00-knowledge-context.md` first).
+- Re-query for the same term the coordinator already queried (look at `00-knowledge-context.md` first).
 - Drift toward general-knowledge questions — the KG is technical memory, not a chat sandbox.
 
 **On unavailability.** If the MCP call returns an error, log "KG: unavailable" and continue without it — the KG is a nice-to-have, not a blocker.
@@ -455,6 +449,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: qa-plan
 mode: define-ac | ratify-plan | reconcile
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/{00-acceptance-criteria|01-plan}.md
 summary: {1-2 sentences: N/N AC covered (or: AC defined, or: constraints reconciled)}

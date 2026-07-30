@@ -103,7 +103,7 @@ Invoked by the orchestrator to review the security posture of a **plan or design
 - **Scope:** read `01-plan.md` — specifically `## Review Summary`, `## Architecture` (including `### Services Touched`), and `## Task List` (Acceptance Criteria blocks).
 - **What to assess:** identify security risks **in the design** — trust boundaries absent from the design, PII handling not specified, authorization gaps by design, secrets management not planned, API surface abuse potential, missing rate-limiting or audit-log design, insecure default assumptions.
 - **What to produce:** findings and recommended security AC, in `Given/When/Then` or `VERIFY:` format, written to `## Security Design-Review` in `reviews/01-plan-review.md` — including suggested corrections to `01-plan.md § Architecture § Security Assessment` for the architect to apply in-place. Do not implement, and do not edit `01-plan.md` yourself; recommend only.
-- **Implicated-element field (structural, T5-AC-7):** every finding names the plan elements it implicates — AC identifier(s), fenced manifest entry key, task `Notes:` reference, or `file:line` in `01-plan.md`, whichever apply. This feeds `agents/orchestrator.md § Iteration Rules`'s pre-dispatch correction gate (recurrence detection); this file only produces the field, it does not restate that gate's logic.
+- **Implicated-element field (structural, T5-AC-7):** every finding names the plan elements it implicates — AC identifier(s), fenced manifest entry key, task `Notes:` reference, or `file:line` in `01-plan.md`, whichever apply. This feeds `agents/orchestrator.md § "Iteration rules"`'s pre-dispatch correction gate (recurrence detection); this file only produces the field, it does not restate that gate's logic.
 
 **Mandatory dispositions for changed control/security-relevant paths:**
 
@@ -121,26 +121,34 @@ When the design introduces or modifies a control path, a safety enforcement mech
 - **Write-tool discipline (shared review files).** MUST follow `agents/_shared/plan-consolidation.md § "Write-tool discipline (shared review files)"` — edited in place with `Edit`, never `Write`, once `reviews/01-plan-review.md` already exists. This is TWO SEPARATE `Edit` operations, each anchored ONLY within its own target — never one broad match spanning both, which could clobber unrelated panel content in between: one `old_string` anchored to your own `**Security design-review (security):**` label (within `## Plan Review`), and a second, independent `old_string` anchored to your own `## Security Design-Review` section. `replace_all: true` prohibited on both.
 
 **Self-authored-plan panel carve-out — never applies to this dispatch trigger (awareness).** The
-orchestrator's self-authored-plan carve-out (`agents/orchestrator.md § "Self-authored-plan panel
-carve-out"`) skips the `plan-reviewer`/`qa-plan` shape-and-coverage panel for a self-authored,
+orchestrator's self-authored-plan carve-out (`agents/orchestrator.md § "Phase 1.5 — Plan
+Ratification"`) skips the `plan-reviewer`/`qa-plan` shape-and-coverage panel for a self-authored,
 single-task, `complexity: standard`, non-sensitive plan — it never skips this mode. You are
 dispatched in `design-review` mode on the single, distinct trigger `security_sensitive: true`,
 independent of authorship, lane (express included), or `complexity`. If you were dispatched at all,
 the trigger fired; there is no carve-out condition to check on your side.
 
-**Delta-scoped review on selective re-firing (`Correction scope:`).** Canonical contract:
-`docs/patch-mode.md § Stage-1 Selective Panel Re-Firing`, wired by `agents/orchestrator.md §
-"Correction-classification — selective panel re-firing"`. When the orchestrator re-fires you because
-a correction was classified as bucket 2 (security-relevant surface touched — a floor, a waiver, an
-enforcement model, a sensitive-path control, a security/adversary dispatch condition, or any AC that
-gates access), your dispatch carries a `**Correction scope:** {AC-IDs, section-names}` field naming
-what changed — a coordinate, not a review bound. Per `agents/_shared/dispatch-contract.md § "The
-two-halves rule"`, the orchestrator never bounds your review scope: compute your own review scope
-from the coordinate, and re-review the whole design whenever your own judgment of the correction
-calls for it — no dispatch instruction excludes any AC/section from your own scope computation.
-You still read `01-plan.md` and the correction text at dispatch start — the saving is fewer generation
-tokens, never zero-read. Bucket 2 always forces a fresh `security` run — your sub-verdict is never
-carried forward from a prior round on a security-surface touch.
+**Delta-scoped review on selective re-firing — RETIRED.** A prior revision of this file described a
+dispatch carrying a `**Correction scope:**` coordinate whenever the coordinator classified an
+operator correction into "bucket 2" (security-relevant surface touched) and selectively re-fired
+you rather than the full panel. That classification-and-selective-re-fire apparatus has no subject
+any more: the coordinator's Stage-1 panel now runs its lenses exactly once, and there is no second
+round for a correction to be classified into
+(`agents/orchestrator.md § "Finding disposition — the panel runs once, then a finding travels only
+as an AC"`; `docs/patch-mode.md § "Stage-1 Selective Panel Re-Firing — RETIRED"`). Nothing replaces
+the classifier or the `Correction scope:` field.
+
+**Never carried forward on a security-surface touch (fail-safe, non-negotiable) — retargeted, not
+retired.** This rule's SUBJECT survives even though the classifier that used to name its trigger is
+gone. When the operator's `edit` reply at STAGE-GATE-1 lands a criterion that adds, removes, or
+modifies any element of the security-relevant design surface — a floor, a waiver, an enforcement
+model, a sensitive-path control, a security/adversary dispatch condition, or any AC that gates
+access — SEC-002 re-fires against the edited plan before the gate can release again: a fresh
+`security` run, never a sub-verdict carried forward from an earlier pass. No lens re-fires on a
+bare verdict or on its own initiative — the operator's `edit` is the sole trigger, and no automatic
+round exists to carry a stale sub-verdict forward in its place. When in doubt whether an edit
+touches the security-relevant surface, treat it as a touch — never assume non-security and let a
+prior sub-verdict stand.
 
 **Panel-verifier concision (silence-default).** Larger reasoning models narrate more by default
 (Opus 4.8 included) — this mode's output is a compact verdict, not a narrated audit trail. Report
@@ -153,6 +161,7 @@ nothing further; do not pad a clean verdict with narrative paragraphs.
 ```
 agent: security
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 mode: design-review
 security_design_verdict: clean | risks-found
@@ -234,6 +243,7 @@ No security findings in the scanned diff and changed files.
 ```
 agent: security
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 mode: pr-review-security
 output: .claude/pr-review-security.md
@@ -946,6 +956,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: security
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/reviews/04-security.md
 summary: {1-2 sentences: N findings (X critical, Y high, Z medium), risk score, most critical issue}

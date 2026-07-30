@@ -121,7 +121,7 @@ existing operator-declared fast-path mechanisms.
 | Command error (final `grep` exits `2`+, or `git diff` itself failed) | Escalate — do not advance and do not silently treat as clean. Surface to the operator. |
 
 **Iteration budget:** shares the existing max-3 cap for Case A (implementation) bounces —
-see `agents/orchestrator.md § If any agent fails → ITERATE`.
+see `agents/orchestrator.md § "Iteration"`.
 
 **`workspaces/` exclusion is structural, not filtered.** The workspaces directory is git-ignored
 (local mode) or lives outside the repository entirely (obsidian mode) — it never appears in
@@ -167,7 +167,7 @@ The Layer-2 cap-exception gate wording is **"explained or under cap"** — this 
 appear both in `agents/implementer.md § Reviewability self-check` (the producer of
 `02-implementation.md § Reviewability Exceptions`) and in `agents/qa.md § Code Hygiene` (the
 consumer that decides whether an over-cap function is a finding). A drift between the two
-wordings is a structural defect — `tests/test_agent_structure.py` pins both sides.
+wordings is a defect — both sides must be edited together; nothing pins them.
 
 ---
 
@@ -186,7 +186,7 @@ false-green gate by construction — see `docs/knowledge.md` node
 | `code_hygiene` PRODUCER | producer B1 | `agents/qa.md` | `## Code Hygiene` audit + Return Protocol `code_hygiene:` field |
 | `code_hygiene` CONSUMER — Phase 3 gate | consumer C1 | `agents/orchestrator.md` | `### Phase 3` worst-of combined verdict (conjunction) |
 | `code_hygiene` CONSUMER — Phase 3.5 gate | consumer C2 | `agents/orchestrator.md` | `## Phase 3.5 — Acceptance Gate` (defensive re-assertion) |
-| `code_hygiene` CONSUMER — iteration routing | consumer C3 | `agents/orchestrator.md` | `### If any agent fails → ITERATE` (Case A) |
+| `code_hygiene` CONSUMER — iteration routing | consumer C3 | `agents/orchestrator.md` | `### Iteration` (Case A) |
 | Observability | event | `agents/orchestrator.md` (event enum) + `docs/observability.md` | `stage2.hygiene` |
 
 **Rule for any future edit to this contract:** touching one row of this table without touching
@@ -208,7 +208,7 @@ Two structural properties make this safe by construction:
 1. **This file is prose (`.md`).** Per § 2, prose-extension files are excluded from the Layer-1
    scan entirely — the pattern alternation in § 3.1 lives inside a fenced `grep` command block,
    and every line of that block starts with `grep`/`|`/`-e`, never a source-code comment leader.
-2. **`tests/test_agent_structure.py` is source code (`.py`), not prose.** Any "bad-example"
+2. **A test file is source code, not prose.** Any "bad-example"
    string the structural suite uses to validate the pattern set MUST be built via string
    concatenation (e.g. `"work" + "spaces/" + "foo.ts:12"`) rather than committed as a contiguous
    literal — and, more importantly, MUST NEVER appear inside a committed `#` Python comment. A

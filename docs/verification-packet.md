@@ -10,7 +10,7 @@ itself lives only here (multi-site invariant, `01-plan.md`).
 86K/run) because each verifier re-read the same workspace narrative independently, with no
 shared-read mechanism across separate agent contexts. The packet applies the same
 build-once-read-many shape already used for `00-knowledge-context.md`
-(`agents/leader.md § Phase 0a`) to the Stage-2 verify block.
+(`agents/orchestrator.md § "Intake"`) to the Stage-2 verify block.
 
 ---
 
@@ -234,7 +234,7 @@ packet_integrity: ok | stale | mismatch | n-a
 ```
 
 The orchestrator propagates these into the `phase.end` event's `tools.packet` object (see
-`agents/orchestrator.md § Populating the tools field on phase.end`).
+`agents/orchestrator.md § "tools propagation"`).
 
 ---
 
@@ -337,7 +337,7 @@ line as `UNMEASURABLE` — never as parity. N=0 always reads UNMEASURABLE, never
 
 **Telemetry-missing ALWAYS counts as fallback-signal, never as acceptance.** A backfilled
 event structurally cannot carry packet telemetry (the reconciliation backstop derives only
-`duration_ms` from breadcrumbs — see `agents/orchestrator.md § Execution Events JSONL`), so
+`duration_ms` from breadcrumbs — see `agents/orchestrator.md § "Reconciliation backstop"`), so
 counting it any other way would let emission loss impersonate packet acceptance.
 
 **What each run reports** (via the Task-1 `## Cost` checkpoint contract in

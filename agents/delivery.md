@@ -63,7 +63,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 
    Use the loaded context to write accurate documentation.
 
-   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the leader's resolved base or the session-start directive's announced base — never the repo-local default.
+   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the coordinator's resolved base or the session-start directive's announced base — never the repo-local default.
 
 2. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
 
@@ -361,7 +361,7 @@ These are now the coordinator's own deterministic procedure — see `agents/_sha
 | AC-1 | {≤5-word gist} | `auth.spec.ts:42` PASS | n/a (express — tester combined result) | clean |
 ```
 
-**Workspace-only, never committed into the product repo.** The matrix lives in `reviews/04-validation.md` on `lane: full`, or in `03-testing.md` on `lane: express` — either way inside the gitignored `workspaces/` tree (see CLAUDE.md § "Workspaces as the shared board") — not under any tracked `docs/specs/` path. It is embedded verbatim in the PR body you draft at Step 9f, which is the durable, human-facing surface for this content; the coordinator's staging procedure (`agents/_shared/delivery-mechanics.md § 4`) never stages `docs/specs/`, on any lane. This holds uniformly on `lane: full` and `lane: express` — express's minimal-artifact profile (`agents/orchestrator.md § Express Lane Profile`) never had a spec/matrix commit to skip in the first place; this step's express branch appends a section to a file the tester already wrote, not a new standalone file.
+**Workspace-only, never committed into the product repo.** The matrix lives in `reviews/04-validation.md` on `lane: full`, or in `03-testing.md` on `lane: express` — either way inside the gitignored `workspaces/` tree (see CLAUDE.md § "Workspaces as the shared board") — not under any tracked `docs/specs/` path. It is embedded verbatim in the PR body you draft at Step 9f, which is the durable, human-facing surface for this content; the coordinator's staging procedure (`agents/_shared/delivery-mechanics.md § 4`) never stages `docs/specs/`, on any lane. This holds uniformly on `lane: full` and `lane: express` — express's minimal-artifact profile (`agents/orchestrator.md § "Express lane — a delta on the full flow"`) never had a spec/matrix commit to skip in the first place; this step's express branch appends a section to a file the tester already wrote, not a new standalone file.
 
 ### Step 9d note — size gate and diff composition moved
 
@@ -485,7 +485,7 @@ Branch creation, version bump + MATCH check, `changelog.d/` assembly + release c
 
 ---
 
-**Timing note, stated honestly.** This best-effort tail belongs to the post-gate dispatch only (the early `mode: knowledge-capture` dispatch does none of it), which itself runs before the coordinator's mechanics — the PR these steps reference does not exist yet at that point in the common case. Each step below already tolerates this by design: it checks its own trigger condition first and logs a named `skipped:` outcome when the condition does not yet hold (no PR, not yet merged, no initiative). This is not a defect introduced by the dispatch-shape change — the original design already treated post-merge conditions as best-effort and same-session-optional (see Step 11.4b's own "Same-session best-effort, not the durable reaper" note below); the leader's own boot-time preflight sweep is the durable backstop for anything left unresolved here.
+**Timing note, stated honestly.** This best-effort tail belongs to the post-gate dispatch only (the early `mode: knowledge-capture` dispatch does none of it), which itself runs before the coordinator's mechanics — the PR these steps reference does not exist yet at that point in the common case. Each step below already tolerates this by design: it checks its own trigger condition first and logs a named `skipped:` outcome when the condition does not yet hold (no PR, not yet merged, no initiative). This is not a defect introduced by the dispatch-shape change — the original design already treated post-merge conditions as best-effort and same-session-optional (see Step 11.4b's own "Same-session best-effort, not the durable reaper" note below); the coordinator's own boot-time preflight sweep is the durable backstop for anything left unresolved here.
 
 ### Step 11.4b — Worktree teardown (post-merge, rule 4; same-session best-effort; conditional)
 
@@ -498,7 +498,7 @@ Branch creation, version bump + MATCH check, `changelog.d/` assembly + release c
 
 When `worktree: null`, this step is a **no-op** — log `worktree_teardown: skipped: branch-in-place` and continue.
 
-**Same-session best-effort, not the durable reaper.** Delivery runs pre-merge in the ordinary single-session flow: the PR it just opened is rarely already merged by the time this step executes, so gate condition 1 fails on most runs (`skipped: pr-not-merged`) and teardown here is a no-op. This step only removes a worktree when the PR is already merged at delivery time (e.g., an auto-merge landed while delivery was still running). The durable reaper for the common case — a worktree whose PR merges in a later session — is the boot-time preflight sweep in `th:leader` Phase 0a, which applies the same predicate from `docs/worktree-discipline.md § Rule 7` at a point in time that actually runs after the merge. Both sites reference Rule 7's predicate; neither redefines it.
+**Same-session best-effort, not the durable reaper.** Delivery runs pre-merge in the ordinary single-session flow: the PR it just opened is rarely already merged by the time this step executes, so gate condition 1 fails on most runs (`skipped: pr-not-merged`) and teardown here is a no-op. This step only removes a worktree when the PR is already merged at delivery time (e.g., an auto-merge landed while delivery was still running). The durable reaper for the common case — a worktree whose PR merges in a later session — is the boot-time preflight sweep at `th:orchestrator`'s Intake step 1a, which applies the same predicate from `docs/worktree-discipline.md § Rule 7` at a point in time that actually runs after the merge. Both sites reference Rule 7's predicate; neither redefines it.
 
 **Worktree teardown is re-anchored to PR merge (rule 3).** The worktree lives through review — review-fix commits go into the same worktree on the same branch. Do NOT tear down earlier than this step.
 
@@ -525,7 +525,7 @@ Log `worktree_teardown: blocked: dirty-worktree` and exit this step. Do NOT proc
 
 **1b. Acquire the sweep lock, then re-verify condition 3 (merged AND no commits ahead) immediately before removal.** Before the ancestry re-check below, acquire this worktree's directory lock per the protocol specified canonically in `docs/worktree-discipline.md § Rule 7` (Lock protocol subsection) — by reference; do not re-derive or duplicate the acquire/check/release sequence (the `mkdir` primitive, the holder-file contents, or the 15-minute stale-lock expiry threshold) here.
 
-- Acquisition fails (another process holds a live, non-stale lock) → do NOT proceed. Log `worktree_teardown: skipped: sweep-lock-held` and report `— sweep lock held (retry next boot)`; the worktree remains a candidate for the leader's next boot-time preflight sweep.
+- Acquisition fails (another process holds a live, non-stale lock) → do NOT proceed. Log `worktree_teardown: skipped: sweep-lock-held` and report `— sweep lock held (retry next boot)`; the worktree remains a candidate for the coordinator's next boot-time preflight sweep.
 - The lock mechanism itself errors (not a held-lock `EEXIST`) → treat as "cannot proceed safely". Log `worktree_teardown: skipped: sweep-lock-error` and do NOT remove.
 
 Once the lock is held, this step's Gate evaluated condition 3 once, before the Teardown protocol began — time has passed since then (this same step's condition-4 check, at minimum). Per `docs/worktree-discipline.md § Rule 7`'s Atomicity discipline (referenced here, not redefined — retained as an internal defense layered under the lock), re-run the ancestry check with no other Bash call interleaved between this re-check and step 2's `git worktree remove`:
@@ -592,7 +592,7 @@ Add one line to the delivery status block:
 worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-present | skipped: branch-in-place | skipped: pr-not-merged | skipped: commits-ahead-of-merge-point | skipped: sweep-lock-held | skipped: sweep-lock-error
 ```
 
-**Never a silent skip.** Every non-`removed` outcome above — `blocked`, `failed`, or `skipped` — is reported in this status-block line; delivery never leaves a worktree behind without logging why. A `skipped: pr-not-merged`, `skipped: commits-ahead-of-merge-point`, or `skipped: sweep-lock-held` worktree is not lost — it remains a candidate for the leader's boot-time preflight sweep once the merge (or ancestry, or lock) condition resolves.
+**Never a silent skip.** Every non-`removed` outcome above — `blocked`, `failed`, or `skipped` — is reported in this status-block line; delivery never leaves a worktree behind without logging why. A `skipped: pr-not-merged`, `skipped: commits-ahead-of-merge-point`, or `skipped: sweep-lock-held` worktree is not lost — it remains a candidate for the coordinator's boot-time preflight sweep once the merge (or ancestry, or lock) condition resolves.
 
 ---
 
@@ -750,7 +750,7 @@ The delivery agent's resilience contract is unchanged: **never fail the delivery
 
 #### Path derivation
 
-Derive from the workspaces path (resolved at leader boot, passed in the dispatch):
+Derive from the workspaces path (resolved at coordinator boot, passed in the dispatch):
 
 ```
 feature_dir = basename(docs_root)                          # e.g. "2026-06-06_obsidian-worklog-interlinking"
@@ -930,9 +930,9 @@ The index/MOC files are written to the Obsidian vault (`{logs-path}/{logs-subfol
 
 **Gate:** proceed only when `initiative` in `00-state.md § Current State` is non-null (a confirmed initiative slug). When `initiative == null`, this step is a **no-op** — log `initiative_overview: skipped: no-initiative` and continue. This step is **best-effort**: any failure logs a one-line WARN and continues — the pipeline NEVER fails or blocks on an overview-write error.
 
-**Purpose:** surface this project's resolved row data — branch, version, PR number/URL, and status — so `overview.md` reflects that Delivery has shipped. In lane mode, `th:leader` performs the actual `overview.md` write; Delivery only returns the data.
+**Purpose:** surface this project's resolved row data — branch, version, PR number/URL, and status — so `overview.md` reflects that Delivery has shipped. The coordinator performs the actual `overview.md` write; Delivery only returns the data.
 
-**Lane mode — Delivery does NOT write `overview.md`.** A non-null `initiative` means this delivery run is an initiative lane spawned by `th:leader` (equivalently, a `lane_mode: true` spawn signal). `th:leader` is the **sole writer** of `overview.md`; a lane's Delivery MUST NOT glob for, read, or write that file. Instead of a read-modify-write, resolve this project's row data and **return it in the delivery status block** for `th:leader` to write:
+**Delivery does NOT write `overview.md`.** The coordinator is the **sole writer** of `overview.md` (`agents/ref-dispatch-machinery.md § "overview.md — you are the sole writer"`) — Delivery, dispatched as a specialist within one project's own pipeline, MUST NOT glob for, read, or write that file. Instead of a read-modify-write, resolve this project's row data and **return it in the delivery status block** for the coordinator to write:
 
 - `{project-slug}` — derived from `repo_name`
 - `{branch}` — the feature branch the coordinator created (`agents/_shared/delivery-mechanics.md § 2`)
@@ -946,13 +946,13 @@ Return the row in the status block as a single pipe-delimited line:
 initiative_row: | {project-slug} | {branch} | {version} | {#PR-number or PR-URL or —} | delivered |
 ```
 
-Do NOT resolve an `overview_path`, do NOT read or write `overview.md`, and do NOT run any on-completion reconcile — locating the file, writing each row, ordering lane completions, and the final all-`delivered` reconcile are `th:leader`'s responsibility (see `agents/ref-dispatch-machinery.md § overview.md Template` and § Parallel Multi-Project Dispatch). Log `initiative_overview: deferred-to-leader (lane mode)` and continue.
+Do NOT resolve an `overview_path`, do NOT read or write `overview.md`, and do NOT run any on-completion reconcile — locating the file, writing each row, and the final all-`delivered` reconcile are the coordinator's own responsibility (see `agents/ref-dispatch-machinery.md § "overview.md — you are the sole writer"` and § "Multi-project sequencing"). Log `initiative_overview: deferred-to-coordinator` and continue.
 
-**Single-writer model (why Delivery no longer writes `overview.md`).** `th:leader` is the only agent that writes `overview.md` — there is exactly one writer, always. An earlier revision had each per-lane Delivery run its own full-document read-modify-write of `overview.md` on the theory that per-project rows were concurrency-safe. That claim was false and self-contradictory: a full-document read-modify-write races on the entire file, not on a single row, so two concurrent lane writes — or a lane write overlapping a leader reconcile — can clobber a sibling's row or a reconcile in flight. The suppression model above replaces it: every lane returns its row data and `th:leader` serializes all writes.
+**Single-writer model (why Delivery never writes `overview.md`).** The coordinator is the only agent that writes `overview.md` — there is exactly one writer, always. An earlier revision had each project's Delivery run its own full-document read-modify-write of `overview.md` on the theory that per-project rows were concurrency-safe. That claim was false and self-contradictory: a full-document read-modify-write races on the entire file, not on a single row, so a Delivery write overlapping the coordinator's own reconcile could clobber a row or a reconcile in flight. The model above replaces it: every project's Delivery returns its row data and the coordinator serializes all writes — a property that holds regardless of whether projects run one after another (the current, serial model) or would ever run concurrently again.
 
 **Status line (add to delivery status block):**
 ```
-initiative_overview: deferred-to-leader (lane mode) | skipped: no-initiative | failed: {error}
+initiative_overview: deferred-to-coordinator | skipped: no-initiative | failed: {error}
 ```
 
 ---
@@ -1023,7 +1023,7 @@ initiative_overview: deferred-to-leader (lane mode) | skipped: no-initiative | f
 - Release tag: {verified | created | skipped: <reason>}
 - KG passive capture: {written | skipped: <reason> | failed}
 - Obsidian interlink: {regenerated | skipped: <reason> | failed}
-- Initiative overview: {deferred-to-leader | skipped: no-initiative | failed}
+- Initiative overview: {deferred-to-coordinator | skipped: no-initiative | failed}
 ```
 
 ---
@@ -1067,6 +1067,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: delivery
 mode: knowledge-capture | (post-gate — omit this field, the historical default)
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/00-state.md § Delivery — Knowledge Capture (mode: knowledge-capture) | § Delivery (post-gate)
 summary: {1-2 sentences: what was documented, PR-body draft location, CLAUDE.md sections updated}
@@ -1076,7 +1077,7 @@ worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-presen
 release_tag: verified: v{X.Y.Z} | created: v{X.Y.Z} | skipped: no-tag-sync-workflow | skipped: no-version-bump | skipped: pr-not-merged
 kg_passive_capture: written | written-with-relation-note: <related-to> | merged-into: <existing-name> | skipped: <reason> | failed: <error>
 obsidian_interlink: regenerated | skipped: local-mode | skipped: no-workspace | skipped: sanitize | failed: {error}
-initiative_overview: deferred-to-leader (lane mode) | skipped: no-initiative | failed: {error}
+initiative_overview: deferred-to-coordinator | skipped: no-initiative | failed: {error}
 context7_consult: hit:N miss:N skipped:N
 kg_hit_used: [node-name, ...]   # KG nodes from 00-knowledge-context.md that directly influenced a delivery decision; [] when none
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N

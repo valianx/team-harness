@@ -164,7 +164,7 @@ Do not force-remove a dirty worktree without operator instruction.
 
 1. **Check for existing session context** — use Glob to look for `workspaces/` related to this PR. If workspaces exist, read them to understand architecture decisions and acceptance criteria from the pipeline.
 
-   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the leader's resolved base or the session-start directive's announced base — never the repo-local default.
+   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the coordinator's resolved base or the session-start directive's announced base — never the repo-local default.
 
 2. **workspaces are optional for reviewer** — most PRs reviewed via `/th:review-pr` won't have workspaces (they are ephemeral). Proceed without them.
 
@@ -660,6 +660,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: reviewer
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 mode: fresh
 output: inline
@@ -714,6 +715,7 @@ issues: {list of critical issues, or "none"}
 ```
 agent: reviewer
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 mode: update-body
 output: inline
@@ -735,6 +737,7 @@ review_body: |
 ```
 agent: reviewer
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 mode: reply
 output: inline

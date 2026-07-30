@@ -16,10 +16,10 @@ import (
 // TestLowCostMatrixInvariants verifies the canonical constraints on the matrix:
 //   - every model is "sonnet" (no opus, no haiku)
 //   - every effort is "medium" or "high" (no max, no low)
-//   - all 18 expected agents are present
+//   - all 17 expected agents are present
 func TestLowCostMatrixInvariants(t *testing.T) {
 	expectedAgents := []string{
-		"leader", "orchestrator", "architect", "agent-builder", "security", "reviewer",
+		"orchestrator", "architect", "agent-builder", "security", "reviewer",
 		"reviewer-consolidator",
 		"qa", "plan-reviewer", "gcp-cost-analyzer", "init", "implementer",
 		"tester", "diagrammer", "likec4-diagrammer",
@@ -46,9 +46,9 @@ func TestLowCostMatrixInvariants(t *testing.T) {
 	}
 }
 
-// TestLowCostMatrixTally verifies the 7 high / 11 medium split from the architecture.
+// TestLowCostMatrixTally verifies the 6 high / 11 medium split from the architecture.
 func TestLowCostMatrixTally(t *testing.T) {
-	high := []string{"leader", "orchestrator", "architect", "agent-builder", "security", "reviewer", "qa"}
+	high := []string{"orchestrator", "architect", "agent-builder", "security", "reviewer", "qa"}
 	medium := []string{
 		"plan-reviewer", "gcp-cost-analyzer", "init", "implementer",
 		"tester", "diagrammer", "likec4-diagrammer",
@@ -274,7 +274,7 @@ func TestAgentNameFromPath(t *testing.T) {
 			path string
 			want string
 		}{
-			{`C:\Users\user\.claude\agents\leader.md`, "leader"},
+			{`C:\Users\user\.claude\agents\orchestrator.md`, "orchestrator"},
 		}
 		for _, tc := range windowsCases {
 			got := agentNameFromPath(tc.path)

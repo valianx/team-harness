@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   verify:
-    name: run-all (policy-block + structure + frontmatter)
+    name: run-all (policy-block + frontmatter + hook/gate suites)
     runs-on: ubuntu-latest
     env:
       # Node/npm/bun suites must run for real in CI, not silently SKIP —
@@ -58,10 +58,9 @@ jobs:
           echo "is_release_only=$is_release_only" >> "$GITHUB_OUTPUT"
           echo "Release-only diff: $is_release_only"
 
-      # Python (structural suite) and Node (policy-block functional suite) are
-      # set up UNCONDITIONALLY: those two suites validate CLAUDE.md and
-      # .claude-plugin/plugin.json, both of which are IN the release-only
-      # allowlist above — so a release-only diff must still exercise them.
+      # Python and Node are set up UNCONDITIONALLY: the policy-block functional
+      # suite validates .claude-plugin/plugin.json, which is IN the release-only
+      # allowlist above — so a release-only diff must still exercise it.
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -82,13 +81,10 @@ jobs:
         if: steps.release-only.outputs.is_release_only != 'true'
         uses: oven-sh/setup-bun@v2
 
-      # The structural and policy-block suites validate CLAUDE.md and
-      # plugin.json — files that ARE in the release-only allowlist — so they run
-      # on every diff, release-only included. The full suite below re-runs them
-      # (plus every other suite) only for non-release diffs.
-      - name: Run structural suite (always — validates CLAUDE.md + plugin.json)
-        run: python3 tests/test_agent_structure.py
-
+      # The policy-block suite validates plugin.json — a file that IS in the
+      # release-only allowlist — so it runs on every diff, release-only included.
+      # The full suite below re-runs it (plus every other suite) only for
+      # non-release diffs.
       - name: Run policy-block functional suite (always)
         run: bash tests/test_policy_block.sh
 
@@ -96,9 +92,9 @@ jobs:
         if: steps.release-only.outputs.is_release_only != 'true'
         run: bash tests/run-all.sh
 
-      - name: Release-only diff — heavier suites skipped (structural + policy-block still ran)
+      - name: Release-only diff — heavier suites skipped (policy-block still ran)
         if: steps.release-only.outputs.is_release_only == 'true'
-        run: echo "Diff is limited to version sites + CHANGELOG.md + changelog.d/ (a per-PR version bump) — the structural and policy-block suites ran above; skipping the heavier frontmatter (uv/PyYAML) and behavioral suites. This check still ran and reports success; it is not a paths-ignore trigger skip."
+        run: echo "Diff is limited to version sites + CHANGELOG.md + changelog.d/ (a per-PR version bump) — the policy-block suite ran above; skipping the heavier frontmatter (uv/PyYAML) and behavioral suites. This check still ran and reports success; it is not a paths-ignore trigger skip."
 
   go-test:
     name: go test (installer)

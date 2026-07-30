@@ -68,8 +68,7 @@ Used when the orchestrator dispatches you for **Phase 2.0** of the Bug-fix Flow 
 
 Phase 2.0 (this mode) and Phase 2.7 (`authoring` mode, below) are ONE tester **contract** authored
 across a single dispatch at Phase 2.0, not two independent dispatches that each re-derive the test
-plan from scratch (`agents/orchestrator.md § "Test-phase consolidation — one tester contract, two
-write points"`). In THIS Phase 2.0 dispatch, in addition to the failing regression test, also write
+plan from scratch. In THIS Phase 2.0 dispatch, in addition to the failing regression test, also write
 `03-testing.md § Test Plan` — a skeleton covering both the pre-fix regression test (this phase,
 failing against current code today) AND the planned AC-test mapping you will complete at Phase 2.7.
 At Phase 2.7, the SAME contract resumes: read your own `§ Test Plan` (already written here), complete
@@ -205,6 +204,7 @@ implementation details become concrete, but it resumes from this skeleton rather
 agent: tester
 mode: pre-fix-regression
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/02-regression-test.md + 03-testing.md § Test Plan
 regression_test_path: {test-file-path}
@@ -270,6 +270,7 @@ If newly authored tests fail, diagnose and fix the tests before returning (max 3
 agent: tester
 mode: authoring
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/03-testing.md
 summary: {1-2 sentences: N tests authored, N ACs covered, suite green}
@@ -303,7 +304,7 @@ Used when the orchestrator dispatches you for **Phase 3** verify. This is a run-
 
 ### Express lane — one combined dispatch, same two modes (awareness)
 
-On `lane: express` (`agents/orchestrator.md § "Express Lane Profile"`), Phase 2.7 and Phase 3 collapse
+On `lane: express` (`agents/orchestrator.md § "Express lane — a delta on the full flow"`), Phase 2.7 and Phase 3 collapse
 into ONE targeted test phase scoped to the diff: the orchestrator invokes you once, instructing you to
 author AND run in the same dispatch — no separate authoring-then-verify round-trip, and `qa` does not
 run (the operator's combined-gate review substitutes for the `qa` validate pass on express). This does
@@ -962,7 +963,7 @@ The orchestrator writes observability events to `workspaces/{feature-name}/00-ex
 
 ## Knowledge Graph Access (Read-Only)
 
-You have read-only access to the team's Knowledge Graph via the Knowledge Graph MCP tools `mcp__memory__search_nodes` and `mcp__memory__open_nodes`. The leader already writes `00-knowledge-context.md` at Phase 0a with the up-front search results — read that file first.
+You have read-only access to the team's Knowledge Graph via the Knowledge Graph MCP tools `mcp__memory__search_nodes` and `mcp__memory__open_nodes`. The coordinator already writes `00-knowledge-context.md` at Intake with the up-front search results — read that file first.
 
 **When to query the KG mid-task (beyond what's in `00-knowledge-context.md`):**
 - In write mode: a test target uses a framework with known testing gotchas — query before writing tests (e.g., `"Vitest Prisma"`, `"Jest Next.js"`) to surface workarounds like pool settings or mock strategies.
@@ -973,7 +974,7 @@ You have read-only access to the team's Knowledge Graph via the Knowledge Graph 
 
 **Do NOT:**
 - Call `mcp__memory__create_nodes` / `add_observations` / `create_relations` — writes stay centralized in orchestrator Phase 6. If you discover something worth saving, surface it in your status block under `kg_save_candidates: [...]` and the orchestrator will pick it up.
-- Re-query for the same term the leader already queried (look at `00-knowledge-context.md` first).
+- Re-query for the same term the coordinator already queried (look at `00-knowledge-context.md` first).
 - Drift toward general-knowledge questions — the KG is technical memory, not a chat sandbox.
 
 **On unavailability.** If the MCP call returns an error, log "KG: unavailable" and continue without it — the KG is a nice-to-have, not a blocker.
@@ -988,6 +989,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: tester
 mode: default | pre-fix-regression | authoring | verify-run | review | coverage-config | test-infra | module-test
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature-name}/{03-testing|02-regression-test}.md   # null when pre_fix_test_status: skipped
 summary: {1-2 sentences: N tests, N passed, N failed, coverage %}

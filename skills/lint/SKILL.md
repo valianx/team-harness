@@ -6,7 +6,7 @@ name: lint
 
 Validate the health of agents and skills in this dev-team system. Run all 4 checks below **in sequence**, then show the consolidated report.
 
-**IMPORTANT:** This skill runs directly — do NOT invoke the `th:leader` or `th:orchestrator` agents or any other agent. Execute all checks yourself using the tools available to you (Bash, Glob, Read, Grep).
+**IMPORTANT:** This skill runs directly — do NOT invoke the `th:orchestrator` agent or any other agent. Execute all checks yourself using the tools available to you (Bash, Glob, Read, Grep).
 
 ## Voice
 
@@ -79,7 +79,7 @@ name: lint
 
 For each `.md` file in `agents/`:
 
-1. **Skip** `leader.md` and `orchestrator.md` (they have a different structure as the coordination agents)
+1. **Skip** `orchestrator.md` (it has a different structure as the coordination agent)
 2. For all other agent files, check that these **mandatory sections** exist (as `## Section Name` headings):
    - `## Core Philosophy`
    - `## Session Context Protocol`
@@ -101,7 +101,7 @@ name: lint
 For each `.md` file in `agents/`:
 
 1. **Skip** these files (they have their own guardrail model or Write/Edit IS their job):
-   - `leader.md`, `orchestrator.md` — coordination agents, different structure
+   - `orchestrator.md` — coordination agent, different structure
    - `diagrammer.md`, `d2-diagrammer.md`, `likec4-diagrammer.md` — generate diagram files (Write/Edit is their core function)
    - `init.md` — generates CLAUDE.md (Write/Edit is its core function)
 2. For each remaining agent, check its tool grants (from frontmatter or Tool Scoping section) and verify:
@@ -117,18 +117,18 @@ Result:
 ---
 name: lint
 
-## Check 5 — orchestrator/leader coherence
+## Check 5 — orchestrator coherence
 
 Cross-reference the orchestrator's team table against actual agent files.
 
 1. **Read `agents/orchestrator.md`** and extract the team table (the `| Agent | Role |` table)
-2. **List all `.md` files in `agents/`** (excluding `leader.md`, `orchestrator.md`, and `ref-*.md` reference files)
+2. **List all `.md` files in `agents/`** (excluding `orchestrator.md` and `ref-*.md` reference files)
 3. **Cross-check:**
    - For each agent in the team table → verify a corresponding `.md` file exists in `agents/`
-   - For each agent `.md` file (excluding leader.md, orchestrator.md, ref-*.md) → verify it appears in either the team table OR the "Standalone agents" note (in `leader.md`)
+   - For each agent `.md` file (excluding orchestrator.md, ref-*.md) → verify it appears in either the team table OR the "Standalone agents" note (in `agents/orchestrator.md`)
    - Report: agents in table but missing file, agents with file but not in table/standalone note
 4. **Workspace-doc conflicts:** Extract the `Workspace doc` column from the team table. Check for duplicate output files (two agents writing to the same workspace doc). Report any duplicates.
-5. **Direct modes coherence:** Read the Direct Modes table in `leader.md`. For each agent referenced in the direct modes table, verify it exists as a file in `agents/`.
+5. **Direct modes coherence:** Read the intent-routing table in `agents/orchestrator.md § Intake → "11 — Intent routing"`. For each agent referenced in the routing table, verify it exists as a file in `agents/`.
 
 Result:
 - **PASS** if all cross-references are consistent and no workspace doc conflicts
@@ -185,8 +185,7 @@ Canonical matrix (must match exactly):
 
 | Agent | Model | Effort |
 |---|---|---|
-| `leader` | opus | xhigh |
-| `orchestrator` | sonnet | xhigh |
+| `orchestrator` | opus | high |
 | `architect` | opus | high |
 | `agent-builder` | opus | xhigh |
 | `security` | opus | xhigh |
@@ -237,7 +236,7 @@ Detect near-duplicate skills so the team does not accumulate redundant slash com
 For each skill, build a comparison profile from its `SKILL.md`:
 - `name` — the frontmatter `name` (or directory name if frontmatter is absent).
 - `desc_tokens` — lowercased word set of the frontmatter `description`, minus stopwords (`the, a, an, and, or, to, of, for, in, on, with, use, when, this, that, run`).
-- `keyword_tokens` — union of `desc_tokens`, the routing class (`leader` | `standalone`), and any verb in the skill name.
+- `keyword_tokens` — union of `desc_tokens`, the routing class (`orchestrator` | `standalone`), and any verb in the skill name.
 
 Compute three overlap signals per pair (A, B):
 1. **Name overlap** — `1.0` if `name_A` is a substring of `name_B` or vice versa; else token-set Jaccard of hyphen-split names.
@@ -275,7 +274,7 @@ Apply a per-skill quality checklist as a quick scan. REPORT-only — this check 
 | Q2 | Voice-rule compliance | A `## Voice` block is present OR the skill references `agents/_shared/operational-rules.md`; body contains none of the forbidden enthusiasm/emoji markers (`✅`, `⚠️`, `🎉`, `✨`, "Perfecto", "Excelente", "Great job"). |
 | Q3 | Output discipline | An `## Output Discipline` block is present (or an explicit Output Format contract section). |
 | Q4 | No orphaned references | Every `agents/<x>.md`, `skills/<x>/`, `docs/<x>.md`, or `hooks/<x>` path referenced in the body resolves on disk. Unresolvable internal path → finding. |
-| Q5 | Correct routing classification | The skill's actual behavior (declares "runs directly" / does NOT route to leader → standalone; builds a task payload and routes → leader) matches its classification in `skills/README.md` Routing. Mismatch → finding. |
+| Q5 | Correct routing classification | The skill's actual behavior (declares "runs directly" / does NOT route to the orchestrator → standalone; builds a task payload and routes → orchestrator) matches its classification in `skills/README.md` Routing. Mismatch → finding. |
 
 Result:
 - **PASS** if every scanned skill satisfies Q1–Q5.
@@ -295,7 +294,7 @@ For each `.md` file in `agents/` (excluding `README.md` and `ref-*.md` reference
 
 **Honesty note on what this check proves.** This is a text-level heuristic over a markdown system prompt, not proof of runtime invocation — a system prompt has no call sites in the code sense, only directives a model may or may not follow. The negation-aware matching narrows the specific false-positive class of a prose-only mention reading as usage; it does not eliminate every way prose can describe a tool without genuinely directing its use.
 
-**Known, documented residuals (do not report as a new finding):** `agents/orchestrator.md`'s `mcp__memory__read_graph` and `agents/ux-reviewer.md`'s two context7 tools — see `tests/test_agent_structure.py` Suite 175's `_S175_KNOWN_UNUSED_MCP_GRANTS` for the rationale of each.
+**Known, documented residuals (do not report as a new finding):** `agents/orchestrator.md`'s `mcp__memory__read_graph` and `agents/ux-reviewer.md`'s two context7 tools — both are deliberate, documented residuals.
 
 Result:
 - **PASS** if every agent's MCP grants are each matched by a body invocation (beyond the documented residuals above).
@@ -371,7 +370,7 @@ Status: {PASS|WARN}
 {for each agent with issues: "  {agent}: has {capability} but missing {guardrail}"}
 {if PASS: "All agents have appropriate guardrails for their tool access"}
 
---- Check 5: orchestrator/leader coherence ---
+--- Check 5: orchestrator coherence ---
 Status: {PASS|WARN|FAIL}
 Team table:  {N agents} referenced | {N matched} | {mismatches}
 workspaces: {N unique} / {N total} | {conflicts or "no conflicts"}

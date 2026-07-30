@@ -52,7 +52,7 @@ tools: [Read, Edit, Write, Bash, Glob, Grep, Task, ...]
 
 When invoked from top-level (e.g., user opens a session and `Task` is dispatched once to `orchestrator`), `Task` is available and the orchestrator can call `Task(subagent_type=architect, ...)`, etc.
 
-When invoked via `@th:orchestrator` mention from inside an active session, `Task` is stripped despite being declared in `tools:`. The orchestrator detects this via a boot probe and emits a dispatch handoff. Top-level Claude reads the handoff and takes over the orchestration role.
+When invoked via `@th:orchestrator` mention from inside an active session, `Task` is stripped despite being declared in `tools:`, even though `orchestrator` is designed to run only as the top-level session agent and never as a nested subagent (a mention from inside an active session is a bypass of that design, not a supported path). At the time this draft was written, our harness detected the stripped tool via a boot probe and emitted a dispatch handoff for top-level Claude to relay; that specific workaround has since been retired in our own architecture (see "Workaround we ship today" below), but the underlying Claude Code behavior this issue reports — silently stripping a declared `Task` grant — is unchanged and still affects any hub-style agent design.
 
 ### Alternatives considered
 
@@ -69,7 +69,7 @@ When invoked via `@th:orchestrator` mention from inside an active session, `Task
 
 ### Workaround we ship today
 
-Documented at https://github.com/valianx/team-harness/blob/main/agents/orchestrator.md (Dispatch-blocked exit section) and https://github.com/valianx/team-harness/blob/main/CLAUDE.md (§14 Universal rule — auto-takeover on `blocked-no-dispatch`). PR https://github.com/valianx/team-harness/pull/15 reduces the handoff token cost from ~3k to ~300 via a structured JSON payload, but the round-trip itself remains until this upstream change lands.
+**Superseded, historical.** At the time this draft was written, the workaround was documented at `agents/orchestrator.md` (Dispatch-blocked exit section) and `CLAUDE.md` (§14 Universal rule — auto-takeover on `blocked-no-dispatch`), and PR https://github.com/valianx/team-harness/pull/15 reduced the handoff token cost from ~3k to ~300 via a structured JSON payload. Since then, our harness fused its two coordination agents into one (`orchestrator`, the top-level session agent) that never dispatches another coordinator, so the specific nested-dispatch scenario that motivated this workaround no longer has a producer in our own architecture — see `docs/subagent-orchestration.md § "Nested-context dispatch — RETIRED protocol, retained provisioning"`. This upstream request stands independently of that internal change: the Claude Code behavior it reports still affects any hub-style agent design elsewhere.
 
 ### Environment
 

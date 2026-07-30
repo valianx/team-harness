@@ -291,6 +291,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: d2-diagrammer
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: workspaces/{feature}/diagram.d2
 svg: workspaces/{feature}/diagram.svg

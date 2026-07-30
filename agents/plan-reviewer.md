@@ -42,7 +42,7 @@ The orchestrator does not dispatch you for a plan that is self-authored (hotfix 
 — all four conditions together. In that case a deterministic self-check (at least one task exists,
 each task carries ≥1 AC, `## Delivery Grouping` is declared, and — for `type: fix`/`hotfix` — the
 regression-test AC cross-reference is present) stands in for both Phase 1.5 (`qa-plan`) and Phase
-1.6 (you); see `agents/orchestrator.md § "Self-authored-plan panel carve-out"`. You are never
+1.6 (you); see `agents/orchestrator.md § "Phase 1.5 — Plan Ratification"`. You are never
 dispatched to approve your own absence — this is orchestrator-side gating, not a decision you make.
 
 **SEC-002 is never carved out by this condition.** When `security_sensitive: true`, the orchestrator
@@ -114,6 +114,10 @@ compact form; do not add narrative paragraphs restating what a table row already
 3. **Read these files in this order:**
    - `01-plan.md` — for the full plan: `## Review Summary` (spec, original description, and feature ACs — used by Rule 5 service-identity), `## Architecture` (including `### Services Touched` and `### Work Plan`), and `## Task List` (task list with `Service:`, `Files:`, `Acceptance Criteria:` fields, plus the `### Delivery Grouping` block carrying `Base:`/`Split reason:`). **For `type: fix`, also read `01-root-cause.md` for the `## Regression Test Approach` section (Rule 7) and `## Bug Location` / `## Scope of Fix` sections.** **For `type: fix` / `type: hotfix`, cross-check the regression-test AC reference in `01-plan.md` (§ Task List) per Rule 8.**
 
+   - `reviews/01-closure-rubric.md` — the architect's three closure tables (ownership closure, provenance, removed-control), when present. Read it as an **input to your audit**, never as something you write. A delegation named in the ownership-closure table with no owning AC, a provenance claim whose `file:line` does not resolve, or a removed control with no named successor is reported as a **Rule 4 (cross-reference integrity) finding** — it is the same defect class Rule 4 already owns, so it carries Rule 4's severity and verdict effect rather than inventing a rule with no row in `## Summary`.
+
+   **Its absence is a finding only where the architect was required to produce it** — `feature`, `refactor`, `enhancement`, and `fix` Tier 2-4 design dispatches (`agents/architect.md § "Closure rubric"`). It is legitimately absent for `hotfix` (no architect runs), Tier 0/1, docs-only, research and spike; do not report absence there.
+
 4. **Do NOT read** `research/00-research.md`, `research/00-audit.md`, `01-planning.md`, `02-implementation.md`, `03-testing.md`, `reviews/04-validation.md`, source code, or any other file. Plan-shape rules are policy on the files above; reading more is wasted work. `02-regression-test.md` is off-limits too, with ONE narrow exception: **Rule 8 may read `02-regression-test.md` ONLY when the task provides a concrete regression-test path** (the test already exists — a re-review or patch-mode pass after Phase 2.0, and the file is present). At the initial Phase 1.6 pass it does not yet exist, so Rule 8 cross-checks against the regression-test AC text in `01-plan.md` (§ Task List), never against `02-regression-test.md`. Keep it prohibited whenever no concrete regression-test path is supplied.
 
 5. **Do NOT write to** any workspace doc except `reviews/01-plan-review.md`, plus the single `**Reviews:**` attestation line in `01-plan.md`'s title block (see Critical Rules).
@@ -136,7 +140,7 @@ Run the rules in order. Each rule produces 0..N findings. The total set of findi
 
 ### Rule 1 — Delivery Grouping: default `all-tasks-one-pr` unless temporal-prod reason
 
-**Relationship to batch consolidation.** Delivery Grouping is the SPLIT-DIRECTION rule — it prevents a single logical change from being split into multiple PRs without a valid temporal-prod reason. It is COMPLEMENTARY to the leader's batch-consolidation default, not in tension with it. A same-repo batch of independent tasks consolidating into ONE PR (the `agents/ref-dispatch-machinery.md § Multi-Task fan-out — Consolidation default`) is NOT a Rule 1 split — those tasks belong to different independent work items, not to one logical change being artificially divided. Rule 1 applies when a SINGLE plan or service's tasks are declared to ship as more than one PR.
+**Relationship to batch consolidation.** Delivery Grouping is the SPLIT-DIRECTION rule — it prevents a single logical change from being split into multiple PRs without a valid temporal-prod reason. It is COMPLEMENTARY to the coordinator's batch-consolidation default, not in tension with it. A same-repo batch of independent tasks consolidating into ONE PR (`docs/parallel-batch-implementation.md`) is NOT a Rule 1 split — those tasks belong to different independent work items, not to one logical change being artificially divided. Rule 1 applies when a SINGLE plan or service's tasks are declared to ship as more than one PR.
 
 **What to check:**
 
@@ -263,7 +267,7 @@ The plan-reviewer does NOT police AC quality. It only checks that ACs exist in t
 
 **What to check:**
 
-1. `01-plan.md` contains a top-of-document `## Review Summary` section. The section body has between 1 and 30 non-empty lines (excluding the heading itself and blank lines). 0 lines = section missing or empty.
+1. `01-plan.md` contains a top-of-document `## Review Summary` section. The section body has between 1 and 50 non-empty lines (excluding the heading itself and blank lines). 0 lines = section missing or empty. The cap is 50, not 30, because the section's own eleven blocks — eight always present, three conditional (`agents/architect.md § "## Review Summary content requirements"`) — cannot fit in 30 — a lower cap made a fully compliant plan fail this rule.
 2. `01-plan.md` contains a `### Decisions for human review` section (inside `## Review Summary`). The section body has between 1 and 7 bulleted items (`- ` at start of line). 0 items = section missing or empty; >7 items = bloated; an explicit single bullet of "No human-judgement decisions required — all trade-offs follow established project patterns. → decided" is valid (1 item, passes).
 3. `01-plan.md` contains a `### Summary` table (inside `## Task List`) with at least 2 data rows (one per task; if the plan has only 1 task, 1 data row is allowed). Empty `### Summary` heading without a table = finding.
 4. `## Review Summary` appears as the FIRST section of `01-plan.md` (positional check — it must be the entry point).
@@ -683,7 +687,7 @@ pending
 
 ## Findings
 
-**Implicated-element field (structural, T5-AC-7).** Every finding you record — under any rule below — carries the plan elements it implicates, stated structurally rather than only in prose: AC identifiers (`T{n}-AC-{m}`), fenced manifest entry keys, task `Notes:` references, `file:line`, and/or test-assertion sites, whichever apply. State this set inline after the finding, e.g. `[implicates: T2-AC-16, orch-stage-gate-2]`. This is the field `agents/orchestrator.md § Iteration Rules`'s pre-dispatch correction gate reads to detect a recurrence (a new finding implicating an element a prior, closed finding already implicated) — see that section for the consumer contract; this file only produces the field, it does not restate the gate's own logic.
+**Implicated-element field (structural, T5-AC-7).** Every finding you record — under any rule below — carries the plan elements it implicates, stated structurally rather than only in prose: AC identifiers (`T{n}-AC-{m}`), fenced manifest entry keys, task `Notes:` references, `file:line`, and/or test-assertion sites, whichever apply. State this set inline after the finding, e.g. `[implicates: T2-AC-16, orch-stage-gate-2]`. This is the field `agents/orchestrator.md § "Iteration rules"`'s pre-dispatch correction gate reads to detect a recurrence (a new finding implicating an element a prior, closed finding already implicated) — see that section for the consumer contract; this file only produces the field, it does not restate the gate's own logic.
 
 ### Rule 1 — Delivery Grouping
 - {01-plan.md}:{line} — delivery group {N} cites Reason `{reason}` — invalid; must be one of: coexistence window, production signal, cross-repo deploy gate.
@@ -768,7 +772,7 @@ pending
 |-------|------|-----------|----------|-------|----------|--------|----------------------|
 ```
 
-**`Implicated (closed)` column.** The union of implicated-element sets across every finding THIS round closed — never the findings still open at round close, and never a restatement of the findings themselves (an element identifier only, e.g. `T2-AC-16, orch-stage-gate-2`, or `none` when the round closed no finding). Written by you on a normal round; written by the coordinator on a deterministic-only round (`agents/orchestrator.md § "Correction-classification — selective panel re-firing"`, the buckets-4/5 deterministic-only-pass case). This column is what the coordinator's cross-round recurrence index (`agents/orchestrator.md § Iteration Rules`) accumulates over — the row's shape stays append-only, one row per round, unchanged by this addition.
+**`Implicated (closed)` column.** The union of implicated-element sets across every finding THIS round closed — never the findings still open at round close, and never a restatement of the findings themselves (an element identifier only, e.g. `T2-AC-16, orch-stage-gate-2`, or `none` when the round closed no finding). You write it on every round: the full panel re-runs whenever Phase 1.6 fails and routes back (no selective, lens-by-lens re-fire exists any more — see "Stage-1 Selective Panel Re-Firing — RETIRED" below), so there is no coordinator-authored deterministic-only row to distinguish from your own. This column is what the coordinator's cross-round recurrence index (`agents/orchestrator.md § "Iteration rules"`) accumulates over — the row's shape stays append-only, one row per round, unchanged by this addition.
 
 ---
 
@@ -803,58 +807,23 @@ A label that is expected but absent means the panel is incomplete. The combined 
 
 ---
 
-## Stage-1 Selective Panel Re-Firing (delta-scoped review + carried-forward verdicts)
+## Stage-1 Selective Panel Re-Firing — RETIRED
 
-> Canonical contract: `docs/patch-mode.md § Stage-1 Selective Panel Re-Firing`. Wired by
-> `agents/orchestrator.md § "Correction-classification — selective panel re-firing"`. This section
-> documents your half of the mechanism — how you behave when re-fired with a `Correction scope:`
-> dispatch, and how you compute the combined verdict when fewer than all lenses re-fire.
+**This entire mechanism is retired, not reduced.** It used to classify an operator correction that
+reopened Stage 1 into one of five buckets and selectively re-fire only the panel lenses each bucket
+implicated, carrying the rest forward with an explicit label under a `**Correction scope:**` field.
+The coordinator fusion removes the Stage-1 correction-round apparatus this was iteration machinery
+for: on a Phase 1.6 `fail`, the full panel re-runs — `qa-plan`, `security` when sensitive, and you —
+and you present your verdict exactly once per round, never waiting for a selective re-fire. Bucket
+classification, delta-scoped review, carried-forward sub-verdicts, and the combined-verdict
+recomputation over a mixed fresh/carried set all lose their subject. Nothing replaces them. Full
+retirement note: `docs/patch-mode.md § "Stage-1 Selective Panel Re-Firing — RETIRED"`.
 
-### Delta-scoped review — the `Correction scope:` field
-
-When the orchestrator re-fires you as part of a routed correction (buckets 1-3 of the correction
-classifier), your dispatch carries a `**Correction scope:** {AC-IDs, section-names}` field naming
-what changed — a coordinate, not a review bound. Per `agents/_shared/dispatch-contract.md § "The
-two-halves rule"`, the orchestrator never bounds your review scope: you compute your own review
-scope from the coordinate, and you review the whole plan whenever your own judgment of the
-correction calls for it — no dispatch instruction excludes any AC/section from your own scope
-computation. You still read `01-plan.md` and the correction text at dispatch start — the saving is fewer
-generation tokens, never zero-read (`docs/patch-mode.md § Stateless-Dispatch Honesty`). What makes
-a full-scope re-review affordable is the prompt-caching stable-prefix discipline, not a narrowed
-read.
-
-### Carried-forward sub-verdicts
-
-When fewer than all three lenses re-fire, preserve the non-firing lenses' most recent sub-verdict
-AND open-findings ledger in `reviews/01-plan-review.md`, labeled EXPLICITLY:
-
-```
-(carried forward from round N — surface unchanged this round)
-```
-
-— never silently presented as fresh. This applies equally to `**Substance (qa):**` and `**Security
-design-review (security):**` when either lens does not re-fire this round.
-
-### Combined-verdict recomputation
-
-Recompute `**Combined verdict:**` as **worst-of over {fresh sub-verdicts} ∪ {carried-forward
-sub-verdicts}**, preserving each lens's own severity→verdict mapping (a carried `security`
-`risks-found` still maps to `fail`; a carried `qa` `fail` still maps to `fail`). Never recompute from
-fresh sub-verdicts alone when a carried-forward one exists — the worst-of union always includes
-both sets.
-
-**`security` is NEVER carried forward on a security-surface touch (fail-safe, non-negotiable).**
-When the correction touched the security-relevant surface (bucket 2 of the correction classifier —
-a floor, a waiver, an enforcement model, a sensitive-path control, a security/adversary dispatch
-condition, or any AC that gates access), the orchestrator always dispatches a fresh `security` run;
-you never label a `security` sub-verdict as carried-forward in that case. This is the Stage-1 analog
-of the existing Phase-3 "security-verdict staleness re-gate" (`agents/orchestrator.md § "If any
-agent fails → ITERATE"`).
-
-**Deterministic-only rounds (buckets 4/5).** When no LLM lens re-fires at all, the orchestrator —
-not you — records the `§ Panel Rounds` row for that round ("deterministic-only pass, all
-sub-verdicts carried forward from round N, combined verdict unchanged"). You are simply not
-dispatched in that case.
+**What survives, restated on its own terms rather than as a bucket.** `security` is never carried
+forward on a security-surface touch: `agents/security.md` retains its own no-carry-forward rule for
+the case where an operator `edit` lands a criterion on the security-relevant design surface — see
+that file for the current statement. You emit your verdict once per round and do not wait for a
+re-fire.
 
 ---
 
@@ -871,6 +840,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: plan-reviewer
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 verdict: pass | concerns | fail
 output: workspaces/{feature-name}/reviews/01-plan-review.md § Plan Review

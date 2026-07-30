@@ -1,6 +1,6 @@
 # Output Discipline
 <!-- Cross-cutting output contract for agents and skills.
-     Consumed by: agents/{leader,orchestrator,delivery,init,architect,implementer,tester,qa,security}.md
+     Consumed by: agents/{orchestrator,delivery,init,architect,implementer,tester,qa,security}.md
      and skills/{setup,lint,memory}/SKILL.md.
      Edit here; consumer files reference this file by section. -->
 
@@ -54,8 +54,7 @@ appears in the chat.
 
 `/th:pipelines` and `/th:trace` are **exempt** from the silence rules above.
 These skills surface internal pipeline state because the operator explicitly
-requested it. The narration lint (`tests/test_agent_structure.py` Suite 31)
-does not scan them.
+requested it.
 
 ## Output Contract — Compression
 
@@ -92,11 +91,13 @@ Every leaf agent's final status block declares its effective model on the line i
 ```
 agent: {name}
 status: success | failed | blocked
+failure_kind: {kind}               # mandatory when status is failed or blocked; omit on success
 model: {effective-model-id}
 effort: {effective-effort-level}   # optional — include when known
 ...
 ```
 
+- **`failure_kind:`** — mandatory whenever `status:` is `failed` or `blocked`, omitted entirely on `success`. Name the **observable cause**, not the symptom: `status: failed` already says a dispatch did not succeed, and this field is the only thing that says which budget applies. Pick one from the taxonomy in `agents/orchestrator.md § Failures`: `invalid-return`, `artifact-missing`, `execution-failed`, `verification-negative`, `build-or-lint`, `hygiene-fail`, `contradiction`, `reclassification-needed`. (`transport` is never yours — it describes a dispatch that never reached you.) `execution-failed` is the residual, not the default: returning it for something the taxonomy already names is itself under-classification. When the blocker is a decision that is not yours to make, `contradiction` and `reclassification-needed` say so, and neither carries a retry budget — that is the point of naming them. You are the only party that knows which cause it was; state it rather than leaving the coordinator to infer it, because a coordinator that infers a kind is guessing at a budget.
 - **`model:`** — mandatory. The literal model ID the agent ran under for this dispatch (e.g. `claude-opus-4-6`, `claude-sonnet-5`), not the frontmatter default. This is a self-report: the agent is best-positioned to state it, particularly under a session model override (see `docs/observability.md` § "Session model override"), but the value is unverified — nothing cross-checks it against the actual invocation. Treat it as consultative context for cost/trace analysis, not a verified fact; a structural, verified successor is tracked under #524.
 - **`effort:`** — optional. Include the line when the agent's effective reasoning-effort level is known (e.g. from its own frontmatter or an explicit override); omit the line entirely otherwise. Do not emit `effort: unknown` — omission is the "unknown" signal.
 

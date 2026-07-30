@@ -123,6 +123,7 @@ No evidence found for angle: {angle}.
 ```
 agent: researcher
 status: success | failed
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: {findings_file path}
 summary: {1 sentence: angle + findings count}

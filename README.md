@@ -1,6 +1,6 @@
 # Team Harness — Claude Code Agent Orchestration System
 
-> Team Harness is a multi-agent orchestration system for **Claude Code**: the top-level coordinator **`th:leader`** frames each request and spawns a **`th:orchestrator`** per task, which dispatches specialized architect, implementer, tester, QA, security, and delivery agents through a Spec-Driven Development (SDD) pipeline with mandatory human gates.
+> Team Harness is a multi-agent orchestration system for **Claude Code**: the top-level coordinator **`th:orchestrator`** frames each request and dispatches specialized architect, implementer, tester, QA, security, and delivery agents through a Spec-Driven Development (SDD) pipeline with mandatory human gates.
 >
 > Every pipeline stage is captured as files on disk, so any session can resume from where the last one stopped.
 
@@ -133,9 +133,9 @@ Alternatively, type `/th-update` inside opencode. The command instructs the agen
 
 ## Quick start
 
-After install, open Claude Code. The top-level session agent is **`th:leader`** — the operator's single point of contact. You drive the pipeline by talking to it directly (no `@mention` needed); `th:leader` frames the request and spawns a `th:orchestrator` per task to run the gated execution pipeline. The entry points are:
+After install, open Claude Code. The top-level session agent is **`th:orchestrator`** — the operator's single point of contact. You drive the pipeline by talking to it directly (no `@mention` needed); it frames the request and runs the gated execution pipeline itself. The entry points are:
 
-- `th:leader` — the top-level session agent; just describe what you want
+- `th:orchestrator` — the top-level session agent; just describe what you want
 - `/th:setup` — configure logs-mode, vault path, and verify MCP connectivity
 - `/th:update` — update to the latest release
 
@@ -154,13 +154,13 @@ Learn mode (explain a codebase, library, or concept with a layered teaching pack
 /th:learn how does the LLM work in this ADK project --resume
 ```
 
-> **`th:leader` is the canonical entry point.** Skills like `/th:design`, `/th:deliver`, `/th:recover` are optional shortcuts that route through the same coordination flow under the hood. See [`docs/agent-tree.md`](./docs/agent-tree.md) for how `th:leader`, `th:orchestrator`, and the leaf specialists relate at runtime.
+> **`th:orchestrator` is the canonical entry point.** Skills like `/th:design`, `/th:deliver`, `/th:recover` are optional shortcuts that route through the same coordination flow under the hood. See [`docs/agent-tree.md`](./docs/agent-tree.md) for how `th:orchestrator` and the leaf specialists relate at runtime.
 
 ---
 
 ## Orchestrator disposition
 
-The top-level session agent is **`th:leader`** — no marker file or activation command required. It frames each request and spawns a `th:orchestrator` per task; that orchestrator runs the full pipeline automatically (architect → implementer → tester/qa/security → delivery) and welds all three stage gates inside its own transcript. A deterministic gate (`hooks/dev-guard.sh`) fires unconditionally on every outward, irreversible action and gates by destination: pushing to a non-default branch on `origin` (no force, no default-branch destination) proceeds without a prompt, while pushing to the default branch, tag pushes, force pushes, `gh pr create`/`merge`/`review`/`comment`, `gh issue create`/`edit`/`comment`, ClickUp outward writes, and GitHub API writes still require explicit operator approval at the point of execution.
+The top-level session agent is **`th:orchestrator`** — no marker file or activation command required. It frames each request and runs the full pipeline automatically (architect → implementer → tester/qa/security → delivery), welding all three stage gates inside its own transcript. A deterministic gate (`hooks/dev-guard.sh`) fires unconditionally on every outward, irreversible action and gates by destination: pushing to a non-default branch on `origin` (no force, no default-branch destination) proceeds without a prompt, while pushing to the default branch, tag pushes, force pushes, `gh pr create`/`merge`/`review`/`comment`, `gh issue create`/`edit`/`comment`, ClickUp outward writes, and GitHub API writes still require explicit operator approval at the point of execution.
 
 Full contract: docs/dev-mode.md.
 
@@ -189,12 +189,60 @@ Full contract: docs/dev-mode.md.
 | [Pipelines reference](./docs/pipelines.md) | All 8+ pipelines, tier classification, phase tables, gate semantics |
 | [Migration guide](./docs/plugin-migration.md) | Migrating from the Go installer to the plugin |
 | [Agents reference](./agents/README.md) | Full agent roster, model/effort matrix, low-cost mode |
-| [Agent tree](./docs/agent-tree.md) | How `th:leader`, `th:orchestrator`, and the leaf specialists relate at runtime |
+| [Agent tree](./docs/agent-tree.md) | How `th:orchestrator` and the leaf specialists relate at runtime |
 | [Configuration reference](./CLAUDE.md) | Architectural conventions, working agreements, subagent routing |
 | [Knowledge base](./docs/knowledge.md) | Decisions, patterns, stack notes, and constraints accumulated across features |
 | [Integration guide](./docs/integration.md) | context-harness-mcp setup, mcpServers config, 16-tool contract, troubleshooting |
 | [Troubleshooting](./docs/troubleshooting.md) | SSH/HTTPS errors, duplicate agents, missing dispatch rule |
 | [Changelog](./CHANGELOG.md) | Release history |
+
+---
+
+## What gets a test
+
+A test in this repository asserts a **property of executable code or of a
+machine-readable artifact, evaluated by running it**. Hooks, the Go installer,
+the shell bootstrap scripts, the TypeScript gate bodies, and the JSON/YAML
+manifests all qualify: they have inputs, outputs, and exit codes, so a failure
+names a real defect.
+
+Agent and skill prose does **not** qualify. A test may not assert that a
+Markdown file contains a wording, a section heading, a token, a line count, or a
+byte-exact snapshot.
+
+**The diagnostic question:** *if this test failed, would the cheapest way to make
+it green be to add or reword a sentence?* If yes, it is a text assertion and it
+does not get registered.
+
+Concretely, none of these may be added as a test:
+
+- presence of a phrase, heading, table row, or modal verb (`MUST`, `NEVER`) in an agent or skill file
+- byte-exact or hash snapshots of prose blocks
+- counts — of sections, checks, enumerated items, or cross-references
+- cross-file wording parity between two Markdown files
+- a check whose oracle is a `grep` over prose
+- a behavioral test whose pass condition is the model **self-reporting** that it followed a rule
+- a test pinned to an architecture that no longer ships
+
+**Why the prohibition is absolute rather than case-by-case.** A text assertion is
+a useful canary and a harmful contract, and it cannot be both at once. Once
+registered, it inverts the direction of authority: the specification stops
+governing the prose and the prose starts serving the check. Development then
+drifts toward whatever makes the search succeed — sentences get added because a
+test wants them, wordings get frozen because a snapshot pins them, and a
+contradiction can sit in a file while every check passes, because presence was
+the only thing ever measured. A previous corpus of ~46,000 lines of these
+assertions was deleted for exactly this reason; it had begun deciding designs.
+
+**What replaces them.** Prose contracts are enforced by *reading* — the agent's
+own file states its contract, a reviewer agent reads the artifact, and the
+operator reads the result. That is a judgement task, and it stays one. When a
+prose rule genuinely needs mechanical enforcement, the correct move is to make it
+unnecessary: scope the tool so the forbidden action is unavailable, or move the
+deterministic part into code that can be executed and asserted.
+
+`grep` remains a valid **enumerator** — use it freely to find work. It is not a
+valid **decider**.
 
 ---
 

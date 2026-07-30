@@ -34,7 +34,7 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 
 `effort` — set the reasoning level the role actually needs:
 - `medium` — mechanical execution, even when polished output matters (delivery, tests by pattern, diagram passes). **This is the project floor; never use `low`.**
-- `high` — solid analytical or planning work that doesn't need exhaustive exploration (leader routing, qa validation, implementer following a Work Plan).
+- `high` — solid analytical or planning work that doesn't need exhaustive exploration (intake routing, qa validation, implementer following a Work Plan).
 - `xhigh` — used sparingly when a task sits between `high` and `max`.
 - `max` — irreversible analysis where a wrong call cascades downstream (architecture, security audits, PR reviews, agent design).
 
@@ -160,6 +160,7 @@ Every agent invoked by the orchestrator must end with this exact block:
 ```
 agent: {name}
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: {file path or "none"}
 summary: {1-2 sentences of what was done}
@@ -222,7 +223,7 @@ Every new worker agent MUST have these sections (checked by `/th:lint`):
 - [ ] `description` frontmatter and Roster `Objective` cell both satisfy the objective-form and counting rules at `agents/README.md § "Objective column — authoring standard"` — read and apply that section; its prose is not restated here.
 - [ ] If the new agent dispatches other agents (a coordination-style worker, not a leaf specialist), its dispatch prompts follow `agents/_shared/dispatch-contract.md` — what a dispatch prompt may and must not carry, and the two-halves scope rule (review scope never bounded by the dispatcher; write scope always bounded by the recipient's own contract). Read and apply that file; do not re-derive or paraphrase its rule set here.
 
-Coordination agents (`leader`, `orchestrator`) are exempt from this check.
+The coordination agent (`orchestrator`) is exempt from this check.
 
 ---
 
@@ -396,6 +397,7 @@ The orchestrator writes observability events to `workspaces/{agent-name}/00-exec
 ```
 agent: agent-builder
 status: success | failed | blocked
+failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/orchestrator.md § Failures
 model: {effective-model-id}
 output: agents/{name}.md (or .claude/commands/{name}.md)
 summary: {what was created and why}

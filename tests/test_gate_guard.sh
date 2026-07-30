@@ -363,7 +363,7 @@ rm -rf "$TMP"
 # § Task-8, AC-4/AC-5.
 #
 # Fixture-by-concatenation discipline (mirrors Suite 152 in
-# tests/test_agent_structure.py, same as tests/test_dev_guard.sh Suite 83f):
+# tests/test_dev_guard.sh Suite 83f, same shape):
 # every covered-action literal below is assembled from separate word tokens
 # at runtime so this file's own source never carries a contiguous "git push"
 # / "gh pr create" substring inside a search-pattern payload.
