@@ -92,11 +92,13 @@ Every leaf agent's final status block declares its effective model on the line i
 ```
 agent: {name}
 status: success | failed | blocked
+failure_kind: {kind}               # mandatory when status is failed or blocked; omit on success
 model: {effective-model-id}
 effort: {effective-effort-level}   # optional — include when known
 ...
 ```
 
+- **`failure_kind:`** — mandatory whenever `status:` is `failed` or `blocked`, omitted entirely on `success`. Pick the one kind that names what actually stopped you, from the taxonomy in `agents/orchestrator.md § Failures`: `specialist-failed`, `artifact-missing`, `verification-negative`, `build-or-lint`, `hygiene-fail`, `scope-expansion`, `contradiction`, `reclassification-needed`. (`transport` is never yours — it describes a dispatch that never reached you.) The kind selects which retry budget the coordinator charges and whether a retry is permitted at all, so a wrong or missing kind spends the wrong budget. You are the only party that knows which it was; state it rather than leaving the coordinator to infer it. When the blocker is a decision that is not yours to make, `contradiction` and `reclassification-needed` are the two kinds that say so — both carry no retry budget, which is precisely the point.
 - **`model:`** — mandatory. The literal model ID the agent ran under for this dispatch (e.g. `claude-opus-4-6`, `claude-sonnet-5`), not the frontmatter default. This is a self-report: the agent is best-positioned to state it, particularly under a session model override (see `docs/observability.md` § "Session model override"), but the value is unverified — nothing cross-checks it against the actual invocation. Treat it as consultative context for cost/trace analysis, not a verified fact; a structural, verified successor is tracked under #524.
 - **`effort:`** — optional. Include the line when the agent's effective reasoning-effort level is known (e.g. from its own frontmatter or an explicit override); omit the line entirely otherwise. Do not emit `effort: unknown` — omission is the "unknown" signal.
 
