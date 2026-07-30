@@ -29,7 +29,7 @@ This file is read on-demand by `th:orchestrator` when executing a direct mode. I
 
 The `plan-review` direct mode runs a panel of up to three reviewers that write their findings into a single `reviews/01-plan-review.md` — the same canonical file and the same rules as the in-pipeline Phase 1.5/1.6 panel. The dispatch order is fixed (earlier reviewers write before the final consolidator reads):
 
-1. **`qa-plan` (mode: `ratify-plan`)** — substance reviewer. Validates AC coverage vs Work Plan. Writes `## Plan Ratification` to `reviews/01-plan-review.md` (existing contract, relocated container) AND writes its sub-verdict as the bold inline label `**Substance (qa):**` followed by a one-line verdict inside `## Plan Review` of that same file. Does NOT use a `###` heading for this label.
+1. **`qa-plan` (mode: `ratify-plan`)** — substance reviewer. Validates AC soundness and whether the Work Plan can satisfy each criterion. Writes `## Plan Ratification` to `reviews/01-plan-review.md` and its sub-verdict as the bold inline label `**Substance (qa):**` inside `## Plan Review`. Does not use a `###` heading for this label.
 2. **`security` (mode: `design-review`)** — design-security reviewer. **Conditional:** runs only when the task is security-sensitive. When run, writes its sub-verdict as the bold inline label `**Security design-review (security):**` followed by `clean` or `risks-found` inside `## Plan Review` of `reviews/01-plan-review.md`. Does NOT use a `###` heading.
 3. **`plan-reviewer` (shape audit, runs last)** — sole writer of the `## Plan Review` header and the `**Combined verdict:**` block, in `reviews/01-plan-review.md`. Reads the sub-verdicts written by (1) and (2) to produce the combined verdict. Runs LAST so it can read the other sub-verdicts. Creates the file with the full skeleton if it is still absent, and appends one row to `## Panel Rounds`.
 
@@ -74,7 +74,7 @@ If a required label is absent, the panel is incomplete — do NOT surface a pass
 ```
 Plan Review (direct mode): {feature-name}
 **Combined verdict:** {pass | concerns | fail}
-Substance (qa): {pass | fail}
+Substance (qa): {pass | concerns | fail}
 Security design-review: {clean | risks-found | SKIPPED — no security-sensitive path or keyword detected in the plan. If this plan touches auth/crypto/session/PII, re-run with --security}
 Shape (plan-reviewer): {pass | concerns | fail}
 

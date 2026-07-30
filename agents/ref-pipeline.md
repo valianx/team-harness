@@ -143,9 +143,9 @@ Read this at boot. Read a phase's own section when you reach it.
 | **STAGE-GATE-1** | **the operator** | plan + verdict, or the deferred note | approve / reject / edit | **mandatory stop** |
 | 1.8 Offer | **you** (+ panel if chosen) | deferred + approved | `skipped`/`reviewed-*` | checkpoint, not a dual-record gate |
 | 2 Implement | `implementer` | `01-plan.md` | `02-implementation.md`, one commit per task | — |
-| 2.5 Reconcile | you (+ `qa-plan` if non-trivial) | `[CONSTRAINT-DISCOVERED]` tags | amended AC | operator confirm on any dropped AC |
+| 2.5 Reconcile | you + operator for non-trivial changes | `[CONSTRAINT-DISCOVERED]` tags | amended AC | operator owns behavioral changes |
 | 2.6 Hygiene | **you**, Bash | diff vs base ref | `stage2.hygiene` | bounded patch on violations |
-| 2.7 Test authoring | `tester` | code + AC | `03-testing.md` | must close before Freeze |
+| 2.7 Evidence authoring | `tester` | code + AC | `03-testing.md` evidence map | must close before Freeze |
 | 2.8 Freeze | **you**, Bash | build, lint, frozen diff, packet | `inputs/00-frozen.diff` + `00-verify-packet.md` + anchor | fail-closed on a non-zero base advance |
 | 3 Verify | full: `qa`; both lanes: `adversary` when the floor applies | the frozen tree | lane-specific validation + optional `reviews/04-adversary.md` | one message when concurrent |
 | 3.5 Acceptance | **you** | the `04-*` artifacts | pass/fail | iterate on fail; re-opens 2.8 → 3 |
@@ -168,7 +168,7 @@ Two columns only, because two facts are all you need: when to call it, and what 
 | `qa` | Phase 3 on full, over the frozen tree | `reviews/04-validation.md` + `code_hygiene: pass\|fail` |
 | `adversary` | Phase 3 when the derived security floor applies | `reviews/04-adversary.md` + `broke-it \| could-not-break` |
 | `security` | Phase 1.6 design review when `security_sensitive` | `reviews/01-plan-review.md § Security Design-Review` |
-| `qa-plan` | Phase 1.5; Phase 2.5 constraint reconciliation | `reviews/01-plan-review.md § Plan Ratification` + `pass\|fail` |
+| `qa-plan` | Phase 1.5 plan ratification | `reviews/01-plan-review.md § Plan Ratification` + `pass\|concerns\|fail` |
 | `plan-reviewer` | Phase 1.6 when the panel is not deferred | `reviews/01-plan-review.md § Plan Review` + `pass\|concerns\|fail` |
 | `ux-reviewer` | Phase 1 and Phase 3 when `frontend_scope` | `reviews/01-ux-review.md`, `reviews/04-ux-validation.md` |
 | `diagrammer` | On request, after the analysis exists | `05-diagram.md` |
@@ -663,7 +663,7 @@ Shares the max-3 budget with Phase 1.6. Skipped by the self-authored carve-out.
 
 ## Phase 1.5 — Plan Ratification
 
-**Agent:** `qa-plan`, `mode: ratify-plan`. Ratifying AC coverage before code turns an expensive Stage-2 iteration into a read-only check.
+**Agent:** `qa-plan`, `mode: ratify-plan`. Judge AC soundness and whether the plan can satisfy each criterion before implementation.
 
 **Pre-check first, for every plan, before any skip or carve-out is evaluated.** Match the plan's `Files:` and the task description against the sensitive-path **path-pattern** list in `docs/pipeline-lanes.md § 2a` — reuse it verbatim, never define a second copy. Any match → monotonically escalate `security_sensitive: false → true`. **Fail closed:** a partial match, or a surface you cannot read, is treated as sensitive. Runs once and governs both carve-out sites, so an escalation here also disables the Phase 1.6 carve-out. Intake is the initial producer; this and the independent Phase-2-close check are named backstops. No backstop may change `true → false`.
 
@@ -685,11 +685,11 @@ Phase 1.5a still runs (§ above — it precedes this phase) and its own checklis
 
 **Self-check replacing the carve-out's dispatch** — four deterministic items: at least one task exists; each task carries at least one AC; `## Delivery Grouping` is declared; for `fix`/`hotfix`, the regression-test AC cross-reference is present. Record the per-item result. A `fail` routes back to your own self-authoring step, never to an architect that does not exist in that flow.
 
-**Advance:** `pass` or `fail` → Phase 1.6, preserving the ratification sub-verdict and findings for the combined roll-up. Ratification never starts an automatic Stage-1 correction.
+**Advance:** `pass`, `concerns`, or `fail` → Phase 1.6, preserving the ratification sub-verdict and findings for the combined roll-up. Ratification never starts an automatic Stage-1 correction.
 
 ## Phase 1.6 — Plan Review
 
-**Agent:** `plan-reviewer`. Phase 1.5 checks substance coverage; this checks plan shape — the contract a human at the gate expects to already hold.
+**Agent:** `plan-reviewer`. Phase 1.5 checks semantic AC/plan substance; this checks plan shape — the contract a human at the gate expects to already hold.
 
 **Skip** when `pipeline_version < 2`. **Carve-out and deferral** read the same fields Phase 1.5 already resolved — never re-run the pre-check or the four-condition check. On either no-dispatch branch, mark the row `[x] (deferred)` or `[x] (not-applicable)` and append `phase.end` with `extra: {plan_review_status}` in the same write: a Phase 1.6 that closes without a dispatch still COMPLETES.
 
@@ -753,7 +753,7 @@ For `fix`/`hotfix` the next phase is **Phase 2.0**, after Phase 1.8 resolves whe
 
 **No automatic Stage-1 correction-round apparatus.** There is no bucket classification, selective panel re-firing, carried-forward sub-verdict, cross-round intersection index, or iteration budget spent on panel findings. The panel's lenses run once for each plan version; a `fail` presents the finding verbatim rather than withholding the plan. Only `reject`/`edit` creates a new plan version and therefore a new one-pass review. SEC-002's dispatch obligation stays unconditional on every sensitive version.
 
-**The only carrier a finding has is becoming an AC.** `open_findings` is not a working queue for this — it is a read-only record of an *accepted-without-AC* disposition (`agents/_shared/orchestrator-state.md § "open_findings"`). A finding travels into implementation **if and only if** it becomes an AC of its owning task, placed there **only** by the operator's `edit` reply landing a concrete criterion (invariant #3(b) above is exactly this path). `qa` then validates that AC like any other, and Phase 3.5 requires a passing test for it. A finding the operator accepts without landing it as an AC is a recorded residual: write a `disposition` entry to `00-decision-ledger.md` and move on — it does not reach the implementation by any other route, and this file never implies one exists.
+**The only carrier a finding has is becoming an AC.** `open_findings` is not a working queue for this — it is a read-only record of an *accepted-without-AC* disposition (`agents/_shared/orchestrator-state.md § "open_findings"`). A finding travels into implementation **if and only if** it becomes an AC of its owning task, placed there **only** by the operator's `edit` reply landing a concrete criterion (invariant #3(b) above is exactly this path). `qa` then validates that AC like any other, and Phase 3.5 requires appropriate successful evidence for it. A finding the operator accepts without landing it as an AC is a recorded residual: write a `disposition` entry to `00-decision-ledger.md` and move on — it does not reach the implementation by any other route, and this file never implies one exists.
 
 **Disposition test, applied at presentation, not a dispatch router:**
 
@@ -788,9 +788,9 @@ Append `plan_review.offered` when you prepare the offer, **before** awaiting the
 
 ### One tester contract, two write points
 
-Phase 2.0 and Phase 2.7 are **one contract authored in a single dispatch here**, not two dispatches each re-deriving the plan. This dispatch writes the failing regression test **and** the full `03-testing.md § Test Plan` covering both the regression test and the AC mapping Phase 2.7 will complete. At Phase 2.7 the same contract resumes from that written plan.
+Phase 2.0 and Phase 2.7 are **one contract with two write points**, not two passes that re-derive the bug. This dispatch writes the failing regression test and its initial row in `03-testing.md`'s evidence map. At Phase 2.7 the tester completes the remaining AC evidence.
 
-Both guarantees are unchanged: the regression test still fails against current code before the implementer touches anything, and the AC tests are still completed and frozen at Phase 2.7 before the Phase 3 block opens.
+Both guarantees remain: the regression test fails against current code before implementation, and all test files plus the evidence map are frozen at Phase 2.7 before Phase 3 opens.
 
 Bug-fix flow only. The consolidation is at the **content** level — both phases stay distinct checklist rows with distinct `phase.start`/`phase.end` pairs.
 
@@ -881,7 +881,7 @@ Then read `01-plan.md § Task List` for `[CONSTRAINT-DISCOVERED]` annotations �
 
 **Triage:** *trivial* is a cosmetic rewording or a verified technical correction. *Non-trivial* adds, removes or alters a behavioural promise, changes a user-visible contract, or is any constraint at all on `complexity: complex`.
 
-All trivial → reconcile inline: rewrite the AC, remove the tag, log it, inform the operator briefly. Any non-trivial → `qa-plan` in `reconcile` mode decides per annotation: AC stays, amended, or dropped. **If any AC is dropped, stop and confirm with the operator** before Phase 3 — accept the drops, iterate, or abort.
+All trivial → reconcile inline: rewrite the AC, remove the tag, log it, and inform the operator briefly. For any non-trivial constraint, stop and present the affected AC, consequence, and implementer's proposed resolution. The operator chooses keep, amend, drop, iterate, or abort. Route to `architect` first only when technical analysis is missing; `qa-plan` does not arbitrate post-implementation requirement changes.
 
 ## Phase 2.6 — Code-hygiene scan
 
@@ -895,13 +895,13 @@ All trivial → reconcile inline: rewrite the AC, remove the tag, log it, inform
 
 Shares the max-3 cap for implementation bounces. A clean scan is a trace event only, never prose.
 
-## Phase 2.7 — Test authoring
+## Phase 2.7 — Evidence authoring
 
-**Agent:** `tester`, `mode: authoring`. Runs before Freeze and the Phase 3 block, over a tree that is immutable afterward. **This is the only `tester` dispatch in the non-bug-fix flow** — there is no second run-only dispatch at Phase 3; the suite run performed here is what Phase 3's lenses validate against.
+**Agent:** `tester`, `mode: authoring`. Runs before Freeze and the Phase 3 block, over a tree that is immutable afterward. The tester classifies each AC as `test`, `command`, or `inspection`, reuses sufficient evidence, authors only warranted missing tests, runs the relevant suite/commands, and writes `03-testing.md`'s evidence map. **This is the only `tester` dispatch in the non-bug-fix flow** — there is no second run-only dispatch at Phase 3.
 
-Bug-fix flow: this resumes the contract Phase 2.0 started — point at the already-written `§ Test Plan` instead of re-deriving AC coverage.
+Bug-fix flow: resume the regression contract Phase 2.0 started and complete the remaining evidence-map rows.
 
-**Advance:** `success` → re-run the commit-integrity check over this dispatch's `commit:` report before Freeze; a conjunct failure blocks and escalates exactly as at Phase 2 close. `failed` → back to `tester` (max-3); Freeze does not open until authoring succeeds.
+**Advance:** `success` requires relevant successful evidence for every AC. `tests_authored: 0` and `commit: none — no source change` are valid. Re-run commit integrity only when `commit:` is a SHA. `failed` → back to the appropriate owner (max-3); Freeze does not open until the evidence map is complete.
 
 **Browser readiness (non-blocking).** When `warranted_types` includes `e2e`/`browser-mode` and tooling is missing, surface the proposed setup commands and wait for confirmation or an explicit decline.
 
@@ -1018,7 +1018,7 @@ Runs after every `implementer`/`tester` dispatch returns `success`, and **again 
 
 **3 — Frozen review diff.** Write `{docs_root}/inputs/00-frozen.diff` from `git diff --binary "${verification_base_ref}"...HEAD -- . ':!workspaces'`. This exact artifact is the immutable review surface for read-only lenses, especially `adversary`, which has no Bash. A command failure blocks Freeze; an empty artifact when changes were expected blocks rather than impersonating a clean diff. Overwrite it on every Freeze rebuild.
 
-**4 — Verification packet.** Write `00-verify-packet.md`, the shared entry point every verifier reads first. Schema and cap: `docs/verification-packet.md`. Header (feature, task, timestamp, `Packet version: 1`, `Tree anchor:`, `Base ref:` copied from `verification_base_ref`, `Frozen diff:`), scope flags, changed-files table + `git diff --stat`, the implementer's summary with deviations and surviving `[CONSTRAINT-DISCOVERED]` tags, the Phase 2.7 test artifact, and full-document pointers as depth-on-demand. **No AC section** — every AC-baselining verifier live-reads `01-plan.md § Task List` at dispatch time. Hard cap 120 lines. Overwrite in place, never a `-v2` sibling.
+**4 — Verification packet.** Write `00-verify-packet.md`, the shared entry point every verifier reads first. Schema and cap: `docs/verification-packet.md`. Header (feature, task, timestamp, `Packet version: 1`, `Tree anchor:`, `Base ref:` copied from `verification_base_ref`, `Frozen diff:`), scope flags, changed-files table + `git diff --stat`, the implementer's summary with deviations and surviving `[CONSTRAINT-DISCOVERED]` tags, the Phase 2.7 evidence map, and full-document pointers as depth-on-demand. **No AC section** — every AC-baselining verifier live-reads `01-plan.md § Task List` at dispatch time. Hard cap 120 lines. Overwrite in place, never a `-v2` sibling.
 
 **5 — Record the fan-open tree anchor** in the same write, computed per `docs/verification-packet.md § 1a`. This is what the gate preparation and the pre-push check compare against.
 
@@ -1123,10 +1123,10 @@ Full lane only. After Phase 3 succeeds and before delivery, re-verify traceabili
 
 1. Count total AC in `01-plan.md § Task List`.
 2. Count PASS vs FAIL per AC in `reviews/04-validation.md`.
-3. Verify every AC has at least one passing test in `03-testing.md`'s coverage table.
+3. Verify every AC has relevant successful `test`, `command`, or `inspection` evidence in `03-testing.md`'s evidence map, following `agents/_shared/ac-evidence.md`.
 4. **UX gate (`frontend_scope` only):** any `critical` (WCAG A) finding in `reviews/04-ux-validation.md` fails the gate → Case A. `high`/`medium`/`suggestion` never block.
 5. **Regression still passing (`fix`/`hotfix`, Tier 2–4):** confirm `regression_test_path` shows PASS, not `skip`/`xfail` — then **read the actual assertion body** and confirm it matches the authored pattern. A weakened or replaced assertion fails the gate even with the test name and PASS status intact.
-6. **Test ratchet:** compare `tests_count` against the previous count. `tests_deleted > 0` with no valid reason — or a forbidden one (`broken`, `flaky`, `couldn't make them pass`, `removing failing tests`) — fails the ratchet → back to `tester`.
+6. **Test-change integrity:** when tests changed or were deleted, require the exact reason and surviving behavioral evidence. A deletion or weakened assertion whose purpose is to hide a failure routes back to `tester`; test counts never gate acceptance.
 7. **`code_hygiene` re-assertion.** Re-read the value `qa` recorded. `fail` closes this gate regardless of AC, security or build outcome. This is a re-check, not a new evaluation — it exists so a hygiene fail cannot slip through if the Phase 3 wording is ever loosened.
 
 Security findings are **not** checked here: the audit ran inside the Phase 3 block and its findings are operator-disposed at the gate.

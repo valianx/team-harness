@@ -29,7 +29,7 @@ You invoke `/th:pipeline add a daily reports endpoint`.
 
 `th:orchestrator` runs the **Discover phase** first: it frames the task, may ask clarifying questions, captures an intake survey (pipeline shape, effort, autonomy, scope hint), and waits for an advance signal. Only after that signal does it create `workspaces/daily-reports/` and dispatch the `architect`.
 
-The architect reads `docs/knowledge.md`, the codebase, and any prior workspaces; produces `01-plan.md` — a single merged document with `§ Architecture` (the design proposal) and `§ Task List` (one section per task, with Given/When/Then acceptance criteria, plus a `§ Delivery Grouping` declaring how tasks map to PRs). It also writes plan sketches (`sketches/api-contract.md`, `sketches/data-model.md`, etc.) when the change touches those surfaces. `qa-plan` runs Phase 1.5 to confirm every AC maps to a Work Plan step, writing to `reviews/01-plan-review.md § Plan Ratification`. `plan-reviewer` runs Phase 1.6 to audit the plan-shape; its verdict is written to `reviews/01-plan-review.md § Plan Review` (`**Combined verdict:**`), and a one-line `**Reviews:**` attestation is reflected back into `01-plan.md`'s title block — the plan itself stays clean.
+The architect reads `docs/knowledge.md`, the codebase, and any prior workspaces; produces `01-plan.md` — a single merged document with `§ Architecture` (the design proposal) and `§ Task List` (one section per task, with acceptance criteria, plus a `§ Delivery Grouping` declaring how tasks map to PRs). It also writes plan sketches when the change touches those surfaces. `qa-plan` runs Phase 1.5 to confirm each AC is sound and the plan can satisfy it, writing to `reviews/01-plan-review.md § Plan Ratification`. `plan-reviewer` runs Phase 1.6 to audit plan shape; the plan itself stays clean.
 
 You receive **STAGE-GATE-1** — a STOP block with the TL;DR, the human-review decisions, and the Task table. `hooks/sketch-guard.sh` validates that required sketches are present before the gate opens. Reply `approve` or `approve autonomous` (skips the Phase 1.8 post-approval plan-review offer).
 
@@ -39,7 +39,7 @@ Every task runs in one `implementer` dispatch, in the order its `Depends on:` fi
 
 - The `implementer` writes code strictly scoped to that task's `Files:`. If a hidden constraint surfaces, it annotates the constraint and Phase 2.5 **Constraint Reconciliation** decides keep / amend / drop.
 - The `tester` writes tests, the `qa` validates against the AC list, `security` audits if the change is security-sensitive — all in parallel.
-- The Acceptance Gate (Phase 3.5) re-reads the three artifacts; if any AC is missing a passing test it routes back to the implementer.
+- The Acceptance Gate (Phase 3.5) requires relevant successful `test`, `command`, or `inspection` evidence for every AC; missing evidence routes to the appropriate owner.
 
 Stage 2 is a single implementer pass over every task (one commit per task) — there is no per-round gate; STAGE-GATE-3, below, is the only gate after STAGE-GATE-1.
 

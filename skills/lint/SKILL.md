@@ -193,7 +193,7 @@ Canonical matrix (must match exactly):
 | `reviewer` | sonnet | medium |
 | `reviewer-consolidator` | sonnet | medium |
 | `qa` | sonnet | high |
-| `qa-plan` | opus | high |
+| `qa-plan` | sonnet | high |
 | `gcp-cost-analyzer` | opus | high |
 | `init` | sonnet | medium |
 | `implementer` | sonnet | high |

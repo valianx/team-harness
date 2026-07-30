@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-07-30
+
+### Changed
+
+- Replaced per-AC test quotas with traceable test, command, or inspection evidence; zero new tests is valid.
+- Slimmed QA planning and testing prompts while preserving semantic plan review and behavioral regression protection.
+
 ## [3.2.0] - 2026-07-30
 
 ### Changed
