@@ -16,7 +16,7 @@ Q-1 covers the per-round report file format. Q-2 covers the `changes_security_co
 
 **Decision:** (a) was selected — one immutable file per round.
 
-**Rationale:** Option (b) would require granting `adversary` the `Edit` tool. `adversary` is structurally read-only by design (`READ_ONLY_AGENTS`, pinned by `tests/test_agent_structure.py` s125/AC-15i) — its only write capability is `Write` to its own report, and even that write never touches source code. Adding `Edit` to close a reporting defect would be a security regression on an agent whose entire mandate depends on a read-only trust boundary. Per-round files make the original overwrite class structurally impossible (a given `N` never accepts a second `Write` — the read-before-write step returns `status: blocked` on a detected collision instead of proceeding) without adding any new tool capability.
+**Rationale:** Option (b) would require granting `adversary` the `Edit` tool. `adversary` is structurally read-only by design (`READ_ONLY_AGENTS`, enforced by `tests/test_security_scan.py` Check 1) — its only write capability is `Write` to its own report, and even that write never touches source code. Adding `Edit` to close a reporting defect would be a security regression on an agent whose entire mandate depends on a read-only trust boundary. Per-round files make the original overwrite class structurally impossible (a given `N` never accepts a second `Write` — the read-before-write step returns `status: blocked` on a detected collision instead of proceeding) without adding any new tool capability.
 
 ---
 

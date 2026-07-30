@@ -1,28 +1,18 @@
 #!/usr/bin/env bash
 # tests/run-behavioral.sh
 #
-# Wrapper for behavioral regression tests — the subset that actually dispatches
-# agents via `claude -p` to verify end-to-end behavior, NOT just file structure.
+# Wrapper for tests that exercise end-to-end runtime behavior rather than a
+# single function — a real process, real inputs, real exit codes.
 #
-# Why separate from tests/run-all.sh:
-#   - Each behavioral test costs ~$1 USD and takes ~10s. Not suitable for
-#     pre-commit or on every save.
-#   - Requires `claude` CLI authenticated and the dev-team installer already
-#     run (so ~/.claude/agents/ has the current versions).
-#   - Catches regression classes that structural tests cannot:
-#       1. Platform changes — Claude Code harness behavior (e.g. how Task is
-#          stripped in nested subagents) changing under us.
-#       2. Model behavior regressions — a model update reintroducing
-#          hallucination patterns we'd previously trained out.
-#       3. Install drift — ~/.claude/agents/ out of sync with repo source
-#          because the installer wasn't re-run after a recent edit.
+# Why separate from tests/run-all.sh: these are slower and may need environment
+# the default run does not guarantee (a TTY, setsid, a specific shell), so each
+# test checks its own prerequisites and skips cleanly rather than failing.
 #
-# When to run:
-#   - Before tagging a release.
-#   - After upgrading Claude Code (claude --version changed).
-#   - After editing any agents/*.md prompt that touches contract-critical prose
-#     (status blocks, boot sequences, dispatch invariants).
-#   - Weekly, as a heartbeat against silent platform drift.
+# What does NOT belong here: any test whose pass condition is a model reporting
+# that it followed a rule, and any test pinned to an architecture that no longer
+# ships. Both classes were retired — see README.md § "What gets a test".
+#
+# When to run: before tagging a release, and after changing anything under bin/.
 #
 # Usage:
 #   bash tests/run-behavioral.sh
@@ -34,28 +24,11 @@ set -uo pipefail
 REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-# Dependency check — fail fast if the environment is wrong.
-if ! command -v claude >/dev/null 2>&1; then
-    echo "ERROR: claude CLI not found in PATH. Install Claude Code first."
-    exit 1
-fi
-
-if [ ! -f "$HOME/.claude/agents/orchestrator.md" ]; then
-    echo "ERROR: ~/.claude/agents/orchestrator.md not found."
-    echo "Run \`uv run bin/install.py\` first to install the agents."
-    exit 1
-fi
-
-# Sanity check: warn if installed orchestrator differs from repo source. The
-# behavioral tests probe the INSTALLED version, so divergence is a false signal.
-if ! diff -q "$HOME/.claude/agents/orchestrator.md" "$REPO_ROOT/agents/orchestrator.md" >/dev/null 2>&1; then
-    echo "WARN: ~/.claude/agents/orchestrator.md differs from repo source."
-    echo "      Behavioral tests will probe the INSTALLED version."
-    echo "      If you've edited agents/orchestrator.md recently, run:"
-    echo "        uv run bin/install.py"
-    echo "      to propagate. Continuing anyway in 3s..."
-    sleep 3
-fi
+# No hard dependency on the `claude` CLI. Every test that dispatched an agent to
+# have it self-report compliance was retired (README.md § "What gets a test") —
+# what remains here exercises deterministic code with real inputs and exit codes,
+# and each test declares and checks its own prerequisites. A test that does need
+# an authenticated CLI must check for it itself and skip cleanly.
 
 ANY_FAILED=0
 TOTAL=0

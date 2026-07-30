@@ -266,7 +266,7 @@ The `### Publish Gate (preview-and-confirm)` section below defines the full cont
 2. **Coordinator direct-mode path** — when the coordinator handles review without going through the skill's Phase 4, it MUST present the draft and wait for approval before calling any verb above.
 3. **Takeover/inline path** (top-level Claude after Task-strip, the least-supervised execution site) — the same gate applies. If top-level Claude reconstructs a publish by calling `gh api .../reviews` directly, it MUST present the draft and wait for explicit approval before executing. There is no execution path that bypasses this gate.
 
-**Anti-drift anchor:** Suite 57 in `tests/test_agent_structure.py` asserts the gate token at each of the three execution sites. A site that loses the gate turns the suite red.
+**Anti-drift note:** the gate token must appear at each of the three execution sites. Nothing mechanically checks this — a site that loses the gate loses it silently.
 
 ### Dual-Review Convergence
 

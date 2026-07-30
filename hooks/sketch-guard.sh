@@ -37,7 +37,8 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Manifest — hardcoded trigger→sketch mapping (must match docs/plan-sketches.md
 # and the agent-readable table in agents/architect.md).
-# Drift is caught by tests/test_agent_structure.py Suite 82.
+# Drift between the three representations is not mechanically checked; the
+# plan-sketches contract is prose (docs/plan-sketches.md).
 #
 # Format: BOOLEAN_NAME:SKETCH_FILENAME
 # Special: touches_data_model+destructive → data-migration (both must be true)

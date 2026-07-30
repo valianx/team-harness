@@ -11,7 +11,7 @@ system. Three representations reference this document:
    an arbitrary repo path mid-dispatch.
 3. **`hooks/sketch-guard.sh`** — the hardcoded manifest mapping used by the gate script
    (a bash script cannot reliably parse markdown at runtime). A structural drift test in
-   `tests/test_agent_structure.py` (Suite 82) asserts all three representations agree.
+   The three representations must agree; nothing mechanically asserts it.
 
 ---
 
@@ -256,12 +256,12 @@ today. The two artifacts never restate each other.
 
 The three representations of the manifest (this file, the agent-readable table in
 `agents/architect.md`, and the hardcoded mapping in `hooks/sketch-guard.sh`) are kept
-consistent by a structural drift test in `tests/test_agent_structure.py` (Suite 82). The
+consistent by review, not by a test. The
 test parses the trigger→sketch mapping from each representation and asserts they agree.
 
 Run it with:
 ```
-python3 tests/test_agent_structure.py
+bash tests/run-all.sh
 ```
 
 or via the full suite:

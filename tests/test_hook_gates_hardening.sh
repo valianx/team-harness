@@ -31,7 +31,7 @@
 # (Suite 1), which has no degraded-path split to begin with.
 #
 # Structural (F-008, F-038, F-009, A1, Lint Check 8) findings are in
-#   tests/test_agent_structure_hardening.py.
+#   its own structural counterpart, since retired.
 #
 # Note on secret patterns in tests:
 #   Token literals in this file are split across variables to prevent the

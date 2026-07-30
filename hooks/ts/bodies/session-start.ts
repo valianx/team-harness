@@ -69,7 +69,7 @@ const CONTROL_CHAR_RE = /[\x00-\x1f\x7f]/;
 // Fires on every session. No marker guard — SEC-DR-2 re-founded v2.89.0.
 // The literal label "orchestrator disposition" is asserted by tests/test_session_start.sh
 // and tests/test_ts_hook_parity_ext.sh (keep it); the function name loadOrchestrator by
-// tests/test_agent_structure.py Suite 59. The disposition body describes the single
+// The disposition body describes the single
 // top-level th:orchestrator role (dispatch specialists directly per task; hard-STOP
 // with a clear error if the pipeline cannot run — there is no monolith fallback).
 // ---------------------------------------------------------------------------

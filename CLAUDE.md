@@ -117,7 +117,7 @@ All commands run from the repo root.
 | Run security self-scan directly | `python3 tests/test_security_scan.py` |
 | Run free verification suite (policy-block + structure + frontmatter) | `bash tests/run-all.sh` |
 | Run policy-block functional tests | `bash tests/test_policy_block.sh` |
-| Run agent/skill/hook structural tests | `python3 tests/test_agent_structure.py` |
+| Run the security self-scan | `python3 tests/test_security_scan.py` |
 | Run agent YAML frontmatter validator | `uv run --with PyYAML python tests/test_agent_frontmatter.py` |
 | Run behavioral suite (`claude -p`, ~$1/run) | `bash tests/run-behavioral.sh` |
 

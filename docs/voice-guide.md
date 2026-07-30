@@ -143,4 +143,4 @@ Before opening a PR that adds or modifies operator-facing copy, walk through thi
 - [ ] All committed copy is in English. Exception: `agents/orchestrator.md § "11 — Intent routing"` (under `## Intake`) table, which routes in the operator's resolved language (live chat is not committed copy — see §7.3).
 - [ ] If the change documents how to invoke the system, the example uses `@th:orchestrator <natural-language>` as the primary path; slash commands are positioned as optional shortcuts.
 
-`tests/test_agent_structure.py` Suite 25 enforces a mechanical subset of these rules at CI time. The checklist above covers the human-judgement cases the test suite cannot catch (e.g., tone of a multi-sentence error message).
+No suite enforces these rules mechanically — voice is a human-judgement property and the presence-based checks that once claimed to cover a subset of it were retired (README.md § "What gets a test"). The checklist above is the standard; review is what applies it.

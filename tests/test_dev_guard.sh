@@ -1463,7 +1463,7 @@ rm -rf "$_dg_normal_bare" "$DG_NORMAL_REPO"
 # pre-pass) exists — see 01-plan.md § Task-8, AC-1/AC-2/AC-3.
 #
 # Fixture-by-concatenation discipline (mirrors Suite 152 in
-# tests/test_agent_structure.py): every covered-action literal used below is
+# this suite alone): every covered-action literal used below is
 # assembled from separate word tokens at runtime so this file's own source
 # never carries a contiguous "git push" / "gh pr merge" / "gh pr create"
 # substring inside a search-pattern payload — the same gate this suite

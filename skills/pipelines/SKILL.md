@@ -377,4 +377,4 @@ Implementation pass (3 tasks, started 14:08:02, closed 14:31:02):
 
 ## Narration Exemption
 
-This skill is **exempt** from the output-discipline silence rules. The operator invoked `/th:pipelines` specifically to see pipeline internals — surfacing phase numbers, stage names, and pipeline mechanics is the explicit purpose of this skill. The narration lint (`tests/test_agent_structure.py` Suite 31) does not scan this file.
+This skill is **exempt** from the output-discipline silence rules. The operator invoked `/th:pipelines` specifically to see pipeline internals — surfacing phase numbers, stage names, and pipeline mechanics is the explicit purpose of this skill. The narration lint does not apply to this file.

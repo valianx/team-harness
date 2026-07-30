@@ -65,8 +65,8 @@ Every file an item touches MUST be declared in that item's `01-plan.md` with its
 
 | Class | Examples | Where edited | Reconciliation |
 |-------|----------|--------------|----------------|
-| **item-local** | new skill/agent/script/doc file; the item's own pre-reserved suite block in `tests/test_agent_structure.py`; the item's own new `docs/` file | inside the item's worktree — no other item touches the same file | wholesale `git checkout <item-branch> -- <item-local-paths>` into the consolidation tree |
-| **shared-serial** | `tests/test_agent_structure.py` overall (other items' suite blocks); `docs/testing.md` registry rows; `README.md` / `skills/README.md` listings; `.claude-plugin/plugin.json` + `marketplace.json`; `CHANGELOG.md` / `changelog.d/` entries | NEVER edited inside the worktree — the item declares its reserved insertion block in its plan and does not touch the file | orchestrator extracts each item's added block and splices all blocks centrally in reserved order at consolidation |
+| **item-local** | new skill/agent/script/doc file; the item's own new test file; the item's own new `docs/` file | inside the item's worktree — no other item touches the same file | wholesale `git checkout <item-branch> -- <item-local-paths>` into the consolidation tree |
+| **shared-serial** | any test file two items both touch; `docs/testing.md` rows; `README.md` / `skills/README.md` listings; `.claude-plugin/plugin.json` + `marketplace.json`; `CHANGELOG.md` / `changelog.d/` entries | NEVER edited inside the worktree — the item declares its reserved insertion block in its plan and does not touch the file | orchestrator extracts each item's added block and splices all blocks centrally in reserved order at consolidation |
 
 **The invariant:** a shared-serial file is never edited in an item's worktree. An item that needs to contribute to a shared-serial file declares its reserved insertion block in the plan (`01-plan.md` § Files, with class: `shared-serial`, content: `<the exact insertion>`). The orchestrator performs the splice centrally.
 
@@ -110,7 +110,7 @@ The first batch (PR #338) consolidated by hand-splicing each item's added lines 
 ### Per-item (in the worktree)
 
 ```bash
-python3 tests/test_agent_structure.py
+bash tests/run-all.sh
 ```
 
 Run this directly in the item's worktree. Do NOT run `bash tests/run-all.sh` concurrently across items. The reason: `run-all.sh` chains `checkpoint-guard.sh` on stdin; concurrent invocations contend on stdin and orphan bash process trees on Windows, leaving zombie processes and incomplete test output (confirmed platform constraint on Windows 11).
@@ -127,7 +127,7 @@ bash tests/run-all.sh
 
 Run the full suite exactly once. This is the mandatory safety net. It covers:
 
-- All structural checks (`test_agent_structure.py` — the concatenated suite blocks run together).
+- The full verification suite (`bash tests/run-all.sh`).
 - `policy-block.sh` secret-scan of all new content.
 - Agent frontmatter validation across all modified agents.
 
@@ -135,7 +135,7 @@ The consolidated full-suite run is the gate that separates the parallel implemen
 
 ## Consolidator role and directives
 
-Consolidation is owned by a SINGLE designated consolidator — a dedicated consolidator orchestrator, never a worker subagent and never split across actors. The consolidator is the only writer of shared-serial files; parallel implementers never reconcile each other's work. The single-owner rule exists because concurrent implementers can contaminate even a notionally-isolated shared file — observed live, two worktrees' copies of `tests/test_agent_structure.py` cross-contaminated, each commit carrying the other item's suite block.
+Consolidation is owned by a SINGLE designated consolidator — a dedicated consolidator orchestrator, never a worker subagent and never split across actors. The consolidator is the only writer of shared-serial files; parallel implementers never reconcile each other's work. The single-owner rule exists because concurrent implementers can contaminate even a notionally-isolated shared file — observed live, two worktrees' copies of the same test file cross-contaminated, each commit carrying the other item's block.
 
 Four directives:
 

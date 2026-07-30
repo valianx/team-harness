@@ -54,7 +54,7 @@ appears in the chat.
 
 `/th:pipelines` and `/th:trace` are **exempt** from the silence rules above.
 These skills surface internal pipeline state because the operator explicitly
-requested it. The narration lint (`tests/test_agent_structure.py` Suite 31)
+requested it. The narration lint
 does not scan them.
 
 ## Output Contract — Compression

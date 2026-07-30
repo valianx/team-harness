@@ -294,7 +294,7 @@ For each `.md` file in `agents/` (excluding `README.md` and `ref-*.md` reference
 
 **Honesty note on what this check proves.** This is a text-level heuristic over a markdown system prompt, not proof of runtime invocation — a system prompt has no call sites in the code sense, only directives a model may or may not follow. The negation-aware matching narrows the specific false-positive class of a prose-only mention reading as usage; it does not eliminate every way prose can describe a tool without genuinely directing its use.
 
-**Known, documented residuals (do not report as a new finding):** `agents/orchestrator.md`'s `mcp__memory__read_graph` and `agents/ux-reviewer.md`'s two context7 tools — see `tests/test_agent_structure.py` Suite 175's `_S175_KNOWN_UNUSED_MCP_GRANTS` for the rationale of each.
+**Known, documented residuals (do not report as a new finding):** `agents/orchestrator.md`'s `mcp__memory__read_graph` and `agents/ux-reviewer.md`'s two context7 tools — both are deliberate, documented residuals.
 
 Result:
 - **PASS** if every agent's MCP grants are each matched by a body invocation (beyond the documented residuals above).

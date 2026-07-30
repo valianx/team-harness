@@ -149,7 +149,7 @@ bash tests/run-all.sh
 | Suite | Catches |
 |---|---|
 | `test_policy_block.sh` | Destructive-command leakage at `PreToolUse` |
-| `test_agent_structure.py` | Missing contract sections, drift between agents, role conflicts, model+effort matrix |
+| `test_security_scan.py` | Read-only-tier agents carrying Bash, missing injection preambles, hook-manifest form, shipped secrets |
 | `test_agent_frontmatter.py` | Silent-agent-drop class of bug (invalid YAML in agent frontmatter) |
 
 Prompt behaviour itself only validates in live pipelines — restart Claude Code and smoke-test by hand.

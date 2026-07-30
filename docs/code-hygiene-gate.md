@@ -167,7 +167,7 @@ The Layer-2 cap-exception gate wording is **"explained or under cap"** — this 
 appear both in `agents/implementer.md § Reviewability self-check` (the producer of
 `02-implementation.md § Reviewability Exceptions`) and in `agents/qa.md § Code Hygiene` (the
 consumer that decides whether an over-cap function is a finding). A drift between the two
-wordings is a structural defect — `tests/test_agent_structure.py` pins both sides.
+wordings is a defect — both sides must be edited together; nothing pins them.
 
 ---
 
@@ -208,7 +208,7 @@ Two structural properties make this safe by construction:
 1. **This file is prose (`.md`).** Per § 2, prose-extension files are excluded from the Layer-1
    scan entirely — the pattern alternation in § 3.1 lives inside a fenced `grep` command block,
    and every line of that block starts with `grep`/`|`/`-e`, never a source-code comment leader.
-2. **`tests/test_agent_structure.py` is source code (`.py`), not prose.** Any "bad-example"
+2. **A test file is source code, not prose.** Any "bad-example"
    string the structural suite uses to validate the pattern set MUST be built via string
    concatenation (e.g. `"work" + "spaces/" + "foo.ts:12"`) rather than committed as a contiguous
    literal — and, more importantly, MUST NEVER appear inside a committed `#` Python comment. A

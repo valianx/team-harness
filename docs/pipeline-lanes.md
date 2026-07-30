@@ -532,7 +532,7 @@ handle is a gap, not a refinement.
 | Outward-action release-floor invariant | docs | `docs/dev-mode.md` | § "Deterministic order floor (`gate-guard`)" |
 | Inline working posture: hard floors (sensitive excluded via § 2a / irreversible excluded / dev-guard untouched / no budget) + escalation signal list | canonical | `docs/pipeline-lanes.md` | § 2b |
 | Inline working posture: hard floors + signals | coordinator | `agents/ref-intake-flows.md` | § "Lane Classification (constraints A-E)" + `agents/orchestrator.md § "11 — Intent routing"` (row e) |
-| Inline working posture: hard floors + signals | test (byte-consistency guard) | `tests/test_agent_structure.py` | `inline-working-posture` suite |
+| Inline working posture: hard floors + signals | prose contract | `docs/pipeline-lanes.md` (this file) | not mechanically checked |
 | Operator-origin by construction (the agent can never self-activate the posture) | skill (deterministic enforcement) | `skills/inline/SKILL.md` | frontmatter `disable-model-invocation: true` |
 | Operator-origin by construction | coordinator (sets disposition only on operator declaration) | `agents/orchestrator.md` | § "11 — Intent routing" (row e) |
 

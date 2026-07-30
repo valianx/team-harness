@@ -300,7 +300,7 @@ pass('module-load: sessionEnforcementPlugin is exported');
 // (b) S-2 DIRECTIVE SNAPSHOT — byte-identity guard for the refactor
 // composeSessionDirectives({}) must return an array whose first element
 // is the exact orchestrator disposition string (unchanged by the refactor).
-// This is the guard that Suite 15 (TS parity) and test_agent_structure.py
+// This is the guard that Suite 15 (TS parity) and this suite
 // cover on the CC side — here we assert it directly on the shared function.
 // =========================================================================
 (function testDirectiveSnapshot() {
@@ -338,7 +338,7 @@ pass('module-load: sessionEnforcementPlugin is exported');
             fail('(b) snapshot: prompt not called (no directive emitted)', '');
             return;
         }
-        // The orchestrator CONTEXT string is asserted by test_agent_structure.py.
+        // The orchestrator CONTEXT string carries no mechanical assertion.
         // Mirror the key anchor tokens here.
         const EXPECTED_TOKENS = [
             'orchestrator disposition is active',

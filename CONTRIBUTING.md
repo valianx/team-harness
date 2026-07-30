@@ -112,7 +112,7 @@ To smoke-test the graceful degradation introduced in v2.10.0 without needing to 
 3. For Tier B write paths, run `/deliver` on a feature branch — if `GH_TOKEN` is set, it should attempt a curl PR creation; if not, it should emit the compare URL and a body file, then report `blocked-manual-push`.
 4. For Tier D (project board), verify the orchestrator logs "Project board update skipped — gh CLI unavailable" rather than erroring out.
 
-This is a manual smoke test — the automated test suite (`tests/test_agent_structure.py`) only verifies the static cross-references are present.
+This is a manual smoke test. No automated suite covers agent/skill prose — see README.md § "What gets a test" for why prose assertions are not registered.
 
 ## Release process
 
