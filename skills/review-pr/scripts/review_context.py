@@ -197,6 +197,7 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
               commit { oid }
               replyTo { databaseId }
             }
+            pageInfo { hasNextPage endCursor }
           }
         }
         pageInfo { hasNextPage endCursor }
@@ -205,6 +206,69 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
   }
 }
 """
+
+THREAD_COMMENTS_QUERY = """
+query($threadId: ID!, $cursor: String!) {
+  node(id: $threadId) {
+    ... on PullRequestReviewThread {
+      comments(first: 100, after: $cursor) {
+        nodes {
+          databaseId body createdAt updatedAt url
+          author { login }
+          commit { oid }
+          replyTo { databaseId }
+        }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+}
+"""
+
+
+def normalize_thread_comment(comment: dict[str, Any]) -> dict[str, Any]:
+    login = author_login(comment.get("author"))
+    return {
+        "id": comment.get("databaseId"),
+        "reply_to_id": (comment.get("replyTo") or {}).get("databaseId"),
+        "author": login,
+        "created_at": comment.get("createdAt"),
+        "updated_at": comment.get("updatedAt"),
+        "commit_id": (comment.get("commit") or {}).get("oid"),
+        "url": comment.get("url"),
+        "body": clean_body(comment.get("body"), login),
+    }
+
+
+def capture_thread_comments(node: dict[str, Any]) -> list[dict[str, Any]]:
+    connection = node.get("comments") or {}
+    comments = [
+        normalize_thread_comment(comment)
+        for comment in connection.get("nodes") or []
+    ]
+    while (connection.get("pageInfo") or {}).get("hasNextPage"):
+        cursor = (connection.get("pageInfo") or {}).get("endCursor")
+        if not cursor:
+            raise ContextError("GitHub reported another comment page without a cursor")
+        data = run_json(
+            [
+                "gh",
+                "api",
+                "graphql",
+                "-f",
+                f"query={THREAD_COMMENTS_QUERY}",
+                "-f",
+                f"threadId={node.get('id')}",
+                "-f",
+                f"cursor={cursor}",
+            ]
+        )
+        connection = (data.get("data", {}).get("node") or {}).get("comments") or {}
+        comments.extend(
+            normalize_thread_comment(comment)
+            for comment in connection.get("nodes") or []
+        )
+    return comments
 
 
 def capture_threads(repo: str, number: int) -> list[dict[str, Any]]:
@@ -235,21 +299,6 @@ def capture_threads(repo: str, number: int) -> list[dict[str, Any]]:
             .get("reviewThreads", {})
         )
         for node in connection.get("nodes") or []:
-            comments = []
-            for comment in (node.get("comments") or {}).get("nodes") or []:
-                login = author_login(comment.get("author"))
-                comments.append(
-                    {
-                        "id": comment.get("databaseId"),
-                        "reply_to_id": (comment.get("replyTo") or {}).get("databaseId"),
-                        "author": login,
-                        "created_at": comment.get("createdAt"),
-                        "updated_at": comment.get("updatedAt"),
-                        "commit_id": (comment.get("commit") or {}).get("oid"),
-                        "url": comment.get("url"),
-                        "body": clean_body(comment.get("body"), login),
-                    }
-                )
             threads.append(
                 {
                     "id": node.get("id"),
@@ -258,7 +307,7 @@ def capture_threads(repo: str, number: int) -> list[dict[str, Any]]:
                     "path": node.get("path"),
                     "line": node.get("line"),
                     "original_line": node.get("originalLine"),
-                    "comments": comments,
+                    "comments": capture_thread_comments(node),
                 }
             )
         page_info = connection.get("pageInfo") or {}

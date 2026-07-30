@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -129,6 +130,14 @@ class ReviewContextTests(unittest.TestCase):
 
     def test_render_prioritizes_open_threads_and_recent_human_context(self):
         value = context(
+            issue_comments=[
+                {
+                    "id": 1,
+                    "author": "human",
+                    "updated_at": "2026-01-03T00:00:00Z",
+                    "body": "Please retain this discussion.",
+                }
+            ],
             review_threads=[
                 {
                     "id": "open",
@@ -163,6 +172,73 @@ class ReviewContextTests(unittest.TestCase):
         rendered = MODULE.render_context(value)
         self.assertLess(rendered.index("Thread `open`"), rendered.index("[resolved]"))
         self.assertIn("This still fails.", rendered)
+        self.assertIn("Please retain this discussion.", rendered)
+
+    def test_capture_threads_paginates_comments_within_a_thread(self):
+        first_page = {
+            "data": {
+                "repository": {
+                    "pullRequest": {
+                        "reviewThreads": {
+                            "nodes": [
+                                {
+                                    "id": "thread-1",
+                                    "isResolved": False,
+                                    "isOutdated": False,
+                                    "path": "src/a.py",
+                                    "line": 7,
+                                    "originalLine": 7,
+                                    "comments": {
+                                        "nodes": [
+                                            {
+                                                "databaseId": 1,
+                                                "body": "First",
+                                                "author": {"login": "alice"},
+                                            }
+                                        ],
+                                        "pageInfo": {
+                                            "hasNextPage": True,
+                                            "endCursor": "comment-cursor",
+                                        },
+                                    },
+                                }
+                            ],
+                            "pageInfo": {
+                                "hasNextPage": False,
+                                "endCursor": None,
+                            },
+                        }
+                    }
+                }
+            }
+        }
+        second_page = {
+            "data": {
+                "node": {
+                    "comments": {
+                        "nodes": [
+                            {
+                                "databaseId": 2,
+                                "body": "Second",
+                                "author": {"login": "bob"},
+                            }
+                        ],
+                        "pageInfo": {
+                            "hasNextPage": False,
+                            "endCursor": None,
+                        },
+                    }
+                }
+            }
+        }
+
+        with patch.object(MODULE, "run_json", side_effect=[first_page, second_page]):
+            threads = MODULE.capture_threads("owner/repo", 1)
+
+        self.assertEqual(
+            [comment["body"] for comment in threads[0]["comments"]],
+            ["First", "Second"],
+        )
 
     def test_clean_body_removes_bot_details_and_bounds_output(self):
         body = "<details><summary>Prompt</summary>" + ("x" * 2_000) + "</details>\nActionable"
