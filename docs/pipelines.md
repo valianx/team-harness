@@ -56,7 +56,7 @@ Non-gated modes the coordinator runs directly: diagram, likec4, d2, review, tran
 
 ## PR review
 
-Review of an existing GitHub PR is a standalone, dispatch-by-`gh`-data skill, never a coordinator-owned pipeline phase — `/th:review-pr` is the hard trigger (`agents/ref-pipeline.md § "11 — Intent routing"`). Its worktree-at-head-SHA gather, tier classification, multi-agent dispatch and decision menu are defined once in `skills/review-pr/SKILL.md`, with the read-only working-tree contract and the multi-reviewer convergence rounds in `agents/ref-direct-modes.md`. Not duplicated here.
+Review of an existing GitHub PR is a standalone, snapshot-bound skill, never a coordinator-owned pipeline phase — `/th:review-pr` is the hard trigger (`agents/ref-pipeline.md § "11 — Intent routing"`). Its immutable gather, evidence-triggered lenses, concise body/inline-thread split, and decision menu are defined once in `skills/review-pr/SKILL.md`; the read-only and publish-gate contracts live in `agents/ref-direct-modes.md`. Not duplicated here.
 
 ## When `gh` is absent or unauthenticated
 

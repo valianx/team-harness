@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.0] - 2026-07-30
+
+### Changed
+
+- Made PR reviews concise by keeping anchored findings in inline threads and the body as a non-duplicating verdict index.
+- Removed size-triggered reviewer multiplication and convergence loops; QA and security now run only from concrete acceptance or security signals.
+
 ## [3.4.0] - 2026-07-30
 
 ### Changed

@@ -53,7 +53,7 @@ STAGE-GATE-3, immediately before delivery: the operator ships, amends, or aborts
 
 ## Other pipelines
 
-For full reference coverage of every pipeline — including the refactor flow, database changes flow, test pipeline, research/spike, plan flow, acceptance gate semantics, gh-fallback degradation tiers, and multi-reviewer — see [`docs/pipelines.md`](./pipelines.md).
+For full reference coverage of every pipeline — including the refactor flow, database changes flow, test pipeline, research/spike, plan flow, acceptance gate semantics, gh-fallback degradation tiers, and standalone PR review — see [`docs/pipelines.md`](./pipelines.md).
 
 ---
 

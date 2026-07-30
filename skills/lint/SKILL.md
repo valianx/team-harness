@@ -190,7 +190,7 @@ Canonical matrix (must match exactly):
 | `agent-builder` | opus | xhigh |
 | `security` | opus | xhigh |
 | `adversary` | sonnet | xhigh |
-| `reviewer` | sonnet | medium |
+| `reviewer` | sonnet | high |
 | `reviewer-consolidator` | sonnet | medium |
 | `qa` | sonnet | high |
 | `qa-plan` | sonnet | high |

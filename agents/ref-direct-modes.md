@@ -234,7 +234,7 @@ In obsidian mode, the agent appends a `![[diagram.svg]]` embed to `{docs_root}/0
 
 When invoked with `Direct Mode Task: review`:
 
-The `/review-pr` skill handles ALL Bash (fetching PR metadata, git diff, etc.) and passes everything inline. The coordinator and reviewer do ZERO Bash. The skill may request different submodes depending on whether a prior review exists.
+The `/review-pr` skill handles ALL Bash (snapshot capture, git diff, and GitHub reads) and passes immutable coordinates plus artifact paths. The coordinator and reviewer do ZERO Bash.
 
 **No-publish invariant:** the reviewer NEVER calls any GitHub API write endpoint. In all submodes (fresh, update-body, reply, internal), the reviewer returns a draft inline in its status block. The coordinator writes the draft to a file and returns control to the skill. Publishing is the sole responsibility of the execution site that receives operator approval — one of three sites:
 - **Skill Phase 4 / Phase 5** (`skills/review-pr/SKILL.md`): the decision menu is the preview gate; Phase 5 does the atomic `POST /reviews`.
@@ -254,8 +254,8 @@ The `### Publish Gate (preview-and-confirm)` section below defines the full cont
 - Dismiss: `PUT /repos/:o/:r/pulls/:n/reviews/:id/dismissals`
 
 **Default behaviour — preview-first:**
-1. Before invoking any verb above, return the full draft (`review_body` + `inline_findings`, or the applicable body) to the operator.
-2. Show the draft explicitly.
+1. Before invoking any verb above, return the exact body and every inline finding with its path and line to the operator.
+2. Show both public surfaces explicitly; a concise body is not a substitute for previewing its threads.
 3. Wait for an explicit OK (e.g., confirmation in the Phase 4 decision menu, or an explicit `sí`/`yes`/`approve` in the conversational path).
 4. Only after receiving explicit approval, execute the write verb.
 
@@ -268,62 +268,23 @@ The `### Publish Gate (preview-and-confirm)` section below defines the full cont
 
 **Anti-drift note:** the gate token must appear at each of the three execution sites. Nothing mechanically checks this — a site that loses the gate loses it silently.
 
-### Dual-Review Convergence
-
-The convergence protocol is an optional loop that wraps the existing per-pass consolidation flow. It applies when the review is Tier 4 (auto-on) or when the operator passes the `--converge` flag. For Tier 0–3 reviews without `--converge`, the single-pass path runs unchanged.
-
-**Trigger conditions (either is sufficient):**
-- PR classified as Tier 4 (security-sensitive paths or security keywords) — auto-on.
-- Operator passes `--converge` flag in the skill invocation — manual opt-in for high-risk non-Tier-4 PRs.
-
-**Loop contract:**
-
-Each convergence round dispatches **two isolated consolidated passes** — Pass A and Pass B. Each pass runs the tier-appropriate reviewer set through `reviewer-consolidator`, writing to disjoint suffixed draft paths (`.claude/pr-review-final-A.md` / `.claude/pr-review-inline-A.json` for Pass A; `-B` equivalents for Pass B). The two passes run concurrently. They never read each other's drafts — context-isolation between the two passes is mandatory and enforced by the dispatch contract (each pass receives only the original diff, policy, and PR metadata from the current round).
-
-**Comparator — three branches:**
-1. Both passes emit `APPROVE` → verdict is `CONVERGED_APPROVE`. Proceed to the existing Publish Gate.
-2. Both passes emit `REQUEST_CHANGES` → verdict is `CONVERGED_CHANGES`. Proceed to the existing Publish Gate with a `REQUEST_CHANGES` event.
-3. Passes diverge (one `APPROVE`, one `REQUEST_CHANGES`):
-   - If `round < 3`: run a **fresh round**. Round-N reviewers receive ONLY the original diff/policy/conversation — no artifacts from any prior round are passed forward. Freshness is mandatory; prior-round outputs must not appear in the next round's dispatch.
-   - If `round == 3` and still divergent: **STOP and escalate** both review bodies to the operator with a structured comparison. The system never auto-resolves a divergence by picking a winner between the two passes. The operator decides.
-
-**Hard cap:** max 3 rounds. Round counting begins at 1. Escalation on round-3 divergence is unconditional.
-
-**Pre-gate positioning:** Convergence runs strictly BEFORE the Publish Gate. The loop never calls a GitHub write verb (`gh pr review`, `POST /reviews`, `PUT`, `POST /comments`, or any equivalent). Writing to GitHub is the sole responsibility of the Publish Gate after operator approval.
-
-**Round-state recording:**
-- `00-state.md` carries a `convergence` block: `round`, `last_verdict_A`, `last_verdict_B`, `status` (`running` / `converged` / `escalated`).
-- The execution-events trace receives a `review.convergence.round` event for each round, carrying `round`, `verdict_A`, `verdict_B`, and `outcome` (`converged_approve` / `converged_changes` / `divergent_continue` / `divergent_escalate`).
-
-**Escalation format (round-3 divergent STOP block):**
-```
-STOP — Dual-Review Convergence: reviewer disagreement after 3 rounds.
-Pass A verdict: {APPROVE | REQUEST_CHANGES}
-Pass B verdict: {APPROVE | REQUEST_CHANGES}
-Pass A body: {.claude/pr-review-final-A.md}
-Pass B body: {.claude/pr-review-final-B.md}
-Action required: operator reviews both bodies and decides the final verdict.
-The system cannot auto-resolve this disagreement. Resume with the chosen verdict.
-```
-
-**Call site:** the `skills/review-pr` Phase 3.1 standalone path is this contract's call site. The SDD pipeline no longer has a pre-STAGE-GATE-3 internal-review phase of its own (that phase was retired — its coverage is delegated to PR review, per `CLAUDE.md § 8`); this convergence contract survives here for `/th:review-pr`'s own on-demand dual-pass option.
-
 ## Read-Only Working-Tree Guard
 
-This guard applies to the `review` direct mode running over the operator's active repository. It does NOT apply to the `/th:review-pr` skill flow, which already runs in a separate worktree with a cleanup trap (`skills/review-pr/SKILL.md:71-78`) and does not mutate the operator's checkout.
+This guard applies to the `review` direct mode running over the operator's active repository. The `/th:review-pr` skill also reviews a detached worktree and performs the same before/after tree comparison; see `skills/review-pr/SKILL.md § Gather`.
 
 ### Layer 1 — No-dispatch
 
-Review mode MUST NOT dispatch `implementer` or any agent that has write tools over working-tree source files. The review pipeline invokes only `reviewer` and (in multi-reviewer mode) `reviewer-consolidator`. Any intent that would require implementation work must be routed to the full pipeline, not handled within a review mode invocation.
+Review mode MUST NOT dispatch `implementer` or any agent to change working-tree source files. It may dispatch `reviewer`, selected QA/security lenses, and `reviewer-consolidator`; all are review-only in this mode. Any implementation request routes to the full pipeline.
 
 ### Layer 2 — Deny-tools (system-prompt prohibition)
 
-`reviewer` and `reviewer-consolidator` both declare `Edit` and `Write` in their frontmatter tool grants. Those grants cannot be revoked from the dispatch side; the prohibition is therefore expressed as an imperative constraint in each agent's system prompt (see `agents/reviewer.md` § Read-Only Working-Tree Contract and `agents/reviewer-consolidator.md` § Read-Only Working-Tree Contract). The permitted writes for each agent are:
+The review agents' system prompts constrain their writes. The permitted review-mode writes are:
 
 - `reviewer-consolidator`: ONLY `.claude/pr-review-*` draft files (`.claude/pr-review-final.md`, `.claude/pr-review-inline.json`, etc.).
-- `reviewer`: ONLY the workspace doc `workspaces/{feature-name}/reviews/04-review.md`.
+- `reviewer`: none; it returns its draft in the status block.
+- QA/security lenses: only their declared transient `.claude/pr-review-*.md` outputs.
 
-NEVER write to source files, configuration files, or any other path in the working tree outside those two zones.
+NEVER write to source files, configuration files, or any path outside those declared zones.
 
 ### Layer 3 — Tree-verify
 
@@ -407,23 +368,24 @@ Check the `Submode` / `Mode` field in the task payload:
 
 ### Step 1 — Receive pre-fetched data (Fresh Review)
 
-The skill already passed all data inline. Extract:
-- PR number, title, body, author, base/head branches, additions/deletions, URL
+The skill already passed the review coordinates and artifact paths. Extract:
+- PR number, title, author, base/head branches, and URL
 - Reviewed head SHA, base SHA, merge-base SHA, and context hash
-- Commit list and structured conversation context
-- Linked issue (number, title, body, labels) or "none"
-- Changed files list
-- Full diff (may be truncated if >3000 lines)
+- Detached worktree and review-artifact root
+- Context, conversation, diff, changed-files, checks, and optional policy paths
+- Workspace and optional linked-issue artifact paths
 
 Zero Bash in this step.
 
 ### Step 2 — Invoke reviewer (Fresh Review)
 
-Invoke `reviewer` in **fresh mode** via Task tool, passing ALL data inline. Include the policy fields when present:
+Invoke `reviewer` in **fresh mode** via Task tool, passing coordinates and artifact paths:
 
 ```
 mode: data-provided
+Focus: {general|architecture|security}
 PR: #{number}
+Repository: {owner}/{repo}
 Title: {title}
 Author: {author}
 Base: {base}
@@ -432,22 +394,17 @@ Reviewed Head SHA: {reviewed_head_sha}
 Base SHA: {reviewed_base_sha}
 Merge Base SHA: {reviewed_merge_base_sha}
 Context Hash: {context_hash}
-Commits: {commit list}
-Additions: +{N}
-Deletions: -{N}
 URL: {url}
-Body: {body}
-Linked Issue: #{issue_number} or "none"
-Issue Title: {title} or "N/A"
-Issue Body: {body} or "N/A"
-Issue Labels: {labels} or "N/A"
-Has Policy: {true|false}
-Review Policy: {verbatim content of .team-harness/review-policy.md, or omit when Has Policy: false}
-Conversation Context: {structured ledger rendered by the skill}
-Changed Files:
-{file list}
-Full Diff:
-{diff}
+Worktree: {worktree}
+Review Artifacts Root: {absolute path}
+Context Path: {context path}
+Conversation Path: {conversation path}
+Diff Path: {diff path}
+Changed Files Path: {changed-files path}
+Checks Path: {checks path}
+Policy Path: {policy path or "none"}
+Workspace Path: {workspace path or "none"}
+Linked Issue Path: {issue artifact path or "none"}
 ```
 
 ### Step 2b — Invoke reviewer (Update Body)
@@ -497,32 +454,33 @@ The skill handles user approval and publishing via `POST .../comments/{id}/repli
 
 ### Step 2d — Consolidation (Mode: review-consolidate)
 
-Invoked when the skill ran 2+ parallel focused reviewers and needs the drafts merged.
+Invoked when more than one selected review lens produced a draft.
 
 Extract from the payload:
-- `Focuses:` list (e.g., `["security","architecture","style"]`)
+- selected source paths
 - PR metadata (number, title, author, URL)
 - `Reviewed Head SHA` and `Context Hash`
 
 Invoke `reviewer-consolidator` via Task tool, passing:
 ```
-Focuses: {focuses list}
 PR: #{number}
 Title: {title}
 Author: {author}
 URL: {url}
 Reviewed Head SHA: {reviewed_head_sha}
 Context Hash: {context_hash}
-Draft Files: .claude/pr-review-draft-{focus}.md per focus
-Inline Files: .claude/pr-review-inline-{focus}.json per focus
+Reviewer Drafts: {supplied .claude/pr-review-draft*.md paths}
+Reviewer Inline Files: {supplied .claude/pr-review-inline*.json paths}
+QA Draft: {.claude/pr-review-qa.md or "none"}
+Security Draft: {.claude/pr-review-security.md or "none"}
 ```
 
-The consolidator reads the focus draft files, applies de-dup rules, builds the unified review_body and inline_findings, and writes `.claude/pr-review-draft.md` and `.claude/pr-review-inline.json`.
+The consolidator de-duplicates by logical fingerprint, adjudicates severity from evidence, and writes `.claude/pr-review-final.md` plus `.claude/pr-review-inline.json`.
 
 Return to the skill:
 ```
-Consolidated review draft written to .claude/pr-review-draft.md
-Decision: {APPROVE or CHANGES_REQUESTED}
+Consolidated review draft written to .claude/pr-review-final.md
+Decision: {APPROVE, CHANGES_REQUESTED, or COMMENT}
 Contradictions: {true|false}
 ```
 
@@ -534,12 +492,12 @@ Take `review_body` from the reviewer's status block and write it to `.claude/pr-
 
 Read `.claude/pr-review-draft.md` back to confirm it was written correctly.
 
-If the reviewer also returned `inline_findings`, write them to `.claude/pr-review-inline.json` (fresh mode only).
+Write `inline_findings` to `.claude/pr-review-inline.json` in fresh mode. Validate that it is a JSON array whose objects contain only `path`, `line`, and `body`.
 
 Return to the skill:
 ```
 Review draft written to .claude/pr-review-draft.md
-Decision: {APPROVE or CHANGES_REQUESTED}
+Decision: {APPROVE, CHANGES_REQUESTED, or COMMENT}
 ```
 
 The skill handles user approval and publishing.

@@ -51,7 +51,7 @@ PLUGIN_DIR = REPO_ROOT / ".claude-plugin"
 # A read-only agent gaining Bash is a trust-boundary regression, which is why
 # the list is declared rather than derived.
 READ_ONLY_AGENTS = {
-    "architect", "security", "qa", "qa-plan",
+    "architect", "security", "qa", "qa-plan", "reviewer",
     "plan-reviewer", "mentor", "adversary",
 }
 
