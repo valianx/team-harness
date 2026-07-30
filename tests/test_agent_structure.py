@@ -36164,7 +36164,11 @@ _s157_knowledge = read(REPO_ROOT / "docs" / "knowledge.md")
 _s157_pr_template = read(REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md")
 _s157_test_yml = read(REPO_ROOT / ".github" / "workflows" / "test.yml")
 _s157_discipline = read(REPO_ROOT / "docs" / "worktree-discipline.md")
-_s157_leader = read(AGENTS_DIR / "leader.md")
+# Repoint (post-fusion): leader.md's own "Phase 0a" numbering is gone — the
+# same boot-time preflight worktree sweep step now lives in orchestrator.md's
+# Intake step "1a", worded as "Preflight worktree sweep" rather than
+# "Boot-time preflight worktree sweep".
+_s157_orch = SPLIT_CORPUS
 
 _S157_CLAUDE_63_STOPS = ("\n### 6.4", "\n## 7", "\n---\n")
 _s157_claude_63_slice = _slice_section(
@@ -36175,9 +36179,9 @@ _s157_lifecycle_release_slice = _slice_section(
     _s157_lifecycle, "## The unified release event", _S157_LIFECYCLE_STOPS
 )
 _s157_leader_1a_slice = _slice_section(
-    _s157_leader,
-    "1a. **Boot-time preflight worktree sweep.**",
-    ("\n2. **Start the KG session.**",),
+    _s157_orch,
+    "1a. **Preflight worktree sweep**",
+    ("\n2. **Start the knowledge session.**",),
 )
 
 # --- Task-2 AC-1: internal carve-out retired, per-PR bump applies to
@@ -36441,29 +36445,32 @@ check(
     "is same-session best-effort — Task-4 AC-2",
 )
 
-# --- Task-4 AC-3: agents/leader.md Phase 0a gains the boot-time preflight
-# sweep step, referencing Rule 7/5/6 by pointer -----------------------------
+# --- Task-4 AC-3: orchestrator.md Intake step 1a carries the boot-time
+# preflight sweep step, referencing Rule 7 by pointer -----------------------
+# Repoint (post-fusion): leader.md's own numbering ("Phase 0a") is gone;
+# the step lives in orchestrator.md's Intake sequence instead.
 check(
-    "s157(t4-ac3a): leader.md Phase 0a declares the boot-time preflight "
+    "s157(t4-ac3a): orchestrator.md Intake declares the preflight "
     "worktree sweep step",
     bool(_s157_leader_1a_slice),
-    "marker '1a. **Boot-time preflight worktree sweep.**' not found in "
-    "agents/leader.md Phase 0a — Task-4 AC-3",
+    "marker '1a. **Preflight worktree sweep**' not found in "
+    "agents/orchestrator.md Intake — Task-4 AC-3",
 )
 check(
-    "s157(t4-ac3b): leader.md's preflight sweep step references "
+    "s157(t4-ac3b): orchestrator.md's preflight sweep step references "
     "worktree-discipline.md § Rule 7 by pointer",
     "docs/worktree-discipline.md § Rule 7" in _s157_leader_1a_slice,
-    "agents/leader.md step 1a must reference 'docs/worktree-discipline.md § "
+    "agents/orchestrator.md Intake step 1a must reference 'docs/worktree-discipline.md § "
     "Rule 7' — Task-4 AC-3",
 )
-check(
-    "s157(t4-ac3c): leader.md's preflight sweep composes with Rule 6's "
-    "per-lane isolation for multi-project initiatives",
-    "composing with Rule 6" in _s157_leader_1a_slice,
-    "agents/leader.md step 1a must state it composes with Rule 6's "
-    "per-lane isolation — Task-4 AC-3",
-)
+# RETIRED (coordinator-fusion): the original check asserted composition with
+# Rule 6's PER-LANE isolation for a concurrent multi-project fan-out.
+# docs/worktree-discipline.md § Rule 6 (retitled "RETIRED for coordinator
+# fan-out; worktree-per-project survives serially") states plainly that the
+# coordinator-level fan-out this rule gated no longer exists — multi-project
+# work is now a serial sequence inside the single coordinator, so there is
+# no concurrent-lane collision class left for a per-lane composition to
+# guard against. The subject (per-lane isolation) is gone, not relocated.
 
 # --- Task-4 AC-4: mode-only allow-list precision — dual numstat, 0\t0 -----
 check(
