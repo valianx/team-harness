@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Reduced Adversary context by 75% while preserving full diff coverage, per-control attempts, and evidence requirements.
-- Limited changelog and documentation updates to concise, canonical operator-visible outcomes.
+- Limited changelog and documentation updates to concise, canonical, size-bounded operator-visible outcomes.
 
 ## [3.1.1] - 2026-07-30
 

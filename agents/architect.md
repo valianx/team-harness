@@ -151,6 +151,16 @@ notes to reference docs, or plan documentation for internal refactors. Cross-lin
 may point to the canonical page but must not copy its prose. Changelog and version
 assembly are Delivery concerns and never appear as implementation tasks.
 
+For every planned README or `docs/**` path, the task must carry one compact line:
+`Docs: {path} | audience: {who} | purpose: {why} | sections: {names} | budget: {standard|extended}`.
+The default budget is one existing
+section and at most 20 added nonblank lines, or at most 80 total lines for a
+necessary new document. Follow the repository's nearest documentation format; if
+none exists, use one title, a one-sentence purpose, and only task-oriented
+sections needed to use the changed behavior. A larger budget is valid only when
+the AC records `Documentation budget: extended — {reason}; max {N} lines`.
+Generated specifications and schemas are outside the prose line budget.
+
 #### Default: delivery grouping
 
 **The pipeline never divides one task's plan or implementation.** One task = one plan = one implementation = one approved delivery. If scope looks too large for one task, SURFACE it to the operator as a `### Decisions for human review` item — never split a plan or implementation on your own authority. Splitting scope into multiple workspaces is the operator's call. (Canonical: `agents/ref-special-flows.md § "Operator-authority invariant"`.)

@@ -69,6 +69,17 @@ location. Do not add background, implementation narrative, release notes,
 examples unrelated to the changed behavior, per-service copies, or new overview
 pages. Never add documentation through scope drift.
 
+Honor the task's documentation audience, purpose, required sections, and budget.
+By default, edit one existing section with at most 20 added nonblank lines, or
+keep a necessary new document at 80 total lines. Exceed that only when the AC
+contains `Documentation budget: extended — {reason}; max {N} lines`; generated
+specifications and schemas are excluded from the prose count. Preserve the
+nearest local document's structure and voice. If no format exists, use one title,
+a one-sentence purpose, and only the task-oriented sections needed to use the
+changed behavior. Use at most one minimal example unless the AC requires distinct
+cases. Do not add introductions, conclusions, FAQs, architecture tours, or
+restate the same fact in multiple sections.
+
 For `type: fix` or `type: hotfix`, the causal scope in `01-root-cause.md § Bug Location` and `§ Scope of Fix` is an additional boundary:
 
 - change only production code on the regression's causal path;

@@ -23,7 +23,12 @@
 - Update tracked documentation only when shipped behavior would make its canonical source
   factually false, or a new public contract/operator workflow otherwise has no documentation.
   Change the single closest source of truth; do not duplicate the same explanation per service
-  or add implementation/release narrative to reference documentation.
+  or add implementation/release narrative to reference documentation. Preserve the nearest local
+  format. The default budget is one existing section and at most 20 added nonblank lines, or
+  80 total lines for a necessary new document. A plan may exceed it only through
+  `Documentation budget: extended — {reason}; max {N} lines`. With no local format, use one title,
+  a one-sentence purpose, and only task-oriented sections; omit introductions, conclusions, FAQs,
+  architecture tours, repeated facts, and examples not required to use the changed behavior.
 - If §3 Tech Stack or §4 Golden Commands of CLAUDE.md changed, update those sections in the same
   PR — do not let CLAUDE.md drift from the repo.
 - If the change establishes a decision, pattern, or constraint that future work must respect,
