@@ -256,6 +256,7 @@ net_new: N
 inline_findings:
   - path: src/service.ts
     line: 42
+    side: RIGHT
     body: |
       **Blocking: Concrete claim**
 
@@ -271,13 +272,14 @@ review_body: |
   Verdict: **REQUEST CHANGES**
   Findings: **1 blocking**, **0 suggestions**
   Checks: passing
-  Mergeability at capture: **clean | conflicting | indeterminate**
+  Mergeability at capture: **clean | conflicting | indeterminate** (`mergeable={raw}`, `mergeStateStatus={raw}`)
 reference_loaded: lens names | none | unavailable
 summary: one sentence with counts and verdict
 issues: blocker headlines | none
 ```
 
-Omit `failure_kind` on success. `inline_findings` contains only `path`, `line`, and `body`.
+Omit `failure_kind` on success. `inline_findings` contains only `path`, `line`, `side`, and `body`;
+`side` is required and must be `LEFT` or `RIGHT`.
 Return `[]` when empty. `decision` mirrors the recommendation while `event` uses the GitHub enum.
 
 Update-body mode:

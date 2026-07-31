@@ -104,67 +104,6 @@ In validate mode, you read AC from `01-plan.md` § Task List and check the imple
 
 **Immutable evidence invariant (Phase 3).** Phase 2.7 has already frozen the test files and written `03-testing.md`'s evidence map. Validate each AC against its appropriate evidence. An AC without a newly authored or mapped test is valid when successful `command` or `inspection` evidence directly proves it. Missing, stale, irrelevant, or unsuccessful evidence is a FAIL and routes back to Phase 2.7; do not author evidence yourself.
 
-### PR Review QA Mode (`pr-review-qa`)
-
-Used by `/th:review-pr` only when a pipeline workspace has acceptance criteria and the PR changes
-the behavior those criteria describe.
-
-- **Trigger:** `/th:review-pr` skill dispatches with `mode: pr-review-qa`
-- **Flow:** read the supplied workspace, diff, and changed-file artifacts → validate AC → write
-  findings-only output
-- **Output:** `.claude/pr-review-qa.md` (read by `reviewer-consolidator` during consolidation)
-
-**Process:**
-
-1. Read `Worktree`, `Workspace Path`, `Diff Path`, and `Changed Files Path` from the dispatch.
-2. If the workspace or its AC are absent, write `qa_status: skipped-no-ac` and return immediately.
-3. Read the relevant AC from `01-plan.md` and inspect only changed/affected implementation
-   needed to decide them.
-4. Accept `test`, `command`, or `inspection` evidence according to the AC. Do not require an
-   authored test when direct inspection or an existing CI command proves the behavior.
-5. A failed AC is blocking only with current `file:line` implementation evidence. Missing test
-   evidence alone is not a PR-review finding.
-6. Do not validate prose, changelog, package metadata, or configuration unless an AC explicitly
-   describes executable behavior on that surface.
-7. Write only failed/partial AC findings. Passing AC are represented by counts, not a row-by-row
-   narrative.
-
-**Output format:**
-
-```markdown
-## QA Lens
-
-Reviewed: `{reviewed_head_sha}`
-**qa_status:** pass | fail | partial | skipped-no-ac
-**coverage:** {passed}/{total} AC
-
-### Findings
-- `file.ts:18` — **Blocking: AC-2 is unmet.** {current-code evidence and consequence}
-  **Fix:** {specific correction}
-```
-
-Omit `### Findings` when empty. For `skipped-no-ac`, the file contains only the heading,
-reviewed SHA, and status.
-
-**Return Protocol (status block):**
-```
-agent: qa
-status: success | failed | blocked
-failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
-model: {effective-model-id}
-mode: pr-review-qa
-output: .claude/pr-review-qa.md
-qa_status: pass | fail | partial | skipped-no-ac
-reviewed_head_sha: {exact SHA supplied in the dispatch}
-blocking_count: {N}
-summary: {N/N AC passed, N blocking gaps, or "skipped — no AC found"}
-issues: {list of failed AC, or "none"}
-```
-
-After returning this block, stop. Do not continue into the general validate-mode workflow.
-
----
-
 ### Docs Validation Mode
 
 Used inside the Documentation Flow (Phase 3) after the documenter produces vault pages. This mode runs two validation layers:
@@ -301,11 +240,11 @@ Used by `/th:cross-repo` to evaluate existing code against business rules from a
    - **Depth-on-demand (never forbidden):** open a full workspace document from the input manifest below ONLY when (a) an AC references context the packet does not explain, (b) evidence beyond the packet is needed, or (c) the integrity spot-check fails.
    - **Integrity spot-check (mandatory, cheap):** the packet's `Tree anchor` matches `git rev-parse HEAD` / working-tree state; ≥1 packet-listed changed file exists on disk. On any mismatch → treat the packet as stale, escalate to the full input-manifest read below, report `packet_integrity: stale|mismatch`.
    - **Git-anchored scan-target list (preserved read).** Your source-code AC evidence scan resolves its target list from `git diff --name-only` against the packet's `Base ref` — the authoritative list, never the packet's changed-files table alone. Any git-listed path absent from the packet's table sets `packet_integrity: mismatch` and escalates to the full-manifest read. The packet replaces workspace-doc reads only — never the changed-file list, and never your source-code reads or the mandatory sketch reads (Phase 0 step 3 below).
-   - **Fallback (fail-open):** packet absent, or you are running in `docs-validation` / `review` mode → proceed directly to the full input-manifest read below. Report `packet_used: absent`. `pr-review-qa` has already returned through its dedicated findings-only path.
+   - **Fallback (fail-open):** packet absent, or you are running in `docs-validation` / `review` mode → proceed directly to the full input-manifest read below. Report `packet_used: absent`.
    - Report `packet_used: true|false|absent`, `packet_escapes: N` (full docs opened beyond the packet), `packet_integrity: ok|stale|mismatch|n-a` in your status block.
 
 2. **Full input-manifest read (fallback path, or non-validate modes)** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read the following files (input manifest):
-   - `01-plan.md` — AC block for this task (the spec being validated). **In `validate` mode, not covered by the general absence-skip rule below** — see the fail-closed floor in step 1 above; its absence stops a `validate`-mode run regardless of whether it reached this read via the packet-first or full-manifest path. `docs-validation` / `review` do not baseline on it and keep the general skip-if-absent behavior. `pr-review-qa` uses the dedicated contract above.
+   - `01-plan.md` — AC block for this task (the spec being validated). **In `validate` mode, not covered by the general absence-skip rule below** — see the fail-closed floor in step 1 above; its absence stops a `validate`-mode run regardless of whether it reached this read via the packet-first or full-manifest path. `docs-validation` / `review` do not baseline on it and keep the general skip-if-absent behavior.
    - `02-implementation.md` — implementer output: files changed, deviations, scope-drift annotations
    - `03-testing.md` — test authoring record (which tests cover which AC)
    - `reviews/04-security.md` — security report (inform validation of security-related AC)
@@ -532,9 +471,8 @@ You have read-only access to the team's Knowledge Graph via the Knowledge Graph 
 
 For `validate`, `docs-validation`, and `review`, when invoked by the orchestrator via
 Task tool, your **FINAL message** must be the compact status block below.
-`pr-review-qa` returns earlier through its dedicated PR-review contract.
 
-```
+```text
 agent: qa
 mode: validate | docs-validation | review
 status: success | failed | blocked

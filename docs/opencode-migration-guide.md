@@ -19,12 +19,11 @@
 **Emit-time frontmatter delta.** The body content of agent and command files requires no modification. The migration applies a frontmatter transformation at emit time, driven by the Item 1 adapter descriptor — not by hand-editing each file. The transform covers:
 
 - **Tool permissions:** omitted from general installed agents and commands so the host's native policy remains authoritative. `reviewer`, `pr-review-qa`, `pr-review-security`, and `reviewer-consolidator` instead receive `"*": deny` plus read/glob/grep allows.
-- **Model identifiers:** bare model names → provider-prefixed identifiers (e.g., `claude-opus-4-5` → `anthropic/claude-opus-4-5`).
 - **Mode:** add explicit `mode` field if absent.
 - **Argument placeholder:** `$ARGUMENTS` is the canonical placeholder on both harnesses (verified against live Claude Code and opencode docs). The transform is **identity** — no rewrite is needed. (A prior draft of this guide listed `{input}` → `$ARGUMENTS`, but `{input}` is not a token in either live harness.)
 - **Relocation:** agent files → `.opencode/agents/`; command files → `.opencode/commands/`.
 
-This transform is deterministic and idempotent. General permission and model fields intentionally do not round-trip because OpenCode inherits host policy and model selection; the closed PR-agent exception projects a deny-by-default read-only map. The canonical body remains in `agents/` unchanged; the projected copy lands in the target harness directory. Host overrides remain outside the guarantee of the emitted artifact.
+This transform is deterministic and idempotent. General permission and model fields are omitted so OpenCode inherits host policy and model selection; the closed PR-agent exception projects a deny-by-default read-only map. The canonical body remains in `agents/` unchanged; the projected copy lands in the target harness directory. Host overrides remain outside the guarantee of the emitted artifact.
 
 ### Hooks
 

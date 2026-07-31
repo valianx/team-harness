@@ -33,6 +33,7 @@ findings:
     severity: blocking | suggestion
     path: path/to/file
     line: N
+    side: LEFT | RIGHT
     claim: concise unmet behavior
     evidence: current implementation evidence
     fix: concrete correction
@@ -40,5 +41,6 @@ summary: one sentence
 issues: blocker headlines | none
 ```
 
-Omit `failure_kind` on success. Never write files or choose a persistence path; the coordinator
-persists the validated return.
+Omit `failure_kind` on success. Every anchored finding includes the frozen-diff `side`; never
+guess it when the supplied diff does not support the anchor. Never write files or choose a
+persistence path; the coordinator persists the validated return.

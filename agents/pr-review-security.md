@@ -39,7 +39,8 @@ draft: |
   Reviewed: `exact supplied SHA`
   Security: **clean | findings**
 
-  {Findings as `path:line` + severity + CWE + evidence/consequence + fix; omit when clean.}
+  {Findings as `path:line:side` + severity + CWE + evidence/consequence + fix; `side` is LEFT or
+  RIGHT from the frozen diff; omit findings when clean.}
 summary: one sentence with counts
 issues: blocking headlines | none
 ```

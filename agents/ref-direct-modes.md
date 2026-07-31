@@ -436,8 +436,10 @@ Checks Path: {checks path}
 Existing Review Path: {current review body artifact path}
 ```
 
-Require the exact reviewed SHA and context hash in the status block. Take `review_body` from the
-reviewer's status block and write it to `.claude/pr-review-draft.md`. Jump to Step 3.
+Require the exact reviewed SHA and context hash in the status block. Run the required frozen
+worktree and review-artifact-root snapshot comparison before trusting the return. Only after both
+snapshots match may the coordinator write `review_body` to `.claude/pr-review-draft.md`. Jump to
+Step 3.
 
 ### Step 2c — Invoke reviewer (Reply)
 
@@ -465,8 +467,10 @@ Thread context:
   original_body: {the inline comment text}
 ```
 
-Require the exact reviewed SHA and context hash in the status block. Take `reply_body` from the
-reviewer's status block and write it to `.claude/pr-review-reply-draft.md`. Return to the skill:
+Require the exact reviewed SHA and context hash in the status block. Run the required frozen
+worktree and review-artifact-root snapshot comparison before trusting the return. Only after both
+snapshots match may the coordinator write `reply_body` to `.claude/pr-review-reply-draft.md`.
+Return to the skill:
 ```
 Reply draft written to .claude/pr-review-reply-draft.md
 Thread ID: {comment_id}
@@ -497,7 +501,9 @@ QA Draft: {.claude/pr-review-qa.md or "none"}
 Security Draft: {.claude/pr-review-security.md or "none"}
 ```
 
-The consolidator de-duplicates by logical fingerprint, adjudicates severity from evidence, and writes `.claude/pr-review-final.md` plus `.claude/pr-review-inline.json`.
+The consolidator de-duplicates by logical fingerprint, adjudicates severity from evidence, and
+returns the consolidated body and findings inline. After the snapshot comparison passes, the
+coordinator persists them to `.claude/pr-review-final.md` and `.claude/pr-review-inline.json`.
 
 Return to the skill:
 ```
@@ -508,13 +514,16 @@ Contradictions: {true|false}
 
 ### Step 3 — Build draft
 
-Take `review_body` from the reviewer's status block and write it to `.claude/pr-review-draft.md`.
+After the required frozen worktree and review-artifact-root snapshot comparison passes, take
+`review_body` from the reviewer's status block and write it to `.claude/pr-review-draft.md`.
 
 **Validation:** If `review_body` is empty, re-invoke reviewer once. If still empty, return `status: failed`.
 
 Read `.claude/pr-review-draft.md` back to confirm it was written correctly.
 
-Write `inline_findings` to `.claude/pr-review-inline.json` in fresh mode. Validate that it is a JSON array whose objects contain only `path`, `line`, and `body`.
+Write `inline_findings` to `.claude/pr-review-inline.json` in fresh mode. Validate that it is a JSON
+array whose objects contain only `path`, `line`, `side`, and `body`; `side` is required and must be
+`LEFT` or `RIGHT`. Preview and validate the full `(path, line, side)` anchor against the frozen diff.
 
 Return to the skill:
 ```

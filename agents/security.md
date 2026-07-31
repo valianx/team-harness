@@ -880,7 +880,7 @@ You have read-only access to the team's Knowledge Graph via the Knowledge Graph 
 
 ## Return Protocol
 
-For `audit`, `focused`, `pipeline`, and `design-review`, when invoked by the
+For `audit`, `focused`, and `pipeline`, when invoked by the
 orchestrator via Task tool, your **FINAL message** must be the compact status block below.
 
 ```

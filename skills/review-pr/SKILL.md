@@ -306,8 +306,11 @@ blocker. Keep at most five suggestions globally. Omit style-only nitpicks.
 Inline JSON must contain only GitHub fields:
 
 ```json
-[{"path":"src/file.ts","line":42,"body":"..."}]
+[{"path":"src/file.ts","line":42,"side":"RIGHT","body":"..."}]
 ```
+
+Every inline finding requires `side: LEFT | RIGHT`. Validate the full `(path, line, side)` anchor
+against the frozen diff before preview and preserve `side` unchanged in the published comments.
 
 ## Prior-review check
 
@@ -327,7 +330,7 @@ Unless `--auto-publish` was supplied, show:
 1. reviewed head SHA, base SHA, and capture time;
 2. classified mergeability and both raw GitHub values;
 3. the exact body;
-4. every inline comment with path and line;
+4. every inline comment with path, line, and side;
 5. any superseded review ID;
 6. the recommended event.
 

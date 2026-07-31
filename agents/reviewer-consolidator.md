@@ -35,7 +35,7 @@ concise professional English for GitHub output and status-block fields.
 Convert each actionable source finding into:
 
 ```text
-path, line/range, severity, category, claim, evidence, consequence, fix, source
+path, line/range, side, severity, category, claim, evidence, consequence, fix, source
 ```
 
 Map source severities:
@@ -89,7 +89,7 @@ specialized evidence, for example `(security)`. Do not add per-agent sections.
 The inline JSON contains only GitHub fields:
 
 ```json
-[{"path":"src/file.ts","line":42,"body":"..."}]
+[{"path":"src/file.ts","line":42,"side":"RIGHT","body":"..."}]
 ```
 
 ## Verdict
@@ -141,7 +141,7 @@ blocking_count: N
 suggestion_count: N
 event: APPROVE | REQUEST_CHANGES | COMMENT
 decision: APPROVE | CHANGES_REQUESTED | COMMENT
-inline_findings: [{path, line, body}]
+inline_findings: [{path, line, side, body}]
 review_body: complete concise body
 contradictions_found: true | false
 summary: one sentence with counts and verdict
