@@ -13,22 +13,6 @@
 
 ## Install
 
-### Codex beta
-
-Add the repository marketplace with `codex plugin marketplace add
-valianx/team-harness`, run `codex plugin add team-harness@team-harness`, and
-start a new thread. Review and trust the repository hooks before enabling them.
-Plugin lifecycle and six-agent installation (`install apply --runtime codex
---scope project`) are separate. The six agents are required before the gated
-workflow can delegate; plugin-only skills remain usable without them. In a
-clean `Main` thread, type `@Team-Harness init <task>` for lightweight intake
-and simple direct work; this does not create pipeline state or subagents. Use
-`@Team-Harness pipeline <task>` only when you want the full gated workflow.
-Both run in `Main`; neither creates a seventh coordinator or requires `/agent`.
-Upgrade/remove commands, the local contributor flow, and the
-six-role/seven-skill roster are in
-[`docs/codex-runtime.md`](./docs/codex-runtime.md).
-
 ### Claude Code
 
 1. Add the marketplace:
@@ -45,6 +29,63 @@ six-role/seven-skill roster are in
 ```
 /th:setup
 ```
+
+### Codex beta (POSIX only)
+
+1. Add the repository marketplace:
+```text
+codex plugin marketplace add valianx/team-harness
+```
+
+2. Install the plugin:
+```text
+codex plugin add team-harness@team-harness
+```
+
+Review the [plugin hook manifest](./plugins/team-harness/hooks/hooks.json) and
+its referenced scripts, then explicitly trust the repository before enabling
+those hooks. Plugin installation and agent installation are separate. The
+plugin provides the Team Harness skills; the six generated agents are installed
+by the repository's Go binary.
+
+3. From the root of the project where Team Harness will run, install its six
+   agents (requires Go 1.25.8 or newer):
+```bash
+cd /path/to/your/project
+go run github.com/valianx/team-harness/cmd/install@latest apply --runtime codex --scope project
+```
+
+Without Go, download the matching `install-<os>-<arch>` asset and
+`SHA256SUMS` from [GitHub Releases](https://github.com/valianx/team-harness/releases),
+verify the exact asset before executing it, and run it from the project root.
+For example, after verifying `install-linux-amd64`:
+```bash
+chmod +x install-linux-amd64
+./install-linux-amd64 apply --runtime codex --scope project
+```
+
+The checksum proves that the binary matches the file published in the same
+GitHub release; it does not protect against compromise of the release origin.
+
+Use `--scope global` instead when the six agents should be available from your
+Codex user configuration rather than only this checkout. The six agents are
+required by the gated `pipeline` workflow; lightweight `init` remains
+available with the plugin alone.
+
+4. Start a new Codex thread so the plugin and installed agents are loaded.
+
+5. Try the two entry points in a clean `Main` thread:
+```text
+@Team-Harness init explain how this repository is structured
+@Team-Harness pipeline add an export-to-CSV feature to invoices
+```
+
+`init` performs lightweight intake and direct bounded work without pipeline
+state or subagents. `pipeline` explicitly starts the full gated workflow in
+`Main`; it does not create a seventh coordinator or require `/agent`.
+
+Upgrade, removal, local development, hook trust, and the complete role/model
+roster are documented in [`docs/codex-runtime.md`](./docs/codex-runtime.md).
 
 ### Install into opencode
 
