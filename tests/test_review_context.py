@@ -4,11 +4,14 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 
@@ -40,6 +43,64 @@ def context(**overrides):
 
 
 class ReviewContextTests(unittest.TestCase):
+    def test_security_selection_is_fail_closed_for_every_reason_and_override(self):
+        cases = [
+            ("agents/security.md\n", "+permission boundary\n", "known-sensitive", True),
+            ("docs/guide.md\n", "+clarify review behavior\n", "known-non-executable", False),
+            ("src/plugin.future\n", "+run new handler\n", "unmatched-executable", True),
+            ("", "", "indeterminate", True),
+        ]
+        for changed_files, diff, reason, required in cases:
+            with self.subTest(reason=reason):
+                self.assertEqual(
+                    MODULE.classify_security_change(changed_files, diff),
+                    reason,
+                )
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    changed_path = root / "changed-files.txt"
+                    diff_path = root / "review.diff"
+                    changed_path.write_text(changed_files, encoding="utf-8")
+                    diff_path.write_text(diff, encoding="utf-8")
+                    output = io.StringIO()
+                    with redirect_stdout(output):
+                        MODULE.command_select_security(
+                            SimpleNamespace(
+                                changed_files=changed_path,
+                                diff=diff_path,
+                                explicit_security=False,
+                                tier=None,
+                            )
+                        )
+                    result = json.loads(output.getvalue())
+                self.assertEqual(result["reason"], reason)
+                self.assertEqual(result["security_required"], required)
+
+        for explicit_security, tier, trigger in (
+            (True, None, "explicit"),
+            (False, 4, "tier-4"),
+        ):
+            with self.subTest(trigger=trigger), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                changed_path = root / "changed-files.txt"
+                diff_path = root / "review.diff"
+                changed_path.write_text("docs/guide.md\n", encoding="utf-8")
+                diff_path.write_text("+clarify review behavior\n", encoding="utf-8")
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    MODULE.command_select_security(
+                        SimpleNamespace(
+                            changed_files=changed_path,
+                            diff=diff_path,
+                            explicit_security=explicit_security,
+                            tier=tier,
+                        )
+                    )
+                result = json.loads(output.getvalue())
+                self.assertEqual(result["reason"], "known-non-executable")
+                self.assertTrue(result["security_required"])
+                self.assertEqual(result["triggers"], [trigger])
+
     def test_capture_binds_mergeability_and_rejects_mid_capture_drift(self):
         metadata = {
             "number": 1,

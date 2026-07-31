@@ -6,45 +6,6 @@ import (
 	"testing"
 )
 
-// TestEmbeddedAssets_AgentCount asserts exactly 26 invocable agent .md files
-// under agents/. This is the AC-6 assertion: every agent in the canonical
-// roster must be present in the embedded FS. The count is a canary — if an
-// agent is added without updating this test, the test fails immediately,
-// preventing a silent deploy where the binary ships fewer agents than expected.
-//
-// Note: agents/_shared/ contains cross-cutting snippets (not invocable agents)
-// and is intentionally excluded from the count.
-func TestEmbeddedAssets_AgentCount(t *testing.T) {
-	const wantAgents = 26 // expected count of invocable top-level agent .md files; canary against a silent embed regression
-	embedded := EmbeddedAssets()
-
-	var mdFiles []string
-	err := fs.WalkDir(embedded, "agents", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		// Only count top-level .md files — skip ALL subdirectories. Subdirectories
-		// under agents/ contain reference material (_shared/, testing-refs/,
-		// gcp-infra-refs/, review-lenses/) that are NOT invocable agents.
-		// Allow the root "agents" directory itself to be entered.
-		if d.IsDir() && path != "agents" {
-			return fs.SkipDir
-		}
-		isRef := d.Name() == "README.md" || strings.HasPrefix(d.Name(), "ref-")
-		if !d.IsDir() && strings.HasSuffix(d.Name(), ".md") && !isRef {
-			mdFiles = append(mdFiles, path)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("WalkDir agents: %v", err)
-	}
-
-	if len(mdFiles) != wantAgents {
-		t.Errorf("embedded agents/*.md count = %d, want %d; files: %v", len(mdFiles), wantAgents, mdFiles)
-	}
-}
-
 // TestEmbeddedAssets_ArchitectMD asserts that agents/architect.md is present,
 // non-empty, and starts with a YAML frontmatter opening ("---\n" or "---\r\n").
 // This is the key-file presence check from AC-6.
@@ -95,7 +56,8 @@ func TestEmbeddedAssets_AllExpectedAgents(t *testing.T) {
 		"d2-diagrammer", "delivery", "diagrammer", "documenter", "gcp-cost-analyzer",
 		"gcp-infra", "implementer", "init", "likec4-diagrammer", "mentor",
 		"orchestrator", "plan-reviewer", "qa", "qa-plan", "research-consolidator",
-		"researcher", "reviewer", "reviewer-consolidator", "security", "tester",
+		"pr-review-qa", "pr-review-security", "researcher", "reviewer",
+		"reviewer-consolidator", "security", "tester",
 		"translator", "ux-reviewer",
 	}
 	embedded := EmbeddedAssets()

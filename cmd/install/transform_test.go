@@ -317,7 +317,8 @@ var opencodeColorRe = regexp.MustCompile(`^(#[0-9a-fA-F]{6}|primary|secondary|ac
 // TestTransformPlacedFormat_AllAgents applies the opencode transform to every
 // real agent .md file in agents/ and asserts the output is valid opencode format:
 //
-//   - permission is absent so OpenCode's native policy remains authoritative
+//   - PR-review agents receive the exact deny-by-default read-only permission
+//     object; permission is absent for every other agent
 //   - no mcp__* tokens appear in the frontmatter section
 //   - if color is present, it matches the opencode hex-or-enum pattern
 //
@@ -365,7 +366,13 @@ func TestTransformPlacedFormat_AllAgents(t *testing.T) {
 			}
 		}
 
-		if strings.Contains(fmSection, "permission:") {
+		name := strings.TrimSuffix(base, ".md")
+		expectedPermission := `permission: {"*": deny, read: allow, glob: allow, grep: allow}`
+		if isPRReviewAgent(name) {
+			if !strings.Contains(fmSection, expectedPermission) {
+				t.Errorf("agent %s: expected exact deny-by-default PR-review permission; got:\n%s", agentPath, fmSection)
+			}
+		} else if strings.Contains(fmSection, "permission:") {
 			t.Errorf("agent %s: permission must be omitted so native OpenCode policy applies", agentPath)
 		}
 

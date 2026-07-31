@@ -52,20 +52,31 @@ PLUGIN_DIR = REPO_ROOT / ".claude-plugin"
 # the list is declared rather than derived.
 READ_ONLY_AGENTS = {
     "architect", "security", "qa", "qa-plan", "reviewer",
-    "plan-reviewer", "mentor", "adversary", "pr-review-security",
+    "plan-reviewer", "mentor", "adversary", "pr-review-qa",
+    "pr-review-security", "reviewer-consolidator",
 }
 
-NO_MUTATION_AGENTS = {"pr-review-security"}
+PR_REVIEW_AGENT_TOOLS = {
+    "reviewer": [
+        "Read", "Glob", "Grep", "mcp__context7__resolve-library-id",
+        "mcp__context7__query-docs",
+    ],
+    "pr-review-qa": ["Read", "Glob", "Grep"],
+    "pr-review-security": ["Read", "Glob", "Grep"],
+    "reviewer-consolidator": ["Read", "Glob", "Grep"],
+}
+
+NO_MUTATION_AGENTS = set(PR_REVIEW_AGENT_TOOLS)
 
 # The full agent roster. check_0_roster_reachability() below fails when a name
 # here no longer resolves to a file.
 EXPECTED_AGENTS = [
     "orchestrator", "architect", "agent-builder", "security", "reviewer",
-    "reviewer-consolidator", "pr-review-security",
+    "reviewer-consolidator", "pr-review-qa", "pr-review-security",
     "qa", "qa-plan", "gcp-cost-analyzer", "gcp-infra", "init", "implementer", "tester",
-    "plan-reviewer", "diagrammer", "likec4-diagrammer",
+    "plan-reviewer", "diagrammer", "documenter", "likec4-diagrammer",
     "d2-diagrammer", "translator", "delivery", "mentor",
-    "researcher", "research-consolidator", "code-researcher", "adversary",
+    "researcher", "research-consolidator", "code-researcher", "adversary", "ux-reviewer",
 ]
 
 # ---------------------------------------------------------------------------
@@ -255,10 +266,19 @@ def check_1_readonly_bash() -> int:
                     f"agents/{agent_name}.md — no-mutation agent carries {forbidden!r} in tools:",
                 )
 
+        expected_tools = PR_REVIEW_AGENT_TOOLS.get(agent_name)
+        if expected_tools is not None and agent_tools != expected_tools:
+            finding(
+                "FAIL",
+                "check-1",
+                f"agents/{agent_name}.md — PR-review capability allowlist is {agent_tools!r},"
+                f" expected exactly {expected_tools!r}",
+            )
+
     if len(findings) == before:
         print(
             f"  [PASS] check-1 — {passed_count} read-only-tier agents audited;"
-            " no-mutation agents exclude Bash/Edit/Write"
+            " PR-review agents expose their exact read-only allowlists"
         )
     return len(findings) - before
 
