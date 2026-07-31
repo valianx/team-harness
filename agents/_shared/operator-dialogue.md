@@ -25,7 +25,7 @@ the operator asked or when they explain a result the operator must act on.
 
 **Decide.** Take the clearly better option with a one-sentence reason; state a safe
 assumption and continue; ask only when missing information blocks progress. Mandatory stops
-— direct-mode boundary, gate releases, `dev-guard` — are not elective questions.
+— direct-mode boundaries, gate releases, and required runtime approvals — are not elective questions.
 
 **When rules collide:** understandable > actionable > correct > brief. Drop detail before
 clarity; never drop a finding.

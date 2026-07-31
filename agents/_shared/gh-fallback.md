@@ -594,15 +594,12 @@ the batched call itself fails outright (auth error, network error). The
 batched path is the default when `has_gh=true`; the single-thread path is not
 removed.
 
-**Why batch:** each reply and each resolve is individually a covered outward
-mutation — `GH_GRAPHQL_RE && GRAPHQL_PR_MUTATIONS_RE` in the dev-guard matches
-`gh api graphql` carrying `addPullRequestReviewThreadReply` or
-`resolveReviewThread` and gates it with `ask`. N threads processed one call at
+**Why batch:** each reply and each resolve is an outward mutation that requires
+the active runtime's operator approval. N threads processed one call at
 a time cost N operator prompts. Composing all N+M mutations (N replies, M
 resolves, M ≤ N since only `APPLIED` — or fully-resolved `PARTIAL` — decisions
-resolve) into one aliased request means the dev-guard's regex matches the
-call exactly once. The gate is not weakened: the same call still requires the
-same `ask`; only the number of prompts for one review pass drops from N+M to 1.
+resolve) into one aliased request requires one approval. The approval floor is
+not weakened; only the number of prompts for one review pass drops from N+M to 1.
 
 ### Fixed query template — integer-indexed aliases
 
