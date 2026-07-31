@@ -91,7 +91,24 @@ function makeReader(): DevGuardReader {
       try {
         const configPath = path.join(os.homedir(), ".claude", ".team-harness.json");
         const raw = fs.readFileSync(configPath, "utf8");
-        return JSON.parse(raw) as Record<string, unknown>;
+        const config = JSON.parse(raw) as Record<string, unknown>;
+
+        // Codex must not inherit Claude Code's persisted autogate state. The
+        // same ~/.claude/.team-harness.json is intentionally readable for
+        // non-approval settings, but `autogate.pr_create` is a Claude-scoped
+        // convenience and cannot silently approve a Codex PermissionRequest.
+        // Beta policy requires the native Codex prompt (or a future explicit
+        // Codex-scoped authorization); remove the persisted block entirely at
+        // the runtime boundary so every body path sees the same safe view.
+        if (process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
+          const codexConfig: Record<string, unknown> = Object.create(null);
+          for (const key of Object.keys(config)) {
+            if (key !== "autogate") codexConfig[key] = config[key];
+          }
+          return codexConfig;
+        }
+
+        return config;
       } catch {
         return null;
       }

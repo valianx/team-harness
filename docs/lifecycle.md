@@ -1,6 +1,12 @@
-# Dual-runtime lifecycle
+# Multi-runtime lifecycle
 
-Team Harness ships one canonical set of agents and skills to Claude Code (CC) and opencode. Hooks remain a Claude Code runtime surface; opencode uses its native permission and approval model. This document is the single lifecycle reference for both runtimes.
+Team Harness ships one canonical role system to Claude Code (CC), Codex, and
+opencode. The table retains the detailed CC/opencode comparison; Codex uses the
+same tag/version namespace, consumes the tagged Git tree through its repository
+marketplace whose `init` skill loads lightweight intake into a clean `Main`
+thread and whose `pipeline` skill explicitly loads full orchestration,
+and has a separate six-agent installer lifecycle. See
+[`codex-runtime.md`](./codex-runtime.md).
 
 Each stage is marked:
 
@@ -17,8 +23,8 @@ Each stage is marked:
 | **author** | Single source: `agents/*.md`, `skills/*.md`, `hooks/ts/bodies/*.ts` + `hooks/ts/entry/*.cc.ts`. | Agents and skills use the canonical bodies. Agents/commands receive an emit-time name/mode delta; the four PR review agents additionally receive a deny-by-default read/glob/grep permission map. Other per-agent permissions remain omitted and no Team Harness hook plugin is installed. | asymmetric |
 | **build** | The plugin distributes the git tree as-is; `hooks/ts/dist/*.cjs` are pre-built and tracked in git. | The Go installer binary is cross-compiled per release (`release.yml`, 5 platform targets, `CGO_ENABLED=0`). | asymmetric |
 | **test** | `tests/run-all.sh` exercises the wired Claude Code hooks, PR source allowlists, and retained body-level regression suites. | Go and Node projection tests cover the four deny-by-default PR agents in addition to installation, preservation, data-home, ledger, and default-agent configuration. | asymmetric |
-| **version** | `.claude-plugin/plugin.json` `version` is the canonical site; `marketplace.json plugins[0].version` and `CLAUDE.md §3` "Current version" mirror it (fenced multi-site invariant). | The Go binary's `version` var is injected at build time via `-ldflags "-X main.version=..."`, sourced from the same release tag. | shared (one version namespace, mirrored sites) |
-| **release-cut** | `tag-sync.yml` (push to main on `plugin.json` version change) creates tag `vX.Y.Z` if it does not already exist, then dispatches `release.yml` via `workflow_dispatch` — a tag pushed with `GITHUB_TOKEN` does not itself trigger other workflows (GitHub's Actions recursion guard), so the explicit dispatch is required. | The same `tag-sync.yml` event triggers `release.yml`, which cross-compiles the 5 opencode binaries + `SHA256SUMS` and publishes the GitHub Release. | shared (one trigger, N runtime artifacts under one version namespace) |
+| **version** | `.claude-plugin/plugin.json` `version` is the canonical site; `.claude-plugin/marketplace.json` `plugins[0].version`, `plugins/team-harness/.codex-plugin/plugin.json`, `CLAUDE.md §3`, and `cmd/install/main.go`'s fallback `var version` mirror it (fenced five-site invariant in the current tree). | The Go binary's `version` var is injected at build time via `-ldflags "-X main.version=..."`, sourced from the same release tag; the checked-in fallback is verified against that tag. | shared (one version namespace, mirrored sites) |
+| **release-cut** | `tag-sync.yml` creates `vX.Y.Z` from `.claude-plugin/plugin.json` and dispatches `release.yml`; the same tag is the Claude Code and Codex plugin boundary. Explicit dispatch avoids GitHub Actions' `GITHUB_TOKEN` recursion guard. | The same event cross-compiles the five opencode binaries, publishes `SHA256SUMS`, and creates the GitHub Release. | shared (one trigger, N runtime artifacts under one version namespace) |
 | **distribute** | The tagged git tree IS the CC artifact — no packaging step. The custom marketplace (`valianx/team-harness`) points at the tag. | GitHub Release binary assets (5 platform builds) + `SHA256SUMS`, served to the bootstrap scripts via the deterministic `releases/latest/download/` URL (GitHub Pages: `bin/install.{sh,ps1,cmd}`). | asymmetric |
 | **install — mechanism** | `/plugin marketplace add valianx/team-harness` → `/plugin install th` → `/th:setup` (operator keys, once). No build, no installer binary — the marketplace plugin is the only CC install channel. | `install.sh`/`.ps1`/`.cmd` downloads the Go binary, which runs `install apply --runtime opencode` — the plan/apply/uninstall engine with an append-only ownership ledger and SEC-01..08 guards. The Go binary does not install Claude Code; a bare invocation on that binary prints a marketplace redirect notice. | asymmetric |
 | **update — mechanism** | `claude plugin marketplace update` (catalog refresh) then `claude plugin update th@team-harness-marketplace` (download). No local diff/confirm step — the plugin runtime replaces the cached version wholesale. | `install update` — three-state version delta (update-available / already-current / installed-ahead), `ComputePlan` diff preview, interactive `[Y/n]` confirm (declining the confirm is a zero-write no-op). | diverged |
@@ -37,7 +43,7 @@ The current flow is one event, not two:
 
 1. A PR bumps `.claude-plugin/plugin.json` `version` (per team-harness's per-PR bump model — `CLAUDE.md §6.3`) and merges to `main`.
 2. `tag-sync.yml` (triggered by that push, path-filtered to `plugin.json`) reads the new version, creates and pushes the `vX.Y.Z` tag if it does not already exist, and dispatches `release.yml` via `workflow_dispatch` with that tag as input. The explicit dispatch is required — a tag pushed under `GITHUB_TOKEN` does not itself chain to other workflows.
-3. `release.yml` builds and publishes every runtime artifact from that single tagged commit: 5 cross-compiled opencode binaries + `SHA256SUMS` + a bare-semver `VERSION` asset, all attached to one GitHub Release.
+3. The tagged Git tree is both the Claude Code and Codex plugin artifact; no Codex archive is built. `release.yml` also publishes the cross-platform installer binaries, checksums, and bare-semver `VERSION` asset.
 4. `release.yml` triggers `pages.yml`, which republishes the bootstrap scripts (`install.sh`/`.ps1`/`.cmd`) that serve the new version.
 
 One tag, one release event, N runtime artifacts, one version namespace. Re-running the sync against an existing tag is a no-op (idempotent) rather than a duplicate release.
@@ -46,9 +52,9 @@ One tag, one release event, N runtime artifacts, one version namespace. Re-runni
 
 ## Installer identity
 
-The Go installer (`cmd/install/`) is the **opencode packager and installer**. It does not install Claude Code, has no CC install path reachable from a bare invocation, and its low-cost frontmatter-rewrite mode (`modes.go::lowCostMatrix`) is unreferenced code from the retired CC path — not a live capability of any runtime this binary currently serves. `cmd/install/` therefore stays frozen for fleet model-allocation changes: there is no live low-cost consumer left to keep in sync. The `standard`/`low-cost` split is driven by the `INSTALL_MODE` env var and is not wired into the opencode manifest engine (`install apply --runtime opencode`).
+The Go installer (`cmd/install/`) manages opencode assets and the six generated Codex agent TOMLs. It does not install marketplace plugins and does not modify Codex `config.toml`; plugin install/update/remove remains marketplace-owned. Claude Code has no reachable binary-install path.
 
-The marketplace plugin (`/plugin marketplace add valianx/team-harness`) is the only Claude Code install channel. The Go binary (`install apply|update|uninstall --runtime opencode`) is the only opencode install channel. Neither channel serves the other runtime.
+The Claude marketplace is the Claude Code install channel. The repository Codex marketplace supplies seven workflow skills (`@Team-Harness init` is lightweight intake and `@Team-Harness pipeline` is explicit full activation), while `install apply|update|uninstall --runtime codex` separately places six specialist agents. The Go binary remains the opencode install channel as well.
 
 ---
 

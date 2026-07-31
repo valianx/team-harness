@@ -46,7 +46,7 @@ jobs:
               while IFS= read -r f; do
                 [ -z "$f" ] && continue
                 case "$f" in
-                  .claude-plugin/plugin.json|.claude-plugin/marketplace.json|CLAUDE.md|CHANGELOG.md|changelog.d/*.md)
+                  .claude-plugin/plugin.json|.claude-plugin/marketplace.json|plugins/team-harness/.codex-plugin/plugin.json|CLAUDE.md|cmd/install/main.go|CHANGELOG.md|changelog.d/*.md)
                     ;;
                   *)
                     is_release_only=false
@@ -57,6 +57,84 @@ jobs:
           fi
           echo "is_release_only=$is_release_only" >> "$GITHUB_OUTPUT"
           echo "Release-only diff: $is_release_only"
+
+      - name: Verify shared version sites on distributed changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            echo "No usable base SHA; skipping base/HEAD version comparison."
+            exit 0
+          fi
+
+          changed="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || true)"
+          distributed=false
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              agents/*|skills/*|hooks/*|plugins/team-harness/*|.agents/*|.codex/*|runtime/schema/*|runtime/codex/*|tools/codex-runtime/*|assets.go)
+                distributed=true ;;
+              cmd/install/*_test.go)
+                ;;
+              cmd/install/*)
+                distributed=true ;;
+            esac
+          done <<< "$changed"
+          if [ "$distributed" != true ]; then
+            echo "No distributed runtime input changed; shared version comparison is not required."
+            exit 0
+          fi
+
+          plugin="$(jq -er '.version' .claude-plugin/plugin.json)"
+          market="$(jq -er '.plugins[0].version' .claude-plugin/marketplace.json)"
+          versions=("$plugin" "$market")
+          sites=(.claude-plugin/plugin.json .claude-plugin/marketplace.json)
+
+          # Codex and installer sites are required once present at BASE or
+          # HEAD. This keeps the guard/CI compatible with the historical
+          # three-site repository while enforcing all five sites today.
+          has_codex=false
+          if git cat-file -e "$BASE_SHA:plugins/team-harness/.codex-plugin/plugin.json" 2>/dev/null || [ -f plugins/team-harness/.codex-plugin/plugin.json ]; then
+            has_codex=true
+            codex="$(jq -er '.version' plugins/team-harness/.codex-plugin/plugin.json)"
+            versions+=("$codex")
+            sites+=(plugins/team-harness/.codex-plugin/plugin.json)
+          fi
+          claude="$(sed -nE 's/.*\*\*Current version:\*\* `([0-9]+\.[0-9]+\.[0-9]+)`.*/\1/p' CLAUDE.md | head -n1)"
+          has_claude=false
+          if git cat-file -e "$BASE_SHA:CLAUDE.md" 2>/dev/null || [ -f CLAUDE.md ]; then
+            has_claude=true
+            if [ -z "$claude" ]; then
+              echo "::error::CLAUDE.md exists but its Current version site is missing or malformed" >&2
+              exit 1
+            fi
+            versions+=("$claude")
+            sites+=(CLAUDE.md)
+          fi
+          has_installer=false
+          if git cat-file -e "$BASE_SHA:cmd/install/main.go" 2>/dev/null || [ -f cmd/install/main.go ]; then
+            has_installer=true
+            installer="$(sed -nE 's/.*var version = "([0-9]+\.[0-9]+\.[0-9]+)".*/\1/p' cmd/install/main.go | head -n1)"
+            versions+=("$installer")
+            sites+=(cmd/install/main.go)
+          fi
+
+          for value in "${versions[@]}"; do
+            if [ -z "$value" ] || [ "$value" != "$plugin" ]; then
+              echo "::error::shared version sites are missing, malformed, or disagree (canonical=$plugin values=${versions[*]})" >&2
+              exit 1
+            fi
+          done
+
+          for site in "${sites[@]}"; do
+            if git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- "$site"; then
+              echo "::error::$site was not changed while a distributed runtime input changed" >&2
+              exit 1
+            fi
+          done
+          echo "Shared version sites are changed, parseable, and equal at $plugin (Codex=$has_codex CLAUDE=$has_claude installer=$has_installer)."
 
       # Python and Node are set up UNCONDITIONALLY: the policy-block functional
       # suite validates .claude-plugin/plugin.json, which is IN the release-only
@@ -130,6 +208,30 @@ jobs:
             echo "building $GOOS/$GOARCH"
             CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -o /dev/null ./cmd/install
           done
+
+  codex-runtime:
+    name: Codex generator, marketplace, plugin, hooks, and runtime
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify generated agent roster
+        run: |
+          node tools/codex-runtime/generate.mjs --check
+          node tools/codex-runtime/test_generate.mjs
+      - name: Validate marketplace and plugin structure
+        run: |
+          node tools/codex-runtime/validate-marketplace.mjs
+          python3 tests/test_codex_runtime.py
+      - name: Verify Codex hooks
+        run: |
+          node tools/codex-runtime/sync-hooks.mjs --check
+          bash tests/test_codex_hooks.sh
 
   dist-freshness:
     name: hooks/ts dist freshness (rebuild + diff + completeness)

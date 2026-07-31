@@ -1,0 +1,20 @@
+{
+  "name": "team-harness",
+  "interface": {
+    "displayName": "Team Harness"
+  },
+  "plugins": [
+    {
+      "name": "team-harness",
+      "source": {
+        "source": "local",
+        "path": "./plugins/team-harness"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

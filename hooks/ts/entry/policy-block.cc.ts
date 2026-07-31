@@ -18,11 +18,14 @@
 //     was too broad here; only the genuinely-empty case is parity-preserved.
 //   - ShimRejectError from a schema/size/depth/pollution guard (oversized
 //     payload, excessive nesting, __proto__ key, non-string tool.name, etc.):
-//     fail-closed → ask. These are TS-only hardening with no Bash equivalent
-//     (the Bash oracle never validates shape beyond the two checks above) —
-//     relaxing them would be a genuine strictness regression, not a parity
-//     fix, so they keep the conservative ask() default.
-//   - Unexpected body exception: ask (same fail-closed rationale).
+//     Claude Code keeps the historical fail-closed → ask mapping. The Codex
+//     adapter sets TEAM_HARNESS_CODEX_HOOK=1 and upgrades this validation
+//     failure to deny: Codex cannot represent PreToolUse `ask`, so degrading a
+//     deterministic safety floor to bounded context would let execution
+//     continue without an operator decision.
+//   - Unexpected body exception: Claude Code → ask (same fail-closed
+//     rationale); Codex → deny because its adapter cannot represent ask
+//     without continuing the tool call.
 //   - Safe default (non-covered tool): none.
 
 import { inboundCC, outboundCC, ShimRejectError } from "../shim/shim.js";
@@ -54,7 +57,24 @@ async function main(): Promise<void> {
     const decision = evaluate(normalized);
     outboundCC(decision);
   } catch (err) {
-    if (err instanceof ShimRejectError && isParseFailure(err)) {
+    if (process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
+      // Every evaluation failure is a deterministic safety-floor failure on
+      // Codex, including unexpected body exceptions. Codex cannot represent
+      // PreToolUse `ask`; degrading an evaluation error to bounded context
+      // would let execution continue without an operator decision. The
+      // launcher already rejects malformed native JSON before reaching this
+      // branch; keeping the bundle itself fail-closed closes direct-entry
+      // paths too.
+      const fallback: NormalizedDecision = {
+        decision: "deny",
+        reason:
+          err instanceof ShimRejectError
+            ? "policy-block: payload failed shim validation — execution denied because safety could not be evaluated (policy-block.cc.ts SEC-07)."
+            : "policy-block: safety evaluation failed — execution denied because policy could not be evaluated (policy-block.cc.ts).",
+        mutations: null,
+      };
+      outboundCC(fallback);
+    } else if (err instanceof ShimRejectError && isParseFailure(err)) {
       if (raw.trim().length === 0) {
         // Empty stdin — fail-open, matching the Bash oracle's silent
         // pass-through and avoiding ask-spam on no-op invocations.
@@ -72,7 +92,9 @@ async function main(): Promise<void> {
       }
     } else if (err instanceof ShimRejectError) {
       // SEC-07 shape/size/depth/pollution guard — TS-only hardening, stays
-      // fail-closed (no Bash equivalent to reconcile against).
+      // fail-closed. Codex has no PreToolUse `ask`; its launcher would turn
+      // ask into additionalContext and continue, so a deterministic policy
+      // validation failure must remain a native deny on that runtime.
       const fallback: NormalizedDecision = {
         decision: "ask",
         reason:
@@ -94,6 +116,21 @@ async function main(): Promise<void> {
 }
 
 main().catch(() => {
-  // Last-resort: empty stdout → no-decision, exit 0.
+  // Last-resort read/transport failure. A Codex deny-floor must still deny
+  // when the wrapper fails before the inner evaluation catch can run.
+  if (process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
+    try {
+      outboundCC({
+        decision: "deny",
+        reason:
+          "policy-block: safety evaluation failed before completion — execution denied because policy could not be evaluated (policy-block.cc.ts).",
+        mutations: null,
+      });
+    } catch {
+      // If stdout/process termination itself fails, fall through to the
+      // runtime's exit path below rather than reflecting an internal error.
+    }
+  }
+  // Claude Code last-resort: empty stdout → no-decision, exit 0.
   process.exit(0);
 });

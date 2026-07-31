@@ -1,4 +1,5 @@
-// Package main is the team-harness installer for the opencode runtime.
+// Package main is the team-harness agent installer for the opencode and Codex
+// runtimes. Plugin installation remains owned by each runtime's marketplace.
 //
 // Claude Code installs exclusively through the marketplace plugin
 // (/plugin marketplace add valianx/team-harness) — this binary's former CC
@@ -30,7 +31,7 @@ import (
 // Note: the value is the BARE semver (no leading "v"). The "v" is added by
 // the printf in main(). The release workflow strips the leading "v" from
 // the git tag (e.g. v2.0.1 → 2.0.1) before injecting — see release.yml.
-var version = "2.119.1"
+var version = "3.6.0"
 
 // forceFlag is preserved as a no-op for backward compatibility. The installer
 // always overwrites embedded files; this flag once disabled the conflict gate,
@@ -49,8 +50,8 @@ func main() {
 
 	// plan|apply|uninstall|update subcommands (the manifest engine — the only
 	// install path this binary still serves for Claude Code — --runtime
-	// claude-code resolves to empty manifests, a deliberate no-op; the real
-	// runtime here is opencode) are handled before the retired legacy path.
+	// claude-code resolves to empty manifests, a deliberate no-op; the live
+	// agent-installer runtimes are opencode and Codex) are handled first.
 	if dispatchSubcommand() {
 		return
 	}
@@ -58,15 +59,15 @@ func main() {
 	// The legacy no-arg interactive path used to install Claude Code
 	// hooks/agents/skills directly into ~/.claude/. Retired: Claude Code
 	// installs exclusively through the marketplace plugin as of the hook
-	// Bash->TS cutover (issue #446). This binary remains the installer for
-	// the opencode runtime only (`install apply --runtime opencode`).
+	// Bash->TS cutover (issue #446). This binary remains the agent installer
+	// for opencode and Codex.
 	printClaudeCodeRetiredNotice()
 }
 
 // printClaudeCodeRetiredNotice tells an operator who ran the bare binary (the
 // former Claude Code interactive install) that Claude Code now installs
 // exclusively through the marketplace plugin. The binary itself remains the
-// installer for the opencode runtime.
+// agent installer for the opencode and Codex runtimes.
 func printClaudeCodeRetiredNotice() {
 	fmt.Println("team-harness installer — Claude Code install path retired.")
 	fmt.Println()
@@ -75,8 +76,10 @@ func printClaudeCodeRetiredNotice() {
 	fmt.Println("  /plugin install th")
 	fmt.Println("  /th:setup")
 	fmt.Println()
-	fmt.Println("This binary remains the installer for the opencode runtime:")
+	fmt.Println("This binary remains the agent installer for opencode and Codex:")
 	fmt.Println("  install apply --runtime opencode")
+	fmt.Println("  install apply --runtime codex --scope project")
+	fmt.Println("Codex plugin installation is separate: use its marketplace commands first.")
 }
 
 // collectConfig determines context7 key, memory MCP choice, and install mode

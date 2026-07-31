@@ -1,8 +1,8 @@
 # Contributing to Team Harness
 
-Thanks for your interest in contributing. Team Harness is an open-source agent
-harness for Claude Code, distributed as a plugin. This guide covers how to
-propose a change. The **binding rules** for any change live in
+Thanks for your interest in contributing. Team Harness is an open-source,
+multi-runtime agent harness for Claude Code, Codex, and opencode. This guide
+covers how to propose a change. The **binding rules** for any change live in
 [`CLAUDE.md` §6 — Mandatory Working Agreements](./CLAUDE.md#6-mandatory-working-agreements);
 this document summarizes them and shows you the contribution flow.
 
@@ -55,22 +55,51 @@ not a second source of truth.
   `### Added` / `### Changed` / `### Fixed` / `### Security`). One file per PR; the
   delivery step assembles them at release. Do not edit `## [Unreleased]` inline.
 - **Distributed-asset version bump:** if your change touches `agents/`, `skills/`,
-  or `hooks/`, you MUST bump the version in **both** `.claude-plugin/plugin.json`
-  AND `.claude-plugin/marketplace.json` (matched semver). Without it the
-  marketplace serves no update. Pure docs/governance changes (like this file) do
-  NOT bump the version.
+  `hooks/`, or another distributed runtime input, you MUST bump the shared
+  version across the five sites documented in
+  [`docs/codex-runtime.md`](./docs/codex-runtime.md#install-and-lifecycle). Without
+  it a marketplace or installer can serve a stale update. Pure docs/governance
+  changes (like this file) do NOT bump the version.
 - **Tests green before you push:** run `bash tests/run-all.sh` — it must exit 0.
 - **Never commit secrets** — tokens, API keys, `.env` files, certificates, private keys.
 
 See [`CLAUDE.md` §6](./CLAUDE.md#6-mandatory-working-agreements) for the complete
 agreements, governance escalation rules, and the anti-pattern list.
 
-## Contributing to the opencode build (beta)
+## Cross-runtime development
 
-Team Harness targets both Claude Code and opencode. Most surfaces are cross-harness
-with no extra work — agents, skills, and rules (`CLAUDE.md` / `AGENTS.md`) are read
-by both runtimes as-is. Two rules apply when a change touches the runtime-specific
-surfaces:
+A change made while using Claude Code is not automatically a Claude-only change:
+the files changed determine which runtimes receive it. Shared semantic intent has
+one canonical source, while runtime packaging and execution details use explicit
+adapters. Do not assume that editing one agent prompt updates every runtime.
+
+| Change | Shared or canonical source | What Codex receives |
+|---|---|---|
+| Model or effort for any canonical Team Harness agent | Frontmatter in its `agents/{role}.md` | The generator updates the complete comparison roster. For the six installed Codex specialists it also rewrites the generated TOML. |
+| Semantic behavior for one of those six specialists | The matching `agents/{role}.md` role contract | Review and, when necessary, update `runtime/codex/instructions/{role}.md`; Codex adapters are concise and the generator does not translate the full Claude prompt body. |
+| Any other Claude agent | Its file under `agents/` | Nothing automatically. The Codex beta intentionally ships only the six roles registered in `runtime/schema/codex-agents.json`. |
+| Orchestrator, intake, pipeline, or workflow behavior | Claude's `agents/orchestrator.md`, pipeline references, and relevant root `skills/` | Update the corresponding Codex plugin skill under `plugins/team-harness/skills/` (`init`, `pipeline`, or another explicit adapter). |
+| General skill behavior | The relevant root `skills/{name}/SKILL.md` | Nothing automatically unless the capability has a Codex plugin counterpart; update that counterpart deliberately. |
+| Hook policy | Shared TypeScript bodies where applicable, plus runtime entrypoints | Build the TypeScript hooks, sync the plugin bundle, and validate the runtime-specific manifest. Codex's native sandbox and approval semantics remain authoritative. |
+
+After changing any canonical agent's model/effort, one of the six installed
+role contracts, its Codex adapter, or the Codex registry, run
+`$sync-codex-agents` in Codex, or run the equivalent commands:
+
+```bash
+node tools/codex-runtime/generate.mjs
+node tools/codex-runtime/generate.mjs --check
+node tools/codex-runtime/test_generate.mjs
+```
+
+Commit the generated `.codex/agents/*.toml` and `.codex/README.md` changes; never
+edit them by hand. For plugin skills, marketplace packaging, install/update
+behavior, and the complete Codex verification set, follow the
+[Codex runtime guide](./docs/codex-runtime.md).
+
+For opencode, most existing surfaces remain cross-harness with no extra work —
+agents, skills, and rules (`CLAUDE.md` / `AGENTS.md`) are read as documented by
+that runtime. Two rules apply when a change touches its runtime-specific surfaces:
 
 - **Hooks remain a Claude Code surface.** Do not project new hook behavior into
   OpenCode; use OpenCode's native permissions and approvals instead. TypeScript

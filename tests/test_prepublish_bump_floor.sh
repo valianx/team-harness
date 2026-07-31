@@ -16,9 +16,12 @@
 #   5. Asserts stdout (nodecision = empty) and stderr (WARN present/absent).
 #
 # Universal-path model: the guard enforces ONE invariant on ANY branch that
-# touches a distributed asset (agents/|skills/|hooks/) — all three version
-# sites (.claude-plugin/plugin.json, .claude-plugin/marketplace.json,
-# CLAUDE.md §3) must be bumped vs origin/main and mutually matching, then the
+# touches a distributed asset (Claude plugin files, Codex marketplace/generator
+# inputs, generated agents, or installer source) — all version sites present
+# in the repository (five in the current tree: .claude-plugin/plugin.json,
+# .claude-plugin/marketplace.json, plugins/team-harness/.codex-plugin/plugin.json,
+# CLAUDE.md §3, and cmd/install/main.go var version) must be bumped vs
+# origin/main and mutually matching, then the
 # mechanical SemVer floor applies. There is no branch-name discriminator, no
 # release-cut marker/trailer, and no changelog.d/version.d fragment escape
 # hatch — fixtures below use ordinary `feat/*` branch names (or no branch at
@@ -97,6 +100,23 @@ _run_hook() {
     tmpout=$(mktemp)
     tmperr=$(mktemp)
     (cd "$dir" && _push_payload | _exec_hook >"$tmpout" 2>"$tmperr") || true
+    _HOOK_STDOUT=$(cat "$tmpout")
+    _HOOK_STDERR=$(cat "$tmperr")
+    rm -f "$tmpout" "$tmperr"
+}
+
+# Run the hook with an explicit bump-override trailer.  The over-bump policy
+# deliberately blocks a MINOR/MAJOR delta when the changed shipped surface
+# only warrants PATCH; fixtures that intentionally exercise an allowed
+# over-bump must provide the same token a real push would carry.
+_run_hook_with_commit_msg() {
+    local dir="$1" commit_msg="$2"
+    _HOOK_STDOUT=""
+    _HOOK_STDERR=""
+    local tmpout tmperr
+    tmpout=$(mktemp)
+    tmperr=$(mktemp)
+    (cd "$dir" && _push_payload | GIT_COMMIT_MSG="$commit_msg" _exec_hook >"$tmpout" 2>"$tmperr") || true
     _HOOK_STDOUT=$(cat "$tmpout")
     _HOOK_STDERR=$(cat "$tmperr")
     rm -f "$tmpout" "$tmperr"
@@ -209,11 +229,11 @@ _make_repo() {
         git config user.email "test@test.com"
         git config user.name "Test"
 
-        mkdir -p .claude-plugin
+        mkdir -p .claude-plugin plugins/team-harness/.codex-plugin
         _write_plugin_json "$old_ver" .claude-plugin/plugin.json
         _write_market_json "$old_ver" .claude-plugin/marketplace.json
 
-        git add .claude-plugin/
+        git add .claude-plugin/ plugins/team-harness/.codex-plugin/
         git commit -m "initial: version $old_ver" -q 2>/dev/null
         git push origin HEAD:main -q 2>/dev/null
     )
@@ -237,6 +257,38 @@ d = {'plugins': [{'name': 'th', 'version': '$ver'}]}
 with open('$path', 'w') as f:
     json.dump(d, f)
 "
+    local root
+    root="$(cd "$(dirname "$path")/.." && pwd)"
+    mkdir -p "$root/plugins/team-harness/.codex-plugin"
+    _write_codex_json "$ver" "$root/plugins/team-harness/.codex-plugin/plugin.json"
+}
+
+# Historical marketplace-only writer. Repositories that never shipped the
+# Codex plugin path retain the original three-site contract.
+_write_market_json_legacy() {
+    local ver="$1" path="$2"
+    python3 -c "
+import json
+d = {'plugins': [{'name': 'th', 'version': '$ver'}]}
+with open('$path', 'w') as f:
+    json.dump(d, f)
+"
+}
+
+_write_codex_json() {
+    local ver="$1" path="$2"
+    python3 -c "
+import json
+d = {'name': 'team-harness', 'version': '$ver', 'description': 'test'}
+with open('$path', 'w') as f:
+    json.dump(d, f)
+"
+}
+
+_write_installer_version() {
+    local ver="$1" path="$2"
+    mkdir -p "$(dirname "$path")"
+    printf 'package main\n\nvar version = "%s"\n' "$ver" > "$path"
 }
 
 # _bump_version CLONE_DIR NEW_VER
@@ -245,7 +297,7 @@ _bump_version() {
     local clone="$1" new_ver="$2"
     _write_plugin_json "$new_ver" "$clone/.claude-plugin/plugin.json"
     _write_market_json "$new_ver" "$clone/.claude-plugin/marketplace.json"
-    (cd "$clone" && git add .claude-plugin/)
+    (cd "$clone" && git add .claude-plugin/ plugins/team-harness/.codex-plugin/)
 }
 
 # Cleanup registry
@@ -279,6 +331,8 @@ echo "--- Version floor pins (AC-9) ---"
 
 _plugin_ver=$(cd "$REPO_ROOT" && python3 -c "import json; d=json.load(open('.claude-plugin/plugin.json')); print(d.get('version',''))" 2>/dev/null || true)
 _market_ver=$(cd "$REPO_ROOT" && python3 -c "import json; d=json.load(open('.claude-plugin/marketplace.json')); print(d['plugins'][0].get('version',''))" 2>/dev/null || true)
+_codex_ver=$(cd "$REPO_ROOT" && python3 -c "import json; d=json.load(open('plugins/team-harness/.codex-plugin/plugin.json')); print(d.get('version',''))" 2>/dev/null || true)
+_installer_ver=$(cd "$REPO_ROOT" && python3 -c "import re; d=open('cmd/install/main.go').read(); m=re.search(r'\\bvar version = \\\"([0-9]+\\.[0-9]+\\.[0-9]+)\\\"', d); print(m.group(1) if m else '')" 2>/dev/null || true)
 
 if _ver_ge "$_plugin_ver" 2 108 0; then
     pass "plugin.json version >= 2.108.0 (floor: MINOR bump for new advisory surface)"
@@ -290,6 +344,24 @@ if _ver_ge "$_market_ver" 2 108 0; then
     pass "marketplace.json version >= 2.108.0"
 else
     fail "marketplace.json version floor" "version '$_market_ver' is below 2.108.0"
+fi
+
+if _ver_ge "$_codex_ver" 2 108 0; then
+    pass "Codex plugin.json version >= 2.108.0"
+else
+    fail "Codex plugin.json version floor" "version '$_codex_ver' is below 2.108.0"
+fi
+
+if _ver_ge "$_installer_ver" 2 108 0; then
+    pass "cmd/install/main.go fallback version >= 2.108.0"
+else
+    fail "installer fallback version floor" "version '$_installer_ver' is below 2.108.0"
+fi
+
+if [ -n "$_plugin_ver" ] && [ "$_plugin_ver" = "$_market_ver" ] && [ "$_plugin_ver" = "$_codex_ver" ] && [ "$_plugin_ver" = "$_installer_ver" ]; then
+    pass "current five version sites are synchronized"
+else
+    fail "current five version sites synchronization" "plugin=$_plugin_ver marketplace=$_market_ver codex=$_codex_ver installer=$_installer_ver"
 fi
 
 # ---------------------------------------------------------------------------
@@ -330,16 +402,16 @@ assert_stderr_contains "AC-1: MINOR WARN mentions MINOR" "MINOR"
 assert_stderr_contains "AC-1: advisory note present" "advisory"
 
 # ---------------------------------------------------------------------------
-# AC-2: docs/ only touched + MINOR delta → over-bump WARN IS emitted; nodecision
+# AC-2: docs/ payload + MINOR delta → explicit override, WARN + nodecision
 #
-# The hook reads .claude-plugin/plugin.json at both origin/main and HEAD on
-# the no-shipped-asset early-exit path and emits an advisory WARN when the
-# version bump is >= MINOR. Push is not blocked (nodecision, stdout empty).
-# This path is unaffected by the universal-invariant collapse — it is a
-# pure early-exit that runs before the version-site check.
+# The Codex manifest is now a shipped path, so synchronizing it (along with
+# the Claude manifests and CLAUDE.md) makes this a PATCH-floor diff. A MINOR
+# bump is therefore an intentional over-bump under Suite 16's policy and must
+# carry a valid bump-override token. The hook still emits a WARN, but push is
+# allowed (nodecision, stdout empty).
 # ---------------------------------------------------------------------------
 echo
-echo "--- AC-2: docs/ only + MINOR delta → over-bump WARN in stderr; nodecision ---"
+echo "--- AC-2: docs/ payload + MINOR delta + override → over-bump WARN; nodecision ---"
 
 _bare2=$(_new_tmp)
 _clone2=$(_new_tmp)
@@ -349,22 +421,31 @@ _make_repo "$_bare2" "$_clone2" "2.107.0"
     cd "$_clone2"
     git config user.email "test@test.com"
     git config user.name "Test"
+    # Seed every version site in origin/main. The feature commit below
+    # updates all four sites, avoiding a missing-origin-site fail-open path.
+    printf '**Current version:** `2.107.0`\n' > CLAUDE.md
+    git add CLAUDE.md
+    git commit -m "base: add CLAUDE version site" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
     mkdir -p docs
     echo "# Some docs" > docs/guide.md
-    # MINOR bump (2.107.0 → 2.108.0) — no shipped asset changed
+    # MINOR bump (2.107.0 → 2.108.0) — docs payload plus synchronized
+    # version sites; Codex makes the manifest update a shipped-path change.
     _write_plugin_json "2.108.0" .claude-plugin/plugin.json
     _write_market_json "2.108.0" .claude-plugin/marketplace.json
+    printf '**Current version:** `2.108.0`\n' > CLAUDE.md
     git add .
     git commit -m "docs update (minor bump)" -q 2>/dev/null
 )
 
-_run_hook "$_clone2"
+_run_hook_with_commit_msg "$_clone2" "bump-override: minor — docs-only metadata synchronization"
 
-# No shipped asset → early exit → nodecision (stdout empty, push not blocked).
-assert_nodecision "AC-2: docs/ only + MINOR delta — nodecision (push proceeds)"
-# Over-bump WARN IS emitted on the no-shipped-asset path.
-assert_stderr_contains "AC-2: over-bump WARN present in stderr" "WARN"
-assert_stderr_contains "AC-2: WARN mentions MINOR or higher" "MINOR"
+# Explicit override → nodecision (stdout empty, push not blocked).
+assert_nodecision "AC-2: docs/ payload + MINOR delta + override — nodecision (push proceeds)"
+# The override acknowledgement includes the actual and mechanical floor.
+assert_stderr_contains "AC-2: over-bump allowed via override" "over-bump allowed"
+assert_stderr_contains "AC-2: override records MINOR over PATCH floor" "actual=minor floor=patch"
+assert_stderr_contains "AC-2: valid bump-override acknowledged" "bump-override"
 
 # ---------------------------------------------------------------------------
 # AC-2 fail-open: docs/ only + MINOR delta + .claude-plugin/plugin.json ABSENT
@@ -444,8 +525,141 @@ _make_repo "$_bare3" "$_clone3" "2.107.0"
 _run_hook "$_clone3"
 
 assert_deny "AC-3: MODIFY without any version bump → deny"
-assert_deny_reason_contains "AC-3: deny reason names the three-site bump requirement" "all three version sites"
+assert_deny_reason_contains "AC-3: deny reason names the four-site bump requirement" "all four version sites"
 assert_stderr_not_contains "AC-3: no WARN alongside the deny" "WARN"
+
+# ---------------------------------------------------------------------------
+# Codex/installer distributed-surface coverage: generated projection inputs,
+# marketplace metadata, generated agents, and the embedded installer source
+# are all shipped inputs. Touching any of them without the version sites must
+# not bypass the universal guard.
+# ---------------------------------------------------------------------------
+echo
+echo "--- Codex distributed inputs + installer embed wiring + no bump → DENY ---"
+
+_bare3surface=$(_new_tmp)
+_clone3surface=$(_new_tmp)
+_make_repo "$_bare3surface" "$_clone3surface" "2.107.0"
+
+(
+    cd "$_clone3surface"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p .agents/plugins .codex/agents runtime/schema runtime/codex/instructions tools/codex-runtime cmd/install
+    printf '{"name":"team-harness","plugins":[]}' > .agents/plugins/marketplace.json
+    printf '# generated agent\n' > .codex/agents/architect.toml
+    printf '{"format_version":1}\n' > runtime/schema/codex-agents.json
+    printf '# instruction\n' > runtime/codex/instructions/architect.md
+    printf '#!/usr/bin/env node\n' > tools/codex-runtime/generate.mjs
+    printf 'package main\n' > assets.go
+    printf 'package main\n' > cmd/install/codex_manifest.go
+    git add .agents .codex runtime tools assets.go cmd/install/codex_manifest.go
+    git commit -m "feat: touch Codex distributed inputs without version bump" -q 2>/dev/null
+)
+
+_run_hook "$_clone3surface"
+assert_deny "Codex distributed inputs + installer embed wiring without bump → deny"
+assert_deny_reason_contains "Codex distributed inputs deny names version sites" "version sites"
+assert_stderr_not_contains "Codex distributed inputs: no WARN alongside deny" "WARN"
+
+# ---------------------------------------------------------------------------
+# Installer fallback version site: once cmd/install/main.go exists on either
+# side, it is a required shared site. A stale fallback must deny rather than
+# silently publishing a binary whose banner/version disagrees with the plugin.
+# ---------------------------------------------------------------------------
+echo
+echo "--- Installer fallback present at origin + stale at HEAD → DENY ---"
+
+_bare3installer=$(_new_tmp)
+_clone3installer=$(_new_tmp)
+_make_repo "$_bare3installer" "$_clone3installer" "2.107.0"
+
+(
+    cd "$_clone3installer"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    _write_installer_version "2.107.0" cmd/install/main.go
+    git add cmd/install/main.go
+    git commit -m "base: add installer fallback version" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+
+    mkdir -p agents
+    printf '# installer-site agent update\n' > agents/installer-site.md
+    _write_plugin_json "2.107.1" .claude-plugin/plugin.json
+    _write_market_json "2.107.1" .claude-plugin/marketplace.json
+    # Codex manifest is updated, but cmd/install/main.go intentionally remains
+    # at 2.107.0 — the five-site current contract must reject this partial bump.
+    git add agents .claude-plugin/ plugins/team-harness/.codex-plugin/
+    git commit -m "feat: partial bump leaves installer fallback stale" -q 2>/dev/null
+)
+
+_run_hook "$_clone3installer"
+assert_deny "Installer fallback stale at HEAD → deny"
+assert_deny_reason_contains "Installer fallback deny names cmd/install/main.go" "cmd/install/main.go"
+assert_stderr_not_contains "Installer fallback stale: no WARN alongside deny" "WARN"
+
+# ---------------------------------------------------------------------------
+# Codex compatibility boundary: repositories where the Codex plugin manifest
+# is absent at both origin/main and HEAD retain historical three-site behavior.
+# Once the manifest exists on either side, it is mandatory: deleting it cannot
+# silently downgrade enforcement back to three sites.
+# ---------------------------------------------------------------------------
+echo
+echo "--- Codex compatibility: absent at origin+HEAD stays legacy; origin deletion requires four sites ---"
+
+_bare3legacy=$(_new_tmp)
+_clone3legacy=$(_new_tmp)
+git init --bare "$_bare3legacy" -q 2>/dev/null
+git clone "$_bare3legacy" "$_clone3legacy" -q 2>/dev/null
+
+(
+    cd "$_clone3legacy"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p .claude-plugin agents
+    _write_plugin_json "2.107.0" .claude-plugin/plugin.json
+    _write_market_json_legacy "2.107.0" .claude-plugin/marketplace.json
+    echo "# legacy agent" > agents/legacy.md
+    git add .
+    git commit -m "initial legacy three-site repository" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+
+    echo "# legacy agent updated" > agents/legacy.md
+    _write_plugin_json "2.107.1" .claude-plugin/plugin.json
+    _write_market_json_legacy "2.107.1" .claude-plugin/marketplace.json
+    git add .
+    git commit -m "fix: legacy asset with historical version bump" -q 2>/dev/null
+)
+
+_run_hook "$_clone3legacy"
+assert_nodecision "Codex absent at origin+HEAD: historical three-site bump remains valid"
+assert_stderr_not_contains "Codex absent at origin+HEAD: no advisory for matching PATCH floor" "WARN"
+
+_bare3delete=$(_new_tmp)
+_clone3delete=$(_new_tmp)
+_make_repo "$_bare3delete" "$_clone3delete" "2.107.0"
+
+(
+    cd "$_clone3delete"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p agents
+    echo "# existing agent" > agents/codex-delete.md
+    git add agents/codex-delete.md
+    git commit -m "base: add agent" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+
+    echo "# updated agent" > agents/codex-delete.md
+    _write_plugin_json "2.107.1" .claude-plugin/plugin.json
+    _write_market_json "2.107.1" .claude-plugin/marketplace.json
+    rm plugins/team-harness/.codex-plugin/plugin.json
+    git add .
+    git commit -m "fix: update agent but delete Codex version site" -q 2>/dev/null
+)
+
+_run_hook "$_clone3delete"
+assert_deny "Codex present at origin but deleted at HEAD: four-site bump required"
+assert_deny_reason_contains "Codex deletion: deny names four-site requirement" "all four version sites"
 
 # ---------------------------------------------------------------------------
 # AC-2/AC-3 regression (inverted): a changelog.d/ fragment no longer bypasses
@@ -553,13 +767,15 @@ assert_deny "AC-3: plugin.json and marketplace.json bumped to different values �
 assert_deny_reason_contains "AC-3: deny reason names the mismatch" "do not match"
 
 # ---------------------------------------------------------------------------
-# AC-1 (positive): feature branch + all-three sites bumped+matching → nodecision
+# AC-1 (positive): feature branch + all-four sites bumped+matching + override
 #
-# A feature branch with all three version sites bumped and mutually matching
-# must be allowed (nodecision) — the branch name carries no meaning.
+# A feature branch with all four version sites bumped and mutually matching
+# must be allowed (nodecision) — the branch name carries no meaning. Since
+# updating the Codex manifest is itself a shipped M-only diff, the MINOR
+# metadata bump also needs an explicit over-bump override.
 # ---------------------------------------------------------------------------
 echo
-echo "--- AC-1 (positive): feat/ac-positive + all-three bumped+matching → nodecision ---"
+echo "--- AC-1 (positive): feat/ac-positive + all-four bumped+matching + override → nodecision ---"
 
 _bare_ac7p=$(_new_tmp)
 _clone_ac7p=$(_new_tmp)
@@ -571,22 +787,26 @@ _make_repo "$_bare_ac7p" "$_clone_ac7p" "2.107.0"
     git config user.name "Test"
     mkdir -p agents
     echo "# release agent" > agents/release.md
-    git add agents/release.md
-    git commit -m "base: add agents/release.md" -q 2>/dev/null
+    # Seed CLAUDE.md in origin/main so this fixture exercises all four version
+    # sites rather than the optional third-site fail-open behavior.
+    printf '**Current version:** `2.107.0`\n' > CLAUDE.md
+    git add agents/release.md CLAUDE.md
+    git commit -m "base: add agents/release.md and CLAUDE version site" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Ordinary feature branch, bump all three sites to a matching X.Y.Z.
+    # Ordinary feature branch, bump all four sites to a matching X.Y.Z.
     git checkout -b feat/ac-positive -q 2>/dev/null
     _write_plugin_json "2.108.0" .claude-plugin/plugin.json
     _write_market_json "2.108.0" .claude-plugin/marketplace.json
-    # CLAUDE.md §3 simulation: create a minimal CLAUDE.md with a version line
+    # CLAUDE.md §3 simulation: update the version site.
     printf '**Current version:** `2.108.0`\n' > CLAUDE.md
     git add .
-    git commit -m "feat: bump all three version sites" -q 2>/dev/null
+    git commit -m "feat: bump all four version sites" -q 2>/dev/null
 )
 
-_run_hook "$_clone_ac7p"
+_run_hook_with_commit_msg "$_clone_ac7p" "bump-override: minor — synchronize all version sites"
 
-assert_nodecision "AC-1 positive: feat/ac-positive + all-three bumped → nodecision"
+assert_nodecision "AC-1 positive: feat/ac-positive + all-four bumped + override → nodecision"
+assert_stderr_contains "AC-1 positive: valid bump-override acknowledged" "bump-override"
 
 # ---------------------------------------------------------------------------
 # AC-4 (partial-bump deny): feature branch + only plugin.json bumped → DENY

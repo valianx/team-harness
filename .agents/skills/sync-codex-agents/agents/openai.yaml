@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sync Codex Agents"
+  short_description: "Regenerate and verify Codex agent projections"
+  default_prompt: "Use $sync-codex-agents to regenerate the committed Codex agents and show me the exact diff."

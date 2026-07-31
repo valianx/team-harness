@@ -80,7 +80,7 @@ func Uninstall(selected []string, placer Placer) (UninstallReport, error) {
 	// Determine current ownership from the ledger.
 	owned := latestOwnership(entries)
 	for compID, tags := range owned {
-		if len(selected) > 0 && !selectedSet[compID] && !strings.HasPrefix(compID, "hook-plugin-") {
+		if len(selected) > 0 && !selectedSet[compID] && !isRetirableLedgerComponent(compID, placer) {
 			continue
 		}
 		if len(tags.ConfigKeys) > 0 {
@@ -92,7 +92,7 @@ func Uninstall(selected []string, placer Placer) (UninstallReport, error) {
 	}
 
 	for compID, tags := range owned {
-		if len(selected) > 0 && !selectedSet[compID] && !strings.HasPrefix(compID, "hook-plugin-") {
+		if len(selected) > 0 && !selectedSet[compID] && !isRetirableLedgerComponent(compID, placer) {
 			continue
 		}
 

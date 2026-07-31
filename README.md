@@ -1,17 +1,19 @@
-# Team Harness — Claude Code Agent Orchestration System
+# Team Harness — Multi-runtime Agent Orchestration
 
-> Team Harness is a multi-agent orchestration system for **Claude Code**: the top-level coordinator **`th:orchestrator`** frames each request and dispatches specialized architect, implementer, tester, QA, security, and delivery agents through a Spec-Driven Development (SDD) pipeline with mandatory human gates.
+> Team Harness is a multi-runtime agent orchestration system for **Claude Code**, **Codex**, and **opencode**: the top-level thread frames each request and dispatches specialized architect, implementer, tester, QA, security, and delivery agents through a Spec-Driven Development (SDD) pipeline with mandatory human gates.
 >
 > Every pipeline stage is captured as files on disk, so any session can resume from where the last one stopped.
 
 [![Version](https://img.shields.io/github/v/release/valianx/team-harness?label=version&color=blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
-> Team Harness runs under both **Claude Code** and **opencode**. Agents, skills, and rules are cross-harness; OpenCode uses native permissions instead of the Claude Code hook layer. See [`docs/lifecycle.md`](./docs/lifecycle.md) for the stage-by-stage maturity of each runtime (author, build, test, release, install, update), the [migration guide](./docs/opencode-migration-guide.md), and the [distribution roadmap](./docs/opencode-distribution-roadmap.md).
+> Team Harness runs under **Claude Code**, **Codex** (POSIX-only beta), and **opencode**. See [`docs/lifecycle.md`](./docs/lifecycle.md) and the [Codex runtime guide](./docs/codex-runtime.md).
 
 ---
 
 ## Install
+
+### Claude Code
 
 1. Add the marketplace:
 ```
@@ -27,6 +29,63 @@
 ```
 /th:setup
 ```
+
+### Codex beta (POSIX only)
+
+1. Add the repository marketplace:
+```text
+codex plugin marketplace add valianx/team-harness
+```
+
+2. Install the plugin:
+```text
+codex plugin add team-harness@team-harness
+```
+
+Review the [plugin hook manifest](./plugins/team-harness/hooks/hooks.json) and
+its referenced scripts, then explicitly trust the repository before enabling
+those hooks. Plugin installation and agent installation are separate. The
+plugin provides the Team Harness skills; the six generated agents are installed
+by the repository's Go binary.
+
+3. From the root of the project where Team Harness will run, install its six
+   agents (requires Go 1.25.8 or newer):
+```bash
+cd /path/to/your/project
+go run github.com/valianx/team-harness/cmd/install@latest apply --runtime codex --scope project
+```
+
+Without Go, download the matching `install-<os>-<arch>` asset and
+`SHA256SUMS` from [GitHub Releases](https://github.com/valianx/team-harness/releases),
+verify the exact asset before executing it, and run it from the project root.
+For example, after verifying `install-linux-amd64`:
+```bash
+chmod +x install-linux-amd64
+./install-linux-amd64 apply --runtime codex --scope project
+```
+
+The checksum proves that the binary matches the file published in the same
+GitHub release; it does not protect against compromise of the release origin.
+
+Use `--scope global` instead when the six agents should be available from your
+Codex user configuration rather than only this checkout. The six agents are
+required by the gated `pipeline` workflow; lightweight `init` remains
+available with the plugin alone.
+
+4. Start a new Codex thread so the plugin and installed agents are loaded.
+
+5. Try the two entry points in a clean `Main` thread:
+```text
+@Team-Harness init explain how this repository is structured
+@Team-Harness pipeline add an export-to-CSV feature to invoices
+```
+
+`init` performs lightweight intake and direct bounded work without pipeline
+state or subagents. `pipeline` explicitly starts the full gated workflow in
+`Main`; it does not create a seventh coordinator or require `/agent`.
+
+Upgrade, removal, local development, hook trust, and the complete role/model
+roster are documented in [`docs/codex-runtime.md`](./docs/codex-runtime.md).
 
 ### Install into opencode
 

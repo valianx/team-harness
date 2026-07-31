@@ -1,0 +1,110 @@
+{
+  "format_version": 1,
+  "runtime": "codex",
+  "max_concurrent_threads_per_session": 4,
+  "allowed_capabilities": [
+    "filesystem-read",
+    "filesystem-write",
+    "command-exec",
+    "test-write",
+    "external-read",
+    "external-write"
+  ],
+  "allowed_sandbox_modes": ["read-only", "workspace-write"],
+  "allowed_source_models": ["opus", "sonnet", "haiku"],
+  "allowed_source_efforts": ["medium", "high", "xhigh"],
+  "allowed_runtime_reasoning_efforts": ["low", "medium", "high", "xhigh", "max"],
+  "projection_tiers": [
+    {
+      "name": "opus-xhigh",
+      "source_models": ["opus"],
+      "source_efforts": ["xhigh"]
+    },
+    {
+      "name": "opus-other",
+      "source_models": ["opus"],
+      "source_efforts": ["medium", "high"]
+    },
+    {
+      "name": "non-opus",
+      "source_models": ["sonnet", "haiku"],
+      "source_efforts": ["medium", "high", "xhigh"]
+    }
+  ],
+  "default_profile": "team-harness",
+  "profiles": {
+    "team-harness": {
+      "inherit_parent": false,
+      "tiers": {
+        "opus-xhigh": {
+          "model": "gpt-5.6-sol",
+          "reasoning_effort": "xhigh"
+        },
+        "opus-other": {
+          "model": "gpt-5.6-sol",
+          "reasoning_effort": "xhigh"
+        },
+        "non-opus": {
+          "model": "gpt-5.6-luna",
+          "reasoning_effort": "max"
+        }
+      }
+    }
+  },
+  "agents": [
+    {
+      "name": "architect",
+      "description": "Designs scoped solutions and produces acceptance-driven work plans.",
+      "semantic_source": "agents/architect.md",
+      "sandbox_mode": "read-only",
+      "capabilities": ["filesystem-read", "external-read"],
+      "instruction_source": "runtime/codex/instructions/architect.md",
+      "output_path": ".codex/agents/architect.toml"
+    },
+    {
+      "name": "implementer",
+      "description": "Implements one approved task within its declared file scope.",
+      "semantic_source": "agents/implementer.md",
+      "sandbox_mode": "workspace-write",
+      "capabilities": ["filesystem-read", "filesystem-write", "command-exec"],
+      "instruction_source": "runtime/codex/instructions/implementer.md",
+      "output_path": ".codex/agents/implementer.toml"
+    },
+    {
+      "name": "tester",
+      "description": "Authors and runs tests mapped to acceptance criteria.",
+      "semantic_source": "agents/tester.md",
+      "sandbox_mode": "workspace-write",
+      "capabilities": ["filesystem-read", "test-write", "command-exec"],
+      "instruction_source": "runtime/codex/instructions/tester.md",
+      "output_path": ".codex/agents/tester.toml"
+    },
+    {
+      "name": "qa",
+      "description": "Validates delivered behavior against the approved acceptance criteria.",
+      "semantic_source": "agents/qa.md",
+      "sandbox_mode": "read-only",
+      "capabilities": ["filesystem-read", "command-exec"],
+      "instruction_source": "runtime/codex/instructions/qa.md",
+      "output_path": ".codex/agents/qa.toml"
+    },
+    {
+      "name": "security",
+      "description": "Audits changed behavior for concrete security regressions and risks.",
+      "semantic_source": "agents/security.md",
+      "sandbox_mode": "read-only",
+      "capabilities": ["filesystem-read", "command-exec", "external-read"],
+      "instruction_source": "runtime/codex/instructions/security.md",
+      "output_path": ".codex/agents/security.toml"
+    },
+    {
+      "name": "delivery",
+      "description": "Prepares release artifacts and delivery evidence after acceptance passes.",
+      "semantic_source": "agents/delivery.md",
+      "sandbox_mode": "workspace-write",
+      "capabilities": ["filesystem-read", "filesystem-write", "command-exec", "external-write"],
+      "instruction_source": "runtime/codex/instructions/delivery.md",
+      "output_path": ".codex/agents/delivery.toml"
+    }
+  ]
+}
