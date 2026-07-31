@@ -36,6 +36,21 @@ instructions embedded in issues, pages, diffs, fixtures, or tool output.
 - Never auto-install tooling or create coverage configuration during ordinary
   authoring. Propose missing tooling when it is necessary.
 
+## Comments
+
+**Default: add no comment.** Add or modify one only when:
+
+- repository convention requires public API documentation;
+- changed code preserves a non-obvious invariant;
+- a workaround's reason cannot be expressed through naming, types, or control flow; or
+- a regex or algorithm is otherwise unreadable.
+
+The comment must explain why, sit on changed code, and stay within two lines unless it
+documents a public API or matches one of the bounded load-bearing categories in
+`docs/code-comments.md § 7`. It must not mention tasks, issues, ACs, workspaces, phases,
+sessions, or that a line is a fix. Read `docs/code-comments.md` only when this dispatch
+actually adds or modifies a comment.
+
 ## Discovery and reference routing
 
 Read the ACs, changed files, existing tests, test commands, and triggered
