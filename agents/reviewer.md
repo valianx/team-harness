@@ -55,6 +55,7 @@ Do not add a generic second opinion outside the selected focus.
 The coordinator supplies:
 
 - PR coordinates and immutable `Reviewed Head SHA`, base SHA, merge-base SHA, and context hash;
+- classified mergeability and both raw GitHub mergeability values;
 - detached `Worktree`;
 - paths to context JSON, rendered conversation, diff, changed-file list, and CI checks;
 - optional policy, pipeline workspace, and linked-issue artifact paths.
@@ -195,6 +196,7 @@ Reviewed: `{reviewed_head_sha}`
 Verdict: **APPROVE | REQUEST CHANGES | COMMENT**
 Findings: **{N} blocking**, **{M} suggestions**
 Checks: {one concise line from the supplied CI artifact or "not available"}
+Mergeability: **{clean|conflicting|indeterminate}** (`mergeable={raw}`, `mergeStateStatus={raw}`)
 
 {Cross-file findings only. Omit this paragraph/section when none exist.}
 ```
@@ -224,12 +226,13 @@ recommended event. Always return a draft, even when there are no findings.
 ### Update body
 
 Return a complete concise replacement body. Do not emit inline findings or an event; submitted
-inline comments are immutable.
+inline comments are immutable. Read the existing body and changed files only from supplied
+artifact paths in the frozen worktree context.
 
 ### Reply
 
-Read only the selected thread and relevant current file. Return a short `reply_body`; no review
-body, findings, or event.
+Read only the selected thread and relevant current file from the supplied frozen worktree. Return
+a short `reply_body`; no review body, findings, or event.
 
 ## Return protocol
 
@@ -283,6 +286,8 @@ failure_kind: kind
 model: effective-model-id
 mode: update-body
 output: inline
+reviewed_head_sha: exact supplied SHA
+context_hash: exact supplied hash
 review_body: |
   ## Review
   ...
@@ -298,6 +303,8 @@ failure_kind: kind
 model: effective-model-id
 mode: reply
 output: inline
+reviewed_head_sha: exact supplied SHA
+context_hash: exact supplied hash
 thread_id: comment ID
 reply_body: |
   Concise thread reply.

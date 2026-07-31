@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 BOT_BODY_LIMIT = 500
 HUMAN_BODY_LIMIT = 2_000
 DETAILS_RE = re.compile(r"<details\b[^>]*>.*?</details>", re.IGNORECASE | re.DOTALL)
@@ -398,6 +398,16 @@ def conversation_identity(context: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def classify_mergeability(mergeable: Any, merge_state_status: Any) -> str:
+    mergeable_value = str(mergeable or "").upper()
+    state_value = str(merge_state_status or "").upper()
+    if mergeable_value == "CONFLICTING" or state_value == "DIRTY":
+        return "conflicting"
+    if mergeable_value == "MERGEABLE" and state_value == "CLEAN":
+        return "clean"
+    return "indeterminate"
+
+
 def finalize_hashes(context: dict[str, Any]) -> None:
     code = {
         "base_oid": context["base_oid"],
@@ -411,6 +421,7 @@ def finalize_hashes(context: dict[str, Any]) -> None:
             "code_hash": context["code_hash"],
             "conversation_hash": context["conversation_hash"],
             "commits": context.get("commits", []),
+            "mergeability": context.get("mergeability", {}),
         }
     )
 
@@ -427,7 +438,8 @@ def capture_metadata(repo: str, number: int) -> dict[str, Any]:
             "--json",
             (
                 "number,title,body,author,baseRefName,headRefName,baseRefOid,"
-                "headRefOid,isCrossRepository,additions,deletions,changedFiles,url,files"
+                "headRefOid,isCrossRepository,additions,deletions,changedFiles,url,files,"
+                "mergeable,mergeStateStatus"
             ),
         ]
     )
@@ -463,6 +475,13 @@ def capture(repo: str, number: int, git_dir: Path, remote: str) -> dict[str, Any
         "head_oid": head_oid,
         "merge_base_oid": refs["merge_base_oid"],
         "git_refs": {"base": refs["base_ref"], "head": refs["head_ref"]},
+        "mergeability": {
+            "status": classify_mergeability(
+                metadata.get("mergeable"), metadata.get("mergeStateStatus")
+            ),
+            "mergeable": metadata.get("mergeable"),
+            "merge_state_status": metadata.get("mergeStateStatus"),
+        },
         "commits": capture_commits(repo, number),
         "issue_comments": capture_issue_comments(repo, number),
         "review_comments": capture_review_comments(repo, number),
@@ -470,7 +489,9 @@ def capture(repo: str, number: int, git_dir: Path, remote: str) -> dict[str, Any
         "reviews": capture_reviews(repo, number),
     }
     final_metadata = capture_metadata(repo, number)
-    for field in ("baseRefOid", "headRefOid", "title", "body"):
+    for field in (
+        "baseRefOid", "headRefOid", "title", "body", "mergeable", "mergeStateStatus"
+    ):
         if (metadata.get(field) or "") != (final_metadata.get(field) or ""):
             raise ContextError(
                 f"PR {field} changed while context was captured; retry before reviewing"
@@ -495,6 +516,7 @@ def compare_contexts(expected: dict[str, Any], actual: dict[str, Any]) -> dict[s
         expected.get("conversation_hash") != actual.get("conversation_hash")
     )
     commits_changed = expected.get("commits") != actual.get("commits")
+    mergeability_changed = expected.get("mergeability") != actual.get("mergeability")
     changed_fields = [
         key
         for key in ("base_oid", "head_oid", "merge_base_oid")
@@ -503,13 +525,14 @@ def compare_contexts(expected: dict[str, Any], actual: dict[str, Any]) -> dict[s
     return {
         "status": (
             "code-changed"
-            if code_changed or commits_changed
+            if code_changed or commits_changed or mergeability_changed
             else "conversation-changed"
             if conversation_changed
             else "current"
         ),
-        "code_changed": code_changed or commits_changed,
+        "code_changed": code_changed or commits_changed or mergeability_changed,
         "conversation_changed": conversation_changed,
+        "mergeability_changed": mergeability_changed,
         "changed_fields": changed_fields,
         "expected_head_oid": expected.get("head_oid"),
         "actual_head_oid": actual.get("head_oid"),
@@ -550,10 +573,14 @@ def body_lines(body: str, indent: str = "  ") -> Iterable[str]:
 
 
 def render_context(context: dict[str, Any]) -> str:
+    mergeability = context.get("mergeability") or {}
     lines = [
         f"Reviewed snapshot: `{context['head_oid']}`",
         f"Base snapshot: `{context['base_oid']}`",
         f"Merge base: `{context['merge_base_oid']}`",
+        f"Mergeability: **{mergeability.get('status', 'indeterminate')}**",
+        f"Raw mergeable: `{mergeability.get('mergeable')}`",
+        f"Raw merge state: `{mergeability.get('merge_state_status')}`",
         "",
         "## Commits",
     ]
@@ -677,6 +704,7 @@ def command_capture(args: argparse.Namespace) -> int:
                 "base_oid": context["base_oid"],
                 "merge_base_oid": context["merge_base_oid"],
                 "context_hash": context["context_hash"],
+                "mergeability": context.get("mergeability"),
                 "output": str(args.output),
             }
         )

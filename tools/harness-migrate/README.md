@@ -10,8 +10,8 @@ Bidirectional deterministic transform for team-harness assets between Claude Cod
 - **Inverse (`to-claude-code`):** `.opencode/agents/` → `agents/` and `.opencode/commands/` → `.claude/commands/`
 
 The transform covers:
-- Agent tool permissions: `tools:` comma-string ↔ `permission.allow` array (agent surface)
-- Command tool permissions: `allowed-tools:` string/array ↔ `permission.allow` array (command surface)
+- Forward projections omit agent and command permissions so OpenCode's native policy remains authoritative.
+- Reverse projections preserve permissions from OpenCode-authored files when present.
 - Model identifiers: bare/alias ↔ provider-prefixed (`anthropic/…`)
 - Mode: forward-add `mode: subagent` for agents (dropped on inverse for CC-origin files)
 - Argument placeholder: `$ARGUMENTS` is identity on both harnesses — no rewrite

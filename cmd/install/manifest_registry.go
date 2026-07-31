@@ -235,8 +235,9 @@ func buildCommandComponents(embeddedFS fs.FS) ([]ComponentManifest, error) {
 //     copied verbatim to .opencode/skills/<name>/...
 //   - Command components: skills/opencode-commands/*.md emitted as opencode
 //     commands to .opencode/commands/<name>.md
-//   - Hook-plugin component: the full transitive closure of hooks/ts/opencode-plugin.ts
-//     + entry/*.opencode.ts + bodies/*.ts + shim/*.ts → {config_root}/plugins/
+//
+// OpenCode uses its native permission and approval model. Team Harness does not
+// install a parallel hook layer for this runtime.
 func buildOpencodeManifests() ([]ModuleManifest, []ComponentManifest, error) {
 	embeddedFS := EmbeddedAssets()
 
@@ -258,18 +259,11 @@ func buildOpencodeManifests() ([]ModuleManifest, []ComponentManifest, error) {
 		return nil, nil, fmt.Errorf("build command components: %w", err)
 	}
 
-	// Collect hook-plugin component (full transitive closure).
-	hookComponents, err := buildHookPluginComponents(embeddedFS)
-	if err != nil {
-		return nil, nil, fmt.Errorf("build hook components: %w", err)
-	}
-
 	allComponents := make([]ComponentManifest, 0,
-		len(agentComponents)+len(skillComponents)+len(commandComponents)+len(hookComponents))
+		len(agentComponents)+len(skillComponents)+len(commandComponents))
 	allComponents = append(allComponents, agentComponents...)
 	allComponents = append(allComponents, skillComponents...)
 	allComponents = append(allComponents, commandComponents...)
-	allComponents = append(allComponents, hookComponents...)
 
 	// Build the module manifest listing all component IDs AFTER assembling the
 	// full component slice (keeps orphan-check safe).
@@ -281,7 +275,7 @@ func buildOpencodeManifests() ([]ModuleManifest, []ComponentManifest, error) {
 	module := ModuleManifest{
 		SchemaVersion:  1,
 		Module:         "opencode-harness",
-		Description:    "Team Harness agents, skills, commands and hook plugin for the opencode runtime",
+		Description:    "Team Harness agents, skills and commands for the opencode runtime",
 		DefaultInstall: "always",
 		Components:     componentIDs,
 	}
@@ -313,6 +307,10 @@ func buildAgentComponents(embeddedFS fs.FS) ([]ComponentManifest, error) {
 
 		name := strings.TrimSuffix(e.Name(), ".md")
 		compID := "agent-" + name
+		configKeys := []string{}
+		if name == "orchestrator" {
+			configKeys = []string{"default_agent"}
+		}
 
 		components = append(components, ComponentManifest{
 			SchemaVersion:  1,
@@ -325,104 +323,7 @@ func buildAgentComponents(embeddedFS fs.FS) ([]ComponentManifest, error) {
 			DefaultInstall: true,
 			Emits: OwnershipTags{
 				Files:      []string{"{config_root}/agents/" + e.Name()},
-				ConfigKeys: []string{},
-			},
-		})
-	}
-
-	return components, nil
-}
-
-// buildHookPluginComponents returns ComponentManifests for the opencode hook
-// plugin tree. The full transitive closure is placed under
-// {config_root}/plugins/ so the plugin loads without unresolved imports
-// (S-6 closure requirement).
-//
-// Placed files:
-//   - hooks/ts/opencode-plugin.ts → {config_root}/plugins/team-harness.ts
-//   - hooks/ts/entry/*.opencode.ts → {config_root}/plugins/entry/
-//   - hooks/ts/bodies/*.ts → {config_root}/plugins/bodies/
-//   - hooks/ts/shim/*.ts → {config_root}/plugins/shim/
-//
-// NOT placed (CC-side only): package.json, tsconfig.json, dist/, *.cc.ts
-func buildHookPluginComponents(embeddedFS fs.FS) ([]ComponentManifest, error) {
-	var components []ComponentManifest
-
-	// 1. Main plugin file (renamed for clarity as the opencode entry point).
-	components = append(components, ComponentManifest{
-		SchemaVersion:  1,
-		Component:      "hook-plugin-entry",
-		Module:         "opencode-harness",
-		Kind:           "hook",
-		Source:         "hooks/ts/opencode-plugin.ts",
-		Cost:           "low",
-		Stability:      "stable",
-		DefaultInstall: true,
-		Emits: OwnershipTags{
-			Files:      []string{"{config_root}/plugins/team-harness.ts"},
-			ConfigKeys: []string{},
-		},
-	})
-
-	// 2. entry/*.opencode.ts — only the opencode entry files.
-	entryComponents, err := buildHookSubdirComponents(embeddedFS, "hooks/ts/entry", ".opencode.ts", "entry", "hook-plugin-entry-")
-	if err != nil {
-		return nil, err
-	}
-	components = append(components, entryComponents...)
-
-	// 3. bodies/*.ts — all body files.
-	bodyComponents, err := buildHookSubdirComponents(embeddedFS, "hooks/ts/bodies", ".ts", "bodies", "hook-plugin-body-")
-	if err != nil {
-		return nil, err
-	}
-	components = append(components, bodyComponents...)
-
-	// 4. shim/*.ts — the normalized shim.
-	shimComponents, err := buildHookSubdirComponents(embeddedFS, "hooks/ts/shim", ".ts", "shim", "hook-plugin-shim-")
-	if err != nil {
-		return nil, err
-	}
-	components = append(components, shimComponents...)
-
-	return components, nil
-}
-
-// buildHookSubdirComponents reads a subdirectory of hooks/ts/ and emits one
-// ComponentManifest per file matching suffix. destSubdir is the relative
-// subdirectory under {config_root}/plugins/.
-func buildHookSubdirComponents(embeddedFS fs.FS, srcDir, suffix, destSubdir, compIDPrefix string) ([]ComponentManifest, error) {
-	entries, err := fs.ReadDir(embeddedFS, srcDir)
-	if err != nil {
-		return nil, fmt.Errorf("read dir %q: %w", srcDir, err)
-	}
-
-	var components []ComponentManifest
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), suffix) {
-			continue
-		}
-
-		// Derive a safe component ID from the filename.
-		base := strings.TrimSuffix(e.Name(), ".ts")
-		base = strings.ReplaceAll(base, ".", "-")
-		base = strings.ReplaceAll(base, "_", "-")
-		compID := compIDPrefix + base
-
-		dest := "{config_root}/plugins/" + destSubdir + "/" + e.Name()
-
-		components = append(components, ComponentManifest{
-			SchemaVersion:  1,
-			Component:      compID,
-			Module:         "opencode-harness",
-			Kind:           "hook",
-			Source:         srcDir + "/" + e.Name(),
-			Cost:           "low",
-			Stability:      "stable",
-			DefaultInstall: true,
-			Emits: OwnershipTags{
-				Files:      []string{dest},
-				ConfigKeys: []string{},
+				ConfigKeys: configKeys,
 			},
 		})
 	}

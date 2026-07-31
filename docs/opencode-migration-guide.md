@@ -1,6 +1,6 @@
 # Opencode Migration Guide
 
-> **Status: hook cutover complete (declared 2026-07-02, issue #446).** **TypeScript is the single source of gate logic for both Claude Code and opencode.** The former interim declaration (Bash canonical, TS the generated projection) is superseded, not accumulated: the hook Bash->TS cutover retired all 11 Bash hook bodies (`hooks/*.sh`) along with the Go installer's Claude Code path — the marketplace plugin (`.claude-plugin/hooks.json`) wires every CC gate through `hooks/run-ts-hook.sh`, a fail-closed launcher with no gate logic of its own, execing the same compiled `hooks/ts/dist/*.cjs` artifacts opencode consumes. A divergence between CC and opencode behavior is now a defect in the shared TS body, not an interim-authority question. Only `hooks/sketch-guard.sh` (not an event hook — invoked via the Bash tool, not wired in `hooks.json`) remains Bash. This document's remaining scope is the asset-type migration process below (skills, agents, `AGENTS.md`) — the hook-specific migration section it used to describe is complete. See [`docs/lifecycle.md`](./lifecycle.md) for the full stage-by-stage picture across both runtimes.
+> **Current status:** agents, skills, commands, and context are projected to OpenCode. Team Harness hooks remain on the Claude Code runtime only; OpenCode uses its native permissions and approval flow instead of a duplicate Team Harness plugin layer.
 
 ---
 
@@ -18,69 +18,19 @@
 
 **Emit-time frontmatter delta.** The body content of agent and command files requires no modification. The migration applies a frontmatter transformation at emit time, driven by the Item 1 adapter descriptor — not by hand-editing each file. The transform covers:
 
-- **Tool permissions:** CC-style `tools` allowlist → explicit `permission` object with `allow`, `ask`, and `deny` arrays.
+- **Tool permissions:** omitted from installed OpenCode agents and commands so the host's native permission policy remains authoritative.
 - **Model identifiers:** bare model names → provider-prefixed identifiers (e.g., `claude-opus-4-5` → `anthropic/claude-opus-4-5`).
 - **Mode:** add explicit `mode` field if absent.
 - **Argument placeholder:** `$ARGUMENTS` is the canonical placeholder on both harnesses (verified against live Claude Code and opencode docs). The transform is **identity** — no rewrite is needed. (A prior draft of this guide listed `{input}` → `$ARGUMENTS`, but `{input}` is not a token in either live harness.)
 - **Relocation:** agent files → `.opencode/agents/`; command files → `.opencode/commands/`.
 
-This transform is reversible and idempotent. The canonical body remains in `agents/` unchanged; the projected copy lands in the target harness directory.
+This transform is deterministic and idempotent. Permission and model fields intentionally do not round-trip because OpenCode inherits the host policy and model selection. The canonical body remains in `agents/` unchanged; the projected copy lands in the target harness directory.
 
 ### Hooks
 
-**Complete as of the hook Bash->TS cutover (issue #446, 2026-07-02).** The process below is retained as the design record of how the rewrite was carried out; every wired CC hook family now has a TS body under `hooks/ts/bodies/`, and the Claude Code plugin wires them through `hooks/run-ts-hook.sh` (a fail-closed launcher with no gate logic).
+**Not projected.** The OpenCode installer does not emit files under `.opencode/plugins/`. Existing TypeScript bodies remain available to Claude Code and for historical regression coverage, but are not an OpenCode runtime dependency.
 
-**Hard case — TypeScript rewrite required (historical framing, now executed).**
-
-The target harness does not execute shell scripts as hooks. Its hook model uses TypeScript/JavaScript plugins on Bun, registered as async event callbacks in `.opencode/plugins/`. There is no execution-model bridge that converts a Bash hook body into a TS plugin without a rewrite. This is the only fundamentally incompatible surface.
-
-**Process per hook family:**
-
-1. **Event mapping.** Map each CC hook event (e.g., `PreToolUse`, `PostToolUse`, `Stop`) to the corresponding target harness plugin event callback. The target harness exposes 23+ events; most CC hook events have a direct counterpart.
-2. **Decision-object translation.** CC hooks communicate via exit code and stdout JSON (`{ "decision": "allow|deny|ask", "reason": "..." }`). The TS plugin equivalent is a return value from the async callback function — translate the exit-code semantics to the TS return value contract.
-3. **Gate semantics preservation.** The deterministic security gates (`policy-block`, `dev-guard`, `checkpoint-guard`, `prepublish-guard`) rely on fail-closed behavior: a missing or erroring hook defaults to deny on security-critical paths. The TS rewrite MUST preserve this: an uncaught exception or a missing decision field in the TS plugin MUST be treated as a deny, not as a pass-through allow.
-4. **Verification spike (required before trusting the rewrite).** Whether the deterministic gate semantics (fail-closed behavior, the specific deny/ask/allow decision logic) are faithfully preserved when rewritten as a TS-on-Bun plugin is a security-relevant unknown. A verification spike — running the rewritten TS gates against the existing hook test suite and against known-bad inputs — MUST be completed and signed off before the rewritten hooks are trusted in production. This is not optional.
-5. **Entropy-scan fold.** The `policy-block` hook currently calls a Python entropy-scanning component (`policy-block.sh` invokes Python-based pattern matching for high-entropy strings). The TS rewrite MUST fold this entropy-scan logic directly into the TS hook body, so full secret-detection coverage no longer requires Python on the end-user machine. This is the corollary of the two-tier dependency rule: a TS-native hook that ships the entropy scan inline drops the Python end-user dependency entirely, producing a leaner install on both Claude Code (Node) and the target harness (Bun).
-
----
-
-## Hook-language options considered
-
-The operator requested that the options be documented before the decision was recorded, so the rationale is preserved for future reference.
-
-### A1 — Keep Bash bodies + ship ONE TS compat-plugin [considered, not chosen]
-
-Author all existing Bash hook bodies unchanged. Ship a single TypeScript plugin for the target harness that reads the CC hooks configuration and dispatches to the existing Bash scripts via child process.
-
-**Pro:** Preserves the entire existing 18-hook Bash investment with no rewrite cost. Adds only one materialized TS bridge artifact for the target harness provider.
-
-**Con:** Keeps two languages in the hook surface. The bridge is a per-provider materialized artifact that adds its own maintenance burden. The deterministic gate guarantees through the bridge are unverified — the Bash scripts run as child processes from within a TS plugin, adding a process boundary whose failure modes differ from direct hook invocation. If the child process fails or times out, the bridge must still fail-closed for the gate semantics to hold — an additional guarantee the bridge must implement.
-
-### A2 — Full TypeScript/JavaScript rewrite of all hooks [CHOSEN]
-
-Rewrite all 18 Bash hook bodies as TypeScript/JavaScript plugins. A single TS body runs natively on Claude Code (Node) and the target harness (Bun) without a bridge.
-
-**Pro:** Single authoring language across both harnesses. Native execution on both runtimes. No per-provider bridge artifact. Lower long-term maintenance burden.
-
-**Con:** Higher up-front rewrite cost. Discards the existing Bash hook investment.
-
-**Chosen** because the runtime-dependency analysis (below) shows TS adds little marginal runtime cost, and a single language across both harnesses is the lower long-term maintenance burden. The verification spike (see hooks migration process above) addresses the security-relevant unknown before the rewritten gates are trusted.
-
-### A3 — Hermetic Python via uv [DROPPED]
-
-Author hooks in Python, distributed hermetially via `uv` so no system Python is required.
-
-**Con:** Does not help the target harness — it wants TS-on-Bun, not Python. This option was the earlier hedge against the Node runtime dependency but is weakened by the evidence: the target harness requires TS/JS plugins and has no Python execution path. Dropped.
-
----
-
-## Runtime-dependency analysis
-
-**Node is already a Claude Code runtime dependency.** Claude Code ships on Node; it is already required on any machine running Claude Code. Authoring hooks in TypeScript therefore adds little marginal runtime cost on the Claude Code side — the Node runtime is already present.
-
-**The target harness runs plugins on Bun.** Bun executes TypeScript/JavaScript natively without a separate compilation step. A TS hook body is the only language that runs natively on both harnesses (Node on CC, Bun on the target) without a bridge or an added runtime.
-
-This is the load-bearing rationale for choosing A2 over A1 and A3: TS is the single-language path that is native on both harnesses with no added end-user runtime dependency beyond what is already required.
+OpenCode intentionally uses its native permission and approval system instead of a translated Team Harness hook layer. Claude Code remains the only runtime that installs the TypeScript guard hooks.
 
 ---
 
@@ -100,7 +50,7 @@ The following table shows where each converted asset type lands after migration:
 | Commands | `.opencode/commands/` |
 | Skills | `.opencode/skills/` — or reuse `.claude/skills/` directly (the target harness reads CC skill directories; no placement step may be needed) |
 | Rules | `AGENTS.md` (cross-tool standard), with `CLAUDE.md` as fallback |
-| Hooks (TS plugins) | `.opencode/plugins/` |
+| Hooks | Not installed; OpenCode uses native permissions and approvals |
 | Config | Merged into `opencode.json` |
 
 ### Installer mechanism
@@ -111,13 +61,13 @@ The installer mechanism is the roadmap's **Item 2** design (two-layer install ma
 
 Three options are available for placing assets on the target harness:
 
-1. **Dedicated installer binary (recommended — Decision B).** The existing Go installer (`cmd/install/`), repurposed for the target harness, places all file-based assets and merges `opencode.json` in one pass. This is the only option that covers agents, commands, skills, rules, hooks, and config in a single operation. It mirrors the existing Go-installer flow and is the Decision B choice.
+1. **Dedicated installer binary (implemented — Decision B).** The Go installer (`cmd/install/`) places the file-based assets and merges `opencode.json` while preserving operator-owned keys.
 
 2. **Native npm plugin referenced from `opencode.json` `plugins`.** The target harness can load a published npm package as a plugin. This option can serve the TS hook plugins but cannot place the file-based agents, commands, skills, or rules — it is insufficient on its own for a full harness install.
 
 3. **Hybrid: installer for file-based assets + npm package for hooks.** The installer materializes the file-based assets; the TS hook plugins are distributed as a published npm package and referenced in `opencode.json`. This option adds value once the hook plugins exist as a publishable artifact. Recommended as a complement to option 1 at that stage.
 
-**Recommendation:** option 1 for the initial implementation; option 3 if and when the hook plugins are later distributed as a published package.
+**Current implementation:** option 1 without OpenCode hook plugins.
 
 ### Uninstall
 
@@ -129,4 +79,4 @@ In Claude Code, the canonical distribution path is the plugin marketplace: `/plu
 
 ### Scope of this section
 
-This section documents the installation and distribution path for the target second harness. It does NOT build the installer. The opencode installer is future work — the Item 2 design realized for the target harness runtime. Nothing in this document ships an installer binary.
+This section documents the shipped OpenCode installer and distribution path.

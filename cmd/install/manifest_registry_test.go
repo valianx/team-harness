@@ -35,8 +35,7 @@ import (
 // ---------------------------------------------------------------------------
 
 // TestBuildOpencodeManifests_SkillComponentsPresent verifies that the opencode
-// manifest set contains at least one kind:skill component, closing the drift
-// where only agents and hook-plugin components were emitted.
+// manifest set contains at least one kind:skill component.
 func TestBuildOpencodeManifests_SkillComponentsPresent(t *testing.T) {
 	modules, components, err := buildOpencodeManifests()
 	if err != nil {
@@ -63,6 +62,23 @@ func TestBuildOpencodeManifests_SkillComponentsPresent(t *testing.T) {
 		t.Error("no kind:skill components emitted — skills-copy drift not closed")
 	}
 	t.Logf("AC-1: %d skill components emitted", skillCount)
+}
+
+func TestBuildOpencodeManifests_NoHookComponents(t *testing.T) {
+	_, components, err := buildOpencodeManifests()
+	if err != nil {
+		t.Fatalf("buildOpencodeManifests: %v", err)
+	}
+	for _, c := range components {
+		if c.Kind == "hook" {
+			t.Errorf("OpenCode manifest still emits hook component %q", c.Component)
+		}
+		for _, f := range c.Emits.Files {
+			if strings.HasPrefix(f, "{config_root}/plugins/") {
+				t.Errorf("OpenCode manifest still emits plugin file %q", f)
+			}
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -611,11 +627,11 @@ func buildMockSkillFS(files map[string]string) fstest.MapFS {
 // references/ is NOT emitted by buildSkillComponents (AC-3b, layer c).
 func TestBuildSkillComponents_MockFS_NonAllowlistedBinaryNotEmitted(t *testing.T) {
 	mockFS := buildMockSkillFS(map[string]string{
-		"skills/my-skill/SKILL.md":              "# My Skill",
-		"skills/my-skill/references/x.md":       "# Reference",
-		"skills/my-skill/references/tool.exe":   "\x00binary",  // non-allowlisted — must be skipped
-		"skills/my-skill/references/font.ttf":   "\x00binary",  // non-allowlisted
-		"skills/my-skill/references/binary":     "\x00binary",  // extension-less — must be skipped
+		"skills/my-skill/SKILL.md":            "# My Skill",
+		"skills/my-skill/references/x.md":     "# Reference",
+		"skills/my-skill/references/tool.exe": "\x00binary", // non-allowlisted — must be skipped
+		"skills/my-skill/references/font.ttf": "\x00binary", // non-allowlisted
+		"skills/my-skill/references/binary":   "\x00binary", // extension-less — must be skipped
 	})
 
 	components, err := buildSkillComponents(mockFS)

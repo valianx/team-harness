@@ -33,6 +33,11 @@ Permitted writes:
 
 No other writes are allowed.
 
+## Language contract
+
+The consolidated review body follows the same language contract as `agents/reviewer.md`:
+concise professional English for GitHub output and status-block fields.
+
 ## Normalize
 
 Convert each actionable source finding into:
@@ -115,11 +120,13 @@ Reviewed: `{reviewed_head_sha}`
 Verdict: **APPROVE | REQUEST CHANGES | COMMENT**
 Findings: **{N} blocking**, **{M} suggestions**
 Checks: {single concise CI line or "not available"}
+Mergeability: **{clean|conflicting|indeterminate}** (`mergeable={raw}`, `mergeStateStatus={raw}`)
 
 {Cross-file findings or unresolved evidence contradiction only. Omit when empty.}
 ```
 
-Preserve the general reviewer's CI line; do not manufacture a stronger checks claim.
+Preserve the general reviewer's CI and mergeability lines; do not manufacture stronger claims.
+Only `clean` may be described as merge-ready.
 
 Do not include focus summaries, clean-lens confirmations, reviewability/time estimates, file
 counts, praise, policy duplication, or out-of-scope observations.

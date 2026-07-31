@@ -88,7 +88,7 @@ Replace:
 **What the flags do:**
 - `--output-format stream-json` keeps the log structured for later inspection.
 - `--permission-mode acceptEdits` auto-approves edits within the allowlist. Bash invocations not in the allowlist still prompt — this prevents runaway destructive commands.
-- `--allowedTools` is a tight surface (Read/Edit/Write/Glob/Grep + scoped Bash). The harness's `policy-block.sh` PreToolUse hook (see `hooks/`) is a separate hard guardrail that always runs.
+- `--allowedTools` is a tight surface (Read/Edit/Write/Glob/Grep + scoped Bash). The active runtime's permission policy remains independent of this tool list.
 - `> /tmp/background-{slug}.log 2>&1 &` runs the process in the background of the user's shell, redirects all output to a log, and returns control immediately.
 
 ---
@@ -133,5 +133,5 @@ name: background
 
 - **`/th:background` does NOT invoke the orchestrator.** This is a deliberately different surface — the orchestrator and its gates exist precisely because most tasks are not eligible for fast-path. If you find yourself wanting to bypass the gates often, the cost is the gates being too heavy, not the gates being wrong; raise it as a `team-harness` issue instead of widening `/th:background`'s eligibility criteria.
 - **`/th:background` does NOT run the dispatched command.** The user owns the actual fire. The skill only validates eligibility, builds the command, and explains how to monitor it.
-- **The dispatched session inherits the user's `~/.claude/` config**, including the `policy-block.sh` PreToolUse hook. Destructive commands stay blocked even in the background session.
+- **The dispatched session inherits the user's `~/.claude/` config** and remains subject to its permission policy. Background execution does not authorize destructive commands.
 - For multiple parallel tasks, `/th:tmux` is the right tool — it manages tmux panes, dependency analysis, and aggregates results. `/th:background` is for a single fire-and-forget.

@@ -202,9 +202,9 @@ alongside — not instead of — `§ Bug Tier` below for `type: fix`/`hotfix`; t
 version bump, changelog assembly, a config edit, a handful of targeted file edits with no design
 or code judgment involved — is executed directly by you, inline, without a branch or PR or
 dispatching specialists. Dispatch a specialist only when the task carries real design/code
-judgment, or when the operator asks for it. Ceremony is not a control: the deterministic hooks
-(`dev-guard`, `prepublish-guard`, CI) remain the enforcement floor for outward actions and
-invariants regardless of who executes the edits. This bias feeds the recommendation below — when
+judgment, or when the operator asks for it. Ceremony is not a control: outward actions still
+require the active runtime's approval, and CI remains independent of who executes the edits.
+This bias feeds the recommendation below — when
 a task is genuinely mechanical, `inline` is the recommended lane, not merely an available one.
 It never weakens the security floor: a sensitive path (per `docs/pipeline-lanes.md § 2a`) still
 never runs inline without the constraint-E waiver, exactly as the bright-line below states.
@@ -214,8 +214,8 @@ operator-declared inline working posture (`docs/pipeline-lanes.md § 2b`, declar
 `/th:inline`) is active, the bright-line check below ALSO admits bounded, non-sensitive,
 reversible code editing, iterated turn by turn at the operator's direction — you (or one
 directly-dispatched `implementer`) edit only in response to the operator's live direction, never
-triggering a pass of your own; no forced branch, no forced PR, and the resulting commit/push
-stays gated by `dev-guard` exactly as today. Evaluate the § 2b escalation signals EVERY turn,
+triggering a pass of your own; no forced branch, no forced PR, and any resulting outward action
+still requires the active runtime's approval. Evaluate the § 2b escalation signals EVERY turn,
 posture active or not, in this order:
 
 - **§ 2a sensitivity first, with precedence.** § 2a sensitivity — including fail-closed on
@@ -225,14 +225,11 @@ posture active or not, in this order:
   only the operator's directive or path: a § 2a content trigger detected AFTER drafting and
   BEFORE commit forces exit from the posture and reroutes — the drafted change is never
   delivered inline.
-- **Mechanism-honesty caveat (§ 2b "Mechanism-honesty caveat for the § 2a scan").** Your
-  per-turn § 2a content evaluation is backed by a deterministic hook only for what
-  `hooks/ts/bodies/policy-block.ts` actually pattern-matches (secret patterns, the fixed
-  sensitive-file-path list, and the two literal destructive-SQL keywords); for auth/authz, PII
-  handling, deserialization of untrusted content, and general injection construction beyond
-  those keywords, the evaluation is your own turn-based judgment — prompt-level self-discipline,
-  not a cryptographic or platform-level guarantee. Read the drafted content and refuse/reroute
-  yourself; never treat the hook as covering those categories.
+- **Enforcement-boundary caveat (§ 2b "Mechanism-honesty caveat for the § 2a scan").** Your
+  per-turn § 2a content evaluation remains your own judgment for auth/authz, PII handling,
+  deserialization of untrusted content, injection construction, secret exposure, sensitive
+  paths, and destructive SQL. Read the drafted content and refuse or reroute it yourself; never
+  assume the active runtime's permissions classify those content categories for you.
 - **Hard blocks (§ 2b signals 1-2).** A sensitive-path touch (§ 2a) or an irreversible/
   outward-effect change categorically forces exit from the posture and reroutes to express/full
   — for sensitive changes the constraint-E waiver (below) remains the ONLY inline-on-sensitive

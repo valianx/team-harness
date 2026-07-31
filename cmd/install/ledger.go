@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,11 +24,17 @@ const ledgerFilenameOpencode = "ownership-ledger-opencode.jsonl"
 // Initialized to the default (claude-code); call setActiveLedgerFilename
 // before any ledger I/O when using the opencode runtime.
 var activeLedgerFilename = ledgerFilename
+var activeLedgerConfigRoot string
 
 // setActiveLedgerFilename configures the ledger filename for the current
 // runtime. Must be called before appendLedger / readLedger / isLedgerAbsent.
 func setActiveLedgerFilename(name string) {
 	activeLedgerFilename = name
+}
+
+func setActiveLedgerContext(name, configRoot string) {
+	activeLedgerFilename = name
+	activeLedgerConfigRoot = filepath.Clean(configRoot)
 }
 
 // LedgerEntry is one line of the ownership ledger. Self-contained: a malformed
@@ -38,6 +45,7 @@ type LedgerEntry struct {
 	Component     string        `json:"component"`     // component id
 	Owns          OwnershipTags `json:"owns"`          // names + {config_root}-paths only (SEC-05)
 	SchemaVersion int           `json:"schemaVersion"` // ledger-entry schema version == 1 (C-3)
+	ConfigRoot    string        `json:"configRoot,omitempty"`
 }
 
 // ledgerError records a malformed ledger line (line number + reason).
@@ -77,6 +85,9 @@ func appendLedger(entries []LedgerEntry) error {
 		if entry.TS == "" {
 			entry.TS = time.Now().UTC().Format(time.RFC3339)
 		}
+		if activeLedgerConfigRoot != "" {
+			entry.ConfigRoot = activeLedgerConfigRoot
+		}
 
 		line, err := json.Marshal(entry)
 		if err != nil {
@@ -93,7 +104,7 @@ func appendLedger(entries []LedgerEntry) error {
 		}
 
 		// SEC-05 structural gate: validate Owns before persisting.
-		if err := validateOwnershipTags(entry.Owns); err != nil {
+		if err := validateLedgerOwnership(entry); err != nil {
 			return fmt.Errorf("SEC-05: ledger entry for component %q fails structural gate: %w", entry.Component, err)
 		}
 
@@ -116,8 +127,12 @@ func appendLedger(entries []LedgerEntry) error {
 // validation time — both surfaces must agree.
 func validateOwnershipTags(tags OwnershipTags) error {
 	for _, f := range tags.Files {
-		if !strings.HasPrefix(f, "{config_root}") {
-			return fmt.Errorf("Files entry %q must begin with {config_root}", f)
+		if !strings.HasPrefix(f, "{config_root}/") {
+			return fmt.Errorf("Files entry %q must begin with {config_root}/", f)
+		}
+		rel := filepath.Clean(filepath.FromSlash(strings.TrimPrefix(f, "{config_root}/")))
+		if rel == "." || filepath.IsAbs(rel) || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("Files entry %q escapes {config_root}", f)
 		}
 	}
 	for _, k := range tags.ConfigKeys {
@@ -132,6 +147,61 @@ func validateOwnershipTags(tags OwnershipTags) error {
 	return nil
 }
 
+func validateLedgerOwnership(entry LedgerEntry) error {
+	if err := validateOwnershipTags(entry.Owns); err != nil {
+		return err
+	}
+	for _, key := range entry.Owns.ConfigKeys {
+		switch key {
+		case "default_agent", "logs-mode", "logs-path", "logs-subfolder", "language", "english_learning", "clickup.workspace_id", "mcp.memory", "mcp.context7":
+		default:
+			return fmt.Errorf("ConfigKeys entry %q is not installer-managed", key)
+		}
+	}
+	for _, ownedPath := range entry.Owns.Files {
+		rel := strings.TrimPrefix(ownedPath, "{config_root}/")
+		clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(rel)))
+		valid := false
+		switch {
+		case strings.HasPrefix(entry.Component, "agent-"):
+			valid = clean == "agents/"+strings.TrimPrefix(entry.Component, "agent-")+".md"
+		case strings.HasPrefix(entry.Component, "command-"):
+			valid = clean == "commands/"+strings.TrimPrefix(entry.Component, "command-")+".md"
+		case strings.HasPrefix(entry.Component, "skill-"):
+			derived := strings.NewReplacer("/", "-", ".", "-", "_", "-").Replace(strings.TrimPrefix(clean, "skills/"))
+			valid = strings.HasPrefix(clean, "skills/") && entry.Component == "skill-"+strings.Trim(derived, "-")
+		case strings.HasPrefix(entry.Component, "hook-plugin-"):
+			valid = historicalPluginOwnershipMatches(entry.Component, clean)
+		}
+		if !valid {
+			return fmt.Errorf("Files entry %q does not match component %q", ownedPath, entry.Component)
+		}
+	}
+	return nil
+}
+
+func historicalPluginOwnershipMatches(component, cleanPath string) bool {
+	if component == "hook-plugin-entry" {
+		return cleanPath == "plugins/team-harness.ts"
+	}
+	checks := []struct {
+		prefix string
+		dir    string
+	}{
+		{"hook-plugin-entry-", "plugins/entry/"},
+		{"hook-plugin-body-", "plugins/bodies/"},
+		{"hook-plugin-shim-", "plugins/shim/"},
+	}
+	for _, check := range checks {
+		if strings.HasPrefix(component, check.prefix) && strings.HasPrefix(cleanPath, check.dir) {
+			base := strings.TrimSuffix(filepath.Base(cleanPath), ".ts")
+			base = strings.NewReplacer(".", "-", "_", "-").Replace(base)
+			return component == check.prefix+base
+		}
+	}
+	return false
+}
+
 // readLedger reads the ownership ledger and returns the set of well-formed
 // entries plus any parse errors encountered. Malformed lines (including
 // schemaVersion != 1) are collected into []ledgerError and skipped — never
@@ -143,21 +213,21 @@ func validateOwnershipTags(tags OwnershipTags) error {
 func readLedger() ([]LedgerEntry, []ledgerError) {
 	root, err := ResolveDataHome()
 	if err != nil {
-		// Absent/unresolvable data-home is treated as absent ledger.
-		return nil, nil
+		return nil, []ledgerError{{Line: 0, Reason: fmt.Sprintf("resolve data home: %v", err)}}
 	}
 	p := filepath.Join(root, activeLedgerFilename)
-	f, err := os.Open(p)
+	data, err := readLeafNoFollow(p)
 	if err != nil {
-		// Absent ledger is not an error here; callers distinguish absent vs malformed.
-		return nil, nil
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, []ledgerError{{Line: 0, Reason: fmt.Sprintf("open ledger without following links: %v", err)}}
 	}
-	defer f.Close()
 
 	var entries []LedgerEntry
 	var errs []ledgerError
 
-	scanner := bufio.NewScanner(f)
+	scanner := bufio.NewScanner(bytes.NewReader(data))
 	lineNum := 0
 	for scanner.Scan() {
 		lineNum++
@@ -185,6 +255,23 @@ func readLedger() ([]LedgerEntry, []ledgerError) {
 		validOps := map[string]bool{"install": true, "update": true, "remove": true}
 		if !validOps[entry.Op] {
 			errs = append(errs, ledgerError{Line: lineNum, Reason: fmt.Sprintf("invalid op %q (want install|update|remove)", entry.Op)})
+			continue
+		}
+		if activeLedgerConfigRoot != "" {
+			if entry.ConfigRoot != "" && filepath.Clean(entry.ConfigRoot) != activeLedgerConfigRoot {
+				errs = append(errs, ledgerError{Line: lineNum, Reason: "config root does not match this installation"})
+				continue
+			}
+			if entry.ConfigRoot == "" && activeLedgerFilename == ledgerFilenameOpencode {
+				globalRoot, rootErr := opencodeGlobalConfigDir()
+				if rootErr != nil || filepath.Clean(globalRoot) != activeLedgerConfigRoot {
+					errs = append(errs, ledgerError{Line: lineNum, Reason: "legacy ledger entry has no config-root binding and cannot be replayed against a non-default root"})
+					continue
+				}
+			}
+		}
+		if err := validateLedgerOwnership(entry); err != nil {
+			errs = append(errs, ledgerError{Line: lineNum, Reason: fmt.Sprintf("invalid ownership: %v", err)})
 			continue
 		}
 

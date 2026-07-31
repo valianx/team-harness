@@ -177,7 +177,7 @@ func TestComputePlan_ToRemove(t *testing.T) {
 	configRoot := t.TempDir()
 
 	// Pre-populate the ledger with an entry for comp-old.
-	oldLine := `{"ts":"2026-06-18T00:00:00Z","op":"install","component":"comp-old","owns":{"files":["{config_root}/agents/old.md"],"configKeys":[]},"schemaVersion":1}`
+	oldLine := `{"ts":"2026-06-18T00:00:00Z","op":"install","component":"hook-plugin-entry","owns":{"files":["{config_root}/plugins/team-harness.ts"],"configKeys":[]},"schemaVersion":1}`
 	writeLedgerLines(t, dataDir, []string{oldLine})
 
 	mockFS := fstest.MapFS{}
@@ -191,7 +191,7 @@ func TestComputePlan_ToRemove(t *testing.T) {
 		t.Fatalf("ComputePlan: %v", err)
 	}
 
-	if len(diff.ToRemove) != 1 || diff.ToRemove[0].Component != "comp-old" {
+	if len(diff.ToRemove) != 1 || diff.ToRemove[0].Component != "hook-plugin-entry" {
 		t.Errorf("expected comp-old in ToRemove, got %v", diff.ToRemove)
 	}
 }

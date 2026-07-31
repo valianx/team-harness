@@ -51,7 +51,8 @@ func parseSemver(v string) [3]int {
 // Security: all asset writes go through the reused ApplyPlan → appendLedger
 // path (SEC-04/05 enforced). Config key updates go through
 // refreshManagedConfigKeys (allowlisted, hardened write, backup before write —
-// SEC-OC-R4 / SEC-OC-R2 / SEC-01..08 reused). opencode.json is never touched.
+// SEC-OC-R4 / SEC-OC-R2 / SEC-01..08 reused). opencode.json is merge-updated
+// only to keep Team Harness selected as the default agent.
 func runUpdateCommand() {
 	// Only the opencode runtime supports `update`.
 	if runtimeFlag != "opencode" {
@@ -66,7 +67,7 @@ func runUpdateCommand() {
 	}
 
 	// Set the runtime-scoped ledger before any ledger I/O (mirrors plan/apply).
-	setActiveLedgerFilename(selectLedgerFilename())
+	setActiveLedgerContext(selectLedgerFilename(), placer.ConfigRoot())
 
 	opencodePlacer, ok := placer.(*opencodePlacer)
 	if !ok {
@@ -89,7 +90,20 @@ func runUpdateCommand() {
 			fmt.Fprintf(os.Stderr, "update: compute plan: %v\n", planErr)
 			os.Exit(1)
 		}
-		hasChanges := len(diff.ToCreate)+len(diff.ToUpdate)+len(diff.ToRemove) > 0
+		if err := validateTeamHarnessConfigFile(cfgPath); err != nil {
+			fmt.Fprintf(os.Stderr, "update: preflight config: %v\n", err)
+			os.Exit(1)
+		}
+		if err := validateOpencodeJSONFile(opencodePlacer.SettingsDocPath()); err != nil {
+			fmt.Fprintf(os.Stderr, "update: preflight config: %v\n", err)
+			os.Exit(1)
+		}
+		defaultConfigured, err := opencodeDefaultAgentConfigured(opencodePlacer.SettingsDocPath())
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "update: inspect default agent: %v\n", err)
+			os.Exit(1)
+		}
+		hasChanges := len(diff.ToCreate)+len(diff.ToUpdate)+len(diff.ToRemove)+len(diff.ToRecord)+len(diff.LedgerErrors) > 0 || !defaultConfigured
 		if !hasChanges {
 			printAlreadyCurrent(installedVersion)
 			return // AC-2: zero writes when already current
@@ -141,13 +155,21 @@ func computeUpdatePlan(placer Placer) (PlanDiff, error) {
 // operator on a TTY, applies the asset changes, and bumps the config keys.
 // When the operator declines at the confirm prompt, ZERO writes are performed.
 func applyUpdateDiff(diff PlanDiff, cfgPath string, placer *opencodePlacer) {
-	// Surface ledger errors prominently before the plan preview (AC-8).
+	// Removal ownership is incomplete when any ledger line is malformed.
 	if len(diff.LedgerErrors) > 0 {
-		fmt.Fprintf(os.Stderr, "Warning: %d ledger error(s) detected — ToRemove entries may be incomplete:\n", len(diff.LedgerErrors))
+		fmt.Fprintf(os.Stderr, "update: %d ledger error(s) detected; refusing an incomplete removal plan:\n", len(diff.LedgerErrors))
 		for _, le := range diff.LedgerErrors {
 			fmt.Fprintf(os.Stderr, "  ! %s\n", le.Error())
 		}
-		fmt.Fprintln(os.Stderr, "Asset create/update will proceed; removal is limited to well-formed ledger entries.")
+		os.Exit(1)
+	}
+	if err := validateTeamHarnessConfigFile(cfgPath); err != nil {
+		fmt.Fprintf(os.Stderr, "update: preflight config: %v\n", err)
+		os.Exit(1)
+	}
+	if err := validateOpencodeJSONFile(placer.SettingsDocPath()); err != nil {
+		fmt.Fprintf(os.Stderr, "update: preflight config: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Print the four-bucket diff preview (reused PrintPlan).
@@ -171,6 +193,10 @@ func applyUpdateDiff(diff PlanDiff, cfgPath string, placer *opencodePlacer) {
 	// Bump only the installer-managed config keys (SEC-OC-R4 / AC-5).
 	if err := refreshManagedConfigKeys(cfgPath, placer); err != nil {
 		fmt.Fprintf(os.Stderr, "update: refresh config keys: %v\n", err)
+		os.Exit(1)
+	}
+	if _, err := registerOpencodeMCP("", "", placer.SettingsDocPath(), tokenModeEnvRef, opencodeMCPSecrets{}); err != nil {
+		fmt.Fprintf(os.Stderr, "update: configure default agent: %v\n", err)
 		os.Exit(1)
 	}
 

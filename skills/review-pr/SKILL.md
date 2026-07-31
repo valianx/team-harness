@@ -76,7 +76,8 @@ python3 "$REVIEW_CONTEXT_HELPER" render \
 ```
 
 Read metadata and immutable refs from `$CONTEXT`. Store `head_oid`, `base_oid`,
-`merge_base_oid`, `context_hash`, `fetched_at`, and `is_cross_repository`.
+`merge_base_oid`, `context_hash`, `fetched_at`, `is_cross_repository`, and the classified and raw
+mergeability values.
 
 ### 3. Materialize review artifacts
 
@@ -191,6 +192,9 @@ Direct Mode Task:
 - Base SHA: {base_oid}
 - Merge Base SHA: {merge_base_oid}
 - Context Hash: {context_hash}
+- Mergeability: {clean|conflicting|indeterminate}
+- Raw Mergeable: {raw mergeable value}
+- Raw Merge State: {raw mergeStateStatus value}
 - Worktree: {WORKTREE}
 - Review Artifacts Root: {ARTIFACTS absolute path}
 - Context Path: {CONTEXT}
@@ -209,17 +213,24 @@ For explicit general/architecture passes, change `Focus` and use a focus suffix.
 independent passes in parallel. Never dispatch both a security-focused reviewer and the security
 specialist for the same review.
 
-When selected, dispatch QA and security in parallel with only their required coordinates:
+When selected, dispatch QA and `pr-review-security` in parallel with only their required
+coordinates:
 
 ```text
 Mode: pr-review-qa | pr-review-security
 PR: #{number}
 Reviewed Head SHA: {head_oid}
+Context Hash: {context_hash}
 Worktree: {WORKTREE}
 Workspace Path: {workspace_path or "none"}
+Context Path: {CONTEXT}
 Diff Path: {DIFF}
 Changed Files Path: {FILES}
 ```
+
+The security specialist returns its draft inline with the exact reviewed SHA and context hash.
+Reject a missing or mismatched value; otherwise the coordinator writes the returned draft to
+`.claude/pr-review-security.md`.
 
 If only the general reviewer ran, its body and inline JSON are canonical. If any additional
 draft exists, dispatch `review-consolidate` once with the source file paths, `head_oid`, and
@@ -245,6 +256,7 @@ Reviewed: `{head_oid}`
 Verdict: **APPROVE | REQUEST CHANGES | COMMENT**
 Findings: **{N} blocking**, **{M} suggestions**
 Checks: {concise CI summary or "not available"}
+Mergeability: **{clean|conflicting|indeterminate}** (`mergeable={raw}`, `mergeStateStatus={raw}`)
 
 {Only cross-file findings that cannot be anchored to one changed line. Omit when empty.}
 ```
@@ -292,10 +304,11 @@ invalid artifact; then stop.
 Unless `--auto-publish` was supplied, show:
 
 1. reviewed SHA and capture time;
-2. the exact body;
-3. every inline comment with path and line;
-4. any superseded review ID;
-5. the recommended event.
+2. classified mergeability and both raw GitHub values;
+3. the exact body;
+4. every inline comment with path and line;
+5. any superseded review ID;
+6. the recommended event.
 
 Then ask:
 
@@ -323,6 +336,7 @@ After approval and immediately before the GitHub write, capture and compare agai
 - Capture failure: stop with `freshness could not be verified — review not published`.
 
 Approval applies only to the displayed `context_hash`.
+Never describe `conflicting` or `indeterminate` mergeability as merge-ready.
 
 ## Publish
 

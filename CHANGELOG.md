@@ -7,12 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [3.5.0] - 2026-07-30
-
 ### Changed
 
 - Made PR reviews concise by keeping anchored findings in inline threads and the body as a non-duplicating verdict index.
 - Removed size-triggered reviewer multiplication and convergence loops; QA and security now run only from concrete acceptance or security signals.
+
+## [3.4.2] - 2026-07-31
+
+### Changed
+
+- OpenCode now uses its native permission and approval policy instead of installed Team Harness hook plugins or projected per-agent permission blocks.
+- Installed `TH-orchestrator` as the primary default OpenCode agent while preserving operator-owned `opencode.json` settings.
+- Agent prompts now state behavioral constraints without depending on runtime guard implementation names.
+- Made installer ownership and configuration mutations fail closed on malformed ledgers, path escapes, symlinks, reparse points, invalid JSON, and mismatched installation roots.
+
+### Removed
+
+- Retired OpenCode plugin emission; update and uninstall remove plugin files recorded by previous ownership ledgers.
+
+### Fixed
+
+- Made ownership durable before asset writes and repairable for already-matching files after interrupted installs.
+- Restored atomic owner-only configuration replacement and complete uninstall failure reporting.
+
+## [3.4.1] - 2026-07-31
+
+### Added
+
+- Chat contract giving the coordinator a reply skeleton, explicit length budgets, and a plain-language-before-identifiers rule.
+
+### Changed
+
+- Bound the coordinator to the dialect-neutrality rules and removed the conditional that weakened its voice contract.
 
 ## [3.4.0] - 2026-07-30
 

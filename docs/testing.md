@@ -45,7 +45,7 @@ Everything below has inputs, outputs, and exit codes.
 | `test_session_start.sh` | SessionStart config read and language-directive injection |
 | `test_language_user_prompt.sh` | UserPromptSubmit language handling |
 | `test_subagent_start.sh` | The deterministic PreToolUse breadcrumb |
-| `test_checkpoint_guard.sh`, `test_prepublish_guard.sh`, `test_prepublish_bump_floor.sh`, `test_worktree_guard.sh` | Unwired from `.claude-plugin/hooks.json` since v2.139.0; the live consumer is the opencode runtime via `teamHarnessPlugins()` |
+| `test_checkpoint_guard.sh`, `test_prepublish_guard.sh`, `test_prepublish_bump_floor.sh`, `test_worktree_guard.sh` | Retained body-level regression suites; unwired from Claude Code and not installed in OpenCode |
 | `test_gate_guard.sh` | Unwired; code retained |
 | `test_isolated_hook_env.sh` | The isolated-environment harness itself (principle ii) |
 | `test_hook_gates_hardening.sh` | Runtime execution of the hardening findings, including the ClickUp MCP matcher (F-008) |
@@ -59,7 +59,8 @@ Everything below has inputs, outputs, and exit codes.
 |---|---|
 | `test_agent_frontmatter.py` | YAML frontmatter parses for every `agents/*.md`, via PyYAML. Catches the silent-agent-drop class: an unquoted `": "` in a description breaks parsing, and Claude Code then drops the agent from the registered `subagent_type` list with no error surfaced |
 | `test_opencode_agent_frontmatter.sh` | The same, for the opencode transform |
-| `test_security_scan.py` | Read-only-tier agents carrying `Bash`, web-facing agents missing the §6.6 injection preamble, `hooks/*.sh` injection anti-patterns, hook-manifest command form, concrete secrets in shipped assets, and roster reachability |
+| `test_security_scan.py` | Read-only-tier agents carrying `Bash`, Bash/Edit/Write on the dedicated PR security lens, `hooks/*.sh` injection anti-patterns, hook-manifest command form, concrete secrets in shipped assets, and roster reachability |
+| `test_review_context.py` | PR snapshot mergeability classification, hash/freshness comparison, rendering, and conversation capture behavior |
 | `test_permission_disjointness.py` | The permission-allowlist disjointness invariant (#18312 floor) |
 | `test_flow_event_schema_sync.py` | Cross-repo flow-event schema sync |
 | `test_lane_marker_identity.py` | Lane-marker byte identity |
@@ -71,7 +72,6 @@ Everything below has inputs, outputs, and exit codes.
 | `go test ./cmd/install/` | The Go installer — preservation, mode transform, import candidates, platform behaviour |
 | `test_installer_preservation.py` | Installer preservation rules |
 | `test_opencode_config_resolver.sh` | opencode config-path resolution (SEC-OC-R3) |
-| `test_opencode_session_enforcement.sh` | opencode `session.created` enforcement |
 | `test_th_update_block_sync.sh` | The `/th:update` managed-block sync matrix |
 | `test_update_opencode_sh.sh` | `update-opencode.sh` non-interactive pre-check |
 | `test_bin_tty_execbit.py`, `test_bin_tty_behavioral.sh` | `bin/` TTY openability and exec bit (#473) |

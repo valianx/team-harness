@@ -26,7 +26,7 @@ type UninstallReport struct {
 
 // RemovedComponent records the files and keys actually removed for one component.
 type RemovedComponent struct {
-	Component   string
+	Component    string
 	FilesRemoved []string
 	KeysRemoved  []string
 }
@@ -61,14 +61,14 @@ func Uninstall(selected []string, placer Placer) (UninstallReport, error) {
 
 	entries, ledgerErrs := readLedger()
 	report.LedgerErrors = ledgerErrs
+	if len(ledgerErrs) > 0 {
+		report.LedgerIntegrityWarning = "ledger contains malformed lines — nothing removed; run 'installer plan' for the dry-run review"
+		return report, nil
+	}
 
 	// Fail-closed: no well-formed entries → remove nothing.
 	if len(entries) == 0 {
-		if len(ledgerErrs) > 0 {
-			report.LedgerIntegrityWarning = "ledger contains only malformed lines — nothing removed; run 'installer plan' for the dry-run review"
-		} else {
-			report.LedgerIntegrityWarning = "ledger is absent or empty — nothing removed; run 'installer plan' for the dry-run review"
-		}
+		report.LedgerIntegrityWarning = "ledger is absent or empty — nothing removed; run 'installer plan' for the dry-run review"
 		return report, nil
 	}
 
@@ -79,9 +79,20 @@ func Uninstall(selected []string, placer Placer) (UninstallReport, error) {
 
 	// Determine current ownership from the ledger.
 	owned := latestOwnership(entries)
+	for compID, tags := range owned {
+		if len(selected) > 0 && !selectedSet[compID] && !strings.HasPrefix(compID, "hook-plugin-") {
+			continue
+		}
+		if len(tags.ConfigKeys) > 0 {
+			if _, _, err := readSettingsDoc(settingsDocPathFor(placer)); err != nil {
+				return report, err
+			}
+			break
+		}
+	}
 
 	for compID, tags := range owned {
-		if len(selected) > 0 && !selectedSet[compID] {
+		if len(selected) > 0 && !selectedSet[compID] && !strings.HasPrefix(compID, "hook-plugin-") {
 			continue
 		}
 
@@ -95,7 +106,7 @@ func Uninstall(selected []string, placer Placer) (UninstallReport, error) {
 		removed.Component = compID
 
 		// Step 1: delete owned files.
-		deleteErr := deleteFiles(concretePaths, &removed)
+		deleteErr := deleteFiles(concretePaths, placer.ConfigRoot(), &removed)
 		if deleteErr != nil {
 			report.IncompleteComponents = append(report.IncompleteComponents, IncompleteComponent{
 				Component: compID,
@@ -208,9 +219,35 @@ func deleteConfigKey(raw map[string]json.RawMessage, key string) bool {
 
 // deleteFiles removes the given concrete paths. Already-absent files are
 // skipped (idempotent). The removed paths are appended to r.FilesRemoved.
-func deleteFiles(paths []string, r *RemovedComponent) error {
+func removeManagedFile(path, configRoot string) error {
+	cleanPath := filepath.Clean(path)
+	cleanRoot := filepath.Clean(configRoot)
+	if !isDescendantOf(cleanPath, cleanRoot) || cleanPath == cleanRoot {
+		return fmt.Errorf("refusing removal outside config root")
+	}
+	rootInfo, err := os.Lstat(cleanRoot)
+	if err != nil {
+		return fmt.Errorf("inspect config root: %w", err)
+	}
+	rootIsLink, err := pathComponentIsLink(cleanRoot, rootInfo)
+	if err != nil {
+		return fmt.Errorf("inspect config root: %w", err)
+	}
+	if rootIsLink {
+		return fmt.Errorf("config root is a symbolic link or reparse point")
+	}
+	if err := lstatWalkForWrite(filepath.Dir(cleanPath), cleanRoot); err != nil {
+		return err
+	}
+	if err := os.Remove(cleanPath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+func deleteFiles(paths []string, configRoot string, r *RemovedComponent) error {
 	for _, p := range paths {
-		if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
+		if err := removeManagedFile(p, configRoot); err != nil {
 			return fmt.Errorf("remove %q: %w", p, err)
 		}
 		r.FilesRemoved = append(r.FilesRemoved, p)
@@ -231,23 +268,16 @@ func deleteFiles(paths []string, r *RemovedComponent) error {
 // only the atomic rename guarantees 0o600 on the live inode regardless of
 // the file's prior mode.
 func deleteConfigKeys(settingsDocPath string, keys []string, r *RemovedComponent) error {
-	// Read the existing doc as a raw map to preserve unknown keys byte-for-byte.
-	raw := map[string]json.RawMessage{}
-	existing, err := os.ReadFile(settingsDocPath)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("read settings doc %q: %w", settingsDocPath, err)
-	}
-	if len(existing) > 0 {
-		if err := json.Unmarshal(existing, &raw); err != nil {
-			return fmt.Errorf("parse settings doc %q: %w", settingsDocPath, err)
-		}
+	raw, existing, err := readSettingsDoc(settingsDocPath)
+	if err != nil {
+		return err
 	}
 
 	// Backup before write, with owner-only 0o600 to protect sensitive content.
 	if len(existing) > 0 {
 		ts := time.Now().UTC().Format("20060102-150405")
 		bakPath := settingsDocPath + ".bak-" + ts
-		if err := os.WriteFile(bakPath, existing, 0o600); err != nil {
+		if err := copyBackupHardened(settingsDocPath, bakPath, 0o600); err != nil {
 			return fmt.Errorf("create backup %q: %w", bakPath, err)
 		}
 	}
@@ -270,11 +300,26 @@ func deleteConfigKeys(settingsDocPath string, keys []string, r *RemovedComponent
 	}
 	out = append(out, '\n')
 
-	// Ensure parent directory exists.
-	ensureDir(filepath.Dir(settingsDocPath))
-
-	if err := writeAtomicSecret(settingsDocPath, out); err != nil {
+	if err := hardenedAtomicWriteSecret(out, settingsDocPath, filepath.Dir(settingsDocPath)); err != nil {
 		return fmt.Errorf("write settings doc %q: %w", settingsDocPath, err)
 	}
 	return nil
+}
+
+func settingsDocPathFor(placer Placer) string {
+	return placer.SettingsDocPath()
+}
+
+func readSettingsDoc(path string) (map[string]json.RawMessage, []byte, error) {
+	raw := map[string]json.RawMessage{}
+	existing, err := readLeafNoFollow(path)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, nil, fmt.Errorf("read settings doc %q: %w", path, err)
+	}
+	if len(existing) > 0 {
+		if err := json.Unmarshal(existing, &raw); err != nil {
+			return nil, nil, fmt.Errorf("parse settings doc %q: %w", path, err)
+		}
+	}
+	return raw, existing, nil
 }

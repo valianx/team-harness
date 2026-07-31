@@ -111,8 +111,7 @@ They leak internal pipeline mechanics into shipped code and mislead future reade
   and PR body, not in source comments.
 
 **Documented exception.** A single top-of-file commit-shaped provenance header (one per file,
-at the very top) is tolerated. Example: `dev-guard.sh:3` carries `fix(dev-guard): … (F-016,
-#304)` — this is a file-provenance marker, not inline work-narration. Raise a finding only
+at the very top) is tolerated. This is a file-provenance marker, not inline work-narration. Raise a finding only
 when the reference appears mid-body, not at the very top of the file.
 
 **Scope note.** Pre-existing work-narration comments in untouched code are out of scope for

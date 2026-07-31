@@ -282,7 +282,8 @@ The review agents' system prompts constrain their writes. The permitted review-m
 
 - `reviewer-consolidator`: ONLY `.claude/pr-review-*` draft files (`.claude/pr-review-final.md`, `.claude/pr-review-inline.json`, etc.).
 - `reviewer`: none; it returns its draft in the status block.
-- QA/security lenses: only their declared transient `.claude/pr-review-*.md` outputs.
+- QA writes only its declared transient `.claude/pr-review-qa.md`; the security lens returns its
+  draft inline and the coordinator writes `.claude/pr-review-security.md`.
 
 NEVER write to source files, configuration files, or any path outside those declared zones.
 
@@ -407,6 +408,10 @@ Workspace Path: {workspace path or "none"}
 Linked Issue Path: {issue artifact path or "none"}
 ```
 
+When the security lens is selected, invoke `pr-review-security` once with the same reviewed head
+SHA, context hash, detached worktree, context path, diff path, and changed-files path. Require the
+exact SHA/hash in its inline return, then write its draft to `.claude/pr-review-security.md`.
+
 ### Step 2b — Invoke reviewer (Update Body)
 
 Invoke `reviewer` in **update-body mode** via Task tool. Pass the changed-files list only — omit the full diff (the reviewer updates the existing body based on what files changed, not by re-reading the full diff):
@@ -418,12 +423,21 @@ Title: {title}
 Author: {author}
 URL: {url}
 Existing review ID: {review_id}
-Existing review body: {current body text}
-Changed Files:
-{file list}
+Reviewed Head SHA: {reviewed_head_sha}
+Base SHA: {reviewed_base_sha}
+Merge Base SHA: {reviewed_merge_base_sha}
+Context Hash: {context_hash}
+Worktree: {worktree}
+Review Artifacts Root: {absolute path}
+Context Path: {context path}
+Conversation Path: {conversation path}
+Changed Files Path: {changed-files path}
+Checks Path: {checks path}
+Existing Review Path: {current review body artifact path}
 ```
 
-Take `review_body` from the reviewer's status block and write it to `.claude/pr-review-draft.md`. Jump to Step 3.
+Require the exact reviewed SHA and context hash in the status block. Take `review_body` from the
+reviewer's status block and write it to `.claude/pr-review-draft.md`. Jump to Step 3.
 
 ### Step 2c — Invoke reviewer (Reply)
 
@@ -435,16 +449,24 @@ PR: #{number}
 Title: {title}
 Author: {author}
 URL: {url}
+Reviewed Head SHA: {reviewed_head_sha}
+Base SHA: {reviewed_base_sha}
+Merge Base SHA: {reviewed_merge_base_sha}
+Context Hash: {context_hash}
+Worktree: {worktree}
+Review Artifacts Root: {absolute path}
+Context Path: {context path}
+Conversation Path: {conversation path}
+Changed Files Path: {changed-files path}
 Thread context:
   comment_id: {selected_id}
   path: {file path}
   line: {line number}
   original_body: {the inline comment text}
-Changed Files:
-{file list}
 ```
 
-Take `reply_body` from the reviewer's status block and write it to `.claude/pr-review-reply-draft.md`. Return to the skill:
+Require the exact reviewed SHA and context hash in the status block. Take `reply_body` from the
+reviewer's status block and write it to `.claude/pr-review-reply-draft.md`. Return to the skill:
 ```
 Reply draft written to .claude/pr-review-reply-draft.md
 Thread ID: {comment_id}

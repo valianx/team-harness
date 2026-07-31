@@ -191,6 +191,7 @@ Canonical matrix (must match exactly):
 | `security` | opus | xhigh |
 | `adversary` | sonnet | xhigh |
 | `reviewer` | sonnet | high |
+| `pr-review-security` | sonnet | high |
 | `reviewer-consolidator` | sonnet | medium |
 | `qa` | sonnet | high |
 | `qa-plan` | sonnet | high |

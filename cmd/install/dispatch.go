@@ -232,7 +232,7 @@ func runPlanCommand() {
 	}
 
 	// Set the runtime-scoped ledger before any ledger I/O.
-	setActiveLedgerFilename(selectLedgerFilename())
+	setActiveLedgerContext(selectLedgerFilename(), placer.ConfigRoot())
 
 	modules, components, err := loadDefaultManifests(runtimeFlag)
 	if err != nil {
@@ -277,7 +277,7 @@ func runApplyCommand() {
 	}
 
 	// Set the runtime-scoped ledger before any ledger I/O.
-	setActiveLedgerFilename(selectLedgerFilename())
+	setActiveLedgerContext(selectLedgerFilename(), placer.ConfigRoot())
 
 	modules, components, err := loadDefaultManifests(runtimeFlag)
 	if err != nil {
@@ -296,6 +296,16 @@ func runApplyCommand() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "apply: compute plan: %v\n", err)
 		os.Exit(1)
+	}
+	if runtimeFlag == "opencode" {
+		if err := validateTeamHarnessConfigFile(opencodeSettingsConfigPath(placer.ConfigRoot())); err != nil {
+			fmt.Fprintf(os.Stderr, "apply: preflight config: %v\n", err)
+			os.Exit(1)
+		}
+		if err := validateOpencodeJSONFile(placer.SettingsDocPath()); err != nil {
+			fmt.Fprintf(os.Stderr, "apply: preflight config: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	if err := ApplyPlan(diff, placer); err != nil {
@@ -538,7 +548,6 @@ func resolveMemoryURLWithCCFallback(ccURL string) string {
 func registerOpencodeMCPFromValues(mcp opencodeMCPValues, settingsDocPath string, mode tokenMode, secrets opencodeMCPSecrets) MCPRegisterOutcome {
 	const context7URL = "https://mcp.context7.com/mcp"
 
-	memWanted := false
 	ctx7Wanted := false
 
 	if mcp.MemoryURL != "" {
@@ -547,8 +556,6 @@ func registerOpencodeMCPFromValues(mcp opencodeMCPValues, settingsDocPath string
 			fmt.Fprintf(os.Stderr, "Error: Memory MCP URL is invalid: %s\n", err)
 			os.Exit(1)
 		}
-		memWanted = true
-
 		// Non-blocking warning when the bearer env var is unset at install time
 		// AND we are using env-ref mode. On the literal path the bearer is already
 		// embedded in opencode.json — no env var warning needed.
@@ -565,26 +572,16 @@ func registerOpencodeMCPFromValues(mcp opencodeMCPValues, settingsDocPath string
 		fmt.Fprintln(os.Stderr, "context7 not configured. To register later: export CONTEXT7_API_KEY and re-run the install, or edit opencode.json directly.")
 	}
 
-	// Register whichever servers are configured in a single opencode.json write.
-	// Return the real per-server outcome so the caller can display truthful status.
-	if memWanted || ctx7Wanted {
-		ctx7URL := ""
-		if ctx7Wanted {
-			ctx7URL = context7URL
-		}
-		outcome, err := registerOpencodeMCP(mcp.MemoryURL, ctx7URL, settingsDocPath, mode, secrets)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "apply: opencode.json MCP registration: %v\n", err)
-			os.Exit(1)
-		}
-		return outcome
+	ctx7URL := ""
+	if ctx7Wanted {
+		ctx7URL = context7URL
 	}
-
-	// Neither server was wanted — both are skipped.
-	return MCPRegisterOutcome{
-		Memory:   MCPStatusSkipped,
-		Context7: MCPStatusSkipped,
+	outcome, err := registerOpencodeMCP(mcp.MemoryURL, ctx7URL, settingsDocPath, mode, secrets)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "apply: opencode.json configuration: %v\n", err)
+		os.Exit(1)
 	}
+	return outcome
 }
 
 // resolveOpencodeMemoryURL returns the Memory MCP URL from --memory-url flag or
@@ -667,7 +664,7 @@ func runUninstallCommand() {
 	}
 
 	// Set the runtime-scoped ledger before any ledger I/O.
-	setActiveLedgerFilename(selectLedgerFilename())
+	setActiveLedgerContext(selectLedgerFilename(), placer.ConfigRoot())
 
 	_, components, err := loadDefaultManifests(runtimeFlag)
 	if err != nil {
@@ -675,8 +672,7 @@ func runUninstallCommand() {
 		os.Exit(1)
 	}
 
-	selected := allComponentIDs(components)
-	report, err := Uninstall(selected, placer)
+	report, err := Uninstall(allComponentIDs(components), placer)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "uninstall: %v\n", err)
 		os.Exit(1)
@@ -701,6 +697,9 @@ func runUninstallCommand() {
 
 	fmt.Printf("uninstall: done (%d components, %d incomplete)\n",
 		len(report.Removed), len(report.IncompleteComponents))
+	if len(report.IncompleteComponents) > 0 {
+		os.Exit(1)
+	}
 }
 
 // loadDefaultManifests returns the manifest set for the given runtime.

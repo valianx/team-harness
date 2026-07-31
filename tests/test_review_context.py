@@ -23,7 +23,7 @@ SPEC.loader.exec_module(MODULE)
 
 def context(**overrides):
     value = {
-        "schema_version": 1,
+        "schema_version": MODULE.SCHEMA_VERSION,
         "base_oid": "base",
         "head_oid": "head",
         "merge_base_oid": "merge",
@@ -40,6 +40,38 @@ def context(**overrides):
 
 
 class ReviewContextTests(unittest.TestCase):
+    def test_mergeability_classification_is_fail_closed(self):
+        self.assertEqual(MODULE.classify_mergeability("CONFLICTING", "CLEAN"), "conflicting")
+        self.assertEqual(MODULE.classify_mergeability("MERGEABLE", "DIRTY"), "conflicting")
+        self.assertEqual(MODULE.classify_mergeability("MERGEABLE", "CLEAN"), "clean")
+        self.assertEqual(MODULE.classify_mergeability("UNKNOWN", "UNKNOWN"), "indeterminate")
+        self.assertEqual(MODULE.classify_mergeability(None, None), "indeterminate")
+
+    def test_mergeability_changes_hash_freshness_and_rendering(self):
+        clean = context(
+            mergeability={
+                "status": "clean",
+                "mergeable": "MERGEABLE",
+                "merge_state_status": "CLEAN",
+            }
+        )
+        conflicting = context(
+            mergeability={
+                "status": "conflicting",
+                "mergeable": "CONFLICTING",
+                "merge_state_status": "DIRTY",
+            }
+        )
+
+        comparison = MODULE.compare_contexts(clean, conflicting)
+        self.assertNotEqual(clean["context_hash"], conflicting["context_hash"])
+        self.assertEqual(comparison["status"], "code-changed")
+        self.assertTrue(comparison["mergeability_changed"])
+        rendered = MODULE.render_context(conflicting)
+        self.assertIn("Mergeability: **conflicting**", rendered)
+        self.assertIn("Raw mergeable: `CONFLICTING`", rendered)
+        self.assertIn("Raw merge state: `DIRTY`", rendered)
+
     def test_compare_distinguishes_code_and_conversation_changes(self):
         original = context()
         conversation = context(

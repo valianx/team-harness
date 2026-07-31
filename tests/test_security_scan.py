@@ -4,7 +4,7 @@
 #
 # Audits the shipped assets of this repo for the security issues a
 # config-distribution repo must never ship:
-#   Check 1 (FAIL) — read-only-tier agent carrying Bash in frontmatter tools:
+#   Check 1 (FAIL) — read-only-tier agent carrying forbidden mutation tools:
 #   Check 3 (FAIL) — hooks/*.sh containing injection anti-patterns
 #   Check 4 (WARN) — hooks.json manifest non-canonical command / over-permissive matcher
 #   Check 5 (FAIL) — concrete secrets in shipped assets
@@ -52,14 +52,16 @@ PLUGIN_DIR = REPO_ROOT / ".claude-plugin"
 # the list is declared rather than derived.
 READ_ONLY_AGENTS = {
     "architect", "security", "qa", "qa-plan", "reviewer",
-    "plan-reviewer", "mentor", "adversary",
+    "plan-reviewer", "mentor", "adversary", "pr-review-security",
 }
+
+NO_MUTATION_AGENTS = {"pr-review-security"}
 
 # The full agent roster. check_0_roster_reachability() below fails when a name
 # here no longer resolves to a file.
 EXPECTED_AGENTS = [
     "orchestrator", "architect", "agent-builder", "security", "reviewer",
-    "reviewer-consolidator",
+    "reviewer-consolidator", "pr-review-security",
     "qa", "qa-plan", "gcp-cost-analyzer", "gcp-infra", "init", "implementer", "tester",
     "plan-reviewer", "diagrammer", "likec4-diagrammer",
     "d2-diagrammer", "translator", "delivery", "mentor",
@@ -185,7 +187,7 @@ def check_0_roster_reachability() -> int:
     """Return count of FAIL findings."""
     before = len(findings)
 
-    for name in sorted(set(EXPECTED_AGENTS) | set(READ_ONLY_AGENTS)):
+    for name in sorted(set(EXPECTED_AGENTS) | READ_ONLY_AGENTS | NO_MUTATION_AGENTS):
         if not (AGENTS_DIR / f"{name}.md").is_file():
             finding(
                 "FAIL",
@@ -204,6 +206,14 @@ def check_0_roster_reachability() -> int:
             " EXPECTED_AGENTS — the read-only tier must be a subset of the roster",
         )
 
+    unknown = NO_MUTATION_AGENTS - set(EXPECTED_AGENTS)
+    if unknown:
+        finding(
+            "FAIL",
+            "check-0",
+            f"NO_MUTATION_AGENTS contains {sorted(unknown)!r}, absent from EXPECTED_AGENTS",
+        )
+
     if len(findings) == before:
         print("  [PASS] check-0 — every rostered agent resolves to a real file and"
               " the read-only tier is a subset of the roster")
@@ -211,7 +221,7 @@ def check_0_roster_reachability() -> int:
 
 
 # ---------------------------------------------------------------------------
-# Check 1 — read-only tier must not carry Bash
+# Check 1 — read-only tiers must not carry forbidden mutation tools
 # ---------------------------------------------------------------------------
 
 def check_1_readonly_bash() -> int:
@@ -236,8 +246,20 @@ def check_1_readonly_bash() -> int:
         else:
             passed_count += 1
 
+        if agent_name in NO_MUTATION_AGENTS:
+            forbidden = sorted({"Bash", "Edit", "Write"} & set(agent_tools))
+            if forbidden:
+                finding(
+                    "FAIL",
+                    "check-1",
+                    f"agents/{agent_name}.md — no-mutation agent carries {forbidden!r} in tools:",
+                )
+
     if len(findings) == before:
-        print(f"  [PASS] check-1 — {passed_count} read-only-tier agents audited, none carry Bash")
+        print(
+            f"  [PASS] check-1 — {passed_count} read-only-tier agents audited;"
+            " no-mutation agents exclude Bash/Edit/Write"
+        )
     return len(findings) - before
 
 
