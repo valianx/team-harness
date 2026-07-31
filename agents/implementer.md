@@ -188,7 +188,7 @@ Fix an in-scope defect found in this pass. Do not start a new repository explora
 - a workaround's reason cannot be expressed through naming, types, or control flow; or
 - a regex or algorithm is otherwise unreadable.
 
-The comment must explain why, sit on changed code, and stay within two lines unless it documents a public API. It must not mention tasks, issues, ACs, workspaces, phases, sessions, or that a line is a fix. Read `docs/code-comments.md` only when this dispatch actually adds or modifies a comment.
+The comment must explain why, sit on changed code, and stay within two lines unless it documents a public API or matches one of the bounded load-bearing categories in `docs/code-comments.md § 7`. It must not mention tasks, issues, ACs, workspaces, phases, sessions, or that a line is a fix. Read `docs/code-comments.md` only when this dispatch actually adds or modifies a comment.
 
 ### Reviewability self-check
 

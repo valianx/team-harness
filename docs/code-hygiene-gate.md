@@ -201,6 +201,8 @@ false-green gate by construction — see `docs/knowledge.md` node
 | Layer 1 scan — takeover/inline path | scan-site A2 | `docs/subagent-orchestration.md` | Takeover Pipeline Manifest (inviolable gates list) |
 | Layer 1 scan — special-flow pointers | scan-site A3 | `agents/ref-special-flows.md` | Bug-fix Flow / Milestone-Build Flow (pointer only — never replicates the command) |
 | `code_hygiene` PRODUCER | producer B1 | `agents/qa.md` | `## Code Hygiene` audit + Return Protocol `code_hygiene:` field |
+| Comment-producer contract — implementer | contract-site D1 | `agents/implementer.md` | `§ Comments` |
+| Comment-producer contract — tester | contract-site D2 | `agents/tester.md` | `§ Comments` |
 | `code_hygiene` CONSUMER — Phase 3 gate | consumer C1 | `agents/ref-pipeline.md` | `### Phase 3` worst-of combined verdict (conjunction) |
 | `code_hygiene` CONSUMER — Phase 3.5 gate | consumer C2 | `agents/ref-pipeline.md` | `## Phase 3.5 — Acceptance Gate` (defensive re-assertion) |
 | `code_hygiene` CONSUMER — iteration routing | consumer C3 | `agents/ref-pipeline.md` | `### Iteration` (Case A) |
@@ -239,5 +241,6 @@ Two structural properties make this safe by construction:
 ## 9. Cross-reference
 
 See `docs/code-comments.md` for the authoring-side contract (when a comment is warranted, what
-never appears in one) that this gate enforces. See `docs/testing.md` for the structural suite
-that pins every row of § 7's site-enumeration table with positive and negative assertions.
+never appears in one) that this gate enforces. No structural suite in `tests/` currently pins
+§ 7's site-enumeration table, and `docs/testing.md` has no hygiene-suite entry; table
+consistency is presently a manual-review discipline, not a mechanically-checked one.

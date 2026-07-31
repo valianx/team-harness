@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.3] - 2026-07-31
+
+### Changed
+
+- Added a comment contract to `tester` and fixed contradictory examples in the comment-authoring guide, reducing comment volume in agent-generated test files.
+
 ## [3.4.2] - 2026-07-31
 
 ### Changed

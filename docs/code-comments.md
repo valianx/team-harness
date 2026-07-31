@@ -53,7 +53,8 @@ Four cases justify a comment:
    the reader has no other documentation (Go `godoc`, TSDoc, Bash function headers in
    shared scripts).
 
-These four cases are the gate. A comment that does not clear any of them does not belong.
+These four cases are the default gate: a new comment that clears none of them does not belong,
+except for the bounded, named exceptions in §7.
 
 ---
 
@@ -92,10 +93,11 @@ forbidden without exception.
 |---|---|
 | **KEEP** | Doc comments on every exported type, const, function, and package. Full sentence, begins with the element name (Go `godoc` convention). WHY-comments on non-obvious invariants. Cross-file provenance (`// Source of truth: …`). |
 | **CUT** | WHAT-comments on unexported bodies where well-named identifiers already express the intent. Session/issue-reference cruft. Commented-out code. |
-| **EXCEPTION — never strip** | The `modes.go` invariants block and its "Source of truth" provenance header. These encode a cross-file contract (`lowCostMatrix` is the single source of truth for model rewriting; invariants verified at test time by `TestLowCostMatrixInvariants`) that a reader of one function cannot infer. The `preservation.go` clobber-avoidance comments encode non-obvious, non-local behavior. |
+| **EXCEPTION — never strip** | A non-obvious cross-file invariant contract, bounded to the block that states it, not the file's entire comment surface — e.g. the `modes.go` `lowCostMatrix` invariants block and its provenance header (verified at test time by `TestLowCostMatrixInvariants`), or the `preservation.go` clobber-avoidance comments. Background on `modes.go`'s current status: `docs/lifecycle.md § Installer identity`. |
 
-**Exemplar:** `cmd/install/modes.go` lines 12–37 — package/type/const doc comments plus an
-invariants block. This is the correct authoring style for Go installer code.
+**Exemplar:** `cmd/install/modes.go:16` — `// ModeStandard is the default: agent files are
+copied byte-identical.` A one-line doc comment per exported identifier is the authoring model;
+the adjacent invariants block is the bounded EXCEPTION above, not the general pattern to copy.
 
 ### 5b. Hooks — `hooks/`
 
@@ -106,11 +108,12 @@ invariants block. This is the correct authoring style for Go installer code.
 |---|---|
 | **KEEP** | Security-floor rationale and threat-model explanation. Deterministic-gate behavior (`fail-CLOSED` vs `fail-OPEN` asymmetry). Non-obvious regex — state what it matches and why. Coverage catalogues (what the gate DOES and DOES NOT cover). Cross-hook fail-mode comparisons. |
 | **CUT** | Comments that restate an obvious shell builtin or a standard flag. Session/workspace narration. |
-| **EXCEPTION — never strip** | The entire security-floor rationale block, coverage catalogues, regex-intent comments, and cross-hook fail-mode comparison in `dev-guard.sh`. Every line of that header is load-bearing. Portability-rationale comments that explain why a construct works on Git Bash, macOS, and Linux simultaneously. |
+| **EXCEPTION — never strip** | The security-floor rationale, threat-model explanation, coverage catalogue, and fail-mode comparison in a deterministic outward-action gate's decision-function header (`hooks/ts/bodies/dev-guard.ts`) — bounded to those categories, not the file's entire comment surface. Portability-rationale comments explaining why a construct works identically on Git Bash, macOS, and Linux. Full rationale: `docs/dev-mode.md § Outward-Action Gate` and `§ Threat Model`. |
 
-**Exemplar:** `hooks/dev-guard.sh` lines 13–50 — the SEC-DR-2 rationale, coverage catalogue,
-and fail-mode asymmetry vs `checkpoint-guard.sh`. This is the highest-value WHY-comment block
-in the repo and MUST survive any "fewer comments" cleanup.
+**Exemplar:** `hooks/ts/bodies/dev-guard.ts:52` — `// Default: none (no-decision) —
+ask/deny/allow EXCLUSIVELY for covered actions.` A single WHY line for an ordinary decision
+point; the file's full security-floor header is the bounded EXCEPTION above, documented in
+`docs/dev-mode.md`, not the general authoring model.
 
 ### 5c. Agent and skill Markdown — `agents/`, `skills/`
 
@@ -181,13 +184,13 @@ The following categories are exempt from "minimize comments." Stripping them cau
 
 | Category | Why load-bearing | Example location |
 |---|---|---|
-| Security-floor / threat-model / fail-mode comments in hooks | Encodes why the gate behaves as it does; a future simplification could break the security property without this anchor | `hooks/dev-guard.sh:13–50` |
+| Security-floor / threat-model / fail-mode comments in hooks | Encodes why the gate behaves as it does; a future simplification could break the security property without this anchor | `hooks/ts/bodies/dev-guard.ts` |
 | Non-obvious regex intent | A regex is genuinely opaque; the intent comment is the only documentation | Any hook or lens trigger block |
 | Cross-file installer invariants | Non-local contract; a reader of one function cannot reconstruct it | `cmd/install/modes.go` invariants block |
 | Cross-platform portability rationale | "Works on Git Bash AND macOS AND Linux because X" — a future edit could break one OS silently | Hooks, bootstrap scripts |
 | Go doc-comments on exported identifiers | Mandated by Go convention and by `godoc`; the public surface has no other documentation | All `cmd/install/*.go` exported symbols |
 | Dated `knowledge.md` version stamps | Deliberate, dated-decision log — not cruft | `docs/knowledge.md` `(vX.Y.Z)` entries |
-| File-header provenance line | One-per-file, top-of-file; tolerated as a provenance marker (see §4) | `hooks/dev-guard.sh:3` |
+| File-header provenance line | One-per-file, top-of-file; tolerated as a provenance marker (see §4) | pattern defined in §4; no single file is the canonical instance |
 
 ---
 
