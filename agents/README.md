@@ -64,11 +64,12 @@ One agent owns coordination. **`orchestrator`** is the top-level session agent a
 
 Plus reference files (`ref-pipeline.md`, `ref-direct-modes.md`, `ref-special-flows.md`, `ref-intake-flows.md`, `ref-dispatch-machinery.md`) loaded on demand by `orchestrator`. They are not invocable subagents. `ref-pipeline.md` contains the gated contract that previously made the startup agent 20K+ words; its sections load only after explicit activation.
 
-Plus eleven cross-cutting snippets in `_shared/` (not invocable agents), installed to `~/.claude/agents/_shared/`:
+Plus twelve cross-cutting snippets in `_shared/` (not invocable agents), installed to `~/.claude/agents/_shared/`:
 
 - `_shared/gh-fallback.md` — single source-of-truth fallback patterns for graceful degradation when the `gh` CLI is unavailable. Consumed by `orchestrator.md`, `ref-special-flows.md`, and skills `issue.md`, `plan.md`, `design.md`, `define-ac.md`, `audit.md`, `review-pr.md` via cross-references.
 - `_shared/delivery-mechanics.md` — the coordinator's deterministic delivery half: version sites + MATCH check, Phase-2 branch validation, `changelog.d/` assembly + release cut, staging + commit, the diff-size gate, the three-conjunct push-step precondition, push, `gh pr create`, and the merge-state poll. Executed directly by the orchestrator at Phase 4 — never dispatched to `delivery.md`, which writes the prose half only.
 - `_shared/operational-rules.md` — cross-cutting voice, language register, git safety, and pipeline integrity rules. Referenced by all agent `## Voice` sections via `§ "Voice"` and `§ "Language register"`.
+- `_shared/operator-dialogue.md` — chat-surface contract: reply shape, length budgets, identifiers-follow-prose, act-then-report. Binds live replies only. Consumed by `orchestrator.md`.
 - `_shared/dispatch-contract.md` — single source of truth for what a dispatch prompt may and must not carry, and for the two-halves scope rule (review scope is never bounded by the dispatcher; write scope is always bounded by the recipient's own contract). Consumed by `orchestrator.md` by pointer, never restated inline.
 - `_shared/gate-contract.md` — the dual-record STAGE-GATE release contract: bare-literal gate fields, the no-repair invariant, and the STOP-block templates. Consumed by `orchestrator.md`.
 - `_shared/plan-consolidation.md` — the plan-is-a-snapshot invariant: `01-plan.md` carries each canonical field's final, reconciled value, never a change log of how it got there. Consumed by `architect.md`, `plan-reviewer.md`, `qa-plan.md`, `qa.md`, `orchestrator.md`.
