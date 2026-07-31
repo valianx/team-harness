@@ -40,6 +40,53 @@ def context(**overrides):
 
 
 class ReviewContextTests(unittest.TestCase):
+    def test_capture_binds_mergeability_and_rejects_mid_capture_drift(self):
+        metadata = {
+            "number": 1,
+            "title": "Title",
+            "body": "Body",
+            "author": {"login": "alice"},
+            "baseRefOid": "base",
+            "headRefOid": "head",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "CLEAN",
+        }
+        refs = {
+            "base_ref": "refs/review/base",
+            "head_ref": "refs/review/head",
+            "merge_base_oid": "merge",
+        }
+
+        with (
+            patch.object(MODULE, "git_snapshot", return_value=refs),
+            patch.object(MODULE, "capture_commits", return_value=[]),
+            patch.object(MODULE, "capture_issue_comments", return_value=[]),
+            patch.object(MODULE, "capture_review_comments", return_value=[]),
+            patch.object(MODULE, "capture_threads", return_value=[]),
+            patch.object(MODULE, "capture_reviews", return_value=[]),
+        ):
+            with patch.object(MODULE, "capture_metadata", side_effect=[metadata, metadata]):
+                captured = MODULE.capture("owner/repo", 1, ROOT, "origin")
+
+            self.assertEqual(
+                captured["mergeability"],
+                {
+                    "status": "clean",
+                    "mergeable": "MERGEABLE",
+                    "merge_state_status": "CLEAN",
+                },
+            )
+            self.assertIn("context_hash", captured)
+
+            changed = {**metadata, "mergeStateStatus": "DIRTY"}
+            with patch.object(
+                MODULE,
+                "capture_metadata",
+                side_effect=[metadata, changed],
+            ):
+                with self.assertRaisesRegex(MODULE.ContextError, "mergeStateStatus changed"):
+                    MODULE.capture("owner/repo", 1, ROOT, "origin")
+
     def test_mergeability_classification_is_fail_closed(self):
         self.assertEqual(MODULE.classify_mergeability("CONFLICTING", "CLEAN"), "conflicting")
         self.assertEqual(MODULE.classify_mergeability("MERGEABLE", "DIRTY"), "conflicting")
