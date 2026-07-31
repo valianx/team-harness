@@ -837,7 +837,7 @@ func TestRegisterOpencodeMCP_IdempotentReRun_ReturnsAlreadyConfigured(t *testing
 
 // TestRegisterOpencodeMCP_GenuineAbsence_ReturnsSkipped verifies that when
 // both URLs are empty, registerOpencodeMCP returns MCPStatusSkipped for both
-// servers (genuine absence path — nothing is written).
+// servers and still configures the Team Harness default agent.
 func TestRegisterOpencodeMCP_GenuineAbsence_ReturnsSkipped(t *testing.T) {
 	dir := t.TempDir()
 	docPath := filepath.Join(dir, "opencode.json")
@@ -855,9 +855,89 @@ func TestRegisterOpencodeMCP_GenuineAbsence_ReturnsSkipped(t *testing.T) {
 		t.Errorf("Context7 outcome = %q, want %q (absent URL — fix: real per-run MCP state)", outcome.Context7, MCPStatusSkipped)
 	}
 
-	// File must not have been created.
-	if _, err := os.Stat(docPath); !os.IsNotExist(err) {
-		t.Error("opencode.json was created despite both URLs being empty (fix: genuine absence must not write)")
+	data, err := os.ReadFile(docPath)
+	if err != nil {
+		t.Fatalf("read opencode.json: %v", err)
+	}
+	var config map[string]interface{}
+	if err := json.Unmarshal(data, &config); err != nil {
+		t.Fatalf("parse opencode.json: %v", err)
+	}
+	if config["default_agent"] != opencodeDefaultAgent {
+		t.Errorf("default_agent = %v, want %q", config["default_agent"], opencodeDefaultAgent)
+	}
+}
+
+func TestRegisterOpencodeMCP_DefaultAgentPreservesOtherConfig(t *testing.T) {
+	dir := t.TempDir()
+	docPath := filepath.Join(dir, "opencode.json")
+	seed := []byte(`{"default_agent":"build","model":"openai/example","share":"disabled"}`)
+	if err := os.WriteFile(docPath, seed, 0o600); err != nil {
+		t.Fatalf("seed opencode.json: %v", err)
+	}
+
+	if _, err := registerOpencodeMCP("", "", docPath, tokenModeEnvRef, opencodeMCPSecrets{}); err != nil {
+		t.Fatalf("registerOpencodeMCP: %v", err)
+	}
+	data, err := os.ReadFile(docPath)
+	if err != nil {
+		t.Fatalf("read opencode.json: %v", err)
+	}
+	var config map[string]interface{}
+	if err := json.Unmarshal(data, &config); err != nil {
+		t.Fatalf("parse opencode.json: %v", err)
+	}
+	if config["default_agent"] != opencodeDefaultAgent {
+		t.Errorf("default_agent = %v, want %q", config["default_agent"], opencodeDefaultAgent)
+	}
+	if config["model"] != "openai/example" || config["share"] != "disabled" {
+		t.Errorf("operator config was not preserved: %v", config)
+	}
+}
+
+func TestRegisterOpencodeMCP_TightensExistingFileMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX permission bits are not enforced on Windows")
+	}
+	dir := t.TempDir()
+	docPath := filepath.Join(dir, "opencode.json")
+	if err := os.WriteFile(docPath, []byte(`{"default_agent":"build"}`), 0o644); err != nil {
+		t.Fatalf("seed opencode.json: %v", err)
+	}
+	if _, err := registerOpencodeMCP("", "", docPath, tokenModeEnvRef, opencodeMCPSecrets{}); err != nil {
+		t.Fatalf("registerOpencodeMCP: %v", err)
+	}
+	info, err := os.Stat(docPath)
+	if err != nil {
+		t.Fatalf("stat opencode.json: %v", err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Errorf("opencode.json mode = %o, want 600", info.Mode().Perm())
+	}
+}
+
+func TestRegisterOpencodeMCP_RejectsSymlinkLeaf(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink setup requires platform privileges on Windows")
+	}
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target.json")
+	docPath := filepath.Join(dir, "opencode.json")
+	if err := os.WriteFile(target, []byte(`{"default_agent":"build"}`), 0o600); err != nil {
+		t.Fatalf("seed target: %v", err)
+	}
+	if err := os.Symlink(target, docPath); err != nil {
+		t.Fatalf("create symlink: %v", err)
+	}
+	if _, err := registerOpencodeMCP("", "", docPath, tokenModeEnvRef, opencodeMCPSecrets{}); err == nil {
+		t.Fatal("registerOpencodeMCP followed a symlink leaf")
+	}
+	backups, err := filepath.Glob(docPath + ".bak-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(backups) != 0 {
+		t.Fatalf("registerOpencodeMCP created a backup before rejecting the symlink: %v", backups)
 	}
 }
 

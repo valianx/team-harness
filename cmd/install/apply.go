@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 )
 
 // ApplyPlan executes the diff produced by ComputePlan:
@@ -14,16 +13,14 @@ import (
 // Idempotent: a PlanDiff whose buckets are all ToSkipHashMatch produces zero
 // writes and zero ledger appends.
 func ApplyPlan(diff PlanDiff, placer Placer) error {
+	if len(diff.LedgerErrors) > 0 {
+		return fmt.Errorf("apply: refusing plan with %d ledger error(s)", len(diff.LedgerErrors))
+	}
+
 	// Process creates and updates, grouped by component for ledger efficiency.
 	installEntries := componentInstallEntries(diff.ToCreate, "install", placer)
 	updateEntries := componentInstallEntries(diff.ToUpdate, "update", placer)
-
-	// Write created files.
-	for _, pf := range diff.ToCreate {
-		if _, err := placer.Place(pf.SrcData, pf.TemplatedDst, ""); err != nil {
-			return fmt.Errorf("apply: create %q: %w", pf.ConcreteDst, err)
-		}
-	}
+	recordEntries := componentInstallEntries(diff.ToRecord, "update", placer)
 
 	// Append install entries through the single choke-point.
 	if len(installEntries) > 0 {
@@ -31,11 +28,16 @@ func ApplyPlan(diff PlanDiff, placer Placer) error {
 			return fmt.Errorf("apply: append install ledger entries: %w", err)
 		}
 	}
+	if len(recordEntries) > 0 {
+		if err := appendLedger(recordEntries); err != nil {
+			return fmt.Errorf("apply: repair ownership ledger entries: %w", err)
+		}
+	}
 
-	// Write updated files.
-	for _, pf := range diff.ToUpdate {
+	// Write created files after ownership is durable.
+	for _, pf := range diff.ToCreate {
 		if _, err := placer.Place(pf.SrcData, pf.TemplatedDst, ""); err != nil {
-			return fmt.Errorf("apply: update %q: %w", pf.ConcreteDst, err)
+			return fmt.Errorf("apply: create %q: %w", pf.ConcreteDst, err)
 		}
 	}
 
@@ -46,11 +48,18 @@ func ApplyPlan(diff PlanDiff, placer Placer) error {
 		}
 	}
 
+	// Write updated files after ownership is durable.
+	for _, pf := range diff.ToUpdate {
+		if _, err := placer.Place(pf.SrcData, pf.TemplatedDst, ""); err != nil {
+			return fmt.Errorf("apply: update %q: %w", pf.ConcreteDst, err)
+		}
+	}
+
 	// Remove files for ToRemove components.
 	var removeEntries []LedgerEntry
 	for _, item := range diff.ToRemove {
 		for _, f := range item.Files {
-			if err := os.Remove(f); err != nil && !os.IsNotExist(err) {
+			if err := removeManagedFile(f, placer.ConfigRoot()); err != nil {
 				return fmt.Errorf("apply: remove %q: %w", f, err)
 			}
 		}
@@ -79,8 +88,14 @@ func ApplyPlan(diff PlanDiff, placer Placer) error {
 func componentInstallEntries(files []PlannedFile, op string, placer Placer) []LedgerEntry {
 	// Collect file paths per component.
 	byComp := make(map[string][]string)
+	keysByComp := make(map[string][]string)
 	for _, pf := range files {
-		byComp[pf.Component] = append(byComp[pf.Component], pf.TemplatedDst)
+		if len(pf.OwnedFiles) > 0 {
+			byComp[pf.Component] = pf.OwnedFiles
+		} else {
+			byComp[pf.Component] = append(byComp[pf.Component], pf.TemplatedDst)
+		}
+		keysByComp[pf.Component] = pf.ConfigKeys
 	}
 	// Preserve deterministic order.
 	seen := make(map[string]bool)
@@ -98,7 +113,8 @@ func componentInstallEntries(files []PlannedFile, op string, placer Placer) []Le
 			Op:        op,
 			Component: compID,
 			Owns: OwnershipTags{
-				Files: byComp[compID],
+				Files:      byComp[compID],
+				ConfigKeys: keysByComp[compID],
 			},
 		})
 	}

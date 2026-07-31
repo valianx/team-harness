@@ -198,13 +198,13 @@ func lstatWalkNoOwnershipCheck(normalized string) error {
 			}
 			return fmt.Errorf("lstat %q: %w", acc, err)
 		}
-		// Reject symlinks (SEC-DR-3).
-		if fi.Mode()&os.ModeSymlink != 0 {
+		isLink, err := pathComponentIsLink(acc, fi)
+		if err != nil {
+			return fmt.Errorf("inspect %q: %w", acc, err)
+		}
+		if isLink {
 			return fmt.Errorf("path component %q is a symbolic link — refusing (SEC-DR-3)", acc)
 		}
-		// On Windows, os.Lstat reports reparse points as symlinks in modern Go.
-		// The Windows datahome_windows.go hasReparsePoint uses GetFileAttributes
-		// for belt-and-suspenders; here lstat's ModeSymlink covers the common case.
 	}
 	return nil
 }

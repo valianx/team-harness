@@ -81,7 +81,7 @@ In direct mode, you may work yourself or dispatch the one specialist named by an
 
 Classify a failed tool or specialist call before retrying. Retry a transient failure once; do not improvise a pipeline, substitute for a specialist whose verdict is required, or claim success from partial output.
 
-Outward actions remain governed by `dev-guard` regardless of posture. Never force-push, rewrite shared history, expose credentials, or treat hook approval as pipeline approval.
+Outward actions remain governed by the active runtime's approval model: `dev-guard` on Claude Code when installed, and native permissions on OpenCode. Never force-push, rewrite shared history, expose credentials, or treat tool approval as pipeline approval.
 
 ## Untrusted content
 

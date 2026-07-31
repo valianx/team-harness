@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+const opencodeDefaultAgent = "TH-orchestrator"
+
 // MCPServerStatus describes what actually happened to one MCP server entry
 // during a single registerOpencodeMCP call. The value is determined by
 // comparing the desired entry against what was already in opencode.json.
@@ -31,8 +33,9 @@ type MCPRegisterOutcome struct {
 	Context7 MCPServerStatus
 }
 
-// registerOpencodeMCP merges mcp.memory and mcp.context7 into the opencode.json
-// at docPath. The default secret model writes {env:VAR} references (tokenModeEnvRef).
+// registerOpencodeMCP sets Team Harness as the default agent and merges
+// mcp.memory and mcp.context7 into the opencode.json at docPath. The default
+// secret model writes {env:VAR} references (tokenModeEnvRef).
 // When called with tokenModeLiteral + a non-empty opencodeMCPSecrets, the literal
 // token values are written instead. tokenModeLiteral is used on both the interactive
 // and non-interactive CC→opencode migration paths when ccMigration.hasLiteralTokens()
@@ -58,6 +61,49 @@ type MCPRegisterOutcome struct {
 //
 // Security: the file is ALWAYS written with mode 0o600 — unconditionally on both
 // the env-ref and literal paths (AC-12 binding contract from the security assessment).
+func validateOpencodeJSONFile(path string) error {
+	data, err := readLeafNoFollow(path)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read opencode.json %q: %w", path, err)
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("parse opencode.json %q: %w", path, err)
+	}
+	if value, ok := raw["mcp"]; ok {
+		var mcp map[string]json.RawMessage
+		if err := json.Unmarshal(value, &mcp); err != nil {
+			return fmt.Errorf("parse opencode.json mcp object %q: %w", path, err)
+		}
+		if mcp == nil {
+			return fmt.Errorf("parse opencode.json mcp object %q: value must be an object", path)
+		}
+	}
+	return nil
+}
+
+func opencodeDefaultAgentConfigured(path string) (bool, error) {
+	data, err := readLeafNoFollow(path)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return false, err
+	}
+	var current string
+	if err := json.Unmarshal(raw["default_agent"], &current); err != nil && len(raw["default_agent"]) > 0 {
+		return false, err
+	}
+	return current == opencodeDefaultAgent, nil
+}
+
 func registerOpencodeMCP(memURL, context7URL, docPath string, mode tokenMode, secrets opencodeMCPSecrets) (MCPRegisterOutcome, error) {
 	outcome := MCPRegisterOutcome{
 		Memory:   MCPStatusSkipped,
@@ -66,7 +112,7 @@ func registerOpencodeMCP(memURL, context7URL, docPath string, mode tokenMode, se
 
 	// Read the whole file as a map of raw JSON values.
 	raw := map[string]json.RawMessage{}
-	existing, err := os.ReadFile(docPath)
+	existing, err := readLeafNoFollow(docPath)
 	if err != nil && !os.IsNotExist(err) {
 		return outcome, fmt.Errorf("read opencode.json %q: %w", docPath, err)
 	}
@@ -76,10 +122,19 @@ func registerOpencodeMCP(memURL, context7URL, docPath string, mode tokenMode, se
 		}
 	}
 
+	var currentDefault string
+	_ = json.Unmarshal(raw["default_agent"], &currentDefault)
+	defaultChanged := currentDefault != opencodeDefaultAgent
+
 	// Extract (or initialise) the mcp sub-object.
 	mcpRaw := map[string]json.RawMessage{}
 	if v, ok := raw["mcp"]; ok {
-		_ = json.Unmarshal(v, &mcpRaw)
+		if err := json.Unmarshal(v, &mcpRaw); err != nil {
+			return outcome, fmt.Errorf("parse opencode.json mcp object %q: %w", docPath, err)
+		}
+		if mcpRaw == nil {
+			return outcome, fmt.Errorf("parse opencode.json mcp object %q: value must be an object", docPath)
+		}
 	}
 
 	// Build desired entries using the caller-supplied token mode. Either entry
@@ -115,7 +170,7 @@ func registerOpencodeMCP(memURL, context7URL, docPath string, mode tokenMode, se
 		}
 	}
 
-	if !memChanged && !ctx7Changed {
+	if !defaultChanged && !memChanged && !ctx7Changed {
 		return outcome, nil // nothing to do — already up-to-date
 	}
 
@@ -123,7 +178,7 @@ func registerOpencodeMCP(memURL, context7URL, docPath string, mode tokenMode, se
 	if len(existing) > 0 {
 		ts := time.Now().UTC().Format("20060102-150405")
 		bakPath := docPath + ".bak-" + ts
-		if err := os.WriteFile(bakPath, existing, 0o600); err != nil {
+		if err := copyBackupHardened(docPath, bakPath, 0o600); err != nil {
 			return outcome, fmt.Errorf("create backup %q: %w", bakPath, err)
 		}
 	}
@@ -138,18 +193,17 @@ func registerOpencodeMCP(memURL, context7URL, docPath string, mode tokenMode, se
 		encoded, _ := json.Marshal(merged)
 		mcpRaw["context7"] = json.RawMessage(encoded)
 	}
+	raw["default_agent"] = mustMarshalJSON(opencodeDefaultAgent)
 
 	encodedMCP, _ := json.Marshal(mcpRaw)
-	raw["mcp"] = json.RawMessage(encodedMCP)
+	if len(mcpRaw) > 0 {
+		raw["mcp"] = json.RawMessage(encodedMCP)
+	}
 
 	out, _ := json.MarshalIndent(raw, "", "  ")
 	out = append(out, '\n')
 
-	ensureDir(filepath.Dir(docPath))
-	// fix(sec): AC-12 — opencode.json is always written 0o600, unconditionally
-	// on both the env-ref and literal paths. A literal secret in a 0o644 file
-	// would be world-readable; 0o600 matches the backup write above.
-	if err := os.WriteFile(docPath, out, 0o600); err != nil {
+	if err := hardenedAtomicWriteSecret(out, docPath, filepath.Dir(docPath)); err != nil {
 		return outcome, fmt.Errorf("write opencode.json %q: %w", docPath, err)
 	}
 	return outcome, nil

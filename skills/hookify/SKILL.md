@@ -87,7 +87,7 @@ Severity defaults:
 
 **Phase 2 — Map signals to candidate hook rules**
 
-For each recurring friction signal (operator-supplied or trace-derived), map it onto the deterministic-hook vocabulary used by the `policy-block` and `dev-guard` gates (TypeScript bodies at `hooks/ts/bodies/policy-block.ts` and `hooks/ts/bodies/dev-guard.ts` — TS is the single source of gate logic for both Claude Code and opencode; each body compiles to `hooks/ts/dist/<name>.cjs` and is wired via `.claude-plugin/hooks.json` → `hooks/run-ts-hook.sh <name>`):
+For each recurring friction signal (operator-supplied or trace-derived), map it onto the deterministic-hook vocabulary used by Claude Code's `policy-block` and `dev-guard` gates (TypeScript bodies at `hooks/ts/bodies/policy-block.ts` and `hooks/ts/bodies/dev-guard.ts`; each body compiles to `hooks/ts/dist/<name>.cjs` and is wired via `.claude-plugin/hooks.json` → `hooks/run-ts-hook.sh <name>`). OpenCode uses native permissions rather than these hooks:
 
 | Field | Description |
 |-------|-------------|

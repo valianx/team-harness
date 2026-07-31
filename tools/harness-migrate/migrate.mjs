@@ -159,9 +159,9 @@ const INJECTED_MODE_VALUES = new Set(["primary", "subagent", "all"]);
  * `mode` (which CC frontmatter simply omits), `name` is required in both
  * formats — so the inverse (transformToCC) cannot drop it; it must restore
  * the canonical CC name derived from the source filename (mirrors
- * applyModeByRole's "orchestrator" -> "TH Orchestrator" forward rename).
+ * applyModeByRole's "orchestrator" -> "TH-orchestrator" forward rename).
  */
-const INJECTED_NAME_VALUES = new Set(["TH Orchestrator"]);
+const INJECTED_NAME_VALUES = new Set(["TH Orchestrator", "TH-orchestrator"]);
 
 /** Writable-prefix allowlist: directories the transform is permitted to write into,
  *  relative to the repo root (forward-slash normalized, no trailing slash). */
@@ -1071,10 +1071,7 @@ function transformToOpencode(filePath, content, repoRoot) {
     // provider lock-in and ProviderModelNotFoundError. Per-provider tiering is a
     // future additive step (docs/opencode-model-config.md); toProviderPrefixedModel
     // is retained for it and for the reverse (opencode→CC) direction.
-    // tools: → permission object {key: "allow"} with mapped lowercase opencode keys.
-    // MCP tools and unrecognized tokens are dropped. Write+Edit deduplicate to "edit".
-    const toolsVal = fm["tools"];
-    projected["permission"] = agentToolsToOpencodePermission(typeof toolsVal === "string" ? toolsVal : "");
+    // Permissions are omitted so OpenCode's native policy remains authoritative.
     projected["mode"] = "subagent";
     // color: map CC color names → opencode named enums; pass through valid values.
     // Unknown colors are dropped (omitted) to avoid emitting an invalid field.
@@ -1086,11 +1083,7 @@ function transformToOpencode(filePath, content, repoRoot) {
     if (fm["name"] !== undefined) projected["name"] = fm["name"];
     if (fm["description"] !== undefined) projected["description"] = fm["description"];
     // model: intentionally NOT emitted (model-less; see the agent-surface note above).
-    const allowedTools = fm["allowed-tools"];
-    const allowArr = commandAllowedToolsToPermissionAllow(allowedTools);
-    if (allowArr.length > 0 || allowedTools !== undefined) {
-      projected["permission"] = { allow: allowArr, ask: [], deny: [] };
-    }
+    // Permissions are omitted so OpenCode's native policy remains authoritative.
     // argument-hint has no opencode equivalent — not carried forward.
     if (fm["agent"] !== undefined) projected["agent"] = fm["agent"];
   }
@@ -1106,7 +1099,7 @@ function transformToOpencode(filePath, content, repoRoot) {
 /**
  * applyModeByRole mirrors cmd/install/transform.go::applyModeByRole: the
  * orchestrator agent (the top-level coordinator) receives mode: "primary" and
- * displays as "TH Orchestrator" in the opencode agent picker; every other
+ * displays as "TH-orchestrator" in the opencode agent picker; every other
  * agent is returned unchanged. Applied as a POST-PROJECTION step in
  * runTransform, ON TOP OF the generic transformToOpencode output, and
  * deliberately NOT part of the transform-conformance.json fixture (which
@@ -1121,7 +1114,7 @@ function applyModeByRole(content, agentName) {
 
   const { frontmatter: fm, body } = parseFrontmatter(content);
   fm["mode"] = "primary";
-  fm["name"] = "TH Orchestrator";
+  fm["name"] = "TH-orchestrator";
   return serializeFrontmatter(fm, body);
 }
 
@@ -1152,18 +1145,17 @@ function transformToOpencodeTiered(filePath, content, repoRoot, provider) {
 }
 
 /**
- * Inserts a "model: <id>" line immediately before the "permission:" line of
- * an already-projected agent frontmatter block. Textual insertion (rather
+ * Inserts a "model: <id>" line immediately before the projected agent's mode
+ * line. Textual insertion (rather
  * than re-adding a "model" key earlier in the projected object) keeps
  * transformToOpencode untouched and the fixture-bound output deterministic.
- * The agent projection always emits a permission: line (even {} for an empty
- * tools list), so this anchor is reliable for every agent-surface output.
+ * The agent projection always emits a mode line, so this anchor is reliable.
  */
 function insertModelLine(content, concrete) {
-  const marker = "\npermission:";
+  const marker = "\nmode:";
   const idx = content.indexOf(marker);
   if (idx < 0) {
-    // No permission: line found (should not happen for agent kind) — leave
+    // No mode line found (should not happen for agent kind) — leave
     // output unchanged rather than risk corrupting it.
     return content;
   }
@@ -1215,7 +1207,7 @@ function transformToCC(filePath, content, repoRoot) {
     // Agent permission is now an object {key: "allow"} — convert back to CC tools string.
     // Each key maps back to the CC tool name; "edit" maps to "Edit" (canonical; Write is
     // omitted since Edit is the more specific tool in CC format).
-    projected["tools"] = opencodePermissionToAgentTools(permission);
+    if (permission !== undefined) projected["tools"] = opencodePermissionToAgentTools(permission);
     // color: map opencode enum back to a canonical CC color (lossy — e.g. info could have
     // been blue, cyan, or teal; we pick a canonical one per enum).
     if (fm["color"] !== undefined) projected["color"] = opencodeColorToCC(String(fm["color"]));

@@ -118,6 +118,21 @@ var installerManagedKeys = map[string]bool{
 	"updated_at":        true,
 }
 
+func validateTeamHarnessConfigFile(path string) error {
+	data, err := readLeafNoFollow(path)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read .team-harness.json: %w", err)
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("existing .team-harness.json is corrupt (cannot parse): %w", err)
+	}
+	return nil
+}
+
 // writeOpencodeTeamHarnessConfig performs an ALLOWLISTED read-merge-write of
 // .team-harness.json at path.
 //
@@ -136,13 +151,15 @@ var installerManagedKeys = map[string]bool{
 func writeOpencodeTeamHarnessConfig(path string, cfg opencodeSetupValues, placer *opencodePlacer) error {
 	assertCfgDerivedKeysMatchAllowlist()
 
-	// Read existing JSON — silently start fresh if absent.
-	existing, readErr := os.ReadFile(path)
+	// Read existing JSON — start fresh only when absent.
+	existing, readErr := readLeafNoFollow(path)
+	if readErr != nil && !os.IsNotExist(readErr) {
+		return fmt.Errorf("read .team-harness.json: %w", readErr)
+	}
 	raw := map[string]json.RawMessage{}
 	if readErr == nil && len(existing) > 0 {
 		if err := json.Unmarshal(existing, &raw); err != nil {
-			// Corrupt file — start fresh.
-			raw = map[string]json.RawMessage{}
+			return fmt.Errorf("existing .team-harness.json is corrupt (cannot parse): %w", err)
 		}
 	}
 
@@ -180,7 +197,9 @@ func writeOpencodeTeamHarnessConfig(path string, cfg opencodeSetupValues, placer
 	if len(existing) > 0 && readErr == nil {
 		ts := time.Now().UTC().Format("20060102-150405")
 		bakPath := path + ".bak-" + ts
-		_ = hardenedWriteFile(existing, bakPath, placer.ConfigRoot(), false)
+		if err := hardenedWriteFileMode(existing, bakPath, placer.ConfigRoot(), 0o600); err != nil {
+			return fmt.Errorf("backup .team-harness.json before write: %w", err)
+		}
 	}
 
 	// Serialize and write through the hardened placer path (SEC-OC-R2).
@@ -190,7 +209,7 @@ func writeOpencodeTeamHarnessConfig(path string, cfg opencodeSetupValues, placer
 	}
 	out = append(out, '\n')
 
-	if err := hardenedWriteFile(out, path, placer.ConfigRoot(), false); err != nil {
+	if err := hardenedAtomicWriteSecret(out, path, placer.ConfigRoot()); err != nil {
 		return fmt.Errorf("write .team-harness.json: %w", err)
 	}
 	return nil
@@ -208,7 +227,10 @@ func writeOpencodeTeamHarnessConfig(path string, cfg opencodeSetupValues, placer
 func refreshManagedConfigKeys(path string, placer *opencodePlacer) error {
 	// Read existing JSON — silently start fresh if absent (first-time update
 	// after a pre-managed-key install).
-	existing, readErr := os.ReadFile(path)
+	existing, readErr := readLeafNoFollow(path)
+	if readErr != nil && !os.IsNotExist(readErr) {
+		return fmt.Errorf("read .team-harness.json: %w", readErr)
+	}
 	raw := map[string]json.RawMessage{}
 	if readErr == nil && len(existing) > 0 {
 		if err := json.Unmarshal(existing, &raw); err != nil {
@@ -239,7 +261,7 @@ func refreshManagedConfigKeys(path string, placer *opencodePlacer) error {
 	if len(existing) > 0 && readErr == nil {
 		ts := time.Now().UTC().Format("20060102-150405")
 		bakPath := path + ".bak-" + ts
-		if err := hardenedWriteFile(existing, bakPath, placer.ConfigRoot(), false); err != nil {
+		if err := hardenedWriteFileMode(existing, bakPath, placer.ConfigRoot(), 0o600); err != nil {
 			return fmt.Errorf("backup .team-harness.json before update: %w", err)
 		}
 	}
@@ -251,7 +273,7 @@ func refreshManagedConfigKeys(path string, placer *opencodePlacer) error {
 	}
 	out = append(out, '\n')
 
-	if err := hardenedWriteFile(out, path, placer.ConfigRoot(), false); err != nil {
+	if err := hardenedAtomicWriteSecret(out, path, placer.ConfigRoot()); err != nil {
 		return fmt.Errorf("write .team-harness.json: %w", err)
 	}
 	return nil
@@ -273,7 +295,10 @@ func refreshManagedConfigKeys(path string, placer *opencodePlacer) error {
 // touches the one tiering key. provider == "" clears any persisted value
 // (matches the model-less baseline contract in writeOpencodeTeamHarnessConfig).
 func persistResolvedTierProvider(path, provider string, placer *opencodePlacer) error {
-	existing, readErr := os.ReadFile(path)
+	existing, readErr := readLeafNoFollow(path)
+	if readErr != nil && !os.IsNotExist(readErr) {
+		return fmt.Errorf("read .team-harness.json: %w", readErr)
+	}
 	raw := map[string]json.RawMessage{}
 	if readErr == nil && len(existing) > 0 {
 		if err := json.Unmarshal(existing, &raw); err != nil {
@@ -293,7 +318,7 @@ func persistResolvedTierProvider(path, provider string, placer *opencodePlacer) 
 	}
 	out = append(out, '\n')
 
-	if err := hardenedWriteFile(out, path, placer.ConfigRoot(), false); err != nil {
+	if err := hardenedAtomicWriteSecret(out, path, placer.ConfigRoot()); err != nil {
 		return fmt.Errorf("write .team-harness.json: %w", err)
 	}
 	return nil
@@ -354,4 +379,3 @@ func extractBoolFromRaw(m map[string]json.RawMessage, key string) bool {
 	}
 	return b
 }
-

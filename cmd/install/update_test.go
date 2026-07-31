@@ -107,12 +107,12 @@ func TestRefreshManagedConfigKeys_PreservesOperatorKeys(t *testing.T) {
 	// Seed with an operator-controlled key, a managed key (forged), and
 	// an extra key that does not appear in any allowlist.
 	seed := map[string]interface{}{
-		"logs-mode":          "obsidian",
-		"logs-path":          "/vault/work-logs",
-		"logs-subfolder":     "team-harness",
-		"my-custom-key":      "keep-me",
-		"installed_version":  "FORGED-1.0.0",
-		"format_version":     "FORGED-99",
+		"logs-mode":         "obsidian",
+		"logs-path":         "/vault/work-logs",
+		"logs-subfolder":    "team-harness",
+		"my-custom-key":     "keep-me",
+		"installed_version": "FORGED-1.0.0",
+		"format_version":    "FORGED-99",
 	}
 	seedBytes, _ := json.Marshal(seed)
 	if err := os.WriteFile(cfgPath, seedBytes, 0o644); err != nil {
@@ -414,18 +414,18 @@ func TestAlreadyCurrent_ZeroWrites_Decision(t *testing.T) {
 
 	applyUpdateDiff(diff, cfgPath, placer)
 
-	// Only .team-harness.json and its timestamped backup must exist in the root;
-	// no asset files must be created (zero-change diff = zero asset writes).
+	// Only managed configuration files may exist in the root; no asset files
+	// must be created (zero-change diff = zero asset writes).
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		t.Fatalf("readdir: %v", err)
 	}
 	for _, e := range entries {
 		name := e.Name()
-		if name == ".team-harness.json" || strings.HasPrefix(name, ".team-harness.json.bak-") {
+		if name == ".team-harness.json" || name == "opencode.json" || strings.HasPrefix(name, ".team-harness.json.bak-") {
 			continue
 		}
-		t.Errorf("unexpected file in config root after zero-change applyUpdateDiff: %q (only config + backup expected)", name)
+		t.Errorf("unexpected file in config root after zero-change applyUpdateDiff: %q", name)
 	}
 
 	// Managed keys must be bumped by applyUpdateDiff.
@@ -440,6 +440,7 @@ func TestAlreadyCurrent_ZeroWrites_Decision(t *testing.T) {
 	if result["installed_version"] != version {
 		t.Errorf("installed_version = %v, want %v (managed key not bumped by applyUpdateDiff)", result["installed_version"], version)
 	}
+	assertOpencodeDefaultAgent(t, placer.SettingsDocPath())
 }
 
 // ---------------------------------------------------------------------------
@@ -689,14 +690,14 @@ func TestApplyUpdateDiff_NonInteractive_BumpsConfigAndNoAssets(t *testing.T) {
 	}
 
 	// Confirm ZERO asset files were created (empty diff = no asset writes).
-	// The config root must contain only .team-harness.json and its backup.
+	// The config root must contain only managed configuration and its backup.
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		t.Fatalf("readdir: %v", err)
 	}
 	for _, e := range entries {
 		name := e.Name()
-		if name == ".team-harness.json" || strings.HasPrefix(name, ".team-harness.json.bak-") {
+		if name == ".team-harness.json" || name == "opencode.json" || strings.HasPrefix(name, ".team-harness.json.bak-") {
 			continue
 		}
 		t.Errorf("unexpected file in config root after empty-diff apply: %q (zero asset writes expected)", name)
@@ -712,6 +713,22 @@ func TestApplyUpdateDiff_NonInteractive_BumpsConfigAndNoAssets(t *testing.T) {
 	}
 	if !bakFound {
 		t.Error("expected a timestamped backup (.team-harness.json.bak-*) but none found")
+	}
+	assertOpencodeDefaultAgent(t, placer.SettingsDocPath())
+}
+
+func assertOpencodeDefaultAgent(t *testing.T, path string) {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read opencode.json: %v", err)
+	}
+	var config map[string]interface{}
+	if err := json.Unmarshal(raw, &config); err != nil {
+		t.Fatalf("parse opencode.json: %v", err)
+	}
+	if config["default_agent"] != opencodeDefaultAgent {
+		t.Errorf("default_agent = %v, want %q", config["default_agent"], opencodeDefaultAgent)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"strings"
 )
 
 // PlannedFile is a file action in the computed diff.
@@ -12,6 +13,8 @@ type PlannedFile struct {
 	Component    string // component id that owns this file
 	TemplatedDst string // {config_root}-prefixed destination path
 	ConcreteDst  string // resolved concrete destination path
+	ConfigKeys   []string
+	OwnedFiles   []string
 	SrcData      []byte // embedded source bytes
 	SrcHash      string // sha256 of src bytes
 	DstHash      string // sha256 of on-disk bytes (empty when absent)
@@ -19,9 +22,9 @@ type PlannedFile struct {
 
 // OwnedItem is a ledger-owned item scheduled for removal.
 type OwnedItem struct {
-	Component   string
-	Files       []string // concrete paths
-	ConfigKeys  []string // bare dotted key names
+	Component  string
+	Files      []string // concrete paths
+	ConfigKeys []string // bare dotted key names
 }
 
 // PlanDiff is the pure, write-nothing diff produced by ComputePlan.
@@ -30,6 +33,7 @@ type PlanDiff struct {
 	ToUpdate        []PlannedFile // file present, hash differs
 	ToSkipHashMatch []PlannedFile // file present, hash matches (idempotent skip)
 	ToRemove        []OwnedItem   // ledger-owned components not in selected set
+	ToRecord        []PlannedFile // unchanged component whose ownership metadata needs repair
 	LedgerErrors    []ledgerError // surfaced for operator review (SEC-06)
 }
 
@@ -50,7 +54,7 @@ type PlanDiff struct {
 //   - src:        embedded source bytes
 //   - kind:       component kind ("agent", "skill", "hook", "command")
 //   - sourcePath: embedded FS path (e.g. "agents/orchestrator.md") — used by
-//                 the opencode transform to identify mode-by-role targets
+//     the opencode transform to identify mode-by-role targets
 func ComputePlan(
 	modules []ModuleManifest,
 	components []ComponentManifest,
@@ -82,6 +86,10 @@ func ComputePlan(
 	for compID, owned := range lastOwned {
 		if selectedSet[compID] {
 			continue // still selected — not a removal candidate
+		}
+		if !strings.HasPrefix(compID, "hook-plugin-") {
+			diff.LedgerErrors = append(diff.LedgerErrors, ledgerError{Line: 0, Reason: fmt.Sprintf("ledger component %q is neither currently managed nor an explicitly retired plugin component", compID)})
+			continue
 		}
 		item := OwnedItem{Component: compID}
 		for _, tpl := range owned.Files {
@@ -116,6 +124,8 @@ func ComputePlan(
 		}
 
 		srcHash := hashBytes(srcData)
+		var firstPlanned *PlannedFile
+		componentChanged := false
 
 		for _, tpl := range c.Emits.Files {
 			dst := resolveTemplatedPath(tpl, placer)
@@ -123,13 +133,20 @@ func ComputePlan(
 				Component:    compID,
 				TemplatedDst: tpl,
 				ConcreteDst:  dst,
+				ConfigKeys:   c.Emits.ConfigKeys,
+				OwnedFiles:   c.Emits.Files,
 				SrcData:      srcData,
 				SrcHash:      srcHash,
+			}
+			if firstPlanned == nil {
+				copy := pf
+				firstPlanned = &copy
 			}
 
 			dstHash, err := hashFile(dst)
 			if os.IsNotExist(err) {
 				diff.ToCreate = append(diff.ToCreate, pf)
+				componentChanged = true
 				continue
 			}
 			if err != nil {
@@ -140,11 +157,31 @@ func ComputePlan(
 				diff.ToSkipHashMatch = append(diff.ToSkipHashMatch, pf)
 			} else {
 				diff.ToUpdate = append(diff.ToUpdate, pf)
+				componentChanged = true
 			}
+		}
+		if !componentChanged && firstPlanned != nil && !ownershipTagsEqual(lastOwned[compID], c.Emits) {
+			diff.ToRecord = append(diff.ToRecord, *firstPlanned)
 		}
 	}
 
 	return diff, nil
+}
+
+func ownershipTagsEqual(a, b OwnershipTags) bool {
+	return stringSlicesEqual(a.Files, b.Files) && stringSlicesEqual(a.ConfigKeys, b.ConfigKeys)
+}
+
+func stringSlicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // PrintPlan writes a human-readable summary of the PlanDiff to w.

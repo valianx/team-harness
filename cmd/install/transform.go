@@ -217,13 +217,7 @@ func transformToOpencode(src []byte, kind string) ([]byte, error) {
 		// This avoids provider lock-in and ProviderModelNotFoundError from baked ids.
 		// Per-provider cost tiering is a future additive step (see
 		// docs/opencode-model-config.md); toProviderPrefixedModel is retained for it.
-		// tools: → permission object {key: "allow"} with mapped lowercase opencode keys.
-		// MCP tools and unrecognized tokens are dropped. Write+Edit deduplicate to "edit".
-		toolsStr := ""
-		if v, ok := fm["tools"]; ok {
-			toolsStr = fmt.Sprintf("%v", v)
-		}
-		projected["permission"] = agentToolsToOpencodePermission(toolsStr)
+		// Permissions are omitted so the host's native policy remains authoritative.
 		// mode: blanket "subagent" for the GENERIC transform (fixture-bound).
 		// The mode-by-role installer layer (orchestrator → primary) is applied
 		// as a post-projection step in manifest_registry.go, NOT here, to keep
@@ -248,16 +242,7 @@ func transformToOpencode(src []byte, kind string) ([]byte, error) {
 			projected["description"] = v
 		}
 		// model: intentionally NOT emitted (model-less; see the agent-surface note above).
-		// allowed-tools → permission.allow
-		allowedTools := fm["allowed-tools"]
-		allowArr := commandAllowedToolsToPermissionAllow(allowedTools)
-		if len(allowArr) > 0 || allowedTools != nil {
-			projected["permission"] = map[string]interface{}{
-				"allow": allowArr,
-				"ask":   []string{},
-				"deny":  []string{},
-			}
-		}
+		// Permissions are omitted so the host's native policy remains authoritative.
 		// argument-hint dropped (no opencode equivalent)
 		if v, ok := fm["agent"]; ok {
 			projected["agent"] = v
@@ -302,20 +287,12 @@ func transformToOpencodeTiered(src []byte, kind, provider string) ([]byte, error
 }
 
 // insertModelLine inserts a "model: <id>" line immediately before the
-// "permission:" line of an already-projected agent frontmatter block.
-//
-// A textual insertion is used (instead of a parse/modify/reserialize
-// round-trip) because re-parsing transformed already lost the orderedPermission
-// type that preserves the source tools: order — a generic
-// map[string]interface{} round-trip would re-emit permission keys sorted
-// alphabetically instead of in source order. The agent projection always
-// emits a permission: line (even {} for an empty tools list), so this anchor
-// is reliable for every TransformKindAgent output.
+// projected agent's mode line.
 func insertModelLine(transformed []byte, concrete string) []byte {
-	marker := []byte("\npermission:")
+	marker := []byte("\nmode:")
 	idx := bytes.Index(transformed, marker)
 	if idx < 0 {
-		// No permission: line found (should not happen for agent kind) — leave
+		// No mode line found (should not happen for agent kind) — leave
 		// output unchanged rather than risk corrupting it.
 		return transformed
 	}
@@ -328,7 +305,7 @@ func insertModelLine(transformed []byte, concrete string) []byte {
 
 // applyModeByRole applies the installer-specific mode-by-role override: the
 // orchestrator agent (the top-level coordinator) receives mode: primary and
-// displays as "TH Orchestrator" in the opencode agent picker; every other
+// displays as "TH-orchestrator" in the opencode agent picker; every other
 // agent remains subagent with its name unchanged. This is layered ON TOP of
 // the generic transform output and is NOT part of the transform-conformance.json
 // fixture (which binds only the generic mapping). The CC-canonical source
@@ -346,7 +323,7 @@ func applyModeByRole(src []byte, agentName string) ([]byte, error) {
 		return nil, fmt.Errorf("applyModeByRole parse: %v", err)
 	}
 	fm["mode"] = "primary"
-	fm["name"] = "TH Orchestrator"
+	fm["name"] = "TH-orchestrator"
 	return serializeFrontmatterYAML(fm, body), nil
 }
 

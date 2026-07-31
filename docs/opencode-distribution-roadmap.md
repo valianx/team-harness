@@ -1,12 +1,12 @@
 # Opencode Distribution-Layer Roadmap
 
-> **Status: see [`docs/lifecycle.md`](./lifecycle.md) for the current stage-by-stage maturity of the opencode runtime.** The Go installer (`cmd/install/`) ships a full plan/apply/uninstall engine with an append-only ownership ledger and all SEC-01..08 guards, wired for the opencode runtime exclusively — it does not install Claude Code (the marketplace plugin is the only CC channel). The updater (`install update`) and bootstrap scripts (`bin/update-opencode.{sh,ps1}`) are production-ready. The hook Bash→TS cutover (issue #446) is complete: TypeScript is the single source of gate logic for both runtimes. This document records what is built, what is genuinely residual, and the design contracts that govern the residual work.
+> **Status: see [`docs/lifecycle.md`](./lifecycle.md) for the current stage-by-stage maturity of the opencode runtime.** The Go installer (`cmd/install/`) ships the OpenCode agents, skills, commands, MCP configuration, and ownership ledger. It does not install Claude Code or a Team Harness OpenCode hook plugin; OpenCode uses native permissions and approvals.
 
 ## Build status — buildable-now-vs-defer
 
 | Item | Mechanism | Status | Notes |
 |------|-----------|--------|-------|
-| 1 | Adapter registry + format-shim | **PARTIAL** | Descriptor shape and shim normalization contract specified (see Item 1 below). Canonical agent bodies built; the emit-time frontmatter delta (opencode-specific `model` IDs, `permission` objects) is applied by `opencodeRuntimeTransform` in `cmd/install/transform.go`. The **descriptor-consuming projector** (the code that reads adapter descriptors and projects canonical bodies) is NOT built — entry files are hand-authored and the transform is hard-coded in Go. |
+| 1 | Agent projection | **BUILT** | Canonical agent bodies receive the OpenCode name/model/mode delta at install time. Per-agent permissions are omitted so the host's native policy remains authoritative. |
 | 2 | Two-layer install manifest + managed-ownership state | **BUILT** (opencode path) | `ComputePlan`/`ApplyPlan`/`appendLedger`/`readLedger` implement the plan/apply/ledger contract in `cmd/install/plan.go`, `apply.go`, `ledger.go`. All SEC-04/05/06 guards enforced. `--runtime claude-code` through the manifest engine is a deliberate empty no-op — the former legacy file-copy path (`installAgents`/`installSkills`/`installHooks` in `main.go`) was retired with the hook Bash→TS cutover (issue #446); Claude Code installs exclusively through the marketplace plugin, so there is no CC path left to unify into the manifest engine (see Genuine residual gaps, item 2, [RESOLVED]). |
 | 3 | Single data-home resolver | **BUILT** | `ResolveDataHome()` in `cmd/install/datahome.go` implements the five-branch resolution order with full SEC-01/02/03/08 enforcement. |
 | 4 | Updater (`install update`) | **BUILT** | `cmd/install/update.go` + `bin/update-opencode.{sh,ps1}`. Three-state version-delta (update-available / already-current / installed-ahead). `ComputePlan` diff preview, interactive `[Y/n]` confirm (operator "n" → zero writes), `ApplyPlan` apply, managed-key-only config bump (`refreshManagedConfigKeys`), restart-to-activate honesty block. `dist/VERSION` release asset for cheap pre-check. |
@@ -38,13 +38,13 @@ The following items are NOT built and are tracked as future work:
 
 4. **Static manifest YAML.** Component and module manifests are synthesized in Go code (`cmd/install/manifest_registry.go`, `opencode_deps.go`) rather than from declarative YAML files on disk. A static YAML representation would make the manifest auditable as a committed artifact without reading Go source. The current approach is functional and correct; YAML is a presentation-layer improvement.
 
-5. **Dual-runtime CI.** No CI workflow runs the hook suite (or any agent behavioral test) against both the Node.js (Claude Code) runtime and the Bun (opencode) runtime in the same pipeline. The existing `tests/` suite is runtime-agnostic; dual-runtime execution requires a second harness presence in CI.
+5. **Live OpenCode smoke CI.** Go tests cover projection and installation, but CI does not yet launch OpenCode and resolve the installed default agent end to end.
 
 ---
 
 ## Item 1 — Adapter registry + format-shim
 
-**Goal.** Author one canonical hook/agent *body* and project it to N runtimes through small declarative *adapters* plus a single I/O-normalizing *shim*, instead of duplicating or rewriting each body per runtime.
+**Goal.** Author one canonical agent body and project only the frontmatter differences required by OpenCode.
 
 **Current build state.** The transform layer exists (`transform.go`), as do the component and module manifests (`manifest_registry.go`). The canonical agent bodies are built. The **adapter descriptor shape** and the **shim normalization contract** are specified below. The **descriptor-consuming projector** (the code that reads adapter YAML and drives the projection) is NOT built — it is the first build milestone when a third runtime target appears.
 
@@ -160,9 +160,9 @@ The schema and the ownership-tracking model are implemented in `cmd/install/`. T
 |---|---|---|---|
 | **Skills** (`SKILL.md`) | Same `SKILL.md` + frontmatter | **Yes** — discovers `.claude/skills/` directly | **None** — already cross-harness |
 | **Rules / context** (`CLAUDE.md`) | `AGENTS.md` (cross-tool standard) | **Yes** — falls back to `CLAUDE.md` when no `AGENTS.md` exists | **Near-zero** — optionally add `AGENTS.md` as an entry point |
-| **Agents** (`.md` + frontmatter) | Same Markdown + frontmatter; CC-compatible agent directories are partially read | Partially — structure matches, but `permission`/`model`/`mode` fields differ | **Light** — emit-time frontmatter delta (tool permissions → `permission` object, provider-prefixed model IDs, explicit `mode`); built in `opencodeRuntimeTransform` |
+| **Agents** (`.md` + frontmatter) | Same Markdown + frontmatter; CC-compatible agent directories are partially read | Partially — structure matches, but `permission`/`model`/`mode` fields differ | **Light** — omit per-agent permission/model fields so host policy applies, and emit explicit `mode`; built in `opencodeRuntimeTransform` |
 | **Commands** (`.md`) | Markdown + frontmatter in `.opencode/commands/`; `$ARGUMENTS` placeholder | Partially — `$ARGUMENTS` vs `{input}`, relocation to `.opencode/commands/` | **Light** — frontmatter delta + path relocation |
-| **Hooks** | TypeScript/JS plugins on Bun (async event callbacks, 23+ events), in `.opencode/plugins/` | **No** — no shell-script hook execution; the official migrator skips hooks entirely | **Done** — TS is the single source of gate logic for both runtimes (issue #446 cutover complete) |
+| **Hooks** | Native OpenCode permissions and approvals | **No** | **None** — Team Harness does not install a parallel OpenCode hook plugin |
 
 ---
 
@@ -172,7 +172,7 @@ Every new distributed implementation must be authorable for both Claude Code and
 
 - **Skills and rules** incur no or near-zero cross-harness effort. Author once; both harnesses read them.
 - **Agents and commands** are authored against the canonical frontmatter. The emit-time frontmatter delta is applied by `opencodeRuntimeTransform` at install time — not hand-duplicated into a per-harness copy.
-- **Hooks are authored in TypeScript (Decision A = A2, CLOSED).** A single TS/JS body runs natively on Claude Code (Node) and opencode (Bun). The Bash→TS cutover is complete (issue #446): TypeScript is the single source of gate logic for both runtimes, and the Claude Code plugin wires every gate through `hooks/run-ts-hook.sh`, a fail-closed launcher with no gate logic of its own. See `docs/opencode-migration-guide.md` for the design record.
+- **Hooks are a Claude Code runtime surface.** OpenCode relies on its native permission and approval model rather than duplicating those controls in a Team Harness plugin.
 
 ### Actionable now (enforceable as review discipline)
 
@@ -185,8 +185,8 @@ Every new distributed implementation must be authorable for both Claude Code and
 
 - Actual descriptor-driven projection and the first non-identity adapter (Item 1 projector build).
 - The materialized `.opencode/` directory structure via the projector.
-- Dual-runtime test execution in CI.
+- Live OpenCode default-agent resolution in CI.
 
 ### Honest enforceability statement
 
-The mandate is binding as authoring and review discipline. What is verifiable today: structural test for rule presence (Suite 105); opencode install integration (verified by `go test ./cmd/install/`). What is NOT verifiable today: dual-runtime hook execution (projector + hook migration are future work).
+The mandate is binding as authoring and review discipline. OpenCode installation and projection are verified by `go test ./cmd/install/`; Team Harness does not claim dual-runtime hook execution.

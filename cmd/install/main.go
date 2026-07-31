@@ -4,7 +4,7 @@
 // (/plugin marketplace add valianx/team-harness) — this binary's former CC
 // install path (bare invocation, no subcommand) is retired and only prints a
 // redirect notice. The manifest engine (`install plan|apply|uninstall
-// --runtime opencode`) installs agents, skills, and the opencode plugin, and
+// --runtime opencode`) installs agents and skills, and
 // registers the memory + context7 MCP servers in opencode.json. The Memory
 // MCP server is an external service (context-harness-mcp or compatible);
 // this installer does not bundle or copy any server source code.

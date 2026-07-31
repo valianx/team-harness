@@ -244,8 +244,8 @@ func TestRegisterOpencodeMCPFromValues_NoSecretInOpencodeJSON(t *testing.T) {
 }
 
 // TestRegisterOpencodeMCPFromValues_SkipsWhenAbsent verifies that when no
-// Memory URL is set AND context7 is disabled, registerOpencodeMCPFromValues
-// skips writing opencode.json (no file created, no os.Exit called).
+// Memory URL is set AND context7 is disabled, only the default agent is
+// configured and no MCP entry is introduced.
 func TestRegisterOpencodeMCPFromValues_SkipsWhenAbsent(t *testing.T) {
 	dir := t.TempDir()
 	settingsPath := filepath.Join(dir, "opencode.json")
@@ -260,13 +260,19 @@ func TestRegisterOpencodeMCPFromValues_SkipsWhenAbsent(t *testing.T) {
 	// abort the test. The absence path should NOT exit.
 	registerOpencodeMCPFromValues(mcp, settingsPath, tokenModeEnvRef, opencodeMCPSecrets{})
 
-	// File may or may not exist — what matters is no panic/exit and that any
-	// written content is valid JSON.
-	if data, err := os.ReadFile(settingsPath); err == nil && len(data) > 0 {
-		var check interface{}
-		if jsonErr := json.Unmarshal(data, &check); jsonErr != nil {
-			t.Errorf("opencode.json written but invalid JSON: %v", jsonErr)
-		}
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("read opencode.json: %v", err)
+	}
+	var config map[string]interface{}
+	if err := json.Unmarshal(data, &config); err != nil {
+		t.Fatalf("parse opencode.json: %v", err)
+	}
+	if config["default_agent"] != opencodeDefaultAgent {
+		t.Errorf("default_agent = %v, want %q", config["default_agent"], opencodeDefaultAgent)
+	}
+	if _, ok := config["mcp"]; ok {
+		t.Error("mcp config was written despite both servers being absent")
 	}
 }
 
@@ -1069,4 +1075,3 @@ func TestCollectOpencodeSetupInteractivePreFilled_Context7InjectedInSource(t *te
 		t.Error("initialContext7Enabled injection occurs AFTER buildOpencodeSetupGroups — import short-circuit would not benefit from it (fix order wrong)")
 	}
 }
-

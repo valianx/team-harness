@@ -86,17 +86,17 @@ team-harness/
 
 | Layer | Choice |
 |---|---|
-| Installer | **opencode-only.** Go 1.23+, cross-compiled to GH Release assets (`cmd/install/main.go` is the source). Does NOT install Claude Code — the marketplace plugin is the only CC channel. Serves opencode exclusively (`install apply\|update\|uninstall --runtime opencode`); agents/skills/hooks embed at compile time via `//go:embed` in `assets.go` — self-contained, no repo clone at runtime. TUI: `charm.land/huh/v2`. `cmd/install/` is frozen for fleet model-allocation (opencode-only binary — `modes.go::lowCostMatrix` is a historical reference, not extended for new agents; see `agents/README.md §"Low-cost mode"`). Full lifecycle detail: `docs/lifecycle.md`. |
+| Installer | **opencode-only.** Go 1.23+, cross-compiled to GH Release assets (`cmd/install/main.go` is the source). Does NOT install Claude Code — the marketplace plugin is the only CC channel. Serves opencode exclusively (`install apply\|update\|uninstall --runtime opencode`); agents and skills embed at compile time via `//go:embed` in `assets.go` — self-contained, no repo clone at runtime. TUI: `charm.land/huh/v2`. `cmd/install/` is frozen for fleet model-allocation (opencode-only binary — `modes.go::lowCostMatrix` is a historical reference, not extended for new agents; see `agents/README.md §"Low-cost mode"`). Full lifecycle detail: `docs/lifecycle.md`. |
 | Bootstrap scripts | **opencode-only.** Bash/PowerShell/cmd.exe (`install.sh`/`.ps1`/`.cmd`) detect OS+arch and download the released binary from the deterministic `releases/latest/download/` URL (no GitHub API call), served via a GitHub Pages workflow. Zero Python, zero `uv` required. See `bin/README.md`. |
 | Agents / skills | Markdown with YAML frontmatter |
 | Complex skills | Markdown + referenced scripts (Python/Node via `uv run` or CLIs) |
-| Hooks | TypeScript (`hooks/ts/bodies/*.ts` → tracked `dist/*.cjs`) — single gate-logic source for CC and opencode. `hooks.json` wires CC via `run-ts-hook.sh` (fail-closed launcher). Only `sketch-guard.sh` remains Bash. |
+| Hooks | Claude Code only: TypeScript (`hooks/ts/bodies/*.ts` → tracked `dist/*.cjs`) wired through `hooks.json` and `run-ts-hook.sh`. OpenCode uses its native permission and approval model. Only `sketch-guard.sh` remains Bash. |
 | Memory MCP | External service (e.g., `context-harness-mcp` on Railway/Render/Fly/Docker). Configured by URL in `~/.claude.json`. Not bundled in this repo. |
 | Config | `~/.claude.json` merge for `mcpServers`; CC hooks wired in `.claude-plugin/hooks.json` |
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — the only CC install channel. Go installer binary (GH Release assets) — the only opencode install channel; it does not serve Claude Code. |
 
-**Current version:** `3.4.1` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `4.0.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
