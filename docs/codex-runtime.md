@@ -26,7 +26,7 @@ codex plugin marketplace add valianx/team-harness \
 
 Use `codex plugin marketplace upgrade team-harness` to refresh the catalog,
 then remove and add the plugin again when upgrading the local snapshot. Remove
-it with `codex plugin remove team-harness`. Run `codex plugin marketplace
+it with `codex plugin remove team-harness@team-harness`. Run `codex plugin marketplace
 remove team-harness` only when no installed plugin still depends on it.
 
 During local plugin development, make a real file change before reinstalling so
@@ -43,7 +43,11 @@ picked up only by a new Codex thread.
 Plugin installation and agent installation are separate. The plugin supplies
 seven skills (`init`, `pipeline`, `design`, `implement`, `validate`, `deliver`,
 `recover`). The Go installer supplies the six generated project or global
-agents without modifying `config.toml`:
+agents without modifying `config.toml`. The commands below assume the released
+installer binary is available as `install`. Without that binary, run the same
+subcommands as `go run github.com/valianx/team-harness/cmd/install@latest ...`
+from the target project root (Go 1.25.8+); contributors working in this checkout
+may use `go run ./cmd/install ...` instead:
 
 ```bash
 install apply --runtime codex --scope project

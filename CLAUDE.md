@@ -65,7 +65,7 @@ team-harness/
 │       ├── pages.yml    Publish bootstrap scripts to GitHub Pages on release
 │       └── test.yml     PR/main verification: policy-block + structure + frontmatter suites
 ├── assets.go            go:embed entry point (package teamharness) — embeds agents/, skills/, hooks/
-├── go.mod               Go module (Go 1.23)
+├── go.mod               Go module (Go 1.25.8)
 ├── docs/
 │   └── knowledge.md     Project knowledge base
 ├── README.md            Human-facing overview
@@ -86,7 +86,7 @@ team-harness/
 
 | Layer | Choice |
 |---|---|
-| Installer | Go 1.23+, cross-compiled to GH Release assets. It manages opencode assets and the six generated Codex agent TOMLs (`--runtime codex`), but never installs either marketplace plugin. Claude Code remains marketplace-only. Full lifecycle detail: `docs/lifecycle.md`. |
+| Installer | Go 1.25.8+, cross-compiled to GH Release assets. It manages opencode assets and the six generated Codex agent TOMLs (`--runtime codex`), but never installs either marketplace plugin. Claude Code remains marketplace-only. Full lifecycle detail: `docs/lifecycle.md`. |
 | Bootstrap scripts | Bash/PowerShell/cmd.exe entry points download the released agent-installer binary. Codex plugin install/update/remove remains a separate marketplace lifecycle. |
 | Agents / skills | Markdown with YAML frontmatter |
 | Complex skills | Markdown + referenced scripts (Python/Node via `uv run` or CLIs) |

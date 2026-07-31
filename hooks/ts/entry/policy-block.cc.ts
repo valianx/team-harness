@@ -23,7 +23,9 @@
 //     failure to deny: Codex cannot represent PreToolUse `ask`, so degrading a
 //     deterministic safety floor to bounded context would let execution
 //     continue without an operator decision.
-//   - Unexpected body exception: ask (same fail-closed rationale).
+//   - Unexpected body exception: Claude Code → ask (same fail-closed
+//     rationale); Codex → deny because its adapter cannot represent ask
+//     without continuing the tool call.
 //   - Safe default (non-covered tool): none.
 
 import { inboundCC, outboundCC, ShimRejectError } from "../shim/shim.js";
@@ -55,15 +57,20 @@ async function main(): Promise<void> {
     const decision = evaluate(normalized);
     outboundCC(decision);
   } catch (err) {
-    if (err instanceof ShimRejectError && process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
-      // Every shim rejection is a deterministic safety-floor failure on
-      // Codex, including malformed/empty direct invocations. The launcher
-      // already rejects malformed native JSON before reaching this branch;
-      // keeping the bundle itself fail-closed closes the direct-entry path too.
+    if (process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
+      // Every evaluation failure is a deterministic safety-floor failure on
+      // Codex, including unexpected body exceptions. Codex cannot represent
+      // PreToolUse `ask`; degrading an evaluation error to bounded context
+      // would let execution continue without an operator decision. The
+      // launcher already rejects malformed native JSON before reaching this
+      // branch; keeping the bundle itself fail-closed closes direct-entry
+      // paths too.
       const fallback: NormalizedDecision = {
         decision: "deny",
         reason:
-          "policy-block: payload failed shim validation — execution denied because safety could not be evaluated (policy-block.cc.ts SEC-07).",
+          err instanceof ShimRejectError
+            ? "policy-block: payload failed shim validation — execution denied because safety could not be evaluated (policy-block.cc.ts SEC-07)."
+            : "policy-block: safety evaluation failed — execution denied because policy could not be evaluated (policy-block.cc.ts).",
         mutations: null,
       };
       outboundCC(fallback);
@@ -109,6 +116,21 @@ async function main(): Promise<void> {
 }
 
 main().catch(() => {
-  // Last-resort: empty stdout → no-decision, exit 0.
+  // Last-resort read/transport failure. A Codex deny-floor must still deny
+  // when the wrapper fails before the inner evaluation catch can run.
+  if (process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
+    try {
+      outboundCC({
+        decision: "deny",
+        reason:
+          "policy-block: safety evaluation failed before completion — execution denied because policy could not be evaluated (policy-block.cc.ts).",
+        mutations: null,
+      });
+    } catch {
+      // If stdout/process termination itself fails, fall through to the
+      // runtime's exit path below rather than reflecting an internal error.
+    }
+  }
+  // Claude Code last-resort: empty stdout → no-decision, exit 0.
   process.exit(0);
 });

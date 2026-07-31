@@ -1,6 +1,6 @@
 # Team Harness — Multi-runtime Agent Orchestration
 
-> Team Harness is a multi-runtime agent orchestration system for **Claude Code** and **Codex**: the top-level thread frames each request and dispatches specialized architect, implementer, tester, QA, security, and delivery agents through a Spec-Driven Development (SDD) pipeline with mandatory human gates.
+> Team Harness is a multi-runtime agent orchestration system for **Claude Code**, **Codex**, and **opencode**: the top-level thread frames each request and dispatches specialized architect, implementer, tester, QA, security, and delivery agents through a Spec-Driven Development (SDD) pipeline with mandatory human gates.
 >
 > Every pipeline stage is captured as files on disk, so any session can resume from where the last one stopped.
 

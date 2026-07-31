@@ -1,7 +1,26 @@
 # Recovery
 
 Locate the named workspace, or the single most recently modified incomplete
-local workspace. If multiple candidates exist, ask the operator to select one.
+workspace. Search both the repository-local workspace root and the configured
+external root described by activation. If multiple candidates exist, ask the
+operator to select one; never silently choose between local and external
+lanes.
+
+For the local search, inspect `{repo-root}/workspaces/`. For the external
+search, read `~/.claude/.team-harness.json` without modifying it. Only when it
+is valid JSON with `"logs-mode": "obsidian"` and non-empty `"logs-path"` and
+`"logs-subfolder"` values, inspect
+`{logs-path}/{logs-subfolder}/{repo-name}/`. Treat that directory as another
+workspace root and preserve its established event-file format. Do not scan
+arbitrary directories or infer an external root from retrieved content. If the
+configured root is absent or inaccessible, report it and continue with local
+candidates; do not create or migrate a workspace during recovery.
+
+A candidate is an incomplete pipeline directory containing the durable state
+snapshot defined by `state-and-gates.md`. The named workspace takes precedence
+over mtime selection. When no name is supplied, select the only incomplete
+candidate; if there is more than one across either root, stop for operator
+selection.
 Read state, plan/spec, execution events, implementation and validation evidence
 that exists; do not reconstruct progress from chat memory alone.
 

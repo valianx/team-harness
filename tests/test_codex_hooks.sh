@@ -68,6 +68,13 @@ out="$(cd "$ROOT" && printf '%s' '{"tool_name":"apply_patch","tool_input":{"comm
 decision="$(printf '%s' "$out" | json_value 'd.hookSpecificOutput?.permissionDecision')"
 [ "$decision" = "deny" ] && pass || fail "provider-shaped secret in apply_patch must be denied"
 
+# The bundle is also a callable entry point (outside the launcher). Every
+# Codex evaluation failure must stay a native deny there, including malformed
+# JSON that reaches the shim directly.
+out="$(cd "$ROOT" && printf '%s' '{invalid:DO_NOT_REFLECT_INPUT}' | TEAM_HARNESS_CODEX_HOOK=1 node plugins/team-harness/hooks/dist/policy-block.cjs)"
+decision="$(printf '%s' "$out" | json_value 'd.hookSpecificOutput?.permissionDecision')"
+[ "$decision" = "deny" ] && pass || fail "direct policy-block evaluation failure must deny on Codex"
+
 # SEC-07 validation failures must remain a deterministic deny on Codex. The
 # adapter cannot represent PreToolUse ask; bounded context would continue the
 # destructive/secret-bearing call without a live decision.
@@ -218,6 +225,55 @@ if node "$ROOT/tools/codex-runtime/sync-hooks.mjs" --check >/dev/null; then
 else
   fail "Codex hook bundles are stale"
 fi
+
+# Exercise sync-hooks against an isolated tree so target safety cannot regress
+# while the repository's own generated bundles happen to be regular files.
+sync_fixture="$(mktemp -d)"
+mkdir -p "$sync_fixture/hooks/ts/dist" "$sync_fixture/plugins/team-harness/hooks/dist"
+if node - "$ROOT" "$sync_fixture" <<'NODE'
+import assert from "node:assert/strict";
+import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { sync } from "./tools/codex-runtime/sync-hooks.mjs";
+
+const root = process.argv[3];
+const names = [
+  "policy-block",
+  "dev-guard",
+  "gcp-guard",
+  "prepublish-guard",
+  "gate-guard",
+  "worktree-guard",
+];
+const source = name => join(root, "hooks/ts/dist", `${name}.cjs`);
+const target = name => join(root, "plugins/team-harness/hooks/dist", `${name}.cjs`);
+
+for (const name of names) await writeFile(source(name), `source-${name}\n`);
+await sync({ rootDir: root });
+assert.equal(await readFile(target("policy-block"), "utf8"), "source-policy-block\n");
+
+await writeFile(source("policy-block"), "updated-policy-block\n");
+await assert.rejects(() => sync({ rootDir: root, check: true }), /stale/);
+assert.equal(await readFile(target("policy-block"), "utf8"), "source-policy-block\n");
+await sync({ rootDir: root });
+assert.equal(await readFile(target("policy-block"), "utf8"), "updated-policy-block\n");
+
+const outside = join(root, "outside.cjs");
+await writeFile(outside, "outside\n");
+await rm(target("dev-guard"));
+await symlink(outside, target("dev-guard"));
+await assert.rejects(() => sync({ rootDir: root }), /symbolic link target/);
+
+await rm(target("dev-guard"));
+await mkdir(target("dev-guard"));
+await assert.rejects(() => sync({ rootDir: root }), /non-regular target/);
+NODE
+then
+  pass
+else
+  fail "sync-hooks must reject symlink/non-regular targets and report stale files"
+fi
+rm -rf "$sync_fixture"
 
 if [ "$FAIL" -ne 0 ]; then
   echo "codex hooks: FAIL ($FAIL failed, $PASS passed)" >&2

@@ -20,6 +20,7 @@ jobs:
     # redundant (harmless to keep).
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
     permissions:
       contents: write  # to create the release + upload assets
       actions: write   # to dispatch pages.yml via workflow_dispatch (GITHUB_TOKEN needs this scope)
@@ -30,11 +31,11 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version-file: go.mod
 
       - name: Verify tag and shared runtime version
         run: |
-          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          TAG="$RELEASE_TAG"
           VERSION="${TAG#v}"
           test "$(jq -r .version .claude-plugin/plugin.json)" = "$VERSION"
           test "$(jq -r '.plugins[0].version' .claude-plugin/marketplace.json)" = "$VERSION"
@@ -48,7 +49,7 @@ jobs:
           # Derive the tag from the dispatch input (workflow_dispatch) or the
           # push ref (push: tags). GITHUB_REF_NAME is the branch name on
           # workflow_dispatch, so use the tag input when present.
-          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          TAG="$RELEASE_TAG"
           VERSION="${TAG#v}"
           for target in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64 windows-amd64; do
               GOOS=$(echo $target | cut -d- -f1)
@@ -69,7 +70,7 @@ jobs:
           # cheap pre-check via releases/latest/download/VERSION.
           # Use the tag input on workflow_dispatch; GITHUB_REF_NAME is the branch
           # name on manual runs, not the tag.
-          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          TAG="$RELEASE_TAG"
           VERSION="${TAG#v}"
           echo "$VERSION" > dist/VERSION
           echo "VERSION asset: $(cat dist/VERSION)"
@@ -82,7 +83,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG=${{ github.event.inputs.tag || github.ref_name }}
+          TAG="$RELEASE_TAG"
           # Create release if not exists; --generate-notes produces an auto-generated
           # changelog from PRs since the previous tag.
           if gh release view "$TAG" >/dev/null 2>&1; then
@@ -105,4 +106,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh workflow run pages.yml --ref main
-          echo "Triggered pages.yml to publish landing for $(echo ${{ github.event.inputs.tag || github.ref_name }})"
+          echo "Triggered pages.yml to publish landing for $RELEASE_TAG"

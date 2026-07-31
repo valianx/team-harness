@@ -25,8 +25,8 @@ const ledgerFilenameOpencode = "ownership-ledger-opencode.jsonl"
 const ledgerFilenameCodex = "ownership-ledger-codex.jsonl"
 
 // activeLedgerFilename is the ledger filename for the current runtime.
-// Initialized to the default (claude-code); call setActiveLedgerFilename
-// before any ledger I/O when using the opencode runtime.
+// Initialized to the default (claude-code); call configureLedger before any
+// ledger I/O when using the opencode or Codex runtime.
 var activeLedgerFilename = ledgerFilename
 var activeLedgerConfigRoot string
 var activeLedgerRoot string

@@ -249,10 +249,10 @@ async function main() {
     const decision = evaluate(normalized);
     outboundCC(decision);
   } catch (err) {
-    if (err instanceof ShimRejectError && process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
+    if (process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
       const fallback = {
         decision: "deny",
-        reason: "policy-block: payload failed shim validation \u2014 execution denied because safety could not be evaluated (policy-block.cc.ts SEC-07).",
+        reason: err instanceof ShimRejectError ? "policy-block: payload failed shim validation \u2014 execution denied because safety could not be evaluated (policy-block.cc.ts SEC-07)." : "policy-block: safety evaluation failed \u2014 execution denied because policy could not be evaluated (policy-block.cc.ts).",
         mutations: null
       };
       outboundCC(fallback);
@@ -285,5 +285,15 @@ async function main() {
   }
 }
 main().catch(() => {
+  if (process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
+    try {
+      outboundCC({
+        decision: "deny",
+        reason: "policy-block: safety evaluation failed before completion \u2014 execution denied because policy could not be evaluated (policy-block.cc.ts).",
+        mutations: null
+      });
+    } catch {
+    }
+  }
   process.exit(0);
 });

@@ -65,9 +65,11 @@ install apply --runtime codex --scope global
 
 The six files are an identity boundary, not just a name lookup. Use one scope
 only (never combine project and global files), require each path to be a
-regular non-symlink file, and inspect its generated header before creating a
-workspace or dispatching a specialist. Every file must contain these exact
-markers, with the role-specific values shown below:
+regular non-symlink file, and inspect its parsed TOML fields before creating a
+workspace or dispatching a specialist. Comments are useful diagnostics but
+are not proof of identity: a stale file can retain generated markers while
+its model, permissions, or instructions have changed. Every file must contain
+the exact markers and effective fields shown below:
 
 | Role | Semantic source marker | Projection/profile marker |
 |---|---|---|
@@ -77,6 +79,36 @@ markers, with the role-specific values shown below:
 | `qa` | `# Semantic source: agents/qa.md (sonnet/high)` | `# Projection tier: non-opus; profile: team-harness` |
 | `security` | `# Semantic source: agents/security.md (opus/xhigh)` | `# Projection tier: opus-xhigh; profile: team-harness` |
 | `delivery` | `# Semantic source: agents/delivery.md (sonnet/medium)` | `# Projection tier: non-opus; profile: team-harness` |
+
+The parsed fields must also match this projection matrix exactly (a missing,
+extra, or mismatched value fails preflight):
+
+| Role | `name` | `model` | `model_reasoning_effort` | `sandbox_mode` |
+|---|---|---|---|---|
+| `architect` | `architect` | `gpt-5.6-sol` | `xhigh` | `read-only` |
+| `implementer` | `implementer` | `gpt-5.6-luna` | `max` | `workspace-write` |
+| `tester` | `tester` | `gpt-5.6-luna` | `max` | `workspace-write` |
+| `qa` | `qa` | `gpt-5.6-luna` | `max` | `read-only` |
+| `security` | `security` | `gpt-5.6-sol` | `xhigh` | `read-only` |
+| `delivery` | `delivery` | `gpt-5.6-luna` | `max` | `workspace-write` |
+
+Finally, compare each normalized (LF) file's SHA-256 against the canonical
+identity digest shipped with this plugin. This catches instruction drift that
+the role fields cannot see. The current digests are:
+
+| Role | SHA-256 of normalized TOML |
+|---|---|
+| `architect` | `1c7e31755f5f902bb5a4e36d8bc392ab9fa6707ff4c8618ee500168cb1b8f07f` |
+| `implementer` | `1b29e02a2ac74696eca4d9c918f0a3d93efede600b38db6053c89881deff3ec1` |
+| `tester` | `e1db34f62274fdf74c9620bec7da71e78a1e0c8322a30b5d4dab7713fd9950ad` |
+| `qa` | `0e3129938dd040b43ae1203ae06ec773693d3e9f76510e30137b7dc25e40aff6` |
+| `security` | `31333c5ab6f655dbc649cc64b6c981cb8387ee9d2b76cdb9ac3a9baed2823859` |
+| `delivery` | `6d4d273fc4814353287634a2f1207cf13f5e7eed64f3301b1cb2d7d312674556` |
+
+Do not accept a file solely because its comments or `name` field match. A
+digest mismatch is a stale or unrelated shadow; stop before workspace
+creation or delegation and ask the operator to reinstall or update the six
+agents.
 
 Also require the deterministic first line
 `# Code generated from runtime/schema/codex-agents.json; DO NOT EDIT.`, the

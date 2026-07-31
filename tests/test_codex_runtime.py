@@ -40,7 +40,7 @@ def main() -> None:
             fail(f"{path}: generated agent must not be a symlink")
         data = tomllib.loads(path.read_text())
         generated.add(data["name"])
-        for required in ("name", "description", "developer_instructions"):
+        for required in ("name", "description", "sandbox_mode", "developer_instructions"):
             if not data.get(required):
                 fail(f"{path}: missing {required}")
         if data["name"] not in expected_identity:
@@ -80,9 +80,19 @@ def main() -> None:
         fail("Codex plugin manifest must not declare the unsupported hooks field")
     claude_plugin = json.loads((ROOT / ".claude-plugin/plugin.json").read_text())
     claude_market = json.loads((ROOT / ".claude-plugin/marketplace.json").read_text())
+    claude_plugin_name = claude_plugin["name"]
+    market_entries = [
+        entry for entry in claude_market["plugins"]
+        if entry.get("name") == claude_plugin_name
+    ]
+    if len(market_entries) != 1:
+        fail(
+            "Claude marketplace must declare exactly one entry for "
+            f"{claude_plugin_name!r}"
+        )
     versions = {
         claude_plugin["version"],
-        claude_market["plugins"][0]["version"],
+        market_entries[0]["version"],
         manifest["version"],
     }
     if len(versions) != 1:
