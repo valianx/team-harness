@@ -53,7 +53,8 @@ Four cases justify a comment:
    the reader has no other documentation (Go `godoc`, TSDoc, Bash function headers in
    shared scripts).
 
-These four cases are the gate. A comment that does not clear any of them does not belong.
+These four cases are the default gate: a new comment that clears none of them does not belong,
+except for the bounded, named exceptions in §7.
 
 ---
 
