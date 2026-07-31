@@ -32,6 +32,7 @@ func ledgerTestEnv(t *testing.T) (dataDir string, cleanup func()) {
 	// or similar paths that may be owned by LocalSystem (SID S-1-5-18).
 	clearDataHomeEnv(t)
 	ResetDataHomeCache()
+	activeLedgerConfigRoot = ""
 
 	// Create a sub-directory under the test's already-clean temp root.
 	tmp := t.TempDir()
@@ -80,6 +81,31 @@ func readLedgerRaw(t *testing.T, dataDir string) []byte {
 	return data
 }
 
+func TestReadLedgerRejectsEscapingOwnershipPath(t *testing.T) {
+	dataDir, cleanup := ledgerTestEnv(t)
+	defer cleanup()
+	writeLedgerLines(t, dataDir, []string{`{"ts":"2026-07-31T00:00:00Z","op":"install","component":"bad","owns":{"files":["{config_root}/../../victim"],"configKeys":[]},"schemaVersion":1}`})
+
+	entries, errs := readLedger()
+	if len(entries) != 0 {
+		t.Fatalf("readLedger accepted escaping ownership: %v", entries)
+	}
+	if len(errs) != 1 {
+		t.Fatalf("readLedger errors = %d, want 1", len(errs))
+	}
+}
+
+func TestReadLedgerRejectsFileClaimUnrelatedToComponent(t *testing.T) {
+	dataDir, cleanup := ledgerTestEnv(t)
+	defer cleanup()
+	writeLedgerLines(t, dataDir, []string{`{"ts":"2026-07-31T00:00:00Z","op":"install","component":"agent-retired","owns":{"files":["{config_root}/opencode.json"],"configKeys":[]},"schemaVersion":1}`})
+
+	entries, errs := readLedger()
+	if len(entries) != 0 || len(errs) != 1 {
+		t.Fatalf("unrelated ownership accepted: entries=%v errors=%v", entries, errs)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // AC-3-bis: append preserves prior lines (SEC-DR-P3-1)
 // ---------------------------------------------------------------------------
@@ -100,9 +126,9 @@ func TestLedger_AppendPreservesPriorLines_SecDrP3_1(t *testing.T) {
 
 	// Pre-populate the ledger with 3 well-formed lines.
 	priorLines := []LedgerEntry{
-		{TS: "2026-06-18T01:00:00Z", Op: "install", Component: "comp-a", Owns: OwnershipTags{Files: []string{"{config_root}/agents/a.md"}, ConfigKeys: []string{}}, SchemaVersion: 1},
-		{TS: "2026-06-18T01:01:00Z", Op: "install", Component: "comp-b", Owns: OwnershipTags{Files: []string{"{config_root}/agents/b.md"}, ConfigKeys: []string{"logs-mode"}}, SchemaVersion: 1},
-		{TS: "2026-06-18T01:02:00Z", Op: "update",  Component: "comp-a", Owns: OwnershipTags{Files: []string{"{config_root}/agents/a.md"}, ConfigKeys: []string{}}, SchemaVersion: 1},
+		{TS: "2026-06-18T01:00:00Z", Op: "install", Component: "agent-a", Owns: OwnershipTags{Files: []string{"{config_root}/agents/a.md"}, ConfigKeys: []string{}}, SchemaVersion: 1},
+		{TS: "2026-06-18T01:01:00Z", Op: "install", Component: "agent-b", Owns: OwnershipTags{Files: []string{"{config_root}/agents/b.md"}, ConfigKeys: []string{"logs-mode"}}, SchemaVersion: 1},
+		{TS: "2026-06-18T01:02:00Z", Op: "update", Component: "agent-a", Owns: OwnershipTags{Files: []string{"{config_root}/agents/a.md"}, ConfigKeys: []string{}}, SchemaVersion: 1},
 	}
 	rawLines := make([]string, len(priorLines))
 	for i, e := range priorLines {
@@ -120,7 +146,7 @@ func TestLedger_AppendPreservesPriorLines_SecDrP3_1(t *testing.T) {
 	// Append one more entry (the second apply).
 	newEntry := LedgerEntry{
 		Op:        "install",
-		Component: "comp-c",
+		Component: "agent-c",
 		Owns:      OwnershipTags{Files: []string{"{config_root}/agents/c.md"}, ConfigKeys: []string{}},
 	}
 	if err := appendLedger([]LedgerEntry{newEntry}); err != nil {
@@ -141,7 +167,7 @@ func TestLedger_AppendPreservesPriorLines_SecDrP3_1(t *testing.T) {
 
 	// The appended entry must be at the end of the file.
 	afterStr := string(after)
-	if !strings.Contains(afterStr, `"comp-c"`) {
+	if !strings.Contains(afterStr, `"agent-c"`) {
 		t.Error("new entry comp-c was not found in ledger after append")
 	}
 
@@ -160,14 +186,14 @@ func TestLedger_AppendPreservesPriorLines_MultipleAppends(t *testing.T) {
 	defer cleanup()
 
 	// Start with one entry.
-	first := LedgerEntry{Op: "install", Component: "first", Owns: OwnershipTags{Files: []string{"{config_root}/f.md"}, ConfigKeys: []string{}}}
+	first := LedgerEntry{Op: "install", Component: "agent-first", Owns: OwnershipTags{Files: []string{"{config_root}/agents/first.md"}, ConfigKeys: []string{}}}
 	if err := appendLedger([]LedgerEntry{first}); err != nil {
 		t.Fatalf("first append: %v", err)
 	}
 	after1 := readLedgerRaw(t, dataDir)
 
 	// Append a second entry.
-	second := LedgerEntry{Op: "install", Component: "second", Owns: OwnershipTags{Files: []string{"{config_root}/s.md"}, ConfigKeys: []string{}}}
+	second := LedgerEntry{Op: "install", Component: "agent-second", Owns: OwnershipTags{Files: []string{"{config_root}/agents/second.md"}, ConfigKeys: []string{}}}
 	if err := appendLedger([]LedgerEntry{second}); err != nil {
 		t.Fatalf("second append: %v", err)
 	}
@@ -179,7 +205,7 @@ func TestLedger_AppendPreservesPriorLines_MultipleAppends(t *testing.T) {
 	}
 
 	// Append a third.
-	third := LedgerEntry{Op: "install", Component: "third", Owns: OwnershipTags{Files: []string{"{config_root}/t.md"}, ConfigKeys: []string{}}}
+	third := LedgerEntry{Op: "install", Component: "agent-third", Owns: OwnershipTags{Files: []string{"{config_root}/agents/third.md"}, ConfigKeys: []string{}}}
 	if err := appendLedger([]LedgerEntry{third}); err != nil {
 		t.Fatalf("third append: %v", err)
 	}
@@ -208,7 +234,7 @@ func TestLedger_RecordsNamesNotValues(t *testing.T) {
 
 	entry := LedgerEntry{
 		Op:        "install",
-		Component: "test-comp",
+		Component: "agent-test",
 		Owns: OwnershipTags{
 			Files:      []string{"{config_root}/agents/test.md"},
 			ConfigKeys: []string{"logs-mode", "logs-path"},
@@ -309,13 +335,13 @@ func TestLedger_ReadLedger_SchemaVersionTwoSkipped(t *testing.T) {
 	defer cleanup()
 
 	lines := []string{
-		`{"ts":"2026-06-18T00:00:00Z","op":"install","component":"good","owns":{"files":["{config_root}/a.md"],"configKeys":[]},"schemaVersion":1}`,
+		`{"ts":"2026-06-18T00:00:00Z","op":"install","component":"agent-good","owns":{"files":["{config_root}/agents/good.md"],"configKeys":[]},"schemaVersion":1}`,
 		`{"ts":"2026-06-18T00:01:00Z","op":"install","component":"bad","owns":{"files":["{config_root}/b.md"],"configKeys":[]},"schemaVersion":2}`,
 	}
 	writeLedgerLines(t, dataDir, lines)
 
 	entries, errs := readLedger()
-	if len(entries) != 1 || entries[0].Component != "good" {
+	if len(entries) != 1 || entries[0].Component != "agent-good" {
 		t.Errorf("expected 1 well-formed entry (good), got %d entries: %v", len(entries), entries)
 	}
 	if len(errs) != 1 {
@@ -330,13 +356,13 @@ func TestLedger_ReadLedger_CorruptTailLine(t *testing.T) {
 	defer cleanup()
 
 	lines := []string{
-		`{"ts":"2026-06-18T00:00:00Z","op":"install","component":"good","owns":{"files":["{config_root}/a.md"],"configKeys":[]},"schemaVersion":1}`,
+		`{"ts":"2026-06-18T00:00:00Z","op":"install","component":"agent-good","owns":{"files":["{config_root}/agents/good.md"],"configKeys":[]},"schemaVersion":1}`,
 		`NOT VALID JSON - truncated{{`,
 	}
 	writeLedgerLines(t, dataDir, lines)
 
 	entries, errs := readLedger()
-	if len(entries) != 1 || entries[0].Component != "good" {
+	if len(entries) != 1 || entries[0].Component != "agent-good" {
 		t.Errorf("expected 1 well-formed entry, got %d", len(entries))
 	}
 	if len(errs) == 0 {

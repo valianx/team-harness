@@ -49,10 +49,10 @@ func TestApplyPlan_CreatesFilesAndAppendsLedger(t *testing.T) {
 		"agents/test.md": &fstest.MapFile{Data: srcData},
 	}
 
-	m, c := buildTestManifestPair("agents/test.md", "test-comp", "{config_root}/agents/test.md")
+	m, c := buildTestManifestPair("agents/test.md", "agent-test", "{config_root}/agents/test.md")
 	placer := newClaudeCodePlacerAt(configRoot)
 
-	diff, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{"test-comp"}, placer, mockFS, nil)
+	diff, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{"agent-test"}, placer, mockFS, nil)
 	if err != nil {
 		t.Fatalf("ComputePlan: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestApplyPlan_CreatesFilesAndAppendsLedger(t *testing.T) {
 	}
 	found := false
 	for _, e := range entries {
-		if e.Component == "test-comp" && e.Op == "install" {
+		if e.Component == "agent-test" && e.Op == "install" {
 			found = true
 			break
 		}
@@ -110,11 +110,11 @@ func TestApplyPlan_Idempotent(t *testing.T) {
 		"agents/idempotent.md": &fstest.MapFile{Data: srcData},
 	}
 
-	m, c := buildTestManifestPair("agents/idempotent.md", "idempotent-comp", "{config_root}/agents/idempotent.md")
+	m, c := buildTestManifestPair("agents/idempotent.md", "agent-idempotent", "{config_root}/agents/idempotent.md")
 	placer := newClaudeCodePlacerAt(configRoot)
 
 	// First apply.
-	diff1, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{"idempotent-comp"}, placer, mockFS, nil)
+	diff1, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{"agent-idempotent"}, placer, mockFS, nil)
 	if err != nil {
 		t.Fatalf("first ComputePlan: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestApplyPlan_Idempotent(t *testing.T) {
 	countAfterFirst := len(entriesAfterFirst)
 
 	// Second apply on unchanged tree.
-	diff2, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{"idempotent-comp"}, placer, mockFS, nil)
+	diff2, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{"agent-idempotent"}, placer, mockFS, nil)
 	if err != nil {
 		t.Fatalf("second ComputePlan: %v", err)
 	}
@@ -164,7 +164,7 @@ func TestApplyPlan_RemoveAppendsClosure(t *testing.T) {
 	configRoot := t.TempDir()
 
 	// Pre-populate the ledger with comp-old.
-	oldLine := `{"ts":"2026-06-18T00:00:00Z","op":"install","component":"comp-old","owns":{"files":["{config_root}/agents/old.md"],"configKeys":[]},"schemaVersion":1}`
+	oldLine := `{"ts":"2026-06-18T00:00:00Z","op":"install","component":"hook-plugin-entry","owns":{"files":["{config_root}/plugins/team-harness.ts"],"configKeys":[]},"schemaVersion":1}`
 	writeLedgerLines(t, dataDir, []string{oldLine})
 
 	// selected = empty → comp-old goes to ToRemove.
@@ -187,12 +187,64 @@ func TestApplyPlan_RemoveAppendsClosure(t *testing.T) {
 	entries, _ := readLedger()
 	found := false
 	for _, e := range entries {
-		if e.Component == "comp-old" && e.Op == "remove" {
+		if e.Component == "hook-plugin-entry" && e.Op == "remove" {
 			found = true
 			break
 		}
 	}
 	if !found {
 		t.Error("expected remove ledger entry for comp-old, not found")
+	}
+}
+
+func TestApplyPlan_RejectsLedgerErrorsBeforeWrites(t *testing.T) {
+	root := t.TempDir()
+	placer := newClaudeCodePlacerAt(root)
+	dest := filepath.Join(root, "agents", "test.md")
+	diff := PlanDiff{
+		ToCreate: []PlannedFile{{
+			Component:    "test-comp",
+			TemplatedDst: "{config_root}/agents/test.md",
+			ConcreteDst:  dest,
+			SrcData:      []byte("test"),
+		}},
+		LedgerErrors: []ledgerError{{Line: 1, Reason: "malformed"}},
+	}
+
+	if err := ApplyPlan(diff, placer); err == nil {
+		t.Fatal("ApplyPlan accepted a plan with ledger errors")
+	}
+	if _, err := os.Stat(dest); !os.IsNotExist(err) {
+		t.Fatal("ApplyPlan wrote files before rejecting ledger errors")
+	}
+}
+
+func TestApplyPlan_RecordsOwnershipForMatchingUntrackedFile(t *testing.T) {
+	_, cleanup := ledgerTestEnv(t)
+	defer cleanup()
+	root := t.TempDir()
+	placer := newClaudeCodePlacerAt(root)
+	data := []byte("matching")
+	dest := filepath.Join(root, "agents", "matching.md")
+	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dest, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m, c := buildTestManifestPair("agents/matching.md", "agent-matching", "{config_root}/agents/matching.md")
+	diff, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{"agent-matching"}, placer, fstest.MapFS{"agents/matching.md": &fstest.MapFile{Data: data}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(diff.ToRecord) != 1 {
+		t.Fatalf("ToRecord = %d, want 1", len(diff.ToRecord))
+	}
+	if err := ApplyPlan(diff, placer); err != nil {
+		t.Fatal(err)
+	}
+	entries, errs := readLedger()
+	if len(errs) != 0 || len(entries) != 1 || entries[0].Component != "agent-matching" {
+		t.Fatalf("ownership repair failed: entries=%v errors=%v", entries, errs)
 	}
 }

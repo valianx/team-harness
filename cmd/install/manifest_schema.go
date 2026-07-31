@@ -52,7 +52,7 @@ var reservedOperatorNamespaces = []string{"mcpServers"}
 // the operator owns everything else under mcp. This must be symmetric in
 // BOTH validateComponentManifest AND validateOwnershipTags.
 var mcpLeafAllowlist = map[string]bool{
-	"mcp.memory":  true,
+	"mcp.memory":   true,
 	"mcp.context7": true,
 }
 
@@ -222,8 +222,8 @@ func validateComponentManifest(c ComponentManifest, moduleByName map[string]Modu
 
 	// SEC-05: validate Emits.Files — every entry must begin with {config_root}.
 	for _, f := range c.Emits.Files {
-		if !strings.HasPrefix(f, "{config_root}") {
-			return fmt.Errorf("component %q: Emits.Files entry %q must begin with {config_root} (SEC-05)", c.Component, f)
+		if err := validateOwnershipTags(OwnershipTags{Files: []string{f}}); err != nil {
+			return fmt.Errorf("component %q: invalid Emits.Files entry: %w (SEC-05)", c.Component, err)
 		}
 	}
 

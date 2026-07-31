@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -50,10 +51,10 @@ func TestUninstall_TwoConfigFileModel_OnlySettingsDocTouched(t *testing.T) {
 
 	// Write settings doc with owned keys + unrelated keys.
 	settingsDoc := map[string]json.RawMessage{
-		"logs-mode":          json.RawMessage(`"local"`),
-		"logs-path":          json.RawMessage(`"/tmp/work-logs"`),
-		"format_version":     json.RawMessage(`"1"`),
-		"installed_version":  json.RawMessage(`"2.107.0"`),
+		"logs-mode":         json.RawMessage(`"local"`),
+		"logs-path":         json.RawMessage(`"/tmp/work-logs"`),
+		"format_version":    json.RawMessage(`"1"`),
+		"installed_version": json.RawMessage(`"2.107.0"`),
 	}
 	settingsBytes, _ := json.MarshalIndent(settingsDoc, "", "  ")
 	settingsBytes = append(settingsBytes, '\n')
@@ -225,6 +226,122 @@ func TestUninstall_FailClosed_CorruptLedgerFixture(t *testing.T) {
 	if len(errs) != 1 {
 		t.Errorf("expected 1 ledger error from corrupt fixture, got %d", len(errs))
 	}
+
+	configRoot := t.TempDir()
+	ownedFile := filepath.Join(configRoot, "agents", "test.md")
+	if err := os.MkdirAll(filepath.Dir(ownedFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(ownedFile, []byte("protected"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	report, err := Uninstall([]string{"agent-test"}, newClaudeCodePlacerAt(configRoot))
+	if err != nil {
+		t.Fatalf("Uninstall: %v", err)
+	}
+	if report.LedgerIntegrityWarning == "" {
+		t.Fatal("expected integrity warning for partially malformed ledger")
+	}
+	if _, err := os.Stat(ownedFile); err != nil {
+		t.Fatalf("Uninstall modified files despite ledger errors: %v", err)
+	}
+}
+
+func TestUninstall_RemovesRetiredComponentsAndDefaultAgent(t *testing.T) {
+	dataDir, cleanup := ledgerTestEnv(t)
+	defer cleanup()
+	configRoot := t.TempDir()
+	placer := newOpencodePlacerAt(configRoot)
+
+	paths := []string{
+		filepath.Join(configRoot, "plugins", "team-harness.ts"),
+		filepath.Join(configRoot, "agents", "orchestrator.md"),
+	}
+	for _, path := range paths {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("managed"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(placer.SettingsDocPath(), []byte(`{"default_agent":"TH-orchestrator","model":"operator/model"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	entries := []LedgerEntry{
+		{TS: "2026-07-31T00:00:00Z", Op: "install", Component: "hook-plugin-entry", Owns: OwnershipTags{Files: []string{"{config_root}/plugins/team-harness.ts"}}, SchemaVersion: 1},
+		{TS: "2026-07-31T00:00:00Z", Op: "install", Component: "agent-orchestrator", Owns: OwnershipTags{Files: []string{"{config_root}/agents/orchestrator.md"}, ConfigKeys: []string{"default_agent"}}, SchemaVersion: 1},
+	}
+	lines := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		raw, err := json.Marshal(entry)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lines = append(lines, string(raw))
+	}
+	writeLedgerLines(t, dataDir, lines)
+
+	report, err := Uninstall(nil, placer)
+	if err != nil {
+		t.Fatalf("Uninstall: %v", err)
+	}
+	if report.LedgerIntegrityWarning != "" {
+		t.Fatalf("unexpected warning: %s", report.LedgerIntegrityWarning)
+	}
+	for _, path := range paths {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Fatalf("managed file survived uninstall: %s", path)
+		}
+	}
+	configBytes, err := os.ReadFile(placer.SettingsDocPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var config map[string]json.RawMessage
+	if err := json.Unmarshal(configBytes, &config); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := config["default_agent"]; exists {
+		t.Fatal("default_agent survived orchestrator uninstall")
+	}
+	if _, exists := config["model"]; !exists {
+		t.Fatal("operator-owned config was removed")
+	}
+}
+
+func TestUninstall_RejectsSymlinkedParentBeforeDeletion(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink setup requires platform privileges on Windows")
+	}
+	dataDir, cleanup := ledgerTestEnv(t)
+	defer cleanup()
+	configRoot := t.TempDir()
+	external := t.TempDir()
+	victim := filepath.Join(external, "victim.md")
+	if err := os.WriteFile(victim, []byte("protected"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(external, filepath.Join(configRoot, "agents")); err != nil {
+		t.Fatal(err)
+	}
+	entry := LedgerEntry{TS: "2026-07-31T00:00:00Z", Op: "install", Component: "agent-victim", Owns: OwnershipTags{Files: []string{"{config_root}/agents/victim.md"}}, SchemaVersion: 1}
+	raw, err := json.Marshal(entry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeLedgerLines(t, dataDir, []string{string(raw)})
+
+	report, err := Uninstall(nil, newOpencodePlacerAt(configRoot))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.IncompleteComponents) != 1 {
+		t.Fatalf("expected rejected deletion, report=%+v", report)
+	}
+	if _, err := os.Stat(victim); err != nil {
+		t.Fatalf("external victim was modified: %v", err)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -266,7 +383,7 @@ func TestUninstall_BlastRadiusTraceability(t *testing.T) {
 	// Pre-populate ledger.
 	entry := LedgerEntry{
 		Op:        "install",
-		Component: "trace-comp",
+		Component: "agent-removeme",
 		Owns: OwnershipTags{
 			Files:      []string{"{config_root}/agents/removeme.md"},
 			ConfigKeys: []string{"logs-mode"},
@@ -277,7 +394,7 @@ func TestUninstall_BlastRadiusTraceability(t *testing.T) {
 	raw, _ := json.Marshal(entry)
 	writeLedgerLines(t, dataDir, []string{string(raw)})
 
-	report, err := Uninstall([]string{"trace-comp"}, placer)
+	report, err := Uninstall([]string{"agent-removeme"}, placer)
 	if err != nil {
 		t.Fatalf("Uninstall: %v", err)
 	}
@@ -286,7 +403,7 @@ func TestUninstall_BlastRadiusTraceability(t *testing.T) {
 		t.Fatalf("expected 1 RemovedComponent, got %d", len(report.Removed))
 	}
 	removed := report.Removed[0]
-	if removed.Component != "trace-comp" {
+	if removed.Component != "agent-removeme" {
 		t.Errorf("Component=%q, want trace-comp", removed.Component)
 	}
 	if len(removed.FilesRemoved) == 0 {
@@ -509,7 +626,7 @@ func TestDeleteConfigKeys_PreservesNonOwnedKeys(t *testing.T) {
 	settingsPath := filepath.Join(dir, "opencode.json")
 
 	settingsDoc := map[string]json.RawMessage{
-		"mcp": json.RawMessage(`{"memory":{"type":"remote"},"operator-server":{"type":"remote","url":"https://op.example.com"}}`),
+		"mcp":              json.RawMessage(`{"memory":{"type":"remote"},"operator-server":{"type":"remote","url":"https://op.example.com"}}`),
 		"some-unknown-key": json.RawMessage(`"keep-me"`),
 	}
 	settingsBytes, _ := json.MarshalIndent(settingsDoc, "", "  ")
@@ -613,10 +730,11 @@ func TestPlacer_NoOpencodeCode(t *testing.T) {
 // while preserving mcp.custom and all other keys byte-for-byte.
 //
 // Two sub-cases are covered:
-//   (A) doc contains mcp.memory + mcp.context7 (TH-owned) + mcp.custom (operator)
-//       → after uninstall: mcp.custom intact; mcp NOT pruned (has survivor)
-//   (B) doc contains ONLY mcp.memory (TH-owned), no operator sibling
-//       → after uninstall: mcp object pruned entirely (empty parent removed)
+//
+//	(A) doc contains mcp.memory + mcp.context7 (TH-owned) + mcp.custom (operator)
+//	    → after uninstall: mcp.custom intact; mcp NOT pruned (has survivor)
+//	(B) doc contains ONLY mcp.memory (TH-owned), no operator sibling
+//	    → after uninstall: mcp object pruned entirely (empty parent removed)
 func TestUninstall_McpLeafExactDelete_PreservesOperatorSibling(t *testing.T) {
 	t.Run("sibling_preserved", func(t *testing.T) {
 		dataDir, cleanup := ledgerTestEnv(t)

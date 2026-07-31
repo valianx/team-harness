@@ -89,9 +89,7 @@ fi
 echo
 echo "############################################################"
 echo "# Suite 4: hooks/ts/bodies/checkpoint-guard.ts — functional tests"
-echo "# Unwired from .claude-plugin/hooks.json since v2.139.0 (Claude Code plugin"
-echo "# mode); live consumer is the opencode runtime, registered via"
-echo "# hooks/ts/opencode-plugin.ts's teamHarnessPlugins() -> checkpointGuardPlugin()."
+echo "# Retained body-level regression suite; not wired in either runtime."
 echo "############################################################"
 run_ts_hook_suite "checkpoint-guard" "test_checkpoint_guard.sh"
 
@@ -194,18 +192,14 @@ fi
 echo
 echo "############################################################"
 echo "# Suite 16: hooks/ts/bodies/prepublish-guard.ts — bump-floor advisory (registry Suite 120)"
-echo "# Unwired from .claude-plugin/hooks.json since v2.139.0 (Claude Code plugin"
-echo "# mode); live consumer is the opencode runtime, registered via"
-echo "# hooks/ts/opencode-plugin.ts's teamHarnessPlugins() -> prepublishGuardPlugin()."
+echo "# Retained body-level regression suite; not wired in either runtime."
 echo "############################################################"
 run_ts_hook_suite "prepublish-bump-floor" "test_prepublish_bump_floor.sh"
 
 echo
 echo "############################################################"
 echo "# Suite 25: hooks/ts/bodies/prepublish-guard.ts — Check 2 command-execution (registry Suite 135)"
-echo "# Unwired from .claude-plugin/hooks.json since v2.139.0 (Claude Code plugin"
-echo "# mode); live consumer is the opencode runtime, registered via"
-echo "# hooks/ts/opencode-plugin.ts's teamHarnessPlugins() -> prepublishGuardPlugin()."
+echo "# Retained body-level regression suite; not wired in either runtime."
 echo "############################################################"
 run_ts_hook_suite "prepublish-guard" "test_prepublish_guard.sh"
 
@@ -218,9 +212,7 @@ run_ts_hook_suite "gcp-guard" "test_gcp_guard.sh"
 echo
 echo "############################################################"
 echo "# Suite 133: hooks/ts/bodies/worktree-guard.ts — worktree-guard-hook-behavior"
-echo "# Unwired from .claude-plugin/hooks.json since v2.139.0 (Claude Code plugin"
-echo "# mode); live consumer is the opencode runtime, registered via"
-echo "# hooks/ts/opencode-plugin.ts's teamHarnessPlugins() -> worktreeGuardPlugin()."
+echo "# Retained body-level regression suite; not wired in either runtime."
 echo "############################################################"
 run_ts_hook_suite "worktree-guard" "test_worktree_guard.sh"
 
@@ -276,24 +268,6 @@ else
         echo "opencode-config-resolver: PASS"
     else
         echo "opencode-config-resolver: FAIL"
-        FAILED=$((FAILED + 1))
-    fi
-fi
-
-echo
-echo "############################################################"
-echo "# Suite 20: opencode session.created enforcement (AC-1..AC-5 + S-1..S-4)"
-echo "# Requires: node, npm, npx (esbuild). Skipped when absent."
-echo "############################################################"
-if ! command -v node >/dev/null 2>&1; then
-    report_skip_or_fail "opencode-session-enforcement" "node not found — install Node.js to run this suite"
-elif ! command -v npm >/dev/null 2>&1; then
-    report_skip_or_fail "opencode-session-enforcement" "npm not found"
-else
-    if bash "$TESTS_DIR/test_opencode_session_enforcement.sh"; then
-        echo "opencode-session-enforcement: PASS"
-    else
-        echo "opencode-session-enforcement: FAIL"
         FAILED=$((FAILED + 1))
     fi
 fi

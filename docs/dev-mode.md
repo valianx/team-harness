@@ -8,7 +8,7 @@ The top-level Claude Code agent IS the orchestrator. This is the CC native archi
 
 ## Outward-Action Gate (`dev-guard`)
 
-The deterministic security layer is the PreToolUse hook `dev-guard`, wired in its own dedicated `Bash`-only PreToolUse entry in `.claude-plugin/hooks.json` — the marketplace plugin's runtime, the only Claude Code install path (the Go installer's CC path is retired; `hooks/config.json`, its per-OS wiring template, no longer exists). The entry runs `hooks/run-ts-hook.sh dev-guard`, a fail-closed launcher with no gate logic of its own that execs `node` against `hooks/ts/dist/dev-guard.cjs` — TypeScript is the single source of gate logic, shared with the opencode runtime. `policy-block` is in a separate entry with matcher `Bash|Write|Edit|NotebookEdit` so it continues to secret-scan write/edit content — dev-guard never fires on Edit/Write/NotebookEdit. This is the GUARANTEE — not the disposition.
+The deterministic security layer is the PreToolUse hook `dev-guard`, wired in its own dedicated `Bash`-only PreToolUse entry in `.claude-plugin/hooks.json` — the marketplace plugin's runtime, the only Claude Code install path. The entry runs `hooks/run-ts-hook.sh dev-guard`, a fail-closed launcher with no gate logic of its own that execs `node` against `hooks/ts/dist/dev-guard.cjs`. `policy-block` is in a separate entry with matcher `Bash|Write|Edit|NotebookEdit` so it continues to secret-scan write/edit content. OpenCode does not install this hook layer and instead uses its native permission and approval model. This is the Claude Code GUARANTEE, not a cross-runtime claim.
 
 The gate fires UNCONDITIONALLY for covered outward actions and gates by destination — evaluating every one of them, never skipping the check, while the DECISION varies with what the command actually targets. No filesystem marker is read; no session state is checked.
 
@@ -212,10 +212,9 @@ The Claude Code docs describe this flag precisely: *"Custom output styles leave 
 This distinction is load-bearing:
 - **What is discarded:** SWE WORKFLOW guidance (how to scope, comment, verify). This is disposition of process, NOT a security control. Its absence degrades workflow tidiness, not safety. The orchestrator contract loaded by the style replaces this guidance with a more explicit version: the SDD pipeline IS scoping + verification.
 - **What is NOT discarded:** The model's harm-rejection and safety layer ("what Claude knows" — Anthropic's constitutional training). An output style adjusts the system prompt; it does NOT disarm the model's refusal to produce harmful outputs, exfiltrate data, or follow malicious instructions. That layer does not live in the "software engineering instructions" block.
-- **Security floors are PROMPT-INDEPENDENT (hooks, not prompt):** the security guarantees of this harness are PreToolUse hooks wired by matcher — they fire regardless of which system prompt is active. Every gate below runs through `hooks/run-ts-hook.sh <name>`, a fail-closed launcher that execs `node` against the matching `hooks/ts/dist/<name>.cjs` bundle (TypeScript is the single source of gate logic for CC and opencode). The enumerated catalogue (Bash-command gates + the MCP-write gate) is:
+- **Claude Code security floors are PROMPT-INDEPENDENT (hooks, not prompt):** these PreToolUse hooks fire regardless of which Claude Code system prompt is active. Every gate below runs through `hooks/run-ts-hook.sh <name>`, a fail-closed launcher that execs `node` against the matching `hooks/ts/dist/<name>.cjs` bundle. OpenCode relies on its native permission and approval model. The Claude Code catalogue is:
   - `policy-block` — matcher `Bash|Write|Edit|NotebookEdit`. Blocks only catastrophic recursive deletion (`/`, `~`, `$HOME`, bare wildcard) and provider-shaped credentials in write content or obvious Bash carriers. It does not gate git workflow, SQL text, reads, filenames, config edits, JWT/Bearer strings, or entropy guesses.
   - `dev-guard` — two dedicated PreToolUse entries: (a) `Bash`-only: gates outward/mutating Bash actions unconditionally (git push, gh pr merge/review/comment, gh api mutating PR endpoints; see § Outward-Action Gate); (b) `mcp__.*__clickup_(update_task|create_task|create_task_comment|attach_task_file)`: gates ClickUp MCP outward writes unconditionally — issues `ask` on any write. Both entries survive the output-style swap intact.
-  - `checkpoint-guard` — matcher `Task`. Gates phase dispatch at reasoning-checkpoint boundaries. Survives intact.
 
 **Conclusion:** `keep-coding-instructions: false` is safe for this harness because the security floors are hooks, not prompt. No security-relevant default lives exclusively in the discarded SWE instructions that the orchestrator contract + hooks do not re-establish.
 
@@ -249,7 +248,7 @@ Ambiguity never auto-activates the pipeline. Broad, sensitive, irreversible, or 
 
 ## Reasoning Checkpoint Promotion
 
-In standard mode (orchestrator as subagent, `Task` stripped on opencode path), only the Layer-2 self-check (orchestrator's own contract discipline) enforces the reasoning checkpoint at boundaries B1/B2/B3. The Layer-1 hook (`checkpoint-guard`, `PreToolUse`/matcher `Task`) never fires because there is no `Task` call to intercept.
+In OpenCode, only the Layer-2 self-check (orchestrator's own contract discipline) enforces the reasoning checkpoint at boundaries B1/B2/B3. OpenCode does not install `checkpoint-guard`; `Task` availability follows the operator's native permission policy.
 
 On the CC foreground path (top-level, `Task` available), the Layer-1 hook fires on every leaf dispatch. B1/B2/B3 are enforced by a harness-level deterministic floor, not just the orchestrator's own discipline. This is a strengthening of the checkpoint. Security floors remain independent of the checkpoint state in both modes (see `docs/reasoning-checkpoint.md § Enforcement`).
 

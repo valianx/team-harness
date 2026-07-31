@@ -7,7 +7,7 @@
 [![Version](https://img.shields.io/github/v/release/valianx/team-harness?label=version&color=blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
-> Team Harness runs under both **Claude Code** and **opencode**. Agents, skills, and rules are cross-harness; hooks are single-source TypeScript. See [`docs/lifecycle.md`](./docs/lifecycle.md) for the stage-by-stage maturity of each runtime (author, build, test, release, install, update), the [migration guide](./docs/opencode-migration-guide.md), and the [distribution roadmap](./docs/opencode-distribution-roadmap.md).
+> Team Harness runs under both **Claude Code** and **opencode**. Agents, skills, and rules are cross-harness; OpenCode uses native permissions instead of the Claude Code hook layer. See [`docs/lifecycle.md`](./docs/lifecycle.md) for the stage-by-stage maturity of each runtime (author, build, test, release, install, update), the [migration guide](./docs/opencode-migration-guide.md), and the [distribution roadmap](./docs/opencode-distribution-roadmap.md).
 
 ---
 
@@ -169,7 +169,7 @@ Full contract: docs/dev-mode.md.
 ## Requirements
 
 **Required:**
-- [Claude Code](https://docs.claude.com/en/docs/claude-code) — the primary runtime team-harness depends on. opencode is also supported — agents, skills, and rules run as-is; hooks are single-source TypeScript. See [`docs/lifecycle.md`](./docs/lifecycle.md) for the stage-by-stage maturity of each runtime and the [migration guide](./docs/opencode-migration-guide.md)
+- [Claude Code](https://docs.claude.com/en/docs/claude-code) — the primary runtime team-harness depends on. opencode is also supported through projected agents, skills, and rules plus its native permission model. See [`docs/lifecycle.md`](./docs/lifecycle.md) for the stage-by-stage maturity of each runtime and the [migration guide](./docs/opencode-migration-guide.md)
 - [context7](https://context7.com/) API key — for library docs retrieval
 - A reachable [Memory MCP](https://github.com/valianx/context-harness-mcp) URL — there is no default URL; `/th:setup` requires an explicit value
 
