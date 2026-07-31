@@ -278,14 +278,10 @@ Review mode MUST NOT dispatch `implementer` or any agent to change working-tree 
 
 ### Layer 2 — Deny-tools (system-prompt prohibition)
 
-The review agents' system prompts constrain their writes. The permitted review-mode writes are:
-
-- `reviewer-consolidator`: ONLY `.claude/pr-review-*` draft files (`.claude/pr-review-final.md`, `.claude/pr-review-inline.json`, etc.).
-- `reviewer`: none; it returns its draft in the status block.
-- QA writes only its declared transient `.claude/pr-review-qa.md`; the security lens returns its
-  draft inline and the coordinator writes `.claude/pr-review-security.md`.
-
-NEVER write to source files, configuration files, or any path outside those declared zones.
+`reviewer`, `pr-review-qa`, `pr-review-security`, and `reviewer-consolidator` have exact read-only
+allowlists and return drafts inline. They never write source, configuration, or review artifacts.
+The coordinator persists validated returns only after tree verification, using the skill's fixed
+mapping rather than a path supplied by an agent.
 
 ### Layer 3 — Tree-verify
 
@@ -298,19 +294,22 @@ git status --untracked-files=all
 git diff HEAD
 ```
 
-After the review completes, `/review-pr` re-runs the same commands and passes the post-review snapshot to the coordinator, which compares the two. The tree is considered clean if the post-review snapshot is byte-identical to the pre-review one EXCEPT for the allowlisted draft zone `.claude/pr-review-*`.
+After the review completes, `/review-pr` re-runs the same commands for both the worktree and
+review-artifact root. Every snapshot must be byte-identical; there is no agent-writable exception.
 
-Verification uses `git status --untracked-files=all` (not plain `git status`) to capture new untracked files outside the allowlisted zone — those would not appear in `git diff HEAD` and would otherwise be silently missed.
+Verification uses `git status --untracked-files=all` (not plain `git status`) to capture new
+untracked files, which would not appear in `git diff HEAD` and would otherwise be silently missed.
 
-If the post-review state differs outside the `.claude/pr-review-*` zone, the coordinator MUST surface the detected changes explicitly as a defect:
+If any post-review state differs, the coordinator MUST surface the detected changes explicitly as
+a defect before trusting the returned draft:
 
 ```
 review mode modified the working tree — this is a defect.
-Detected changes outside the allowed draft zone:
+Detected changes:
 {output of git status / git diff showing the unexpected changes}
 ```
 
-The review output is still returned to the operator, but the defect report is prepended so the operator is aware of the unexpected mutation before approving any publish step.
+The review output is not persisted or previewed as trusted output after a detected mutation.
 
 ### Layer 4 — Mode-transition gate
 
@@ -408,9 +407,10 @@ Workspace Path: {workspace path or "none"}
 Linked Issue Path: {issue artifact path or "none"}
 ```
 
-When the security lens is selected, invoke `pr-review-security` once with the same reviewed head
-SHA, context hash, detached worktree, context path, diff path, and changed-files path. Require the
-exact SHA/hash in its inline return, then write its draft to `.claude/pr-review-security.md`.
+When selected, invoke `pr-review-qa` and `pr-review-security` once with the same reviewed head SHA,
+context hash, detached worktree, context path, diff path, and changed-files path. Require exact
+SHA/hash values in every inline return. After strict worktree and artifact-root comparison, the
+coordinator persists each return at the skill's fixed path; agents never choose paths.
 
 ### Step 2b — Invoke reviewer (Update Body)
 

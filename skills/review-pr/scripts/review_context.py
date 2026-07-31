@@ -408,6 +408,45 @@ def classify_mergeability(mergeable: Any, merge_state_status: Any) -> str:
     return "indeterminate"
 
 
+SENSITIVE_PATH_PARTS = {
+    "auth", "authorization", "crypto", "middleware", "permission", "security",
+    "secret", "session",
+}
+SENSITIVE_FILENAMES = {
+    "cargo.lock", "cargo.toml", "go.mod", "go.sum", "package-lock.json",
+    "package.json", "pnpm-lock.yaml", "poetry.lock", "pyproject.toml",
+    "requirements.txt", "yarn.lock",
+}
+NON_EXECUTABLE_SUFFIXES = {
+    ".adoc", ".avif", ".bmp", ".gif", ".ico", ".jpeg", ".jpg", ".md",
+    ".pdf", ".png", ".rst", ".svg", ".txt", ".webp",
+}
+SENSITIVE_DIFF_TOKENS = re.compile(
+    r"\b(auth(?:entication|orization)?|crypt(?:o|ography)|eval|exec|password|"
+    r"permission|secret|session|subprocess|token)\b|(?:command|sql)\s*(?:build|construct)",
+    re.IGNORECASE,
+)
+
+
+def classify_security_change(changed_files: str, diff: str) -> str:
+    paths = [line.strip() for line in changed_files.splitlines() if line.strip()]
+    if not paths or not diff.strip() or "GIT binary patch" in diff or "Binary files " in diff:
+        return "indeterminate"
+    if any("\x00" in value for value in (changed_files, diff)):
+        return "indeterminate"
+
+    for raw_path in paths:
+        path = Path(raw_path)
+        parts = {part.lower() for part in path.parts}
+        if parts & SENSITIVE_PATH_PARTS or path.name.lower() in SENSITIVE_FILENAMES:
+            return "known-sensitive"
+    if SENSITIVE_DIFF_TOKENS.search(diff):
+        return "known-sensitive"
+    if all(Path(path).suffix.lower() in NON_EXECUTABLE_SUFFIXES for path in paths):
+        return "known-non-executable"
+    return "unmatched-executable"
+
+
 def finalize_hashes(context: dict[str, Any]) -> None:
     code = {
         "base_oid": context["base_oid"],
@@ -578,6 +617,7 @@ def render_context(context: dict[str, Any]) -> str:
         f"Reviewed snapshot: `{context['head_oid']}`",
         f"Base snapshot: `{context['base_oid']}`",
         f"Merge base: `{context['merge_base_oid']}`",
+        f"Captured at: `{context.get('fetched_at', 'unknown')}`",
         f"Mergeability: **{mergeability.get('status', 'indeterminate')}**",
         f"Raw mergeable: `{mergeability.get('mergeable')}`",
         f"Raw merge state: `{mergeability.get('merge_state_status')}`",
@@ -734,6 +774,26 @@ def command_same_author(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_select_security(args: argparse.Namespace) -> int:
+    try:
+        changed_files = args.changed_files.read_text(encoding="utf-8")
+        diff = args.diff.read_text(encoding="utf-8")
+        reason = classify_security_change(changed_files, diff)
+    except (OSError, UnicodeError):
+        reason = "indeterminate"
+    triggers = []
+    if args.explicit_security:
+        triggers.append("explicit")
+    if args.tier == 4:
+        triggers.append("tier-4")
+    print(json.dumps({
+        "reason": reason,
+        "security_required": reason != "known-non-executable" or bool(triggers),
+        "triggers": triggers,
+    }))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -760,6 +820,13 @@ def build_parser() -> argparse.ArgumentParser:
     author_parser.add_argument("--context", required=True, type=Path)
     author_parser.add_argument("--login", required=True)
     author_parser.set_defaults(func=command_same_author)
+
+    security_parser = subparsers.add_parser("select-security")
+    security_parser.add_argument("--changed-files", required=True, type=Path)
+    security_parser.add_argument("--diff", required=True, type=Path)
+    security_parser.add_argument("--explicit-security", action="store_true")
+    security_parser.add_argument("--tier", type=int)
+    security_parser.set_defaults(func=command_select_security)
     return parser
 
 

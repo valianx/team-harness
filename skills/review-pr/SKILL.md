@@ -113,9 +113,10 @@ Register an EXIT trap immediately. It removes the worktree, all
 artifacts, and `refs/team-harness/review-pr/{number}/{base,head}`. Never force-remove an
 unexpected dirty worktree; surface it.
 
-Capture `git status --untracked-files=all` and `git diff HEAD` before dispatch. Repeat after all
-agents finish. Outside the allowlisted `.claude/pr-review-*` artifacts, the two snapshots must
-be byte-identical; surface any mutation as a defect before previewing.
+Capture `git status --untracked-files=all` and `git diff HEAD` for both the frozen worktree and
+review-artifact root before dispatch. Repeat after all agents finish. The snapshots must be
+byte-identical; surface any mutation as a defect before trusting a returned draft. Only after this
+check may the coordinator persist inline returns to the fixed `.claude/pr-review-*` paths.
 
 Detect an existing pipeline workspace from `workspaces/*/01-plan.md` or
 `workspaces/*/02-implementation.md` inside `$WORKTREE`. If present:
@@ -144,14 +145,25 @@ Keep the returned review, if any, for duplicate detection.
 
 The default is one `general` reviewer. PR size alone never adds reviewers.
 
+Run the local selector before adding specialist agents:
+
+```bash
+python3 "$REVIEW_CONTEXT_HELPER" select-security \
+  --changed-files "$FILES" --diff "$DIFF" \
+  {--explicit-security when requested} {--tier 4 when supplied}
+```
+
+The selector returns `known-sensitive`, `known-non-executable`, `unmatched-executable`, or
+`indeterminate`. Only `known-non-executable` without an explicit security request or Tier 4 may
+omit the security lens. A missing helper, unreadable input, or invalid result is
+`indeterminate` and requires security.
+
 Add specialist agents only from concrete signals:
 
 - **QA:** a pipeline workspace with acceptance criteria exists and the diff changes executable
   behavior. Skip for docs, changelog, package metadata, formatting, and configuration-only
   changes unless an AC explicitly describes that surface.
-- **Security:** explicit `--reviewers security`, `[TIER: 4]`, or changed code touches authentication, authorization, permissions,
-  secrets, cryptography, sessions, untrusted-input parsing, command/SQL construction, dependency
-  trust, or sensitive-data exposure. A keyword in prose alone is insufficient.
+- **Security:** the selector reports `security_required: true`.
 - **Focused reviewer passes:** only `general`/`architecture`, and only when explicitly requested
   through `--reviewers`/`--multi`.
   A large PR remains one general pass; report coverage limits instead of multiplying opinions.
@@ -175,6 +187,12 @@ Capture a new context immediately before dispatch and compare it with `$CONTEXT`
 - A second movement or capture failure: stop without reviewing.
 
 ## Dispatch
+
+The four PR agents are `reviewer`, `pr-review-qa`, `pr-review-security`, and
+`reviewer-consolidator`. Their source manifests and OpenCode projections are deny-by-default and
+read-only. Codex dispatch is unavailable unless a Team Harness Codex projection exists and its
+capability validator confirms the same exact allowlist; never inherit a general agent's authority.
+Host overrides after Team Harness emits an artifact are outside this guarantee.
 
 Pass coordinates and artifact paths, not artifact bodies:
 
@@ -228,9 +246,12 @@ Diff Path: {DIFF}
 Changed Files Path: {FILES}
 ```
 
-The security specialist returns its draft inline with the exact reviewed SHA and context hash.
-Reject a missing or mismatched value; otherwise the coordinator writes the returned draft to
-`.claude/pr-review-security.md`.
+Every lens returns its draft inline with the exact reviewed SHA and context hash. Reject a missing
+or mismatched value. After the strict post-dispatch snapshots pass, the coordinator alone persists
+returns using this fixed mapping: reviewer body → `.claude/pr-review-draft.md`, reviewer findings →
+`.claude/pr-review-draft-inline.json`, QA → `.claude/pr-review-qa.md`, security →
+`.claude/pr-review-security.md`, consolidator body → `.claude/pr-review-final.md`, and consolidator
+findings → `.claude/pr-review-inline.json`. Ignore any output path proposed by an agent.
 
 If only the general reviewer ran, its body and inline JSON are canonical. If any additional
 draft exists, dispatch `review-consolidate` once with the source file paths, `head_oid`, and
@@ -252,11 +273,11 @@ Use a compact index:
 ```markdown
 ## Review
 
-Reviewed: `{head_oid}`
+Reviewed: head `{head_oid}` against base `{base_oid}` at `{fetched_at}`
 Verdict: **APPROVE | REQUEST CHANGES | COMMENT**
 Findings: **{N} blocking**, **{M} suggestions**
 Checks: {concise CI summary or "not available"}
-Mergeability: **{clean|conflicting|indeterminate}** (`mergeable={raw}`, `mergeStateStatus={raw}`)
+Mergeability at capture: **{clean|conflicting|indeterminate}** (`mergeable={raw}`, `mergeStateStatus={raw}`)
 
 {Only cross-file findings that cannot be anchored to one changed line. Omit when empty.}
 ```
@@ -303,7 +324,7 @@ invalid artifact; then stop.
 
 Unless `--auto-publish` was supplied, show:
 
-1. reviewed SHA and capture time;
+1. reviewed head SHA, base SHA, and capture time;
 2. classified mergeability and both raw GitHub values;
 3. the exact body;
 4. every inline comment with path and line;
@@ -327,16 +348,19 @@ another complete preview.
 
 ## Pre-publish freshness
 
-After approval and immediately before the GitHub write, capture and compare again.
+After approval and immediately before the GitHub write, capture and compare again. Require exact
+head, base, merge-base, and mergeability equality with the approved capture.
 
-- `current`: publish.
-- `code-changed`: invalidate the draft and restart from Gather.
-- `conversation-changed`: rerun selected lenses once against the same frozen code, then preview
-  again.
-- Capture failure: stop with `freshness could not be verified — review not published`.
+- `current`: proceed directly to the write.
+- Any mismatch, including conversation or mergeability drift: invalidate approval and restart
+  Gather.
+- Capture or comparison failure: invalidate approval and restart Gather with
+  `freshness could not be verified — review not published`.
 
 Approval applies only to the displayed `context_hash`.
 Never describe `conflicting` or `indeterminate` mergeability as merge-ready.
+`clean` describes only the displayed captured head/base/time; it never asserts current external
+readiness. State that the external system can change after Team Harness's final local check.
 
 ## Publish
 

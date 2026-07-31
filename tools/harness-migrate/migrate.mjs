@@ -311,14 +311,14 @@ function parseFrontmatter(content) {
     }
 
     // Nested object: rest empty, next lines are "  key: val"
-    if (rest === "" && i + 1 < lines.length && /^\s{2,}\w/.test(lines[i + 1])) {
+    if (rest === "" && i + 1 < lines.length && /^\s{2,}\S/.test(lines[i + 1])) {
       const obj = Object.create(null);
       i++;
       while (i < lines.length && /^\s{2,}/.test(lines[i])) {
         const innerLine = lines[i].trim();
         const innerColon = innerLine.indexOf(":");
         if (innerColon !== -1) {
-          const innerKey = innerLine.slice(0, innerColon).trim();
+          const innerKey = parseMappingKey(innerLine.slice(0, innerColon).trim());
           const innerRest = innerLine.slice(innerColon + 1).trimStart();
           // Check if innerRest starts an indented array
           if (innerRest === "" && i + 1 < lines.length && /^\s{4,}-/.test(lines[i + 1])) {
@@ -381,7 +381,7 @@ function parseFlowMappingToNullProto(inner) {
     if (!trimmed) continue;
     const colonIdx = trimmed.indexOf(":");
     if (colonIdx < 0) continue;
-    const k = trimmed.slice(0, colonIdx).trim();
+    const k = parseMappingKey(trimmed.slice(0, colonIdx).trim());
     const v = trimmed.slice(colonIdx + 1).trimStart();
     obj[k] = parseTopLevelValue(v);
   }
@@ -437,6 +437,17 @@ function parseScalar(s) {
   return s;
 }
 
+function parseMappingKey(key) {
+  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+    return key.slice(1, -1);
+  }
+  return key;
+}
+
+function serializeMappingKey(key) {
+  return key === "*" ? '"*"' : key;
+}
+
 /**
  * Serialize a frontmatter object + body back to a Markdown string.
  */
@@ -457,12 +468,12 @@ function serializeFrontmatter(fm, body) {
         lines.push(`${key}:`);
         for (const [k, v] of entries) {
           if (Array.isArray(v)) {
-            lines.push(`  ${k}:`);
+            lines.push(`  ${serializeMappingKey(k)}:`);
             for (const item of v) {
               lines.push(`    - ${item}`);
             }
           } else {
-            lines.push(`  ${k}: ${v}`);
+            lines.push(`  ${serializeMappingKey(k)}: ${v}`);
           }
         }
       }
@@ -718,6 +729,14 @@ function agentToolsToOpencodePermission(toolsStr) {
     }
   }
   return perm;
+}
+
+const PR_REVIEW_AGENTS = new Set([
+  "reviewer", "pr-review-qa", "pr-review-security", "reviewer-consolidator",
+]);
+
+function prReviewPermission() {
+  return { "*": "deny", read: "allow", glob: "allow", grep: "allow" };
 }
 
 /**
@@ -1071,7 +1090,9 @@ function transformToOpencode(filePath, content, repoRoot) {
     // provider lock-in and ProviderModelNotFoundError. Per-provider tiering is a
     // future additive step (docs/opencode-model-config.md); toProviderPrefixedModel
     // is retained for it and for the reverse (opencode→CC) direction.
-    // Permissions are omitted so OpenCode's native policy remains authoritative.
+    if (PR_REVIEW_AGENTS.has(fm["name"])) {
+      projected["permission"] = prReviewPermission();
+    }
     projected["mode"] = "subagent";
     // color: map CC color names → opencode named enums; pass through valid values.
     // Unknown colors are dropped (omitted) to avoid emitting an invalid field.

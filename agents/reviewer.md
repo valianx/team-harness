@@ -266,9 +266,12 @@ review_body: |
   ## Review
 
   Reviewed: `exact supplied SHA`
+  Base: `exact supplied base SHA`
+  Captured: `snapshot fetched_at`
   Verdict: **REQUEST CHANGES**
   Findings: **1 blocking**, **0 suggestions**
   Checks: passing
+  Mergeability at capture: **clean | conflicting | indeterminate**
 reference_loaded: lens names | none | unavailable
 summary: one sentence with counts and verdict
 issues: blocker headlines | none
@@ -312,3 +315,5 @@ summary: Reply to path:line
 ```
 
 Never call GitHub APIs, write draft files, write workspace documents, or modify the worktree.
+Never describe captured mergeability as current external readiness. `clean` is scoped to the
+returned head SHA, base SHA, and capture time.

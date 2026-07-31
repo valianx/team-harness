@@ -107,12 +107,17 @@ For each `.md` file in `agents/`:
 2. For each remaining agent, check its tool grants (from frontmatter or Tool Scoping section) and verify:
    - **Agents with Bash access** must have anti-patterns that mention destructive commands (e.g., `rm -rf`, `git push --force`, `drop table`, or similar)
    - **Agents with Write/Edit access** must have a section or statements about what they NEVER do (e.g., `NEVER implement code`, `NEVER modify files directly`)
+   - **PR review agents** (`reviewer`, `pr-review-qa`, `pr-review-security`,
+     `reviewer-consolidator`) must expose only their documented read/search allowlist, with no
+     process execution, filesystem mutation, or delegation. Validate any generated Codex
+     projection against the same list; absence means Codex dispatch is unavailable.
 3. Report which agents are missing guardrails for their capability level
 
 Result:
 - **PASS** if all agents have appropriate guardrails for their tool access
 - **WARN** if any agent is missing guardrails (not blocking, but should be fixed)
-- **FAIL** — not used for this check (guardrails are advisory)
+- **FAIL** if a PR review agent grants an additional capability; other guardrail findings remain
+  advisory warnings.
 
 ---
 name: lint
@@ -191,6 +196,7 @@ Canonical matrix (must match exactly):
 | `security` | opus | xhigh |
 | `adversary` | sonnet | xhigh |
 | `reviewer` | sonnet | high |
+| `pr-review-qa` | sonnet | high |
 | `pr-review-security` | sonnet | high |
 | `reviewer-consolidator` | sonnet | medium |
 | `qa` | sonnet | high |
