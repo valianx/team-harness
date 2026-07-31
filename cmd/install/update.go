@@ -54,9 +54,8 @@ func parseSemver(v string) [3]int {
 // SEC-OC-R4 / SEC-OC-R2 / SEC-01..08 reused). opencode.json is merge-updated
 // only to keep Team Harness selected as the default agent.
 func runUpdateCommand() {
-	// Only the opencode runtime supports `update`.
-	if runtimeFlag != "opencode" {
-		fmt.Fprintf(os.Stderr, "update: --runtime opencode is required (got %q)\n", runtimeFlag)
+	if runtimeFlag != "opencode" && runtimeFlag != "codex" {
+		fmt.Fprintf(os.Stderr, "update: --runtime opencode or codex is required (got %q)\n", runtimeFlag)
 		os.Exit(1)
 	}
 
@@ -67,7 +66,15 @@ func runUpdateCommand() {
 	}
 
 	// Set the runtime-scoped ledger before any ledger I/O (mirrors plan/apply).
-	setActiveLedgerContext(selectLedgerFilename(), placer.ConfigRoot())
+	configureLedger(placer)
+
+	if runtimeFlag == "codex" {
+		if err := runCodexUpdate(placer); err != nil {
+			fmt.Fprintf(os.Stderr, "update: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	opencodePlacer, ok := placer.(*opencodePlacer)
 	if !ok {
@@ -135,6 +142,29 @@ func runUpdateCommand() {
 		}
 		applyUpdateDiff(diff, cfgPath, opencodePlacer)
 	}
+}
+
+// runCodexUpdate refreshes only installer-owned custom agents. Plugin bytes
+// remain marketplace-owned and config.toml remains operator-owned.
+func runCodexUpdate(placer Placer) error {
+	diff, err := computeUpdatePlan(placer)
+	if err != nil {
+		return fmt.Errorf("compute plan: %w", err)
+	}
+	if len(diff.LedgerErrors) > 0 {
+		return fmt.Errorf("%d ledger error(s) detected; refusing update", len(diff.LedgerErrors))
+	}
+	PrintPlan(diff, os.Stdout)
+	if !nonInteractiveFlag && hasInteractiveInput() && !confirmApply() {
+		fmt.Println("Update cancelled. No changes were written.")
+		return nil
+	}
+	if err := ApplyPlan(diff, placer); err != nil {
+		return fmt.Errorf("apply: %w", err)
+	}
+	fmt.Println("Codex agent files updated. Start a new Codex session to activate them.")
+	fmt.Println("The Team Harness plugin is updated separately through the Codex marketplace.")
+	return nil
 }
 
 // computeUpdatePlan loads the manifests and computes the plan diff.

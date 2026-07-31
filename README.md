@@ -1,17 +1,35 @@
-# Team Harness — Claude Code Agent Orchestration System
+# Team Harness — Multi-runtime Agent Orchestration
 
-> Team Harness is a multi-agent orchestration system for **Claude Code**: the top-level coordinator **`th:orchestrator`** frames each request and dispatches specialized architect, implementer, tester, QA, security, and delivery agents through a Spec-Driven Development (SDD) pipeline with mandatory human gates.
+> Team Harness is a multi-runtime agent orchestration system for **Claude Code** and **Codex**: the top-level thread frames each request and dispatches specialized architect, implementer, tester, QA, security, and delivery agents through a Spec-Driven Development (SDD) pipeline with mandatory human gates.
 >
 > Every pipeline stage is captured as files on disk, so any session can resume from where the last one stopped.
 
 [![Version](https://img.shields.io/github/v/release/valianx/team-harness?label=version&color=blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
-> Team Harness runs under both **Claude Code** and **opencode**. Agents, skills, and rules are cross-harness; OpenCode uses native permissions instead of the Claude Code hook layer. See [`docs/lifecycle.md`](./docs/lifecycle.md) for the stage-by-stage maturity of each runtime (author, build, test, release, install, update), the [migration guide](./docs/opencode-migration-guide.md), and the [distribution roadmap](./docs/opencode-distribution-roadmap.md).
+> Team Harness runs under **Claude Code**, **Codex** (POSIX-only beta), and **opencode**. See [`docs/lifecycle.md`](./docs/lifecycle.md) and the [Codex runtime guide](./docs/codex-runtime.md).
 
 ---
 
 ## Install
+
+### Codex beta
+
+Add the repository marketplace with `codex plugin marketplace add
+valianx/team-harness`, run `codex plugin add team-harness@team-harness`, and
+start a new thread. Review and trust the repository hooks before enabling them.
+Plugin lifecycle and six-agent installation (`install apply --runtime codex
+--scope project`) are separate. The six agents are required before the gated
+workflow can delegate; plugin-only skills remain usable without them. In a
+clean `Main` thread, type `@Team-Harness init <task>` for lightweight intake
+and simple direct work; this does not create pipeline state or subagents. Use
+`@Team-Harness pipeline <task>` only when you want the full gated workflow.
+Both run in `Main`; neither creates a seventh coordinator or requires `/agent`.
+Upgrade/remove commands, the local contributor flow, and the
+six-role/seven-skill roster are in
+[`docs/codex-runtime.md`](./docs/codex-runtime.md).
+
+### Claude Code
 
 1. Add the marketplace:
 ```

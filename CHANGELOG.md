@@ -9,8 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.5.0] - 2026-07-31
 
+### Added
+
+- Added a Codex beta distribution with a repository marketplace, seven workflow skills, six generated custom-agent roles, shared TypeScript hook adapters, and project/global agent installation lifecycle.
+- Added deterministic Claude-role-to-Codex model projection: `opus` uses Sol/xhigh and non-`opus` uses Luna/max, with the complete canonical roster visible in the generated Codex workspace guide.
+
 ### Changed
 
+- Unified the Claude Code plugin, Codex plugin, installer, and release tag under version 3.5.0; the tagged Git tree is the Codex artifact rather than a separate archive.
+- Extended CI, release checks, and the prepublish version invariant to cover Codex generation, marketplace/plugin structure, hook freshness and behavior, runtime structure, and the five synchronized version sites (including the installer fallback).
+- Kept Codex `Main` clean by default: `@Team-Harness init <task>` loads only lightweight intake and direct-work routing, while `@Team-Harness pipeline <task>` (or explicit approval after intake) progressively loads the full gated orchestrator contract. Codex installs only the six specialist agents; no selectable or persistent seventh coordinator is created, and skill activation does not change Main's model or native permission policy.
 - Made PR reviews concise by keeping anchored findings in inline threads and the body as a non-duplicating verdict index.
 - Removed size-triggered reviewer multiplication and convergence loops; QA and security now run only from concrete acceptance or security signals.
 

@@ -32,6 +32,16 @@ jobs:
         with:
           go-version: "1.23"
 
+      - name: Verify tag and shared runtime version
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          test "$(jq -r .version .claude-plugin/plugin.json)" = "$VERSION"
+          test "$(jq -r '.plugins[0].version' .claude-plugin/marketplace.json)" = "$VERSION"
+          test "$(jq -r .version plugins/team-harness/.codex-plugin/plugin.json)" = "$VERSION"
+          grep -Fq "**Current version:** \`$VERSION\`" CLAUDE.md
+          test "$(sed -nE 's/.*var version = \"([0-9]+\.[0-9]+\.[0-9]+)\".*/\1/p' cmd/install/main.go | head -n1)" = "$VERSION"
+
       - name: Cross-compile install binaries
         run: |
           mkdir -p dist

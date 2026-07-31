@@ -87,7 +87,7 @@ func ComputePlan(
 		if selectedSet[compID] {
 			continue // still selected — not a removal candidate
 		}
-		if !strings.HasPrefix(compID, "hook-plugin-") {
+		if !isRetirableLedgerComponent(compID, placer) {
 			diff.LedgerErrors = append(diff.LedgerErrors, ledgerError{Line: 0, Reason: fmt.Sprintf("ledger component %q is neither currently managed nor an explicitly retired plugin component", compID)})
 			continue
 		}
@@ -156,6 +156,14 @@ func ComputePlan(
 			if dstHash == srcHash {
 				diff.ToSkipHashMatch = append(diff.ToSkipHashMatch, pf)
 			} else {
+				// A same-name Codex custom agent that is not proven as ours by this
+				// runtime/root's ledger belongs to the operator. Refuse to replace it.
+				if placer.Runtime() == "codex" {
+					owned, wasOwned := lastOwned[compID]
+					if !wasOwned || !ownershipTagsEqual(owned, c.Emits) {
+						return PlanDiff{}, fmt.Errorf("plan: refusing to overwrite unowned Codex agent %q; move or rename the conflicting file, then retry", dst)
+					}
+				}
 				diff.ToUpdate = append(diff.ToUpdate, pf)
 				componentChanged = true
 			}
@@ -166,6 +174,11 @@ func ComputePlan(
 	}
 
 	return diff, nil
+}
+
+func isRetirableLedgerComponent(component string, placer Placer) bool {
+	return strings.HasPrefix(component, "hook-plugin-") ||
+		(placer.Runtime() == "codex" && strings.HasPrefix(component, "codex-agent-"))
 }
 
 func ownershipTagsEqual(a, b OwnershipTags) bool {

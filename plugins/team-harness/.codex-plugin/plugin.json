@@ -1,0 +1,38 @@
+{
+  "name": "team-harness",
+  "version": "3.5.0",
+  "description": "Load lightweight Team Harness intake or an explicit gated workflow into a clean Codex Main thread.",
+  "author": {
+    "name": "Mario Gutierrez",
+    "url": "https://github.com/valianx"
+  },
+  "homepage": "https://github.com/valianx/team-harness",
+  "repository": "https://github.com/valianx/team-harness",
+  "license": "MIT",
+  "keywords": [
+    "orchestration",
+    "agents",
+    "workflow",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Team Harness",
+    "shortDescription": "Lightweight intake with optional gated delivery.",
+    "longDescription": "Keep Codex Main clean by default. Use @Team-Harness init for lightweight intake and direct work, or explicitly request @Team-Harness pipeline to load staged planning, implementation, verification, recovery, and delivery backed by specialized agents.",
+    "developerName": "Mario Gutierrez",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/valianx/team-harness",
+    "defaultPrompt": [
+      "@Team-Harness init: help me frame or handle this task without starting the full pipeline.",
+      "@Team-Harness pipeline: explicitly start the full gated workflow for this change in the current Main thread.",
+      "Continue implementation of the active approved Team Harness pipeline.",
+      "Recover the active Team Harness workspace."
+    ],
+    "brandColor": "#2563EB"
+  }
+}

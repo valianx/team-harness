@@ -1,8 +1,8 @@
 # Codex Runtime Support Assessment
 
-**Status:** proposed
-**Date:** 2026-07-30
-**Scope:** evaluate native Codex support without changing the current Claude Code or opencode runtimes
+**Status:** implemented POSIX-only beta
+**Date:** 2026-07-31
+**Scope:** shipped native Codex support without changing the current Claude Code or opencode runtime contracts
 
 ## Executive summary
 
@@ -56,8 +56,9 @@ explicitly activates the Team Harness pipeline.
 
 ```text
 Codex direct mode
-    -> explicit pipeline skill
-    -> progressively loaded coordinator contract
+    -> @Team-Harness init (lightweight intake)
+    -> explicit @Team-Harness pipeline (full gated workflow)
+    -> progressively loaded phase contracts
     -> task-specific custom subagents
 ```
 
@@ -66,7 +67,9 @@ agent identity globally.
 
 ### Progressive activation
 
-The pipeline skill should load:
+The lightweight `init` skill should load only the startup kernel and intake
+routing into the current Main thread. After explicit full-pipeline activation,
+the `pipeline` skill should progressively load:
 
 1. the activation and intake contract;
 2. only the current phase;
@@ -75,29 +78,27 @@ The pipeline skill should load:
 
 The full pipeline reference and unused agents must not become startup context.
 
-### Agent cost distribution
+### Agent model distribution
 
 Codex custom agents support independent `model` and `model_reasoning_effort`
-configuration. Team Harness can therefore preserve its existing cost-distribution
-principle, while mapping conceptual tiers rather than hard-coding transient model
-names into canonical agent prose.
+configuration. The deterministic renderer reads each canonical Claude role's
+frontmatter and applies the operator-approved mapping:
 
-Recommended canonical tiers:
-
-| Team Harness tier | Intended use |
+| Canonical model/effort | Codex model/effort |
 |---|---|
-| frontier/high | Coordination, architecture, difficult adversarial analysis |
-| balanced/medium | Implementation, QA, review, delivery |
-| efficient/low | Deterministic research, formatting, extraction, and narrow checks |
+| `opus` + `xhigh` | `gpt-5.6-sol` + `xhigh` |
+| other `opus` | `gpt-5.6-sol` + `xhigh` |
+| non-`opus` | `gpt-5.6-luna` + `max` |
 
-The Codex renderer resolves these tiers to concrete runtime configuration.
+The generated per-role roster is committed at `.codex/README.md` and checked by
+CI; canonical agent prose does not contain Codex-specific model identifiers.
 
 ## Packaging and installation
 
-A Codex plugin can bundle skills, hooks, MCP configuration, and assets through
+A Codex plugin bundles skills, hooks, MCP configuration, and assets through
 `.codex-plugin/plugin.json`. Custom agents are loaded from `~/.codex/agents/` or
-project-scoped `.codex/agents/`, so complete Team Harness installation will likely
-require both:
+project-scoped `.codex/agents/`, so complete Team Harness installation uses two
+separate lifecycle surfaces:
 
 - a Codex plugin for skills, hooks, and MCP declarations; and
 - a `--runtime codex` installer adapter for custom agent files and managed config.
@@ -115,9 +116,9 @@ Include:
 - install, update, and uninstall ownership tracking;
 - explicit pipeline activation;
 - progressively loaded coordinator instructions;
-- `architect`, `implementer`, `adversary`, reviewer/QA, and `delivery`;
+- `architect`, `implementer`, `tester`, `qa`, `security`, and `delivery`;
 - Markdown-to-TOML custom-agent rendering;
-- conceptual model and effort tier mapping;
+- deterministic Sol/Luna model and effort projection;
 - the minimum pipeline skills;
 - Memory and Context7 MCP configuration;
 - targeted installation, activation, dispatch, and update smoke tests; and

@@ -2,7 +2,7 @@
   "name": "th",
   "displayName": "Team Harness",
   "version": "3.5.0",
-  "description": "Orchestrated Claude Code agent system: architect, implement, test, and deliver via a multi-agent pipeline with a single orchestrator entry point.",
+  "description": "Orchestrated multi-agent development system for Claude Code, Codex, and opencode.",
   "author": {
     "name": "Mario Gutierrez"
   },

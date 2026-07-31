@@ -20,11 +20,16 @@ const ledgerFilename = "ownership-ledger.jsonl"
 // opencode-owned files and vice-versa (Step 12 in the Work Plan).
 const ledgerFilenameOpencode = "ownership-ledger-opencode.jsonl"
 
+// ledgerFilenameCodex is stored below the selected Codex configuration root,
+// not in the shared Team Harness data home.
+const ledgerFilenameCodex = "ownership-ledger-codex.jsonl"
+
 // activeLedgerFilename is the ledger filename for the current runtime.
 // Initialized to the default (claude-code); call setActiveLedgerFilename
 // before any ledger I/O when using the opencode runtime.
 var activeLedgerFilename = ledgerFilename
 var activeLedgerConfigRoot string
+var activeLedgerRoot string
 
 // setActiveLedgerFilename configures the ledger filename for the current
 // runtime. Must be called before appendLedger / readLedger / isLedgerAbsent.
@@ -35,6 +40,48 @@ func setActiveLedgerFilename(name string) {
 func setActiveLedgerContext(name, configRoot string) {
 	activeLedgerFilename = name
 	activeLedgerConfigRoot = filepath.Clean(configRoot)
+	activeLedgerRoot = ""
+}
+
+// configureLedger binds ledger I/O to the selected runtime and installation
+// root. Codex keeps lifecycle state at <codex-root>/team-harness so project and
+// global installations are isolated naturally.
+func configureLedger(placer Placer) {
+	name := ledgerFilename
+	switch placer.Runtime() {
+	case "opencode":
+		name = ledgerFilenameOpencode
+	case "codex":
+		name = ledgerFilenameCodex
+	}
+	setActiveLedgerContext(name, placer.ConfigRoot())
+	if placer.Runtime() == "codex" {
+		activeLedgerRoot = filepath.Join(placer.ConfigRoot(), "team-harness")
+	}
+}
+
+func activeLedgerDataHome() (string, error) {
+	if activeLedgerRoot != "" {
+		if err := lstatWalkPreResolution(activeLedgerRoot); err != nil {
+			return "", fmt.Errorf("inspect runtime ledger root: %w", err)
+		}
+		return activeLedgerRoot, nil
+	}
+	return ResolveDataHome()
+}
+
+func openActiveLedger() (*os.File, error) {
+	root, err := activeLedgerDataHome()
+	if err != nil {
+		return nil, err
+	}
+	if activeLedgerRoot != "" {
+		root, err = secureAndVerify(root)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return openStateFilePlatform(root, activeLedgerFilename)
 }
 
 // LedgerEntry is one line of the ownership ledger. Self-contained: a malformed
@@ -73,7 +120,7 @@ func (e ledgerError) Error() string {
 // ownership-ledger.jsonl. ApplyPlan and Uninstall MUST call this function and
 // MUST NOT construct or write JSONL lines directly (SEC-DR-P3-2).
 func appendLedger(entries []LedgerEntry) error {
-	f, err := OpenStateFile(activeLedgerFilename)
+	f, err := openActiveLedger()
 	if err != nil {
 		return fmt.Errorf("open ledger for append: %w", err)
 	}
@@ -148,6 +195,13 @@ func validateOwnershipTags(tags OwnershipTags) error {
 }
 
 func validateLedgerOwnership(entry LedgerEntry) error {
+	if activeLedgerFilename == ledgerFilenameCodex {
+		if !strings.HasPrefix(entry.Component, "codex-agent-") {
+			return fmt.Errorf("component %q does not belong to the Codex runtime ledger", entry.Component)
+		}
+	} else if strings.HasPrefix(entry.Component, "codex-agent-") {
+		return fmt.Errorf("component %q is present in a non-Codex runtime ledger", entry.Component)
+	}
 	if err := validateOwnershipTags(entry.Owns); err != nil {
 		return err
 	}
@@ -165,6 +219,8 @@ func validateLedgerOwnership(entry LedgerEntry) error {
 		switch {
 		case strings.HasPrefix(entry.Component, "agent-"):
 			valid = clean == "agents/"+strings.TrimPrefix(entry.Component, "agent-")+".md"
+		case strings.HasPrefix(entry.Component, "codex-agent-"):
+			valid = clean == "agents/"+strings.TrimPrefix(entry.Component, "codex-agent-")+".toml"
 		case strings.HasPrefix(entry.Component, "command-"):
 			valid = clean == "commands/"+strings.TrimPrefix(entry.Component, "command-")+".md"
 		case strings.HasPrefix(entry.Component, "skill-"):
@@ -211,7 +267,7 @@ func historicalPluginOwnershipMatches(component, cleanPath string) bool {
 // than OpenStateFile (which creates the file). ComputePlan calls readLedger
 // as a pure read — it must NOT create the ledger as a side effect (AC-2).
 func readLedger() ([]LedgerEntry, []ledgerError) {
-	root, err := ResolveDataHome()
+	root, err := activeLedgerDataHome()
 	if err != nil {
 		return nil, []ledgerError{{Line: 0, Reason: fmt.Sprintf("resolve data home: %v", err)}}
 	}
@@ -269,6 +325,10 @@ func readLedger() ([]LedgerEntry, []ledgerError) {
 					continue
 				}
 			}
+			if entry.ConfigRoot == "" && activeLedgerFilename == ledgerFilenameCodex {
+				errs = append(errs, ledgerError{Line: lineNum, Reason: "Codex ledger entry has no config-root binding"})
+				continue
+			}
 		}
 		if err := validateLedgerOwnership(entry); err != nil {
 			errs = append(errs, ledgerError{Line: lineNum, Reason: fmt.Sprintf("invalid ownership: %v", err)})
@@ -290,7 +350,7 @@ func readLedger() ([]LedgerEntry, []ledgerError) {
 // the file on O_CREAT / OPEN_ALWAYS). We use ResolveDataHome to get the path
 // and then Stat the file without creating it.
 func isLedgerAbsent() bool {
-	root, err := ResolveDataHome()
+	root, err := activeLedgerDataHome()
 	if err != nil {
 		return true
 	}

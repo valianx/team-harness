@@ -1,5 +1,25 @@
 # Installation guide
 
+## Codex beta (POSIX only)
+
+Install from the repository marketplace:
+
+```text
+codex plugin marketplace add valianx/team-harness
+codex plugin add team-harness@team-harness
+```
+
+Review and explicitly trust the plugin hooks, then start a new thread. Plugin
+installation is separate from the six-agent placement required by the gated
+workflow; use `install apply --runtime codex --scope project` for the six
+generated TOML agents before delegation. Start from a clean `Main` thread and
+invoke `@Team-Harness init <task>` for lightweight intake without state or
+subagents. Invoke `@Team-Harness pipeline <task>` only for the full gated flow.
+No seventh coordinator is installed or selected through `/agent`. Plugin-only skills can still
+be used without the agents. See
+[`codex-runtime.md`](./codex-runtime.md) for the trusted-checkout contributor
+flow, upgrade, and removal.
+
 Detailed installation reference. For the **canonical install**, see the [README](../README.md#install).
 
 ---

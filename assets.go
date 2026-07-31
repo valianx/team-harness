@@ -16,17 +16,19 @@ import (
 //   - The "all:" prefix on agents/ overrides the default exclusion of files and
 //     directories starting with "." or "_". This is required to embed the
 //     agents/_shared/ subdirectory (shared cross-cutting snippets).
+//   - Codex custom-agent TOML files are embedded from `.codex/agents`; the
+//     operator-owned `.codex/config.toml` is intentionally excluded.
 //   - The embedded layout mirrors the repo layout: `agents/architect.md`
 //     in the repo becomes `agents/architect.md` inside embeddedAssets.
 //   - installer-assets/ holds opencode-only templates (e.g. commands) that are
 //     NOT distributed plugin assets (agents/skills/hooks). Changes here do not
 //     require a plugin.json version bump.
 
-//go:embed all:agents skills hooks installer-assets
+//go:embed all:agents skills hooks installer-assets all:.codex/agents
 var embeddedAssets embed.FS
 
-// FS returns the read-only embedded filesystem containing agents/, skills/,
-// and hooks/. Imported by the installer binary (cmd/install) as the canonical
+// FS returns the read-only embedded filesystem containing runtime assets.
+// Imported by the installer binary (cmd/install) as the canonical
 // byte source; the binary is fully self-contained and does not require a repo
 // clone at runtime.
 func FS() fs.FS {

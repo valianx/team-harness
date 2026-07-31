@@ -1,5 +1,19 @@
 # Troubleshooting
 
+## Codex plugin or agents do not appear
+
+Start a new thread after install or upgrade; Codex does not retrofit plugin and
+project-agent discovery into an existing thread. Confirm the marketplace and
+plugin with `codex plugin marketplace list` and `codex plugin list`. Plugin
+installation does not install `.codex/agents/*.toml`; run the separate agent
+installer when those roles are wanted.
+
+## Codex hooks do not run
+
+The beta hooks are POSIX-only and require explicit repository trust. Review
+`plugins/team-harness/hooks/hooks.json`, trust the checkout, and start a new
+thread. Do not use the hook-trust bypass on unreviewed code.
+
 ## Plugin install fails: "source type not supported"
 
 **Error:** `Failed to install: This plugin uses a source type your Claude Code version does not support.`

@@ -18,10 +18,11 @@
 //     was too broad here; only the genuinely-empty case is parity-preserved.
 //   - ShimRejectError from a schema/size/depth/pollution guard (oversized
 //     payload, excessive nesting, __proto__ key, non-string tool.name, etc.):
-//     fail-closed → ask. These are TS-only hardening with no Bash equivalent
-//     (the Bash oracle never validates shape beyond the two checks above) —
-//     relaxing them would be a genuine strictness regression, not a parity
-//     fix, so they keep the conservative ask() default.
+//     Claude Code keeps the historical fail-closed → ask mapping. The Codex
+//     adapter sets TEAM_HARNESS_CODEX_HOOK=1 and upgrades this validation
+//     failure to deny: Codex cannot represent PreToolUse `ask`, so degrading a
+//     deterministic safety floor to bounded context would let execution
+//     continue without an operator decision.
 //   - Unexpected body exception: ask (same fail-closed rationale).
 //   - Safe default (non-covered tool): none.
 
@@ -54,7 +55,19 @@ async function main(): Promise<void> {
     const decision = evaluate(normalized);
     outboundCC(decision);
   } catch (err) {
-    if (err instanceof ShimRejectError && isParseFailure(err)) {
+    if (err instanceof ShimRejectError && process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
+      // Every shim rejection is a deterministic safety-floor failure on
+      // Codex, including malformed/empty direct invocations. The launcher
+      // already rejects malformed native JSON before reaching this branch;
+      // keeping the bundle itself fail-closed closes the direct-entry path too.
+      const fallback: NormalizedDecision = {
+        decision: "deny",
+        reason:
+          "policy-block: payload failed shim validation — execution denied because safety could not be evaluated (policy-block.cc.ts SEC-07).",
+        mutations: null,
+      };
+      outboundCC(fallback);
+    } else if (err instanceof ShimRejectError && isParseFailure(err)) {
       if (raw.trim().length === 0) {
         // Empty stdin — fail-open, matching the Bash oracle's silent
         // pass-through and avoiding ask-spam on no-op invocations.
@@ -72,7 +85,9 @@ async function main(): Promise<void> {
       }
     } else if (err instanceof ShimRejectError) {
       // SEC-07 shape/size/depth/pollution guard — TS-only hardening, stays
-      // fail-closed (no Bash equivalent to reconcile against).
+      // fail-closed. Codex has no PreToolUse `ask`; its launcher would turn
+      // ask into additionalContext and continue, so a deterministic policy
+      // validation failure must remain a native deny on that runtime.
       const fallback: NormalizedDecision = {
         decision: "ask",
         reason:

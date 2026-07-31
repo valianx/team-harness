@@ -15,6 +15,9 @@ var scopeFlag = "global"
 // opencodeDirFlag holds the --opencode-dir flag value (default: "", uses scope).
 var opencodeDirFlag = ""
 
+// codexDirFlag holds the --codex-dir override (default: "", uses scope).
+var codexDirFlag = ""
+
 // memoryURLFlag holds the --memory-url flag value (default: "", falls back to MEMORY_MCP_URL env).
 var memoryURLFlag = ""
 
@@ -76,7 +79,7 @@ func dispatchSubcommand() bool {
 	}
 }
 
-// parseDispatchFlags extracts --runtime, --scope, and --opencode-dir flags from
+// parseDispatchFlags extracts --runtime, --scope, and runtime directory flags from
 // args (which may precede or follow the subcommand name). Returns the remaining
 // args with flags consumed.
 //
@@ -121,6 +124,12 @@ func parseDispatchFlags(args []string) []string {
 		case strings.HasPrefix(arg, "--opencode-dir="):
 			opencodeDirFlag = strings.TrimPrefix(arg, "--opencode-dir=")
 			i++
+		case arg == "--codex-dir" && i+1 < len(args):
+			codexDirFlag = args[i+1]
+			i += 2
+		case strings.HasPrefix(arg, "--codex-dir="):
+			codexDirFlag = strings.TrimPrefix(arg, "--codex-dir=")
+			i++
 		case arg == "--memory-url" && i+1 < len(args):
 			memoryURLFlag = args[i+1]
 			i += 2
@@ -154,8 +163,10 @@ func selectPlacer() (Placer, error) {
 		return newClaudeCodePlacer(), nil
 	case "opencode":
 		return newOpencodePlacer(scopeFlag, opencodeDirFlag)
+	case "codex":
+		return newCodexPlacer(scopeFlag, codexDirFlag)
 	default:
-		return nil, fmt.Errorf("unrecognized runtime %q (want claude-code|opencode)", runtimeFlag)
+		return nil, fmt.Errorf("unrecognized runtime %q (want claude-code|opencode|codex)", runtimeFlag)
 	}
 }
 
@@ -216,8 +227,11 @@ func resolveActiveTierProvider(placer Placer) (string, error) {
 // selectLedgerFilename returns the runtime-scoped ledger filename.
 // This prevents a claude-code uninstall from removing opencode files.
 func selectLedgerFilename() string {
-	if runtimeFlag == "opencode" {
+	switch runtimeFlag {
+	case "opencode":
 		return ledgerFilenameOpencode
+	case "codex":
+		return ledgerFilenameCodex
 	}
 	return ledgerFilename
 }
@@ -232,7 +246,7 @@ func runPlanCommand() {
 	}
 
 	// Set the runtime-scoped ledger before any ledger I/O.
-	setActiveLedgerContext(selectLedgerFilename(), placer.ConfigRoot())
+	configureLedger(placer)
 
 	modules, components, err := loadDefaultManifests(runtimeFlag)
 	if err != nil {
@@ -277,7 +291,7 @@ func runApplyCommand() {
 	}
 
 	// Set the runtime-scoped ledger before any ledger I/O.
-	setActiveLedgerContext(selectLedgerFilename(), placer.ConfigRoot())
+	configureLedger(placer)
 
 	modules, components, err := loadDefaultManifests(runtimeFlag)
 	if err != nil {
@@ -664,7 +678,7 @@ func runUninstallCommand() {
 	}
 
 	// Set the runtime-scoped ledger before any ledger I/O.
-	setActiveLedgerContext(selectLedgerFilename(), placer.ConfigRoot())
+	configureLedger(placer)
 
 	_, components, err := loadDefaultManifests(runtimeFlag)
 	if err != nil {
@@ -709,6 +723,16 @@ func runUninstallCommand() {
 // production apply path always runs validateManifests so a malformed component
 // fails loudly at install time rather than silently mis-emitting later).
 func loadDefaultManifests(runtime string) ([]ModuleManifest, []ComponentManifest, error) {
+	if runtime == "codex" {
+		modules, components, err := buildCodexManifests()
+		if err != nil {
+			return nil, nil, err
+		}
+		if err := validateManifests(modules, components, EmbeddedAssets()); err != nil {
+			return nil, nil, fmt.Errorf("codex manifest validation: %w", err)
+		}
+		return modules, components, nil
+	}
 	if runtime == "opencode" {
 		modules, components, err := buildOpencodeManifests()
 		if err != nil {

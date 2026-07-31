@@ -6,7 +6,7 @@
 
 ## 1. Purpose & Boundaries
 
-**What this repo is.** `team-harness` is a **pure distribution of a Claude Code agent system** (today; a future v2 will abstract over the runtime — see README Roadmap). It packages agents (system prompts), skills (slash commands), hooks (OS-native notifications), and a cross-platform Go installer that wires everything into a developer's `~/.claude/` + `~/.claude.json`. The Memory MCP server (Knowledge Graph) is an **external service**, configured by a single URL during install. Target audience: developers on Mario's team who already use Claude Code and want a standardized orchestrated dev-team setup.
+**What this repo is.** `team-harness` distributes one orchestrated development system across Claude Code, Codex, and opencode. Runtime-specific projections preserve a shared set of semantic roles while using each host's plugin, agent, and hook contracts. The Memory MCP server is an external service; it is never bundled here.
 
 **What this repo is NOT.** Not an application, library, API, or service; not a runtime beyond the installer and the (post-install) MCP server; not a deployed, hosted application — see §3/§4 for its own build/test tooling; not a general-purpose framework — it encodes one opinionated workflow (orchestrator + specialized subagents + SDD pipeline).
 
@@ -86,17 +86,17 @@ team-harness/
 
 | Layer | Choice |
 |---|---|
-| Installer | **opencode-only.** Go 1.23+, cross-compiled to GH Release assets (`cmd/install/main.go` is the source). Does NOT install Claude Code — the marketplace plugin is the only CC channel. Serves opencode exclusively (`install apply\|update\|uninstall --runtime opencode`); agents and skills embed at compile time via `//go:embed` in `assets.go` — self-contained, no repo clone at runtime. TUI: `charm.land/huh/v2`. `cmd/install/` is frozen for fleet model-allocation (opencode-only binary — `modes.go::lowCostMatrix` is a historical reference, not extended for new agents; see `agents/README.md §"Low-cost mode"`). Full lifecycle detail: `docs/lifecycle.md`. |
-| Bootstrap scripts | **opencode-only.** Bash/PowerShell/cmd.exe (`install.sh`/`.ps1`/`.cmd`) detect OS+arch and download the released binary from the deterministic `releases/latest/download/` URL (no GitHub API call), served via a GitHub Pages workflow. Zero Python, zero `uv` required. See `bin/README.md`. |
+| Installer | Go 1.23+, cross-compiled to GH Release assets. It manages opencode assets and the six generated Codex agent TOMLs (`--runtime codex`), but never installs either marketplace plugin. Claude Code remains marketplace-only. Full lifecycle detail: `docs/lifecycle.md`. |
+| Bootstrap scripts | Bash/PowerShell/cmd.exe entry points download the released agent-installer binary. Codex plugin install/update/remove remains a separate marketplace lifecycle. |
 | Agents / skills | Markdown with YAML frontmatter |
 | Complex skills | Markdown + referenced scripts (Python/Node via `uv run` or CLIs) |
-| Hooks | Claude Code only: TypeScript (`hooks/ts/bodies/*.ts` → tracked `dist/*.cjs`) wired through `hooks.json` and `run-ts-hook.sh`. OpenCode uses its native permission and approval model. Only `sketch-guard.sh` remains Bash. |
+| Hooks | Shared TypeScript bodies compile to tracked Claude Code bundles and are projected into the Codex plugin. Codex hooks are POSIX-only beta and require explicit repository trust; OpenCode uses its native permission and approval model. |
 | Memory MCP | External service (e.g., `context-harness-mcp` on Railway/Render/Fly/Docker). Configured by URL in `~/.claude.json`. Not bundled in this repo. |
 | Config | `~/.claude.json` merge for `mcpServers`; CC hooks wired in `.claude-plugin/hooks.json` |
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
-| Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — the only CC install channel. Go installer binary (GH Release assets) — the only opencode install channel; it does not serve Claude Code. |
+| Distribution | Claude Code plugin `th`; Codex plugin `team-harness` via `.agents/plugins/marketplace.json`; Go agent installer for opencode and Codex. The tagged Git tree is both plugin artifact—there is no separate Codex archive. |
 
-**Current version:** `3.5.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `3.5.0` (see `.claude-plugin/plugin.json`, the tag authority. Its version is shared by the Claude and Codex plugin manifests, the Claude marketplace entry, and the installer fallback. `CHANGELOG.md` tracks release history).
 
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
@@ -111,6 +111,7 @@ All commands run from the repo root.
 | Intent | Command |
 |---|---|
 | Install plugin | `/plugin marketplace add valianx/team-harness` then `/plugin install th` then `/th:setup` |
+| Verify Codex projection | `node tools/codex-runtime/generate.mjs --check && node tools/codex-runtime/test_generate.mjs && python3 tests/test_codex_runtime.py` |
 | Build installer from source (contributors) | `go run ./cmd/install` |
 | Validate agents/skills health | `/th:lint` inside Claude Code |
 | Run security self-scan | `/th:audit-security` inside Claude Code |
@@ -192,7 +193,8 @@ README.md, any `docs/` knowledge/architecture file, and CHANGELOG.md's latest bl
 Post-work deliverable rules now live in [`docs/working-agreements.md`](./docs/working-agreements.md):
 the `changelog.d/{pr-slug}.md` fragment mechanism (Keep-a-Changelog subsection; direct
 `## [Unreleased]` edits stay a valid fallback), CLAUDE.md §3/§4 sync, `docs/knowledge.md` capture,
-the OpenAPI version-bump rule, the internal-distribution version rule (three sites per PR;
+the OpenAPI version-bump rule, the internal-distribution version rule (five sites per PR in
+the current tree; Codex/installer sites remain optional for historical repositories);
 rebase-and-rebump trade-off; `changelog.d/` remains the batch/fallback path), and the
 TypeScript-hooks mandate. This section is intentionally a pointer to keep one source of truth.
 
