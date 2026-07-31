@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.1] - 2026-07-31
+
+### Added
+
+- Chat contract giving the coordinator a reply skeleton, explicit length budgets, and a plain-language-before-identifiers rule.
+
+### Changed
+
+- Bound the coordinator to the dialect-neutrality rules and removed the conditional that weakened its voice contract.
+
 ## [3.4.0] - 2026-07-30
 
 ### Changed
