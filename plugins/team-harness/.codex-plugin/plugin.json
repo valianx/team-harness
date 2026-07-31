@@ -1,6 +1,6 @@
 {
   "name": "team-harness",
-  "version": "3.5.0",
+  "version": "3.6.0",
   "description": "Load lightweight Team Harness intake or an explicit gated workflow into a clean Codex Main thread.",
   "author": {
     "name": "Mario Gutierrez",
