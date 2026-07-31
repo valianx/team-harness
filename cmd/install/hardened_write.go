@@ -28,12 +28,23 @@ import (
 // check walks from the configRoot to the dest leaf — both must be under the
 // same tree.
 func hardenedWriteFile(src []byte, dest, configRoot string, executable bool) error {
+	mode := os.FileMode(0o644)
+	if executable {
+		mode = 0o755
+	}
+	return hardenedWriteFileMode(src, dest, configRoot, mode)
+}
+
+func hardenedWriteFileMode(src []byte, dest, configRoot string, mode os.FileMode) error {
 	// Verify dest is a descendant of configRoot (must be true for all placer
 	// destinations, but guard here defensively).
 	cleanDest := filepath.Clean(dest)
 	cleanRoot := filepath.Clean(configRoot)
 	if !isDescendantOf(cleanDest, cleanRoot) {
 		return fmt.Errorf("hardened write: destination %q is not under config root %q", cleanDest, cleanRoot)
+	}
+	if fi, err := os.Lstat(cleanDest); err == nil && fi.Mode().IsRegular() {
+		mode &= fi.Mode().Perm()
 	}
 
 	// Per-component Lstat walk from configRoot to dest parent — reject symlinks.
@@ -48,10 +59,33 @@ func hardenedWriteFile(src []byte, dest, configRoot string, executable bool) err
 	}
 
 	// Write the leaf file with O_NOFOLLOW on POSIX.
-	if err := writeLeafNoFollow(src, cleanDest, executable); err != nil {
+	if err := writeLeafNoFollow(src, cleanDest, mode); err != nil {
 		return fmt.Errorf("hardened write: write leaf %q: %w", cleanDest, err)
 	}
 	return nil
+}
+
+func hardenedAtomicWriteSecret(src []byte, dest, configRoot string) error {
+	cleanDest := filepath.Clean(dest)
+	cleanRoot := filepath.Clean(configRoot)
+	if !isDescendantOf(cleanDest, cleanRoot) {
+		return fmt.Errorf("hardened write: destination %q is not under config root %q", cleanDest, cleanRoot)
+	}
+	if err := lstatWalkForWrite(filepath.Dir(cleanDest), cleanRoot); err != nil {
+		return err
+	}
+	if fi, err := os.Lstat(cleanDest); err == nil {
+		isLink, inspectErr := pathComponentIsLink(cleanDest, fi)
+		if inspectErr != nil {
+			return inspectErr
+		}
+		if isLink {
+			return fmt.Errorf("hardened write: destination %q is a symbolic link or reparse point", cleanDest)
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	return writeAtomicSecret(cleanDest, src)
 }
 
 // isDescendantOf reports whether candidate is the same as base or a descendant.
@@ -96,7 +130,11 @@ func lstatWalkForWrite(dir, configRoot string) error {
 			}
 			return fmt.Errorf("lstat %q: %w", current, err)
 		}
-		if fi.Mode()&os.ModeSymlink != 0 {
+		isLink, err := pathComponentIsLink(current, fi)
+		if err != nil {
+			return fmt.Errorf("inspect path component %q: %w", current, err)
+		}
+		if isLink {
 			return fmt.Errorf("path component %q is a symbolic link — refusing write (SEC-DR-3)", current)
 		}
 	}
@@ -121,7 +159,11 @@ func mkdirAllSegmented(path string) error {
 		fi, err := os.Lstat(current)
 		if err == nil {
 			// Already exists — check it is not a symlink.
-			if fi.Mode()&os.ModeSymlink != 0 {
+			isLink, err := pathComponentIsLink(current, fi)
+			if err != nil {
+				return fmt.Errorf("inspect path component %q: %w", current, err)
+			}
+			if isLink {
 				return fmt.Errorf("path component %q is a symbolic link — refusing mkdir (SEC-DR-3)", current)
 			}
 			continue

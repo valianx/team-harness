@@ -253,7 +253,7 @@ Before committing, all must hold:
 3. when `worktree` is non-null, repository root equals that path; and
 4. staged paths are exactly task `Files:` plus declared scope drift.
 
-These checks are structural because `policy-block` only scans provider-shaped credentials and `dev-guard` gates outward actions, not local commit placement.
+These checks enforce local commit placement independently of outward-action approval.
 
 Stage explicit paths only. Never use `git add -A`, `git add .`, `git commit -a`, or equivalents. Inspect `git diff --cached --name-only`; any unrelated staged path blocks rather than being swept into the commit.
 

@@ -126,7 +126,7 @@ working_branch: {branch}|null
 
 `verification_base_source_ref` and `verification_base_ref` have one producer site: Phase 2 entry. The source field preserves the selected branch or commit so Freeze can detect movement; the base field is the full commit SHA resolved from that source and is never rewritten. Phase 2.6, Phase 2 close, Freeze, the frozen diff, and the verification packet all consume the immutable SHA. The packet mirrors it; it never produces it.
 
-Live consumers, so it is never treated as documentation: the record-based recover backstop, the operator reading the file, and the executable branch comparisons in `implementer`, `tester`, and the Phase-2-close commit-integrity check. On the Claude Code plugin path no wired hook reads it — `gate-guard` and `checkpoint-guard` are both unwired. `opencode`'s own plugin wiring registers `checkpoint-guard` independently; that is outside this contract's scope.
+Live consumers, so it is never treated as documentation: the record-based recover backstop, the operator reading the file, and the executable branch comparisons in `implementer`, `tester`, and the Phase-2-close commit-integrity check. No wired hook reads it: `gate-guard` and `checkpoint-guard` are unwired in Claude Code, and Team Harness installs no parallel hook layer in OpenCode.
 
 **Delivery coordinates — written by the coordinator during STAGE-GATE-3 preparation.**
 ```
@@ -153,7 +153,7 @@ checkpoint_boundary: intake-plan|null        # armed at Phase 1 entry, cleared w
 checkpoint_advance_fresh: true|false         # see note below
 ```
 
-**`checkpoint_advance_fresh` — set it, and why it still exists.** One live consumer outside this runtime: `hooks/ts/bodies/checkpoint-guard.ts:335-340` denies an opencode `th:architect` dispatch unless this field AND `functional_clarity_confirmed` are both `true`, registered at `hooks/ts/opencode-plugin.ts:84` (unwired on the Claude Code path). Dropping the field would deny every `th:architect` dispatch on opencode while `checkpoint_boundary: intake-plan` is armed. Set it `true` alongside `checkpoint_boundary: intake-plan` at Phase 1 entry, on your own attestation. **Retiring it requires changing that consumer first** — `docs/decisions.md`.
+**`checkpoint_advance_fresh` — set it, and why it still exists.** This derived cache records the coordinator's fresh checkpoint transition for recovery and operator inspection. No runtime hook consumes it: `checkpoint-guard` is unwired in Claude Code and not installed in OpenCode. Set it `true` alongside `checkpoint_boundary: intake-plan` at Phase 1 entry, on your own attestation.
 
 **Permission provisioning.**
 ```

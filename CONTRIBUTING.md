@@ -72,12 +72,9 @@ with no extra work — agents, skills, and rules (`CLAUDE.md` / `AGENTS.md`) are
 by both runtimes as-is. Two rules apply when a change touches the runtime-specific
 surfaces:
 
-- **New hooks are authored in TypeScript, not Bash** (CLAUDE.md §6.3, Decision A). A
-  single TypeScript hook body runs on Claude Code (Node) and opencode (Bun) through
-  the `normalized-v1` shim in `hooks/ts/`; Bash↔TS decision parity is enforced by
-  `tests/test_ts_hook_parity.sh` (run-all Suite 15). See
-  [`docs/opencode-distribution-roadmap.md`](./docs/opencode-distribution-roadmap.md)
-  § Cross-Harness Authoring Mandate.
+- **Hooks remain a Claude Code surface.** Do not project new hook behavior into
+  OpenCode; use OpenCode's native permissions and approvals instead. TypeScript
+  remains the canonical implementation language for Claude Code hooks.
 - **Project this repo's own assets between harness formats** with the repo-local
   `/harness-migrate <to-opencode|to-claude-code>` command (`tools/harness-migrate/`)
   — never by hand-editing frontmatter. It is a contributor tool, not a distributed

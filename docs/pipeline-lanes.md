@@ -541,7 +541,7 @@ paragraphs below describe the contract `gate-guard` implemented and what its cod
 invoked directly, not a hook that fires today in the Claude Code plugin path
 (`.claude-plugin/hooks.json`) — see `agents/_shared/gate-contract.md`'s own header and
 `docs/dev-mode.md § "Boundary, not flow"`. The deterministic floor that actually runs today is
-`dev-guard`'s destination gate, described in `agents/ref-pipeline.md § "Mechanism-honesty sweep"`.
+the active runtime's approval boundary, described in `agents/ref-pipeline.md § "Runtime-neutral enforcement boundaries"`.
 Do not read what follows as a live enforcement description.
 
 **Lane uniformity — the outward-action release floor applies to all three lanes without reshaping any of them, as a contract.** `gate-guard`'s deny is detection-dependent, not universal (§ above and `agents/_shared/gate-contract.md § "Outward-action release floor"`), so its behavior per lane follows directly from what each lane already does:

@@ -342,9 +342,8 @@ proceeds.
 git push --set-upstream origin {branch-name}
 ```
 
-Never `--force` in any form — `dev-guard`'s destination-based floor gates this push
-unconditionally on `gate3_release`, regardless of which agent invokes it; there is no
-legitimate reason to force here in the first place, and no code path in this procedure ever
+Never `--force` in any form. The active runtime's approval remains required for this push,
+independently of `gate3_release`; there is no legitimate reason to force here, and no code path in this procedure ever
 constructs a `--force`/`--force-with-lease`/`+refspec` invocation.
 
 **If `has_remote: false`:** skip §§ 6-7. The branch and commit stay local (already committed
@@ -452,5 +451,5 @@ automated-review-tool detection is out of scope.
 | Push-step precondition (a) `gate3_release`/`gate_nonce` | "No gate-field repair" invariant, prose-only | fail-closed — abort, never repaired in place | orchestrator, § 6(a) | `agents/_shared/gate-contract.md § "The dual-record release"` |
 | Push-step precondition (b) base-advance | prose-only, coordinator self-applied | fail-closed — re-opens Phase 2.8 → Phase 3 → STAGE-GATE-3 | orchestrator, § 6(b) | this file § 6 |
 | Push-step precondition (c) tree-anchor + allowlist | prose-only, coordinator self-applied | fail-closed on any out-of-allowlist path | orchestrator, § 6(c) | this file § 6 |
-| No force-push from this procedure | `dev-guard` (destination-based, unconditional on `gate3_release`) | fail-closed — denied at the tool-call level | orchestrator, § 7 | `docs/dev-mode.md § "Outward-Action Gate"` |
+| No force-push from this procedure | coordinator contract + active runtime approval | fail-closed — never invoked | orchestrator, § 7 | this file § 7 |
 | Merge-state poll never blocks on CI conclusion | prose-only | n/a — report-only, never a gate | orchestrator, § 9 | this file § 9 |

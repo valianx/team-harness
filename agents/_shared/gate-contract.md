@@ -1,14 +1,9 @@
 # Gate contract
 
-> **`gate-guard` is UNWIRED as of v2.139.0 in the Claude Code plugin path.** The STAGE-GATE
-> mechanism below — the dual-record release, the recover backstop, the STOP-block templates
-> and the preparer/presenter flow — is unchanged and remains binding: it is how the pipeline
-> records and presents gates. What changed is that no hook wired in the Claude Code plugin
-> path (`.claude-plugin/hooks.json`) enforces it any more. Every reference below to
-> `gate-guard` denying a push, or to a hook verifying a gate field, describes Claude Code
-> plugin behavior that is no longer dispatched there. Do not rely on the Claude Code plugin's
-> hooks to catch a missing or malformed release; the contract is the control. Rationale:
-> `docs/dev-mode.md § "Boundary, not flow"`.
+> The STAGE-GATE mechanism below — the dual-record release, the recover backstop, the
+> STOP-block templates and the preparer/presenter flow — is binding. The orchestrator contract
+> orders pipeline outward actions; the active runtime separately enforces its current permission
+> and approval model.
 <!-- Single source of truth for the STAGE-GATE mechanism: the dual-record release,
      the record-based recover backstop, the STOP-block templates, and the single
      preparer + presenter + recorder flow.
@@ -25,7 +20,7 @@ rules below verbatim. No other agent file may copy, restate, or fork this contra
 Duplicating it re-imports the drift risk this design closes: a second copy would diverge
 from this one the first time either is edited, and a diverged copy is a security-relevant
 defect (the audited-relay integrity property this contract once depended on — now retired,
-see § "Integrity model — audited relay + a deterministic outward floor" below — depended on
+see § "Integrity model — audited relay + runtime approval floor" below — depended on
 exactly one prompt in the system recording the dual-record schema; the single-coordinator
 model keeps that same one-prompt property for the schema itself, even though the relay it
 used to audit no longer exists).
@@ -37,89 +32,28 @@ separate presentation duty.
 
 ## Outward-action release floor
 
-No outward action from a **detected** pipeline context — a `git push` to a feature
-branch, or `gh pr create` — proceeds without `gate3_release ∈ {ship}` registered in the
-governing lane's `00-state.md` (see § "The dual-record release" below for the field and
-its per-gate allowlist). `gate-guard` — a deterministic PreToolUse hook, structural
-sibling of `prepublish-guard` — is the enforcer: it resolves the governing lane by
-mtime-selecting the active `00-state.md` (local or vault) and correlating the current
-branch against that lane's `working_branch` field, valid in both the worktree and the
-branch-in-place topology, then denies the outward action unless the resolved lane's
-`gate3_release` is in the allowlist.
+No pipeline outward action — including `git push`, `gh pr create`, or `gh pr merge` —
+proceeds without `gate3_release ∈ {ship}` registered in the governing lane's
+`00-state.md` (see § "The dual-record release" below). The orchestrator enforces this
+ordering by refusing to invoke the action before the release exists.
 
-**This is detection-dependent, not universal or unconditional coverage.** `gate-guard`
-denies only when a governing lane actually *resolves*. When no lane resolves — a manual
-push by the developer, an inline (no-orchestrator) session, an unrelated repository —
-`gate-guard` defers (`decision: none`) and the action proceeds exactly as it did before
-this design, under the outward-action floor already applied by `dev-guard`. Stating
-this plainly is a deliberate correction: an earlier draft of this contract described the
-floor as covering every outward action unconditionally, which overstated it — the floor
-closes the ORDER gap only for a push/pr-create that `gate-guard` can attribute to a
-detected pipeline lane.
+Pipeline release and runtime approval are independent requirements. A recorded release
+does not grant tool permission, and runtime approval does not create or repair a pipeline
+release. Every outward action still requires the active runtime's current approval.
 
-**Detection is parse-based, via the shared command analyzer.** `gate-guard`'s
-covered-verb detection resolves the executed command through the same shared analyzer
-`dev-guard` consumes (`hooks/ts/bodies/command-lexer.ts::analyzeCommand`
-+ `classifyCoveredAction`) — recursive wrapper resolution plus per-subcommand-binary
-basename equivalence, not a boundary-character-class regex over the literal string. A
-covered verb reconstructed through a wrapper (`bash -c "git push …"`) or invoked via its
-own per-subcommand executable (`git-push`, `$(git --exec-path)/git-push`) now resolves
-to the same classified command as the literal dispatcher form, closing the evasion this
-paragraph previously disclosed as accepted. The residual static-resolution limits that
-remain — a dynamic verb/executable token, a statically-unresolvable pipe-to-shell
-payload, recursion-depth-exceeded, script-file execution, alias/PATH-shadowing
-execution, and `ssh <host> "<cmd>"` — are documented in
-`docs/dev-mode.md § "Detection mechanism"` and fail CLOSED
-(`ask`/`deny`), never silently treated as "no covered action."
+**Force-push clause (Invariant E, operator-mandated).** The pipeline never force-pushes —
+not with `-f`, `--force`, `--force-with-lease`, or a `+`-prefixed refspec. A `ship`
+decision cannot authorize force-push or shared-history rewriting.
 
-**Force-push clause (Invariant E, operator-mandated).** No outward action from a
-detected pipeline context force-pushes — neither the flag form (`-f`, `--force`,
-`--force-with-lease`) nor the `+`-prefixed refspec form (e.g. `git push origin
-+feature:main`). This is a **DENY unconditional on `gate3_release`**: force-push is
-never legitimate from an in-lane pipeline delivery, so `ship` does not authorize it.
-`gate-guard` is the in-lane enforcer for both forms, evaluated on the same `git push`
-invocation it already inspects for the order check above.
+**Permitted push shape (Invariant G).** The pipeline constructs only
+`git push [-u|--set-upstream|-v|--verbose|--progress] origin <plain-branch>`.
+`<plain-branch>` excludes ref-namespace-qualified and tag-like destinations. Shell
+wrappers, dynamically reconstructed commands, alternate executables, git configuration
+overrides, and unresolved shell syntax are not permitted substitutes.
 
-**Detection mechanism (Invariant G, `hooks/ts/bodies/command-lexer.ts::matchBenignPushGrammar`
-over resolved argv) — a closed positive grammar, not a character-denylist.** An earlier
-implementation of Invariant E enumerated bad characters/flags and was defeated three
-times by three different shell token-reconstruction techniques (whole-token quoting,
-mid-token quote-splicing, then brace expansion/backtick substitution). The replacement
-permits ONLY the exact benign push shape — `git push [-u|--set-upstream|-v|--verbose|
---progress] origin <plain-branch>`, where `<plain-branch>` excludes any
-ref-namespace-qualified or tag-like destination (a destination whose first
-`/`-segment is `refs`/`heads`/`tags`/`remotes`, checked via
-`isPlainBranchDestination`) — validated against the RESOLVED argv the shared analyzer
-produces (after recursive wrapper unwrapping and basename resolution), not the raw
-command string: any token that still carries an unresolved shell metacharacter is
-marked `tainted` and the grammar rejects it outright, rather than inspecting its
-characters against a fixed safe set. An obfuscation technique never specifically
-considered still lands on the deny side, because it is not the one permitted shape or
-it stayed tainted, not because it was individually detected — INCLUDING a shape reached
-only through a command-executing wrapper or a per-subcommand binary, which the retired
-string-level grammar could not see at all. `gate-guard` (force+order
-deny) and `dev-guard`'s push gate both consume this single shared analyzer and grammar
-module — one source of truth, never duplicated. Honest scope: the grammar reasons
-about the resolved argv the analyzer could statically determine, not everything a live
-shell might ultimately execute — an env-assignment prefix, a `git -c <k=v>` config
-override, or a tree/exec-path-redirecting option on a covered push is surfaced by the
-analyzer and fails closed on the consuming hook, no longer silently out of scope; what
-remains genuinely out of scope by design is git config already persisted in the
-repository (`push.default`, `remote.origin.push`), a `git` shell alias or function, a
-shadowing `git` binary earlier on `PATH`, and `ssh`-remote execution — an attacker
-controlling any of those already has code execution in the session or on the target
-host.
-
-`dev-guard` remains the registered outward-action owner. It routes force flags,
-`+`-prefixed refspecs and other non-benign push forms to `ask`, destination-aware and
-without reading lane state. `policy-block` intentionally owns no git workflow policy.
-The unwired `gate-guard` body retains its self-contained in-lane deny semantics only as
-historical code; it does not strengthen the live Claude Code or OpenCode path.
-
-This design never touches or works around server-side branch protections; mutating
-`gh api` writes remain `ask` under `dev-guard`, unchanged. The philosophy this design
-anchors: **the only two hard points are force-push (deny in-lane, ask outside) and
-merge (always ask, non-configurable) — every other git operation stays frictionless.**
+This contract never bypasses server-side branch protections. Mutating GitHub API writes
+and merges require explicit operator approval through the active runtime; local git
+operations remain subject to the repository's own rules.
 
 ## The dual-record release
 
@@ -237,8 +171,8 @@ that same conversation** — never synthesized, never inferred, never carried in
 different turn or a different agent's summary. This removes the hand-off the prior
 two-agent flow relied on, and with it the audited-relay property that flow provided (§
 "Integrity model" below states plainly what that removal costs — it is a retirement, not a
-strengthening). The deterministic floor for irreversible outward actions remains
-`dev-guard`, independent of any gate and unaffected by this change.
+strengthening). Irreversible outward actions remain subject to the active runtime's approval,
+independent of any gate.
 
 ## STOP-block templates
 
@@ -316,7 +250,7 @@ This is a **record-based** backstop, not a structural one — it closes a specif
 fabrication vector by construction, not by preventing writes at the filesystem level. See
 the next section for the precise boundary of what it does and does not close.
 
-## Integrity model — audited relay + a deterministic outward floor
+## Integrity model — audited relay + runtime approval floor
 
 **The dual-record backstop above is record-based, not structural.** Agents share a
 filesystem and the runtime gives no per-agent write-sandbox, so nothing at the filesystem
@@ -343,67 +277,36 @@ not.**
 
 A release's integrity never depended on which agent held the pen — a prompt-injected
 coordinator, monolithic or split, could forge its own release identically by writing both
-dual-record halves directly, because no hook can distinguish writers (a `Write`/`Edit`
-payload carries **no writer identity** — the only identity signals, `subagent_type` and
-`agent_id`, ride Task-dispatch and SubagentStop *boundary* payloads, never an interior
-write). This residual is pre-existing and platform-bounded; the fusion neither adds nor
-removes it. The two paragraphs below carry this file's pre-existing residual disclosures
-forward verbatim — the fusion changes who prepares and presents a gate, never what a wired
-hook does or does not verify about the resulting field.
+dual-record halves directly. Runtime permissions do not establish writer identity for an
+interior file write. This residual is pre-existing and platform-bounded; the fusion neither
+adds nor removes it.
 
-**2. The deterministic order floor (`gate-guard`) — new, layered above the outward
-floor below.** Before this design, no control verified that a gate release preceded a
-push/pr-create from a pipeline lane: `gh pr create` was already covered **by
-destination** (`dev-guard`'s `ask` default, or `allow` under the `autogate.pr_create`
-opt-in), and a push to a feature branch already auto-`allow`ed — neither check related
-to whether a STAGE-GATE-3 release had been recorded. `gate-guard` adds exactly that
-missing ORDER check: it denies the outward action from a detected pipeline lane unless
-`gate3_release ∈ {ship}` for that lane (§ "Outward-action release floor").
+**2. The contractual order floor.** The orchestrator does not invoke a pipeline outward
+action unless `gate3_release ∈ {ship}` for that lane (§ "Outward-action release floor").
+This rule closes the ordering gap only; it does not verify writer identity because the
+release field remains intra-privilege-forgeable.
 
-This addition does **not** verify writer identity. `gate-guard` reads `gate3_release` —
-an **intra-privilege-forgeable field**, per the same no-writer-identity limit described
-above: nothing distinguishes which agent wrote it. That writer-identity residual
-persists unchanged; `gate-guard` closes an ORDER gap, not that one. The
-**ask-class caveat** (`docs/dev-mode.md § Ask-class caveat`) still applies unchanged to
-`dev-guard`'s own `ask` on `gh pr create` and `gh pr merge` — whether those `ask`s
-actually stop the action depends on the session's permission posture, not on
-`gate-guard`. `gate-guard`'s own decision set is `{none, deny}` (never `ask`), so it
-neither inherits nor removes that softness: the two mechanisms are independent and
-additive, not a replacement of one by the other.
-
-`gate-guard` also does not close the **approval→push content-drift** residual:
+The order floor also does not close the **approval→push content-drift** residual:
 `gate3_release: ship` binds ORDER (that the release preceded the push), not CONTENT (a
 tree hash) — HEAD can move between recording `ship` and the push actually running (an
 `amend`, a concurrent mutation), and the pushed tree can differ from the one the
 operator saw at the gate. This is the same failure shape the KG pattern
 `pattern-agent-executed-safety-predicate-no-true-atomicity` describes — a safety
-predicate and the gated action are not truly atomic. `gate-guard`, as a PreToolUse hook
-evaluating the SAME `git push`/`gh pr create` invocation it gates (not a separate
-check-then-act call pair), has a genuinely tighter check-to-act window than that pattern
-— a real strength for the ORDER guarantee above — but tightening check-to-act timing is
-a different thing from binding content: it does not close the content-drift gap. That
-residual is mitigated elsewhere (an `amend` re-runs Internal Review and regenerates the
-`gate_nonce`), not by `gate-guard` itself.
+predicate and the gated action are not truly atomic. That residual is mitigated elsewhere:
+an `amend` re-runs Internal Review and regenerates the `gate_nonce`.
 
-**3. The pre-existing outward floor (`dev-guard`).** The actions that actually cannot be
-undone — `git push`, `gh pr create/merge`, GitHub/ClickUp API writes — are gated by the
-`dev-guard` hook, which fires unconditionally on the tool call and prompts the operator
-natively in the UI, independent of any gate release. This floor is unchanged by this
-design: even a forged STAGE-GATE-3 release still has to clear `dev-guard`'s native
-destination-based gating. The internal gates no longer have an audited-relay layer to rely
-on — layer 1 is retired, above — so their fabrication-visibility rests on the record-based
-backstop and the operator's own attentiveness at each presentation; the irreversible
-boundary still relies on `dev-guard`, with `gate-guard`'s deterministic order check sitting
-in front of it for a detected pipeline lane.
+**3. The runtime approval floor.** Actions that cannot be undone — `git push`,
+`gh pr create/merge`, and GitHub or ClickUp API writes — require the active runtime's
+operator approval independently of any gate release. Runtime approval does not verify
+pipeline state or writer identity.
 
-**Never over-claim.** Do not describe the record-based backstop, `gate-guard`'s field
-read, or any hook as verifying writer identity, or as closing the approval→push
+**Never over-claim.** Do not describe the record-based backstop, the orchestrator's field
+read, or runtime approval as verifying writer identity, or as closing the approval→push
 content-drift gap, or as structurally preventing a forged release. Do not describe the
 single-coordinator flow as restoring or replacing the retired audited-relay property under
 another name. The honest model is: a retired audit layer for the internal gates (named as
-such, not papered over), a deterministic ORDER floor (`gate-guard`) added for a detected
-pipeline lane's outward action, and `dev-guard`'s pre-existing destination-based floor
-underneath both. Any prose elsewhere that implies a structural closure beyond ORDER, or
+such, not papered over), a contractual ORDER floor owned by the orchestrator, and the
+active runtime's separate approval floor. Any prose elsewhere that implies a structural closure beyond ORDER, or
 that implies layer 1's property survived the fusion, is a contract violation.
 
 ## Multi-lane event scoping (SEC-DR-H)

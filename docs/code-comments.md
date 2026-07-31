@@ -100,10 +100,8 @@ the adjacent invariants block is the bounded EXCEPTION above, not the general pa
 
 ### 5b. Hooks — `hooks/`
 
-> New hooks ship in TypeScript per the cross-harness authoring mandate
-> (`docs/opencode-distribution-roadmap.md § Cross-Harness Authoring Mandate`). TypeScript hooks
-> use TSDoc/JSDoc rather than Bash `#` headers. The guidance below covers both existing Bash
-> hooks and new TypeScript hooks; the substance is the same, only the syntax differs.
+> Claude Code hooks are authored in TypeScript and use TSDoc/JSDoc rather than Bash `#`
+> headers. OpenCode uses native permissions and approvals and does not install these hooks.
 
 | | Guidance |
 |---|---|

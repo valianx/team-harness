@@ -97,33 +97,12 @@ echo "-------------------"
 
 FAILURES=0
 
-# 1. permission must be present.
-if ! echo "${FM}" | grep -q "^permission:"; then
-  echo "FAIL: permission field not found in frontmatter"
+# Installed agents omit permission so OpenCode's native policy remains authoritative.
+if echo "${FM}" | grep -q "^permission:"; then
+  echo "FAIL: permission field overrides native OpenCode policy"
   FAILURES=$((FAILURES + 1))
 else
-  echo "PASS: permission field present"
-fi
-
-# 2. permission must be flow-form object (not array form).
-# Valid: "permission: {read: allow, edit: allow, ...}" or "permission: {}"
-# Invalid: "permission: {allow: [...]}" or block form with separate allow: key
-if echo "${FM}" | grep -q "^permission:.*\[" || echo "${FM}" | grep -qP "^\s+allow:" 2>/dev/null; then
-  echo "FAIL: permission appears to use array form (allow: [...] or block allow: key)"
-  FAILURES=$((FAILURES + 1))
-else
-  echo "PASS: permission is not in array form"
-fi
-
-# 2b. permission must be on a single line (flow-form object).
-PERM_LINE="$(echo "${FM}" | grep "^permission:" || true)"
-if [[ -z "${PERM_LINE}" ]]; then
-  echo "INFO: permission field not found on a single line (already flagged above)"
-elif echo "${PERM_LINE}" | grep -q "^permission: {"; then
-  echo "PASS: permission is flow-form object {}"
-else
-  echo "FAIL: permission is not flow-form — expected 'permission: {key: allow, ...}'"
-  FAILURES=$((FAILURES + 1))
+  echo "PASS: permission omitted; native OpenCode policy applies"
 fi
 
 # 3. permission block must not contain mcp__ tokens.
@@ -132,27 +111,6 @@ if echo "${FM}" | grep -q "mcp__"; then
   FAILURES=$((FAILURES + 1))
 else
   echo "PASS: no mcp__ tokens in frontmatter"
-fi
-
-# 4. Every permission key in the flow-form object must be from the opencode closed key set.
-# Flow form: permission: {read: allow, edit: allow, bash: allow}
-VALID_KEYS="read edit glob grep list bash task external_directory todowrite webfetch websearch lsp skill question doom_loop"
-PERM_LINE="$(echo "${FM}" | grep "^permission:" || true)"
-if [[ -n "${PERM_LINE}" ]]; then
-  # Extract the content between { and } from "permission: {read: allow, edit: allow}"
-  PERM_CONTENT="${PERM_LINE#*\{}"
-  PERM_CONTENT="${PERM_CONTENT%\}*}"
-  # Split by comma and check each key.
-  IFS=',' read -ra PERM_PAIRS <<< "${PERM_CONTENT}"
-  for pair in "${PERM_PAIRS[@]}"; do
-    pair="$(echo "${pair}" | tr -d ' ')"
-    if [[ -z "${pair}" ]]; then continue; fi
-    key="${pair%%:*}"
-    if [[ -n "${key}" ]] && ! echo " ${VALID_KEYS} " | grep -q " ${key} "; then
-      echo "FAIL: permission key '${key}' is not in the opencode closed key set"
-      FAILURES=$((FAILURES + 1))
-    fi
-  done
 fi
 
 # 5. If color is present, it must be a valid opencode value (named enum or hex).

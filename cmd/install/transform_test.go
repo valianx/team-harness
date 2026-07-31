@@ -153,7 +153,7 @@ func TestTransform_BlankModelSkipped(t *testing.T) {
 // TestTransform_ModeByRole_Orchestrator asserts the installer-layer
 // mode-by-role override: applying applyModeByRole to an already-transformed
 // orchestrator file replaces mode: subagent with mode: primary AND renames
-// the display name to "TH Orchestrator" (AC-12 / S-5; Task-2 AC-2).
+// the display name to "TH-orchestrator" (AC-12 / S-5; Task-2 AC-2).
 //
 // This test is deliberately separate from the conformance fixture — the generic
 // transform always injects mode: subagent and name: orchestrator (fixture-bound /
@@ -185,8 +185,8 @@ func TestTransform_ModeByRole_Orchestrator(t *testing.T) {
 	if strings.Contains(string(final), "mode: subagent") {
 		t.Error("after applyModeByRole, 'mode: subagent' should be replaced in orchestrator")
 	}
-	if !strings.Contains(string(final), "name: TH Orchestrator") {
-		t.Error("after applyModeByRole, orchestrator should display as name: TH Orchestrator")
+	if !strings.Contains(string(final), "name: TH-orchestrator") {
+		t.Error("after applyModeByRole, orchestrator should display as name: TH-orchestrator")
 	}
 	if strings.Contains(string(final), "name: orchestrator\n") {
 		t.Error("after applyModeByRole, 'name: orchestrator' should be replaced in orchestrator")
@@ -216,8 +216,8 @@ func TestTransform_ModeByRole_NonOrchestrator(t *testing.T) {
 	if !strings.Contains(string(final), "name: architect") {
 		t.Error("non-orchestrator agent should retain its own name after applyModeByRole")
 	}
-	if strings.Contains(string(final), "TH Orchestrator") {
-		t.Error("non-orchestrator agent must never receive the coordinator's TH Orchestrator display name")
+	if strings.Contains(string(final), "TH-orchestrator") {
+		t.Error("non-orchestrator agent must never receive the coordinator's TH-orchestrator display name")
 	}
 }
 
@@ -311,34 +311,13 @@ func TestTransform_CommandArgumentHintDropped(t *testing.T) {
 // Suite: Placed-format validation over all real agents (AC-4)
 // ---------------------------------------------------------------------------
 
-// opencodePermKeySet is the closed set of valid opencode permission keys.
-// Source: https://opencode.ai/docs/agents (confirmed in 00-research.md).
-var opencodePermKeySet = map[string]bool{
-	"read":               true,
-	"edit":               true,
-	"glob":               true,
-	"grep":               true,
-	"list":               true,
-	"bash":               true,
-	"task":               true,
-	"external_directory": true,
-	"todowrite":          true,
-	"webfetch":           true,
-	"websearch":          true,
-	"lsp":                true,
-	"skill":              true,
-	"question":           true,
-	"doom_loop":          true,
-}
-
 // opencodeColorRe matches the opencode color field: hex or named enum.
 var opencodeColorRe = regexp.MustCompile(`^(#[0-9a-fA-F]{6}|primary|secondary|accent|success|warning|error|info)$`)
 
 // TestTransformPlacedFormat_AllAgents applies the opencode transform to every
 // real agent .md file in agents/ and asserts the output is valid opencode format:
 //
-//   - permission field is present and is a YAML block mapping (not a flow array)
-//   - every permission key in the output is a member of the opencode closed key set
+//   - permission is absent so OpenCode's native policy remains authoritative
 //   - no mcp__* tokens appear in the frontmatter section
 //   - if color is present, it matches the opencode hex-or-enum pattern
 //
@@ -370,7 +349,7 @@ func TestTransformPlacedFormat_AllAgents(t *testing.T) {
 			return nil
 		}
 
-		got, transformErr := transformToOpencode(src, TransformKindAgent)
+		got, transformErr := opencodeRuntimeTransform(src, TransformKindAgent, agentPath)
 		if transformErr != nil {
 			t.Errorf("agent %s: transformToOpencode error: %v", agentPath, transformErr)
 			return nil
@@ -386,61 +365,13 @@ func TestTransformPlacedFormat_AllAgents(t *testing.T) {
 			}
 		}
 
-		// Assert permission is present and is flow-form object (not array form).
-		// Valid: "permission: {read: allow, edit: allow}" or "permission: {}"
-		// Invalid: "permission: {allow: [...]}" or block form with separate allow: key
-		if !strings.Contains(fmSection, "permission:") {
-			t.Errorf("agent %s: permission field missing from frontmatter", agentPath)
-			return nil
-		}
-		if strings.Contains(fmSection, "allow: [") || strings.Contains(fmSection, "\n  allow:") {
-			t.Errorf("agent %s: permission uses array form (allow: [...]) — must be an object (PermissionRuleConfig)", agentPath)
-		}
-		// Verify flow-form: permission must be on a single line as "{...}".
-		for _, line := range strings.Split(fmSection, "\n") {
-			if strings.HasPrefix(line, "permission:") {
-				trimmed := strings.TrimSpace(strings.TrimPrefix(line, "permission:"))
-				if !strings.HasPrefix(trimmed, "{") {
-					t.Errorf("agent %s: permission must be flow-form {key: allow, ...}, got: %q", agentPath, line)
-				}
-				break
-			}
+		if strings.Contains(fmSection, "permission:") {
+			t.Errorf("agent %s: permission must be omitted so native OpenCode policy applies", agentPath)
 		}
 
 		// Assert no mcp__ tokens appear in the frontmatter.
 		if strings.Contains(fmSection, "mcp__") {
 			t.Errorf("agent %s: mcp__ token found in frontmatter — must be dropped from permission", agentPath)
-		}
-
-		// Validate every permission key in the flow-form object against the closed key set.
-		// Flow form: "permission: {read: allow, edit: allow, bash: allow}"
-		for _, line := range strings.Split(fmSection, "\n") {
-			if !strings.HasPrefix(line, "permission:") {
-				continue
-			}
-			inner := strings.TrimSpace(strings.TrimPrefix(line, "permission:"))
-			// Strip surrounding braces.
-			if len(inner) >= 2 && inner[0] == '{' && inner[len(inner)-1] == '}' {
-				inner = inner[1 : len(inner)-1]
-			}
-			for _, pair := range strings.Split(inner, ",") {
-				pair = strings.TrimSpace(pair)
-				if pair == "" {
-					continue
-				}
-				colonIdx := strings.Index(pair, ":")
-				if colonIdx < 0 {
-					continue
-				}
-				key := strings.TrimSpace(pair[:colonIdx])
-				if key == "" {
-					continue
-				}
-				if !opencodePermKeySet[key] {
-					t.Errorf("agent %s: permission key %q is not in the opencode closed key set", agentPath, key)
-				}
-			}
-			break
 		}
 
 		// Assert color, if present, is a valid opencode value.

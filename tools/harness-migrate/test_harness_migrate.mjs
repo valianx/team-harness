@@ -132,7 +132,7 @@ This is the agent body. It uses $ARGUMENTS in instructions.
 // Expected opencode projection of the agent (oracle)
 // - model: ABSENT — opencode agents are model-less so the harness follows the
 //   operator's runtime /model pick on any provider (no baked id, no provider lock-in).
-// - permission: {read: "allow", glob: "allow", grep: "allow"} (object form, opencode PermissionRuleConfig)
+// - permission: ABSENT — native OpenCode policy remains authoritative
 // - mode: subagent (forward-injected)
 // - color: warning (orange maps to the opencode "warning" named enum)
 // - th-origin: opencode (records the current format; consistent with structural evidence)
@@ -140,7 +140,7 @@ const EXPECTED_OPENCODE_AGENT_FM = {
   name: "test-agent",
   description: "A test agent for migration tests.",
   model: undefined,
-  permission: { read: "allow", glob: "allow", grep: "allow" },
+  permission: undefined,
   mode: "subagent",
   color: "warning",
   "th-origin": "opencode",
@@ -157,13 +157,13 @@ Run the test with $ARGUMENTS and report results.
 `;
 
 // Expected opencode projection of the command (oracle)
-// - permission.allow from allowed-tools
+// - permission: ABSENT — native OpenCode policy remains authoritative
 // - $ARGUMENTS preserved (identity)
 // - th-origin: opencode (records current format)
 const EXPECTED_OPENCODE_COMMAND_FM = {
   description: "Run the harness test with arguments.",
   model: undefined,
-  permission: { allow: ["Bash(node tools/test.mjs *)"], ask: [], deny: [] },
+  permission: undefined,
   "th-origin": "opencode",
 };
 
@@ -350,18 +350,12 @@ console.log("\n=== Section 4: Forward transform CC → opencode (AC-1, AC-2, AC-
   const { frontmatter: fm, body } = parseFrontmatter(result.content);
 
   assert("AC-1: output path is .opencode/agents/", result.outputPath.includes(path.join(".opencode", "agents")));
-  assert("AC-1: agent permission is object form (read, glob, grep)",
-    typeof fm["permission"] === "object" &&
-    !Array.isArray(fm["permission"]) &&
-    fm["permission"]["read"] === "allow" &&
-    fm["permission"]["glob"] === "allow" &&
-    fm["permission"]["grep"] === "allow"
-  );
+  assert("AC-1: agent permission is omitted", fm["permission"] === undefined);
   assert("AC-1: agent is model-less (no model emitted)", fm["model"] === undefined);
   assert("AC-1: mode is forward-injected", fm["mode"] === "subagent");
   const { body: origBody } = parseFrontmatter(CC_AGENT_CONTENT);
   assert("AC-1: body is verbatim (identity)", body === origBody);
-  assert("AC-1: agent key is tools: (NOT allowed-tools:)", fm["tools"] === undefined && fm["permission"] !== undefined);
+  assert("AC-1: source tool keys are omitted", fm["tools"] === undefined && fm["allowed-tools"] === undefined);
   assert("AC-2: output uses plural .opencode/agents/ path", !result.outputPath.includes("agent/"));
 }
 
@@ -372,7 +366,7 @@ console.log("\n=== Section 4: Forward transform CC → opencode (AC-1, AC-2, AC-
   const { frontmatter: fm, body } = parseFrontmatter(result.content);
 
   assert("AC-2: output uses plural .opencode/commands/ path", result.outputPath.includes(path.join(".opencode", "commands")));
-  assert("AC-3: allowed-tools → permission.allow", Array.isArray(fm["permission"]?.["allow"]) && fm["permission"]["allow"].length > 0);
+  assert("AC-3: command permission is omitted", fm["permission"] === undefined);
   assert("AC-3: $ARGUMENTS preserved verbatim in body", body.includes("$ARGUMENTS"));
   assert("AC-3: no {input} rewrite (identity)", !body.includes("{input}"));
   assert("AC-3: argument-hint not carried to opencode", fm["argument-hint"] === undefined);
@@ -385,7 +379,7 @@ console.log("\n=== Section 4: Forward transform CC → opencode (AC-1, AC-2, AC-
   // directions equally would still be caught here.
   //
   // Expected serialised content produced by transformToOpencode for CC_AGENT_CONTENT.
-  // Fields ordered: name, description, permission (block object form), mode, color, th-origin.
+  // Fields ordered: name, description, mode, color, th-origin.
   // model: ABSENT — opencode agents are model-less (harness follows the operator's /model pick).
   // color: orange maps to opencode "warning" enum.
   // Body starts with a blank line then the CC_AGENT_CONTENT body verbatim.
@@ -393,10 +387,6 @@ console.log("\n=== Section 4: Forward transform CC → opencode (AC-1, AC-2, AC-
     "---",
     "name: test-agent",
     "description: A test agent for migration tests.",
-    "permission:",
-    "  read: allow",
-    "  glob: allow",
-    "  grep: allow",
     "mode: subagent",
     "color: warning",
     "th-origin: opencode",
@@ -438,7 +428,7 @@ console.log("\n=== Section 5: Inverse transform opencode → CC (AC-4, AC-5) ===
   // model is intentionally NOT preserved through opencode: the forward transform
   // drops it (model-less), so the reverse reconstruction has no model to restore.
   assert("AC-4: round-trip drops model (opencode is model-less)", rtFm["model"] === undefined);
-  assert("AC-4: round-trip tools", rtFm["tools"] === origFm["tools"]);
+  assert("AC-4: round-trip drops tools so native permissions apply", rtFm["tools"] === undefined);
   assert("AC-4: round-trip name", rtFm["name"] === origFm["name"]);
   assert("AC-4: round-trip description", rtFm["description"] === origFm["description"]);
   const { body: expectedBody } = parseFrontmatter(CC_AGENT_CONTENT);
@@ -731,7 +721,7 @@ Body content.
   assert("AC-9: out-of-allowlist 'tags' key NOT in projected output (allowlist-based, not blacklist)", projFm["tags"] === undefined);
   // Allowlisted keys ARE present.
   assert("AC-9: allowlisted 'name' IS in projected output", projFm["name"] === "test-agent");
-  assert("AC-9: allowlisted 'permission' IS in projected output", projFm["permission"] !== undefined);
+  assert("AC-9: permission is omitted from projected output", projFm["permission"] === undefined);
 }
 
 {
@@ -1024,7 +1014,7 @@ Orchestrator body.
   // Applying the role layer on top renames + re-modes the orchestrator.
   const roled = applyModeByRole(projected, "orchestrator");
   const { frontmatter: roledFm } = parseFrontmatter(roled);
-  assert("Task-2 AC-1: role layer sets name: TH Orchestrator", roledFm["name"] === "TH Orchestrator");
+  assert("Task-2 AC-1: role layer sets name: TH-orchestrator", roledFm["name"] === "TH-orchestrator");
   assert("Task-2 AC-1: role layer sets mode: primary", roledFm["mode"] === "primary");
 
   // Every other agent is returned unchanged by the role layer.
@@ -1077,7 +1067,7 @@ Orchestrator body.
 
     const orchestratorOutput = await fs.readFile(path.join(tmpDir, ".opencode", "agents", "orchestrator.md"), "utf8");
     const { frontmatter: orchestratorOutFm } = parseFrontmatter(orchestratorOutput);
-    assert("Task-2 AC-2: runTransform output has name: TH Orchestrator", orchestratorOutFm["name"] === "TH Orchestrator");
+    assert("Task-2 AC-2: runTransform output has name: TH-orchestrator", orchestratorOutFm["name"] === "TH-orchestrator");
     assert("Task-2 AC-2: runTransform output has mode: primary", orchestratorOutFm["mode"] === "primary");
 
     const architectOutput = await fs.readFile(path.join(tmpDir, ".opencode", "agents", "architect.md"), "utf8");
@@ -1099,7 +1089,7 @@ Orchestrator body.
   // Round-trip: project the orchestrator agent forward (generic + role
   // layer), then project the result back to CC form. The inverse must
   // restore the canonical CC name ("orchestrator") rather than carry through
-  // the injected opencode display name ("TH Orchestrator") — the defect
+  // the injected opencode display name ("TH-orchestrator") — the defect
   // found in the dual review of this feature.
   const orchestratorInput = `---
 name: orchestrator
@@ -1113,12 +1103,12 @@ Orchestrator body.
   const forwardGeneric = transformToOpencode("agents/orchestrator.md", orchestratorInput, "/fake-repo").content;
   const forwardRoled = applyModeByRole(forwardGeneric, "orchestrator");
   const { frontmatter: forwardFm } = parseFrontmatter(forwardRoled);
-  assert("round-trip fixture: forward pass produced the injected display name", forwardFm["name"] === "TH Orchestrator");
+  assert("round-trip fixture: forward pass produced the injected display name", forwardFm["name"] === "TH-orchestrator");
 
   const back = transformToCC(".opencode/agents/orchestrator.md", forwardRoled, "/fake-repo");
   const { frontmatter: backFm } = parseFrontmatter(back.content);
-  assert("round-trip: inverse restores canonical name 'orchestrator', not the injected 'TH Orchestrator'", backFm["name"] === "orchestrator");
-  assert("round-trip: inverse does not leak the injected display name", backFm["name"] !== "TH Orchestrator");
+  assert("round-trip: inverse restores canonical name 'orchestrator', not the injected 'TH-orchestrator'", backFm["name"] === "orchestrator");
+  assert("round-trip: inverse does not leak the injected display name", backFm["name"] !== "TH-orchestrator");
 }
 
 // ---------------------------------------------------------------------------
