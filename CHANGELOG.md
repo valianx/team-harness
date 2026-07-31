@@ -7,11 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [4.0.0] - 2026-07-31
+## [3.4.2] - 2026-07-31
 
 ### Changed
 
-- **BREAKING:** OpenCode now uses its native permission and approval policy instead of installed Team Harness hook plugins or projected per-agent permission blocks.
+- OpenCode now uses its native permission and approval policy instead of installed Team Harness hook plugins or projected per-agent permission blocks.
 - Installed `TH-orchestrator` as the primary default OpenCode agent while preserving operator-owned `opencode.json` settings.
 - Made installer ownership and configuration mutations fail closed on malformed ledgers, path escapes, symlinks, reparse points, invalid JSON, and mismatched installation roots.
 
