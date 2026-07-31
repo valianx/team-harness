@@ -14,7 +14,7 @@ Longer only on request, or for a Critical/High finding's headline and remediatio
 **Identifiers follow prose.** State the problem in words; `AC-*`, `SEC-*`, `STAGE-GATE-*`,
 phase numbers, and issue ids trail as references.
 
-```
+```text
 Weak:   SEC-123 causes PROB-213, so AC-874 fails.
 Strong: Validation accepts requests with no authorization header, so the criterion
         requiring authenticated access is unmet. References: SEC-123, PROB-213, AC-874.
