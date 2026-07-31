@@ -94,7 +94,7 @@ forbidden without exception.
 | **CUT** | WHAT-comments on unexported bodies where well-named identifiers already express the intent. Session/issue-reference cruft. Commented-out code. |
 | **EXCEPTION — never strip** | A non-obvious cross-file invariant contract, bounded to the block that states it, not the file's entire comment surface — e.g. the `modes.go` `lowCostMatrix` invariants block and its provenance header (verified at test time by `TestLowCostMatrixInvariants`), or the `preservation.go` clobber-avoidance comments. Background on `modes.go`'s current status: `docs/lifecycle.md § Installer identity`. |
 
-**Exemplar:** `cmd/install/modes.go:14` — `// ModeStandard is the default: agent files are
+**Exemplar:** `cmd/install/modes.go:16` — `// ModeStandard is the default: agent files are
 copied byte-identical.` A one-line doc comment per exported identifier is the authoring model;
 the adjacent invariants block is the bounded EXCEPTION above, not the general pattern to copy.
 
