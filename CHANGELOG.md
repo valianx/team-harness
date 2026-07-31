@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Made PR reviews concise by keeping anchored findings in inline threads and the body as a non-duplicating verdict index.
 - Removed size-triggered reviewer multiplication and convergence loops; QA and security now run only from concrete acceptance or security signals.
 
+## [3.4.3] - 2026-07-31
+
+### Changed
+
+- Added a comment contract to `tester` and fixed contradictory examples in the comment-authoring guide, reducing comment volume in agent-generated test files.
+
 ## [3.4.2] - 2026-07-31
 
 ### Changed
