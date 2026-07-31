@@ -43,7 +43,7 @@ def context(**overrides):
 
 
 class ReviewContextTests(unittest.TestCase):
-    def test_security_selection_is_fail_closed_for_every_reason_and_override(self):
+    def test_security_selection_is_fail_closed_for_every_reason(self):
         cases = [
             ("agents/security.md\n", "+permission boundary\n", "known-sensitive", True),
             ("docs/guide.md\n", "+clarify review behavior\n", "known-non-executable", False),
@@ -76,6 +76,7 @@ class ReviewContextTests(unittest.TestCase):
                 self.assertEqual(result["reason"], reason)
                 self.assertEqual(result["security_required"], required)
 
+    def test_explicit_and_tier_four_selection_require_security(self):
         for explicit_security, tier, trigger in (
             (True, None, "explicit"),
             (False, 4, "tier-4"),
