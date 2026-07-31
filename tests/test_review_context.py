@@ -4,11 +4,14 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 
@@ -23,7 +26,7 @@ SPEC.loader.exec_module(MODULE)
 
 def context(**overrides):
     value = {
-        "schema_version": 1,
+        "schema_version": MODULE.SCHEMA_VERSION,
         "base_oid": "base",
         "head_oid": "head",
         "merge_base_oid": "merge",
@@ -40,6 +43,144 @@ def context(**overrides):
 
 
 class ReviewContextTests(unittest.TestCase):
+    def test_security_selection_is_fail_closed_for_every_reason(self):
+        cases = [
+            ("agents/security.md\n", "+permission boundary\n", "known-sensitive", True),
+            ("docs/guide.md\n", "+clarify review behavior\n", "known-non-executable", False),
+            ("src/plugin.future\n", "+run new handler\n", "unmatched-executable", True),
+            ("", "", "indeterminate", True),
+        ]
+        for changed_files, diff, reason, required in cases:
+            with self.subTest(reason=reason):
+                self.assertEqual(
+                    MODULE.classify_security_change(changed_files, diff),
+                    reason,
+                )
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    changed_path = root / "changed-files.txt"
+                    diff_path = root / "review.diff"
+                    changed_path.write_text(changed_files, encoding="utf-8")
+                    diff_path.write_text(diff, encoding="utf-8")
+                    output = io.StringIO()
+                    with redirect_stdout(output):
+                        MODULE.command_select_security(
+                            SimpleNamespace(
+                                changed_files=changed_path,
+                                diff=diff_path,
+                                explicit_security=False,
+                                tier=None,
+                            )
+                        )
+                    result = json.loads(output.getvalue())
+                self.assertEqual(result["reason"], reason)
+                self.assertEqual(result["security_required"], required)
+
+    def test_explicit_and_tier_four_selection_require_security(self):
+        for explicit_security, tier, trigger in (
+            (True, None, "explicit"),
+            (False, 4, "tier-4"),
+        ):
+            with self.subTest(trigger=trigger), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                changed_path = root / "changed-files.txt"
+                diff_path = root / "review.diff"
+                changed_path.write_text("docs/guide.md\n", encoding="utf-8")
+                diff_path.write_text("+clarify review behavior\n", encoding="utf-8")
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    MODULE.command_select_security(
+                        SimpleNamespace(
+                            changed_files=changed_path,
+                            diff=diff_path,
+                            explicit_security=explicit_security,
+                            tier=tier,
+                        )
+                    )
+                result = json.loads(output.getvalue())
+                self.assertEqual(result["reason"], "known-non-executable")
+                self.assertTrue(result["security_required"])
+                self.assertEqual(result["triggers"], [trigger])
+
+    def test_capture_binds_mergeability_and_rejects_mid_capture_drift(self):
+        metadata = {
+            "number": 1,
+            "title": "Title",
+            "body": "Body",
+            "author": {"login": "alice"},
+            "baseRefOid": "base",
+            "headRefOid": "head",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "CLEAN",
+        }
+        refs = {
+            "base_ref": "refs/review/base",
+            "head_ref": "refs/review/head",
+            "merge_base_oid": "merge",
+        }
+
+        with (
+            patch.object(MODULE, "git_snapshot", return_value=refs),
+            patch.object(MODULE, "capture_commits", return_value=[]),
+            patch.object(MODULE, "capture_issue_comments", return_value=[]),
+            patch.object(MODULE, "capture_review_comments", return_value=[]),
+            patch.object(MODULE, "capture_threads", return_value=[]),
+            patch.object(MODULE, "capture_reviews", return_value=[]),
+        ):
+            with patch.object(MODULE, "capture_metadata", side_effect=[metadata, metadata]):
+                captured = MODULE.capture("owner/repo", 1, ROOT, "origin")
+
+            self.assertEqual(
+                captured["mergeability"],
+                {
+                    "status": "clean",
+                    "mergeable": "MERGEABLE",
+                    "merge_state_status": "CLEAN",
+                },
+            )
+            self.assertIn("context_hash", captured)
+
+            changed = {**metadata, "mergeStateStatus": "DIRTY"}
+            with patch.object(
+                MODULE,
+                "capture_metadata",
+                side_effect=[metadata, changed],
+            ):
+                with self.assertRaisesRegex(MODULE.ContextError, "mergeStateStatus changed"):
+                    MODULE.capture("owner/repo", 1, ROOT, "origin")
+
+    def test_mergeability_classification_is_fail_closed(self):
+        self.assertEqual(MODULE.classify_mergeability("CONFLICTING", "CLEAN"), "conflicting")
+        self.assertEqual(MODULE.classify_mergeability("MERGEABLE", "DIRTY"), "conflicting")
+        self.assertEqual(MODULE.classify_mergeability("MERGEABLE", "CLEAN"), "clean")
+        self.assertEqual(MODULE.classify_mergeability("UNKNOWN", "UNKNOWN"), "indeterminate")
+        self.assertEqual(MODULE.classify_mergeability(None, None), "indeterminate")
+
+    def test_mergeability_changes_hash_freshness_and_rendering(self):
+        clean = context(
+            mergeability={
+                "status": "clean",
+                "mergeable": "MERGEABLE",
+                "merge_state_status": "CLEAN",
+            }
+        )
+        conflicting = context(
+            mergeability={
+                "status": "conflicting",
+                "mergeable": "CONFLICTING",
+                "merge_state_status": "DIRTY",
+            }
+        )
+
+        comparison = MODULE.compare_contexts(clean, conflicting)
+        self.assertNotEqual(clean["context_hash"], conflicting["context_hash"])
+        self.assertEqual(comparison["status"], "code-changed")
+        self.assertTrue(comparison["mergeability_changed"])
+        rendered = MODULE.render_context(conflicting)
+        self.assertIn("Mergeability: **conflicting**", rendered)
+        self.assertIn("Raw mergeable: `CONFLICTING`", rendered)
+        self.assertIn("Raw merge state: `DIRTY`", rendered)
+
     def test_compare_distinguishes_code_and_conversation_changes(self):
         original = context()
         conversation = context(

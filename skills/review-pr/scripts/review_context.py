@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 BOT_BODY_LIMIT = 500
 HUMAN_BODY_LIMIT = 2_000
 DETAILS_RE = re.compile(r"<details\b[^>]*>.*?</details>", re.IGNORECASE | re.DOTALL)
@@ -398,6 +398,55 @@ def conversation_identity(context: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def classify_mergeability(mergeable: Any, merge_state_status: Any) -> str:
+    mergeable_value = str(mergeable or "").upper()
+    state_value = str(merge_state_status or "").upper()
+    if mergeable_value == "CONFLICTING" or state_value == "DIRTY":
+        return "conflicting"
+    if mergeable_value == "MERGEABLE" and state_value == "CLEAN":
+        return "clean"
+    return "indeterminate"
+
+
+SENSITIVE_PATH_PARTS = {
+    "auth", "authorization", "crypto", "middleware", "permission", "security",
+    "secret", "session",
+}
+SENSITIVE_FILENAMES = {
+    "cargo.lock", "cargo.toml", "go.mod", "go.sum", "package-lock.json",
+    "package.json", "pnpm-lock.yaml", "poetry.lock", "pyproject.toml",
+    "requirements.txt", "yarn.lock",
+}
+NON_EXECUTABLE_SUFFIXES = {
+    ".adoc", ".avif", ".bmp", ".gif", ".ico", ".jpeg", ".jpg", ".md",
+    ".pdf", ".png", ".rst", ".svg", ".txt", ".webp",
+}
+SENSITIVE_DIFF_TOKENS = re.compile(
+    r"\b(auth(?:entication|orization)?|crypt(?:o|ography)|eval|exec|password|"
+    r"permission|secret|session|subprocess|token)\b|(?:command|sql)\s*(?:build|construct)",
+    re.IGNORECASE,
+)
+
+
+def classify_security_change(changed_files: str, diff: str) -> str:
+    paths = [line.strip() for line in changed_files.splitlines() if line.strip()]
+    if not paths or not diff.strip() or "GIT binary patch" in diff or "Binary files " in diff:
+        return "indeterminate"
+    if any("\x00" in value for value in (changed_files, diff)):
+        return "indeterminate"
+
+    for raw_path in paths:
+        path = Path(raw_path)
+        parts = {part.lower() for part in path.parts}
+        if parts & SENSITIVE_PATH_PARTS or path.name.lower() in SENSITIVE_FILENAMES:
+            return "known-sensitive"
+    if SENSITIVE_DIFF_TOKENS.search(diff):
+        return "known-sensitive"
+    if all(Path(path).suffix.lower() in NON_EXECUTABLE_SUFFIXES for path in paths):
+        return "known-non-executable"
+    return "unmatched-executable"
+
+
 def finalize_hashes(context: dict[str, Any]) -> None:
     code = {
         "base_oid": context["base_oid"],
@@ -411,6 +460,7 @@ def finalize_hashes(context: dict[str, Any]) -> None:
             "code_hash": context["code_hash"],
             "conversation_hash": context["conversation_hash"],
             "commits": context.get("commits", []),
+            "mergeability": context.get("mergeability", {}),
         }
     )
 
@@ -427,7 +477,8 @@ def capture_metadata(repo: str, number: int) -> dict[str, Any]:
             "--json",
             (
                 "number,title,body,author,baseRefName,headRefName,baseRefOid,"
-                "headRefOid,isCrossRepository,additions,deletions,changedFiles,url,files"
+                "headRefOid,isCrossRepository,additions,deletions,changedFiles,url,files,"
+                "mergeable,mergeStateStatus"
             ),
         ]
     )
@@ -463,6 +514,13 @@ def capture(repo: str, number: int, git_dir: Path, remote: str) -> dict[str, Any
         "head_oid": head_oid,
         "merge_base_oid": refs["merge_base_oid"],
         "git_refs": {"base": refs["base_ref"], "head": refs["head_ref"]},
+        "mergeability": {
+            "status": classify_mergeability(
+                metadata.get("mergeable"), metadata.get("mergeStateStatus")
+            ),
+            "mergeable": metadata.get("mergeable"),
+            "merge_state_status": metadata.get("mergeStateStatus"),
+        },
         "commits": capture_commits(repo, number),
         "issue_comments": capture_issue_comments(repo, number),
         "review_comments": capture_review_comments(repo, number),
@@ -470,7 +528,9 @@ def capture(repo: str, number: int, git_dir: Path, remote: str) -> dict[str, Any
         "reviews": capture_reviews(repo, number),
     }
     final_metadata = capture_metadata(repo, number)
-    for field in ("baseRefOid", "headRefOid", "title", "body"):
+    for field in (
+        "baseRefOid", "headRefOid", "title", "body", "mergeable", "mergeStateStatus"
+    ):
         if (metadata.get(field) or "") != (final_metadata.get(field) or ""):
             raise ContextError(
                 f"PR {field} changed while context was captured; retry before reviewing"
@@ -495,6 +555,7 @@ def compare_contexts(expected: dict[str, Any], actual: dict[str, Any]) -> dict[s
         expected.get("conversation_hash") != actual.get("conversation_hash")
     )
     commits_changed = expected.get("commits") != actual.get("commits")
+    mergeability_changed = expected.get("mergeability") != actual.get("mergeability")
     changed_fields = [
         key
         for key in ("base_oid", "head_oid", "merge_base_oid")
@@ -503,13 +564,14 @@ def compare_contexts(expected: dict[str, Any], actual: dict[str, Any]) -> dict[s
     return {
         "status": (
             "code-changed"
-            if code_changed or commits_changed
+            if code_changed or commits_changed or mergeability_changed
             else "conversation-changed"
             if conversation_changed
             else "current"
         ),
-        "code_changed": code_changed or commits_changed,
+        "code_changed": code_changed or commits_changed or mergeability_changed,
         "conversation_changed": conversation_changed,
+        "mergeability_changed": mergeability_changed,
         "changed_fields": changed_fields,
         "expected_head_oid": expected.get("head_oid"),
         "actual_head_oid": actual.get("head_oid"),
@@ -550,10 +612,15 @@ def body_lines(body: str, indent: str = "  ") -> Iterable[str]:
 
 
 def render_context(context: dict[str, Any]) -> str:
+    mergeability = context.get("mergeability") or {}
     lines = [
         f"Reviewed snapshot: `{context['head_oid']}`",
         f"Base snapshot: `{context['base_oid']}`",
         f"Merge base: `{context['merge_base_oid']}`",
+        f"Captured at: `{context.get('fetched_at', 'unknown')}`",
+        f"Mergeability: **{mergeability.get('status', 'indeterminate')}**",
+        f"Raw mergeable: `{mergeability.get('mergeable')}`",
+        f"Raw merge state: `{mergeability.get('merge_state_status')}`",
         "",
         "## Commits",
     ]
@@ -677,6 +744,7 @@ def command_capture(args: argparse.Namespace) -> int:
                 "base_oid": context["base_oid"],
                 "merge_base_oid": context["merge_base_oid"],
                 "context_hash": context["context_hash"],
+                "mergeability": context.get("mergeability"),
                 "output": str(args.output),
             }
         )
@@ -706,6 +774,26 @@ def command_same_author(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_select_security(args: argparse.Namespace) -> int:
+    try:
+        changed_files = args.changed_files.read_text(encoding="utf-8")
+        diff = args.diff.read_text(encoding="utf-8")
+        reason = classify_security_change(changed_files, diff)
+    except (OSError, UnicodeError):
+        reason = "indeterminate"
+    triggers = []
+    if args.explicit_security:
+        triggers.append("explicit")
+    if args.tier == 4:
+        triggers.append("tier-4")
+    print(json.dumps({
+        "reason": reason,
+        "security_required": reason != "known-non-executable" or bool(triggers),
+        "triggers": triggers,
+    }))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -732,6 +820,13 @@ def build_parser() -> argparse.ArgumentParser:
     author_parser.add_argument("--context", required=True, type=Path)
     author_parser.add_argument("--login", required=True)
     author_parser.set_defaults(func=command_same_author)
+
+    security_parser = subparsers.add_parser("select-security")
+    security_parser.add_argument("--changed-files", required=True, type=Path)
+    security_parser.add_argument("--diff", required=True, type=Path)
+    security_parser.add_argument("--explicit-security", action="store_true")
+    security_parser.add_argument("--tier", type=int)
+    security_parser.set_defaults(func=command_select_security)
     return parser
 
 

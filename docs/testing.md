@@ -59,7 +59,8 @@ Everything below has inputs, outputs, and exit codes.
 |---|---|
 | `test_agent_frontmatter.py` | YAML frontmatter parses for every `agents/*.md`, via PyYAML. Catches the silent-agent-drop class: an unquoted `": "` in a description breaks parsing, and Claude Code then drops the agent from the registered `subagent_type` list with no error surfaced |
 | `test_opencode_agent_frontmatter.sh` | The same, for the opencode transform |
-| `test_security_scan.py` | Read-only-tier agents carrying `Bash`, web-facing agents missing the §6.6 injection preamble, `hooks/*.sh` injection anti-patterns, hook-manifest command form, concrete secrets in shipped assets, and roster reachability |
+| `test_security_scan.py` | Exact source allowlists for all four PR agents, optional Codex projection validation, read-only-tier Bash grants, hook injection patterns, secrets, and roster reachability |
+| `test_review_context.py` | PR security-selection reason enums plus snapshot mergeability classification, hash/freshness comparison, rendering, and conversation capture behavior |
 | `test_permission_disjointness.py` | The permission-allowlist disjointness invariant (#18312 floor) |
 | `test_flow_event_schema_sync.py` | Cross-repo flow-event schema sync |
 | `test_lane_marker_identity.py` | Lane-marker byte identity |

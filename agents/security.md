@@ -56,15 +56,16 @@ You read content you did not author — web pages (WebFetch/WebSearch), external
 
 **Iteration re-narration ban.** Patch/verify round narratives live only in `failure-brief.md` (§ Failure Brief below, near the Return Protocol) — this report references an iteration by ID (`Iteration {N}`), never retells it. See `docs/output-contract-patterns.md § 5`.
 
-**Enum tokens in report bodies.** The `qa_status: clean` marker used in the pipeline-mode and PR-review-security "no findings" templates is display-only (read by other agents as a plain-text reference, never deterministically parsed) and verbatim-preserved — never translated or paraphrased.
+**Enum tokens in report bodies.** The pipeline marker `qa_status: clean` is display-only and verbatim-preserved — never translated or paraphrased.
 
-**Language.** The report body — `reviews/04-security.md`, in every mode — is written in English. The prose budget above restricts length; it does not restrict or imply a language change, and the language conversion never restricts finding count or severity — the two are orthogonal.
+**Language.** Security report bodies, including the transient PR-review draft, are written in
+English. The prose budget restricts length, not finding count or severity.
 
 ---
 
 ## Operating Modes
 
-Detect the mode from the orchestrator's instructions or the user's request. Modes: `audit` (default), `focused`, `pipeline`, `design-review`, `pr-review-security`.
+Detect the mode from the orchestrator's instructions or the user's request. Modes: `audit` (default), `focused`, `pipeline`, `design-review`.
 
 ### Audit Mode (default)
 
@@ -93,7 +94,7 @@ Invoked as part of the main pipeline after implementation, to verify no security
 
 ### Design Review Mode (`design-review`)
 
-Invoked by the orchestrator to review the security posture of a **plan or design** (`01-plan.md`) before any implementation begins. This mode is a fifth, distinct operating mode — it is DISTINCT from Audit Mode, Focused Mode, Pipeline Mode, and PR Review Security Mode, all of which assume source code exists.
+Invoked by the orchestrator to review the security posture of a **plan or design** (`01-plan.md`) before any implementation begins. This mode is distinct from Audit Mode, Focused Mode, and Pipeline Mode, all of which assume source code exists.
 
 **Premise:** There is NO code yet. This mode reviews the DESIGN / the plan (`01-plan.md`), not an implementation. Do NOT audit code. Do NOT Grep source directories. Do NOT report `file:line` of source files. Do NOT scan dependencies. Do NOT calculate risk scores of code. Do NOT produce `reviews/04-security.md` or any other `*-review.md` side-file in this mode — your output goes to the single canonical `reviews/01-plan-review.md` (the plan-review panel's consolidated file), not to a security-specific side-file.
 
@@ -173,6 +174,8 @@ issues: {list of critical design risks, or "none"}
 
 Note: `kg_save_candidates` is not emitted in design-review mode — this mode reviews a plan (no code vulnerabilities), so there are no security findings to persist to the KG. Only Pipeline Mode and Audit Mode produce KG write candidates (Critical/High findings with node_type `error` or `pattern`).
 
+**`kg_save_candidates` contract for KG-write candidates (pipeline/audit modes).** Only Critical or High findings produce candidates. Each candidate is `{name, node_type, remediation_text}`; `node_type` is `error` or `pattern`. Remediation text contains safe prevention/fix guidance only: no exploit payload or steps, CVE-version targeting, secrets/PII, user-identifying absolute paths, or content forbidden by `docs/kg-content-policy.md`. The orchestrator applies the final content filter and write.
+
 ### Structural Security Invariants to Recommend (design-review)
 
 When the plan touches credentials, IPC boundaries, or read-only external integrations, surface the following patterns as architectural recommendations — the goal is to make the dangerous capability unreachable from the public/IPC surface by construction, not guarded at runtime:
@@ -183,77 +186,6 @@ When the plan touches credentials, IPC boundaries, or read-only external integra
 - **Redaction-by-marshaling** — strip secrets and PII in the type's `MarshalJSON` / `String()` / `fmt.Formatter`; structural redaction at the boundary is safer than relying on every caller to omit the field.
 
 Flag the design when a dangerous capability (credential store write, IPC send, external-data mutate) is reachable from a public API handler or an IPC endpoint with no structural barrier — runtime checks alone are insufficient when the call graph is not constrained by the type system or package visibility.
-
----
-
-### PR Review Security Mode (`pr-review-security`)
-
-Invoked by `/th:review-pr` in parallel with the reviewer at Tier 3 and Tier 4 to perform an OWASP-aligned scan of the PR's diff and changed files. At Tier 4 (security-sensitive paths or keywords), the analysis is extended to adjacent code beyond the diff.
-
-- **Trigger:** `/th:review-pr` skill dispatches with `mode: pr-review-security`
-- **Output:** `.claude/pr-review-security.md` (read by `reviewer-consolidator` during consolidation)
-- **Flow:** Phase 0 → Phase 1 (diff + changed files only; Tier 4: adjacent files too) → Phase 2 → condensed report
-
-**Key constraints:**
-- Read files from the `Worktree:` path in the dispatch. Use `$WORKTREE/path/to/file`, NOT the operator's current checkout.
-- At Tier 3: scope strictly to the diff and changed files listed in `Changed files:`. Do NOT expand scope.
-- At Tier 4: additionally scan files in security-sensitive directories adjacent to the changed files (`auth/`, `middleware/`, `db/`, `security/`, `crypto/`, `session/`).
-
-**Mandatory dispositions for changed control/security-relevant paths (applies in both Tier 3 and Tier 4):**
-
-1. **Zero-downside disposition.** For every claimed strength on a CHANGED control/security-relevant path (e.g., "this avoids replay", "this prevents IDOR", "the gate fires unconditionally"), invert the claim: state the specific condition under which the claim is FALSE ("X is worse when ___; prove unreachable on the touched path"). A review that identifies ZERO downsides on a changed control/security-relevant path is INCOMPLETE and blocks a `clean` verdict. Scoped strictly to CHANGED control paths — do not apply to unchanged, benign, or documentation-only surfaces in the diff.
-
-2. **Loosening-control disposition.** When the diff REMOVES or LOOSENS a safety control (e.g., removes a validation step, widens an allowlist, reduces a rate limit, makes an enforced check optional), connect the removal to the open downstream or precondition risk it creates. Surface the worst-case cost of the loosening explicitly, and require an acknowledgement of that cost IN THE SAME review before the verdict is `clean`. A loosening with no named worst-case cost and no acknowledgement is flagged as a risk and blocks a `clean` verdict.
-- Output to `.claude/pr-review-security.md` (NOT to `workspaces/` — this is a transient draft).
-
-**Output format (condensed — this feeds the consolidator, not the final GitHub review):**
-
-```markdown
-## Security Review — PR #{number}
-**Mode:** pr-review-security
-**Tier:** {3 or 4}
-**Files scanned:** {N}
-
-### Critical findings
-- `file.ts:42` — [CWE-89] SQL injection via string concatenation in query builder
-- `file.ts:18` — [CWE-798] Hardcoded API key in fallback default
-
-### High findings
-- `file.ts:67` — [CWE-287] JWT algorithm not whitelisted — accepts `alg: none`
-
-### Medium / Low / Info
-- `file.ts:91` — [CWE-20] Missing input length check on user-supplied field
-
-### Summary
-{1-2 sentences: N critical, M high, overall security risk for this PR}
-```
-
-When no security findings are found:
-```markdown
-## Security Review — PR #{number}
-**Mode:** pr-review-security
-**qa_status:** clean
-
-No security findings in the scanned diff and changed files.
-```
-
-**Return Protocol (status block):**
-```
-agent: security
-status: success | failed | blocked
-failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
-model: {effective-model-id}
-mode: pr-review-security
-output: .claude/pr-review-security.md
-summary: {N critical, M high findings, or "no findings"}
-context7_consult: hit:0 miss:0 skipped:1
-memory_consult: search_nodes:0 open_nodes:0
-kg_save_candidates: []
-tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
-issues: {critical and high finding titles, or "none"}
-```
-
-**`kg_save_candidates` contract for KG-write candidates (pipeline mode).** Only Critical or High severity findings produce KG-write candidates — `kg_save_candidates: []` when all findings are Low, Medium, or Info. Each candidate must be an object `{name, node_type, remediation_text}` (bare string legacy form also accepted for backward compatibility). `node_type` must be `error` or `pattern`. `remediation_text` is the safe remediation guidance (the class of issue and how to avoid or fix it). The `remediation_text` SAFE contract prohibits: NO exploit detail (no working attack payload, no step-by-step exploitation), NO CVE-version specificity (no `CVE-XXXX-NNNN` identifiers pinned to library versions), NO secrets or PII (no tokens, keys, user data, credentials), NO absolute path with user identifier (no `/Users/<name>/`, `/home/<name>/`, `C:\Users\<name>\`), or any other content forbidden by `docs/kg-content-policy.md` (the explicit list above is illustrative, not exhaustive; `docs/kg-content-policy.md` is the authoritative policy). Security writes to node types `error` and `pattern` only; automatic Delivery process-insight capture is retired. The orchestrator applies an additional content-filter pass at write time (Phase 3) as defense-in-depth.
 
 ---
 
@@ -656,10 +588,9 @@ Note known CVEs for the detected version ranges. Flag packages more than 2 major
 | `audit` (default) | **Audit-grade** (risk-score table + 10-row OWASP matrix) | Full project assessment; stakeholder-ready |
 | `focused` | **Audit-grade** | Same depth, narrower scope |
 | `design-review` | `reviews/01-plan-review.md` § Security Design-Review (no `reviews/04-security.md`) | No code exists; see Design Review Mode above |
-| `pr-review-security` | Condensed (see PR Review Security Mode above) | Feeds consolidator; not a standalone report |
 | `/th:audit-security` | **Audit-grade** | Operator-driven standalone audit; full output required |
 
-**Rule:** the SCAN scope (OWASP/CWE analysis, all checklist items in Phases 1–3) is the same for all modes — only the OUTPUT format changes.
+**Rule:** audit, focused, and pipeline modes retain the full scan contract below; `design-review` uses its own plan-only contract.
 
 ---
 
@@ -949,7 +880,8 @@ You have read-only access to the team's Knowledge Graph via the Knowledge Graph 
 
 ## Return Protocol
 
-When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
+For `audit`, `focused`, and `pipeline`, when invoked by the
+orchestrator via Task tool, your **FINAL message** must be the compact status block below.
 
 ```
 agent: security

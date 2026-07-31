@@ -373,6 +373,25 @@ console.log("\n=== Section 4: Forward transform CC → opencode (AC-1, AC-2, AC-
 }
 
 {
+  const expectedPermission = {
+    "*": "deny",
+    read: "allow",
+    glob: "allow",
+    grep: "allow",
+  };
+  for (const name of ["reviewer", "pr-review-qa", "pr-review-security", "reviewer-consolidator"]) {
+    const source = `---\nname: ${name}\nmodel: sonnet\ntools: Read, Glob, Grep\n---\nBody.\n`;
+    const result = transformToOpencode(`agents/${name}.md`, source, "/repo");
+    const { frontmatter: fm } = parseFrontmatter(result.content);
+    assert(
+      `PR review projection: ${name} is deny-by-default with the exact read-only allowlist`,
+      JSON.stringify(fm["permission"]) === JSON.stringify(expectedPermission),
+      JSON.stringify(fm["permission"]),
+    );
+  }
+}
+
+{
   // SEC-OCM-4: independent fixed-bytes oracle for the forward agent transform.
   // This assertion compares transform output against hand-authored expected bytes —
   // NOT against the transform's own output — so a symmetric bug that corrupts both

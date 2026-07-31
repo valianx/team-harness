@@ -317,7 +317,8 @@ var opencodeColorRe = regexp.MustCompile(`^(#[0-9a-fA-F]{6}|primary|secondary|ac
 // TestTransformPlacedFormat_AllAgents applies the opencode transform to every
 // real agent .md file in agents/ and asserts the output is valid opencode format:
 //
-//   - permission is absent so OpenCode's native policy remains authoritative
+//   - PR-review agents receive the exact deny-by-default read-only permission
+//     object; permission is absent for every other agent
 //   - no mcp__* tokens appear in the frontmatter section
 //   - if color is present, it matches the opencode hex-or-enum pattern
 //
@@ -329,65 +330,73 @@ var opencodeColorRe = regexp.MustCompile(`^(#[0-9a-fA-F]{6}|primary|secondary|ac
 // This is AC-4 per 01-plan.md.
 func TestTransformPlacedFormat_AllAgents(t *testing.T) {
 	agentsFS := EmbeddedAssets()
-
 	err := fs.WalkDir(agentsFS, "agents", func(agentPath string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() || !strings.HasSuffix(agentPath, ".md") {
+		if !isInvocableAgentPath(agentPath, d) {
 			return nil
 		}
-		// Skip README and _shared snippets (not invocable agents).
-		base := agentPath[strings.LastIndex(agentPath, "/")+1:]
-		if base == "README.md" || strings.Contains(agentPath, "_shared") {
-			return nil
-		}
-
-		src, readErr := fs.ReadFile(agentsFS, agentPath)
-		if readErr != nil {
-			t.Errorf("cannot read embedded %s: %v", agentPath, readErr)
-			return nil
-		}
-
-		got, transformErr := opencodeRuntimeTransform(src, TransformKindAgent, agentPath)
-		if transformErr != nil {
-			t.Errorf("agent %s: transformToOpencode error: %v", agentPath, transformErr)
-			return nil
-		}
-
-		// Extract the frontmatter section only (between --- fences).
-		outStr := string(got)
-		fmSection := ""
-		if strings.HasPrefix(outStr, "---\n") {
-			rest := outStr[4:]
-			if closeIdx := strings.Index(rest, "\n---"); closeIdx >= 0 {
-				fmSection = rest[:closeIdx]
-			}
-		}
-
-		if strings.Contains(fmSection, "permission:") {
-			t.Errorf("agent %s: permission must be omitted so native OpenCode policy applies", agentPath)
-		}
-
-		// Assert no mcp__ tokens appear in the frontmatter.
-		if strings.Contains(fmSection, "mcp__") {
-			t.Errorf("agent %s: mcp__ token found in frontmatter — must be dropped from permission", agentPath)
-		}
-
-		// Assert color, if present, is a valid opencode value.
-		for _, line := range strings.Split(fmSection, "\n") {
-			if strings.HasPrefix(line, "color: ") {
-				colorStr := strings.TrimSpace(strings.TrimPrefix(line, "color: "))
-				colorStr = strings.Trim(colorStr, `"'`)
-				if !opencodeColorRe.MatchString(colorStr) {
-					t.Errorf("agent %s: color %q is not a valid opencode enum or hex (#rrggbb)", agentPath, colorStr)
-				}
-			}
-		}
-
+		assertEmbeddedAgentProjection(t, agentsFS, agentPath)
 		return nil
 	})
 	if err != nil {
 		t.Fatalf("WalkDir agents: %v", err)
+	}
+}
+
+func isInvocableAgentPath(agentPath string, d fs.DirEntry) bool {
+	if d.IsDir() || !strings.HasSuffix(agentPath, ".md") {
+		return false
+	}
+	base := agentPath[strings.LastIndex(agentPath, "/")+1:]
+	return base != "README.md" && !strings.Contains(agentPath, "_shared")
+}
+
+func assertEmbeddedAgentProjection(t *testing.T, agentsFS fs.FS, agentPath string) {
+	t.Helper()
+	src, err := fs.ReadFile(agentsFS, agentPath)
+	if err != nil {
+		t.Errorf("cannot read embedded %s: %v", agentPath, err)
+		return
+	}
+	got, err := opencodeRuntimeTransform(src, TransformKindAgent, agentPath)
+	if err != nil {
+		t.Errorf("agent %s: transformToOpencode error: %v", agentPath, err)
+		return
+	}
+	assertPlacedAgentFrontmatter(t, agentPath, extractFrontmatter(string(got)))
+}
+
+func extractFrontmatter(output string) string {
+	if !strings.HasPrefix(output, "---\n") {
+		return ""
+	}
+	rest := output[4:]
+	if closeIdx := strings.Index(rest, "\n---"); closeIdx >= 0 {
+		return rest[:closeIdx]
+	}
+	return ""
+}
+
+func assertPlacedAgentFrontmatter(t *testing.T, agentPath, frontmatter string) {
+	t.Helper()
+	name := strings.TrimSuffix(agentPath[strings.LastIndex(agentPath, "/")+1:], ".md")
+	expectedPermission := `permission: {"*": deny, read: allow, glob: allow, grep: allow}`
+	if isPRReviewAgent(name) && !strings.Contains(frontmatter, expectedPermission) {
+		t.Errorf("agent %s: expected exact deny-by-default PR-review permission; got:\n%s", agentPath, frontmatter)
+	} else if !isPRReviewAgent(name) && strings.Contains(frontmatter, "permission:") {
+		t.Errorf("agent %s: permission must be omitted so native OpenCode policy applies", agentPath)
+	}
+	if strings.Contains(frontmatter, "mcp__") {
+		t.Errorf("agent %s: mcp__ token found in frontmatter — must be dropped from permission", agentPath)
+	}
+	for _, line := range strings.Split(frontmatter, "\n") {
+		if strings.HasPrefix(line, "color: ") {
+			color := strings.Trim(strings.TrimSpace(strings.TrimPrefix(line, "color: ")), `"'`)
+			if !opencodeColorRe.MatchString(color) {
+				t.Errorf("agent %s: color %q is not a valid opencode enum or hex (#rrggbb)", agentPath, color)
+			}
+		}
 	}
 }

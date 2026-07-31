@@ -6,7 +6,7 @@
 
 | Item | Mechanism | Status | Notes |
 |------|-----------|--------|-------|
-| 1 | Agent projection | **BUILT** | Canonical agent bodies receive the OpenCode name/model/mode delta at install time. Per-agent permissions are omitted so the host's native policy remains authoritative. |
+| 1 | Agent projection | **BUILT** | Canonical agent bodies receive the OpenCode name/mode delta at install time. General per-agent permissions are omitted; the four PR review agents receive a deny-by-default read/glob/grep map. |
 | 2 | Two-layer install manifest + managed-ownership state | **BUILT** (opencode path) | `ComputePlan`/`ApplyPlan`/`appendLedger`/`readLedger` implement the plan/apply/ledger contract in `cmd/install/plan.go`, `apply.go`, `ledger.go`. All SEC-04/05/06 guards enforced. `--runtime claude-code` through the manifest engine is a deliberate empty no-op — the former legacy file-copy path (`installAgents`/`installSkills`/`installHooks` in `main.go`) was retired with the hook Bash→TS cutover (issue #446); Claude Code installs exclusively through the marketplace plugin, so there is no CC path left to unify into the manifest engine (see Genuine residual gaps, item 2, [RESOLVED]). |
 | 3 | Single data-home resolver | **BUILT** | `ResolveDataHome()` in `cmd/install/datahome.go` implements the five-branch resolution order with full SEC-01/02/03/08 enforcement. |
 | 4 | Updater (`install update`) | **BUILT** | `cmd/install/update.go` + `bin/update-opencode.{sh,ps1}`. Three-state version-delta (update-available / already-current / installed-ahead). `ComputePlan` diff preview, interactive `[Y/n]` confirm (operator "n" → zero writes), `ApplyPlan` apply, managed-key-only config bump (`refreshManagedConfigKeys`), restart-to-activate honesty block. `dist/VERSION` release asset for cheap pre-check. |
@@ -160,7 +160,7 @@ The schema and the ownership-tracking model are implemented in `cmd/install/`. T
 |---|---|---|---|
 | **Skills** (`SKILL.md`) | Same `SKILL.md` + frontmatter | **Yes** — discovers `.claude/skills/` directly | **None** — already cross-harness |
 | **Rules / context** (`CLAUDE.md`) | `AGENTS.md` (cross-tool standard) | **Yes** — falls back to `CLAUDE.md` when no `AGENTS.md` exists | **Near-zero** — optionally add `AGENTS.md` as an entry point |
-| **Agents** (`.md` + frontmatter) | Same Markdown + frontmatter; CC-compatible agent directories are partially read | Partially — structure matches, but `permission`/`model`/`mode` fields differ | **Light** — omit per-agent permission/model fields so host policy applies, and emit explicit `mode`; built in `opencodeRuntimeTransform` |
+| **Agents** (`.md` + frontmatter) | Same Markdown + frontmatter; CC-compatible agent directories are partially read | Partially — structure matches, but `permission`/`model`/`mode` fields differ | **Light** — omit general permission/model fields, emit explicit `mode`, and project an exact read-only permission map for the four PR review agents; built in `opencodeRuntimeTransform` |
 | **Commands** (`.md`) | Markdown + frontmatter in `.opencode/commands/`; `$ARGUMENTS` placeholder | Partially — `$ARGUMENTS` vs `{input}`, relocation to `.opencode/commands/` | **Light** — frontmatter delta + path relocation |
 | **Hooks** | Native OpenCode permissions and approvals | **No** | **None** — Team Harness does not install a parallel OpenCode hook plugin |
 

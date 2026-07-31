@@ -1,722 +1,394 @@
 ---
 name: review-pr
-description: Review a pull request on GitHub.
+description: Review a GitHub pull request against an immutable code and conversation snapshot, preview a concise review, and publish it atomically after operator approval.
 ---
 
-Analyze the input: $ARGUMENTS
+Analyze `$ARGUMENTS`. Accept a PR number (`45`, `#45`) or URL.
 
----
-name: review-pr
+## Options
 
-## Flag parsing (run before all modes)
+- `--reviewers <focus[,focus]>`: request explicit lenses. `general` and `architecture`
+  use reviewer passes; `security` selects the security specialist.
+- `--multi`: shorthand for `--reviewers general,architecture`.
+- `[TIER: N]`: compatibility override. Tier 4 forces the security specialist; other values do not add reviewers.
+- `--resume-from-draft`: publish a saved draft only after snapshot validation.
+- `--auto-publish`: operator opt-in to skip the preview menu.
+- `--converge`: compatibility alias for `--multi`. Run one set of independent passes; never loop until models agree.
 
-Before routing to a mode, parse optional flags from `$ARGUMENTS`:
+Remove options before parsing the PR identifier.
 
-- `--multi` → set `multi_reviewer=true`, `focuses=["security","architecture","style"]`.
-- `--reviewers <focus1[,focus2,...]>` → set `multi_reviewer=true`, `focuses` to the comma-separated list (e.g., `security,architecture` → `["security","architecture"]`).
-- `[TIER: N]` (in the PR number / arguments) → set `tier_override=N` (0–4). Takes precedence over auto-classification.
-- `--resume-from-draft` → validate the saved `.claude/pr-review-context.json` against GitHub before using `.claude/pr-review-final.md` (or `.claude/pr-review-draft.md`). If code or conversation changed, discard the stale draft and restart at Phase 1.
-- `--auto-publish` → opt-in flag that skips the Phase 4 preview-and-confirm gate. The operator explicitly authorises publish without seeing the draft first. **Default (without this flag): preview is mandatory** — Phase 4 always shows the full draft and waits for an explicit operator selection before Phase 5 publishes. Set `auto_publish=true` when this flag is present, `auto_publish=false` otherwise.
-- `--converge` → opt-in flag that activates dual-review convergence. Set `converge=true` when this flag is present. When absent, convergence is still auto-enabled for Tier 4 PRs (see Phase 2 Tier Classification — the existing Tier-4 detection predicate triggers convergence without requiring the flag).
+## Non-negotiable invariants
 
-**Publish gate alignment (`ref-direct-modes.md § Publish Gate`):** This skill implements the canonical publish gate at Phase 4 (decision menu = preview-and-confirm). The `--auto-publish` flag satisfies the opt-in contract defined in that gate. When `auto_publish=true`, Phase 4 is skipped and Phase 5 executes immediately after Phase 3 completes; the operator's explicit `--auto-publish` declaration is the approval. When `auto_publish=false` (the default), Phase 4 MUST show the full draft and wait for an explicit choice before Phase 5.
+1. Invoke `orchestrator` for every agent dispatch. Agents run no Bash.
+2. Bind every artifact and GitHub review to the captured `head_oid` and `context_hash`.
+3. Review the detached worktree, never the operator's checkout or a moving branch.
+4. Fail closed when code or semantic conversation freshness cannot be verified.
+5. Never publish without preview and explicit approval unless `--auto-publish` was supplied.
+6. Publish one atomic GitHub review containing `body`, `event`, `commit_id`, and `comments`.
+7. Keep each finding in one public channel:
+   - an anchored finding lives in an inline thread;
+   - a genuinely cross-file finding lives in the review body;
+   - the body may count inline findings but must not repeat them.
+8. Preserve every supported blocking finding. Brevity removes repetition and optional commentary, never blockers.
 
-Remove parsed flags from the PR number/URL before processing. Remaining input is the PR number or URL.
+## Resume
 
-**Constants (tunable here):**
+Require `.claude/pr-review-context.json`, a non-empty body draft, and
+`.claude/pr-review-inline.json` (an empty JSON array is valid). Capture a fresh context and run
+`review_context.py compare`.
+
+- `current`: continue at Preview.
+- Any change: discard the draft and restart at Gather.
+- Capture failure or missing snapshot identity: stop; do not publish a legacy or stale draft.
+
+## Gather
+
+### 1. Resolve the helper and repository
+
+Resolve `{owner}/{repo}` from the URL or `gh repo view`. Require authenticated `gh`, Python 3,
+and the bundled helper. Resolve it in this order:
+
+1. latest `~/.claude/plugins/cache/team-harness-marketplace/th/*/skills/review-pr/scripts/review_context.py`
+2. `~/.claude/skills/review-pr/scripts/review_context.py`
+3. `./skills/review-pr/scripts/review_context.py`
+
+If any prerequisite is unavailable, stop with:
+
+```text
+cannot capture a trustworthy PR snapshot — authenticate gh or paste the diff and conversation
 ```
-AUTO_MULTI_LINES_THRESHOLD = 1500
-AUTO_MULTI_FILES_THRESHOLD = 8
-DEFAULT_FOCUSES = ["security", "architecture", "style"]
-```
 
----
-name: review-pr
+Do not recreate the helper inline.
 
-## Prerequisite probe — sketch-guard check (mid-pipeline entry)
-
-When entering mid-pipeline (i.e., a workspace folder for this feature already exists in `workspaces/`), run `hooks/sketch-guard.sh` as a best-effort prerequisite probe before the review begins. This surfaces any missing sketch artifacts to the operator before the gather step executes.
-
-Resolve the script through the documented 3-tier chain before invoking:
+### 2. Capture immutable context
 
 ```bash
-# 3-tier resolution: plugin cache -> ~/.claude/hooks/ -> ./hooks/
-PLUGIN_BASE="${HOME}/.claude/plugins/cache/team-harness-marketplace/th"
-SKETCH_GUARD=""
-if [ -d "$PLUGIN_BASE" ]; then
-  LATEST=$(ls -1 "$PLUGIN_BASE" 2>/dev/null | sort -V | tail -1)
-  if [ -n "$LATEST" ] && [ -f "$PLUGIN_BASE/$LATEST/hooks/sketch-guard.sh" ]; then
-    SKETCH_GUARD="$PLUGIN_BASE/$LATEST/hooks/sketch-guard.sh"
-  fi
-fi
-if [ -z "$SKETCH_GUARD" ] && [ -f "${HOME}/.claude/hooks/sketch-guard.sh" ]; then
-  SKETCH_GUARD="${HOME}/.claude/hooks/sketch-guard.sh"
-fi
-if [ -z "$SKETCH_GUARD" ] && [ -f "./hooks/sketch-guard.sh" ]; then
-  SKETCH_GUARD="./hooks/sketch-guard.sh"
-fi
+REVIEW_ROOT="$(git rev-parse --show-toplevel)"
+ARTIFACTS="$REVIEW_ROOT/.claude"
+CONTEXT="$ARTIFACTS/pr-review-context.json"
+CONVERSATION="$ARTIFACTS/pr-review-conversation.md"
 
-if [ -n "$SKETCH_GUARD" ]; then
-  bash "$SKETCH_GUARD" "${WORKSPACE_PATH}" 2>/dev/null
-else
-  echo "sketch-guard probe unavailable — skipping"
-  # In pipeline context: append a *.skipped event to the execution-events JSONL
-fi
+python3 "$REVIEW_CONTEXT_HELPER" capture \
+  --repo "{owner}/{repo}" --pr {number} --git-dir "$REVIEW_ROOT" \
+  --output "$CONTEXT"
+python3 "$REVIEW_CONTEXT_HELPER" render \
+  --context "$CONTEXT" --output "$CONVERSATION"
 ```
 
-Parse the JSON output. If `verdict: concerns`, show a one-line banner before the gather step begins:
-```
-Note: sketch-guard found concerns for this workspace — {concerns[0]}. Proceeding with review.
-```
+Read metadata and immutable refs from `$CONTEXT`. Store `head_oid`, `base_oid`,
+`merge_base_oid`, `context_hash`, `fetched_at`, `is_cross_repository`, and the classified and raw
+mergeability values.
 
-**Required sketch reading (mid-pipeline entry):** after the guard probe, read every `sketches/*` file present in the workspace before the reviewer agent begins its pass. In a multi-project initiative, resolve sketch paths from `{overview_root}/sketches/{project}-{name}` (and `{overview_root}/sketches/service-interaction.md` for the shared service-interaction sketch). These sketch files are required reading — they define the contract the diff is being reviewed against.
+### 3. Materialize review artifacts
 
-**Fail-open:** if the script exits non-zero or the workspace cannot be located, continue. The probe is informational only — it never blocks the review flow.
-
----
-name: review-pr
-
-## Mode 1 — PR number or URL provided
-
-### Resume entry
-
-When `--resume-from-draft` is present, require both a non-empty draft and `.claude/pr-review-context.json`. Resolve the helper, capture `.claude/pr-review-context-resume.json`, and compare it with the saved context before showing the draft.
-
-- `current` → load repository, PR number, `reviewed_head_sha`, and `context_hash` from the saved context; continue at Phase 4.
-- Any change → delete the stale draft, promote the refreshed context, and restart Phase 1.
-- Missing context or failed capture → STOP. A legacy draft without snapshot identity cannot be published.
-
-### Phase 1 — Gather (all Bash happens here, in the main context)
-
-1. Extract the PR number from the input (e.g., `#45`, `45`, or full URL)
-
-2. Resolve `{owner}/{repo}` from the PR URL or `gh repo view`. Resolve a Python 3 interpreter and the bundled context helper:
-
-   ```bash
-   REVIEW_CONTEXT_HELPER=""
-   PLUGIN_BASE="${HOME}/.claude/plugins/cache/team-harness-marketplace/th"
-   if [ -d "$PLUGIN_BASE" ]; then
-     LATEST=$(ls -1 "$PLUGIN_BASE" 2>/dev/null | sort -V | tail -1)
-     [ -f "$PLUGIN_BASE/$LATEST/skills/review-pr/scripts/review_context.py" ] &&
-       REVIEW_CONTEXT_HELPER="$PLUGIN_BASE/$LATEST/skills/review-pr/scripts/review_context.py"
-   fi
-   [ -z "$REVIEW_CONTEXT_HELPER" ] &&
-     [ -f "${HOME}/.claude/skills/review-pr/scripts/review_context.py" ] &&
-     REVIEW_CONTEXT_HELPER="${HOME}/.claude/skills/review-pr/scripts/review_context.py"
-   [ -z "$REVIEW_CONTEXT_HELPER" ] &&
-     [ -f "./skills/review-pr/scripts/review_context.py" ] &&
-     REVIEW_CONTEXT_HELPER="./skills/review-pr/scripts/review_context.py"
-   ```
-
-   Do not rewrite the helper inline. Set `has_gh=true` after its authenticated access succeeds. If `gh`, Python 3, the helper, or authenticated PR access is unavailable, STOP with `cannot capture a trustworthy PR snapshot — authenticate gh or paste the diff and conversation`. A review without verifiable head and conversation identity is not publishable.
-
-3. Capture the canonical context:
-
-   ```bash
-   CONTEXT=.claude/pr-review-context.json
-   CONVERSATION=.claude/pr-review-conversation.md
-   python3 "$REVIEW_CONTEXT_HELPER" capture \
-     --repo "{owner}/{repo}" --pr {number} --git-dir "$(git rev-parse --show-toplevel)" \
-     --output "$CONTEXT"
-   python3 "$REVIEW_CONTEXT_HELPER" render \
-     --context "$CONTEXT" --output "$CONVERSATION"
-   ```
-
-   The helper:
-   - captures `baseRefOid`, `headRefOid`, merge base, commits, files, formal reviews, issue comments, inline comments, and paginated GraphQL review threads;
-   - preserves thread identity, replies, resolved/outdated state, timestamps, and commit identity;
-   - removes bot boilerplate and applies semantic context limits;
-   - fetches exact immutable refs under `refs/team-harness/review-pr/{number}/`;
-   - fails if the PR moves while it is being captured.
-
-   Load PR metadata from `$CONTEXT`. Store `reviewed_head_sha`, `reviewed_base_sha`, `reviewed_merge_base_sha`, `context_hash`, and the two immutable git refs. These values identify every downstream draft.
-
-4. Detect linked issue: search the captured PR body for patterns like `Closes #N`, `Fixes #N`, `Resolves #N`
-   - If found: fetch issue data. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier A — read a single issue". When `has_gh=true`: `gh issue view {N} --json number,title,body,labels`. When `has_gh=false`: use the curl fallback; if unavailable, linked issue = "none" (best-effort).
-   - If not found: linked issue = "none"
-
-5. Get the diff and file list only from the immutable refs recorded in the context:
-   ```
-   git diff {frozen_base_ref}...{frozen_head_ref}
-   ```
-   Save the full diff output. If it exceeds ~3000 lines, keep only the first 2000 lines and append a note: `\n[DIFF TRUNCATED — {total} lines total, showing first 2000. Use Read tool for full file context.]`
-
-6. Get changed file list (1 Bash call):
-   ```
-   git diff --name-only {frozen_base_ref}...{frozen_head_ref}
-   ```
-
-7. **Create a detached temporary worktree at `reviewed_head_sha`** so agents read the exact snapshot:
-   ```sh
-   WORKTREE="${TMPDIR:-/tmp}/team-harness-pr-review-{N}"
-   git worktree add --detach "$WORKTREE" "$reviewed_head_sha"
-   ```
-   Where `{N}` is the PR number. Store `$WORKTREE` for passing to agents and for cleanup in Phase 5.
-
-   **Multi-PR safety:** the worktree name includes the PR number (`{N}`) — no conflicts when reviewing multiple PRs concurrently in the same session.
-
-   **Cleanup trap (declare immediately after worktree creation):**
-   ```sh
-   cleanup() {
-     git worktree remove "$WORKTREE" --force 2>/dev/null || true
-     rm -f .claude/pr-review-*.md .claude/pr-review-*.json 2>/dev/null || true
-     rm -f .claude/pr-review-*-A.md .claude/pr-review-*-A.json 2>/dev/null || true
-     rm -f .claude/pr-review-*-B.md .claude/pr-review-*-B.json 2>/dev/null || true
-     rm -f .claude/pr-review-convergence.json 2>/dev/null || true
-     rm -f .claude/pr-review-context*.json .claude/pr-review-conversation.md 2>/dev/null || true
-     git update-ref -d "refs/team-harness/review-pr/{N}/base" 2>/dev/null || true
-     git update-ref -d "refs/team-harness/review-pr/{N}/head" 2>/dev/null || true
-   }
-   trap cleanup EXIT
-   ```
-
-8. **Detect workspaces** (team-harness pipeline PRs carry AC):
-   ```sh
-   workspaces_PATH=""
-   if ls "$WORKTREE/workspaces/"*/01-plan.md 2>/dev/null | head -1 | grep -q .; then
-     workspaces_PATH=$(ls "$WORKTREE/workspaces/"*/01-plan.md 2>/dev/null | head -1 | xargs dirname)
-   elif ls "$WORKTREE/workspaces/"*/02-implementation.md 2>/dev/null | head -1 | grep -q .; then
-     workspaces_PATH=$(ls "$WORKTREE/workspaces/"*/02-implementation.md 2>/dev/null | head -1 | xargs dirname)
-   fi
-   has_workspaces=false
-   [ -n "$workspaces_PATH" ] && has_workspaces=true
-   ```
-   Pass `workspaces_PATH` to qa when dispatched.
-
-9. Read `$CONVERSATION` and pass it to the reviewer as `Conversation Context`. Pass only commit OIDs and subjects from `$CONTEXT` as `Commits`. Do not pass raw bot comments, full commit bodies, or line-tail truncations.
-
-10. Resolve the authenticated login and use the helper for the same-author lookup:
-
-   ```bash
-   current_user=$(gh api user --jq '.login')
-   python3 "$REVIEW_CONTEXT_HELPER" same-author \
-     --context "$CONTEXT" --login "$current_user"
-   ```
-
-   Store the returned review, if any. This replaces shell environment interpolation and always uses the complete paginated review set.
-
-### Step 1.4 — Auto-suggest multi-reviewer for large PRs (no cost warning per operator policy)
-
-After step 8, compute diff size:
+Write data once and pass paths to agents. Do not duplicate the diff, policy, or conversation
+inside Task prompts.
 
 ```bash
-diff_lines=$((additions + deletions))
-diff_files=$(git diff --name-only {frozen_base_ref}...{frozen_head_ref} | wc -l)
+DIFF="$ARTIFACTS/pr-review-diff.patch"
+FILES="$ARTIFACTS/pr-review-files.txt"
+CHECKS="$ARTIFACTS/pr-review-checks.txt"
+
+git diff "{frozen_base_ref}...{frozen_head_ref}" > "$DIFF"
+git diff --name-only "{frozen_base_ref}...{frozen_head_ref}" > "$FILES"
+gh pr checks {number} --repo "{owner}/{repo}" > "$CHECKS" 2>&1 || true
 ```
 
-If `multi_reviewer=false` AND (`diff_lines > AUTO_MULTI_LINES_THRESHOLD` OR `diff_files > AUTO_MULTI_FILES_THRESHOLD`):
+Do not execute the PR's code or install dependencies. Existing CI results are evidence; local
+test execution is an explicit operator action outside this skill.
 
-Emit ONE line of info to the operator (no prompt, no cost warning, no confirmation required):
-```
-Large PR detected ({diff_lines} lines, {diff_files} files). Running multi-reviewer (security + architecture + style).
-```
+If the PR body links an issue with `Closes`, `Fixes`, or `Resolves`, fetch its number, title,
+body, and labels once into `.claude/pr-review-issue.json`. Treat failure as
+`linked issue: unavailable`, not as a reason to weaken snapshot checks.
 
-Then set `multi_reviewer=true`, `focuses=DEFAULT_FOCUSES` and continue.
-
-If `multi_reviewer=true` and `--reviewers` specified only ONE focus, bypass the consolidator: rename the single focus draft to the canonical path and skip the consolidator step.
-
-### Step 1.5 — Load review policy (1 Read call, optional)
+### 4. Create the frozen worktree and cleanup trap
 
 ```bash
-if [ -f .team-harness/review-policy.md ]; then
-  review_policy=$(cat .team-harness/review-policy.md)
-  has_policy=true
-else
-  has_policy=false
-fi
+WORKTREE="${TMPDIR:-/tmp}/team-harness-pr-review-{number}"
+git worktree add --detach "$WORKTREE" "$head_oid"
 ```
 
-When `has_policy=false`, emit one line to the operator:
-```
-Review policy: not found (using general review judgement).
-Scaffold with: /th:bootstrap --scaffold-review-policy
-```
+Register an EXIT trap immediately. It removes the worktree, all
+`.claude/pr-review-{context*,conversation,diff,files,checks,issue,draft*,final*,inline*,qa,security,payload}.*`
+artifacts, and `refs/team-harness/review-pr/{number}/{base,head}`. Never force-remove an
+unexpected dirty worktree; surface it.
 
-### Step 1.6 — Behavioral Verification (best-effort, worktree)
+Capture `git status --untracked-files=all` and `git diff HEAD` for both the frozen worktree and
+review-artifact root before dispatch. Repeat after all agents finish. The snapshots must be
+byte-identical; surface any mutation as a defect before trusting a returned draft. Only after this
+check may the coordinator persist inline returns to the fixed `.claude/pr-review-*` paths.
 
-After loading the review policy and before tier classification, run the repo's existing test/build suite against the PR's head SHA in `$WORKTREE`. This step is best-effort — it degrades to skip on any error or missing command; it never blocks the review and never publishes anything.
+Detect an existing pipeline workspace from `workspaces/*/01-plan.md` or
+`workspaces/*/02-implementation.md` inside `$WORKTREE`. If present:
 
-**Trust-tier gate (MANDATORY — run first):**
+- run the resolved `sketch-guard.sh` probe best-effort;
+- pass the workspace path to the reviewer and QA;
+- let each receiving agent read only the sketches relevant to its own lens.
 
-Read `is_cross_repo` from `$CONTEXT`; do not query a potentially newer PR state for this decision.
+Do not preload or paste sketches into dispatches.
 
-- If `is_cross_repo == "true"` (fork/external PR — author does not have push access to the base repo): **SKIP** the behavioral verification entirely. Emit one note to the operator:
-  ```
-  Behavioral verification omitida — PR de fork (isCrossRepository: true). Ejecutar la suite en código de fork no confiable ejecutaría código del autor del PR en tu máquina. El operador puede correr la suite manualmente fuera de esta herramienta.
-  ```
-  Set `behavioral_result=skipped:fork` and proceed to Phase 2.
+### 5. Load optional policy and prior-review identity
 
-- If `is_cross_repo == "false"` (same-repo PR — author has push access, trusted): proceed with the auto-run below.
+Set `policy_path` to `$WORKTREE/.team-harness/review-policy.md` when present; otherwise use
+`none`. Do not paste its contents into Task prompts.
 
-**Same-repo auto-run (only when `is_cross_repo == "false"`):**
-
-The step runs ONLY suites/builds already declared in the repo. It does NOT install new dependencies, does NOT run ad-hoc scripts derived from PR content, and does NOT execute commands not declared in the repo's own config files.
+Resolve the authenticated login and run:
 
 ```bash
-cd "$WORKTREE"
-
-runnable_cmd=""
-if [ -f go.mod ]; then
-  runnable_cmd="go test ./..."
-elif [ -f package.json ] && grep -q '"test"' package.json; then
-  runnable_cmd="npm test"
-elif command -v pytest >/dev/null 2>&1 && find . -name '*_test.py' -o -name 'test_*.py' | head -1 | grep -q .; then
-  runnable_cmd="pytest"
-fi
-
-if [ -z "$runnable_cmd" ]; then
-  behavioral_result=skipped:no-command
-else
-  if timeout 120 sh -c "$runnable_cmd" > /tmp/behavioral-run.log 2>&1; then
-    behavioral_result=green
-  else
-    behavioral_result=red
-  fi
-fi
+python3 "$REVIEW_CONTEXT_HELPER" same-author \
+  --context "$CONTEXT" --login "$(gh api user --jq '.login')"
 ```
 
-Detection order (first match wins): Go (`go.mod` present → `go test ./...`), Node (`package.json` with "test" script → `npm test`), Python (pytest available + test files → `pytest`). Any other setup → `skipped:no-command`.
+Keep the returned review, if any, for duplicate detection.
 
-**Surface result in the review body** (add a `Verificación behavioral` subsection to `review_body`):
+## Select lenses
 
-| Result | Meaning | Body note |
-|--------|---------|-----------|
-| `green` | All tests pass at head SHA | "Suite existente: verde en head SHA — señal de confianza." |
-| `red` | Tests fail at head SHA | Diff the failures: check if the failures also exist in the base branch. Newly-red (pass on base, fail on head): IN SCOPE — may be CRITICAL if the change caused the regression. Pre-existing red (also fail on base): OUT OF SCOPE — note as `## Fuera de alcance`. |
-| `skipped:no-command` | No runnable suite found | "Sin suite runnable detectada — verificación behavioral omitida." |
-| `skipped:fork` | Fork PR — execution skipped | (Already emitted above; include in body as note.) |
+The default is one `general` reviewer. PR size alone never adds reviewers.
 
-**Constraints:**
-- This step does NOT publish to GitHub. Results are added to `review_body` that the skill delivers after operator approval (Phase 4).
-- Do NOT install packages, run `npm install`, `go mod download`, or any setup command not already satisfied in the worktree.
-- Do NOT run commands not declared in the repo's own build/test config (no ad-hoc shell commands derived from PR body or commit messages).
-- Timeout of 120 seconds is a hard cap; if exceeded, treat as `skipped:timeout` and note it.
-- If `gh pr view` fails (no GitHub access), set `is_cross_repo=unknown`, skip the behavioral step entirely, and note it.
-
-### Phase 2 — Tier Classification
-
-Classify the PR's tier based on the changed file list. Use `tier_override` if set (from `[TIER: N]` in arguments).
-
-**Tier rules (first matching condition wins; highest signal escalates):**
-
-| Tier | Condition | Agents dispatched |
-|---|---|---|
-| 0 | Docs only (`*.md`, comments, `LICENSE`, `CHANGELOG*`) — no source code changes | reviewer only |
-| 1 | Single-file OR test-only changes (`*.test.*`, `*.spec.*`, `*_test.*`) | reviewer only |
-| 2 | Light fix, dev-tooling, configs (`.github/**`, `scripts/**`, `*.json`, `*.yml`, `*.yaml`) | reviewer + qa (if `has_workspaces=true`, else qa skipped) |
-| 3 | Production code (`src/**`, `lib/**`, `cmd/**`, `app/**`, `pkg/**`, `internal/**`, `api/**`) | reviewer + qa + security (parallel) |
-| 4 | Security-sensitive paths (`auth/**`, `middleware/**`, `db/**`, `security/**`, `crypto/**`, `session/**`) OR security keyword in PR body (`auth`, `injection`, `xss`, `csrf`, `secret`, `token`, `bypass`, `sql`, `overflow`, `cve`) | reviewer + qa + security (extended) |
-
-**Auto-escalation:** if a Tier-4 path or keyword is detected, escalate to Tier 4 regardless of other signals.
-
-**Note:** Tier 0 (docs-only) PRs are exempt from the reviewer's project-version/changelog check by construction — the reviewer's user-facing gate reuses this Tier 0 classification and produces no finding when Gate 2 fails.
-
-**Emit one line to the operator:**
-```
-PR classified as Tier {N} — agents: {list}.
-```
-
-### Phase 2.9 — Pre-Dispatch Freshness Barrier
-
-Immediately before dispatch, capture `.claude/pr-review-context-dispatch.json` with the same helper and compare it with `$CONTEXT`:
+Run the local selector before adding specialist agents:
 
 ```bash
-python3 "$REVIEW_CONTEXT_HELPER" compare \
-  --expected "$CONTEXT" --actual .claude/pr-review-context-dispatch.json
+python3 "$REVIEW_CONTEXT_HELPER" select-security \
+  --changed-files "$FILES" --diff "$DIFF" \
+  {--explicit-security when requested} {--tier 4 when supplied}
 ```
 
-- `current` (exit 0) → delete the refresh file and dispatch.
-- `conversation-changed` (exit 10) or `code-changed` (exit 20) → do not dispatch with mixed inputs. Remove the temporary worktree, promote the new context, render it, and restart Phase 1 from the frozen refs.
-- capture/compare failure → STOP. Never review when freshness cannot be established.
+The selector returns `known-sensitive`, `known-non-executable`, `unmatched-executable`, or
+`indeterminate`. Only `known-non-executable` without an explicit security request or Tier 4 may
+omit the security lens. A missing helper, unreadable input, or invalid result is
+`indeterminate` and requires security.
 
-Allow one automatic restart. If the PR changes again during the second capture, surface `PR is moving while review starts — retry when pushes/comments settle` and stop.
+Add specialist agents only from concrete signals:
 
-### Phase 3 — Multi-Agent Review Dispatch
+- **QA:** a pipeline workspace with acceptance criteria exists and the diff changes executable
+  behavior. Skip for docs, changelog, package metadata, formatting, and configuration-only
+  changes unless an AC explicitly describes that surface.
+- **Security:** the selector reports `security_required: true`.
+- **Focused reviewer passes:** only `general`/`architecture`, and only when explicitly requested
+  through `--reviewers`/`--multi`.
+  A large PR remains one general pass; report coverage limits instead of multiplying opinions.
 
-Dispatch review agents based on tier classification. ALL Bash happens in the main context. Agents do ZERO Bash and read files from `$WORKTREE/...`, NOT from the operator's current checkout.
+The general reviewer owns goal fit, correctness, public contracts, error behavior, and
+change-caused regressions. QA owns acceptance evidence. Security owns exploitability and trust
+boundaries. Do not ask two lenses to perform the same generic review.
 
-**The `WORKTREE` path MUST be passed to every agent invocation so they read files at the correct state.**
+Emit one line:
 
-#### Multi-reviewer path (when `multi_reviewer=true`, dispatched via orchestrator)
-
-9a. For each focus in `focuses`, dispatch the orchestrator with:
-   ```
-   Direct Mode Task:
-   - Mode: review
-   - Focus: {focus}
-   - Multi-Reviewer: true
-   - Worktree: {WORKTREE}
-   - workspaces path: {workspaces_PATH or "none"}
-   - Draft Output: .claude/pr-review-draft-{focus}.md
-   - Inline Output: .claude/pr-review-inline-{focus}.json
-   - Reviewed Head SHA: {reviewed_head_sha}
-   - Base SHA: {reviewed_base_sha}
-   - Merge Base SHA: {reviewed_merge_base_sha}
-   - Context Hash: {context_hash}
-   - Commits: {commit list from $CONTEXT}
-   - Conversation Context: {rendered $CONVERSATION}
-   - {... same PR fields as single-reviewer ...}
-   ```
-   Dispatches run **in parallel** (same pattern as Phase 3 tester+qa+security parallel). Wait for all to complete.
-
-9b. If Tier 3 or Tier 4, ALSO dispatch qa and security in parallel (alongside the multi-focused reviewers):
-   - qa dispatch (only when Tier 3+ AND `has_workspaces=true`):
-     ```
-     Direct Mode Task:
-     - Mode: pr-review-qa
-     - Worktree: {WORKTREE}
-     - workspaces path: {workspaces_PATH}
-     - PR: #{number}
-     - Reviewed Head SHA: {reviewed_head_sha}
-     ```
-   - security dispatch (always at Tier 3+):
-     ```
-     Direct Mode Task:
-     - Mode: pr-review-security
-     - Worktree: {WORKTREE}
-     - PR: #{number}
-     - Reviewed Head SHA: {reviewed_head_sha}
-     - Diff: {diff output from step 5}
-     - Changed files: {file list from step 6}
-     ```
-
-9c. After all agents complete, dispatch the orchestrator in consolidation mode:
-   ```
-   Direct Mode Task:
-   - Mode: review-consolidate
-   - Focuses: [{focus1}, {focus2}, ...]
-   - Has QA draft: {true if .claude/pr-review-qa.md exists}
-   - Has Security draft: {true if .claude/pr-review-security.md exists}
-   - PR: #{number}
-   - Title: {title}
-   - Author: {author}
-   - URL: {url}
-   - Reviewed Head SHA: {reviewed_head_sha}
-   - Context Hash: {context_hash}
-   ```
-   The orchestrator invokes the `reviewer-consolidator` agent which reads all draft files and writes `.claude/pr-review-final.md` and `.claude/pr-review-inline.json`.
-
-9d. After consolidation, proceed to Phase 4 using `.claude/pr-review-final.md` and `.claude/pr-review-inline.json`.
-
-#### Single-reviewer path (when `multi_reviewer=false`)
-
-For Tier 0 / 1: dispatch reviewer only.
-For Tier 2: dispatch reviewer; if `has_workspaces=true`, also dispatch qa in parallel.
-For Tier 3 / 4: dispatch reviewer, qa (if `has_workspaces=true`), and security in parallel.
-
-10. Pass ALL gathered data to the `orchestrator` agent:
-   ```
-   Direct Mode Task:
-   - Mode: review
-   - PR: #{number}
-   - Title: {title}
-   - Author: {author.login}
-   - Base: {baseRefName}
-   - Head: {headRefName}
-   - Reviewed Head SHA: {reviewed_head_sha}
-   - Base SHA: {reviewed_base_sha}
-   - Merge Base SHA: {reviewed_merge_base_sha}
-   - Context Hash: {context_hash}
-   - Commits: {commit list from $CONTEXT}
-   - Additions: +{additions}
-   - Deletions: -{deletions}
-   - Changed Files Count: {changedFiles count}
-   - URL: {url}
-   - Body: {body}
-   - Linked Issue: #{issue_number} or "none"
-   - Issue Title: {issue_title} or "N/A"
-   - Issue Body: {issue_body} or "N/A"
-   - Issue Labels: {labels} or "N/A"
-   - Changed Files List:
-     {file list from step 6}
-   - Full Diff:
-     {diff output from step 5}
-   - Has Policy: {true if .team-harness/review-policy.md was found in Step 1.5, else false}
-   - Review Policy: {verbatim content of .team-harness/review-policy.md, or omit field when has_policy=false}
-   - Conversation Context: {rendered $CONVERSATION}
-   - Behavioral Result: {behavioral_result}
-   - Worktree: {WORKTREE}
-   - workspaces path: {workspaces_PATH or "none"}
-   ```
-
-11. For Tier 2 (single-reviewer path) with `has_workspaces=true`, also dispatch qa in parallel:
-    ```
-    Direct Mode Task:
-    - Mode: pr-review-qa
-    - Worktree: {WORKTREE}
-    - workspaces path: {workspaces_PATH}
-    - PR: #{number}
-    - Reviewed Head SHA: {reviewed_head_sha}
-    ```
-
-12. For Tier 3/4 (single-reviewer path), also dispatch security in parallel with reviewer:
-    ```
-    Direct Mode Task:
-    - Mode: pr-review-security
-    - Worktree: {WORKTREE}
-    - PR: #{number}
-    - Reviewed Head SHA: {reviewed_head_sha}
-    - Diff: {diff output from step 5}
-    - Changed files: {file list from step 6}
-    ```
-
-13. Wait for all dispatched agents to complete. Then consolidate:
-    - If only reviewer ran (Tier 0/1, no qa, no security): `.claude/pr-review-draft.md` is the canonical output.
-    - If 2+ agent drafts exist (any combination of reviewer + qa + security): dispatch `reviewer-consolidator` to merge them into `.claude/pr-review-final.md`. Single-file case uses that file directly as `.claude/pr-review-final.md`.
-
-The `canonical_draft_path` is `.claude/pr-review-final.md` if it exists, else `.claude/pr-review-draft.md`.
-
-### Phase 3.1 — Dual-Review Convergence (when active)
-
-**When convergence is active:** `converge=true` (set by `--converge` flag OR by Tier 4 auto-on — the Tier-4 classification in Phase 2 automatically sets `converge=true` using the existing Tier-4 detection predicate; no new keyword list is introduced). When `converge=false`, skip this sub-section and proceed directly to Phase 3.5.
-
-**Convergence state initialization:**
-```sh
-convergence_round=1
-convergence_status=running   # running | converged | escalated
-# Record initial convergence block in 00-state.md convergence field
+```text
+Review lenses: general{, qa}{, security}{, explicit: focus...}.
 ```
 
-**Per-round loop (max 3 rounds):**
+## Pre-dispatch freshness
 
-For each round while `convergence_status == running` and `convergence_round <= 3`:
+Capture a new context immediately before dispatch and compare it with `$CONTEXT`.
 
-1. **Dispatch Pass A and Pass B concurrently.** Each pass dispatches the orchestrator in `review-consolidate` mode with:
-   ```
-   Direct Mode Task:
-   - Mode: review-consolidate
-   - Convergence Pass: A          # or B for the second dispatch
-   - Focuses: {focuses list}
-   - Has QA draft: {true|false}
-   - Has Security draft: {true|false}
-   - Draft Output: .claude/pr-review-final-A.md    # -B for Pass B
-   - Inline Output: .claude/pr-review-inline-A.json  # -B for Pass B
-   - PR: #{number}
-   - Title: {title}
-   - Author: {author}
-   - URL: {url}
-   - Reviewed Head SHA: {reviewed_head_sha}
-   - Context Hash: {context_hash}
-   ```
-   **Isolation contract:** each pass receives only the original diff/policy/PR metadata. No prior-round artifacts are passed forward. Pass A and Pass B NEVER read each other's `-A` / `-B` draft files.
+- `current`: dispatch.
+- `conversation-changed` or `code-changed`: rebuild artifacts and restart Gather once.
+- A second movement or capture failure: stop without reviewing.
 
-2. **Wait for both passes to complete.** Read `event` from each pass's status block.
+## Dispatch
 
-3. **Comparator — three branches:**
-   - Both emit `APPROVE` → `convergence_status=converged`, `canonical_draft_path=.claude/pr-review-final-A.md` (either pass; A is canonical), `convergence_verdict=CONVERGED_APPROVE`. Break loop.
-   - Both emit `REQUEST_CHANGES` → `convergence_status=converged`, `canonical_draft_path=.claude/pr-review-final-A.md`, `convergence_verdict=CONVERGED_CHANGES`. Break loop.
-   - Passes diverge (one `APPROVE`, one `REQUEST_CHANGES`):
-     - If `convergence_round < 3`: increment `convergence_round`, delete the `-A` and `-B` draft files from this round, continue loop (fresh round — reviewers receive only original inputs on the next iteration).
-     - If `convergence_round == 3`: `convergence_status=escalated`. **STOP and escalate** — do NOT proceed to Phase 3.5 or Phase 4. Surface the escalation block below and wait for operator instruction.
+The four PR agents are `reviewer`, `pr-review-qa`, `pr-review-security`, and
+`reviewer-consolidator`. Their source manifests and OpenCode projections are deny-by-default and
+read-only. Codex dispatch is unavailable unless a Team Harness Codex projection exists and its
+capability validator confirms the same exact allowlist; never inherit a general agent's authority.
+Host overrides after Team Harness emits an artifact are outside this guarantee.
 
-4. **Record round event** in the execution-events trace:
-   ```
-   {"event": "review.convergence.round", "round": {N}, "verdict_A": "{A}", "verdict_B": "{B}", "outcome": "{converged_approve|converged_changes|divergent_continue|divergent_escalate}"}
-   ```
-   Update `00-state.md` convergence block: `round`, `last_verdict_A`, `last_verdict_B`, `status`.
+Pass coordinates and artifact paths, not artifact bodies:
 
-**Round-state file:** write `.claude/pr-review-convergence.json` after each round:
+```text
+Direct Mode Task:
+- Mode: review
+- Focus: general
+- PR: #{number}
+- Repository: {owner}/{repo}
+- Title: {title}
+- Author: {author}
+- Base: {base_ref}
+- Head: {head_ref}
+- Reviewed Head SHA: {head_oid}
+- Base SHA: {base_oid}
+- Merge Base SHA: {merge_base_oid}
+- Context Hash: {context_hash}
+- Mergeability: {clean|conflicting|indeterminate}
+- Raw Mergeable: {raw mergeable value}
+- Raw Merge State: {raw mergeStateStatus value}
+- Worktree: {WORKTREE}
+- Review Artifacts Root: {ARTIFACTS absolute path}
+- Context Path: {CONTEXT}
+- Conversation Path: {CONVERSATION}
+- Diff Path: {DIFF}
+- Changed Files Path: {FILES}
+- Checks Path: {CHECKS}
+- Policy Path: {policy_path or "none"}
+- Workspace Path: {workspace_path or "none"}
+- Linked Issue Path: {.claude/pr-review-issue.json absolute path or "none"}
+- Draft Output: .claude/pr-review-draft{suffix}.md
+- Inline Output: .claude/pr-review-inline{suffix}.json
+```
+
+For explicit general/architecture passes, change `Focus` and use a focus suffix. Dispatch
+independent passes in parallel. Never dispatch both a security-focused reviewer and the security
+specialist for the same review.
+
+When selected, dispatch QA and `pr-review-security` in parallel with only their required
+coordinates:
+
+```text
+Mode: pr-review-qa | pr-review-security
+PR: #{number}
+Reviewed Head SHA: {head_oid}
+Context Hash: {context_hash}
+Worktree: {WORKTREE}
+Workspace Path: {workspace_path or "none"}
+Context Path: {CONTEXT}
+Diff Path: {DIFF}
+Changed Files Path: {FILES}
+```
+
+Every lens returns its draft inline with the exact reviewed SHA and context hash. Reject a missing
+or mismatched value. After the strict post-dispatch snapshots pass, the coordinator alone persists
+returns using this fixed mapping: reviewer body → `.claude/pr-review-draft.md`, reviewer findings →
+`.claude/pr-review-draft-inline.json`, QA → `.claude/pr-review-qa.md`, security →
+`.claude/pr-review-security.md`, consolidator body → `.claude/pr-review-final.md`, and consolidator
+findings → `.claude/pr-review-inline.json`. Ignore any output path proposed by an agent.
+
+If only the general reviewer ran, its body and inline JSON are canonical. If any additional
+draft exists, dispatch `review-consolidate` once with the source file paths, `head_oid`, and
+`context_hash`. The consolidator produces:
+
+- `.claude/pr-review-final.md`
+- `.claude/pr-review-inline.json`
+
+There is no automatic convergence loop.
+
+## Output contract
+
+The canonical GitHub review has two surfaces.
+
+### Body
+
+Use a compact index:
+
+```markdown
+## Review
+
+Reviewed: head `{head_oid}` against base `{base_oid}` at `{fetched_at}`
+Verdict: **APPROVE | REQUEST CHANGES | COMMENT**
+Findings: **{N} blocking**, **{M} suggestions**
+Checks: {concise CI summary or "not available"}
+Mergeability at capture: **{clean|conflicting|indeterminate}** (`mergeable={raw}`, `mergeStateStatus={raw}`)
+
+{Only cross-file findings that cannot be anchored to one changed line. Omit when empty.}
+```
+
+Do not include reviewability scores, estimated time, file counts, per-agent sections, repeated
+inline findings, praise, or out-of-scope observations by default.
+
+Target at most 80 lines and 900 words. If supported cross-file blockers require more, preserve
+them and remove optional prose; never truncate a blocker.
+
+### Inline threads
+
+Use one comment per actionable, line-anchored finding:
+
+```markdown
+**Blocking: {claim}**
+
+{Evidence and consequence in at most three short sentences.}
+
+**Fix:** {concrete correction in at most two short sentences.}
+```
+
+Use `Suggestion` instead of `Blocking` for non-blocking improvements. Publish every supported
+blocker. Keep at most five suggestions globally. Omit style-only nitpicks.
+
+Inline JSON must contain only GitHub fields:
+
 ```json
-{
-  "pr": "{number}",
-  "round": {N},
-  "verdict_A": "{APPROVE|REQUEST_CHANGES}",
-  "verdict_B": "{APPROVE|REQUEST_CHANGES}",
-  "status": "{running|converged|escalated}"
-}
+[{"path":"src/file.ts","line":42,"side":"RIGHT","body":"..."}]
 ```
 
-**Escalation STOP block (round 3, divergent):**
-```
-STOP — Dual-Review Convergence: reviewer disagreement after 3 rounds.
-Pass A verdict: {APPROVE | REQUEST_CHANGES}  (.claude/pr-review-final-A.md)
-Pass B verdict: {APPROVE | REQUEST_CHANGES}  (.claude/pr-review-final-B.md)
+Every inline finding requires `side: LEFT | RIGHT`. Validate the full `(path, line, side)` anchor
+against the frozen diff before preview and preserve `side` unchanged in the published comments.
 
-Both review bodies are available for operator review.
-The system does not auto-resolve this disagreement. Operator decides the final verdict.
-Options:
-  (a) Accept Pass A verdict and body → run /th:review-pr {N} --resume-from-draft (after copying A to final)
-  (b) Accept Pass B verdict and body → run /th:review-pr {N} --resume-from-draft (after copying B to final)
-  (c) Cancel → discard all drafts, do not publish
+## Prior-review check
 
-Choose [a/b/c]:
-```
-On `(c)` or no response: discard all drafts (cleanup trap fires). Do NOT publish.
+- No prior review from this author: continue.
+- Prior review with `commit_id == head_oid`: stop; do not duplicate it.
+- Prior review on another SHA: preview the new review as superseding that historical review.
 
-**After convergence loop completes (non-escalated):** `canonical_draft_path` is `.claude/pr-review-final-A.md`. Proceed to Phase 3.5.
+Never dismiss prior reviews automatically.
 
-### Phase 3.5 — Prior Review Check (MANDATORY before proceeding to Phase 4)
+## Preview
 
-Use the same-author result captured in Phase 1:
+Require a non-empty body and valid inline JSON. Retry the producing agent once for a missing or
+invalid artifact; then stop.
 
-- No prior non-dismissed review → proceed to Phase 4.
-- Prior review with `commit_id == reviewed_head_sha` → STOP without publishing a duplicate:
+Unless `--auto-publish` was supplied, show:
 
-  ```
-  Prior review by {current_user} (ID: {review_id}) already covers
-  {reviewed_head_sha}. No duplicate review posted.
-  ```
+1. reviewed head SHA, base SHA, and capture time;
+2. classified mergeability and both raw GitHub values;
+3. the exact body;
+4. every inline comment with path, line, and side;
+5. any superseded review ID;
+6. the recommended event.
 
-- Prior review on another commit, or without a usable `commit_id` → proceed to Phase 4. State in the preview that the new review supersedes review `{review_id}` by SHA.
+Then ask:
 
-Do not dismiss the prior review. GitHub review history is evidence: the new review is explicitly bound to the newer SHA and the prior submission remains attributable to its original commit. This also prevents a cancelled or failed replacement from destroying the previous review state.
-
-### Phase 4 — Decision Menu
-
-**Verify the draft exists.** Check that the canonical draft path was created and is not empty. If it's missing or empty:
-- Tell the user: "The review agent did not produce the review draft. Retrying once."
-- Re-invoke the review dispatch (go back to Phase 3)
-- If it fails a second time, report the error and stop
-
-Read the canonical draft and display the full review draft to the user.
-
-Display the reviewed snapshot and any superseded review before the menu:
-
-```
-Reviewed head: {reviewed_head_sha}
-Context captured: {fetched_at}
-Supersedes: review {review_id} on {prior_commit_id}  # omit when none
+```text
+(a) approve
+(b) request changes
+(c) comment only
+(d) defer
+(e) cancel
 ```
 
-Present the decision menu:
+`defer` copies the canonical body to `.claude/pr-review-final.md`, preserves that file, inline
+JSON, and context for `--resume-from-draft`, removes the worktree/nonessential artifacts, and
+disables the EXIT trap before returning. `cancel` removes all artifacts. Operator edits require
+another complete preview.
 
-```
-Review draft ready. Decide action:
-  (a) approve              — APPROVE event, body + inline comments posted
-  (b) request changes      — REQUEST_CHANGES event, body + inline comments posted
-  (c) comment only         — COMMENT event, body posted without approval state
-  (d) defer                — save draft to disk, do not publish (operator publishes later)
-  (e) cancel               — discard draft, do not publish
+## Pre-publish freshness
 
-Recommendation: {auto-suggested based on findings}
-Choose [a/b/c/d/e]:
-```
+After approval and immediately before the GitHub write, capture and compare again. Require exact
+head, base, merge-base, and mergeability equality with the approved capture.
 
-**Recommendation hint:**
-- `net_new == 0` (all findings overlap prior reviews or are already resolved) → `(e) cancel` (post nothing) if there are no new substantive points, or `(c) comment only` with a single-line Spanish summary if a one-line acknowledgement adds value
-- 0 critical findings, 0 high-priority, `net_new > 0` → `(a) approve`
-- 0 critical, 1+ high-priority, `net_new > 0` → `(c) comment only`
-- 1+ critical, `net_new > 0` → `(b) request changes`
+- `current`: proceed directly to the write.
+- Any mismatch, including conversation or mergeability drift: invalidate approval and restart
+  Gather.
+- Capture or comparison failure: invalidate approval and restart Gather with
+  `freshness could not be verified — review not published`.
 
-**If operator picks `(d) defer`:**
-- Ensure draft is at `.claude/pr-review-final.md` (copy from canonical path if needed).
-- Remove the cleanup trap so files persist.
-- Print: "Draft saved to .claude/pr-review-final.md. Run /th:review-pr {N} --resume-from-draft to publish later."
-- STOP cleanly. Do NOT remove the worktree (it may be needed for reference). Note: operator should remove it manually or it will be cleaned up at session end.
+Approval applies only to the displayed `context_hash`.
+Never describe `conflicting` or `indeterminate` mergeability as merge-ready.
+`clean` describes only the displayed captured head/base/time; it never asserts current external
+readiness. State that the external system can change after Team Harness's final local check.
 
-**If operator picks `(e) cancel`:**
-- Discard all draft files (cleanup trap fires on EXIT).
-- STOP.
+## Publish
 
-**If operator selects `(a)`, `(b)`, or `(c)`:**
-- Proceed to Phase 4.9.
+Map the operator choice to `APPROVE`, `REQUEST_CHANGES`, or `COMMENT`. Submit exactly once:
 
-**If operator requests edits before committing:**
-- Modify the draft per feedback, show again, repeat until a final choice is made.
-
-### Phase 4.9 — Pre-Publish Freshness Barrier
-
-After operator approval and immediately before the write, capture `.claude/pr-review-context-publish.json` and compare it with `$CONTEXT`.
-
-- `current` → proceed immediately to Phase 5.
-- `code-changed` → do not publish. Report the old and new head SHAs, invalidate the draft, and restart from Phase 1 against the new snapshot.
-- `conversation-changed` → do not publish a review that ignores new discussion. Replace the context, rerender it, and rerun Phase 3 once against the same frozen code before showing a new preview.
-- capture/compare failure → STOP with `freshness could not be verified — review not published`.
-
-This barrier is fail-closed. Operator approval applies to the displayed draft and its `context_hash`; it does not authorize publishing a materially different or stale context.
-
-### Phase 5 — Publish + Cleanup
-
-**Atomic submission** via a single API call with body + event + inline comments:
-
-a. Read the review body from the canonical draft path.
-b. Read inline findings from `.claude/pr-review-inline.json` (if it exists). Format: `[{"path": "...", "line": N, "body": "..."}]`. If the file doesn't exist or is empty, use an empty array `[]`.
-c. Map operator choice to GitHub event:
-   - `(a) approve` → event `APPROVE`
-   - `(b) request changes` → event `REQUEST_CHANGES`
-   - `(c) comment only` → event `COMMENT`
-d. Construct the JSON payload and submit in a **single atomic call**. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — submit a PR review (atomic POST)". The body+event+comments payload is saved to `.claude/pr-review-payload.json` regardless of whether `gh` or curl is used:
-   ```bash
-   jq -n \
-     --arg body "$(cat {canonical_draft_path})" \
-     --arg event "{EVENT}" \
-     --arg commit_id "{reviewed_head_sha}" \
-     --argjson comments "$(cat .claude/pr-review-inline.json 2>/dev/null || echo '[]')" \
-     '{body: $body, event: $event, commit_id: $commit_id, comments: $comments}' \
-   | gh api -X POST repos/{owner}/{repo}/pulls/{number}/reviews --input -
-   ```
-   Replace `{owner}/{repo}` with the repo from the PR URL, `{number}` with the PR number, and `{EVENT}` with the mapped event.
-e. **NEVER use `gh pr review`** for publishing. NEVER post separate inline comments via `gh api repos/.../pulls/:n/comments`. The single `POST /repos/:o/:r/pulls/:n/reviews` call with `body` + `event` + `comments[]` is the ONLY allowed submission method.
-f. **Verify the review was posted.** After the API call, check the exit code. If it failed, report the error to the user with the exact error message.
-
-**Cleanup:**
-- Remove worktree: `git worktree remove "$WORKTREE" --force 2>/dev/null || true`
-- Delete all temp draft files:
-  - `.claude/pr-review-draft.md`, `.claude/pr-review-final.md`
-  - `.claude/pr-review-inline.json`, `.claude/pr-review-payload.json`
-  - `.claude/pr-review-draft-security.md`, `.claude/pr-review-draft-architecture.md`, `.claude/pr-review-draft-style.md`
-  - `.claude/pr-review-inline-security.json`, `.claude/pr-review-inline-architecture.json`, `.claude/pr-review-inline-style.json`
-  - `.claude/pr-review-qa.md`, `.claude/pr-review-security.md`
-  - `.claude/pr-review-final-A.md`, `.claude/pr-review-inline-A.json` (convergence Pass A drafts)
-  - `.claude/pr-review-final-B.md`, `.claude/pr-review-inline-B.json` (convergence Pass B drafts)
-  - `.claude/pr-review-convergence.json` (convergence round-state file)
-  - `.claude/pr-review-context*.json`, `.claude/pr-review-conversation.md` (snapshot and rendered ledger)
-- Remove the cleanup trap (EXIT trap already handles this, but call explicitly):
-  ```sh
-  trap - EXIT
-  cleanup
-  ```
-
-**Context prune reminder (MANDATORY).** Each `/th:review-pr` invocation accumulates 5-30K tokens in the main context (PR metadata, full diff, file lists from `gh` and `git` outputs in Phase 1, plus the orchestrator's status block, plus Phase 5 publish outputs). Subagents die between PRs but the **main context does not** — successive reviews in the same session compound linearly.
-
-Your **final response** to the user MUST include this reminder block (verbatim or equivalent — do NOT shorten it, do NOT phrase it as optional):
-
-```
-Review on PR #{number} published.
-
-Context cleanup (recommended)
-This review accumulated approximately {estimated_kb}K tokens in
-your session (PR data, diff, file lists). Before reviewing the
-next PR, run:
-
-    /compact
-
-Without this, each successive `/th:review-pr` adds another 5-30K
-tokens that never get released. After 5 or more reviews in one
-session, response latency and per-turn cost grow noticeably.
-
-If this is the last review of the session, no action is needed —
-close the session normally.
+```bash
+jq -n \
+  --arg body "$(cat "$CANONICAL_DRAFT")" \
+  --arg event "$EVENT" \
+  --arg commit_id "$head_oid" \
+  --argjson comments "$(cat .claude/pr-review-inline.json 2>/dev/null || echo '[]')" \
+  '{body: $body, event: $event, commit_id: $commit_id, comments: $comments}' \
+| gh api -X POST "repos/{owner}/{repo}/pulls/{number}/reviews" --input -
 ```
 
-Estimate `{estimated_kb}` from the size of the diff you handled in Phase 1: small PR (<100 changed lines) ≈ 5K, medium (100-500) ≈ 10K, large (500-2000) ≈ 20K, truncated (>2000) ≈ 30K.
+Never split the body and inline comments across API calls. Check the exit status, report the
+exact error on failure, and run cleanup on every terminal path.
 
-**Terminate.** Do NOT perform any additional actions after the context prune reminder — no second pass for inline comments, no follow-up reviews, no supplementary observations. The review is complete.
+Final response:
 
----
-name: review-pr
+```text
+Review on PR #{number} published against {head_oid}.
+Run /compact before reviewing another PR in this session.
+```
 
-## Mode 2 — No input provided
+## No input
 
-Ask the user: "Provide a PR number or URL to review. Example: `#45`, `45`, or `https://github.com/owner/repo/pull/45`."
-
----
-name: review-pr
-
-## Important
-
-- Always invoke the `orchestrator` agent — do NOT invoke agents directly
-- The orchestrator coordinates agents (reviewer, qa, security, reviewer-consolidator) with all data inline (zero Bash in sub-agents)
-- ALL Bash commands run in this skill (main context) — agents do ZERO Bash
-- **Agents read files from `$WORKTREE/path/to/file`, NOT from the operator's current checkout.** Pass `$WORKTREE` to every agent dispatch.
-- **Multi-PR safety:** worktree name includes the PR number — concurrent PR reviews in the same session do not conflict.
-- The user approves the review before publishing (Phase 4)
-- **Snapshot-bound publication:** every draft has `reviewed_head_sha` and `context_hash`; Phase 2.9 and Phase 4.9 must confirm them. The atomic review POST includes `commit_id: reviewed_head_sha`.
-- **Same-author continuity:** do not duplicate a review on the same SHA. A review on a newer SHA may supersede an older review without dismissing history.
-- **Atomic submission for fresh reviews.** The `gh api POST .../reviews` call (Phase 5) includes body + event + comments[] in a single call. NEVER split into `gh pr review` + separate `gh api pulls/:n/comments`. This applies to both the `gh` and curl paths.
-- **GitHub API model:** a submitted review and its inline comments remain immutable historical evidence. Re-reviews are fresh SHA-bound submissions; they do not rewrite or dismiss prior history.
-- **Tier classification:** Tier 0/1 → reviewer only. Tier 2 → reviewer + qa (if AC found). Tier 3/4 → reviewer + qa + security (parallel). Auto-escalation: any security-sensitive path or keyword → Tier 4.
-- **Decision menu:** operator always picks the action explicitly. The recommendation hint is advisory only. Options: approve / request changes / comment only / defer / cancel.
-- **Cleanup is trap-style** — worktree and draft files are removed even on early exit via the EXIT trap registered in step 7.
-- **Multi-reviewer:** `--multi` / `--reviewers <focuses>` dispatches N focused reviewers in parallel, then the `reviewer-consolidator` merges the results plus any qa/security drafts. Auto-triggers when diff exceeds `AUTO_MULTI_LINES_THRESHOLD` or `AUTO_MULTI_FILES_THRESHOLD`. **No cost-warning UI** — per operator policy, multi-reviewer runs silently with one info line.
-- **Re-review continuity:** when a prior review's body contains `## Hallazgos por enfoque`, `--multi` is automatically applied to preserve focus coverage on re-review.
+Ask for a PR number or URL and stop.

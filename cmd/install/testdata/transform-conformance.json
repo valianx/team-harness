@@ -116,6 +116,13 @@
     "note": "MCP tools are dropped from permission — opencode governs MCP separately."
   },
   {
+    "name": "agent_pr_review_read_only_permission",
+    "surface": "agent",
+    "input": "---\nname: reviewer-consolidator\nmodel: sonnet\ntools: Read, Glob, Grep\n---\nBody.\n",
+    "expectedOutput": "---\nname: reviewer-consolidator\npermission: {\"*\": deny, read: allow, glob: allow, grep: allow}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
+    "note": "PR review agents deny unknown capabilities and allow only read, glob, and grep."
+  },
+  {
     "name": "agent_write_collapses_to_edit",
     "surface": "agent",
     "input": "---\nname: test\nmodel: sonnet\ntools: Read, Edit, Write, Glob, Grep\n---\nBody.\n",

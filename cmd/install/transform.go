@@ -217,7 +217,9 @@ func transformToOpencode(src []byte, kind string) ([]byte, error) {
 		// This avoids provider lock-in and ProviderModelNotFoundError from baked ids.
 		// Per-provider cost tiering is a future additive step (see
 		// docs/opencode-model-config.md); toProviderPrefixedModel is retained for it.
-		// Permissions are omitted so the host's native policy remains authoritative.
+		if name, _ := fm["name"].(string); isPRReviewAgent(name) {
+			projected["permission"] = prReviewPermission()
+		}
 		// mode: blanket "subagent" for the GENERIC transform (fixture-bound).
 		// The mode-by-role installer layer (orchestrator → primary) is applied
 		// as a post-projection step in manifest_registry.go, NOT here, to keep
@@ -439,6 +441,24 @@ func ccColorToOpencode(cc string) (string, bool) {
 type orderedPermission struct {
 	keys   []string
 	values map[string]string
+}
+
+var prReviewAgents = map[string]bool{
+	"pr-review-qa": true, "pr-review-security": true,
+	"reviewer": true, "reviewer-consolidator": true,
+}
+
+func isPRReviewAgent(name string) bool {
+	return prReviewAgents[name]
+}
+
+func prReviewPermission() orderedPermission {
+	return orderedPermission{
+		keys: []string{"*", "read", "glob", "grep"},
+		values: map[string]string{
+			"*": "deny", "read": "allow", "glob": "allow", "grep": "allow",
+		},
+	}
 }
 
 // agentToolsToOpencodePermission converts a CC tools comma-string to an
@@ -853,7 +873,11 @@ func writeYAMLKeyValue(buf *bytes.Buffer, key string, value interface{}) {
 			if i > 0 {
 				buf.WriteString(", ")
 			}
-			buf.WriteString(k + ": " + v.values[k])
+			serializedKey := k
+			if k == "*" {
+				serializedKey = `"*"`
+			}
+			buf.WriteString(serializedKey + ": " + v.values[k])
 		}
 		buf.WriteString("}\n")
 	case map[string]interface{}:

