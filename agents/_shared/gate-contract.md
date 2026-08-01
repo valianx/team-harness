@@ -37,9 +37,12 @@ proceeds without `gate3_release ∈ {ship}` registered in the governing pipeline
 `00-state.md` (see § "The dual-record release" below). The orchestrator enforces this
 ordering by refusing to invoke the action before the release exists.
 
-Pipeline release and runtime approval are independent requirements. A recorded release
-does not grant tool permission, and runtime approval does not create or repair a pipeline
-release. Every outward action still requires the active runtime's current approval.
+`Gate 3: ship` is the operator's single delivery approval for the previewed frozen tree. It
+authorizes the coordinator's standard sequence through version/changelog, commit, feature-branch
+push, and draft PR creation/update; no second conversational confirmation is allowed between
+those steps. Native runtime tool approval may still be required to execute a command, but that is
+a technical permission boundary—not another Team Harness decision and never a substitute for the
+recorded release. Merge, tag, release, publication, force-push, and broader scope remain excluded.
 
 **Force-push clause (Invariant E, operator-mandated).** The pipeline never force-pushes —
 not with `-f`, `--force`, `--force-with-lease`, or a `+`-prefixed refspec. A `ship`
@@ -51,8 +54,9 @@ decision cannot authorize force-push or shared-history rewriting.
 wrappers, dynamically reconstructed commands, alternate executables, git configuration
 overrides, and unresolved shell syntax are not permitted substitutes.
 
-This contract never bypasses server-side branch protections. Mutating GitHub API writes
-and merges require explicit operator approval through the active runtime; local git
+This contract never bypasses server-side branch protections. Standard draft-PR creation/update is
+covered by `ship`; merge, tag, release, publication, and other non-previewed GitHub writes require
+a separate explicit live request. Local git
 operations remain subject to the repository's own rules.
 
 ## The dual-record release

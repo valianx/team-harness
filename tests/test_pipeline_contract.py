@@ -612,6 +612,43 @@ def check_ad_hoc_review_boundary() -> None:
         require("delivery record" in adapter and "creates no" in adapter, f"Codex {role}: ad-hoc review can create delivery")
 
 
+def check_single_ship_delivery() -> None:
+    """Gate 3 ship is the one operator decision through draft PR."""
+    sources = {
+        "Claude gate": read("agents/_shared/gate-contract.md"),
+        "Claude mechanics": read("agents/_shared/delivery-mechanics.md"),
+        "Claude pipeline": read("agents/ref-pipeline.md"),
+        "Codex pipeline": read("plugins/team-harness/skills/pipeline/SKILL.md"),
+        "Codex state": read("plugins/team-harness/skills/pipeline/references/state-and-gates.md"),
+        "Codex delivery skill": read("plugins/team-harness/skills/deliver/SKILL.md"),
+        "Codex delivery reference": read("plugins/team-harness/skills/pipeline/references/delivery.md"),
+    }
+    for label, text in sources.items():
+        flat = re.sub(r"\s+", " ", text.lower())
+        for marker in ("version", "commit", "push", "draft pr"):
+            require(marker in flat, f"{label}: ship delivery omits {marker}")
+        require(
+            "do not ask" in flat
+            or "no second conversational" in flat
+            or "without another conversational" in flat
+            or "never ask" in flat,
+            f"{label}: delivery can ask for another operator decision after ship",
+        )
+        require("merge" in flat and "release" in flat, f"{label}: ship exclusions are incomplete")
+
+    codex_pipeline = sources["Codex pipeline"].lower()
+    require(
+        "does not authorize a push" not in codex_pipeline,
+        "Codex pipeline still says Gate 3 ship cannot authorize push/PR",
+    )
+    codex_delivery = re.sub(r"\s+", " ", sources["Codex delivery reference"].lower())
+    require(
+        "technical runtime boundary" in codex_delivery
+        and "not a new team harness" in codex_delivery,
+        "Codex delivery conflates native tool permission with another operator gate",
+    )
+
+
 def check_claude_codex_parity() -> None:
     """The two runtime projections expose the same posture and migration rules."""
     claude = "\n".join(
@@ -667,6 +704,7 @@ def main() -> None:
         ("residual corrections", check_residual_corrections),
         ("sensitive inline authorization", check_sensitive_inline_authorization),
         ("ad-hoc review boundary", check_ad_hoc_review_boundary),
+        ("single ship delivery", check_single_ship_delivery),
         ("Claude/Codex parity", check_claude_codex_parity),
     )
     for name, check in checks:

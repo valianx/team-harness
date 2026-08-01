@@ -202,8 +202,12 @@ edit`, and `4: reason — reject`; Gate 3 offers `1 — ship`, `2 — amend`, an
 `3 — abort`.
 
 Never treat a specialist result as a gate decision. Never let a specialist
-present a gate or write coordination state. An explicit pipeline activation
-does not authorize a push, PR mutation, merge, tag, release, or publication.
+present a gate or write coordination state. Pipeline activation alone does not
+authorize delivery. A later valid `Gate 3: ship` reply is the operator's single
+delivery decision for the frozen tree: it authorizes the coordinator to apply
+the previewed version/changelog, commit, push the feature branch, and create or
+update its draft PR without another conversational confirmation. It never
+authorizes merge, tag, release, publication, force-push, or broader scope.
 
 ## Workspace I/O budget
 

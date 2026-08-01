@@ -98,7 +98,7 @@ Runtime facts, not advice.
 
 ## Runtime-neutral enforcement boundaries
 
-1. **Push ordering is contractual.** This file will not invoke a push or `gh pr create/merge` until the merge/push guard in invariant 5 of § "State, events and observability" confirms the required release. The active runtime's separate approval for an outward action never substitutes for `gate3_release`, and `gate3_release` never substitutes for runtime approval.
+1. **Push ordering is contractual.** This file will not invoke a push or `gh pr create/merge` until the merge/push guard in invariant 5 of § "State, events and observability" confirms the required release. `gate3_release: ship` is the operator's single approval for version/changelog, commit, feature-branch push, and draft PR; never ask conversationally again between those steps. Native runtime tool approval is only a technical execution boundary and never creates or repairs `gate3_release`. Merge, tag, release, and publication remain outside `ship`.
 2. **Do not assume runtime posture resolution.** The orchestrator owns pipeline-state correlation. Fields such as `working_branch` and terminal `status: complete` serve the record-based recovery contract and operator visibility; never claim that the active runtime derives pipeline state from them.
 
 ## Knowledge-graph write asymmetry — why `mark_superseded` is never granted
@@ -272,7 +272,7 @@ You present every STAGE-GATE to the operator inline and record its release. Cont
 
 **The nonce is a freshness token, not a secret and not proof of operator origin** — you generate it yourself. Its only job is to separate a reply to the current presentation from a stale one. Never describe it as authentication.
 
-**Enforcement honesty.** Gate integrity is audited, not structural: nothing at the filesystem level prevents a forged release, and runtime permissions do not establish writer identity. Irreversible outward actions separately require the active runtime's approval. State that model honestly; never claim that runtime approval verifies pipeline state or that pipeline state replaces runtime approval (§ "Runtime-neutral enforcement boundaries" above).
+**Enforcement honesty.** Gate integrity is audited, not structural: nothing at the filesystem level prevents a forged release, and runtime permissions do not establish writer identity. `ship` is the operator decision for standard delivery; a native runtime prompt may still grant technical command execution but is not another conversational approval. State that model honestly; never claim that runtime approval verifies pipeline state or that runtime permission creates a gate release (§ "Runtime-neutral enforcement boundaries" above).
 
 **Checkpoint-trust-transfer.** Functional clarity is a `checkpoint.confirmed` event in the events file, with `provenance: operator-live | inferred`. Mirror it into `00-state.md` as a derived cache; always read the event, never the cache. It is a reasoning checkpoint, not a STAGE-GATE — no release field, no release event, and it never substitutes for STAGE-GATE-1 or STAGE-GATE-3.
 
@@ -1201,7 +1201,7 @@ You execute the deterministic half yourself per `agents/_shared/delivery-mechani
 the current non-default branch. A null or mismatch blocks as an upstream branch-guarantee
 failure; delivery never creates a branch around already-reviewed commits.
 
-**It never force-pushes.** The push step has no legitimate reason to force, and the active runtime's approval remains required. Push ordering is enforced by invariant 5 of § "State, events and observability": this file will not call the push step until the dual-record shows `gate3_release: ship`.
+**It never force-pushes.** The push step has no legitimate reason to force. `gate3_release: ship` already carries the operator's standard-delivery approval; do not ask again before version, commit, push, or draft PR. A native runtime tool prompt remains only a technical execution boundary. Push ordering is enforced by invariant 5 of § "State, events and observability": this file will not call the push step until the dual-record shows `gate3_release: ship`.
 
 ### GitHub update (delivery)
 

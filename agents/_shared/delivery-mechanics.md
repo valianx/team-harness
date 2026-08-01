@@ -342,8 +342,9 @@ proceeds.
 git push --set-upstream origin {branch-name}
 ```
 
-Never `--force` in any form. The active runtime's approval remains required for this push,
-independently of `gate3_release`; there is no legitimate reason to force here, and no code path in this procedure ever
+Never `--force` in any form. `gate3_release: ship` is the operator's approval for this standard
+push and the following draft PR; do not ask conversationally again. The active runtime may still
+surface a technical tool-approval prompt, but there is no legitimate reason to force here, and no code path in this procedure ever
 constructs a `--force`/`--force-with-lease`/`+refspec` invocation.
 
 **If `has_remote: false`:** skip §§ 6-7. The branch and commit stay local (already committed

@@ -184,7 +184,7 @@ def main() -> None:
         "${CODEX_HOME:-$HOME/.codex}/.team-harness.json",
         "scripts/manage_config.py",
         "scripts/manage_agents.py",
-        "manage_config.py ensure --version 4.0.0",
+        "manage_config.py ensure --version 3.6.3",
         "codex mcp add memory",
         "@upstash/context7-mcp@3.2.5",
         "manage_agents.py sync --scope SCOPE",
@@ -544,6 +544,24 @@ def main() -> None:
         fail("Codex sensitive inline path does not prohibit a second confirmation")
     if "explicitly selects `inline`" not in activation_reference.lower() and "selects `inline`" not in init.lower():
         fail("Codex sensitive inline path lacks live explicit selection")
+
+    deliver_skill = (ROOT / "plugins/team-harness/skills/deliver/SKILL.md").read_text()
+    delivery_reference = (
+        ROOT / "plugins/team-harness/skills/pipeline/references/delivery.md"
+    ).read_text()
+    ship_contract = "\n".join((pipeline, current_state, deliver_skill, delivery_reference)).lower()
+    for marker in ("single", "version", "changelog", "commit", "push", "draft pr"):
+        if marker not in ship_contract:
+            fail(f"Codex Gate 3 ship contract is missing {marker!r}")
+    for marker in ("merge", "tag", "release", "publication"):
+        if marker not in ship_contract:
+            fail(f"Codex Gate 3 ship exclusions are missing {marker!r}")
+    if "does not authorize a push" in pipeline.lower():
+        fail("Codex pipeline still requires another operator decision after Gate 3 ship")
+    if "do not ask" not in ship_contract and "never ask" not in ship_contract:
+        fail("Codex delivery can ask again for version, commit, push, or draft PR")
+    if "technical runtime boundary" not in ship_contract:
+        fail("Codex delivery conflates native tool approval with an operator gate")
 
     for label, content in {
         "direct configuration": configuration_reference,

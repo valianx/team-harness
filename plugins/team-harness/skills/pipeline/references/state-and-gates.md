@@ -190,10 +190,15 @@ Record a release atomically in both places:
 
 Consume the nonce and clear `gate_pending`. A field without its event, or an
 event without its field, is not a release. Never repair a malformed field;
-re-present with a fresh nonce. Pipeline release never replaces native Codex
-tool approval and the pipeline never force-pushes. An administrative close for
-a live inline request is not a gate decision: it does not set `gate1_release` or
-`gate3_release`, consume a nonce, or pretend that a gate reply occurred.
+re-present with a fresh nonce. `Gate 3: ship` is the operator's single approval
+for the previewed standard delivery through version/changelog, commit,
+feature-branch push, and draft PR; do not ask again between those steps. Native
+Codex tool approval may still be required to execute a command, but it is a
+technical runtime boundary rather than another Team Harness decision. The
+pipeline never force-pushes, and `ship` excludes merge, tag, release, and
+publication. An administrative close for a live inline request is not a gate
+decision: it does not set `gate1_release` or `gate3_release`, consume a nonce,
+or pretend that a gate reply occurred.
 
 ## Numbered decisions
 
