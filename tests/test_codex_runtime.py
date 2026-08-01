@@ -166,7 +166,7 @@ def main() -> None:
         "${CODEX_HOME:-$HOME/.codex}/.team-harness.json",
         "scripts/manage_config.py",
         "scripts/manage_agents.py",
-        "manage_config.py ensure --version 3.6.1",
+        "manage_config.py ensure --version 3.6.2",
         "codex mcp add memory",
         "@upstash/context7-mcp@3.2.5",
         "manage_agents.py sync --scope SCOPE",

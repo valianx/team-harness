@@ -50,7 +50,7 @@ Supported targets are `workspace`, `language`, `english-learning`, `memory`,
    ```
 
    Show only paths and key names. After explicit selection, copy with
-   `import --from SOURCE --version 3.6.1`. The helper deep-fills missing keys,
+   `import --from SOURCE --version 3.6.2`. The helper deep-fills missing keys,
    copies opaque values without printing them, preserves existing native
    values, and records provenance. Never merge sources silently.
 
@@ -59,7 +59,7 @@ Supported targets are `workspace`, `language`, `english-learning`, `memory`,
    installed version without replacing operator values:
 
    ```bash
-   python3 scripts/manage_config.py ensure --version 3.6.1
+   python3 scripts/manage_config.py ensure --version 3.6.2
    ```
 
 3. For a full setup, refresh marketplace metadata and inspect the installed
