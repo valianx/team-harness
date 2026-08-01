@@ -4,6 +4,11 @@
 **Date:** 2026-07-31
 **Scope:** shipped native Codex support without changing the current Claude Code or opencode runtime contracts
 
+**Parity update (2026-08-01):** the canonical 57-skill catalog is now projected
+to Codex and opencode through runtime adapters. The six-agent Codex pipeline
+roster remains intentionally narrower than the full semantic agent fleet. The
+original narrow-beta proposal below is retained as design history.
+
 ## Executive summary
 
 Team Harness can support Codex without a full rewrite. Codex already provides the
@@ -124,10 +129,9 @@ Include:
 - targeted installation, activation, dispatch, and update smoke tests; and
 - beta documentation and known limitations.
 
-Defer:
+Defer from the original beta scope:
 
-- all 32 agents and all 54 skills;
-- optional diagram and special-purpose flows;
+- full custom-agent projection beyond the six pipeline specialists;
 - complete observability parity;
 - prose-presence or snapshot tests over agent wording;
 - process gates removed from the current Claude Code flow; and
@@ -169,9 +173,10 @@ user-facing beta documentation.
 
 ### PR 3 — Expansion based on evidence
 
-Port additional agents and skills only when real Codex runs show that they are
-needed. Measure activation success, context consumed, dispatch count, elapsed time,
-and failure causes before expanding the surface.
+Port additional custom-agent roles only when real Codex runs show that they are
+needed. Skill parity is provided through Main-owned runtime adapters. Measure
+activation success, context consumed, dispatch count, elapsed time, and failure
+causes before expanding the installed agent surface.
 
 ## Long-term source architecture
 

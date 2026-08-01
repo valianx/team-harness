@@ -1,6 +1,6 @@
 ---
 name: hookify
-description: Analyze friction signals from the current session and propose candidate deterministic hook rules for operator review. REPORT-only — never writes or modifies any file under hooks/ or ~/.claude/.
+description: Analyze friction signals from the current session and propose candidate deterministic hook rules for operator review. REPORT-only and never modifies runtime hook or configuration files.
 ---
 name: hookify
 

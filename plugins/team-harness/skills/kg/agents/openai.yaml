@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Kg"
+  short_description: "Team Harness Kg workflow"
+  default_prompt: "Use $team-harness:kg for this request."

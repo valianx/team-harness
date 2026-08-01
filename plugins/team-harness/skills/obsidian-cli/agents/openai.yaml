@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Obsidian Cli"
+  short_description: "Team Harness Obsidian Cli workflow"
+  default_prompt: "Use $team-harness:obsidian-cli for this request."

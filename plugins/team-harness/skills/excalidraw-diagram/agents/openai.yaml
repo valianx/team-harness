@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Excalidraw Diagram"
+  short_description: "Team Harness Excalidraw Diagram workflow"
+  default_prompt: "Use $team-harness:excalidraw-diagram for this request."

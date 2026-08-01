@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Define Ac"
+  short_description: "Team Harness Define Ac workflow"
+  default_prompt: "Use $team-harness:define-ac for this request."

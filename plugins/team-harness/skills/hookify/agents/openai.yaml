@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Hookify"
+  short_description: "Team Harness Hookify workflow"
+  default_prompt: "Use $team-harness:hookify for this request."

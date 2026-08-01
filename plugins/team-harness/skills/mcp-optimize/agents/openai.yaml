@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Mcp Optimize"
+  short_description: "Team Harness Mcp Optimize workflow"
+  default_prompt: "Use $team-harness:mcp-optimize for this request."

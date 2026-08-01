@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Tmux"
+  short_description: "Team Harness Tmux workflow"
+  default_prompt: "Use $team-harness:tmux for this request."

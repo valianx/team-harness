@@ -20,7 +20,7 @@ Each stage is marked:
 
 | Stage | Claude Code | opencode | Classification |
 |---|---|---|---|
-| **author** | Single source: `agents/*.md`, `skills/*.md`, `hooks/ts/bodies/*.ts` + `hooks/ts/entry/*.cc.ts`. | Agents and skills use the canonical bodies. Agents/commands receive an emit-time name/mode delta; the four PR review agents additionally receive a deny-by-default read/glob/grep permission map. Other per-agent permissions remain omitted and no Team Harness hook plugin is installed. | asymmetric |
+| **author** | Single source: `agents/*.md`, `skills/*/SKILL.md`, `hooks/ts/bodies/*.ts` + `hooks/ts/entry/*.cc.ts`. | The canonical skill catalog is projected through opencode-native adapters; agents/commands receive their existing emit-time deltas. The four PR review agents additionally receive a deny-by-default read/glob/grep permission map. No Team Harness hook plugin is installed. | asymmetric |
 | **build** | The plugin distributes the git tree as-is; `hooks/ts/dist/*.cjs` are pre-built and tracked in git. | The Go installer binary is cross-compiled per release (`release.yml`, 5 platform targets, `CGO_ENABLED=0`). | asymmetric |
 | **test** | `tests/run-all.sh` exercises the wired Claude Code hooks, PR source allowlists, and retained body-level regression suites. | Go and Node projection tests cover the four deny-by-default PR agents in addition to installation, preservation, data-home, ledger, and default-agent configuration. | asymmetric |
 | **version** | `.claude-plugin/plugin.json` `version` is the canonical site; `.claude-plugin/marketplace.json` `plugins[0].version`, `plugins/team-harness/.codex-plugin/plugin.json`, `CLAUDE.md §3`, and `cmd/install/main.go`'s fallback `var version` mirror it (fenced five-site invariant in the current tree). | The Go binary's `version` var is injected at build time via `-ldflags "-X main.version=..."`, sourced from the same release tag; the checked-in fallback is verified against that tag. | shared (one version namespace, mirrored sites) |
@@ -54,7 +54,13 @@ One tag, one release event, N runtime artifacts, one version namespace. Re-runni
 
 The Go installer (`cmd/install/`) manages opencode assets and the six generated Codex agent TOMLs. It does not install marketplace plugins and does not modify Codex `config.toml`; plugin install/update/remove remains marketplace-owned. Claude Code has no reachable binary-install path.
 
-The Claude marketplace is the Claude Code install channel. The repository Codex marketplace supplies two lifecycle skills (`setup`, `update`) plus seven workflow skills (`@Team-Harness init` is lightweight intake and `@Team-Harness pipeline` is explicit full activation), while `install apply|update|uninstall --runtime codex` separately places six specialist agents. The Go binary remains the opencode install channel as well.
+The Claude marketplace is the Claude Code install channel. All three runtimes
+now expose the same 57 canonical skill names. Claude Code consumes the source
+skills directly; Codex packages ten native contracts plus 47 generated
+adapters; opencode receives generated adapters plus six native lifecycle or
+session overrides. The Codex setup/update flow separately places six
+specialist agents for the gated pipeline. The Go binary remains the opencode
+install channel.
 
 ---
 

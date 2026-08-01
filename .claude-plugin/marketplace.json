@@ -10,10 +10,10 @@
       "name": "th",
       "displayName": "Team Harness",
       "source": {"source": "github", "repo": "valianx/team-harness"},
-      "description": "Orchestrated Claude Code agent system: architect, implement, test, and deliver via a multi-agent pipeline",
-      "version": "3.6.4",
+      "description": "Complete shared Team Harness skill catalog and gated multi-agent workflows for Claude Code, Codex, and opencode",
+      "version": "3.6.5",
       "category": "development",
-      "tags": ["orchestration", "agents", "workflow"],
+      "tags": ["orchestration", "agents", "workflow", "diagrams", "gcp"],
       "author": {
         "name": "Mario Gutierrez"
       },

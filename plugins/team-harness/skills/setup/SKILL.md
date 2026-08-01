@@ -61,7 +61,7 @@ migration, and preserve every unrelated value.
    ```
 
    Show only paths and key names. After explicit selection, copy with
-   `import --from SOURCE --version 3.6.3`. The helper deep-fills missing keys,
+   `import --from SOURCE --version 3.6.5`. The helper deep-fills missing keys,
    copies opaque values without printing them, preserves existing native
    values, and records provenance. Never merge sources silently.
 
@@ -70,7 +70,7 @@ migration, and preserve every unrelated value.
    installed version without replacing operator values:
 
    ```bash
-   python3 scripts/manage_config.py ensure --version 3.6.3
+   python3 scripts/manage_config.py ensure --version 3.6.5
    ```
 
 3. For a full setup, refresh marketplace metadata and inspect the installed

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Lint"
+  short_description: "Team Harness Lint workflow"
+  default_prompt: "Use $team-harness:lint for this request."

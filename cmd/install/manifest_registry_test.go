@@ -4,12 +4,12 @@ package main
 //
 // ACs covered:
 //   AC-1  : at least one kind:skill component whose Emits.Files starts with {config_root}/skills/
-//   AC-2  : none of the six excluded skills (opencodeExcludedSkills) appears in the emitted set
+//   AC-2  : all six runtime-specific skills are emitted from native opencode overrides
 //   AC-3  : no emitted path contains .venv / site-packages / __pycache__ / a dot/underscore segment
 //   AC-3b : isCopyableSkillPath is fail-closed — a non-allowlisted extension is rejected;
 //           an allowlisted .md IS accepted
 //   AC-4  : nested references/ file is emitted (skills/d2-diagram/references/dsl-reference.md)
-//   AC-5  : exactly one kind:command component, emitting to {config_root}/commands/th-update.md
+//   AC-5  : the th-update and th-modes command components emit to {config_root}/commands/
 //   AC-6  : th-update.md contains install-opencode.sh, and zero claude-binary invocations
 //   AC-7  : ComputePlan+ApplyPlan are idempotent (second apply → zero creates/updates)
 //   AC-8  : runApplyCommand stdout includes the update-later line for opencode
@@ -82,30 +82,32 @@ func TestBuildOpencodeManifests_NoHookComponents(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// AC-2: excluded skills are absent
+// AC-2: runtime-specific skills use native opencode overrides
 // ---------------------------------------------------------------------------
 
-// TestBuildOpencodeManifests_ExcludedSkillsAbsent verifies that every skill in
-// opencodeExcludedSkills is absent from the emitted component set. The test
-// iterates opencodeExcludedSkills so the assertion shares the single source of
-// truth with the walker.
-func TestBuildOpencodeManifests_ExcludedSkillsAbsent(t *testing.T) {
+// TestBuildOpencodeManifests_OverridesPresent verifies that every runtime-
+// specific capability remains present under the shared name, sourced from its
+// native opencode adapter rather than the Claude-oriented canonical body.
+func TestBuildOpencodeManifests_OverridesPresent(t *testing.T) {
 	_, components, err := buildOpencodeManifests()
 	if err != nil {
 		t.Fatalf("buildOpencodeManifests: %v", err)
 	}
 
-	for excluded := range opencodeExcludedSkills {
-		prefix := "{config_root}/skills/" + excluded + "/"
-		exact := "{config_root}/skills/" + excluded
-
+	for name := range opencodeSkillOverrides {
+		wantEmit := "{config_root}/skills/" + name + "/SKILL.md"
+		wantSource := "installer-assets/opencode-skills/" + name + "/SKILL.md"
+		found := false
 		for _, c := range components {
-			for _, f := range c.Emits.Files {
-				if strings.HasPrefix(f, prefix) || f == exact {
-					t.Errorf("excluded skill %q found in emitted components: component=%s file=%s",
-						excluded, c.Component, f)
+			if len(c.Emits.Files) == 1 && c.Emits.Files[0] == wantEmit {
+				found = true
+				if c.Source != wantSource {
+					t.Errorf("override %q source = %q, want %q", name, c.Source, wantSource)
 				}
 			}
+		}
+		if !found {
+			t.Errorf("native opencode override %q is not emitted", name)
 		}
 	}
 }
@@ -204,13 +206,17 @@ func TestIsCopyableSkillPath_NonAllowlistedExtensionRejected(t *testing.T) {
 	}
 }
 
-// TestIsCopyableSkillPath_ExcludedSkillsRejected verifies that paths under
-// the six excluded top-level folders are all rejected.
-func TestIsCopyableSkillPath_ExcludedSkillsRejected(t *testing.T) {
-	for name := range opencodeExcludedSkills {
+// TestIsCopyableSkillPath_OverrideSources verifies that the canonical body is
+// skipped when a native override owns the same emitted path, while the
+// explicit override path itself passes the bounded copy predicate.
+func TestIsCopyableSkillPath_OverrideSources(t *testing.T) {
+	for name := range opencodeSkillOverrides {
 		path := name + "/SKILL.md"
 		if isCopyableSkillPath(path) {
-			t.Errorf("isCopyableSkillPath(%q) = true, want false (excluded skill)", path)
+			t.Errorf("isCopyableSkillPath(%q) = true, want false (overridden canonical skill)", path)
+		}
+		if !isCopyableProjectedSkillPath(path) {
+			t.Errorf("isCopyableProjectedSkillPath(%q) = false, want true", path)
 		}
 	}
 }
@@ -263,13 +269,11 @@ func TestBuildOpencodeManifests_NestedReferencesEmitted(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// AC-5: exactly one command component, emitting th-update.md
+// AC-5: the expected command components are emitted
 // ---------------------------------------------------------------------------
 
-// TestBuildOpencodeManifests_CommandComponentPresent verifies that exactly one
-// kind:command component is emitted, and that it emits to
-// {config_root}/commands/th-update.md sourced from
-// installer-assets/opencode-commands/th-update.md.
+// TestBuildOpencodeManifests_CommandComponentPresent verifies that the two
+// supported opencode commands are emitted from their canonical sources.
 func TestBuildOpencodeManifests_CommandComponentPresent(t *testing.T) {
 	_, components, err := buildOpencodeManifests()
 	if err != nil {
@@ -283,19 +287,38 @@ func TestBuildOpencodeManifests_CommandComponentPresent(t *testing.T) {
 		}
 	}
 
-	if len(cmdComponents) != 1 {
-		t.Fatalf("expected exactly 1 kind:command component, got %d", len(cmdComponents))
+	if len(cmdComponents) != 2 {
+		t.Fatalf("expected exactly 2 kind:command components, got %d", len(cmdComponents))
 	}
 
-	cmd := cmdComponents[0]
-	const wantEmit = "{config_root}/commands/th-update.md"
-	const wantSource = "installer-assets/opencode-commands/th-update.md"
-
-	if len(cmd.Emits.Files) != 1 || cmd.Emits.Files[0] != wantEmit {
-		t.Errorf("command component emit = %v, want [%s]", cmd.Emits.Files, wantEmit)
+	want := map[string]string{
+		"{config_root}/commands/th-modes.md":  "installer-assets/opencode-commands/th-modes.md",
+		"{config_root}/commands/th-update.md": "installer-assets/opencode-commands/th-update.md",
 	}
-	if cmd.Source != wantSource {
-		t.Errorf("command component source = %q, want %q", cmd.Source, wantSource)
+	for _, cmd := range cmdComponents {
+		if len(cmd.Emits.Files) != 1 {
+			t.Errorf("command component emits %d files, want 1", len(cmd.Emits.Files))
+			continue
+		}
+		emit := cmd.Emits.Files[0]
+		if wantSource, ok := want[emit]; !ok {
+			t.Errorf("unexpected command component emit %q", emit)
+		} else if cmd.Source != wantSource {
+			t.Errorf("command component source = %q, want %q", cmd.Source, wantSource)
+		}
+	}
+}
+
+func TestTHModesCommand_LoadsNativeModesSkill(t *testing.T) {
+	embeddedFS := EmbeddedAssets()
+	data, err := fs.ReadFile(embeddedFS, "installer-assets/opencode-commands/th-modes.md")
+	if err != nil {
+		t.Fatalf("read th-modes.md: %v", err)
+	}
+	for _, marker := range [][]byte{[]byte("native `modes` skill"), []byte("read-only")} {
+		if !bytes.Contains(data, marker) {
+			t.Errorf("th-modes.md is missing %q", marker)
+		}
 	}
 }
 
@@ -417,8 +440,7 @@ func TestRunApplyCommand_OpencodeUpdateHintString(t *testing.T) {
 
 // TestValidateManifests_ProductionSetPasses verifies that the real opencode
 // manifest set (built by buildOpencodeManifests) passes validateManifests
-// without error, AND that skill components are present and the six excluded
-// skill folders are absent.
+// without error, AND that skill components and runtime overrides are present.
 func TestValidateManifests_ProductionSetPasses(t *testing.T) {
 	modules, components, err := buildOpencodeManifests()
 	if err != nil {
@@ -440,15 +462,19 @@ func TestValidateManifests_ProductionSetPasses(t *testing.T) {
 		t.Error("AC-9: no skill components in production set (vacuous pass guard)")
 	}
 
-	// Assert the six excluded folders are absent.
-	for excluded := range opencodeExcludedSkills {
-		prefix := "{config_root}/skills/" + excluded + "/"
+	// Assert every runtime override is represented in the validated set.
+	for name := range opencodeSkillOverrides {
+		want := "{config_root}/skills/" + name + "/SKILL.md"
+		found := false
 		for _, c := range components {
 			for _, f := range c.Emits.Files {
-				if strings.HasPrefix(f, prefix) {
-					t.Errorf("AC-9: excluded skill %q found in validated production set: %s", excluded, f)
+				if f == want {
+					found = true
 				}
 			}
+		}
+		if !found {
+			t.Errorf("AC-9: opencode override %q absent", name)
 		}
 	}
 }
@@ -612,7 +638,8 @@ func TestPluginJSON_VersionUnchanged(t *testing.T) {
 // Helpers for mock FS-based tests
 // ---------------------------------------------------------------------------
 
-// buildMockSkillFS builds a minimal fstest.MapFS simulating a skills/ tree
+// buildMockSkillFS builds a minimal fstest.MapFS simulating a projected
+// installer-assets/opencode-skills/ tree
 // for unit-testing buildSkillComponents without the full embedded FS.
 func buildMockSkillFS(files map[string]string) fstest.MapFS {
 	m := fstest.MapFS{}
@@ -627,11 +654,11 @@ func buildMockSkillFS(files map[string]string) fstest.MapFS {
 // references/ is NOT emitted by buildSkillComponents (AC-3b, layer c).
 func TestBuildSkillComponents_MockFS_NonAllowlistedBinaryNotEmitted(t *testing.T) {
 	mockFS := buildMockSkillFS(map[string]string{
-		"skills/my-skill/SKILL.md":            "# My Skill",
-		"skills/my-skill/references/x.md":     "# Reference",
-		"skills/my-skill/references/tool.exe": "\x00binary", // non-allowlisted — must be skipped
-		"skills/my-skill/references/font.ttf": "\x00binary", // non-allowlisted
-		"skills/my-skill/references/binary":   "\x00binary", // extension-less — must be skipped
+		"installer-assets/opencode-skills/my-skill/SKILL.md":            "# My Skill",
+		"installer-assets/opencode-skills/my-skill/references/x.md":     "# Reference",
+		"installer-assets/opencode-skills/my-skill/references/tool.exe": "\x00binary", // non-allowlisted — must be skipped
+		"installer-assets/opencode-skills/my-skill/references/font.ttf": "\x00binary", // non-allowlisted
+		"installer-assets/opencode-skills/my-skill/references/binary":   "\x00binary", // extension-less — must be skipped
 	})
 
 	components, err := buildSkillComponents(mockFS)

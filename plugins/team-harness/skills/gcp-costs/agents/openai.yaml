@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Gcp Costs"
+  short_description: "Team Harness Gcp Costs workflow"
+  default_prompt: "Use $team-harness:gcp-costs for this request."

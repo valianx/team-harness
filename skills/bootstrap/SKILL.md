@@ -1,6 +1,6 @@
 ---
 name: bootstrap
-description: Initialize CLAUDE.md and project conventions for a repository.
+description: Initialize runtime-native project instructions and conventions for a repository.
 ---
 
 ## Parse flags

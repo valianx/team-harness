@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Eval"
+  short_description: "Team Harness Eval workflow"
+  default_prompt: "Use $team-harness:eval for this request."

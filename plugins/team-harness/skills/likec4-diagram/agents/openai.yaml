@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Likec4 Diagram"
+  short_description: "Team Harness Likec4 Diagram workflow"
+  default_prompt: "Use $team-harness:likec4-diagram for this request."

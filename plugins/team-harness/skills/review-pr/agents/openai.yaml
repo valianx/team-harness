@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Review Pr"
+  short_description: "Team Harness Review Pr workflow"
+  default_prompt: "Use $team-harness:review-pr for this request."

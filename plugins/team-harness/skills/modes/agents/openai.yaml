@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Modes"
+  short_description: "Browse Team Harness skills and modes"
+  default_prompt: "Use $team-harness:modes to list available Team Harness skills and their purposes."
