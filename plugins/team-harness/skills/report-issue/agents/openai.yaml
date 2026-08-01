@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Report Issue"
+  short_description: "Team Harness Report Issue workflow"
+  default_prompt: "Use $team-harness:report-issue for this request."

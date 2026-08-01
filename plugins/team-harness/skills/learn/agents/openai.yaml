@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Learn"
+  short_description: "Team Harness Learn workflow"
+  default_prompt: "Use $team-harness:learn for this request."

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"path"
@@ -26,13 +27,11 @@ func isInvocableAgent(name string, isDir bool) bool {
 	return name != "README.md" && !strings.HasPrefix(name, "ref-")
 }
 
-// opencodeExcludedSkills is the authoritative set of top-level skill folders
-// excluded from the opencode skill copy. These skills invoke the `claude`
-// binary or depend on a Claude-Code-only mechanic (plugin marketplace,
-// ~/.claude.json plugin config, CC session launch) and are non-functional
-// under opencode. Declared once so the walker and the test share one source
-// of truth.
-var opencodeExcludedSkills = map[string]bool{
+// opencodeSkillOverrides is the authoritative set of canonical skill names
+// whose Claude-oriented implementation is replaced by a native opencode
+// adapter from installer-assets/opencode-skills/<name>/. The capability name
+// remains shared across all runtimes; only the runtime mechanics differ.
+var opencodeSkillOverrides = map[string]bool{
 	"update":     true,
 	"setup":      true,
 	"background": true,
@@ -70,7 +69,7 @@ var opencodeCopyableSkillExt = map[string]bool{
 // It returns true only when ALL of the following hold:
 //  1. No path segment begins with '.' or '_' (defensive .venv / _shared guard — layer b).
 //  2. The file is not skills/README.md.
-//  3. The first path segment after skills/ is not in opencodeExcludedSkills.
+//  3. The first path segment after skills/ does not have an opencode override.
 //  4. The first path segment after skills/ is not "opencode-commands" (that
 //     folder is emitted by buildCommandComponents, not the skill walker).
 //  5. The file extension is in opencodeCopyableSkillExt (layer c — fail-closed).
@@ -97,7 +96,7 @@ func isCopyableSkillPath(rel string) bool {
 		return false
 	}
 	topLevel := segments[0]
-	if opencodeExcludedSkills[topLevel] {
+	if opencodeSkillOverrides[topLevel] {
 		return false
 	}
 	if topLevel == "opencode-commands" {
@@ -113,51 +112,28 @@ func isCopyableSkillPath(rel string) bool {
 	return true
 }
 
-// buildSkillComponents returns one ComponentManifest per copyable skill file,
-// mirroring the buildHookSubdirComponents pattern (one component per file).
+// buildSkillComponents returns one ComponentManifest per projected opencode
+// skill file, mirroring the buildHookSubdirComponents pattern (one component
+// per file). Every projection is generated from the canonical skills/ tree
+// except the small native override set above.
 //
-// Source: skills/<rel>
+// Source: installer-assets/opencode-skills/<rel>
 // Emit:   {config_root}/skills/<rel>  (preserves the subfolder path verbatim)
-//
-// Skills use the identity transform (kind != agent && kind != command in
-// transformToOpencode), so the content is copied byte-for-byte — the
-// cross-harness identical requirement is satisfied with no transform code.
 func buildSkillComponents(embeddedFS fs.FS) ([]ComponentManifest, error) {
 	var components []ComponentManifest
-
-	err := fs.WalkDir(embeddedFS, "skills", func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
-
-		// p is the full embedded path: "skills/foo/bar.md"
-		// rel is the part after "skills/": "foo/bar.md"
-		rel := strings.TrimPrefix(p, "skills/")
-
-		if !isCopyableSkillPath(rel) {
-			return nil
-		}
-
-		// Derive a safe component ID from the relative path.
-		// Replace path separators and other non-kebab characters with hyphens.
+	appendComponent := func(source, rel string) {
 		compIDBase := strings.NewReplacer(
 			"/", "-",
 			".", "-",
 			"_", "-",
 		).Replace(rel)
-		// Trim any leading/trailing hyphens that may result from replacement.
 		compIDBase = strings.Trim(compIDBase, "-")
-		compID := "skill-" + compIDBase
-
 		components = append(components, ComponentManifest{
 			SchemaVersion:  1,
-			Component:      compID,
+			Component:      "skill-" + compIDBase,
 			Module:         "opencode-harness",
 			Kind:           "skill",
-			Source:         "skills/" + rel,
+			Source:         source,
 			Cost:           "low",
 			Stability:      "stable",
 			DefaultInstall: true,
@@ -166,14 +142,40 @@ func buildSkillComponents(embeddedFS fs.FS) ([]ComponentManifest, error) {
 				ConfigKeys: []string{},
 			},
 		})
+	}
 
+	err := fs.WalkDir(embeddedFS, "installer-assets/opencode-skills", func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel := strings.TrimPrefix(p, "installer-assets/opencode-skills/")
+		if !isCopyableProjectedSkillPath(rel) {
+			return nil
+		}
+		appendComponent(p, rel)
 		return nil
 	})
-	if err != nil {
-		return nil, fmt.Errorf("walk skills: %w", err)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("walk opencode skill overrides: %w", err)
 	}
 
 	return components, nil
+}
+
+func isCopyableProjectedSkillPath(rel string) bool {
+	segments := strings.Split(rel, "/")
+	if len(segments) < 2 || segments[0] == "" {
+		return false
+	}
+	for _, segment := range segments {
+		if strings.HasPrefix(segment, ".") || strings.HasPrefix(segment, "_") {
+			return false
+		}
+	}
+	return opencodeCopyableSkillExt[strings.ToLower(path.Ext(rel))]
 }
 
 // buildCommandComponents returns one ComponentManifest per .md file in

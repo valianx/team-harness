@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Bootstrap"
+  short_description: "Team Harness Bootstrap workflow"
+  default_prompt: "Use $team-harness:bootstrap for this request."

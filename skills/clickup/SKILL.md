@@ -1,6 +1,6 @@
 ---
 name: clickup
-description: Manage ClickUp tasks: setup config, list filtered tasks, route a task to the team-harness pipeline.
+description: "Manage ClickUp tasks: setup config, list filtered tasks, route a task to the team-harness pipeline."
 ---
 
 Manage ClickUp tasks from the command line. This is a standalone utility — it does NOT route through the orchestrator.

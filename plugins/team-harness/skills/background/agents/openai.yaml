@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Background"
+  short_description: "Team Harness Background workflow"
+  default_prompt: "Use $team-harness:background for this request."

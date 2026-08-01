@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Obsidian Bases"
+  short_description: "Team Harness Obsidian Bases workflow"
+  default_prompt: "Use $team-harness:obsidian-bases for this request."

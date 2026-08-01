@@ -1,6 +1,6 @@
 ---
 name: background
-description: Dispatch a task to a background Claude session.
+description: Dispatch a bounded task to a background session or native subtask supported by the active runtime.
 ---
 name: background
 

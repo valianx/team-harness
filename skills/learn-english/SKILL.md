@@ -1,6 +1,6 @@
 ---
 name: learn-english
-description: Toggle the english-learning correction mode. on enables corrections (independent of the configured response language) and offers an optional English-immersion switch; off disables corrections and asks whether to keep English; status reports current state. Writes ~/.claude/.team-harness.json directly.
+description: Toggle English-learning corrections and optional immersion independently of the configured response language, persisting the choice in the active runtime's Team Harness settings.
 ---
 
 This is a standalone utility skill that reads and writes `~/.claude/.team-harness.json` directly to toggle the english-learning correction mode. It does NOT route through the orchestrator (mirrors `/th:setup` and `/th:update`, which read/write config directly). Writing `.team-harness.json` is this skill's purpose, exactly as it is `/th:setup`'s — so the "`/th:update` never writes `.team-harness.json`" rule does not apply here. Changes take effect at the next SessionStart, when `hooks/session-start.sh` reads the keys.

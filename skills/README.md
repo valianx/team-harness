@@ -9,7 +9,13 @@ Every skill lives at `skills/<name>/SKILL.md`. This format is compatible with bo
 When the plugin is active (canonical path), skills are invoked as `/th:<name>`.
 When installed via the legacy Go binary installer, skills are invoked as `/<name>`.
 
-**Runtime-restricted skills — durable convention.** A skill that functions under only one runtime (Claude Code or opencode) must name that restriction in the first clause of its `description` frontmatter field (e.g. a description opening with "Opencode runtime only"), and add a matching runtime line near the top of the body, before the first operational instruction. Claude Code's skill frontmatter reference does not honor a `runtime`/`os`/`platform` field, so legibility in the listed text is the only mechanism available. The one-way exclusion from the opposite direction (a Claude-Code-only skill kept out of the opencode copy) is enforced separately by `cmd/install/manifest_registry.go`'s `opencodeExcludedSkills`.
+**Shared capability convention.** Every top-level skill name is available in
+Claude Code, Codex, and opencode. `skills/` owns the canonical domain workflow;
+`tools/codex-runtime/sync-skills.mjs` packages generated Codex and opencode
+adapters that translate runtime paths, tools, delegation, and permissions.
+Hand-authored overrides are reserved for lifecycle or gated-pipeline mechanics
+that genuinely differ. Never exclude a capability merely because its source
+body names one runtime.
 
 ### Complex skill — subfolder with references
 
@@ -29,7 +35,7 @@ Convention: parse arguments, build a task payload, route to the `orchestrator` a
 - **Explicit gated activation:** `/th:pipeline` (operator-only, `disable-model-invocation: true`).
 - **Explicit compatibility activation:** `/th:issue`, `/th:plan` in `plan-and-execute` mode, and `/th:recover` for persisted state.
 - **Routes to the direct orchestrator kernel:** plain `/th:plan`, `/th:design`, `/th:plan-review`, `/th:research`, `/th:learn`, `/th:spike`, `/th:test`, `/th:test-cross-browser`, `/th:test-pipeline`, `/th:validate`, `/th:define-ac`, `/th:security`, `/th:audit`, `/th:review-pr`, `/th:deliver`, `/th:diagram`, `/th:likec4-diagram`, `/th:d2-diagram`, `/th:translate`, `/th:bootstrap`, `/th:eval`, `/th:gcp-costs`, `/th:cross-repo`, `/th:inline`.
-- **Standalone** (no orchestrator involvement): `/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:background`, `/th:update`, `/th:report-issue`, `/th:hookify`, `/th:save-session`, `/th:resume-session`, `/th:todo`, `/th:mcp-optimize`.
+- **Standalone** (no orchestrator involvement): `/th:modes`, `/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:background`, `/th:update`, `/th:report-issue`, `/th:hookify`, `/th:save-session`, `/th:resume-session`, `/th:todo`, `/th:mcp-optimize`.
 - **Standalone complex skills** (no slash-command entry point, triggered by description matching): `obsidian-markdown`, `obsidian-bases`, `json-canvas`, `obsidian-cli`.
 
 ## Adding a skill

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Security"
+  short_description: "Team Harness Security workflow"
+  default_prompt: "Use $team-harness:security for this request."

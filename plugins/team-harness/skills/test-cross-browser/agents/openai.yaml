@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Test Cross Browser"
+  short_description: "Team Harness Test Cross Browser workflow"
+  default_prompt: "Use $team-harness:test-cross-browser for this request."

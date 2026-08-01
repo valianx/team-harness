@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Clickup"
+  short_description: "Team Harness Clickup workflow"
+  default_prompt: "Use $team-harness:clickup for this request."

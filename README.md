@@ -95,6 +95,17 @@ available with the plugin alone.
 @Team-Harness pipeline add an export-to-CSV feature to invoices
 ```
 
+To browse every Team Harness skill available in Codex, type `/skills`, start a
+skill mention with `$team-harness`, or invoke the alphabetical catalog:
+
+```text
+$team-harness:modes
+```
+
+The same 57 canonical capability names are shipped to Claude Code, Codex, and
+opencode. Runtime adapters translate native paths, tools, permissions, and
+delegation without maintaining separate feature lists.
+
 `init` performs lightweight intake and direct bounded work without pipeline
 state or subagents. `pipeline` explicitly starts the full gated workflow in
 `Main`; it does not create a seventh coordinator or require `/agent`.
@@ -102,6 +113,8 @@ state or subagents. `pipeline` explicitly starts the full gated workflow in
 Upgrade, removal, local development, hook trust, and the complete role/model
 roster are documented in [`docs/codex-runtime.md`](./docs/codex-runtime.md).
 For routine upgrades invoke `$team-harness:update` from a Codex thread.
+Use `$team-harness:modes` in Codex, `/th:modes` in Claude Code, or
+`/th-modes` in opencode for an alphabetical, read-only capability catalog.
 
 ### Install into opencode
 

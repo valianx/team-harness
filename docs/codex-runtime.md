@@ -36,8 +36,12 @@ codex plugin marketplace add valianx/team-harness \
 Use `$team-harness:update` for the normal update flow. It refreshes the
 marketplace, compares versions, replaces the installed plugin through native
 permissions, ensures native settings exist, and automatically aligns all six
-bundled agents in the configured scope. It also repairs configuration and
-agents when the version is current. The underlying manual sequence remains `codex plugin marketplace
+bundled agents in the configured scope. It also leaves a guarded compatibility
+link from the running thread's old versioned cache path to the new snapshot, so
+already-known skill and hook paths keep working without a restart. It never
+overwrites a real cached directory or an unrelated symlink. The updater also
+repairs configuration and agents when the version is current. The underlying
+manual sequence remains `codex plugin marketplace
 upgrade team-harness`, remove `team-harness@team-harness`, then add it again.
 Run `codex plugin marketplace remove team-harness` only when no installed
 plugin still depends on it.
@@ -53,8 +57,14 @@ only deterministic-deny hooks (`policy-block` and the catastrophic branch of
 hook-level `ask` and native permissions own approvals. Review
 `plugins/team-harness/hooks/hooks.json` and its scripts before trusting the
 checkout; never bypass hook trust for an unreviewed repository. Hooks and the
-installer beta currently require a POSIX shell. Installation or updates are
-picked up only by a new Codex thread.
+installer beta currently require a POSIX shell. An update can bridge paths that
+the current thread already knows, but newly added or renamed skills, agent or
+MCP declarations, and hook registrations still require a new Codex thread.
+Hook commands prefer Codex's native
+`PLUGIN_ROOT`, accept the `CLAUDE_PLUGIN_ROOT` compatibility alias that Codex
+itself provides without requiring Claude Code, recover a replacement snapshot
+from the same Codex cache, and fail closed without a shell-level `127` when no
+plugin runtime can be resolved.
 
 For contributors, the generated project `.codex/config.toml` keeps
 `workspace-write` plus `on-request` approvals, enables dependency network
@@ -64,9 +74,15 @@ paths and broad write access to `$HOME`. Temporary `.git`
 directories remain protected by Codex and any test that constructs them still
 requires a narrowly scoped live approval.
 
-The plugin supplies nine skills (`setup`, `update`, `init`, `pipeline`,
-`design`, `implement`, `validate`, `deliver`, `recover`) and the six generated
-agent definitions used by setup/update. Consumers do not need the Go installer.
+The plugin supplies all 57 canonical Team Harness skills. Ten lifecycle and
+pipeline contracts remain hand-authored for Codex; the other 47 are generated
+runtime adapters that package the canonical workflow, references, scripts, and
+assets while translating invocation, configuration paths, tools, delegation,
+and permission boundaries. This includes the diagram family and both GCP
+skills. The six generated specialist definitions used by the gated pipeline
+remain a separate setup/update concern. Consumers do not need the Go installer.
+Run `$team-harness:modes` for an alphabetical catalog with concise descriptions,
+or use `/skills` and `$team-harness` completion in the Codex composer.
 These helper commands remain available for diagnostics and manual recovery:
 
 ```bash
@@ -88,8 +104,11 @@ the primary thread must find a complete set of `architect.toml`,
 `implementer.toml`, `tester.toml`, `qa.toml`, `security.toml`, and
 `delivery.toml` in either the project `.codex/agents/` or global
 `$CODEX_HOME/agents/` scope before it delegates. Setup/update install them from
-the marketplace snapshot; start a new Codex thread after placement. The plugin-only skills remain
-available for direct use when the agents are not installed.
+the marketplace snapshot. A new Codex thread is needed only when Codex must
+discover changed declarations; the updater's compatibility bridge keeps
+existing paths live. Shared direct skills remain available without the six
+pipeline specialists and execute through Main unless their adapter names a
+bounded native delegation.
 
 ## Roles and model projection
 
@@ -128,6 +147,7 @@ deterministic deny floors emit a hook decision; hook-level `ask` and classifier
 ```bash
 node tools/codex-runtime/generate.mjs --check
 node tools/codex-runtime/test_generate.mjs
+node tools/codex-runtime/sync-skills.mjs --check
 node tools/codex-runtime/validate-marketplace.mjs
 node tools/codex-runtime/sync-hooks.mjs --check
 bash tests/test_codex_hooks.sh
