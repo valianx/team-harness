@@ -70,12 +70,12 @@ the normalized (LF) bytes against these canonical SHA-256 digests:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| architect | `1c7e31755f5f902bb5a4e36d8bc392ab9fa6707ff4c8618ee500168cb1b8f07f` |
-| implementer | `1b29e02a2ac74696eca4d9c918f0a3d93efede600b38db6053c89881deff3ec1` |
-| tester | `e1db34f62274fdf74c9620bec7da71e78a1e0c8322a30b5d4dab7713fd9950ad` |
-| qa | `0e3129938dd040b43ae1203ae06ec773693d3e9f76510e30137b7dc25e40aff6` |
-| security | `31333c5ab6f655dbc649cc64b6c981cb8387ee9d2b76cdb9ac3a9baed2823859` |
-| delivery | `6d4d273fc4814353287634a2f1207cf13f5e7eed64f3301b1cb2d7d312674556` |
+| architect | `b410e50b380a132cdf74a16f55ab5dffa75c9f67f616f0afef693df012ecc6e4` |
+| implementer | `e44e306245bd082a21099b524281f945ddb415c26be33be07e4bae8c469cbe70` |
+| tester | `606f476400212e3bf11a66f0a71b3933a6f88a105603c7402688c3aaee30e04d` |
+| qa | `3b92245e8ed0a00bf32a8ca972e89ec530ea3f55c182b0fbc916016e0e0fb0d1` |
+| security | `ef87b9740ea860fc8f16a4d580d2dae4b59e8f4411cc00673747e028d4082582` |
+| delivery | `48266915b9484a32c474b74050f0d186d7b92e287660da80f730443059446bb4` |
 
 A digest mismatch is an identity failure; stop before workspace creation or
 delegation. Ask the operator to run
@@ -123,6 +123,9 @@ Create:
   `status: in_progress`, and `next_action: delegate architect`.
 - `00-execution-events.jsonl`: append-only trace in local mode. For a new
   Obsidian workspace use `00-execution-events.md`; preserve an established
-  lane's existing format.
+  lane's existing format. Both formats append one minified JSON object per
+  durability-bearing event and are never rewritten. The Markdown variant adds
+  its wrapper once; it does not justify narrative events. Do not emit routine
+  tool-call start/success pairs or content already recoverable from state.
 
 Initialize state before dispatch so an interrupted design is recoverable.

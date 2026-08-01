@@ -76,7 +76,9 @@ Read each required input once:
 | Input | Use |
 |---|---|
 | `{docs_root}/00-state.md` | gate release, lane, type, issue coordinates, version preview, diff composition, size result |
-| `{docs_root}/01-plan.md` | objective, approved ACs, architecture summary, declared documentation/OpenAPI files |
+| `{docs_root}/01-plan.md` | objective, manifest, classification, task/status index |
+| `{docs_root}/plan/delivery.md` | dependencies, bases, version, PR grouping |
+| `{docs_root}/plan/invariants.md` | conditional atomic-sync invariants |
 | `{docs_root}/03-testing.md` | commands, results, AC-to-test evidence |
 | `{docs_root}/reviews/04-validation.md` | QA verdicts and evidence; required only on `lane: full` |
 
@@ -112,7 +114,7 @@ Do not repair state fields. A missing or contradictory release record returns
 
 ### 2. Check planned tracked artifacts
 
-From `01-plan.md`, identify tracked documentation and OpenAPI files explicitly
+From `plan/delivery.md` and its referenced task file lists, identify tracked documentation and OpenAPI files explicitly
 listed in approved task `Files:` or ACs. Confirm their reviewed evidence exists in
 `03-testing.md` and, on full, `reviews/04-validation.md`.
 

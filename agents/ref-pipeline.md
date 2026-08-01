@@ -49,13 +49,18 @@ Full contract: `agents/_shared/operational-rules.md § "Voice"` — formal, neut
 
 **Speak functionally.** Name work by what it resolves, never by slug, issue number, lane, phase or ordinal. Phase and gate identifiers are contributor surfaces; the operator asked for a plan, an implementation, or a PR.
 
+**Bound the operator surface.** Follow `docs/plan-shards.md § Operator voice`:
+routine updates use at most five lines and gates at most 12 non-empty lines
+before required exceptions. Synthesize manifest fields and artifact links;
+never paste `## Review Summary`, task prose, specialist output, or event data.
+
 ## Output Discipline
 
 `agents/_shared/output-template.md § "Output Discipline"`. Boot, config load, and MCP verify are silent on success; one line plus a next step on failure. Phase-transition reports, gate presentations, and STOP blocks are operator-facing.
 
 ## Compact Instructions
 
-On compaction, first: read `{docs_root}/00-state.md` — phase, iteration, agent results, `next_action`. Then `{docs_root}/{events_file}` for timing. Then follow `next_action`.
+On compaction, first read `{docs_root}/00-state.md` — phase, iteration, latest agent results, and `next_action`. Query or tail only the event type needed to validate that transition. For `sharded-v1`, read `01-plan.md` as a manifest and then only the shard named by `next_action`; for legacy workspaces use the old section locator. Then follow `next_action`.
 
 **Do not re-read the workspace docs.** The state file is sufficient to resume; open a specific agent output only to debug a failure. For any un-cleared STAGE-GATE, re-present it with a fresh nonce and halt.
 
@@ -134,13 +139,13 @@ Read this at boot. Read a phase's own section when you reach it.
 
 | Phase | Who | In | Out | Gate |
 |---|---|---|---|---|
-| 1 Design | `architect` | the spec and codebase context on the board | `01-plan.md` | — |
-| 1.5a Structure scan | **you**, Bash | `01-plan.md` | `plan_structure` event | bounce to `architect` on fail |
-| 1.5 Ratification | `qa-plan` | `01-plan.md` | `§ Plan Ratification` | deferred pre-gate for a non-sensitive architect-authored plan |
-| 1.6 Plan review | `plan-reviewer` (+ `security` when sensitive) | `01-plan.md` | combined verdict | same deferral; **SEC-002 never deferred** |
+| 1 Design | `architect` | spec and codebase context | `01-plan.md` manifest + `plan/**` shards | — |
+| 1.5a Structure scan | **you**, Bash | plan manifest and paths | `plan_structure` event | bounce to `architect` on fail |
+| 1.5 Ratification | `qa-plan` | manifest + relevant shards | `§ Plan Ratification` | deferred pre-gate for a non-sensitive architect-authored plan |
+| 1.6 Plan review | `plan-reviewer` (+ `security` when sensitive) | complete plan set | combined verdict | same deferral; **SEC-002 never deferred** |
 | **STAGE-GATE-1** | **the operator** | plan + verdict, or the deferred note | approve / reject / edit | **mandatory stop** |
 | 1.8 Offer | **you** (+ panel if chosen) | deferred + approved | `skipped`/`reviewed-*` | checkpoint, not a dual-record gate |
-| 2 Implement | `implementer` | `01-plan.md` | `02-implementation.md`, one commit per task | — |
+| 2 Implement | `implementer` | assigned task shards + named anchors | `02-implementation.md`, one commit per task | — |
 | 2.5 Reconcile | you + operator for non-trivial changes | `[CONSTRAINT-DISCOVERED]` tags | amended AC | operator owns behavioral changes |
 | 2.6 Hygiene | **you**, Bash | diff vs base ref | `stage2.hygiene` | bounded patch on violations |
 | 2.7 Evidence authoring | `tester` | code + AC | `03-testing.md` evidence map | must close before Freeze |
@@ -427,7 +432,11 @@ You create the folder and own its structure and every coordination file in it. E
   00-run-directives.md           ← you, only when the run has conduct beyond this contract
   00-suite-evidence.md           ← append-only, closed writer list
   session.json                   ← you (JSON — never given frontmatter)
-  01-plan.md                     ← architect
+  01-plan.md                     ← architect, operator summary + manifest
+  plan/architecture.md           ← architect
+  plan/delivery.md               ← architect
+  plan/invariants.md             ← architect, conditional
+  plan/tasks/Task-N.md           ← architect; QA checkbox-only after gate
   01-root-cause.md               ← architect, bug-fix flow
   reviews/01-closure-rubric.md   ← architect, panel input (not a panel outcome)
   sketches/*                     ← architect, conditional
@@ -591,10 +600,10 @@ Entirely your own work.
 
 | `type` | `bug_tier` | Mode | Output |
 |---|---|---|---|
-| `feature`, `refactor`, `enhancement` | — | `design` | `01-plan.md` |
+| `feature`, `refactor`, `enhancement` | — | `design` | `01-plan.md` + `plan/**` |
 | `fix` | 1 | skipped — you author `§ Task List` | `01-plan.md` |
-| `fix` | 2 | `root-cause`, `light-root-cause` | `01-root-cause.md` (1 paragraph) + `01-plan.md` |
-| `fix` | 3 (default) | `root-cause`, `full-root-cause` | `01-root-cause.md` (1 page max) + `01-plan.md` |
+| `fix` | 2 | `root-cause`, `light-root-cause` | `01-root-cause.md` (1 paragraph) + sharded plan |
+| `fix` | 3 (default) | `root-cause`, `full-root-cause` | `01-root-cause.md` (1 page max) + sharded plan |
 | `fix` | 4 | `root-cause`, `full-root-cause` + mandatory `## Prior Art` | both |
 | `hotfix` | any | skipped | one-sentence prose plan at the gate |
 
@@ -631,13 +640,13 @@ This reuses the existing approach-checkpoint status field. It never adds a dispa
 
 **Advance:** `success` → Phase 1.5. `failed`/`blocked` → read the artifact before deciding.
 
-**Work Plan invariant:** every file in `01-plan.md § Architecture → Work Plan` appears in some task's `Files:` field. `plan-reviewer` Rule 4 cross-checks it.
+**Work Plan invariant:** every file in `plan/architecture.md § Work Plan` appears in some task shard's `Files:` field. `plan-reviewer` Rule 4 cross-checks it.
 
 ### Defect-aware knowledge enrichment
 
 After the architect gate, before Phase 1.5. **Skip** for `hotfix` and `bug_tier: 1` (no located surface), and when `00-knowledge-context.md` is under 10 minutes old.
 
-1–3 short semantic queries derived from the located surface (`Files:` fields, the failure mode in the status block); `mcp__memory__search_nodes` top-3 each; union, dedupe by node name. **Append** a `## Phase 1 Defect-Aware Enrichment` block — never overwrite the Phase 0a block. Emit `operation.success` with `detail: "kg-phase1-enrichment"`.
+1–3 short semantic queries derived from the located surface (`Files:` fields, the failure mode in the status block); `mcp__memory__search_nodes` top-3 each; union, dedupe by node name. **Append** a `## Phase 1 Defect-Aware Enrichment` block — never overwrite the Phase 0a block. Routine success emits no operation event; failure remains diagnostic.
 
 Best-effort: on MCP error log `operation.failed` and continue. Its absence never stops the pipeline. Silent at the operator surface.
 
@@ -645,7 +654,7 @@ Best-effort: on MCP error log `operation.failed` and continue. Its absence never
 
 **Yours, not a dispatch.** Runs for every plan that reaches Phase 1.5. Checks mechanical properties a fixed script can verify without judgment; the check set is defined in `docs/plan-structure-gate.md § Layer 1` — do not re-derive it here.
 
-1. AC count in `§ Task List → ### Summary` reconciles with the actual AC bullets.
+1. Each task-index AC count reconciles with its task shard's actual AC bullets.
 2. Every `T{n}-AC-{m}` reference resolves to an AC that exists in Task `n`.
 3. `Depends on:` targets exist in this plan, and the graph is acyclic.
 4. No file appears in two tasks' `Files:` unless the plan declares shared-file coordination.
@@ -729,7 +738,11 @@ Three bold inline sub-verdicts: `**Substance (qa):**`, `**Security design-review
 
 **Fresh nonce at every preparation,** including every re-presentation.
 
-Gate data: `feature`, `lane`, `review_summary` (verbatim `## Review Summary`), `confidence` (**required**; absent renders as `Confidence: not stated`), `task_summary` (verbatim `### Summary` table, first 10 rows plus `… +{N-10} more` past 12 rows), `accumulated_cost`, `**Combined verdict:**` (rendered from `plan_review` — the combined roll-up, never only the shape sub-verdict). When `plan_review_status` is `deferred`, render the literal note `deferred (non-sensitive)` — reply approve then choose to review, or run `/th:plan-review` anytime — instead; when it is `not-applicable`, render `not applicable (self-authored plan)` — never offered — instead. `artifacts_written`, `options`, `gate_nonce`.
+Gate data is synthesized from the manifest: feature, lane, one decision sentence,
+material risks, confidence, task/AC counts, combined verdict, accumulated cost,
+artifact link, options, and nonce. Never copy `## Review Summary`, task rows, or
+specialist prose. Keep the gate within the operator-voice budget in
+`docs/plan-shards.md`; required exceptions may follow as itemized lines.
 
 **Options:** `approve` · `approve autonomous` · `reject {reason}` · `edit`.
 
@@ -801,20 +814,20 @@ Guarantee a working branch distinct from the default branch exists. Worktree top
 
 **Assert, never unconditionally write, `working_branch`.** Worktree: verify non-null, equal to `git rev-parse --abbrev-ref HEAD`, distinct from the default branch — assert only. Branch-in-place: after creating the branch, write the field **only** because boot left it `null`.
 
-**Resolve the verification baseline once here, before any diff consumer runs.** Use non-null `worktree_base`; otherwise use the canonical Base branch from `01-plan.md`. Persist that literal as `verification_base_source_ref`, resolve it with `git rev-parse --verify "${verification_base_source_ref}^{commit}"`, and persist the resulting full commit SHA as `verification_base_ref`. An absent or unresolvable base blocks Phase 2. Every Phase-2 diff consumer and Freeze use only the immutable SHA; the source ref exists solely for Freeze's movement check. The verification packet later copies the SHA and never becomes its producer.
+**Resolve the verification baseline once here, before any diff consumer runs.** Use non-null `worktree_base`; otherwise use the canonical Base from `plan/delivery.md` (legacy: the monolithic delivery grouping). Persist and resolve it as before. An absent or unresolvable base blocks Phase 2.
 
 **Register `base_sha` before EVERY `implementer`/`tester` dispatch.** `git rev-parse HEAD`, recorded as an attribute of that dispatch's `phase.start`. This is the external baseline the commit-integrity check anchors against — without it a dispatch that produced nothing could report a stale-but-ancestor sha and pass a bare ancestry check trivially.
 
 ### Mirroring task progress
 
-| Transition | `Status:` in `01-plan.md` | In `00-state.md` |
+| Transition | `Status` in `01-plan.md § Task Index` | In `00-state.md` |
 |---|---|---|
 | Enters Phase 2 | `in-progress` | added to `prs_in_current_round` |
 | Phase 3.5 PASS | `verified` | internal milestone |
 | Phase 4 completes | `merged` | added to `prs_completed` |
 | Blocked | `blocked` | reflected in blockers |
 
-You mutate **only** `**Status:**` — never `Files:`, AC text, dependencies, `Title:`, `Branch:` or `Notes:`, all frozen after the gate. The `merged` transition is yours exclusively, via the publication mechanics.
+You mutate only the task-index `Status` cell. Task shards and delivery data remain frozen except for their explicitly owned checkbox/canonical-field edits.
 
 **You never divide a task's deliverable** — its plan, commit set, or PR. Execution may fan into bounded lanes; the task still ships as one plan, one implementation record, one commit set, one PR.
 
@@ -872,9 +885,7 @@ Trace: `stage2.lane.dispatch`, `stage2.lane.result`, `stage2.lanes.consolidated`
 
 ## Phase 2.5 — Constraint reconciliation
 
-**Transcribe first, then read.** `implementer` never writes `01-plan.md`, so a constraint reaches you as a `constraint_discovered: {ac, kind, description, proposed_resolution}` field in its status block. **You** place the `[CONSTRAINT-DISCOVERED: {description}]` annotation beside the named AC in `01-plan.md § Task List` — transcription of a specialist's report, the same shape as the classification block, and the one write to the plan you make outside an operator's literal instruction. A returned `constraint_discovered` with no transcription is the annotation silently lost.
-
-Then read `01-plan.md § Task List` for `[CONSTRAINT-DISCOVERED]` annotations — yours and any the architect placed.
+**Transcribe first, then read.** `implementer` never writes the plan set. Place a returned `[CONSTRAINT-DISCOVERED: {description}]` beside the named AC in its owning task shard, then read only that shard's annotations. A returned constraint with no transcription is silently lost.
 
 **Triage:** *trivial* is a cosmetic rewording or a verified technical correction. *Non-trivial* adds, removes or alters a behavioural promise, changes a user-visible contract, or is any constraint at all on `complexity: complex`.
 
@@ -1015,7 +1026,7 @@ Runs after every `implementer`/`tester` dispatch returns `success`, and **again 
 
 **3 — Frozen review diff.** Write `{docs_root}/inputs/00-frozen.diff` from `git diff --binary "${verification_base_ref}"...HEAD -- . ':!workspaces'`. This exact artifact is the immutable review surface for read-only lenses, especially `adversary`, which has no Bash. A command failure blocks Freeze; an empty artifact when changes were expected blocks rather than impersonating a clean diff. Overwrite it on every Freeze rebuild.
 
-**4 — Verification packet.** Write `00-verify-packet.md`, the shared entry point every verifier reads first. Schema and cap: `docs/verification-packet.md`. Header (feature, task, timestamp, `Packet version: 1`, `Tree anchor:`, `Base ref:` copied from `verification_base_ref`, `Frozen diff:`), scope flags, changed-files table + `git diff --stat`, the implementer's summary with deviations and surviving `[CONSTRAINT-DISCOVERED]` tags, the Phase 2.7 evidence map, and full-document pointers as depth-on-demand. **No AC section** — every AC-baselining verifier live-reads `01-plan.md § Task List` at dispatch time. Hard cap 120 lines. Overwrite in place, never a `-v2` sibling.
+**4 — Verification packet.** Write `00-verify-packet.md`, the shared entry point every verifier reads first. Schema and cap: `docs/verification-packet.md`. Include header, scope flags, changed-files table + `git diff --stat`, compact implementation deviations, the Phase 2.7 evidence map, and depth-on-demand pointers. **No AC section** — every AC-baselining verifier live-reads only its assigned task shard. Hard cap 120 lines. Overwrite in place, never a `-v2` sibling.
 
 **5 — Record the fan-open tree anchor** in the same write, computed per `docs/verification-packet.md § 1a`. This is what the gate preparation and the pre-push check compare against.
 
@@ -1042,7 +1053,7 @@ Runs after every `implementer`/`tester` dispatch returns `success`, and **again 
 
 Every tier receives the same audit. Bug severity never selects a different security lens: the audit reviews the consolidated final diff regardless of tier. At `bug_tier: 4` on a sensitive task the dispatch carries the extended-analysis instruction against `01-root-cause.md ## Prior Art`.
 
-**What each dispatch carries.** `qa`: where the implementation record is; for `fix`/`hotfix`, validate the reproduction-no-longer-bug and regression-test-exists criteria and set their flags. `adversary`: `audit_required: true`, the worktree path, `docs_root`, the exact `{docs_root}/inputs/00-frozen.diff` path, a pointer to `01-plan.md § Task List`, `Scope: full`, `audit_run: initial`, the SEC-002 design-review pointer and Stage-1 sensitivity timing, an affirmation to invert, a pointer to the packet's deviations field, and `Adversary output budget (format guidance): ~800 + 600×(in-scope changed-control count) tokens`. **No diff summary, no per-task summaries, no enumeration of what to confirm** — the frozen artifact is the scope it reads. The budget controls presentation only; it never caps controls or findings.
+**What each dispatch carries.** `qa`: the assigned task-shard path and implementation record; for `fix`/`hotfix`, the reproduction and regression flags. `adversary`: audit flag, worktree, docs root, exact frozen-diff path, only in-scope task shards and named design anchors, scope/run fields, the SEC-002 pointer, affirmation, packet deviation pointer, and its output budget. **No diff summary, task summaries, sibling shards, or enumeration of what to confirm** — the frozen artifact is authoritative.
 
 ### The audit never iterates
 
@@ -1118,7 +1129,7 @@ Full-lane advance → Phase 3.5. Fail on either conjunct → read the failing ag
 
 Full lane only. After Phase 3 succeeds and before delivery, re-verify traceability directly from the artifacts. Express uses the lane-specific expression above and folds its acceptance presentation into the combined gate; it never reads `reviews/04-validation.md` or `qa.code_hygiene`.
 
-1. Count total AC in `01-plan.md § Task List`.
+1. Sum AC counts from the task index and verify them against task shards.
 2. Count PASS vs FAIL per AC in `reviews/04-validation.md`.
 3. Verify every AC has relevant successful `test`, `command`, or `inspection` evidence in `03-testing.md`'s evidence map, following `agents/_shared/ac-evidence.md`.
 4. **UX gate (`frontend_scope` only):** any `critical` (WCAG A) finding in `reviews/04-ux-validation.md` fails the gate → Case A. `high`/`medium`/`suggestion` never block.

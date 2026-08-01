@@ -442,6 +442,82 @@ def main() -> None:
     if "${CODEX_HOME:-$HOME/.codex}/.team-harness.json" not in activation:
         fail("pipeline activation must prefer the Codex-native Team Harness config")
 
+    output_contract = (ROOT / "docs/output-contract-patterns.md").read_text()
+    for marker in (
+        "## 6. Workspace artifact budgets",
+        "Follow `docs/plan-shards.md`",
+        "`02-implementation.md` | 5–30 lines and ≤8 KB",
+        "## 7. Read-once, section-first contract",
+        "It does not preload every completed phase.",
+    ):
+        if marker not in output_contract:
+            fail(f"workspace I/O contract is missing {marker!r}")
+
+    recovery = (
+        ROOT / "plugins/team-harness/skills/pipeline/references/recovery.md"
+    ).read_text()
+    for marker in (
+        "Read the bounded state snapshot first",
+        "never load the stream in full",
+        "read `01-plan.md` once as a manifest",
+        "Do not preload the full plan set",
+    ):
+        if marker not in recovery:
+            fail(f"Codex recovery still lacks section-first routing: {marker!r}")
+
+    instruction_markers = {
+        "architect": ("plan_format: sharded-v1", "Each fact has one canonical home"),
+        "implementer": ("plan/tasks/Task-N.md", "never preload sibling tasks"),
+        "tester": ("plan/tasks/Task-N.md", "fixed testing prose within 40 lines"),
+        "qa": ("plan/tasks/Task-N.md", "fixed report prose within 30 lines"),
+        "security": ("security-relevant task shards", "fixed prose within 20 lines"),
+        "delivery": ("plan/delivery.md", "within 60 lines and 12 KB"),
+    }
+    for role, markers in instruction_markers.items():
+        instructions = (ROOT / f"runtime/codex/instructions/{role}.md").read_text()
+        for marker in markers:
+            if marker not in instructions:
+                fail(f"{role} Codex adapter is missing workspace budget marker {marker!r}")
+
+    plan_consolidation = (ROOT / "agents/_shared/plan-consolidation.md").read_text()
+    if "superseded finding bodies are replaced, not retained" not in plan_consolidation:
+        fail("plan review contract still permits historical finding-body accumulation")
+
+    plan_shards = (ROOT / "docs/plan-shards.md").read_text()
+    for marker in (
+        "**Plan format:** sharded-v1",
+        "`plan/tasks/Task-N.md`",
+        "Each fact has one canonical home",
+        "must not preload every shard",
+        "at most 12 non-empty lines",
+        "monolith-v1",
+    ):
+        if marker not in plan_shards:
+            fail(f"sharded plan contract is missing {marker!r}")
+
+    runtime_plan_shards = (
+        ROOT / "plugins/team-harness/skills/pipeline/references/plan-shards.md"
+    ).read_text()
+    for marker in (
+        "plan_format: sharded-v1",
+        "plan/tasks/Task-N.md",
+        "Only the plan panel may inspect every shard",
+        "A workspace without the format marker is legacy",
+    ):
+        if marker not in runtime_plan_shards:
+            fail(f"distributable sharded plan contract is missing {marker!r}")
+
+    observability = (ROOT / "docs/observability.md").read_text()
+    for marker in (
+        "### Low-cost append contract",
+        "neither format is rewritten",
+        "successful tool call does not deserve",
+        "one minified JSON object on one line",
+        "`.jsonl` alone would not",
+    ):
+        if marker not in observability:
+            fail(f"low-cost event contract is missing {marker!r}")
+
     marketplace_check = subprocess.run(
         ["node", "tools/codex-runtime/validate-marketplace.mjs"],
         cwd=ROOT,

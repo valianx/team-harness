@@ -93,8 +93,8 @@ STAGE-GATE-1 and `plan-reviewer` Rule 11 can audit consistency.
 
 | Sketch | Trigger | Format | Tool | Fidelity ceiling | Representation ceiling | Home |
 |--------|---------|--------|------|-----------------|----------------------|------|
-| Functional acceptance criteria | always | Given/When/Then text | none | per-task AC, no implementation detail | markdown | collapses into `01-plan.md § Task List` per-task AC block (no standalone file) |
-| Non-functional notes | always | bullet list (auth, perf, rate-limit, errors; a11y if frontend) | none | bullets only, no design | markdown | collapses into `01-plan.md § Architecture` Security/Performance Assessment (no standalone file) |
+| Functional acceptance criteria | always | Given/When/Then text | none | per-task AC, no implementation detail | markdown | canonical in the affected `plan/tasks/Task-N.md` |
+| Non-functional notes | always | bullet list (auth, perf, rate-limit, errors; a11y if frontend) | none | bullets only, no design | markdown | canonical in `plan/architecture.md` Security/Performance Assessment |
 
 The two always-sketches collapse into existing surfaces and are NOT separate files.
 Every plan has a `§ Task List` AC block and a `§ Architecture` Security/Performance section,

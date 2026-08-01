@@ -53,7 +53,7 @@ degenerate case, so Phase 1.5a does not run separately for it.
 **Checks (canonical — the orchestrator's inline scan must not re-derive or paraphrase this set):**
 
 1. **AC-count-vs-`### Summary`-table reconciliation.** The total AC count declared in
-   `01-plan.md § Task List → ### Summary` matches the actual count of `- [ ]`/`- [x]` AC bullets
+   each `01-plan.md § Task Index` AC count matches its task shard's actual `- [ ]`/`- [x]` AC bullets
    across every task's `#### Acceptance Criteria` block. A mismatch in EITHER direction (table
    overstates or understates) is a violation.
 2. **Dangling `T{n}-AC-{m}` cross-references.** Every `T{n}-AC-{m}`-shaped reference anywhere in

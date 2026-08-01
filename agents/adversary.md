@@ -70,7 +70,7 @@ The audit result never starts an autonomous patch loop. The orchestrator present
 3. Read only `reviews/01-plan-review.md § Security Design-Review` when present. Do not read unrelated panel sections.
    - If Stage 1 declared the task sensitive and the required plan-review artifact is absent, block with `failure_kind: artifact-missing`.
    - If the plan review exists without a Security Design-Review because sensitivity escalated after Stage 1, proceed and record `design_review: absent (escalated post-1.6)`.
-4. Read the targeted design baseline in `01-plan.md`: `Review Summary § Proposed Approach`, `§ Risks`, and `§ Classification block`; `Architecture § Key Decisions` and `§ Security Assessment`; and the AC blocks only for tasks whose files or controls are in scope. Skip absent sections and unrelated task prose. These are intent inputs to falsify; the frozen diff remains authoritative for what ships.
+4. Read the targeted design baseline through the `01-plan.md` manifest: classification and risks from the index, named Key Decisions/Security Assessment anchors from `plan/architecture.md`, conditional affected invariants, and only task shards whose files or controls are in scope. Skip sibling tasks. Legacy workspaces use the old logical locators. These are intent inputs to falsify; the frozen diff remains authoritative for what ships.
 5. Open source files only to resolve context missing from the frozen diff or to prove a reachable precondition. Do not scan untouched files.
 6. Consult only task-relevant entries already present in `00-knowledge-context.md`, when available. Do not perform additional KG or web searches.
 

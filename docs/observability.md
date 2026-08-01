@@ -13,6 +13,28 @@ Team Harness maintains two distinct observability planes. Operators and tools (e
 opt-in channel for aggregate fleet-level friction signals. The two planes MUST NOT be
 conflated — they answer different questions with different audiences.
 
+### Low-cost append contract
+
+The extension is not the cost boundary. Both local formats carry the same compact
+JSON object per event and use physical append; neither format is rewritten to add an
+event. Obsidian Markdown adds frontmatter, a heading, and one open `jsonl` fence at
+initialization only. New events append after that fence; closing it is optional and
+must never require rewriting the stream.
+
+Emit only durability-bearing events: session/pipeline start, phase end, gate
+presentation/release, failures, required iteration markers, and completion. A routine
+successful tool call does not deserve an `operation.started` + `operation.success`
+pair. `operation.*` remains available for a long-running boundary whose recovery needs
+an explicit start marker, or for a failure that needs diagnosis. Never log reasoning,
+prompts, specialist prose, diffs, command output, or fields already recoverable from
+`00-state.md` or the named artifact.
+
+Each append is one minified JSON object on one line. Use identifiers, enums, counts,
+durations, token figures, and artifact paths; optional free text follows the existing
+120-character bound. Recovery tails or queries only relevant event types and never
+loads the stream in full. These rules reduce model output and I/O; renaming `.md` to
+`.jsonl` alone would not.
+
 | Dimension | Local plane (`00-execution-events`) | Cross-user plane (flow events) |
 |-----------|-------------------------------------|-------------------------------|
 | Purpose | Per-workspace pipeline trace for the individual operator | Cross-fleet friction signal for TH maintainers |
@@ -142,9 +164,9 @@ enforces it by construction. Neither side relies solely on the other (defense in
 
 ## What operation.* is
 
-`operation.*` is an **optional, additive** event family that agents and skills
-emit for discrete internal operations (config-load, MCP connectivity probe,
-initialization, tool call). It is nested inside the existing
+`operation.*` is an **optional, additive** event family for a long-running
+recoverable boundary or a diagnostic failure. Routine successful config loads,
+initialization, and tool calls stay silent. It is nested inside the existing
 `00-execution-events.{jsonl|md}` file — it is NOT a separate file. No existing
 `phase.*` or `gate.*` contract is modified; `operation.*` events coexist in the
 same stream, distinguished by the `event` field prefix.
@@ -825,9 +847,10 @@ about what a run costs, and tagging them would not add information.
 
 ## Relationship to the Output Discipline contract
 
-The `operation.*` schema is the log target for the silent-on-success rule:
+The `operation.*` schema is the diagnostic log target for the output discipline:
 
-- **On success**: emit `operation.success` to the events file. No operator-facing output.
+- **On routine success**: emit no operation event and no operator-facing output.
+- **On long-running recoverable success**: a previously emitted start may be closed with `operation.success`.
 - **On failure**: emit `operation.failed` to the events file AND surface one line to the operator: `{error} — {suggestion}`.
 
 Full behavioral contract: see `agents/_shared/output-template.md` § "Output Discipline".

@@ -8,7 +8,7 @@
 
 A workspace is the shared working directory for a single pipeline session. Each pipeline run creates its own isolated workspace at `workspaces/{feature-name}/`. Agents communicate through files — each reads prior agents' output and writes its own. The operator uses the workspace as a review surface. Values are never passed through return values. `workspaces/` is always git-ignored and never committed.
 
-Beyond the root-tier docs (`00-state.md`, `01-plan.md`, `02-implementation.md`, `03-testing.md`, etc.), a workspace groups related artifacts under subfolders created implicitly on first `Write` (no orchestrator `mkdir` step): `sketches/` for plan-stage sketches, `research/` for research-family artifacts (`00-research.md`, `00-audit.md`, `research-findings-*.md`, `code-findings-*.md`), and `reviews/` for review-family reports (`04-validation.md`, `04-security.md`, `01-ux-review.md`, `04-ux-validation.md`, `04-adversary.md`, `04-adversary-amend-{N}.md`, `04-review.md`). Basenames never change merely because of this grouping — only the directory prefix distinguishes tiers; a contract-defined audit revision suffix remains part of that artifact's basename.
+Beyond the root-tier docs (`00-state.md`, `01-plan.md`, `02-implementation.md`, `03-testing.md`, etc.), a workspace groups related artifacts under subfolders created implicitly on first `Write`: `plan/` for architecture, delivery, conditional invariants, and per-task shards; `sketches/` for plan-stage sketches; `research/` for research-family artifacts; and `reviews/` for review-family reports. Basenames never change merely because of grouping except where `docs/plan-shards.md` defines the plan layout.
 
 ## Document classification
 
@@ -16,7 +16,8 @@ Every workspace doc is either **operator-facing** or **agentic**. The operator's
 
 | Doc | Tier | Format contract | Writer |
 |-----|------|-----------------|--------|
-| `01-plan.md` | operator-facing | Intrinsic plan schema (`## Review Summary` first, `## Architecture`, `## Task List`); consolidated, ordered, final state before implementation (`## Review Summary` is the plan's own operator summary — not reviewer output) | architect (content); see write-scope table in `agents/_shared/plan-consolidation.md` |
+| `01-plan.md` | operator-facing | `sharded-v1` operator summary and manifest; no copied architecture or AC prose | architect (content); see `docs/plan-shards.md` |
+| `plan/architecture.md`, `plan/delivery.md`, `plan/invariants.md`, `plan/tasks/*.md` | agentic | Canonical plan shards; one fact in one owning artifact | architect; bounded post-gate writers per consolidation contract |
 | `sketches/*` | operator-facing | `docs/plan-sketches.md` manifest (unchanged) | architect |
 | `01-root-cause.md` | operator-facing | Strict root-cause template (unchanged); the bug-fix equivalent of the plan, read at STAGE-GATE-1 | architect |
 | `overview.md` (initiative) | operator-facing | `agents/ref-dispatch-machinery.md § "overview.md — you are the sole writer"` (unchanged) | orchestrator (sole writer; derives completion-row coordinates after its own Phase-4 mechanics) |
@@ -28,6 +29,11 @@ Every workspace doc is either **operator-facing** or **agentic**. The operator's
 | Vault pages produced by `documenter`, `00-teaching-pack-*.md` | operator-deliverable | Own contracts (docs flow / mentor); outside the two-tier mandate | documenter / mentor |
 
 Consequence: the old universal mandate ("every workspace doc gets `## Review Summary` then `## Technical Detail`") is rescoped. Operator-facing docs keep their intrinsic templates (which already carry a `## Review Summary`-equivalent where it matters). Agentic docs use whatever compact, structured format their own agent already defines — no two-tier obligation. STOP blocks and the status-block return protocol are unaffected — they are already agentic/operator-facing by design.
+
+All tiers also follow the enforceable workspace write and read budgets in
+`docs/output-contract-patterns.md § 6` and § 7. “Operator-facing” permits clear prose; it does
+not permit an unbounded transcript. “Agentic” means a compact current snapshot with canonical
+pointers, not a second copy of source evidence.
 
 ### Two-tier language rule
 

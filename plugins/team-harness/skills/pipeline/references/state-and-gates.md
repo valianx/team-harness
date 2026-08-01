@@ -17,6 +17,7 @@ Keep a replaceable snapshot with these stable fields:
 
 ```text
 pipeline_version: 2
+plan_format: sharded-v1
 activation: explicit
 feature: {kebab-case slug}
 repo_root: {absolute path}
@@ -36,8 +37,14 @@ worktree: {absolute path or null}
 working_branch: {branch or null}
 ```
 
-Also keep a short phase checklist and a bounded specialist-results table.
-Update existing fields in place; do not grow narrative inside the snapshot.
+Also keep a short phase checklist and a bounded specialist-results table with
+only the latest result per role. The complete file must stay ≤160 lines and
+≤16 KB. Update existing fields in place; do not grow narrative inside the
+snapshot.
+
+Routine operator updates follow `plan-shards.md`: at most
+five lines containing only outcome, changed state, blocker/risk, next action,
+and artifact link. Do not copy specialist or workspace prose into the update.
 
 ## Gate release rule
 

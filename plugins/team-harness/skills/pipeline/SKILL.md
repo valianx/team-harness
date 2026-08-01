@@ -26,8 +26,8 @@ behavior for the initialized workflow:
   `security`, and `delivery`;
 * never let a specialist approve a gate, speak for the operator, or become a
   second coordinator;
-* re-read durable state before every continuation instead of relying on recalled
-  conversation state; and
+* re-read the bounded durable state snapshot once before every continuation,
+  then load only the section/artifact named by `next_action`; and
 * return to ordinary direct behavior after the workflow completes or the live
   operator explicitly aborts it.
 
@@ -98,12 +98,12 @@ the role fields cannot see. The current digests are:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| `architect` | `1c7e31755f5f902bb5a4e36d8bc392ab9fa6707ff4c8618ee500168cb1b8f07f` |
-| `implementer` | `1b29e02a2ac74696eca4d9c918f0a3d93efede600b38db6053c89881deff3ec1` |
-| `tester` | `e1db34f62274fdf74c9620bec7da71e78a1e0c8322a30b5d4dab7713fd9950ad` |
-| `qa` | `0e3129938dd040b43ae1203ae06ec773693d3e9f76510e30137b7dc25e40aff6` |
-| `security` | `31333c5ab6f655dbc649cc64b6c981cb8387ee9d2b76cdb9ac3a9baed2823859` |
-| `delivery` | `6d4d273fc4814353287634a2f1207cf13f5e7eed64f3301b1cb2d7d312674556` |
+| `architect` | `b410e50b380a132cdf74a16f55ab5dffa75c9f67f616f0afef693df012ecc6e4` |
+| `implementer` | `e44e306245bd082a21099b524281f945ddb415c26be33be07e4bae8c469cbe70` |
+| `tester` | `606f476400212e3bf11a66f0a71b3933a6f88a105603c7402688c3aaee30e04d` |
+| `qa` | `3b92245e8ed0a00bf32a8ca972e89ec530ea3f55c182b0fbc916016e0e0fb0d1` |
+| `security` | `ef87b9740ea860fc8f16a4d580d2dae4b59e8f4411cc00673747e028d4082582` |
+| `delivery` | `48266915b9484a32c474b74050f0d186d7b92e287660da80f730443059446bb4` |
 
 Do not accept a file solely because its comments or `name` field match. A
 digest mismatch is a stale or unrelated shadow; stop before workspace
@@ -151,3 +151,22 @@ the recorded `next_action`:
 Never treat a specialist result as a gate decision. Never let a specialist
 present a gate or write coordination state. An explicit pipeline activation
 does not authorize a push, PR mutation, merge, tag, release, or publication.
+
+## Workspace I/O budget
+
+Workspace files are compact current snapshots and evidence indexes, not
+transcripts. Dispatch pointers plus a digest of at most 10 lines; never paste a
+workspace artifact into another prompt or report. Read an assigned task/AC
+section once, use verification packets before phase reports, and escape to a
+source section only for a verdict-bearing fact. Query or tail execution events;
+do not read the stream from byte zero during ordinary continuation. After a
+write, verify the edited range, headings, and size instead of re-reading the
+whole artifact.
+
+Hard budgets apply only to fixed prose. Plans use `sharded-v1` from
+`references/plan-shards.md`: `01-plan.md` is the manifest, architecture/delivery and
+conditional invariants are separate, and every task has one canonical shard.
+Dispatch only the assigned shard and named anchors. Testing, validation, and
+review reports keep bounded fixed prose plus one compact row per distinct AC,
+finding, test, or changed control. Never omit an item, block, or split
+operator-approved scope solely to meet a total-size target.
