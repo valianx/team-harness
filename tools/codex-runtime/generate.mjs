@@ -107,7 +107,10 @@ function validateProfile(contract, profileName, usedProjectionTiers, allowedRunt
 export async function render({ rootDir = repositoryRoot, profileName } = {}) {
   rootDir = resolve(rootDir);
   const contractPath = join(rootDir, "runtime/schema/codex-agents.json");
-  const outputDir = join(rootDir, ".codex/agents");
+  const outputDirs = [
+    join(rootDir, ".codex/agents"),
+    join(rootDir, "plugins/team-harness/skills/setup/assets/agents")
+  ];
   let contract;
   try {
     contract = JSON.parse(await readFile(contractPath, "utf8"));
@@ -274,6 +277,7 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
       ""
     ].join("\n");
     files.set(repositoryPath(rootDir, agent.output_path, `${agent.name}.output_path`), generated);
+    files.set(join(rootDir, "plugins/team-harness/skills/setup/assets/agents", `${agent.name}.toml`), generated);
   }
 
   const config = [
@@ -324,7 +328,7 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     "bash tests/run-all.sh",
     "```",
     "",
-    "Read `CONTRIBUTING.md` for the cross-runtime change matrix and `docs/codex-runtime.md` for packaging, local installation, and the complete validation set. Do not edit this generated roster or `.codex/agents/*.toml` directly.",
+    "Read `CONTRIBUTING.md` for the cross-runtime change matrix and `docs/codex-runtime.md` for packaging, local installation, and the complete validation set. Do not edit this generated roster, `.codex/agents/*.toml`, or `plugins/team-harness/skills/setup/assets/agents/*.toml` directly.",
     "",
     "## Canonical roster and Codex availability",
     "",
@@ -336,11 +340,11 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     ""
   ].join("\n");
   files.set(join(rootDir, ".codex/README.md"), roster);
-  return { files, outputDir, profileName: selectedProfileName };
+  return { files, outputDirs, profileName: selectedProfileName };
 }
 
 export async function generate({ check = false, rootDir = repositoryRoot, profileName } = {}) {
-  const { files, outputDir } = await render({ rootDir, profileName });
+  const { files, outputDirs } = await render({ rootDir, profileName });
   const expected = new Set(files.keys());
   const stalePaths = [];
   const extraPaths = [];
@@ -352,13 +356,15 @@ export async function generate({ check = false, rootDir = repositoryRoot, profil
     }
     if (current !== content) stalePaths.push(path);
   }
-  try {
-    for (const entry of await readdir(outputDir, { withFileTypes: true })) {
-      const path = join(outputDir, entry.name);
-      if (entry.name.endsWith(".toml") && !expected.has(path)) extraPaths.push(path);
+  for (const outputDir of outputDirs) {
+    try {
+      for (const entry of await readdir(outputDir, { withFileTypes: true })) {
+        const path = join(outputDir, entry.name);
+        if (entry.name.endsWith(".toml") && !expected.has(path)) extraPaths.push(path);
+      }
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
     }
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
   }
 
   if (check) {
@@ -367,7 +373,7 @@ export async function generate({ check = false, rootDir = repositoryRoot, profil
     if (stalePaths.length > 0 || extraPaths.length > 0) fail("generated Codex artifacts are stale");
     return;
   }
-  if (extraPaths.length > 0) fail(`unexpected generated agent ${relative(outputDir, extraPaths[0])}`);
+  if (extraPaths.length > 0) fail(`unexpected generated agent ${relative(rootDir, extraPaths[0])}`);
   for (const path of stalePaths) {
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, files.get(path));

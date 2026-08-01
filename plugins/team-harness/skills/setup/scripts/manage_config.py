@@ -24,6 +24,15 @@ ALLOWED_KEYS = {
     "clickup.workspace_id",
     "obsidian_tasks",
     "lane_autoselect",
+    "agent-scope",
+}
+DEFAULTS = {
+    "logs-mode": "local",
+    "english_learning": False,
+    "flow_telemetry.enabled": False,
+    "obsidian_tasks": False,
+    "lane_autoselect": "announce-and-proceed-on-trivial",
+    "agent-scope": "global",
 }
 IMPORT_EXCLUDED_KEYS = {
     "format_version",
@@ -220,6 +229,8 @@ def validate(key: str, value: Any) -> None:
         raise ValueError("invalid lane_autoselect value")
     if key == "clickup.workspace_id" and not isinstance(value, str):
         raise ValueError("clickup.workspace_id must be a string")
+    if key == "agent-scope" and value not in {"project", "global"}:
+        raise ValueError("agent-scope must be project or global")
 
 
 def write_atomic(path: Path, before: dict[str, Any], after: dict[str, Any]) -> bool:
@@ -306,6 +317,26 @@ def set_values(assignments: list[str], removals: list[str], version: str | None)
     return 0
 
 
+def ensure_defaults(version: str | None) -> int:
+    path = config_path()
+    before = read_json(path)
+    after = json.loads(json.dumps(before))
+    added: list[str] = []
+    for key, value in DEFAULTS.items():
+        if get_nested(after, key) is None:
+            set_nested(after, key, value)
+            added.append(key)
+    after["format_version"] = "1"
+    if version is not None:
+        if re.fullmatch(r"\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?", version) is None:
+            raise ValueError("version must be a semantic version")
+        after["installed_version"] = version
+    after["updated_at"] = dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
+    changed = write_atomic(path, before, after)
+    print(json.dumps({"path": str(path), "changed": changed, "added": added}, sort_keys=True))
+    return 0
+
+
 def inspect_import(source_name: str) -> int:
     target = read_json(config_path())
     source_path = import_sources()[source_name]
@@ -367,6 +398,8 @@ def parser() -> argparse.ArgumentParser:
     setter.add_argument("--set", dest="assignments", action="append", default=[])
     setter.add_argument("--remove", action="append", default=[])
     setter.add_argument("--version")
+    ensure = commands.add_parser("ensure")
+    ensure.add_argument("--version")
     importer = commands.add_parser("import")
     importer.add_argument("--from", dest="source", choices=("claude", "opencode"), required=True)
     importer.add_argument("--version")
@@ -383,6 +416,8 @@ def main() -> int:
         return show()
     if args.command == "set":
         return set_values(args.assignments, args.remove, args.version)
+    if args.command == "ensure":
+        return ensure_defaults(args.version)
     if args.command == "import":
         return import_config(args.source, args.version)
     if args.command == "inspect-import":

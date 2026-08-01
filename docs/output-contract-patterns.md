@@ -1,8 +1,8 @@
 # Output Contract Patterns — Intensity Levels, Preservation, and Measurement
 
-> Canonical reference for the full-lane output-verbosity contract. Defines the four named
-> compression intensity levels every agent report maps to, the verbatim-preservation rule, the
-> clarity exemptions, the iteration re-narration ban, and the before/after measurement method.
+> Canonical reference for the full-lane workspace I/O contract. Defines the four named
+> compression intensity levels, enforceable artifact budgets, section-scoped reads, the
+> verbatim-preservation rule, the iteration re-narration ban, and measurement.
 > `agents/_shared/output-template.md § Output Contract — Compression` carries a compact mirror of
 > the intensity-level table plus a pointer here — the two tables are a multi-site invariant and
 > must not diverge. Consumers apply these rules to their own report/body sections; they reference
@@ -38,7 +38,7 @@ appears under, not to a level chosen ad hoc per document.
 | `verbatim` | Never paraphrased, never compressed, reproduced exactly as produced. | Code blocks and diffs; shell commands; file paths and identifiers; exact error/exception strings; status-block field names and enum values (e.g. `broke-it`, `could-not-break`, `APPROVE`, `REQUEST_CHANGES`); CWE/OWASP reference tokens (`CWE-{N}`); `file:line` locators. |
 | `tight` | A bounded prose budget PER ITEM; the item count is never capped. | Per-finding prose in `security`/`adversary`/`reviewer` pipeline-mode reports — Critical/High findings, per-control entries in adversary's report, reviewer's Critical findings. |
 | `bounded` | The overall document or section is a capped, replaceable snapshot — not an accumulating log. | `00-state.md` § Hot Context / § Agent Results; `00-execution-events.md` free-text fields (`summary`, `detail`); `changelog.d/*.md` fragments; `01-plan.md § Decisions for human review` (existing 7-bullet cap); `failure-brief.md` iteration entries (existing 5-10 line contract, see § 4 below). |
-| `standard` | Ordinary analytical/explanatory prose — no special compression beyond normal editorial concision. | `01-plan.md § Architecture` / `## Review Summary` narrative; `02-implementation.md`; `03-testing.md`; `docs/*.md` reference documentation; any prose not assigned to one of the three classes above. |
+| `standard` | Compact decision/evidence prose under the artifact budgets in § 6; it is not an uncapped fallback. | sharded plan summary/architecture prose; `02-implementation.md`; `03-testing.md`; `docs/*.md` reference documentation; any prose not assigned to one of the three classes above. |
 
 **Reading order for a new artifact:** check `verbatim` first (is this an exact reproduction of
 something machine- or human-produced verbatim?), then `tight` (is this a per-item entry in a
@@ -102,7 +102,60 @@ text or reproduce the iteration narrative locally.
 
 ---
 
-## 6. Before/After Measurement Method
+## 6. Workspace artifact budgets
+
+Workspace files are coordination surfaces, not transcripts. Store only a current decision,
+claim, finding, or evidence pointer that another participant cannot cheaply reconstruct from
+Git, source, a status block, or the event stream. Never paste diffs, complete command output,
+tool chronology, repeated AC text, or prior-round narrative into a Markdown report.
+
+These budgets apply to newly written or rewritten artifacts. They bound fixed prose and prose per
+item, not the number of projects, tasks, ACs, findings, changed controls, or failed commands.
+Every distinct required item remains present, so a multi-project plan scales linearly with real
+scope. The prose *inside* each item remains subject to the stated shape. A writer compacts a
+fixed-prose breach before returning success, but never blocks, omits an item, invents an overflow
+file, or asks to split operator-approved scope solely because the complete artifact exceeds a
+total line or byte target.
+
+| Artifact | Hard budget / compact shape |
+|---|---|
+| `00-state.md` | ≤160 lines and ≤16 KB; replace fields and keep only the latest result per role. |
+| `01-plan.md` + `plan/**` | Follow `docs/plan-shards.md`: index ≤80 lines/12 KB, architecture ≤120 lines/20 KB, delivery ≤80 lines/12 KB, invariant prose ≤2 lines per item, and task fixed prose ≤30 lines plus ≤2 prose lines per AC. These are targets, never item-count ceilings. Above target emit `size_reason: required-items`. Do not persist raw exploration. |
+| `reviews/01-plan-review.md` | Current snapshot only: fixed prose ≤120 lines, each finding ≤4 lines, each Panel Rounds entry exactly one table row. Replaced finding bodies are not retained. |
+| `02-implementation.md` | 5–30 lines and ≤8 KB; outcome, deviations, exceptions, one-line checks, and commit only. Git is the changed-file authority. |
+| `03-testing.md` | Fixed prose ≤40 lines plus one evidence-map row per AC and one line per authored test; one concise suite result. An ordinary single-project target is ≤80 lines/12 KB, not a ceiling. Never paste runner output. |
+| `reviews/04-validation.md` | Fixed prose ≤30 lines; one row per AC and ≤3 extra lines per failed AC. PASS entries are evidence pointers, not explanations. |
+| pipeline `reviews/04-security.md` | Fixed prose ≤20 lines plus one line per finding. Standalone audit mode remains audit-grade and is outside this pipeline budget. |
+| `reviews/04-adversary*.md` | Fixed prose ≤40 lines plus ≤6 lines per changed control. No duplicated security checklist or remediation history. |
+| delivery / summary artifacts | ≤60 lines and ≤12 KB; link to canonical evidence instead of restating it. |
+
+`inputs/*.diff`, generated diagrams, and other verbatim evidence are not model-authored report
+prose and do not count as output-budget violations. They still carry input cost: only a role
+whose decision requires the full evidence reads them in full.
+
+## 7. Read-once, section-first contract
+
+Separate agents do not share context, so every dispatch must minimize cold reads:
+
+1. The dispatcher passes coordinates and a ≤10-line digest, never an artifact body already on
+   disk. A status block is routing data; do not expand it into a second report.
+2. Read `00-state.md` once per continuation. In normal phase work, read only `Current State`,
+   `Hot Context`, and the latest relevant result. The event stream is queried by event type or
+   tailed; it is never read from byte zero during ordinary continuation.
+3. Resolve the assigned task from `01-plan.md`, then read only its task shard and named
+   architecture/invariant anchors. Never preload sibling shards. Use `00-verify-packet.md` before implementation/testing reports and escape to a
+   source section only when a verdict-bearing fact requires it.
+4. Read each input once per dispatch. Re-read only a changed file or the exact range implicated
+   by an error. After writing, verify headings, size, and the edited range; do not re-read the
+   whole artifact merely to confirm the write.
+5. Recovery reads the bounded state snapshot first, then the last relevant events and only the
+   artifacts named by `next_action`. It does not preload every completed phase.
+
+Depth-on-demand is always allowed for correctness, security, or an unresolved contradiction.
+The agent records the escape as a pointer/count; it does not copy the source material into its
+own report.
+
+## 8. Before/After Measurement Method
 
 Measure the effect of this contract using the existing `00-pipeline-summary.md § Cost` rollup
 (`docs/observability.md § Cost rollup`) as the baseline — no new instrumentation is introduced.
@@ -127,7 +180,7 @@ contract's rollout is the corresponding "after" using the same method.
 
 ---
 
-## 7. Multi-Site Invariant
+## 9. Multi-Site Invariant
 
 The intensity-level table in § 2 is mirrored — compactly, names and artifact-class assignments
 only, no restated rationale — in `agents/_shared/output-template.md § Output Contract —

@@ -1,168 +1,125 @@
 ---
 name: setup
-description: Configure or reconfigure Team Harness for Codex, including its native settings, workspace location, response language, optional MCP servers, six custom agents, and hook trust. Use when the operator invokes Team Harness setup, asks to configure the Codex plugin, or wants to change one Team Harness setting without starting the gated pipeline.
+description: "Configure or reconfigure the complete Team Harness Codex installation: native settings, bundled specialist agents, optional MCP servers, workspace preferences, and hook verification. Use when the operator invokes Team Harness setup or asks to configure any Codex integration."
 ---
 
 # Team Harness setup for Codex
 
-Configure the installed Codex runtime. This is a standalone lifecycle utility:
-do not activate the Team Harness pipeline, create pipeline state, or spawn
-subagents while running setup.
+Converge the installed Codex runtime. The marketplace distributes plugin code;
+this skill configures that code for use. Do not activate a pipeline, create
+pipeline state, or spawn subagents.
 
-Store Team Harness settings in
-`${CODEX_HOME:-$HOME/.codex}/.team-harness.json`. Never create or modify
-`~/.claude/CLAUDE.md`, `~/.claude/settings.json`, Claude output styles, or
-Claude plugin state. If the native Codex settings file is absent and
-Claude Code or opencode has a `.team-harness.json`, offer an import of
-all missing values, including opaque sensitive values; never overwrite an
-existing Codex value during import. Resolve opencode from `OPENCODE_CONFIG_DIR`, then
-`$XDG_CONFIG_HOME/opencode`, then `~/.config/opencode`.
+Team Harness settings are native and runtime-isolated at
+`${CODEX_HOME:-$HOME/.codex}/.team-harness.json`. Never read Claude Code or
+opencode settings during ordinary operation and never modify their files.
+The only cross-runtime operation allowed here is an explicit one-time copy of
+values selected by the operator.
 
-Use `scripts/manage_config.py` for every Team Harness settings read or write.
-It validates values, preserves unrelated keys, creates a rolling `0o600`
-backup, and replaces the document atomically. Do not improvise writes to the
-JSON file.
+Resolve both helpers relative to this skill and use them for every managed
+write:
 
-## Intent routing
+- `scripts/manage_config.py` validates, backs up, and atomically writes native
+  settings with mode `0o600`.
+- `scripts/manage_agents.py` installs or refreshes the six bundled generated
+  agents without overwriting an unmanaged same-name file.
 
-With no targeted intent, run the complete flow. For a targeted request, handle
-only the named concern and then report it:
+## Routing
 
-- `workspace` or `obsidian`: workspace output mode and path.
-- `language`: persistent response/workspace language.
-- `english-learning`: English correction mode.
-- `memory` or `context7`: the matching MCP server.
-- `agents`: the six Codex specialist agents.
-- `clickup`, `obsidian-tasks`, `lane-autoselect`, or `flow-telemetry`: the
-  matching settings key.
-
-Do not run the marketplace freshness check for a targeted request.
+With no targeted intent, run the complete flow. For a targeted request, change
+only that concern and still ensure the native settings document exists.
+Supported targets are `workspace`, `language`, `english-learning`, `memory`,
+`context7`, `agents`, `clickup`, `obsidian-tasks`, `lane-autoselect`, and
+`flow-telemetry`.
 
 ## Procedure
 
-1. Resolve the bundled script relative to this skill directory and run:
+1. Inspect native state:
 
    ```bash
    python3 scripts/manage_config.py show
    ```
 
-   Treat malformed native JSON as a blocking configuration error. If the
-   output reports one or more import sources, show their paths and ask which
-   source to import first. Inspect each source without displaying values:
+   Malformed native JSON is blocking; never fall through to another runtime.
+   When the native file is absent and Claude Code or opencode import sources
+   are available, offer a one-time import. This is the sole exception to
+   runtime isolation. Inspect without displaying values:
 
    ```bash
    python3 scripts/manage_config.py inspect-import --from claude
    python3 scripts/manage_config.py inspect-import --from opencode
    ```
 
-   Show only the source path, importable key names, preserved native key names,
-   and excluded helper-managed metadata key names. When both exist, do not merge them silently: the
-   selected first source wins because imports fill only missing native keys.
-   On approval run the matching command:
+   Show only paths and key names. After explicit selection, copy with
+   `import --from SOURCE --version 3.6.2`. The helper deep-fills missing keys,
+   copies opaque values without printing them, preserves existing native
+   values, and records provenance. Never merge sources silently.
+
+2. Create or migrate native configuration on every setup, including targeted
+   setup. This adds safe defaults only when keys are absent and stamps the
+   installed version without replacing operator values:
 
    ```bash
-   python3 scripts/manage_config.py import --from claude
-   python3 scripts/manage_config.py import --from opencode
+   python3 scripts/manage_config.py ensure --version 3.6.2
    ```
 
-   The helper copies values directly from source JSON to the native `0o600`
-   document without printing them or putting them in command arguments. It
-   deep-fills missing keys, never overwrites an existing native value, and
-   records source, path, imported key names, and timestamp under
-   `migration.imports`. It excludes only helper-managed metadata. Values such
-   as Claude's `autogate` are preserved for lossless migration but remain inert:
-   Codex hooks explicitly strip them before permission evaluation. Preview key
-   names before import and report keys preserved because they were already
-   configured.
+3. For a full setup, refresh marketplace metadata and inspect the installed
+   plugin with `codex plugin marketplace upgrade team-harness --json` and
+   `codex plugin list --json`. If code is stale, run `$team-harness:update`
+   before continuing. An unavailable network is non-blocking when the installed
+   snapshot is usable.
 
-2. For a full setup, run the advisory freshness check:
+4. Gather only requested values, showing current values as defaults. Apply all
+   selected settings in one `manage_config.py set` command.
+
+   - Workspace defaults to `local`. For `obsidian`, require an existing
+     absolute vault path plus a safe relative subfolder. Reject filesystem
+     roots, the user home, traversal, globs, and symlink escapes. Codex native
+     sandbox approval remains authoritative; never weaken it.
+   - Language is a two-letter lowercase code or absent for automatic detection.
+   - English learning, Obsidian Tasks, and flow telemetry are booleans;
+     telemetry defaults off.
+   - Lane auto-select is `announce-and-proceed-on-trivial` or `always-stop`.
+   - ClickUp stores only a workspace ID, never a token.
+   - Agent scope is `global` (default, available to every project) or `project`.
+     Persist it as `agent-scope`.
+
+5. Reconcile all six bundled specialists in the persisted scope on every full
+   setup, and whenever `agents` is targeted:
 
    ```bash
-   codex plugin marketplace upgrade team-harness --json
-   codex plugin list --json
+   python3 scripts/manage_agents.py inspect --scope SCOPE
+   python3 scripts/manage_agents.py sync --scope SCOPE
    ```
 
-   If the installed plugin version is behind the refreshed marketplace entry,
-   recommend `$team-harness:update` and ask whether to update first or continue.
-   An offline or unavailable marketplace is non-blocking; state that freshness
-   could not be checked.
+   The required set is `architect`, `implementer`, `tester`, `qa`, `security`,
+   and `delivery`. Missing files are installed and stale Team Harness-managed
+   files are refreshed automatically. A same-name unmanaged file is a blocking
+   conflict: report it and do not overwrite it. Writes outside the repository
+   use Codex's native permission prompt. Do not use or download the separate Go
+   installer; the marketplace snapshot is the source of these agent bytes.
 
-3. Gather only the requested settings. Show existing values as defaults.
+6. Configure selected MCP servers after `codex mcp list --json`. Preserve an
+   existing registration unless the operator explicitly requests replacement.
 
-   - Workspace: choose `local` (default, `{repo}/workspaces/`) or `obsidian`.
-     For Obsidian require an existing absolute vault path and a safe relative
-     subfolder, default `work-logs`. Do not accept a filesystem root, the user
-     home, `..`, or glob metacharacters. Explain that Codex may request access
-     to the external directory according to its native sandbox policy; never
-     weaken global permissions automatically.
-   - Language: accept a two-letter lowercase ISO 639-1 code, or remove the key
-     to restore automatic detection.
-   - English learning, Obsidian Tasks, and flow telemetry: boolean values.
-     Telemetry is opt-in and defaults off.
-   - Lane auto-select: accept only `announce-and-proceed-on-trivial` or
-     `always-stop`.
-   - ClickUp: store only the workspace ID. Never store a token.
+   - Memory: register a streamable HTTP URL, optionally with the name (not the
+     value) of a bearer-token environment variable:
+     `codex mcp add memory --url URL [--bearer-token-env-var ENV_NAME]`.
+   - Context7: require `CONTEXT7_API_KEY` in the launch environment without
+     printing it, then run
+     `codex mcp add context7 --env DEFAULT_MINIMUM_TOKENS=10000 -- npx -y @upstash/context7-mcp@3.2.5`.
 
-   Apply the chosen values in one command using repeated `--set KEY=JSON`
-   arguments, and use `--remove KEY` for a requested reset. Examples:
+7. Verify the installed plugin's `hooks/hooks.json`. Codex supports the
+   deterministic deny hooks only: `policy-block` and the catastrophic-deny
+   portion of `gcp-guard`. Approval-classifying `ask` guards are intentionally
+   not registered because Codex's native permission flow owns approvals.
+   Explain that the operator must review and trust hooks through `/hooks`;
+   never approve or bypass trust.
 
-   ```bash
-   python3 scripts/manage_config.py set --set 'logs-mode="local"' --version 3.6.1
-   python3 scripts/manage_config.py set --set 'language="es"'
-   python3 scripts/manage_config.py set --set 'english_learning=true'
-   python3 scripts/manage_config.py set --remove language
-   ```
+8. Re-run both helper inspections and `codex mcp list --json`. Report one
+   compact result: native config path, workspace/language, agent scope and six
+   agent statuses, MCP registrations, hook verification/trust, and whether a
+   new thread is required. Never print imported opaque values, secrets, or
+   environment-variable values.
 
-   Writes outside the current repository remain subject to Codex's native
-   approval prompt. Never claim a write succeeded before re-running `show`.
-
-4. Configure MCP servers only when selected. Inspect first with
-   `codex mcp list --json`. Replacing an existing server requires showing the
-   exact non-secret configuration and obtaining explicit approval before
-   `codex mcp remove NAME` followed by `codex mcp add`.
-
-   - Memory: ask for a streamable HTTP URL and, optionally, the *name* of an
-     environment variable containing its bearer token. Never ask Codex to echo
-     or persist the token value. Use:
-
-     ```bash
-     codex mcp add memory --url URL
-     codex mcp add memory --url URL --bearer-token-env-var ENV_NAME
-     ```
-
-   - Context7: require `CONTEXT7_API_KEY` to be present in the environment that
-     launches Codex, without printing it, then use:
-
-     ```bash
-     codex mcp add context7 --env DEFAULT_MINIMUM_TOKENS=10000 -- npx -y @upstash/context7-mcp@3.2.5
-     ```
-
-   A new Codex thread is required before newly added MCP tools are available.
-   Verify connectivity only in that new thread; do not claim a server is
-   connected merely because registration succeeded.
-
-5. Configure specialists when selected. Check for the complete set
-   `architect.toml`, `implementer.toml`, `tester.toml`, `qa.toml`,
-   `security.toml`, and `delivery.toml` in project `.codex/agents/` and global
-   `${CODEX_HOME:-$HOME/.codex}/agents/`. If missing, ask for project or global
-   scope and obtain approval before running the installed Team Harness binary:
-
-   ```bash
-   install apply --runtime codex --scope project
-   install apply --runtime codex --scope global
-   ```
-
-   If `install` is unavailable, report the documented fallback
-   `go run github.com/valianx/team-harness/cmd/install@latest apply ...`; do not
-   download or execute it without approval.
-
-6. Explain that hooks require operator review and trust through `/hooks`.
-   Never approve or bypass hook trust on the operator's behalf.
-
-7. Re-run `manage_config.py show` and `codex mcp list --json`, then give one
-   compact summary: native config path, workspace mode, language, MCP
-   registrations, agent scope/completeness, hook-trust next step, and whether a
-   new thread is required. Do not print secrets or environment-variable values.
-
-The flow is idempotent: keep current values on blank input, preserve unrelated
-config keys, and avoid writes when the resolved document is unchanged.
+The flow is idempotent. Blank input preserves current values; unrelated native
+keys remain untouched; unchanged config and agent files are not rewritten.

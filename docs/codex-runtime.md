@@ -13,12 +13,14 @@ codex plugin marketplace add valianx/team-harness
 codex plugin add team-harness@team-harness
 ```
 
-Then invoke `$team-harness:setup`. The setup skill writes native settings to
+Then invoke `$team-harness:setup`. The marketplace only distributes code;
+setup converges the operational installation. It writes native settings to
 `${CODEX_HOME:-$HOME/.codex}/.team-harness.json`, configures workspace and
-language preferences, offers Memory/context7 MCP registration, checks hook
-trust, and can place the six specialist agents in project or global scope.
-It can import all missing values from Claude Code or opencode without printing
-opaque values; existing Codex-native values always win.
+language preferences, offers Memory/context7 MCP registration, verifies hook
+trust, and places the six bundled specialist agents in project or global scope.
+An explicit setup import can copy missing values from Claude Code or opencode
+without printing opaque values; normal Codex modes never read another
+runtime's configuration and existing Codex-native values always win.
 
 Contributors testing an already trusted local checkout can replace the first
 command with `codex plugin marketplace add .`.
@@ -32,9 +34,10 @@ codex plugin marketplace add valianx/team-harness \
 ```
 
 Use `$team-harness:update` for the normal update flow. It refreshes the
-marketplace, compares versions, asks before replacing the installed plugin,
-preserves native settings, and offers to align an existing specialist-agent
-installation. The underlying manual sequence remains `codex plugin marketplace
+marketplace, compares versions, replaces the installed plugin through native
+permissions, ensures native settings exist, and automatically aligns all six
+bundled agents in the configured scope. It also repairs configuration and
+agents when the version is current. The underlying manual sequence remains `codex plugin marketplace
 upgrade team-harness`, remove `team-harness@team-harness`, then add it again.
 Run `codex plugin marketplace remove team-harness` only when no installed
 plugin still depends on it.
@@ -44,7 +47,10 @@ the development cache key changes; then remove and add
 `team-harness@team-harness` again and start a new thread. If no source byte has
 changed, Codex may correctly reuse the same cached snapshot.
 
-Codex requires explicit trust before repository hooks execute. Review
+Codex requires explicit trust before repository hooks execute. The plugin wires
+only deterministic-deny hooks (`policy-block` and the catastrophic branch of
+`gcp-guard`); approval-classifying guards are omitted because Codex has no
+hook-level `ask` and native permissions own approvals. Review
 `plugins/team-harness/hooks/hooks.json` and its scripts before trusting the
 checkout; never bypass hook trust for an unreviewed repository. Hooks and the
 installer beta currently require a POSIX shell. Installation or updates are
@@ -58,19 +64,15 @@ paths and broad write access to `$HOME`. Temporary `.git`
 directories remain protected by Codex and any test that constructs them still
 requires a narrowly scoped live approval.
 
-Plugin installation and agent installation are separate. The plugin supplies
-nine skills (`setup`, `update`, `init`, `pipeline`, `design`, `implement`,
-`validate`, `deliver`, `recover`). The Go installer supplies the six generated project or global
-agents without modifying `config.toml`. The commands below assume the released
-installer binary is available as `install`. Without that binary, run the same
-subcommands as `go run github.com/valianx/team-harness/cmd/install@latest ...`
-from the target project root (Go 1.25.8+); contributors working in this checkout
-may use `go run ./cmd/install ...` instead:
+The plugin supplies nine skills (`setup`, `update`, `init`, `pipeline`,
+`design`, `implement`, `validate`, `deliver`, `recover`) and the six generated
+agent definitions used by setup/update. Consumers do not need the Go installer.
+These helper commands remain available for diagnostics and manual recovery:
 
 ```bash
-install apply --runtime codex --scope project
-install update --runtime codex --scope project
-install uninstall --runtime codex --scope project
+python3 PLUGIN/skills/setup/scripts/manage_agents.py inspect --scope project
+python3 PLUGIN/skills/setup/scripts/manage_agents.py sync --scope project
+python3 PLUGIN/skills/setup/scripts/manage_agents.py sync --scope global
 ```
 
 The current release uses one version namespace across five sites: the Claude
@@ -85,8 +87,8 @@ but not for lightweight `init` intake:
 the primary thread must find a complete set of `architect.toml`,
 `implementer.toml`, `tester.toml`, `qa.toml`, `security.toml`, and
 `delivery.toml` in either the project `.codex/agents/` or global
-`$CODEX_HOME/agents/` scope before it delegates. Install them separately and
-start a new Codex thread after placement. The plugin-only skills remain
+`$CODEX_HOME/agents/` scope before it delegates. Setup/update install them from
+the marketplace snapshot; start a new Codex thread after placement. The plugin-only skills remain
 available for direct use when the agents are not installed.
 
 ## Roles and model projection
@@ -117,11 +119,9 @@ specialists:
 `.codex/README.md` is the generated roster. After editing canonical role
 metadata or adapters, run `$sync-codex-agents`; do not hand-edit generated TOML.
 
-Codex's `PermissionRequest` path keeps the native operator prompt
-authoritative: a classifier `allow` is never converted into an automatic
-approval. Only deterministic deny floors emit a Codex deny; without an
-explicit Codex-scoped, action-bound authorization (not present in this beta),
-all other permission requests produce no decision.
+Codex's native sandbox and permission path remain authoritative. Only
+deterministic deny floors emit a hook decision; hook-level `ask` and classifier
+`allow` are never translated into authorization.
 
 ## Verify
 

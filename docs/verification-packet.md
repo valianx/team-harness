@@ -95,13 +95,13 @@ silently.
 | **Changed files** | Table: path + `new`\|`modify` + one-line role, plus `git diff --stat` output | implementer status block + `git diff --stat` |
 | **Implementation summary** | Implementer status-block summary; `Deviations from Architecture` copied verbatim (or `"none"`); surviving `[CONSTRAINT-DISCOVERED]` annotations verbatim (or `"none"`) | `02-implementation.md` |
 | **Test artifact** | Phase 2.7 suite result, tests added, AC→test map; `regression_test_path` + status for the bug-fix flow | `03-testing.md` (authoring section) |
-| **Full-document pointers** | Explicit paths to `01-plan.md`, `02-implementation.md`, `03-testing.md`, `inputs/00-frozen.diff`, `reviews/01-plan-review.md` (when present), `01-root-cause.md` (fix flow), `sketches/*` | — the depth-on-demand escape hatch (§4) |
+| **Depth-on-demand pointers** | `01-plan.md` manifest, assigned task shards, named architecture/invariant anchors, `02-implementation.md`, `03-testing.md`, `inputs/00-frozen.diff`, reviews, root cause, and sketches as applicable | — never attach the full plan set by default |
 
 ### No AC section
 
 The packet carries **no acceptance-criteria copy — verbatim or digested.** AC live in
-`01-plan.md § Task List`; every verifier whose verdict baselines on AC live-reads that
-block at dispatch time (§4 Step 0). Rationale: `01-plan.md` sits outside the git tree in
+the assigned `plan/tasks/Task-N.md`; every verifier whose verdict baselines on AC live-reads that
+shard at dispatch time (§4 Step 0). Rationale: the plan sits outside the git tree in
 obsidian mode, so no git anchor can detect an AC edit, and any copy-freshness mechanism
 (count check, content digest) depends on prompt-compliance-dependent emission — the same
 reliability class the June 2026 data measured at ~40%. The live read needs no new
@@ -147,6 +147,9 @@ regression_test_path: {path or "n/a"}
 
 ## Full-Document Pointers
 - 01-plan.md
+- plan/tasks/Task-N.md (assigned tasks only)
+- plan/architecture.md#{named-anchor} (only when referenced)
+- plan/invariants.md#{named-invariant} (only when present and referenced)
 - 02-implementation.md
 - 03-testing.md
 - inputs/00-frozen.diff
@@ -178,11 +181,11 @@ per-mode instructions, regression-test instructions) are unchanged and additive 
 Every Phase-3 verifier's Session Context Protocol follows this ladder:
 
 0. **Live AC read (mandatory, never replaced by the packet).** Every verifier whose
-   verdict baselines on AC live-reads the per-task AC block from `01-plan.md § Task List`
+   verdict baselines on AC live-reads the assigned `plan/tasks/Task-N.md`
    at dispatch time, before or alongside the packet read. AC-baselining verifiers: `qa`
    (per-AC verdict), `ux-reviewer` validate (UI/UX AC), and `adversary` when attacking
-   AC/plan controls as written. The AC block for one task is small (§-scoped, typically
-   ≤30 lines) — this read is what makes an AC-substance edit, same-count reword included,
+   AC/plan controls as written. One task shard is small — this read is what
+   makes an AC-substance edit, same-count reword included,
    visible with zero rebuild machinery.
 1. **Read `00-verify-packet.md` for implementation context.** Changed files, deviations,
    evidence map, pointers — never AC (§2 states the packet carries none).
@@ -266,7 +269,7 @@ dispatch whenever EITHER of these fire:
 
 There is NO AC-edit rebuild trigger. An AC edit (Phase 2.5 late reconciliation, Case C
 reword, operator review-surface edit) does not stale the packet because the packet carries
-no AC (§2) — the edit reaches the next verifier through its live `01-plan.md § Task List`
+no AC (§2) — the edit reaches the next verifier through its live task-shard
 read (§4 Step 0) with no orchestrator action required. Both remaining triggers are
 git-grounded; neither depends on the orchestrator noticing a document edit outside the
 code tree.
@@ -279,7 +282,7 @@ code tree.
   ceiling.
 - Source-code reads are **out of the packet's scope by contract** (§5).
 - AC cannot be misstated by the packet because the packet does not carry them (§2) — every
-  AC-baselining verifier reads them live from `01-plan.md § Task List` (§4 Step 0).
+  AC-baselining verifier reads its assigned task shard live (§4 Step 0).
 - The integrity check **fails toward MORE reading for the facts it anchors** — tree state,
   changed-file existence, and the git-derived scan-target list (§4). The packet's narrative
   fields (implementation summary, deviations, evidence map) are protected by the

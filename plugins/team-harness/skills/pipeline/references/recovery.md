@@ -7,11 +7,11 @@ operator to select one; never silently choose between local and external
 lanes.
 
 For the local search, inspect `{repo-root}/workspaces/`. For the external
-search, read `${CODEX_HOME:-$HOME/.codex}/.team-harness.json` without modifying
-it. If it is absent, use `~/.claude/.team-harness.json`, then opencode's config
-resolved from `OPENCODE_CONFIG_DIR`, `$XDG_CONFIG_HOME/opencode`, or
-`~/.config/opencode`, as read-only compatibility fallbacks. Only when the
-selected document is a valid JSON object with `"logs-mode": "obsidian"`,
+search, read only `${CODEX_HOME:-$HOME/.codex}/.team-harness.json` without
+modifying it. If it is absent, search local workspaces only and recommend
+`$team-harness:setup`; never inspect Claude Code or opencode configuration as a
+runtime fallback. Only when the native document is a valid JSON object with
+`"logs-mode": "obsidian"`,
 canonicalize and validate the external base before scanning it: `logs-path`
 must be absolute, accessible, non-root, and different from the user home;
 `logs-subfolder` must be normalized and relative without `.`, `..`, glob, or
@@ -28,8 +28,15 @@ snapshot defined by `state-and-gates.md`. The named workspace takes precedence
 over mtime selection. When no name is supplied, select the only incomplete
 candidate; if there is more than one across either root, stop for operator
 selection.
-Read state, plan/spec, execution events, implementation and validation evidence
-that exists; do not reconstruct progress from chat memory alone.
+Read the bounded state snapshot first. Query or tail only the event types
+needed to validate the recorded transition; never load the stream in full.
+Then read only the last relevant
+execution events. For `sharded-v1`, read `01-plan.md` once as a manifest, then
+open only the task or supporting shard and evidence artifact named by
+`next_action`. For a legacy workspace without the format marker, use the old
+section locator without migrating the plan. Do not preload the full plan set,
+event stream, implementation, and validation history, and do not reconstruct
+progress from chat memory alone.
 
 Treat completed checklist phases plus their recorded result/event as complete
 and do not replay them. Resume from `next_action` only after checking structural

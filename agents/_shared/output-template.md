@@ -70,7 +70,7 @@ the measurement method: `docs/output-contract-patterns.md`.
 | `verbatim` | Code/diffs, commands, identifiers, exact error strings, status-block field names and enum values, CWE/OWASP tokens, `file:line` locators — never paraphrased or compressed. |
 | `tight` | Per-finding prose in `security`/`adversary`/`reviewer` pipeline-mode reports — Critical/High findings and adversary per-control entries get a prose budget per item; item count is never capped. |
 | `bounded` | Whole-document/section capped, replaceable snapshots — `00-state.md`, `00-execution-events.md` free-text fields, `changelog.d/*.md`, `01-plan.md § Decisions for human review`, `failure-brief.md` iteration entries. |
-| `standard` | Ordinary analytical prose not covered above — architecture narrative, implementation/testing docs, `docs/` reference material. |
+| `standard` | Compact decision/evidence prose under `docs/output-contract-patterns.md § 6` — architecture narrative, implementation/testing docs, `docs/` reference material. It is not an uncapped fallback. |
 
 **Verbatim rule:** code, commands, identifiers, and exact error strings are never paraphrased or
 compressed, regardless of the document's assigned level.
@@ -81,6 +81,16 @@ exempt from compression at any level.
 
 **Non-negotiable floor:** compression is a format constraint only — no level caps the number of
 findings, controls, or AC results reported at any severity.
+
+## Workspace I/O budget
+
+Apply `docs/output-contract-patterns.md § 6` and § 7. Workspace files are current snapshots and
+evidence indexes, not transcripts. Keep every required item, but remove duplicated AC text,
+prior-round prose, diffs, raw command output, and tool chronology. Read the assigned section or
+digest once; use depth-on-demand only for a verdict-bearing fact; after a write verify the edited
+range and size instead of re-reading the whole file. Budgets cap fixed prose and prose per item,
+not the number of required projects, tasks, ACs, findings, or controls. Compact duplication, but
+never omit required items or split operator-approved scope solely to meet a total-size target.
 
 ## Status block — common fields
 

@@ -106,12 +106,12 @@ The repository and approved architecture outrank generic style preferences.
 
 ## Session Context Protocol
 
-Resolve the workspace from `workspaces path:` when supplied; otherwise use `workspaces/{feature-name}/`. The workspace and `01-plan.md` must already exist except in explicit `mode: inline`.
+Resolve the workspace from `workspaces path:` when supplied; otherwise use `workspaces/{feature-name}/`. The workspace and `01-plan.md` manifest must already exist except in explicit `mode: inline`.
 
 Read only this manifest:
 
 1. **Runtime project instructions.** Use the `CLAUDE.md` already present in runtime context. Do not issue a second full-file read. Read a specific section only when the task needs a detail not already available.
-2. **Assigned plan slice.** From `01-plan.md`, read the assigned task's `Files:`, `Depends on:`, AC, and only the Architecture/Work Plan paragraphs it references. Do not load unrelated tasks.
+2. **Assigned plan shard.** Resolve the exact path from `01-plan.md § Task Index`, then read only that `plan/tasks/Task-N.md` plus named architecture/invariant anchors. Get ordering from `plan/delivery.md` only when the dispatch does not already provide it. Do not load sibling tasks or the full plan set. For legacy workspaces without the format marker, use the old section locator.
 3. **Conditional evidence.**
    - `01-root-cause.md`: bug location and scope only, for fix/hotfix.
    - `03-testing.md`: named regression and task-relevant test plan only.
@@ -128,7 +128,7 @@ Missing optional evidence is skipped. Missing workspace, `01-plan.md`, or a boun
 
 `mode: inline` is the only planless route. Its dispatch must contain literal scope; otherwise block. Inline work does not invent pipeline artifacts, including `02-implementation.md`.
 
-Never write `01-plan.md`, workspace state, testing artifacts, validation reports, or a second/suffixed implementation document. Your only workspace write is `02-implementation.md`.
+Never write `01-plan.md`, `plan/**`, workspace state, testing artifacts, validation reports, or a second/suffixed implementation document. Your only workspace write is `02-implementation.md`.
 
 ## Phase 0 — Targeted verification
 

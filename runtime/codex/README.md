@@ -25,7 +25,9 @@ unmapped or multiply mapped role, invalid role/source/output paths,
 capabilities, sandbox modes, and profile values.
 
 `tools/codex-runtime/generate.mjs` generates `.codex/config.toml`,
-`.codex/agents/*.toml`, and the human-readable `.codex/README.md`. That README
+`.codex/agents/*.toml`, byte-identical packaged copies under
+`plugins/team-harness/skills/setup/assets/agents/`, and the human-readable
+`.codex/README.md`. That README
 contains the Codex contributor workflow plus the complete canonical Team
 Harness roster, with an explicit availability column distinguishing the six
 installed custom agents, the Main-hosted orchestrator posture, and roles not yet

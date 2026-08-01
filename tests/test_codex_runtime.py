@@ -124,6 +124,24 @@ def main() -> None:
     )
     if "PreToolUse" not in hooks.get("hooks", {}):
         fail("Codex plugin default hooks/hooks.json must define PreToolUse")
+    if "PermissionRequest" in hooks.get("hooks", {}):
+        fail("Codex plugin must leave approval requests to native permissions")
+    hook_commands = [
+        hook["command"]
+        for group in hooks["hooks"]["PreToolUse"]
+        for hook in group.get("hooks", [])
+    ]
+    if len(hook_commands) != 2 or not all(
+        any(name in command for command in hook_commands)
+        for name in ("policy-block", "gcp-guard")
+    ):
+        fail("Codex plugin must wire exactly the two deterministic-deny hooks")
+    if any(
+        retired in command
+        for command in hook_commands
+        for retired in ("dev-guard", "gate-guard", "prepublish-guard", "worktree-guard")
+    ):
+        fail("Codex plugin still wires an approval-classifying hook")
 
     skill_names = {
         path.parent.name
@@ -147,10 +165,12 @@ def main() -> None:
     for marker in (
         "${CODEX_HOME:-$HOME/.codex}/.team-harness.json",
         "scripts/manage_config.py",
+        "scripts/manage_agents.py",
+        "manage_config.py ensure --version 3.6.2",
         "codex mcp add memory",
         "@upstash/context7-mcp@3.2.5",
-        "install apply --runtime codex",
-        "Never create or modify",
+        "manage_agents.py sync --scope SCOPE",
+        "never modify their files",
     ):
         if marker not in setup:
             fail(f"Codex setup skill is missing {marker!r}")
@@ -158,13 +178,16 @@ def main() -> None:
         "codex plugin marketplace upgrade team-harness",
         "codex plugin remove team-harness@team-harness",
         "codex plugin add team-harness@team-harness",
-        "install update --runtime codex",
+        "manage_config.py ensure --version NEW_VERSION",
+        "manage_agents.py sync --scope SCOPE",
+        "Even when plugin versions compare equal",
         "start a new Codex thread",
     ):
         if marker not in update:
             fail(f"Codex update skill is missing {marker!r}")
 
     config_script = ROOT / "plugins/team-harness/skills/setup/scripts/manage_config.py"
+    agents_script = ROOT / "plugins/team-harness/skills/setup/scripts/manage_agents.py"
     with tempfile.TemporaryDirectory() as temp_root:
         env = {**os.environ, "CODEX_HOME": temp_root}
         first = subprocess.run(
@@ -255,6 +278,63 @@ def main() -> None:
 
     with tempfile.TemporaryDirectory() as temp_root:
         temp = pathlib.Path(temp_root)
+        env = {**os.environ, "CODEX_HOME": str(temp / "codex-home")}
+        ensured = subprocess.run(
+            [sys.executable, str(config_script), "ensure", "--version", manifest["version"]],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if ensured.returncode != 0:
+            fail(f"Codex config ensure failed: {ensured.stdout}{ensured.stderr}")
+        ensured_doc = json.loads((temp / "codex-home/.team-harness.json").read_text())
+        if ensured_doc.get("logs-mode") != "local":
+            fail("Codex config ensure did not install safe local defaults")
+        if ensured_doc.get("agent-scope") != "global":
+            fail("Codex config ensure did not persist the global agent default")
+        synced = subprocess.run(
+            [sys.executable, str(agents_script), "sync", "--scope", "global"],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if synced.returncode != 0:
+            fail(f"Codex bundled-agent sync failed: {synced.stdout}{synced.stderr}")
+        sync_result = json.loads(synced.stdout)
+        if set(sync_result.get("changed", [])) != expected:
+            fail("Codex bundled-agent sync did not install all six roles")
+        for role in expected:
+            installed = temp / "codex-home/agents" / f"{role}.toml"
+            packaged = ROOT / "plugins/team-harness/skills/setup/assets/agents" / f"{role}.toml"
+            if installed.read_bytes() != packaged.read_bytes():
+                fail(f"Codex bundled-agent sync changed {role} bytes")
+            if stat.S_IMODE(installed.stat().st_mode) != 0o600:
+                fail(f"Codex bundled-agent sync did not protect {role}")
+        repeated = subprocess.run(
+            [sys.executable, str(agents_script), "sync", "--scope", "global"],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if repeated.returncode != 0 or json.loads(repeated.stdout).get("changed") != []:
+            fail("Codex bundled-agent sync is not idempotent")
+        conflict = temp / "codex-home/agents/architect.toml"
+        conflict.write_text("operator-owned\n")
+        refused = subprocess.run(
+            [sys.executable, str(agents_script), "sync", "--scope", "global"],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if refused.returncode == 0 or conflict.read_text() != "operator-owned\n":
+            fail("Codex bundled-agent sync overwrote an unmanaged conflict")
+
+    with tempfile.TemporaryDirectory() as temp_root:
+        temp = pathlib.Path(temp_root)
         home = temp / "home"
         codex_home = home / ".codex"
         claude_home = home / ".claude"
@@ -335,6 +415,20 @@ def main() -> None:
             fail("Codex config import did not copy opencode-only values")
         if merged_doc.get("language") != "es":
             fail("opencode import overwrote a value already imported from Claude")
+        ensured_import = subprocess.run(
+            [sys.executable, str(config_script), "ensure", "--version", manifest["version"]],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if ensured_import.returncode != 0:
+            fail("Codex config ensure failed after explicit imports")
+        ensured_import_doc = json.loads((codex_home / ".team-harness.json").read_text())
+        if ensured_import_doc.get("custom", {}).get("opaque_plain") != source_secret:
+            fail("Codex config ensure changed an opaque Claude import")
+        if ensured_import_doc.get("opencode_only", {}).get("api_key") != opencode_secret:
+            fail("Codex config ensure changed an opaque opencode import")
         merged_mtime = (codex_home / ".team-harness.json").stat().st_mtime_ns
         repeated_import = subprocess.run(
             [sys.executable, str(config_script), "import", "--from", "opencode"],
@@ -396,13 +490,13 @@ def main() -> None:
     ).read_text()
     for marker in (
         "${CODEX_HOME:-$HOME/.codex}/.team-harness.json",
-        "~/.claude/.team-harness.json",
-        "OPENCODE_CONFIG_DIR",
         "read-only",
         "does not authorize creating a workspace",
     ):
         if marker not in config_resolution:
             fail(f"direct-mode configuration contract is missing {marker!r}")
+    if "~/.claude/.team-harness.json" in config_resolution or "OPENCODE_CONFIG_DIR" in config_resolution:
+        fail("direct-mode configuration still falls back to another runtime")
     for direct_name in ("design", "implement", "validate", "deliver"):
         direct = (ROOT / f"plugins/team-harness/skills/{direct_name}/SKILL.md").read_text()
         if "../init/references/configuration.md" not in direct:
@@ -414,8 +508,8 @@ def main() -> None:
             fail(f"pipeline preflight does not name {role}.toml")
     for marker in (
         "$CODEX_HOME/agents/",
-        "install apply --runtime codex",
-        "install update --runtime codex",
+        "$team-harness:setup agents",
+        "$team-harness:update",
         "plugin-only skills",
         "regular non-symlink file",
         "stale or unrelated shadow",
@@ -434,13 +528,89 @@ def main() -> None:
         "regular non-symlink file",
         "agents/architect.md (opus/xhigh)",
         "agents/delivery.md (sonnet/medium)",
-        "install update --runtime codex",
+        "$team-harness:update",
         "generate.mjs --check",
     ):
         if marker not in activation:
             fail(f"pipeline activation preflight is missing {marker!r}")
     if "${CODEX_HOME:-$HOME/.codex}/.team-harness.json" not in activation:
         fail("pipeline activation must prefer the Codex-native Team Harness config")
+
+    output_contract = (ROOT / "docs/output-contract-patterns.md").read_text()
+    for marker in (
+        "## 6. Workspace artifact budgets",
+        "Follow `docs/plan-shards.md`",
+        "`02-implementation.md` | 5–30 lines and ≤8 KB",
+        "## 7. Read-once, section-first contract",
+        "It does not preload every completed phase.",
+    ):
+        if marker not in output_contract:
+            fail(f"workspace I/O contract is missing {marker!r}")
+
+    recovery = (
+        ROOT / "plugins/team-harness/skills/pipeline/references/recovery.md"
+    ).read_text()
+    for marker in (
+        "Read the bounded state snapshot first",
+        "never load the stream in full",
+        "read `01-plan.md` once as a manifest",
+        "Do not preload the full plan set",
+    ):
+        if marker not in recovery:
+            fail(f"Codex recovery still lacks section-first routing: {marker!r}")
+
+    instruction_markers = {
+        "architect": ("plan_format: sharded-v1", "Each fact has one canonical home"),
+        "implementer": ("plan/tasks/Task-N.md", "never preload sibling tasks"),
+        "tester": ("plan/tasks/Task-N.md", "fixed testing prose within 40 lines"),
+        "qa": ("plan/tasks/Task-N.md", "fixed report prose within 30 lines"),
+        "security": ("security-relevant task shards", "fixed prose within 20 lines"),
+        "delivery": ("plan/delivery.md", "within 60 lines and 12 KB"),
+    }
+    for role, markers in instruction_markers.items():
+        instructions = (ROOT / f"runtime/codex/instructions/{role}.md").read_text()
+        for marker in markers:
+            if marker not in instructions:
+                fail(f"{role} Codex adapter is missing workspace budget marker {marker!r}")
+
+    plan_consolidation = (ROOT / "agents/_shared/plan-consolidation.md").read_text()
+    if "superseded finding bodies are replaced, not retained" not in plan_consolidation:
+        fail("plan review contract still permits historical finding-body accumulation")
+
+    plan_shards = (ROOT / "docs/plan-shards.md").read_text()
+    for marker in (
+        "**Plan format:** sharded-v1",
+        "`plan/tasks/Task-N.md`",
+        "Each fact has one canonical home",
+        "must not preload every shard",
+        "at most 12 non-empty lines",
+        "monolith-v1",
+    ):
+        if marker not in plan_shards:
+            fail(f"sharded plan contract is missing {marker!r}")
+
+    runtime_plan_shards = (
+        ROOT / "plugins/team-harness/skills/pipeline/references/plan-shards.md"
+    ).read_text()
+    for marker in (
+        "plan_format: sharded-v1",
+        "plan/tasks/Task-N.md",
+        "Only the plan panel may inspect every shard",
+        "A workspace without the format marker is legacy",
+    ):
+        if marker not in runtime_plan_shards:
+            fail(f"distributable sharded plan contract is missing {marker!r}")
+
+    observability = (ROOT / "docs/observability.md").read_text()
+    for marker in (
+        "### Low-cost append contract",
+        "neither format is rewritten",
+        "successful tool call does not deserve",
+        "one minified JSON object on one line",
+        "`.jsonl` alone would not",
+    ):
+        if marker not in observability:
+            fail(f"low-cost event contract is missing {marker!r}")
 
     marketplace_check = subprocess.run(
         ["node", "tools/codex-runtime/validate-marketplace.mjs"],

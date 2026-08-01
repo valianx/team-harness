@@ -14,6 +14,7 @@ Where a field's semantics are defined elsewhere, this schema names the home and 
 
 ```
 pipeline_version: 2
+plan_format: sharded-v1
 lane: inline|express|full            # resolved at intake; docs/pipeline-lanes.md § 2
 type: feature|fix|refactor|hotfix|enhancement
 phase: 1|1.5|1.6|2.0|2|2.5|2.6|2.7|2.8|3|3.5|4|5|6

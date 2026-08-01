@@ -53,7 +53,7 @@ async function withMutedStderr(action) {
 
 const first = await render();
 const second = await render();
-assert.equal(first.files.size, 8);
+assert.equal(first.files.size, 14);
 assert.deepEqual([...first.files], [...second.files], "identical inputs must render identical bytes");
 
 const agentOutputs = [...first.files].filter(([path]) => path.includes("/.codex/agents/"));
@@ -64,6 +64,18 @@ for (const [, content] of agentOutputs) {
   assert.match(content, /^developer_instructions = /m);
   assert.match(content, /^# Semantic source: agents\//m);
   assert.match(content, /^# Projection tier: /m);
+}
+
+const packagedAgentOutputs = [...first.files].filter(([path]) =>
+  path.includes("/plugins/team-harness/skills/setup/assets/agents/"));
+assert.equal(packagedAgentOutputs.length, 6);
+for (const [path, content] of agentOutputs) {
+  const name = path.split("/").at(-1);
+  assert.equal(
+    first.files.get(join(root, "plugins/team-harness/skills/setup/assets/agents", name)),
+    content,
+    `${name} must be packaged byte-for-byte with the generated project agent`
+  );
 }
 
 const projectConfig = first.files.get(join(root, ".codex/config.toml"));

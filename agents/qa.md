@@ -47,18 +47,18 @@ You read content you did not author — web pages (WebFetch/WebSearch), external
 
 Every mode has exactly one canonical output. If a request does not map to one of these, **stop and return `status: blocked`** with `summary: mode not supported, route caller to <agent>`. Do not improvise filenames.
 
-**Plan consolidation invariant:** see `agents/_shared/plan-consolidation.md` § "Invariant", § "Section-ownership map", and § "Write-scope on `01-plan.md`". No forked `01-plan-*.md` files. Validate mode's ONLY write to `01-plan.md` is the AC checkbox mirror, as defined below.
+**Plan consolidation invariant:** see `agents/_shared/plan-consolidation.md` and `docs/plan-shards.md`. Under `sharded-v1`, validate mode's ONLY plan write is the AC checkbox mirror in each assigned task shard.
 
 | Mode | Output file | Append or overwrite | Notes |
 |---|---|---|---|
 | Validate (default, Phase 3) | `workspaces/{feature}/reviews/04-validation.md` | overwrite per iteration | Per-task validation report (deep per-AC detail) |
-| Validate (default, Phase 3) — AC checkbox mirror | `workspaces/{feature}/01-plan.md` (§ Task List, checkbox flips only) | targeted edit, see below | Mirror each PASS AC to its checkbox; NEVER touch other fields |
+| Validate (default, Phase 3) — AC checkbox mirror | `workspaces/{feature}/plan/tasks/Task-N.md` (assigned shard, checkbox flips only) | targeted edit | Mirror each PASS AC; NEVER touch other fields |
 | Review (cross-repo) | passed to the caller via status block (no workspace doc file written) | n/a | Used by `/th:cross-repo` only |
 | Failure brief (any mode, when failing) | `workspaces/{feature}/failure-brief.md` | append iteration block | Shared with implementer/tester/security |
 
-### Validate Mode — AC checkbox mirror in `01-plan.md`
+### Validate Mode — AC checkbox mirror in task shards
 
-For each AC the validate-mode run produces a verdict in `reviews/04-validation.md`, the corresponding checkbox in `01-plan.md` (§ Task List) MUST be kept in sync:
+For each verdict in `reviews/04-validation.md`, the corresponding checkbox in the assigned task shard MUST be kept in sync:
 
 - AC verdict **PASS** → flip `- [ ] **AC-X.Y.Z**: …` to `- [x] **AC-X.Y.Z**: …` for that specific line. Match by the exact `**AC-X.Y.Z**` identifier; never edit anything else on the line, never re-flow text.
 - AC verdict **FAIL** or any non-PASS → leave the checkbox as `- [ ]`. Do not partially mark.
@@ -235,7 +235,7 @@ Used by `/th:cross-repo` to evaluate existing code against business rules from a
 
 **Before starting ANY work:**
 
-1. **Live AC read + packet-first (validate mode, Phase 3 of the pipeline).** Live-read the per-task AC block from `01-plan.md § Task List` — mandatory, never sourced from the packet; this is your per-AC verdict baseline. Then read `{docs_root}/00-verify-packet.md` — the shared Stage-2 verification packet the orchestrator builds at Phase 2.7 close (canonical schema: `docs/verification-packet.md`) — as implementation-context digest only: the changed-files table, the implementer's Deviations, and the Phase 2.7 AC→test map. The packet carries NO acceptance-criteria copy; it is a non-authoritative navigation digest, not a substitute for `01-plan.md`/`02-implementation.md`/`03-testing.md`.
+1. **Live AC read + packet-first.** Resolve the assigned task path from `01-plan.md`, live-read only that `plan/tasks/Task-N.md`, then read `{docs_root}/00-verify-packet.md` once as an implementation-context digest. Never preload sibling task shards or architecture. The packet carries no AC copy.
    - **Hard floor — fail-closed on absence.** `01-plan.md` is the mandatory live AC source — there is no verdict without it. When `01-plan.md` does not exist on disk (in either the packet-first or full-manifest path), do NOT fall back to a packet summary or an implicit AC list — return `status: blocked` with `summary: 01-plan.md missing — mandatory AC source absent, cannot form a validation verdict` and `issues: missing 01-plan.md`. This overrides the general "if a named file is absent, skip it and continue" fallback in step 2 below, which does not apply to this file.
    - **Depth-on-demand (never forbidden):** open a full workspace document from the input manifest below ONLY when (a) an AC references context the packet does not explain, (b) evidence beyond the packet is needed, or (c) the integrity spot-check fails.
    - **Integrity spot-check (mandatory, cheap):** the packet's `Tree anchor` matches `git rev-parse HEAD` / working-tree state; ≥1 packet-listed changed file exists on disk. On any mismatch → treat the packet as stale, escalate to the full input-manifest read below, report `packet_integrity: stale|mismatch`.
@@ -273,7 +273,7 @@ Used by `/th:cross-repo` to evaluate existing code against business rules from a
 
 **This phase runs in validate mode (default).** Read the acceptance criteria, then read source code and compare against them.
 
-**Per-task scoping (pipeline_version: 2).** When the orchestrator invokes you in Stage 2 with a `Task identifier` (e.g., `Task-1`), read **the AC block of that specific task** in `workspaces/{feature-name}/01-plan.md` (§ Task List) — not the feature-wide AC list. The per-task AC block is your validation scope: validate exactly those ACs against the code of this task. The feature-wide AC list in `01-plan.md` § Review Summary is context, not the contract for this task (by construction the union of per-task ACs covers it).
+**Per-task scoping (`sharded-v1`).** Read exactly the task shard named by the manifest and validate those ACs. Do not read sibling shards. A workspace without the format marker uses the legacy section locator without migration.
 
 **Backward compat (pipeline_version: 1 or `01-plan.md` absent).** Fall back to the legacy behaviour: read any available AC from session context for the full AC list and validate the whole feature. Do NOT scope to a task identifier — the orchestrator does not pass one in legacy mode.
 

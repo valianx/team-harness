@@ -82,7 +82,10 @@ affected contract makes them relevant.
 ## Mode: `ratify-plan`
 
 This is Layer 2 of the plan-structure gate and runs only after
-`plan_structure: pass`. Read `01-plan.md` and any triggered `sketches/*.md`.
+`plan_structure: pass`. Read the Task List summary, each task's AC block, and the Work Plan rows
+that claim to satisfy them; do not load unrelated Architecture prose. Read triggered
+`sketches/*.md` once. Escape to another plan section only for a concrete contradiction and do
+not copy that prose into the review.
 Judge two properties:
 
 1. **AC soundness:** each AC satisfies `agents/_shared/ac-evidence.md`; it states

@@ -150,7 +150,7 @@ When `spec_seed_present: false` or `spec_seed_dissents: false`, the check is a n
 
 ### 4.3 Why `## Review Summary` (not inline)
 
-STAGE-GATE-1 copies `## Review Summary` verbatim into the STOP block (`orchestrator.md § STAGE-GATE-1`). The dissent must be where the operator already looks — inline markers in the plan body would be missed at the gate.
+STAGE-GATE-1 synthesizes its decision line from `## Review Summary`; it never copies the section verbatim. Dissent must remain in that operator-facing source rather than a deep shard.
 
 ---
 

@@ -29,7 +29,7 @@ You invoke `/th:pipeline add a daily reports endpoint`.
 
 `th:orchestrator` runs the **Discover phase** first: it frames the task, may ask clarifying questions, captures an intake survey (pipeline shape, effort, autonomy, scope hint), and waits for an advance signal. Only after that signal does it create `workspaces/daily-reports/` and dispatch the `architect`.
 
-The architect reads `docs/knowledge.md`, the codebase, and any prior workspaces; produces `01-plan.md` — a single merged document with `§ Architecture` (the design proposal) and `§ Task List` (one section per task, with acceptance criteria, plus a `§ Delivery Grouping` declaring how tasks map to PRs). It also writes plan sketches when the change touches those surfaces. `qa-plan` runs Phase 1.5 to confirm each AC is sound and the plan can satisfy it, writing to `reviews/01-plan-review.md § Plan Ratification`. `plan-reviewer` runs Phase 1.6 to audit plan shape; the plan itself stays clean.
+The architect produces the `sharded-v1` plan set: `01-plan.md` is the compact operator summary and manifest, while architecture, delivery/dependencies, conditional invariants, and each task/AC contract live under `plan/`. Roles resolve only the shards their decision needs. It also writes plan sketches when the change touches those surfaces. `qa-plan` confirms each AC is sound and `plan-reviewer` audits the complete shape; panel output stays in `reviews/01-plan-review.md`.
 
 You receive **STAGE-GATE-1** — a STOP block with the TL;DR, the human-review decisions, and the Task table. `hooks/sketch-guard.sh` validates that required sketches are present before the gate opens. Reply `approve` or `approve autonomous` (skips the Phase 1.8 post-approval plan-review offer).
 
@@ -100,7 +100,7 @@ Full flow definition: [`agents/ref-special-flows.md`](../agents/ref-special-flow
 
 All state lives in files. `/recover {feature-name}` reads `00-state.md` and continues from `next_action`. Works across compactions, across sessions, across machines (as long as `workspaces/` travels with the repo).
 
-Open `01-plan.md § Task List` at any point and you see task-level `Status:` (`pending | in-progress | verified | merged | blocked`) and AC checkboxes flipped to `- [x]` on PASS. No cross-referencing required.
+Open `01-plan.md § Task Index` for task status. Follow one task path to see only that task's scope and AC checkboxes; no unrelated task must be read.
 
 ---
 
@@ -114,7 +114,7 @@ Chat-driven Claude Code, run unguided, has documented failure modes that compoun
 | Plans accumulate iteration cruft (`v1 → v6`, "previously decided", parallel review files) | `architect` forbids version markers; `qa` cannot write sibling review files — analysis docs read as one polished pass |
 | Reviews get punted to the human ("the harness blocked it") | Phase 1.6 plan-review is inviolable — dispatched as a subagent, never escalated to the user without a verdict; there is no degraded inline mode |
 | Multi-PR splits leave the WHY in nobody's head | Base PRs carry `Cleanup PR:` with operational rationale; secondary PRs carry `Base PR:` back-reference |
-| "Did the AC pass?" requires reading three files | `01-plan.md § Task List` self-describes: `Status:` per task + AC checkboxes flipped on PASS |
+| "Did the AC pass?" requires reading the whole plan | `01-plan.md § Task Index` routes to one task shard; its AC checkboxes mirror PASS |
 | Agents silently disappear when their frontmatter has invalid YAML | A structural test parses every agent and fails on broken YAML |
 | Destructive commands slip through inattention | `PreToolUse` policy blocks `rm -rf`, force push, secret-file writes |
 

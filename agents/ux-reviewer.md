@@ -40,7 +40,7 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 
 ### Mode: enrich (Stage 1 — invoked after architect)
 
-Read the architect's `01-plan.md`. Add UI/UX acceptance criteria to the plan.
+Read the `01-plan.md` manifest, UI-relevant architecture anchors, and affected task shards only. Add UI/UX acceptance criteria to those canonical task shards.
 
 **Input:** `workspaces/{feature}/01-plan.md`
 **Output:** `workspaces/{feature}/reviews/01-ux-review.md`
@@ -72,14 +72,14 @@ Read the architect's `01-plan.md`. Add UI/UX acceptance criteria to the plan.
 - [ ] Given a mobile viewport (375px), When viewing {page}, Then content reflows without horizontal scroll
 ```
 
-### AC sink — 01-plan.md § Task List
+### AC sink — assigned task shards
 
-**Primary AC sink (gate source-of-truth):** enrich-mode AC MUST be pinned into `01-plan.md § Task List` (the per-task AC block), not only into `reviews/01-ux-review.md`. The acceptance gate at Phase 3.5 reads AC from `01-plan.md § Task List` — AC that exist only in `reviews/01-ux-review.md` are never evaluated by any gate.
+**Primary AC sink:** enrich-mode AC MUST be pinned into the affected `plan/tasks/Task-N.md`, not only into `reviews/01-ux-review.md`. AC that exist only in the review are never evaluated by a gate.
 
 **Procedure:**
 1. Write the full UX narrative (findings, checklist evaluation, existing patterns) in `reviews/01-ux-review.md`.
 2. Extract the recommended AC additions (Given/When/Then format) from `## Recommended AC Additions`.
-3. Append those AC to `01-plan.md § Task List` in the per-task AC block, using contiguous numbering after the architect's last AC.
+3. Append those AC to the affected task shard, using contiguous numbering after the architect's last AC.
 
 **Resolution of prior contradiction:** the output field at the top of this mode (`Output: reviews/01-ux-review.md`) describes the UX narrative file. The text "append to the existing task's AC list" at the AC format section means append to `01-plan.md § Task List` — not exclusively to `reviews/01-ux-review.md`. Both files receive the AC: `reviews/01-ux-review.md` as narrative context, `01-plan.md § Task List` as the gate-binding pin. `01-plan.md § Task List` is the primary, authoritative AC sink.
 
@@ -92,7 +92,7 @@ Read the implementation and validate against UI/UX criteria.
 
 **Live AC read + packet-first read (canonical schema: `docs/verification-packet.md`).**
 
-1. Live-read the per-task AC block from `01-plan.md § Task List` — mandatory, never sourced from the packet; this is your UI/UX AC verdict baseline. Then read `00-verify-packet.md` — it carries the changed-files table and the implementer's summary/Deviations (NO acceptance-criteria copy — the packet is a non-authoritative navigation digest). Use it in place of separately reading `02-implementation.md` for WORKSPACE-NARRATIVE context.
+1. Live-read only the affected task shard — mandatory, never sourced from the packet. Then read `00-verify-packet.md` once as the implementation-context digest. Never preload sibling tasks.
 2. **Hard floor — preserved read.** `reviews/01-ux-review.md` (the Stage-1 UI/UX AC baseline) stays a MANDATORY read, untouched by the packet — always read it in full when it exists.
 3. **Integrity spot-check (mandatory, cheap):** the packet's `Tree anchor` matches `git rev-parse HEAD` / working-tree state; ≥1 packet-listed changed file exists on disk. On any mismatch → treat the packet as stale, escalate to a full read of `02-implementation.md`, report `packet_integrity: stale|mismatch`.
 4. **Depth-on-demand (never forbidden):** open `02-implementation.md` in full ONLY when (a) an AC references context the packet does not explain, (b) evidence beyond the packet is needed, or (c) the integrity spot-check fails.

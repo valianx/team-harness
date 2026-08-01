@@ -4,13 +4,12 @@ Resolve Team Harness configuration before any direct-mode intake or work.
 This is read-only: never create, repair, migrate, or update configuration from
 a direct mode.
 
-1. Read `${CODEX_HOME:-$HOME/.codex}/.team-harness.json` first.
-2. If the native file is absent, try `~/.claude/.team-harness.json`, then the
-   opencode path resolved from `OPENCODE_CONFIG_DIR`,
-   `$XDG_CONFIG_HOME/opencode`, or `~/.config/opencode`.
-3. If a higher-priority file exists but is malformed, report a concise warning
-   and use safe defaults. Do not hide corruption by falling through to another
-   runtime's file.
+1. Read only `${CODEX_HOME:-$HOME/.codex}/.team-harness.json`.
+2. If the native file is absent, report that setup has not converged, use safe
+   defaults for this operation, and recommend `$team-harness:setup`. Never read
+   Claude Code or opencode configuration as a fallback.
+3. If the native file is malformed, report a concise warning and use safe
+   defaults. Do not hide corruption by consulting another runtime's file.
 4. Accept only correctly typed values. Ignore an invalid individual key and
    name it in one warning:
    - `logs-mode`: `local` or `obsidian`.
@@ -34,5 +33,5 @@ a direct mode.
    for a file output. Pipeline activation independently revalidates the same
    configuration before choosing its workspace.
 
-When a compatibility source is used, mention it once and recommend
-`$team-harness:setup` to import the values into native Codex configuration.
+Cross-runtime values may be copied only by an explicit `$team-harness:setup`
+import. Direct modes never inspect compatibility sources.
