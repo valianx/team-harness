@@ -7,11 +7,11 @@ operator to select one; never silently choose between local and external
 lanes.
 
 For the local search, inspect `{repo-root}/workspaces/`. For the external
-search, read `${CODEX_HOME:-$HOME/.codex}/.team-harness.json` without modifying
-it. If it is absent, use `~/.claude/.team-harness.json`, then opencode's config
-resolved from `OPENCODE_CONFIG_DIR`, `$XDG_CONFIG_HOME/opencode`, or
-`~/.config/opencode`, as read-only compatibility fallbacks. Only when the
-selected document is a valid JSON object with `"logs-mode": "obsidian"`,
+search, read only `${CODEX_HOME:-$HOME/.codex}/.team-harness.json` without
+modifying it. If it is absent, search local workspaces only and recommend
+`$team-harness:setup`; never inspect Claude Code or opencode configuration as a
+runtime fallback. Only when the native document is a valid JSON object with
+`"logs-mode": "obsidian"`,
 canonicalize and validate the external base before scanning it: `logs-path`
 must be absolute, accessible, non-root, and different from the user home;
 `logs-subfolder` must be normalized and relative without `.`, `..`, glob, or

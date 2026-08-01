@@ -8,11 +8,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const names = [
   "policy-block",
-  "dev-guard",
-  "gcp-guard",
-  "prepublish-guard",
-  "gate-guard",
-  "worktree-guard"
+  "gcp-guard"
 ];
 
 export async function sync({ check = false, rootDir = root } = {}) {

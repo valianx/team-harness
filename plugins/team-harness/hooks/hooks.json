@@ -1,5 +1,5 @@
 {
-  "description": "Team Harness safety hooks for the POSIX-only Codex beta. Matching hooks run concurrently and require explicit review/trust before enforcement is active.",
+  "description": "Team Harness deterministic-deny safety hooks for POSIX Codex. Native Codex permissions own approval prompts; review/trust is required before these hooks are active.",
   "hooks": {
     "PreToolUse": [
       {
@@ -14,50 +14,13 @@
         ]
       },
       {
-        "matcher": "Bash|mcp__.+__clickup_(update_task|create_task|create_task_comment|attach_task_file|delete_task)",
+        "matcher": "Bash",
         "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$PLUGIN_ROOT/hooks/run-codex-hook.sh\" dev-guard",
-            "timeout": 10,
-            "statusMessage": "Checking Team Harness outward-action policy"
-          },
           {
             "type": "command",
             "command": "bash \"$PLUGIN_ROOT/hooks/run-codex-hook.sh\" gcp-guard",
             "timeout": 10,
-            "statusMessage": "Checking Team Harness GCP policy"
-          },
-          {
-            "type": "command",
-            "command": "bash \"$PLUGIN_ROOT/hooks/run-codex-hook.sh\" prepublish-guard",
-            "timeout": 120,
-            "statusMessage": "Checking Team Harness publish requirements"
-          },
-          {
-            "type": "command",
-            "command": "bash \"$PLUGIN_ROOT/hooks/run-codex-hook.sh\" gate-guard",
-            "timeout": 15,
-            "statusMessage": "Checking Team Harness final gate release"
-          },
-          {
-            "type": "command",
-            "command": "bash \"$PLUGIN_ROOT/hooks/run-codex-hook.sh\" worktree-guard",
-            "timeout": 10,
-            "statusMessage": "Checking Team Harness worktree discipline"
-          }
-        ]
-      }
-    ],
-    "PermissionRequest": [
-      {
-        "matcher": "Bash|mcp__.+__clickup_(update_task|create_task|create_task_comment|attach_task_file|delete_task)",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$PLUGIN_ROOT/hooks/run-codex-hook.sh\" dev-guard PermissionRequest",
-            "timeout": 10,
-            "statusMessage": "Applying Team Harness pre-approved outward-action policy"
+            "statusMessage": "Checking catastrophic GCP operations"
           }
         ]
       }

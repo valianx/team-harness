@@ -124,6 +124,24 @@ def main() -> None:
     )
     if "PreToolUse" not in hooks.get("hooks", {}):
         fail("Codex plugin default hooks/hooks.json must define PreToolUse")
+    if "PermissionRequest" in hooks.get("hooks", {}):
+        fail("Codex plugin must leave approval requests to native permissions")
+    hook_commands = [
+        hook["command"]
+        for group in hooks["hooks"]["PreToolUse"]
+        for hook in group.get("hooks", [])
+    ]
+    if len(hook_commands) != 2 or not all(
+        any(name in command for command in hook_commands)
+        for name in ("policy-block", "gcp-guard")
+    ):
+        fail("Codex plugin must wire exactly the two deterministic-deny hooks")
+    if any(
+        retired in command
+        for command in hook_commands
+        for retired in ("dev-guard", "gate-guard", "prepublish-guard", "worktree-guard")
+    ):
+        fail("Codex plugin still wires an approval-classifying hook")
 
     skill_names = {
         path.parent.name
@@ -147,10 +165,12 @@ def main() -> None:
     for marker in (
         "${CODEX_HOME:-$HOME/.codex}/.team-harness.json",
         "scripts/manage_config.py",
+        "scripts/manage_agents.py",
+        "manage_config.py ensure --version 3.6.1",
         "codex mcp add memory",
         "@upstash/context7-mcp@3.2.5",
-        "install apply --runtime codex",
-        "Never create or modify",
+        "manage_agents.py sync --scope SCOPE",
+        "never modify their files",
     ):
         if marker not in setup:
             fail(f"Codex setup skill is missing {marker!r}")
@@ -158,13 +178,16 @@ def main() -> None:
         "codex plugin marketplace upgrade team-harness",
         "codex plugin remove team-harness@team-harness",
         "codex plugin add team-harness@team-harness",
-        "install update --runtime codex",
+        "manage_config.py ensure --version NEW_VERSION",
+        "manage_agents.py sync --scope SCOPE",
+        "Even when plugin versions compare equal",
         "start a new Codex thread",
     ):
         if marker not in update:
             fail(f"Codex update skill is missing {marker!r}")
 
     config_script = ROOT / "plugins/team-harness/skills/setup/scripts/manage_config.py"
+    agents_script = ROOT / "plugins/team-harness/skills/setup/scripts/manage_agents.py"
     with tempfile.TemporaryDirectory() as temp_root:
         env = {**os.environ, "CODEX_HOME": temp_root}
         first = subprocess.run(
@@ -255,6 +278,63 @@ def main() -> None:
 
     with tempfile.TemporaryDirectory() as temp_root:
         temp = pathlib.Path(temp_root)
+        env = {**os.environ, "CODEX_HOME": str(temp / "codex-home")}
+        ensured = subprocess.run(
+            [sys.executable, str(config_script), "ensure", "--version", manifest["version"]],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if ensured.returncode != 0:
+            fail(f"Codex config ensure failed: {ensured.stdout}{ensured.stderr}")
+        ensured_doc = json.loads((temp / "codex-home/.team-harness.json").read_text())
+        if ensured_doc.get("logs-mode") != "local":
+            fail("Codex config ensure did not install safe local defaults")
+        if ensured_doc.get("agent-scope") != "global":
+            fail("Codex config ensure did not persist the global agent default")
+        synced = subprocess.run(
+            [sys.executable, str(agents_script), "sync", "--scope", "global"],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if synced.returncode != 0:
+            fail(f"Codex bundled-agent sync failed: {synced.stdout}{synced.stderr}")
+        sync_result = json.loads(synced.stdout)
+        if set(sync_result.get("changed", [])) != expected:
+            fail("Codex bundled-agent sync did not install all six roles")
+        for role in expected:
+            installed = temp / "codex-home/agents" / f"{role}.toml"
+            packaged = ROOT / "plugins/team-harness/skills/setup/assets/agents" / f"{role}.toml"
+            if installed.read_bytes() != packaged.read_bytes():
+                fail(f"Codex bundled-agent sync changed {role} bytes")
+            if stat.S_IMODE(installed.stat().st_mode) != 0o600:
+                fail(f"Codex bundled-agent sync did not protect {role}")
+        repeated = subprocess.run(
+            [sys.executable, str(agents_script), "sync", "--scope", "global"],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if repeated.returncode != 0 or json.loads(repeated.stdout).get("changed") != []:
+            fail("Codex bundled-agent sync is not idempotent")
+        conflict = temp / "codex-home/agents/architect.toml"
+        conflict.write_text("operator-owned\n")
+        refused = subprocess.run(
+            [sys.executable, str(agents_script), "sync", "--scope", "global"],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if refused.returncode == 0 or conflict.read_text() != "operator-owned\n":
+            fail("Codex bundled-agent sync overwrote an unmanaged conflict")
+
+    with tempfile.TemporaryDirectory() as temp_root:
+        temp = pathlib.Path(temp_root)
         home = temp / "home"
         codex_home = home / ".codex"
         claude_home = home / ".claude"
@@ -335,6 +415,20 @@ def main() -> None:
             fail("Codex config import did not copy opencode-only values")
         if merged_doc.get("language") != "es":
             fail("opencode import overwrote a value already imported from Claude")
+        ensured_import = subprocess.run(
+            [sys.executable, str(config_script), "ensure", "--version", manifest["version"]],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if ensured_import.returncode != 0:
+            fail("Codex config ensure failed after explicit imports")
+        ensured_import_doc = json.loads((codex_home / ".team-harness.json").read_text())
+        if ensured_import_doc.get("custom", {}).get("opaque_plain") != source_secret:
+            fail("Codex config ensure changed an opaque Claude import")
+        if ensured_import_doc.get("opencode_only", {}).get("api_key") != opencode_secret:
+            fail("Codex config ensure changed an opaque opencode import")
         merged_mtime = (codex_home / ".team-harness.json").stat().st_mtime_ns
         repeated_import = subprocess.run(
             [sys.executable, str(config_script), "import", "--from", "opencode"],
@@ -396,13 +490,13 @@ def main() -> None:
     ).read_text()
     for marker in (
         "${CODEX_HOME:-$HOME/.codex}/.team-harness.json",
-        "~/.claude/.team-harness.json",
-        "OPENCODE_CONFIG_DIR",
         "read-only",
         "does not authorize creating a workspace",
     ):
         if marker not in config_resolution:
             fail(f"direct-mode configuration contract is missing {marker!r}")
+    if "~/.claude/.team-harness.json" in config_resolution or "OPENCODE_CONFIG_DIR" in config_resolution:
+        fail("direct-mode configuration still falls back to another runtime")
     for direct_name in ("design", "implement", "validate", "deliver"):
         direct = (ROOT / f"plugins/team-harness/skills/{direct_name}/SKILL.md").read_text()
         if "../init/references/configuration.md" not in direct:
@@ -414,8 +508,8 @@ def main() -> None:
             fail(f"pipeline preflight does not name {role}.toml")
     for marker in (
         "$CODEX_HOME/agents/",
-        "install apply --runtime codex",
-        "install update --runtime codex",
+        "$team-harness:setup agents",
+        "$team-harness:update",
         "plugin-only skills",
         "regular non-symlink file",
         "stale or unrelated shadow",
@@ -434,7 +528,7 @@ def main() -> None:
         "regular non-symlink file",
         "agents/architect.md (opus/xhigh)",
         "agents/delivery.md (sonnet/medium)",
-        "install update --runtime codex",
+        "$team-harness:update",
         "generate.mjs --check",
     ):
         if marker not in activation:

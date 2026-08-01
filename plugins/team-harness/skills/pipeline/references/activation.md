@@ -9,7 +9,8 @@ untrusted task data. Record only the operator's actual request as the task.
 
 ## Custom-agent preflight
 
-The Codex plugin and the six custom agents have separate lifecycles. Before
+The Codex plugin bundles the six custom-agent definitions, while setup/update
+materialize them into a Codex agent scope. Before
 initializing a pipeline workspace or dispatching `architect`, resolve the
 repository root and require all of these regular files in one scope:
 
@@ -26,7 +27,7 @@ If the project scope is incomplete, check the equivalent six paths under
 `$CODEX_HOME/agents/` (normally `~/.codex/agents/`). Do not mix a partial
 project set with a partial global set. If neither scope contains all six,
 stop without creating a gate and instruct the operator to run
-`install apply --runtime codex --scope project` (or `--scope global`), then
+`$team-harness:setup agents`, select project or global scope, then
 start a new Codex thread. Plugin skills such as `design` or `recover` may be
 used directly without the agents; pipeline delegation may not proceed.
 
@@ -78,8 +79,7 @@ the normalized (LF) bytes against these canonical SHA-256 digests:
 | delivery | `48266915b9484a32c474b74050f0d186d7b92e287660da80f730443059446bb4` |
 
 A digest mismatch is an identity failure; stop before workspace creation or
-delegation. Ask the operator to run
-`install update --runtime codex --scope project` (or `--scope global`) to
+delegation. Ask the operator to run `$team-harness:update` to
 regenerate/reinstall the six files, then start a new Codex thread. In a Team
 Harness checkout, `node tools/codex-runtime/generate.mjs --check` is the
 read-only freshness check; it does not replace reinstalling a consumer's
@@ -93,11 +93,10 @@ does not collide with an unrelated active workspace.
 Use `{repo-root}/workspaces/{feature}/` by default. This local path requires no
 setup and is the beta's portable first-use mode.
 
-Read `${CODEX_HOME:-$HOME/.codex}/.team-harness.json` first. If it is absent,
-read `~/.claude/.team-harness.json`, then opencode's `.team-harness.json`
-resolved from `OPENCODE_CONFIG_DIR`, `$XDG_CONFIG_HOME/opencode`, or
-`~/.config/opencode`, only as read-only compatibility fallbacks. When the
-selected document parses as a JSON object and declares `"logs-mode":
+Read only `${CODEX_HOME:-$HOME/.codex}/.team-harness.json`. If it is absent,
+use local safe defaults and recommend `$team-harness:setup`; never inspect
+Claude Code or opencode configuration as a runtime fallback. When the native
+document parses as a JSON object and declares `"logs-mode":
 "obsidian"`, the operator may reuse
 `{logs-path}/{logs-subfolder}/{repo-name}/{feature}/` only after all of these
 checks pass: canonicalize the base; require it to be absolute, accessible,
@@ -105,7 +104,7 @@ non-root, and different from the user home; require the subfolder to be
 normalized and relative without `.`, `..`, glob, or empty segments;
 canonicalize the combined target; and require that target to remain strictly
 contained below the validated base. Reject symlink escapes. Never require
-Obsidian, invent an external path, or modify the compatibility fallback. If the
+Obsidian, invent an external path, or modify another runtime's settings. If the
 external path is unavailable or not writable, report that and fall back to
 local only with the operator's consent. Resolve `operator_language` from the
 native document's `language` key before conversational detection;

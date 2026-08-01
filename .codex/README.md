@@ -17,7 +17,7 @@ node tools/codex-runtime/test_generate.mjs
 bash tests/run-all.sh
 ```
 
-Read `CONTRIBUTING.md` for the cross-runtime change matrix and `docs/codex-runtime.md` for packaging, local installation, and the complete validation set. Do not edit this generated roster or `.codex/agents/*.toml` directly.
+Read `CONTRIBUTING.md` for the cross-runtime change matrix and `docs/codex-runtime.md` for packaging, local installation, and the complete validation set. Do not edit this generated roster, `.codex/agents/*.toml`, or `plugins/team-harness/skills/setup/assets/agents/*.toml` directly.
 
 ## Canonical roster and Codex availability
 

@@ -38,8 +38,9 @@ Codex approvals or hook decisions.
 
 ## Mandatory agent prerequisite
 
-The plugin supplies the workflow skills, but Codex custom-agent TOML is a
-separate installation. Before creating a workspace, dispatching `architect`,
+The plugin supplies the workflow skills and bundled custom-agent definitions;
+setup/update materialize the TOML into a Codex agent scope. Before creating a
+workspace, dispatching `architect`,
 or presenting any gate, preflight all six required regular files:
 
 ```text
@@ -55,12 +56,10 @@ Accept a complete set in either the repository project scope
 `<repo>/.codex/agents/` or the configured global scope
 `$CODEX_HOME/agents/` (normally `~/.codex/agents/`). A partial set is not
 usable. If any role is missing, stop before delegation and tell the operator to
-install the agents separately, for example:
+run the lifecycle configuration for the desired scope:
 
 ```bash
-install apply --runtime codex --scope project
-# or, for a user-wide install:
-install apply --runtime codex --scope global
+$team-harness:setup agents
 ```
 
 The six files are an identity boundary, not just a name lookup. Use one scope
@@ -117,8 +116,7 @@ the exact TOML field `name = "<role>"`. A same-name file without all of these
 markers is a stale or unrelated shadow and must fail preflight; do not create a
 workspace or delegate through it. Regenerate a project set with
 `node tools/codex-runtime/generate.mjs --check` (repository contributors) or
-reinstall it with `install update --runtime codex --scope project` /
-`install update --runtime codex --scope global`, then start a new Codex thread
+reinstall it with `$team-harness:update`, then start a new Codex thread
 so the custom-agent registry is rediscovered.
 
 After installation, start a new Codex thread so the custom-agent registry is
