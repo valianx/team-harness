@@ -107,7 +107,7 @@ Do not run the marketplace freshness check for a targeted request.
    arguments, and use `--remove KEY` for a requested reset. Examples:
 
    ```bash
-   python3 scripts/manage_config.py set --set 'logs-mode="local"' --version 3.7.0
+   python3 scripts/manage_config.py set --set 'logs-mode="local"' --version 3.6.1
    python3 scripts/manage_config.py set --set 'language="es"'
    python3 scripts/manage_config.py set --set 'english_learning=true'
    python3 scripts/manage_config.py set --remove language

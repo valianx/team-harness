@@ -16,7 +16,7 @@ CODEX_HOME=<temporary> codex plugin list
 
 Result: the local marketplace resolved to `.agents/plugins/marketplace.json`,
 `team-harness@team-harness` changed from `not installed` to `installed, enabled`,
-and Codex cached version `3.7.0`. The cached snapshot contained all nine skills:
+and Codex cached version `3.6.1`. The cached snapshot contained all nine skills:
 `setup`, `update`, `init`, `pipeline`, `design`, `implement`, `validate`, `deliver`, and `recover`, plus the
 declared hook manifest, launcher, and six hook bundles.
 
