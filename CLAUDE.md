@@ -96,7 +96,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin `th`; Codex plugin `team-harness` via `.agents/plugins/marketplace.json`; Go agent installer for opencode and Codex. The tagged Git tree is both plugin artifact—there is no separate Codex archive. |
 
-**Current version:** `3.6.2` (see `.claude-plugin/plugin.json`, the tag authority. Its version is shared by the Claude and Codex plugin manifests, the Claude marketplace entry, and the installer fallback. `CHANGELOG.md` tracks release history).
+**Current version:** `4.0.0` (see `.claude-plugin/plugin.json`, the tag authority. Its version is shared by the Claude and Codex plugin manifests, the Claude marketplace entry, and the installer fallback. `CHANGELOG.md` tracks release history).
 
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
@@ -131,10 +131,10 @@ All commands run from the repo root.
 
 - **One concern per file.** One agent per `.md` in `agents/`. One skill per `.md` in `skills/` (complex skills get their own subfolder).
 - **Frontmatter-driven agents.** Every agent file starts with YAML frontmatter (`name`, `description`, `model`, `color`, `effort`). Model tiers: `opus` (architect/agent-builder/security/coordination), `haiku` (researcher/init-project), `sonnet` (all others). Effort ceiling `xhigh`; session-global on CC, per-agent-advisory on opencode — see `agents/README.md`.
-- **orchestrator is the lightweight hub.** Direct work is the default. `/th:pipeline` activates the lazy-loaded gated contract in `agents/ref-pipeline.md`; skills never invoke pipeline specialists directly.
+- **orchestrator is the lightweight hub.** Direct work is the default. `/th:pipeline` activates the lazy-loaded v3 contract in `agents/ref-pipeline.md`; skills never invoke pipeline specialists directly. The canonical sequence is `design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete`.
 - **Workspaces as the shared board.** Agents communicate through files in `workspaces/{feature-name}/`; the operator uses it as a review surface. Never through return values. `workspaces/` is always git-ignored. `docs/conventions.md`.
 - **Dual-mode workspaces.** Local (`./workspaces/`) or Obsidian vault, via `logs-mode` in `~/.claude/.team-harness.json`. `docs/conventions.md`.
-- **Initiative layer (opt-in).** Groups per-project pipelines under an `overview.md` parent index; detect + confirm gate; **projects run one at a time** — parallel multi-project dispatch was retired with the coordinator fusion, because fanning out per-project lanes required the coordinator to dispatch a copy of itself. There is no `--serial` flag to pass; serial is the only mode. Full contracts: `agents/ref-dispatch-machinery.md § "Multi-project sequencing"`; `docs/discover-phase.md § 11`.
+- **Initiative layer (opt-in).** Groups per-project pipelines under an `overview.md` parent index; detect + confirm gate; **projects run one at a time** — parallel multi-project dispatch was retired with the coordinator fusion, because fanning out per-project tracks required the coordinator to dispatch a copy of itself. There is no `--serial` flag to pass; serial is the only mode. Full contracts: `agents/ref-dispatch-machinery.md § "Multi-project sequencing"`; `docs/discover-phase.md § 11`.
 - **Two-tier document classification.** Operator-facing vs agentic. `docs/conventions.md § Document classification`.
 - **Status-block return protocol.** Agents finish with a compact status block; the orchestrator gates on it without re-reading full workspaces.
 - **Installer always overwrites embedded files.** Direct edits to `~/.claude/agents/*.md` are replaced on every install. Hash-match files are skipped. `docs/conventions.md` has the full contract.
@@ -145,15 +145,25 @@ All commands run from the repo root.
 - **KG content is technical-only.** Never store personal data, preferences, tokens, or stakeholder names. `docs/kg-content-policy.md`.
 - **Knowledge capture is explicit.** Delivery never writes KG or project doctrine. Reusable insights are saved only when the operator invokes the knowledge flow; the conditional Phase-3 security-finding write remains the narrow automatic exception.
 - **Delivery post-create check.** The coordinator's deterministic mechanics query merge state and take one CI snapshot after `gh pr create`; they never wait for CI. `agents/_shared/delivery-mechanics.md § 9`.
-- **Pipeline observability is mandatory.** Every run produces `00-execution-events.jsonl`/`.md` and `00-pipeline-summary.md` (Tier 0 fixes exempt). Full contract: `docs/observability.md`.
+- **Pipeline observability is mandatory.** Every activated pipeline run produces
+  `00-execution-events.jsonl`/`.md` and `00-pipeline-summary.md`; inline work has no pipeline
+  artifacts. Legacy tier markers never create an observability exemption. Full contract:
+  `docs/observability.md`.
 - **Documentation freshness via context7.** Verify third-party APIs before generating code. Mandatory triggers: `docs/context7-usage.md §2`.
 - **Bug-fix flow forces security review + regression test.** `type: fix`/`hotfix`. `agents/ref-special-flows.md § Bug-fix Flow`.
-- **Pre-delivery security audit — `adversary` alone, conditional, within Phase 3's parallel validation block.** `adversary` runs once per delivery group over the consolidated final diff when `security_floor_applies` holds, concurrently with `qa`, in one message, over the tree Phase 2.8 (Freeze) froze; SEC-002 design-review (Phase 1.6) and PR review complete the floor — no unconditional in-pipeline code-audit dispatch. `agents/ref-pipeline.md § "Phase 3 — Verify"`, `docs/dev-mode.md § Security Floor Non-Waivability`.
+- **Validation security floor.** `adversary` runs once over the frozen final diff when the derived security floor applies, alongside `qa`; sensitive plans also retain the design-time `security` review. Findings that are correctable in scope return to implementation and revalidate the delta. `agents/ref-pipeline.md § "Validation"`, `docs/dev-mode.md § Security Floor Non-Waivability`.
 - **Stage-2 code-hygiene gate (two-layer, mandatory for all types).** Deterministic pre-verify scan bounces work-narration comments; `qa`'s `## Code Hygiene` audit emits `code_hygiene: pass|fail` as a Phase 3 gate conjunction. Canonical pattern set: `docs/code-hygiene-gate.md`.
 - **Patch mode + selective verifier re-run.** Full contract: `docs/patch-mode.md`.
 - **Suite-run evidence.** Append-only, per-feature record of a verification-command run against a concrete tree state, so a downstream link can cite it instead of re-running. Canonical contract: `docs/suite-evidence.md`.
-- **Three-lane execution model (inline/express/full).** One classification system (`--fast`/`[TIER: N]`/Simple-Mode are aliases); informational cost estimate, no budget mechanism. `docs/pipeline-lanes.md`.
-- **Plan-review panel centralization** — worst-of verdict; writes `reviews/01-plan-review.md`. Deferred-by-default for a non-sensitive, architect-authored plan (offered post-approval / on demand via `/th:plan-review`); sensitive plans unaffected. `agents/ref-direct-modes.md`; `agents/ref-pipeline.md § Phase 1.5/1.6/1.8`.
+- **Two-posture execution model (inline/pipeline).** Inline is the direct default; sensitive work
+  may remain inline when the current live operator explicitly selects it, and live tester/QA/security
+  requests remain ad hoc inline reviews with no pipeline state, events, gates, or delivery. Pipeline
+  entry requires explicit live activation or recovery and always uses canonical full v3. Retired
+  route markers are migration data only: show `1 — inline` / `2 — pipeline` and never infer a route
+  or gate decision. `docs/pipeline-lanes.md`.
+- **Plan review is explicit only.** `/th:plan-review` may dispatch `qa-plan`, `security` when relevant, and `plan-reviewer` as a standalone direct mode. No plan-review panel, ratification loop, approach checkpoint, or post-approval offer runs automatically in the pipeline. `skills/plan-review/SKILL.md`; `agents/ref-direct-modes.md`.
+- **Coordination state has one writer.** Only `orchestrator` writes `00-state.md`, the execution trace, the decision ledger, and the pipeline summary. Specialists return status blocks and artifact pointers; they never edit coordination state. `agents/_shared/orchestrator-state.md`.
+- **Gate UX is concise and numeric.** Gate 1 displays `1 approve`, `2 approve autonomous`, `3 edit`, `4 reject`; Gate 3 displays `1 ship`, `2 amend`, `3 abort`. A number alone is accepted for a decision; edit/reject require `N: detail`. Fresh nonce, dual record, and live operator approval remain mandatory. `agents/_shared/gate-contract.md`.
 - **Discover phase + intake survey + spec co-authoring.** Depth DIAL, not a stage switch; security floors non-surveyable. `docs/discover-phase.md`, `docs/spec-coauthoring.md`.
 - **Orchestrator disposition — unconditional, lightweight, top-level.** The top-level agent is the direct-mode coordinator; the gated pipeline is explicit and lazy-loaded. Outward actions remain gated by `dev-guard`. `docs/dev-mode.md`.
 - **Obsidian interlinking.** 3-tier MOC, knowledge allowlist: `docs/obsidian-linking.md`.
@@ -247,13 +257,13 @@ See `docs/voice-guide.md` for the full Bad/Good example and extended rationale.
 
 ### 7.2 Vocabulary — dev-natural verbs at the operator surface
 
-The three things a developer already knows how to ask for — a work plan, an implementation, a PR — map cleanly onto the three pipeline stages. The operator never learns `Phase 1.5`, `Phase 2.8`, or `STAGE-GATE-3`. Those are internal mechanics.
+The three things a developer already knows how to ask for — a work plan, an implementation, a PR — map cleanly onto the pipeline states. The operator need not learn implementation checkpoints; the state machine remains named and recoverable for contributors.
 
 | Operator asks for | Maps to | Internal mechanics (operator never sees) |
 |---|---|---|
-| "give me the work plan" / "design X" | Stage 1 — Analysis | Intake / Specify / Design / Plan Ratification / Plan Review / STAGE-GATE-1 |
-| "implement it" | Stage 2 — Implementation | Implementer / Tester / QA / Security / Acceptance Gate / Acceptance Checker |
-| "open the PR" / "ship it" | Stage 3 — Delivery | STAGE-GATE-3 / delivery prose / coordinator publication mechanics |
+| "give me the work plan" / "design X" | `design` → `waiting_gate1` | Discover / Specify / architect / Gate 1 |
+| "implement it" | `implementation` → `validation` | implementer / tester / QA / security floor |
+| "open the PR" / "ship it" | `waiting_gate3` → `delivery` → `complete` | Gate 3 / delivery prose / coordinator publication mechanics |
 
 **Rule:** operator-visible status blocks, STOP-block templates, install prompts, error messages, and skill help text use dev-natural verbs (`plan`, `implement`, `validate`, `review`, `recover`, `ship`). Phase numbers and gate identifiers appear only in contributor surfaces (this `CLAUDE.md`, `agents/*.md` instructional sections, workspace doc templates internal to the pipeline state machine).
 
@@ -282,6 +292,14 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 ## 8. Architecture Decisions
 <!-- Updated in the reviewed implementation tree when a feature establishes a durable decision. Empty at init. -->
 > Full history: see `docs/decisions.md`. Recent entries below.
+- **2026-07-31 (superseded by the two-posture convergence)** — Historical decision: every
+  activated `full` or `express` run used
+  `design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete`.
+  The coordinator alone wrote `00-state.md`, the events file, the decision ledger, and the
+  pipeline summary. Automatic Stage-1 panels and structure loops were retired; `/th:plan-review`
+  remained explicit. The historical route names are retained for migration context only; current
+  pipeline entry is canonical full v3. → `agents/_shared/orchestrator-state.md`,
+  `agents/ref-pipeline.md`
 - **2026-07-27** — Gate-state contract (#530): six named `00-state.md` fields require bare-literal values (no annotation), prose-only enforcement (`gate-guard`/`checkpoint-guard` unwired since v2.139.0), plus the named "No gate-field repair" invariant. → `agents/_shared/gate-contract.md § "The dual-record release"`
 - **2026-07-27** — Canonical dispatch contract (#524): one home for what a dispatch prompt may/must not carry and a single two-halves rule (review scope never bounded by the dispatcher; write scope always bounded by the recipient's own contract, by pointer to `plan-consolidation.md`), asserted via a five-column control rubric instead of prose. → `agents/_shared/dispatch-contract.md`
 - **2026-07-28** — Pipeline dispatch shape collapsed: one `implementer` + one `tester` dispatch, `qa`+`adversary` fan out together in Phase 3; Phase 3.75/3.8 absorb into new Phase 2.8/Phase 3; Phase 4.5 retires (delivery diff bounded by a post-gate write allowlist instead). STAGE-GATE-3 moves immediately before Phase 4. → `agents/ref-pipeline.md § Phase 2.8`

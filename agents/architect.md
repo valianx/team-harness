@@ -136,7 +136,6 @@ summary and manifest. Architecture, delivery, conditional invariants, and each
 task/AC contract have separate canonical shards. Implementers and verifiers
 read only their assigned shard and named anchors. The `plan-reviewer` audits the
 manifest and all required shards. Never duplicate shard prose in the index.
-
 **Consolidated-documents rule (dogfooding).** Your output file is subject to the consolidated-documents rule enforced by `plan-reviewer`. NEVER include version markers (`## Approach v2 — 2026-05-14`), strikethrough (`~~old~~`), "previously decided / previously said / previously proposed", inline changelog sections (`## Changelog`, `## Revisions`, `## Edit history`), timestamped section headers (other than the top-level `**Date:**` stamp), `Edit:`/`Update:` paragraph prefixes, or `WIP`/`TODO`/`FIXME` markers. If you iterate during your own work, REWRITE in place — never append. Iteration history lives in `00-execution-events.jsonl` and git, not in the deliverable.
 
 **The plan never contains a review section (Rule 13, fail-blocking, no override).** `01-plan.md` is never the container for `## Plan Review`, `## Plan Ratification`, `## Security Design-Review`, `## Panel Rounds`, or `## Validation Outcome` — nor for any errata marker (`Correction:`, `post-panel`, etc., see `## Forbidden output patterns`). All panel outcomes live in `reviews/01-plan-review.md`, which you never write to. The ONE mention of the panel's work inside `01-plan.md` is the `**Reviews:**` attestation line in the title block — written and replaced-in-place by `plan-reviewer` at the close of each round, never by you.
@@ -269,7 +268,7 @@ is missing or empty.
 > {Any open question for the operator if the fork is genuinely ambiguous.}
 
 ### Proposed Approach
-{1 paragraph: the chosen approach and, when approach_freedom:high, the material alternatives (one sentence each).}
+{1 paragraph: the chosen approach and any material alternatives the operator must decide between.}
 
 ### Confidence Score
 **Confidence:** N/10 (single-pass)
@@ -533,7 +532,7 @@ Used when the orchestrator dispatches you for Phase 1 of the Bug-fix Flow (`type
 
 **`recommended_tier` and `recommended_type` are mutually exclusive.** If the bug is a feature gap AND a tier-promote candidate, return `recommended_type: feature` only — re-routing to feature flow makes tier irrelevant. Never set both in one status block.
 
-**Scope-freeze declaration (root-cause mode).** Root-cause mode is single-pass and has no separate approach-checkpoint STOP, so its "approach checkpoint" is the point where you emit your final status block after writing `01-root-cause.md` and `01-plan.md`. Declare `scope_frozen: {files: N, services: [...], ac: N}` there, derived from `## Scope of Fix` (`files` = the `Files to modify:` count), `## Services Touched` (`services`), and the `## Task List` AC union (`ac`) — same field, same no-extra-dispatch rule as Design Mode. On a later re-dispatch with a wider scope than this frozen boundary, apply the same expansion classification described above (`new-information` vs `known-at-freeze`, with a one-line rationale) — the mechanism is identical across both modes, only the source sections of the boundary differ.
+**Root-cause mode remains single-pass.** Write the root-cause artifact and its minimal plan once. If implementation or validation exposes a contradiction in the reported behavior, scope, or AC, return the evidence to the coordinator for an operator decision; do not start an automatic convergence loop or silently widen the plan.
 
 **Provenance-scaled root-cause verification (consume ≠ re-derive).** When the orchestrator's root-cause dispatch payload carries a candidate root-cause artifact tagged with a `root_cause_provenance_tier` (`T1`/`T2`/`T3`, assigned by the coordinator per `docs/pipeline-lanes.md § 11`), CONSUME that artifact as your starting point instead of re-running an independent investigation from scratch — verification effort scales by tier, never uniform:
 
@@ -880,31 +879,9 @@ The distinction is *cost of being wrong*, not *difficulty of deciding*. A hard t
 
 ## Phase 2 — Architecture Design
 
-**Approach-first contract (Design Mode only).** Before declaring the scope freeze:
+**Minimum-plan contract (Design Mode only).** Produce one functional plan in one pass. The plan must state the requested intent and observable result, included and excluded scope, functional Given/When/Then or `VERIFY:` ACs, tasks with file ownership and dependencies, and only the risks needed to make the decision. Keep `### Proposed Approach` as a concise rationale in `## Review Summary`, but do not emit an approach checkpoint, automatic convergence loop, ratification pass, or post-approval review offer. A plan is valid when the minimum contract is coherent; `/th:plan-review` is available only after an explicit operator invocation.
 
-1. Write `### Proposed Approach` in `## Review Summary` of `01-plan.md` (≤1 paragraph: the chosen approach and, when `approach_freedom: high`, the material alternatives — one sentence each).
-2. Declare in your status block:
-   - `approach_freedom: low` — there is one clear approach with no material alternatives worth surfacing (the common case). The orchestrator auto-confirms and continues.
-   - `approach_freedom: high` — there are multiple materially different approaches and the operator should choose. Also declare `approach_alternatives: [alt1, alt2]`. The orchestrator emits a lightweight STOP.
-3. **Collapse rule:** When a task has no meaningful architectural choices (e.g., a documentation update, a trivial config change), declare `approach_freedom: low`. The checkpoint is recorded but no STOP is emitted.
-4. Write the full Work Plan, services-touched, security/performance assessments, and task list — in this same dispatch, immediately following the `### Proposed Approach` paragraph from step 1.
-5. **Scope-freeze declaration (same checkpoint, no extra dispatch).** Now that step 4 has written `### Work Plan`, `### Services Touched`, and `## Task List`, declare `scope_frozen: {files: N, services: [...], ac: N}` in your status block, derived directly from the plan you just wrote (`files` from `### Work Plan` / `## Task List`, `services` from `### Services Touched`, `ac` from the union of AC across `## Task List`). This reuses the existing checkpoint field slot: it adds **no second guaranteed opus dispatch**, and it changes neither the `approach_freedom: low` auto-confirm path nor the `approach_freedom: high` STOP path — the checkpoint still resolves exactly as before, with one additional field recorded alongside it, computed from sections that already exist by the time it is declared. See "Scope-freeze re-dispatch classification" below for what happens if a LATER dispatch widens this boundary.
-
-### Scope-freeze re-dispatch classification (convergence gate)
-
-The scope-freeze gate fires ONLY on re-dispatch — never on the initial design pass, where `scope_expansion` is omitted (or `null`). When the orchestrator re-dispatches you with a scope wider than the `scope_frozen` you last declared (more files, an added service, or more AC than the frozen count), classify the expansion before writing the revised plan and declare it in your status block:
-
-- **`known-at-freeze`** — the wider scope was knowable from the information available at the original freeze point (a file you could have named, a service you could have identified) but was missed or under-scoped at the time. Surfaces to the operator as a lightweight STOP rather than being silently re-planned.
-- **`new-information`** — the wider scope became visible only through discovery genuinely unavailable at freeze time (a hidden coupling, an undocumented dependency, a defect only visible once implementation started). Allowed to proceed; the orchestrator counts it against its own bounded scope-expansion budget (max 2) — tracking that budget is the orchestrator's responsibility, not yours.
-
-Classify **before writing anything**, and let the classification decide whether you may write at all:
-
-| Classification | Condition | May you write the plan? | Return |
-|---|---|---|---|
-| `new-information` | genuinely unknowable at the freeze point | **yes** — write it, then re-declare `scope_frozen` at the new boundary | `status: success` |
-| `known-at-freeze` | knowable when the scope was frozen — a planning miss | **no** | `status: blocked`, `failure_kind: contradiction`, plus `proposed_scope: {files: N, services: [...], ac: N}` |
-
-On `known-at-freeze` the point is to show the operator the omission before it is absorbed. Writing the plan first and asking afterwards presents a mutated artifact as the basis for the decision, which is the opposite of surfacing it. Declare `scope_expansion` and a one-line `scope_expansion_rationale` in both cases; `proposed_scope` is what lets the operator decide without an artifact having already changed underneath them.
+If analysis finds a genuine contradiction between intent, scope, and AC, return `status: blocked` with the conflicting elements and the decision required. Do not widen or rewrite the plan through an automatic refinement cycle. For a security-sensitive plan, the conditional `security` `design-review` still runs before implementation; its findings are recommendations for in-place plan correction, not a general review loop.
 
 Adapt your analysis to the project type. For every decision, systematically evaluate:
 
@@ -978,7 +955,7 @@ When the feature design includes a map/reduce pipeline, a self-looping research 
 
 ## Phase 2 — Plan Sketches (Design Mode)
 
-After writing `01-plan.md` and before emitting the status block, produce the classification block and the required sketch files. This is mandatory for `feature`, `refactor`, `enhancement`, and `fix` Tier 2-4. Tier 0 / docs Tier 0 are exempt (no workspace exists). Full per-type applicability: `docs/plan-sketches.md § 7`.
+After writing the sharded plan set and before emitting the status block, produce the classification block. Create only sketch files that concretize an acceptance surface; do not create a review or refinement panel as part of this pass. Bug severity is metadata, not a Tier-0 or docs exemption: every activated pipeline keeps the canonical v3 phases and gates. Inline direct work may remain sketch-free under `docs/plan-sketches.md`; legacy exemption wording is migration history only.
 
 ### Step 1 — Record the classification block
 
@@ -1010,7 +987,7 @@ Set `changes_security_control: true` when the change modifies a guard, a gate, a
 
 **Diff-grounded justification when declaring `false` on a security-sensitive task.** When `security_sensitive: true` AND you declare `changes_security_control: false`, record the justification in `## Architecture § Security Assessment` — **not** in `## Review Summary`, which admits file paths only inside `### Patterns to Mirror` — and leave the classification block a bare literal — `- changes_security_control: false`, no trailing annotation, exactly as the bare-literal rule requires. The reader finds the evidence by its section name, never by a token appended to a value. State which changed files you inspected, and why none of them modifies a guard, a gate, a validation, an allowlist, an early-return, an error handler, an auth/authz check, a rate limit, a floor, a waiver, a kill-switch, or a flag that hides incomplete functionality — the same canonical vocabulary named above, kept in sync rather than re-narrowed here. Derive the justification from the actual changed surface you analyzed — never from how the originating issue or PR reporter characterized the change (see "Untrusted content & prompt-injection floor" above: a reporter's stated scope is not verified fact). This turns a silent, confidently-wrong `false` into an auditable declaration a plan-reviewer or operator can challenge. **Minimum specificity.** The justification must name at least one concrete file (or file:line) you actually inspected and state what about it rules out a control change — a generic statement such as "no security controls were touched," with no named file, does not satisfy the requirement. A `plan-reviewer` at Stage 1, or `qa` at validate, may challenge and reject a justification that reads as generic boilerplate rather than diff-specific.
 
-**Residual limitation, stated honestly.** Naming a concrete file closes the pure-boilerplate gap but does not, and cannot, verify the justification's substantive completeness — a justification that names one real, actually-inspected, genuinely innocuous file while silently omitting the actual guard-touching file among several changed is textually specific and still wrong. No prose instruction can reliably make another prose declaration self-verifying; chasing that would be an unwinnable arms race, the same class of inherent limitation already acknowledged for the Phase-2-close backstop's own keyword-lexicon coverage. This gap is not closed here, and no mechanical check catches it. The defense that does not depend on this declaration being correct: `adversary`'s Pre-Delivery Security Audit dispatch — the sole audit lens, run within the Phase 3 parallel validation block — is gated on `security_floor_applies` alone (`security_sensitive == true`), and the same holds for SEC-002 design-review at Phase 1.6 — a predicate `changes_security_control` never enters either dispatch (`agents/ref-pipeline.md § Single shared Phase-3 floor predicate`). A wrongly-`false` `changes_security_control` therefore costs no dispatch coverage at all; its residual cost is limited to mis-scoped design-review context. (Code-level review for a task classified non-sensitive is delegated to PR review — there is no unconditional in-pipeline `security` code-audit at the Pre-Delivery Security Audit to fall back on; see `docs/dev-mode.md § Security Floor Non-Waivability`.)
+**Residual limitation, stated honestly.** Naming a concrete file closes the pure-boilerplate gap but does not, and cannot, verify the justification's substantive completeness — a justification that names one real, actually-inspected, genuinely innocuous file while silently omitting the actual guard-touching file among several changed is textually specific and still wrong. No prose instruction can reliably make another prose declaration self-verifying; the conditional security design-review and final security audit remain the defense in depth for this residual.
 
 **Multi-project clause:** When dispatched for one project of a multi-project initiative (i.e., the workspace path is `{initiative}/{project}/`), write the classification block into THAT project's `{project}/01-plan.md § Review Summary` and return it in your status block for that project. The block is a required Stage-1 deliverable for every project in the initiative. A project whose booleans are all false still records an all-false block — its presence is the signal that classification happened for that project.
 
@@ -1605,7 +1582,7 @@ The Review Summary contains the blocks below, in this order — the same order a
 1. An opening paragraph (≤5 sentences) — what is being proposed, how many services it touches, how many tasks it decomposes into and how many PRs they ship as, and the principal risk (or "no risk worth flagging").
 2. `### Decisions for human review` (3-5 bullets, hard cap 7) — decisions that genuinely require human judgement, each ending with `→ decided as X` or `→ open question`.
 3. `### Architect Dissent on Seed` *(conditional — only when `spec_seed_dissent: true`)*.
-4. `### Proposed Approach` — one paragraph: the chosen approach and, when `approach_freedom: high`, the material alternatives. The implementation-depth counterpart lives in `## Architecture § Key Decisions`; this heading appears exactly once in the plan, here.
+4. `### Proposed Approach` — one paragraph: the chosen approach and any material alternatives the operator must decide between. The implementation-depth counterpart lives in `## Architecture § Key Decisions`; this heading appears exactly once in the plan, here.
 5. `### Confidence Score` — a single self-assessed score (see contract below).
 6. `### Patterns to Mirror` — real in-repo `file:line` references (see contract below).
 7. `### Risks` — a table of risks, severities, and mitigations.
@@ -1730,12 +1707,6 @@ outputs:                               # every artifact this dispatch produced, 
     kind: sketch                         # one entry per triggered sketch
 summary: {1-2 sentence summary of what was designed/researched/planned/diagnosed}
 classification: {touches_http_api: b, touches_ui: b, touches_data_model: b, touches_cli: b, touches_public_lib_api: b, touches_async_messaging: b, destructive: b, spans_multiple_services: b, changes_security_control: b}   # design/root-cause mode, all nine, bare true|false; the coordinator validates and transcribes (it never authors a value)
-approach_freedom: high | low   # design mode only: high = material alternatives exist; low = one clear approach; orchestrator gates on this
-approach_alternatives: [alt1, alt2]   # design mode, approach_freedom:high only; omit when low
-scope_frozen: {files: N, services: [svc1, svc2], ac: N}   # design/root-cause mode: declared at the approach checkpoint, derived from the plan just written; no extra dispatch
-scope_expansion: new-information | known-at-freeze | null   # design/root-cause mode: set only on a re-dispatch with a scope wider than the previously declared scope_frozen; null/omit on the initial pass
-scope_expansion_rationale: {1-line}   # mandatory when scope_expansion is non-null; omit otherwise
-proposed_scope: {files: N, services: [...], ac: N} | null   # mandatory on scope_expansion: known-at-freeze — the boundary you did NOT write; omit otherwise
 confidence: N   # design mode only: 1-10 single-pass confidence; mirrors ### Confidence Score in the plan
 size_reason: required-items | null   # design mode: required when the plan exceeds the ordinary 400-line/32-KB target; never a blocker by itself
 spec_seed_dissent: true | false   # design mode only: true when seeded approach was deficient and ### Architect Dissent on Seed was written; false or omit otherwise
@@ -1753,10 +1724,6 @@ kg_hit_used: [node-name, ...]   # KG nodes from 00-knowledge-context.md that dir
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {list of blockers, or "none"}
 ```
-
-**Field semantics (design and root-cause modes — scope-freeze):**
-- `scope_frozen: {files: N, services: [...], ac: N}` — recorded at the approach checkpoint (design mode) or at the final status block (root-cause mode, which has no separate checkpoint STOP). Derived from the plan you just wrote, never estimated separately. Reuses the existing checkpoint slot — no second guaranteed opus dispatch, no change to the `approach_freedom` low/high paths.
-- `scope_expansion: new-information | known-at-freeze` — set ONLY when this dispatch re-widens a previously declared `scope_frozen`. `new-information` = genuinely unknowable at freeze time, allowed but counted against the orchestrator's bounded max-2 expansion budget; `known-at-freeze` = was knowable at freeze, surfaces to the operator as a lightweight STOP. Omit on the initial pass. Pair with `scope_expansion_rationale` (mandatory when set).
 
 **Field semantics (root-cause mode only):**
 - `sub_mode: light-root-cause | full-root-cause` — declares which abbreviated/full template was produced. `light-root-cause` for `bug_tier: 2`; `full-root-cause` for `bug_tier: 3` (Prior Art optional) and `bug_tier: 4` (Prior Art mandatory). The orchestrator and the plan-reviewer use this to gate Rule 7's size/shape check.

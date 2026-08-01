@@ -103,7 +103,7 @@ For each `.md` file in `agents/`:
 1. **Skip** these files (they have their own guardrail model or Write/Edit IS their job):
    - `orchestrator.md` — coordination agent, different structure
    - `diagrammer.md`, `d2-diagrammer.md`, `likec4-diagrammer.md` — generate diagram files (Write/Edit is their core function)
-   - `init.md` — generates CLAUDE.md (Write/Edit is its core function)
+   - `init-project.md` — generates CLAUDE.md (Write/Edit is its core function)
 2. For each remaining agent, check its tool grants (from frontmatter or Tool Scoping section) and verify:
    - **Agents with Bash access** must have anti-patterns that mention destructive commands (e.g., `rm -rf`, `git push --force`, `drop table`, or similar)
    - **Agents with Write/Edit access** must have a section or statements about what they NEVER do (e.g., `NEVER implement code`, `NEVER modify files directly`)

@@ -1,6 +1,6 @@
 # Adversary Cost Model
 
-> Measurement assumptions for the conditional Phase-3 `adversary` audit. This document describes the current one-audit-per-delivery-group design, not the retired per-task/per-round model.
+> Measurement assumptions for the conditional validation-checkpoint `adversary` audit. This document describes the current one-audit-per-delivery-group design, not the retired per-task/per-round model.
 
 ## Measured baseline
 
@@ -71,7 +71,9 @@ Cost reduction is acceptable only while all of these remain true:
 3. `broke-it` requires a protected property, reachable precondition, and `file:line` trace.
 4. `security` and `adversary` retain different methods and verdict vocabularies.
 5. Untestable material coverage is declared through `incomplete_on_changed_control`.
-6. Findings remain operator-disposed at STAGE-GATE-3.
+6. A correctable `broke-it` or incomplete sensitive-coverage finding fails validation and
+   returns to implementation → Freeze → a fresh audit; only non-correctable structural
+   concerns remain operator-disposed at STAGE-GATE-3.
 
 `could-not-break` is neutral and non-certifying. It maps to `concerns` only when material evidence or coverage was unavailable, rather than automatically penalizing every completed negative attempt.
 

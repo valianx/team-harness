@@ -1,17 +1,19 @@
-# Observability — Event Schemas and Planes
+# Observability — v3 Events and Coordination Records
 
-> This document defines the TH observability surfaces: the **local** per-workspace pipeline
-> trace (`00-execution-events.{jsonl|md}`) and the **cross-user** flow-event plane (opt-in
-> telemetry via `context-harness-mcp`). The two planes are independent and serve different
-> purposes. The local plane is always active; the cross-user plane is opt-in and never
-> affects pipeline outcomes.
+The local execution trace is the canonical machine-readable history of an activated pipeline.
+The state snapshot and decision ledger are separate coordinator-owned records:
 
-## Two observability planes — local vs. cross-user
+| Record | Purpose | Writer |
+|---|---|---|
+| `00-state.md` | Current v3 state, fields, checklist, agent results, next action | coordinator only |
+| `00-execution-events.jsonl` / `.md` | Append-only lifecycle and phase trace | coordinator only |
+| `00-decision-ledger.jsonl` / `.md` | Gate decisions, finding dispositions, dry-run evidence | coordinator only |
+| `00-pipeline-summary.md` | Replaceable human summary | coordinator only |
 
-Team Harness maintains two distinct observability planes. Operators and tools (e.g.,
-`/th:trace`) read only from the **local plane**. The **cross-user plane** is a separate,
-opt-in channel for aggregate fleet-level friction signals. The two planes MUST NOT be
-conflated — they answer different questions with different audiences.
+Specialists return status blocks and artifact pointers. They never create, edit, or repair these
+records. The complete field schema is authoritative in `agents/_shared/orchestrator-state.md`.
+
+## 1. Canonical machine and trace events
 
 ### Low-cost append contract
 
@@ -45,93 +47,93 @@ loads the stream in full. These rules reduce model output and I/O; renaming `.md
 | Schema scope | Rich pipeline detail (phase timing, tokens, gate verdicts, iteration counts, tool usage) | Metadata-only bounded fields (8-value event enum, ints, version, timestamp, bare project tag — NO diff, NO code, NO paths) |
 | Contains PII / content? | Operator-local only; never sent cross-user | Filtered by CH `internal/validate.Run` + metadata-only by construction |
 
-### Cross-user flow-event plane (opt-in)
+## 2. Canonical machine and trace sequence
 
-When `flow_telemetry.enabled: true` in `~/.claude/.team-harness.json` (default: `false`),
-the orchestrator emits pipeline friction events to `context-harness-mcp` via the
-`mcp__memory__record_flow_event` MCP tool. Emission is best-effort:
 
-- Any error (CH unreachable, tool absent, timeout, validation rejection) → log
-  `flow-telemetry: unavailable` as an `operation.failed` event in `{events_file}` and
-  continue. The pipeline outcome is NEVER changed by a telemetry failure.
-- Payloads are metadata-only: bounded enums, integers, booleans, a semver string, and a
-  timestamp. No diff, no code, no file paths with user identifiers, no AC text.
-- The CH Content Filter (`internal/validate.Run`) is the ingest-side enforcement floor;
-  TH emission is the construction-side floor. Neither side trusts the other alone.
+Every activated v3 run uses one sequence:
 
-Full emission contract, the 8-event catalog, and the trigger map: see
-`§ Flow Telemetry Emission` below.
+```text
+design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete
+```
 
----
+Every `pipeline` run uses this canonical full v3 sequence. `inline` direct work is outside the
+machine and has no pipeline state, execution trace, decision ledger, summary, or gate events.
+Implementation checkpoints (evidence, hygiene, Freeze) and validation acceptance are trace details
+inside their named states; they are not persisted machine phases. A live tester, QA, or security
+request made while inline returns chat/bounded evidence only unless the operator explicitly asks
+for a standalone artifact; that request does not activate pipeline observability.
+
+The coordinator emits lifecycle events at every pipeline state transition and gate. Legacy tier,
+fast, simple, or profile markers never create an observability exemption or a pipeline trace.
+
+## 2. Event envelope
+
+One JSON object per line, append-only. In Obsidian mode the same JSONL is wrapped in a fenced
+`jsonl` block. Every event contains `ts`, `event`, and `feature`; phase events include `phase` and
+`agent`, and gate-release events include `decision`.
+
+Core event names are:
+
+| Event | Meaning |
+|---|---|
+| `pipeline.start`, `pipeline.complete`, `pipeline.incomplete`, `pipeline.end` | Run lifecycle |
+| `phase.start`, `phase.end` | Named-state dispatch and completion; `phase` is one of the v3 states or a trace detail owned by that state |
+| `stage.gate`, `stage.gate.release` | Gate presentation and dual-record release |
+| `gate`, `gate.pass`, `gate.fail` | Human-checkpoint marker or an internal verdict; never a release by itself |
+| `iteration.start` | Correction round, including the cause (`operator` or `verification`) |
+| `artifact.missing`, `operation.started/success/failed` | Artifact and operation observability |
+| `checkpoint.confirmed` | Discover reasoning checkpoint evidence, not a gate |
+| `stage2.hygiene` | Implementation hygiene scan result |
+| `kg_write` | One reason-coded knowledge write batch; no `kg.started` family |
+| `compaction.trigger` | Context-compaction breadcrumb |
+
+There is no `plan_structure` event in v3: the former deterministic plan-structure phase is
+retired. Plan validity is a minimum artifact check in `design`; a missing or malformed artifact
+gets one normal design correction.
 
 ## Flow Telemetry Emission
 
-This section is the coordinator's cross-user flow-event emission contract. Emission is
-**best-effort and non-blocking** — telemetry NEVER halts, fails, or delays a pipeline.
+Flow telemetry is a separate, opt-in cross-user plane. It is not the local execution trace, does
+not change the v3 state machine, and never carries gate releases or coordination state.
 
 ### Config gate
 
-The orchestrator reads `flow_telemetry.enabled` from `~/.claude/.team-harness.json` at boot,
-alongside `logs-mode` and `language`.
-
-- **`flow_telemetry.enabled: true`** — emit flow events at the friction points listed below.
-- **`flow_telemetry.enabled: false` or key absent (default)** — emit nothing. Zero
-  `record_flow_event` calls are made. This is the factory default; telemetry is opt-in.
+The coordinator reads `flow_telemetry.enabled` from
+`~/.claude/.team-harness.json` at startup. The default is `false`; when absent or false, no
+`mcp__memory__record_flow_event` calls are made. When true, emission is fire-and-forget and
+best-effort. A connectivity, validation, or tool error logs exactly
+`flow-telemetry: unavailable` in the local events file and the pipeline continues unchanged.
 
 ### Emission contract
 
-When `flow_telemetry.enabled: true`, the orchestrator calls `mcp__memory__record_flow_event`
-once at each friction point listed below. The call is **fire-and-forget** — no return value is
-awaited, no error from this call propagates to the pipeline, and it is never retried.
-
-**Resilience rule (mirrors `agents/_shared/kg-write-policy.md` § "Failure modes"):**
-Any error on the `record_flow_event` call — CH server unreachable, tool absent, timeout,
-validation rejection — MUST be handled as follows:
-1. Log `flow-telemetry: unavailable` to the pipeline's `{events_file}` as a single
-   `operation.failed` event (same schema as other `operation.*` events).
-2. Continue the pipeline. The emission failure changes nothing about the pipeline outcome.
-
-### Event catalog (8 events — byte-identical to CH `internal/validate/flowevent.go`)
-
-The closed `event` enum and per-event field sets are an invariant shared with
-`context-harness-mcp/internal/validate/flowevent.go` (multi-site invariant — #404).
-Do NOT add or rename values without a coordinated two-repo change.
-
-**Common fields (every event):**
-
-| Field | Type | Constraint |
-|-------|------|------------|
-| `event` | string | One of the 8 values below |
-| `ts` | string | RFC3339 UTC — use `date -u +%Y-%m-%dT%H:%M:%SZ` or equivalent |
-| `project` | string | Bare repo name (e.g. `team-harness`). No path. |
-| `task_type` | string | `feature \| fix \| hotfix \| refactor \| enhancement \| docs \| research` |
-| `th_version` | string | Plugin semver (read from `.claude-plugin/plugin.json` `version` field) |
-
-**Closed `event` enum (8 values) and per-event fields:**
+The external context-harness-mcp flow-event schema is metadata-only and must remain byte-identical
+to the catalog below. Every payload contains the common fields `event`, `ts`, `project`,
+`task_type`, and `th_version`; per-event fields are limited to the listed names.
 
 | `event` | Per-event fields | Field constraints |
-|---------|-----------------|-------------------|
-| `guard.block` | `hook`, `reason`, `resolved` | `hook` ∈ {prepublish, dev, policy}; `reason` ∈ {over-bump, secret, outward}; `resolved` bool |
-| `gate.fail` | `gate`, `verdict` | `gate` ∈ {STAGE-GATE-1, STAGE-GATE-3, acceptance, plan-review}; `verdict` ∈ {fail, concerns} |
-| `verify.reject` | `agent`, `verdict` | `agent` ∈ {qa, tester}; `verdict` ∈ {fail, concerns} |
-| `iteration.loop` | `stage`, `iterations` | `stage` ∈ {1, 2, 3}; `iterations` int ≥ 2 |
-| `blocked` | `reason` | `reason` ∈ {no-dispatch, manual-push, guard, dependency} |
-| `scope.collapse` | `items_dropped` | `items_dropped` int ≥ 1 |
-| `mcp.unavailable` | `op` | `op` ∈ {read, write} |
-| `abandon` | `last_stage` | `last_stage` ∈ {1, 2, 3} |
+|---|---|---|
+| `guard.block` | `hook`, `reason`, `resolved` | `hook`: `prepublish`/`dev`/`policy`; `reason`: `over-bump`/`secret`/`outward`; `resolved`: boolean |
+| `gate.fail` | `gate`, `verdict` | `gate`: `STAGE-GATE-1`/`STAGE-GATE-3`/`acceptance`/`plan-review`; `verdict`: `fail`/`concerns` |
+| `verify.reject` | `agent`, `verdict` | `agent`: `qa`/`tester`; `verdict`: `fail`/`concerns` |
+| `iteration.loop` | `stage`, `iterations` | `stage`: `1`/`2`/`3`; `iterations`: integer ≥ 2 |
+| `blocked` | `reason` | `reason`: `no-dispatch`/`manual-push`/`guard`/`dependency` |
+| `scope.collapse` | `items_dropped` | integer ≥ 1 |
+| `mcp.unavailable` | `op` | `op`: `read`/`write` |
+| `abandon` | `last_stage` | `last_stage`: `1`/`2`/`3` |
 
-### Metadata-only construction rule
+The payload contains bounded enums, integers, booleans, a semver, and a timestamp only. No diff,
+code, AC text, private path, personal identifier, secret, credential, or gate nonce crosses into
+the cross-user plane.
 
-Every payload MUST contain ONLY the fields from the catalog above — bounded enums, ints,
-booleans, a semver string, and a timestamp. The following are FORBIDDEN in any field value:
-- Diff content, code snippets, file paths containing a user identifier
-- AC text, commit message bodies, branch names containing personal prefixes
-- Secrets, tokens, credentials of any kind
+### Cross-user plane and triggers
 
-The CH Content Filter (`internal/validate.Run`) enforces this at ingest; the orchestrator
-enforces it by construction. Neither side relies solely on the other (defense in depth).
+The local plane (`00-execution-events.jsonl` or fenced `.md`) remains the operator's complete
+trace. The cross-user plane is an aggregate friction signal only. When enabled, the coordinator
+emits `guard.block`, `gate.fail`, `verify.reject`, `iteration.loop`, `blocked`, `scope.collapse`,
+`mcp.unavailable`, and `abandon` at the corresponding friction points. Telemetry is never a
+replacement for `00-state.md`, and it never releases a gate.
 
-### Emission trigger map
+### Cross-user friction triggers
 
 | Friction point | `event` value | When to emit |
 |---------------|---------------|--------------|
@@ -210,15 +212,15 @@ KG content policy that governs knowledge-graph nodes applies here.
 
 Every free-text field carried by any event in `00-execution-events.*` — this
 section's own `detail`/`error`/`suggestion`, `kg_write.writes[].detail`
-(§ "kg_write event" below), and `plan_structure.extra.detail`
-(§ "Additional pipeline event types" below) — is bounded to the `bounded`
+(§ "kg_write event" below), and any legacy `plan_structure.extra.detail`
+retained for historical traces — is bounded to the `bounded`
 intensity level defined in `docs/output-contract-patterns.md § 2`: ONE compact
 clause — a short phrase or single sentence fragment, ≤120 chars — never
 multi-sentence narrative prose. This is a FORMAT bound only: it never reduces
 the one-JSON-object-per-line invariant, and it never removes an event —
 every `phase.*`/`gate.*` event this schema requires still fires unchanged,
-regardless of how compact its optional free-text fields are (see "Tier 0
-carve-out" below for the sole exemption from the observability floor itself).
+regardless of how compact its optional free-text fields are. Inline direct work is
+outside the pipeline observability floor; activated pipeline events remain mandatory.
 Canonical source: `agents/ref-pipeline.md § "Free-text bound"`; the two
 sites must not diverge.
 
@@ -246,6 +248,13 @@ above is byte-preserved for every other free-text field.
 
 ## Placement in 00-execution-events
 
+### subagent.start
+
+The Claude Code plugin's PreToolUse hook records a dispatch-start breadcrumb as
+one JSONL line. The hook is observational and fail-open: it records the
+specialist type and the dispatch prompt's exact UTF-8 byte count, never prompt
+content.
+
 `operation.*` events are written as additional JSONL lines within the existing
 `00-execution-events.jsonl` (local mode) or inside the `jsonl` fence in
 `00-execution-events.md` (Obsidian mode). They are optional additions to a
@@ -253,129 +262,84 @@ valid pipeline trace — a pipeline that emits no `operation.*` events is still
 valid.
 
 Example (local mode `.jsonl`):
+The Claude Code plugin's PreToolUse breadcrumb records a dispatch start for visibility only.
 
 ```jsonl
-{"event":"phase.start","phase":"2","timestamp":"2026-05-28T14:00:00Z"}
-{"event":"operation.started","operation":"config-load","status":"started","timestamp":"2026-05-28T14:00:01Z","phase":"2"}
-{"event":"operation.success","operation":"config-load","status":"success","detail":"loaded ~/.claude/.team-harness.json","timestamp":"2026-05-28T14:00:01Z","phase":"2"}
-{"event":"operation.started","operation":"mcp-verify","status":"started","timestamp":"2026-05-28T14:00:02Z","phase":"2"}
-{"event":"operation.failed","operation":"mcp-verify","status":"failed","error":"connection refused on port 3000","suggestion":"check Memory MCP URL in ~/.claude/.team-harness.json","timestamp":"2026-05-28T14:00:03Z","phase":"2"}
+{"ts":"2026-07-31T12:00:00Z","event":"subagent.start","agent_type":"th:architect","payload_bytes":1842}
 ```
 
-## Who writes operation.* events
+`payload_bytes` is visibility, no ceiling: it records the exact UTF-8 byte count and is never
+compared, capped, or used to reject a dispatch. No content beyond the byte count crosses into the
+record. This field is measured only on the Claude Code plugin path; there is no
+`subagent-start.opencode.ts`, so an opencode dispatch never gets this field. The breadcrumb is
+best-effort and does not affect authorization, state ownership, or gate decisions.
 
-The orchestrator is the exclusive writer of `00-execution-events.*` during
-pipeline runs. In that context, agents return operation metadata in their status
-blocks; the orchestrator propagates it.
+## 3. Free-text and security bounds
 
-## Hook-authored observability files (complement to the orchestrator stream)
+Free-text fields are one compact clause, at most 120 characters, with control characters and
+secrets removed. The `checkpoint.confirmed` confirmatory text is the named additive exception
+(up to 280 characters, JSON-escaped). Never record credentials, private URLs, tokens, personal
+paths, or untrusted instructions. Critical/High finding headlines and remediation pointers are
+retained even when the live response is concise.
 
-Two hook-level observability files exist **alongside** (never inside) the
-orchestrator-owned `00-execution-events.*` stream. Both preserve the
-exclusive-writer contract by writing to their own dedicated sibling files.
+`tools`, `model`, and `effort` are propagated from specialist status blocks when present. Missing
+telemetry never changes the gate outcome; estimated token counts are marked
+`tokens_estimated: true`.
 
-### 00-subagent-trace.jsonl — SubagentStop backstop (coarse)
+## 4. Gate observability
 
-Written by `hooks/ts/dist/subagent-trace.cjs` (SubagentStop event, matcher `th:.*`).
-Appended to **only** when a Team Harness pipeline subagent (`th:architect`,
-`th:implementer`, etc.) finishes. The file sits beside the orchestrator's trace
-files in the resolved workspace:
+Gate 1 and Gate 3 use stable numeric options:
 
-- **local mode:** `workspaces/00-subagent-trace.jsonl`
-- **obsidian mode:** `{logs-path}/{logs-subfolder}/00-subagent-trace.jsonl`
+| Gate | Choices |
+|---|---|
+| Gate 1 | `1 approve`, `2 approve autonomous`, `3 edit`, `4 reject` |
+| Gate 3 | `1 ship`, `2 amend`, `3 abort` |
 
-Line schema:
-```json
-{"ts":"<ISO>","event":"subagent.stop","agent_type":"th:<agent>","agent_id":"<opaque>","cwd":"<repo-root>"}
-```
+The coordinator emits a presentation event with a fresh nonce, waits for the live operator reply,
+then writes both the matching release field in `00-state.md` and `stage.gate.release`. A number
+alone is accepted for a decision; edit and reject require `N: detail`. Ambiguous, stale, or
+unknown replies never release a gate. The renderer reads these fields and events but never edits
+them.
 
-**What this is NOT.** This is a coarse backstop — a deterministic proof that a
-subagent boundary occurred. It does NOT carry tokens, duration, result, or
-per-phase context. The orchestrator's `phase.end` events in `00-execution-events`
-remain the authoritative rich observability record. The SubagentStop payload
-simply does not carry that data.
+## 5. Correction and staleness trace
 
-**`project` key — stop-side residual (permanent, not a TODO).** Unlike the
-start-side breadcrumb below, `subagent.stop` lines never carry a `project`
-key. The SubagentStop payload exposes `agent_type`/`agent_id`/`stop_reason`
-only — there is no prompt to read a `TH-LANE: {project-key}` marker from at
-stop time. Readers that need the authoritative per-agent project/timing
-record for a lane-scoped run should use the orchestrator's `phase.end` event
-(which does carry `project`), not this breadcrumb. See "subagent.start" below
-for how pairing is redefined when `project` is present on the start side.
+Validation findings are classified and routed as follows:
 
-**Non-suppressible breadcrumb.** The existence breadcrumb (the `subagent.stop`
-write) runs unconditionally — `TH_HOOK_PROFILE=minimal` does NOT suppress it.
-Only the scope guard (non-`th:` agent → silent exit) and the base-path check
-(no resolvable workspace directory → silent exit) cause a run without a write.
-This makes the breadcrumb a deterministic observability floor: any `TH_HOOK_PROFILE`
-value can suppress notifications and richer observability, but it cannot erase
-proof that a `th:*` boundary occurred.
+- in-scope code, test, or documentation defect → implementation executor;
+- missing evidence → tester;
+- correctable security finding → implementation plus delta audit;
+- structural contradiction → operator decision, then optional design re-open and new Gate 1.
 
-**Reconciliation source (kept unconditionally, repurposed).** `00-subagent-trace.jsonl`
-is retained unconditionally and read by the orchestrator's stage-gate reconciliation
-backstop (`agents/ref-pipeline.md § "Reconciliation backstop"`) as the
-backfill source for a `phase.end` gap: the paired `subagent.start`/`subagent.stop`
-lines for the missing phase's `agent_type`, matched by the pipeline's time window,
-supply the `duration_ms` for the backfilled event. This is its primary value —
-prompt-level `phase.end` emission proved unreliable in measurement (usable in only
-31/78 sampled workspaces), while this hook-authored breadcrumb is non-suppressible
-by design and costs zero agent tokens. Consolidating it away or making it opt-in
-would remove the only deterministic proof layer the backfill depends on; neither is
-proposed here or anywhere in this document.
+Every tree change after Freeze emits a new implementation/validation sequence. No event from an
+older tree can be used as current Gate 3 evidence. The trace records the correction cause and the
+new tree anchor; it does not rewrite historical events.
 
-**Second consumer — per-run parity line cross-check (upward-only enrichment, never
-denominator ground truth).** The per-run parity line
-(`docs/verification-packet.md § 8`) also reads `00-subagent-trace.jsonl`, but in a
-narrower role than the reconciliation backstop above: the parity line's dispatch
-denominator is grounded in the workspace verdict docs (`03-testing.md` run-only
-section, `reviews/04-validation.md`, `reviews/04-security.md`,
-`reviews/04-adversary.md` / `reviews/04-adversary-amend-{N}.md` — the Pre-Delivery Security Audit reports,
-`reviews/04-ux-validation.md`), and breadcrumbs are consulted only to ADD a
-breadcrumb-evidenced dispatch that has no matching verdict entry, classified
-telemetry-missing. A dispatch's breadcrumb pair being absent never removes it from,
-or shrinks, the denominator — the two consumers never share a subtraction path.
+## 6. Decision ledger
 
-### subagent.start — PreToolUse breadcrumb (start-side twin)
+The decision ledger is append-only and coordinator-owned. It records four event families:
+`gate-verdict`, `operator-approval`, `disposition`, and `dry-run-enforced`. It contains the
+rationale and subject of a decision, not phase timing or token counts; those remain exclusively in
+the execution trace. The ledger records both gate numbers using the same `stage` and `phase` keys
+so audit readers can join the two files.
 
-Written by `hooks/ts/dist/subagent-start.cjs` (PreToolUse event, matcher
-`Task`). This is the first hook authored under Decision A (CLAUDE.md §6.3)
-with no Bash body — TypeScript is the single source, not a port. It fires
-BEFORE a Team Harness pipeline subagent (`subagent_type` starting with
-`th:`) is dispatched and appends one line to the SAME `00-subagent-trace.jsonl`
-sink as the `subagent.stop` breadcrumb above, so start/stop pairs are
-derivable from a single file.
+Finding dispositions distinguish `accept`, `watch`, and `reject`. A structural contradiction is
+never converted into an accepted finding merely to advance the state. Gate releases remain valid
+only when the state field and ledger/event record agree with the live reply and nonce.
 
-Line schema:
-```json
-{"ts":"<ISO>","event":"subagent.start","agent_type":"th:<agent>","project":"<optional — bounded [a-z0-9-]{1,60}>","payload_bytes":"<optional — byte length of the dispatch prompt>"}
-```
+## 7. Cross-user flow telemetry (optional)
 
-`agent_id` is intentionally absent — at PreToolUse time the runtime has not
-yet assigned one (it only becomes observable on the corresponding
-`SubagentStop` payload). Readers pair a `subagent.start` line with the next
-`subagent.stop` line carrying the same `agent_type` in file order.
+When `flow_telemetry.enabled` is true, the coordinator may emit bounded metadata to the external
+Memory MCP flow-event plane. It is opt-in, metadata-only, and best effort. A telemetry failure
+emits one local `operation.failed` breadcrumb and never changes a pipeline result. Payloads never
+contain diffs, code, AC text, file paths with user identifiers, secrets, or gate nonces.
 
-**`payload_bytes` (visibility, no ceiling).** The byte length of the dispatch
-prompt, measured with the same UTF-8 byte-counting the shim already uses for
-its own pre-parse size guard. No constant, comparison, or branch anywhere in
-`hooks/ts/bodies/subagent-start.ts` reads this value — it is purely
-observational, never a rejection or a warning threshold. A measurement error
-omits the field alone (fail-open, same posture as the rest of this hook);
-the record's other fields still land. Coverage: measured only on the Claude
-Code plugin path — there is no `subagent-start.opencode.ts` entry, so an
-opencode dispatch never gets this field. No content beyond the byte count —
-not the whole prompt, not a truncated excerpt, not any other derived value —
-ever enters the record.
+## 8. Rendering and recovery
 
-**`project` key (lane-scoped dispatch, bounded).** When the dispatching
-agent's prompt carries a `TH-LANE: {project-key}` line, this hook stamps a
-`project` field on the `subagent.start` record with that key. The value is
-charset/length-bounded (`[a-z0-9-]{1,60}`) before it ever reaches the JSONL
-sink — a marker present but out of that shape is treated as absent (`project`
-omitted), never written unbounded. When the marker is absent altogether,
-`project` is omitted and pairing falls back to the plain `agent_type`
-file-order rule above (backward-compat — byte-identical to pre-lane behavior).
+`/th:pipelines` is a pure reader of state and events. It displays the named `phase`, gate pending,
+iteration, and `next_action`; it never displays or infers a route/profile value and never infers a
+release from a checklist row. `/th:trace` renders the event timeline and links to artifacts
+without copying their full content. Inline work and inline ad hoc reviews have no pipeline trace to
+render.
 
 **Pairing redefinition within `project` (AC-5.2).** When one or more
 `subagent.start` lines in the trace carry a `project` key, same-agent-type
@@ -552,14 +516,13 @@ The following event types appear in `00-execution-events` in addition to the cor
 | `research.lane.skipped` | When a research fan-out lane returns no findings (fail-open) | `lane`, `angle`, `reason` |
 | `artifact.missing` | When an expected agent output file is absent after dispatch | `expected_file`, `agent`, `action` (`retry`/`escalate`) |
 | `stage2.hygiene` | When the Phase 2.6 code-hygiene scan completes (deterministic, orchestrator-run — see `docs/code-hygiene-gate.md § Layer 1`) | `verdict` (`pass`/`fail`), `extra.files` (int, on `fail`), `extra.count` (int, on `fail`) |
-| `plan_structure` | When the Phase 1.5a deterministic plan-structure scan completes, before any `qa-plan` dispatch (deterministic, orchestrator-run — see `docs/plan-structure-gate.md § 2`) | `verdict` (`pass`/`fail`), `extra.check`/`extra.detail` (on `fail`, the specific mechanical failure) |
 | `checkpoint.confirmed` | When `th:orchestrator` obtains — or fails to obtain — the operator's live confirmation of the functional-clarity artifact at Discover Boundary B1, before dispatching `architect` (`docs/reasoning-checkpoint.md § "Attribution and failure direction"`) | `provenance` (`operator-live`/`inferred`), the confirmatory text (named exception to the Free-text field bound, see below) |
 
 Note: `checkpoint.confirmed` is written exclusively by `th:orchestrator`, on the same file it already initializes at Intake (`agents/ref-pipeline.md § "Intake"`). On a later `/th:recover`, the same agent reads and verifies the event but never repairs it.
 
 Note: `gate` (human checkpoint) is distinct from `gate.pass` / `gate.fail` (automated agent-to-agent gates). The latter fire when the orchestrator evaluates a plan-review or acceptance-gate result without pausing for human input; the former fires when execution is suspended pending operator approval.
 
-Note: the `lane` field on `research.lane.skipped` names a **research fan-out lane** (one angle of a `/th:research-code` fan-out) — an unrelated homonym of the pipeline **execution lane** (`inline`/`express`/`full`) documented in "Active-lane observability surface" below. The two never appear on the same event.
+Note: the `lane` field on `research.lane.skipped` names a **research fan-out lane** (one angle of a `/th:research-code` fan-out). It is unrelated to the retired pipeline depth-lane markers; current pipeline state has no execution-lane field.
 
 ## kg_write event
 
@@ -644,8 +607,7 @@ narrative for a given round lives exclusively in `failure-brief.md`.
 
 **Does not weaken the observability floor.** This is a FORMAT bound on two
 `00-state.md` sections; it does not touch `{events_file}`'s mandatory
-`phase.*`/`gate.*` emission (§ "Tier 0 carve-out" below is the only
-exemption from that floor) and it does not change what `00-pipeline-summary.md`
+`phase.*`/`gate.*` emission (inline direct work is outside that machine) and it does not change what `00-pipeline-summary.md`
 derives from the trace.
 
 Canonical source: `agents/ref-pipeline.md § "Transition protocol — atomic, all three steps, never
@@ -653,41 +615,28 @@ partial"` (the upsert mechanic) and `§ "Agent Results"` (the schema template �
 Context" section this upsert once also maintained is retired, per that same section's own note);
 the two sites must not diverge.
 
-## Active-lane observability surface
+## Posture observability
 
-The three-lane execution model (`inline`/`express`/`full`, canonical contract: `docs/pipeline-lanes.md`) is a dispatch-time classification, not a new enforcement layer. This section documents where the running lane is visible across the observability surfaces this file defines, and states plainly what this contract deliberately does NOT add.
+The live contract has two postures. `pipeline` uses the canonical v3 state machine and emits
+the local trace, ledger, summary, phase events, and gate events. `inline` is direct work outside
+that machine: it creates no pipeline state, workspace records, or gate events. A live ad-hoc
+tester, QA, or security review requested while inline returns bounded evidence only.
 
-### `lane` field — `00-state.md` + status-block/STOP-header echo
+Legacy `express`/`full` depth lanes, `lane` fields, `lane_autoselect`, and related fast/simple
+markers are migration data only. They never select a posture, suppress an event, waive a security
+floor, or release a gate. Readers may retain them when interpreting historical traces, but current
+writers do not emit them.
 
-`lane` is a `00-state.md § Current State` field (`inline | express | full`), resolved by the coordinator itself at Classify — `--fast`, `[TIER: N]`, and Simple-Mode keywords all resolve to a lane value there, so the coordinator never re-derives lane from a legacy flag downstream. The orchestrator echoes `Lane: {lane}` as the first line of every phase-transition status block and every STAGE-GATE / express-combined-gate STOP block header — canonical visibility contract at `docs/pipeline-lanes.md § 8`.
+Security-sensitive pipeline work always receives the same security floor. Inline sensitive work
+requires a fresh live operator choice under the inline authorization contract; that choice is
+not persisted as a route selector and never activates pipeline observability.
 
-**Honest scope — not (yet) a discrete `phase.end` JSONL key.** `lane` lives in the state file and in the human-facing status-block/STOP-block text; the `phase.end` schema (§ "Execution Events JSONL" above) does not currently stamp its own `lane` key. A reader who needs the running lane for a given phase reads `00-state.md` alongside `{events_file}`, the same way `stage`/`phase` are already cross-read together with the trace.
+## Retired plan-structure event
 
-**Naming note.** This execution-lane `lane` is unrelated to the `lane` field on `research.lane.skipped` (§ "Additional pipeline event types" above), which names one angle of a `/th:research-code` fan-out. The two homonyms never appear on the same event.
-
-### `operator-inline-security-waiver` audit marker
-
-`inline` on a security-sensitive path requires a fresh, live, per-invocation operator confirm to the risk statement defined in `docs/pipeline-lanes.md § 5`. When granted, the coordinator writes a distinct audit marker — `operator-inline-security-waiver` — to `00-execution-events` (when a workspace exists) or its own session tracking (inline runs no pipeline at all). It records the sensitive path(s) that triggered the floor, the exact risk string shown, the operator's literal reply, and a timestamp. Full mechanism, the fail-closed rules, and the non-persistence guarantee (no config key — including `lane_autoselect` — makes the waiver sticky or default) live in `docs/pipeline-lanes.md § 5`.
-
-### No `budget` config key, no `budget_pending` event
-
-An earlier design iteration proposed a hard token-budget config key (`budget`) with a budget-driven STOP (constraint C). It was evaluated and removed before this contract shipped — a budget-STOP that could recommend `inline` on a sensitive path was identified as a fail-open security vector (a pre-flight budget check reaching a security recommendation before the security-relevant classification ran); see `docs/pipeline-lanes.md § "Historical note — constraint C removed"` for the full rationale. This observability contract documents the trace and config surface exactly as shipped: **no `budget` key exists in `~/.claude/.team-harness.json`, and no `budget_pending` (or equivalent) event exists in the `event` enum** (§ "Execution Events JSONL" § Schema above). The only cost-visibility surface remains the existing read-only `## Cost` rollup (§ "Cost rollup" below) — a render of `phase.end` tokens, never a gate, never a STOP.
-
-### Security floor unaffected by lane
-
-`security_floor_applies` — the single shared Phase-3 predicate that dispatches `security` + `adversary` on a sensitive path — is computed from `security_sensitive` alone; no lane, trim, flag, or env var changes its evaluation (`agents/ref-pipeline.md § "The single floor predicate"`). This is a trace-observable invariant: a sensitive-path run's `phase.end` events show the same `security`/`adversary` phase entries on `lane: express` as on `lane: full`, and the express combined-gate STOP block surfaces the same verdicts inline rather than omitting them (`docs/pipeline-lanes.md § "Two-lens floor"`).
-
-## Phase 1.5a structural scan — observability surface
-
-### `plan_structure` event (Phase 1.5a, deterministic)
-
-Documented in the "Additional pipeline event types" table above. Emitted by the orchestrator itself (never a subagent dispatch) at Phase 1.5a, before any `qa-plan` ratify-plan dispatch, for every plan that does not take the self-authored-plan carve-out. Same shape as `stage2.hygiene`: a structural trace event carrying a `verdict`, never operator-facing prose on the clean path. `verdict: pass` proceeds to `qa-plan`; `verdict: fail` bounces to `architect` under the BOUNDED-PATCH contract with `extra.check`/`extra.detail` naming the specific mechanical failure. The four Layer-1 checks (AC-count-vs-summary reconciliation, dangling `T{n}-AC-{m}` cross-references, DAG acyclicity, cross-task file-disjointness) are defined canonically in `docs/plan-structure-gate.md § 2` — this file does not re-derive or paraphrase that check set.
-
-### Stage-1 Selective Panel Re-Firing — RETIRED
-
-**This entire observability surface is retired, not reduced.** It used to trace a correction-bucket classification (broad-structural, security-relevant surface, non-security coverage change, editorial/operator-decided reduction, shape/consistency-only) that selectively re-fired only the implicated panel lens(es), plus a `§ Panel Rounds` `Implicated (closed)` column and a carried-forward sub-verdict label for the lenses that did not re-fire. The coordinator fusion removes the Stage-1 correction-round apparatus this traced: on a Phase 1.6 `fail`, the full panel re-runs — `qa-plan`, `security` when sensitive, `plan-reviewer` — and each presents its verdict exactly once, never carrying one forward. Bucket classification, the routing record, and carried-forward labeling all lose their subject. Nothing replaces them. Full retirement note: `docs/patch-mode.md § "Stage-1 Selective Panel Re-Firing — RETIRED"`.
-
-**What survives.** The `plan_structure` event above is unaffected — Phase 1.5a's deterministic scan runs regardless. The cross-round recurrence check's producer column (`Implicated (closed)`) is now written by `plan-reviewer` on every round, since the full panel always re-runs — see `agents/ref-pipeline.md § "Iteration rules"` for the consumer contract.
+The former `plan_structure` event and Phase 1.5a automatic scan are superseded. Current v3
+design performs one deterministic presence/coherence check before Gate 1, and explicit
+`/th:plan-review` may inspect plan shape. The historical event vocabulary and checks remain
+reference material only; they are not emitted, dispatched, or gate-releasing.
 
 ## Cost rollup
 
@@ -890,9 +839,11 @@ Every KG write emits a reason-coded `kg_write` event carrying `attempted`/`succe
 
 The `/trace <feature>` skill is the canonical 30-second answer to "did this pipeline work and were the tools effective?". It detects both `.jsonl` (local) and `.md` (obsidian) formats automatically. The legacy `pipeline-metrics.json` / `done.yml` artifacts are deprecated in favor of the trace.
 
-### Tier 0 carve-out
+### Historical no-workspace note
 
-**Exception:** Tier 0 fixes (single-file ≤5-line trivial/docs, `workspaces: NONE` by design) are explicitly exempt from this observability invariant — they produce no workspace in which to write the events file. This is the only exception; all other pipeline types including Tier 1-4 bug fixes, features, refactors, and documentation flows are subject to the mandatory observability contract.
+Legacy Tier-0/no-workspace markers are retained only for interpreting old traces. They are not a
+current pipeline exemption: every activated `pipeline` run creates its state, events, ledger, and
+summary. `inline` direct work is outside the machine and intentionally has none of those records.
 
 ### Lightweight direct-mode exemptions (diagram, spike)
 
@@ -952,7 +903,8 @@ Mirrors `00-execution-events` exactly:
 - **Obsidian mode:** `00-decision-ledger.md` — YAML frontmatter (`tags: [work-logs, {repo}, decision-ledger]`) + `# Decision Ledger` heading + ` ```jsonl ` fence, identical structure to `00-execution-events.md`.
 - The orchestrator is the **exclusive writer**; append-only `>>` with a here-doc; never rewritten.
 - **best-effort resilience:** if constructing or appending a ledger line fails, log the failure and continue — the pipeline NEVER hard-fails on a ledger emit error. The deterministic gate outcome and the `00-execution-events` trace remain the authoritative record.
-- **Tier 0 carve-out:** Tier-0 fixes (`workspaces: NONE`) produce no decision-ledger (same exemption as `00-execution-events`).
+- Legacy no-workspace/Tier-0 traces may lack a decision ledger; current `pipeline` runs always emit
+  the coordinator-owned ledger, while `inline` direct work has no pipeline ledger by definition.
 
 ### Example lines
 
@@ -977,3 +929,8 @@ The two files are complementary — neither replaces the other:
 | Was a dangerous action forced through dry-run first? | `00-decision-ledger` (`dry-run-enforced` + `guard`) |
 
 The decision-ledger is queryable with `jq` and uses the same `phase`/`stage` key as `00-execution-events` so the two files can be joined on a shared identifier.
+
+On `/th:recover`, the coordinator reads the state snapshot and current trace before acting. v2
+snapshots are mapped to the v3 named states by `skills/recover/SKILL.md`; migration records
+`state.migrated` on the first legitimate write and never synthesizes a gate release or repairs
+history.

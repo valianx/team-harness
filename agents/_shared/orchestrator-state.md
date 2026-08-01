@@ -13,25 +13,50 @@ Everything in this file is written by the orchestrator and by nothing else. No s
 Where a field's semantics are defined elsewhere, this schema names the home and stops. It does not restate the rule.
 
 ```
-pipeline_version: 2
-plan_format: sharded-v1
-lane: inline|express|full            # resolved at intake; docs/pipeline-lanes.md § 2
+pipeline_version: 3
+plan_format: sharded-v1             # lifecycle metadata; not a posture or route selector
 type: feature|fix|refactor|hotfix|enhancement
-phase: 1|1.5|1.6|2.0|2|2.5|2.6|2.7|2.8|3|3.5|4|5|6
-subphase: approach-check|structure-scan|post-approval-offer|null   # the within-phase steps: 1.0-approach-check, 1.5a, 1.8
-stage: 1|2|3
-status: in_progress|waiting|iterating|paused|paused_for_amend|complete|blocked|blocked-incomplete|verified
+phase: design|waiting_gate1|implementation|validation|waiting_gate3|delivery|complete|blocked|aborted
+stage: 1|2|3|4                 # telemetry grouping; `phase` is the machine authority
+status: in_progress|waiting_for_gate|iterating|paused|paused_for_amend|complete|blocked|blocked-incomplete|aborted
+gate_pending: gate1|gate3|null
 iteration: N/3
-last_completed: {phase-name}
+last_completed: design|waiting_gate1|implementation|validation|waiting_gate3|delivery|complete|null
 next_action: {what to do next}      # the successor to a prose recovery section
 total_tokens: N
 ```
+
+The seven named states above are the only legal v3 pipeline sequence. `inline` is a
+pre-activation direct-mode outcome and is never a v3 state or field value. Every activated
+pipeline uses this same v3 machine and both gates; there is no depth profile. An activated
+pipeline cannot execute direct work in place. A current live explicit `inline` request
+closes the run administratively by setting `phase: aborted` and `status: aborted`, clearing
+any pending gate, and writing no gate release; only then may the new direct request run,
+without creating state, a workspace, or an inline value. A live ad-hoc tester, QA, security,
+or other review requested during inline work is also outside this machine: it creates no
+state, events, gates, delivery record, or pipeline. Implementation checkpoints (regression
+setup, reconciliation, hygiene, evidence and Freeze) are trace
+details inside `implementation`; acceptance is a trace detail inside `validation`. They
+must never be persisted as additional machine phases.
+
+**Compatibility note.** A legacy snapshot (including v2 numeric/named phases, a legacy
+`lane: express|full` field, profile flags, fast/simple markers, or tier markers) is not
+mapped silently. Recovery stops and presents the live choices `1 — inline` or `2 — pipeline`.
+`inline` closes the old run administratively and continues outside this machine. `pipeline`
+allows the orchestrator's first legitimate write to migrate the snapshot to v3, atomically
+writing the schema/version marker and mapped phase with `state.migrated`. That write
+preserves every valid dual-record gate field, release decision, pending or consumed nonce,
+checklist mark, and historical event; it never synthesizes a gate release or repairs a malformed or
+missing half. Recovery may advance across a prerequisite gate only when that gate's state
+field and its matching `stage.gate.release` event both exist, carry the same decision and
+nonce, and pass the dual-record contract. An absent, stale, or mismatched half fails closed
+and blocks recovery; phase names or legacy status alone never release a gate.
 
 **Intake classification** — the orchestrator produces the initial values at intake. `security_sensitive` is monotonic: the named plan and Phase-2-close backstops may escalate `false → true`, but no downstream step may change `true → false`. The other fields are never re-derived downstream.
 ```
 security_sensitive: true|false
 frontend_scope: true|false
-bug_tier: 0|1|2|3|4|null
+bug_tier: 1|2|3|4|null
 bug_tier_source: auto|operator|architect-promote|null
 ```
 
@@ -48,7 +73,7 @@ spans_multiple_services: true|false
 changes_security_control: true|false   # informational; NOT a dispatch predicate
 ```
 
-Every field belongs to exactly one of these two blocks, with one producer and one production phase. `changes_security_control` sits in the second: it is a property of the designed change, so it cannot be known at intake. Before Design closes it is simply **absent** — never `null` standing in for "not yet decided", because an absent field and a decided-`false` field must not look alike to a reader. `security_floor_applies` derives from `security_sensitive` alone (`agents/ref-pipeline.md § Phase 3`), so nothing gated is waiting on the second block.
+Every field belongs to exactly one of these two blocks, with one producer and one production state. `changes_security_control` sits in the second: it is a property of the designed change, so it cannot be known at intake. Before Design closes it is simply **absent** — never `null` standing in for "not yet decided", because an absent field and a decided-`false` field must not look alike to a reader. `security_floor_applies` derives from `security_sensitive` alone (`agents/ref-pipeline.md § Validation`), so nothing gated is waiting on the second block.
 
 **Classification block — sketch triggers.** Eight booleans, **decided** by `architect` at Design time (`docs/plan-sketches.md § 2`) and **transcribed** into this file, read verbatim by `hooks/sketch-guard.sh`. Never re-derive a value; never author one. Copy what `architect` returned. Dash-prefixed, one boolean per line, exactly as the parser's own anchor requires (`^[[:space:]]*-[[:space:]]*{field}:[[:space:]]*true[[:space:]]*$`, `hooks/sketch-guard.sh:131`). `- touches_http_api:` is the parser's sole sentinel for `has_classification_block` (`:138`) — its absence alone hides all eight from the check, so never omit it even when its value is `false`.
 
@@ -91,15 +116,15 @@ current_round: R1|R2|...|null
 total_rounds: N|null
 prs_in_current_round: [Task-1, ...]|null
 prs_completed: [Task-1, ...]|[]
-lane_decomposition: {...}|null              # docs/parallel-batch-implementation.md
+task_decomposition: {...}|null              # implementation decomposition, not a posture
 ```
 
 **Verification and review status.**
 ```
 regression_test_path: {path}|null
 regression_test_status: failing|passing|skipped|null
-plan_review_status: not-applicable|deferred|reviewed-pass|reviewed-concerns|skipped|null
-audit_status: pending|done|unavailable|null  # set at Phase 3: pending on dispatch, done on report, unavailable after a second audit failure. STAGE-GATE-3 states it in the block; it is not a machine-checked precondition — the tree anchor is the only one (agents/ref-pipeline.md § STAGE-GATE-3)
+plan_review_status: not-requested|requested|pass|concerns|fail|null  # only explicit /th:plan-review
+audit_status: pending|done|unavailable|null  # set in validation: pending on dispatch, done on report, unavailable after a second audit failure. STAGE-GATE-3 states it in the block; it is not a machine-checked precondition — the tree anchor is the only one (agents/ref-pipeline.md § STAGE-GATE-3)
 code_hygiene: pass|fail|null                # docs/code-hygiene-gate.md
 verification_base_source_ref: origin/main|{dep-branch}|{commit}  # selected base ref; re-resolved at Freeze to detect movement
 verification_base_ref: {full commit object ID}             # immutable Phase-2 baseline; copied into the verification packet
@@ -108,7 +133,7 @@ open_findings: [{id, disposition}]|[]       # dispositions live in 00-decision-l
 
 **`open_findings` — kept, with a schema and a named reader, never left as an unread promise.** The reader is the Recover safety contract: on `/th:recover`, any entry present with no matching `disposition` row in `00-decision-ledger.md` is surfaced to the operator as an unresolved carry-over before the next gate is prepared. An entry is written only by the orchestrator, only when a finding lands as a task AC or when `agents/ref-pipeline.md § "Finding disposition"` records it as accepted-without-AC — never populated speculatively, and never treated as the transport for a finding that has not gone through that disposition path.
 
-**Gate fields — bare literals, never repaired.** Contract: `agents/_shared/gate-contract.md § "The dual-record release"` and its no-gate-field-repair invariant. The six named fields carrying this invariant are `gate1_release`, `gate3_release`, `gate_nonce`, `working_branch`, `worktree`, and `checkpoint_boundary` — every one a bare literal in the real file, with no second space-delimited token ever trailing a value.
+**Gate fields — bare literals, never repaired.** Contract: `agents/_shared/gate-contract.md § "The dual-record release"` and its no-gate-field-repair invariant. The six gate fields are `gate_pending`, `gate1_release`, `gate3_release`, `gate_nonce`, `working_branch`, and `worktree` — every one a bare literal in the real file, with no second space-delimited token ever trailing a value. `checkpoint_boundary` is a separate derived checkpoint cache, not a gate field or release. A release is valid only as a dual record: the matching state field and `stage.gate.release` event must agree on decision and nonce. Recovery and delivery fail closed when either half is absent or mismatched; neither side may be repaired or inferred from phase/status text. An administrative close for a live inline request sets no gate release and consumes no nonce.
 ```
 gate1_release: approved|approved-autonomous|rejected|edit|null
 gate3_release: ship|amend|abort|null
@@ -123,11 +148,11 @@ worktree_base: origin/main|{dep-branch}|null
 working_branch: {branch}|null
 ```
 
-`working_branch` has two legitimate producer paths and only the orchestrator writes either. **Worktree topology:** copied from `worktree_branch` at branch establishment. **Branch-in-place:** `null` until Phase 2 entry, which creates the branch and writes the field. Phase 4 only validates it; a null or mismatched value is an upstream failure, never permission to create a late branch around reviewed commits.
+`working_branch` has two legitimate producer paths and only the orchestrator writes either. **Worktree topology:** copied from `worktree_branch` at branch establishment. **Branch-in-place:** `null` until implementation entry, which creates the branch and writes the field. Delivery only validates it; a null or mismatched value is an upstream failure, never permission to create a late branch around reviewed commits.
 
-`verification_base_source_ref` and `verification_base_ref` have one producer site: Phase 2 entry. The source field preserves the selected branch or commit so Freeze can detect movement; the base field is the full commit SHA resolved from that source and is never rewritten. Phase 2.6, Phase 2 close, Freeze, the frozen diff, and the verification packet all consume the immutable SHA. The packet mirrors it; it never produces it.
+`verification_base_source_ref` and `verification_base_ref` have one producer site: implementation entry. The source field preserves the selected branch or commit so Freeze can detect movement; the base field is the full commit SHA resolved from that source and is never rewritten. Implementation checkpoints, Freeze, the frozen diff, and the verification packet all consume the immutable SHA. The packet mirrors it; it never produces it.
 
-Live consumers, so it is never treated as documentation: the record-based recover backstop, the operator reading the file, and the executable branch comparisons in `implementer`, `tester`, and the Phase-2-close commit-integrity check. No wired hook reads it: `gate-guard` and `checkpoint-guard` are unwired in Claude Code, and Team Harness installs no parallel hook layer in OpenCode.
+Live consumers, so it is never treated as documentation: the record-based recover backstop, the operator reading the file, and the executable branch comparisons in `implementer`, `tester`, and the implementation-close commit-integrity check. No wired hook reads it: `gate-guard` and `checkpoint-guard` are unwired in Claude Code, and Team Harness installs no parallel hook layer in OpenCode.
 
 **Delivery coordinates — written by the coordinator during STAGE-GATE-3 preparation.**
 ```
@@ -150,11 +175,11 @@ carry a prior preview or file map forward.
 ```
 functional_clarity_confirmed: true|false     # DERIVED CACHE — the checkpoint.confirmed event is the authority
 functional_clarity_artifact: {statement}     # DERIVED CACHE — same event
-checkpoint_boundary: intake-plan|null        # armed at Phase 1 entry, cleared when the architect dispatch clears
+checkpoint_boundary: intake-plan|null        # armed at design entry, cleared when the architect dispatch clears
 checkpoint_advance_fresh: true|false         # see note below
 ```
 
-**`checkpoint_advance_fresh` — set it, and why it still exists.** This derived cache records the coordinator's fresh checkpoint transition for recovery and operator inspection. No runtime hook consumes it: `checkpoint-guard` is unwired in Claude Code and not installed in OpenCode. Set it `true` alongside `checkpoint_boundary: intake-plan` at Phase 1 entry, on your own attestation.
+**`checkpoint_advance_fresh` — set it, and why it still exists.** This derived cache records the coordinator's fresh checkpoint transition for recovery and operator inspection. No runtime hook consumes it: `checkpoint-guard` is unwired in Claude Code and not installed in OpenCode. Set it `true` alongside `checkpoint_boundary: intake-plan` at design entry, on your own attestation.
 
 **Permission provisioning.**
 ```
@@ -163,31 +188,23 @@ permission_provisioning_decline: obsidian|cross-repo|both|null   # session-scope
 
 > The `#` annotations above are documentation for the agent authoring the real file. They are never written into `00-state.md`.
 
-**Dropped field:** `skip_delivery` — batch-lane mode retired with the fan-out.
+**Dropped field:** `skip_delivery` — delivery is mandatory for every pipeline.
 
 ## Phase Checklist — canonical shape
 
-Write this complete skeleton on the first state write. Preserve rows across transitions; mutate only the marker and an optional parenthetical outcome. A lane-authorized skip uses `[~skipped: reason]`, never deletion.
+Write this complete skeleton on the first state write. Preserve rows across transitions;
+mutate only the marker and an optional parenthetical outcome. An explicitly approved,
+not-applicable checkpoint uses `[~skipped: reason]`, never deletion.
 
 ```markdown
 ## Phase Checklist
-- [ ] 1 Design
-- [ ] 1.0 Approach checkpoint
-- [ ] 1.5a Plan-structure scan
-- [ ] 1.5 Plan ratification
-- [ ] 1.6 Plan review
-- [ ] 1.8 Post-approval offer
-- [ ] 2.0 Regression test authoring
-- [ ] 2 Implementation
-- [ ] 2.5 Constraint reconciliation
-- [ ] 2.6 Code-hygiene scan
-- [ ] 2.7 Test authoring
-- [ ] 2.8 Freeze
-- [ ] 3 Verify
-- [ ] 3.5 Acceptance
-- [ ] 4 Delivery
-- [ ] 5 GitHub update
-- [ ] 6 Close
+- [ ] design
+- [ ] waiting_gate1 (STAGE-GATE-1)
+- [ ] implementation
+- [ ] validation
+- [ ] waiting_gate3 (STAGE-GATE-3)
+- [ ] delivery
+- [ ] complete
 ```
 
 ## Agent Results — canonical shape
@@ -209,7 +226,21 @@ The table is a bounded snapshot keyed by `(agent, phase)`. A same-key return rep
 
 **Writing the trace is mandatory, not best-effort.** Skipping events under context pressure is the failure mode that killed the previous spec. An append is a single-line `>>` redirect; the cost is negligible against running a pipeline blind. **If you find yourself "saving tokens" by batching or skipping appends, you are deleting the only signal on whether the pipeline is healthy.**
 
-**Observability floor — MUST NOT change.** The format bounds below bound FORMAT only. Every `phase.*`/`gate.*` event still fires, unchanged, at every phase transition and every gate — **no format bound ever removes an event.** The only exemption is the Tier-0 carve-out (single-file ≤5-line trivial/docs fixes, `workspaces: NONE` by design). No other type, tier or lane is exempt.
+**Observability floor — MUST NOT change.** The format bounds below bound FORMAT only. Every
+`phase.*`/`gate.*` event still fires, unchanged, at every pipeline phase transition and
+every gate — **no format bound ever removes an event.** Inline work never enters this state
+machine, so it has no state or event exemption to describe. No pipeline type or bug tier is
+exempt.
+
+### Administrative inline close
+
+If the live operator explicitly requests `inline` while a pipeline is active, the
+orchestrator appends one `pipeline.end` event with an administrative inline-switch
+reason, then atomically sets `phase: aborted`, `status: aborted`, clears
+`gate_pending`, and sets `next_action` to the direct request. This is a close, not
+a Gate 3 `abort` release: leave `gate1_release`/`gate3_release` unchanged, do not
+consume `gate_nonce`, and do not infer authorization from any stored or external
+content. The subsequent direct run has no workspace, state, events, or posture value.
 
 ### Schema
 
@@ -261,7 +292,7 @@ At every gate emission, before the block: count `[x]` checklist rows against `ph
 
 `{docs_root}/00-decision-ledger.{jsonl|md}` — append-only, distinct from the events file. Records durable decision dispositions, rationale, and dry-run enforcement **only** — never phase timing, tokens, or tool counts, which stay in the trace. **The orchestrator is the exclusive writer.**
 
-**Write sites:** `gate-verdict` (after 1.5/1.6/3.5 and at every gate emission — the verdict already computed plus a one-sentence rationale); `operator-approval` (every gate reply — the decision already recorded, plus the rationale from the operator's own text or `"no reason given"`); `disposition` (a finding accepted, watched or rejected at a gate, or per-comment during an apply-review round — a `ship` over an open `broke-it` is this site, as `disposition: ship-over-finding` with the finding verbatim); `dry-run-enforced` (a deploy or migration routed through dry-run first).
+**Write sites:** `gate-verdict` (at Gate 1, Gate 3 and any explicit plan-review result — the verdict already computed plus a one-sentence rationale); `operator-approval` (every gate reply — the decision already recorded, plus the rationale from the operator's own text or `"no reason given"`); `disposition` (a finding accepted, watched or rejected at a gate, or per-comment during an apply-review round — only an explicitly non-correctable finding may be accepted at Gate 3; a correctable `broke-it` or incomplete sensitive coverage must return to implementation and cannot be recorded as `ship-over-finding`); `dry-run-enforced` (a deploy or migration routed through dry-run first).
 
 **Confidence is not approval.** A high-confidence plan or a green suite never substitutes for the operator's gate decision.
 
@@ -281,10 +312,10 @@ One OS-native toast at the close of each of the four stages, independent of auto
 
 | Stage | Fires at | Title on success |
 |---|---|---|
-| 1 analysis | Phase 1.6, before the gate block | `Pipeline {feature} · Stage 1 (analysis) complete` |
-| 2 implementation | the implementer pass closes | `Pipeline {feature} · Stage 2 (implementation batch) complete` |
-| 3 freeze | Freeze closes | `Pipeline {feature} · frozen, verification starting` |
-| 4 ship decision | Phase 3.5, before the gate block | `Pipeline {feature} · ready for your ship decision` |
+| 1 design | `design`, before Gate 1 | `Pipeline {feature} · design complete` |
+| 2 implementation | `implementation` closes | `Pipeline {feature} · implementation complete` |
+| 3 validation | Freeze closes and validation opens | `Pipeline {feature} · frozen, validation starting` |
+| 4 ship decision | `validation`, before Gate 3 | `Pipeline {feature} · ready for your ship decision` |
 
 Fail or block appends `FAILED`/`BLOCKED`.
 
@@ -312,13 +343,13 @@ After every phase transition, update `00-state.md`. This is the orchestrator's p
 
 1. **Append the event first.** `phase.start` before dispatch, `phase.end` after the agent returns (with `tokens`, `duration_ms`, `tools`, `model`, `effort`), `gate` when a gate is reached. **First, because events are append-only and must reflect real time** — backfilling later loses timestamp accuracy.
    **Token tracking is mandatory.** Every `phase.end` carries `tokens`: from the call result metadata when available, otherwise estimated (`duration_min × 1500` opus-heavy, `× 800` sonnet-heavy) with `tokens_estimated: true`. **`"tokens": 0` is forbidden.**
-2. **Update `00-state.md`** — the `§ Current State` fields, the completed phase `[x]`, and the `§ Agent Results` row **upserted by `(agent, phase)` key**: overwrite in place on a same-key re-run across iterations, never append a duplicate. A new row appears only for a genuinely new key, so `qa` and `adversary` at Phase 3 each keep their own current verdict and are never collapsed to one last-writer-wins value.
+2. **Update `00-state.md`** — the `§ Current State` fields, the completed state `[x]`, and the `§ Agent Results` row **upserted by `(agent, phase)` key**: overwrite in place on a same-key re-run across iterations, never append a duplicate. A new row appears only for a genuinely new key, so `qa` and `adversary` in validation each keep their own current verdict and are never collapsed to one last-writer-wins value.
    *Narrative sections are gone.* There is no TL;DR to rewrite, no Hot Context to overwrite, and no prose recovery section: the events file carries the narrative and the `next_action` field carries the recovery instruction.
 3. **Only then dispatch.**
 
 **Enforcement:** never dispatch the next phase until the event is appended and the state file updated. If compaction lost the place, read the trace — when the last event does not match the last `[x]`, backfill before continuing.
 
-**Merge and push guard:** never merge a PR or push until Phase 3 is `[x]` **and** STAGE-GATE-3 is cleared per the dual record. `"ship it"` outside that gate's own reply never overrides this. This rule — enforced by the orchestrator against itself, at the moment it would otherwise call the push step — is the actual mechanism that keeps a push from preceding its gate; no hook reads `gate3_release` to enforce the same order from outside.
+**Merge and push guard:** never merge a PR or push until `validation` is `[x]` **and** STAGE-GATE-3 is cleared per the dual record. `"ship it"` outside that gate's own reply never overrides this. This rule — enforced by the orchestrator against itself, at the moment it would otherwise call the push step — is the actual mechanism that keeps a push from preceding its gate; no hook reads `gate3_release` to enforce the same order from outside.
 
 ### Artifact verification
 
@@ -326,17 +357,16 @@ After every dispatch returning `success`, verify the expected doc exists on disk
 
 | Agent | Phase | Expected |
 |---|---|---|
-| `architect` | 1 design | `01-plan.md` + any triggered `sketches/*` |
-| `architect` | 1 root-cause | `01-root-cause.md` **and** `01-plan.md` |
-| `implementer` | 2 | `02-implementation.md` |
-| `tester` | 2.0 | `02-regression-test.md` |
-| `tester` | 2.7 | `03-testing.md` |
-| `qa` | 3 | `reviews/04-validation.md` |
-| `adversary` | 3 | initial: `reviews/04-adversary.md`; operator amend `N`: `reviews/04-adversary-amend-{N}.md` |
-| `qa-plan` | 1.5 | `reviews/01-plan-review.md § Plan Ratification` |
-| `plan-reviewer` | 1.6 | `reviews/01-plan-review.md § Plan Review` |
-| `architect` | 1 | `reviews/01-closure-rubric.md` (Tier 2-4 only) |
-| `delivery` | 4 | `inputs/pr-body-draft.md` + the lane-specific Acceptance Matrix |
+| `architect` | `design` | `01-plan.md` + any triggered `sketches/*` |
+| `architect` | `design` root-cause | `01-root-cause.md` **and** `01-plan.md` |
+| `implementer` | `implementation` | `02-implementation.md` |
+| `tester` | `implementation` regression | `02-regression-test.md` |
+| `tester` | `implementation` evidence | `03-testing.md` |
+| `qa` | `validation` | `reviews/04-validation.md` |
+| `adversary` | `validation` | initial: `reviews/04-adversary.md`; operator amend `N`: `reviews/04-adversary-amend-{N}.md` |
+| `qa-plan` | explicit plan-review | `reviews/01-plan-review.md § Plan Ratification` |
+| `plan-reviewer` | explicit plan-review | `reviews/01-plan-review.md § Plan Review` |
+| `delivery` | `delivery` | `inputs/pr-body-draft.md` + the pipeline Acceptance Matrix |
 
 For `adversary`, resolve the expected path from the current dispatch/status
 block's exact `audit_run`: `initial` maps to `reviews/04-adversary.md` and
@@ -350,7 +380,7 @@ Exists and non-empty → proceed. Otherwise append `artifact.missing` (`action: 
 
 ### Final sanity check
 
-After delivery returns `success`, before Phase 5:
+After delivery returns `success`, before the GitHub update substep:
 
 1. Enumerate the `status: success` rows in `§ Agent Results`.
 2. Resolve each expected artifact from the table above, excluding no-file rows.
@@ -358,7 +388,7 @@ After delivery returns `success`, before Phase 5:
 4. Verify `00-pipeline-summary.md` exists, is non-empty, and contains `## Cost`.
 5. Verify the trace exists and `phase.end` count ≥ the count of `[x]` checklist rows.
 
-**Pass** → append `pipeline.complete`, proceed. **Fail** → append `pipeline.incomplete`, set `status: blocked-incomplete`, and STOP listing the missing artifacts. **Do not emit "pipeline complete."** Phase 5 does not execute. The PR already on remote stays valid; the operator resolves and resumes via `/th:recover`.
+**Pass** → append `pipeline.complete`, proceed. **Fail** → append `pipeline.incomplete`, set `status: blocked-incomplete`, and STOP listing the missing artifacts. **Do not emit "pipeline complete."** The GitHub update substep does not execute. The PR already on remote stays valid; the operator resolves and resumes via `/th:recover`.
 
 ### Terminal status write — mandatory
 

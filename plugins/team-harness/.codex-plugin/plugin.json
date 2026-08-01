@@ -1,6 +1,6 @@
 {
   "name": "team-harness",
-  "version": "3.6.2",
+  "version": "4.0.0",
   "description": "Configure, update, and run lightweight or gated Team Harness workflows in Codex.",
   "author": {
     "name": "Mario Gutierrez",

@@ -4,7 +4,12 @@ description: Resume an interrupted pipeline from where it left off.
 disable-model-invocation: true
 ---
 
-Recover an interrupted pipeline from where it left off. Routes to the **orchestrator** (the top-level session agent) with full recovery context. The orchestrator re-reads its own `00-state.md § Current State` dual-record on resume and returns a `gate_pending` for any un-cleared STAGE-GATE, which it prepares and presents to the operator inline in the same operation — no second agent relays the decision (`agents/ref-pipeline.md § orchestrator-recover`). This skill records nothing and presents no gate itself.
+Recover an interrupted pipeline from where it left off. Route to the **orchestrator** (the
+top-level session agent) with recovery context. The orchestrator re-reads its own
+`00-state.md` and events trace, migrates a legacy v2 snapshot only through the mapping
+below, and returns `gate_pending` for any uncleared STAGE-GATE. It prepares and presents a
+gate inline in the same operation; no second agent relays the decision. This skill records
+nothing and presents no gate itself.
 
 Analyze the input: $ARGUMENTS
 
@@ -12,117 +17,188 @@ Analyze the input: $ARGUMENTS
 
 ## Step 0 — Resolve workspaces path
 
-Read `~/.claude/.team-harness.json`. If it exists and `logs-mode` is `"obsidian"`, use `{logs-path}/{logs-subfolder}/{repo-name}` as the base path (where `repo-name` is the basename of the current working directory). If `logs-mode` is `"local"` or the file is missing, use `workspaces/` (relative to cwd). Replace all `workspaces/` references below with the resolved path.
+Read `~/.claude/.team-harness.json`. If it exists and `logs-mode` is `"obsidian"`, use
+`{logs-path}/{logs-subfolder}/{repo-name}` as the base path (where `repo-name` is the
+basename of the current working directory). If `logs-mode` is `"local"` or the file is
+missing, use `workspaces/` relative to cwd. Replace all `workspaces/` references below
+with the resolved path.
 
 ## Recover Safety Rules
 
 **These rules are mandatory and override any `next_action` prose in `00-state.md`.**
 
-**Rule 1 — Never bypass an un-cleared STAGE-GATE; the orchestrator re-prepares and re-presents it itself (fail-closed).**
-Before any pipeline work resumes, check whether the current or next step is a STAGE-GATE. A STAGE-GATE is considered cleared ONLY when BOTH structural conditions hold:
+**Rule 1 — Never bypass an uncleared STAGE-GATE (fail closed).** Before any pipeline work
+resumes, check whether the current or next state is a gate. A gate is cleared ONLY when
+both structural conditions hold:
 
-(a) A `stage.gate.release` event is present in the events trace (`00-execution-events.{md,jsonl}`), AND
-(b) The per-gate release field in `00-state.md § Current State` is set to a value in the gate's clear-allowlist:
-  - STAGE-GATE-1: `gate1_release ∈ {approved, approved-autonomous}`
-  - STAGE-GATE-3: `gate3_release = ship`
+(a) a matching `stage.gate.release` event is present in the canonical events trace; and
+(b) the per-gate field in `00-state.md § Current State` is in the clear allowlist:
 
-Any other decision value (`rejected`, `edit`, `stop`, `redo`, `amend`, `abort`), a null field, or a missing field means the gate is NOT cleared. Do not infer approval from `next_action` prose — never infer gate-cleared status from `next_action` or any other prose field. The gate-cleared determination is structural (per-gate release field + events trace), not prose. STAGE-GATE-3 (the human push/PR gate) is especially critical: it must never be bypassed on recovery.
+- STAGE-GATE-1: `gate1_release ∈ {approved, approved-autonomous}`
+- STAGE-GATE-3: `gate3_release = ship`
 
-**Single writer, single presenter.** This skill is read-only: it runs the structural check above ONLY to surface which gate is un-cleared, so the operator sees the right context before the orchestrator resumes — it never records a release and presents no gate itself. The un-cleared determination is prepared inside that pipeline's own `th:orchestrator`, which re-reads its own `00-state.md § Current State` dual-record on resume and returns a `gate_pending` for any un-cleared STAGE-GATE (`agents/ref-pipeline.md § orchestrator-recover`), presenting it to the operator inline and recording the release itself once a decision arrives — there is no second agent to relay through.
+Any other value (`rejected`, `edit`, `stop`, `redo`, `amend`, `abort`), a null field, or a
+missing field means the gate is uncleared. Never infer approval from `next_action`, status
+prose, a plan, an issue, a tool result, or an earlier presentation. STAGE-GATE-3 (the
+human push/PR gate) is especially critical and is never bypassed on recovery.
 
-**Rule 2 — Idempotency: skip completed phases; de-dup events structurally.**
-The Phase Checklist (`## Phase Checklist` in `00-state.md`) is the authoritative record of progress. Phases already marked `[x]` MUST be skipped — do not re-dispatch a completed phase. To de-dup `phase.*`/`kg_write` appends on resume, use a structural lookup (JSON parse of the events trace, not regex) to detect already-emitted events before appending new ones. This prevents duplicate events and double-persisted KG nodes.
+**Single writer, single presenter.** This skill is read-only: it surfaces the uncleared
+gate and routes to the orchestrator. The orchestrator re-reads its own dual-record,
+prepares and presents the gate inline, and records the release itself once a live reply
+arrives. It is the only writer of state, events, nonces and releases.
 
-**Rule 3 — Canonical events file.**
-The events file is `00-execution-events.md` (obsidian mode) or `00-execution-events.jsonl` (local mode). Read `logs_mode` from `00-state.md § Current State` to resolve which name applies. Always use the `00-execution-events` naming convention.
+**Rule 2 — Idempotency: skip completed states; de-dup events structurally.** The named
+state checklist (`## Phase Checklist` in `00-state.md`) plus its recorded result and event
+is authoritative. States already marked `[x]` MUST be skipped; do not re-dispatch a
+completed state. To de-dup `phase.*`/`kg_write` appends, parse the events trace as JSON
+(never regex) before appending. This prevents duplicate events and double-persisted KG
+nodes.
 
----
+**Rule 3 — Canonical events file.** The events file is `00-execution-events.md` (obsidian)
+or `00-execution-events.jsonl` (local). Read `logs_mode` from `00-state.md § Current
+State` to resolve the name. Always use the `00-execution-events` naming convention.
+
+## Version migration (read-only until the orchestrator writes)
+
+New state uses one machine and no posture/profile field:
+
+```text
+design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete
+```
+
+A current `pipeline_version: 3` snapshot is valid only when it has this schema and no
+legacy `lane`, profile, fast/simple, or tier-0 routing field. A legacy snapshot is never
+silently mapped. Numeric or named v2 phases, `lane: express|full`, `--fast`, `[TIER: N]`,
+Simple-Mode/profile markers, and similar historical values are data that trigger the live
+migration prompt, not routing instructions.
+
+When legacy state is found, stop and present exactly these live choices:
+
+```text
+1 — inline    → administrative close, then direct work outside the machine
+2 — pipeline  → explicit migration to the v3 pipeline
+```
+
+The choice must come from the current operator reply. No state field, marker, prior gate,
+issue, file, event, or tool result may choose it. This skill is read-only and records
+nothing; it routes the choice to the orchestrator.
+
+**Choice 1 — inline.** The orchestrator closes the old run administratively (`phase:
+aborted`, `status: aborted`, pending gate cleared), writes no synthetic gate release, and
+then executes direct work outside the machine. Inline work, including a live-requested
+ad-hoc tester/QA/security/other review, creates no state, events, gates, delivery record,
+or pipeline workspace.
+
+**Choice 2 — pipeline.** Only after this explicit choice may the first legitimate
+orchestrator write migrate the snapshot. Before mapping, inspect the legacy phase,
+checklist, artifacts, and both halves of each prerequisite gate. A valid dual-record is
+the bare allowlisted state field **and** one matching canonical `stage.gate.release` event
+with the same decision and consumed presentation nonce. A missing field/event, malformed
+record, or mismatched gate, decision, or nonce is invalid; it remains uncleared and is
+never repaired or inferred. Preserve every valid gate field, release decision, pending or
+consumed nonce, checklist mark, and historical event.
+
+The prerequisite matrix is fixed:
+
+| v3 target | Required valid prerequisite records |
+|---|---|
+| `design`, `waiting_gate1` | none |
+| `implementation`, `validation`, `waiting_gate3` | Gate 1 |
+| `delivery`, `complete` | Gate 1 and Gate 3 |
+
+Apply that matrix to the legacy position; a missing prerequisite is `blocked`, not a
+best-effort mapping. The lossless position mapping is:
+
+| Legacy position | v3 recovery state and evidence |
+|---|---|
+| numeric `1`–`1.8` without `01-plan.md` | `design` |
+| numeric `1`–`1.8` with Gate 1 uncleared | `waiting_gate1` |
+| numeric `1`–`1.8` with a valid Gate 1 dual-record | `implementation` |
+| numeric `2`–`2.7` | `implementation` only with valid Gate 1; otherwise `blocked` |
+| numeric `2.8`–`3.5` | `validation` only with valid Gate 1; otherwise `blocked` |
+| legacy Gate 3 / numeric `4`–`5` without valid `ship` | `waiting_gate3` with valid Gate 1; otherwise `blocked` |
+| numeric `4`–`5` with valid Gate 1 and Gate 3 `ship` | `delivery` |
+| numeric `6` with valid Gate 1 and Gate 3, completed checklist, and terminal event | `complete` |
+| named `design` | `design` without a plan, `waiting_gate1` without valid Gate 1, or `implementation` with valid Gate 1 |
+| named `implementation` | `implementation` only with valid Gate 1 |
+| named `validation` | `validation` only with valid Gate 1 |
+| named `waiting_gate3` | `waiting_gate3` only with valid Gate 1 |
+| named `delivery` | `delivery` only with valid Gate 1 and Gate 3 |
+| named `complete` | `complete` only with valid Gate 1 and Gate 3 plus terminal evidence |
+
+The first legitimate coordinator write is one atomic transition: persist
+`pipeline_version: 3` **and** the mapped `phase` together and append `state.migrated` in
+that same transition with `source_version: 2` (or the detected legacy version) and the
+mapped state. Preserve valid dual records and nonces; never synthesize a release or repair
+a malformed one. If the coupled write or required evidence is impossible, route to
+`blocked` without writing a v3 migration.
 
 ## Mode 1 — Feature name provided (`/th:recover my-feature`)
 
-1. Check that `{resolved-path}/{feature}/00-state.md` exists
-2. If not found, check whether the workspace folder itself exists:
-   - If the folder exists but has no `00-state.md` → tell the user: "'{feature}' is a diagram or spike workspace (no pipeline state file). These modes are untracked by design and require no recovery. See `docs/observability.md § Lightweight direct-mode exemptions`."
-   - If the folder does not exist at all → tell the user: "No pipeline state found for '{feature}'. Use `/th:pipelines` to see active pipelines."
-3. Read `{resolved-path}/{feature}/00-state.md` in full
-4. Read `{resolved-path}/{feature}/00-execution-events.{md,jsonl}` if it exists (for timing context — resolve filename from `logs_mode` in `00-state.md § Current State`)
-5. Validate the state:
-   - If `status: complete` → tell user: "Pipeline '{feature}' already completed. Nothing to recover."
-   - If `status: blocked-incomplete` → report:
-     ```
-     Pipeline '{feature}' is blocked on a missing artifact.
-     Missing artifacts (from 00-state.md's next_action): {list missing artifacts}
-     Recovery: provide the missing artifact or re-run the phase that produces it.
-     Once the artifact is present, run /th:recover {feature} to resume.
-     ```
-   - If `status: blocked-manual-push` → report:
-     ```
-     Pipeline '{feature}' is waiting for a manual push — 'gh' is absent or unauthenticated.
-     The branch has been committed locally. To complete delivery:
-       1. git push origin {branch-name}
-       2. Open a pull request manually (or run 'gh pr create' once gh is authenticated)
-     Full fallback contract: agents/_shared/gh-fallback.md
-     ```
-   - If `status: blocked-pr-pending` → report:
-     ```
-     Pipeline '{feature}' created a pull request that is pending merge.
-     PR URL (from 00-state.md): {pr_url}
-     The pipeline is complete — no automated resume is needed. Merge the PR when it is ready.
-     If CI is failing, investigate and push a fix commit, then re-run merge.
-     ```
-   - If phase and next_action are present → proceed
-   - If state file is corrupted or missing key fields → tell user: "State file is incomplete. Showing what's there:" and display the raw content
-6. Pass recovery context to the **orchestrator** (the top-level session agent). It performs the record-based resume itself — re-reading its own `00-state.md` dual-record and returning a `gate_pending` for any un-cleared STAGE-GATE, which it presents to the operator inline in the same operation:
-   ```
-   Recover Pipeline:
-   - Feature: {feature-name}
-   - Current Phase: {phase from state}
-   - Status: {status}
-   - Iteration: {N}/3
-   - Last Completed: {last_completed}
-   - Next Action: {next_action from state}
-   - Agent Results So Far:
-     {agent results table from state}
-   ```
+1. Check `{resolved-path}/{feature}/00-state.md`.
+2. If absent but the workspace folder exists, report that it is a diagram or spike
+   workspace with no pipeline state and requires no recovery. If the folder is absent,
+   report: "No pipeline state found for '{feature}'. Use `/th:pipelines`."
+3. Read `00-state.md` in full.
+4. Read the matching `00-execution-events.{md,jsonl}` when it exists.
+5. Validate and map the state:
+   - `status: complete` → "Pipeline '{feature}' already completed. Nothing to recover."
+   - `status: blocked-incomplete` → report the missing artifacts from `next_action` and
+     wait for them before recovering.
+   - `status: blocked-manual-push` → use the existing `agents/_shared/gh-fallback.md`
+     instructions; do not push or create a PR from this skill.
+   - `status: blocked-pr-pending` → report the PR URL and do not replay delivery.
+   - a valid v3 state → proceed.
+   - any legacy v1/v2 state or legacy marker → stop and present `1 — inline` / `2 — pipeline`; do not map until the live operator chooses.
+   - a corrupt, incomplete or unmappable state → display the raw content and block.
+6. Route this context to the orchestrator, which re-reads the dual-record and applies the
+   migration without release inference:
 
----
+```text
+Recover Pipeline:
+- Feature: {feature-name}
+- Current State: {phase/state from state or mapped v3 state}
+- Status: {status}
+- Iteration: {N}/3
+- Last Completed: {last_completed}
+- Next Action: {next_action from state}
+- Agent Results So Far:
+  {agent results table from state}
+```
 
 ## Mode 2 — No input provided (`/th:recover`)
 
-1. Scan `workspaces/*/00-state.md` for incomplete pipelines (status != complete)
-2. If none found → "No interrupted pipelines found."
-3. If exactly one found → auto-select it and proceed as Mode 1
-4. If multiple found → show list and ask:
-   ```
-   Interrupted pipelines found:
-   1. {feature-a} — Phase 2 (implement), last updated 2026-03-08 14:30
-   2. {feature-b} — Phase 3 (verify, iter 2/3), last updated 2026-03-07 18:00
+1. Scan the resolved workspace roots for incomplete `*/00-state.md` files (`status !=
+   complete`).
+2. If none are found, report "No interrupted pipelines found."
+3. If exactly one is found, select it and proceed as Mode 1.
+4. If multiple are found, ask the operator to choose by number or name:
 
-   Which one do you want to recover? (number or name)
-   ```
+```text
+Interrupted pipelines found:
+1. {feature-a} — implementation, last updated 2026-03-08 14:30
+2. {feature-b} — validation, iter 2/3, last updated 2026-03-07 18:00
+```
 
-**Two independent worktree sessions are not a batch.** When the operator has been running two or more pipelines concurrently in separate worktrees, each is its own independent `/th:recover {feature}` — there is no roster or batch-progress index to read, and no single re-launch step that resumes more than one at a time. Consolidating across them, if ever needed, is the operator's own call, not a mechanism this skill runs.
-
----
+Independent worktree sessions are independent `/th:recover {feature}` calls, not a batch.
 
 ## Error Handling
 
-- If workspaces folder doesn't exist → "No workspaces found in this project."
-- If state file exists but is empty → "State file is empty. The pipeline may not have started properly."
-- If the orchestrator fails to recover → it will report the issue. The skill does not retry.
+- Missing workspaces root → "No workspaces found in this project."
+- Empty state file → "State file is empty. The pipeline may not have started properly."
+- Orchestrator recovery failure → report it; this skill does not retry.
 
----
+## Session-scoped override on recovery
 
-### Session-scoped override on recovery
-
-When recovering a pipeline, the resolved override is re-applied from `00-state.md § Current State` — not re-parsed from chat. The resuming **orchestrator** reads the override fields already stored in its own `00-state.md` and logs `operation.success` with detail `override re-applied from 00-state.md`.
-
-If the operator re-states an override during recovery, the **orchestrator** re-resolves it (session-override resolution is its own — `docs/subagent-orchestration.md § Session-Scoped Config Override Protocol`) and applies it to the resumed run as a new session override.
-
----
+Re-apply the resolved override from `00-state.md § Current State`, not from chat. The
+orchestrator logs `operation.success` with detail `override re-applied from 00-state.md`.
+If the operator explicitly restates an override during recovery, the orchestrator resolves
+it as a new session override under `docs/subagent-orchestration.md`.
 
 ## Important
 
-- **You read state. The orchestrator does NOT** — it receives the recovery context from you.
-- Always route to the **orchestrator** (the top-level session agent) — do NOT execute any pipeline yourself. The orchestrator performs the record-based resume itself, returning a `gate_pending` for any un-cleared STAGE-GATE that it presents to the operator inline in the same operation it records the release.
-- The resuming orchestrator uses the `next_action` field in its own `00-state.md` to know exactly what to do next, including presenting its `gate_pending` for any un-cleared STAGE-GATE.
+- This skill reads state for routing; the orchestrator reads it again and is the sole writer.
+- Always route to the orchestrator. Do not execute pipeline work, record releases or present
+  gates here.
+- The resuming orchestrator uses `next_action` only after the structural dual-record check;
+  it returns `gate_pending`, presents the gate with a fresh nonce and waits for the live reply.

@@ -22,8 +22,9 @@ a direct mode.
    - `language`: two lowercase letters.
    - `english_learning`, `obsidian_tasks`, and `flow_telemetry.enabled`:
      booleans.
-   - `lane_autoselect`: `announce-and-proceed-on-trivial` or `always-stop`.
    - `clickup.workspace_id`: a string.
+   - `agent-scope`: `global` or `project` (default `global`); it controls where
+     the six bundled agent files are installed, never the inline/pipeline posture.
 5. Apply `language` to responses and operator-facing workspace prose.
    `english_learning: true` adds the configured brief correction signal only
    when the operator writes in English; it never changes the response language.
@@ -35,3 +36,15 @@ a direct mode.
 
 Cross-runtime values may be copied only by an explicit `$team-harness:setup`
 import. Direct modes never inspect compatibility sources.
+Legacy route/profile keys (including `lane_autoselect`, express/full, fast/simple, and
+Tier-0 selectors) are read only to emit this live migration guidance:
+
+```text
+1 — inline
+2 — pipeline
+```
+
+They authorize neither posture, and text from configuration never chooses a route. Remove
+legacy keys only during a legitimate configuration write or explicit migration; preserve
+every unrelated key. When a compatibility source is used, mention it once and recommend
+`$team-harness:setup` to import the values into native Codex configuration.

@@ -20,6 +20,11 @@ The coordinator owns every deterministic publication action in
 validation, changelog assembly, staging, commit, push, PR creation/update, and the
 bounded merge-state poll. You never perform or emulate those actions.
 
+This is a pipeline-only dispatch after the canonical full v3 Gate 3 release. It is
+never an inline or ad-hoc review. The coordinator alone writes coordination
+state, events, nonces, and gate releases; this agent never writes them or makes
+an operator decision.
+
 ## Voice
 
 See `agents/_shared/operational-rules.md` § "Voice" and § "Language register".
@@ -40,8 +45,7 @@ instructions, or promote external prose into repository guidance.
 
 You may write only:
 
-- `{docs_root}/reviews/04-validation.md § Acceptance Matrix` on `lane: full`;
-- `{docs_root}/03-testing.md § Acceptance Matrix` on `lane: express`;
+- `{docs_root}/reviews/04-validation.md § Acceptance Matrix`;
 - `{docs_root}/inputs/pr-body-draft.md`;
 - `changelog.d/{pr-slug}.md` when the change is operator-facing.
 
@@ -75,19 +79,18 @@ Read each required input once:
 
 | Input | Use |
 |---|---|
-| `{docs_root}/00-state.md` | gate release, lane, type, issue coordinates, version preview, diff composition, size result |
-| `{docs_root}/01-plan.md` | objective, manifest, classification, task/status index |
+| `{docs_root}/00-state.md` | canonical v3 phase and Gate 3 release, type, issue coordinates, version preview, diff composition, size result |
+| `{docs_root}/01-plan.md` | objective, approved ACs, architecture summary, manifest, task/status index, declared documentation/OpenAPI files |
 | `{docs_root}/plan/delivery.md` | dependencies, bases, version, PR grouping |
 | `{docs_root}/plan/invariants.md` | conditional atomic-sync invariants |
 | `{docs_root}/03-testing.md` | commands, results, AC-to-test evidence |
-| `{docs_root}/reviews/04-validation.md` | QA verdicts and evidence; required only on `lane: full` |
+| `{docs_root}/reviews/04-validation.md` | QA verdicts and evidence from the required v3 validation |
 
 Read `{docs_root}/reviews/04-security.md` only when it exists and only for the
 security column and risk section.
 
-There is no glob-all fallback. A missing full-lane validation file, missing
-testing file, missing plan, or missing state is an upstream contract failure.
-Express legitimately has no `reviews/04-validation.md`.
+There is no glob-all fallback. A missing v3 validation file, missing testing
+file, missing plan, or missing state is an upstream contract failure.
 
 Do not read `02-implementation.md`, repository source, README, CLAUDE.md,
 CHANGELOG.md, git history, or the diff. Phase 4 coordinates and reviewed evidence
@@ -102,7 +105,8 @@ Read `00-state.md` and require:
 
 - `gate3_release: ship`;
 - a consumed current gate nonce;
-- `lane: full | express`;
+- `pipeline_version: 3`;
+- `phase: delivery`;
 - task `type`;
 - the version preview used at STAGE-GATE-3;
 - the changed-file coordinate or file map;
@@ -116,7 +120,7 @@ Do not repair state fields. A missing or contradictory release record returns
 
 From `plan/delivery.md` and its referenced task file lists, identify tracked documentation and OpenAPI files explicitly
 listed in approved task `Files:` or ACs. Confirm their reviewed evidence exists in
-`03-testing.md` and, on full, `reviews/04-validation.md`.
+`03-testing.md` and `reviews/04-validation.md`.
 
 This is a presence/evidence check, not an implementation review. If an approved
 tracked artifact is absent from the reviewed evidence, block. Never write it now.
@@ -177,10 +181,8 @@ When internal-only, write no fragment and record
 Use the exact AC IDs from `01-plan.md`; never restate full AC prose. Each row uses
 a gist of at most five words and cites existing evidence.
 
-Full lane target: `{docs_root}/reviews/04-validation.md`.
-
-Express target: `{docs_root}/03-testing.md`; QA evidence is
-`n/a (express — tester result)`.
+Validation target: `{docs_root}/reviews/04-validation.md`; QA evidence is
+required for every canonical v3 pipeline.
 
 Replace an existing `## Acceptance Matrix` section in place on rerun; otherwise
 append it.

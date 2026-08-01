@@ -32,13 +32,13 @@ When the user asks to investigate, compare technologies, evaluate a migration, o
 7. **Present** the research report to the user
 8. **Ask** the user how to proceed (implement, discard, or investigate further)
 9. **Act on user's choice:**
-   - **Implement:** reclassify the pipeline and re-enter the full pipeline with all gates:
+   - **Implement:** reclassify the pipeline and re-enter the pipeline with all gates:
      a. Determine the new type: `refactor` if the research identified structural changes to existing code; `feature` if it identified new functionality to build.
      b. Append reclassification event: `{"ts":"<ISO>","event":"pipeline.reclassify","from":"research","to":"<new_type>","reason":"operator chose implement"}`.
      c. Update `00-state.md`: set `type:` to the new classification, reset `phase:` to `0b`, set `status: in_progress`. Add to Hot Context: `Reclassified from research to {type}. research/00-research.md is input context for design.`
-     d. Re-enter the full pipeline at **Phase 0b (Specify)**. The `research/00-research.md` feeds the architect's design phase as prior analysis — it is NOT a substitute for `01-plan.md`.
+     d. Re-enter the pipeline at **Phase 0b (Specify)**. The `research/00-research.md` feeds the architect's design phase as prior analysis — it is NOT a substitute for `01-plan.md`.
      e. **All gates are mandatory:** STAGE-GATE-1, Phase 3 (verify), STAGE-GATE-3. The Phase Gate Prerequisites (§ Phase Checkpointing in `orchestrator.md`) enforce this mechanically.
-     f. If the architect produced a `01-plan.md` during the research session (e.g., the operator asked for a plan before deciding to implement), that plan enters the normal ratification flow (Phase 1.5 → 1.6 → STAGE-GATE-1). It does NOT bypass design review.
+     f. If the architect produced a `01-plan.md` during the research session (e.g., the operator asked for a plan before deciding to implement), the coordinator validates it as the design artifact and presents the normal STAGE-GATE-1. `/th:plan-review` remains available only when explicitly invoked; no automatic ratification or review phase is inserted.
    - **Discard:** clean up workspaces, mark pipeline as `complete` with `summary: research discarded by operator`.
    - **Investigate further — bounded gap-closure loop (coordinator-owned):** After each consolidation+synthesis round, the coordinator reads the `## Coverage gaps` fenced block from `research/00-research.md` and evaluates the gate:
 
@@ -101,7 +101,7 @@ When the operator asks to investigate how the codebase works, trace a flow in re
 8. **Skip Phases 2-5** (no implementation, testing, validation, or delivery)
 9. **Present** the research report to the user
 10. **Ask** the user how to proceed (implement, discard, or investigate further)
-11. **Act on user's choice** — same options as Research Flow (implement → full pipeline reclassification; discard → clean up; investigate further → bounded gap-closure loop below).
+11. **Act on user's choice** — same options as Research Flow (implement → pipeline reclassification; discard → clean up; investigate further → bounded gap-closure loop below).
 12. **Bounded gap-closure loop (coordinator-owned) — extended gate:** After each consolidation + synthesis round, the coordinator reads the `## Coverage gaps` fenced block from `research/00-research.md` and evaluates the gate:
 
     **Gate condition (ANY must hold, AND round cap must not be reached):**
@@ -149,7 +149,7 @@ Use `/th:research-code --multi-repo` when the question is about understanding co
 
 ## Spike Flow
 
-When the user wants to quickly test a technical hypothesis without full pipeline ceremony:
+When the user wants to quickly test a technical hypothesis without pipeline ceremony:
 
 **Observability:** spike mode is a named observability exemption — it writes no `00-state.md` and no `00-execution-events` file. Its workspace is intentionally invisible to `/th:pipelines` and `/th:recover`. See `docs/observability.md § Lightweight direct-mode exemptions`.
 
@@ -169,7 +169,7 @@ When the user wants to quickly test a technical hypothesis without full pipeline
    3. Investigate further → I'll run another spike or a /th:research
    ```
 8. **Act on user's choice:**
-   - Formalize: create GitHub issue using **SDD template** — include spike findings in Technical Context. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — create an issue". When `has_gh=true`: `gh issue create`. When `has_gh=false` and token + GitHub origin available: curl POST. When neither: write SDD body to `workspaces/{feature}/inputs/issue-create.md` and prompt operator to paste it into GitHub, then reply with the new issue number. Ask: "Issue created (or paste required). Run full pipeline now?"
+   - Formalize: create GitHub issue using **SDD template** — include spike findings in Technical Context. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — create an issue". When `has_gh=true`: `gh issue create`. When `has_gh=false` and token + GitHub origin available: curl POST. When neither: write SDD body to `workspaces/{feature}/inputs/issue-create.md` and prompt operator to paste it into GitHub, then reply with the new issue number. Ask: "Issue created (or paste required). Run pipeline now?"
    - Discard: `git checkout -- .` to revert (confirm with user first). Clean up workspaces.
    - Investigate: continue as directed.
 
@@ -177,7 +177,7 @@ When the user wants to quickly test a technical hypothesis without full pipeline
 
 ## Plan Flow
 
-Two modes: `plan` (analysis only) and `plan-and-execute` (analysis + full pipeline per task).
+Two modes: `plan` (analysis only) and `plan-and-execute` (analysis + pipeline per task).
 
 **Distinction from normal pipeline mode.** Plan flow's architect output is `01-planning.md` — a task breakdown for **multi-task batch orchestration** across worktrees, with dispatch labels (BLOCKER / PARALLEL / CONVERGENCE / SEQUENTIAL) and size estimates. This is structurally different from `01-plan.md`, which the architect produces in **normal pipeline mode** (single-feature, sequential tasks, per-task ACs in Given/When/Then). The two files coexist for different consumers:
 
@@ -367,220 +367,106 @@ stack of commits on one branch.
 
 ## Bug-fix Flow
 
-When `type: fix` is classified (Classify, by `th:orchestrator`), the same coordinator runs the **Bug-fix Pipeline** — the same 3-stage shell as feature flow, with type-specific content shifts. The pipeline is **tier-classified (1-4)** based on bug content keywords, impacted file paths, and operator override. The tier determines which artifacts are produced and which agents run: Tier 1 (docs/trivial) skips the architect entirely and conditionally skips the pre-fix regression test; Tier 2 (light) uses an abbreviated root-cause + tester + qa; Tier 3 (standard, the PR #50 default) runs the full pipeline + security; Tier 4 (critical/security) adds mandatory prior-art memory query and extended security analysis. The "security runs always for bugs" rule from PR #50 is preserved for Tier 3+; auto-escalation favors high-tier signals so any fix touching a security-sensitive path lands at Tier 3+ regardless of the operator's hint.
+A `type: fix` request uses the same gated pipeline only after explicit live
+activation or recovery. Bug severity is metadata (`bug_tier: 1|2|3|4`) that
+controls root-cause and evidence depth after activation; it never selects an
+inline/pipeline posture and never creates a workspace by itself. A small
+non-sensitive fix may remain inline under the ordinary predicate, and a
+sensitive fix may remain inline only when the current live operator explicitly
+selects `inline`. No second confirmation, legacy marker, or tier-zero route
+changes that decision.
 
 ### Tier System (4 tiers)
 
-The canonical Tier table, Tier 0 auto-detection rules, auto-classification signals (Signal 1/2/3), Tier 1 regression-test conditional skip, auto-escalation rules, and worked examples are defined in `agents/ref-intake-flows.md § "Bug Tier"` (Classify). That is the single authoritative source — the coordinator runs classification at Classify and `[TIER: 0]` operator override is defined there. See `agents/ref-intake-flows.md § "Bug Tier"` for the complete Tier table, all signal definitions, the auto-escalation rules, and worked examples. The summary below covers only the Bug-fix Pipeline flow behavior; all Tier-classification decisions are governed by the canonical source.
+- **Tier 1 — Docs/Trivial:** non-functional documentation or comments; no root-cause
+  artifact; regression evidence may be skipped only under the conditional rule.
+- **Tier 2 — Light fix:** light root-cause analysis and mandatory regression evidence.
+- **Tier 3 — Standard fix:** full root-cause analysis, mandatory regression evidence,
+  and security validation when the security floor applies.
+- **Tier 4 — Critical/Security:** Tier 3 plus mandatory prior-art query and extended
+  security analysis.
 
-**Quick reference — Tier names and Pipeline effects (see `agents/ref-intake-flows.md § "Bug Tier"` for the authoritative table):**
-- **Tier 0 (Trivial/Cosmetic):** no workspaces, no gates (PR review is the only gate), implementer runs inline. No `00-state.md`, no `01-plan.md`, no workspaces folder.
-- **Tier 1 (Docs/Trivial):** workspaces created; architect skipped; Tier 1 regression-test conditional skip — only when no behavior change; tester only (suite no-regress) at Phase 3.
-- **Tier 2 (Light fix):** architect dispatched in light-root-cause mode; regression test mandatory; tester + qa at Phase 3.
-- **Tier 3 (Standard fix):** architect dispatched in full-root-cause mode; regression test mandatory; tester + qa at Phase 3; security at the Pre-Delivery Security Audit (within Phase 3).
-- **Tier 4 (Critical/Security):** same as Tier 3 plus mandatory KG prior-art query (`mcp__memory__search_nodes`) and extended security analysis.
-
-**Auto-classification signals (canonical definition in `agents/ref-intake-flows.md § "Bug Tier"`):**
-- **Signal 1 — Keywords in the bug report:** high-tier triggers (escalate to Tier 4): `auth`, `injection`, `xss`, `csrf`, `secret`, `token`, `permission`, `bypass`, `vulnerability`, `cve`, `leak`, `exposed`, `unauthorized`. Low-tier hints (Tier 1 candidate): `typo`, `trivial`, `quick fix`, `cosmetic`, `whitespace`.
-- **Signal 2 — File-path patterns:** security-sensitive paths (force Tier 3+, `security-sensitive: true`): `auth/**`, `middleware/**`, `api/**`, `db/**`, `security/**`, `crypto/**`, `session/**`, any path with `auth` or `permission` in name. File-path patterns drive the re-tier GATE at Phase 2 close.
-- **Signal 3 — Operator override:** `[TIER: 0|1|2|3|4]` forces declared tier; `[regression-test: required]` forces Tier 2 minimum; `[security: required]` forces Tier 3 minimum.
-
-**Auto-escalation rules:** high-tier signal sobrescribes lower-tier classification. Path priority > keyword priority > size hints. Default: Tier 3 when in doubt (conservative).
-
-**`type: hotfix` Tier 3 floor:** a hotfix is always Tier 3 minimum — auto-classification MUST NOT assign a hotfix a tier below 3. The override-clamp (`[TIER: 0/1/2]` on a hotfix) is silently raised to Tier 3. See `agents/ref-intake-flows.md § "Bug Tier"` for the full floor rule.
-
-**Auto-promotion Tier 1 → Tier 2:** a Tier 1 candidate is auto-promoted to Tier 2 when any condition for the regression-test skip fails (e.g., UI strings, test-fixture changes). The promotion is recorded in `00-state.md` and announced to the operator.
-
-**Worked examples:** see `agents/ref-intake-flows.md § "Bug Tier"` § Worked examples for the complete set. Representative cases: Tier 0 (typo in CHANGELOG, no workspaces); Tier 1 (docs string fix, no architect); Tier 2 (config change, light root-cause); Tier 3 (production code bug, full pipeline); Tier 4 (auth bypass — security-escalation example with Signal 1 + Signal 2 combined).
+Signals may promote a tier: security-sensitive paths and high-risk keywords take
+priority, an ambiguous fix defaults to Tier 3, and a hotfix has a Tier 3 minimum.
+Operator tier text is metadata only; retired mode and profile markers are never mapped.
 
 #### Tier 1 regression-test conditional skip
 
-The Tier 1 candidate skips Phase 2.0 ONLY when ALL of these conditions hold (canonical definition in `agents/ref-intake-flows.md § "Bug Tier"`): Tier is `1`; all touched paths are docs/comments/non-functional strings; no test paths touched; operator did NOT declare `[regression-test: required]`. Otherwise the candidate is auto-promoted to Tier 2. The conditional skip is recorded in `00-state.md` as `regression_test_status: skipped`.
+Skip pre-fix regression evidence only when the tier is 1, all touched paths are
+documentation/comments/non-functional strings, no test path is touched, and the
+operator did not require regression evidence. Otherwise promote to Tier 2.
 
 #### Worked examples
 
-**Example Tier 0 — typo in CHANGELOG, no workspaces:**
-- Operator request: "fix typo in CHANGELOG.md: 'reseved' should be 'reserved'"
-- Signal 1: `typo` (low-tier hint).
-- Signal 2: `CHANGELOG.md` — single file, ≤5 lines, docs-only, no system-level path.
-- Signal 3: none.
-- Classification: `bug_tier: 0` (auto). All Tier 0 conditions satisfied.
-- Pipeline: no workspaces created. Implementer makes the fix. Tester runs suite no-regress. PR is opened. PR review is the only gate. ~1 agent run total.
-
-**Example Tier 0 — whitespace fix in README:**
-- Operator request: "trailing whitespace on line 42 of README.md"
-- Signal 1: `whitespace` (low-tier hint).
-- Signal 2: `README.md` — single file, ≤5 lines, docs-only, whitespace-only change.
-- Signal 3: none.
-- Classification: `bug_tier: 0` (auto). All Tier 0 conditions satisfied.
-- Pipeline: no workspaces, no STAGE-GATEs. Implementer makes the fix, runs tests, opens PR. ~1 agent run total.
-
-**Example A — Tier 1, regression-test skipped:**
-- Operator request: "fix typo in README.md: 'recieve' should be 'receive'"
-- Signal 1: `typo` (low-tier hint).
-- Signal 2: `README.md` matches Tier 1 path pattern.
-- Signal 3: none.
-- Classification: `bug_tier: 1` (auto). All touched paths match `*.md`, no test paths touched, no `[regression-test: required]` declaration → Phase 2.0 skipped.
-- Pipeline: the orchestrator skips Phase 1 (no architect). Phase 1.6 plan-reviewer runs against the minimal `01-plan.md`. STAGE-GATE-1 with one-sentence prose plan. Phase 2 (implementer fixes the typo). Phase 3 (tester suite no-regress + qa simplified validation). No security. ~3 agent runs total.
-
-**Example B — Tier 2, light fix:**
-- Operator request: "fix bug in .github/workflows/ci.yml — the matrix doesn't include Python 3.12"
-- Signal 1: none high-tier.
-- Signal 2: `.github/**` matches Tier 2 path pattern.
-- Signal 3: none.
-- Classification: `bug_tier: 2` (auto).
-- Pipeline: the orchestrator dispatches architect with `mode: light-root-cause`. `01-root-cause.md` contains 1-paragraph `## Mechanism` + 1-paragraph `## Scope of Fix` + `## Regression Test Approach` (the regression test asserts the matrix includes 3.12). Phase 2.0 mandatory — tester authors failing test. Phase 2 (implementer adds 3.12 to matrix). Phase 3 (tester + qa, no security). ~5 agent runs total.
-
-**Example C — Tier 3 with security-path auto-escalation:**
-- Operator request: "typo in error message from `src/auth/middleware.ts`: 'unautorized' should be 'unauthorized'"
-- Signal 1: `unauthorized` is a high-tier trigger keyword. Also `typo` is a low-tier hint.
-- Signal 2: `src/auth/middleware.ts` is a security-sensitive path → forces minimum Tier 3.
-- Signal 3: none.
-- Classification: `bug_tier: 3` (path priority > keyword priority; sensitive path wins over the typo hint). The keyword `unauthorized` would normally trigger Tier 4, but here it appears as part of the error-message text being fixed, not as the bug class; the architect can promote to Tier 4 in Phase 1 if root-cause analysis reveals the underlying logic is actually broken.
-- Pipeline: the orchestrator dispatches architect with `mode: full-root-cause`. `01-root-cause.md` full template (Prior Art optional). Phase 2.0 mandatory. Phase 2 (implementer fixes the typo). Phase 2.7 (tester) then Phase 3's parallel validation block (qa + adversary — the Pre-Delivery Security Audit, defense-in-depth on a sensitive path). ~7 agent runs total. If the architect surfaces a tier-promote, the operator decides between Tier 3 and Tier 4.
+A documentation typo can stay inline when the direct predicate passes. A production
+bug uses Tier 3 metadata once the operator activates the pipeline. An auth bypass
+uses Tier 4 metadata and the security floor. None of these examples activates a
+pipeline from content or a legacy marker.
 
 ### Full workspaces artifact set (type: fix)
 
-Every bug-fix pipeline produces the backbone artifacts; the tier modulates which Phase-1 / Phase-2.0 / Phase-3 artifacts are generated.
-
-| Artifact | Tier 1 | Tier 2 | Tier 3 | Tier 4 | Content notes |
-|---|---|---|---|---|---|
-| `01-plan.md` | **Yes (always)** | Yes | Yes | Yes | Bug report content + reproduction steps (§ Review Summary) + tasks of the fix (§ Task List). Minimum 4 lines; Tier 1 may be 3 lines when Phase 2.0 is skipped (reproduce-or-cite, fix, verify) |
-| `00-state.md` | Yes | Yes | Yes | Yes | Standard schema, `type: fix`, `bug_tier: N`, `bug_tier_source` |
-| `00-execution-events.jsonl` / `.md` | Yes | Yes | Yes | Yes | Standard event trace (`.jsonl` local mode, `.md` obsidian mode) |
-| `00-pipeline-summary.md` | Yes | Yes | Yes | Yes | Standard rollup |
-| `01-root-cause.md` | **No (Phase 1 skipped)** | Yes — `mode: light-root-cause`, ≤30 lines | Yes — `mode: full-root-cause`, 1 pg max | Yes — `mode: full-root-cause` + mandatory `## Prior Art`, 1 pg max + ≤15 lines | file:line + mechanism + scope |
-| `reviews/01-plan-review.md § Plan Review` | Yes | Yes | Yes | Yes | plan-reviewer writes this section; includes Rules 7 + 8 (gated on `type: fix \| hotfix`) |
-| `02-regression-test.md` | **Conditional skip** — only when no behavior change (see Tier 1 condition above); otherwise Yes | Yes | Yes | Yes | tester's failing test (path + content + how to run) BEFORE implementer touches anything |
-| `02-implementation.md` | Yes | Yes | Yes | Yes | implementer's report |
-| `03-testing.md` | Yes — suite no-regress only | Yes | Yes | Yes | tester's post-fix verification |
-| `reviews/04-validation.md` | Yes — Tier 1 simplified template (≤15 lines, no per-AC table) | Yes — default bug-fix contract | Yes — default bug-fix contract | Yes — default bug-fix contract | qa validation |
-| `reviews/04-security.md` | **No** | **No** | **Yes (mandatory)** | **Yes (mandatory + extended analysis)** | security agent — see "Why security is tier-gated" below |
-| `00-state.md § Delivery` | Yes | Yes | Yes | Yes | coordinator is sole writer; it upserts Delivery's returned prose coordinates and publication coordinates |
-
-**Why security is tier-gated.** PR #50 set `security-sensitive: true` for every bug as a defense-in-depth override. The Tier System refines that override: security runs for every Tier 3+ bug (Tier 4 includes extended analysis cross-referencing prior art), and Tier 1 / Tier 2 fixes skip security because the impacted scope is non-functional (docs, dev-tooling, test infra). The auto-escalation rule guarantees that any fix touching a security-sensitive path (`auth/**`, `middleware/**`, `api/**`, etc.) lands at Tier 3+ at classification time — so a Tier 1 / Tier 2 run cannot accidentally bypass security on sensitive paths. Many bugs have non-obvious security implications (input-validation bugs that are actually injection, race conditions that are TOCTOU vulnerabilities, error-handling bugs that leak information); the path-pattern auto-escalation captures these without forcing security on every typo-in-docs fix.
+After explicit pipeline activation, the normal plan, implementation, testing,
+validation, and delivery artifacts apply. Tier 1 may omit root-cause and
+pre-fix regression artifacts only under its conditional rule; Tiers 2–4 keep
+their required evidence and security artifacts.
 
 ### Phase structure (type: fix)
 
-| Phase | Owner | Output | Notes |
-|---|---|---|---|
-| 0a Intake | orchestrator | `00-state.md` initial | KG session start, KG query, CLAUDE.md read, type classified as `fix`, `bug_tier` classified (1-4), `security-sensitive: true` forced for Tier 3+ |
-| 0b Specify | orchestrator | Spec context (bug-report format) passed inline to architect; architect incorporates into `01-plan.md` § Review Summary | Reported behaviour / Expected behaviour / Reproduction steps / Environment / AC (AC-1 reproduction-no-longer-bug, AC-2 regression-test-exists for Tier 2-4; Tier 1 uses implicit "cited issue is fixed") |
-| 0.5 Bootstrap | orchestrator | — | Same as feature flow |
-| 1 Root-cause | architect (mode: root-cause + sub-mode) | `01-root-cause.md` (Tier 2-4 only) | **Tier 1: skipped.** Tier 2: `mode: light-root-cause`, ≤30 lines. Tier 3: `mode: full-root-cause`, 1 pg max. Tier 4: `mode: full-root-cause` + mandatory `## Prior Art`. |
-| 1.5 Plan ratification | qa-plan (mode: ratify-plan) | `reviews/01-plan-review.md § Plan Ratification` | Usually skipped for a qualifying self-authored fix plan |
-| 1.6 Plan review | plan-reviewer | `reviews/01-plan-review.md § Plan Review` | Rules 1-6 plus Rules 7 + 8 (gated on `type: fix \| hotfix`). For Tier 1: Rule 7 is no-op (no `01-root-cause.md`); Rule 8 conditional on Phase 2.0 run |
-| STAGE-GATE-1 | orchestrator | STOP block | Plan-reviewer verdict + TL;DR from `01-root-cause.md` + Task Summary from `01-plan.md` (§ Task List). Tier 1: one-sentence prose plan replaces TL;DR copy |
-| **2.0 Regression Test** | tester (mode: pre-fix-regression) | `02-regression-test.md` + initial `03-testing.md` evidence row (Tier 2-4 mandatory; Tier 1 conditional skip) | Tier 1 with no-behavior-change: skipped (`pre_fix_test_required: false`). Tier 2-4: mandatory, no fallback. Phase 2.7 resumes the same regression contract and completes the remaining evidence map. |
-| 2 Implement | implementer | `02-implementation.md` | Scope-discipline contract: zero tangential refactors |
-| 2.5 Reconcile | orchestrator + operator when non-trivial | — | Same as feature flow |
-| 2.6 Code-Hygiene Scan | orchestrator (no dispatch) | `stage2.hygiene` trace event | Same as feature flow — deterministic scan, `[all types]`. See `docs/code-hygiene-gate.md § Layer 1` for the pinned command; not replicated here. |
-| **2.7 Evidence Authoring** | tester (mode: authoring) | `03-testing.md` evidence map | Classify each AC as test, command, or inspection; reuse sufficient evidence and author only warranted missing tests. When Phase 2.0 ran, resume its regression row. Zero new tests is valid. |
-| 3 Verify | qa (+ adversary when `security_floor_applies`) | `reviews/04-validation.md` | The suite itself already ran once, at Phase 2.7 — there is no second, run-only tester dispatch here. Tier 1: qa (simplified). Tier 2-4: qa. `qa` and `adversary` (when dispatched) run in one message, concurrent, over the frozen tree Phase 2.8 produced. Security runs at the Pre-Delivery Security Audit, within this same parallel block, once per delivery group (Tier 4 carries the extended-analysis instruction there). |
-| 3.5 Acceptance gate | orchestrator | — | Same as feature flow; regression test must still be in suite (Tier 2-4) or `regression_test_status: skipped` confirmed (Tier 1). Gate also checks assertion-content match: authored assertion patterns from `02-regression-test.md` must still be present in the actual test file at `regression_test_path` — a weakened/replaced assertion body fails the gate (see orchestrator.md Phase 3.5 Step 6). |
-| 4 Delivery | delivery prose + orchestrator mechanics | `inputs/pr-body-draft.md` + Acceptance Matrix; coordinator-owned `00-state.md § Delivery` | CHANGELOG `### Fixed`, PR title `fix(area):`, Bug Report section in PR body, `Fixes #N` |
-| 4.5 Internal review | reviewer (mode: internal) | — | Conditional per diff-size gate |
-| STAGE-GATE-3 | orchestrator | STOP block | ship / amend / abort |
-| 5 GitHub update | orchestrator | — | Comment with regression test path + Before/After (regression test omitted for Tier 1 skipped) |
-| 6 Session close | orchestrator | — | entity save is explicit-only; if requested, `process-insight` describes failure mode learned, not feature shipped |
+The pipeline retains its ordinary design, implementation, validation, and delivery
+states and its operator gates. Tier metadata changes only the specialist depth
+and evidence obligations inside those states.
 
-### Phase 2.0 — Regression Test Authoring (mandatory, never skipped)
+### Plan-reviewer Rules 7 + 8 (gated on type: fix | hotfix)
 
-**Why this slots between STAGE-GATE-1 and Phase 2.** The human at STAGE-GATE-1 approves the approach (root-cause + regression-test plan). After approval, the tester writes the failing test. The implementer is dispatched at Phase 2 with a test that is already failing. The contract: "make this test pass without breaking the rest." This is the cleanest test-driven bug-fix pattern.
+Plan review is never automatic. It runs only when the live operator explicitly
+requests the direct plan-review mode.
 
-**Regression-contract reuse (T2-AC-4).** This dispatch writes the failing regression test and its initial `03-testing.md` evidence row. Phase 2.7 resumes that contract and fills the remaining AC evidence without re-deriving the bug. Pre-fix ordering and the pre-Phase-3 frozen-tree guarantee remain unchanged.
+### qa validate-mode for type: fix | hotfix
 
-**Operator override (rejects the architect's documented exit hatch):** **Regression test is mandatory always, no exceptions, no fallback.** The architect's design doc proposed a manual-repro-script fallback for race/timing/environment-dependent bugs. The fallback is **rejected**. If the tester cannot author a regression test, the pipeline blocks with `status: blocked` and surfaces to the operator. There is no exit hatch.
-
-**Dispatch:** the orchestrator invokes `tester` via Task with:
-- Feature name for workspaces
-- Pointer to `01-plan.md` (§ Review Summary — reproduction steps + expected behaviour + AC)
-- Pointer to `01-root-cause.md` (Regression Test Approach section)
-- `mode: pre-fix-regression`
-- Instruction: "Write a failing test that captures the bug described in `01-plan.md` § Review Summary (reproduction steps). The test MUST fail against the current codebase. Do NOT modify any source code — test files only. Output the test path in your status block; write your summary to `02-regression-test.md`."
-
-**Gate (orchestrator):**
-
-| `status` | `tests_failing_as_expected` vs `tests_added` | Action |
-|---|---|---|
-| `success` | equal AND `suite_still_passing: true` | Proceed to Phase 2. Mutate `<TBD-Phase-2.0>` placeholder in `01-plan.md` (§ Task List) to `regression_test_path` |
-| `success` | unequal OR `suite_still_passing: false` | Route back to tester; treat as iteration of Phase 2.0 (max-3) |
-| `failed` with `regression_test_status: bug-not-reproducible` | n/a | Route back to architect — root-cause is wrong. Re-run Phase 1, then Phase 2.0. Counts toward Phase 1.6 iteration budget |
-| `blocked` | n/a | Cannot author a test. Pipeline blocks with `status: blocked`; surface to operator. **No fallback** |
-
-### Implementer scope-discipline contract (for `type: fix` / `type: hotfix`)
-
-Documented inline in `agents/implementer.md § Scope contract`. Zero tangential refactors or adjacent-issue exploration. Incidental issues remain untouched; `[SCOPE-DRIFT: file X required for AC-N]` is reserved for a file required to satisfy the assigned AC and routes back to the architect to update `01-root-cause.md` and re-run Phase 1.6.
-
-### Plan-reviewer Rules 7 + 8 (gated on `type: fix | hotfix`)
-
-Documented in `agents/plan-reviewer.md`. Fire only when the coordinator's classification declares `type: fix` or `type: hotfix`:
-
-- **Rule 7** — `01-root-cause.md` declares a `## Regression Test Approach` section with Test layer (unit / integration / e2e), Test scaffold, Failing assertion. Size cap on `01-root-cause.md` ≤120 lines (>120 = `concerns` finding).
-- **Rule 8** — every PR in `01-plan.md` (§ Task List) has an AC referencing the regression test path: `VERIFY: regression test exists at <path>` (or `<TBD-Phase-2.0>` before Phase 2.0 runs).
-
-### qa validate-mode for `type: fix | hotfix`
-
-`agents/qa.md` validate mode adds two boolean fields to the status block:
-- `regression_test_referenced: true | false` — confirms the per-AC mapping in `reviews/04-validation.md` cross-references `02-regression-test.md`
-- `reproduction_steps_validated: true | false` — confirms the AC-1 (reproduction-no-longer-bug) was checked against `01-plan.md` § Review Summary (Reproduction steps)
+Validation runs only after implementation Freeze in the explicitly activated
+pipeline. A failed or incomplete security result returns to implementation and
+fresh validation; no legacy marker can bypass it.
 
 ### Type classification — auto-detect bug-fix vs hotfix
 
-The coordinator's Classify logic uses these signal lists:
-
-- **`fix`** — request describes broken/incorrect behaviour; keywords: `bug`, `solucionar`, `arreglar`, `corregir`, `fixear`, `debuguear`, `regresión`, `error en`, `no funciona`, `está rompiendo`, GitHub label `bug`.
-- **`hotfix`** — all signals of `fix` PLUS urgency markers (`hotfix`, `urgente`, `crítico`, `production down`, `usuarios afectados`) AND scope ≤2 files (inferred from Phase 0b Step 1) AND single causal site described by operator.
-
-**Operator override:** the operator can force a classification by saying so directly. E.g., `@th:orchestrator this is a hotfix:` forces `type: hotfix`.
-
-**Architect re-classification (operator-in-loop):** during Phase 1, if the architect determines the bug is actually a missing feature, the architect returns `status: blocked` with `failure_kind: reclassification-needed`, `recommended_type: feature`, `rationale` and `evidence`. The orchestrator surfaces the recommendation and its evidence to the operator for decision. The architect does not auto-route.
+Use the explicit request type. A hotfix records `bug_tier: 3` minimum and
+requires the security floor after activation.
 
 ### Multi-bug requests
 
-Routes through existing `plan-and-execute` flow. Each bug is one sub-task in `01-planning.md`; each sub-task dispatches as its own worktree running the full bug-fix pipeline via Multi-Task Orchestration. No new batch-bug-fix path is created.
+Keep one explicit pipeline request per task unless the operator explicitly chooses
+a separate direct scope; never create a workspace or route from a marker.
 
-### KG process-insight semantics for bugs
+### Security-Sensitive Flow (extended)
 
-When the operator explicitly requests a knowledge save after a bug pipeline, reuse the existing `process-insight` schema. The observation describes the **failure mode learned**, not the feature shipped. Example good capture: `nestjs-typeorm-decimal-stringification — TypeORM returns decimal columns as strings; arithmetic on the returned value produces string concatenation. Discovered while fixing aggregation-totals-mismatch in zippy-commission-api.`
-
----
-
+Sensitive bug work keeps the security controls of the pipeline when the operator
+chooses it. Explicit live inline work remains direct, with warnings/audit notes
+informational and native runtime approvals unchanged.
 ## Hotfix sub-flow (type: hotfix)
 
-The Hotfix sub-flow is a tighter variant of the Bug-fix Flow for trivially scoped defects with urgency markers. **Phase 1 (Root-Cause Analysis) is skipped entirely** — no architect dispatch, no `01-root-cause.md`. Everything else from the Bug-fix Flow is preserved, including Phase 2.0 (mandatory regression test), Phase 4 delivery routing (`### Fixed` CHANGELOG, `fix(area): ... (hotfix)` PR title), and Phase 6 session close. Entity save remains explicit-only. The Phase 4 PR title appends `(hotfix)` to signal urgency to the reviewer.
+A hotfix is a pipeline request only after explicit live activation or recovery.
+It records `bug_tier: 3` minimum (or 4 when promoted) as metadata and keeps
+the ordinary pipeline gates and security obligations. It does not create a
+workspace from urgency text, Fast/Simple wording, a tier marker, or any other
+content.
 
-**Tier 3 hard floor for hotfix:** a hotfix is pinned to Tier 3 minimum at Classify (see `agents/ref-intake-flows.md § "Bug Tier"` for the full hotfix floor rule). Because every hotfix is Tier 3+, the security agent runs for every hotfix — "security always runs for hotfix" is a direct consequence of this pin. The hotfix Tier 3 floor and the security-always contract are the same rule stated from two angles; they are consistent by construction.
 ### Skipped phases (relative to type: fix)
 
-- Phase 1 — no architect dispatch, no `01-root-cause.md`.
+The root-cause specialist may be skipped under the hotfix plan contract. The
+operator still receives the normal pipeline plan and gate presentation after
+activation.
 
 ### Modified phases
 
-- Phase 0b — bug-report intake same as `type: fix`, but the AC list is tighter (typically only AC-1 reproduction-no-longer-bug and AC-2 regression-test-exists). **Before STAGE-GATE-1, the orchestrator authors `01-plan.md § Review Summary`** (constructed from the Phase 0b bug-report payload: Reported behaviour, Expected behaviour, Reproduction steps, Environment) and `§ Task List` (minimum 4-line list: reproduce, regression test, fix, verify). This is the orchestrator-self-authored path — the architect is not dispatched in the hotfix flow. See `orchestrator.md § STAGE-GATE-1` for the full self-authored step contract.
-- Phase 1.5 and 1.6 — still run. Plan ratification + plan review operate against the regression test + task list + 1-sentence prose plan emitted by the orchestrator inline at STAGE-GATE-1. plan-reviewer Rules 7 + 8 still apply.
-- STAGE-GATE-1 — uses a tighter STOP block with a one-sentence prose plan from the orchestrator; `## Review Summary` is self-authored by the orchestrator (see Phase 0b bullet above).
+The coordinator may self-author the hotfix plan and regression evidence when its
+contract permits. No automatic plan review is inserted; `/th:plan-review`
+remains available only when the live operator asks.
 
-### Unchanged from `type: fix`
+### Unchanged from type: fix
 
-- Phase 2.0 (Regression Test) — **still mandatory**. The operator override "regression test is mandatory always" applies to hotfixes too.
-- Phase 2 (Implementation) — scope-discipline contract still applies.
-- Phase 3 (Verify) — `security` agent still runs always for hotfix. This is a direct consequence of the Tier 3 hard floor: `type: hotfix` is pinned to Tier 3 minimum at Classify (the hotfix Tier 3 floor rule), so the Tier-gated dispatch table always routes every hotfix to the Phase 3 `security` agent (Tier 3 row). "security runs always for hotfix" and "security runs for every Tier 3+ fix" are the same statement — the hotfix pin makes them equivalent.- Phase 3.5 (Acceptance Gate) — same.
-- Phase 2.8 (Freeze, including Build Verification) — runs normally (hotfix code must still compile).
-- Phase 4 (Delivery) — same `### Fixed` routing; PR title gains `(hotfix)` suffix.
-- STAGE-GATE-3 — always mandatory.
-- Phases 5 (GitHub Update) and 6 (KG Save) — same.
-
-### workspaces artifact set (type: hotfix)
-
-Every artifact required by `type: fix` is also required by `type: hotfix`, **with one exception**: `01-root-cause.md` is omitted (Phase 1 skipped). `01-plan.md` is **still produced** (§ Task List minimum: 4-line task list — reproduce, regression test, fix, verify). All other artifacts in the table above for `type: fix` are produced for `type: hotfix` too — `reviews/01-plan-review.md § Plan Review`, `02-regression-test.md`, `02-implementation.md`, `03-testing.md`, `reviews/04-validation.md`, `reviews/04-security.md`, `00-state.md § Delivery`.
-
-### Operator-facing surface
-
-v1 detects hotfix by keyword in natural language (auto-classification + operator override). The `/th:hotfix` slash command is deferred to v2.
-
----
-
+Implementation, testing, validation, security review, delivery, and all pipeline
+gates remain mandatory after activation. Native runtime and outward-action
+approvals remain independent.
 ## Security-Sensitive Flow (extended)
 
 1. Design is mandatory with extended security analysis
@@ -605,7 +491,7 @@ v1 detects hotfix by keyword in natural language (auto-classification + operator
 When `type: refactor`:
 
 1. **Specify** — ACs focus on `VERIFY:` format (same API, same behavior, improved structure)
-2. **Design** — architect focuses on target structure, not new features. The single-file output contract applies: `01-plan.md` (pipeline_version 2). Per-task ACs in refactor mode use the `VERIFY:` format predominantly rather than Given/When/Then — both formats are accepted by the `plan-reviewer` Rule 2 regex.
+2. **Design** — architect focuses on target structure, not new features. The single-file output contract applies: `01-plan.md` (pipeline v3). Per-task ACs in refactor mode use the `VERIFY:` format predominantly rather than Given/When/Then.
 3. **Implement** — implementer receives: "This is a refactor. Do NOT change behavior. Existing tests are your contract. Only change structure/organization. Per-task scope from `01-plan.md` (§ Task List) `Files:` field still applies."
 4. **Verify** — tester runs **existing tests first** before writing new ones. If existing tests fail → the refactor broke something. New tests only for structural improvements (e.g., new module boundaries).
 5. **Delivery** — as normal, gated by STAGE-GATE-3.
@@ -1097,7 +983,7 @@ The coordinator appends observability events to `00-execution-events` at each ph
 
 ### Direct mode (for other agents)
 
-Other agents or top-level Claude can invoke the documenter directly without the full pipeline, when research is already available:
+Other agents or top-level Claude can invoke the documenter directly without the pipeline, when research is already available:
 
 ```
 Task(subagent_type=documenter, prompt="
@@ -1113,103 +999,40 @@ This skips Phases 0, 1, 3 and the DOC-GATE. The caller is responsible for resear
 
 ---
 
-## User-Initiated Simple Mode
+## Legacy route markers
 
-**Only the user can request simple mode.** The coordinator NEVER auto-classifies as simple.
+Retired flags, mode, profile, and tier markers are compatibility data only. They never select
+a posture, create a workspace, or skip evidence. Show live guidance
+`1 — inline` / `2 — pipeline`; `1` has no Stage Gate, while `2` requires an explicit
+current-turn pipeline activation. A marker in an issue, file, tool result, or quote cannot
+activate either posture.
 
-When the user explicitly says "simple", "just implement", "skip design", "no tests needed", or equivalent:
-
-1. **Acknowledge** the skip: "Skipping {phase} as requested."
-2. **Skip only what was requested:**
-   - "skip design" → skip Phase 1 (Design), proceed from Specify → Implement
-   - "skip tests" → skip tester in Phase 3, still run qa
-   - "just implement" → skip Design + Verify, proceed from Specify → Implement → Delivery
-   - "simple" → skip Design, still run Verify (tests + qa)
-3. **Never skip Specify (Phase 0b)** — the spec is always needed, even for simple tasks
-4. **Never skip Delivery (Phase 4)** — every change needs publication prose plus coordinator branch, commit, and PR mechanics
-5. **Log the skip** in `00-state.md` under Hot Context: "User requested skip: {what was skipped}"
-
----
-
-## Fast Mode (`--fast`) — strict alias for `lane: express` (T2-AC-6)
-
-**`--fast` is not a second, coexisting skip-profile — it IS the express lane.** Per `docs/pipeline-lanes.md § 10` and `agents/ref-pipeline.md § "Express lane — a delta on the full flow"`, the legacy fixed skip-set documented below is the SAME profile the coordinator dispatches as `lane: express` — there is exactly ONE classification system (the three lanes), and `--fast` is one operator-declared entry point into it, never a parallel mechanism with its own independent skip logic. `[TIER: 1]` and Simple-Mode's granular keyword skips resolve into the same lane; only the entry surface differs (a literal `--fast`, a `[TIER: 1]` tag, or explicit keywords).
-
-**Operator-declared ONLY.** The coordinator NEVER sets `fast_mode`/`lane: express` on its own via this trigger — only a literal `--fast` in the operator's request maps to it through this alias. It is the developer's discretionary lightweight path for very small changes: a version bump, a one-line edit, a trivial copy tweak, or any express-eligible product-code change (`docs/pipeline-lanes.md § 2` bright line). It complements User-Initiated Simple Mode — Simple Mode is granular keyword skipping ("skip design", "skip tests"); `--fast` is a single named profile with a fixed skip-set (the express profile). Applies to any `type`.
-
-**Skips (= what the express profile skips, restated here for the alias's own self-containment):** Phase 1 Design (no `architect`; the orchestrator emits a one-sentence prose plan into `01-plan.md`, same surface as `type: hotfix`); plan ratification (Phase 1.5) and plan review (Phase 1.6), folded into the deterministic self-check and STAGE-GATE-1/STAGE-GATE-3, folded into ONE combined plan+delivery gate; the `qa` and `adversary` agents at Phase 3 (`adversary` skipped ONLY when non-sensitive — see "Security override" below). Full phase-by-phase mechanics: `agents/ref-pipeline.md § "Express lane — a delta on the full flow"` — this section states the alias mapping only, never a second copy of the mechanics.
-
-**Keeps — floors that `--fast` can NEVER skip:** Specify (Phase 0b); Implement (Phase 2); the Code-Hygiene Scan (Phase 2.6); the `tester` agent at Phase 3 (ONE targeted test phase scoped to the diff); the Freeze's build verification (Phase 2.8, scoped to the diff); the express combined gate (the single operator round-trip that replaces STAGE-GATE-1/STAGE-GATE-3 — never itself skippable); the active runtime's approval for the push; Delivery (Phase 4 — minimal publication prose plus coordinator branch, commit, and PR mechanics).
-
-**Security design-review carve-out (SEC-002) — restated verbatim from the express profile's own SEC-DR5-01 fold-in, never a second, independently-drifting statement.** `--fast` skips Phase 1.6's PANEL (plan-reviewer audit + qa-plan ratification) in general, but the security design-review is NOT skipped when the task is security-sensitive (path match, semantic keyword match, `[security: required]`, or `type: hotfix` on a security-sensitive path). When the carve-out fires, the `security` agent is dispatched in design-review mode within Phase 1.6, BEFORE the express combined gate — exactly as `lane: full` runs it before STAGE-GATE-1. This carve-out is additive to the Tier 3+ hotfix floor — `type: hotfix` still gets its Phase 3 security run via the floor and additionally gets the Phase 1.6 design-review when on a sensitive path. Full definition: `agents/ref-pipeline.md § "Phase 1.6 is inviolable"` and `§ "Security on express — stated directly, never inferred"`.
-
-**Security override (hard, non-negotiable — must never contradict "never waivable on express/full," `docs/pipeline-lanes.md § 5`).** A security-sensitive path (`auth/**`, `middleware/**`, `api/**`, `db/**`, `security/**`, `crypto/**`, `session/**`, or any path containing `auth`/`permission`) or `[security: required]` forces the `security` agent to run at Phase 3 regardless of `--fast` — and, when the path is sensitive, `adversary` runs alongside it from the SAME single shared Phase-3 floor predicate `agents/ref-pipeline.md § "Single shared Phase-3 floor predicate"` computes (T2-AC-10) — never a second, `--fast`-specific security condition that could drift from that predicate. For `type: fix | hotfix`, the tier-driven security floor (Tier 3+) is also preserved. `--fast` never bypasses security on sensitive code, on any type, under any override; the orchestrator announces the override when it fires. This statement is the express-lane floor stated from the `--fast` alias's own angle — it is never a second, independently-maintained security-override rule; drift between this paragraph and `docs/pipeline-lanes.md § 5` / `§ 7` is a contract violation (see `docs/pipeline-lanes.md § 12` site-enumeration table).
-
-**Acknowledge** the choice to the operator: "Fast mode (express lane) — skipping the plan-review panel, qa, and security (non-sensitive scope). tester, the push gate, and delivery still run." Record `lane: express` and `fast_mode: true` in `00-state.md § Current State` and log it under Hot Context.
-
----
-
+While inline, a live operator may request tester, QA, security, or another bounded review. The
+coordinator may suggest a review informatively but never dispatches one without that request. A
+requested review remains inline and creates no workspace, state, events, gates, Stage Gate, or
+pipeline activation.
 ## Artifact Verification in Special Flows
 
-Every special flow that skips phases must explicitly document which artifact verifications are skipped and why. The Artifact Verification Protocol (see `orchestrator.md` § Artifact Verification Protocol) runs for every agent that IS dispatched — it is only exempt for phases that are skipped entirely.
-
-### Research Flow
-
-- **Phases skipped:** 2-5 (implementation, verify, delivery, GitHub update).
-- **Artifact verification runs for:**
-  - `researcher` lanes (N parallel) → `workspaces/{feature}/research/research-findings-{angle}.md` per lane. The coordinator gates on each lane's status block. Missing or `findings: 0` lanes record a `research.lane.skipped` event (fail-open, not a failure).
-  - `research-consolidator` → `workspaces/{feature}/research/00-research.md` (or `research/research-findings-consolidated.md` for docs-flow). The coordinator verifies the consolidated findings file exists before dispatching the architect. Checks `material_closeable_gaps` in the consolidator status block for gate evaluation.
-  - `architect` → `research/00-research.md`. The coordinator verifies `research/00-research.md` exists and is non-empty after the architect returns. On termination, verifies `## Residual Gaps` section is present.
-  - **Per-round re-dispatch (gap-closure loop):** after each follow-up round, the same artifact verification sequence repeats — researcher lanes → consolidator (amended `research/00-research.md`) → architect (re-synthesized `research/00-research.md`). The coordinator also verifies the `## Coverage gaps` fenced block is present in `research/00-research.md` after the consolidator and architect return, and that `research_round` in `00-state.md` matches the current loop iteration.
-- **Artifact verification skipped for:** `implementer` (not dispatched), `tester` (not dispatched), `qa` (not dispatched), `security` (not dispatched), `delivery` (not dispatched).
-- **Not applicable:** Phases 3-4 (Phase 3.5, Phase 2.8's build verification) — no implementation to build.
-
-### Spike Flow
-
-- **Phases skipped:** 1 (design), 3-5 (verify, delivery, GitHub update).
-- **Artifact verification runs for:** `implementer` → `02-implementation.md`. The orchestrator verifies `02-implementation.md` exists after the implementer returns.
-- **Artifact verification skipped for:** `architect` (not dispatched), `tester` (not dispatched), `qa` (not dispatched), `security` (not dispatched), `delivery` (not dispatched).
-- **Not applicable:** Phases 3-4 (Phase 3.5, Phase 2.8's build verification) — no verify stage.
-
-### Hotfix sub-flow
-
-- **Phases skipped:** Phase 1 (no architect, no `01-root-cause.md`).
-- **Artifact verification runs for:** all agents that ARE dispatched — `tester` (Phase 2.0 → `02-regression-test.md`, Phase 2.7 → `03-testing.md`), `implementer` (Phase 2 → `02-implementation.md`), `qa` (Phase 3 → `reviews/04-validation.md`), `security` (Phase 1.6/Phase 3 → `reviews/04-security.md`), `delivery` (Phase 4).
-- **Artifact verification skipped for:** `architect` (not dispatched — Phase 1 skipped).
-- **Phase 2.8's build verification:** runs normally (hotfix code must still compile).
-
-### Simple Mode (user-initiated)
-
-- **Phases skipped:** only what the user requested (see above).
-- **Artifact verification runs for:** all agents that ARE dispatched in the remaining phases.
-- **Artifact verification skipped for:** agents in phases the user explicitly skipped.
-- **Phase 2.8's build verification:** runs if Phase 3 (verify) runs; skipped if the user skipped verify.
-
-### Fast Mode (--fast, operator-declared) — `lane: express`
-
-- **Phases skipped:** 1 (Design — no `architect`), 1.5, 1.6 (folded into the deterministic self-check, unless `security_sensitive: true` forces the SEC-002 design-review — see `agents/ref-pipeline.md § "Security on express — stated directly, never inferred"`), STAGE-GATE-1/STAGE-GATE-3 (replaced by the express combined gate); Phase 3 `qa` (never runs on express) + `security` (unless a sensitive path / `[security: required]` forces security, via the single shared Phase-3 floor predicate, T2-AC-10).
-- **Artifact verification runs for:** `implementer` → `02-implementation.md`; `tester` → `03-testing.md` (ONE targeted authoring+run dispatch, scoped to the diff); `delivery` (Phase 4, minimal artifacts). The orchestrator verifies each exists after the agent returns.
-- **Artifact verification skipped for:** `architect` (not dispatched — one-sentence prose plan in `01-plan.md` instead, unless the plan is architect-authored per the self-authored-plan carve-out's own boundary), `qa` (not dispatched), `security` (not dispatched, unless the sensitive-path override fires).
-- **Phase 2.8's build verification:** runs, scoped to the diff — the change must still build and the suite must pass.
-
----
-
+Artifact verification is defined by each named direct flow and by the gated pipeline after
+explicit activation. Legacy profile markers do not change verification or create a Stage Gate.
 ## Plan Sketches — Per-Type Applicability
 
 This section defines which task types and tiers produce a classification block and `sketches/*` files. The canonical reference is `docs/plan-sketches.md § 7`.
 
 | Type / Tier | Classification block? | Always-sketches (collapsed surfaces) | Conditional sketches (`sketches/*`) | sketch-guard.sh invoked? |
 |-------------|----------------------|-------------------------------------|----------------------------------------|--------------------------|
-| `feature` / `refactor` / `enhancement` | Yes — architect records in `00-state.md` and mirrors in `01-plan.md § Review Summary → ### Classification block` | Yes — functional-acceptance AC in `§ Task List`; non-functional notes in `§ Architecture` | Per booleans: the architect produces every triggered file | Yes, at STAGE-GATE-1 |
-| `fix` Tier 2-4 | Yes — architect root-cause mode records in `00-state.md`; defaults false unless fix touches a contract surface | Yes (minimum AC in `§ Task List`) | Rare — only if the fix modifies a contract surface (e.g., the fix adds an endpoint); booleans default false | Yes — no-op pass when all-false |
+| `feature` / `refactor` / `enhancement` | Yes — architect returns the block and mirrors it in `01-plan.md § Review Summary → ### Classification block`; coordinator transcribes `00-state.md` | Yes — functional-acceptance AC in `§ Task List`; non-functional notes in `§ Architecture` | Per booleans: the architect produces every triggered file | Yes, at STAGE-GATE-1 |
+| `fix` Tier 2-4 | Yes — architect returns the root-cause classification; coordinator transcribes `00-state.md`; defaults false unless fix touches a contract surface | Yes (minimum AC in `§ Task List`) | Rare — only if the fix modifies a contract surface (e.g., the fix adds an endpoint); booleans default false | Yes — no-op pass when all-false |
 | `fix` Tier 1 / `hotfix` | No architect → orchestrator records all-false block when it self-authors `01-plan.md` | Yes (minimum 4-line AC) | None (all-false by orchestrator self-author) | Yes — no-op pass (empty required set) |
-| `fix` Tier 0 / `docs` Tier 0 | **Exempt** — no workspace (CLAUDE.md §5 observability exemption) | n/a | n/a | Not invoked (no `00-state.md`) |
+| direct inline implementation | **Exempt** — no pipeline artifacts | n/a | n/a | Not invoked (no `00-state.md`) |
 | `docs` flow (Tier ≥1) | Architect docs-research mode → coordinator records all-false block (docs do not touch product contracts) | Yes (minimum AC in `§ Task List`) | None | Yes — no-op pass |
 | Research / Spike | No — architect does not produce `01-plan.md` § Task List with per-task AC | n/a | n/a | Not invoked (research/spike have no STAGE-GATE-1) |
 
-**Recording contract for self-authored plans (fix Tier 1 / hotfix / docs):** when the orchestrator self-authors `01-plan.md` (including for `docs` flow), it MUST add the `### Classification block` subsection to `## Review Summary` with all seven booleans set to `false`. This satisfies the plan-reviewer Rule 11 classification-block check and ensures `sketch-guard.sh` receives a valid state file at STAGE-GATE-1.
+**Recording contract for self-authored plans (fix Tier 1 / hotfix / docs):** when the orchestrator self-authors `01-plan.md` (including for `docs` flow), it MUST add the `### Classification block` subsection to `## Review Summary` with all nine design-classification booleans set to `false`. The coordinator, never the architect, transcribes that block into `00-state.md`; `sketch-guard.sh` then receives a valid state file at STAGE-GATE-1.
 
-**Fast Mode:** the architect is not dispatched — the orchestrator writes a one-sentence prose plan. Classification block: all-false (same as self-authored path above). Sketch-guard: invoked as a no-op pass. `sketches/*`: none produced.
+**Direct inline:** the coordinator performs only the requested bounded edit; no plan, sketch, or
+Stage Gate is created. A live operator-requested review remains ad hoc and does not activate the
+pipeline.
 
 ---
 

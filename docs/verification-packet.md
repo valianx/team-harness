@@ -1,10 +1,12 @@
 # Verification Packet — Canonical Contract
 
-This document is the **single source of truth** for `00-verify-packet.md`, the shared,
-build-once-read-many artifact that Phase-3 verifiers (`qa`, conditional `adversary`,
+This document is the **single source of truth** for `00-verify-packet.md`, a pipeline-only,
+shared build-once-read-many artifact that Phase-3 verifiers (`qa`, conditional `adversary`,
 `ux-reviewer` validate) read first instead of independently re-reading the full workspace
-document set. Agent files reference this contract by pointer — the schema
-itself lives only here (multi-site invariant, `01-plan.md`).
+document set. Inline work and live ad hoc tester/QA/security reviews never create or require a
+verification packet; they return bounded evidence in chat unless the operator explicitly asks for
+a separate artifact. Agent files reference this contract by pointer — the schema itself lives
+only here (multi-site invariant, `01-plan.md`).
 
 **Origin.** The Stage-2 verify block measured 2.8M tokens across 40 June 2026 runs (median
 86K/run) because each verifier re-read the same workspace narrative independently, with no
@@ -91,7 +93,7 @@ silently.
 | Section | Content | Source |
 |---|---|---|
 | **Header** | `Feature:`, `Task identifier:`, `Built:` (ISO timestamp), `Packet version: N`, `Tree anchor:` (computed per § 1a's canonical algorithm — never re-derived inline), `Base ref:` (copied from state `verification_base_ref`), `Frozen diff:` (`inputs/00-frozen.diff`) | orchestrator |
-| **Scope** | `type`, `bug_tier`, `security_sensitive`, `frontend_scope`, `complexity` | `00-state.md` |
+| **Scope** | `type`, `bug_tier` (1–4 metadata only), `security_sensitive`, `frontend_scope`, `complexity` | `00-state.md` |
 | **Changed files** | Table: path + `new`\|`modify` + one-line role, plus `git diff --stat` output | implementer status block + `git diff --stat` |
 | **Implementation summary** | Implementer status-block summary; `Deviations from Architecture` copied verbatim (or `"none"`); surviving `[CONSTRAINT-DISCOVERED]` annotations verbatim (or `"none"`) | `02-implementation.md` |
 | **Test artifact** | Phase 2.7 suite result, tests added, AC→test map; `regression_test_path` + status for the bug-fix flow | `03-testing.md` (authoring section) |
@@ -127,7 +129,7 @@ therefore misdirect navigation but can never change a verdict's evidence base.
 **Frozen diff:** inputs/00-frozen.diff
 
 ## Scope
-type: {feature|fix|hotfix|refactor|enhancement} | bug_tier: {0-4|n-a} | security_sensitive: {true|false} | frontend_scope: {true|false} | complexity: {simple|standard|complex}
+type: {feature|fix|hotfix|refactor|enhancement} | bug_tier: {1-4|n-a} (metadata only) | security_sensitive: {true|false} | frontend_scope: {true|false} | complexity: {bounded|standard|complex}
 
 ## Changed Files
 | Path | Type | Role |
@@ -292,7 +294,7 @@ code tree.
 - `packet_escapes` / `packet_integrity` telemetry make packet quality measurable — a high
   escape rate is the signal to enrich the packet schema, not to tighten the read contract
   further.
-- Every full-pipeline run's per-run parity line (§8) reports the verdict-doc-counted
+- Every pipeline run's per-run parity line (§8) reports the verdict-doc-counted
   three-bucket dispatch classification and verifier catch rates against the June 2026
   baseline — the evidence base the operator evaluates whenever an ordered reversion of the
   packet-first contract is under consideration.
@@ -301,7 +303,7 @@ code tree.
 
 ## 8. Per-run parity reporting (operator-evaluated)
 
-**Reporting unit = one run.** Every full-pipeline run's `00-pipeline-summary.md` reports one
+**Reporting unit = one run.** Every pipeline run's `00-pipeline-summary.md` reports one
 parity line, computable entirely from that run's own artifacts. There is no run counter, no
 multi-run window, no window-close step, and no automatic trigger of any kind.
 
@@ -319,7 +321,7 @@ contract's own Task-1 fix is repairing.
 
 **Dispatch floor — exactly one derivation.** The floor is the should-have verifier set
 derived strictly from that run's `00-state.md` scope flags: `tester` authoring unconditionally; +
-`qa` iff `lane: full`; +
+`qa` for every pipeline run; +
 `adversary` iff the orchestrator's derived security floor evaluates true; +
 `ux-reviewer` validate iff `frontend_scope: true`.
 The floor is **never** derived from
@@ -360,7 +362,7 @@ If that exact adversary report is missing, report its metrics as unavailable.
 Never fall back to an older amend report or select the greatest suffix.
 
 **Ownership and rollback — operator-owned, no automatic trigger.** Parity data accumulates
-in every full-pipeline summary; the OPERATOR evaluates it against the June 2026 baseline
+in every pipeline summary; the OPERATOR evaluates it against the June 2026 baseline
 whenever desired — there is no cross-run aggregation, window, or scheduled evaluation point
 owned by the contract itself. Rollback is a one-line contract flip shipped as a normal PR:
 the packet-first ladder default in the Phase-3 verifier Session Context Protocols

@@ -23,31 +23,70 @@ Broad, ambiguous, sensitive, or irreversible direct work is never silently upgra
 
 ## The pipeline
 
-You invoke `/th:pipeline add a daily reports endpoint`.
+You invoke `/th:pipeline add a daily reports endpoint`. Every activated run uses one
+recoverable machine:
 
-### Stage 1 — Analysis
+```text
+design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete
+```
 
-`th:orchestrator` runs the **Discover phase** first: it frames the task, may ask clarifying questions, captures an intake survey (pipeline shape, effort, autonomy, scope hint), and waits for an advance signal. Only after that signal does it create `workspaces/daily-reports/` and dispatch the `architect`.
+Team Harness has exactly two postures. `inline` is the direct default and stays outside this
+machine: it creates no pipeline workspace, state, events, gates, or delivery action. A live
+operator may explicitly request a bounded tester, QA, or security review while inline; that ad hoc
+review remains inline and does not activate a pipeline. Sensitive work may also remain inline when
+the current live operator explicitly selects `inline`; no second confirmation or forced route is
+inferred. `pipeline` is the only gated posture and every run uses the canonical full v3 machine.
+It starts only after a current live `/th:pipeline` (or equivalent explicit activation) or
+`/th:recover` of an existing run. Retired route markers are migration data only and never select a
+posture or release a gate.
 
-The architect produces the `sharded-v1` plan set: `01-plan.md` is the compact operator summary and manifest, while architecture, delivery/dependencies, conditional invariants, and each task/AC contract live under `plan/`. Roles resolve only the shards their decision needs. It also writes plan sketches when the change touches those surfaces. `qa-plan` confirms each AC is sound and `plan-reviewer` audits the complete shape; panel output stays in `reviews/01-plan-review.md`.
+### `design` and `waiting_gate1`
 
-You receive **STAGE-GATE-1** — a STOP block with the TL;DR, the human-review decisions, and the Task table. `hooks/sketch-guard.sh` validates that required sketches are present before the gate opens. Reply `approve` or `approve autonomous` (skips the Phase 1.8 post-approval plan-review offer).
+The architect produces the `sharded-v1` plan set: `01-plan.md` is the compact operator summary
+and manifest, while architecture, delivery/dependencies, conditional invariants, and each task/AC
+contract live under `plan/`. Roles resolve only the shards their decision needs. It also writes
+plan sketches when the change touches those surfaces. `qa-plan` and `plan-reviewer` are available
+only through an explicit `/th:plan-review`; their panel output stays in
+`reviews/01-plan-review.md` and never creates an automatic pipeline state.
 
-### Stage 2 — Implementation (single pass, all tasks)
+`th:orchestrator` runs Discover first, asks for an explicit advance, then dispatches one
+`architect` pass. The architect produces the manifest plus required plan shards with intention,
+included/excluded scope, functional Given/When/Then acceptance criteria, tasks with file ownership
+and dependencies, and only the risks needed to make the decision. Required sketches are emitted
+when their classification triggers them. The coordinator validates the minimum artifact,
+transcribes the architect's classification, and remains the sole writer of `00-state.md`.
 
-Every task runs in one `implementer` dispatch, in the order its `Depends on:` field implies — this is execution order within the single pass, not a set of separate dispatches. Each task closes with its own commit. For each task:
+There is no automatic approach checkpoint, ratification loop, structure loop, or post-approval
+review offer. `/th:plan-review` remains available only when explicitly invoked. A sensitive
+plan still receives its required security design review before Gate 1.
 
-- The `implementer` writes code strictly scoped to that task's `Files:`. If a hidden constraint surfaces, it annotates the constraint and Phase 2.5 **Constraint Reconciliation** decides keep / amend / drop.
-- The `tester` writes tests, the `qa` validates against the AC list, `security` audits if the change is security-sensitive — all in parallel.
-- The Acceptance Gate (Phase 3.5) requires relevant successful `test`, `command`, or `inspection` evidence for every AC; missing evidence routes to the appropriate owner.
+At **STAGE-GATE-1**, the operator sees a short summary and an artifact pointer. The stable
+options are `1 approve`, `2 approve autonomous`, `3 edit`, `4 reject`; a number alone is enough
+for the decision, while `3: detail` and `4: reason` carry edits or rejection context.
 
-Stage 2 is a single implementer pass over every task (one commit per task) — there is no per-round gate; STAGE-GATE-3, below, is the only gate after STAGE-GATE-1.
+### `implementation` and `validation`
 
-### Stage 3 — Delivery
+After Gate 1, the coordinator dispatches the approved implementation work and evidence pass.
+Tester, QA, and the applicable security lens inspect the resulting tree. A code, test, or
+documentation defect inside scope returns to the implementation executor and the affected
+validation delta is rerun. Missing evidence returns to tester. A correctable security
+`broke-it` finding or incomplete sensitive coverage fails validation, reopens Freeze, and
+requires a fresh audit before Gate 3; it cannot be carried as a concern to ship. A finding that
+would change the approved intention, scope fence, or acceptance criteria is a structural
+contradiction: the operator decides whether to reopen design and release a new Gate 1. No
+finding creates an automatic design-perfection loop.
 
-STAGE-GATE-3, immediately before delivery: the operator ships, amends, or aborts, seeing a version/CHANGELOG-entry preview and the Pre-Delivery Security Audit's findings. On `ship`, `delivery` writes the PR body and CHANGELOG entry text, and the coordinator validates the Phase-2 branch, bumps the version, commits, pushes, and opens the PR.
+Every tree change after Freeze reopens Freeze and the affected validation. Security review,
+nonces, dual-record gate releases, rollback planning, and outward-action approval remain in
+force for sensitive, destructive, or external work.
 
-**STAGE-GATE-3** is your final stop — reply `ship` / `amend` / `abort`. On `ship`, the orchestrator proceeds to Phase 5 (GitHub Update): the PR is opened on GitHub with `Fixes #N` and labels. The PR is NOT opened during the Phase 4 commit step — STAGE-GATE-3 must complete first.
+### `waiting_gate3`, `delivery`, and `complete`
+
+After validation passes, the coordinator presents **STAGE-GATE-3** with concise findings and
+delivery coordinates. The stable options are `1 ship`, `2 amend`, `3 abort`. `amend` returns
+to implementation and revalidates the changed tree; `abort` closes the run. On `ship`, delivery
+prepares publication prose and the coordinator performs the gated release mechanics. Only the
+coordinator writes state, events, and gate records.
 
 ---
 
@@ -64,35 +103,46 @@ claiming current GitHub readiness, and any final recapture mismatch restarts gat
 
 ## Bug-fix flow (type: fix and type: hotfix)
 
-When th:orchestrator classifies a request as `type: fix` or `type: hotfix` (via signals like `bug`, `solucionar`, `arreglar`, `corregir`, `regresión`, urgency markers, or GitHub `bug` label), the pipeline runs the **Bug-fix Pipeline** — the same 3-stage shell as feature flow, with type-specific content shifts. Nothing is stripped from the workspaces backbone; every artifact a feature produces is also produced for a bug fix.
+When th:orchestrator classifies a request as `type: fix` or `type: hotfix`, the run uses the
+same v3 state machine with type-specific evidence. Nothing is stripped from the workspace
+backbone; bug-fix evidence changes the design artifact and regression evidence, not the
+states or gates.
 
-| Stage | Bug-fix difference |
+| State | Bug-fix difference |
 |---|---|
-| Stage 1 — Analysis | The architect runs in **root-cause mode** and produces `01-root-cause.md` (1 page max, focused on file:line + mechanism + scope) instead of `01-plan.md`. plan-reviewer gains Rules 7 + 8 (Regression Test Approach declared in `01-root-cause.md`; regression test cross-referenced in every task's AC). |
-| Phase 2.0 — Regression Test (NEW, between STAGE-GATE-1 and Phase 2) | The tester authors a **failing test** in `02-regression-test.md` BEFORE the implementer touches source code. The test becomes the implementer's contract. Mandatory always; there is no fallback. |
-| Stage 2 — Implementation | The implementer runs under a **scope-discipline contract**: zero tangential refactors, no "while I'm here" exploration or cleanup. Incidental issues remain untouched. AC-compatible technical deviations are recorded only in `02-implementation.md`; task-blocking constraints and required scope drift are also surfaced to the coordinator. |
-| Stage 2 — Verify | `security` agent runs **always** in parallel with `tester` and `qa`, regardless of any other criterion. Defense-in-depth: many bugs have non-obvious security implications. |
-| Stage 3 — Delivery | CHANGELOG entry goes under `### Fixed`. PR title is `fix(area): <summary>` (or `... (hotfix)` for hotfix). PR body includes a mandatory **Bug Report** section with reproduction steps + root cause + regression test path. `Fixes #N` triggers GitHub's auto-close. |
+| `design` | Root-cause analysis and a minimal plan identify the regression, file:line mechanism, scope fence, and functional AC. It is not a separate state or automatic review loop. |
+| `implementation` | Tester establishes the regression evidence before source edits where the tier requires it; implementer keeps the fix scoped and records deviations. |
+| `validation` | QA validates the regression no longer reproduces. Security review remains conditional on the same fail-closed security floor. Findings route through the common final-result correction path. |
+| `delivery` | Changelog and PR prose use the `Fixed` category and include reproduction/root-cause evidence when applicable. |
 
-For `type: hotfix`: Phase 1 (architect root-cause) is skipped entirely; th:orchestrator emits a one-sentence prose plan at STAGE-GATE-1 instead. Phase 2.0 (regression test) is still mandatory.
+For `type: hotfix`, the coordinator may use the documented minimal design artifact, but Gate 1
+still exists and the regression evidence floor remains applicable.
 
-### Tier System (0–4)
+### Bug severity metadata
 
-The Bug-fix Pipeline is **tier-classified** at Phase 0a (Classify) so trivial bugs skip ceremony and critical bugs get extended analysis. th:orchestrator combines three signals — keywords in the bug report (low-tier hints like `typo`, high-tier triggers like `auth`/`injection`/`token`/`bypass`), file-path patterns (Tier 1: `*.md` / `docs/**`; Tier 2: `.github/**` / `scripts/**` / `*.test.*`; Tier 3: `src/**` / `lib/**` / `app/**` / `cmd/**`; Tier 4: sensitive paths combined with high-tier keywords), and operator overrides (`[TIER: N]`, `[regression-test: required]`, `[security: required]`) — to derive `bug_tier: 0 | 1 | 2 | 3 | 4`. Sensitive paths (`auth/**`, `middleware/**`, `api/**`, `db/**`, `security/**`, `crypto/**`, `session/**`) force a minimum of Tier 3 regardless of the operator's hint, so a Tier 1 / Tier 2 run cannot accidentally bypass security on production-critical code.
+Bug severity is evidence metadata for a bug-fix request, not a runtime posture or route selector.
+During intake the coordinator may record a severity band (`1`–`4`) from the report, paths, and
+verified operator context. Sensitive paths keep the security floor; ambiguity is fail-closed.
+The metadata can shape the evidence requested inside the canonical full v3 pipeline, but it never
+skips a phase, removes a gate, creates a direct exception, or authorizes a specialist dispatch.
 
-| Tier | Name | Phase 1 (root-cause) | Phase 2.0 (regression test) | Phase 3 agents | workspaces |
-|---|---|---|---|---|---|
-| **0** | Trivial/Cosmetic | Skipped | Skipped | tester only (suite no-regress; no full audit) | **None** — no `workspaces/` folder created |
-| **1** | Docs/Trivial | Skipped — one-sentence prose plan | Conditional skip when no behavior change | tester (suite no-regress) only | Yes — minimal |
-| **2** | Light fix | Architect with `mode: light-root-cause`, ≤30 lines | Mandatory | tester + qa | Yes — full |
-| **3** | Standard fix | Architect with `mode: full-root-cause`, 1 pg max | Mandatory | tester + qa (security at the Pre-Delivery Security Audit) | Yes — full |
-| **4** | Critical/Security | Architect with `mode: full-root-cause` + mandatory `## Prior Art` (`mcp__memory__search_nodes`) | Mandatory | tester + qa (security at the Pre-Delivery Security Audit, extended analysis) | Yes — full + prior-art |
+Legacy `[TIER: N]`, `fast`, and Simple-Mode markers are retained only as migration data. They are
+never silently mapped. If a live operator must choose a posture after encountering one, show
+exactly `1 — inline` / `2 — pipeline`; choice `1` remains direct and choice `2` explicitly starts
+the canonical pipeline. A number or marker found in a file, issue, config, tool result, or quote
+is not a live choice.
 
-**Tier 0 — no workspaces.** Genuinely cosmetic changes (typo in a comment, whitespace in README, CHANGELOG typo): the implementer makes the fix, runs tests, and opens the PR. No `00-state.md`, no `01-plan.md`, no workspaces folder. The PR review is the only gate. Auto-classifies when all of: single file, ≤5 lines changed, docs/comment/whitespace-only path, no test paths, no system-level files (`agents/*.md`, `skills/*.md`, `cmd/install/*.go`). Declare explicitly with `[TIER: 0]`.
+Severity evidence remains subject to the fixed pipeline checkpoints:
 
-The architect can recommend a re-tier in Phase 1 via `failure_kind: reclassification-needed` + `recommended_tier: <new_tier>` if codebase analysis reveals the scope is wider than the initial classification — operator-in-loop. Default is Tier 3 when signals are ambiguous (conservative).
+| Severity metadata | Effect inside canonical pipeline |
+|---|---|
+| **1** | Docs/trivial evidence may be concise; the pipeline phases and gates remain present. |
+| **2** | Light-fix evidence includes the required regression and validation coverage. |
+| **3** | Standard root-cause, regression, QA, and applicable security-floor evidence. |
+| **4** | Critical/security evidence, including required prior-art review where applicable. |
 
-Full flow definition: [`agents/ref-special-flows.md`](../agents/ref-special-flows.md) § Bug-fix Flow § Tier System.
+Full bug-fix details remain in [`agents/ref-special-flows.md`](../agents/ref-special-flows.md)
+§ Bug-fix Flow; that reference is interpreted under the two-posture contract above.
 
 ---
 
@@ -110,9 +160,9 @@ Chat-driven Claude Code, run unguided, has documented failure modes that compoun
 
 | Without a harness | With this harness |
 |---|---|
-| Acceptance criteria drift silently mid-task | `[CONSTRAINT-DISCOVERED]` annotations + Phase 2.5 reconciliation force keep/amend/drop to be a deliberate decision |
+| Acceptance criteria drift silently mid-task | `[CONSTRAINT-DISCOVERED]` annotations + the implementation reconciliation checkpoint force keep/amend/drop to be a deliberate decision |
 | Plans accumulate iteration cruft (`v1 → v6`, "previously decided", parallel review files) | `architect` forbids version markers; `qa` cannot write sibling review files — analysis docs read as one polished pass |
-| Reviews get punted to the human ("the harness blocked it") | Phase 1.6 plan-review is inviolable — dispatched as a subagent, never escalated to the user without a verdict; there is no degraded inline mode |
+| Findings are hidden behind review panels | Gate 1 shows the minimum plan and finding headlines; final defects route to implementation, while structural contradictions require an explicit new Gate 1 |
 | Multi-PR splits leave the WHY in nobody's head | Base PRs carry `Cleanup PR:` with operational rationale; secondary PRs carry `Base PR:` back-reference |
 | "Did the AC pass?" requires reading the whole plan | `01-plan.md § Task Index` routes to one task shard; its AC checkboxes mirror PASS |
 | Agents silently disappear when their frontmatter has invalid YAML | A structural test parses every agent and fails on broken YAML |
@@ -161,6 +211,6 @@ Prompt behaviour itself only validates in live pipelines — restart Claude Code
 
 **Today.** Team Harness is built on **Claude Code** specifically — the agents, skills, hooks, and installer assume the Claude Code CLI, the `Task(subagent_type=…)` dispatch model, the `~/.claude/` layout, and the slash-command surface. There is no abstraction layer over the runtime.
 
-**v2 — provider abstraction.** A future major version will introduce a runtime layer that lets the same agent + skill + hook artifacts target other agentic systems (OpenAI Assistants, LangGraph, local-model harnesses, etc.) without rewriting prompts. The orchestration model (Stage 1 / 2 / 3 + parallel verify + mandatory human gates) is provider-agnostic; the bindings are not.
+**v2 — provider abstraction.** A future major version will introduce a runtime layer that lets the same agent + skill + hook artifacts target other agentic systems (OpenAI Assistants, LangGraph, local-model harnesses, etc.) without rewriting prompts. The orchestration model (design, implementation, validation, and mandatory human gates) is provider-agnostic; the bindings are not.
 
 No timeline. PRs welcome that explore the abstraction shape without breaking the current Claude Code path.

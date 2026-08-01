@@ -5,6 +5,8 @@ import json
 import os
 import pathlib
 import stat
+import hashlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -80,6 +82,22 @@ def main() -> None:
             fail(f"{path}: write role is unexpectedly read-only")
     if generated != expected:
         fail(f"generated roles do not match contract: {sorted(generated)}")
+
+    # The generated TOML is the runtime projection of each compact adapter.
+    # Compare the parsed instruction value directly instead of relying only on
+    # generator freshness, so a stale adapter/TOML pair cannot pass unnoticed.
+    for agent in agents:
+        role = agent["name"]
+        instruction_path = ROOT / agent["instruction_source"]
+        output_path = ROOT / agent["output_path"]
+        if not instruction_path.is_file():
+            fail(f"{role}: instruction source is missing")
+        if not output_path.is_file():
+            fail(f"{role}: generated TOML is missing")
+        projected = tomllib.loads(output_path.read_text())
+        expected_instructions = instruction_path.read_text().strip()
+        if projected.get("developer_instructions") != expected_instructions:
+            fail(f"{role}: TOML developer_instructions drift from runtime adapter")
 
     if (ROOT / "codex-plugin").exists():
         fail("legacy codex-plugin tree must not remain after the marketplace layout move")
@@ -166,7 +184,7 @@ def main() -> None:
         "${CODEX_HOME:-$HOME/.codex}/.team-harness.json",
         "scripts/manage_config.py",
         "scripts/manage_agents.py",
-        "manage_config.py ensure --version 3.6.2",
+        "manage_config.py ensure --version 4.0.0",
         "codex mcp add memory",
         "@upstash/context7-mcp@3.2.5",
         "manage_agents.py sync --scope SCOPE",
@@ -174,6 +192,21 @@ def main() -> None:
     ):
         if marker not in setup:
             fail(f"Codex setup skill is missing {marker!r}")
+    setup_targets_match = re.search(
+        r"Supported targets are(?P<targets>.*?)(?:\n\n|\Z)",
+        setup,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if setup_targets_match is None:
+        fail("Codex setup does not declare its supported targets")
+    setup_targets = setup_targets_match.group("targets").lower()
+    if "lane-autoselect" in setup_targets:
+        fail("Codex setup must not advertise lane-autoselect as a supported target")
+    if re.search(r"(?im)^\s*-\s*lane auto-select\s+is\b", setup):
+        fail("Codex setup must not advertise an active lane-autoselect value")
+    for marker in ("migration-only", "1 — inline", "2 — pipeline"):
+        if marker not in setup.lower():
+            fail(f"Codex setup lane migration guidance is missing {marker!r}")
     for marker in (
         "codex plugin marketplace upgrade team-harness",
         "codex plugin remove team-harness@team-harness",
@@ -452,6 +485,66 @@ def main() -> None:
     recovery_reference = (
         ROOT / "plugins/team-harness/skills/pipeline/references/recovery.md"
     ).read_text()
+    init = (ROOT / "plugins/team-harness/skills/init/SKILL.md").read_text()
+    pipeline = (ROOT / "plugins/team-harness/skills/pipeline/SKILL.md").read_text()
+    activation = (ROOT / "plugins/team-harness/skills/pipeline/references/activation.md").read_text()
+
+    # AC13-AC20: the Codex projection exposes the same two-posture contract as
+    # Claude. Direct inline work is the default and stays outside the canonical
+    # machine; only explicit live pipeline activation/recovery enters full v3.
+    machine_text = " → ".join(
+        ("design", "waiting_gate1", "implementation", "validation", "waiting_gate3", "delivery", "complete")
+    )
+    posture_sources = {
+        "Codex pipeline": pipeline,
+        "Codex state": (ROOT / "plugins/team-harness/skills/pipeline/references/state-and-gates.md").read_text(),
+        "Claude pipeline": (ROOT / "agents/ref-pipeline.md").read_text(),
+    }
+    for label, content in posture_sources.items():
+        lowered = content.lower()
+        if "inline" not in lowered or "pipeline" not in lowered:
+            fail(f"{label} does not name both inline and pipeline postures")
+        if machine_text not in content:
+            fail(f"{label} does not expose canonical full v3 sequence")
+    for label, content in {
+        "Codex init": init,
+        "Codex pipeline": pipeline,
+        "Codex activation": activation_reference,
+    }.items():
+        if not re.search(r"exactly two postures|two postures only|only postures", content, re.IGNORECASE):
+            fail(f"{label} does not assert exactly two postures")
+
+    current_state = (ROOT / "plugins/team-harness/skills/pipeline/references/state-and-gates.md").read_text()
+    current_machine = current_state.split("## Ownership and snapshot", 1)[0].lower()
+    if re.search(r"(?m)^lane:\s*", current_machine) or re.search(r"(?m)^profile:\s*", current_machine):
+        fail("Codex active state exposes a retired lane/profile field")
+    if "lane_autoselect" in current_machine or "tier-0" in current_machine:
+        fail("Codex active state exposes a retired route selector")
+
+    if "1 — inline" not in activation_reference or "2 — pipeline" not in activation_reference:
+        fail("Codex activation does not present the exact live 1/2 posture choices")
+    if "never infer a posture from configuration" not in activation_reference.lower():
+        fail("Codex activation lets configuration choose a posture")
+    config_lower = configuration_reference.lower()
+    if "legacy route/profile keys" not in config_lower:
+        fail("Codex configuration does not identify legacy route keys")
+    if "authorize neither posture" not in config_lower or "never chooses a route" not in config_lower:
+        fail("Codex configuration treats legacy route keys as authoritative")
+    if "1 — inline" not in configuration_reference or "2 — pipeline" not in configuration_reference:
+        fail("Codex configuration does not provide live migration guidance")
+
+    # A live tester/QA/security request is an ad-hoc inline report, not a
+    # pipeline run and not a source of state, gates, or delivery artifacts.
+    for role in ("tester", "qa", "security"):
+        adapter = (ROOT / f"runtime/codex/instructions/{role}.md").read_text().lower()
+        for marker in ("ad-hoc inline review", "creates no workspace", "coordination state", "events", "gates", "delivery record"):
+            if marker not in adapter:
+                fail(f"Codex {role} ad-hoc boundary is missing {marker!r}")
+    if "no second confirmation" not in activation_reference.lower() and "second confirmation" not in init.lower():
+        fail("Codex sensitive inline path does not prohibit a second confirmation")
+    if "explicitly selects `inline`" not in activation_reference.lower() and "selects `inline`" not in init.lower():
+        fail("Codex sensitive inline path lacks live explicit selection")
+
     for label, content in {
         "direct configuration": configuration_reference,
         "pipeline activation": activation_reference,
@@ -470,7 +563,6 @@ def main() -> None:
     if "dispatch `init-project` directly" not in routing:
         fail("bootstrap routing does not target init-project")
 
-    init = (ROOT / "plugins/team-harness/skills/init/SKILL.md").read_text()
     for marker in (
         "@Team-Harness init",
         "references/configuration.md",
@@ -502,7 +594,6 @@ def main() -> None:
         if "../init/references/configuration.md" not in direct:
             fail(f"{direct_name} direct fallback does not load persistent configuration")
 
-    pipeline = (ROOT / "plugins/team-harness/skills/pipeline/SKILL.md").read_text()
     for role in ("architect", "implementer", "tester", "qa", "security", "delivery"):
         if f"{role}.toml" not in pipeline:
             fail(f"pipeline preflight does not name {role}.toml")
@@ -523,7 +614,6 @@ def main() -> None:
     ):
         if marker not in pipeline:
             fail(f"pipeline preflight is missing {marker!r}")
-    activation = (ROOT / "plugins/team-harness/skills/pipeline/references/activation.md").read_text()
     for marker in (
         "regular non-symlink file",
         "agents/architect.md (opus/xhigh)",
@@ -611,6 +701,35 @@ def main() -> None:
     ):
         if marker not in observability:
             fail(f"low-cost event contract is missing {marker!r}")
+
+    # Activation and pipeline skills carry the same generated-agent identity
+    # digests. Verify both tables against the actual normalized TOML bytes.
+    def digest_table(text: str) -> dict[str, str]:
+        return dict(
+            re.findall(
+                r"\|\s+`?(architect|implementer|tester|qa|security|delivery)`?\s+\|\s+`([0-9a-f]{64})`\s+\|",
+                text,
+            )
+        )
+
+    activation_digests = digest_table(activation)
+    pipeline_digests = digest_table(pipeline)
+    if set(activation_digests) != expected or activation_digests != pipeline_digests:
+        fail("pipeline and activation skill digest tables are not synchronized")
+    for role, expected_digest in activation_digests.items():
+        normalized = (ROOT / f".codex/agents/{role}.toml").read_bytes().replace(
+            b"\r\n", b"\n"
+        )
+        actual_digest = hashlib.sha256(normalized).hexdigest()
+        if actual_digest != expected_digest:
+            fail(
+                f"{role}: activation digest {expected_digest} does not match "
+                f"generated TOML {actual_digest}"
+            )
+
+    for reference in ("activation", "state-and-gates", "design", "implementation", "validation", "recovery", "delivery"):
+        if f"references/{reference}.md" not in pipeline:
+            fail(f"pipeline skill does not link references/{reference}.md")
 
     marketplace_check = subprocess.run(
         ["node", "tools/codex-runtime/validate-marketplace.mjs"],
