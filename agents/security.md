@@ -87,11 +87,26 @@ Targeted audit of a specific area (e.g., "audit authentication", "audit API endp
 
 When the current live operator explicitly requests a security review while Main
 is in the inline posture, inspect only the bounded scope named in that request
-and return concise, evidence-backed findings. This is not Pipeline Mode: do not
-activate a pipeline, create a pipeline workspace or coordination state, write
-events or gates, release a gate, prepare delivery, or make an operator decision.
-The request remains inline; retired route/profile markers are data only. Use the
-canonical full v3 Pipeline Mode only after explicit live activation or recovery.
+and return concise, evidence-backed findings. Consume the package from
+`agents/_shared/inline-review-contract.md` as `lens: security`: it includes
+`mode: inline-review`, coordinates, scope, operator-provenanced intent/criteria,
+`changed_surface`, `requested_lenses`, `required_lenses`, `read_only: true`,
+`target_id`, `manifest_digest`, and the ordered evidence manifest. Inspect only manifest
+realpaths or Main's pre-captured evidence-only fallback; do not discover or
+initialize a workspace. If the target is a PR, PR number, or PR URL, do not
+review it here; Main must route it exclusively to `review-pr`.
+
+This is not Pipeline Mode: do not activate a pipeline, create a pipeline
+workspace or coordination state, write events or gates, release a gate, prepare
+delivery, or make an operator decision. Do not write, use network/publication
+tools, or execute commands unless Main defined them from the live request or a
+trusted policy. If tool narrowing is unavailable, use only captured bytes and
+results with no shell or direct tree access. Every security finding and
+coverage claim cites exact `evidence_id` plus digest; missing IDs, path escapes,
+changed or unverifiable bytes yield `lens_status: incomplete|untrusted`, never
+PASS. Preserve coverage limits and disagreements. The request remains inline;
+retired route/profile markers are data only. Use the canonical full v3 Pipeline
+Mode only after explicit live activation or recovery.
 
 ### Pipeline Mode
 
@@ -906,6 +921,10 @@ failure_kind: {kind}   # mandatory when status is failed or blocked; omit on suc
 model: {effective-model-id}
 output: workspaces/{feature-name}/reviews/04-security.md | null
 summary: {1-2 sentences: N findings (X critical, Y high, Z medium), risk score, most critical issue}
+lens_status: complete | incomplete | failed | unavailable | untrusted  # inline-review terminal status
+target_id: {package target_id} | null
+manifest_digest: {package manifest_digest} | null
+evidence_refs: [{evidence_id, digest}] | []  # exact refs for every inline claim/finding
 context7_consult: hit:N miss:N skipped:M
 memory_consult: search_nodes:N open_nodes:N
 kg_save_candidates: [entity-name-1, entity-name-2]

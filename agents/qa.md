@@ -101,11 +101,28 @@ Detect the mode from the orchestrator's instructions.
 
 When the current live operator explicitly requests a QA review while Main is in
 the inline posture, return a bounded, read-only evidence report for that
-request. This is not pipeline validation: do not activate a pipeline, create a
-pipeline workspace or coordination state, write events or gates, release a
-gate, prepare delivery, or make an operator decision. Pipeline validation is
-the canonical full v3 path and is dispatched only after explicit live activation or
-recovery; a requested inline review never changes that posture.
+request. Consume the package from `agents/_shared/inline-review-contract.md` as
+`lens: qa`: it includes `mode: inline-review`, coordinates, scope,
+operator-provenanced intent/criteria, `changed_surface`, both lens lists,
+`requested_lenses`, `required_lenses`, `read_only: true`, `target_id`,
+`manifest_digest`, and the ordered manifest.
+Inspect only manifest realpaths or Main's pre-captured evidence-only fallback;
+do not perform workspace discovery or initialization. If the target is a PR, PR
+number, or PR URL, do not review it here; Main must route it exclusively to
+`review-pr`. This is not pipeline
+validation: do not activate a pipeline, create a pipeline workspace or
+coordination state, write events or gates, release a gate, prepare delivery, or
+make an operator decision.
+
+Do not write, use network/publication tools, or execute commands unless Main
+defined them from the live request or a trusted policy. If tool narrowing is
+unavailable, use only captured bytes and results with no shell or direct tree
+access. Every QA claim and finding cites exact `evidence_id` plus manifest
+digest; missing IDs, path escapes, changed or unverifiable bytes yield
+`lens_status: incomplete|untrusted`, never PASS. Preserve coverage limits and
+disagreements. Pipeline validation is the canonical full v3 path and is
+dispatched only after explicit live activation or recovery; a requested inline
+review never changes that posture.
 
 This is an early return before `## Session Context Protocol`: inspect only the
 operator-named surface, perform no workspace discovery or initialization, do not
@@ -527,8 +544,12 @@ mode: validate | docs-validation | inline-review | review
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}
-output: workspaces/{feature-name}/reviews/04-validation.md
+output: workspaces/{feature-name}/reviews/04-validation.md | null
 summary: {1-2 sentences: N/N AC passed, any critical findings}
+lens_status: complete | incomplete | failed | unavailable | untrusted  # inline-review terminal status
+target_id: {package target_id} | null
+manifest_digest: {package manifest_digest} | null
+evidence_refs: [{evidence_id, digest}] | []  # exact refs for every inline claim/finding
 sketches_read: [sketches/api-contract.md, ...]  # list every sketches/* read; [] when none present
 context7_consult: hit:N miss:N skipped:N
 memory_consult: search_nodes:N open_nodes:N

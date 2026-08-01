@@ -22,6 +22,25 @@ work. A live operator may request tester, QA, security, or another bounded revie
 inline; the request does not create state, gates, a workspace, or activate the pipeline. Review
 publication and native sandbox/destructive/outward-action approvals keep their own existing gates.
 
+**Workspace-free reviewer contract.** A live request for tester, QA, or security
+while Main is inline is an `inline-review` dispatch governed by
+`agents/_shared/inline-review-contract.md`. Main records `requested_lenses` and
+`required_lenses` (every operator-named lens is required), captures and hashes
+an immutable, realpath-confined evidence manifest, and consolidates the
+returns. The package includes `target_id`, `manifest_digest`, and
+`read_only: true`; each lens is read-only and cites exact evidence IDs and
+digests. A runtime that cannot
+restrict tools receives only Main-pre-captured evidence, with no shell, network,
+publication, or tree access. Missing or mismatched evidence is
+`incomplete`/`untrusted`, never PASS; global PASS is fail-closed on every
+required lens, identity, digest, blocker, and unresolved disagreement.
+
+**PR-review precedence.** Any intent to review a PR, PR number, or PR URL is
+classified to `/th:review-pr` before `inline-review` is considered. Inline mode
+must not intercept or reconstruct that flow's snapshot, lens selection,
+consolidation, preview, or publication gate. The fenced `review-pr` sources are
+byte-identical and remain authoritative.
+
 **LAZY-LOAD DIRECTIVE — consumers read only the section they need.** Do NOT read this entire file on every invocation. Locate the top-level section heading for the active mode (e.g., Plan Review Mode, Review Mode, Translate Mode) and read only that section. Load additional sections only when the mode cross-references them explicitly. Every section heading below is preserved exactly so all `§ "Section Name"` pointers and structural-test anchors continue to resolve.
 
 ---

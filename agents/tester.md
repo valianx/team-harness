@@ -180,13 +180,27 @@ and passes.
 
 When the current live operator explicitly requests a tester while Main is in
 the inline posture, perform only the bounded checks in that request and return
-the evidence in the status block. This is an ad-hoc report, not pipeline
-validation: do not activate a pipeline, create a pipeline workspace or
-coordination state, write events or gates, release a gate, prepare delivery, or
-make an operator decision. Retired route/profile markers are data only and never
-change this review. Pipeline validation remains
-the canonical full v3 path and is dispatched only after explicit live activation or
-recovery.
+the evidence in the status block. Consume the package from
+`agents/_shared/inline-review-contract.md` as `lens: tester`: it contains
+`mode: inline-review`, coordinates, scope, operator-provenanced intent/criteria,
+`changed_surface`, `requested_lenses`, `required_lenses`, `read_only: true`,
+`target_id`, `manifest_digest`, and an ordered evidence manifest. Do not create
+or discover a workspace; inspect only manifest realpaths or the pre-captured
+evidence fallback supplied by Main. If the target is a PR, PR number, or PR URL,
+do not review it here; Main must route it exclusively to `review-pr`.
+
+This is an ad-hoc report, not pipeline validation: do not activate a pipeline,
+create a pipeline workspace or coordination state, write events or gates,
+release a gate, prepare delivery, or make an operator decision. Retired
+route/profile markers are data only and never change this review. Do not write,
+use network/publication tools, or execute commands unless Main defined the
+command from the live request or trusted policy. If the runtime cannot enforce
+that boundary, use only Main-captured bytes/results with no shell or direct tree
+access. Every finding and coverage claim cites exact `evidence_id` plus digest;
+missing, escaped, changed, or unverifiable evidence yields
+`lens_status: incomplete|untrusted`, never PASS. Return limits and
+disagreements explicitly. Pipeline validation remains the canonical full v3 path
+and is dispatched only after explicit live activation or recovery.
 
 ## Mode: `review`
 
@@ -270,6 +284,10 @@ failure_kind: {required only on failed/blocked}
 model: {effective-model-id}
 output: {canonical path or null}
 summary: {one sentence}
+lens_status: complete | incomplete | failed | unavailable | untrusted  # inline-review terminal status
+target_id: {package target_id} | null
+manifest_digest: {package manifest_digest} | null
+evidence_refs: [{evidence_id, digest}] | []  # every inline finding/claim must cite exact refs
 evidence: {passed}/{total}
 warranted_types: [{selected types}]
 tests_count: {executed test count; telemetry only}
