@@ -76,11 +76,26 @@ function makeReader(): GateGuardReader {
         ? [path.join(codexRoot, ".team-harness.json"), legacyPath]
         : [legacyPath];
       for (const configPath of candidates) {
+        let raw: string;
         try {
-          const raw = fs.readFileSync(configPath, "utf8");
-          return JSON.parse(raw) as Record<string, unknown>;
+          raw = fs.readFileSync(configPath, "utf8");
+        } catch (err: unknown) {
+          if (err && typeof err === "object" && "code" in err
+              && (err as { code?: string }).code === "ENOENT") {
+            continue;
+          }
+          process.stderr.write(`gate-guard: cannot read Team Harness config at ${configPath}; using safe defaults\n`);
+          return null;
+        }
+        try {
+          const parsed = JSON.parse(raw) as unknown;
+          if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+            throw new TypeError("config root must be an object");
+          }
+          return parsed as Record<string, unknown>;
         } catch {
-          // Try the compatibility fallback, if any.
+          process.stderr.write(`gate-guard: malformed Team Harness config at ${configPath}; using safe defaults\n`);
+          return null;
         }
       }
       return null;

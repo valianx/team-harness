@@ -6,11 +6,12 @@
     "sandbox_mode": "workspace-write",
     "approval_policy": "on-request",
     "network_access": true,
-    "cache_environment": {
-      "GOCACHE": "/tmp/team-harness-go-cache",
-      "UV_CACHE_DIR": "/tmp/team-harness-uv-cache",
-      "npm_config_cache": "/tmp/team-harness-npm-cache"
-    }
+    "writable_roots": [
+      "~/.cache/go-build",
+      "~/.cache/uv",
+      "~/.npm",
+      "~/go/pkg/mod"
+    ]
   },
   "allowed_capabilities": [
     "filesystem-read",

@@ -134,7 +134,7 @@ Do not run the marketplace freshness check for a targeted request.
      launches Codex, without printing it, then use:
 
      ```bash
-     codex mcp add context7 --env DEFAULT_MINIMUM_TOKENS=10000 -- npx -y @upstash/context7-mcp
+     codex mcp add context7 --env DEFAULT_MINIMUM_TOKENS=10000 -- npx -y @upstash/context7-mcp@3.2.5
      ```
 
    A new Codex thread is required before newly added MCP tools are available.

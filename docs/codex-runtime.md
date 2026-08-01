@@ -52,8 +52,9 @@ picked up only by a new Codex thread.
 
 For contributors, the generated project `.codex/config.toml` keeps
 `workspace-write` plus `on-request` approvals, enables dependency network
-access, and places Go, uv, and npm caches under dedicated `/tmp` directories.
-This avoids granting broad write access to `$HOME`. Temporary `.git`
+access, and grants write access only to the current user's standard Go, uv,
+npm, and Go module cache directories. This avoids shared predictable `/tmp`
+paths and broad write access to `$HOME`. Temporary `.git`
 directories remain protected by Codex and any test that constructs them still
 requires a narrowly scoped live approval.
 

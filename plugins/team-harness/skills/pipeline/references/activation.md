@@ -97,15 +97,20 @@ Read `${CODEX_HOME:-$HOME/.codex}/.team-harness.json` first. If it is absent,
 read `~/.claude/.team-harness.json`, then opencode's `.team-harness.json`
 resolved from `OPENCODE_CONFIG_DIR`, `$XDG_CONFIG_HOME/opencode`, or
 `~/.config/opencode`, only as read-only compatibility fallbacks. When the
-selected document parses as JSON, declares `"logs-mode":
-"obsidian"`, and contains non-empty `logs-path` and `logs-subfolder` strings,
-the operator may reuse
-`{logs-path}/{logs-subfolder}/{repo-name}/{feature}/`. Never require Obsidian,
-invent an external path, or modify the compatibility fallback. If the external
-path is unavailable or not writable, report that and fall back to local only
-with the operator's consent. Resolve `operator_language` from the native
-document's `language` key before conversational detection; `english_learning`
-remains an independent boolean. `$team-harness:setup` owns persistent changes.
+selected document parses as a JSON object and declares `"logs-mode":
+"obsidian"`, the operator may reuse
+`{logs-path}/{logs-subfolder}/{repo-name}/{feature}/` only after all of these
+checks pass: canonicalize the base; require it to be absolute, accessible,
+non-root, and different from the user home; require the subfolder to be
+normalized and relative without `.`, `..`, glob, or empty segments;
+canonicalize the combined target; and require that target to remain strictly
+contained below the validated base. Reject symlink escapes. Never require
+Obsidian, invent an external path, or modify the compatibility fallback. If the
+external path is unavailable or not writable, report that and fall back to
+local only with the operator's consent. Resolve `operator_language` from the
+native document's `language` key before conversational detection;
+`english_learning` remains an independent boolean. `$team-harness:setup` owns
+persistent changes.
 
 ## Initial artifacts
 

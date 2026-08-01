@@ -31,7 +31,7 @@ IMPORT_EXCLUDED_KEYS = {
     "updated_at",
     "migration",
 }
-TOKEN_RE = re.compile(r"(?:gh[pousr]_|github_pat_|sk-[A-Za-z0-9])")
+TOKEN_RE = re.compile(r"(?:gh[pousr]_|github_pat_|sk-[A-Za-z0-9_-]{20,})")
 GLOB_RE = re.compile(r"[*?\[\]]")
 SENSITIVE_KEY_RE = re.compile(r"(?:token|secret|password|api[_-]?key|authorization|bearer)", re.I)
 
@@ -223,7 +223,9 @@ def validate(key: str, value: Any) -> None:
 
 
 def write_atomic(path: Path, before: dict[str, Any], after: dict[str, Any]) -> bool:
-    if before == after:
+    stable_before = {key: value for key, value in before.items() if key != "updated_at"}
+    stable_after = {key: value for key, value in after.items() if key != "updated_at"}
+    if stable_before == stable_after:
         return False
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     if path.exists():

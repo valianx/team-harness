@@ -94,29 +94,41 @@ function makeReader(): DevGuardReader {
         ? [path.join(codexRoot, ".team-harness.json"), legacyPath]
         : [legacyPath];
       for (const configPath of candidates) {
+        let raw: string;
         try {
-          const raw = fs.readFileSync(configPath, "utf8");
-          const config = JSON.parse(raw) as Record<string, unknown>;
+          raw = fs.readFileSync(configPath, "utf8");
+        } catch (err: unknown) {
+          if (err && typeof err === "object" && "code" in err
+              && (err as { code?: string }).code === "ENOENT") {
+            continue;
+          }
+          process.stderr.write(`dev-guard: cannot read Team Harness config at ${configPath}; using safe defaults\n`);
+          return null;
+        }
+
+        let config: Record<string, unknown>;
+        try {
+          const parsed = JSON.parse(raw) as unknown;
+          if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+            throw new TypeError("config root must be an object");
+          }
+          config = parsed as Record<string, unknown>;
+        } catch {
+          process.stderr.write(`dev-guard: malformed Team Harness config at ${configPath}; using safe defaults\n`);
+          return null;
+        }
 
         // Codex must not inherit Claude Code's persisted autogate state. The
-        // same ~/.claude/.team-harness.json is intentionally readable for
-        // non-approval settings, but `autogate.pr_create` is a Claude-scoped
-        // convenience and cannot silently approve a Codex PermissionRequest.
-        // Beta policy requires the native Codex prompt (or a future explicit
-        // Codex-scoped authorization); remove the persisted block entirely at
-        // the runtime boundary so every body path sees the same safe view.
-          if (process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
-            const codexConfig: Record<string, unknown> = Object.create(null);
-            for (const key of Object.keys(config)) {
-              if (key !== "autogate") codexConfig[key] = config[key];
-            }
-            return codexConfig;
+        // compatibility file remains readable for non-approval settings only.
+        if (process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
+          const codexConfig: Record<string, unknown> = Object.create(null);
+          for (const key of Object.keys(config)) {
+            if (key !== "autogate") codexConfig[key] = config[key];
           }
-
-          return config;
-        } catch {
-          // Try the compatibility fallback, if any.
+          return codexConfig;
         }
+
+        return config;
       }
       return null;
     },

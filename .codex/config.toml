@@ -4,9 +4,7 @@ approval_policy = "on-request"
 
 [sandbox_workspace_write]
 network_access = true
-
-[shell_environment_policy]
-set = { GOCACHE = "/tmp/team-harness-go-cache", UV_CACHE_DIR = "/tmp/team-harness-uv-cache", npm_config_cache = "/tmp/team-harness-npm-cache" }
+writable_roots = ["~/.cache/go-build", "~/.cache/uv", "~/.npm", "~/go/pkg/mod"]
 
 [agents]
 enabled = true

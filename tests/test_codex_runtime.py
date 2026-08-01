@@ -34,13 +34,16 @@ def main() -> None:
         fail("Codex project must preserve scoped approval requests")
     if config.get("sandbox_workspace_write", {}).get("network_access") is not True:
         fail("Codex project sandbox must allow dependency network access")
-    expected_caches = {
-        "GOCACHE": "/tmp/team-harness-go-cache",
-        "UV_CACHE_DIR": "/tmp/team-harness-uv-cache",
-        "npm_config_cache": "/tmp/team-harness-npm-cache",
-    }
-    if config.get("shell_environment_policy", {}).get("set") != expected_caches:
-        fail("Codex project must route tool caches to dedicated /tmp paths")
+    expected_cache_roots = [
+        "~/.cache/go-build",
+        "~/.cache/uv",
+        "~/.npm",
+        "~/go/pkg/mod",
+    ]
+    if config.get("sandbox_workspace_write", {}).get("writable_roots") != expected_cache_roots:
+        fail("Codex project must allow only user-scoped tool cache paths")
+    if "shell_environment_policy" in config:
+        fail("Codex project must not override tool caches with shared paths")
 
     generated = set()
     expected_identity = {
@@ -145,6 +148,7 @@ def main() -> None:
         "${CODEX_HOME:-$HOME/.codex}/.team-harness.json",
         "scripts/manage_config.py",
         "codex mcp add memory",
+        "@upstash/context7-mcp@3.2.5",
         "install apply --runtime codex",
         "Never create or modify",
     ):
@@ -199,6 +203,21 @@ def main() -> None:
         )
         if second.returncode != 0 or not settings_path.with_name(".team-harness.json.bak").is_file():
             fail("Codex setup config helper did not create its rolling backup")
+        settings_mtime = settings_path.stat().st_mtime_ns
+        backup_bytes = settings_path.with_name(".team-harness.json.bak").read_bytes()
+        unchanged = subprocess.run(
+            [sys.executable, str(config_script), "set", "--set", 'language="en"'],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if unchanged.returncode != 0 or json.loads(unchanged.stdout).get("changed") is not False:
+            fail("Codex setup config helper did not report an unchanged set as a no-op")
+        if settings_path.stat().st_mtime_ns != settings_mtime:
+            fail("Codex setup config helper replaced the config during a no-op")
+        if settings_path.with_name(".team-harness.json.bak").read_bytes() != backup_bytes:
+            fail("Codex setup config helper replaced its backup during a no-op")
         invalid = subprocess.run(
             [sys.executable, str(config_script), "set", "--set", 'logs-path="/"'],
             text=True,
@@ -208,6 +227,31 @@ def main() -> None:
         )
         if invalid.returncode == 0:
             fail("Codex setup config helper accepted a filesystem-root logs path")
+        short_sk = subprocess.run(
+            [sys.executable, str(config_script), "set", "--set", 'logs-subfolder="sk-a"'],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if short_sk.returncode != 0:
+            fail("Codex setup config helper treated a short sk- string as a secret")
+        realistic_sk = "sk-" + "A" * 20
+        secret_like = subprocess.run(
+            [
+                sys.executable,
+                str(config_script),
+                "set",
+                "--set",
+                f'logs-subfolder="{realistic_sk}"',
+            ],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if secret_like.returncode == 0:
+            fail("Codex setup config helper accepted a realistic sk- secret")
 
     with tempfile.TemporaryDirectory() as temp_root:
         temp = pathlib.Path(temp_root)
@@ -291,6 +335,37 @@ def main() -> None:
             fail("Codex config import did not copy opencode-only values")
         if merged_doc.get("language") != "es":
             fail("opencode import overwrote a value already imported from Claude")
+        merged_mtime = (codex_home / ".team-harness.json").stat().st_mtime_ns
+        repeated_import = subprocess.run(
+            [sys.executable, str(config_script), "import", "--from", "opencode"],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        repeated_result = json.loads(repeated_import.stdout) if repeated_import.returncode == 0 else {}
+        if repeated_result.get("changed") is not False or repeated_result.get("imported") != []:
+            fail("Codex setup config helper did not report a repeated import as a no-op")
+        if (codex_home / ".team-harness.json").stat().st_mtime_ns != merged_mtime:
+            fail("Codex setup config helper replaced the config during a no-op import")
+
+    configuration_reference = (
+        ROOT / "plugins/team-harness/skills/init/references/configuration.md"
+    ).read_text()
+    activation_reference = (
+        ROOT / "plugins/team-harness/skills/pipeline/references/activation.md"
+    ).read_text()
+    recovery_reference = (
+        ROOT / "plugins/team-harness/skills/pipeline/references/recovery.md"
+    ).read_text()
+    for label, content in {
+        "direct configuration": configuration_reference,
+        "pipeline activation": activation_reference,
+        "pipeline recovery": recovery_reference,
+    }.items():
+        lowered = content.lower()
+        if "canonical" not in lowered or "contain" not in lowered:
+            fail(f"{label} does not require canonical external-workspace containment")
 
     if (ROOT / "agents/init.md").exists():
         fail("the ambiguous project initializer name must not remain")

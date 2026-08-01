@@ -136,22 +136,20 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
   if (typeof projectExecution.network_access !== "boolean") {
     fail("project_execution.network_access must be a boolean");
   }
-  const cacheEnvironment = projectExecution.cache_environment;
-  if (!cacheEnvironment || typeof cacheEnvironment !== "object" || Array.isArray(cacheEnvironment)) {
-    fail("project_execution.cache_environment must be an object");
-  }
-  const expectedCacheVariables = new Set(["GOCACHE", "UV_CACHE_DIR", "npm_config_cache"]);
-  if (Object.keys(cacheEnvironment).length !== expectedCacheVariables.size) {
-    fail("project_execution.cache_environment must declare exactly the supported cache variables");
-  }
-  for (const [name, value] of Object.entries(cacheEnvironment)) {
-    if (!expectedCacheVariables.has(name)) {
-      fail(`project_execution.cache_environment: unsupported variable ${name}`);
-    }
-    assertNonEmptyString(value, `project_execution.cache_environment.${name}`);
-    if (!value.startsWith("/tmp/team-harness-") || value.includes("..")) {
-      fail(`project_execution.cache_environment.${name} must use a dedicated /tmp/team-harness-* path`);
-    }
+  const writableRoots = assertUniqueStringArray(
+    projectExecution.writable_roots,
+    "project_execution.writable_roots",
+    { nonEmpty: true }
+  );
+  const expectedWritableRoots = new Set([
+    "~/.cache/go-build",
+    "~/.cache/uv",
+    "~/.npm",
+    "~/go/pkg/mod"
+  ]);
+  if (writableRoots.size !== expectedWritableRoots.size
+      || [...writableRoots].some(root => !expectedWritableRoots.has(root))) {
+    fail("project_execution.writable_roots must declare exactly the supported user-scoped cache paths");
   }
   const allowedSourceModels = assertUniqueStringArray(contract.allowed_source_models, "allowed_source_models", { nonEmpty: true });
   const allowedSourceEfforts = assertUniqueStringArray(contract.allowed_source_efforts, "allowed_source_efforts", { nonEmpty: true });
@@ -285,9 +283,7 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     "",
     "[sandbox_workspace_write]",
     `network_access = ${projectExecution.network_access}`,
-    "",
-    "[shell_environment_policy]",
-    `set = { ${Object.entries(cacheEnvironment).map(([name, value]) => `${name} = ${JSON.stringify(value)}`).join(", ")} }`,
+    `writable_roots = [${[...writableRoots].map(root => JSON.stringify(root)).join(", ")}]`,
     "",
     "[agents]",
     "enabled = true",

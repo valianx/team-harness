@@ -14,8 +14,12 @@ a direct mode.
 4. Accept only correctly typed values. Ignore an invalid individual key and
    name it in one warning:
    - `logs-mode`: `local` or `obsidian`.
-   - `logs-path` and `logs-subfolder`: non-empty strings; an Obsidian path is
-     usable only when the base is absolute, non-root, and accessible.
+   - `logs-path`: a non-empty absolute path whose canonical target is
+     accessible and is neither a filesystem root nor the user home.
+   - `logs-subfolder`: a normalized, non-empty relative path without `.`, `..`,
+     glob, or empty segments. Canonicalize the combined external target and
+     require it to remain strictly contained below the validated `logs-path`;
+     otherwise reject the external workspace and use safe defaults.
    - `language`: two lowercase letters.
    - `english_learning`, `obsidian_tasks`, and `flow_telemetry.enabled`:
      booleans.

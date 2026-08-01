@@ -128,6 +128,31 @@ decision="$(printf '%s' "$out" | json_value 'd.hookSpecificOutput?.permissionDec
 [ "$decision" != "allow" ] && pass || fail "Codex-native imported autogate data must remain inert"
 rm -rf "$tmp_home"
 
+# A malformed native Codex config is authoritative corruption, not permission
+# to fall through to another runtime's persisted settings. Each config-aware
+# Codex hook warns and uses safe defaults instead.
+tmp_home="$(mktemp -d)"
+mkdir -p "$tmp_home/.codex" "$tmp_home/.claude"
+printf '%s\n' '{malformed' > "$tmp_home/.codex/.team-harness.json"
+printf '%s\n' '{"autogate":{"pr_create":true},"prepublish_check":"false"}' > "$tmp_home/.claude/.team-harness.json"
+for hook in dev-guard gate-guard prepublish-guard; do
+  fixture="pretool-outward-approval.json"
+  error_file="$tmp_home/$hook.stderr"
+  (cd "$ROOT" && HOME="$tmp_home" CODEX_HOME="$tmp_home/.codex" TEAM_HARNESS_CODEX_HOOK=1 \
+    node "plugins/team-harness/hooks/dist/$hook.cjs" < "$FIXTURES/$fixture" >/dev/null 2>"$error_file")
+  grep -q "$hook: malformed Team Harness config" "$error_file" \
+    && pass || fail "$hook must stop at malformed native Codex config and warn"
+done
+printf '%s\n' '[]' > "$tmp_home/.codex/.team-harness.json"
+for hook in dev-guard gate-guard prepublish-guard; do
+  error_file="$tmp_home/$hook.invalid-type.stderr"
+  (cd "$ROOT" && HOME="$tmp_home" CODEX_HOME="$tmp_home/.codex" TEAM_HARNESS_CODEX_HOOK=1 \
+    node "plugins/team-harness/hooks/dist/$hook.cjs" < "$FIXTURES/pretool-outward-approval.json" >/dev/null 2>"$error_file")
+  grep -q "$hook: malformed Team Harness config" "$error_file" \
+    && pass || fail "$hook must reject a non-object native Codex config and warn"
+done
+rm -rf "$tmp_home"
+
 # A positively-resolved non-default push reaches dev-guard's closed-positive
 # classifier allow. That classification is not a live Codex authorization:
 # PermissionRequest must still decline to decide, so native Codex keeps the

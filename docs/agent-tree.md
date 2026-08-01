@@ -23,11 +23,14 @@ th:orchestrator  ── top-level session agent · the operator's single point o
      research      researcher (fan-out) · code-researcher · research-consolidator ·
                    architect (research mode)
      docs          documenter
-     other         mentor · init (bootstrap) · translator · qa-plan (define-ac)
+     other         mentor · init-project (bootstrap) · translator · qa-plan (define-ac)
      Tier 0 fix    implementer (direct → straight to PR; the one gated-work exception)
 
 meta (outside any pipeline run):  agent-builder  ── authors new agents and skills
 ```
+
+`@Team-Harness init` remains the lightweight intake command; it is not the
+project-bootstrap agent name.
 
 ## Roles at a glance
 
