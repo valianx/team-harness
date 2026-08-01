@@ -222,7 +222,13 @@ def main() -> None:
             "custom": {"opaque_plain": source_secret, "nested": 7},
             "autogate": {"pr_create": True},
         }))
-        env = {**os.environ, "HOME": str(home), "CODEX_HOME": str(codex_home)}
+        env = {
+            **os.environ,
+            "HOME": str(home),
+            "CODEX_HOME": str(codex_home),
+            "XDG_CONFIG_HOME": str(home / ".config"),
+        }
+        env.pop("OPENCODE_CONFIG_DIR", None)
         inspect = subprocess.run(
             [sys.executable, str(config_script), "inspect-import", "--from", "claude"],
             text=True,
@@ -230,8 +236,10 @@ def main() -> None:
             env=env,
             check=False,
         )
-        if inspect.returncode != 0 or source_secret in inspect.stdout + inspect.stderr:
-            fail("Codex import inspection failed or disclosed a source value")
+        if inspect.returncode != 0:
+            fail("Codex import inspection command failed")
+        if source_secret in inspect.stdout + inspect.stderr:
+            fail("Codex import inspection disclosed a source value")
         imported = subprocess.run(
             [sys.executable, str(config_script), "import", "--from", "claude"],
             text=True,
@@ -239,8 +247,10 @@ def main() -> None:
             env=env,
             check=False,
         )
-        if imported.returncode != 0 or source_secret in imported.stdout + imported.stderr:
-            fail("Codex config import failed or disclosed a copied value")
+        if imported.returncode != 0:
+            fail("Codex config import command failed")
+        if source_secret in imported.stdout + imported.stderr:
+            fail("Codex config import disclosed a copied value")
         imported_doc = json.loads((codex_home / ".team-harness.json").read_text())
         if imported_doc.get("custom", {}).get("opaque_plain") != source_secret:
             fail("Codex config import did not copy opaque nested values")
@@ -272,8 +282,10 @@ def main() -> None:
             env=env,
             check=False,
         )
-        if imported_opencode.returncode != 0 or opencode_secret in imported_opencode.stdout + imported_opencode.stderr:
-            fail("opencode config import failed or disclosed a copied value")
+        if imported_opencode.returncode != 0:
+            fail("opencode config import command failed")
+        if opencode_secret in imported_opencode.stdout + imported_opencode.stderr:
+            fail("opencode config import disclosed a copied value")
         merged_doc = json.loads((codex_home / ".team-harness.json").read_text())
         if merged_doc.get("opencode_only", {}).get("api_key") != opencode_secret:
             fail("Codex config import did not copy opencode-only values")
