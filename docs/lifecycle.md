@@ -54,7 +54,7 @@ One tag, one release event, N runtime artifacts, one version namespace. Re-runni
 
 The Go installer (`cmd/install/`) manages opencode assets and the six generated Codex agent TOMLs. It does not install marketplace plugins and does not modify Codex `config.toml`; plugin install/update/remove remains marketplace-owned. Claude Code has no reachable binary-install path.
 
-The Claude marketplace is the Claude Code install channel. The repository Codex marketplace supplies seven workflow skills (`@Team-Harness init` is lightweight intake and `@Team-Harness pipeline` is explicit full activation), while `install apply|update|uninstall --runtime codex` separately places six specialist agents. The Go binary remains the opencode install channel as well.
+The Claude marketplace is the Claude Code install channel. The repository Codex marketplace supplies two lifecycle skills (`setup`, `update`) plus seven workflow skills (`@Team-Harness init` is lightweight intake and `@Team-Harness pipeline` is explicit full activation), while `install apply|update|uninstall --runtime codex` separately places six specialist agents. The Go binary remains the opencode install channel as well.
 
 ---
 

@@ -93,13 +93,19 @@ does not collide with an unrelated active workspace.
 Use `{repo-root}/workspaces/{feature}/` by default. This local path requires no
 setup and is the beta's portable first-use mode.
 
-If `~/.claude/.team-harness.json` already exists, parses as JSON, declares
-`"logs-mode": "obsidian"`, and contains non-empty `logs-path` and
-`logs-subfolder` strings, the operator may reuse
+Read `${CODEX_HOME:-$HOME/.codex}/.team-harness.json` first. If it is absent,
+read `~/.claude/.team-harness.json`, then opencode's `.team-harness.json`
+resolved from `OPENCODE_CONFIG_DIR`, `$XDG_CONFIG_HOME/opencode`, or
+`~/.config/opencode`, only as read-only compatibility fallbacks. When the
+selected document parses as JSON, declares `"logs-mode":
+"obsidian"`, and contains non-empty `logs-path` and `logs-subfolder` strings,
+the operator may reuse
 `{logs-path}/{logs-subfolder}/{repo-name}/{feature}/`. Never require Obsidian,
-invent an external path, or modify this legacy configuration. If the external
+invent an external path, or modify the compatibility fallback. If the external
 path is unavailable or not writable, report that and fall back to local only
-with the operator's consent.
+with the operator's consent. Resolve `operator_language` from the native
+document's `language` key before conversational detection; `english_learning`
+remains an independent boolean. `$team-harness:setup` owns persistent changes.
 
 ## Initial artifacts
 

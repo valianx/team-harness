@@ -36,7 +36,7 @@ Generated with the `team-harness` profile. This table includes every canonical T
 | `gcp-cost-analyzer` | `opus` | `high` | `gpt-5.6-sol` | `xhigh` | not shipped in Codex beta |
 | `gcp-infra` | `opus` | `xhigh` | `gpt-5.6-sol` | `xhigh` | not shipped in Codex beta |
 | `implementer` | `sonnet` | `high` | `gpt-5.6-luna` | `max` | installed custom agent |
-| `init` | `haiku` | `medium` | `gpt-5.6-luna` | `max` | not shipped in Codex beta |
+| `init-project` | `haiku` | `medium` | `gpt-5.6-luna` | `max` | not shipped in Codex beta |
 | `likec4-diagrammer` | `sonnet` | `medium` | `gpt-5.6-luna` | `max` | not shipped in Codex beta |
 | `mentor` | `opus` | `high` | `gpt-5.6-sol` | `xhigh` | not shipped in Codex beta |
 | `orchestrator` | `opus` | `high` | `gpt-5.6-sol` | `xhigh` | Main via `init` / `pipeline` skills |

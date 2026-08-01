@@ -1573,21 +1573,25 @@ function makeReader() {
       }
     },
     readConfig() {
-      try {
-        const configPath = path.join(os.homedir(), ".claude", ".team-harness.json");
-        const raw = fs.readFileSync(configPath, "utf8");
-        const config = JSON.parse(raw);
-        if (process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
-          const codexConfig = /* @__PURE__ */ Object.create(null);
-          for (const key of Object.keys(config)) {
-            if (key !== "autogate") codexConfig[key] = config[key];
+      const legacyPath = path.join(os.homedir(), ".claude", ".team-harness.json");
+      const codexRoot = process.env.CODEX_HOME?.trim() || path.join(os.homedir(), ".codex");
+      const candidates = process.env.TEAM_HARNESS_CODEX_HOOK === "1" ? [path.join(codexRoot, ".team-harness.json"), legacyPath] : [legacyPath];
+      for (const configPath of candidates) {
+        try {
+          const raw = fs.readFileSync(configPath, "utf8");
+          const config = JSON.parse(raw);
+          if (process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
+            const codexConfig = /* @__PURE__ */ Object.create(null);
+            for (const key of Object.keys(config)) {
+              if (key !== "autogate") codexConfig[key] = config[key];
+            }
+            return codexConfig;
           }
-          return codexConfig;
+          return config;
+        } catch {
         }
-        return config;
-      } catch {
-        return null;
       }
+      return null;
     }
   };
 }

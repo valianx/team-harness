@@ -175,7 +175,7 @@ Two columns only, because two facts are all you need: when to call it, and what 
 | `researcher` | research flow — N parallel lanes, default 3, cap 5 | per-lane findings files |
 | `research-consolidator` | research flow, after the lanes return | consolidated `research/00-research.md` |
 | `code-researcher` | codebase-research flow — N parallel code lanes | per-lane `file:line`-grounded findings |
-| `init` | Bootstrap check fails at Intake | `CLAUDE.md`, `CHANGELOG.md`, `.gitignore` |
+| `init-project` | Bootstrap check fails at Intake | `CLAUDE.md`, `CHANGELOG.md`, `.gitignore` |
 | `d2-diagrammer` · `likec4-diagrammer` | the operator's chosen diagram mode | `.d2` · `.c4` source, rendered |
 | `documenter` | documentation flow | vault pages + `02-documentation.md` |
 | `translator` | translate mode | locale files + glossary |
@@ -505,7 +505,7 @@ Classify plain-text requests against the table before entering the pipeline. Rea
 | spike, prototype, PoC | `spike` | write |
 | documentar/document, "genera documentación" | `docs` | write |
 | entregar/deliver | `deliver` | write |
-| inicializar/init/bootstrap | `init` | write |
+| inicializar proyecto / project init / bootstrap | `init-project` | write |
 | language request **with** a persistence marker (`por defecto`, `siempre`, `default`, `permanente`, `de aquí en adelante`) | language-set, **persistent** | write |
 | language request **without** one | language-set, session-only | write |
 | english-learning toggle, with / without a persistence marker | english-learning-set, persistent / session | write |
@@ -558,7 +558,7 @@ Lane classification is **the one classification system**; `--fast`, `[TIER: N]` 
 
 ### 14–17
 
-14. **Bootstrap check** (skip for `research`/`plan`/`spike`) — verify `CLAUDE.md`, `CHANGELOG.md`, and `.gitignore` covering `/workspaces`. Any missing → dispatch `init` directly.
+14. **Bootstrap check** (skip for `research`/`plan`/`spike`) — verify `CLAUDE.md`, `CHANGELOG.md`, and `.gitignore` covering `/workspaces`. Any missing → dispatch `init-project` directly.
 15. **Decomposition analysis — always run, never skipped.** Evaluate whether the scope is N independent tasks. Three valid outcomes: one atomic task; **N independent tasks → one plan carrying N tasks, ordered by the DAG and implemented through the Phase 2 base dispatch — with any qualifying task substituted out into seam fan-out (§ Scheduler) — consolidated into one PR**; one cohesive-but-oversized task → surface it to the operator rather than force a split. *One atomic task is a result of running the analysis, never a bypass of it.*
 16. **Test-pipeline auto-detection** and spike/docs type routing — route per `agents/ref-special-flows.md`.
 17. **Announce the classification**, then Specify.

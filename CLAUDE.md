@@ -96,7 +96,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin `th`; Codex plugin `team-harness` via `.agents/plugins/marketplace.json`; Go agent installer for opencode and Codex. The tagged Git tree is both plugin artifact—there is no separate Codex archive. |
 
-**Current version:** `3.6.0` (see `.claude-plugin/plugin.json`, the tag authority. Its version is shared by the Claude and Codex plugin manifests, the Claude marketplace entry, and the installer fallback. `CHANGELOG.md` tracks release history).
+**Current version:** `3.7.0` (see `.claude-plugin/plugin.json`, the tag authority. Its version is shared by the Claude and Codex plugin manifests, the Claude marketplace entry, and the installer fallback. `CHANGELOG.md` tracks release history).
 
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
@@ -130,7 +130,7 @@ All commands run from the repo root.
 > Extended detail for conventions without a dedicated docs/ file: see `docs/conventions.md`.
 
 - **One concern per file.** One agent per `.md` in `agents/`. One skill per `.md` in `skills/` (complex skills get their own subfolder).
-- **Frontmatter-driven agents.** Every agent file starts with YAML frontmatter (`name`, `description`, `model`, `color`, `effort`). Model tiers: `opus` (architect/agent-builder/security/coordination), `haiku` (researcher/init), `sonnet` (all others). Effort ceiling `xhigh`; session-global on CC, per-agent-advisory on opencode — see `agents/README.md`.
+- **Frontmatter-driven agents.** Every agent file starts with YAML frontmatter (`name`, `description`, `model`, `color`, `effort`). Model tiers: `opus` (architect/agent-builder/security/coordination), `haiku` (researcher/init-project), `sonnet` (all others). Effort ceiling `xhigh`; session-global on CC, per-agent-advisory on opencode — see `agents/README.md`.
 - **orchestrator is the lightweight hub.** Direct work is the default. `/th:pipeline` activates the lazy-loaded gated contract in `agents/ref-pipeline.md`; skills never invoke pipeline specialists directly.
 - **Workspaces as the shared board.** Agents communicate through files in `workspaces/{feature-name}/`; the operator uses it as a review surface. Never through return values. `workspaces/` is always git-ignored. `docs/conventions.md`.
 - **Dual-mode workspaces.** Local (`./workspaces/`) or Obsidian vault, via `logs-mode` in `~/.claude/.team-harness.json`. `docs/conventions.md`.

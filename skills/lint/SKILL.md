@@ -202,7 +202,7 @@ Canonical matrix (must match exactly):
 | `qa` | sonnet | high |
 | `qa-plan` | sonnet | high |
 | `gcp-cost-analyzer` | opus | high |
-| `init` | sonnet | medium |
+| `init-project` | sonnet | medium |
 | `implementer` | sonnet | high |
 | `tester` | sonnet | high |
 | `documenter` | sonnet | high |

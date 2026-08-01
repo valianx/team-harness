@@ -48,7 +48,7 @@ meta (outside any pipeline run):  agent-builder  ── authors new agents and s
 | `diagrammer` / `d2-diagrammer` / `likec4-diagrammer` | any | orchestrator | No |
 | `documenter` | docs | orchestrator (docs direct mode) | No |
 | `researcher` / `code-researcher` / `research-consolidator` | research | orchestrator (research direct mode) | No |
-| `mentor` / `init` / `translator` | direct | orchestrator | No |
+| `mentor` / `init-project` / `translator` | direct | orchestrator | No |
 | `gcp-cost-analyzer` / `gcp-infra` | ops | orchestrator | No (gcp-infra has its own blast-radius confirmation) |
 | `agent-builder` | meta | operator (not a pipeline run) | No |
 

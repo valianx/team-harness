@@ -123,6 +123,36 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
   }
   const allowedCapabilities = assertUniqueStringArray(contract.allowed_capabilities, "allowed_capabilities", { nonEmpty: true });
   const allowedSandboxModes = assertUniqueStringArray(contract.allowed_sandbox_modes, "allowed_sandbox_modes", { nonEmpty: true });
+  const projectExecution = contract.project_execution;
+  if (!projectExecution || typeof projectExecution !== "object" || Array.isArray(projectExecution)) {
+    fail("project_execution must be an object");
+  }
+  if (!allowedSandboxModes.has(projectExecution.sandbox_mode)) {
+    fail(`project_execution: unsupported sandbox mode ${projectExecution.sandbox_mode ?? "missing"}`);
+  }
+  if (projectExecution.approval_policy !== "on-request") {
+    fail("project_execution.approval_policy must be on-request");
+  }
+  if (typeof projectExecution.network_access !== "boolean") {
+    fail("project_execution.network_access must be a boolean");
+  }
+  const cacheEnvironment = projectExecution.cache_environment;
+  if (!cacheEnvironment || typeof cacheEnvironment !== "object" || Array.isArray(cacheEnvironment)) {
+    fail("project_execution.cache_environment must be an object");
+  }
+  const expectedCacheVariables = new Set(["GOCACHE", "UV_CACHE_DIR", "npm_config_cache"]);
+  if (Object.keys(cacheEnvironment).length !== expectedCacheVariables.size) {
+    fail("project_execution.cache_environment must declare exactly the supported cache variables");
+  }
+  for (const [name, value] of Object.entries(cacheEnvironment)) {
+    if (!expectedCacheVariables.has(name)) {
+      fail(`project_execution.cache_environment: unsupported variable ${name}`);
+    }
+    assertNonEmptyString(value, `project_execution.cache_environment.${name}`);
+    if (!value.startsWith("/tmp/team-harness-") || value.includes("..")) {
+      fail(`project_execution.cache_environment.${name} must use a dedicated /tmp/team-harness-* path`);
+    }
+  }
   const allowedSourceModels = assertUniqueStringArray(contract.allowed_source_models, "allowed_source_models", { nonEmpty: true });
   const allowedSourceEfforts = assertUniqueStringArray(contract.allowed_source_efforts, "allowed_source_efforts", { nonEmpty: true });
   const allowedRuntimeReasoningEfforts = assertUniqueStringArray(contract.allowed_runtime_reasoning_efforts, "allowed_runtime_reasoning_efforts", { nonEmpty: true });
@@ -250,6 +280,15 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
 
   const config = [
     "# Code generated from runtime/schema/codex-agents.json; DO NOT EDIT.",
+    `sandbox_mode = ${JSON.stringify(projectExecution.sandbox_mode)}`,
+    `approval_policy = ${JSON.stringify(projectExecution.approval_policy)}`,
+    "",
+    "[sandbox_workspace_write]",
+    `network_access = ${projectExecution.network_access}`,
+    "",
+    "[shell_environment_policy]",
+    `set = { ${Object.entries(cacheEnvironment).map(([name, value]) => `${name} = ${JSON.stringify(value)}`).join(", ")} }`,
+    "",
     "[agents]",
     "enabled = true",
     `max_concurrent_threads_per_session = ${contract.max_concurrent_threads_per_session}`,

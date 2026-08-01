@@ -54,7 +54,7 @@ func TestEmbeddedAssets_AllExpectedAgents(t *testing.T) {
 	roster := []string{
 		"adversary", "agent-builder", "architect", "code-researcher",
 		"d2-diagrammer", "delivery", "diagrammer", "documenter", "gcp-cost-analyzer",
-		"gcp-infra", "implementer", "init", "likec4-diagrammer", "mentor",
+		"gcp-infra", "implementer", "init-project", "likec4-diagrammer", "mentor",
 		"orchestrator", "plan-reviewer", "qa", "qa-plan", "research-consolidator",
 		"pr-review-qa", "pr-review-security", "researcher", "reviewer",
 		"reviewer-consolidator", "security", "tester",

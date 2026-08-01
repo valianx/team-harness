@@ -6,7 +6,8 @@ description: Continue validation for an explicitly activated Team Harness pipeli
 # Validate
 
 Locate state whose `activation` is `explicit`. If none exists, do not create
-pipeline state or gates; continue the user's ordinary Codex validation.
+pipeline state or gates; read `../init/references/configuration.md`, resolve the
+persistent settings, and continue the user's ordinary Codex validation.
 
 For an active pipeline, read
 `../pipeline/references/state-and-gates.md` and

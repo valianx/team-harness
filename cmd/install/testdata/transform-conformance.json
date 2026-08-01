@@ -23,8 +23,8 @@
   {
     "name": "agent_empty_tools",
     "surface": "agent",
-    "input": "---\nname: init\nmodel: haiku\ntools: \n---\nBody.\n",
-    "expectedOutput": "---\nname: init\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
+    "input": "---\nname: init-project\nmodel: haiku\ntools: \n---\nBody.\n",
+    "expectedOutput": "---\nname: init-project\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
     "note": "Empty tools list → empty permission object."
   },
   {
@@ -245,8 +245,8 @@
     "name": "tiered_haiku_bakes_anthropic_haiku",
     "surface": "agent",
     "tierProvider": "anthropic",
-    "input": "---\nname: init\nmodel: haiku\ntools: \n---\nBody.\n",
-    "expectedOutput": "---\nname: init\nmodel: anthropic/claude-haiku-4-5\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
+    "input": "---\nname: init-project\nmodel: haiku\ntools: \n---\nBody.\n",
+    "expectedOutput": "---\nname: init-project\nmodel: anthropic/claude-haiku-4-5\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
     "note": "#424 AC-9: haiku -> low -> anthropic/claude-haiku-4-5."
   },
   {

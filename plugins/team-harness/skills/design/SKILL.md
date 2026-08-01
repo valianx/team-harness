@@ -6,8 +6,9 @@ description: Continue the design phase of an explicitly activated Team Harness p
 # Design
 
 First locate active state whose `activation` is `explicit`. If none exists, do
-not create state, dispatch specialists, or introduce gates; continue the user's
-ordinary Codex task directly.
+not create state, dispatch specialists, or introduce gates; read
+`../init/references/configuration.md`, resolve the persistent settings, and
+continue the user's ordinary Codex task directly.
 
 For an active pipeline, read
 `../pipeline/references/state-and-gates.md` and

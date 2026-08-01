@@ -1,5 +1,5 @@
 ---
-name: init
+name: init-project
 description: Bootstraps Claude Code in any repository (backend, frontend, or fullstack). Discovers the tech stack, generates a CLAUDE.md with golden commands and subagent orchestration, and creates a CHANGELOG.md if missing.
 model: haiku
 effort: medium
@@ -48,7 +48,7 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 
    **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 
-2. **Create workspaces folder if needed** — create `workspaces/{feature-name}/` for your init report (`00-init.md`). Use `init` as feature name when standalone, or the pipeline's feature name when auto-init.
+2. **Create workspaces folder if needed** — create `workspaces/{feature-name}/` for your init report (`00-init.md`). Use `init-project` as feature name when standalone, or the pipeline's feature name when auto-init.
 
 3. **Ensure `.gitignore` includes `workspaces`** — this is part of init's Phase 4 responsibilities.
 
@@ -86,7 +86,7 @@ Write your init summary to `workspaces/{feature-name}/00-init.md`:
 - {items that couldn't be verified, or "none"}
 ```
 
-Use `init` as feature name when running standalone. When invoked as auto-init from the pipeline, use the pipeline's feature name.
+Use `init-project` as feature name when running standalone. When invoked as auto-init from the pipeline, use the pipeline's feature name.
 
 Init also writes to the repository root (these are committed, not ephemeral):
 - `CLAUDE.md` — project configuration for Claude Code
@@ -463,7 +463,7 @@ This pins all text files to LF on checkout, which is the dominant convention for
 
 ## Phase 4.5 — Optional scaffolds (interactive or flag-driven)
 
-Run these steps only when explicitly invoked via flag or when the operator confirms during an interactive `init` run.
+Run these steps only when explicitly invoked via flag or when the operator confirms during an interactive `init-project` run.
 
 ### `--scaffold-review-policy`
 
@@ -503,10 +503,10 @@ Scaffold the GitHub Actions re-review reminder workflow into the consumer repo.
 
 ## Execution Log Protocol
 
-The orchestrator writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly. If init runs standalone (no workspaces context), skip this step.
+The orchestrator writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly. If init-project runs standalone (no workspaces context), skip this step.
 
-**On start:** append `| {YYYY-MM-DD HH:MM} | init | init | started | — | — |`
-**On end:** append `| {YYYY-MM-DD HH:MM} | init | init | completed | {Nm} | {success/failed} |`
+**On start:** append `| {YYYY-MM-DD HH:MM} | init-project | init-project | started | — | — |`
+**On end:** append `| {YYYY-MM-DD HH:MM} | init-project | init-project | completed | {Nm} | {success/failed} |`
 
 ---
 
@@ -515,7 +515,7 @@ The orchestrator writes observability events to `workspaces/{feature-name}/00-ex
 When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
-agent: init
+agent: init-project
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}

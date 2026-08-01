@@ -121,6 +121,11 @@ out="$(cd "$ROOT" && HOME="$tmp_home" bash "$ADAPTER" dev-guard PermissionReques
 [ -z "$out" ] && pass || fail "Claude autogate must not auto-approve Codex PermissionRequest"
 out="$(cd "$ROOT" && HOME="$tmp_home" bash "$ADAPTER" dev-guard PreToolUse < "$FIXTURES/pretool-outward-approval.json")"
 [ -n "$out" ] && ! printf '%s' "$out" | grep -q 'permissionDecision' && pass || fail "Codex autogate state must not bypass native PreToolUse policy"
+mkdir -p "$tmp_home/.codex"
+printf '%s\n' '{"autogate":{"pr_create":true}}' > "$tmp_home/.codex/.team-harness.json"
+out="$(cd "$ROOT" && HOME="$tmp_home" TEAM_HARNESS_CODEX_HOOK=1 node plugins/team-harness/hooks/dist/dev-guard.cjs < "$FIXTURES/pretool-outward-approval.json")"
+decision="$(printf '%s' "$out" | json_value 'd.hookSpecificOutput?.permissionDecision')"
+[ "$decision" != "allow" ] && pass || fail "Codex-native imported autogate data must remain inert"
 rm -rf "$tmp_home"
 
 # A positively-resolved non-default push reaches dev-guard's closed-positive

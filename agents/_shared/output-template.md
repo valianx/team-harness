@@ -1,6 +1,6 @@
 # Output Discipline
 <!-- Cross-cutting output contract for agents and skills.
-     Consumed by: agents/{orchestrator,delivery,init,architect,implementer,tester,qa,security}.md
+     Consumed by: agents/{orchestrator,delivery,init-project,architect,implementer,tester,qa,security}.md
      and skills/{setup,lint,memory}/SKILL.md.
      Edit here; consumer files reference this file by section. -->
 

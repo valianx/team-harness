@@ -56,13 +56,20 @@ function makeReader(): PrepublishReader {
     },
 
     readConfig(): Record<string, unknown> | null {
-      try {
-        const configPath = path.join(os.homedir(), ".claude", ".team-harness.json");
-        const raw = fs.readFileSync(configPath, "utf8");
-        return JSON.parse(raw) as Record<string, unknown>;
-      } catch {
-        return null;
+      const legacyPath = path.join(os.homedir(), ".claude", ".team-harness.json");
+      const codexRoot = process.env.CODEX_HOME?.trim() || path.join(os.homedir(), ".codex");
+      const candidates = process.env.TEAM_HARNESS_CODEX_HOOK === "1"
+        ? [path.join(codexRoot, ".team-harness.json"), legacyPath]
+        : [legacyPath];
+      for (const configPath of candidates) {
+        try {
+          const raw = fs.readFileSync(configPath, "utf8");
+          return JSON.parse(raw) as Record<string, unknown>;
+        } catch {
+          // Try the compatibility fallback, if any.
+        }
       }
+      return null;
     },
 
     gitDiffNameStatus(): Array<{ status: string; path: string; oldPath?: string }> | null {

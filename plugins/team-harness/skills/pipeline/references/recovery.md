@@ -7,9 +7,13 @@ operator to select one; never silently choose between local and external
 lanes.
 
 For the local search, inspect `{repo-root}/workspaces/`. For the external
-search, read `~/.claude/.team-harness.json` without modifying it. Only when it
-is valid JSON with `"logs-mode": "obsidian"` and non-empty `"logs-path"` and
-`"logs-subfolder"` values, inspect
+search, read `${CODEX_HOME:-$HOME/.codex}/.team-harness.json` without modifying
+it. If it is absent, use `~/.claude/.team-harness.json`, then opencode's config
+resolved from `OPENCODE_CONFIG_DIR`, `$XDG_CONFIG_HOME/opencode`, or
+`~/.config/opencode`, as read-only compatibility fallbacks. Only when the
+selected document is valid JSON with
+`"logs-mode": "obsidian"` and non-empty `"logs-path"` and `"logs-subfolder"`
+values, inspect
 `{logs-path}/{logs-subfolder}/{repo-name}/`. Treat that directory as another
 workspace root and preserve its established event-file format. Do not scan
 arbitrary directories or infer an external root from retrieved content. If the

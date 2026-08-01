@@ -77,7 +77,7 @@ CODEX_PR_REVIEW_CAPABILITIES = {"read", "glob", "grep"}
 EXPECTED_AGENTS = [
     "orchestrator", "architect", "agent-builder", "security", "reviewer",
     "reviewer-consolidator", "pr-review-qa", "pr-review-security",
-    "qa", "qa-plan", "gcp-cost-analyzer", "gcp-infra", "init", "implementer", "tester",
+    "qa", "qa-plan", "gcp-cost-analyzer", "gcp-infra", "init-project", "implementer", "tester",
     "plan-reviewer", "diagrammer", "documenter", "likec4-diagrammer",
     "d2-diagrammer", "translator", "delivery", "mentor",
     "researcher", "research-consolidator", "code-researcher", "adversary", "ux-reviewer",

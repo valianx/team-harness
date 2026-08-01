@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Update"
+  short_description: "Update Team Harness for Codex"
+  default_prompt: "Use $team-harness:update to update Team Harness for Codex."

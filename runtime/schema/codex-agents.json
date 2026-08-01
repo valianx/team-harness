@@ -2,6 +2,16 @@
   "format_version": 1,
   "runtime": "codex",
   "max_concurrent_threads_per_session": 4,
+  "project_execution": {
+    "sandbox_mode": "workspace-write",
+    "approval_policy": "on-request",
+    "network_access": true,
+    "cache_environment": {
+      "GOCACHE": "/tmp/team-harness-go-cache",
+      "UV_CACHE_DIR": "/tmp/team-harness-uv-cache",
+      "npm_config_cache": "/tmp/team-harness-npm-cache"
+    }
+  },
   "allowed_capabilities": [
     "filesystem-read",
     "filesystem-write",

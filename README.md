@@ -42,13 +42,27 @@ codex plugin marketplace add valianx/team-harness
 codex plugin add team-harness@team-harness
 ```
 
+3. Start a new Codex thread and configure the runtime:
+
+```text
+$team-harness:setup
+```
+
+The setup skill configures native Team Harness settings, optional MCP servers,
+workspace/language preferences, and the six specialist agents. It preserves
+Codex's native permission and hook-trust prompts. It can also import every
+missing setting from an existing Claude Code or opencode Team Harness config;
+opaque values are copied directly and never displayed.
+
 Review the [plugin hook manifest](./plugins/team-harness/hooks/hooks.json) and
 its referenced scripts, then explicitly trust the repository before enabling
 those hooks. Plugin installation and agent installation are separate. The
 plugin provides the Team Harness skills; the six generated agents are installed
 by the repository's Go binary.
 
-3. From the root of the project where Team Harness will run, install its six
+The equivalent manual agent-installation fallback, from the project root, is:
+
+From the root of the project where Team Harness will run, install its six
    agents (requires Go 1.25.8 or newer):
 ```bash
 cd /path/to/your/project
@@ -72,7 +86,8 @@ Codex user configuration rather than only this checkout. The six agents are
 required by the gated `pipeline` workflow; lightweight `init` remains
 available with the plugin alone.
 
-4. Start a new Codex thread so the plugin and installed agents are loaded.
+4. Start another Codex thread so newly configured MCP servers and installed
+   agents are loaded.
 
 5. Try the two entry points in a clean `Main` thread:
 ```text
@@ -86,6 +101,7 @@ state or subagents. `pipeline` explicitly starts the full gated workflow in
 
 Upgrade, removal, local development, hook trust, and the complete role/model
 roster are documented in [`docs/codex-runtime.md`](./docs/codex-runtime.md).
+For routine upgrades invoke `$team-harness:update` from a Codex thread.
 
 ### Install into opencode
 

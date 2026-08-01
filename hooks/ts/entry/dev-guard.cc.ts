@@ -88,10 +88,15 @@ function makeReader(): DevGuardReader {
     },
 
     readConfig(): Record<string, unknown> | null {
-      try {
-        const configPath = path.join(os.homedir(), ".claude", ".team-harness.json");
-        const raw = fs.readFileSync(configPath, "utf8");
-        const config = JSON.parse(raw) as Record<string, unknown>;
+      const legacyPath = path.join(os.homedir(), ".claude", ".team-harness.json");
+      const codexRoot = process.env.CODEX_HOME?.trim() || path.join(os.homedir(), ".codex");
+      const candidates = process.env.TEAM_HARNESS_CODEX_HOOK === "1"
+        ? [path.join(codexRoot, ".team-harness.json"), legacyPath]
+        : [legacyPath];
+      for (const configPath of candidates) {
+        try {
+          const raw = fs.readFileSync(configPath, "utf8");
+          const config = JSON.parse(raw) as Record<string, unknown>;
 
         // Codex must not inherit Claude Code's persisted autogate state. The
         // same ~/.claude/.team-harness.json is intentionally readable for
@@ -100,18 +105,20 @@ function makeReader(): DevGuardReader {
         // Beta policy requires the native Codex prompt (or a future explicit
         // Codex-scoped authorization); remove the persisted block entirely at
         // the runtime boundary so every body path sees the same safe view.
-        if (process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
-          const codexConfig: Record<string, unknown> = Object.create(null);
-          for (const key of Object.keys(config)) {
-            if (key !== "autogate") codexConfig[key] = config[key];
+          if (process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
+            const codexConfig: Record<string, unknown> = Object.create(null);
+            for (const key of Object.keys(config)) {
+              if (key !== "autogate") codexConfig[key] = config[key];
+            }
+            return codexConfig;
           }
-          return codexConfig;
-        }
 
-        return config;
-      } catch {
-        return null;
+          return config;
+        } catch {
+          // Try the compatibility fallback, if any.
+        }
       }
+      return null;
     },
   };
 }

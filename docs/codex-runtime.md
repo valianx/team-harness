@@ -13,6 +13,13 @@ codex plugin marketplace add valianx/team-harness
 codex plugin add team-harness@team-harness
 ```
 
+Then invoke `$team-harness:setup`. The setup skill writes native settings to
+`${CODEX_HOME:-$HOME/.codex}/.team-harness.json`, configures workspace and
+language preferences, offers Memory/context7 MCP registration, checks hook
+trust, and can place the six specialist agents in project or global scope.
+It can import all missing values from Claude Code or opencode without printing
+opaque values; existing Codex-native values always win.
+
 Contributors testing an already trusted local checkout can replace the first
 command with `codex plugin marketplace add .`.
 
@@ -24,10 +31,13 @@ codex plugin marketplace add valianx/team-harness \
   --sparse plugins/team-harness
 ```
 
-Use `codex plugin marketplace upgrade team-harness` to refresh the catalog,
-then remove and add the plugin again when upgrading the local snapshot. Remove
-it with `codex plugin remove team-harness@team-harness`. Run `codex plugin marketplace
-remove team-harness` only when no installed plugin still depends on it.
+Use `$team-harness:update` for the normal update flow. It refreshes the
+marketplace, compares versions, asks before replacing the installed plugin,
+preserves native settings, and offers to align an existing specialist-agent
+installation. The underlying manual sequence remains `codex plugin marketplace
+upgrade team-harness`, remove `team-harness@team-harness`, then add it again.
+Run `codex plugin marketplace remove team-harness` only when no installed
+plugin still depends on it.
 
 During local plugin development, make a real file change before reinstalling so
 the development cache key changes; then remove and add
@@ -40,9 +50,16 @@ checkout; never bypass hook trust for an unreviewed repository. Hooks and the
 installer beta currently require a POSIX shell. Installation or updates are
 picked up only by a new Codex thread.
 
+For contributors, the generated project `.codex/config.toml` keeps
+`workspace-write` plus `on-request` approvals, enables dependency network
+access, and places Go, uv, and npm caches under dedicated `/tmp` directories.
+This avoids granting broad write access to `$HOME`. Temporary `.git`
+directories remain protected by Codex and any test that constructs them still
+requires a narrowly scoped live approval.
+
 Plugin installation and agent installation are separate. The plugin supplies
-seven skills (`init`, `pipeline`, `design`, `implement`, `validate`, `deliver`,
-`recover`). The Go installer supplies the six generated project or global
+nine skills (`setup`, `update`, `init`, `pipeline`, `design`, `implement`,
+`validate`, `deliver`, `recover`). The Go installer supplies the six generated project or global
 agents without modifying `config.toml`. The commands below assume the released
 installer binary is available as `install`. Without that binary, run the same
 subcommands as `go run github.com/valianx/team-harness/cmd/install@latest ...`
