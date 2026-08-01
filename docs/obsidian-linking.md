@@ -108,12 +108,12 @@ This means:
 
 ---
 
-## Local-Mode and Tier-0 No-Ops
+## Local-mode and no-workspace no-ops
 
 | Condition | Behavior |
 |---|---|
 | `logs_mode == "local"` | Explicit indexing is a no-op. Report `obsidian_interlink: skipped: local-mode`. |
-| `docs_root` does not exist (Tier-0 fix / no-workspace run) | Explicit indexing is a no-op. Report `obsidian_interlink: skipped: no-workspace`. |
+| `docs_root` does not exist (inline/direct artifact or invalid input) | Explicit indexing is a no-op. Report `obsidian_interlink: skipped: no-workspace`. |
 
 The index/MOC files are written to the Obsidian vault (`{logs-path}/{logs-subfolder}/...`), never to the repo working tree. They are never staged or committed.
 

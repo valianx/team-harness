@@ -74,6 +74,37 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 3c: converged Claude/Codex pipeline contract"
+echo "############################################################"
+if [ -n "$PY" ] && $PY "$TESTS_DIR/test_pipeline_contract.py"; then
+    echo "pipeline-contract: PASS"
+elif [ -z "$PY" ]; then
+    echo "pipeline-contract: FAIL (Python 3 not found)"
+    FAILED=$((FAILED + 1))
+else
+    echo "pipeline-contract: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 3d: Codex runtime projection and skill synchronization"
+echo "# Requires: Python 3 and node. Skipped when node is absent."
+echo "############################################################"
+if [ -z "$PY" ]; then
+    echo "codex-runtime: FAIL (Python 3 not found)"
+    FAILED=$((FAILED + 1))
+elif ! command -v node >/dev/null 2>&1; then
+    report_skip_or_fail "codex-runtime" "node not found"
+elif $PY "$TESTS_DIR/test_codex_runtime.py"; then
+    echo "codex-runtime: PASS"
+else
+    echo "codex-runtime: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 echo "# Suite 3b: review context snapshot helper — behavioral tests"
 echo "############################################################"
 if [ -n "$PY" ] && $PY "$TESTS_DIR/test_review_context.py"; then

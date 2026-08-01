@@ -27,5 +27,10 @@ the operator asked or when they explain a result the operator must act on.
 assumption and continue; ask only when missing information blocks progress. Mandatory stops
 — direct-mode boundaries, gate releases, and required runtime approvals — are not elective questions.
 
+**Gate replies.** Show each stable numeric option beside its textual meaning. Accept the
+number alone only when no detail is required; Gate 1 edit/reject require `3: detail` or
+`4: reason`. Textual equivalents remain valid. An unknown number, modified reply or
+detail-less edit/reject is ambiguous and releases nothing; re-present with a fresh nonce.
+
 **When rules collide:** understandable > actionable > correct > brief. Drop detail before
 clarity; never drop a finding.

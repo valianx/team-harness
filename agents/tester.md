@@ -154,7 +154,9 @@ successful. Do not convert it into a test to satisfy a coverage table.
 For a bug-fix with a Phase 2.0 artifact, reuse that regression contract and
 confirm it now passes. If a newly warranted test exposes a product defect,
 return `status: failed` and route the behavior to the implementer; do not weaken
-the assertion.
+the assertion. Record the finding with its cause, affected files, implicated AC,
+and concrete correction so the implementer can patch the approved scope without
+re-opening design.
 
 Append the suite run to `{docs_root}/00-suite-evidence.md` when that artifact is
 present in the pipeline contract.
@@ -166,15 +168,25 @@ present, run the recorded tests/commands, and verify each evidence-map row is
 still relevant and successful. For inspection evidence, confirm the cited
 artifact location exists and supports the claim.
 
-Do not add or edit tests. Missing or stale evidence is a finding that reopens
-Phase 2.7. For Tier 2–4 fixes, confirm the regression assertion is intact and
-passes.
+Do not add or edit tests. Missing or stale evidence is a tester finding: report
+the cause, evidence files, implicated AC, and the exact evidence correction. A
+product defect discovered by the run returns to implementation. A sensitive
+coverage gap that cannot be closed by the tester returns to implementation,
+reopens Freeze, and requires a fresh security audit of the changed delta before
+the next gate. For Tier 2–4 fixes, confirm the regression assertion is intact
+and passes.
 
-## Express lane
+## Ad-hoc inline review
 
-When explicitly dispatched for the express lane, perform `authoring` and
-`verify-run` in one targeted pass. The evidence contract and zero-test success
-remain unchanged.
+When the current live operator explicitly requests a tester while Main is in
+the inline posture, perform only the bounded checks in that request and return
+the evidence in the status block. This is an ad-hoc report, not pipeline
+validation: do not activate a pipeline, create a pipeline workspace or
+coordination state, write events or gates, release a gate, prepare delivery, or
+make an operator decision. Retired route/profile markers are data only and never
+change this review. Pipeline validation remains
+the canonical full v3 path and is dispatched only after explicit live activation or
+recovery.
 
 ## Mode: `review`
 
@@ -213,6 +225,21 @@ for it.
 When `skip-security` is not exactly `true`, perform the direct flow's compact
 source security scan and report only concrete findings with `file:line`.
 
+## Final-result finding contract
+
+For every failed test, missing evidence row, or incomplete sensitive coverage,
+write a compact finding containing all four values below:
+
+- **Cause:** what failed or what evidence is missing.
+- **Files:** the test, source, or artifact paths that establish the finding.
+- **AC:** the exact `AC-N` identifiers implicated.
+- **Correction:** the smallest concrete action and its owner.
+
+Use `failure-brief.md` for a finding that blocks acceptance. The brief must also
+state `Freeze: reopened` and `Re-audit: required` when a sensitive coverage gap
+or adversarial/security finding returns work to implementation. Never rewrite an
+AC to make a test pass, and never claim a finding is resolved for QA or security.
+
 ## Test changes and failures
 
 A test may be removed or changed under
@@ -227,8 +254,9 @@ or inconvenient. A failing product behavior routes to the implementer. A
 malformed or isolated test may be corrected by the tester.
 
 On failure append only the actionable iteration to
-`workspaces/{feature}/failure-brief.md`: failing evidence, relevant output,
-likely owner, and required correction.
+`workspaces/{feature}/failure-brief.md`: cause, affected files, implicated AC,
+required correction, and the owner. Keep the evidence concise and preserve the
+approved AC text.
 
 ## Return protocol
 
@@ -236,7 +264,7 @@ Return a compact status block only:
 
 ```text
 agent: tester
-mode: pre-fix-regression | authoring | verify-run | review | coverage-config | test-infra | module-test
+mode: pre-fix-regression | authoring | verify-run | inline-review | review | coverage-config | test-infra | module-test
 status: success | failed | blocked
 failure_kind: {required only on failed/blocked}
 model: {effective-model-id}
@@ -259,6 +287,9 @@ packet_escapes: N
 packet_integrity: ok | stale | mismatch | n-a
 tools: read:N write:N edit:N bash:N grep:N glob:N
 issues: {actionable blockers or none}
+finding_summary: [{cause, files, ac, correction}] | none
+freeze_reopened: true | false
+reaudit_required: true | false
 ```
 
 Omit mode-specific fields when they do not apply. `tests_count` is observational

@@ -8,14 +8,14 @@
      the record-based recover backstop, the STOP-block templates, and the single
      preparer + presenter + recorder flow.
      Consumed by: agents/ref-pipeline.md — IMPLEMENTS/RECORDS this contract for its
-     three STAGE-GATEs; it is the sole agent that prepares, presents and records
+     two STAGE-GATEs; it is the sole agent that prepares, presents and records
      a gate.
      Edit here; the coordinator references this file by section. -->
 
 ## Ownership — single source, never copied
 
 This file is the ONE canonical description of the gate mechanism. `agents/ref-pipeline.md`
-**implements and references** it — the three STAGE-GATEs it welds internally follow the
+**implements and references** it — its two STAGE-GATEs follow the
 rules below verbatim. No other agent file may copy, restate, or fork this contract.
 Duplicating it re-imports the drift risk this design closes: a second copy would diverge
 from this one the first time either is edited, and a diverged copy is a security-relevant
@@ -33,13 +33,18 @@ separate presentation duty.
 ## Outward-action release floor
 
 No pipeline outward action — including `git push`, `gh pr create`, or `gh pr merge` —
-proceeds without `gate3_release ∈ {ship}` registered in the governing lane's
+proceeds without `gate3_release ∈ {ship}` registered in the governing pipeline's
 `00-state.md` (see § "The dual-record release" below). The orchestrator enforces this
 ordering by refusing to invoke the action before the release exists.
 
-Pipeline release and runtime approval are independent requirements. A recorded release
-does not grant tool permission, and runtime approval does not create or repair a pipeline
-release. Every outward action still requires the active runtime's current approval.
+`Gate 3: ship` is the operator's single delivery approval for the previewed frozen tree and the
+exact workspace prose paths/digests presented with it. It authorizes the coordinator's standard
+sequence through version/changelog, commit, feature-branch push, and draft PR creation/update;
+it never authorizes mutating an existing ready-for-review PR. No second conversational
+confirmation is allowed between those steps. Native runtime tool approval may still be required
+to execute a command, but that is
+a technical permission boundary—not another Team Harness decision and never a substitute for the
+recorded release. Merge, tag, release, publication, force-push, and broader scope remain excluded.
 
 **Force-push clause (Invariant E, operator-mandated).** The pipeline never force-pushes —
 not with `-f`, `--force`, `--force-with-lease`, or a `+`-prefixed refspec. A `ship`
@@ -51,8 +56,9 @@ decision cannot authorize force-push or shared-history rewriting.
 wrappers, dynamically reconstructed commands, alternate executables, git configuration
 overrides, and unresolved shell syntax are not permitted substitutes.
 
-This contract never bypasses server-side branch protections. Mutating GitHub API writes
-and merges require explicit operator approval through the active runtime; local git
+This contract never bypasses server-side branch protections. Standard draft-PR creation/update is
+covered by `ship`; merge, tag, release, publication, and other non-previewed GitHub writes require
+a separate explicit live request. Local git
 operations remain subject to the repository's own rules.
 
 ## The dual-record release
@@ -62,7 +68,7 @@ the same phase-transition:
 
 | Record | Where | What it carries |
 |---|---|---|
-| Field | `00-state.md § Current State` | `gate1_release` or `gate3_release` — see the per-gate allowlist table below — plus `gate_nonce`, the token currently pending for that gate |
+| Field | `00-state.md § Current State` | `gate_pending`, `gate1_release` or `gate3_release` — see the per-gate allowlist table below — plus `gate_nonce`, the token currently pending for that gate |
 | Event | `{events_file}` | a `stage.gate.release` JSON line carrying `stage`, `decision`, `gate_nonce` (the consumed value) |
 
 **The `gate_nonce` field.** Each dual-record carries a third element: a `gate_nonce` — a
@@ -90,6 +96,11 @@ governs every phase boundary (checklist mark + `phase.end` event as one step). A
 update with no matching event, or an event with no matching field, is a contract violation
 the moment it happens.
 
+While a gate is presented, `gate_pending` is the bare literal `gate1` or `gate3` and
+`gate_nonce` is the fresh token. On a valid release, the coordinator records the matching
+release field and event in the same transition, consumes the nonce and clears
+`gate_pending`. A re-presentation replaces both pending values; it never reuses a nonce.
+
 **Per-gate allowlists** (the values recover treats as "cleared" — see § "Record-based
 recover backstop"):
 
@@ -116,8 +127,8 @@ nonce is a freshness and ordering token, not a secret and not an authentication 
 presentation*, which the coordinator observes directly and the operator cannot forge by
 omitting a string.
 
-**Bare-literal field values.** Each of the five gate-state fields —
-`gate1_release`, `gate3_release`, `gate_nonce`,
+**Bare-literal field values.** Each of the gate-state fields —
+`gate_pending`, `gate1_release`, `gate3_release`, `gate_nonce`,
 `working_branch`, and `worktree` — is written to `00-state.md § Current State`
 as a bare literal: the value carries no second token delimited by a space on
 the same line, no trailing nonce, attribution, justification, or condition
@@ -142,7 +153,7 @@ gate decision belongs in `00-decision-ledger` (`operator-approval`,
 
 **The "No gate-field repair" invariant.** No agent converts a malformed
 gate-field value into a well-formed one. No agent other than the
-orchestrator writes any of the five fields above, under any circumstance —
+orchestrator writes any of the six fields above, under any circumstance —
 including one it finds already malformed. Recovery from a malformed field is
 re-presenting the affected gate with a fresh `gate_nonce` (see above); the
 write that eventually lands is the product of a new operator reply, never a
@@ -179,7 +190,7 @@ independent of any gate.
 At each STAGE-GATE the orchestrator renders the STOP block directly to the operator
 inline, pausing for an explicit reply in that same conversation. The shape below is a
 GENERIC template: the orchestrator's own gate-data contract
-(`agents/ref-pipeline.md § "STAGE-GATE-1"`/`"STAGE-GATE-3"`/`"Express combined gate"`)
+(`agents/ref-pipeline.md § "STAGE-GATE-1"`/`"STAGE-GATE-3"`)
 supplies the REAL option set of each presentation, including its conditionality.
 Substituting the real option set with this generic placeholder — rendering the bare
 `ship`/`amend`/`abort` shape shown below when the actual presentation's set is narrower or
@@ -187,46 +198,50 @@ richer — is a contract violation, not a formatting choice: the template below 
 shape of a STOP block, it never overrides what a specific gate's own section says its
 options are.
 
-**STAGE-GATE-1** — end of Stage 1 (mandatory, never skippable):
+**STAGE-GATE-1** — end of `design` (mandatory, never skippable):
 
 ```
 ========================================
  STAGE-GATE-1 — Plan ready for human review
 ========================================
- {Review Summary + Confidence band + Task Summary + accumulated cost
-  + combined verdict, or a deferred-review note when the plan-review panel
-  was deferred pre-gate (agents/ref-pipeline.md § "Phase 1.5 — Plan
-  Ratification" / § "Phase 1.6 — Plan Review")}
+ {intent + scope fence + functional AC summary + task/file map + required risks
+  + security-design result when the security floor applies; full plan at artifact}
 
  Reply with:
-   - "approve"            → proceed to Stage 2
-   - "approve autonomous" → proceed to Stage 2, skip the Phase 1.8 post-approval plan-review offer
-   - "reject {reason}"    → route back to architect
-   - "edit"                → pause for manual edits, then "approve"
+   - "1 — approve"            → proceed to `implementation`
+   - "2 — approve autonomous" → proceed to `implementation` with preference retained
+   - "3: detail — edit"        → return to `design` after the requested edit
+   - "4: reason — reject"      → return to `design` after the operator's decision
 ========================================
 ```
 
-**Deferred-review variant (no allowlist or dual-record change).** When the implementing orchestrator's `plan_review_status` is `deferred` or `not-applicable`, the `{...}` placeholder above renders a one-line deferred-review note instead of a combined verdict — see `agents/ref-pipeline.md § "STAGE-GATE-1 — End of Stage 1"` for the exact rendering. This substitutes CONTENT inside the placeholder only: the allowlist, the nonce mechanics, and the dual-record fields this file governs are unchanged — a deferred-review presentation clears and records exactly like any other STAGE-GATE-1 presentation.
+Numbers are stable input aliases for the exact textual values. A bare `3` or `4` is
+ambiguous because edit/reject require detail; use `3: detail` or `4: reason`. The alias
+never changes nonce, dual-record or live-reply requirements.
 
-**STAGE-GATE-3** — end of Stage 3 (mandatory, never skippable, regardless of
+**STAGE-GATE-3** — end of `validation` (mandatory, never skippable, regardless of
 `autonomous`):
 
 ```
 ====================================
  STAGE-GATE-3 — Delivery ready for human approval
 ====================================
- {delivery summary + version/CHANGELOG-entry preview + Pre-Delivery Security Audit findings,
+ {delivery summary + version preview + exact PR title/body, acceptance-matrix, and optional
+  CHANGELOG-entry draft paths with SHA-256 digests + Pre-Delivery Security Audit findings,
   or a stated absence when no audit lens ran (security_floor_applies: false)}
 
  Reply with:
-   - "ship"   → proceed to Delivery, GitHub Update, and session close
-   - "amend"  → pause for local fixes, then "ship"
-   - "abort"  → halt without pushing
+   - "1 — ship"   → proceed to `delivery`
+   - "2 — amend"  → return to `implementation`, then validate again
+   - "3 — abort"  → record terminal `phase/status: aborted` and halt without pushing
 ====================================
 ```
 
-Each allowlist above (`approve` / `approve autonomous` / `reject {reason}` / `edit`;
-`ship` / `amend` / `abort`) is
+The Gate 3 numeric aliases are exact textual equivalents; a modified or combined reply
+is ambiguous and releases nothing.
+
+Each allowlist above (Gate 1: `1`/`approve`, `2`/`approve autonomous`, `3: detail`/`edit`,
+`4: reason`/`reject {reason}`; Gate 3: `1`/`ship`, `2`/`amend`, `3`/`abort`) is
 closed — see § "Ambiguous-gate-reply rule" for what happens when a reply does not map to
 exactly one of these values.
 
@@ -282,7 +297,7 @@ interior file write. This residual is pre-existing and platform-bounded; the fus
 adds nor removes it.
 
 **2. The contractual order floor.** The orchestrator does not invoke a pipeline outward
-action unless `gate3_release ∈ {ship}` for that lane (§ "Outward-action release floor").
+action unless `gate3_release ∈ {ship}` for that pipeline (§ "Outward-action release floor").
 This rule closes the ordering gap only; it does not verify writer identity because the
 release field remains intra-privilege-forgeable.
 
@@ -309,18 +324,33 @@ such, not papered over), a contractual ORDER floor owned by the orchestrator, an
 active runtime's separate approval floor. Any prose elsewhere that implies a structural closure beyond ORDER, or
 that implies layer 1's property survived the fusion, is a contract violation.
 
-## Multi-lane event scoping (SEC-DR-H)
+## Shared event scoping (SEC-DR-H)
 
-When multiple orchestrator lanes share a single `events_file` (an initiative-level or
-otherwise shared events file, as already used elsewhere for multi-project fan-out), the
-"dual" in dual-record must still hold per-lane, not just per-file. Every
-`stage.gate.release` event carries the lane/`project` key. The event-side half of the recover check (condition (a) above) must be
-matched against the **same** lane/`project` as the field-side
-half (condition (b), read from that lane's own orchestrator `00-state.md`) — never against
-the nearest `stage.gate.release` line in the shared file regardless of which lane wrote
-it. Scoping the search this way preserves the dual-record guarantee under a shared
-`events_file`: a release event from lane A can never satisfy condition (a) for lane B's
-gate, even when both lines live in the same JSONL/markdown file.
+When multiple projects share a single `events_file` (an initiative-level or otherwise
+shared events file), the "dual" in dual-record must still hold per project, not merely
+per file. Every `stage.gate.release` event carries the `project` key. The event-side half
+of the recover check (condition (a) above) must match the **same** project as the
+field-side half (condition (b), read from that project's own `00-state.md`) — never the
+nearest release line regardless of which project wrote it. A release event from project A
+can never satisfy condition (a) for project B, even when both lines live in one trace.
+
+## Posture boundary and migration
+
+`inline` is direct work outside the pipeline machine. It creates no state, events, gates,
+delivery record, or pipeline workspace. A live operator may request an ad-hoc tester, QA,
+security, or other review while inline; that review remains inline and does not create
+pipeline state or a gate. Runtime/native permission, destructive-action, and outward-action
+approvals remain unchanged.
+
+If a live operator requests `inline` while a pipeline is active, the orchestrator performs
+an administrative close (`phase: aborted`, `status: aborted`, pending gate cleared) and
+then returns to direct work. It writes no synthetic gate release and consumes no pending
+nonce. A legacy snapshot is never silently mapped: the operator must choose `1 — inline`
+or `2 — pipeline`. Only an explicit `2 — pipeline` permits the first legitimate write to
+set `pipeline_version: 3`, map the phase, and append `state.migrated`; valid dual-record
+gate fields, decisions, pending or consumed nonces, checklist marks, and historical events are
+preserved, while malformed or missing records remain uncleared. No migration write may
+synthesize a release or repair a gate.
 
 ## Ambiguous-gate-reply rule
 
@@ -337,10 +367,10 @@ a reply, the orchestrator:
 
 The per-gate allowlists this rule enforces:
 
-| Gate | Allowlist |
+| Gate | Allowlist (text and numeric aliases) |
 |---|---|
-| STAGE-GATE-1 | `approve`, `approve autonomous`, `reject {reason}`, `edit` |
-| STAGE-GATE-3 | `ship`, `amend`, `abort` |
+| STAGE-GATE-1 | `1`/`approve`, `2`/`approve autonomous`, `3: {detail}`/`edit`, `4: {reason}`/`reject {reason}` |
+| STAGE-GATE-3 | `1`/`ship`, `2`/`amend`, `3`/`abort` |
 
 This turns the one residual place where model capability could matter at the gate seam —
 interpreting an ambiguous human reply — into a closed-form contract rule that holds

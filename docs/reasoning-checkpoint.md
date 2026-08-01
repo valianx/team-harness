@@ -1,6 +1,10 @@
 # Reasoning Checkpoint — Contract
 
-The reasoning checkpoint is a reusable gate that the coordinator applies at three pipeline boundaries to ensure the operator has provided a fresh advance signal **and** a confirmed functional-clarity artifact before any phased dispatch proceeds.
+The reasoning checkpoint is a reusable gate for the canonical `pipeline` posture. It applies at
+three pipeline boundaries to ensure the operator has provided a fresh advance signal **and** a
+confirmed functional-clarity artifact before any phased dispatch proceeds. `inline` is the direct
+default and does not enter this checkpoint, create pipeline state, or dispatch pipeline phases;
+live tester/QA/security ad hoc reviews remain inline with bounded evidence only.
 
 This document is the authoritative contract, read by `agents/ref-pipeline.md` only after an activated run reaches B1, B2, or B3.
 
@@ -49,7 +53,10 @@ Add to `## Current State`:
   # its `provenance` for convenience and is never consulted in place of the event
 ```
 
-These four fields coexist with the existing `discover_state`, `advance_signal`, and `survey_*` fields — they are complementary, not replacements. `checkpoint_advance_fresh` is the deterministic predicate the guard reads; `advance_signal` continues to record the specific form.
+These four fields coexist with the pipeline's existing `discover_state`, `advance_signal`, and
+metadata fields. They are complementary, not route selectors. `checkpoint_advance_fresh` is the
+deterministic predicate the guard reads; `advance_signal` continues to record the specific live
+form.
 
 ---
 
@@ -68,9 +75,17 @@ These four fields coexist with the existing `discover_state`, `advance_signal`, 
    with exit 0 (deny). The dispatch does not proceed.
 4. If the advance contract is satisfied (`checkpoint_advance_fresh: true` AND `functional_clarity_confirmed: true`), the hook allows the dispatch (`permissionDecision: "allow"`).
 
-**Skip markers.** When `00-state.md` records `fast_mode: true`, a `bug_tier` value, or the `discover_state: bypassed` flag, the guard permits the advance without requiring the clarity artifact. Skip markers are a deliberate operator opt-out (`--fast`, `[TIER: N]`, `@th:orchestrator this is a hotfix:`). A skip marker bypasses the checkpoint; it does NOT bypass any security floor.
+**Retired route markers are data only.** The guard never treats `fast_mode`, a tier marker,
+`discover_state: bypassed`, `--fast`, `[TIER: N]`, Simple-Mode wording, or a hotfix phrase as a
+checkpoint bypass. Every active pipeline boundary requires the two-part advance contract. If a live
+operator needs to choose a posture after encountering old wording, show `1 — inline` /
+`2 — pipeline`; neither choice is inferred from the old value.
 
-**HI-2 inviolable at all three boundaries (B1, B2, B3).** The checkpoint guard NEVER waives a security floor. The guard governs only the functional-clarity transition. Security gates (triggered by `security_sensitive: true`, path-pattern auto-escalation, and the bug-fix forcing rule) run on a fully independent path and are unaffected by the checkpoint state. A skip marker that bypasses the checkpoint does NOT bypass the security gate. This invariant holds at B1 intake→plan, B2 research→next, and B3 postverify→next without exception.
+**HI-2 inviolable at all three boundaries (B1, B2, B3).** The checkpoint guard NEVER waives a
+security floor. The guard governs only the functional-clarity transition. Security gates (triggered
+by `security_sensitive: true`, path-pattern auto-escalation, and the bug-fix forcing rule) run on a
+fully independent path and are unaffected by the checkpoint state. This invariant holds at B1
+intake→plan, B2 research→next, and B3 postverify→next without exception.
 
 **Fail-safe design.** If the hook cannot read `00-state.md` (file absent, parse error, or the hook errors out), it permits the dispatch (fail-open). This is intentional: the checkpoint gates functional clarity, not security. The Layer-2 self-check (below) is the fallback, and security floors are independent.
 
@@ -94,7 +109,7 @@ Every failure mode — no marker, a malformed header, a nonexistent path, or a r
 
 **Trust model — intra-privilege.** The agent that writes `checkpoint_advance_fresh: true` to `00-state.md` is the same agent that subsequently dispatches the `Task`. There is no cross-privilege escalation boundary: a spoofed value in the state file would bypass a pedagogical pause, not a security gate. The worst-case outcome of a spurious `true` is that the clarity checkpoint is skipped, not that a security control is compromised. This is documented as an explicit design decision, not a gap.
 
-**Sibling deterministic floor — `gate-guard`.** `checkpoint-guard` is not the only PreToolUse hook that resolves the governing `00-state.md` before making a decision. `gate-guard` (`hooks/ts/bodies/gate-guard.ts`, `PreToolUse`/matcher `Bash`) is a structural sibling: it too locates the active lane's `00-state.md` by mtime-selection — the same `selectByMtime` strategy this file's Layer-1 hook uses (local workspaces subtree + the obsidian vault subtree) — before deciding. Both hooks read `00-state.md` for a deterministic pipeline floor, but the fields they read govern two DIFFERENT trust models:
+**Sibling deterministic floor — `gate-guard` (historical/unwired).** `checkpoint-guard` is not the only PreToolUse hook that historically resolved the governing `00-state.md` before making a decision. `gate-guard` (`hooks/ts/bodies/gate-guard.ts`, `PreToolUse`/matcher `Bash`) is retained as a structural sibling: its old terminology refers to a pipeline record, not a current posture or selector. Both hooks read `00-state.md` for a deterministic pipeline floor, but the fields they read govern two DIFFERENT trust models:
 
 - **`checkpoint-guard` gates a pedagogical pause.** The fields it reads (`checkpoint_advance_fresh`, `functional_clarity_confirmed`) govern whether the operator has engaged with the functional-clarity checkpoint before a phase-advance dispatch. Per "Trust model — intra-privilege" above, a spoofed value bypasses a REASONING pause, not a security control.
 - **`gate-guard` gates outward-action ORDER.** The field it reads (`gate3_release`) governs whether a push/`gh pr create` from a detected pipeline lane is preceded by a recorded STAGE-GATE-3 release (`agents/_shared/gate-contract.md § "Outward-action release floor"`). This field is equally intra-privilege-forgeable — no hook distinguishes writers, the same platform-bounded limit described above — but the consequence of a forged value differs in kind: it would let an outward, potentially irreversible action proceed out of order, not merely skip a pause. `gate-guard`'s own decision set is `{none, deny}` (never `ask`), and it sits ABOVE the pre-existing `dev-guard` destination floor, which remains the actual irreversibility backstop underneath it (`docs/dev-mode.md § Outward-Action Gate`).
@@ -103,19 +118,24 @@ Both hooks share the identical no-writer-identity limit — an interior `Write`/
 
 **Hook reads only the four clarity fields.** The hook does NOT read `security_sensitive`, `security_gate_status`, or any other security-related field from `00-state.md`. Its input is strictly limited to `checkpoint_boundary`, `checkpoint_advance_fresh`, `functional_clarity_artifact`, and `functional_clarity_confirmed`. The hook never conditions its decision on a security field.
 
-### Layer 1 — Hook is the active floor at all three boundaries
+### Layer 1 — Hook support and currently armed boundaries
 
 The top-level agent IS the orchestrator and the `Task` tool is always available. The Layer-1 hook (`hooks/checkpoint-guard.sh`, `PreToolUse`/matcher `Task`) fires on every leaf agent dispatch — covering all three boundaries in both local and obsidian logs-mode. When `logs-mode: obsidian`, the hook resolves the vault workspace root from `~/.claude/.team-harness.json`, so obsidian-resident state files are found on the same selection pass as local ones:
 
 - **B1 (intake → plan):** name-keyed — gate fires only when the destination is `th:architect`. A non-architect dispatch while B1 is armed still allows (the orchestrator may dispatch other agents at B1 without triggering the gate).
 - **B2 (research → next):** boundary-keyed — gate fires on ANY Task dispatch when `checkpoint_boundary: research-next` is armed. B2 dispatches variable subagent types depending on context; the boundary value is the stable arming signal.
-- **B3 (postverify → next):** boundary-keyed — gate fires on ANY Task dispatch when `checkpoint_boundary: postverify-next` is armed, for the same reason as B2.
+- **B3 (postverify → next):** the hook retains boundary-keyed parser support for legacy state,
+  but current v3 never arms `postverify-next`; acceptance plus mandatory Gate 3 subsumes it.
 
-This promotes all three B1/B2/B3 boundaries from the Layer-2 self-check (non-deterministic, relies on orchestrator discipline) to the Layer-1 deterministic floor. In dev mode, the checkpoint gate is as strong as in a standard top-level orchestrator session. This is a strengthening, not a regression: security floors remain independent of the checkpoint state regardless of mode.
+When a supported boundary is armed, this promotes it from the Layer-2 self-check
+(non-deterministic, relies on orchestrator discipline) to the Layer-1 deterministic floor in a
+top-level session. Current v3 actively arms B1/B2 only; B3 remains dormant compatibility support. The
+checkpoint gate is independent of the inline posture; inline work never reaches it. This is a
+strengthening, not a regression: security floors remain independent of the checkpoint state.
 
 ### Layer 2 — Orchestrator self-check (floor in nested-context sessions)
 
-When the orchestrator runs as a subagent (nested context), the `Task` tool is stripped by the harness and `PreToolUse` hooks never fire, because there is no `Task` call for the hook to intercept. In this context, enforcement falls back to a synchronous self-check inside the orchestrator's own Step 6d (B1), B2, and B3 contract blocks.
+When the orchestrator runs as a subagent (nested context), the `Task` tool is stripped by the harness and `PreToolUse` hooks never fire, because there is no `Task` call for the hook to intercept. In this context, enforcement falls back to a synchronous self-check inside the orchestrator's B1 and B2 contract blocks; current B3 is the mandatory Gate 3 rather than a separately armed checkpoint.
 
 **Declared limitation.** The self-check is as deterministic as the orchestrator's discipline in following its own contract. It is NOT a harness-level floor. It can be weakened by context drift in a way that the Layer-1 hook cannot. PR-A delivers both layers and marks which layer applies in each context. The degradation from Layer 1 to Layer 2 is a loss of pedagogical rigor, not a security regression.
 
@@ -135,17 +155,24 @@ The intra-privilege trust model still holds: the agent that writes the clarity f
 
 ### Attribution and failure direction (B1)
 
-The B1 clarity artifact is not self-attesting. The coordinator appends a `checkpoint.confirmed` event to `{events_file}` (Intake) carrying the operator's own confirmatory words — within the named exception to the Free-text field bound (`docs/observability.md § Free-text field bound`) — and a `provenance` field: `operator-live` (a fresh reply from the operator in this same conversation) or `inferred` (the confirmation was derived from a skip marker or a re-ask that returned without a live reply). The event, not `functional_clarity_confirmed`/`functional_clarity_artifact` above, is the sole authority at every arrival, including a `/th:recover` re-entry — those two fields are a derived cache for quick reference and are never consulted in place of the event.
+The B1 clarity artifact is not self-attesting. The coordinator appends a `checkpoint.confirmed` event to `{events_file}` (Intake) carrying the operator's own confirmatory words — within the named exception to the Free-text field bound (`docs/observability.md § Free-text field bound`) — and a `provenance` field: `operator-live` (a fresh reply from the operator in this same conversation) or `inferred` (a re-ask returned without a live reply). Retired skip-marker wording is never a source of confirmation. The event, not `functional_clarity_confirmed`/`functional_clarity_artifact` above, is the sole authority at every arrival, including a `/th:recover` re-entry — those two fields are a derived cache for quick reference and are never consulted in place of the event.
 
-**Failure direction.** Absent attribution — no `checkpoint.confirmed` event, or one carrying `inferred` — is not silently treated as clarity-confirmed. The disposition is one re-ask, never a loop: the coordinator asks the operator once more for an explicit confirmation; if no live reply returns, the run continues with `provenance: inferred` recorded and visible at the next gate presentation. This never aborts the run and never re-asks a second time — consistent with the checkpoint's own posture (§ "Postura" above): it gates functional clarity, not security, so its failure direction is a pause-and-report, never a hard stop.
+**Failure direction.** Absent attribution — no `checkpoint.confirmed` event, or one carrying
+`inferred` — is not clarity-confirmed. The coordinator makes one re-ask, never an automatic loop.
+If no live reply returns, it records the inferred attempt, leaves Discover open and
+`functional_clarity_confirmed: false`, and stops without dispatching `architect`. A later live
+operator message may answer the pending checkpoint. The run is paused and visible, not aborted;
+it never advances to a gate on inferred provenance.
 
 ---
 
-## Skip-marker bypass
+## Legacy skip-marker behavior — superseded
 
-Skip markers (`--fast`, `[TIER: N]`, `@th:orchestrator this is a hotfix:`) bypass the reasoning checkpoint at all three boundaries. The bypass is an explicit opt-out, not a loophole. It preserves the same semantics as the pre-existing Discover gate bypass (`docs/discover-phase.md §3.1`).
-
-A skip marker does NOT bypass security gates. `--fast` still inherits every security carve-out defined in `agents/ref-pipeline.md § "13 — Classify"` (SEC-002 and the path-pattern auto-escalation). This invariant holds at B1, B2, and B3.
+Older runs allowed `--fast`, `[TIER: N]`, or a hotfix phrase to bypass this checkpoint. That route
+is **superseded** and is retained here only as migration history; those values are not active
+selectors and cannot skip a phase, alter canonical full v3, or release a gate. A live operator who
+encounters one receives the explicit posture choices `1 — inline` / `2 — pipeline`. Choice `1`
+stays direct without checkpoint state; choice `2` enters the normal checkpoint contract above.
 
 ---
 

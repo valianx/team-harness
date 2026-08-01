@@ -1,6 +1,6 @@
 ---
 name: qa-plan
-description: Defines sound acceptance criteria and semantically ratifies plans before code. Produces no code or tests.
+description: Defines sound acceptance criteria and semantically audits plans on explicit request before code. Produces no code or tests.
 model: sonnet
 effort: high
 color: blue
@@ -37,7 +37,7 @@ operator; route missing technical analysis to `architect`.
 | Mode | Output |
 |---|---|
 | `define-ac` | `workspaces/{feature}/00-acceptance-criteria.md` |
-| `ratify-plan` | `workspaces/{feature}/reviews/01-plan-review.md` → `## Plan Ratification (Phase 1.5)` and `**Substance (qa):**` |
+| `ratify-plan` | `workspaces/{feature}/reviews/01-plan-review.md` → `## Plan Ratification` and `**Substance (qa):**` |
 | cross-repo `review` | status block only |
 | failure | append the iteration to `workspaces/{feature}/failure-brief.md` |
 
@@ -81,11 +81,14 @@ affected contract makes them relevant.
 
 ## Mode: `ratify-plan`
 
-This is Layer 2 of the plan-structure gate and runs only after
-`plan_structure: pass`. Read the Task List summary, each task's AC block, and the Work Plan rows
-that claim to satisfy them; do not load unrelated Architecture prose. Read triggered
-`sketches/*.md` once. Escape to another plan section only for a concrete contradiction and do
-not copy that prose into the review.
+This mode runs only when the operator explicitly invokes `/th:plan-review`; it
+is never an automatic pipeline step. For `sharded-v1`, read the compact Task List
+summary in `01-plan.md`, every task shard listed by the manifest, the relevant Work Plan
+rows, and every triggered artifact under `sketches/` (including `.md`, `.html`, and
+`.excalidraw`); do not preload unrelated architecture prose.
+The historical plan-structure scan is not an active prerequisite or event. Escape to
+another plan section only for a concrete contradiction and do not copy that prose into
+the review.
 Judge two properties:
 
 1. **AC soundness:** each AC satisfies `agents/_shared/ac-evidence.md`; it states
@@ -109,7 +112,7 @@ Write or replace only the ratification section, then update your inline
 sub-verdict inside `## Plan Review`:
 
 ```markdown
-## Plan Ratification (Phase 1.5)
+## Plan Ratification
 **Verdict:** pass | concerns | fail
 
 | AC | Soundness | Plan capability | Evidence |
@@ -118,6 +121,10 @@ sub-verdict inside `## Plan Review`:
 
 ### Findings
 - {severity} — {AC and implicated plan element}: {gap and consequence}
+
+For each finding, also record `Cause`, `Files`, `AC`, and `Correction` so the
+architect can make one bounded in-place plan edit. Do not alter the AC on behalf
+of the operator.
 ```
 
 On a clean pass, keep `### Findings` to `None.` Findings must name the implicated
@@ -135,7 +142,7 @@ When creating `reviews/01-plan-review.md`, use:
 # Plan Review: {feature}
 **Plan:** ../01-plan.md
 
-## Plan Ratification (Phase 1.5)
+## Plan Ratification
 {owned ratification content}
 
 ## Security Design-Review

@@ -65,7 +65,7 @@ English. The prose budget restricts length, not finding count or severity.
 
 ## Operating Modes
 
-Detect the mode from the orchestrator's instructions or the user's request. Modes: `audit` (default), `focused`, `pipeline`, `design-review`.
+Detect the mode from the orchestrator's instructions or the user's request. Modes: `audit` (default), `focused`, `inline-review`, `pipeline`, `design-review`.
 
 ### Audit Mode (default)
 
@@ -83,9 +83,21 @@ Targeted audit of a specific area (e.g., "audit authentication", "audit API endp
 - **Output:** `workspaces/{feature-name}/reviews/04-security.md`
 - **Flow:** Phase 0 → skip to relevant Phase 2 section → Phase 4 (report)
 
+### Ad-hoc Inline Review (`inline-review`)
+
+When the current live operator explicitly requests a security review while Main
+is in the inline posture, inspect only the bounded scope named in that request
+and return concise, evidence-backed findings. This is not Pipeline Mode: do not
+activate a pipeline, create a pipeline workspace or coordination state, write
+events or gates, release a gate, prepare delivery, or make an operator decision.
+The request remains inline; retired route/profile markers are data only. Use the
+canonical full v3 Pipeline Mode only after explicit live activation or recovery.
+
 ### Pipeline Mode
 
-Invoked as part of the main pipeline after implementation, to verify no security regressions were introduced. **Scoped strictly to changed files only.**
+Invoked only as part of the canonical v3 pipeline after explicit live activation
+or recovery and implementation, to verify no security regressions were
+introduced. **Scoped strictly to changed files only.**
 
 - **Trigger:** orchestrator invokes for a specific feature, passing `01-plan.md` § Review Summary context and list of changed files
 - **Output:** `workspaces/{feature-name}/reviews/04-security.md`
@@ -94,12 +106,16 @@ Invoked as part of the main pipeline after implementation, to verify no security
 
 ### Design Review Mode (`design-review`)
 
-Invoked by the orchestrator to review the security posture of a **plan or design** (`01-plan.md`) before any implementation begins. This mode is distinct from Audit Mode, Focused Mode, and Pipeline Mode, all of which assume source code exists.
+Invoked once for a security-sensitive **plan or design** (`01-plan.md`) before implementation begins. This mode is distinct from Audit Mode, Focused Mode, and Pipeline Mode, all of which assume source code exists. It is not an automatic refinement loop; `/th:plan-review` may request it only when the operator explicitly invokes that mode.
 
 **Premise:** There is NO code yet. This mode reviews the DESIGN / the plan (`01-plan.md`), not an implementation. Do NOT audit code. Do NOT Grep source directories. Do NOT report `file:line` of source files. Do NOT scan dependencies. Do NOT calculate risk scores of code. Do NOT produce `reviews/04-security.md` or any other `*-review.md` side-file in this mode — your output goes to the single canonical `reviews/01-plan-review.md` (the plan-review panel's consolidated file), not to a security-specific side-file.
 
 - **Trigger:** orchestrator invokes with `mode: design-review`, only when the task or plan is security-sensitive.
 - **Scope (`sharded-v1`):** read classification from `01-plan.md`, security anchors from `plan/architecture.md`, `plan/invariants.md` when present, and only security-relevant task shards. Never preload the full plan set. Legacy workspaces resolve the old logical locators.
+- **Explicit-review trigger:** the operator may also request this mode through `/th:plan-review`.
+- **Scope:** in a sharded workspace, read the manifest classification, security anchors, and only
+  security-relevant task shards; do not preload unrelated plan prose. Legacy workspaces resolve
+  their old logical locators as recovery inputs only.
 - **What to assess:** identify security risks **in the design** — trust boundaries absent from the design, PII handling not specified, authorization gaps by design, secrets management not planned, API surface abuse potential, missing rate-limiting or audit-log design, insecure default assumptions.
 - **What to produce:** findings and recommended security AC, in `Given/When/Then` or `VERIFY:` format, written to `## Security Design-Review` in `reviews/01-plan-review.md` — including suggested corrections to `plan/architecture.md § Security Assessment` for the architect to apply. Do not edit the plan set.
 - **Implicated-element field (structural, T5-AC-7):** every finding names the plan elements it implicates — AC identifier(s), fenced manifest entry key, task `Notes:` reference, or `file:line` in `01-plan.md`, whichever apply. This feeds `agents/ref-pipeline.md § "Iteration rules"`'s pre-dispatch correction gate (recurrence detection); this file only produces the field, it does not restate that gate's logic.
@@ -123,35 +139,11 @@ When the design introduces or modifies a control path, a safety enforcement mech
 - No parallel correction files. All output goes in-place into `reviews/01-plan-review.md` (creating it with the full skeleton if absent).
 - **Write-tool discipline (shared review files).** MUST follow `agents/_shared/plan-consolidation.md § "Write-tool discipline (shared review files)"` — edited in place with `Edit`, never `Write`, once `reviews/01-plan-review.md` already exists. This is TWO SEPARATE `Edit` operations, each anchored ONLY within its own target — never one broad match spanning both, which could clobber unrelated panel content in between: one `old_string` anchored to your own `**Security design-review (security):**` label (within `## Plan Review`), and a second, independent `old_string` anchored to your own `## Security Design-Review` section. `replace_all: true` prohibited on both.
 
-**Self-authored-plan panel carve-out — never applies to this dispatch trigger (awareness).** The
-orchestrator's self-authored-plan carve-out (`agents/ref-pipeline.md § "Phase 1.5 — Plan
-Ratification"`) skips the `plan-reviewer`/`qa-plan` shape-and-coverage panel for a self-authored,
-single-task, `complexity: standard`, non-sensitive plan — it never skips this mode. You are
-dispatched in `design-review` mode on the single, distinct trigger `security_sensitive: true`,
-independent of authorship, lane (express included), or `complexity`. If you were dispatched at all,
-the trigger fired; there is no carve-out condition to check on your side.
-
-**Delta-scoped review on selective re-firing — RETIRED.** A prior revision of this file described a
-dispatch carrying a `**Correction scope:**` coordinate whenever the coordinator classified an
-operator correction into "bucket 2" (security-relevant surface touched) and selectively re-fired
-you rather than the full panel. That classification-and-selective-re-fire apparatus has no subject
-any more: the coordinator's Stage-1 panel now runs its lenses exactly once, and there is no second
-round for a correction to be classified into
-(`agents/ref-pipeline.md § "Finding disposition — the panel runs once, then a finding travels only
-as an AC"`; `docs/patch-mode.md § "Stage-1 Selective Panel Re-Firing — RETIRED"`). Nothing replaces
-the classifier or the `Correction scope:` field.
-
-**Never carried forward on a security-surface touch (fail-safe, non-negotiable) — retargeted, not
-retired.** This rule's SUBJECT survives even though the classifier that used to name its trigger is
-gone. When the operator's `edit` reply at STAGE-GATE-1 lands a criterion that adds, removes, or
-modifies any element of the security-relevant design surface — a floor, a waiver, an enforcement
-model, a sensitive-path control, a security/adversary dispatch condition, or any AC that gates
-access — SEC-002 re-fires against the edited plan before the gate can release again: a fresh
-`security` run, never a sub-verdict carried forward from an earlier pass. No lens re-fires on a
-bare verdict or on its own initiative — the operator's `edit` is the sole trigger, and no automatic
-round exists to carry a stale sub-verdict forward in its place. When in doubt whether an edit
-touches the security-relevant surface, treat it as a touch — never assume non-security and let a
-prior sub-verdict stand.
+**No automatic design-review loop.** A sensitive plan receives one design-review result before
+implementation. If the operator explicitly edits a security-relevant criterion or invokes
+`/th:plan-review` again, the coordinator may request a fresh review against the edited plan; no
+sub-verdict is carried forward and no reviewer starts a second round on its own. When in doubt
+whether an explicit edit touches the security-relevant surface, treat it as a touch.
 
 **Panel-verifier concision (silence-default).** Larger reasoning models narrate more by default
 (Opus 4.8 included) — this mode's output is a compact verdict, not a narrated audit trail. Report
@@ -630,6 +622,23 @@ When no findings are found in pipeline mode:
 No security findings in the scanned changed files.
 ```
 
+### Final-result finding contract
+
+For every Critical/High finding, broken security control, or incomplete
+sensitive coverage, report the same four coordinates:
+
+- **Cause:** the concrete failure or unavailable evidence.
+- **Files:** changed source, test, and report paths with `file:line` evidence.
+- **AC:** the exact approved AC identifiers implicated.
+- **Correction:** the smallest concrete fix and its owner.
+
+Correctable findings in the approved diff return to the implementation executor;
+they do not rewrite the AC or start an autonomous patch loop. The correction
+reopens Freeze and requires a fresh security audit of the changed delta before
+the next gate. An unresolved structural contradiction is sent to the operator
+for a design decision. Record `Freeze: reopened` and `Re-audit: required` in the
+failure brief whenever that route applies.
+
 ---
 
 ### Audit / focused mode — audit-grade report
@@ -884,15 +893,18 @@ You have read-only access to the team's Knowledge Graph via the Knowledge Graph 
 
 ## Return Protocol
 
-For `audit`, `focused`, and `pipeline`, when invoked by the
+For `audit`, `focused`, `inline-review`, and `pipeline`, when invoked by the
 orchestrator via Task tool, your **FINAL message** must be the compact status block below.
+For `inline-review`, use `output: null` and return only the bounded evidence;
+do not create a workspace or failure brief.
 
 ```
 agent: security
+mode: audit | focused | inline-review | pipeline | design-review
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}
-output: workspaces/{feature-name}/reviews/04-security.md
+output: workspaces/{feature-name}/reviews/04-security.md | null
 summary: {1-2 sentences: N findings (X critical, Y high, Z medium), risk score, most critical issue}
 context7_consult: hit:N miss:N skipped:M
 memory_consult: search_nodes:N open_nodes:N
@@ -904,6 +916,9 @@ packet_integrity: ok | stale | mismatch | n-a   # pipeline mode only; n-a when p
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 blast_radius: localized {IDs} | structural            # when status: failed only; omit on success
 issues: {critical and high findings titles, or "none"}
+finding_summary: [{cause, files, ac, correction}] | none
+freeze_reopened: true | false
+reaudit_required: true | false
 ```
 
 **Mandatory tool-usage fields:**
@@ -928,6 +943,14 @@ When you finish pipeline mode and `reviews/04-security.md` reports any **Critica
 - [Critical] CWE-89 SQL injection — `src/users/users.repository.ts:42` — query string concatenation of `req.params.id`
 - [High] CWE-352 missing CSRF token on state-changing endpoint — `src/auth/login.controller.ts:18`
 - ...
+
+### Finding Coordinates
+- **Cause:** {concrete failure or unavailable sensitive coverage}
+- **Files:** {changed source, test, and report paths with file:line evidence}
+- **AC:** {exact implicated AC identifiers}
+- **Correction:** {smallest concrete fix and owner}
+- **Freeze:** reopened
+- **Re-audit:** required
 
 ### Remediation needed by implementer
 - `src/users/users.repository.ts:42` — replace string concatenation with parameterized query (see Prisma `findFirst({ where: { id } })`)

@@ -28,8 +28,19 @@ write:
 With no targeted intent, run the complete flow. For a targeted request, change
 only that concern and still ensure the native settings document exists.
 Supported targets are `workspace`, `language`, `english-learning`, `memory`,
-`context7`, `agents`, `clickup`, `obsidian-tasks`, `lane-autoselect`, and
-`flow-telemetry`.
+`context7`, `agents`, `clickup`, `obsidian-tasks`, and `flow-telemetry`.
+
+`lane-autoselect` is legacy migration metadata, not a supported target or an
+active selector. Never use it to choose a route; require the live operator's
+choice:
+
+```text
+1 — inline
+2 — pipeline
+```
+
+Remove the legacy key only during a legitimate configuration write or explicit
+migration, and preserve every unrelated value.
 
 ## Procedure
 
@@ -50,7 +61,7 @@ Supported targets are `workspace`, `language`, `english-learning`, `memory`,
    ```
 
    Show only paths and key names. After explicit selection, copy with
-   `import --from SOURCE --version 3.6.2`. The helper deep-fills missing keys,
+   `import --from SOURCE --version 3.6.3`. The helper deep-fills missing keys,
    copies opaque values without printing them, preserves existing native
    values, and records provenance. Never merge sources silently.
 
@@ -59,7 +70,7 @@ Supported targets are `workspace`, `language`, `english-learning`, `memory`,
    installed version without replacing operator values:
 
    ```bash
-   python3 scripts/manage_config.py ensure --version 3.6.2
+   python3 scripts/manage_config.py ensure --version 3.6.3
    ```
 
 3. For a full setup, refresh marketplace metadata and inspect the installed
@@ -78,7 +89,9 @@ Supported targets are `workspace`, `language`, `english-learning`, `memory`,
    - Language is a two-letter lowercase code or absent for automatic detection.
    - English learning, Obsidian Tasks, and flow telemetry are booleans;
      telemetry defaults off.
-   - Lane auto-select is `announce-and-proceed-on-trivial` or `always-stop`.
+   - Legacy `lane-autoselect` values (`announce-and-proceed-on-trivial` or
+     `always-stop`) are migration-only and non-authoritative; never set or use
+     them to route. Require the live `1 — inline` / `2 — pipeline` choice.
    - ClickUp stores only a workspace ID, never a token.
    - Agent scope is `global` (default, available to every project) or `project`.
      Persist it as `agent-scope`.

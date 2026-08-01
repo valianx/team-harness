@@ -2,9 +2,10 @@
 
 This file is the single source of truth for the mechanical, one-correct-answer half of
 delivery: every step here is executed by the orchestrator directly (Bash/`gh`/`git`), never
-dispatched to a subagent. `delivery` owns only the prose half: changelog fragment text, the
-workspace acceptance matrix, and the PR-body draft. It runs once after STAGE-GATE-3 records
-`ship`; it has no prepare mode, knowledge-capture mode, post-PR tail, or post-merge cleanup.
+dispatched to a subagent. `delivery` owns only the pre-gate prose preview: a workspace
+changelog-fragment draft, standalone acceptance matrix, and PR-body draft. It runs once after
+acceptance and before STAGE-GATE-3; it has no post-ship mode, knowledge-capture mode, post-PR
+tail, or post-merge cleanup.
 `agents/ref-pipeline.md § Phase 4 — Delivery` points here by reference; do not re-derive or
 paraphrase this file's procedures inline there.
 
@@ -16,9 +17,11 @@ once, at Phase 4 — never at boot, unlike anything inlined directly into
 `agents/_shared/dispatch-contract.md` and `agents/_shared/gate-contract.md`.
 
 **Ordering — this file's procedures run in the order listed**, immediately after
-STAGE-GATE-3 records `gate3_release: ship` and the single `delivery` dispatch returns with
-`changelog.d/{pr-slug}.md` when applicable, the workspace Acceptance Matrix, and
-`workspaces/{feature-name}/inputs/pr-body-draft.md`. Product documentation, OpenAPI, and
+STAGE-GATE-3 records `gate3_release: ship`. Before step 1, re-read each workspace preview
+artifact and require its path and SHA-256 to match the exact `delivery_preview` bound to that
+release. A mismatch blocks and requires a fresh Gate 3; nothing may recompose prose after
+`ship`. Section 3 materializes the validated changelog draft when applicable. Product
+documentation, OpenAPI, and
 memory files are part of the reviewed implementation tree or are absent; Phase 4 never
 authors them.
 
@@ -41,8 +44,8 @@ that gate; no unwired hook enforces it mechanically.
 hatch — its own `CLAUDE.md §6.3` documents the per-PR shipped default, not a deferral.
 `skip-version: true` — set only when the consuming repository documents a repo-local
 versioning/release-deferral convention — skips
-this whole section; `changelog.d/` assembly (§ 3) still runs, since the fragment itself was
-already written by `delivery`.
+this whole section; § 3 still materializes the approved workspace draft, but skips assembly
+and the release cut.
 
 **Site discovery order:**
 1. `01-plan.md § Review Summary` declares a `### Multi-site invariants` block for a
@@ -114,10 +117,14 @@ lands.
 
 ## 3. `changelog.d/` assembly and the release cut
 
-**Gated on a version bump having been performed (§ 1).** If the bump was skipped
-(`skip-version: true`) or produced no change, skip this section entirely.
+**Materialize the approved draft first.** When
+`delivery_preview` contains a changelog draft, validate its slug/path and digest and copy its
+exact bytes to `changelog.d/{pr-slug}.md`; do not edit or reflow them. This step runs even when
+the version bump was skipped or produced no change, leaving the fragment for a later release.
 
-**Assemble fragments (idempotent).** If `changelog.d/` is absent or empty, this is a no-op —
+**Assembly and release-cut gate.** If the bump was skipped (`skip-version: true`) or produced
+no change, stop this section after materialization. Otherwise, assemble idempotently. If
+`changelog.d/` is then absent or empty, assembly is a no-op —
 proceed using whatever `[Unreleased]` content `CHANGELOG.md` already has. Otherwise, read
 every `*.md` fragment in lexicographic order, merge their subsection entries
 (`### Added`/`### Changed`/`### Fixed`/`### Security`) into one combined block —
@@ -342,8 +349,9 @@ proceeds.
 git push --set-upstream origin {branch-name}
 ```
 
-Never `--force` in any form. The active runtime's approval remains required for this push,
-independently of `gate3_release`; there is no legitimate reason to force here, and no code path in this procedure ever
+Never `--force` in any form. `gate3_release: ship` is the operator's approval for this standard
+push and the following draft PR; do not ask conversationally again. The active runtime may still
+surface a technical tool-approval prompt, but there is no legitimate reason to force here, and no code path in this procedure ever
 constructs a `--force`/`--force-with-lease`/`+refspec` invocation.
 
 **If `has_remote: false`:** skip §§ 6-7. The branch and commit stay local (already committed
@@ -358,14 +366,22 @@ manual merge: `git checkout main && git merge {branch-name}`."
 multi-group delivery, follow the serial-merge contract from § 2.
 
 **Check for an existing PR** (`gh pr list --head {branch} --base main --state all --json
-number,url,title,state -q '.[0]'`, or the curl Tier A fallback per
+number,url,title,state,isDraft -q '.[0]'`, or the curl Tier A fallback per
 `agents/_shared/gh-fallback.md`). `MERGED`/`CLOSED` → this should not happen if branch
-creation (§ 2) ran correctly; report `status: failed` naming the stale PR. `OPEN` → update it
-(`gh pr edit`). None → create it.
+creation (§ 2) ran correctly; report `status: failed` naming the stale PR. `OPEN` with
+`isDraft: true` → update only its exact approved title/body (`gh pr edit {number} --title
+"{approved title from delivery_preview}" --body-file "{approved pr_body_path from
+delivery_preview}"`). `OPEN` with `isDraft: false` → block and surface
+the existing ready-for-review PR; `ship` authorizes draft creation/update only and never
+downgrades or mutates a published review request. None → create a draft.
 
-**Body.** Use `workspaces/{feature-name}/inputs/pr-body-draft.md` verbatim as `--body` — this
-is `delivery`'s already-drafted prose artifact (its own Return Protocol produces it before
-this procedure runs). Recompose only if the draft is missing or stale.
+**Bound preview, checked again immediately before mutation.** Require the recorded PR-body
+path to be the canonical, non-symlink
+`{docs_root}/inputs/pr-body-draft.md`, re-read it, and compare its SHA-256 with
+`delivery_preview`. Use that exact path verbatim as `--body-file`. Use the exact recorded
+`pr_title`; validate it against the format below, but never regenerate it. A missing file,
+path mismatch, digest mismatch, or invalid title blocks and requires a fresh Gate 3; never
+recompose approved prose after release.
 
 **Title format (by task payload `type:`):**
 
@@ -380,18 +396,20 @@ this procedure runs). Recompose only if the draft is missing or stale.
 
 ```
 gh pr create --base main \
-  --title "{type-prefix}({area}): {short summary}{hotfix-suffix-if-applicable}" \
+  --draft \
+  --title "{approved title from delivery_preview}" \
   --assignee @me \
   --label "{label1},{label2}" \
   --project "{project-number}" \
-  --body "$(cat workspaces/{feature-name}/inputs/pr-body-draft.md)"
+  --body-file "{approved pr_body_path from delivery_preview}"
 ```
 
 Labels/project come from issue coordinates already captured during Intake in `00-state.md`;
 omit either flag when its value is absent. `Closes #{number}`/`Fixes #{number}` is inside the
 draft body already — never synthesize a number when no issue is linked.
 
-**When `has_gh: false`:** use the Tier B fallback chain (`agents/_shared/gh-fallback.md`).
+**When `has_gh: false`:** use the Tier B fallback chain (`agents/_shared/gh-fallback.md`) with
+the API draft field set to true.
 When neither `gh` nor a token is available, emit the compare URL and body file and report
 `status: blocked-manual-push` — the pipeline resumes when the operator replies `pr opened
 #N`.

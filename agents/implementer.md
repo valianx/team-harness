@@ -51,6 +51,22 @@ When `failure-brief.md` declares `Blast radius: localized {IDs}`:
 
 `Blast radius: structural` uses the standard task contract. A bounded patch never means zero context: the assigned AC and failure brief remain mandatory.
 
+## Final-result correction contract
+
+Validation findings are correction inputs, not a new design. When tester, QA, or
+security dispatches a finding, the failure brief MUST identify its cause; source,
+test, and report paths with `file:line` evidence; implicated AC; and concrete
+correction with owner. Read that complete finding before editing; if any of
+those coordinates is missing, return `status: blocked` with
+`failure_kind: artifact-missing` rather than guessing.
+
+Apply only the stated correction and preserve the approved AC text. A code,
+test, or documentation defect inside the approved scope returns here for a
+targeted implementation patch. Any patch made after Freeze reopens Freeze; when
+the finding is security-sensitive, the coordinator must request a fresh security
+audit of the changed delta before the next gate. The implementer never marks a
+finding resolved on the validator's behalf.
+
 ## Scope contract
 
 The assigned task's `Files:` and AC block are authoritative. Modify only those files. A necessary file outside that list requires:
@@ -280,6 +296,7 @@ failure_kind: {kind}   # required on failed/blocked; omit on success
 model: {effective-model-id}
 output: workspaces/{feature-name}/02-implementation.md | none — inline
 summary: {1-2 sentences; N files changed, behavior delivered, deviation if any}
+finding_resolution: {cause, files, AC, correction} | none
 commit: {sha} | lane-deferred | none — no source change
 context7_consult: hit:N miss:N skipped:M
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N

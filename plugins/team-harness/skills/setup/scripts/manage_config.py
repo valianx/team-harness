@@ -23,7 +23,6 @@ ALLOWED_KEYS = {
     "flow_telemetry.enabled",
     "clickup.workspace_id",
     "obsidian_tasks",
-    "lane_autoselect",
     "agent-scope",
 }
 DEFAULTS = {
@@ -31,9 +30,37 @@ DEFAULTS = {
     "english_learning": False,
     "flow_telemetry.enabled": False,
     "obsidian_tasks": False,
-    "lane_autoselect": "announce-and-proceed-on-trivial",
     "agent-scope": "global",
 }
+LEGACY_SELECTOR_KEYS = frozenset({
+    "lane_autoselect", "lane", "profile", "posture", "mode", "express",
+    "full", "fast", "fast_mode", "simple", "simple_mode", "tier",
+    "tier0", "tier_0", "bug_tier",
+})
+LEGACY_VALUE_KEYS = frozenset({"lane", "mode", "profile", "posture", "tier", "bug_tier"})
+LEGACY_BOOLEAN_KEYS = frozenset({
+    "express", "full", "fast", "fast_mode", "simple", "simple_mode", "tier0", "tier_0",
+})
+LEGACY_AUTOSELECT_VALUES = frozenset({
+    "always-stop", "announce-and-proceed-on-trivial", "auto", "automatic",
+})
+LEGACY_MARKER_VALUES = frozenset({
+    "inline",
+    "pipeline",
+    "express",
+    "full",
+    "fast",
+    "simple",
+    "tier0",
+    "tier_0",
+    "tier-0",
+    "tier 0",
+    "0",
+})
+LEGACY_GUIDANCE = (
+    "Legacy posture/profile selectors are informational only. Choose 1 inline or "
+    "2 pipeline from the live operator; configuration never authorizes either posture."
+)
 IMPORT_EXCLUDED_KEYS = {
     "format_version",
     "installed_version",
@@ -129,6 +156,58 @@ def remove_nested(doc: dict[str, Any], dotted: str) -> None:
             parent.pop(part)
 
 
+def is_legacy_selector(key: str, value: Any) -> bool:
+    leaf = key.rsplit(".", 1)[-1]
+    if leaf not in LEGACY_SELECTOR_KEYS:
+        return False
+    if leaf in LEGACY_VALUE_KEYS:
+        return (
+            leaf in {"tier", "bug_tier"}
+            and isinstance(value, int)
+            and not isinstance(value, bool)
+            and value == 0
+        ) or (
+            isinstance(value, str)
+            and value.strip().lower() in LEGACY_MARKER_VALUES
+        )
+    if leaf in LEGACY_BOOLEAN_KEYS:
+        return isinstance(value, bool)
+    if leaf == "lane_autoselect":
+        return (
+            isinstance(value, bool)
+            or (
+                isinstance(value, str)
+                and value.strip().lower() in LEGACY_AUTOSELECT_VALUES
+            )
+        )
+    return False
+
+
+def legacy_selectors(doc: dict[str, Any], prefix: str = "") -> list[str]:
+    """Return legacy selector keys without treating them as routing input."""
+    found: list[str] = []
+    for key, value in doc.items():
+        dotted = f"{prefix}.{key}" if prefix else key
+        if is_legacy_selector(key, value):
+            found.append(dotted)
+        elif isinstance(value, dict):
+            found.extend(legacy_selectors(value, dotted))
+    return sorted(found)
+
+
+def remove_legacy_selectors(doc: dict[str, Any], prefix: str = "") -> list[str]:
+    """Remove only known legacy selectors; preserve every unrelated key."""
+    removed: list[str] = []
+    for key, value in list(doc.items()):
+        dotted = f"{prefix}.{key}" if prefix else key
+        if is_legacy_selector(key, value):
+            doc.pop(key)
+            removed.append(dotted)
+        elif isinstance(value, dict):
+            removed.extend(remove_legacy_selectors(value, dotted))
+    return sorted(removed)
+
+
 def redact_for_display(value: Any, key: str = "") -> Any:
     if SENSITIVE_KEY_RE.search(key):
         return "<redacted>"
@@ -158,19 +237,35 @@ def displayable_config(doc: dict[str, Any]) -> dict[str, Any]:
     return shown
 
 
-def import_missing(target: dict[str, Any], source: dict[str, Any], prefix: str = "") -> list[str]:
+def import_missing(
+    target: dict[str, Any],
+    source: dict[str, Any],
+    prefix: str = "",
+    legacy: list[str] | None = None,
+) -> list[str]:
     imported: list[str] = []
     for key, source_value in source.items():
         if not prefix and key in IMPORT_EXCLUDED_KEYS:
             continue
         dotted = f"{prefix}.{key}" if prefix else key
+        if is_legacy_selector(key, source_value):
+            if legacy is not None:
+                legacy.append(dotted)
+            continue
         if key not in target:
-            target[key] = json.loads(json.dumps(source_value))
+            copied = json.loads(json.dumps(source_value))
+            if isinstance(copied, dict):
+                removed = remove_legacy_selectors(copied, dotted)
+                if legacy is not None:
+                    legacy.extend(removed)
+                if not copied:
+                    continue
+            target[key] = copied
             imported.append(dotted)
             continue
         target_value = target[key]
         if isinstance(target_value, dict) and isinstance(source_value, dict):
-            imported.extend(import_missing(target_value, source_value, dotted))
+            imported.extend(import_missing(target_value, source_value, dotted, legacy))
     return imported
 
 
@@ -181,8 +276,14 @@ def classify_import(target: dict[str, Any], source: dict[str, Any], prefix: str 
         if not prefix and key in IMPORT_EXCLUDED_KEYS:
             continue
         dotted = f"{prefix}.{key}" if prefix else key
+        if is_legacy_selector(key, source_value):
+            continue
         if key not in target:
-            importable.append(dotted)
+            copied = json.loads(json.dumps(source_value))
+            if isinstance(copied, dict):
+                remove_legacy_selectors(copied, dotted)
+            if copied != {}:
+                importable.append(dotted)
             continue
         target_value = target[key]
         if isinstance(target_value, dict) and isinstance(source_value, dict):
@@ -222,11 +323,6 @@ def validate(key: str, value: Any) -> None:
         raise ValueError("language must be a two-letter lowercase code")
     if key in {"english_learning", "flow_telemetry.enabled", "obsidian_tasks"} and not isinstance(value, bool):
         raise ValueError(f"{key} must be a JSON boolean")
-    if key == "lane_autoselect" and value not in {
-        "announce-and-proceed-on-trivial",
-        "always-stop",
-    }:
-        raise ValueError("invalid lane_autoselect value")
     if key == "clickup.workspace_id" and not isinstance(value, str):
         raise ValueError("clickup.workspace_id must be a string")
     if key == "agent-scope" and value not in {"project", "global"}:
@@ -275,6 +371,7 @@ def show() -> int:
     path = config_path()
     doc = read_json(path)
     sources = import_sources()
+    legacy = legacy_selectors(doc)
     result = {
         "path": str(path),
         "exists": path.exists(),
@@ -284,6 +381,8 @@ def show() -> int:
             for name, source in sources.items()
         ],
         "config": displayable_config(doc),
+        "legacySelectors": legacy,
+        "migrationGuidance": LEGACY_GUIDANCE if legacy else None,
         "preservedOpaqueTopLevelKeys": sum(
             1
             for key in doc
@@ -303,9 +402,10 @@ def set_values(assignments: list[str], removals: list[str], version: str | None)
         key, value = parse_assignment(raw)
         set_nested(after, key, value)
     for key in removals:
-        if key not in ALLOWED_KEYS:
+        if key not in ALLOWED_KEYS and key not in LEGACY_SELECTOR_KEYS:
             raise ValueError(f"unsupported setting: {key}")
         remove_nested(after, key)
+    removed_legacy = remove_legacy_selectors(after)
     after["format_version"] = "1"
     if version is not None:
         if re.fullmatch(r"\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?", version) is None:
@@ -313,7 +413,12 @@ def set_values(assignments: list[str], removals: list[str], version: str | None)
         after["installed_version"] = version
     after["updated_at"] = dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
     changed = write_atomic(path, before, after)
-    print(json.dumps({"path": str(path), "changed": changed}, sort_keys=True))
+    print(json.dumps({
+        "path": str(path),
+        "changed": changed,
+        "removedLegacySelectors": removed_legacy,
+        "migrationGuidance": LEGACY_GUIDANCE if removed_legacy else None,
+    }, sort_keys=True))
     return 0
 
 
@@ -321,6 +426,7 @@ def ensure_defaults(version: str | None) -> int:
     path = config_path()
     before = read_json(path)
     after = json.loads(json.dumps(before))
+    removed_legacy = remove_legacy_selectors(after)
     added: list[str] = []
     for key, value in DEFAULTS.items():
         if get_nested(after, key) is None:
@@ -333,7 +439,13 @@ def ensure_defaults(version: str | None) -> int:
         after["installed_version"] = version
     after["updated_at"] = dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
     changed = write_atomic(path, before, after)
-    print(json.dumps({"path": str(path), "changed": changed, "added": added}, sort_keys=True))
+    print(json.dumps({
+        "path": str(path),
+        "changed": changed,
+        "added": added,
+        "removedLegacySelectors": removed_legacy,
+        "migrationGuidance": LEGACY_GUIDANCE if removed_legacy else None,
+    }, sort_keys=True))
     return 0
 
 
@@ -342,12 +454,15 @@ def inspect_import(source_name: str) -> int:
     source_path = import_sources()[source_name]
     source = read_json(source_path, missing_ok=False)
     importable, conflicts = classify_import(target, source)
+    legacy = legacy_selectors(source)
     print(json.dumps({
         "source": source_name,
         "sourcePath": str(source_path),
         "importableKeys": sorted(importable),
         "preservedNativeKeys": sorted(conflicts),
         "excludedKeys": sorted(key for key in source if key in IMPORT_EXCLUDED_KEYS),
+        "legacySelectors": legacy,
+        "migrationGuidance": LEGACY_GUIDANCE if legacy else None,
     }, sort_keys=True))
     return 0
 
@@ -358,7 +473,10 @@ def import_config(source_name: str, version: str | None) -> int:
     source_path = import_sources()[source_name]
     source = read_json(source_path, missing_ok=False)
     after = json.loads(json.dumps(before))
-    imported = import_missing(after, source)
+    legacy: list[str] = []
+    imported = import_missing(after, source, legacy=legacy)
+    removed_legacy = remove_legacy_selectors(after)
+    legacy = sorted(set(legacy + removed_legacy))
     after["format_version"] = "1"
     if version is not None:
         after["installed_version"] = version
@@ -386,6 +504,8 @@ def import_config(source_name: str, version: str | None) -> int:
         "source": source_name,
         "sourcePath": str(source_path),
         "imported": imported,
+        "removedLegacySelectors": legacy,
+        "migrationGuidance": LEGACY_GUIDANCE if legacy else None,
     }, sort_keys=True))
     return 0
 

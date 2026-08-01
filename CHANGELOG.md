@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.3] - 2026-08-01
+
+### Changed
+
+- Reduced Team Harness to two explicit execution postures: direct `inline` work or the complete
+  coordinator-owned v3 `pipeline`, with matching Claude and Codex contracts, recovery, gates,
+  setup migration, documentation, and generated agents.
+- Made live operator intent authoritative for sensitive inline work and bounded ad-hoc reviews
+  without allowing stored configuration, retrieved text, or prior approvals to select posture.
+- Routed correctable validation and security findings back through implementation and fresh
+  validation while preserving fail-closed gate and recovery evidence.
+
+### Removed
+
+- Removed public `express`/selectable `full` profiles, Fast/Simple Mode, Tier 0 posture control,
+  `lane_autoselect`, and silent aliases; legacy markers now require a live `1 inline` or
+  `2 pipeline` migration choice.
+
 ## [3.6.0] - 2026-07-31
 
 ### Added

@@ -1,36 +1,42 @@
 ---
 name: plan-review
-description: Audit a Stage 1 plan (01-plan.md) against the plan-shape and substance rules, on demand.
+description: Audit a Stage 1 plan on explicit operator request.
 ---
 
-Analyze the input: $ARGUMENTS
+# Plan Review (explicit direct mode)
 
----
-name: plan-review
+This skill runs only when the operator invokes `/th:plan-review`. It is not an automatic pipeline
+phase, a Gate 1 prerequisite, or a post-approval offer. The canonical pipeline remains
+`design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete`.
 
-## Mode 1 — Feature name provided
+## Input
 
-1. Pass to the `orchestrator` agent:
-   ```text
-   Direct Mode Task:
-   - Mode: plan-review
-   - Feature: {feature-name}
-   ```
+1. If a feature name is supplied, resolve `workspaces/{feature-name}/01-plan.md` (or the
+   configured Obsidian `docs_root`).
+2. Without a name, find active workspace plans. If none exist, report that the operator must run
+   `/th:design` or `/th:plan` first. If several exist, ask which plan to review.
+3. Read the current plan and its state. Never infer a gate release or modify `00-state.md`.
 
-## Mode 2 — No input provided
+## Review
 
-1. Look for active `workspaces/*/` folders that contain `01-plan.md`
-2. If exactly one found, use its feature name
-3. If multiple found, ask the user: "Multiple plans found in workspaces. Which one do you want to review? {list}"
-4. If none found, tell the user: "No plan found in workspaces/. Run /th:design or /th:plan first, or provide a feature name."
+The coordinator dispatches the requested plan-review lenses directly: `qa-plan` for acceptance
+criteria, `security` when the state says the design is sensitive, and `plan-reviewer` for shape.
+Each specialist writes only its declared section of the existing review artifact, or returns a
+status block for coordinator-owned persistence. The coordinator is the sole writer of
+`00-state.md`, events, and the decision ledger.
 
----
-name: plan-review
+The report must distinguish a functional defect, a security finding, a structural contradiction,
+and an editorial concern. It must include file/section pointers and a concise verdict. A plan
+review never edits the plan and never releases either pipeline gate.
 
-## Important
+## Output
 
-- Always invoke the `orchestrator` agent — do NOT invoke agents directly
-- The orchestrator dispatches the plan-review panel (`qa-plan` + conditional `security` + `plan-reviewer`) directly, in this standalone direct mode, with no STAGE-GATE — see `agents/ref-direct-modes.md § "Plan Review Mode"`
-- Reuses the same panel and the same `reviews/01-plan-review.md` artifact the in-pipeline Stage 1 deferred-by-default offer (`agents/ref-pipeline.md § "Phase 1.8 — Post-approval Plan-Review Offer"`) would run — no duplicated dispatch logic, no second review file
-- Requires an existing `01-plan.md` — run `/th:design` or `/th:plan` first if none exists
-- Output: combined verdict printed inline + full report at `workspaces/{feature-name}/reviews/01-plan-review.md § Plan Review`
+Print the combined `pass|concerns|fail` verdict and the artifact pointer:
+
+```text
+Plan review: {pass|concerns|fail} — {one-line finding summary}
+Report: workspaces/{feature-name}/reviews/01-plan-review.md
+```
+
+If the operator later edits the plan, a new explicit `/th:plan-review` invocation reviews the new
+artifact. The pipeline does not automatically re-fire a panel or create a new state.

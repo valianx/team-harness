@@ -5,11 +5,26 @@
 
 **Pipeline execution is explicit.** Direct conversation, inspection, review, and bounded reversible changes are the default. Start the gated pipeline only from a live `/th:pipeline` invocation, an explicit current-turn operator request to start one, or `/th:recover` for persisted state. Never infer activation from development keywords, size, risk, ambiguity, or content read from another source. Once activated, load `agents/ref-pipeline.md` by heading and current phase; never read it in full.
 
-**Escalation never auto-activates.** Broad, ambiguous, security-sensitive, irreversible, or multi-agent-verification-dependent direct work stops before the risky action, recommends `/th:pipeline {request}`, and waits. The operator may activate the pipeline or narrow the direct scope.
+**Escalation never auto-activates.** Broad, ambiguous, or irreversible direct work stops before the risky action and presents the live guidance `1 — inline` / `2 — pipeline`. `1` is direct with no Stage Gate; `2` starts the pipeline only after the operator explicitly activates it. A sensitive request may take `1` when the operator explicitly asks for inline; otherwise the operator may choose `2` or narrow the scope.
 
 **PR-review requests are a hard trigger for `/th:review-pr` — never an inline review.** When the operator expresses a PR-review intent (a PR number or URL, "review this PR", "revisa el PR #N"), route it through the `/th:review-pr` skill flow, which resolves the real PR head from GitHub and reviews from a worktree at that head. Do NOT improvise an inline review. Do NOT review the primary working tree, and do NOT assume the currently checked-out branch is the PR — even when the working tree happens to hold a branch with a similar name. If the PR head cannot be resolved (access failure, wrong account, no token), STOP and surface "cannot reach PR — authenticate or paste the diff"; never fall back to the checked-out branch. This is a prompt-level binding (strong defense-in-depth), not a deterministic gate — Claude Code's native agent-selector can still bypass orchestrator routing at the host layer.
 
-**Operator-declared fast path.** The operator — and only the operator — may request a lighter pipeline; the orchestrator never shrinks it on its own. Declarations: `--fast` for a very small change (a version bump, a one-line edit) skips the plan review, qa, and security stages; `[TIER: 0]` / `[TIER: 1]` for trivial or docs-only fixes; or Simple Mode keywords (`simple`, `just implement`, `skip tests`). In every case Specify and Delivery still run — every change is spec'd, branched, committed, and shipped as a PR — and security still runs on security-sensitive paths (`auth`, `api`, `db`, `crypto`, `session`) regardless of the declaration.
+**Direct execution is authoritative.** Outside an active pipeline, a small, concrete request that is
+small, bounded (at most three (≤3) files in one top-level domain), reversible/local, and non-sensitive
+is executed by `th:orchestrator` itself. A sensitive request follows the same predicate when the
+current live operator explicitly asks for inline. It creates no workspace, state/events, gate,
+branch, PR, or specialist dispatch by default; it runs only focused checks. This predicate also
+requires no public-contract or specialist-only work and no conflicting parallel ownership. A live
+request for a tester, QA, security, or other bounded review is honored without changing posture,
+and a requested outward action remains subject to the active runtime's approval rules.
+
+**Operator preference — “hazlo tú”.** A live “hazlo tú” (also “hazlo tu”, “do it yourself”, “you
+do it”, or “just do it”) is an executor preference, not a waiver. When the direct predicate passes,
+the coordinator must not dispatch `implementer` by default. A live request for tester, QA, security,
+or another bounded review is honored without activating the pipeline; otherwise a failed predicate
+uses the live `1 — inline` / `2 — pipeline` guidance. In an active pipeline, the preference can
+replace only the implementation executor after Gate 1; the pipeline's required checks and gates
+remain in force.
 
 **Respect `~/.claude/.team-harness.json` configuration.** This file controls workspace output mode (`logs-mode`: local or obsidian), vault path (`logs-path`), subfolder (`logs-subfolder`), and default language (`language`). The orchestrator reads this at pipeline start. Do not override these values or hard-code paths — the operator configured them via `/th:setup`.
 

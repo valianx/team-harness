@@ -400,11 +400,23 @@ def run_tests() -> int:
             "'flow_telemetry.enabled' config gate not documented"
         )
 
-    # A6: resilience / non-blocking contract documented.
-    if "flow-telemetry: unavailable" not in section:
+    # A6: resilience / non-blocking contract uses the canonical local trace event.
+    resilience_markers = (
+        "`operation.failed`",
+        "`operation: flow-telemetry`",
+        "`status: failed`",
+        "pipeline continues unchanged",
+    )
+    missing_resilience = [marker for marker in resilience_markers if marker not in section]
+    if missing_resilience:
         failures.append(
             "docs/observability.md § Flow Telemetry Emission: "
-            "resilience log line 'flow-telemetry: unavailable' not documented"
+            f"canonical non-blocking failure contract missing {missing_resilience}"
+        )
+    if "flow-telemetry: unavailable" in section:
+        failures.append(
+            "docs/observability.md § Flow Telemetry Emission: "
+            "obsolete free-form telemetry failure line remains documented"
         )
 
     # A7/A8 — RETIRED. They asserted that this file and docs/testing.md each

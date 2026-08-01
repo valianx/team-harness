@@ -5,6 +5,8 @@ import json
 import os
 import pathlib
 import stat
+import hashlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -24,6 +26,11 @@ def main() -> None:
     expected = {agent["name"] for agent in agents}
     if expected != {"architect", "implementer", "tester", "qa", "security", "delivery"}:
         fail(f"unexpected Codex vertical-slice roles: {sorted(expected)}")
+    architect_contract = next(agent for agent in agents if agent["name"] == "architect")
+    if architect_contract["sandbox_mode"] != "workspace-write":
+        fail("Codex architect must be able to write its assigned plan artifacts")
+    if "filesystem-write" not in architect_contract["capabilities"]:
+        fail("Codex architect is missing its bounded filesystem-write capability")
 
     config = tomllib.loads((ROOT / ".codex/config.toml").read_text())
     if config["agents"]["enabled"] is not True:
@@ -76,10 +83,26 @@ def main() -> None:
         for marker in markers:
             if marker not in content.splitlines():
                 fail(f"{path}: missing deterministic Team Harness marker {marker!r}")
-        if data["sandbox_mode"] == "read-only" and data["name"] in {"implementer", "tester", "delivery"}:
+        if data["sandbox_mode"] == "read-only" and data["name"] in {"architect", "implementer", "tester", "delivery"}:
             fail(f"{path}: write role is unexpectedly read-only")
     if generated != expected:
         fail(f"generated roles do not match contract: {sorted(generated)}")
+
+    # The generated TOML is the runtime projection of each compact adapter.
+    # Compare the parsed instruction value directly instead of relying only on
+    # generator freshness, so a stale adapter/TOML pair cannot pass unnoticed.
+    for agent in agents:
+        role = agent["name"]
+        instruction_path = ROOT / agent["instruction_source"]
+        output_path = ROOT / agent["output_path"]
+        if not instruction_path.is_file():
+            fail(f"{role}: instruction source is missing")
+        if not output_path.is_file():
+            fail(f"{role}: generated TOML is missing")
+        projected = tomllib.loads(output_path.read_text())
+        expected_instructions = instruction_path.read_text().strip()
+        if projected.get("developer_instructions") != expected_instructions:
+            fail(f"{role}: TOML developer_instructions drift from runtime adapter")
 
     if (ROOT / "codex-plugin").exists():
         fail("legacy codex-plugin tree must not remain after the marketplace layout move")
@@ -166,7 +189,7 @@ def main() -> None:
         "${CODEX_HOME:-$HOME/.codex}/.team-harness.json",
         "scripts/manage_config.py",
         "scripts/manage_agents.py",
-        "manage_config.py ensure --version 3.6.2",
+        "manage_config.py ensure --version 3.6.3",
         "codex mcp add memory",
         "@upstash/context7-mcp@3.2.5",
         "manage_agents.py sync --scope SCOPE",
@@ -174,6 +197,21 @@ def main() -> None:
     ):
         if marker not in setup:
             fail(f"Codex setup skill is missing {marker!r}")
+    setup_targets_match = re.search(
+        r"Supported targets are(?P<targets>.*?)(?:\n\n|\Z)",
+        setup,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if setup_targets_match is None:
+        fail("Codex setup does not declare its supported targets")
+    setup_targets = setup_targets_match.group("targets").lower()
+    if "lane-autoselect" in setup_targets:
+        fail("Codex setup must not advertise lane-autoselect as a supported target")
+    if re.search(r"(?im)^\s*-\s*lane auto-select\s+is\b", setup):
+        fail("Codex setup must not advertise an active lane-autoselect value")
+    for marker in ("migration-only", "1 — inline", "2 — pipeline"):
+        if marker not in setup.lower():
+            fail(f"Codex setup lane migration guidance is missing {marker!r}")
     for marker in (
         "codex plugin marketplace upgrade team-harness",
         "codex plugin remove team-harness@team-harness",
@@ -345,6 +383,7 @@ def main() -> None:
             "language": "es",
             "custom": {"opaque_plain": source_secret, "nested": 7},
             "autogate": {"pr_create": True},
+            "routing": {"mode": "fast", "mode_note": "keep-me"},
         }))
         env = {
             **os.environ,
@@ -380,6 +419,10 @@ def main() -> None:
             fail("Codex config import did not copy opaque nested values")
         if imported_doc.get("autogate", {}).get("pr_create") is not True:
             fail("Codex config import did not preserve an opaque authorization-like value")
+        if "mode" in imported_doc.get("routing", {}):
+            fail("Codex config import retained a nested legacy route selector")
+        if imported_doc.get("routing", {}).get("mode_note") != "keep-me":
+            fail("Codex config import removed opaque data beside a nested legacy selector")
         shown = subprocess.run(
             [sys.executable, str(config_script), "show"],
             text=True,
@@ -392,6 +435,16 @@ def main() -> None:
         shown_doc = json.loads(shown.stdout)
         if "custom" in shown_doc.get("config", {}):
             fail("Codex config display exposed an opaque imported object")
+        (claude_home / ".team-harness.json").write_text("not-json\n")
+        isolated_show = subprocess.run(
+            [sys.executable, str(config_script), "show"],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if isolated_show.returncode != 0:
+            fail("Codex config show parsed another runtime's malformed document")
         opencode_home = home / ".config" / "opencode"
         opencode_home.mkdir(parents=True)
         opencode_secret = "opaque-opencode-value-572"
@@ -415,6 +468,15 @@ def main() -> None:
             fail("Codex config import did not copy opencode-only values")
         if merged_doc.get("language") != "es":
             fail("opencode import overwrote a value already imported from Claude")
+        merged_doc["lane_autoselect"] = "always-stop"
+        merged_doc["nested_migration"] = {
+            "profile": "pipeline",
+            "bug_tier": 0,
+            "profile_note": "preserve",
+        }
+        merged_doc["mode"] = "custom-renderer"
+        merged_doc["fast"] = "opaque-string"
+        (codex_home / ".team-harness.json").write_text(json.dumps(merged_doc))
         ensured_import = subprocess.run(
             [sys.executable, str(config_script), "ensure", "--version", manifest["version"]],
             text=True,
@@ -429,6 +491,18 @@ def main() -> None:
             fail("Codex config ensure changed an opaque Claude import")
         if ensured_import_doc.get("opencode_only", {}).get("api_key") != opencode_secret:
             fail("Codex config ensure changed an opaque opencode import")
+        if "lane_autoselect" in ensured_import_doc:
+            fail("Codex config ensure retained a known legacy selector")
+        if "profile" in ensured_import_doc.get("nested_migration", {}):
+            fail("Codex config ensure retained a nested legacy selector")
+        if "bug_tier" in ensured_import_doc.get("nested_migration", {}):
+            fail("Codex config ensure retained a numeric Tier-0 selector")
+        if ensured_import_doc.get("nested_migration", {}).get("profile_note") != "preserve":
+            fail("Codex config ensure removed opaque nested migration data")
+        if ensured_import_doc.get("mode") != "custom-renderer":
+            fail("Codex config ensure removed an unrelated mode value")
+        if ensured_import_doc.get("fast") != "opaque-string":
+            fail("Codex config ensure removed an unrelated fast value")
         merged_mtime = (codex_home / ".team-harness.json").stat().st_mtime_ns
         repeated_import = subprocess.run(
             [sys.executable, str(config_script), "import", "--from", "opencode"],
@@ -452,6 +526,84 @@ def main() -> None:
     recovery_reference = (
         ROOT / "plugins/team-harness/skills/pipeline/references/recovery.md"
     ).read_text()
+    init = (ROOT / "plugins/team-harness/skills/init/SKILL.md").read_text()
+    pipeline = (ROOT / "plugins/team-harness/skills/pipeline/SKILL.md").read_text()
+    activation = (ROOT / "plugins/team-harness/skills/pipeline/references/activation.md").read_text()
+
+    # AC13-AC20: the Codex projection exposes the same two-posture contract as
+    # Claude. Direct inline work is the default and stays outside the canonical
+    # machine; only explicit live pipeline activation/recovery enters full v3.
+    machine_text = " → ".join(
+        ("design", "waiting_gate1", "implementation", "validation", "waiting_gate3", "delivery", "complete")
+    )
+    posture_sources = {
+        "Codex pipeline": pipeline,
+        "Codex state": (ROOT / "plugins/team-harness/skills/pipeline/references/state-and-gates.md").read_text(),
+        "Claude pipeline": (ROOT / "agents/ref-pipeline.md").read_text(),
+    }
+    for label, content in posture_sources.items():
+        lowered = content.lower()
+        if "inline" not in lowered or "pipeline" not in lowered:
+            fail(f"{label} does not name both inline and pipeline postures")
+        if machine_text not in content:
+            fail(f"{label} does not expose canonical full v3 sequence")
+    for label, content in {
+        "Codex init": init,
+        "Codex pipeline": pipeline,
+        "Codex activation": activation_reference,
+    }.items():
+        if not re.search(r"exactly two postures|two postures only|only postures", content, re.IGNORECASE):
+            fail(f"{label} does not assert exactly two postures")
+
+    current_state = (ROOT / "plugins/team-harness/skills/pipeline/references/state-and-gates.md").read_text()
+    current_machine = current_state.split("## Ownership and snapshot", 1)[0].lower()
+    if re.search(r"(?m)^lane:\s*", current_machine) or re.search(r"(?m)^profile:\s*", current_machine):
+        fail("Codex active state exposes a retired lane/profile field")
+    if "lane_autoselect" in current_machine or "tier-0" in current_machine:
+        fail("Codex active state exposes a retired route selector")
+
+    if "1 — inline" not in activation_reference or "2 — pipeline" not in activation_reference:
+        fail("Codex activation does not present the exact live 1/2 posture choices")
+    if "never infer a posture from configuration" not in activation_reference.lower():
+        fail("Codex activation lets configuration choose a posture")
+    config_lower = configuration_reference.lower()
+    if "legacy route/profile keys" not in config_lower:
+        fail("Codex configuration does not identify legacy route keys")
+    if "authorize neither posture" not in config_lower or "never chooses a route" not in config_lower:
+        fail("Codex configuration treats legacy route keys as authoritative")
+    if "1 — inline" not in configuration_reference or "2 — pipeline" not in configuration_reference:
+        fail("Codex configuration does not provide live migration guidance")
+
+    # A live tester/QA/security request is an ad-hoc inline report, not a
+    # pipeline run and not a source of state, gates, or delivery artifacts.
+    for role in ("tester", "qa", "security"):
+        adapter = (ROOT / f"runtime/codex/instructions/{role}.md").read_text().lower()
+        for marker in ("ad-hoc inline review", "creates no workspace", "coordination state", "events", "gates", "delivery record"):
+            if marker not in adapter:
+                fail(f"Codex {role} ad-hoc boundary is missing {marker!r}")
+    if "no second confirmation" not in activation_reference.lower() and "second confirmation" not in init.lower():
+        fail("Codex sensitive inline path does not prohibit a second confirmation")
+    if "explicitly selects `inline`" not in activation_reference.lower() and "selects `inline`" not in init.lower():
+        fail("Codex sensitive inline path lacks live explicit selection")
+
+    deliver_skill = (ROOT / "plugins/team-harness/skills/deliver/SKILL.md").read_text()
+    delivery_reference = (
+        ROOT / "plugins/team-harness/skills/pipeline/references/delivery.md"
+    ).read_text()
+    ship_contract = "\n".join((pipeline, current_state, deliver_skill, delivery_reference)).lower()
+    for marker in ("single", "version", "changelog", "commit", "push", "draft pr"):
+        if marker not in ship_contract:
+            fail(f"Codex Gate 3 ship contract is missing {marker!r}")
+    for marker in ("merge", "tag", "release", "publication"):
+        if marker not in ship_contract:
+            fail(f"Codex Gate 3 ship exclusions are missing {marker!r}")
+    if "does not authorize a push" in pipeline.lower():
+        fail("Codex pipeline still requires another operator decision after Gate 3 ship")
+    if "do not ask" not in ship_contract and "never ask" not in ship_contract:
+        fail("Codex delivery can ask again for version, commit, push, or draft PR")
+    if "technical runtime boundary" not in ship_contract:
+        fail("Codex delivery conflates native tool approval with an operator gate")
+
     for label, content in {
         "direct configuration": configuration_reference,
         "pipeline activation": activation_reference,
@@ -470,7 +622,6 @@ def main() -> None:
     if "dispatch `init-project` directly" not in routing:
         fail("bootstrap routing does not target init-project")
 
-    init = (ROOT / "plugins/team-harness/skills/init/SKILL.md").read_text()
     for marker in (
         "@Team-Harness init",
         "references/configuration.md",
@@ -502,7 +653,6 @@ def main() -> None:
         if "../init/references/configuration.md" not in direct:
             fail(f"{direct_name} direct fallback does not load persistent configuration")
 
-    pipeline = (ROOT / "plugins/team-harness/skills/pipeline/SKILL.md").read_text()
     for role in ("architect", "implementer", "tester", "qa", "security", "delivery"):
         if f"{role}.toml" not in pipeline:
             fail(f"pipeline preflight does not name {role}.toml")
@@ -523,7 +673,6 @@ def main() -> None:
     ):
         if marker not in pipeline:
             fail(f"pipeline preflight is missing {marker!r}")
-    activation = (ROOT / "plugins/team-harness/skills/pipeline/references/activation.md").read_text()
     for marker in (
         "regular non-symlink file",
         "agents/architect.md (opus/xhigh)",
@@ -560,7 +709,12 @@ def main() -> None:
             fail(f"Codex recovery still lacks section-first routing: {marker!r}")
 
     instruction_markers = {
-        "architect": ("plan_format: sharded-v1", "Each fact has one canonical home"),
+        "architect": (
+            "plan_format: sharded-v1",
+            "Each fact has one canonical home",
+            "coordinator-assigned plan artifacts",
+            "`status`, `artifact_pointers`",
+        ),
         "implementer": ("plan/tasks/Task-N.md", "never preload sibling tasks"),
         "tester": ("plan/tasks/Task-N.md", "fixed testing prose within 40 lines"),
         "qa": ("plan/tasks/Task-N.md", "fixed report prose within 30 lines"),
@@ -611,6 +765,35 @@ def main() -> None:
     ):
         if marker not in observability:
             fail(f"low-cost event contract is missing {marker!r}")
+
+    # Activation and pipeline skills carry the same generated-agent identity
+    # digests. Verify both tables against the actual normalized TOML bytes.
+    def digest_table(text: str) -> dict[str, str]:
+        return dict(
+            re.findall(
+                r"\|\s+`?(architect|implementer|tester|qa|security|delivery)`?\s+\|\s+`([0-9a-f]{64})`\s+\|",
+                text,
+            )
+        )
+
+    activation_digests = digest_table(activation)
+    pipeline_digests = digest_table(pipeline)
+    if set(activation_digests) != expected or activation_digests != pipeline_digests:
+        fail("pipeline and activation skill digest tables are not synchronized")
+    for role, expected_digest in activation_digests.items():
+        normalized = (ROOT / f".codex/agents/{role}.toml").read_bytes().replace(
+            b"\r\n", b"\n"
+        )
+        actual_digest = hashlib.sha256(normalized).hexdigest()
+        if actual_digest != expected_digest:
+            fail(
+                f"{role}: activation digest {expected_digest} does not match "
+                f"generated TOML {actual_digest}"
+            )
+
+    for reference in ("activation", "state-and-gates", "design", "implementation", "validation", "recovery", "delivery"):
+        if f"references/{reference}.md" not in pipeline:
+            fail(f"pipeline skill does not link references/{reference}.md")
 
     marketplace_check = subprocess.run(
         ["node", "tools/codex-runtime/validate-marketplace.mjs"],

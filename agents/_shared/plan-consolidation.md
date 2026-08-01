@@ -5,7 +5,13 @@
 
 ## Invariant
 
-The `sharded-v1` plan set defined by `docs/plan-shards.md` is a snapshot of the final, reconciled plan state — not a log of how the plan was reached. Each canonical fact appears exactly once in its owning artifact. When later input supersedes an earlier value, overwrite the smallest owning field or section; never append the new value beside the old one and never regenerate unrelated shards.
+The `sharded-v1` plan set defined by `docs/plan-shards.md` is a snapshot of the final,
+reconciled plan state — not a log of how the plan was reached. Each canonical field or fact
+appears exactly once in its owning artifact. When later input supersedes an earlier value,
+overwrite the smallest owning field or section; never append the new value beside the old one
+and never regenerate unrelated shards. Auxiliary deep-detail docs (`reviews/04-validation.md`,
+etc.) are permitted, but their final reconciled outcome must be reflected in the owning shard
+by detail or by reference.
 
 The plan-review panel's outcomes live exclusively in `reviews/01-plan-review.md`. `01-plan.md` carries only the one-line `**Reviews:**` attestation pointing at that file.
 
@@ -38,7 +44,7 @@ This closes the set of panel *outcomes*, not the set of files under `reviews/`. 
 | cross-project or multi-site invariants | `plan/invariants.md` | architect | author when needed; amend owning invariant only |
 | task scope, files, seams, notes, AC text and checkboxes | `plan/tasks/Task-N.md` | architect | one canonical shard per task; amend owning field only |
 | Closure rubric (ownership closure, provenance, removed-control) | `reviews/01-closure-rubric.md` | architect | author; rewrite in place on amend |
-| `## Plan Ratification (Phase 1.5)` | `reviews/01-plan-review.md` | qa-plan (ratify-plan) | replace own section in place; surface any required plan/AC correction to `architect` — qa-plan never edits the plan body |
+| `## Plan Ratification` | `reviews/01-plan-review.md` | qa-plan (ratify-plan, explicit `/th:plan-review` only) | replace own section in place; surface any required plan/AC correction to `architect` — qa-plan never edits the plan body |
 | `## Plan Review` header + `## Summary` rules table + `## Findings` + `## Recommendation to orchestrator` + `**Combined verdict:**` | `reviews/01-plan-review.md` | plan-reviewer | append in place; replace any prior copy |
 | `## Panel Rounds` | `reviews/01-plan-review.md` | plan-reviewer | append exactly one compact row per round; never retain prior finding bodies |
 | `## Plan Review` sub-verdict `**Substance (qa):**` | `reviews/01-plan-review.md` | qa-plan (panel) | replace own labelled line in place |
@@ -64,6 +70,16 @@ Every writer's permitted edit is enumerated below. A writer not listed has no wr
 | qa-plan, security, tester, implementer, and everyone else | NONE | — |
 
 (Stage-2 `[CONSTRAINT-DISCOVERED]` annotations are placed in the affected task shard by the **orchestrator**, transcribing an implementer's status field; the implementer never writes the plan set.)
+
+## Final-result finding coordinates
+
+Tester, QA, security, and adversary findings that block acceptance use one
+coordinate set: `Cause`, `Files`, implicated `AC`, and `Correction`. A defect or
+coverage gap inside the approved scope returns to implementation; the
+coordinator reopens Freeze and requests a fresh audit of a sensitive delta.
+Only a structural contradiction between intent, scope, and AC asks the operator
+whether to reopen design. No validator rewrites an AC or edits coordination
+state to manufacture PASS.
 
 ## Write-tool discipline (shared review files)
 

@@ -1,19 +1,27 @@
-# Plan-Structure Gate — Contract and Site Enumeration
+# Plan-Structure Gate — Historical Contract and Site Enumeration
 
-> Single source of truth for the Stage-1 deterministic plan-structure contract: the canonical
+> **[SUPERSEDED — canonical v3/two-posture contract]** This document is retained as migration
+> and plan-quality reference material. The automatic `plan_structure` scan, Phase 1.5a state,
+> event, dispatch, bounce loop, and gate authority described below are retired. Current `pipeline`
+> runs use the canonical `design → waiting_gate1 → implementation → validation → waiting_gate3 →
+> delivery → complete` machine; `inline` direct work creates no workspace, state, events, or gates.
+> Use `docs/plan-shards.md`, the architect/QA contracts, and explicit `/th:plan-review` for current
+> plan quality. Nothing in this historical file releases a gate or authorizes a dispatch.
+>
+> Historical source for the former Stage-1 deterministic plan-structure contract: the canonical
 > Layer-1 check set, the `plan_structure: pass|fail` verdict, and the enumeration of every
 > execution site that dispatches or consumes this contract. Mirrors `docs/code-hygiene-gate.md`
 > one-for-one (two layers, fixed check set, site enumeration, byte-consistency rule) — that file
-> is the template this one follows structurally; the two gates check unrelated properties (plan
+> is the template this one followed structurally; the two gates checked unrelated properties (plan
 > shape vs. comment hygiene) and share no command or pattern set. **Formerly sibling to
 > `docs/patch-mode.md § "Stage-1 Selective Panel Re-Firing"` as a bucket-5 feeder — that
 > classifier is retired (`docs/patch-mode.md § "Stage-1 Selective Panel Re-Firing — RETIRED"`),
-> so this file no longer feeds anything; `plan_structure` is a standalone Layer-1 gate consumed
-> only where § 5 below names a consumer.**
+> so this file no longer feeds anything; the `plan_structure` producer/consumer map below is
+> historical only.**
 
 ---
 
-## 1. Why two layers
+## 1. Why two layers (historical, non-gating)
 
 Before this gate existed, plan-ratification (`qa-plan`, Phase 1.5) carried both mechanical checks
 (does the AC count match the summary table, are cross-references dangling) and genuine judgment
@@ -36,13 +44,16 @@ now owns everything a script CAN decide, leaving only genuine judgment on the mo
 
 ---
 
-## 2. Layer 1 — Phase 1.5a Plan-Structure Scan (deterministic)
+## 2. Layer 1 — Phase 1.5a Plan-Structure Scan (historical, non-gating)
 
-**Owner:** `agents/ref-pipeline.md` — not a subagent dispatch, a Bash gate the orchestrator runs
-itself (same shape as the Phase 2.6 Code-Hygiene Scan and the Phase 2-close scope/backstop
-checks).
+> **Retired:** no current orchestrator invocation runs this scan or emits `plan_structure`.
+> The checks below are retained only as deterministic plan-quality guidance for authors and the
+> explicit plan-review flow.
 
-**When:** immediately before any Phase 1.5 `qa-plan` dispatch, for every plan that reaches Phase
+**Historical owner:** `agents/ref-pipeline.md` — this was not a subagent dispatch, but a Bash gate
+the former orchestrator ran itself. It is no longer an active gate.
+
+**Historical timing:** immediately before any Phase 1.5 `qa-plan` dispatch, for every plan that reached Phase
 1.5 — i.e., every plan that does NOT take the self-authored-plan panel carve-out
 (`agents/ref-pipeline.md § "Phase 1.5 — Plan Ratification"`, T2-AC-2). A self-authored plan
 (hotfix / Tier-1-fix / express one-line plan) is a fixed 3-4 line task list with no
@@ -50,7 +61,7 @@ checks).
 carve-out's own deterministic self-check item "at least one task exists" already covers the
 degenerate case, so Phase 1.5a does not run separately for it.
 
-**Checks (canonical — the orchestrator's inline scan must not re-derive or paraphrase this set):**
+**Checks (historical reference — current authors and explicit reviewers may use these as guidance):**
 
 1. **AC-count-vs-`### Summary`-table reconciliation.** The total AC count declared in
    each `01-plan.md § Task Index` AC count matches its task shard's actual `- [ ]`/`- [x]` AC bullets
@@ -74,20 +85,23 @@ degenerate case, so Phase 1.5a does not run separately for it.
 
 | Result | Action |
 |---|---|
-| Clean | Emit `plan_structure` (`verdict: pass`) to `{events_file}` as a structural trace event only — **never operator-facing prose**. Proceed to `qa-plan` (Layer 2, judgment-only ratify-plan). |
-| Violations found | Emit `plan_structure` (`verdict: fail`, `extra: {check, detail}`). Bounce to `architect` under the BOUNDED-PATCH contract (`agents/architect.md § BOUNDED-PATCH contract`) with the specific mechanical failure named — never a vague "the plan has issues." Do NOT dispatch `qa-plan` until the re-scan passes. |
-| Command error | Escalate — never a silent pass. A check that cannot run (malformed markdown table, a `Depends on:` value that cannot be parsed) is an escalation, the same "escalate-never-silently-pass" contract `docs/code-hygiene-gate.md § 3.1` states for its own exit-code handling. |
+| Clean | Historical behavior: emit `plan_structure` (`verdict: pass`) and proceed to `qa-plan`. Current behavior: no event or automatic dispatch. |
+| Violations found | Historical behavior: emit `plan_structure` (`verdict: fail`) and bounce to `architect`. Current behavior: surface the issue through the normal design correction or explicit `/th:plan-review`. |
+| Command error | Historical behavior escalated rather than silently passing. Current design checks remain fail-closed, but this document has no gate authority. |
 
-**Iteration budget.** Shares the same max-3 budget as Phase 1.6 (Plan Review) — a `plan_structure`
-bounce is a Stage-1 iteration, not a fresh, independently-tracked budget.
+**Historical iteration budget.** The former scan shared the max-3 Stage-1 budget; current v3 has
+one normal design correction and no automatic structure loop.
 
 ---
 
-## 3. Layer 2 — `qa-plan` judgment scope (ratify-plan mode)
+## 3. Layer 2 — `qa-plan` judgment scope (historical, non-gating)
 
-**Owner:** `agents/qa-plan.md`, `mode: ratify-plan`, dispatched ONLY after Layer 1 returns
-`plan_structure: pass` (Task-4 scope for the file itself; this section states the scope
-boundary the orchestrator's Phase 1.5 dispatch already assumes).
+> **Retired automatic path:** `qa-plan` is dispatched only by an explicit `/th:plan-review`;
+> it no longer waits on a `plan_structure: pass` event or participates in an automatic loop.
+
+**Historical owner:** `agents/qa-plan.md`, `mode: ratify-plan`, once dispatched after the former
+Layer 1 returned `plan_structure: pass`. Current `qa-plan` dispatch requires explicit
+`/th:plan-review` and does not consume that event.
 
 **What it audits (requires judgment; NOT expressible as a fixed check):**
 
@@ -104,7 +118,7 @@ covers AC soundness + plan capability only; it does not restate the AC count or 
 
 ---
 
-## 4. Exit-code / escalation contract
+## 4. Exit-code / escalation contract (historical, non-gating)
 
 The Layer-1 scan is a set of structural checks (table-count comparison, string-pattern
 cross-reference resolution, graph-cycle detection, set-intersection) rather than a single pinned
@@ -115,7 +129,7 @@ never a silent "no violations found." A broken check must not be misread as a cl
 
 ---
 
-## 5. Site enumeration
+## 5. Site enumeration (historical, non-gating)
 
 Every execution path that dispatches or gates this contract, as a separate site class. A consumer
 of the `plan_structure` field enumerated without its producer (or vice versa) is a false-green
@@ -136,7 +150,22 @@ every other row in the same change is the failure mode this gate exists to preve
 
 ---
 
-## 6. Cross-reference
+## 6. Current non-gating plan-quality and I/O guidance
+
+The active plan contract is `sharded-v1`: `01-plan.md` is the compact manifest and operator
+summary; architecture, delivery/dependencies, conditional invariants, and task/AC contracts
+live in `plan/architecture.md`, `plan/delivery.md`, `plan/invariants.md`, and
+`plan/tasks/Task-N.md`. Each canonical fact has one owning shard and the manifest indexes every
+task. Use the historical checks above as review inputs without copying canonical prose between
+shards.
+
+Target budgets in `docs/plan-shards.md` and `docs/output-contract-patterns.md` constrain compact
+prose and I/O, not required projects, tasks, ACs, invariants, findings, or controls. When required
+content exceeds a target, preserve it and report a bounded `size_reason: required-items`; never
+omit a required item or block solely on size. Pipeline work keeps the full canonical lifecycle;
+inline work remains workspace-free direct work.
+
+## 7. Cross-reference (historical)
 
 See `docs/code-hygiene-gate.md` for the structural template this file mirrors (two-layer
 deterministic + judgment pattern, site-enumeration table, byte-consistency rule) — the two gates

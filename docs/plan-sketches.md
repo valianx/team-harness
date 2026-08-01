@@ -17,15 +17,19 @@ system. Three representations reference this document:
 
 ## 1. Purpose
 
-The plan stage declares a **result-defining sketch set** — lightweight, plan-resident
-documents (`sketches/{type}`) that show WHAT will be delivered (functional + non-functional)
+The plan stage declares a **result-defining sketch set** for an active `pipeline` posture —
+lightweight, plan-resident documents (`sketches/{type}`) that show WHAT will be delivered (functional + non-functional)
 so the final result is determinable before a line is implemented. The goal is **contract
 determinism, not content determinism**: the same input type produces a predictable,
 verifiable SET of artifacts in a fixed shape. LLM prose varies; the envelope (what exists,
 what fields, what passed) is deterministic.
 
-**Fidelity ceiling:** inside the dev pipeline, sketches are LOW-fidelity and
+**Fidelity ceiling:** inside the canonical pipeline, sketches are LOW-fidelity and
 changed-surface-only. They are throwaway decision aids, not production polish.
+
+Sketches are pipeline artifacts. Inline direct work and live ad hoc tester/QA/security reviews do
+not create or require a sketch set; if an operator explicitly requests a standalone sketch, it is
+bounded evidence rather than pipeline state.
 
 **Representation ceiling (global):** token-cheap text that renders in Obsidian with zero
 dependency — Mermaid / ASCII / markdown tables / fenced code. **No verbose machine-JSON
@@ -34,7 +38,7 @@ permitted for the api-contract and event-contract sketches (fenced ` ```json ` b
 headers only — not the full machine schema). **Mermaid is the ONLY render library**
 (data-model ER only; native Obsidian + GitHub render, no CLI); JSON examples are fenced
 text, not a render library. **Excalidraw / D2 / LikeC4 are NOT in the sketch set** — they
-stay in the durable `/th:docs` lane (post-completion, never gated into development).
+stay in the durable `/th:docs` mode (post-completion, never gated into development).
 
 **Narrowly-scoped exception — UI wireframe.** The UI wireframe sketch alone is delivered as
 a standalone, self-contained HTML file (`sketches/ui-wireframe.html`) instead of the zero-
@@ -50,9 +54,11 @@ ui-wireframe — the zero-dependency, text-only rule stands for the other 8 sket
 
 ## 2. Classification Schema
 
-The architect records a bounded **classification block** of yes/no facts in `00-state.md §
-Current State` (the verifier's authority) and mirrors it in `01-plan.md § Review Summary →
-### Classification block` (the human-facing mirror).
+The architect returns a bounded **classification block** of yes/no facts in its status block and
+mirrors it in `01-plan.md § Review Summary → ### Classification block`. The **coordinator**
+validates and transcribes those values into `00-state.md § Current State`; the architect and every
+other specialist are forbidden to write coordination state. The state file is the verifier's
+authority and the plan is the human-facing mirror.
 
 ### The eight booleans
 
@@ -82,8 +88,9 @@ Current State` (the verifier's authority) and mirrors it in `01-plan.md § Revie
 
 The verifier reads these with strict line-token parsing (same as `checkpoint-guard.sh:97-102`).
 `00-state.md` is the **verifier's authority**. `01-plan.md § Review Summary → ### Classification
-block` is the **human-facing mirror** — it repeats the same values so the human sees them at
-STAGE-GATE-1 and `plan-reviewer` Rule 11 can audit consistency.
+block` is the **human-facing mirror** — it repeats the same values so the operator sees them at
+STAGE-GATE-1. Only the coordinator writes the state block; a specialist finding a mismatch
+returns it for correction rather than editing `00-state.md`.
 
 ---
 
@@ -197,15 +204,15 @@ run via `hooks/run-ts-hook.sh notify-stage`), NOT a `PreToolUse` event hook. Do 
 add it to `.claude-plugin/hooks.json`.
 
 **Fail-OPEN:** the verifier fails safe-allow (same pattern as `checkpoint-guard.sh:20-22`).
-This is a completeness gate, not a security gate. The plan-reviewer (agent) and the human
-at STAGE-GATE-1 are the backstops. A missing sketch surfaces as a `concerns`-level finding
-the human sees — never a hard block that strands the pipeline on a parsing edge case.
+This is a completeness check, not a security gate. The coordinator and the operator at
+STAGE-GATE-1 are the backstops. A missing sketch surfaces as a `concerns`-level finding the
+operator sees — never a hard block that strands the pipeline on a parsing edge case.
 
 **Anti-gaming check (concerns-only):** if the plan's `Files:` touch contract-surface
 keywords (route, controller, handler, endpoint, schema, migration, component, etc.) but the
 matching boolean is `false`, the verifier emits a `concerns`-level consistency finding. This
-is a backstop, not the sole control — `plan-reviewer` Rule 11 and the human at STAGE-GATE-1
-also see the classification block and the diff signal. The check is `concerns`-severity
+is a backstop, not the sole control — the operator at STAGE-GATE-1 also sees the classification
+block and the diff signal. The check is `concerns`-severity
 (surface to human), never `fail`.
 
 ---
@@ -214,27 +221,27 @@ also see the classification block and the diff signal. The check is `concerns`-s
 
 | Phase | Who | Action |
 |-------|-----|--------|
-| Stage 1 Design (alongside `01-plan.md`) | architect | Records the classification block in each project's `00-state.md` (required for every project including all-false); produces exactly the manifest-required `sketches/*` files |
-| Phase 1.5 (Plan Ratification) | qa-plan | Checks sketch↔AC consistency (functional-acceptance sketch matches `§ Task List` AC) |
-| Phase 1.6 (Plan Review) | plan-reviewer | Rule 11 — sketch completeness per-project (shape-only, fail-OPEN parity); each project's block audited independently in multi-project dispatch |
-| STAGE-GATE-1 | orchestrator | Invokes `sketch-guard.sh`; folds its verdict into the combined verdict; human reviews sketches |
-| Stage 2 Implementation | implementer | **Required reading:** reads every triggered `sketches/*` file (or consolidated `{overview_root}/sketches/` paths in multi-project workspaces) before writing any code; builds the delivered surface TO the sketch contracts; emits `sketches_read` in status block |
-| Stage 2 Test Authoring | tester | **Required reading:** reads the triggered `sketches/*` files; derives test cases from each declared contract surface (endpoint, table, call-hop, etc.) in addition to the per-task AC; emits `sketches_read` in status block |
-| Phase 3 Validation | qa | **Required reading:** reads the triggered `sketches/*` files; cross-checks the delivered API/data/UI/call-flow against the corresponding sketch contract as part of AC validation; emits `sketches_read` in status block |
-| Phase 3 Code Review | reviewer | **Required reading:** reads the triggered `sketches/*` files; confirms the diff matches the sketch contracts; flags a delivered surface that silently diverges from the api-contract or service-interaction sketch |
-| Direct-entry skills | `/th:review-pr`, `/th:validate` | Run `sketch-guard.sh` as a prerequisite probe; **required reading:** reads the triggered sketch files when entering mid-pipeline before the consuming pass begins |
+| `design` | architect | Produces the required `sketches/*` files and returns the classification block; the coordinator transcribes it into each project's `00-state.md` (including all-false) |
+| `waiting_gate1` | orchestrator + operator | Invokes `sketch-guard.sh`, shows missing-sketch concerns and the sketch pointers in the concise Gate 1 summary |
+| `implementation` | implementer + tester | Reads every triggered sketch before writing code or evidence and records `sketches_read` in its status block |
+| `validation` | qa (+ adversary when the security floor applies) | Reads the triggered sketches and checks the delivered surface against the corresponding contracts |
+| Explicit `/th:plan-review` | qa-plan / plan-reviewer / security when requested | May inspect sketch completeness as part of the operator-requested review; never runs automatically |
+| Pipeline-attached entry skills | `/th:review-pr`, `/th:validate` | When an active pipeline workspace is supplied, run `sketch-guard.sh` as a prerequisite probe and read triggered sketch files before the consuming pass; standalone inline reviews do not create a sketch set |
 
 ---
 
 ## 7. Per-Type Applicability
 
-| Type / Tier | Classification block produced? | Always-sketches | Conditional sketches | Verifier runs? |
+| Type / severity metadata | Classification block produced? | Always-sketches | Conditional sketches | Verifier runs? |
 |-------------|-------------------------------|-----------------|---------------------|---------------|
-| `feature` / `refactor` / `enhancement` | Yes (architect, Stage 1) | yes (collapsed surfaces) | per booleans | Yes, at STAGE-GATE-1 |
-| `fix` Tier 2-4 | Yes (architect root-cause mode records the block in `00-state.md`) | yes (AC in § Task List) | only if the fix touches a contract surface (rare); booleans default false | Yes, at STAGE-GATE-1 |
-| `fix` Tier 1 / `hotfix` | No architect → orchestrator records all-false block when it self-authors `01-plan.md` | yes (minimum 4-line AC) | none (all false) | Yes — no-op pass (all-false → empty required set) |
-| `fix` Tier 0 / `docs` Tier 0 | **Exempt** — no workspace exists (CLAUDE.md §5 observability exemption) | n/a | n/a | Not invoked (no `00-state.md`) |
-| `docs` flow (Tier ≥1) | architect docs research → orchestrator records all-false block (docs do not touch product contracts) | yes | none | Yes — no-op pass |
+| `feature` / `refactor` / `enhancement` | Yes (architect returns; coordinator transcribes) | yes (collapsed surfaces) | per booleans | Yes, at STAGE-GATE-1 |
+| `fix` severity 2–4 (metadata) | Yes (architect root-cause mode returns; coordinator transcribes) | yes (AC in § Task List) | only if the fix touches a contract surface (rare); booleans default false | Yes, at STAGE-GATE-1 |
+| `fix` severity 1 / `hotfix` | Minimal design may be coordinator-authored only where the canonical flow permits; coordinator still owns state | yes (minimum AC) | none (all false unless architect returns otherwise) | Yes, at STAGE-GATE-1 |
+| `docs` request in pipeline posture | architect docs research → orchestrator records all-false block (docs do not touch product contracts) | yes | none | Yes — no-op pass |
+
+The former Tier-0/docs exemption is **superseded**. Old workspaces may lack sketches, but that
+historical absence is migration data and does not authorize a current pipeline to skip its fixed
+design and Gate 1 checks.
 
 ---
 

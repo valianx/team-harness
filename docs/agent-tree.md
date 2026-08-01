@@ -6,15 +6,15 @@ How Team Harness agents relate at runtime. The top-level session agent is **`th:
 th:orchestrator  ── top-level session agent · the operator's single point of contact
 │    Owns: Intake · Discover/framing · Specify · spec+AC co-authoring ·
 │    config/language resolution · initiative + overview.md · the gated pipeline
-│    (Phase 1 Design → Phase 6 Knowledge Save) · all three STAGE-GATEs, presented
-│    inline and recorded in the same operation · sole writer of 00-state.md.
+│    (design → waiting_gate1 → implementation → validation → waiting_gate3 →
+│    delivery → complete) · both STAGE-GATEs, presented inline and recorded in
+│    the same operation · sole writer of 00-state.md and its coordination trace.
 │
 ├─ dispatches pipeline specialists (leaf agents — no further orchestration):
-│    Stage 1 · Analysis        architect · qa-plan (ratify) · plan-reviewer ·
-│                               security (design-review)
-│    Stage 2 · Implementation  implementer · tester · qa · security · adversary
-│    Stage 3 · Delivery        delivery · reviewer (internal pre-PR) ·
-│                               reviewer-consolidator
+│    Design                     architect · security (design-review when sensitive)
+│    Implementation             implementer · tester
+│    Validation                 qa · adversary (when the security floor applies)
+│    Delivery                   delivery
 │    UI / diagrams (triggered) ux-reviewer · diagrammer · d2-diagrammer ·
 │                               likec4-diagrammer · documenter
 │    GCP tasks                  gcp-cost-analyzer · gcp-infra
@@ -24,7 +24,7 @@ th:orchestrator  ── top-level session agent · the operator's single point o
                    architect (research mode)
      docs          documenter
      other         mentor · init-project (bootstrap) · translator · qa-plan (define-ac)
-     Tier 0 fix    implementer (direct → straight to PR; the one gated-work exception)
+     direct fix    coordinator when eligible (no pipeline state or specialist dispatch)
 
 meta (outside any pipeline run):  agent-builder  ── authors new agents and skills
 ```
@@ -32,19 +32,28 @@ meta (outside any pipeline run):  agent-builder  ── authors new agents and s
 `@Team-Harness init` remains the lightweight intake command; it is not the
 project-bootstrap agent name.
 
+## Runtime postures
+
+Exactly two postures are available: `inline` and `pipeline`. Inline is the direct default; a
+current live operator may explicitly request sensitive inline work or a bounded tester, QA, or
+security review, and those requests create no workspace, state, events, gates, or delivery action.
+Pipeline entry requires explicit live activation or recovery and always uses the canonical full v3
+machine shown above. Retired route markers are migration data only and cannot select a posture or
+release a gate.
+
 ## Roles at a glance
 
 | Agent | Tier | Dispatched by | Owns gates? |
 |---|---|---|---|
 | `th:orchestrator` | lightweight direct coordination; gated execution after activation | — (top-level session agent) | Yes, only during an active pipeline |
 | `architect` | analysis | orchestrator (or research/design direct mode) | No |
-| `qa-plan` | analysis | orchestrator (ratify / define-ac direct) | No |
-| `plan-reviewer` | analysis | orchestrator | No |
-| `implementer` | implementation | orchestrator (direct for a Tier 0 fix) | No |
+| `qa-plan` | analysis | orchestrator (define-ac direct; explicit plan-review only) | No |
+| `plan-reviewer` | analysis | orchestrator (explicit `/th:plan-review` only) | No |
+| `implementer` | implementation | orchestrator after Gate 1 | No |
 | `tester` | implementation | orchestrator | No |
 | `qa` | implementation | orchestrator | No |
-| `security` | analysis + implementation | orchestrator (design-review + verify) | No |
-| `adversary` | implementation | orchestrator (verify, security-sensitive) | No |
+| `security` | design review | orchestrator when `security_sensitive` | No |
+| `adversary` | validation | orchestrator when the security floor applies | No |
 | `delivery` | delivery | orchestrator | No |
 | `reviewer` / `reviewer-consolidator` | delivery | orchestrator | No |
 | `ux-reviewer` | analysis + implementation | orchestrator (frontend scope) | No |
@@ -59,6 +68,12 @@ project-bootstrap agent name.
 
 - **Exactly one coordinator node.** `th:orchestrator` never spawns another orchestrator. The small kernel stays direct until `/th:pipeline`; the activated contract retains the specialist-only dispatch invariant (`agents/ref-pipeline.md § Dispatch invariants`).
 - **Gate state has a single writer.** The orchestrator prepares each STAGE-GATE, presents its STOP block to the operator inline, and records the release (the dual-record: the `gateN_release` field in `00-state.md` plus the `stage.gate.release` event) in the same operation — no second agent relays or forges any part of it (`agents/_shared/gate-contract.md § "The dual-record release"`).
-- **Direct modes have no STAGE-GATE** — the orchestrator dispatches those specialists itself, with no pipeline `00-state.md` created.
+- **Inline direct work has no STAGE-GATE or pipeline state** — the coordinator acts directly or
+  dispatches the explicitly requested ad hoc specialist. This includes `/th:plan-review` and
+  live tester/QA/security reviews; none activates the pipeline.
+- **Numeric gate UX is stable.** Gate 1 presents `1 approve`, `2 approve autonomous`, `3 edit`,
+  `4 reject`; Gate 3 presents `1 ship`, `2 amend`, `3 abort`. A number alone is accepted only
+  for the corresponding decision; edit/reject use `N: detail`. The nonce, dual record and live
+  operator approval remain mandatory (`agents/_shared/gate-contract.md`).
 
 See also: `docs/how-it-works.md`, `agents/orchestrator.md` (startup kernel), `agents/ref-pipeline.md` (gated contract), and `docs/reasoning-checkpoint.md`.

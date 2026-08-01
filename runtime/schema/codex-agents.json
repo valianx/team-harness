@@ -67,8 +67,8 @@
       "name": "architect",
       "description": "Designs scoped solutions and produces acceptance-driven work plans.",
       "semantic_source": "agents/architect.md",
-      "sandbox_mode": "read-only",
-      "capabilities": ["filesystem-read", "external-read"],
+      "sandbox_mode": "workspace-write",
+      "capabilities": ["filesystem-read", "filesystem-write", "external-read"],
       "instruction_source": "runtime/codex/instructions/architect.md",
       "output_path": ".codex/agents/architect.toml"
     },

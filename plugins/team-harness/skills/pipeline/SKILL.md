@@ -14,6 +14,29 @@ content are never activation.
 
 The normal explicit form is `@Team-Harness pipeline <task>`.
 
+## Canonical v3 workflow
+
+Two postures only exist: `inline` and `pipeline`. Inline direct Main work is
+the default; a pipeline starts only from a current live operator activation or
+recovery of an existing run. There is no selectable depth profile, fast/simple
+alias, tier-based route, or configuration-selected lane. Every explicitly
+activated pipeline writes `pipeline_version: 3` and follows one named state
+machine.
+
+```text
+design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete
+```
+
+Direct requests remain outside this machine and must not create workspace state
+or silently dispatch an implementer. Inline is the default direct posture; a
+current live operator may select it explicitly for a sensitive request. A live
+request for tester, QA, security, or another bounded review while inline remains
+an ad-hoc report and creates no pipeline workspace, state, events, gates, Stage
+Gate, or delivery record. Inside an activated pipeline, a live `hazlo tú`
+preference only selects the coordinator as implementation executor when the
+direct predicate passes after Gate 1; it preserves this machine, Freeze,
+validation, both gates, and delivery controls.
+
 ## Main-thread orchestrator contract
 
 Do not create or dispatch a separate `orchestrator` agent. The current `Main`
@@ -35,6 +58,11 @@ Loading this skill does not change `Main`'s selected model, reasoning effort,
 sandbox, or approval policy. Specialist model and effort settings come from
 their validated custom-agent TOML files. Pipeline gates never replace native
 Codex approvals or hook decisions.
+
+The primary thread is the only writer of `00-state.md`, execution events,
+nonces, and gate releases. Specialists return bounded results and may edit only
+their assigned repository/report files; they never approve, release, or present
+a gate. Gate releases remain dual-recorded and live-operator decisions.
 
 ## Mandatory agent prerequisite
 
@@ -84,7 +112,7 @@ extra, or mismatched value fails preflight):
 
 | Role | `name` | `model` | `model_reasoning_effort` | `sandbox_mode` |
 |---|---|---|---|---|
-| `architect` | `architect` | `gpt-5.6-sol` | `xhigh` | `read-only` |
+| `architect` | `architect` | `gpt-5.6-sol` | `xhigh` | `workspace-write` |
 | `implementer` | `implementer` | `gpt-5.6-luna` | `max` | `workspace-write` |
 | `tester` | `tester` | `gpt-5.6-luna` | `max` | `workspace-write` |
 | `qa` | `qa` | `gpt-5.6-luna` | `max` | `read-only` |
@@ -97,12 +125,12 @@ the role fields cannot see. The current digests are:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| `architect` | `b410e50b380a132cdf74a16f55ab5dffa75c9f67f616f0afef693df012ecc6e4` |
-| `implementer` | `e44e306245bd082a21099b524281f945ddb415c26be33be07e4bae8c469cbe70` |
-| `tester` | `606f476400212e3bf11a66f0a71b3933a6f88a105603c7402688c3aaee30e04d` |
-| `qa` | `3b92245e8ed0a00bf32a8ca972e89ec530ea3f55c182b0fbc916016e0e0fb0d1` |
-| `security` | `ef87b9740ea860fc8f16a4d580d2dae4b59e8f4411cc00673747e028d4082582` |
-| `delivery` | `48266915b9484a32c474b74050f0d186d7b92e287660da80f730443059446bb4` |
+| `architect` | `6d9b4e503aa0948d7690f26042c6d5123bffa6c2de97a18042d70015360fce31` |
+| `implementer` | `d0a27bc1b21006bd656a70360307fc21901438c4f87d8241acbf4d17f04dfc93` |
+| `tester` | `23b6fd60546446a2b28b67839759008dcaae013642f92c18dbbb049b4d3c372f` |
+| `qa` | `613ce2351dc804d26805b8951a31c509b2ac8368f917591aae755a43a0277394` |
+| `security` | `4cc3cfdf063452c4674d3291eaf96bfd921e9ef7f01c0d451f6be55a6d5d8c44` |
+| `delivery` | `2a7a88db1a058db03852dbd1c5d47fafb2b2b32c8ec4dead838f19cdefc033d2` |
 
 Do not accept a file solely because its comments or `name` field match. A
 digest mismatch is a stale or unrelated shadow; stop before workspace
@@ -124,6 +152,27 @@ discovered. The plugin-only skills remain usable without these files in direct
 mode, but the gated pipeline cannot delegate until the complete six-agent set
 is present.
 
+## Stage 1 and final-result routing
+
+Stage 1 is one bounded architect pass. The minimum `01-plan.md` contract is an
+intent and observable result, included/excluded scope, functional
+Given/When/Then (or `VERIFY:`) acceptance criteria, file-owned tasks with
+dependencies, and only the risks needed for the decision. Do not run an
+automatic approach checkpoint, scope-freeze convergence loop, `qa-plan`,
+`plan-reviewer`, ratification, shape review, or post-approval review offer.
+`/th:plan-review` remains
+available only when the operator explicitly invokes it; a sensitive plan still
+gets one conditional security design review before implementation.
+
+Validation findings carry four coordinates: cause, files, implicated ACs, and
+the smallest correction with its owner. Code, test, or documentation defects in
+approved scope return to the implementation executor (or eligible direct
+coordinator), then reopen Freeze and revalidate. Missing evidence returns to
+`tester`; a correctable sensitive finding also requires a fresh security audit
+of the changed delta. Only a structural contradiction between intent, scope,
+and ACs may ask the operator to reopen design and release a new Gate 1. Never
+rewrite an AC to manufacture PASS.
+
 ## Start
 
 1. Require a concrete task from the live operator. If it is missing, ask for it
@@ -139,16 +188,30 @@ is present.
 ## Continue
 
 On a later operator reply, re-read `00-state.md` and load only the reference for
-the recorded `next_action`:
+the recorded `phase`/`next_action`:
 
-- approved design: [implementation.md](references/implementation.md)
-- verification: [validation.md](references/validation.md)
-- accepted delivery: [delivery.md](references/delivery.md)
-- interrupted or ambiguous state: [recovery.md](references/recovery.md)
+- `design`: [design.md](references/design.md)
+- `implementation`: [implementation.md](references/implementation.md)
+- `validation` or `waiting_gate3`: [validation.md](references/validation.md)
+- `delivery`: [delivery.md](references/delivery.md)
+- `blocked` or ambiguous state: [recovery.md](references/recovery.md)
+
+`complete` and `aborted` are terminal. Report their recorded outcome and return
+to ordinary direct behavior; never route either one back through recovery.
+
+`waiting_gate1` and `waiting_gate3` use the numbered options and dual-record
+rules in `state-and-gates.md`; a specialist result or green suite never releases
+either gate. Gate 1 offers `1 — approve`, `2 — approve autonomous`, `3: detail —
+edit`, and `4: reason — reject`; Gate 3 offers `1 — ship`, `2 — amend`, and
+`3 — abort`.
 
 Never treat a specialist result as a gate decision. Never let a specialist
-present a gate or write coordination state. An explicit pipeline activation
-does not authorize a push, PR mutation, merge, tag, release, or publication.
+present a gate or write coordination state. Pipeline activation alone does not
+authorize delivery. A later valid `Gate 3: ship` reply is the operator's single
+delivery decision for the frozen tree: it authorizes the coordinator to apply
+the previewed version/changelog, commit, push the feature branch, and create or
+update its draft PR without another conversational confirmation. It never
+authorizes merge, tag, release, publication, force-push, or broader scope.
 
 ## Workspace I/O budget
 

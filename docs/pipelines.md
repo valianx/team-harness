@@ -6,24 +6,35 @@ Regenerate this index whenever a flow's home changes. Do not edit a flow's behav
 
 ---
 
-## The pipeline
+## The two postures
 
-The opt-in gated flow is Design → Implementation → Verify → Delivery, with a human gate at the end of analysis and another before publication. `/th:pipeline` activates it; its authoritative lazy-loaded definition is `agents/ref-pipeline.md`.
+Team Harness has exactly two runtime postures: `inline` and `pipeline`. `inline` is the direct
+default. It creates no pipeline workspace, state, events, gates, or delivery action; a live
+operator may explicitly request a bounded tester, QA, or security review and that ad hoc review
+also remains inline. Sensitive inline work is allowed when the current live operator selects
+`inline`; no second confirmation or forced route is inferred.
+
+`pipeline` is the only gated posture and is always the canonical full v3 state machine:
+`design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete`.
+Only a current live `/th:pipeline` (or equivalent explicit activation) or `/th:recover` of an
+existing run enters it. Its authoritative lazy-loaded definition is `agents/ref-pipeline.md`.
+Retired route markers are compatibility data only; they do not select a posture or release a gate.
 
 | What you want to know | Authoritative home |
 |---|---|
-| Phase sequence and what advances it | `agents/ref-pipeline.md` |
+| Named states, successors and what advances them | `agents/ref-pipeline.md` + `agents/_shared/orchestrator-state.md` |
 | Gate mechanics: dual record, STOP templates, ambiguous reply, nonce | `agents/_shared/gate-contract.md` |
 | Which specialist is called when, and what its return must contain | `agents/ref-pipeline.md § "Your Team"` |
 | What a dispatch may and must not carry | `agents/_shared/dispatch-contract.md` |
-| Lane model (inline / express / full) and its cost estimate | `docs/pipeline-lanes.md` |
-| Intake: lane classification, bug tier, provenance tiers | `agents/ref-intake-flows.md` |
+| Two-posture compatibility and legacy migration | `docs/pipeline-lanes.md` |
+| Intake: posture classification, bug metadata, provenance tiers | `agents/ref-intake-flows.md` |
 | Discover depth, external-report scope verification | `docs/discover-phase.md` |
 | Spec co-authoring | `docs/spec-coauthoring.md` |
 | Publication mechanics: version bump, branch, changelog, push, PR | `agents/_shared/delivery-mechanics.md` |
 | Event schema, cost formula, trace fields | `docs/observability.md` |
 | Suite-run evidence and tree anchors | `docs/suite-evidence.md` |
 | Code-hygiene pattern set | `docs/code-hygiene-gate.md` |
+| Concise gate options and numeric shortcuts | `agents/_shared/gate-contract.md` |
 
 ## Flow variants
 
@@ -41,7 +52,7 @@ Each variant is defined once, in `agents/ref-special-flows.md`, under the sectio
 | Plan (task breakdown) | `## Plan Flow` |
 | Milestone build (`type: plan`) | `## Milestone-Build Flow`, `## Milestone Index` |
 | Documentation | `## Documentation Flow` |
-| Simple mode · fast mode | `## User-Initiated Simple Mode` · `## Fast Mode` |
+| Legacy simple/fast wording | `docs/pipeline-lanes.md` § Legacy route markers (compatibility only) |
 | Learn / teaching | `## Learn (Teaching) Flow` |
 | Plan sketches, per type | `## Plan Sketches — Per-Type Applicability` |
 | Artifact verification in special flows | `## Artifact Verification in Special Flows` |
@@ -52,7 +63,9 @@ Grouping several projects' pipelines under one `overview.md` parent index. Proje
 
 ## Direct modes
 
-Non-gated modes the coordinator runs directly: diagram, likec4, d2, review, translate, plan-review. Definition: `agents/ref-direct-modes.md`.
+Non-gated modes the coordinator runs directly: diagram, likec4, d2, review, translate, and
+plan-review. Definition: `agents/ref-direct-modes.md`. `plan-review` is never an automatic
+pipeline panel; it runs only after an explicit `/th:plan-review` invocation.
 
 ## PR review
 

@@ -4,6 +4,16 @@ The top-level Claude Code agent IS the orchestrator. This is the CC native archi
 
 **SEC-DR-2 re-founding (v2.89.0).** The former "dev mode" was a conditional disposition controlled by `~/.claude/.dev-mode-active`. That model was retired when empirical testing (M1 probe, 2026-06-14) confirmed that nested foreground subagents retain the `Task` tool — the foundational premise behind the handoff machinery was obsolete on the CC path. The disposition is now unconditional: the general agent is always the orchestrator, and the gate is always armed.
 
+## Runtime postures
+
+The runtime has exactly two postures: `inline` and `pipeline`. Inline is the direct default and
+creates no pipeline workspace, state, events, gates, or delivery action. A current live operator
+may explicitly select sensitive inline work or request a bounded tester, QA, or security review;
+those ad hoc reviews remain inline and do not activate a pipeline. Pipeline entry requires a live
+explicit `/th:pipeline` (or equivalent current-turn activation) or recovery of an existing run
+with `/th:recover`, and every pipeline uses canonical full v3. Retired route markers are
+compatibility data only; they cannot select a posture, skip a phase, or release a gate.
+
 ---
 
 ## Outward-Action Gate (`dev-guard`)
@@ -71,7 +81,7 @@ The threat model this gate defends is disposition that rationalises the readable
 1. **Bounded resolver** — `analyzeCommand`/`classifyCoveredAction` (`hooks/ts/bodies/command-lexer.ts`) recognize the command shapes a normal developer, script, or CI wrapper actually produces: direct commands, the modeled runner prefixes, the modeled shell/`eval`/`xargs` wrappers, and per-subcommand-binary dispatch — see § Detection mechanism above for the mechanism detail.
 2. **Fail-closed on ambiguity within covered commands** — an unresolvable token (`tainted`) or an unrecognized prefix/option on a command classified as covered is surfaced as `requiresFailClosed`, and the consuming hook asks instead of guessing `allow`. An unresolvable wrapper payload (`unresolvableShellPayload`) or exceeded unwrap depth (`depthExceeded`) is, by the recalibration above, NOT treated as covered — only the resolved effective commands are evaluated (documented residual).
 3. **Documented residuals** — every construction the resolver does not structurally unify is enumerated below, not silently absorbed into "closed."
-4. **Defense-in-depth** — the client-side gate is one layer among several. Server-side branch protection is the authoritative floor for an unauthorized push regardless of any client-side gap; `gh pr merge` stays `ask` unconditionally; force-push stays deny-in-lane/ask-outside-lane regardless of how the command was assembled; human review at STAGE-GATE-3 / PR review is the last check before a change lands.
+4. **Defense-in-depth** — the client-side gate is one layer among several. Server-side branch protection is the authoritative floor for an unauthorized push regardless of any client-side gap; `gh pr merge` stays `ask` unconditionally; force-push stays subject to the active runtime's outward-action policy regardless of how the command was assembled; human review at STAGE-GATE-3 / PR review is the last check before a change lands.
 
 **What this design closes (mechanism detail: § Detection mechanism above).** Relative to the retired raw-string boundary-class/char-gate routers, the resolved-argv analyzer closes: wrapper-embedded quoted commands (`bash -c "git push origin main"`, `eval`, a literal `echo`/`printf`-to-shell pipe); the per-subcommand-binary dispatch form (`$(git --exec-path)/git-push`, case/`.exe`-variant binaries) via `classifyCoveredAction`'s centralized basename normalization; `xargs` replacement-string forms (`-I{}`/`-i`, fail-closed rather than misread as a literal payload); cross-hook case- and `.exe`-insensitive binary resolution (one centralized resolution, not a per-hook fallback); a capability-audited `SAFE_NON_EXECUTING_BASENAMES` exemption list for read-only/data-only tools; and the multi-call-dispatcher direct form (`busybox sh -c ...`) via `detectDispatcherShellCPayload`. It also removes friction: a benign non-force push to a non-default branch on `origin` — including a colon refspec or a quoted-but-literal destination — resolves to `allow` under `matchBenignPushGrammar` instead of prompting.
 
@@ -97,9 +107,11 @@ The threat model this gate defends is disposition that rationalises the readable
 
 **Why the four came out, empirically.** They enforced process over a non-deterministic agent flow, and the false positives accumulated faster than the prevented incidents. Three shipped as bugs against this repo, and a fourth surfaced inside the pipeline while those three were being fixed — an anti-gaming check flagged a plan because a file path contained the substring `model`. Meanwhile no incident is recorded as prevented, because **none of the hooks logs its decisions** — measured cost against unmeasured benefit. Decision logging is the prerequisite for reinstating any of them.
 
-**Everything below in this section describes the unwired `gate-guard` and is retained for the follow-up cleanup, not as a description of current behavior.**
+**Everything below in this section describes the unwired `gate-guard` and is retained as a
+superseded historical record, not as a description of current behavior. The historical word
+`lane` below is not a current posture or selector.**
 
-## Deterministic order floor (`gate-guard`) — deny vs ask, and the force-push floor (Invariant E) — UNWIRED as of v2.139.0
+## Historical (superseded/unwired): deterministic order floor (`gate-guard`) — deny vs ask, and the force-push floor (Invariant E)
 
 **`gh pr create` correction — already covered, not net-new.** The table above lists `gh pr create` as `ask` by default with an `allow` opt-in (`autogate.pr_create`) — that coverage PRE-DATES this section and is unchanged by it. The net-new contribution documented below is the ORDER floor (`gate-guard`), not `gh pr create` coverage.
 
@@ -163,11 +175,17 @@ carries (`dev-guard`), not a regression introduced by this mechanism.
 
 ## Ask-class caveat — the gate stops only when the session stops on `ask`
 
-The outward-action gate is `ask`-class, not `deny`-class. When `dev-guard` returns `permissionDecision: "ask"` for a lane's push / merge / PR write, that decision only STOPS the action if the operator's session actually halts on an `ask` — i.e. the session is interactive and a present operator answers the prompt. It is not a `deny`: the runtime does not refuse the action outright; it defers to the operator's normal permission flow. This is a deliberate loosening (a delivery push at STAGE-GATE-3 must be able to proceed through operator approval), and its consequences must be stated honestly rather than oversold.
+The outward-action gate is `ask`-class, not `deny`-class. When `dev-guard` returns
+`permissionDecision: "ask"` for an active pipeline's push / merge / PR write, that decision only
+STOPS the action if the operator's session actually halts on an `ask` — i.e. the session is
+interactive and a present operator answers the prompt. It is not a `deny`: the runtime does not
+refuse the action outright; it defers to the operator's normal permission flow. This is a deliberate
+loosening (a delivery push at STAGE-GATE-3 must be able to proceed through operator approval), and
+its consequences must be stated honestly rather than oversold.
 
 - **Do not assume `ask` stops under a broad Bash auto-allow.** If the operator's session runs with a blanket `Bash` allow, `--dangerously-skip-permissions`, or any posture that auto-satisfies `ask` prompts, an `ask` is auto-answered and the outward action proceeds with no human in the loop. The gate did its job (it issued `ask`); the session's permission posture is what determined whether that `ask` actually halted.
 - **Do not assume `ask` stops under a non-interactive or bridged posture.** In a headless / `-p` / bridged / relay session there may be no interactive operator to answer the prompt; how the runtime handles an unanswered `ask` is a session-posture property outside the gate's control.
-- **The coordinator's gate presentation must not oversell this.** When `th:orchestrator` presents a lane's STAGE-GATE to the operator inline and records the decision itself (`agents/ref-pipeline.md § "Gates"` — "Ask-class caveat"), the presentation is a request for a human decision, not a claim that anything is being mechanically "halted." The coordinator does not know the session's permission posture and must not imply a guarantee the `ask`-class gate does not make.
+- **The coordinator's gate presentation must not oversell this.** When `th:orchestrator` presents an active pipeline's STAGE-GATE to the operator inline and records the decision itself (`agents/ref-pipeline.md § "Gates"` — "Ask-class caveat"), the presentation is a request for a human decision, not a claim that anything is being mechanically "halted." The coordinator does not know the session's permission posture and must not imply a guarantee the `ask`-class gate does not make.
 - **Nested coordination is structural, not string-policed.** The coordinator uses native task dispatch. `policy-block` no longer tries to recognize `claude --dangerously-skip-permissions` inside arbitrary shell text; that heuristic was evadable and retained a large legacy-tmux exception without creating a security boundary.
 
 ---
@@ -178,22 +196,29 @@ The ask-class caveat has a direct consequence for how STAGE-GATE-3 — the human
 
 **(a) The coordinator presents STAGE-GATE-3 inline and records the operator's decision itself.** STAGE-GATE-3 is prepared, presented and recorded by the same `th:orchestrator` that owns the task, inline — in the operator's main conversation, the only reliably reachable channel (`agents/ref-pipeline.md § "Gates"`). Because the outward-action `ask` does not itself guarantee a stop (it can be auto-satisfied), the presentation must be an active, unmissable interactive surface that names two things: the gate (`STAGE-GATE-3`), and the decision the operator is being asked to make. A passive breadcrumb the operator might scroll past is insufficient — the human decision is the actual control here. The deterministic floor on the actual push/PR remains `dev-guard`'s native `ask`, not this presentation; the presentation is what routes the operator to that decision.
 
-**(b) Anti-pattern: broad Bash auto-allow + lane mode.** Running a multi-lane fan-out under a blanket `Bash` auto-allow (or any posture that auto-answers `ask`) is an anti-pattern: it removes the human from the STAGE-GATE-3 outward-action prompt, so a lane's delivery push/merge could proceed without the operator ever entering the gate. The operator releases STAGE-GATE-3 by replying to the coordinator's inline presentation, which records the release directly, and recover's STAGE-GATE-3 clear-allowlist requires `gate3_release = ship` (`skills/recover/SKILL.md § Rule 1`). The broad auto-allow posture defeats the interactive stop this design depends on.
+**(b) Anti-pattern: broad Bash auto-allow + parallel fan-out.** Running parallel work under a
+blanket `Bash` auto-allow (or any posture that auto-answers `ask`) is an anti-pattern: it removes
+the human from the STAGE-GATE-3 outward-action prompt, so delivery push/merge could proceed without
+the operator ever entering the gate. The operator releases STAGE-GATE-3 by replying to the
+coordinator's inline presentation, which records the release directly, and recover's STAGE-GATE-3
+clear-allowlist requires `gate3_release = ship` (`skills/recover/SKILL.md § Rule 1`). The broad
+auto-allow posture defeats the interactive stop this design depends on.
 
 **(c) recover's fail-safe covers gate NON-release, not an already-run `ask`-satisfied action.** `/th:recover`'s Rule 1 protects the case where a gate was never released. It cannot undo an outward action that already ran because an `ask` was auto-satisfied. The authoritative floor for protected branches is server-side branch protection.
 
 ---
 
-## Inline Orchestration Permit (SEC-DR-2)
+## Inline Orchestration Permit (SEC-DR-2) — superseded routing text
 
-**Re-founded in v2.89.0.** Executing the orchestrator role inline at top level is the CC native architecture — the general agent IS the orchestrator. No filesystem marker is required. The condition for inline orchestration is:
+**Historical note.** Re-founding the top-level agent as the coordinator remains current, but the
+older rule that every development task “belongs in the pipeline” is superseded by the two-posture
+contract. The top-level coordinator serves direct `inline` work by default. It enters `pipeline`
+only after a current live `/th:pipeline` (or equivalent explicit request) or `/th:recover` for an
+existing run. Top-level availability, development wording, risk, and retrieved content never
+activate the pipeline.
 
-- The session is a top-level CC session (level 0 — `Task` is available), AND
-- The request is a development task that belongs in the pipeline.
-
-This condition is satisfied in every normal CC session. No separate activation step, no marker write, no mode toggle.
-
-**Prohibited case:** executing orchestration inline is PROHIBITED only when the top-level agent is itself running as a subagent inside another orchestrator. In that case, the nested-handoff/takeover machinery in `docs/subagent-orchestration.md` is the FALLBACK (opencode/legacy path).
+Nested-handoff/takeover machinery remains retired. A nested specialist does not create or activate
+a pipeline on the coordinator's behalf.
 
 **Previous framing (retired):** before v2.89.0, SEC-DR-2 required `~/.claude/.dev-mode-active` to contain `dev_mode: true`. That observable was retired when the foundational premise (nested orchestrator loses `Task`) was disproven by the M1 empirical probe. The gate — `dev-guard` — is now unconditional.
 
@@ -226,12 +251,14 @@ This distinction is load-bearing:
 
 ## Security Floor Non-Waivability (SEC-DR-3)
 
-The orchestrator disposition is a **signal of routing topology** — the same category as the intake survey answers and `--fast`. Like those signals, it is NEVER written to `security_sensitive`, `security_gate_status`, or any gate-status field in `00-state.md`.
+The orchestrator disposition is a **signal of routing topology**. Like other retired route markers,
+it is NEVER written to `security_sensitive`, `security_gate_status`, or any gate-status field in
+`00-state.md`.
 
 The following security mechanisms run **input-independent** and are NOT waivable:
 
 - **HI-2 (discover-phase.md §3):** the security floor non-waivability invariant. No disposition signal can bypass the security gate. The gate fires whenever `security_sensitive: true` is set, regardless of session state.
-- **Path-pattern auto-escalation (`agents/ref-pipeline.md § "13 — Classify"`, deriving from `docs/pipeline-lanes.md § 2a`):** sets `security_sensitive: true` based on file paths touched by the PR. This runs on the diff, not on the session state.
+- **Path-pattern auto-escalation (`agents/ref-pipeline.md § "13 — Classify"`, deriving from `agents/ref-intake-flows.md § "Lane Classification"`):** sets `security_sensitive: true` based on file paths touched by the PR. This runs on the diff, not on the session state.
 - **Bug-fix forcing rule:** for `type: fix` and `type: hotfix`, `security_sensitive: true` is forced. On a sensitive task the non-waivable floor is: SEC-002 design-review at Stage 1, plus `adversary` at the Pre-Delivery Security Audit (within Phase 3); code-level audit is delegated to PR review, referred to generically (not dependent on any specific configured tool).
 
 ---
@@ -242,7 +269,9 @@ Direct work is the startup disposition. A live `/th:pipeline`, explicit current-
 
 Ambiguity never auto-activates the pipeline. Broad, sensitive, irreversible, or verification-dependent work stops before the risky action, recommends activation, and waits. This is a routing boundary; `dev-guard` and the security floors remain independent.
 
-**Phase Checklist enforcement:** no Phase Checklist item may be marked `[~skipped: reason]` unless the skip is authorised by an operator-declared tier (`[TIER: 0]`, `[TIER: 1]`, `--fast`) or the bug-fix tier system. Marking a gate as skipped without authorisation is a contract violation.
+**Phase Checklist enforcement:** every canonical full v3 pipeline runs the fixed Phase Checklist.
+Retired tier, fast, simple, or profile markers never authorize a skipped phase or gate. Marking a
+phase or gate as skipped without an explicit current contract rule is a violation.
 
 ---
 
