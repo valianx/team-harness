@@ -21,7 +21,7 @@ func TestLowCostMatrixInvariants(t *testing.T) {
 	expectedAgents := []string{
 		"orchestrator", "architect", "agent-builder", "security", "reviewer",
 		"reviewer-consolidator",
-		"qa", "plan-reviewer", "gcp-cost-analyzer", "init", "implementer",
+		"qa", "plan-reviewer", "gcp-cost-analyzer", "init-project", "implementer",
 		"tester", "diagrammer", "likec4-diagrammer",
 		"d2-diagrammer", "translator", "delivery",
 	}
@@ -50,7 +50,7 @@ func TestLowCostMatrixInvariants(t *testing.T) {
 func TestLowCostMatrixTally(t *testing.T) {
 	high := []string{"orchestrator", "architect", "agent-builder", "security", "reviewer", "qa"}
 	medium := []string{
-		"plan-reviewer", "gcp-cost-analyzer", "init", "implementer",
+		"plan-reviewer", "gcp-cost-analyzer", "init-project", "implementer",
 		"tester", "diagrammer", "likec4-diagrammer",
 		"d2-diagrammer", "translator", "delivery",
 		"reviewer-consolidator",

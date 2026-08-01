@@ -524,13 +524,34 @@ function makeReader() {
       }
     },
     readConfig() {
-      try {
-        const configPath = path.join(os.homedir(), ".claude", ".team-harness.json");
-        const raw = fs.readFileSync(configPath, "utf8");
-        return JSON.parse(raw);
-      } catch {
-        return null;
+      const legacyPath = path.join(os.homedir(), ".claude", ".team-harness.json");
+      const codexRoot = process.env.CODEX_HOME?.trim() || path.join(os.homedir(), ".codex");
+      const candidates = process.env.TEAM_HARNESS_CODEX_HOOK === "1" ? [path.join(codexRoot, ".team-harness.json"), legacyPath] : [legacyPath];
+      for (const configPath of candidates) {
+        let raw;
+        try {
+          raw = fs.readFileSync(configPath, "utf8");
+        } catch (err) {
+          if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") {
+            continue;
+          }
+          process.stderr.write(`prepublish-guard: cannot read Team Harness config at ${configPath}; using safe defaults
+`);
+          return null;
+        }
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+            throw new TypeError("config root must be an object");
+          }
+          return parsed;
+        } catch {
+          process.stderr.write(`prepublish-guard: malformed Team Harness config at ${configPath}; using safe defaults
+`);
+          return null;
+        }
       }
+      return null;
     },
     gitDiffNameStatus() {
       try {

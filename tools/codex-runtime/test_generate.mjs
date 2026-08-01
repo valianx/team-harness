@@ -66,6 +66,14 @@ for (const [, content] of agentOutputs) {
   assert.match(content, /^# Projection tier: /m);
 }
 
+const projectConfig = first.files.get(join(root, ".codex/config.toml"));
+assert.match(projectConfig, /^sandbox_mode = "workspace-write"$/m);
+assert.match(projectConfig, /^approval_policy = "on-request"$/m);
+assert.match(projectConfig, /^\[sandbox_workspace_write\]$/m);
+assert.match(projectConfig, /^network_access = true$/m);
+assert.match(projectConfig, /^writable_roots = \["~\/\.cache\/go-build", "~\/\.cache\/uv", "~\/\.npm", "~\/go\/pkg\/mod"\]$/m);
+assert.doesNotMatch(projectConfig, /^\[shell_environment_policy\]$/m);
+
 for (const name of ["architect", "security"]) {
   const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
   assert.match(content, /^model = "gpt-5\.6-sol"$/m);
@@ -135,6 +143,15 @@ await expectRegistryFailure(registry => {
 await expectRegistryFailure(registry => {
   registry.agents[0].sandbox_mode = "danger-full-access";
 }, /unsupported sandbox mode/);
+await expectRegistryFailure(registry => {
+  registry.project_execution.sandbox_mode = "danger-full-access";
+}, /project_execution: unsupported sandbox mode/);
+await expectRegistryFailure(registry => {
+  registry.project_execution.approval_policy = "never";
+}, /approval_policy must be on-request/);
+await expectRegistryFailure(registry => {
+  registry.project_execution.writable_roots = ["~/.cache"];
+}, /must declare exactly the supported user-scoped cache paths/);
 await expectRegistryFailure(registry => {
   registry.agents[0].output_path = ".codex/agents/wrong.toml";
 }, /output_path must be/);

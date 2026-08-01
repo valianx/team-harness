@@ -1,4 +1,11 @@
 # Code generated from runtime/schema/codex-agents.json; DO NOT EDIT.
+sandbox_mode = "workspace-write"
+approval_policy = "on-request"
+
+[sandbox_workspace_write]
+network_access = true
+writable_roots = ["~/.cache/go-build", "~/.cache/uv", "~/.npm", "~/go/pkg/mod"]
+
 [agents]
 enabled = true
 max_concurrent_threads_per_session = 4

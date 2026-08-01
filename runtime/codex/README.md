@@ -32,6 +32,15 @@ installed custom agents, the Main-hosted orchestrator posture, and roles not yet
 shipped in the Codex beta. These files are committed so a trusted checkout works
 without a build step. Do not edit generated files directly.
 
+The generated project config uses `workspace-write` with `on-request`
+approvals, enables dependency network access, and grants narrowly scoped write
+access to the current user's standard Go, uv, npm, and Go module cache paths.
+This keeps routine builds inside the sandbox without shared predictable `/tmp`
+directories or broad write access to the user home. Codex still
+protects `.git` directories in this mode, so tests that construct temporary Git
+repositories require a narrowly approved command or an equivalent external CI
+sandbox; the project config does not weaken that boundary.
+
 The distributable package lives under `plugins/team-harness/`; the repo-scoped
 catalog at `.agents/plugins/marketplace.json` exposes it to Codex. It is
 isolated from the root Claude-oriented skill set because Codex plugin

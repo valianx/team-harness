@@ -50,7 +50,7 @@ var lowCostMatrix = map[string]AgentOverride{
 	// Advisory, executor, downstream generators — effort: medium
 	"plan-reviewer":      {Model: "sonnet", Effort: "medium"},
 	"gcp-cost-analyzer":  {Model: "sonnet", Effort: "medium"},
-	"init":               {Model: "sonnet", Effort: "medium"},
+	"init-project":       {Model: "sonnet", Effort: "medium"},
 	"implementer":        {Model: "sonnet", Effort: "medium"},
 	"tester":             {Model: "sonnet", Effort: "medium"},
 	"diagrammer":         {Model: "sonnet", Effort: "medium"},

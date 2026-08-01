@@ -1,7 +1,7 @@
 {
   "name": "team-harness",
-  "version": "3.6.0",
-  "description": "Load lightweight Team Harness intake or an explicit gated workflow into a clean Codex Main thread.",
+  "version": "3.6.1",
+  "description": "Configure, update, and run lightweight or gated Team Harness workflows in Codex.",
   "author": {
     "name": "Mario Gutierrez",
     "url": "https://github.com/valianx"
@@ -18,8 +18,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Team Harness",
-    "shortDescription": "Lightweight intake with optional gated delivery.",
-    "longDescription": "Keep Codex Main clean by default. Use @Team-Harness init for lightweight intake and direct work, or explicitly request @Team-Harness pipeline to load staged planning, implementation, verification, recovery, and delivery backed by specialized agents.",
+    "shortDescription": "Setup, updates, intake, and gated delivery.",
+    "longDescription": "Configure and update Team Harness natively in Codex, keep Main clean by default, use @Team-Harness init for lightweight intake and direct work, or explicitly request @Team-Harness pipeline for staged delivery backed by specialized agents.",
     "developerName": "Mario Gutierrez",
     "category": "Developer Tools",
     "capabilities": [
@@ -28,6 +28,8 @@
     ],
     "websiteURL": "https://github.com/valianx/team-harness",
     "defaultPrompt": [
+      "@Team-Harness setup: configure Team Harness for Codex.",
+      "@Team-Harness update: update the Codex marketplace, plugin, configuration, and installed agents.",
       "@Team-Harness init: help me frame or handle this task without starting the full pipeline.",
       "@Team-Harness pipeline: explicitly start the full gated workflow for this change in the current Main thread.",
       "Continue implementation of the active approved Team Harness pipeline.",

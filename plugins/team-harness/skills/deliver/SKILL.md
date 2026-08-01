@@ -6,7 +6,8 @@ description: Continue local delivery preparation for an accepted, explicitly act
 # Deliver
 
 Locate state whose `activation` is `explicit`. If none exists, do not create
-pipeline state or gates; continue in ordinary direct mode and obey normal
+pipeline state or gates; read `../init/references/configuration.md`, resolve the
+persistent settings, and continue in ordinary direct mode while obeying normal
 runtime approvals.
 
 For an active pipeline, read

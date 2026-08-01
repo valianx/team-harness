@@ -16,8 +16,8 @@ CODEX_HOME=<temporary> codex plugin list
 
 Result: the local marketplace resolved to `.agents/plugins/marketplace.json`,
 `team-harness@team-harness` changed from `not installed` to `installed, enabled`,
-and Codex cached version `3.6.0`. The cached snapshot contained all seven skills:
-`init`, `pipeline`, `design`, `implement`, `validate`, `deliver`, and `recover`, plus the
+and Codex cached version `3.6.1`. The cached snapshot contained all nine skills:
+`setup`, `update`, `init`, `pipeline`, `design`, `implement`, `validate`, `deliver`, and `recover`, plus the
 declared hook manifest, launcher, and six hook bundles.
 
 ## Isolated installer lifecycle smoke
@@ -34,7 +34,8 @@ files. The Codex-specific ownership ledger remained as the lifecycle audit log.
 - deterministic generator and freshness suite: pass;
 - marketplace and runtime structure suites: pass;
 - official local plugin validator: pass;
-- Codex hook suite: 23/23 pass, including deny-shim and no-autoapproval cases;
+- Codex hook suite: 26/26 pass, including native-config, deny-shim, and
+  no-autoapproval cases;
 - prepublish/version guard suite: 79/79 pass across five current version sites;
 - installer unit and race suites: pass;
 - all Go packages: pass.

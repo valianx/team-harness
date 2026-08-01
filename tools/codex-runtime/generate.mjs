@@ -123,6 +123,34 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
   }
   const allowedCapabilities = assertUniqueStringArray(contract.allowed_capabilities, "allowed_capabilities", { nonEmpty: true });
   const allowedSandboxModes = assertUniqueStringArray(contract.allowed_sandbox_modes, "allowed_sandbox_modes", { nonEmpty: true });
+  const projectExecution = contract.project_execution;
+  if (!projectExecution || typeof projectExecution !== "object" || Array.isArray(projectExecution)) {
+    fail("project_execution must be an object");
+  }
+  if (!allowedSandboxModes.has(projectExecution.sandbox_mode)) {
+    fail(`project_execution: unsupported sandbox mode ${projectExecution.sandbox_mode ?? "missing"}`);
+  }
+  if (projectExecution.approval_policy !== "on-request") {
+    fail("project_execution.approval_policy must be on-request");
+  }
+  if (typeof projectExecution.network_access !== "boolean") {
+    fail("project_execution.network_access must be a boolean");
+  }
+  const writableRoots = assertUniqueStringArray(
+    projectExecution.writable_roots,
+    "project_execution.writable_roots",
+    { nonEmpty: true }
+  );
+  const expectedWritableRoots = new Set([
+    "~/.cache/go-build",
+    "~/.cache/uv",
+    "~/.npm",
+    "~/go/pkg/mod"
+  ]);
+  if (writableRoots.size !== expectedWritableRoots.size
+      || [...writableRoots].some(root => !expectedWritableRoots.has(root))) {
+    fail("project_execution.writable_roots must declare exactly the supported user-scoped cache paths");
+  }
   const allowedSourceModels = assertUniqueStringArray(contract.allowed_source_models, "allowed_source_models", { nonEmpty: true });
   const allowedSourceEfforts = assertUniqueStringArray(contract.allowed_source_efforts, "allowed_source_efforts", { nonEmpty: true });
   const allowedRuntimeReasoningEfforts = assertUniqueStringArray(contract.allowed_runtime_reasoning_efforts, "allowed_runtime_reasoning_efforts", { nonEmpty: true });
@@ -250,6 +278,13 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
 
   const config = [
     "# Code generated from runtime/schema/codex-agents.json; DO NOT EDIT.",
+    `sandbox_mode = ${JSON.stringify(projectExecution.sandbox_mode)}`,
+    `approval_policy = ${JSON.stringify(projectExecution.approval_policy)}`,
+    "",
+    "[sandbox_workspace_write]",
+    `network_access = ${projectExecution.network_access}`,
+    `writable_roots = [${[...writableRoots].map(root => JSON.stringify(root)).join(", ")}]`,
+    "",
     "[agents]",
     "enabled = true",
     `max_concurrent_threads_per_session = ${contract.max_concurrent_threads_per_session}`,

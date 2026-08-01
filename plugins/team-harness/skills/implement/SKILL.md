@@ -6,7 +6,8 @@ description: Continue implementation of an explicitly activated and Stage-Gate-1
 # Implement
 
 Locate state whose `activation` is `explicit`. If none exists, do not create
-pipeline state or gates; continue the user's ordinary Codex implementation.
+pipeline state or gates; read `../init/references/configuration.md`, resolve the
+persistent settings, and continue the user's ordinary Codex implementation.
 
 For an active pipeline, read
 `../pipeline/references/state-and-gates.md` and

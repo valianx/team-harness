@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Setup"
+  short_description: "Configure Team Harness for Codex"
+  default_prompt: "Use $team-harness:setup to configure Team Harness for Codex."
