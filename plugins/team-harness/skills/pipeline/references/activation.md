@@ -26,7 +26,9 @@ destructive/outward approvals remain unchanged.
 In an active pipeline, a current live explicit `inline` request first receives an
 administrative close: the coordinator appends the pipeline-end record, sets
 `phase: aborted` and `status: aborted`, clears any pending gate, and writes no gate
-release or nonce consumption. Only after that close may direct Main work resume;
+release or nonce consumption. Set `next_action: none — pipeline administratively
+closed`; do not persist the direct request or other operator prose in the closed
+workspace. Only after that close may direct Main work resume;
 the new direct run creates no workspace or pipeline state.
 
 ## Custom-agent preflight
@@ -79,7 +81,7 @@ The effective runtime fields must match this projection exactly:
 
 | Role | `name` | `model` | `model_reasoning_effort` | `sandbox_mode` |
 |---|---|---|---|---|
-| architect | `architect` | `gpt-5.6-sol` | `xhigh` | `read-only` |
+| architect | `architect` | `gpt-5.6-sol` | `xhigh` | `workspace-write` |
 | implementer | `implementer` | `gpt-5.6-luna` | `max` | `workspace-write` |
 | tester | `tester` | `gpt-5.6-luna` | `max` | `workspace-write` |
 | qa | `qa` | `gpt-5.6-luna` | `max` | `read-only` |
@@ -93,12 +95,12 @@ the normalized (LF) bytes against these canonical SHA-256 digests:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| architect | `f65f997fa2bbc54b90efc3b23f27dfb7a037c04dfb5a797b131198b48bd5b37e` |
+| architect | `6d9b4e503aa0948d7690f26042c6d5123bffa6c2de97a18042d70015360fce31` |
 | implementer | `d0a27bc1b21006bd656a70360307fc21901438c4f87d8241acbf4d17f04dfc93` |
 | tester | `23b6fd60546446a2b28b67839759008dcaae013642f92c18dbbb049b4d3c372f` |
 | qa | `613ce2351dc804d26805b8951a31c509b2ac8368f917591aae755a43a0277394` |
 | security | `4cc3cfdf063452c4674d3291eaf96bfd921e9ef7f01c0d451f6be55a6d5d8c44` |
-| delivery | `c7b597b53abd1e41542a552a3dd4b45ef90a874c829eb7ea160844e3805dbf25` |
+| delivery | `2a7a88db1a058db03852dbd1c5d47fafb2b2b32c8ec4dead838f19cdefc033d2` |
 
 A digest mismatch is an identity failure; stop before workspace creation or
 delegation. Ask the operator to run `$team-harness:update` to

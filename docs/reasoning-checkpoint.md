@@ -118,22 +118,24 @@ Both hooks share the identical no-writer-identity limit — an interior `Write`/
 
 **Hook reads only the four clarity fields.** The hook does NOT read `security_sensitive`, `security_gate_status`, or any other security-related field from `00-state.md`. Its input is strictly limited to `checkpoint_boundary`, `checkpoint_advance_fresh`, `functional_clarity_artifact`, and `functional_clarity_confirmed`. The hook never conditions its decision on a security field.
 
-### Layer 1 — Hook is the active floor at all three boundaries
+### Layer 1 — Hook support and currently armed boundaries
 
 The top-level agent IS the orchestrator and the `Task` tool is always available. The Layer-1 hook (`hooks/checkpoint-guard.sh`, `PreToolUse`/matcher `Task`) fires on every leaf agent dispatch — covering all three boundaries in both local and obsidian logs-mode. When `logs-mode: obsidian`, the hook resolves the vault workspace root from `~/.claude/.team-harness.json`, so obsidian-resident state files are found on the same selection pass as local ones:
 
 - **B1 (intake → plan):** name-keyed — gate fires only when the destination is `th:architect`. A non-architect dispatch while B1 is armed still allows (the orchestrator may dispatch other agents at B1 without triggering the gate).
 - **B2 (research → next):** boundary-keyed — gate fires on ANY Task dispatch when `checkpoint_boundary: research-next` is armed. B2 dispatches variable subagent types depending on context; the boundary value is the stable arming signal.
-- **B3 (postverify → next):** boundary-keyed — gate fires on ANY Task dispatch when `checkpoint_boundary: postverify-next` is armed, for the same reason as B2.
+- **B3 (postverify → next):** the hook retains boundary-keyed parser support for legacy state,
+  but current v3 never arms `postverify-next`; acceptance plus mandatory Gate 3 subsumes it.
 
-This promotes all three B1/B2/B3 boundaries from the Layer-2 self-check (non-deterministic, relies
-on orchestrator discipline) to the Layer-1 deterministic floor in a top-level session. The
+When a supported boundary is armed, this promotes it from the Layer-2 self-check
+(non-deterministic, relies on orchestrator discipline) to the Layer-1 deterministic floor in a
+top-level session. Current v3 actively arms B1/B2 only; B3 remains dormant compatibility support. The
 checkpoint gate is independent of the inline posture; inline work never reaches it. This is a
 strengthening, not a regression: security floors remain independent of the checkpoint state.
 
 ### Layer 2 — Orchestrator self-check (floor in nested-context sessions)
 
-When the orchestrator runs as a subagent (nested context), the `Task` tool is stripped by the harness and `PreToolUse` hooks never fire, because there is no `Task` call for the hook to intercept. In this context, enforcement falls back to a synchronous self-check inside the orchestrator's own Step 6d (B1), B2, and B3 contract blocks.
+When the orchestrator runs as a subagent (nested context), the `Task` tool is stripped by the harness and `PreToolUse` hooks never fire, because there is no `Task` call for the hook to intercept. In this context, enforcement falls back to a synchronous self-check inside the orchestrator's B1 and B2 contract blocks; current B3 is the mandatory Gate 3 rather than a separately armed checkpoint.
 
 **Declared limitation.** The self-check is as deterministic as the orchestrator's discipline in following its own contract. It is NOT a harness-level floor. It can be weakened by context drift in a way that the Layer-1 hook cannot. PR-A delivers both layers and marks which layer applies in each context. The degradation from Layer 1 to Layer 2 is a loss of pedagogical rigor, not a security regression.
 
@@ -155,7 +157,12 @@ The intra-privilege trust model still holds: the agent that writes the clarity f
 
 The B1 clarity artifact is not self-attesting. The coordinator appends a `checkpoint.confirmed` event to `{events_file}` (Intake) carrying the operator's own confirmatory words — within the named exception to the Free-text field bound (`docs/observability.md § Free-text field bound`) — and a `provenance` field: `operator-live` (a fresh reply from the operator in this same conversation) or `inferred` (a re-ask returned without a live reply). Retired skip-marker wording is never a source of confirmation. The event, not `functional_clarity_confirmed`/`functional_clarity_artifact` above, is the sole authority at every arrival, including a `/th:recover` re-entry — those two fields are a derived cache for quick reference and are never consulted in place of the event.
 
-**Failure direction.** Absent attribution — no `checkpoint.confirmed` event, or one carrying `inferred` — is not silently treated as clarity-confirmed. The disposition is one re-ask, never a loop: the coordinator asks the operator once more for an explicit confirmation; if no live reply returns, the run continues with `provenance: inferred` recorded and visible at the next gate presentation. This never aborts the run and never re-asks a second time — consistent with the checkpoint's own posture (§ "Postura" above): it gates functional clarity, not security, so its failure direction is a pause-and-report, never a hard stop.
+**Failure direction.** Absent attribution — no `checkpoint.confirmed` event, or one carrying
+`inferred` — is not clarity-confirmed. The coordinator makes one re-ask, never an automatic loop.
+If no live reply returns, it records the inferred attempt, leaves Discover open and
+`functional_clarity_confirmed: false`, and stops without dispatching `architect`. A later live
+operator message may answer the pending checkpoint. The run is paused and visible, not aborted;
+it never advances to a gate on inferred provenance.
 
 ---
 

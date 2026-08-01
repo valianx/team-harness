@@ -9,4 +9,5 @@ Read `../pipeline/references/state-and-gates.md` and
 `../pipeline/references/recovery.md`. The primary thread performs recovery and
 remains the sole coordination-state writer and gate presenter. If no explicit
 pipeline state exists, report that there is nothing to recover; do not create a
-pipeline implicitly.
+pipeline implicitly. `complete` and `aborted` are terminal outcomes, not
+recoverable states.

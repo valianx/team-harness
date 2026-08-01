@@ -112,7 +112,7 @@ extra, or mismatched value fails preflight):
 
 | Role | `name` | `model` | `model_reasoning_effort` | `sandbox_mode` |
 |---|---|---|---|---|
-| `architect` | `architect` | `gpt-5.6-sol` | `xhigh` | `read-only` |
+| `architect` | `architect` | `gpt-5.6-sol` | `xhigh` | `workspace-write` |
 | `implementer` | `implementer` | `gpt-5.6-luna` | `max` | `workspace-write` |
 | `tester` | `tester` | `gpt-5.6-luna` | `max` | `workspace-write` |
 | `qa` | `qa` | `gpt-5.6-luna` | `max` | `read-only` |
@@ -125,12 +125,12 @@ the role fields cannot see. The current digests are:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| `architect` | `f65f997fa2bbc54b90efc3b23f27dfb7a037c04dfb5a797b131198b48bd5b37e` |
+| `architect` | `6d9b4e503aa0948d7690f26042c6d5123bffa6c2de97a18042d70015360fce31` |
 | `implementer` | `d0a27bc1b21006bd656a70360307fc21901438c4f87d8241acbf4d17f04dfc93` |
 | `tester` | `23b6fd60546446a2b28b67839759008dcaae013642f92c18dbbb049b4d3c372f` |
 | `qa` | `613ce2351dc804d26805b8951a31c509b2ac8368f917591aae755a43a0277394` |
 | `security` | `4cc3cfdf063452c4674d3291eaf96bfd921e9ef7f01c0d451f6be55a6d5d8c44` |
-| `delivery` | `c7b597b53abd1e41542a552a3dd4b45ef90a874c829eb7ea160844e3805dbf25` |
+| `delivery` | `2a7a88db1a058db03852dbd1c5d47fafb2b2b32c8ec4dead838f19cdefc033d2` |
 
 Do not accept a file solely because its comments or `name` field match. A
 digest mismatch is a stale or unrelated shadow; stop before workspace
@@ -190,10 +190,14 @@ rewrite an AC to manufacture PASS.
 On a later operator reply, re-read `00-state.md` and load only the reference for
 the recorded `phase`/`next_action`:
 
+- `design`: [design.md](references/design.md)
 - `implementation`: [implementation.md](references/implementation.md)
 - `validation` or `waiting_gate3`: [validation.md](references/validation.md)
 - `delivery`: [delivery.md](references/delivery.md)
-- `blocked`, `aborted`, or ambiguous state: [recovery.md](references/recovery.md)
+- `blocked` or ambiguous state: [recovery.md](references/recovery.md)
+
+`complete` and `aborted` are terminal. Report their recorded outcome and return
+to ordinary direct behavior; never route either one back through recovery.
 
 `waiting_gate1` and `waiting_gate3` use the numbered options and dual-record
 rules in `state-and-gates.md`; a specialist result or green suite never releases

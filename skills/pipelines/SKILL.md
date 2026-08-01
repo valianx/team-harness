@@ -13,9 +13,11 @@ field, or changes `00-state.md`. The coordinator is the sole writer of coordinat
 1. Resolve the configured local or Obsidian logs root.
 2. Find `*/00-state.md` files, including active worktrees when available.
 3. Parse the literal v3 fields `pipeline_version`, `phase`, `status`, `gate_pending`,
-   `iteration`, and `next_action`. There is no lane or profile field. Read gate release
-   fields directly; never infer a release.
-4. Ignore folders without `00-state.md` unless they are known direct-mode artifacts (for example
+   `iteration`, `next_action`, and the last-updated coordinate. There is no lane or profile
+   field. Read gate release fields directly; never infer a release.
+4. Read `git worktree list --porcelain` and, when available, `tmux list-sessions` to classify
+   each worktree row as `LIVE`, `DEAD`, or `?`. A missing tmux executable is unknown, not dead.
+5. Ignore folders without `00-state.md` unless they are known direct-mode artifacts (for example
    diagram or spike output). Do not treat them as broken pipelines.
 
 ## Named machine
@@ -40,13 +42,25 @@ record, or pipeline workspace.
 
 Render one row per state file:
 
-| Feature | State | Status | Iteration | Gate | Next action |
-|---|---|---|---|---|---|
-| `{feature}` | `{phase}` | `{status}` | `{iteration}` | `{gate_pending}` | `{next_action}` |
+| Feature | State | Status | Iteration | Gate | Process | Last updated | Next action |
+|---|---|---|---|---|---|---|---|
+| `{feature}` | `{phase}` | `{status}` | `{iteration}` | `{gate_pending}` | `{LIVE|DEAD|?|—}` | `{timestamp}` | `{next_action}` |
 
 Use `—` for absent optional values. Keep the output concise and point to the workspace path.
 The gate column is a factual field, not a verdict. A `waiting_gate1` row means the run is paused
 for Gate 1; a `waiting_gate3` row means it is paused for Gate 3.
+
+Mark a non-terminal row stale when its last update is more than one hour old. A `DEAD` worktree
+process or stale row should point to `/th:recover {feature}`; this is a diagnostic suggestion and
+never a state mutation.
+
+## In-flight lanes
+
+When a row has `00-subagent-trace.jsonl`, parse its JSONL in file order and FIFO-pair
+`subagent.start`/`subagent.stop` by `agent_type`. Render unmatched starts as running with elapsed
+time and at most the five most recent completed pairs beneath that feature. Malformed lines are
+skipped and a missing/empty trace omits the block silently. This view is read-only and does not
+append, repair, or normalize the trace.
 
 ## Numeric gate display
 

@@ -209,8 +209,12 @@ Prompt behaviour itself only validates in live pipelines — restart Claude Code
 
 ## Roadmap
 
-**Today.** Team Harness is built on **Claude Code** specifically — the agents, skills, hooks, and installer assume the Claude Code CLI, the `Task(subagent_type=…)` dispatch model, the `~/.claude/` layout, and the slash-command surface. There is no abstraction layer over the runtime.
+**Today.** Team Harness ships native Claude Code, Codex, and opencode projections. Their agents, skills,
+configuration, and dispatch bindings remain runtime-specific; there is not yet one generalized
+provider abstraction for arbitrary agentic systems.
 
-**v2 — provider abstraction.** A future major version will introduce a runtime layer that lets the same agent + skill + hook artifacts target other agentic systems (OpenAI Assistants, LangGraph, local-model harnesses, etc.) without rewriting prompts. The orchestration model (design, implementation, validation, and mandatory human gates) is provider-agnostic; the bindings are not.
+**Future — generalized provider abstraction.** A future major version may introduce a runtime
+layer that targets additional agentic systems without bespoke projections. The orchestration
+model is provider-agnostic; today's Claude Code, Codex, and opencode bindings are not.
 
 No timeline. PRs welcome that explore the abstraction shape without breaking the current Claude Code path.

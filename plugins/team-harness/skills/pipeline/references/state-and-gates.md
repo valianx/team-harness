@@ -76,6 +76,7 @@ freeze_anchor: {immutable tree anchor or null}
 open_findings: [{id, disposition}]|[]
 worktree: {absolute path or null}
 working_branch: {branch or null}
+delivery_preview: {pr title, workspace paths, and SHA-256 digests bound to Gate 3}|null
 ```
 
 Also keep a short phase checklist and a bounded specialist-results table with
@@ -149,6 +150,11 @@ The prerequisite matrix is fixed:
 Apply that matrix to the legacy position; a missing prerequisite is `blocked`,
 not a best-effort mapping. The lossless position mapping is:
 
+For the table, “with `01-plan.md`” requires a bounded, structurally valid plan
+manifest whose format marker and task index agree with state; presence alone is
+not evidence. The numeric `1`–`1.8` rows are mutually exclusive in listed order,
+and malformed or conflicting plan evidence maps to `blocked`.
+
 | Legacy position | v3 recovery state and evidence |
 |---|---|
 | numeric `1`–`1.8` without `01-plan.md` | `design` |
@@ -156,7 +162,9 @@ not a best-effort mapping. The lossless position mapping is:
 | numeric `1`–`1.8` with a valid Gate 1 dual-record | `implementation` |
 | numeric `2`–`2.7` | `implementation` only with valid Gate 1; otherwise `blocked` |
 | numeric `2.8`–`3.5` | `validation` only with valid Gate 1; otherwise `blocked` |
-| legacy Gate 3 / numeric `4`–`5` without valid `ship` | `waiting_gate3` with valid Gate 1; otherwise `blocked` |
+| legacy Gate 3 / numeric `4`–`5` with a valid `amend` decision record | `implementation` with valid Gate 1; otherwise `blocked` |
+| legacy Gate 3 / numeric `4`–`5` with a valid `abort` decision record | terminal `aborted`; never recover |
+| legacy Gate 3 / numeric `4`–`5` without valid `ship`, `amend`, or `abort` | `waiting_gate3` with valid Gate 1; otherwise `blocked` |
 | numeric `4`–`5` with valid Gate 1 and Gate 3 `ship` | `delivery` |
 | numeric `6` with valid Gate 1 and Gate 3, completed checklist, and terminal event | `complete` |
 | named `design` | `design` without a plan, `waiting_gate1` without valid Gate 1, or `implementation` with valid Gate 1 |
@@ -165,11 +173,15 @@ not a best-effort mapping. The lossless position mapping is:
 | named `waiting_gate3` | `waiting_gate3` only with valid Gate 1 |
 | named `delivery` | `delivery` only with valid Gate 1 and Gate 3 |
 | named `complete` | `complete` only with valid Gate 1 and Gate 3 plus terminal evidence |
+| named `aborted` | terminal `aborted`; preserve the recorded close and never recover |
 
-The first legitimate coordinator write is one atomic transition: persist
+Archive every recognized legacy route field in the `state.migrated` event before
+removing it from active state: keep its exact key and a redacted scalar value of
+at most 128 UTF-8 bytes, or key plus type for non-scalar/oversized values. The first legitimate coordinator write is one atomic transition: persist
 `pipeline_version: 3` **and** the mapped `phase` together and append
 `state.migrated` in that same transition with `source_version: 2` (or the
-detected legacy version) and the mapped state. Preserve valid dual records and
+detected legacy version), mapped state, and bounded legacy-field archive; remove
+the archived selectors from the active v3 snapshot atomically. Preserve valid dual records and
 nonces; never synthesize a release or repair a malformed one. If the coupled
 write or required evidence is impossible, route to `blocked` without writing a
 v3 migration.
@@ -199,6 +211,25 @@ pipeline never force-pushes, and `ship` excludes merge, tag, release, and
 publication. An administrative close for a live inline request is not a gate
 decision: it does not set `gate1_release` or `gate3_release`, consume a nonce,
 or pretend that a gate reply occurred.
+
+## Decision transitions
+
+Every valid live reply updates the release field, matching event, nonce, phase,
+status, `last_completed`, and `next_action` in one coordinator transition. The
+mapping is exact:
+
+| Decision | Required snapshot after recording |
+|---|---|
+| Gate 1 `approve` | `phase: implementation`; `stage: 2`; `status: in_progress`; `last_completed: waiting_gate1`; `next_action: start approved implementation`; `autonomous: false`; `autonomous_granted_at: null` |
+| Gate 1 `approve autonomous` | same implementation transition, plus `autonomous: true`; `autonomous_granted_at: STAGE-GATE-1` |
+| Gate 1 `edit` | `phase: design`; `stage: 1`; `status: iterating`; `last_completed: waiting_gate1`; `next_action: apply operator-requested Gate 1 edit` |
+| Gate 1 `reject` | `phase: design`; `stage: 1`; `status: paused`; `last_completed: waiting_gate1`; `next_action: await operator-directed design decision` |
+| Gate 3 `ship` | `phase: delivery`; `stage: 4`; `status: in_progress`; `last_completed: waiting_gate3`; `next_action: execute the exact previewed delivery package` |
+| Gate 3 `amend` | `phase: implementation`; `stage: 2`; `status: paused_for_amend`; `last_completed: waiting_gate3`; `next_action: apply operator-requested amendment, then re-Freeze and revalidate` |
+| Gate 3 `abort` | `phase: aborted`; `stage: 4`; `status: aborted`; `last_completed: waiting_gate3`; `next_action: none — pipeline administratively closed` |
+
+Every row clears `gate_pending` and consumes `gate_nonce`. An invalid or stale
+reply changes none of these fields and is re-presented with a fresh nonce.
 
 ## Numbered decisions
 

@@ -107,6 +107,10 @@ gate, prepare delivery, or make an operator decision. Pipeline validation is
 the canonical full v3 path and is dispatched only after explicit live activation or
 recovery; a requested inline review never changes that posture.
 
+This is an early return before `## Session Context Protocol`: inspect only the
+operator-named surface, perform no workspace discovery or initialization, do not
+touch `.gitignore`, and return `output: null` in the bounded status block.
+
 ### Validate Mode (default)
 
 Used only inside the canonical v3 pipeline after implementation. Validates code
@@ -249,7 +253,8 @@ Used by `/th:cross-repo` to evaluate existing code against business rules from a
 
 ## Session Context Protocol
 
-**Before starting ANY work:**
+**Before starting pipeline/report work:** `inline-review` has already returned
+through its read-only early path and never enters this protocol.
 
 1. **Live AC read + packet-first.** Resolve the assigned task path from `01-plan.md`, live-read only that `plan/tasks/Task-N.md`, then read `{docs_root}/00-verify-packet.md` once as an implementation-context digest. Never preload sibling task shards or architecture. The packet carries no AC copy.
    - **Hard floor — fail-closed on absence.** `01-plan.md` is the mandatory live AC source — there is no verdict without it. When `01-plan.md` does not exist on disk (in either the packet-first or full-manifest path), do NOT fall back to a packet summary or an implicit AC list — return `status: blocked` with `summary: 01-plan.md missing — mandatory AC source absent, cannot form a validation verdict` and `issues: missing 01-plan.md`. This overrides the general "if a named file is absent, skip it and continue" fallback in step 2 below, which does not apply to this file.

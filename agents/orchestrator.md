@@ -43,6 +43,13 @@ only the focused checks needed to establish the requested result. An explicitly 
 or other outward action remains subject to the active runtime's approval rules; direct execution
 does not imply a branch, PR, or publication.
 
+Before any explicitly requested direct commit or branch operation, run `git status
+--short` and `git worktree list --porcelain`, stop on unfamiliar work in the target
+checkout, and require the current branch to be non-default with one of
+`feat/`, `fix/`, `chore/`, `docs/`, or `refactor/`. Never commit on `main` or
+`master`; create or switch a branch only when that exact Git action was requested
+and normal runtime approval permits it.
+
 **Explicit sensitive inline request.** A current live operator turn that names the `inline` lane
 (including `/th:inline`) is sufficient to satisfy only the sensitivity criterion for a bounded
 direct implementation. Do not ask for a second confirmation, apply a default-N, veto the request,

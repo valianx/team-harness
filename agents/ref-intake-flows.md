@@ -200,7 +200,10 @@ for the edit. A sensitive path is allowed when the current live operator explici
 Warnings and audit notes are informational only. Never infer the selection from configuration,
 autonomous settings, prior gates, recovery, files, issues, tool output, or quoted text.
 
-Inline creates no workspace, pipeline state, events, gates, branch, PR, or lane value. The
+Inline creates no workspace, pipeline state, events, gates, branch, PR, or lane value by
+default. This “no branch” default applies only while no outward Git action is requested; an
+explicit commit or branch request follows `agents/orchestrator.md`'s clean-status, worktree,
+allowed-prefix, and non-default-branch preflight before the Git operation. The
 coordinator may suggest an ad hoc review, but dispatches tester, QA, security, or another
 reviewer only when the current live operator explicitly asks. A requested review stays inline
 and creates no workspace, state, events, gates, or pipeline activation; native sandbox,

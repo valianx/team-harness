@@ -66,7 +66,9 @@ The `plan-review` direct mode runs a panel of up to three reviewers that write t
 
 1. Glob `workspaces/{feature-name}/`. If the folder does not exist, return a friendly message asking the user to first run `/th:design` or to confirm the feature name.
 2. Confirm `01-plan.md` exists. If it is absent but `01-architecture.md` is present, prompt the user: "no `01-plan.md` — this looks like a legacy plan (pipeline_version 1) or an incomplete design. Run `/th:design {feature}` to produce the merged plan, or invoke `/th:plan-review` after the architect has emitted `01-plan.md`."
-3. Invoke `qa-plan` (mode: `ratify-plan`) via Task tool. Wait for status block.
+3. Resolve the complete task-shard list from the manifest and invoke `qa-plan`
+   (mode: `ratify-plan`) with that full list. Wait for the consolidated status
+   block; feature-level ratification never samples an assigned subset.
 4. Determine security-sensitivity (per gating above). If security-sensitive, invoke `security` (mode: `design-review`) via Task tool. Wait for status block. This is the explicit review's conditional lens; the normal pipeline's security design-review remains a separate pre-implementation check.
 5. Invoke `plan-reviewer` via Task tool (always runs last). Wait for status block. Read `verdict` and `findings` counts from the combined verdict it writes.
 6. Surface the combined verdict to the user (Output Discipline #186 — the combined verdict IS operator-facing; per-reviewer chatter is NOT). Direct mode does NOT emit a STAGE-GATE-1 STOP block.

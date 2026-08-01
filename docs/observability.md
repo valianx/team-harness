@@ -69,8 +69,10 @@ fast, simple, or profile markers never create an observability exemption or a pi
 ## 2. Event envelope
 
 One JSON object per line, append-only. In Obsidian mode the same JSONL is wrapped in a fenced
-`jsonl` block. Every event contains `ts`, `event`, and `feature`; phase events include `phase` and
-`agent`, and gate-release events include `decision`.
+`jsonl` block. Coordinator-authored events contain `ts`, `event`, and `feature`; phase events
+include `phase` and `agent`, and gate-release events include `decision`. The observational
+`subagent.start` hook is the sole envelope exception because PreToolUse has no trustworthy
+pipeline feature coordinate; its complete bounded schema is defined in `### subagent.start`.
 
 Core event names are:
 
@@ -101,8 +103,9 @@ not change the v3 state machine, and never carries gate releases or coordination
 The coordinator reads `flow_telemetry.enabled` from
 `~/.claude/.team-harness.json` at startup. The default is `false`; when absent or false, no
 `mcp__memory__record_flow_event` calls are made. When true, emission is fire-and-forget and
-best-effort. A connectivity, validation, or tool error logs exactly
-`flow-telemetry: unavailable` in the local events file and the pipeline continues unchanged.
+best-effort. A connectivity, validation, or tool error appends exactly one local
+`operation.failed` event with `operation: flow-telemetry`, `status: failed`, a bounded
+one-line `error`, and a one-line retry `suggestion`; the pipeline continues unchanged.
 
 ### Emission contract
 
@@ -903,8 +906,10 @@ Mirrors `00-execution-events` exactly:
 - **Obsidian mode:** `00-decision-ledger.md` — YAML frontmatter (`tags: [work-logs, {repo}, decision-ledger]`) + `# Decision Ledger` heading + ` ```jsonl ` fence, identical structure to `00-execution-events.md`.
 - The orchestrator is the **exclusive writer**; append-only `>>` with a here-doc; never rewritten.
 - **best-effort resilience:** if constructing or appending a ledger line fails, log the failure and continue — the pipeline NEVER hard-fails on a ledger emit error. The deterministic gate outcome and the `00-execution-events` trace remain the authoritative record.
-- Legacy no-workspace/Tier-0 traces may lack a decision ledger; current `pipeline` runs always emit
-  the coordinator-owned ledger, while `inline` direct work has no pipeline ledger by definition.
+- Legacy no-workspace/Tier-0 traces may lack a decision ledger. Current `pipeline` runs always
+  attempt each coordinator-owned ledger append; an append failure is recorded in the authoritative
+  execution trace and may leave the ledger incomplete. `inline` direct work has no pipeline ledger
+  by definition.
 
 ### Example lines
 

@@ -7,7 +7,7 @@
 > delivery → complete` machine; `inline` direct work creates no workspace, state, events, or gates.
 > Use `docs/plan-shards.md`, the architect/QA contracts, and explicit `/th:plan-review` for current
 > plan quality. Nothing in this historical file releases a gate or authorizes a dispatch.
-
+>
 > Historical source for the former Stage-1 deterministic plan-structure contract: the canonical
 > Layer-1 check set, the `plan_structure: pass|fail` verdict, and the enumeration of every
 > execution site that dispatches or consumes this contract. Mirrors `docs/code-hygiene-gate.md`

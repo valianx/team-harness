@@ -94,7 +94,8 @@ compact form; do not add narrative paragraphs restating what a table row already
    - `type: hotfix` → there is no design doc (`01-root-cause.md`); Rule 7 is no-op and **Rule 8 is active** against the explicit task shard or manifest task index when supplied. The task contract is the minimum 4-line list authored by the orchestrator (reproduce, regression test, fix, verify).
 
 3. **Read these files in this order:**
-   - `01-plan.md`, every path in `## Plan Manifest`, and all indexed task shards. Parse services/work-plan from `plan/architecture.md`, grouping/base/version from `plan/delivery.md`, conditional invariants from `plan/invariants.md`, and task fields/ACs from `plan/tasks/*.md`. A workspace without the format marker is a recovery input, not a silent monolithic fallback. For `type: fix`, also read `01-root-cause.md` for the regression-test and fix-scope sections.
+   - For `feature`/`refactor`/`enhancement` and `fix`, read `01-plan.md`, every path in `## Plan Manifest`, and all indexed task shards. Parse services/work-plan from `plan/architecture.md`, grouping/base/version from `plan/delivery.md`, conditional invariants from `plan/invariants.md`, and task fields/ACs from `plan/tasks/*.md`. A workspace without the format marker is a recovery input, not a silent monolithic fallback. For `type: fix`, also read `01-root-cause.md` for the regression-test and fix-scope sections.
+   - For `type: hotfix`, read only the explicit task shard or manifest task-index coordinates supplied by the dispatch. Do not require or read an absent `01-plan.md`/`01-root-cause.md`.
 
    - `reviews/01-closure-rubric.md` — the architect's three closure tables (ownership closure, provenance, removed-control), when present. Read it as an **input to your audit**, never as something you write. A delegation named in the ownership-closure table with no owning AC, a provenance claim whose `file:line` does not resolve, or a removed control with no named successor is reported as a **Rule 4 (cross-reference integrity) finding** — it is the same defect class Rule 4 already owns, so it carries Rule 4's severity and verdict effect rather than inventing a rule with no row in `## Summary`.
 
@@ -102,11 +103,11 @@ compact form; do not add narrative paragraphs restating what a table row already
 
    4. **Do NOT read** `research/00-research.md`, `research/00-audit.md`, `01-planning.md`, `02-implementation.md`, `03-testing.md`, `reviews/04-validation.md`, source code, or any other file. Plan-shape rules are policy on the manifest and named shards; reading more is wasted work. `02-regression-test.md` is off-limits too, with ONE narrow exception: **Rule 8 may read it ONLY when the task provides a concrete regression-test path**. On the initial explicit invocation it does not yet exist, so Rule 8 cross-checks against the regression-test AC in the assigned task shard.
 
-5. **Do NOT write to** any workspace doc except `reviews/01-plan-review.md`, plus the single `**Reviews:**` attestation line in `01-plan.md`'s title block (see Critical Rules).
+5. **Do NOT write to** any workspace doc except `reviews/01-plan-review.md`, plus the single `**Reviews:**` attestation line in `01-plan.md`'s title block when that manifest exists (see Critical Rules).
 
    6. **Write your output** to `workspaces/{feature-name}/reviews/01-plan-review.md`. If the file does not exist, create it with the full skeleton (all sections present, `pending` placeholders for the sections you do not own) before filling your own. Rewrite the `## Plan Review` header, `## Summary`, `## Findings`, `## Recommendation to orchestrator`, and `**Combined verdict:**` in place — never append a second copy. Append one row to `## Panel Rounds`. Enforce `docs/output-contract-patterns.md § 6`: fixed prose ≤120 lines and each finding ≤4 lines, excluding the one required row per finding and round.
 
-7. **Write the attestation line** to `01-plan.md`'s title block (after `**Agent:**`, before the first `##`), replacing any prior copy in place:
+7. **When `01-plan.md` exists, write the attestation line** to its title block (after `**Agent:**`, before the first `##`), replacing any prior copy in place. For a hotfix without that manifest, skip this step; never create a plan merely to hold an attestation.
 
    ```
    **Reviews:** substance {pass|fail} · security {clean|risks-found|skipped} · shape {pass|concerns|fail} → combined **{pass|concerns|fail}** — detail: reviews/01-plan-review.md
@@ -151,7 +152,7 @@ Run the rules in order. Each rule produces 0..N findings. The total set of findi
 
 **Detection algorithm:**
 
-```
+```python
 grouping = parse_delivery_grouping(plan/delivery.md § Delivery Grouping)
 if grouping is None:
     findings.append((None, "Rule 1: ### Delivery Grouping block missing from plan/delivery.md"))
@@ -274,13 +275,13 @@ elif decisions_section.bullet_count == 0:
 elif decisions_section.bullet_count > 7:
     findings.append(("Rule 6: ### Decisions for human review has >7 bullets — many of those are likely mechanical decisions that do NOT belong here", CONCERNS))
 
-task_list_section = extract section "### Task Index" body from 01-plan.md
-summary_section = extract subsection "### Summary" from task_list_section
+task_index_section = extract section "### Task Index" body from 01-plan.md
+task_index_table = first markdown table directly inside task_index_section
 
-if summary_section is None or no markdown table inside:
-    findings.append(("Rule 6: 01-plan.md missing ### Summary table in ### Task Index", FAIL))
-elif data_row_count(summary_section) < (1 if 1 task else 2):
-    findings.append(("Rule 6: ### Summary table has fewer data rows than tasks declared", FAIL))
+if task_index_table is None:
+    findings.append(("Rule 6: 01-plan.md missing task table in ### Task Index", FAIL))
+elif data_row_count(task_index_table) < declared_task_count:
+    findings.append(("Rule 6: ### Task Index table has fewer data rows than tasks declared", FAIL))
 
 # Positional checks
 if 01-plan.md's first ## heading is not ## Review Summary:
@@ -378,7 +379,7 @@ For each task section in the assigned `plan/tasks/*.md` shards:
 
 **Detection algorithm:**
 
-```
+```python
 grouping = parse_delivery_grouping(plan/delivery.md § Delivery Grouping)
 if grouping.mode == "groups":
     primary_repo = grouping.groups[0].repo  # first group's Repo, or None when omitted
@@ -608,7 +609,7 @@ for line in 01-plan.md.lines:
 |---|---|
 | `pass` | Zero findings. All applicable rules satisfied (Rules 1-6, 9, and 13 always; Rule 10 when `Consolidates:` is declared; Rules 7-8 when `type: fix | hotfix`; Rule 11 when applicable type; Rule 12 when applicable type). |
 | `concerns` | Findings exist but all are in rules 3, 4, 5 (document shape, cross-ref hygiene, identity declaration), rule 6 overflow/order (sections exist but bloated or out of order), rule 7 size overflow (>120 lines in `01-root-cause.md`), rule 10 `concerns`-level consolidation conditions, rule 11 sketch completeness (always `concerns`, never `fail`), rule 12 confidence score (always `concerns`, never `fail`), OR findings in rules 1, 2, 6-missing carry valid `Plan-reviewer override:` notes. The plan is structurally OK to be reviewed by the human; the orchestrator surfaces concerns and proceeds to STAGE-GATE-1. The human can still reject. |
-| `fail` | Any finding in rule 1 (Delivery Grouping), rule 2 (per-task ACs), rule 6 missing-section without an override, rule 9 (stacked PR / invalid base), rule 10 `fail` escalation (production-code fusion in a `Consolidates:` task), **rule 13a/13b** (embedded review section or errata marker — no override, ever), **rule 7 missing section / missing sub-field / invalid Test layer value / `manual-repro-script` value** (Bug-fix Flow), or **rule 8 missing regression-test AC reference** (Bug-fix Flow). These are core contract violations. The explicit review reports the findings to the operator; only a subsequent explicit `/th:plan-review` invocation audits an architect revision.
+| `fail` | Any finding in rule 1 (Delivery Grouping), rule 2 (per-task ACs), rule 6 missing-section without an override, rule 9 (stacked PR / invalid base), rule 10 `fail` escalation (production-code fusion in a `Consolidates:` task), **rule 13a/13b** (embedded review section or errata marker — no override, ever), **rule 7 missing section / missing sub-field / invalid Test layer value / `manual-repro-script` value** (Bug-fix Flow), or **rule 8 missing regression-test AC reference** (Bug-fix Flow). These are core contract violations. The explicit review reports the findings to the operator; only a subsequent explicit `/th:plan-review` invocation audits an architect revision. |
 
 **Tie-breaker:** when in doubt between `concerns` and `fail`, ask: "is this a rule the team set as 'must hold before human review'?" Rules 1, 2, 6-missing, 7-structural, 8, 9, 13, and rule 10 `fail` escalation are; rules 3, 4, 5, 6-overflow/order, 7-size-overflow, 10 `concerns`, 11, and 12 are not.
 
@@ -630,7 +631,7 @@ for line in 01-plan.md.lines:
 
 **Document format:** `reviews/01-plan-review.md` is an agentic-tier document (see `docs/conventions.md § Document classification`) — a fixed skeleton of anchored sections, tables and labels, no `## Review Summary`/`## Technical Detail` split obligation.
 
-Write your output to `workspaces/{feature-name}/reviews/01-plan-review.md`. If the file does not exist, create it with the full skeleton below (`pending` placeholders for the sections you do not own) before filling your own. Rewrite the `## Plan Review` header, `## Summary`, `## Findings`, `## Recommendation to orchestrator`, and `**Combined verdict:**` in place — never append a second copy. Preserve-in-place the `## Plan Ratification` and `## Security Design-Review` sub-verdict sections owned by `qa-plan` and `security`. Append exactly one compact row to `## Panel Rounds`; replace superseded finding bodies instead of retaining them. Enforce the fixed-prose and per-finding budgets in `docs/output-contract-patterns.md § 6`. Additionally, replace the one-line `**Reviews:**` attestation in the `01-plan.md` manifest title block in place — this is the only write you make to the plan set.
+Write your output to `workspaces/{feature-name}/reviews/01-plan-review.md`. If the file does not exist, create it with the full skeleton below (`pending` placeholders for the sections you do not own) before filling your own. Rewrite the `## Plan Review` header, `## Summary`, `## Findings`, `## Recommendation to orchestrator`, and `**Combined verdict:**` in place — never append a second copy. Preserve-in-place the `## Plan Ratification` and `## Security Design-Review` sub-verdict sections owned by `qa-plan` and `security`. Append exactly one compact row to `## Panel Rounds`; replace superseded finding bodies instead of retaining them. Enforce the fixed-prose and per-finding budgets in `docs/output-contract-patterns.md § 6`. Additionally, when `01-plan.md` exists, replace its one-line `**Reviews:**` attestation in place — this is the only write you make to the plan set. A hotfix without a manifest has no attestation write.
 
 **Single canonical verdict location (security).** The top-level `## Security Design-Review` section's own `**Verdict:**` line is security's local placeholder — it is never read by the worst-of combine. The one canonical input to `**Combined verdict:**` for security is the `**Security design-review (security):**` sub-verdict line inside `## Plan Review` (see § "Consolidated Plan Review section" below). Do not treat the two lines as interchangeable.
 
@@ -699,9 +700,9 @@ pending
 ### Rule 6 — Human-readability sections
 - 01-plan.md:{line} — `## Review Summary` missing or empty (FAIL).
 - 01-plan.md:{line} — `### Decisions for human review` has {N} bullets > 7 (CONCERNS — likely contains mechanical decisions).
-- 01-plan.md:{line} — `### Summary` table in § Task List absent or empty (FAIL).
+- 01-plan.md:{line} — task table in `### Task Index` absent or incomplete (FAIL).
 - 01-plan.md: `## Review Summary` is not the first section (CONCERNS).
-(or "None — Review Summary / Decisions / Task List Summary all present, sized appropriately, and ordered correctly.")
+(or "None — Review Summary / Decisions / Task Index all present, sized appropriately, and ordered correctly.")
 
 ### Rule 7 — Regression Test Approach (Bug-fix Flow only)
 - 01-root-cause.md: `## Regression Test Approach` section missing (FAIL).

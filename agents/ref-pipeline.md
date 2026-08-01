@@ -133,8 +133,8 @@ Read this at boot. Read a phase's own section when you reach it.
 | `waiting_gate1` | **the operator** | the sharded plan set and review result | approve / edit / reject | **mandatory stop** |
 | `implementation` | `implementer` (+ `tester` for evidence) | released task shards and named anchors | code, implementation record and evidence | — |
 | `validation` | `qa`, `adversary` when the security floor applies | the frozen tree and assigned shards | validation and audit findings | — |
-| `waiting_gate3` | **the operator** | validated tree and delivery coordinates | ship / amend / abort | **mandatory stop** |
-| `delivery` | `delivery` prose + **you** mechanics | `gate3_release: ship` | PR body, changelog, commit and outward action | — |
+| `waiting_gate3` | `delivery` preview, then **the operator** | validated tree and exact delivery coordinates/digests | ship / amend / abort | **mandatory stop** |
+| `delivery` | **you** mechanics | `gate3_release: ship` bound to the exact preview | changelog materialization, commit and outward action | — |
 | `complete` | **you** | delivery result | terminal summary | — |
 
 `ux-reviewer` runs when `frontend_scope: true` — design input and validation evidence remain
@@ -156,7 +156,7 @@ Two columns only, because two facts are all you need: when to call it, and what 
 | `plan-reviewer` | explicit `/th:plan-review` only | `reviews/01-plan-review.md § Plan Review` + `pass\|concerns\|fail` |
 | `ux-reviewer` | `design` and `validation` when `frontend_scope` | `reviews/01-ux-review.md`, `reviews/04-ux-validation.md` |
 | `diagrammer` | On request, after the analysis exists | `05-diagram.md` |
-| `delivery` | `delivery`, always after `gate3_release: ship` | PR body, changelog entry, acceptance matrix |
+| Gate 3 preparation | `delivery`, once after acceptance and before presentation | exact workspace PR body, changelog-fragment draft, acceptance matrix |
 | `gcp-cost-analyzer` · `gcp-infra` | Only in their own lane | `00-gcp-costs.md` · `02-gcp-infra.md` |
 | `researcher` | research flow — N parallel lanes, default 3, cap 5 | per-lane findings files |
 | `research-consolidator` | research flow, after the lanes return | consolidated `research/00-research.md` |
@@ -467,7 +467,9 @@ This is an administrative exit, not a pipeline transition or gate decision. When
 the current live operator turn explicitly requests `inline` while this run is
 active, append one `pipeline.end` record with the inline-switch reason, set
 `phase: aborted` and `status: aborted`, clear `gate_pending`, and set
-`next_action` to the direct request. Leave `gate1_release`, `gate3_release`, and
+`next_action: none — pipeline administratively closed`. Record only the fixed
+reason `operator selected inline`, never the direct request or other operator
+prose, in the terminal event. Leave `gate1_release`, `gate3_release`, and
 the pending nonce untouched; do not write a synthetic Gate 3 `abort` release or
 consume a nonce. Only after the close may direct work begin. The new direct run
 creates no workspace, state, events, or inline value, and its eligibility
@@ -554,7 +556,13 @@ change — never to a reviewer as an automatic loop.**
 - **Clear task, no marker** → restate, ask targeted questions if needed, confirm the functional-clarity artifact explicitly ("what are we building, functionally?"), then ask whether to move to planning and **wait**.
 - **Unclear** → stay conversational, using only your own capability — **never dispatch a subagent to ask questions**. One soft reminder after several turns without an advance signal.
 
-**Recording the checkpoint.** Whenever this boundary closes, append one `checkpoint.confirmed` event. Carry the operator's own confirmatory words within the named free-text exception and set `provenance: operator-live`. Closed without a live reply — a skip marker, or a re-ask that returned nothing — sets `provenance: inferred`. **Never record `operator-live` without a fresh live reply to that exact turn.** The run gets **one** re-ask; append an updated event with the outcome and never loop further.
+**Recording the checkpoint.** The boundary closes only on a fresh live reply: append one
+`checkpoint.confirmed` event carrying the operator's own confirmatory words within the named
+free-text exception and set `provenance: operator-live`. If the single re-ask returns without a
+live reply, record `provenance: inferred` only as the failed attempt, keep Discover open with
+`functional_clarity_confirmed: false`, and stop without dispatching design. **Never record
+`operator-live` without a fresh reply to that exact turn.** Do not loop automatically; a later
+operator message may answer the pending checkpoint.
 
 An explicit pipeline activation may bypass conversational framing only when the activation
 is live and attributable to the current operator. Historical markers never bypass this
@@ -643,19 +651,13 @@ operator explicitly invokes it; its reviewers read the relevant sharded artifact
 The intake-to-design checkpoint remains a reasoning checkpoint, not a gate. Read the
 `checkpoint.confirmed` event before dispatch, write `checkpoint_boundary: intake-plan`,
 dispatch with the controlled `TH-STATE-REF` first line, and clear the boundary after the
-return. A missing live reply may be recorded as `provenance: inferred`; it never releases
-Gate 1 and never becomes operator approval.
+return. A missing live reply may be recorded as `provenance: inferred`; it keeps the checkpoint
+open and blocks the architect dispatch. It never releases Gate 1 or becomes operator approval.
 
 For `security_sensitive: true`, run the security design review before implementation as
 the conditional security floor. It is a single review, not an automatic correction loop.
 For any other plan, the coordinator performs only a deterministic presence/coherence
 check before Gate 1: required sections exist, files/dependencies are coherent, and no
-clarification marker remains. An invalid artifact receives one normal design correction;
-an unresolved ambiguity blocks and is surfaced to the operator. There is no automatic
-Stage-1 perfection cycle.
-
-The normal pipeline performs a deterministic presence/coherence check before Gate 1:
-required sections and sharded artifacts exist, files and dependencies are coherent, and no
 clarification marker remains. An invalid artifact receives one normal design correction;
 an unresolved ambiguity blocks and is surfaced to the operator. There is no automatic
 Stage-1 perfection cycle.
@@ -682,8 +684,8 @@ requirements.
 
 | Reply | Transition |
 |---|---|
-| `1` / `approve` | record `gate1_release: approved`; enter `implementation` |
-| `2` / `approve autonomous` | record `gate1_release: approved-autonomous`; enter `implementation`; retain validation and Gate 3 |
+| `1` / `approve` | record `gate1_release: approved`, `autonomous: false`, and `autonomous_granted_at: null`; enter `implementation` |
+| `2` / `approve autonomous` | record `gate1_release: approved-autonomous`, `autonomous: true`, and `autonomous_granted_at: STAGE-GATE-1`; enter `implementation`; retain validation and Gate 3 |
 | `3: {detail}` / `edit` with detail | record `edit`; operator edit then return to `design` and prepare a fresh Gate 1 |
 | `4: {reason}` / `reject {reason}` | record `rejected`; return to `design` for the operator-directed decision |
 
@@ -741,6 +743,11 @@ points remain traceable events inside the single `implementation` state.
 ### Branch guarantee, `working_branch` assertion, `base_sha` registration — at entry, before any dispatch
 
 Guarantee a working branch distinct from the default branch exists. Worktree topology: already true from boot. **Branch-in-place: create it here** (`git checkout -b`, naming per `CLAUDE.md § 6.2`) — this is where that branch comes into existence, never deferred to delivery.
+
+Immediately before branch-in-place creation, run `git status --short` and `git worktree list
+--porcelain`. Stop on unfamiliar work or unexpected worktree ownership; never create the branch
+around an unresolved checkout. Require the proposed branch to use an allowed prefix and to
+differ from `main`, `master`, and the resolved default branch.
 
 **Assert, never unconditionally write, `working_branch`.** Worktree: verify non-null, equal to `git rev-parse --abbrev-ref HEAD`, distinct from the default branch — assert only. Branch-in-place: after creating the branch, write the field **only** because boot left it `null`.
 
@@ -808,13 +815,23 @@ Parallelizes execution **within** one task. Never divides its deliverable.
 
 **All must hold:** the task declares `Lane-decomposable: yes`; `Files:` count ≥ 8; declared seams ≥ 2, file-disjoint, none also in `frozen-contracts:`.
 
-**On fire:** one implementer per seam, concurrent, capped at 5 with eager slot-fill. Each lane scoped to its seam's files only and instructed to STOP with `status: blocked, reason: seam-not-disjoint` rather than edit a frozen-contract file. All lanes write the same worktree and branch.
+**On fire:** first record one immutable lane baseline, then provision one dedicated worktree and
+temporary branch per seam from that baseline. Dispatch one implementer per seam, concurrent,
+capped at 5 with eager slot-fill. Each lane is scoped to its own worktree and seam files only
+and instructed to STOP with `status: blocked, reason: seam-not-disjoint` rather than edit a
+frozen-contract file. No two lanes share a worktree, branch, or index.
 
 **Seam-not-disjoint:** abort the fan-out for that task, emit `stage2.lane.result` with the reason, re-dispatch the whole task monolithically, and **report the fallback** — never absorbed silently.
 
 **Consolidation is mandatory.** Verify no worker's diff touches a file outside its seam or frozen contracts; write one line per worker into `02-implementation.md § Review Summary`; record `task_decomposition` with `status: consolidated`.
 
-**You are the sole committer of the consolidation.** Every worker reports `commit: lane-deferred` — concurrent workers committing on one branch would race the index. You commit once, after verifying seam-disjointness, and record the sha in both the consolidation report and `task_decomposition`. Subject it to the same ancestry check as any worker-reported sha. A task with a `lane-deferred` report and no registered consolidation sha is `blocked`, never `success`.
+**You are the sole committer of the shipped consolidation.** Each worker commits only on its
+temporary lane branch and returns that lane SHA. Verify every lane diff against the recorded
+baseline and declared seam, then apply the verified lane commits without committing to the
+task's working branch and create one consolidation commit there. Record that SHA in both the
+consolidation report and `task_decomposition` and subject it to the normal ancestry check. Only
+after the consolidated tree and commit pass may you remove the exact lane worktrees and
+temporary branches. A missing lane SHA or consolidation SHA is `blocked`, never `success`.
 
 Trace: `stage2.lane.dispatch`, `stage2.lane.result`, `stage2.lanes.consolidated`.
 
@@ -989,7 +1006,11 @@ no second run-only `tester` dispatch here.
 
 **Any tree change after this fan opens re-opens Freeze → validation → STAGE-GATE-3** — not merely the gate preparation. Triggers: a validation bounce, a `[CONSTRAINT-DISCOVERED]` fold-back, an operator-directed amend, and any other change the anchor comparison detects.
 
-**Excluded by declaration, and bounded — never open-ended:** the post-gate `delivery` dispatch's workspace writes (PR body and acceptance matrix), its changelog fragment, and your release-assembly commit, all necessarily written after the gate records `ship`. The tracked-file bound is the changelog/version-only post-gate allowlist checked immediately before pushing.
+**Excluded by declaration, and bounded — never open-ended:** pre-gate `delivery` writes only
+workspace preview artifacts after validation, and Gate 3 binds their exact paths and SHA-256
+digests. After `ship`, the coordinator may materialize only the approved changelog draft and
+perform the release-assembly commit. The tracked-file bound is the changelog/version-only
+post-gate allowlist checked immediately before pushing.
 
 **Tier-gated dispatch (`fix`/`hotfix`):**
 
@@ -1019,12 +1040,13 @@ validation failure**, with the same implementation → Freeze → fresh-audit ro
 complete `could-not-break` or a finding explicitly classified as a non-correctable structural
 contradiction may remain a Gate-3 concern; neither case silently certifies changed controls.
 
-**Re-audit on amend is the only re-run.** When the gate records `amend`, fixes land in
+**Every correction re-audits the changed sensitive delta.** Whether the correction came
+from an operator `amend` or a correctable validation finding, fixes land in
 `implementation`, Freeze is rebuilt, and `validation` re-runs **delta-scoped** (`Scope:
-localized {files changed since the prior audit}`) alongside `qa` — never a fresh full pass
-and never a re-audit the operator did not cause. Set `audit_run: amend-N`, where `N` is one
-plus the greatest existing `reviews/04-adversary-amend-{N}.md` suffix (or `1` when none
-exists); the output path uses the same `N`.
+localized {files changed since the prior audit}`) alongside `qa`, never as an unrelated
+fresh full pass. Set `audit_run: {cause}-N`, where `{cause}` is `amend` or `correction` and
+`N` is one plus the greatest matching `reviews/04-adversary-{cause}-{N}.md` suffix (or `1`
+when none exists); the output path uses the same value.
 
 **Infrastructure failure is not a verdict.** `failed`/`blocked` is re-dispatched once; a second failure presents `audit: unavailable (adversary)` at the gate and the operator decides with that stated. **The audit is never silently skipped:** a required audit with no report is stated in the block, never omitted.
 
@@ -1118,10 +1140,12 @@ the plan drifted and needs reconciliation.
 ## STAGE-GATE-3
 
 **Trigger:** validation and its acceptance check pass with no correctable security finding.
-This gate is the `waiting_gate3` state immediately before delivery — there is no prepare
-dispatch: the version bump, changelog preview and diff summary it presents are computed
-deterministically by you. A correctable `broke-it` or incomplete sensitive-coverage finding
-prevents this state entirely and returns to implementation.
+This gate is the `waiting_gate3` state immediately before delivery. The version preview and diff
+summary are computed deterministically by you; after acceptance and while the Freeze anchor is
+current, one bounded `delivery` dispatch prepares the exact workspace-only PR body, standalone
+acceptance matrix, and changelog-fragment draft. You validate their paths, compute SHA-256, and
+persist those coordinates before presentation. A correctable `broke-it` or incomplete
+sensitive-coverage finding prevents this state entirely and returns to implementation.
 
 **Gate contract:** see `agents/_shared/gate-contract.md` for the dual-record release, the
 prepare/present/record flow, the record-based recovery backstop, numeric shortcuts and
@@ -1137,6 +1161,7 @@ the ambiguous-reply rule. This section implements it for STAGE-GATE-3.
 |---|---|
 | `feature` | — |
 | `delivery_summary` | branch, commit count, `{old} → {new}` version, files touched, **diff composition** — computed by you per `agents/_shared/delivery-mechanics.md` |
+| `delivery_preview` | exact PR title plus PR-body, acceptance-matrix, and optional changelog-draft workspace paths with SHA-256 digests |
 | `accumulated_cost` | `~{N}K tokens (~${X})` |
 | `security_audit` | verdict (`could-not-break` / `broke-it` / `not run (security_floor_applies: false)` / `unavailable`), `sec002_verdict`, `open_breaks: [{finding, file:line, impact}]`, `audit_coverage`, `incomplete_on_changed_control` |
 | `bump_override` | `{level} — <reason>`, present **only** when the computed version sits above the mechanical SemVer floor for the diff |
@@ -1169,8 +1194,8 @@ can be accepted by the operator; no keyword can waive the correction route.
 | Reply | Action |
 |---|---|
 | `ship` | `gate3_release: ship`, release event, nonce consumed. Only non-correctable findings explicitly accepted by the operator may be recorded as a disposition; a correctable `broke-it` or incomplete sensitive-coverage finding never reaches this gate. Proceed to delivery |
-| `amend` | `gate3_release: amend`, `status: paused_for_amend`. **Re-opens implementation → Freeze → validation → this gate** — never merely a re-prepare over the same fan findings. On the next `ship`, re-prepare with a **fresh nonce**; the prior one is superseded and can never be relayed back |
-| `abort` | `gate3_release: abort`, `status: blocked`. No delivery, no push. Exit |
+| `amend` | `gate3_release: amend`, `phase: implementation`, `status: paused_for_amend`. **Re-opens implementation → Freeze → validation → this gate** — never merely a re-prepare over the same fan findings. On the next `ship`, re-prepare with a **fresh nonce**; the prior one is superseded and can never be relayed back |
+| `abort` | `gate3_release: abort`, `phase: aborted`, `status: aborted`, `next_action: none — pipeline administratively closed`. No delivery, no push. Exit |
 
 **Ambiguous reply:** write neither half; re-surface the allowlist with a fresh nonce. This gate is the irreversible push — a reply that does not map to exactly one allowlist value, or that cannot be attributed to the currently-pending presentation in coordinator state, is **never** treated as a release. The operator never types the nonce.
 
@@ -1178,18 +1203,19 @@ can be accepted by the operator; no keyword can waive the correction route.
 
 **Trigger:** the gate recorded `ship`.
 
-**One dispatch plus your own mechanics.** `delivery` writes only the prose half: the changelog fragment when operator-facing, the workspace acceptance matrix, and the workspace PR-body draft. It never changes product documentation, OpenAPI, project memory, version files, git state, GitHub state, KG, Obsidian indexes, or worktrees. Any required tracked documentation or API-contract change belongs in the reviewed implementation tree before Freeze.
-
-Before dispatch, ensure `00-state.md` durably records the coordinates Delivery consumes:
-type, issue metadata when present, version preview, changed-file map, diff composition, size
-result, and suite-evidence coordinate. The dispatch points at `docs_root`; it does not
-summarize those values inline.
+**No post-gate prose dispatch.** `delivery` already prepared the exact workspace-only prose
+before Gate 3. Re-read every recorded preview path and require its SHA-256 to match
+`delivery_preview`; any missing, changed, or out-of-scope artifact blocks and requires a fresh
+presentation. Materialize only the exact approved changelog draft when operator-facing. Any
+required tracked documentation or API-contract change belonged in the reviewed implementation
+tree before Freeze.
 
 You execute the deterministic half yourself per `agents/_shared/delivery-mechanics.md` — the version bump across its declared sites plus the multi-site MATCH check, implementation branch validation, `changelog.d/` assembly and release cut, staging and commit, the push-step's three-conjunct precondition (`gate3_release`/`gate_nonce` re-read, base-advance reconcile, tree-anchor plus post-gate allowlist check), the push, `gh pr create`, and the merge-state poll. That file is the single source for the deterministic half; this is the pointer, not a restatement.
 
 *No worktree teardown here, and no CI wait* — report URL, number, merge state and `CI: pending — check with gh pr checks`, then close.
 
-**Order:** the prose dispatch runs **before** your mechanics. It needs the version and changelog preview already computed for the gate — reuse it, never recompute — to write an accurate PR body. On return, upsert only its `pr_title`, `pr_body`, `acceptance_matrix`, `changelog_fragment`, and `dod` values into `00-state.md § Delivery`; preserve every coordinator-owned key already present. You then commit the tracked changelog output alongside your own writes in the single delivery commit, before the push precondition block runs.
+**Order:** verify the gate-bound preview, materialize its exact changelog bytes when applicable,
+then run mechanics. Never recompose or refresh approved prose after `ship`.
 
 | Outcome | Action |
 |---|---|
@@ -1205,14 +1231,18 @@ failure; delivery never creates a branch around already-reviewed commits.
 
 ### GitHub update (delivery)
 
-**Yours.** Steps 1–3 only when the task originated from a GitHub issue.
+**Separate outward write.** Steps 1–2 run only when the task originated from a GitHub issue and
+only after a new explicit live operator request made after the draft PR exists. Gate 3 `ship`
+authorizes the previewed feature-branch push and draft PR only; it does not authorize issue
+comments or project-board mutations. Stop and wait before either write. Step 3 remains the
+non-action invariant.
 
 1. Comment on the issue: branch, commit, version, files changed, test results, **every AC individually pass/fail** — read `reviews/04-validation.md` and the AC mapping in `03-testing.md` — never only "15/15 passed". Include QA notes when QA ran.
 2. Move to "In Review" on the board.
 3. **Do not close the issue.**
 4. **Close the ClickUp origin when `clickup_task_id` is set.** One functional comment, previewed and Y/n-gated — **non-waivable even under `autonomous: true`**.
 
-Non-iterating: report and continue on failure.
+Non-iterating: after the separate request, report and continue on failure.
 
 ## Complete — close the session
 

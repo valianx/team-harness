@@ -73,7 +73,7 @@ Cost reduction is acceptable only while all of these remain true:
 5. Untestable material coverage is declared through `incomplete_on_changed_control`.
 6. A correctable `broke-it` or incomplete sensitive-coverage finding fails validation and
    returns to implementation → Freeze → a fresh audit; only non-correctable structural
-   concerns remain operator-disposed at STAGE-GATE-3.
+   concerns remain operator-disposed at Gate 3.
 
 `could-not-break` is neutral and non-certifying. It maps to `concerns` only when material evidence or coverage was unavailable, rather than automatically penalizing every completed negative attempt.
 

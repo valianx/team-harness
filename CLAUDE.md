@@ -96,7 +96,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin `th`; Codex plugin `team-harness` via `.agents/plugins/marketplace.json`; Go agent installer for opencode and Codex. The tagged Git tree is both plugin artifact—there is no separate Codex archive. |
 
-**Current version:** `3.6.3` (see `.claude-plugin/plugin.json`, the tag authority. Its version is shared by the Claude and Codex plugin manifests, the Claude marketplace entry, and the installer fallback. `CHANGELOG.md` tracks release history).
+**Current version:** `3.6.4` (see `.claude-plugin/plugin.json`, the tag authority. Its version is shared by the Claude and Codex plugin manifests, the Claude marketplace entry, and the installer fallback. `CHANGELOG.md` tracks release history).
 
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
@@ -149,7 +149,7 @@ All commands run from the repo root.
   `00-execution-events.jsonl`/`.md` and `00-pipeline-summary.md`; inline work has no pipeline
   artifacts. Legacy tier markers never create an observability exemption. Full contract:
   `docs/observability.md`.
-- **Documentation freshness via context7.** Verify third-party APIs before generating code. Mandatory triggers: `docs/context7-usage.md §2`.
+- **Documentation freshness via Context7.** Verify third-party APIs before generating code. Mandatory triggers: `docs/context7-usage.md §2`.
 - **Bug-fix flow forces security review + regression test.** `type: fix`/`hotfix`. `agents/ref-special-flows.md § Bug-fix Flow`.
 - **Validation security floor.** `adversary` runs once over the frozen final diff when the derived security floor applies, alongside `qa`; sensitive plans also retain the design-time `security` review. Findings that are correctable in scope return to implementation and revalidate the delta. `agents/ref-pipeline.md § "Validation"`, `docs/dev-mode.md § Security Floor Non-Waivability`.
 - **Stage-2 code-hygiene gate (two-layer, mandatory for all types).** Deterministic pre-verify scan bounces work-narration comments; `qa`'s `## Code Hygiene` audit emits `code_hygiene: pass|fail` as a Phase 3 gate conjunction. Canonical pattern set: `docs/code-hygiene-gate.md`.

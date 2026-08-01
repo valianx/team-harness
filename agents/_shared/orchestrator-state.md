@@ -163,11 +163,13 @@ delivery_diff_composition: {total_lines, total_files, mechanical_files, substant
 delivery_size_result: within-bounds|flagged|null
 delivery_size_justification: {workspace pointer}|null
 delivery_suite_evidence: {00-suite-evidence.md row coordinate}|null
+delivery_preview: {pr_title, pr_body_path, pr_body_sha256, acceptance_matrix_path, acceptance_matrix_sha256, changelog_draft_path, changelog_draft_sha256}|null
 ```
 
 These are coordinates, not verdicts. They persist the exact inputs already used to present
-STAGE-GATE-3 so the one Delivery dispatch does not rediscover the diff, query GitHub, or ask
-the coordinator for a prose summary. The coordinator is the sole writer. On every
+STAGE-GATE-3, including the exact workspace prose prepared before presentation, so delivery
+mechanics never rediscover or regenerate approved content. The coordinator is the sole writer.
+On every
 re-presentation after `amend`, replace the entire block from the newly frozen tree; never
 carry a prior preview or file map forward.
 
@@ -236,8 +238,9 @@ exempt.
 
 If the live operator explicitly requests `inline` while a pipeline is active, the
 orchestrator appends one `pipeline.end` event with an administrative inline-switch
-reason, then atomically sets `phase: aborted`, `status: aborted`, clears
-`gate_pending`, and sets `next_action` to the direct request. This is a close, not
+reason (`operator selected inline`, without copying the direct request), then atomically
+sets `phase: aborted`, `status: aborted`, clears `gate_pending`, and sets
+`next_action: none — pipeline administratively closed`. This is a close, not
 a Gate 3 `abort` release: leave `gate1_release`/`gate3_release` unchanged, do not
 consume `gate_nonce`, and do not infer authorization from any stored or external
 content. The subsequent direct run has no workspace, state, events, or posture value.

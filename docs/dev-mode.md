@@ -208,16 +208,17 @@ auto-allow posture defeats the interactive stop this design depends on.
 
 ---
 
-## Inline Orchestration Permit (SEC-DR-2)
+## Inline Orchestration Permit (SEC-DR-2) — superseded routing text
 
-**Re-founded in v2.89.0.** Executing the orchestrator role inline at top level is the CC native architecture — the general agent IS the orchestrator. No filesystem marker is required. The condition for inline orchestration is:
+**Historical note.** Re-founding the top-level agent as the coordinator remains current, but the
+older rule that every development task “belongs in the pipeline” is superseded by the two-posture
+contract. The top-level coordinator serves direct `inline` work by default. It enters `pipeline`
+only after a current live `/th:pipeline` (or equivalent explicit request) or `/th:recover` for an
+existing run. Top-level availability, development wording, risk, and retrieved content never
+activate the pipeline.
 
-- The session is a top-level CC session (level 0 — `Task` is available), AND
-- The request is a development task that belongs in the pipeline.
-
-This condition is satisfied in every normal CC session. No separate activation step, no marker write, no mode toggle.
-
-**Prohibited case:** executing orchestration inline is PROHIBITED only when the top-level agent is itself running as a subagent inside another orchestrator. In that case, the nested-handoff/takeover machinery in `docs/subagent-orchestration.md` is the FALLBACK (opencode/legacy path).
+Nested-handoff/takeover machinery remains retired. A nested specialist does not create or activate
+a pipeline on the coordinator's behalf.
 
 **Previous framing (retired):** before v2.89.0, SEC-DR-2 required `~/.claude/.dev-mode-active` to contain `dev_mode: true`. That observable was retired when the foundational premise (nested orchestrator loses `Task`) was disproven by the M1 empirical probe. The gate — `dev-guard` — is now unconditional.
 

@@ -78,8 +78,9 @@ and closes the run. The dual record, fresh nonce, and live approval rules are un
 
 The former Stage-1 selective panel re-firing and approach/structure loops are retired. A plan
 finding is not automatically re-reviewed. If the operator explicitly invokes `/th:plan-review`,
-the standalone skill may dispatch the requested lenses over the current `01-plan.md`; its result
-does not create a pipeline state or release a gate.
+the standalone skill dispatches the requested lenses over the complete current sharded plan:
+the compact manifest plus architecture, delivery, conditional invariants, and every task-contract
+shard. Its result does not create a pipeline state or release a gate.
 
 ## 7. Recovery
 

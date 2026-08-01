@@ -34,16 +34,20 @@ def read(relative: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def section(text: str, start: str, *stops: str) -> str:
+def section(text: str, start: str, *stops: str, to_end: bool = False) -> str:
     """Slice one named contract section without depending on line numbers."""
     begin = text.find(start)
     if begin < 0:
         raise AssertionError(f"missing section anchor: {start!r}")
     end = len(text)
+    matched_stop = False
     for stop in stops:
         candidate = text.find(stop, begin + len(start))
         if candidate >= 0:
             end = min(end, candidate)
+            matched_stop = True
+    if not to_end and not matched_stop:
+        raise AssertionError(f"missing section stop after {start!r}: {stops!r}")
     return text[begin:end]
 
 
@@ -115,6 +119,11 @@ def check_corrective_routes() -> None:
     codex_security = read("runtime/codex/instructions/security.md")
     codex_tester = read("runtime/codex/instructions/tester.md")
     codex_routes = "\n".join((codex_pipeline, codex_validation, codex_security, codex_tester))
+    codex_sensitive = section(
+        codex_pipeline,
+        "## Stage 1 and final-result routing",
+        "## Start",
+    )
 
     # Ordinary code/test/docs defects return to implementation; missing evidence
     # remains a tester responsibility in both runtimes.
@@ -126,7 +135,7 @@ def check_corrective_routes() -> None:
 
     # Sensitive findings and incomplete sensitive coverage must go through the
     # same implementation → Freeze → audit loop, never silently pass validation.
-    for label, text in (("Claude", claude_audit), ("Codex", codex_routes)):
+    for label, text in (("Claude", claude_audit), ("Codex", codex_sensitive)):
         lowered = text.lower()
         require("implementation" in lowered, f"{label}: sensitive route lacks implementation")
         require("freeze" in lowered, f"{label}: sensitive route lacks Freeze reopening")
@@ -259,11 +268,11 @@ def check_single_writer() -> None:
     for role in ("architect", "implementer", "tester", "qa", "security", "delivery"):
         adapter = read(f"runtime/codex/instructions/{role}.md").lower()
         state_denied = re.search(
-            r"(?:do not|never|must not).*?(?:write[^.\n]*00-state|write coordination state)",
+            r"\b(?:do not|never|must not)\b[^.;\n]*(?:\bwrite\b[^.;\n]*\b00-state\b|\bwrite coordination state\b)",
             adapter,
         )
         gate_denied = re.search(
-            r"(?:do not|never|must not).*?(?:approve|release)[^.\n]*gate",
+            r"\b(?:do not|never|must not)\b[^.;\n]*\b(?:approve|release)\b[^.;\n]*\bgates?\b",
             adapter,
         )
         require(state_denied is not None, f"Codex {role}: may write coordination state")
@@ -279,7 +288,7 @@ def check_gate_aliases() -> None:
             ("`1`/`approve`", "1 — approve"),
             ("`2`/`approve autonomous`", "2 — approve autonomous"),
             ("`3: detail`/`edit`", "3: detail — edit"),
-            ("`4: reason`/`reject", "4: reason — reject"),
+            ("`4: reason`/`reject`", "4: reason — reject"),
         ),
         (
             ("`1`/`ship`", "1 — ship"),
@@ -388,7 +397,12 @@ def check_profile_and_document_guards() -> None:
         require("1 — inline" in text and "2 — pipeline" in text, f"{label}: live migration choices missing")
         require_any(text, ("never silently mapped", "never infer", "not this live choice", "untrusted data", "never chooses a route", "authorize neither posture"), f"{label}: legacy value can be silently mapped")
         if label != "Codex configuration":
-            require("gate" in flat and ("never" in flat or "no " in flat), f"{label}: legacy value can infer a gate")
+            gate_negation = re.search(
+                r"(?:\b(?:never|no)\b[^.;\n]{0,180}\bgates?\b|"
+                r"\bgates?\b[^.;\n]{0,180}\b(?:never|no)\b)",
+                flat,
+            )
+            require(gate_negation is not None, f"{label}: legacy value can infer a gate")
 
     # Coordinator ownership remains explicit in both projections. This also
     # guards against reintroducing specialist writes while changing routing.
@@ -451,7 +465,7 @@ def check_recovery_fail_closed() -> None:
         for row in numeric_rows:
             require(row in migration, f"{relative}: numeric recovery row drifted: {row}")
         require(
-            "legacy Gate 3 / numeric `4`–`5` without valid `ship` | `waiting_gate3` with valid Gate 1; otherwise `blocked`"
+            "legacy Gate 3 / numeric `4`–`5` without valid `ship`, `amend`, or `abort` | `waiting_gate3` with valid Gate 1; otherwise `blocked`"
             in migration,
             f"{relative}: numeric Gate 3 partial/mismatch prerequisite is not fail-closed",
         )
@@ -469,12 +483,19 @@ def check_recovery_fail_closed() -> None:
             "named `waiting_gate3`",
             "named `delivery`",
             "named `complete`",
+            "named `aborted`",
         ):
             require(row in migration, f"{relative}: named recovery row drifted: {row}")
         require("named `implementation` | `implementation` only with valid Gate 1" in migration, f"{relative}: named implementation can bypass Gate 1")
         require("named `delivery` | `delivery` only with valid Gate 1 and Gate 3" in migration, f"{relative}: named delivery can bypass a gate")
         require("named `complete` | `complete` only with valid Gate 1 and Gate 3" in migration, f"{relative}: named complete can bypass a gate")
         require("express exception" not in flat, f"{relative}: retired express exception remains executable")
+        require("gate_pending: null" in migration or "gate_pending: null" in text, f"{relative}: a pending gate can be treated as released")
+        require("exact consumed nonce" in flat, f"{relative}: release validation does not bind the consumed nonce")
+        require("presence alone is insufficient" in flat or "presence alone is insufficient" in re.sub(r"\s+", " ", text.lower()), f"{relative}: plan presence can satisfy recovery without structural validation")
+        require("state.migrated" in flat, f"{relative}: legacy selectors are not archived")
+        require("128 utf-8 bytes" in flat, f"{relative}: migrated legacy evidence is unbounded")
+        require("redacted" in flat, f"{relative}: migrated legacy evidence can persist secrets")
 
 
 def check_residual_corrections() -> None:
@@ -603,7 +624,11 @@ def check_ad_hoc_review_boundary() -> None:
         require("ad hoc" in lowered or "ad-hoc" in lowered, f"{label}: ad-hoc review boundary missing")
         for artifact in ("workspace", "state", "events", "gates", "delivery"):
             require(artifact in lowered, f"{label}: ad-hoc review missing {artifact} prohibition")
-        require("no " in lowered or "without" in lowered or "creates no" in lowered, f"{label}: ad-hoc review is not artifact-free")
+            denied = re.search(
+                rf"(?:\bcreates?\s+no\b|\bwithout\b|\bnever\s+(?:creates?|writes?|records?)\b)[^.;\n]{{0,180}}\b{artifact}\b",
+                lowered,
+            )
+            require(denied is not None, f"{label}: ad-hoc review does not clause-scope the {artifact} prohibition")
         require("live" in lowered and "tester" in lowered and "qa" in lowered and "security" in lowered, f"{label}: live review roles drifted")
     for role in ("tester", "qa", "security"):
         adapter = read(f"runtime/codex/instructions/{role}.md").lower()
@@ -647,6 +672,107 @@ def check_single_ship_delivery() -> None:
         and "not a new team harness" in codex_delivery,
         "Codex delivery conflates native tool permission with another operator gate",
     )
+
+
+def check_delivery_preview_binding() -> None:
+    """Gate 3 binds exact prose and standard delivery remains draft-only."""
+    claude_pipeline = read("agents/ref-pipeline.md").lower()
+    claude_delivery = read("agents/_shared/delivery-mechanics.md").lower()
+    claude_delivery_flat = re.sub(r"\s+", " ", claude_delivery)
+    delivery_role = read("agents/delivery.md").lower()
+    codex_validation = read("plugins/team-harness/skills/pipeline/references/validation.md").lower()
+    codex_delivery = read("plugins/team-harness/skills/pipeline/references/delivery.md").lower()
+    deliver_skill = read("plugins/team-harness/skills/deliver/SKILL.md").lower()
+
+    for label, text in (
+        ("Claude pipeline", claude_pipeline),
+        ("Codex validation", codex_validation),
+    ):
+        require("before" in text and "gate 3" in text and "sha-256" in text, f"{label}: exact prose is not bound before Gate 3")
+    require("before stage-gate-3" in delivery_role, "Delivery role still runs after Gate 3")
+    require("do not modify tracked repository files" in delivery_role, "Delivery preview can change the frozen tree")
+    require("do not regenerate prose" in codex_delivery, "Codex delivery can regenerate approved prose")
+    require("never recompose" in claude_delivery_flat, "Claude mechanics can recompose approved prose")
+    require("--draft" in claude_delivery and "isdraft" in claude_delivery, "Claude mechanics do not enforce draft-only PR delivery")
+    require("open` with `isdraft: false" in claude_delivery, "Ready-for-review PR mutation is not blocked")
+    require(
+        "approved title from delivery_preview" in claude_delivery_flat
+        and "approved pr_body_path from delivery_preview" in claude_delivery_flat,
+        "Claude mechanics can regenerate or select a different PR title/body",
+    )
+    require(
+        "runs even when the version bump was skipped" in claude_delivery_flat
+        and "stop this section after materialization" in claude_delivery_flat,
+        "Claude mechanics can lose the approved fragment when versioning is deferred",
+    )
+    require("exact `00-state.md`" in deliver_skill and "never scan" in deliver_skill, "Codex deliver can select another active workspace")
+    codex_delivery_flat = re.sub(r"\s+", " ", codex_delivery)
+    require(
+        "non-default" in codex_delivery_flat
+        and "not `main` or `master`" in codex_delivery_flat
+        and "allowed delivery prefixes" in codex_delivery_flat,
+        "Codex delivery can stage from an unapproved branch",
+    )
+
+
+def check_terminal_and_transition_mapping() -> None:
+    """Gate decisions persist complete transitions and aborted runs stay terminal."""
+    codex_state = read("plugins/team-harness/skills/pipeline/references/state-and-gates.md").lower()
+    codex_pipeline = read("plugins/team-harness/skills/pipeline/SKILL.md").lower()
+    recovery = read("plugins/team-harness/skills/pipeline/references/recovery.md").lower()
+    claude_recovery = read("skills/recover/SKILL.md").lower()
+    claude_pipeline = read("agents/ref-pipeline.md").lower()
+
+    for marker in (
+        "gate 1 `approve autonomous`",
+        "autonomous_granted_at: stage-gate-1",
+        "gate 3 `ship`",
+        "phase: delivery",
+        "gate 3 `abort`",
+        "phase: aborted",
+    ):
+        require(marker in codex_state, f"Codex transition mapping missing {marker!r}")
+    require("complete` and `aborted` are terminal" in codex_pipeline, "Codex continuation can recover a terminal run")
+    for label, text in (("Codex", recovery), ("Claude", claude_recovery)):
+        require("status" in text and "aborted" in text and "never recover" in text, f"{label}: aborted recovery is not terminal")
+        require("valid `amend` decision record" in text, f"{label}: Gate 3 amend migration is missing")
+    require("autonomous: true" in claude_pipeline and "autonomous_granted_at: stage-gate-1" in claude_pipeline, "Claude autonomous grant is not persisted")
+    require("pipeline administratively closed" in claude_pipeline, "Claude administrative close does not clear next_action safely")
+
+
+def check_review_comment_regressions() -> None:
+    """Target the cross-document defects identified during PR review."""
+    discover = read("docs/discover-phase.md")
+    discover_flat = re.sub(r"\s+", " ", discover.lower())
+    require("at most 500 utf-8 bytes" in discover_flat, "Discover: survey value bound is missing")
+    require("at most 4 kb" in discover_flat, "Discover: spec-seed bound is missing")
+    require("[redacted]" in discover, "Discover: secret redaction marker is missing")
+    require("survey_effort" not in discover, "Discover: retired survey_effort field remains live")
+
+    qa = read("agents/qa.md")
+    qa_inline = section(qa, "### Ad-hoc inline review", "### Validate Mode")
+    for marker in ("early return", "no workspace discovery", ".gitignore", "output: null"):
+        require(marker in qa_inline, f"QA inline review: missing early-return guard {marker!r}")
+    qa_session = section(qa, "## Session Context Protocol", "## Phase 0")
+    require("inline-review" in qa_session and "never enters this protocol" in qa_session, "QA inline review can enter the workspace protocol")
+
+    for relative in ("agents/ref-pipeline.md", "docs/reasoning-checkpoint.md"):
+        checkpoint = read(relative)
+        checkpoint_flat = re.sub(r"\s+", " ", checkpoint.lower())
+        require("provenance: inferred" in checkpoint_flat or "`inferred`" in checkpoint_flat, f"{relative}: inferred checkpoint provenance is missing")
+        require("discover open" in checkpoint_flat, f"{relative}: inferred checkpoint can close Discover")
+        require(
+            re.search(r"without dispatching (?:`?architect`?|design)", checkpoint_flat) is not None,
+            f"{relative}: inferred checkpoint can dispatch the architect",
+        )
+
+    observability = read("docs/observability.md")
+    envelope = section(observability, "## 2. Event envelope", "## Flow Telemetry Emission")
+    require("sole envelope exception" in envelope and "`subagent.start`" in envelope, "Observability: subagent.start exception is undocumented")
+    telemetry = section(observability, "## Flow Telemetry Emission", "## What operation.* is")
+    telemetry_flat = re.sub(r"\s+", " ", telemetry.lower())
+    require("exactly one local" in telemetry_flat and "`operation.failed`" in telemetry, "Observability: telemetry failure event is ambiguous")
+    require("flow-telemetry: unavailable" not in observability, "Observability: obsolete telemetry failure event remains")
 
 
 def check_claude_codex_parity() -> None:
@@ -705,6 +831,9 @@ def main() -> None:
         ("sensitive inline authorization", check_sensitive_inline_authorization),
         ("ad-hoc review boundary", check_ad_hoc_review_boundary),
         ("single ship delivery", check_single_ship_delivery),
+        ("delivery preview binding", check_delivery_preview_binding),
+        ("terminal/transition mapping", check_terminal_and_transition_mapping),
+        ("PR review regressions", check_review_comment_regressions),
         ("Claude/Codex parity", check_claude_codex_parity),
     )
     for name, check in checks:

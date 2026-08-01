@@ -156,21 +156,32 @@ When the user wants to quickly test a technical hypothesis without pipeline cere
 1. **Intake** — classify as `spike`, complexity always `simple`
 2. **MANDATORY — Query KG** — call `search_nodes` with 1-2 semantic queries. Write `00-knowledge-context.md` if results found.
 3. **Skip Design** — no architecture proposal needed
-4. **Prepare minimal spec context** — just: description, what to test, success criteria (passed inline to the implementer dispatch)
-5. **Invoke `implementer`** with: "This is a spike — write exploratory code to test: {description}. No tests needed. Focus on proving whether {hypothesis} works. Document what you found in `02-implementation.md`."
-6. **Skip Phases 3-5** (no testing, validation, delivery, or GitHub update)
-7. **Present results** to the user:
+4. **Create an isolated spike worktree** — require a clean source checkout, then create a
+   dedicated worktree and `spike/{slug}` branch from the current immutable `HEAD`. Record its
+   canonical path, branch, baseline commit, and initially empty changed-path set. Never run a
+   spike in the operator's existing worktree or share its index.
+5. **Prepare minimal spec context** — just: description, what to test, success criteria (passed inline to the implementer dispatch)
+6. **Invoke `implementer` in the isolated worktree** with: "This is a spike — write exploratory code to test: {description}. No tests needed. Focus on proving whether {hypothesis} works. Document what you found in `02-implementation.md`." After it returns, derive and record the exact spike-owned tracked and untracked paths from that worktree's status.
+7. **Skip Phases 3-5** (no testing, validation, delivery, or GitHub update)
+8. **Present results** to the user:
    ```
    Spike complete: {summary}
 
    Options:
    1. Formalize as feature → I'll create an issue with findings as technical context
-   2. Discard → I'll revert the changes (git checkout)
+   2. Discard → I'll remove the isolated spike changes and worktree
    3. Investigate further → I'll run another spike or a /th:research
    ```
-8. **Act on user's choice:**
+9. **Act on user's choice:**
    - Formalize: create GitHub issue using **SDD template** — include spike findings in Technical Context. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — create an issue". When `has_gh=true`: `gh issue create`. When `has_gh=false` and token + GitHub origin available: curl POST. When neither: write SDD body to `workspaces/{feature}/inputs/issue-create.md` and prompt operator to paste it into GitHub, then reply with the new issue number. Ask: "Issue created (or paste required). Run pipeline now?"
-   - Discard: `git checkout -- .` to revert (confirm with user first). Clean up workspaces.
+   - Discard: confirm with the user, then revalidate the worktree using `git worktree list
+     --porcelain` and `git status --porcelain`. Require its canonical path, branch, and baseline
+     to match the recorded spike and require every changed path to be in the recorded
+     spike-owned set. Restore only those explicit tracked paths from the recorded baseline and
+     remove only those explicit untracked paths; never run `git checkout -- .`, `git restore
+     .`, a wildcard clean, or another repository-wide reset. Require the isolated worktree to
+     be clean before removing that exact worktree and spike branch. Any mismatch stops and is
+     surfaced instead of touching either worktree. Clean up only spike-owned workspace output.
    - Investigate: continue as directed.
 
 ---
@@ -467,13 +478,16 @@ remains available only when the live operator asks.
 Implementation, testing, validation, security review, delivery, and all pipeline
 gates remain mandatory after activation. Native runtime and outward-action
 approvals remain independent.
-## Security-Sensitive Flow (extended)
+## Security-sensitive validation (extended)
 
-1. Design is mandatory with extended security analysis
-2. Phase 3 launches `security` agent in parallel with tester+qa (automatic — triggered by `security-sensitive: true`)
-3. Critical/High findings block delivery → iterate with implementer (Case D)
-4. Medium/Low/Info findings are warnings in delivery report, do NOT block
-5. If any security risk unresolved after max iterations → document in `reviews/04-security.md` and proceed
+1. A sensitive plan receives the required design security review before implementation.
+2. Validation dispatches the conditional adversarial audit against the current Freeze anchor.
+3. Every correctable `broke-it` result or incomplete changed-control coverage blocks delivery,
+   returns to implementation, rebuilds Freeze, and receives a fresh delta audit.
+4. A genuinely structural contradiction is surfaced for an explicit operator design decision;
+   it is never silently downgraded to a warning.
+5. If a required finding remains unresolved when the iteration limit is exhausted, set the run
+   to `blocked` and stop before Gate 3 or delivery. No iteration cap waives a security finding.
 
 ---
 

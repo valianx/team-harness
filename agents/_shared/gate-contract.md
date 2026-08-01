@@ -37,10 +37,12 @@ proceeds without `gate3_release ∈ {ship}` registered in the governing pipeline
 `00-state.md` (see § "The dual-record release" below). The orchestrator enforces this
 ordering by refusing to invoke the action before the release exists.
 
-`Gate 3: ship` is the operator's single delivery approval for the previewed frozen tree. It
-authorizes the coordinator's standard sequence through version/changelog, commit, feature-branch
-push, and draft PR creation/update; no second conversational confirmation is allowed between
-those steps. Native runtime tool approval may still be required to execute a command, but that is
+`Gate 3: ship` is the operator's single delivery approval for the previewed frozen tree and the
+exact workspace prose paths/digests presented with it. It authorizes the coordinator's standard
+sequence through version/changelog, commit, feature-branch push, and draft PR creation/update;
+it never authorizes mutating an existing ready-for-review PR. No second conversational
+confirmation is allowed between those steps. Native runtime tool approval may still be required
+to execute a command, but that is
 a technical permission boundary—not another Team Harness decision and never a substitute for the
 recorded release. Merge, tag, release, publication, force-push, and broader scope remain excluded.
 
@@ -224,13 +226,14 @@ never changes nonce, dual-record or live-reply requirements.
 ====================================
  STAGE-GATE-3 — Delivery ready for human approval
 ====================================
- {delivery summary + version/CHANGELOG-entry preview + Pre-Delivery Security Audit findings,
+ {delivery summary + version preview + exact PR title/body, acceptance-matrix, and optional
+  CHANGELOG-entry draft paths with SHA-256 digests + Pre-Delivery Security Audit findings,
   or a stated absence when no audit lens ran (security_floor_applies: false)}
 
  Reply with:
    - "1 — ship"   → proceed to `delivery`
    - "2 — amend"  → return to `implementation`, then validate again
-   - "3 — abort"  → halt without pushing
+   - "3 — abort"  → record terminal `phase/status: aborted` and halt without pushing
 ====================================
 ```
 

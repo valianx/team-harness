@@ -83,8 +83,9 @@ affected contract makes them relevant.
 
 This mode runs only when the operator explicitly invokes `/th:plan-review`; it
 is never an automatic pipeline step. For `sharded-v1`, read the compact Task List
-summary in `01-plan.md`, each assigned task shard's AC block, the relevant Work Plan
-rows, and any triggered `sketches/*.md`; do not preload unrelated architecture prose.
+summary in `01-plan.md`, every task shard listed by the manifest, the relevant Work Plan
+rows, and every triggered artifact under `sketches/` (including `.md`, `.html`, and
+`.excalidraw`); do not preload unrelated architecture prose.
 The historical plan-structure scan is not an active prerequisite or event. Escape to
 another plan section only for a concrete contradiction and do not copy that prose into
 the review.

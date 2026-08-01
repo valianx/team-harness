@@ -26,6 +26,11 @@ def main() -> None:
     expected = {agent["name"] for agent in agents}
     if expected != {"architect", "implementer", "tester", "qa", "security", "delivery"}:
         fail(f"unexpected Codex vertical-slice roles: {sorted(expected)}")
+    architect_contract = next(agent for agent in agents if agent["name"] == "architect")
+    if architect_contract["sandbox_mode"] != "workspace-write":
+        fail("Codex architect must be able to write its assigned plan artifacts")
+    if "filesystem-write" not in architect_contract["capabilities"]:
+        fail("Codex architect is missing its bounded filesystem-write capability")
 
     config = tomllib.loads((ROOT / ".codex/config.toml").read_text())
     if config["agents"]["enabled"] is not True:
@@ -78,7 +83,7 @@ def main() -> None:
         for marker in markers:
             if marker not in content.splitlines():
                 fail(f"{path}: missing deterministic Team Harness marker {marker!r}")
-        if data["sandbox_mode"] == "read-only" and data["name"] in {"implementer", "tester", "delivery"}:
+        if data["sandbox_mode"] == "read-only" and data["name"] in {"architect", "implementer", "tester", "delivery"}:
             fail(f"{path}: write role is unexpectedly read-only")
     if generated != expected:
         fail(f"generated roles do not match contract: {sorted(generated)}")
@@ -378,6 +383,7 @@ def main() -> None:
             "language": "es",
             "custom": {"opaque_plain": source_secret, "nested": 7},
             "autogate": {"pr_create": True},
+            "routing": {"mode": "fast", "mode_note": "keep-me"},
         }))
         env = {
             **os.environ,
@@ -413,6 +419,10 @@ def main() -> None:
             fail("Codex config import did not copy opaque nested values")
         if imported_doc.get("autogate", {}).get("pr_create") is not True:
             fail("Codex config import did not preserve an opaque authorization-like value")
+        if "mode" in imported_doc.get("routing", {}):
+            fail("Codex config import retained a nested legacy route selector")
+        if imported_doc.get("routing", {}).get("mode_note") != "keep-me":
+            fail("Codex config import removed opaque data beside a nested legacy selector")
         shown = subprocess.run(
             [sys.executable, str(config_script), "show"],
             text=True,
@@ -425,6 +435,16 @@ def main() -> None:
         shown_doc = json.loads(shown.stdout)
         if "custom" in shown_doc.get("config", {}):
             fail("Codex config display exposed an opaque imported object")
+        (claude_home / ".team-harness.json").write_text("not-json\n")
+        isolated_show = subprocess.run(
+            [sys.executable, str(config_script), "show"],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if isolated_show.returncode != 0:
+            fail("Codex config show parsed another runtime's malformed document")
         opencode_home = home / ".config" / "opencode"
         opencode_home.mkdir(parents=True)
         opencode_secret = "opaque-opencode-value-572"
@@ -448,6 +468,15 @@ def main() -> None:
             fail("Codex config import did not copy opencode-only values")
         if merged_doc.get("language") != "es":
             fail("opencode import overwrote a value already imported from Claude")
+        merged_doc["lane_autoselect"] = "always-stop"
+        merged_doc["nested_migration"] = {
+            "profile": "pipeline",
+            "bug_tier": 0,
+            "profile_note": "preserve",
+        }
+        merged_doc["mode"] = "custom-renderer"
+        merged_doc["fast"] = "opaque-string"
+        (codex_home / ".team-harness.json").write_text(json.dumps(merged_doc))
         ensured_import = subprocess.run(
             [sys.executable, str(config_script), "ensure", "--version", manifest["version"]],
             text=True,
@@ -462,6 +491,18 @@ def main() -> None:
             fail("Codex config ensure changed an opaque Claude import")
         if ensured_import_doc.get("opencode_only", {}).get("api_key") != opencode_secret:
             fail("Codex config ensure changed an opaque opencode import")
+        if "lane_autoselect" in ensured_import_doc:
+            fail("Codex config ensure retained a known legacy selector")
+        if "profile" in ensured_import_doc.get("nested_migration", {}):
+            fail("Codex config ensure retained a nested legacy selector")
+        if "bug_tier" in ensured_import_doc.get("nested_migration", {}):
+            fail("Codex config ensure retained a numeric Tier-0 selector")
+        if ensured_import_doc.get("nested_migration", {}).get("profile_note") != "preserve":
+            fail("Codex config ensure removed opaque nested migration data")
+        if ensured_import_doc.get("mode") != "custom-renderer":
+            fail("Codex config ensure removed an unrelated mode value")
+        if ensured_import_doc.get("fast") != "opaque-string":
+            fail("Codex config ensure removed an unrelated fast value")
         merged_mtime = (codex_home / ".team-harness.json").stat().st_mtime_ns
         repeated_import = subprocess.run(
             [sys.executable, str(config_script), "import", "--from", "opencode"],
@@ -668,7 +709,12 @@ def main() -> None:
             fail(f"Codex recovery still lacks section-first routing: {marker!r}")
 
     instruction_markers = {
-        "architect": ("plan_format: sharded-v1", "Each fact has one canonical home"),
+        "architect": (
+            "plan_format: sharded-v1",
+            "Each fact has one canonical home",
+            "coordinator-assigned plan artifacts",
+            "`status`, `artifact_pointers`",
+        ),
         "implementer": ("plan/tasks/Task-N.md", "never preload sibling tasks"),
         "tester": ("plan/tasks/Task-N.md", "fixed testing prose within 40 lines"),
         "qa": ("plan/tasks/Task-N.md", "fixed report prose within 30 lines"),

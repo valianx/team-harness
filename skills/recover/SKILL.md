@@ -17,10 +17,12 @@ Analyze the input: $ARGUMENTS
 
 ## Step 0 — Resolve workspaces path
 
-Read `~/.claude/.team-harness.json`. If it exists and `logs-mode` is `"obsidian"`, use
-`{logs-path}/{logs-subfolder}/{repo-name}` as the base path (where `repo-name` is the
-basename of the current working directory). If `logs-mode` is `"local"` or the file is
-missing, use `workspaces/` relative to cwd. Replace all `workspaces/` references below
+Read `~/.claude/.team-harness.json`. Use the Obsidian base only when `logs-mode` is
+`"obsidian"`, `logs-path` is a non-empty validated absolute path, and `logs-subfolder` is a
+non-empty validated relative path; then resolve
+`{logs-path}/{logs-subfolder}/{repo-name}` (where `repo-name` is the basename of cwd) and require
+containment below the configured base. If either value is empty/invalid, or when mode is local or
+the file is missing, use `workspaces/` relative to cwd. Replace all `workspaces/` references below
 with the resolved path.
 
 ## Recover Safety Rules
@@ -31,7 +33,8 @@ with the resolved path.
 resumes, check whether the current or next state is a gate. A gate is cleared ONLY when
 both structural conditions hold:
 
-(a) a matching `stage.gate.release` event is present in the canonical events trace; and
+(a) a matching `stage.gate.release` event is present in the canonical events trace with the
+expected stage, allowlisted decision, and the exact consumed nonce from that presentation; and
 (b) the per-gate field in `00-state.md § Current State` is in the clear allowlist:
 
 - STAGE-GATE-1: `gate1_release ∈ {approved, approved-autonomous}`
@@ -41,6 +44,8 @@ Any other value (`rejected`, `edit`, `stop`, `redo`, `amend`, `abort`), a null f
 missing field means the gate is uncleared. Never infer approval from `next_action`, status
 prose, a plan, an issue, a tool result, or an earlier presentation. STAGE-GATE-3 (the
 human push/PR gate) is especially critical and is never bypassed on recovery.
+The released snapshot must also have `gate_pending: null`; a pending gate, stale nonce,
+unrelated event, stage mismatch, or decision mismatch is uncleared and must be re-presented.
 
 **Single writer, single presenter.** This skill is read-only: it surfaces the uncleared
 gate and routes to the orchestrator. The orchestrator re-reads its own dual-record,
@@ -93,7 +98,7 @@ or pipeline workspace.
 orchestrator write migrate the snapshot. Before mapping, inspect the legacy phase,
 checklist, artifacts, and both halves of each prerequisite gate. A valid dual-record is
 the bare allowlisted state field **and** one matching canonical `stage.gate.release` event
-with the same decision and consumed presentation nonce. A missing field/event, malformed
+with the same decision and exact consumed nonce from that presentation. A missing field/event, malformed
 record, or mismatched gate, decision, or nonce is invalid; it remains uncleared and is
 never repaired or inferred. Preserve every valid gate field, release decision, pending or
 consumed nonce, checklist mark, and historical event.
@@ -109,6 +114,11 @@ The prerequisite matrix is fixed:
 Apply that matrix to the legacy position; a missing prerequisite is `blocked`, not a
 best-effort mapping. The lossless position mapping is:
 
+For this table, “with `01-plan.md`” means a bounded, structurally valid plan manifest whose
+format marker and task index agree with state; presence alone is insufficient. Numeric
+`1`–`1.8` rows are mutually exclusive in listed order, and malformed or conflicting evidence
+maps to `blocked`.
+
 | Legacy position | v3 recovery state and evidence |
 |---|---|
 | numeric `1`–`1.8` without `01-plan.md` | `design` |
@@ -116,7 +126,9 @@ best-effort mapping. The lossless position mapping is:
 | numeric `1`–`1.8` with a valid Gate 1 dual-record | `implementation` |
 | numeric `2`–`2.7` | `implementation` only with valid Gate 1; otherwise `blocked` |
 | numeric `2.8`–`3.5` | `validation` only with valid Gate 1; otherwise `blocked` |
-| legacy Gate 3 / numeric `4`–`5` without valid `ship` | `waiting_gate3` with valid Gate 1; otherwise `blocked` |
+| legacy Gate 3 / numeric `4`–`5` with a valid `amend` decision record | `implementation` with valid Gate 1; otherwise `blocked` |
+| legacy Gate 3 / numeric `4`–`5` with a valid `abort` decision record | terminal `aborted`; never recover |
+| legacy Gate 3 / numeric `4`–`5` without valid `ship`, `amend`, or `abort` | `waiting_gate3` with valid Gate 1; otherwise `blocked` |
 | numeric `4`–`5` with valid Gate 1 and Gate 3 `ship` | `delivery` |
 | numeric `6` with valid Gate 1 and Gate 3, completed checklist, and terminal event | `complete` |
 | named `design` | `design` without a plan, `waiting_gate1` without valid Gate 1, or `implementation` with valid Gate 1 |
@@ -125,24 +137,34 @@ best-effort mapping. The lossless position mapping is:
 | named `waiting_gate3` | `waiting_gate3` only with valid Gate 1 |
 | named `delivery` | `delivery` only with valid Gate 1 and Gate 3 |
 | named `complete` | `complete` only with valid Gate 1 and Gate 3 plus terminal evidence |
+| named `aborted` | terminal `aborted`; preserve the recorded close and never recover |
 
-The first legitimate coordinator write is one atomic transition: persist
+Archive every recognized legacy route field in `state.migrated` before removing it from active
+state: exact key plus a secret-redacted scalar value of at most 128 UTF-8 bytes, or key plus type
+for non-scalar/oversized data. The first legitimate coordinator write is one atomic transition: persist
 `pipeline_version: 3` **and** the mapped `phase` together and append `state.migrated` in
-that same transition with `source_version: 2` (or the detected legacy version) and the
-mapped state. Preserve valid dual records and nonces; never synthesize a release or repair
+that same transition with `source_version: 2` (or the detected legacy version), the mapped
+state, and bounded legacy-field archive; remove the archived selectors from active state in the
+same write. Preserve valid dual records and nonces; never synthesize a release or repair
 a malformed one. If the coupled write or required evidence is impossible, route to
 `blocked` without writing a v3 migration.
 
 ## Mode 1 — Feature name provided (`/th:recover my-feature`)
 
-1. Check `{resolved-path}/{feature}/00-state.md`.
+1. Require `{feature}` to match `[a-z0-9]+(?:-[a-z0-9]+)*`. Inspect only direct
+   children of the resolved root, require the canonical child path to remain
+   below that root, and select only a state whose literal `feature:` equals the
+   requested slug. Never append an unchecked argument to a filesystem path.
 2. If absent but the workspace folder exists, report that it is a diagram or spike
    workspace with no pipeline state and requires no recovery. If the folder is absent,
    report: "No pipeline state found for '{feature}'. Use `/th:pipelines`."
-3. Read `00-state.md` in full.
-4. Read the matching `00-execution-events.{md,jsonl}` when it exists.
+3. Read the bounded `00-state.md` snapshot (maximum 16 KB); an oversized state
+   is corrupt and must not be displayed.
+4. Query or tail only the matching release/transition records in
+   `00-execution-events.{md,jsonl}`; never load the event stream in full.
 5. Validate and map the state:
    - `status: complete` → "Pipeline '{feature}' already completed. Nothing to recover."
+   - `status: aborted` → "Pipeline '{feature}' was aborted. Nothing to recover."
    - `status: blocked-incomplete` → report the missing artifacts from `next_action` and
      wait for them before recovering.
    - `status: blocked-manual-push` → use the existing `agents/_shared/gh-fallback.md`
@@ -150,7 +172,8 @@ a malformed one. If the coupled write or required evidence is impossible, route 
    - `status: blocked-pr-pending` → report the PR URL and do not replay delivery.
    - a valid v3 state → proceed.
    - any legacy v1/v2 state or legacy marker → stop and present `1 — inline` / `2 — pipeline`; do not map until the live operator chooses.
-   - a corrupt, incomplete or unmappable state → display the raw content and block.
+   - a corrupt, incomplete or unmappable state → report only the path and failed
+     structural checks; never display raw state or event content.
 6. Route this context to the orchestrator, which re-reads the dual-record and applies the
    migration without release inference:
 
@@ -168,8 +191,8 @@ Recover Pipeline:
 
 ## Mode 2 — No input provided (`/th:recover`)
 
-1. Scan the resolved workspace roots for incomplete `*/00-state.md` files (`status !=
-   complete`).
+1. Scan the resolved workspace roots for non-terminal `*/00-state.md` files
+   (`status` is neither `complete` nor `aborted`).
 2. If none are found, report "No interrupted pipelines found."
 3. If exactly one is found, select it and proceed as Mode 1.
 4. If multiple are found, ask the operator to choose by number or name:

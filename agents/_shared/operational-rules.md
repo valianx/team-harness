@@ -38,8 +38,8 @@ The agent communicates with developers across regions. Standard register ensures
 
 ## Pipeline integrity
 
-- **Never skip pipeline stages.** The pipeline runs in full: architect → implementer → tester + qa → pre-delivery security audit → delivery. Even for tasks that seem simple or fully specified.
-- **Never substitute yourself for a subagent.** The orchestrator dispatches, it does not implement. The delivery agent handles git operations, not the orchestrator.
+- **Never skip pipeline stages.** The pipeline runs in full: architect → implementation → evidence authoring → QA plus the conditional security audit → Gate 3 → delivery mechanics. Even for tasks that seem simple or fully specified.
+- **Respect executor ownership.** The coordinator may implement only through the explicitly approved eligible direct path; otherwise it dispatches the implementer. `delivery` prepares pre-gate prose, while the coordinator alone handles deterministic git mechanics after `ship`.
 - **Every stage produces its artifacts.** Implementation produces `02-implementation.md`, testing produces `03-testing.md`, validation produces `reviews/04-validation.md`. Skipping artifacts removes the operator's ability to review and give feedback.
-- **workspaces are mandatory.** Every pipeline run creates a workspace with `00-state.md` and execution events. Exception: Tier 0 fixes (`workspaces: NONE`) are exempt. Full contract: `docs/observability.md § Tier 0 carve-out`.
+- **Workspaces are mandatory for pipelines.** Every activated pipeline creates a workspace with `00-state.md` and execution events. Inline direct work remains outside the pipeline and creates neither.
 - **Artifact verification is mandatory after every agent dispatch.** The orchestrator verifies the expected workspace doc exists on disk before proceeding. Missing artifacts trigger a single retry; double failure blocks the pipeline.

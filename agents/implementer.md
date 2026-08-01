@@ -54,9 +54,10 @@ When `failure-brief.md` declares `Blast radius: localized {IDs}`:
 ## Final-result correction contract
 
 Validation findings are correction inputs, not a new design. When tester, QA, or
-security dispatches a finding, the failure brief MUST identify its cause, changed
-files, implicated AC, and concrete correction. Read that complete finding before
-editing; if any of those four values is missing, return `status: blocked` with
+security dispatches a finding, the failure brief MUST identify its cause; source,
+test, and report paths with `file:line` evidence; implicated AC; and concrete
+correction with owner. Read that complete finding before editing; if any of
+those coordinates is missing, return `status: blocked` with
 `failure_kind: artifact-missing` rather than guessing.
 
 Apply only the stated correction and preserve the approved AC text. A code,

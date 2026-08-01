@@ -35,9 +35,17 @@ has seen the current anchor. An operator-approved amend follows the same
 implementation → Freeze → validation route. A contradiction is never resolved
 by changing an AC in place.
 
-When all required evidence and reviews pass, set `phase: waiting_gate3`,
-`status: waiting_for_gate`, a fresh `gate_nonce`, and
+When all required evidence and reviews pass and the Freeze anchor is still
+current, delegate `delivery` once in pre-gate preparation mode. It may write only
+the workspace PR-body, standalone acceptance-matrix, and changelog-fragment
+drafts. The coordinator validates those paths, computes SHA-256 for every exact
+artifact, requires the canonical non-symlink fixed filenames under the selected
+workspace's `inputs/` directory, and records the title, paths, and digests in
+`delivery_preview`; a
+missing or contradictory artifact blocks before the gate. Then set `phase:
+waiting_gate3`, `status: waiting_for_gate`, a fresh `gate_nonce`, and
 `next_action: record Gate 3 decision`. Present the concise delivery summary and
-Gate 3's numbered `ship`, `amend`, and `abort` options; stop for the live
+the exact preview paths/digests with Gate 3's numbered `ship`, `amend`, and
+`abort` options; stop for the live
 operator reply. Gate release remains a dual record and is not inferred from a
 green suite or specialist result.

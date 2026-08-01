@@ -33,23 +33,17 @@ DEFAULTS = {
     "agent-scope": "global",
 }
 LEGACY_SELECTOR_KEYS = frozenset({
-    "lane_autoselect",
-    "lane",
-    "profile",
-    "posture",
-    "mode",
-    "express",
-    "full",
-    "fast",
-    "fast_mode",
-    "simple",
-    "simple_mode",
-    "tier",
-    "tier0",
-    "tier_0",
-    "bug_tier",
+    "lane_autoselect", "lane", "profile", "posture", "mode", "express",
+    "full", "fast", "fast_mode", "simple", "simple_mode", "tier",
+    "tier0", "tier_0", "bug_tier",
 })
-LEGACY_VALUE_KEYS = frozenset({"lane", "mode", "posture", "tier"})
+LEGACY_VALUE_KEYS = frozenset({"lane", "mode", "profile", "posture", "tier", "bug_tier"})
+LEGACY_BOOLEAN_KEYS = frozenset({
+    "express", "full", "fast", "fast_mode", "simple", "simple_mode", "tier0", "tier_0",
+})
+LEGACY_AUTOSELECT_VALUES = frozenset({
+    "always-stop", "announce-and-proceed-on-trivial", "auto", "automatic",
+})
 LEGACY_MARKER_VALUES = frozenset({
     "inline",
     "pipeline",
@@ -163,26 +157,55 @@ def remove_nested(doc: dict[str, Any], dotted: str) -> None:
 
 
 def is_legacy_selector(key: str, value: Any) -> bool:
-    if key not in LEGACY_SELECTOR_KEYS:
+    leaf = key.rsplit(".", 1)[-1]
+    if leaf not in LEGACY_SELECTOR_KEYS:
         return False
-    if key in LEGACY_VALUE_KEYS:
-        return isinstance(value, str) and value.strip().lower() in LEGACY_MARKER_VALUES
-    if key == "bug_tier":
-        return str(value).strip().lower() in LEGACY_MARKER_VALUES
-    return True
+    if leaf in LEGACY_VALUE_KEYS:
+        return (
+            leaf in {"tier", "bug_tier"}
+            and isinstance(value, int)
+            and not isinstance(value, bool)
+            and value == 0
+        ) or (
+            isinstance(value, str)
+            and value.strip().lower() in LEGACY_MARKER_VALUES
+        )
+    if leaf in LEGACY_BOOLEAN_KEYS:
+        return isinstance(value, bool)
+    if leaf == "lane_autoselect":
+        return (
+            isinstance(value, bool)
+            or (
+                isinstance(value, str)
+                and value.strip().lower() in LEGACY_AUTOSELECT_VALUES
+            )
+        )
+    return False
 
 
-def legacy_selectors(doc: dict[str, Any]) -> list[str]:
+def legacy_selectors(doc: dict[str, Any], prefix: str = "") -> list[str]:
     """Return legacy selector keys without treating them as routing input."""
-    return sorted(key for key, value in doc.items() if is_legacy_selector(key, value))
+    found: list[str] = []
+    for key, value in doc.items():
+        dotted = f"{prefix}.{key}" if prefix else key
+        if is_legacy_selector(key, value):
+            found.append(dotted)
+        elif isinstance(value, dict):
+            found.extend(legacy_selectors(value, dotted))
+    return sorted(found)
 
 
-def remove_legacy_selectors(doc: dict[str, Any]) -> list[str]:
+def remove_legacy_selectors(doc: dict[str, Any], prefix: str = "") -> list[str]:
     """Remove only known legacy selectors; preserve every unrelated key."""
-    removed = legacy_selectors(doc)
-    for key in removed:
-        doc.pop(key, None)
-    return removed
+    removed: list[str] = []
+    for key, value in list(doc.items()):
+        dotted = f"{prefix}.{key}" if prefix else key
+        if is_legacy_selector(key, value):
+            doc.pop(key)
+            removed.append(dotted)
+        elif isinstance(value, dict):
+            removed.extend(remove_legacy_selectors(value, dotted))
+    return sorted(removed)
 
 
 def redact_for_display(value: Any, key: str = "") -> Any:
@@ -225,12 +248,19 @@ def import_missing(
         if not prefix and key in IMPORT_EXCLUDED_KEYS:
             continue
         dotted = f"{prefix}.{key}" if prefix else key
-        if not prefix and is_legacy_selector(key, source_value):
+        if is_legacy_selector(key, source_value):
             if legacy is not None:
                 legacy.append(dotted)
             continue
         if key not in target:
-            target[key] = json.loads(json.dumps(source_value))
+            copied = json.loads(json.dumps(source_value))
+            if isinstance(copied, dict):
+                removed = remove_legacy_selectors(copied, dotted)
+                if legacy is not None:
+                    legacy.extend(removed)
+                if not copied:
+                    continue
+            target[key] = copied
             imported.append(dotted)
             continue
         target_value = target[key]
@@ -246,10 +276,14 @@ def classify_import(target: dict[str, Any], source: dict[str, Any], prefix: str 
         if not prefix and key in IMPORT_EXCLUDED_KEYS:
             continue
         dotted = f"{prefix}.{key}" if prefix else key
-        if not prefix and is_legacy_selector(key, source_value):
+        if is_legacy_selector(key, source_value):
             continue
         if key not in target:
-            importable.append(dotted)
+            copied = json.loads(json.dumps(source_value))
+            if isinstance(copied, dict):
+                remove_legacy_selectors(copied, dotted)
+            if copied != {}:
+                importable.append(dotted)
             continue
         target_value = target[key]
         if isinstance(target_value, dict) and isinstance(source_value, dict):
@@ -338,17 +372,6 @@ def show() -> int:
     doc = read_json(path)
     sources = import_sources()
     legacy = legacy_selectors(doc)
-    legacy_sources: dict[str, list[str]] = {}
-    for source_name, source_path in sources.items():
-        if not source_path.is_file():
-            continue
-        try:
-            source_doc = read_json(source_path, missing_ok=False)
-        except (OSError, ValueError, json.JSONDecodeError):
-            continue
-        source_legacy = legacy_selectors(source_doc)
-        if source_legacy:
-            legacy_sources[source_name] = source_legacy
     result = {
         "path": str(path),
         "exists": path.exists(),
@@ -359,8 +382,7 @@ def show() -> int:
         ],
         "config": displayable_config(doc),
         "legacySelectors": legacy,
-        "legacySourceSelectors": legacy_sources,
-        "migrationGuidance": LEGACY_GUIDANCE if legacy or legacy_sources else None,
+        "migrationGuidance": LEGACY_GUIDANCE if legacy else None,
         "preservedOpaqueTopLevelKeys": sum(
             1
             for key in doc
@@ -404,6 +426,7 @@ def ensure_defaults(version: str | None) -> int:
     path = config_path()
     before = read_json(path)
     after = json.loads(json.dumps(before))
+    removed_legacy = remove_legacy_selectors(after)
     added: list[str] = []
     for key, value in DEFAULTS.items():
         if get_nested(after, key) is None:
@@ -416,7 +439,13 @@ def ensure_defaults(version: str | None) -> int:
         after["installed_version"] = version
     after["updated_at"] = dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
     changed = write_atomic(path, before, after)
-    print(json.dumps({"path": str(path), "changed": changed, "added": added}, sort_keys=True))
+    print(json.dumps({
+        "path": str(path),
+        "changed": changed,
+        "added": added,
+        "removedLegacySelectors": removed_legacy,
+        "migrationGuidance": LEGACY_GUIDANCE if removed_legacy else None,
+    }, sort_keys=True))
     return 0
 
 
