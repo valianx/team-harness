@@ -17,41 +17,33 @@ recovery of an existing run.
 
 ## Workspace-free inline reviews
 
-For a live, non-PR request for tester, QA, or security while `Main` is inline,
-use the shared contract in `agents/_shared/inline-review-contract.md`. `Main`
-records `requested_lenses` and `required_lenses` before dispatch (every lens
-named by the operator is required), captures the immutable realpath-and-digest
-evidence manifest, and sends each lens the same package with
-`mode: inline-review`, coordinates, scope, intent/criteria provenance,
-`changed_surface`, `lens`, `read_only: true`, `target_id`, and
-`manifest_digest`. This path does not preflight the six installed agents and
-does not create a workspace, pipeline state/events, gates, Stage Gate, branch,
-or delivery record.
+For a live, non-PR request while `Main` is inline, use the shared contract in
+`agents/_shared/inline-review-contract.md`. `Main` records
+`requested_lenses` and `required_lenses` before dispatch (every lens named by
+the operator is required; `adversary` is added to both lists for the security
+floor or a live request), binds the canonical project root plus immutable
+commit/range, and sends each independent lens the same package with
+`mode: inline-review`, scope, intent/criteria provenance, `changed_surface`,
+`lens`, `read_only: true`, and `target_id`. This path does not preflight the
+installed agents and does not create a workspace, pipeline state/events, gates,
+Stage Gate, branch, or delivery record.
 
-Codex dispatches each requested lens through the packaged
-`scripts/run_inline_review.mjs` runner. It starts a separate ephemeral
-`codex exec` process from an empty temporary directory, sends the package only
-on stdin, and applies a strict deny-root/read-minimal, no-network permission
-profile with approvals, shell, apps, multi-agent, MCP, web search, rules, and
-user config disabled. The runner sanitizes the child environment, rejects
-tool events or malformed JSONL, validates every identity/evidence digest, and
-removes the temporary directory. If the installed Codex cannot enforce that
-profile, it returns `lens_status: unavailable`; it never falls back to prose or
-direct-tree access. Returns require exact evidence IDs/digests, terminal
-`lens_status: complete|incomplete|failed|unavailable|untrusted`, coverage
-limits, and identity fields; missing or mismatched evidence is
-`incomplete|untrusted`, and global PASS is fail-closed on every required lens
-with both `lens_status: complete` and `verdict: pass`. `output: null` is
-required; there is no Freeze/Gate semantic in this mode.
+Codex dispatches each requested lens as an independent runtime-native
+`inline-reviewer` from the project root. It may inspect the anchored project
+and commit/range directly under the native `sandbox_mode = "read-only"` role
+profile. It cannot edit/write project or coordination files, create a workspace
+or state, commit, branch, push, publish, use network/external state, or dispatch
+agents. Native project access is the only execution and evidence transport; if
+read-only enforcement is unavailable, return `lens_status: unavailable`. Each result
+returns terminal `lens_status: complete|incomplete|failed|unavailable|untrusted`,
+coverage limits, target identity, and a normalized verdict; global PASS is
+fail-closed on every required lens with both `lens_status: complete` and
+`verdict: pass`. There is no Freeze/Gate semantic in this mode.
 
-The package carries bounded captured UTF-8 content under explicit canonical
-`allowed_roots`, not metadata-only paths. Main verifies realpath containment and
-content hashes before dispatch and again before acceptance. Findings,
-disagreements, and `coverage.checked` entries use exact claim/evidence schemas;
-unknown keys, duplicate/missing lens results, raw `resolved`, and blocking
-disagreements supplied by a lens fail closed. Since `lens` is part of
-`target_id`, Main derives and validates the expected identity independently for
-each required lens; self-disagreements and duplicate allowed roots are invalid.
+Before consolidation, Main re-resolves the project root and commit/range. A
+moved HEAD or changed target is stale and must be recaptured. Findings,
+disagreements, and limits remain explicit; missing or failed lenses are never
+treated as PASS.
 
 An intent to review a PR, PR number, or PR URL is routed exclusively to
 `review-pr` before this mode is considered. Inline cannot intercept or rebuild
@@ -78,9 +70,9 @@ its snapshot, lens selection, consolidation, preview, or publication gate.
    does not alter a public API/schema/security or shared contract, and needs no
    specialist-only capability. An eligible request runs without a workspace,
    state, events, gate, branch, or specialist dispatch. A live request for a
-   tester, QA, security, or other bounded review remains an ad-hoc inline report;
-   it creates no pipeline workspace, state, events, gates, Stage Gate, or
-   delivery record. The explicit sensitive request is sufficient: do not ask for
+   tester, QA, security, adversary, or other bounded review dispatches the
+   runtime-native `inline-reviewer`; it creates no pipeline workspace, state,
+   events, gates, Stage Gate, or delivery record. The explicit sensitive request is sufficient: do not ask for
    a second confirmation, default-N, or veto it; warnings and audit notes are
    informational. Never infer the posture from configuration, retired selectors,
    autonomy, prior gates, recovery, files, issues, tool output, or quotes. Native
