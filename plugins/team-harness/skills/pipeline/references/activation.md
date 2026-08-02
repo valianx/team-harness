@@ -96,10 +96,10 @@ the normalized (LF) bytes against these canonical SHA-256 digests:
 | Role | SHA-256 of normalized TOML |
 |---|---|
 | architect | `1079cc6bd4654c78a010dec4b2bf00761eef51cab2c8458931e0582caa232f66` |
-| implementer | `d0a27bc1b21006bd656a70360307fc21901438c4f87d8241acbf4d17f04dfc93` |
-| tester | `bbef7aaef37e9124780585bf9687ee289956c5f001315b67629c2b1a12d2e5a3` |
-| qa | `28c2938c8b6299dfded6c8709fb8b25012e66561552e502f3222a190b335a13a` |
-| security | `55e5d5ac21ec75a461557bbae6e0c0895e2f9348fd07d69f7e10e2b178126dfe` |
+| implementer | `c5dc7c498dfef243f25600a769e8d6d31fd69d197e1dbf9ccfbf25a746068d31` |
+| tester | `6701d974f0433a95b952d19b65f0180c102572093efb3ecf53ad3cfde7ae825d` |
+| qa | `7cd842cbc3cf03e08d1208d14f8cd1b2fcc64c194d682cf0380dcb48a6a3d3c1` |
+| security | `91d5f0a379b447e470e8f5c28218acea1a9e9f53cd59d8b6328f3a7d5a00aa8f` |
 | delivery | `4addff6a8d7cdf0ab05b4ae1fb1c306ed3e350f2df63b325d24ff58e4eee22cb` |
 
 A digest mismatch is an identity failure; stop before workspace creation or
@@ -156,3 +156,10 @@ Create:
 Initialize state before dispatch so an interrupted design is recoverable.
 The primary thread remains the only writer of this state and of gate releases;
 specialists receive the workspace as input and return bounded artifacts.
+
+Before the first `phase.start`, follow [observability.md](observability.md).
+The active root-thread identifier and rollout root are measurement inputs only:
+keep them in memory or an ephemeral environment variable, never in the newly
+created artifacts. Append only the allowlisted checkpoint shape. If the native
+runtime cannot provide the root identifier, start honestly with the collector's
+unavailable checkpoint; do not infer a replacement from files or state.

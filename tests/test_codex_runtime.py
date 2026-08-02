@@ -1223,6 +1223,67 @@ def main() -> None:
         if marker not in observability:
             fail(f"low-cost event contract is missing {marker!r}")
 
+    native_observability = (
+        ROOT / "plugins/team-harness/skills/pipeline/references/observability.md"
+    ).read_text()
+    trace_canonical = (ROOT / "skills/trace/SKILL.md").read_text()
+    trace_projection = (ROOT / "plugins/team-harness/skills/trace/canonical.md").read_text()
+    trace_opencode_projection = (
+        ROOT / "installer-assets/opencode-skills/trace/canonical.md"
+    ).read_text()
+    for marker in (
+        "codex_usage_checkpoint",
+        "codex_usage_delta",
+        "CHECKPOINT_UNAVAILABLE",
+        "never write either one",
+        "Cost: unavailable",
+        '"currency": "USD"',
+        '"effective_from"',
+    ):
+        if marker not in native_observability:
+            fail(f"native Codex observability contract is missing {marker!r}")
+    for marker in (
+        "not native Codex lifecycle telemetry",
+        "`agent.spawn`",
+        "`agent.close`",
+        "`agent.correction.spawn`",
+        "`context_strategy: fresh|continued`",
+        "`follow_up_count`",
+        "codex_agent_attempt_metrics",
+        "PER_ATTEMPT_METRICS_UNAVAILABLE",
+        "cached_input_per_approved_ac",
+        "does not create or promise such telemetry",
+    ):
+        if marker not in native_observability:
+            fail(f"native Codex lifecycle contract is missing {marker!r}")
+    for label, text in (
+        ("canonical trace", trace_canonical),
+        ("Codex trace projection", trace_projection),
+        ("opencode trace projection", trace_opencode_projection),
+    ):
+        for marker in (
+            "Cost: unavailable",
+            "exact, case-sensitive tuple",
+            "reasoning_output_tokens",
+            "Native Codex branch — selected only by `usage.kind`",
+            "Never infer provider/model/rate",
+            "~/.claude/.team-harness.json",
+            "tokens_estimated",
+            "Static opus-agent fallback",
+            "price table not configured",
+        ):
+            if marker not in text:
+                fail(f"{label} is missing native/legacy cost marker {marker!r}")
+        for marker in (
+            "Declared Codex lifecycle efficiency — selected only by `agent.*`",
+            "PER_ATTEMPT_METRICS_UNAVAILABLE",
+            "Cached-input per approved AC",
+            "the legacy output above unchanged",
+            "never changes the legacy Claude cost",
+        ):
+            if marker not in text:
+                fail(f"{label} is missing lifecycle observability marker {marker!r}")
+
     # Activation and pipeline skills carry the same generated-agent identity
     # digests. Verify both tables against the actual normalized TOML bytes.
     def digest_table(text: str) -> dict[str, str]:
@@ -1235,8 +1296,18 @@ def main() -> None:
 
     activation_digests = digest_table(activation)
     pipeline_digests = digest_table(pipeline)
+    expected_updated_digests = {
+        "architect": "1079cc6bd4654c78a010dec4b2bf00761eef51cab2c8458931e0582caa232f66",
+        "implementer": "c5dc7c498dfef243f25600a769e8d6d31fd69d197e1dbf9ccfbf25a746068d31",
+        "tester": "6701d974f0433a95b952d19b65f0180c102572093efb3ecf53ad3cfde7ae825d",
+        "qa": "7cd842cbc3cf03e08d1208d14f8cd1b2fcc64c194d682cf0380dcb48a6a3d3c1",
+        "security": "91d5f0a379b447e470e8f5c28218acea1a9e9f53cd59d8b6328f3a7d5a00aa8f",
+        "delivery": "4addff6a8d7cdf0ab05b4ae1fb1c306ed3e350f2df63b325d24ff58e4eee22cb",
+    }
     if set(activation_digests) != pipeline_roles or activation_digests != pipeline_digests:
         fail("pipeline and activation skill digest tables are not synchronized")
+    if activation_digests != expected_updated_digests:
+        fail("pipeline identity digest table does not match the approved projection set")
     for role, expected_digest in activation_digests.items():
         normalized = (ROOT / f".codex/agents/{role}.toml").read_bytes().replace(
             b"\r\n", b"\n"

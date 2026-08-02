@@ -1127,6 +1127,468 @@ def check_claude_codex_parity() -> None:
         require(not re.search(r"(?m)^profile:\s*", text), f"{relative}: retired profile field remains active")
 
 
+def check_execution_efficiency_contract() -> None:
+    """Codex execution stays interruptible, bounded, and diagnostically useful."""
+    pipeline = re.sub(
+        r"\s+", " ", read("plugins/team-harness/skills/pipeline/SKILL.md").lower()
+    )
+    implementation = read("plugins/team-harness/skills/pipeline/references/implementation.md")
+    validation = read("plugins/team-harness/skills/pipeline/references/validation.md")
+    contracts = {
+        "implementation": re.sub(r"\s+", " ", implementation.lower()),
+        "validation": re.sub(r"\s+", " ", validation.lower()),
+    }
+
+    for marker in (
+        "pipeline preflight resolves",
+        "absolute path relative to the loaded pipeline skill/reference",
+        "`bounded_command_path`",
+        "state, events, reports",
+        "node <bounded_command_path> -- <argv...>",
+        "--success-diagnostic -- <argv...>",
+        "read/search",
+        "narrower helper-wrapped query",
+        "never bypass the helper",
+        "outside pipeline mode",
+    ):
+        require(marker in pipeline, f"pipeline: AC12 helper-route marker missing {marker!r}")
+
+    for label, text in contracts.items():
+        for marker in (
+            "completion or live operator input",
+            "60 seconds",
+            "`list_agents`",
+            "live status request",
+            "real timeout",
+            "recovery",
+            "without recap",
+            "30%",
+            "70% reduction",
+        ):
+            require(marker in text, f"{label}: AC8 execution marker missing {marker!r}")
+
+        for marker in (
+            "at most 30 tool calls",
+            "50 tool calls",
+            "first compaction",
+            "75 tool calls",
+            "8 m cumulative processed tokens",
+            "second substantial scope change",
+            "handoff",
+            "freeze",
+            "mandatory suite",
+            "gate",
+        ):
+            require(marker in text, f"{label}: AC9 rotation marker missing {marker!r}")
+
+        for marker in (
+            "stdout and stderr",
+            "64 kib",
+            "8 kib",
+            "exit code",
+            "duration",
+            "bytes",
+            "`truncated`",
+            "ansi",
+            "binary",
+            "sanitized",
+            "successful command",
+            "narrow follow-up",
+            "replay",
+        ):
+            require(marker in text, f"{label}: AC12 tool-output marker missing {marker!r}")
+
+        for marker in (
+            "explicitly activated pipeline",
+            "preflight resolves",
+            "absolute path relative to the loaded pipeline skill/reference",
+            "`bounded_command_path`",
+            "state, events, reports",
+            "node <bounded_command_path> -- <argv...>",
+            "--success-diagnostic -- <argv...>",
+            "read/search",
+            "narrower helper-wrapped query",
+            "never bypass the helper",
+            "outside pipeline mode",
+        ):
+            require(marker in text, f"{label}: AC12 helper-route marker missing {marker!r}")
+
+    require(
+        "giant line beyond 64 kib" in contracts["validation"],
+        "validation: AC12 lacks giant-line coverage",
+    )
+    require(
+        "nonzero failure without replay" in contracts["validation"],
+        "validation: AC12 lacks no-replay failure coverage",
+    )
+
+    for role in ("implementer", "tester", "qa", "security"):
+        adapter = re.sub(r"\s+", " ", read(f"runtime/codex/instructions/{role}.md").lower())
+        for marker in (
+            "heartbeat at most every 60 seconds",
+            "`list_agents` only",
+            "at most 30 tool calls",
+            "50 tool calls",
+            "first compaction",
+            "75 tool calls",
+            "8 m cumulative processed tokens",
+            "second substantial scope change",
+            "bounded handoff",
+            "64 kib",
+            "8 kib",
+            "`truncated`",
+            "strip ansi",
+            "binary/control data safely",
+            "successful commands report only the envelope",
+            "without replaying full output",
+            "never waive acs, qa, security, freeze, mandatory suites, or gates",
+            "explicitly activated pipeline",
+            "`bounded_command_path`",
+            "node <bounded_command_path> -- <argv...>",
+            "--success-diagnostic -- <argv...>",
+            "read/search",
+            "narrower helper-wrapped query",
+            "never bypass the helper",
+            "outside pipeline mode",
+        ):
+            require(marker in adapter, f"{role}: execution contract missing {marker!r}")
+
+
+def check_context_isolation_rotation_contract() -> None:
+    """AC9/AC13-AC16: fresh packets, closed attempts, and recoverable rotation."""
+    pipeline = read("plugins/team-harness/skills/pipeline/SKILL.md")
+    implementation = read("plugins/team-harness/skills/pipeline/references/implementation.md")
+    validation = read("plugins/team-harness/skills/pipeline/references/validation.md")
+    shards = read("docs/plan-shards.md")
+    pipeline_flat = re.sub(r"\s+", " ", pipeline.lower())
+    validation_flat = re.sub(r"\s+", " ", validation.lower())
+    shards_flat = re.sub(r"\s+", " ", shards.lower())
+
+    for marker in (
+        "`fork_turns: none`",
+        "exact role packet",
+        "terminal specialist result",
+        "`followup_task` is prohibited",
+        "same file and same ac",
+        "at most 3 tool calls",
+        "second feedback",
+        "scope expansion",
+        "substantive correction",
+        "bounded correction packet",
+        "`cause`",
+        "`files`",
+        "`ac`",
+        "`correction`",
+        "current frozen anchor",
+        "required evidence",
+    ):
+        require(marker in pipeline_flat, f"pipeline: AC13 lifecycle marker missing {marker!r}")
+
+    for marker in (
+        "preflight the exact shard",
+        "required_invariants",
+        "required_evidence_anchors",
+        "cross_runtime_preservation",
+        "fail closed",
+        "transcript, full plan, or sibling shard is never a substitute",
+        "models, gates, permissions, nor lifecycle routes",
+    ):
+        require(marker in pipeline_flat, f"pipeline: AC15 preflight marker missing {marker!r}")
+
+    for marker in (
+        "first compaction",
+        "100 coordinator tool calls",
+        "20 m cumulative processed tokens",
+        "recoverable handoff",
+        "fresh user thread",
+        "implementation → validation",
+        "automatic native main replacement",
+        "nested orchestrator",
+    ):
+        require(marker in pipeline_flat, f"pipeline: AC16 Main-rotation marker missing {marker!r}")
+
+    for marker in (
+        "every tester, qa, and security dispatch uses a fresh",
+        "`fork_turns: none` agent",
+        "current frozen commit/tree",
+        "verification facts/evidence",
+        "implementer's success narrative",
+        "every revalidation after a correction starts new tester, qa, and security agents",
+        "never reuse a prior verifier",
+    ):
+        require(marker in validation_flat, f"validation: AC14 isolation marker missing {marker!r}")
+
+    for marker in (
+        "every task shard must declare all three fields",
+        "required_invariants",
+        "required_evidence_anchors",
+        "cross_runtime_preservation",
+        "fails closed",
+        "attaching main's transcript, a sibling task shard, or the full plan set",
+    ):
+        require(marker in shards_flat, f"plan shards: AC15 declaration marker missing {marker!r}")
+
+    for source, label in ((implementation, "implementation"), (validation, "validation")):
+        flat = re.sub(r"\s+", " ", source.lower())
+        for marker in (
+            "at most 30 tool calls",
+            "50 tool calls",
+            "75 tool calls",
+            "8 m cumulative processed tokens",
+            "same file and ac",
+            "at most 3 tool calls",
+            "fresh",
+            "correction",
+        ):
+            require(marker in flat, f"{label}: Task 3 routing marker missing {marker!r}")
+        require("150 tool calls" not in flat and "25 m tokens" not in flat, f"{label}: superseded rotation limit remains")
+
+    for role in ("implementer", "tester", "qa", "security"):
+        adapter = re.sub(r"\s+", " ", read(f"runtime/codex/instructions/{role}.md").lower())
+        for marker in (
+            "fresh `fork_turns: none` attempt",
+            "at most 30 tool calls",
+            "50 tool calls",
+            "75 tool calls",
+            "8 m cumulative processed tokens",
+            "post-terminal `followup_task`",
+            "same file and ac",
+            "at most 3 tool calls",
+            "second feedback",
+            "scope expansion",
+            "substantive correction",
+            "`cause`",
+            "`files`",
+            "`ac`",
+            "`correction`",
+        ):
+            require(marker in adapter, f"{role}: AC9/AC13 marker missing {marker!r}")
+        require("150 tool calls" not in adapter and "25 m tokens" not in adapter, f"{role}: superseded rotation limit remains")
+
+    for role in ("tester", "qa", "security"):
+        adapter = re.sub(r"\s+", " ", read(f"runtime/codex/instructions/{role}.md").lower())
+        require("implementer's success narrative" in adapter, f"{role}: implementer narrative is not excluded")
+        require("every revalidation starts a new" in adapter, f"{role}: revalidation is not fresh")
+
+
+def check_codex_usage_observability_contract() -> None:
+    """AC6/AC7: the native collector is the only accounting and cost authority."""
+    observability = read("plugins/team-harness/skills/pipeline/references/observability.md")
+    pipeline = read("plugins/team-harness/skills/pipeline/SKILL.md")
+    activation = read("plugins/team-harness/skills/pipeline/references/activation.md")
+    state = read("plugins/team-harness/skills/pipeline/references/state-and-gates.md")
+    delivery = read("plugins/team-harness/skills/pipeline/references/delivery.md")
+    shared_state = read("agents/_shared/orchestrator-state.md")
+    docs = read("docs/observability.md")
+    trace = read("skills/trace/SKILL.md")
+
+    for source, marker in (
+        (pipeline, "references/observability.md"),
+        (activation, "[observability.md](observability.md)"),
+        (state, "[observability.md](observability.md)"),
+        (delivery, "[observability.md](observability.md)"),
+        (shared_state, "references/observability.md"),
+    ):
+        require(marker in source, f"native usage contract is not linked by {marker!r}")
+
+    for marker in (
+        "collectCodexUsage({ rolloutsRoot, rootThreadId })",
+        "checkpointFromUsage",
+        "compareCheckpoints(start, end)",
+        '"event":"phase.start"',
+        '"event":"phase.end"',
+        '"kind":"codex_usage_checkpoint"',
+        '"kind":"codex_usage_delta"',
+        "CHECKPOINT_UNAVAILABLE",
+        "Every started pipeline phase",
+        "never write either one",
+        "reasoning_output_tokens",
+        "never added to `total_tokens` again",
+        "Cost: unavailable",
+    ):
+        require(marker in observability, f"observability reference misses {marker!r}")
+
+    for source in (state, shared_state):
+        for marker in (
+            "usage_schema_version: 1|null",
+            "usage_status: available|unavailable",
+            "usage_reason_code:",
+            "usage_components:",
+            "total_tokens: N|unavailable",
+            "cost_status: available|unavailable",
+            "cost_usd: decimal|null",
+        ):
+            require(marker in source, f"state projection misses {marker!r}")
+
+    require("total_tokens: N" in shared_state, "shared state lost the legacy total_tokens schema")
+    require(
+        "Native Codex accounting overlay — conditional" in shared_state,
+        "shared state does not make the Codex overlay conditional",
+    )
+
+    for source, label in ((docs, "observability docs"), (observability, "pipeline reference")):
+        for marker in (
+            "Cost: unavailable",
+            '"provider"',
+            '"model"',
+            '"dimension"',
+            '"currency": "USD"',
+            '"source"',
+            '"effective_from"',
+        ):
+            require(marker in source, f"{label}: exact-pricing marker missing {marker!r}")
+
+    for marker in (
+        "Cost: unavailable",
+        "Native Codex branch — selected only by `usage.kind`",
+        "exact, case-sensitive tuple",
+        "provider",
+        "model",
+        "dimension",
+        "currency: USD",
+        "source",
+        "effective",
+    ):
+        require(marker in trace, f"trace skill: exact-pricing marker missing {marker!r}")
+
+    for source, label in ((docs, "observability docs"), (trace, "trace skill"), (shared_state, "shared state")):
+        require("tokens_estimated" in source, f"{label}: legacy Claude token estimate was removed")
+    for source, label in ((docs, "observability docs"), (trace, "trace skill")):
+        for marker in (
+            "~/.claude/.team-harness.json",
+            "tokens_in",
+            "tokens_out",
+            "frontmatter",
+            "Static opus-agent fallback",
+            "price table not configured",
+        ):
+            require(marker in source, f"{label}: legacy Claude pricing marker missing {marker!r}")
+
+    for marker in (
+        "price table not configured",
+        "Static opus-agent fallback",
+        "all others → sonnet",
+        "duration_min × 1500",
+    ):
+        require(marker in docs or marker in trace, f"legacy Claude contract lost {marker!r}")
+
+    native_section = section(
+        docs,
+        "### Native Codex branch — `usage.kind: codex_usage_delta`",
+        "---",
+    )
+    for marker in (
+        "Cost: unavailable",
+        "never substitutes `0`",
+        "Never infer this identity or rate",
+        "never added again",
+    ):
+        require(marker in native_section, f"Codex docs branch misses strict marker {marker!r}")
+    require("tokens_estimated" not in native_section, "Codex docs branch permits legacy estimation")
+
+    usage_tests = read("tests/test_codex_usage.mjs")
+    for marker in (
+        "identical duplicate sessions contribute once",
+        "checkpoints report only end - start",
+        "CHECKPOINT_REGRESSION",
+    ):
+        require(marker in usage_tests, f"collector coverage missing reused-session/data-absence guard {marker!r}")
+
+
+def check_declared_agent_lifecycle_contract() -> None:
+    """AC17: lifecycle facts are finite, privacy-safe coordinator declarations."""
+    observability = read("plugins/team-harness/skills/pipeline/references/observability.md")
+    pipeline = read("plugins/team-harness/skills/pipeline/SKILL.md")
+    shared_state = read("agents/_shared/orchestrator-state.md")
+    docs = read("docs/observability.md")
+    trace = read("skills/trace/SKILL.md")
+
+    for marker in (
+        "not native Codex lifecycle telemetry",
+        "`agent.spawn`",
+        "`agent.close`",
+        "`agent.correction.spawn`",
+        "`agent_role`",
+        "`task`",
+        "`attempt_ordinal`",
+        "`context_strategy: fresh|continued`",
+        "`follow_up_count`",
+        "`correction_cause: verification`",
+        "`quality_verdict`",
+        "codex_agent_attempt_metrics",
+        "PER_ATTEMPT_METRICS_UNAVAILABLE",
+        "MUST use\n`unavailable`",
+        "cached_input_per_approved_ac",
+        "never reconstructs one from rollout files, callbacks,",
+        "does not create or promise such telemetry",
+    ):
+        require(marker in observability, f"AC17 lifecycle reference misses {marker!r}")
+
+    for role, task in (
+        ("architect", "design"),
+        ("implementer", "implementation"),
+        ("tester", "test_evidence"),
+        ("qa", "quality_review"),
+        ("security", "security_review"),
+        ("delivery", "delivery"),
+    ):
+        require(
+            f"`{role}` | `{task}`" in observability,
+            f"AC17 lifecycle role/task pair missing {role}/{task}",
+        )
+
+    for marker in (
+        "Declared specialist lifecycle",
+        "coordinator\nbookkeeping declarations, not native Codex telemetry",
+        "strict native usage/cost branch or the legacy Claude route",
+    ):
+        require(marker in pipeline, f"pipeline lifecycle instruction misses {marker!r}")
+
+    for marker in (
+        "Declared Codex agent-lifecycle overlay — conditional",
+        "agent_lifecycle_schema_version: 1|null",
+        "agent_lifecycle_metrics_status: available|unavailable|null",
+        "agent_lifecycle_attempt_count: N|null",
+        "agent_lifecycle_follow_up_count: N|null",
+        "agent_lifecycle_correction_count: N|null",
+        "agent_lifecycle_quality_verdicts:",
+        "agent_lifecycle_metrics:",
+        "approved_ac_count: N|null",
+        "cached_input_per_approved_ac: decimal|unavailable",
+        "does not divide, attribute, or\ncopy a root/phase usage delta",
+    ):
+        require(marker in shared_state, f"lifecycle state overlay misses {marker!r}")
+
+    for marker in (
+        "Declared Codex agent lifecycle",
+        "`agent.spawn`, `agent.close`, `agent.correction.spawn`",
+        "Declared lifecycle efficiency render",
+        "## Lifecycle Efficiency",
+        "Cached-input per approved AC",
+        "does **not** select the\nNative Codex cost branch",
+        "PER_ATTEMPT_METRICS_UNAVAILABLE",
+    ):
+        require(marker in docs, f"observability docs AC17 marker missing {marker!r}")
+
+    for marker in (
+        "Declared Codex lifecycle efficiency — selected only by `agent.*`",
+        "the legacy output above unchanged",
+        "PER_ATTEMPT_METRICS_UNAVAILABLE",
+        "Cached-input per approved AC",
+        "never changes the legacy Claude cost\nroute or the strict Native Codex cost semantics",
+    ):
+        require(marker in trace, f"trace lifecycle renderer misses {marker!r}")
+
+    require(
+        "never selects the Native Codex cost branch" in docs,
+        "AC17 lifecycle events can accidentally select native cost accounting",
+    )
+    require(
+        "legacy Claude route" in observability and "legacy Claude route" in pipeline,
+        "AC17 lifecycle contract can weaken the legacy Claude route",
+    )
+
+
 def main() -> None:
     checks = (
         ("v3 machine", check_v3_machine),
@@ -1145,6 +1607,10 @@ def main() -> None:
         ("terminal/transition mapping", check_terminal_and_transition_mapping),
         ("PR review regressions", check_review_comment_regressions),
         ("Claude/Codex parity", check_claude_codex_parity),
+        ("execution efficiency", check_execution_efficiency_contract),
+        ("context isolation and rotation", check_context_isolation_rotation_contract),
+        ("Codex usage observability", check_codex_usage_observability_contract),
+        ("declared agent lifecycle", check_declared_agent_lifecycle_contract),
     )
     for name, check in checks:
         check()

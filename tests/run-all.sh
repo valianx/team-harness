@@ -287,6 +287,48 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 160: local Codex usage collector (AC1–AC5)"
+echo "# Requires: node. Skipped when absent (NOT a pass — see output)."
+echo "############################################################"
+if ! command -v node >/dev/null 2>&1; then
+    report_skip_or_fail "codex-usage" "node not found — install Node.js to run this suite"
+elif node "$TESTS_DIR/test_codex_usage.mjs"; then
+    echo "codex-usage: PASS"
+else
+    echo "codex-usage: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 161: bounded argv command output (AC12)"
+echo "# Requires: node. Skipped when absent (NOT a pass — see output)."
+echo "############################################################"
+if ! command -v node >/dev/null 2>&1; then
+    report_skip_or_fail "bounded-command" "node not found — install Node.js to run this suite"
+elif node "$TESTS_DIR/test_bounded_command.mjs"; then
+    echo "bounded-command: PASS"
+else
+    echo "bounded-command: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 162: Codex pipeline-efficiency provenance preflight (AC18)"
+echo "# Requires: node. Skipped when absent (NOT a pass — see output)."
+echo "############################################################"
+if ! command -v node >/dev/null 2>&1; then
+    report_skip_or_fail "codex-pipeline-benchmark" "node not found — install Node.js to run this suite"
+elif node "$TESTS_DIR/test_codex_pipeline_benchmark.mjs"; then
+    echo "codex-pipeline-benchmark: PASS"
+else
+    echo "codex-pipeline-benchmark: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 echo "# Suite 19: opencode config-path resolver (AC-10 / SEC-OC-R3)"
 echo "# Requires: node, npm, npx (esbuild). Skipped when absent."
 echo "############################################################"

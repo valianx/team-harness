@@ -64,6 +64,74 @@ nonces, and gate releases. Specialists return bounded results and may edit only
 their assigned repository/report files; they never approve, release, or present
 a gate. Gate releases remain dual-recorded and live-operator decisions.
 
+## Specialist context, lifecycle, and Main rotation
+
+Every new specialist attempt, correction, and revalidation starts a fresh
+native agent with `fork_turns: none`; only the bounded micro-correction
+exception below may continue an open attempt. Send only its exact role packet: the role
+instruction, assigned task shard, that shard's named invariants and evidence
+anchors, its `cross_runtime_preservation` obligation, the current frozen
+identity when one exists, and the minimal role-specific environment or facts.
+Never compensate for a missing packet fact with Main's transcript, an
+implementer's narrative, sibling shards, the full plan, historical tool output,
+or a prompt recap.
+
+Before a dispatch that uses a task shard, preflight the exact shard and fail
+closed unless it declares usable `required_invariants`,
+`required_evidence_anchors`, and `cross_runtime_preservation` values for the
+applicable work. Resolve only those named anchors into the packet; do not
+delegate until each applicable obligation is present. A transcript, full plan,
+or sibling shard is never a substitute for a missing declaration. This
+preflight preserves the existing Claude and other-runtime contracts; it changes
+neither their models, gates, permissions, nor lifecycle routes.
+
+### AC12 bounded command route
+
+Only while this pipeline is explicitly activated, pipeline preflight resolves
+the helper's absolute path relative to the loaded pipeline skill/reference
+(`scripts/bounded-command.mjs` from the skill directory or
+`../scripts/bounded-command.mjs` from a reference), never from the workspace
+or current directory; fail closed if it cannot be resolved. Include the helper
+in each role packet only as `bounded_command_path` with that absolute path. It
+is transient: never persist `bounded_command_path` in state, events, reports,
+summaries, or workspace artifacts.
+
+In pipeline mode, Main and specialists route every command through
+`node <bounded_command_path> -- <argv...>` by default. For a read/search
+command, or any command whose result text is required, use
+`node <bounded_command_path> --success-diagnostic -- <argv...>` so only its
+sanitized bounded tails can be rendered on success. On `truncated: true`, issue
+a narrower helper-wrapped query; never bypass the helper or replay raw/full
+output. Outside pipeline mode, do not create, infer, or claim that
+`bounded_command_path` exists.
+
+Treat every terminal specialist result as a closed attempt. A post-terminal
+`followup_task` is prohibited, except for one recorded micro-correction of the
+same file and same AC that is explicitly limited to at most 3 tool calls. Record
+that exceptional continuation as `context_strategy: continued`; any second
+feedback, scope expansion, or substantive correction closes the old attempt and
+spawns a fresh agent with a bounded correction packet containing `Cause`,
+`Files`, implicated `AC`, `Correction`, the current frozen anchor, and required
+evidence. Never use continued context for a new file, another AC, a second
+finding, or a revalidation.
+
+Tester, QA, and security each start fresh with `fork_turns: none` on the same
+current frozen commit/tree for their validation round. Their packets contain
+the executable ACs or review surface plus verifiable facts and evidence, never
+the implementer's success narrative. Every revalidation after a correction
+uses new tester, QA, and security agents against the rebuilt current frozen
+identity; it does not reuse a prior verification thread.
+
+Main has a separate coordinator boundary. On its first compaction, or before
+continuing after 100 coordinator tool calls or 20 M cumulative processed
+tokens, Main writes a recoverable handoff with the durable state, exact phase
+and task, frozen identities/anchors, evidence pointers, remaining work, and
+pending gate decision. It then requires a fresh user thread before continuing;
+the new Main resumes from that handoff, durable artifacts, and anchors rather
+than a transcript. When near this boundary, prefer an implementation →
+validation handoff when the approved work is ready. This is not an automatic
+native Main replacement and never creates a nested orchestrator.
+
 ## Mandatory agent prerequisite
 
 The plugin supplies the workflow skills and bundled custom-agent definitions;
@@ -126,10 +194,10 @@ the role fields cannot see. The current digests are:
 | Role | SHA-256 of normalized TOML |
 |---|---|
 | `architect` | `1079cc6bd4654c78a010dec4b2bf00761eef51cab2c8458931e0582caa232f66` |
-| `implementer` | `d0a27bc1b21006bd656a70360307fc21901438c4f87d8241acbf4d17f04dfc93` |
-| `tester` | `bbef7aaef37e9124780585bf9687ee289956c5f001315b67629c2b1a12d2e5a3` |
-| `qa` | `28c2938c8b6299dfded6c8709fb8b25012e66561552e502f3222a190b335a13a` |
-| `security` | `55e5d5ac21ec75a461557bbae6e0c0895e2f9348fd07d69f7e10e2b178126dfe` |
+| `implementer` | `c5dc7c498dfef243f25600a769e8d6d31fd69d197e1dbf9ccfbf25a746068d31` |
+| `tester` | `6701d974f0433a95b952d19b65f0180c102572093efb3ecf53ad3cfde7ae825d` |
+| `qa` | `7cd842cbc3cf03e08d1208d14f8cd1b2fcc64c194d682cf0380dcb48a6a3d3c1` |
+| `security` | `91d5f0a379b447e470e8f5c28218acea1a9e9f53cd59d8b6328f3a7d5a00aa8f` |
 | `delivery` | `4addff6a8d7cdf0ab05b4ae1fb1c306ed3e350f2df63b325d24ff58e4eee22cb` |
 
 Do not accept a file solely because its comments or `name` field match. A
@@ -195,10 +263,13 @@ next agent.
    and stop without creating a workspace.
 2. Read [activation.md](references/activation.md), resolve the workspace, and
    initialize its state. Do not preload later phase references.
-3. Read [state-and-gates.md](references/state-and-gates.md) before the first
+3. Read [observability.md](references/observability.md) before the first
+   `phase.start`; it is the sole contract for native Codex usage checkpoints,
+   unavailable measurement, and cost provenance.
+4. Read [state-and-gates.md](references/state-and-gates.md) before the first
    state write. The primary thread remains the sole state writer, gate
    presenter, approval interpreter, and result consolidator.
-4. Read [design.md](references/design.md), delegate the bounded design task to
+5. Read [design.md](references/design.md), delegate the bounded design task to
    `architect`, write the returned plan, present `STAGE-GATE-1`, and stop.
 
 ## Continue
@@ -211,6 +282,10 @@ the recorded `phase`/`next_action`:
 - `validation` or `waiting_gate3`: [validation.md](references/validation.md)
 - `delivery`: [delivery.md](references/delivery.md)
 - `blocked` or ambiguous state: [recovery.md](references/recovery.md)
+
+Before every `phase.start`, `phase.end`, state aggregate, summary rewrite, or
+trace cost render, apply [observability.md](references/observability.md). It
+does not authorize a state write by a specialist or relax any gate rule.
 
 `complete` and `aborted` are terminal. Report their recorded outcome and return
 to ordinary direct behavior; never route either one back through recovery.
@@ -248,3 +323,25 @@ Dispatch only the assigned shard and named anchors. Testing, validation, and
 review reports keep bounded fixed prose plus one compact row per distinct AC,
 finding, test, or changed control. Never omit an item, block, or split
 operator-approved scope solely to meet a total-size target.
+
+## Native Codex observability
+
+Every started pipeline phase closes with the measured or unavailable
+`phase.end` defined in [observability.md](references/observability.md). The
+root thread identifier and rollout path stay ephemeral; the append-only events,
+current state, summary, and `$team-harness:trace` retain only the collector's
+allowlisted checkpoint and delta shapes. Do not estimate usage or cost.
+
+### Declared specialist lifecycle
+
+Before a deliberate specialist dispatch, continued follow-up, terminal return,
+or verification correction, apply the declared lifecycle protocol in
+[observability.md](references/observability.md). Emit only the allowlisted
+`agent.spawn`, `agent.close`, or `agent.correction.spawn` record with its
+finite role/task pair, local ordinal, and `fresh|continued` strategy. A
+terminal correction is always a fresh ordinal. These are coordinator
+bookkeeping declarations, not native Codex telemetry: never recover or persist
+a native ID, alias, rollout path, transcript, prompt, tool output, or
+free-form label, and never attribute a root/phase delta to one agent attempt.
+Unavailable per-attempt metrics remain unavailable; they do not change the
+strict native usage/cost branch or the legacy Claude route.

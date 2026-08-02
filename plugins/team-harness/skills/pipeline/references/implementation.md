@@ -6,12 +6,72 @@ Enter only from `phase: implementation` with a valid dual-record
 half is absent, malformed, or inconsistent, load `recovery.md`, prepare the
 gate with a fresh nonce, and stop.
 
-Read `plan/delivery.md` to form dependency rounds. For each dispatch, pass only the exact
-`plan/tasks/Task-N.md` path and its named architecture/invariant anchors; never attach sibling
-tasks or the full plan set. Delegate bounded, file-scoped work to `implementer`; state that other
-agents may be editing the repository and unrelated changes must be preserved. Parallelize only
-tasks with disjoint ownership. The primary thread records dispatches and results, waits for all
-tasks in a round, and consolidates their evidence.
+Read `plan/delivery.md` to form dependency rounds. Before every task dispatch,
+preflight its exact `plan/tasks/Task-N.md` and fail closed unless its
+`required_invariants`, `required_evidence_anchors`, and
+`cross_runtime_preservation` declarations supply every applicable obligation.
+Pass only that shard, its named architecture/invariant anchors, frozen identity
+when present, and the role's necessary environment; never compensate with a
+transcript, implementer history, sibling tasks, or the full plan set. Delegate
+bounded, file-scoped work to a fresh `implementer` with `fork_turns: none`;
+state that other agents may be editing the repository and unrelated changes
+must be preserved. Parallelize only tasks with disjoint ownership. The primary
+thread records dispatches and results, waits for all tasks in a round, and
+consolidates their evidence.
+
+## Efficient execution, rotation, and tool diagnostics
+
+Wait for a specialist completion or live operator input rather than polling. A
+heartbeat may run at most once every 60 seconds; call `list_agents` only for a
+live status request, an actual timeout, or recovery. A normal timeout only
+continues the directed wait without recap, new analysis, or a new dispatch. The normalized benchmark counts only waits and queries that are
+not caused by completion, input, a real timeout, or recovery; the current
+policy must keep that count at no more than 30% of the normalized baseline
+(at least a 70% reduction) while retaining immediate operator interruption.
+
+Track each active specialist attempt's compaction signal, tool-call count,
+cumulative processed-token count, and substantial scope changes. Target at
+most 30 tool calls and make a bounded handoff ready at 50 tool calls. Before
+continuing after its first compaction, at 75 tool calls, at 8 M cumulative
+processed tokens, or after a second substantial scope change, rotate to a
+fresh session. The handoff names the exact task, owned files, current
+outcome/evidence pointers, and remaining decision or work; it carries no
+transcript, raw tool output, or stale prior snapshot. Rotation never waives
+required AC evidence, QA, security, Freeze, mandatory suites, or either gate.
+
+Close a terminal implementation attempt and prohibit post-terminal
+`followup_task`. The sole exception is one recorded micro-correction on the
+same file and AC, limited to at most 3 tool calls; a second feedback item, any
+scope expansion, or a substantive correction must use a fresh agent
+(`fork_turns: none`) and a bounded `Cause`/`Files`/`AC`/`Correction` packet with the
+current frozen anchor and required evidence. A continued attempt never absorbs
+another AC, file, or revalidation.
+
+Main separately writes a recoverable handoff and requires a fresh user thread
+after its first compaction or before continuing at 100 coordinator tool calls
+or 20 M cumulative processed tokens. When that boundary is near, prefer a
+completed implementation → validation handoff. This rotation does not create a
+nested orchestrator or automatically replace native Main.
+
+Only in this explicitly activated pipeline, preflight resolves the helper's
+absolute path relative to the loaded pipeline skill/reference and fails closed
+if unavailable; include it in the implementer role packet only as
+`bounded_command_path`. Never persist that value in state, events, reports,
+summaries, or workspace artifacts. Main and the implementer route every command
+through `node <bounded_command_path> -- <argv...>` by default. A read/search
+command, or any command whose result text is required, uses
+`node <bounded_command_path> --success-diagnostic -- <argv...>`.
+
+The helper captures stdout and stderr independently to a 64 KiB maximum buffer
+per stream while separately counting all received bytes. Render its envelope
+with exit code, duration, per-stream bytes, and `truncated`; render no more than
+an 8 KiB sanitized tail per stream. Strip ANSI control sequences and render
+binary/control data safely before display. A successful command normally needs
+only the envelope; a failing command may use its sanitized failure tail for
+diagnosis. If either stream truncates, make a narrow follow-up as a narrower
+helper-wrapped query and never bypass the helper or replay the original raw/full output or command just
+to obtain it. Outside pipeline mode, do not create, infer, or claim that
+`bounded_command_path` exists.
 
 A live operator request that explicitly selects `inline` is not an in-place pipeline downgrade:
 close the active run administratively first (`phase: aborted`/`status: aborted`, clear a pending

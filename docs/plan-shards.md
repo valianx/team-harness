@@ -9,7 +9,7 @@ small canonical artifacts, not a monolith copied between roles:
 | `plan/architecture.md` | decisions, services, assessments, and file-level work plan | architect, plan panel; referenced slices for implementer/security |
 | `plan/delivery.md` | task ordering, dependencies, branches, bases, and PR grouping | orchestrator, delivery |
 | `plan/invariants.md` | cross-project or multi-site invariants; omit when none | affected implementers, security, delivery |
-| `plan/tasks/Task-N.md` | one task's scope, files, seams, notes, ACs, and AC checkboxes | assigned implementer, tester, QA |
+| `plan/tasks/Task-N.md` | one task's scope, files, seams, dispatch declarations, ACs, and AC checkboxes | assigned implementer, tester, QA |
 
 `01-plan.md` begins with `**Plan format:** sharded-v1` and contains a
 `## Plan Manifest` table with one row per artifact. Its task index contains the
@@ -34,6 +34,24 @@ required by the dispatch. A role must not preload every shard:
 Plan-panel roles may inspect all shards because completeness is their explicit
 job. Prefer deterministic structure checks over loading prose when a path,
 heading, ID, or count can be checked mechanically.
+
+## Dispatch completeness
+
+Every task shard must declare all three fields in its `## Dispatch anchors`
+block:
+
+```text
+required_invariants: [I...]
+required_evidence_anchors: [A...]
+cross_runtime_preservation: <non-empty preservation statement>
+```
+
+The dispatch preflight reads that exact shard once and fails closed if any
+field is absent, malformed, or omits an obligation applicable to the assigned
+files. An empty list is valid only when no invariant or evidence anchor applies;
+`cross_runtime_preservation` is always non-empty. It resolves only the named
+anchors into the role packet. Never compensate for a missing declaration by
+attaching Main's transcript, a sibling task shard, or the full plan set.
 
 ## Write and size rules
 

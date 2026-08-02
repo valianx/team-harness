@@ -74,12 +74,27 @@ include `phase` and `agent`, and gate-release events include `decision`. The obs
 `subagent.start` hook is the sole envelope exception because PreToolUse has no trustworthy
 pipeline feature coordinate; its complete bounded schema is defined in `### subagent.start`.
 
+Only for a Native Codex trace selected by a `phase.end` whose
+`usage.kind` is `codex_usage_delta`, `phase.start` also contains an allowlisted
+`usage_checkpoint` and `usage_scope: "codex-root-reachable"`; `phase.end`
+contains an allowlisted `usage` delta. The complete shape and privacy boundary
+are defined in `plugins/team-harness/skills/pipeline/references/observability.md`.
+The root thread identifier, session identifiers, rollout paths, raw rollouts,
+and collector session list are never native event fields. A legacy Claude trace
+without `usage` retains its existing envelope.
+
+The declared Codex `agent.*` lifecycle extension is separate from that usage
+selection. It records only coordinator-declared, allowlisted specialist
+lifecycle facts and never selects the Native Codex cost branch. A trace without
+`agent.*` retains its existing lifecycle and cost behavior.
+
 Core event names are:
 
 | Event | Meaning |
 |---|---|
 | `pipeline.start`, `pipeline.complete`, `pipeline.incomplete`, `pipeline.end` | Run lifecycle |
 | `phase.start`, `phase.end` | Named-state dispatch and completion; `phase` is one of the v3 states or a trace detail owned by that state |
+| `agent.spawn`, `agent.close`, `agent.correction.spawn` | Declared specialist lifecycle; finite role/task, local ordinal, context strategy, final follow-up count, and closed aggregate result only |
 | `stage.gate`, `stage.gate.release` | Gate presentation and dual-record release |
 | `gate`, `gate.pass`, `gate.fail` | Human-checkpoint marker or an internal verdict; never a release by itself |
 | `iteration.start` | Implementation/validation correction round; new producers use `cause: verification` only. Historical `cause: operator` events remain readable but are not emitted for plan repairs, operator decisions, or explicit design work |
@@ -92,6 +107,55 @@ Core event names are:
 There is no `plan_structure` event in v3: the former deterministic plan-structure phase is
 retired. Plan validity is a minimum artifact check in `design`; a missing or malformed artifact
 gets one normal design correction.
+
+### Declared Codex agent lifecycle
+
+These events are coordinator bookkeeping for deliberate specialist dispatches,
+not native Codex lifecycle telemetry. The current runtime does not expose a
+privacy-safe per-attempt attribution record. The coordinator writes an event
+only for a dispatch, continuation, terminal return, or verification correction
+it directly observes. It does not mine rollouts, callbacks, transcripts,
+prompts, tool output, or native IDs to fill the schema.
+
+`agent_role` and `task` are paired closed enums:
+
+| `agent_role` | `task` |
+|---|---|
+| `architect` | `design` |
+| `implementer` | `implementation` |
+| `tester` | `test_evidence` |
+| `qa` | `quality_review` |
+| `security` | `security_review` |
+| `delivery` | `delivery` |
+
+Every `agent.*` event carries that pair, a positive `attempt_ordinal`,
+`context_strategy: fresh|continued`, and `follow_up_count`. The ordinal is a
+local ordering pseudonym scoped to the pair—not a session ID or alias. A fresh
+`agent.spawn` begins an ordinal with count zero; a continued `agent.spawn`
+reuses its one open ordinal and increments the count. Exactly one `agent.close`
+terminates it and reports the final count. `agent.correction.spawn` has literal
+`correction_cause: verification`, is always `fresh` with count zero, and uses a
+new ordinal after its prior related attempt closed. No standalone follow-up
+event or free-form task label is allowed.
+
+`agent.close` also carries a closed `quality_verdict`
+(`pass|concerns|fail|n-a`) and an `attempt_metrics` object with only
+`cached_input_tokens`, `uncached_input_tokens`, `output_tokens`,
+`wall_time_ms`, and `tool_calls`. All components must be complete together, or
+the object is closed-code unavailable with `components: null`. The current
+collector is root/phase scoped and cannot make that attribution, so current
+producers record `PER_ATTEMPT_METRICS_UNAVAILABLE`; they never split a phase
+delta or make an estimate. This is deliberate unavailable reporting, not a
+claim that runtime telemetry exists.
+
+The current snapshot aggregates complete closed attempts only. A duplicate,
+missing, open, malformed, unavailable, or conflicting attempt makes all
+aggregate attempt metrics unavailable, never partial. It separately counts
+fresh attempts, final follow-ups, correction spawns, and closed quality
+verdicts. After Gate 1 approval, `approved_ac_count` is just the current
+positive count of approved AC rows—never their IDs or text. The summary and
+trace render `cached_input_per_approved_ac` only when that denominator and the
+complete lifecycle metric aggregate are available.
 
 ## Flow Telemetry Emission
 
@@ -287,7 +351,9 @@ retained even when the live response is concise.
 
 `tools`, `model`, and `effort` are propagated from specialist status blocks when present. Missing
 telemetry never changes the gate outcome; estimated token counts are marked
-`tokens_estimated: true`.
+`tokens_estimated: true` on the legacy Claude branch. When a `phase.end`
+contains `usage.kind: codex_usage_delta`, select the Native Codex branch instead:
+that branch records a closed unavailable usage result rather than an estimate.
 
 ## 4. Gate observability
 
@@ -648,6 +714,15 @@ reference material only; they are not emitted, dispatched, or gate-releasing.
 
 ## Cost rollup
 
+
+**Branch selection.** Select the Native Codex branch only when a `phase.end`
+event contains an object whose `usage.kind` is `codex_usage_delta`. A
+`phase.start` checkpoint, route, model, agent, or any other field never
+selects it. When no such `phase.end` exists, retain the complete legacy Claude
+contract below unchanged, including `tokens`, `tokens_in`/`tokens_out`,
+`tokens_estimated`, `~/.claude/.team-harness.json` pricing, the
+event/frontmatter/static fallbacks, and the established rendering.
+
 This section defines the cost-visibility surface introduced in Phase B of the
 pipeline-collaboration-cost-redesign programme. It covers: (a) the price table
 key format in `~/.claude/.team-harness.json`; (b) the schema of the `## Cost`
@@ -800,6 +875,95 @@ definition (the `duration_min × 1500` / `× 800` fallback multiplier, already
 carrying `tokens_estimated: true`). These are structural literals, not claims
 about what a run costs, and tagging them would not add information.
 
+
+
+### Native Codex branch — `usage.kind: codex_usage_delta`
+
+This branch is selected only by the exact `phase.end.usage.kind` predicate
+above. It reads only the allowlisted native delta from each selected
+`phase.end` and its matching safe checkpoints; it never scans rollouts. A
+missing, malformed, unavailable, regressive, conflicting, or mixed native
+delta makes the complete aggregate unavailable. It never substitutes `0`,
+estimates, reuses a prior delta, or retains a partial subtotal.
+`usage.components.total_tokens` is summed once; `reasoning_output_tokens`
+is displayed separately and is never added again.
+
+```markdown
+## Cost
+Usage: {measured|unavailable (REASON_CODE)}
+Total tokens: {N|unavailable}
+Cost: {${X.XX} USD|unavailable}
+```
+
+No prices are bundled with the native collector and it currently has no exact
+provider/model pricing identity. Therefore the current native rendering is:
+
+```text
+Cost: unavailable
+```
+
+A future native USD amount requires a read-only quote for every
+non-overlapping billable dimension with this exact, case-sensitive tuple and
+complete provenance:
+
+```json
+{
+  "provider": "exact native provider",
+  "model": "exact native model id",
+  "dimension": "exact usage dimension",
+  "currency": "USD",
+  "rate_per_million": 0,
+  "source": "https://authoritative.example/pricing",
+  "effective_from": "YYYY-MM-DD",
+  "effective_until": null
+}
+```
+
+The native phase must carry the same exact provider and model in
+`pricing_identity`; the source must be present and the effective range must
+contain the measurement date. Never infer this identity or rate from an agent
+role, event model, frontmatter default, prefix, family, or alias; never blend
+rates, convert currency, price aggregate `total_tokens`, or double-count a
+component. These prohibitions apply only to the selected Native Codex branch;
+they do not change the legacy Claude rules above.
+
+### Declared lifecycle efficiency render
+
+This is additive and is selected only when the trace contains an `agent.spawn`,
+`agent.close`, or `agent.correction.spawn` event. It does **not** select the
+Native Codex cost branch: that predicate remains exactly
+`phase.end.usage.kind: codex_usage_delta`. With no `agent.*` record, retain the
+legacy summary and `/th:trace` output unchanged.
+
+When selected, insert this summary section after `## Cost` and before
+`## Iterations`:
+
+```markdown
+## Lifecycle Efficiency
+Declared attempts: {N}
+Follow-ups: {N|unavailable}
+Corrections: {N}
+Quality verdicts: pass:{N}, concerns:{N}, fail:{N}, n-a:{N}
+Metrics: {measured|unavailable (REASON_CODE)}
+Cached input: {N|unavailable}
+Uncached input: {N|unavailable}
+Output: {N|unavailable}
+Wall time: {N ms|unavailable}
+Tool calls: {N|unavailable}
+Approved ACs: {N|unavailable}
+Cached-input per approved AC: {decimal|unavailable}
+```
+
+Read the values only from the allowlisted declared lifecycle records and the
+current `approved_ac_count` snapshot. Sum a component once per closed ordinal;
+continued declarations never create another attempt. Any missing close,
+unavailable or malformed `attempt_metrics`, invalid ordinal sequence, or absent
+positive approved-AC count yields the affected `unavailable` value. Never use
+a root/session identifier, alias, rollout path, raw rollout, transcript,
+prompt, tool output, AC text, or a free-form task label to repair the result.
+The current collector does not provide per-attempt attribution, so today's
+normal lifecycle metric output is unavailable rather than an estimate.
+
 ---
 
 ## Relationship to the Output Discipline contract
@@ -829,13 +993,29 @@ Both are written exclusively by the orchestrator. Agents return tool-usage count
 
 ### tokens field on phase.end
 
-Every `phase.end` event MUST include a `tokens` field (integer). When `Agent()`/`Task()` metadata is absent, estimate via `duration_min × 1500` (opus) / `× 800` (sonnet) and mark `tokens_estimated: true`. **Zero is forbidden** — a zero token count is indistinguishable from a missing field and breaks the cost rollup.
+**Legacy Claude branch — no native `usage` object.** Every `phase.end` event MUST include a `tokens` field (integer). When `Agent()`/`Task()` metadata is absent, estimate via `duration_min × 1500` (opus) / `× 800` (sonnet) and mark `tokens_estimated: true`. **Zero is forbidden** — a zero token count is indistinguishable from a missing field and breaks the cost rollup.
+
+
+### Native Codex usage on `phase.end`
+
+Select this separate branch only when a `phase.end` contains
+`usage.kind: codex_usage_delta`. Every selected `phase.end` carries the
+allowlisted checkpoint delta from
+`plugins/team-harness/skills/pipeline/references/observability.md`: either
+measured or a closed-code unavailable result. For this branch only, zero
+substitution, duration-based estimation, alias reuse, partial totals, and using
+the legacy `tokens` field as an accounting source are forbidden.
 
 ### model / effort fields on phase.end
 
 Every leaf agent's status block declares its effective model on a `model:` line (mandatory) and, when known, its effective effort level on an `effort:` line (optional) — see `agents/_shared/output-template.md` § "Status block — common fields". The orchestrator propagates both verbatim onto the corresponding `phase.end` event's `model` / `effort` fields, using the same propagation mechanism already used for `tools` (see `agents/ref-pipeline.md` § "Populating the `model`/`effort` fields on `phase.end`"). Both fields are optional at the schema level — legacy events and events from agents that have not yet reported the fields simply omit them, and classification falls through to frontmatter/static-list inference (see § Derivation rule below).
 
 This is the field that makes a session model override (`agents/ref-pipeline.md` § "Session model override") observable in the trace: the frontmatter `model:` in `agents/{agent}.md` is only the agent's *default*; `event.model` on a given `phase.end` is what that specific dispatch actually ran under.
+
+For a selected Native Codex branch, `model` and `effort` remain operational
+context only. Native cost requires the exact `pricing_identity` and active
+quote provenance defined in the native branch; no legacy event/frontmatter/static
+fallback can price it.
 
 **Session model override — distinct from the config-override whitelist.** The session model override (an operator utterance such as "use the bigger model for analysis this session") is recorded exclusively in `00-state.md § Current State` and applies only to analysis-tier dispatches (`architect`, the plan-review panel, consolidators) for the current session — it is never written to `~/.claude/.team-harness.json`. This is a **separate mechanism** from the session-scoped config override whitelist (CLAUDE.md §5), which governs `logs-mode`, `logs-path`, `logs-subfolder`, and `clickup.workspace_id`, and which continues to explicitly EXCLUDE `model`. The two must not be conflated: the config whitelist is about persisted-vs-session config keys reachable from `/th:setup`; the session model override is a dispatch-time-only instruction that never touches config and is discarded at session end. Full mechanism: `agents/ref-pipeline.md` § "Session model override".
 

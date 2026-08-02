@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.7.0] - 2026-08-02
+
+### Added
+
+- Added native Codex usage attribution and a provenance-attested isolated benchmark runner for
+  comparing pipeline efficiency without provider pricing or shared plugin state.
+
+### Changed
+
+- Made fresh specialist attempts the default, closed terminal sessions, bounded command output,
+  lowered rotation thresholds, and required fresh verification after implementation changes.
+
 ## [3.6.8] - 2026-08-02
 
 ### Fixed
