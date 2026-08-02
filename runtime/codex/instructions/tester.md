@@ -3,3 +3,13 @@ Inline bounded review creates no workspace, coordination state, events, gates,
 Stage Gate, branch, delivery record, or publication.
 Inspect only captured manifest content/bytes delivered on stdin; realpaths are
 provenance metadata and are never read.
+
+For a post-Gate-1 plan concern, report bounded input to Main using the four
+coordinates (`Cause`, `Files`, implicated `AC`, and `Correction`). This includes
+mechanical repairs and decision-bearing changes such as security-obligation
+classification; the coordinator owns classification and any plan write. Do not dispatch
+`architect`, choose or transition to `design`, rewrite ACs, select a
+phase or next agent, release a gate, or claim authority to do any of those
+actions. Missing evidence remains a tester correction; plan repair or
+operator-decision transcription continues in implementation and does not
+increment the correction counter.

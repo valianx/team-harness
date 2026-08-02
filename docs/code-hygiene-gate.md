@@ -134,11 +134,14 @@ existing operator-declared fast-path mechanisms.
 | Result | Action |
 |---|---|
 | Clean (final `grep` exits `1`) | Emit a structural trace event only (`stage2.hygiene`, `verdict: pass`) — **never operator-facing prose**. Advance to Phase 2.7. |
-| Violations found (final `grep` exits `0`) | Emit `stage2.hygiene` (`verdict: fail`, `extra: {files, count}`). Write a `failure-brief.md` iteration entry with `Blast radius: localized {file:line, ...}`. Re-dispatch `implementer` under the BOUNDED-PATCH contract (`agents/implementer.md § BOUNDED-PATCH contract`). Re-run the scan only; the verification packet does not exist yet. |
+| Violations found (final `grep` exits `0`) | Emit `stage2.hygiene` (`verdict: fail`, `extra: {files, count}`). Write a `failure-brief.md` correction entry with `Blast radius: localized {file:line, ...}`. Re-dispatch `implementer` under the BOUNDED-PATCH contract (`agents/implementer.md § BOUNDED-PATCH contract`). Re-run the scan only; the verification packet does not exist yet. |
 | Command error (final `grep` exits `2`+, or `git diff` itself failed) | Escalate — do not advance and do not silently treat as clean. Surface to the operator. |
 
-**Iteration budget:** shares the existing max-3 cap for Case A (implementation) bounces —
-see `agents/ref-pipeline.md § "Iteration"`.
+**Correction-round budget:** a hygiene violation consumes one implementation/validation
+correction round in the existing max-3 cap and returns through implementation → Freeze →
+validation. It does not edit the plan, dispatch `architect`, increment the counter for a
+plan repair, or create an `iteration.start` for an operator decision; see
+`agents/ref-pipeline.md § "Iteration rules"`.
 
 **`workspaces/` exclusion is structural, not filtered.** The workspaces directory is git-ignored
 (local mode) or lives outside the repository entirely (obsidian mode) — it never appears in

@@ -64,6 +64,192 @@ def check_inline_runner() -> None:
     )
     if focused.returncode != 0:
         fail(f"inline runner behavioral tests failed:\n{focused.stdout}{focused.stderr}")
+EXPECTED_POST_GATE1 = {
+    "mechanical": ("main", "implementation", "prohibited", "none", 0),
+    "decision": ("main", "implementation", "explicit-only", "none", 0),
+    "architect-request": ("main", "design", "allowed", "new-gate1", 0),
+    "implementation": ("implementation", "implementation", "prohibited", "none", 1),
+    "evidence": ("tester", "validation", "prohibited", "none", 1),
+}
+
+
+def _routing_cells(line: str) -> list[str]:
+    if not line.lstrip().startswith("|"):
+        return []
+    cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+    if len(cells) < 2 or all(re.fullmatch(r":?-+:?", cell) for cell in cells):
+        return []
+    return cells
+
+
+def _routing_key(label: str) -> str | None:
+    lowered = label.lower()
+    if "mechanical" in lowered:
+        return "mechanical"
+    if "decision-bearing" in lowered or "security-obligation" in lowered:
+        return "decision"
+    if "explicit" in lowered and "architect" in lowered:
+        return "architect-request"
+    if "correctable code" in lowered:
+        return "implementation"
+    if "missing" in lowered or "insufficient evidence" in lowered:
+        return "evidence"
+    return None
+
+
+def _routing_section(text: str) -> str:
+    begin = text.find("### Authoritative post-Gate-1 routing")
+    end = text.find("## Start", begin + 1)
+    if begin < 0 or end < 0:
+        fail("Codex authoritative post-Gate-1 routing section is missing")
+    return text[begin:end]
+
+
+def _routing_owner(owner_text: str) -> str:
+    if re.search(r"\btester\b", owner_text):
+        return "tester"
+    if "implementation executor" in owner_text:
+        return "implementation"
+    if re.search(r"\bmain\b", owner_text):
+        return "main"
+    return ""
+
+
+def _routing_phase(key: str, continuation: str) -> str:
+    phase_match = re.search(r"`phase:\s*(design|implementation|validation)`", continuation)
+    if phase_match:
+        return phase_match.group(1)
+    if key == "evidence" and "affected validation" in continuation:
+        return "validation"
+    if key == "implementation" and "return to implementation" in continuation:
+        return "implementation"
+    return ""
+
+
+def _routing_architect(architect_text: str) -> str:
+    if "prohibited unless" in architect_text or "unless separately" in architect_text:
+        return "explicit-only"
+    if "allowed" in architect_text:
+        return "allowed"
+    if "prohibited" in architect_text:
+        return "prohibited"
+    return ""
+
+
+def _routing_gate(continuation: str) -> str:
+    if re.search(r"\bno new gate 1\b", continuation):
+        return "none"
+    if re.search(r"\bnew gate 1\b", continuation):
+        return "new-gate1"
+    return ""
+
+
+def _routing_row_values(key: str, cells: list[str]) -> tuple[str, str, str, str, int]:
+    owner = _routing_owner(cells[1].lower())
+    continuation = cells[2].lower()
+    phase = _routing_phase(key, continuation)
+    architect = _routing_architect(cells[3].lower())
+    gate = _routing_gate(continuation)
+    delta_match = re.fullmatch(r"`?([+-]?\d+)`?", cells[4].strip())
+    if not delta_match:
+        fail(f"Codex routing row has a non-numeric iteration delta: {cells!r}")
+    return owner, phase, architect, gate, int(delta_match.group(1))
+
+
+def _parse_codex_routing_rows(text: str) -> dict[str, tuple[str, str, str, str, int]]:
+    rows: dict[str, tuple[str, str, str, str, int]] = {}
+    for line in _routing_section(text).splitlines():
+        cells = _routing_cells(line)
+        if len(cells) != 5:
+            continue
+        key = _routing_key(cells[0])
+        if key is None:
+            continue
+        if key in rows:
+            fail(f"Codex routing table repeats {key!r}")
+        rows[key] = _routing_row_values(key, cells)
+    return rows
+
+
+def _assert_markers(text: str, markers: tuple[str, ...], context: str) -> None:
+    for marker in markers:
+        if marker not in text:
+            fail(f"{context} lost required marker {marker!r}")
+
+
+def _assert_no_automatic_design_route(text: str, context: str) -> None:
+    flattened = re.sub(r"\s+", " ", text.lower())
+    concern = r"(?:decision-bearing|structural[^.]{0,80}contradiction)"
+    design = r"(?:reopen|transition(?:s)?(?:\s+to)?|sets?\s+`?phase:?|`?phase:)\s*`?design"
+    gate = r"(?:requires?|releases?)\s+(?:a\s+)?new gate 1"
+    explicit = r"explicit(?:\s+\w+){0,3}\s+decision"
+    for pattern in (
+        rf"{concern}[^.]{{0,240}}{design}",
+        rf"{concern}[^.]{{0,240}}{gate}",
+        rf"{explicit}[^.]{{0,240}}(?:{design}|{gate}|new gate 1)",
+    ):
+        if re.search(pattern, flattened):
+            fail(f"{context} permits a decision-bearing concern to reopen design")
+
+
+def _check_agent_adapter_parity() -> None:
+    generated = ROOT / ".codex/agents"
+    packaged = ROOT / "plugins/team-harness/skills/setup/assets/agents"
+    for role in ("architect", "tester", "qa", "security"):
+        project = (generated / f"{role}.toml").read_bytes().replace(b"\r\n", b"\n")
+        package = (packaged / f"{role}.toml").read_bytes().replace(b"\r\n", b"\n")
+        if project != package:
+            fail(f"generated Codex adapter parity drifted for {role}")
+        adapter = (ROOT / f"runtime/codex/instructions/{role}.md").read_text().lower()
+        if role == "architect" and "only a separate, explicit current live operator request" not in re.sub(r"\s+", " ", adapter):
+            fail("Codex architect adapter permits automatic post-Gate-1 dispatch")
+        if role in {"tester", "qa", "security"} and "do not dispatch" not in adapter:
+            fail(f"Codex {role} adapter can select a post-Gate-1 route")
+
+
+def _check_qa_post_gate1_route(validation: str) -> None:
+    adapter = (ROOT / "runtime/codex/instructions/qa.md").read_text()
+    generated = tomllib.loads((ROOT / ".codex/agents/qa.toml").read_text())
+    packaged = tomllib.loads(
+        (ROOT / "plugins/team-harness/skills/setup/assets/agents/qa.toml").read_text()
+    )
+    sources = (
+        ("Codex validation reference", validation),
+        ("QA instruction adapter", adapter),
+        ("generated QA adapter", generated["developer_instructions"]),
+        ("packaged generated QA adapter", packaged["developer_instructions"]),
+    )
+    for context, text in sources:
+        _assert_no_automatic_design_route(text, context)
+        _assert_markers(
+            re.sub(r"\s+", " ", text.lower()),
+            ("separate explicit current live operator request for architect work",),
+            context,
+        )
+    qa_markers = (
+        "return exactly four-coordinate input to main",
+        "never select `design` or `architect`",
+    )
+    for context, text in sources[1:]:
+        _assert_markers(re.sub(r"\s+", " ", text.lower()), qa_markers, context)
+
+
+def check_post_gate1_projection() -> None:
+    """Parse the Codex routing rows and prove generated adapters preserve them."""
+    pipeline = (ROOT / "plugins/team-harness/skills/pipeline/SKILL.md").read_text()
+    rows = _parse_codex_routing_rows(pipeline)
+    if rows != EXPECTED_POST_GATE1:
+        fail(f"Codex post-Gate-1 transition results drifted: {rows!r}")
+    _assert_markers(
+        re.sub(r"\s+", " ", pipeline.lower()),
+        ("security-obligation classification", "bounded live operator decision", "implementation → freeze → validation", "conditional security review", "new gate 1"),
+        "Codex routing projection",
+    )
+    _assert_no_automatic_design_route(pipeline, "Codex pipeline skill")
+    _check_agent_adapter_parity()
+    _check_qa_post_gate1_route(
+        (ROOT / "plugins/team-harness/skills/pipeline/references/validation.md").read_text()
+    )
 
 
 def main() -> None:
@@ -71,8 +257,10 @@ def main() -> None:
     contract = json.loads((ROOT / "runtime/schema/codex-agents.json").read_text())
     agents = contract["agents"]
     expected = {agent["name"] for agent in agents}
-    if expected != {"architect", "implementer", "tester", "qa", "security", "delivery"}:
-        fail(f"unexpected Codex vertical-slice roles: {sorted(expected)}")
+    pipeline_roles = {"architect", "implementer", "tester", "qa", "security", "delivery"}
+    review_roles = {"reviewer", "pr-review-qa", "pr-review-security", "reviewer-consolidator"}
+    if expected != pipeline_roles | review_roles:
+        fail(f"unexpected Codex installed roles: {sorted(expected)}")
     architect_contract = next(agent for agent in agents if agent["name"] == "architect")
     if architect_contract["sandbox_mode"] != "workspace-write":
         fail("Codex architect must be able to write its assigned plan artifacts")
@@ -107,6 +295,10 @@ def main() -> None:
         "qa": ("sonnet/high", "non-opus"),
         "security": ("opus/xhigh", "opus-xhigh"),
         "delivery": ("sonnet/medium", "non-opus"),
+        "reviewer": ("sonnet/high", "non-opus"),
+        "pr-review-qa": ("sonnet/high", "non-opus"),
+        "pr-review-security": ("sonnet/high", "non-opus"),
+        "reviewer-consolidator": ("sonnet/medium", "non-opus"),
     }
     for path in (ROOT / ".codex/agents").glob("*.toml"):
         if path.is_symlink():
@@ -132,6 +324,14 @@ def main() -> None:
                 fail(f"{path}: missing deterministic Team Harness marker {marker!r}")
         if data["sandbox_mode"] == "read-only" and data["name"] in {"architect", "implementer", "tester", "delivery"}:
             fail(f"{path}: write role is unexpectedly read-only")
+        if data["name"] in review_roles and data["sandbox_mode"] != "read-only":
+            fail(f"{path}: PR-review role must be read-only")
+    review_contracts = {agent["name"]: agent for agent in agents if agent["name"] in review_roles}
+    if review_contracts["reviewer"]["capabilities"] != ["filesystem-read", "external-read"]:
+        fail("Codex reviewer capability allowlist drifted")
+    for role in review_roles - {"reviewer"}:
+        if review_contracts[role]["capabilities"] != ["filesystem-read"]:
+            fail(f"Codex {role} capability allowlist drifted")
     if generated != expected:
         fail(f"generated roles do not match contract: {sorted(generated)}")
 
@@ -206,6 +406,11 @@ def main() -> None:
         for name in ("policy-block", "gcp-guard")
     ):
         fail("Codex plugin must wire exactly the two deterministic-deny hooks")
+    if not all(
+        "PLUGIN_ROOT" in command and "CLAUDE_PLUGIN_ROOT" in command
+        for command in hook_commands
+    ):
+        fail("Codex hook commands must support both plugin-root environment aliases")
     if any(
         retired in command
         for command in hook_commands
@@ -213,13 +418,23 @@ def main() -> None:
     ):
         fail("Codex plugin still wires an approval-classifying hook")
 
+    shared_skill_names = {
+        path.parent.name for path in (ROOT / "skills").glob("*/SKILL.md")
+    }
     skill_names = {
         path.parent.name
         for path in (ROOT / "plugins/team-harness/skills").glob("*/SKILL.md")
     }
-    if skill_names != {
+    if skill_names != shared_skill_names:
+        fail(
+            "Codex plugin skill set differs from the canonical shared set: "
+            f"missing={sorted(shared_skill_names - skill_names)}, "
+            f"extra={sorted(skill_names - shared_skill_names)}"
+        )
+    codex_overrides = {
         "setup",
         "update",
+        "modes",
         "init",
         "pipeline",
         "design",
@@ -227,8 +442,33 @@ def main() -> None:
         "validate",
         "deliver",
         "recover",
-    }:
-        fail(f"unexpected Codex skills: {sorted(skill_names)}")
+    }
+    generated_marker = (
+        "<!-- Code generated by tools/codex-runtime/sync-skills.mjs; "
+        "DO NOT EDIT. -->"
+    )
+    for name in sorted(skill_names - codex_overrides):
+        projected = ROOT / f"plugins/team-harness/skills/{name}"
+        if generated_marker not in (projected / "SKILL.md").read_text():
+            fail(f"Codex skill projection is unmanaged: {name}")
+        if not (projected / "canonical.md").is_file():
+            fail(f"Codex skill projection lacks canonical workflow: {name}")
+        if not (projected / "agents/openai.yaml").is_file():
+            fail(f"Codex skill projection lacks UI metadata: {name}")
+
+    for name in ("inline", "issue", "pipeline", "plan", "recover"):
+        metadata = (
+            ROOT / f"plugins/team-harness/skills/{name}/agents/openai.yaml"
+        ).read_text()
+        if "allow_implicit_invocation: false" not in metadata:
+            fail(f"Codex operator-only skill permits implicit invocation: {name}")
+
+    for required_resource in (
+        "plugins/team-harness/skills/excalidraw-diagram/references/json-schema.md",
+        "plugins/team-harness/skills/interactive-presentation/references/templates/package.json",
+    ):
+        if not (ROOT / required_resource).is_file():
+            fail(f"Codex projected skill resource is missing: {required_resource}")
 
     setup = (ROOT / "plugins/team-harness/skills/setup/SKILL.md").read_text()
     update = (ROOT / "plugins/team-harness/skills/update/SKILL.md").read_text()
@@ -236,7 +476,7 @@ def main() -> None:
         "${CODEX_HOME:-$HOME/.codex}/.team-harness.json",
         "scripts/manage_config.py",
         "scripts/manage_agents.py",
-        "manage_config.py ensure --version 3.6.3",
+        "manage_config.py ensure --version 3.6.5",
         "codex mcp add memory",
         "@upstash/context7-mcp@3.2.5",
         "manage_agents.py sync --scope SCOPE",
@@ -259,17 +499,154 @@ def main() -> None:
     for marker in ("migration-only", "1 — inline", "2 — pipeline"):
         if marker not in setup.lower():
             fail(f"Codex setup lane migration guidance is missing {marker!r}")
+
+    modes = (ROOT / "plugins/team-harness/skills/modes/SKILL.md").read_text()
+    for marker in (
+        "/skills",
+        "$team-harness",
+        "never activates a pipeline or another skill",
+        "Enumerate every sibling",
+        "reading only its YAML `name` and `description`",
+        "discovery",
+        "Do not read a sibling skill body",
+    ):
+        if marker not in modes:
+            fail(f"Team Harness modes catalog is missing {marker!r}")
+
+    shared_modes = (ROOT / "skills/modes/SKILL.md").read_text()
+    shared_catalog_names = [
+        line.split("`")[1]
+        for line in shared_modes.splitlines()
+        if line.startswith("| `")
+    ]
+    if set(shared_catalog_names) != shared_skill_names:
+        fail("shared Team Harness modes catalog does not match packaged skills")
+    if shared_catalog_names != sorted(shared_catalog_names):
+        fail("shared Team Harness modes catalog must be alphabetical")
+    opencode_skill_names = {
+        path.parent.name
+        for path in (ROOT / "installer-assets/opencode-skills").glob("*/SKILL.md")
+    }
+    if opencode_skill_names != shared_skill_names:
+        fail(
+            "opencode skill projection differs from the canonical shared set: "
+            f"missing={sorted(shared_skill_names - opencode_skill_names)}, "
+            f"extra={sorted(opencode_skill_names - shared_skill_names)}"
+        )
+    opencode_overrides = {
+        "background", "cross-repo", "recover", "setup", "tmux", "update"
+    }
+    for name in sorted(opencode_skill_names - opencode_overrides):
+        projected = ROOT / f"installer-assets/opencode-skills/{name}"
+        if generated_marker not in (projected / "SKILL.md").read_text():
+            fail(f"opencode skill projection is unmanaged: {name}")
+        if not (projected / "canonical.md").is_file():
+            fail(f"opencode skill projection lacks canonical workflow: {name}")
+    for name in ("inline", "issue", "pipeline", "plan", "recover"):
+        metadata = (
+            ROOT / f"installer-assets/opencode-skills/{name}/SKILL.md"
+        ).read_text()
+        if 'opencode/autoinvoke: "false"' not in metadata:
+            fail(f"opencode operator-only skill permits auto-invocation: {name}")
+    opencode_modes = (
+        ROOT / "installer-assets/opencode-commands/th-modes.md"
+    ).read_text()
+    for marker in ("native `modes` skill", "read-only"):
+        if marker not in opencode_modes:
+            fail(f"opencode th-modes command is missing {marker!r}")
     for marker in (
         "codex plugin marketplace upgrade team-harness",
         "codex plugin remove team-harness@team-harness",
         "codex plugin add team-harness@team-harness",
+        "skills/update/scripts/bridge_snapshot.py",
+        "--old-plugin OLD_PLUGIN --new-plugin NEW_PLUGIN",
         "manage_config.py ensure --version NEW_VERSION",
         "manage_agents.py sync --scope SCOPE",
         "Even when plugin versions compare equal",
-        "start a new Codex thread",
+        "NEW_PLUGIN` and `NEW_VERSION` are the only",
+        "without exiting `127`",
+        "do not require a restart merely because the cache version changed",
+        "Ask the operator to restart Codex or open a new thread only when",
     ):
         if marker not in update:
             fail(f"Codex update skill is missing {marker!r}")
+
+    bridge_script = ROOT / "plugins/team-harness/skills/update/scripts/bridge_snapshot.py"
+    with tempfile.TemporaryDirectory() as temp_root:
+        cache = (
+            pathlib.Path(temp_root)
+            / ".codex/plugins/cache/team-harness/team-harness"
+        )
+        new_snapshot = cache / manifest["version"]
+        (new_snapshot / ".codex-plugin").mkdir(parents=True)
+        (new_snapshot / "hooks").mkdir()
+        (new_snapshot / ".codex-plugin/plugin.json").write_text(json.dumps({
+            "name": "team-harness",
+            "version": manifest["version"],
+        }))
+        (new_snapshot / "hooks/run-codex-hook.sh").write_text("#!/bin/sh\n")
+        old_snapshot = cache / "3.6.2"
+
+        linked = subprocess.run(
+            [
+                sys.executable,
+                str(bridge_script),
+                "--old-plugin",
+                str(old_snapshot),
+                "--new-plugin",
+                str(new_snapshot),
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if linked.returncode != 0:
+            fail(f"Codex snapshot bridge failed: {linked.stdout}{linked.stderr}")
+        linked_result = json.loads(linked.stdout)
+        if linked_result.get("status") != "linked" or linked_result.get("restartRequired"):
+            fail("Codex snapshot bridge did not create a live compatibility link")
+        if old_snapshot.resolve() != new_snapshot.resolve():
+            fail("Codex snapshot bridge does not resolve to the new plugin")
+
+        repeated = subprocess.run(
+            [
+                sys.executable,
+                str(bridge_script),
+                "--old-plugin",
+                str(old_snapshot),
+                "--new-plugin",
+                str(new_snapshot),
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if repeated.returncode != 0 or json.loads(repeated.stdout).get("status") != "current":
+            fail("Codex snapshot bridge is not idempotent")
+
+        real_snapshot = cache / "3.6.1"
+        real_snapshot.mkdir()
+        refused = subprocess.run(
+            [
+                sys.executable,
+                str(bridge_script),
+                "--old-plugin",
+                str(real_snapshot),
+                "--new-plugin",
+                str(new_snapshot),
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        refused_result = json.loads(refused.stdout)
+        if (
+            refused.returncode != 0
+            or refused_result.get("status") != "skipped-existing-path"
+            or not refused_result.get("restartRequired")
+            or real_snapshot.is_symlink()
+        ):
+            fail("Codex snapshot bridge replaced a real cached directory")
 
     config_script = ROOT / "plugins/team-harness/skills/setup/scripts/manage_config.py"
     agents_script = ROOT / "plugins/team-harness/skills/setup/scripts/manage_agents.py"
@@ -389,7 +766,7 @@ def main() -> None:
             fail(f"Codex bundled-agent sync failed: {synced.stdout}{synced.stderr}")
         sync_result = json.loads(synced.stdout)
         if set(sync_result.get("changed", [])) != expected:
-            fail("Codex bundled-agent sync did not install all six roles")
+            fail("Codex bundled-agent sync did not install all ten roles")
         for role in expected:
             installed = temp / "codex-home/agents" / f"{role}.toml"
             packaged = ROOT / "plugins/team-harness/skills/setup/assets/agents" / f"{role}.toml"
@@ -694,9 +1071,13 @@ def main() -> None:
         ROOT / "plugins/team-harness/skills/pipeline/references/delivery.md"
     ).read_text()
     ship_contract = "\n".join((pipeline, current_state, deliver_skill, delivery_reference)).lower()
-    for marker in ("single", "version", "changelog", "commit", "push", "draft pr"):
+    for marker in ("single", "validated commit", "validated_commit_sha", "validated_tree_sha", "push", "draft pr"):
         if marker not in ship_contract:
             fail(f"Codex Gate 3 ship contract is missing {marker!r}")
+    delivery_lower = delivery_reference.lower()
+    for forbidden in ("run tests", "edit version/changelog", "stage", "commit", "fetch or reconcile"):
+        if forbidden not in delivery_lower:
+            fail(f"Codex publish-only delivery does not prohibit {forbidden!r}")
     for marker in ("merge", "tag", "release", "publication"):
         if marker not in ship_contract:
             fail(f"Codex Gate 3 ship exclusions are missing {marker!r}")
@@ -787,6 +1168,22 @@ def main() -> None:
             fail(f"pipeline activation preflight is missing {marker!r}")
     if "${CODEX_HOME:-$HOME/.codex}/.team-harness.json" not in activation:
         fail("pipeline activation must prefer the Codex-native Team Harness config")
+
+    review_pr = (ROOT / "plugins/team-harness/skills/review-pr/canonical.md").read_text()
+    for role in ("reviewer", "pr-review-qa", "pr-review-security", "reviewer-consolidator"):
+        if role not in review_pr:
+            fail(f"Codex review-pr preflight does not name {role}")
+    for marker in (
+        "all four exact agent identities",
+        "one complete project or global set only",
+        "regular non-symlink",
+        'sandbox_mode = "read-only"',
+        "filesystem-read plus external-read",
+        "$team-harness:setup agents",
+        "new Codex thread",
+    ):
+        if marker not in review_pr:
+            fail(f"Codex review-pr preflight is missing {marker!r}")
 
     output_contract = (ROOT / "docs/output-contract-patterns.md").read_text()
     for marker in (
@@ -881,7 +1278,7 @@ def main() -> None:
 
     activation_digests = digest_table(activation)
     pipeline_digests = digest_table(pipeline)
-    if set(activation_digests) != expected or activation_digests != pipeline_digests:
+    if set(activation_digests) != pipeline_roles or activation_digests != pipeline_digests:
         fail("pipeline and activation skill digest tables are not synchronized")
     for role, expected_digest in activation_digests.items():
         normalized = (ROOT / f".codex/agents/{role}.toml").read_bytes().replace(
@@ -944,11 +1341,25 @@ def main() -> None:
     if hook_check.returncode != 0:
         fail(f"Codex hook bundles are stale:\n{hook_check.stdout}{hook_check.stderr}")
 
+    skill_check = subprocess.run(
+        ["node", "tools/codex-runtime/sync-skills.mjs", "--check"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if skill_check.returncode != 0:
+        fail(
+            "Codex skill projections are stale:\n"
+            f"{skill_check.stdout}{skill_check.stderr}"
+        )
+
     print("codex runtime structure: PASS")
 
 
 if __name__ == "__main__":
     try:
+        check_post_gate1_projection()
         main()
     except Exception as error:
         print(f"codex runtime structure: FAIL: {error}", file=sys.stderr)

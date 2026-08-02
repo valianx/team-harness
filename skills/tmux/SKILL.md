@@ -1,6 +1,6 @@
 ---
 name: tmux
-description: Orchestrate multiple Claude Code instances in parallel.
+description: Orchestrate multiple runtime-native coding-agent sessions in parallel through tmux.
 ---
 name: tmux
 

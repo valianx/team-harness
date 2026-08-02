@@ -1,0 +1,6 @@
+interface:
+  display_name: "Team Harness Pipeline"
+  short_description: "Explicitly activate the gated Team Harness pipeline"
+  default_prompt: "Use $team-harness:pipeline for this task."
+policy:
+  allow_implicit_invocation: false

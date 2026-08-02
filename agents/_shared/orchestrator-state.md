@@ -26,6 +26,13 @@ next_action: {what to do next}      # the successor to a prose recovery section
 total_tokens: N
 ```
 
+`iteration: N/3` is the implementation/validation correction-round counter only. A
+plan repair that preserves approved meaning, an operator decision or its transcription,
+and explicitly requested architect work do not increment it and do not emit a new
+`iteration.start`. New writers emit only `cause: verification` for a correction round;
+`cause: operator` remains readable for historical traces but is not produced for new
+runs.
+
 The seven named states above are the only legal v3 pipeline sequence. `inline` is a
 pre-activation direct-mode outcome and is never a v3 state or field value. Every activated
 pipeline uses this same v3 machine and both gates; there is no depth profile. An activated
@@ -128,6 +135,10 @@ audit_status: pending|done|unavailable|null  # set in validation: pending on dis
 code_hygiene: pass|fail|null                # docs/code-hygiene-gate.md
 verification_base_source_ref: origin/main|{dep-branch}|{commit}  # selected base ref; re-resolved at Freeze to detect movement
 verification_base_ref: {full commit object ID}             # immutable Phase-2 baseline; copied into the verification packet
+freeze_commit_sha: {full commit object ID}|null             # complete clean candidate before validation
+freeze_tree_sha: {full tree object ID}|null
+validated_commit_sha: {full commit object ID}|null          # copied from Freeze only after acceptance passes
+validated_tree_sha: {full tree object ID}|null
 open_findings: [{id, disposition}]|[]       # dispositions live in 00-decision-ledger.md
 ```
 
@@ -157,13 +168,14 @@ Live consumers, so it is never treated as documentation: the record-based recove
 **Delivery coordinates — written by the coordinator during STAGE-GATE-3 preparation.**
 ```
 delivery_issue: {number, title, labels, project}|null
-delivery_version_preview: {old}->{new}|not-bumped|null
+delivery_version: {committed version}|not-bumped|null
 delivery_changed_files: [{path}, ...]|[]
 delivery_diff_composition: {total_lines, total_files, mechanical_files, substantive_files}|null
 delivery_size_result: within-bounds|flagged|null
 delivery_size_justification: {workspace pointer}|null
+delivery_base_status: {base_ref, validated_base_sha, remote_base_sha: {full SHA}|null, status: current|moved|unknown}|null
 delivery_suite_evidence: {00-suite-evidence.md row coordinate}|null
-delivery_preview: {pr_title, pr_body_path, pr_body_sha256, acceptance_matrix_path, acceptance_matrix_sha256, changelog_draft_path, changelog_draft_sha256}|null
+delivery_preview: {pr_title, pr_body_path, pr_body_sha256, acceptance_matrix_path, acceptance_matrix_sha256}|null
 ```
 
 These are coordinates, not verdicts. They persist the exact inputs already used to present
@@ -258,7 +270,7 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | `duration_ms`, `tokens`, `tokens_in`, `tokens_out`, `tokens_estimated` | conditional | per the token-tracking rule |
 | `verdict` | conditional | `pass`/`concerns`/`fail`/`partial-fail` |
 | `decision` | conditional | required for `stage.gate.release` |
-| `cause` | conditional | `operator`/`verification` — required for `iteration.start` |
+| `cause` | conditional | `verification` for new `iteration.start` correction rounds; historical `operator` values remain readable |
 | `provenance` | conditional | required for `checkpoint.confirmed`; a **closed enum, never free text**, and never subject to the bound below |
 | `tools`, `model`, `effort` | optional | propagated verbatim from the returning status block |
 | `extra` | optional | event-specific |

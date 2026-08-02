@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -61,6 +62,284 @@ def require_any(text: str, markers: tuple[str, ...], message: str) -> None:
     require(any(marker.lower() in lowered for marker in markers), message)
 
 
+@dataclass(frozen=True)
+class TransitionOutcome:
+    """Machine-shaped result extracted from one post-Gate-1 routing row."""
+
+    owner: str
+    phase: str
+    architect: str
+    gate: str
+    delta: int
+
+
+EXPECTED_POST_GATE1: dict[str, TransitionOutcome] = {
+    "mechanical": TransitionOutcome("main", "implementation", "prohibited", "none", 0),
+    "decision": TransitionOutcome(
+        "main", "implementation", "explicit-only", "none", 0
+    ),
+    "architect-request": TransitionOutcome(
+        "main", "design", "allowed", "new-gate1", 0
+    ),
+    "implementation": TransitionOutcome(
+        "implementation", "implementation", "prohibited", "none", 1
+    ),
+    "evidence": TransitionOutcome("tester", "validation", "prohibited", "none", 1),
+}
+
+
+def _table_cells(line: str) -> list[str]:
+    """Return Markdown table cells without treating inline pipes as fields."""
+    if not line.lstrip().startswith("|"):
+        return []
+    cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+    if len(cells) < 2 or all(re.fullmatch(r":?-+:?", cell) for cell in cells):
+        return []
+    return cells
+
+
+def _route_key(label: str) -> str | None:
+    lowered = label.lower()
+    if "mechanical" in lowered:
+        return "mechanical"
+    if "decision-bearing" in lowered or "security-obligation" in lowered:
+        return "decision"
+    if "explicit" in lowered and "architect" in lowered:
+        return "architect-request"
+    if "correctable code" in lowered or "implementation executor" in lowered:
+        return "implementation"
+    if "missing" in lowered or "insufficient evidence" in lowered:
+        return "evidence"
+    return None
+
+
+def _table_owner(text: str) -> str:
+    """Normalize one Codex routing-table owner cell."""
+    if re.search(r"\btester\b", text):
+        return "tester"
+    if "implementation executor" in text:
+        return "implementation"
+    return "main" if re.search(r"\bmain\b", text) else ""
+
+
+def _table_phase(text: str, key: str) -> str:
+    """Extract the continuation phase, including table-specific shorthand."""
+    match = re.search(r"`phase:\s*(design|implementation|validation)`", text)
+    if match:
+        return match.group(1)
+    shorthand = {
+        "evidence": ("affected validation", "validation"),
+        "implementation": ("return to implementation", "implementation"),
+        "architect-request": ("phase: design", "design"),
+    }
+    marker, phase = shorthand.get(key, ("", ""))
+    return phase if marker in text else ""
+
+
+def _table_architect(text: str) -> str:
+    """Normalize the architect-permission cell."""
+    if "prohibited unless" in text or "unless separately" in text:
+        return "explicit-only"
+    if "allowed" in text:
+        return "allowed"
+    return "prohibited" if "prohibited" in text else ""
+
+
+def _table_gate(text: str) -> str:
+    """Normalize the Gate-1 consequence from a continuation cell."""
+    if re.search(r"\bno new gate 1\b", text):
+        return "none"
+    return "new-gate1" if re.search(r"\bnew gate 1\b", text) else ""
+
+
+def _table_delta(text: str) -> int | None:
+    """Return a valid iteration delta, or None for malformed table input."""
+    match = re.fullmatch(r"`?([+-]?\d+)`?", text.strip())
+    return int(match.group(1)) if match else None
+
+
+def _parse_table_outcome(cells: list[str], source: str) -> tuple[str, TransitionOutcome] | None:
+    """Parse one row from the Codex authoritative transition table."""
+    if len(cells) != 5 or (key := _route_key(cells[0])) is None:
+        return None
+    continuation = cells[2].lower()
+    owner = _table_owner(cells[1].lower())
+    phase = _table_phase(continuation, key)
+    architect = _table_architect(cells[3].lower())
+    gate = _table_gate(continuation)
+    delta = _table_delta(cells[4])
+    if not all((owner, phase, architect, gate)) or delta is None:
+        raise AssertionError(f"{source}: malformed transition row {cells!r}")
+    return key, TransitionOutcome(owner, phase, architect, gate, delta)
+
+
+def _parse_codex_transition_rows(text: str) -> dict[str, TransitionOutcome]:
+    """Parse the exhaustive Codex post-Gate-1 table into transition results."""
+    block = section(text, "### Authoritative post-Gate-1 routing", "## Start")
+    rows: dict[str, TransitionOutcome] = {}
+    for line in block.splitlines():
+        parsed = _parse_table_outcome(_table_cells(line), "Codex routing table")
+        if parsed is None:
+            continue
+        key, outcome = parsed
+        if key in rows:
+            raise AssertionError(f"Codex routing table repeats {key!r}")
+        rows[key] = outcome
+    return rows
+
+
+def _claude_transition_sections(text: str) -> tuple[str, str]:
+    """Return the fixed Claude matrix and its final-result correction contract."""
+    route = section(
+        text,
+        "After Gate 1, the coordinator applies one fixed routing matrix:",
+        "Every pipeline uses this exact sequence",
+    )
+    final_result = section(
+        text,
+        "## Final-result correction and structural contradiction",
+        "### Implementation checkpoint",
+    )
+    return route.lower(), final_result.lower()
+
+
+def _parse_claude_transition_rows(text: str) -> dict[str, TransitionOutcome]:
+    """Parse explicit machine fields from Claude's fixed routing projection."""
+    route, final_result = _claude_transition_sections(text)
+    rows: dict[str, TransitionOutcome] = {}
+    field_pattern = re.compile(
+        r"`route: (?P<key>[a-z-]+)`;\s*"
+        r"`owner: (?P<owner>main|implementation|tester)`;\s*"
+        r"`phase: (?P<phase>design|implementation|validation)`;\s*"
+        r"`architect: (?P<architect>prohibited|explicit-only|allowed)`;\s*"
+        r"`gate: (?P<gate>none|new-gate1)`;\s*"
+        r"`iteration delta: (?P<delta>[+-]?\d+)`"
+    )
+    for match in field_pattern.finditer(f"{route}\n{final_result}"):
+        key = match.group("key")
+        require(key not in rows, f"Claude routing prose repeats {key!r}")
+        rows[key] = TransitionOutcome(
+            match.group("owner"),
+            match.group("phase"),
+            match.group("architect"),
+            match.group("gate"),
+            int(match.group("delta")),
+        )
+    return rows
+
+
+def _claude_security_obligation_contracts() -> tuple[tuple[str, str], ...]:
+    """Return the two coordinator-owned Claude security-routing contracts."""
+    pipeline = read("agents/ref-pipeline.md")
+    return (
+        ("Claude authoritative routing matrix", _claude_transition_sections(pipeline)[0]),
+        (
+            "Claude shared plan-write boundary",
+            section(
+                read("agents/_shared/plan-consolidation.md"),
+                "## Write-scope on the plan set (closed list)",
+                "## Final-result finding coordinates",
+            ).lower(),
+        ),
+    )
+
+
+def _require_claude_security_obligation_routes() -> None:
+    """Require full decision/audit handling in both Claude coordinator contracts."""
+    markers = (
+        "security-obligation change is never mechanical",
+        "decision-bearing",
+        "bounded live operator decision",
+        "implementation → freeze → fresh security audit → validation",
+        "architect is prohibited unless the live operator separately and explicitly requests architect work",
+        "`iteration` delta: `0`",
+    )
+    for label, contract in _claude_security_obligation_contracts():
+        flat = re.sub(r"\s+", " ", contract.lower())
+        require(all(marker in flat for marker in markers), f"{label}: security-obligation route drifted")
+
+
+def _claude_decision_route_contracts() -> tuple[tuple[str, str], ...]:
+    """Return Claude post-Gate-1 sections where decisions could select a phase."""
+    pipeline = read("agents/ref-pipeline.md")
+    return _claude_security_obligation_contracts() + (
+        ("Claude iteration rules", section(pipeline, "## Iteration rules", "### Cost-ordered re-run — R0 → R1 → R2")),
+        ("Claude final-result correction", _claude_transition_sections(pipeline)[1]),
+        ("Claude audit correction", section(pipeline, "### The audit never iterates", "### Knowledge write on audit findings")),
+    )
+
+
+def _reject_unqualified_decision_to_design() -> None:
+    """Reject post-Gate-1 decision clauses that can open design on their own."""
+    required_request = "separately and explicitly requests architect work"
+    transitions = (
+        r"\bdecision(?:s)?\b[^.]{0,220}\b(?:reopen|open|return to|set)\s+`?(?:phase:\s*)?design\b[^.]*",
+        r"\b(?:reopen|open|return to|set)\s+`?(?:phase:\s*)?design\b[^.]{0,220}\bdecision(?:s)?\b[^.]*",
+        r"\bdecision(?:s)?\b[^.]{0,220}\bnew gate 1\b[^.]*",
+        r"\bnew gate 1\b[^.]{0,220}\bdecision(?:s)?\b[^.]*",
+    )
+    for label, contract in _claude_decision_route_contracts():
+        flat = re.sub(r"\s+", " ", contract.lower())
+        for pattern in transitions:
+            for match in re.finditer(pattern, flat):
+                require(
+                    required_request in match.group(0),
+                    f"{label}: decision can open design without a separate explicit architect request",
+                )
+
+
+def _require_matching_post_gate1_rows(
+    claude: dict[str, TransitionOutcome], codex: dict[str, TransitionOutcome]
+) -> None:
+    """Compare both projections with the authoritative machine-shaped outcomes."""
+    for label, rows in (("Claude", claude), ("Codex", codex)):
+        require(set(rows) == set(EXPECTED_POST_GATE1), f"{label} transition rows drifted: {sorted(rows)}")
+        for key, expected in EXPECTED_POST_GATE1.items():
+            require(rows[key] == expected, f"{label} {key} transition drifted: {rows[key]!r}")
+
+
+def _require_codex_security_obligation_route() -> None:
+    """Preserve the equivalent Codex security-obligation routing guarantee."""
+    block = section(read("plugins/team-harness/skills/pipeline/SKILL.md"), "### Authoritative post-Gate-1 routing", "## Start").lower()
+    markers = (
+        "security-obligation classification",
+        "bounded live operator decision",
+        "implementation → freeze → validation",
+        "conditional security review",
+    )
+    require(all(marker in block for marker in markers), "Codex security-obligation transition lost operator/Freeze/security validation")
+
+
+def _require_iteration_cause_contract() -> None:
+    """Keep fresh correction events verification-only while retaining old history."""
+    iteration = section(read("agents/ref-pipeline.md"), "### `cause` and the severity floor", "### Pre-dispatch gate over a Phase-3 correction round's findings").lower()
+    iteration_flat = re.sub(r"\s+", " ", iteration)
+    state_iteration = re.sub(r"\s+", " ", read("agents/_shared/orchestrator-state.md").lower())
+    require(
+        "new `iteration.start` events are correction-only" in iteration_flat
+        and "new writers emit only `cause: verification`" in state_iteration
+        and "historical events with `cause: operator` remain readable" in iteration_flat
+        and "are not produced by new runs" in iteration_flat,
+        "Claude iteration compatibility permits new operator-cause correction events",
+    )
+    require(
+        "every `iteration.start` carries `cause: operator" not in iteration_flat
+        and "new writers emit only `cause: operator" not in state_iteration,
+        "Claude iteration compatibility still produces operator-cause events",
+    )
+
+
+def check_authoritative_post_gate1_transitions() -> None:
+    """Claude/Codex transition rows have identical machine-shaped outcomes."""
+    claude = _parse_claude_transition_rows(read("agents/ref-pipeline.md"))
+    codex = _parse_codex_transition_rows(read("plugins/team-harness/skills/pipeline/SKILL.md"))
+    _require_matching_post_gate1_rows(claude, codex)
+    _require_claude_security_obligation_routes()
+    _reject_unqualified_decision_to_design()
+    _require_codex_security_obligation_route()
+    _require_iteration_cause_contract()
+
+
 def check_v3_machine() -> None:
     """Claude and Codex expose the same seven named states and no alternate v3."""
     state_paths = (
@@ -101,89 +380,73 @@ def check_v3_machine() -> None:
     require("edit/reject → design" in claude_flow, "Claude Gate 1 edge drifted")
 
 
-def check_corrective_routes() -> None:
-    """The final-result correction routes remain equivalent across projections."""
+def _corrective_route_contracts() -> dict[str, str]:
+    """Collect the bounded Claude/Codex contracts used by correction checks."""
     claude_pipeline = read("agents/ref-pipeline.md")
-    claude_correction = section(
-        claude_pipeline,
-        "## Final-result correction and structural contradiction",
-        "### Implementation checkpoint",
-    )
-    claude_audit = section(
-        claude_pipeline,
-        "### The audit never iterates",
-        "### Knowledge write on audit findings",
-    )
     codex_pipeline = read("plugins/team-harness/skills/pipeline/SKILL.md")
     codex_validation = read("plugins/team-harness/skills/pipeline/references/validation.md")
-    codex_security = read("runtime/codex/instructions/security.md")
-    codex_tester = read("runtime/codex/instructions/tester.md")
-    codex_routes = "\n".join((codex_pipeline, codex_validation, codex_security, codex_tester))
-    codex_sensitive = section(
-        codex_pipeline,
-        "## Stage 1 and final-result routing",
-        "## Start",
-    )
+    return {
+        "claude_pipeline": claude_pipeline,
+        "claude_correction": _claude_transition_sections(claude_pipeline)[1],
+        "claude_audit": section(claude_pipeline, "### The audit never iterates", "### Knowledge write on audit findings"),
+        "claude_gate3": section(claude_pipeline, "## STAGE-GATE-3", "## Delivery"),
+        "codex_pipeline": codex_pipeline,
+        "codex_validation": codex_validation,
+        "codex_routes": "\n".join((codex_pipeline, codex_validation, read("runtime/codex/instructions/security.md"), read("runtime/codex/instructions/tester.md"))),
+        "codex_sensitive": section(codex_pipeline, "## Stage 1 and final-result routing", "## Start"),
+    }
 
-    # Ordinary code/test/docs defects return to implementation; missing evidence
-    # remains a tester responsibility in both runtimes.
-    require("return to `implementation`" in claude_correction, "Claude defect route drifted")
-    require("Evidence gaps return to `tester`" in claude_correction, "Claude evidence route drifted")
-    require("return to the implementation executor" in codex_pipeline, "Codex defect route drifted")
-    require("Missing evidence returns to" in codex_pipeline, "Codex evidence route drifted")
-    require("`tester`" in codex_validation, "Codex evidence route lost tester owner")
 
-    # Sensitive findings and incomplete sensitive coverage must go through the
-    # same implementation → Freeze → audit loop, never silently pass validation.
-    for label, text in (("Claude", claude_audit), ("Codex", codex_sensitive)):
+def _require_ordinary_corrective_routes(contracts: dict[str, str]) -> None:
+    """Require implementation correction and tester-owned evidence repair."""
+    claude = re.sub(r"\s+", " ", contracts["claude_correction"].lower())
+    codex = re.sub(r"\s+", " ", contracts["codex_pipeline"].lower())
+    require("return to `implementation`" in claude, "Claude defect route drifted")
+    require("evidence gaps return to `tester`" in claude, "Claude evidence route drifted")
+    require("return to the implementation executor" in codex, "Codex defect route drifted")
+    require("missing evidence returns to `tester`" in codex, "Codex evidence route drifted")
+    require("`tester`" in contracts["codex_validation"], "Codex evidence route lost tester owner")
+
+
+def _require_sensitive_audit_routes(contracts: dict[str, str]) -> None:
+    """Require the implementation/Freeze/fresh-audit loop for sensitive findings."""
+    for label, text in (("Claude", contracts["claude_audit"]), ("Codex", contracts["codex_sensitive"])):
         lowered = text.lower()
         require("implementation" in lowered, f"{label}: sensitive route lacks implementation")
         require("freeze" in lowered, f"{label}: sensitive route lacks Freeze reopening")
-        require_any(
-            text,
-            ("fresh security audit", "fresh audit", "re-audit", "re-audit required"),
-            f"{label}: sensitive route lacks fresh audit requirement",
-        )
+        require_any(text, ("fresh security audit", "fresh audit", "re-audit", "re-audit required"), f"{label}: sensitive route lacks fresh audit requirement")
+    require("broke-it" in contracts["claude_audit"], "Claude audit route lost broke-it handling")
+    require("incomplete_on_changed_control" in contracts["claude_audit"], "Claude audit route lost incomplete sensitive-coverage handling")
+    require("sensitive coverage gap" in contracts["codex_routes"].lower(), "Codex route lost sensitive coverage handling")
 
-    require("broke-it" in claude_audit, "Claude audit route lost broke-it handling")
-    require(
-        "incomplete_on_changed_control" in claude_audit,
-        "Claude audit route lost incomplete sensitive-coverage handling",
-    )
-    require("sensitive coverage gap" in codex_routes.lower(), "Codex route lost sensitive coverage handling")
 
-    # A correctable break or incomplete sensitive coverage is a validation
-    # failure: it cannot enter waiting_gate3 or be accepted by `ship`. The
-    # compact Codex projection expresses the same invariant through its
-    # current-anchor/no-ship rule rather than repeating the adversary vocabulary.
-    claude_gate3 = section(claude_pipeline, "## STAGE-GATE-3", "## Delivery")
-    require(
-        "prevents this state entirely" in claude_gate3
-        and "never reaches this gate" in claude_gate3,
-        "Claude: correctable sensitive findings can reach Gate 3",
-    )
-    require(
-        "broke-it" in claude_gate3 and "incomplete sensitive-coverage" in claude_gate3,
-        "Claude: Gate 3 does not name both fail-closed security cases",
-    )
-    codex_validation_flat = re.sub(r"\s+", " ", codex_validation.lower())
-    require(
-        "do not ship until the audit has seen the current anchor" in codex_validation_flat,
-        "Codex: Gate 3 can ship a sensitive delta before re-audit",
-    )
-    require(
-        "correctable sensitive finding" in codex_pipeline.lower()
-        and "fresh security audit" in codex_pipeline.lower(),
-        "Codex: sensitive correction route is not tied to fresh audit",
-    )
+def _require_gate3_security_routes(contracts: dict[str, str]) -> None:
+    """Ensure correctable sensitive findings cannot reach shipping approval."""
+    claude_gate3 = contracts["claude_gate3"]
+    require("prevents this state entirely" in claude_gate3 and "never reaches this gate" in claude_gate3, "Claude: correctable sensitive findings can reach Gate 3")
+    require("broke-it" in claude_gate3 and "incomplete sensitive-coverage" in claude_gate3, "Claude: Gate 3 does not name both fail-closed security cases")
+    validation = re.sub(r"\s+", " ", contracts["codex_validation"].lower())
+    require("do not ship until the audit has seen the current anchor" in validation, "Codex: Gate 3 can ship a sensitive delta before re-audit")
+    codex = contracts["codex_pipeline"].lower()
+    require("correctable sensitive finding" in codex and "fresh security audit" in codex, "Codex: sensitive correction route is not tied to fresh audit")
 
-    # A structural contradiction is the only correction that can reopen design,
-    # and it needs an operator decision plus a new Gate 1 in both projections.
-    for label, text in (("Claude", claude_correction), ("Codex", codex_routes)):
+
+def _require_structural_contradiction_routes(contracts: dict[str, str]) -> None:
+    """Require operator-controlled design/Gate-1 handling for contradictions."""
+    for label, text in (("Claude", contracts["claude_correction"]), ("Codex", contracts["codex_routes"])):
         lowered = text.lower()
         require("structural contradiction" in lowered, f"{label}: contradiction route missing")
         require("operator" in lowered, f"{label}: contradiction route lacks operator decision")
         require("design" in lowered and "gate 1" in lowered, f"{label}: contradiction route lacks new Gate 1")
+
+
+def check_corrective_routes() -> None:
+    """The final-result correction routes remain equivalent across projections."""
+    contracts = _corrective_route_contracts()
+    _require_ordinary_corrective_routes(contracts)
+    _require_sensitive_audit_routes(contracts)
+    _require_gate3_security_routes(contracts)
+    _require_structural_contradiction_routes(contracts)
 
 
 def check_direct_predicate() -> None:
@@ -663,9 +926,8 @@ def check_inline_review_contract() -> None:
             require(marker in lowered, f"Codex {role}: inline field missing {marker!r}")
 
 
-def check_single_ship_delivery() -> None:
-    """Gate 3 ship is the one operator decision through draft PR."""
-    sources = {
+def _delivery_publish_sources() -> dict[str, str]:
+    return {
         "Claude gate": read("agents/_shared/gate-contract.md"),
         "Claude mechanics": read("agents/_shared/delivery-mechanics.md"),
         "Claude pipeline": read("agents/ref-pipeline.md"),
@@ -674,10 +936,17 @@ def check_single_ship_delivery() -> None:
         "Codex delivery skill": read("plugins/team-harness/skills/deliver/SKILL.md"),
         "Codex delivery reference": read("plugins/team-harness/skills/pipeline/references/delivery.md"),
     }
-    for label, text in sources.items():
+
+
+def _check_publish_contracts(publish_sources: dict[str, str]) -> None:
+    for label, text in publish_sources.items():
         flat = re.sub(r"\s+", " ", text.lower())
-        for marker in ("version", "commit", "push", "draft pr"):
+        for marker in ("push", "draft pr"):
             require(marker in flat, f"{label}: ship delivery omits {marker}")
+        require(
+            "validated commit" in flat or "validated_commit_sha" in flat,
+            f"{label}: ship delivery omits validated commit identity",
+        )
         require(
             "do not ask" in flat
             or "no second conversational" in flat
@@ -687,16 +956,55 @@ def check_single_ship_delivery() -> None:
         )
         require("merge" in flat and "release" in flat, f"{label}: ship exclusions are incomplete")
 
-    codex_pipeline = sources["Codex pipeline"].lower()
+
+def _check_implementation_assembly() -> None:
+    assembly_sources = {
+        "Claude assembly": read("agents/_shared/implementation-assembly.md"),
+        "Codex implementation": read("plugins/team-harness/skills/pipeline/references/implementation.md"),
+    }
+    for label, text in assembly_sources.items():
+        flat = re.sub(r"\s+", " ", text.lower())
+        for marker in ("version", "changelog", "commit", "before freeze"):
+            require(marker in flat, f"{label}: implementation assembly omits {marker}")
+        for marker in ("diff composition", "mechanical", "substantive", "reviewability exceptions"):
+            require(marker in flat, f"{label}: implementation assembly omits {marker}")
+    claude_pipeline = read("agents/ref-pipeline.md")
+    require(
+        "agents/_shared/implementation-assembly.md" in claude_pipeline,
+        "Claude pipeline does not invoke the canonical implementation assembly contract",
+    )
+
+
+def check_single_ship_delivery() -> None:
+    """Implementation freezes a complete commit; delivery only publishes it."""
+    publish_sources = _delivery_publish_sources()
+    _check_publish_contracts(publish_sources)
+    _check_implementation_assembly()
+    mechanics = publish_sources["Claude mechanics"].lower()
+    for forbidden in ("git commit -m", "git add ", "git fetch origin {default-branch}"):
+        require(forbidden not in mechanics, f"Claude delivery still executes {forbidden!r}")
+    for marker in ("validated_commit_sha", "validated_tree_sha", "git status --porcelain"):
+        require(marker in mechanics, f"Claude delivery identity check omits {marker!r}")
+    for marker in ("git ls-remote", "verification_base_ref", "current", "moved", "unknown"):
+        require(marker in mechanics, f"Claude delivery base-status report omits {marker!r}")
+    require("git fetch" not in mechanics, "Claude delivery base-status report mutates remote refs")
+
+    codex_pipeline = publish_sources["Codex pipeline"].lower()
     require(
         "does not authorize a push" not in codex_pipeline,
         "Codex pipeline still says Gate 3 ship cannot authorize push/PR",
     )
-    codex_delivery = re.sub(r"\s+", " ", sources["Codex delivery reference"].lower())
+    codex_delivery = re.sub(r"\s+", " ", publish_sources["Codex delivery reference"].lower())
     require(
         "technical runtime boundary" in codex_delivery
         and "not a new team harness" in codex_delivery,
         "Codex delivery conflates native tool permission with another operator gate",
+    )
+    require(
+        "git ls-remote" in codex_delivery
+        and "verification_base_ref" in codex_delivery
+        and "without mutating refs" in codex_delivery,
+        "Codex delivery omits the non-mutating base-status report",
     )
 
 
@@ -717,20 +1025,21 @@ def check_delivery_preview_binding() -> None:
         require("before" in text and "gate 3" in text and "sha-256" in text, f"{label}: exact prose is not bound before Gate 3")
     require("before stage-gate-3" in delivery_role, "Delivery role still runs after Gate 3")
     require("do not modify tracked repository files" in delivery_role, "Delivery preview can change the frozen tree")
+    require("changelog-fragment-draft.md" not in delivery_role, "Delivery preview still owns changelog assembly")
     require("do not regenerate prose" in codex_delivery, "Codex delivery can regenerate approved prose")
     require("never recompose" in claude_delivery_flat, "Claude mechanics can recompose approved prose")
     require("--draft" in claude_delivery and "isdraft" in claude_delivery, "Claude mechanics do not enforce draft-only PR delivery")
-    require("open` with `isdraft: false" in claude_delivery, "Ready-for-review PR mutation is not blocked")
+    require(
+        "ready-for-review" in claude_delivery and "never downgraded" in claude_delivery,
+        "Ready-for-review PR mutation is not blocked",
+    )
     require(
         "approved title from delivery_preview" in claude_delivery_flat
         and "approved pr_body_path from delivery_preview" in claude_delivery_flat,
         "Claude mechanics can regenerate or select a different PR title/body",
     )
-    require(
-        "runs even when the version bump was skipped" in claude_delivery_flat
-        and "stop this section after materialization" in claude_delivery_flat,
-        "Claude mechanics can lose the approved fragment when versioning is deferred",
-    )
+    require("does not run tests" in claude_delivery_flat, "Claude delivery can rerun validated tests")
+    require("moving base" in claude_delivery_flat and "does not change" in claude_delivery_flat, "Claude delivery can invalidate on base movement")
     require("exact `00-state.md`" in deliver_skill and "never scan" in deliver_skill, "Codex deliver can select another active workspace")
     codex_delivery_flat = re.sub(r"\s+", " ", codex_delivery)
     require(
@@ -848,6 +1157,7 @@ def main() -> None:
     checks = (
         ("v3 machine", check_v3_machine),
         ("corrective routes", check_corrective_routes),
+        ("authoritative post-Gate-1 transitions", check_authoritative_post_gate1_transitions),
         ("direct predicate", check_direct_predicate),
         ("single writer", check_single_writer),
         ("gate aliases", check_gate_aliases),

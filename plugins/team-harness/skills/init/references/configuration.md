@@ -24,7 +24,7 @@ a direct mode.
      booleans.
    - `clickup.workspace_id`: a string.
    - `agent-scope`: `global` or `project` (default `global`); it controls where
-     the six bundled agent files are installed, never the inline/pipeline posture.
+     the ten bundled agent files are installed, never the inline/pipeline posture.
 5. Apply `language` to responses and operator-facing workspace prose.
    `english_learning: true` adds the configured brief correction signal only
    when the operator writes in English; it never changes the response language.

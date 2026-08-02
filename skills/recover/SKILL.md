@@ -71,6 +71,13 @@ New state uses one machine and no posture/profile field:
 design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete
 ```
 
+`iteration: N/3` is a correction counter for implementation/validation remediation only.
+Mechanical plan repairs and bounded operator decisions are coordinator-owned and resume at
+`implementation` without incrementing the counter or emitting `iteration.start`; explicit
+architect work is likewise counter-neutral and requires a fresh live operator request before
+`design` and a new Gate 1. Historical `cause: operator` iteration events remain readable, but
+new recovery writers emit correction events with `cause: verification` only.
+
 A current `pipeline_version: 3` snapshot is valid only when it has this schema and no
 legacy `lane`, profile, fast/simple, or tier-0 routing field. A legacy snapshot is never
 silently mapped. Numeric or named v2 phases, `lane: express|full`, `--fast`, `[TIER: N]`,

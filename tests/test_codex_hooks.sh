@@ -87,6 +87,124 @@ if (!manifest.description.includes("Native Codex permissions") || !manifest.desc
 NODE
 then pass; else fail "manifest must wire only deterministic deny hooks"; fi
 
+# Codex documents PLUGIN_ROOT for plugin hooks, but some supported hosts expose
+# only the Claude-compatible alias. Execute the literal manifest command in a
+# clean environment so the packaged hook cannot regress to /hooks/... + 127.
+manifest_command="$(node - "$ROOT/plugins/team-harness/hooks/hooks.json" <<'NODE'
+const fs = require("node:fs");
+const manifest = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const commands = manifest.hooks.PreToolUse
+  .flatMap(group => group.hooks || [])
+  .map(hook => hook.command);
+const command = commands.find(value => value.includes("policy-block"));
+if (!command) process.exit(1);
+process.stdout.write(command);
+NODE
+)"
+out="$(
+  cd "$ROOT" &&
+  env -i PATH=/usr/bin:/bin \
+    CLAUDE_PLUGIN_ROOT="$ROOT/plugins/team-harness" \
+    /bin/bash -c "$manifest_command" < "$FIXTURES/pretool-destructive.json"
+)"
+[ "$(printf '%s' "$out" | json_value 'd.hookSpecificOutput?.permissionDecision')" = "deny" ] \
+  && pass || fail "manifest command must launch with CLAUDE_PLUGIN_ROOT only"
+
+out="$(
+  cd "$ROOT" &&
+  env -i PATH=/usr/bin:/bin \
+    PLUGIN_ROOT="$ROOT/plugins/team-harness" \
+    CLAUDE_PLUGIN_ROOT=/invalid-plugin-root \
+    /bin/bash -c "$manifest_command" < "$FIXTURES/pretool-destructive.json"
+)"
+[ "$(printf '%s' "$out" | json_value 'd.hookSpecificOutput?.permissionDecision')" = "deny" ] \
+  && pass || fail "manifest command must prefer native PLUGIN_ROOT when available"
+
+stale_root="$(mktemp -d "/tmp/team harness cache.XXXXXX")"
+stale_cache="$stale_root/plugins/cache/team-harness/team-harness"
+mkdir -p "$stale_cache/3.6.3/.codex-plugin"
+cp -R "$ROOT/plugins/team-harness/hooks" "$stale_cache/3.6.3/hooks"
+printf '%s\n' '{"name":"team-harness","version":"3.6.3"}' > "$stale_cache/3.6.3/.codex-plugin/plugin.json"
+out="$(
+  cd "$ROOT" &&
+  env -i PATH=/usr/bin:/bin \
+    CLAUDE_PLUGIN_ROOT="$stale_cache/3.6.2" \
+    /bin/bash -c "$manifest_command" < "$FIXTURES/pretool-destructive.json"
+)"
+[ "$(printf '%s' "$out" | json_value 'd.hookSpecificOutput?.permissionDecision')" = "deny" ] \
+  && pass || fail "manifest command must recover from a replaced versioned plugin root"
+rm -rf "$stale_root"
+
+assert_invalid_plugin_root() {
+  root_value="$1"
+  label="$2"
+  out="$(
+    cd "$ROOT" &&
+    env -i PATH=/usr/bin:/bin \
+      PLUGIN_ROOT="$root_value" \
+      /bin/bash -c "$manifest_command" < "$FIXTURES/pretool-safe.json"
+  )"
+  if [ "$(printf '%s' "$out" | json_value 'd.hookSpecificOutput?.permissionDecision')" = "deny" ] \
+    && printf '%s' "$out" | grep -q 'plugin runtime missing'; then
+    pass
+  else
+    fail "$label must fail closed without executing a fallback"
+  fi
+}
+
+assert_invalid_plugin_root "relative/plugin" "relative plugin root"
+assert_invalid_plugin_root "/" "filesystem root"
+
+foreign_root="$(mktemp -d)"
+mkdir -p "$foreign_root/attacker/hooks"
+printf '%s\n' '#!/bin/sh' 'printf "%s\\n" "foreign-runner-executed"' > "$foreign_root/attacker/hooks/run-codex-hook.sh"
+chmod +x "$foreign_root/attacker/hooks/run-codex-hook.sh"
+assert_invalid_plugin_root "$foreign_root/stale" "foreign sibling root"
+rm -rf "$foreign_root"
+
+unsafe_root="$(mktemp -d)"
+unsafe_cache="$unsafe_root/plugins/cache/team-harness/team-harness"
+mkdir -p "$unsafe_cache/9.9.9/hooks" "$unsafe_cache/9.9.9/.codex-plugin"
+printf '%s\n' '#!/bin/sh' 'printf "%s\\n" "unsafe-runner-executed"' > "$unsafe_root/runner.sh"
+chmod +x "$unsafe_root/runner.sh"
+ln -s "$unsafe_root/runner.sh" "$unsafe_cache/9.9.9/hooks/run-codex-hook.sh"
+printf '%s\n' '{"name":"team-harness","version":"9.9.9"}' > "$unsafe_cache/9.9.9/.codex-plugin/plugin.json"
+assert_invalid_plugin_root "$unsafe_cache/8.8.8" "symlink fallback runner"
+rm -rf "$unsafe_root"
+
+nonregular_root="$(mktemp -d)"
+nonregular_cache="$nonregular_root/plugins/cache/team-harness/team-harness"
+mkdir -p "$nonregular_cache/9.9.9/hooks/run-codex-hook.sh" \
+  "$nonregular_cache/9.9.9/.codex-plugin"
+printf '%s\n' '{"name":"team-harness","version":"9.9.9"}' \
+  > "$nonregular_cache/9.9.9/.codex-plugin/plugin.json"
+assert_invalid_plugin_root "$nonregular_cache/8.8.8" "non-regular fallback runner"
+rm -rf "$nonregular_root"
+
+wrong_manifest_root="$(mktemp -d)"
+wrong_manifest_cache="$wrong_manifest_root/plugins/cache/team-harness/team-harness"
+mkdir -p "$wrong_manifest_cache/9.9.9/hooks" \
+  "$wrong_manifest_cache/9.9.9/.codex-plugin"
+printf '%s\n' '#!/bin/sh' 'printf "%s\\n" "wrong-manifest-runner-executed"' \
+  > "$wrong_manifest_cache/9.9.9/hooks/run-codex-hook.sh"
+chmod +x "$wrong_manifest_cache/9.9.9/hooks/run-codex-hook.sh"
+printf '%s\n' '{"name":"not-team-harness","version":"8.8.8"}' \
+  > "$wrong_manifest_cache/9.9.9/.codex-plugin/plugin.json"
+assert_invalid_plugin_root "$wrong_manifest_cache/8.8.8" "invalid fallback manifest"
+rm -rf "$wrong_manifest_root"
+
+out="$(
+  cd "$ROOT" &&
+  env -i PATH=/usr/bin:/bin \
+    /bin/bash -c "$manifest_command" < "$FIXTURES/pretool-safe.json"
+)"
+if [ "$(printf '%s' "$out" | json_value 'd.hookSpecificOutput?.permissionDecision')" = "deny" ] \
+  && printf '%s' "$out" | grep -q 'plugin runtime missing'; then
+  pass
+else
+  fail "missing plugin-root aliases must fail closed without hook exit 127"
+fi
+
 if node "$ROOT/tools/codex-runtime/sync-hooks.mjs" --check >/dev/null; then
   pass
 else

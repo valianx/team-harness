@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Resume Session"
+  short_description: "Team Harness Resume Session workflow"
+  default_prompt: "Use $team-harness:resume-session for this request."

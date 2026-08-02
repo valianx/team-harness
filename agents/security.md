@@ -649,12 +649,15 @@ sensitive coverage, report the same four coordinates:
 - **AC:** the exact approved AC identifiers implicated.
 - **Correction:** the smallest concrete fix and its owner.
 
-Correctable findings in the approved diff return to the implementation executor;
-they do not rewrite the AC or start an autonomous patch loop. The correction
-reopens Freeze and requires a fresh security audit of the changed delta before
-the next gate. An unresolved structural contradiction is sent to the operator
-for a design decision. Record `Freeze: reopened` and `Re-audit: required` in the
-failure brief whenever that route applies.
+These coordinates are evidence for the coordinator, not routing authority: security
+does not select `design`, edit the plan, change phase, or dispatch the next agent.
+Correctable findings in the approved diff are sent to the coordinator for one
+implementation/validation correction round; they do not rewrite the AC or start an
+autonomous patch loop. The correction reopens Freeze and requires a fresh security
+audit of the changed delta before the next gate. An unresolved structural contradiction
+is presented to the live operator; only an explicit architect request may reopen design.
+Record `Freeze: reopened` and `Re-audit: required` in the failure brief whenever that
+route applies.
 
 ---
 
@@ -953,11 +956,11 @@ Do NOT repeat the full workspaces content in your final message — it's already
 
 ### Failure Brief (pipeline mode only, when Critical/High findings exist)
 
-When you finish pipeline mode and `reviews/04-security.md` reports any **Critical** or **High** finding (or `status: failed`), **append** an iteration entry to `workspaces/{feature-name}/failure-brief.md` so the orchestrator can route Case D iteration without re-reading the full security report. Create the file if it doesn't exist.
+When you finish pipeline mode and `reviews/04-security.md` reports any **Critical** or **High** finding (or `status: failed`), **append** a correction entry to `workspaces/{feature-name}/failure-brief.md` so the coordinator can route one implementation/validation round without re-reading the full security report. Create the file if it doesn't exist.
 
 ```markdown
 ## Iteration {N} — security — {YYYY-MM-DD HH:MM}
-**Root cause type:** D (security-only)
+**Root cause type:** A (implementation/validation correction)
 **Blast radius:** localized {STEP-2} | structural
 
 ### Critical / High findings
@@ -979,11 +982,11 @@ When you finish pipeline mode and `reviews/04-security.md` reports any **Critica
 - ...
 ```
 
-**Blast radius guidance:** declare `localized {IDs}` when the finding is confined to specific, named implementation steps or files and a targeted fix resolves it. Declare `structural` when the finding reflects a design-level vulnerability or implicates multiple interconnected components. Default to `structural` when uncertain — security fixes must err on the side of full re-dispatch.
+**Blast radius guidance:** declare `localized {IDs}` when the finding is confined to specific, named implementation steps or files and a targeted fix resolves it. Declare `structural` when the finding reflects a design-level vulnerability or implicates multiple interconnected components. Default to `structural` when uncertain — the coordinator presents a design decision to the live operator; no automatic architect dispatch is allowed.
 
 Medium / Low / Info findings do NOT go in the brief — those are warnings included in the delivery report, not iteration triggers. Keep the brief tight: 5-10 lines per iteration.
 
-**Prose-budget exemption.** The pipeline-mode per-finding prose budget (§ Output Contract above — `file:line` + CWE + ≤1-sentence impact + ≤1-line remediation pointer) governs `reviews/04-security.md` only. It does NOT apply to the remediation lines above: `failure-brief.md` retains `file:line` + actionable remediation guidance for every Critical/High blocking finding, uncapped — this is the Case-D iteration vehicle, exempt from the report's prose budget.
+**Prose-budget exemption.** The pipeline-mode per-finding prose budget (§ Output Contract above — `file:line` + CWE + ≤1-sentence impact + ≤1-line remediation pointer) governs `reviews/04-security.md` only. It does NOT apply to the remediation lines above: `failure-brief.md` retains `file:line` + actionable remediation guidance for every Critical/High blocking finding, uncapped — this is the Case-A iteration vehicle, exempt from the report's prose budget.
 
 ---
 

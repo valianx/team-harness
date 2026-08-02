@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Json Canvas"
+  short_description: "Team Harness Json Canvas workflow"
+  default_prompt: "Use $team-harness:json-canvas for this request."

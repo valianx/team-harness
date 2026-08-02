@@ -29,7 +29,7 @@ capabilities, sandbox modes, and profile values.
 `plugins/team-harness/skills/setup/assets/agents/`, and the human-readable
 `.codex/README.md`. That README
 contains the Codex contributor workflow plus the complete canonical Team
-Harness roster, with an explicit availability column distinguishing the six
+Harness roster, with an explicit availability column distinguishing the ten
 installed custom agents, the Main-hosted orchestrator posture, and roles not yet
 shipped in the Codex beta. These files are committed so a trusted checkout works
 without a build step. Do not edit generated files directly.
@@ -44,12 +44,15 @@ repositories require a narrowly approved command or an equivalent external CI
 sandbox; the project config does not weaken that boundary.
 
 The distributable package lives under `plugins/team-harness/`; the repo-scoped
-catalog at `.agents/plugins/marketplace.json` exposes it to Codex. It is
-isolated from the root Claude-oriented skill set because Codex plugin
-validation requires the literal plugin-local `skills/` path.
+catalog at `.agents/plugins/marketplace.json` exposes it to Codex. The root
+`skills/` tree is the canonical capability set. Ten hand-authored Codex
+contracts own lifecycle and gated-pipeline behavior; `sync-skills.mjs`
+generates adapters for every other canonical skill, including its referenced
+scripts and assets. The plugin therefore retains the required literal
+plugin-local `skills/` path without maintaining an independent catalog.
 
 Contributors should invoke `$sync-codex-agents` after changing any canonical
-agent's model/effort, one of the six installed role contracts, its Codex
+agent's model/effort, one of the ten installed role contracts, its Codex
 adapter, or the registry. The skill runs the deterministic renderer, shows the
 exact generated diff, and executes the same freshness and generator tests
 required by CI; it never synthesizes role prose or TOML itself.
@@ -61,5 +64,6 @@ node tools/codex-runtime/generate.mjs
 git diff -- .codex/config.toml .codex/agents .codex/README.md
 node tools/codex-runtime/generate.mjs --check
 node tools/codex-runtime/test_generate.mjs
+node tools/codex-runtime/sync-skills.mjs --check
 node tools/codex-runtime/validate-marketplace.mjs
 ```

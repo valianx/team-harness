@@ -224,6 +224,7 @@ jobs:
         run: |
           node tools/codex-runtime/generate.mjs --check
           node tools/codex-runtime/test_generate.mjs
+          node tools/codex-runtime/sync-skills.mjs --check
       - name: Validate marketplace and plugin structure
         run: |
           node tools/codex-runtime/validate-marketplace.mjs

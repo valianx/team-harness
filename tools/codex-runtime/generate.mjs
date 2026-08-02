@@ -6,6 +6,10 @@ import { fileURLToPath } from "node:url";
 import process from "node:process";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const capabilityProfiles = new Map([
+  ["review-read-only", { default: "deny", allow: ["read", "glob", "grep"] }]
+]);
+
 function fail(message) {
   throw new Error(`codex-runtime: ${message}`);
 }
@@ -176,6 +180,15 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     for (const capability of capabilities) {
       if (!allowedCapabilities.has(capability)) fail(`${agent.name}: unsupported capability ${capability}`);
     }
+    let capabilityProfile = null;
+    if (agent.capability_profile !== undefined) {
+      assertNonEmptyString(agent.capability_profile, `${agent.name}.capability_profile`);
+      capabilityProfile = capabilityProfiles.get(agent.capability_profile);
+      if (!capabilityProfile) fail(`${agent.name}: unsupported capability profile ${agent.capability_profile}`);
+      if (agent.sandbox_mode !== "read-only") {
+        fail(`${agent.name}: capability profile ${agent.capability_profile} requires read-only sandbox mode`);
+      }
+    }
 
     const expectedSemanticSource = `agents/${agent.name}.md`;
     if (agent.semantic_source !== expectedSemanticSource) fail(`${agent.name}: semantic_source must be ${expectedSemanticSource}`);
@@ -204,7 +217,7 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     if (outputPaths.has(resolvedOutput)) fail(`${agent.name}: duplicate output_path`);
     outputPaths.add(resolvedOutput);
     usedProjectionTiers.add(matches[0].name);
-    validatedAgents.push({ ...agent, projectionTier: matches[0].name, sourceModel, sourceEffort });
+    validatedAgents.push({ ...agent, capabilityProfile, projectionTier: matches[0].name, sourceModel, sourceEffort });
   }
 
   const semanticRoster = [];
@@ -274,6 +287,12 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
       ]),
       `sandbox_mode = ${JSON.stringify(agent.sandbox_mode)}`,
       `developer_instructions = ${JSON.stringify(instructions)}`,
+      ...(agent.capabilityProfile ? [
+        "",
+        "[capabilities]",
+        `default = ${JSON.stringify(agent.capabilityProfile.default)}`,
+        `allow = [${agent.capabilityProfile.allow.map(capability => JSON.stringify(capability)).join(", ")}]`
+      ] : []),
       ""
     ].join("\n");
     files.set(repositoryPath(rootDir, agent.output_path, `${agent.name}.output_path`), generated);
@@ -319,7 +338,7 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     "",
     "Author shared role intent in `agents/*.md`. Codex model and effort values are projected from that frontmatter, while Codex-specific execution instructions live in `runtime/codex/instructions/*.md` and workflow adapters live in `plugins/team-harness/skills/`. A semantic prompt change is not translated automatically into those adapters, so review both surfaces when behavior should change in Claude Code and Codex.",
     "",
-    "After changing any canonical agent's model or effort, one of the six installed role contracts, a Codex instruction adapter, or `runtime/schema/codex-agents.json`, run `$sync-codex-agents`. The equivalent repository commands are:",
+    "After changing any canonical agent's model or effort, one of the ten installed role contracts, a Codex instruction adapter, or `runtime/schema/codex-agents.json`, run `$sync-codex-agents`. The equivalent repository commands are:",
     "",
     "```bash",
     "node tools/codex-runtime/generate.mjs",

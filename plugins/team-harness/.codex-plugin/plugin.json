@@ -1,7 +1,7 @@
 {
   "name": "team-harness",
-  "version": "3.6.4",
-  "description": "Configure, update, and run lightweight or gated Team Harness workflows in Codex.",
+  "version": "3.6.8",
+  "description": "Run the complete shared Team Harness skill catalog in Codex with native setup, updates, hooks, and gated workflows.",
   "author": {
     "name": "Mario Gutierrez",
     "url": "https://github.com/valianx"
@@ -13,13 +13,15 @@
     "orchestration",
     "agents",
     "workflow",
+    "diagrams",
+    "gcp",
     "codex"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Team Harness",
-    "shortDescription": "Setup, updates, intake, and gated delivery.",
-    "longDescription": "Configure and update Team Harness natively in Codex, keep Main clean by default, use @Team-Harness init for lightweight intake and direct work, or explicitly request @Team-Harness pipeline for staged delivery backed by specialized agents.",
+    "shortDescription": "Shared workflows, diagrams, GCP, and delivery.",
+    "longDescription": "Use the complete shared Team Harness skill catalog in Codex through native runtime adapters, including diagrams, GCP, research, review, setup, updates, lightweight intake, and the explicitly gated delivery pipeline.",
     "developerName": "Mario Gutierrez",
     "category": "Developer Tools",
     "capabilities": [
@@ -28,10 +30,13 @@
     ],
     "websiteURL": "https://github.com/valianx/team-harness",
     "defaultPrompt": [
+      "@Team-Harness modes: list the available Team Harness skills and explain when to use each one.",
       "@Team-Harness setup: configure Team Harness for Codex.",
       "@Team-Harness update: update the Codex marketplace, plugin, configuration, and installed agents.",
       "@Team-Harness init: help me frame or handle this task without starting the full pipeline.",
       "@Team-Harness pipeline: explicitly start the full gated workflow for this change in the current Main thread.",
+      "Use Team Harness to create an architecture diagram for this repository.",
+      "Use Team Harness to inspect GCP infrastructure in read-only plan mode.",
       "Continue implementation of the active approved Team Harness pipeline.",
       "Recover the active Team Harness workspace."
     ],

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Translate"
+  short_description: "Team Harness Translate workflow"
+  default_prompt: "Use $team-harness:translate for this request."

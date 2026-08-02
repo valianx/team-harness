@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Cross Repo"
+  short_description: "Team Harness Cross Repo workflow"
+  default_prompt: "Use $team-harness:cross-repo for this request."

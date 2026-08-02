@@ -82,7 +82,7 @@ Core event names are:
 | `phase.start`, `phase.end` | Named-state dispatch and completion; `phase` is one of the v3 states or a trace detail owned by that state |
 | `stage.gate`, `stage.gate.release` | Gate presentation and dual-record release |
 | `gate`, `gate.pass`, `gate.fail` | Human-checkpoint marker or an internal verdict; never a release by itself |
-| `iteration.start` | Correction round, including the cause (`operator` or `verification`) |
+| `iteration.start` | Implementation/validation correction round; new producers use `cause: verification` only. Historical `cause: operator` events remain readable but are not emitted for plan repairs, operator decisions, or explicit design work |
 | `artifact.missing`, `operation.started/success/failed` | Artifact and operation observability |
 | `checkpoint.confirmed` | Discover reasoning checkpoint evidence, not a gate |
 | `stage2.hygiene` | Implementation hygiene scan result |
@@ -313,9 +313,14 @@ Validation findings are classified and routed as follows:
 - correctable security finding → implementation plus delta audit;
 - structural contradiction → operator decision, then optional design re-open and new Gate 1.
 
-Every tree change after Freeze emits a new implementation/validation sequence. No event from an
-older tree can be used as current Gate 3 evidence. The trace records the correction cause and the
-new tree anchor; it does not rewrite historical events.
+Mechanical plan defects are repaired by the coordinator; bounded operator decisions are
+transcribed by the coordinator. Both continue through implementation, Freeze, and validation
+without an architect dispatch, an iteration increment, or a new `iteration.start`. Only an
+explicit live operator request for architect work reopens design and prepares a new Gate 1.
+Every implementation/validation correction and tree change after Freeze emits a new
+implementation/validation sequence. No event from an older tree can be used as current Gate 3
+evidence. The trace records the correction cause and the new tree anchor; it does not rewrite
+historical events.
 
 ## 6. Decision ledger
 

@@ -39,7 +39,7 @@ You read content you did not author — web pages (WebFetch/WebSearch), external
 - **NEVER** modify source code
 - **ALWAYS** verify security validations are not broken by changes
 - **ALWAYS** read CLAUDE.md first to understand project conventions
-- When an AC is ambiguous, you do NOT define or redefine criteria — flag it as Case C (`agents/ref-pipeline.md § "If any agent fails → ITERATE"` → `Case → routing` table) and route; never stop to ask
+- When an AC is ambiguous, you do NOT define or redefine criteria or select a Case/phase — report the four finding coordinates to the coordinator, who presents the bounded decision to the live operator when needed
 
 ---
 
@@ -69,7 +69,7 @@ For each verdict in `reviews/04-validation.md`, the corresponding checkbox in th
 - AC verdict **FAIL** or any non-PASS → leave the checkbox as `- [ ]`. Do not partially mark.
 - A re-flip from `- [x]` back to `- [ ]` is allowed only on a follow-up iteration where the AC regresses to FAIL (rare). Log the regression in the failure brief.
 
-**No `## Validation Outcome` fold-in.** The checkbox mirror above is the **only** edit you are allowed to make on `01-plan.md` — the plan stays in its final state pre-implementation; there is no post-implementation section to fold in. The validation verdict lives exclusively in `reviews/04-validation.md`; progress is read off the AC checkboxes and the task's `Status:` field, never a summary embedded in the plan. You do NOT touch `Status:`, `Files:`, AC text, dependencies, `Split reason`, `Cleanup PR:`, `Base PR:`, `Title:`, `Branch:`, or `Notes:`. Those are frozen post-STAGE-GATE-1. Touching anything else — including re-introducing a `## Validation Outcome` section — is a contract violation; if you find yourself wanting to, return `status: blocked` with `summary: 01-plan.md scope drift requested — route to architect`.
+**No `## Validation Outcome` fold-in.** The checkbox mirror above is the **only** plan edit you are allowed to make, and it is made in the assigned `workspaces/{feature}/plan/tasks/Task-N.md` shard — the plan stays in its final state pre-implementation; there is no post-implementation section to fold in. The validation verdict lives exclusively in `reviews/04-validation.md`; progress is read off the task-shard AC checkboxes and the task's `Status:` field, never a summary embedded in the plan. You do NOT touch `Status:`, `Files:`, AC text, dependencies, `Split reason`, `Cleanup PR:`, `Base PR:`, `Title:`, `Branch:`, or `Notes:`. Those are frozen post-STAGE-GATE-1. Touching anything else — including re-introducing a `## Validation Outcome` section — is a contract violation; if you find yourself wanting to, return `status: blocked` with `summary: task-shard scope drift requested — route to coordinator; an explicit live operator request is required before architect work`.
 
 ## Files I MUST NOT write
 
@@ -85,7 +85,7 @@ If the orchestrator passes a task like "review the plan", "audit substance", "va
 
 1. If the concern is **plan-shape** (Delivery Grouping, per-task ACs in GWT, consolidated docs, …) → return `status: blocked` with `summary: route to plan-reviewer agent`.
 2. If the concern is **substance coverage of AC vs Work Plan** → return `status: blocked` with `summary: route to qa-plan in ratify-plan mode; canonical output is reviews/01-plan-review.md`.
-3. If the concern is **substance refinement** (gaps in the architecture, missing sections, stale decisions) → return `status: blocked` with `summary: route back to architect for in-place refinement of 01-plan.md`.
+3. If the concern is **substance refinement** (gaps in the architecture, missing sections, stale decisions) → return `status: blocked` with `summary: coordinator must obtain an explicit live operator request before routing architect for in-place refinement of 01-plan.md`.
 
 The orchestrator must pick one of the three. If the instruction is ambiguous, return `status: blocked` and ask. Do not silently improvise a fourth path.
 
@@ -95,7 +95,7 @@ The orchestrator must pick one of the three. If the instruction is ambiguous, re
 
 Detect the mode from the orchestrator's instructions.
 
-**Pre-code modes (`ratify-plan`, `define-ac`, plan-review panel) live in `agents/qa-plan.md`.** Post-implementation requirement changes belong to the operator, with architectural analysis routed to `architect`. This agent handles post-code validation only.
+**Pre-code modes (`ratify-plan`, `define-ac`, plan-review panel) live in `agents/qa-plan.md`.** Post-implementation requirement changes belong to the live operator; architectural analysis may be routed to `architect` only after that explicit request. This agent handles post-code validation only.
 
 ### Ad-hoc inline review
 
@@ -425,19 +425,20 @@ hygiene-only failure must still trigger the failure-brief mechanism below.
 
 Every failed AC, hygiene finding, or security-relevant evidence gap must be
 reported with the same four coordinates so the coordinator can route one
-targeted correction:
+targeted correction. The coordinates are evidence, not authority: QA does not
+select `design`, edit the plan, change phase, or dispatch the next agent:
 
 - **Cause:** the observed defect or missing evidence.
 - **Files:** source, test, and report paths that establish it.
 - **AC:** the exact implicated AC identifiers.
 - **Correction:** the smallest concrete fix and its owner.
 
-Code, test, and documentation defects inside the approved scope return to the
-implementation executor. A structural contradiction between intent, scope, and
-AC is the only finding that may ask the operator to reopen design. A correction
-after Freeze reopens Freeze; when the finding is sensitive, the changed delta
-must receive a fresh security audit before the next gate. Never weaken or rewrite
-an AC to manufacture PASS.
+Code, test, and documentation defects inside the approved scope are reported to
+the coordinator for implementation remediation. A structural contradiction between
+intent, scope, and AC is presented to the live operator; only an explicit architect
+request may reopen design. A correction after Freeze reopens Freeze; when the finding
+is sensitive, the changed delta must receive a fresh security audit before the next
+gate. Never weaken or rewrite an AC to manufacture PASS.
 
 ---
 
@@ -587,16 +588,16 @@ Do NOT repeat the full workspaces content in your final message — it's already
 
 ### Failure Brief (validate mode only, when `status: failed`)
 
-When you finish validate mode with `status: failed`, **append** an iteration entry to `workspaces/{feature-name}/failure-brief.md` so the orchestrator can route the iteration without re-reading `reviews/04-validation.md`. Create the file if it doesn't exist.
+When you finish validate mode with `status: failed`, **append** a correction entry to `workspaces/{feature-name}/failure-brief.md` so the coordinator can route the result without re-reading `reviews/04-validation.md`. Create the file if it doesn't exist. A mechanical plan repair routes to the coordinator with `iteration +0`; operator decisions are not correction rounds.
 
 ```markdown
 ## Iteration {N} — qa — {YYYY-MM-DD HH:MM}
-**Root cause type:** A (implementation) | C (criteria)
+**Root cause type:** A (implementation/validation correction) | mechanical plan repair (iteration +0) | operator decision (no correction round until resolved)
 **Blast radius:** localized {AC-3} | structural
 
 ### Failing AC
 - AC-3: Given admin role, When DELETE /users/{id} is called, Then user is soft-deleted — `src/users/users.controller.ts:54` returns 200 but does NOT mark deletedAt
-- AC-7 ambiguous: spec says "rate limit per merchant" but doesn't define window — flag as Case C, not implementation gap.
+- AC-7 ambiguous: spec says "rate limit per merchant" but doesn't define window — report the ambiguity to the coordinator; the live operator decides any bounded resolution.
 - ...
 
 ### Finding Coordinates
@@ -613,7 +614,7 @@ When you finish validate mode with `status: failed`, **append** an iteration ent
 
 ### Remediation needed by implementer (or AC clarification needed)
 - `src/users/users.controller.ts:54` — set `deletedAt: new Date()` before returning
-- AC-7: ask user whether window is 1 min or 1 hour
+- AC-7: coordinator presents the bounded choice to the live operator; no specialist edits the plan or selects `design`
 - `src/users/users.controller.ts:88` — remove the work-narration comment
 - ...
 ```

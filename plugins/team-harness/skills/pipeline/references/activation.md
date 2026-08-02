@@ -95,12 +95,12 @@ the normalized (LF) bytes against these canonical SHA-256 digests:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| architect | `6d9b4e503aa0948d7690f26042c6d5123bffa6c2de97a18042d70015360fce31` |
+| architect | `1079cc6bd4654c78a010dec4b2bf00761eef51cab2c8458931e0582caa232f66` |
 | implementer | `d0a27bc1b21006bd656a70360307fc21901438c4f87d8241acbf4d17f04dfc93` |
-| tester | `aa9fce0b5c46c157ad3ae6433ab17f3248e3890c4100b8f9360fe0301b83e4f9` |
-| qa | `0ee008abedac57720b061c9c40865d3f480cbfa2703d1705e841580375965511` |
-| security | `cb61d7854e67201b71b5cf965aa27272904a887e0263980dcf55e4fd2feb40d8` |
-| delivery | `2a7a88db1a058db03852dbd1c5d47fafb2b2b32c8ec4dead838f19cdefc033d2` |
+| tester | `a8f5a6d976a53058b034641767e2fb466b031e3fe5e89f7192b1f4daccda2fcd` |
+| qa | `8c6deba3b667b982c2e0e88052bb2d25c830dcf515e88f276c8a226372821823` |
+| security | `bfb1f51b595f2cfca3eda6a067950d4dfd1d510dec3900ef75f5cd41d76577d8` |
+| delivery | `4addff6a8d7cdf0ab05b4ae1fb1c306ed3e350f2df63b325d24ff58e4eee22cb` |
 
 A digest mismatch is an identity failure; stop before workspace creation or
 delegation. Ask the operator to run `$team-harness:update` to

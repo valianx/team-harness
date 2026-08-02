@@ -125,12 +125,12 @@ the role fields cannot see. The current digests are:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| `architect` | `6d9b4e503aa0948d7690f26042c6d5123bffa6c2de97a18042d70015360fce31` |
+| `architect` | `1079cc6bd4654c78a010dec4b2bf00761eef51cab2c8458931e0582caa232f66` |
 | `implementer` | `d0a27bc1b21006bd656a70360307fc21901438c4f87d8241acbf4d17f04dfc93` |
-| `tester` | `aa9fce0b5c46c157ad3ae6433ab17f3248e3890c4100b8f9360fe0301b83e4f9` |
-| `qa` | `0ee008abedac57720b061c9c40865d3f480cbfa2703d1705e841580375965511` |
-| `security` | `cb61d7854e67201b71b5cf965aa27272904a887e0263980dcf55e4fd2feb40d8` |
-| `delivery` | `2a7a88db1a058db03852dbd1c5d47fafb2b2b32c8ec4dead838f19cdefc033d2` |
+| `tester` | `a8f5a6d976a53058b034641767e2fb466b031e3fe5e89f7192b1f4daccda2fcd` |
+| `qa` | `8c6deba3b667b982c2e0e88052bb2d25c830dcf515e88f276c8a226372821823` |
+| `security` | `bfb1f51b595f2cfca3eda6a067950d4dfd1d510dec3900ef75f5cd41d76577d8` |
+| `delivery` | `4addff6a8d7cdf0ab05b4ae1fb1c306ed3e350f2df63b325d24ff58e4eee22cb` |
 
 Do not accept a file solely because its comments or `name` field match. A
 digest mismatch is a stale or unrelated shadow; stop before workspace
@@ -164,14 +164,30 @@ automatic approach checkpoint, scope-freeze convergence loop, `qa-plan`,
 available only when the operator explicitly invokes it; a sensitive plan still
 gets one conditional security design review before implementation.
 
-Validation findings carry four coordinates: cause, files, implicated ACs, and
-the smallest correction with its owner. Code, test, or documentation defects in
-approved scope return to the implementation executor (or eligible direct
-coordinator), then reopen Freeze and revalidate. Missing evidence returns to
-`tester`; a correctable sensitive finding also requires a fresh security audit
-of the changed delta. Only a structural contradiction between intent, scope,
-and ACs may ask the operator to reopen design and release a new Gate 1. Never
-rewrite an AC to manufacture PASS.
+### Authoritative post-Gate-1 routing
+
+Main is the coordinator and classifies every post-Gate-1 concern. Specialists
+return only the bounded four coordinates—cause, files, implicated ACs, and the
+smallest correction with its owner. The following matrix is exhaustive:
+
+| Concern | Owner/action | Required continuation and gate/audit behavior | Architect | `iteration` delta |
+|---|---|---|---|---:|
+| Mechanical plan repair (references, identifiers, paths, counts, format, or field coherence with no semantic change) | Main repairs the canonical field and records the repair | `phase: implementation`; no new Gate 1; if Freeze was reached, rebuild Freeze and revalidate | prohibited | `0` |
+| Decision-bearing plan resolution, including a structural intent/scope/AC contradiction, security-obligation classification, or a change to intent, scope, behavior, or AC meaning | Main pauses for a bounded live operator decision and transcribes the approved resolution without reinterpretation | `phase: implementation`; `next_action` continues through implementation → Freeze → validation; no new Gate 1 and retain the conditional security review when the classification is sensitive | prohibited unless the separate explicit current live operator request for architect work applies | `0` |
+| Explicit, current live operator request for architect work | Main records the request and dispatches `architect` | `phase: design`; the resulting plan requires a new Gate 1 | allowed only for that request | `0` |
+| Correctable code, test, documentation, hygiene, or security finding inside approved scope | Implementation executor (or eligible direct Main executor) applies the smallest correction | Return to implementation → Freeze → validation; a sensitive delta requires a fresh security audit; no new Gate 1 | prohibited | `+1` |
+| Missing or insufficient evidence | `tester` completes or corrects the evidence | Re-run affected validation; tree/package changes reopen Freeze; no new Gate 1 | prohibited | `+1` |
+
+Code, test, or documentation defects in approved scope return to the implementation executor
+(or eligible direct coordinator), then reopen Freeze and revalidate. Missing
+evidence returns to `tester`; a correctable sensitive finding also requires a
+fresh security audit of the changed delta. Decision-bearing concerns, including
+structural intent/scope/AC contradictions, continue at `phase: implementation`
+after Main records a bounded live operator resolution. `phase: design`,
+dispatch of `architect`, and a new Gate 1 are reserved solely for a separate
+explicit current live operator request for architect work. Never rewrite an AC
+to manufacture PASS, and never let a specialist select the owner, phase, or
+next agent.
 
 ## Start
 
@@ -208,9 +224,10 @@ edit`, and `4: reason — reject`; Gate 3 offers `1 — ship`, `2 — amend`, an
 Never treat a specialist result as a gate decision. Never let a specialist
 present a gate or write coordination state. Pipeline activation alone does not
 authorize delivery. A later valid `Gate 3: ship` reply is the operator's single
-delivery decision for the frozen tree: it authorizes the coordinator to apply
-the previewed version/changelog, commit, push the feature branch, and create or
-update its draft PR without another conversational confirmation. It never
+delivery decision for the frozen tree: implementation has already assembled
+version/changelog and committed the complete candidate. `ship` authorizes the
+coordinator to push that exact validated commit and create or update its
+draft PR without another conversational confirmation. It never
 authorizes merge, tag, release, publication, force-push, or broader scope.
 
 ## Workspace I/O budget

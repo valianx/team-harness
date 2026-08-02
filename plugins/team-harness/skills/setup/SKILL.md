@@ -20,7 +20,7 @@ write:
 
 - `scripts/manage_config.py` validates, backs up, and atomically writes native
   settings with mode `0o600`.
-- `scripts/manage_agents.py` installs or refreshes the six bundled generated
+- `scripts/manage_agents.py` installs or refreshes the ten bundled generated
   agents without overwriting an unmanaged same-name file.
 
 ## Routing
@@ -61,7 +61,7 @@ migration, and preserve every unrelated value.
    ```
 
    Show only paths and key names. After explicit selection, copy with
-   `import --from SOURCE --version 3.6.3`. The helper deep-fills missing keys,
+   `import --from SOURCE --version 3.6.5`. The helper deep-fills missing keys,
    copies opaque values without printing them, preserves existing native
    values, and records provenance. Never merge sources silently.
 
@@ -70,7 +70,7 @@ migration, and preserve every unrelated value.
    installed version without replacing operator values:
 
    ```bash
-   python3 scripts/manage_config.py ensure --version 3.6.3
+   python3 scripts/manage_config.py ensure --version 3.6.5
    ```
 
 3. For a full setup, refresh marketplace metadata and inspect the installed
@@ -96,7 +96,7 @@ migration, and preserve every unrelated value.
    - Agent scope is `global` (default, available to every project) or `project`.
      Persist it as `agent-scope`.
 
-5. Reconcile all six bundled specialists in the persisted scope on every full
+5. Reconcile all ten bundled specialists in the persisted scope on every full
    setup, and whenever `agents` is targeted:
 
    ```bash
@@ -104,8 +104,9 @@ migration, and preserve every unrelated value.
    python3 scripts/manage_agents.py sync --scope SCOPE
    ```
 
-   The required set is `architect`, `implementer`, `tester`, `qa`, `security`,
-   and `delivery`. Missing files are installed and stale Team Harness-managed
+   The pipeline set is `architect`, `implementer`, `tester`, `qa`, `security`,
+   and `delivery`; the PR-review set is `reviewer`, `pr-review-qa`,
+   `pr-review-security`, and `reviewer-consolidator`. Missing files are installed and stale Team Harness-managed
    files are refreshed automatically. A same-name unmanaged file is a blocking
    conflict: report it and do not overwrite it. Writes outside the repository
    use Codex's native permission prompt. Do not use or download the separate Go
@@ -129,7 +130,7 @@ migration, and preserve every unrelated value.
    never approve or bypass trust.
 
 8. Re-run both helper inspections and `codex mcp list --json`. Report one
-   compact result: native config path, workspace/language, agent scope and six
+   compact result: native config path, workspace/language, agent scope and ten
    agent statuses, MCP registrations, hook verification/trust, and whether a
    new thread is required. Never print imported opaque values, secrets, or
    environment-variable values.

@@ -53,11 +53,11 @@ async function withMutedStderr(action) {
 
 const first = await render();
 const second = await render();
-assert.equal(first.files.size, 14);
+assert.equal(first.files.size, 22);
 assert.deepEqual([...first.files], [...second.files], "identical inputs must render identical bytes");
 
 const agentOutputs = [...first.files].filter(([path]) => path.includes("/.codex/agents/"));
-assert.equal(agentOutputs.length, 6);
+assert.equal(agentOutputs.length, 10);
 for (const [, content] of agentOutputs) {
   assert.match(content, /^name = /m);
   assert.match(content, /^description = /m);
@@ -68,7 +68,7 @@ for (const [, content] of agentOutputs) {
 
 const packagedAgentOutputs = [...first.files].filter(([path]) =>
   path.includes("/plugins/team-harness/skills/setup/assets/agents/"));
-assert.equal(packagedAgentOutputs.length, 6);
+assert.equal(packagedAgentOutputs.length, 10);
 for (const [path, content] of agentOutputs) {
   const name = path.split("/").at(-1);
   assert.equal(
@@ -91,10 +91,30 @@ for (const name of ["architect", "security"]) {
   assert.match(content, /^model = "gpt-5\.6-sol"$/m);
   assert.match(content, /^model_reasoning_effort = "xhigh"$/m);
 }
-for (const name of ["implementer", "tester", "qa", "delivery"]) {
+for (const name of [
+  "implementer",
+  "tester",
+  "qa",
+  "delivery",
+  "reviewer",
+  "pr-review-qa",
+  "pr-review-security",
+  "reviewer-consolidator"
+]) {
   const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
   assert.match(content, /^model = "gpt-5\.6-luna"$/m);
   assert.match(content, /^model_reasoning_effort = "max"$/m);
+}
+
+for (const name of ["reviewer", "pr-review-qa", "pr-review-security", "reviewer-consolidator"]) {
+  const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
+  assert.match(content, /^\[capabilities\]$/m);
+  assert.match(content, /^default = "deny"$/m);
+  assert.match(content, /^allow = \["read", "glob", "grep"\]$/m);
+}
+for (const name of ["architect", "implementer", "tester", "qa", "security", "delivery"]) {
+  const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
+  assert.doesNotMatch(content, /^\[capabilities\]$/m);
 }
 
 // The pipeline skill preflight uses a canonical digest in addition to the
@@ -124,6 +144,10 @@ assert.match(roster, /\$sync-codex-agents/);
 assert.match(roster, /\| Agent \| Canonical Claude model \| Canonical source effort \| Codex model \| Codex effort \| Codex availability \|/);
 assert.match(roster, /\| `architect` \| `opus` \| `xhigh` \| `gpt-5\.6-sol` \| `xhigh` \| installed custom agent \|/);
 assert.match(roster, /\| `implementer` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `reviewer` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `pr-review-qa` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `pr-review-security` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `reviewer-consolidator` \| `sonnet` \| `medium` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
 assert.match(roster, /\| `orchestrator` \| `opus` \| `high` \| `gpt-5\.6-sol` \| `xhigh` \| Main via `init` \/ `pipeline` skills \|/);
 assert.match(roster, /\| `agent-builder` \| `opus` \| `xhigh` \| `gpt-5\.6-sol` \| `xhigh` \| not shipped in Codex beta \|/);
 
@@ -155,6 +179,13 @@ await expectRegistryFailure(registry => {
 await expectRegistryFailure(registry => {
   registry.agents[0].sandbox_mode = "danger-full-access";
 }, /unsupported sandbox mode/);
+await expectRegistryFailure(registry => {
+  registry.agents[0].capability_profile = "unknown";
+}, /unsupported capability profile/);
+await expectRegistryFailure(registry => {
+  const reviewer = registry.agents.find(agent => agent.name === "reviewer");
+  reviewer.sandbox_mode = "workspace-write";
+}, /requires read-only sandbox mode/);
 await expectRegistryFailure(registry => {
   registry.project_execution.sandbox_mode = "danger-full-access";
 }, /project_execution: unsupported sandbox mode/);

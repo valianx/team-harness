@@ -49,7 +49,8 @@ $team-harness:setup
 ```
 
 The setup skill configures native Team Harness settings, optional MCP servers,
-workspace/language preferences, and the six specialist agents. It preserves
+workspace/language preferences, and ten specialist agents: six for the gated
+pipeline and four for immutable PR review. It preserves
 Codex's native permission and hook-trust prompts. It can also import every
 missing setting from an existing Claude Code or opencode Team Harness config;
 opaque values are copied directly and never displayed.
@@ -57,12 +58,12 @@ opaque values are copied directly and never displayed.
 Review the [plugin hook manifest](./plugins/team-harness/hooks/hooks.json) and
 its referenced scripts, then explicitly trust the repository before enabling
 those hooks. Plugin installation and agent installation are separate. The
-plugin provides the Team Harness skills; the six generated agents are installed
+plugin provides the Team Harness skills; the ten generated agents are installed
 by the repository's Go binary.
 
 The equivalent manual agent-installation fallback, from the project root, is:
 
-From the root of the project where Team Harness will run, install its six
+From the root of the project where Team Harness will run, install its ten
    agents (requires Go 1.25.8 or newer):
 ```bash
 cd /path/to/your/project
@@ -81,9 +82,9 @@ chmod +x install-linux-amd64
 The checksum proves that the binary matches the file published in the same
 GitHub release; it does not protect against compromise of the release origin.
 
-Use `--scope global` instead when the six agents should be available from your
-Codex user configuration rather than only this checkout. The six agents are
-required by the gated `pipeline` workflow; lightweight `init` remains
+Use `--scope global` instead when the ten agents should be available from your
+Codex user configuration rather than only this checkout. Six agents are
+required by the gated `pipeline` workflow and four by `review-pr`; lightweight `init` remains
 available with the plugin alone.
 
 4. Start another Codex thread so newly configured MCP servers and installed
@@ -94,6 +95,17 @@ available with the plugin alone.
 @Team-Harness init explain how this repository is structured
 @Team-Harness pipeline add an export-to-CSV feature to invoices
 ```
+
+To browse every Team Harness skill available in Codex, type `/skills`, start a
+skill mention with `$team-harness`, or invoke the alphabetical catalog:
+
+```text
+$team-harness:modes
+```
+
+The same 57 canonical capability names are shipped to Claude Code, Codex, and
+opencode. Runtime adapters translate native paths, tools, permissions, and
+delegation without maintaining separate feature lists.
 
 `init` performs lightweight intake and direct bounded work without pipeline
 state or agent preflight. A current live request for tester, QA, or security may
@@ -110,6 +122,8 @@ not create a seventh coordinator or require `/agent`.
 Upgrade, removal, local development, hook trust, and the complete role/model
 roster are documented in [`docs/codex-runtime.md`](./docs/codex-runtime.md).
 For routine upgrades invoke `$team-harness:update` from a Codex thread.
+Use `$team-harness:modes` in Codex, `/th:modes` in Claude Code, or
+`/th-modes` in opencode for an alphabetical, read-only capability catalog.
 
 ### Install into opencode
 

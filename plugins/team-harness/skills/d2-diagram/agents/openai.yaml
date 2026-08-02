@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness D2 Diagram"
+  short_description: "Team Harness D2 Diagram workflow"
+  default_prompt: "Use $team-harness:d2-diagram for this request."

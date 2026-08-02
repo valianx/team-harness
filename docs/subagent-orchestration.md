@@ -86,8 +86,9 @@ On recovery, the resolved config is re-read from `00-state.md` § Current State 
 | Tests (if/when introduced) | `tester` | Test plan + tests with factory mocks |
 | Acceptance criteria + validation against AC | `qa` | AC list / validation report |
 | Required product/API docs | `implementer` or `documenter`, before Freeze | Reviewed tracked docs |
-| Publication prose | `delivery` | Changelog fragment + acceptance matrix + PR-body draft |
-| Version, branch, commit, push, PR | coordinator mechanics | Published change + PR |
+| Publication prose | `delivery` | Acceptance matrix + PR-body draft |
+| Version/changelog + final candidate commit | coordinator mechanics in implementation | Complete branch before Freeze |
+| Validated identity check + push + PR | coordinator mechanics in delivery | Exact validated commit published |
 | PR review | `reviewer` | Inline review, approve/request-changes |
 | Security review of hooks, installer, or MCP (elevated privileges on user's machine) | `security` | OWASP/CWE-aligned report |
 | Visualize agent flow | `diagrammer` / `likec4-diagrammer` / `d2-diagrammer` | Diagram file + preview |

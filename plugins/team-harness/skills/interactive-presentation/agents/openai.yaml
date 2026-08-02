@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Interactive Presentation"
+  short_description: "Team Harness Interactive Presentation workflow"
+  default_prompt: "Use $team-harness:interactive-presentation for this request."

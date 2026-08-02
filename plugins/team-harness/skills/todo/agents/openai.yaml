@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Todo"
+  short_description: "Team Harness Todo workflow"
+  default_prompt: "Use $team-harness:todo for this request."

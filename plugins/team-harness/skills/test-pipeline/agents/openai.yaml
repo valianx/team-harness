@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Test Pipeline"
+  short_description: "Team Harness Test Pipeline workflow"
+  default_prompt: "Use $team-harness:test-pipeline for this request."

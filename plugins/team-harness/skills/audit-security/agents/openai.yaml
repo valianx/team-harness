@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Audit Security"
+  short_description: "Team Harness Audit Security workflow"
+  default_prompt: "Use $team-harness:audit-security for this request."

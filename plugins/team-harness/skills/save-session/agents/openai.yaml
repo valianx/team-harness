@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Save Session"
+  short_description: "Team Harness Save Session workflow"
+  default_prompt: "Use $team-harness:save-session for this request."

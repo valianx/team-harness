@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Spike"
+  short_description: "Team Harness Spike workflow"
+  default_prompt: "Use $team-harness:spike for this request."
