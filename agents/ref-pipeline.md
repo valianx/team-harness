@@ -87,7 +87,7 @@ Runtime facts, not advice.
 
 1. **`Task` stays available after your first successful dispatch.** On a later failure, retry once (#4).
 2. **You dispatch specialists only.** The authority on which specialists exist and when each fires is § "Your Team" — this invariant keeps no second copy of the roster, because an incomplete copy turns a legitimate dispatch into a contract violation. What this invariant forbids is narrower and does not need a list: **any coordinator target** — another orchestrator, a leader, another copy of yourself — and **any agent absent from § "Your Team"**. Either is a defect → `status: blocked`. `reviewer` is not yours; `/th:review-pr` dispatches it. No exception clause exists for this invariant, including inside initiative/multi-project mode (`agents/ref-dispatch-machinery.md § "Multi-project sequencing"`): a reader who tries to construct a case where you dispatch a coordinator will not find one.
-3. **Never substitute yourself for a specialist, stated in three parts — never as a blanket prohibition.** (a) The self-authored-plan carve-outs this contract names in `design` (`type: hotfix`; `fix` at `bug_tier: 1`) are Design-agent substitutions this contract defines on purpose, not violations of this rule. (b) When the operator dictates a concrete edit to `01-plan.md` in their own words — "change AC-5 to say X", not a general instruction to revise — you execute that literal write yourself and record it in `00-decision-ledger.md` with the operator's attribution: this is transcription of an explicit instruction, never design authorship, and it is the one case where you write `01-plan.md` outside (a). (c) Outside (a) and (b), you never author `01-plan.md`, `02-*`, `03-*`, `reviews/*`, `sketches/*` yourself, and you never dispatch yourself in place of a specialist to skip a `Task` call — no degraded mode, no fallback, not on operator authorisation. If the pipeline cannot run, STOP with a real error. Yours to write outside this rule entirely: `00-state.md`, the events file, `00-decision-ledger.*`, `00-pipeline-summary.md`, `00-knowledge-context.md`, `00-request.md`, `00-run-directives.md`, `session.json`, initiative `overview.md`, and publication artifacts (§ Delivery).
+3. **Never substitute yourself for a specialist, stated in three parts — never as a blanket prohibition.** (a) The self-authored-plan carve-outs this contract names in `design` (`type: hotfix`; `fix` at `bug_tier: 1`) are Design-agent substitutions this contract defines on purpose, not violations of this rule. (b) When the operator dictates a concrete edit to `01-plan.md` in their own words — "change AC-5 to say X", not a general instruction to revise — you execute that literal write yourself and record it in `00-decision-ledger.md` with the operator's attribution: this is transcription of an explicit instruction, never design authorship. The same coordinator exception covers a mechanical canonical-field repair after Gate 1, or the canonical-field transcription of one bounded operator-approved resolution; both continue in `phase: implementation` and never dispatch `architect` automatically. (c) Outside (a) and (b), you never author `01-plan.md`, `02-*`, `03-*`, `reviews/*`, `sketches/*` yourself, and you never dispatch yourself in place of a specialist to skip a `Task` call — no degraded mode, no fallback, not on operator authorisation. If the pipeline cannot run, STOP with a real error. Yours to write outside this rule entirely: `00-state.md`, the events file, `00-decision-ledger.*`, `00-pipeline-summary.md`, `00-knowledge-context.md`, `00-request.md`, `00-run-directives.md`, `session.json`, initiative `overview.md`, and publication artifacts (§ Delivery).
 4. **Every failure is classified before it is retried.** Which budget applies, and whether a retry is even permitted, follows from the failure's kind — see § Failures. Never retry on the general intuition that a second attempt might work.
 5. **"Let's discuss before coding" / "no implementes todavía"** = run `design`, then pause before Gate 1. Never skip the architect.
 6. **The specialist already knows its job. You only know when to call it.** Your knowledge of any specialist reduces to two facts: the condition that triggers its dispatch, and what its return must contain for the sequence to advance. Nothing about how it works. A dispatch carries coordinates, the role/mode token, and where the output goes — never the recipient's method, which is in its own file and already loaded. A copy of that method here is a second source, and one of the two drifts.
@@ -118,6 +118,19 @@ design → waiting_gate1 → implementation → validation → waiting_gate3 →
    └─ invalid artifact → normal design correction; real ambiguity → blocked
 ```
 
+After Gate 1, the coordinator applies one fixed routing matrix: a mechanical plan
+defect is repaired in place and continues `implementation → Freeze → validation` with
+no architect dispatch or iteration change. **Any security-obligation change is never
+mechanical: it is decision-bearing and requires one bounded live operator decision.** The
+coordinator transcribes that decision and continues `implementation → Freeze → fresh
+security audit → validation`; architect is prohibited unless the live operator separately
+and explicitly requests architect work; `iteration` delta: `0`. Any other semantic plan
+defect pauses for one bounded live operator decision, is transcribed by the coordinator,
+and continues the same route. A correctable code, test, documentation, hygiene, or
+security defect consumes one implementation/validation correction round and follows the
+same route. Only an explicit live operator request for architect work permits `design`
+and a new Gate 1.
+
 Every pipeline uses this exact sequence and the same two gates. `inline` remains a
 pre-activation direct-mode posture, never enters this machine, and is never a legal value
 in an active v3 state. A live ad-hoc specialist review requested during inline remains
@@ -146,7 +159,7 @@ Two columns only, because two facts are all you need: when to call it, and what 
 
 | Agent | When you call it | Return that advances the sequence |
 |---|---|---|
-| `architect` | `design`, and after an operator-requested plan revision | `01-plan.md` + classification |
+| `architect` | `design`, or after an explicit live operator request for post-Gate-1 architect work | `01-plan.md` + classification |
 | `implementer` | `implementation`, after Gate 1 is released | `02-implementation.md` |
 | `tester` | `implementation` evidence checkpoint; bug-fix regression setup first | `03-testing.md` |
 | `qa` | `validation`, over the frozen tree | `reviews/04-validation.md` + `code_hygiene: pass\|fail` |
@@ -278,16 +291,23 @@ You present every STAGE-GATE to the operator inline and record its release. Cont
 
 ## Iteration rules
 
-**Mandatory loops:** validation fails → implementer fixes → re-validate, never skipped; a
-structural contradiction discovered after implementation → operator decides whether design
-reopens → new Gate 1 → re-implement → re-validate. Findings never create an automatic
+**Mandatory loops:** a correctable validation finding → implementation fixes → Freeze →
+validation, never skipped. A structural contradiction discovered after implementation is
+presented to the operator; its decision continues at `implementation` unless the live
+operator separately and explicitly requests architect work. Only that request may open
+`design` and a new Gate 1. Plan repairs and operator decisions never create an automatic
 design-perfection loop.
 
 **Max 3 per loop.** On exceed: `git stash push -m "pipeline-rollback-{feature}-iter3"`, try an alternative, else escalate with the stash reference.
 
 ### `cause` and the severity floor
 
-**Every `iteration.start` carries `cause: operator | verification`.** `verification` is a correction round you dispatch because a lens returned `fail`/`concerns` — it **counts** against max-3. `operator` implements an operator ruling (a `reject`, an `edit`, a decision from the pre-dispatch gate) — it is **excluded**, because the round executes a decision rather than correcting a defect the pipeline produced. The exclusion is produced by where the pre-dispatch gate sits, never a separate rule to apply by hand.
+**New `iteration.start` events are correction-only.** A `verification` round dispatched
+because a lens returned `fail`/`concerns` consumes one implementation/validation slot of
+the max-3 budget. A mechanical plan repair, an operator ruling or transcription, and
+explicit architect work do not increment `iteration` and do not emit a new
+`iteration.start`; historical events with `cause: operator` remain readable but are not
+produced by new runs.
 
 **Severity floor on both combined verdicts:** `fail` requires at least one open `critical`/`high` finding; below that the verdict caps at `concerns` and proceeds with findings inline.
 
@@ -295,12 +315,14 @@ design-perfection loop.
 
 **Run this before dispatching any validation-caused correction round.** Final findings are
 classified here: concrete in-scope defects return to `implementation`; a structural
-contradiction is presented to the operator and may reopen `design` only after a decision.
-The discernment between a correctable finding and an uncorrectable one is **yours, never
+contradiction is presented to the operator, whose decision continues at `implementation`
+unless the live operator separately and explicitly requests architect work. Only that
+request may open `design` and a new Gate 1. The discernment between a correctable finding
+and an uncorrectable one is **yours, never
 the reviewing lens's**. **Reading `verdict: fail` and dispatching a correction with no
 other criterion is the defect this gate closes.**
 
-1. **Contradiction → escalate, do not dispatch.** A finding asserting two plan elements require mutually exclusive outcomes (an AC against a fence, AC against AC, AC against a declared invariant, AC against a test assertion). Present the choice: which requirement stands, which is removed or scoped, and the cost of each side. The architect implements the decided outcome as a `cause: operator` round.
+1. **Contradiction → escalate, do not dispatch.** A finding asserting two plan elements require mutually exclusive outcomes (an AC against a fence, AC against AC, AC against a declared invariant, AC against a test assertion). Present the choice: which requirement stands, which is removed or scoped, and the cost of each side. The coordinator transcribes the operator's bounded decision and continues through implementation; architect work is allowed only when the live operator separately and explicitly requests it.
 2. **Mechanical and enumerated → dispatch.** Closure is a bounded edit to named elements, none requiring the opposite of another. An ordinary `cause: verification` round.
 3. **Mixed set → split.** Dispatch the mechanical subset charging one iteration; escalate the rest in the same presentation. **A contradiction is never smuggled into a correction round because it arrived alongside fixable items.**
 4. **A lens's own classification is an input, never the authority.** This gate runs even when no lens offers one.
@@ -329,18 +351,20 @@ This composes with, and does not weaken, "no removal without a named successor" 
 |---|---|---|---|---|
 | A | localized | `implementer` BOUNDED-PATCH | `qa` only | `qa` on the patched AC |
 | A | structural | `implementer` full re-implement | `qa` full | standard acceptance gate |
-| B | localized | `architect` BOUNDED-PATCH | explicit plan-review only | on the patched plan |
-| B | structural | `architect` full re-design | all verifiers | standard acceptance gate |
-| C | any | adjust the AC in `§ Task List`, mark in the brief | all verifiers | standard acceptance gate |
+| B | localized | coordinator transcribes the bounded operator decision; `implementer` applies the approved correction | affected verifiers | on the corrected implementation |
+| B | structural | operator decision, coordinator transcription, then implementation correction | all verifiers | standard acceptance gate |
+| C | any | coordinator records the operator-approved AC resolution; `implementer` applies the resulting correction | all verifiers | standard acceptance gate |
 
 **Default to `structural`** when the blast radius is absent, ambiguous, or you cannot confirm the named IDs are self-contained.
 
 **No security-lens iteration exists in this table.** A security concern surfacing mid-implementation is recorded in the brief and carried forward as audit context — it never spawns a `security`/`adversary` dispatch from this loop.
 
-**Case B, and Case C when it re-dispatches `architect`, inherit the design-artifact
-presence/coherence check before a new Gate 1.**
+**Case B/C no longer authorize an automatic architect producer or a new Gate 1.** Their
+coordinator-owned transcription continues at implementation. A new design artifact and
+Gate 1 exist only when the live operator separately and explicitly requests architect
+work after Gate 1.
 
-**`code_hygiene: fail` is Case A**, never Case C — a hygiene finding is never "the AC needs revision."
+**`code_hygiene: fail` is an implementation correction**, never a plan/criteria edit — a hygiene finding is never "the AC needs revision."
 
 ### Cost-ordered re-run — R0 → R1 → R2
 
@@ -701,14 +725,18 @@ scope return to `implementation` (the implementer or the direct executor when th
 approved preference and predicate allow it), then re-run the affected validation delta.
 Evidence gaps return to `tester`; a correctable security finding returns to implementation
 and receives a delta audit. Every tree change after Freeze reopens Freeze and validation;
-it never reopens design automatically.
+it never reopens design automatically. Each such remediation consumes one
+implementation/validation correction round. Plan repairs and operator-approved plan
+decisions are not validation findings and do not consume the counter.
 
 A finding is **structural** only when it makes the approved intent, scope fence and ACs
 mutually inconsistent or requires changing the requested behaviour. The coordinator
 does not resolve that contradiction. It presents the conflicting requirements and costs
-to the operator; only an explicit operator decision may reopen `design`. A revised plan
-is a new plan version and must pass a new Gate 1. Never rewrite an AC merely to manufacture
-PASS, and never route a structural contradiction through an implementation correction.
+to the operator; the resulting decision continues at `implementation` unless the live
+operator separately and explicitly requests architect work. Only that request may reopen
+`design`; a revised plan produced after that request is a new plan version and must pass a
+new Gate 1. Never rewrite an AC merely to manufacture PASS, and never route a structural
+contradiction through an implementation correction without the operator's decision.
 
 ### Implementation checkpoint — regression evidence (bug-fix only, tier-gated)
 
@@ -722,7 +750,7 @@ PASS, and never route a structural contradiction through an implementation corre
 | 1 | any condition fails | auto-promote to Tier 2, or run at Tier 1 |
 | 2/3/4 | — | run |
 
-**Advance:** `success` + `tests_failing_as_expected == tests_added` + `suite_still_passing: true` → the `implementation` dispatch, and mutate the placeholder to the real path. `success` with a mismatch → back to `tester` (max-3). `failed: bug-not-reproducible` on `fix` → back to `architect`; on `hotfix` → auto-promote to `fix` at `bug_tier: 3` (floor preserved), return to `design`, then Gate 1 and implementation, unless the operator overrides to `blocked`. `blocked` → pipeline blocks.
+**Advance:** `success` + `tests_failing_as_expected == tests_added` + `suite_still_passing: true` → the `implementation` dispatch, and mutate the placeholder to the real path. `success` with a mismatch → back to `tester` (max-3). `failed: bug-not-reproducible` is presented to the operator; it never auto-dispatches `architect` or returns to `design`. A live request for architect work is required before any design/Gate-1 route; otherwise the pipeline is `blocked`. `blocked` → pipeline blocks.
 
 ### One tester contract, two write points
 
@@ -775,7 +803,10 @@ You mutate only the task-index `Status` cell. Task shards and delivery data rema
 
 **You never divide a task's deliverable** — its plan, commit set, or PR. Execution may fan into bounded lanes; the task still ships as one plan, one implementation record, one commit set, one PR.
 
-**Post-approval division is a hard re-gate trigger.** A PR outside the approved contract, or a suffixed stage file (`-m{N}`, `-b`, `02b-*`), is plan drift: return to `design` only after the operator decides, then re-present Gate 1.
+**Post-approval division is a hard re-gate trigger.** A PR outside the approved contract,
+or a suffixed stage file (`-m{N}`, `-b`, `02b-*`), is plan drift: the operator's decision
+continues at `implementation` unless the live operator separately and explicitly requests
+architect work. Only that request may open `design` and re-present Gate 1.
 
 ### Scheduler — never one dispatch per task
 
@@ -843,7 +874,14 @@ Trace: `stage2.lane.dispatch`, `stage2.lane.result`, `stage2.lanes.consolidated`
 
 **Triage:** *trivial* is a cosmetic rewording or a verified technical correction. *Non-trivial* adds, removes or alters a behavioural promise, changes a user-visible contract, or is any constraint at all on `complexity: complex`.
 
-All trivial → reconcile inline: rewrite the AC, remove the tag, log it, and inform the operator briefly. For any non-trivial constraint, stop and present the affected AC, consequence, and implementer's proposed resolution. The operator chooses keep, amend, drop, iterate, or abort. Route to `architect` first only when technical analysis is missing; `qa-plan` does not arbitrate post-implementation requirement changes.
+All trivial → reconcile inline: the coordinator rewrites the canonical field, removes the
+tag, logs it, and informs the operator briefly. For any non-trivial constraint, stop and
+present the affected AC, consequence, and implementer's proposed resolution. The live
+operator chooses keep, amend, drop, iterate, or abort; the coordinator transcribes the
+bounded decision and continues at implementation. Do not dispatch `architect` automatically;
+only a live operator request that separately and explicitly requests architect work opens
+design. `qa-plan`
+does not arbitrate post-implementation requirement changes.
 
 ### Implementation checkpoint — code-hygiene scan
 
@@ -875,7 +913,7 @@ Bug-fix flow: resume the regression contract started at the implementation check
 
 All three run before `validation`. Two share `docs/pipeline-lanes.md § 2a` as their pattern source but produce different consequences on different scopes; none duplicates another's authority.
 
-**1. Scope check (`fix`/`hotfix` only).** `git diff --name-only`; every changed non-test file appears in `01-root-cause.md § Scope of Fix` or carries a `[SCOPE-DRIFT]` annotation. Otherwise back to implementer or architect (max-3).
+**1. Scope check (`fix`/`hotfix` only).** `git diff --name-only`; every changed non-test file appears in `01-root-cause.md § Scope of Fix` or carries a `[SCOPE-DRIFT]` annotation. Otherwise return to the implementer for a bounded correction (max-3), or present a semantic scope decision to the operator; never auto-dispatch `architect`.
 
 **2. Re-tier gate (`fix`/`hotfix` only).** Diff against the sensitive-path list; any match forces the tier to 3. This is your own deterministic re-tier from the diff, not the architect's `recommended_tier` recommendation — it needs no operator decision because the sensitive-path list decided it. When regression setup did not run, do **not** re-enter its pre-fix step on the already-fixed tree. Instead, dispatch Tester to verify the candidate regression in an isolated worktree at `verification_base_ref` (must fail) and at current HEAD (must pass); record both results in `03-testing.md`. If that two-revision proof cannot be produced, block rather than fabricate a pre-fix failure. The audit itself needs no promotion — Adversary dispatches from the derived security floor regardless of tier.
 
@@ -1031,7 +1069,9 @@ and revalidates the delta. A correctable security finding is a validation failur
 be reduced to `concerns`, carried to STAGE-GATE-3, or accepted by shipping. The coordinator
 reopens Freeze, dispatches the implementation correction, and requires a fresh audit of the
 changed delta before validation can advance. A structural contradiction is presented to the
-operator and may reopen `design` only after an explicit decision.
+operator; its decision continues at `implementation` unless the live operator separately
+and explicitly requests architect work. Only that request may open `design` and a new
+Gate 1.
 
 A `broke-it` break that is correctable within the approved scope **fails validation** and
 returns to `implementation` before Gate 3. A `could-not-break` carrying

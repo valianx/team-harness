@@ -30,9 +30,19 @@ design → waiting_gate1 → implementation → validation → waiting_gate3 →
 
 Allowed alternate transitions are: invalid design artifact → normal design correction;
 operator edit/reject at Gate 1 → `design`; implementation constraint that changes behavior →
-operator decision; validation defect → `implementation`; structural contradiction → operator
-decides whether to reopen `design`; amend at Gate 3 → `implementation`; external delivery
-precondition failure → `blocked`; explicit cancellation → `aborted`.
+coordinator transcription of a bounded operator decision, then `implementation`; validation
+defect → `implementation`; structural contradiction → operator decision, then implementation
+unless the operator explicitly requests architect work; amend at Gate 3 → `implementation`;
+external delivery precondition failure → `blocked`; explicit cancellation → `aborted`.
+
+After Gate 1, a mechanical plan repair is coordinator-owned and continues
+`implementation → Freeze → validation` with no architect dispatch and no iteration change.
+Correctable code, test, documentation, hygiene, or security findings consume one
+implementation/validation correction round and follow that same route; a sensitive delta
+requires a fresh audit. `iteration: N/3` counts only those correction rounds. Plan repairs,
+operator decisions, and explicitly requested design work do not increment it or emit a new
+`iteration.start`; historical `cause: operator` events remain readable, while new writers
+use `cause: verification`.
 
 `inline` is direct work and has no pipeline state. A live ad-hoc tester, QA, security, or
 other review requested during inline remains inline and creates no state, gates, delivery

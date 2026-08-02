@@ -26,6 +26,13 @@ next_action: {what to do next}      # the successor to a prose recovery section
 total_tokens: N
 ```
 
+`iteration: N/3` is the implementation/validation correction-round counter only. A
+plan repair that preserves approved meaning, an operator decision or its transcription,
+and explicitly requested architect work do not increment it and do not emit a new
+`iteration.start`. New writers emit only `cause: verification` for a correction round;
+`cause: operator` remains readable for historical traces but is not produced for new
+runs.
+
 The seven named states above are the only legal v3 pipeline sequence. `inline` is a
 pre-activation direct-mode outcome and is never a v3 state or field value. Every activated
 pipeline uses this same v3 machine and both gates; there is no depth profile. An activated
@@ -258,7 +265,7 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | `duration_ms`, `tokens`, `tokens_in`, `tokens_out`, `tokens_estimated` | conditional | per the token-tracking rule |
 | `verdict` | conditional | `pass`/`concerns`/`fail`/`partial-fail` |
 | `decision` | conditional | required for `stage.gate.release` |
-| `cause` | conditional | `operator`/`verification` — required for `iteration.start` |
+| `cause` | conditional | `verification` for new `iteration.start` correction rounds; historical `operator` values remain readable |
 | `provenance` | conditional | required for `checkpoint.confirmed`; a **closed enum, never free text**, and never subject to the bound below |
 | `tools`, `model`, `effort` | optional | propagated verbatim from the returning status block |
 | `extra` | optional | event-specific |

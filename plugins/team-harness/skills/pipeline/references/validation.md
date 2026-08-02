@@ -6,7 +6,8 @@ criterion-by-criterion review to `qa`, and the required focused audit to `securi
 sensitivity/risk floor applies. Give tester and QA only the assigned task-shard paths plus the
 verification packet; give security the packet and changed attack surface plus named invariant or
 architecture anchors when required. Never attach the full plan set. None may edit coordination
-state, gate fields, or releases.
+state, gate fields, or releases. Specialists report only `Cause`, `Files`, implicated `AC`, and
+`Correction`; Main owns disposition, phase, plan writes, and routing.
 
 A live operator-requested tester, QA, or security review while Main is inline is an ad-hoc report,
 not pipeline validation. It runs without a pipeline workspace, state, events, gates, Stage Gate,
@@ -19,21 +20,32 @@ rewrite acceptance criteria to manufacture a pass.
 
 Record each criterion, command, output, failure, skipped check, and rationale.
 A failed criterion stays failed; never rewrite acceptance criteria to create a
-pass. Findings are routed by cause:
+pass. Post-Gate-1 findings are routed by cause:
+
+Decision-bearing concerns, including structural contradictions between intent,
+scope fences, and ACs, continue at `phase: implementation` after Main obtains
+a bounded live operator resolution. A transition to `design`, dispatch of
+`architect`, and a new Gate 1 are reserved solely for a separate explicit
+current live operator request for architect work.
 
 | Finding | Route |
 |---|---|
-| Code, test, or documentation defect inside approved scope | Implementation executor (`implementer`, or the eligible `hazlo tú` coordinator), then re-Freeze and revalidate the affected delta |
-| Missing or insufficient evidence | `tester`, then rerun the affected validation |
-| Correctable security finding in the approved diff | Implementation executor, re-Freeze, and a fresh security audit of the delta |
-| Structural contradiction between intent, scope fence, and ACs | Present to the operator; reopen `design` only after an explicit decision and release a new Gate 1 |
-| Non-blocking observation that violates no AC or security floor | Carry it to Gate 3 without silently changing scope |
+| Mechanical plan defect with no semantic change | Main repairs the canonical field; continue at `phase: implementation`; if Freeze was reached, rebuild Freeze and revalidate; no Gate 1 and `iteration` `+0` |
+| Decision-bearing plan concern (intent, scope, behavior, AC meaning, or security-obligation classification) | Main presents a bounded live operator decision, transcribes the approved field, and continues at `phase: implementation` through Freeze and validation; no Gate 1, `iteration` `+0`, and retain the conditional security review when sensitive |
+| Explicit current live operator request for architect work | Main records the request, dispatches `architect`, sets `phase: design`, and requires a new Gate 1; `iteration` `+0` |
+| Code, test, or documentation defect inside approved scope | Implementation executor (`implementer`, or the eligible `hazlo tú` coordinator), then re-Freeze and revalidate the affected delta; `iteration` `+1` |
+| Missing or insufficient evidence | `tester`, then rerun the affected validation; `iteration` `+1` when the correction re-enters validation |
+| Correctable security finding in the approved diff | Implementation executor, re-Freeze, and a fresh security audit of the delta; `iteration` `+1` |
+| Structural contradiction between intent, scope fence, and ACs | Main obtains a bounded live operator resolution, transcribes the approved field, and continues at `phase: implementation` through Freeze and validation; `iteration` `+0` |
+| Non-blocking observation that violates no AC or security floor | Carry it to Gate 3 without silently changing scope; `iteration` `+0` |
 
 Every implementation correction reopens Freeze and invalidates validation that
 saw the old tree. Re-run all affected checks, and do not ship until the audit
 has seen the current anchor. An operator-approved amend follows the same
 implementation → Freeze → validation route. A contradiction is never resolved
-by changing an AC in place.
+by changing an AC in place. Plan repair, operator-decision transcription, and
+explicit architect work do not produce an `iteration.start`; only an
+implementation/validation correction consumes the `0`–`3` correction budget.
 
 When all required evidence and reviews pass and the Freeze anchor is still
 current, delegate `delivery` once in pre-gate preparation mode. It may write only

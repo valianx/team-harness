@@ -125,11 +125,11 @@ the role fields cannot see. The current digests are:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| `architect` | `6d9b4e503aa0948d7690f26042c6d5123bffa6c2de97a18042d70015360fce31` |
+| `architect` | `1079cc6bd4654c78a010dec4b2bf00761eef51cab2c8458931e0582caa232f66` |
 | `implementer` | `d0a27bc1b21006bd656a70360307fc21901438c4f87d8241acbf4d17f04dfc93` |
-| `tester` | `23b6fd60546446a2b28b67839759008dcaae013642f92c18dbbb049b4d3c372f` |
-| `qa` | `613ce2351dc804d26805b8951a31c509b2ac8368f917591aae755a43a0277394` |
-| `security` | `4cc3cfdf063452c4674d3291eaf96bfd921e9ef7f01c0d451f6be55a6d5d8c44` |
+| `tester` | `bbef7aaef37e9124780585bf9687ee289956c5f001315b67629c2b1a12d2e5a3` |
+| `qa` | `28c2938c8b6299dfded6c8709fb8b25012e66561552e502f3222a190b335a13a` |
+| `security` | `f384a721456188e3459cbf481149ff0575cf90595cce967e682978282ac49bf2` |
 | `delivery` | `2a7a88db1a058db03852dbd1c5d47fafb2b2b32c8ec4dead838f19cdefc033d2` |
 
 Do not accept a file solely because its comments or `name` field match. A
@@ -164,14 +164,30 @@ automatic approach checkpoint, scope-freeze convergence loop, `qa-plan`,
 available only when the operator explicitly invokes it; a sensitive plan still
 gets one conditional security design review before implementation.
 
-Validation findings carry four coordinates: cause, files, implicated ACs, and
-the smallest correction with its owner. Code, test, or documentation defects in
-approved scope return to the implementation executor (or eligible direct
-coordinator), then reopen Freeze and revalidate. Missing evidence returns to
-`tester`; a correctable sensitive finding also requires a fresh security audit
-of the changed delta. Only a structural contradiction between intent, scope,
-and ACs may ask the operator to reopen design and release a new Gate 1. Never
-rewrite an AC to manufacture PASS.
+### Authoritative post-Gate-1 routing
+
+Main is the coordinator and classifies every post-Gate-1 concern. Specialists
+return only the bounded four coordinates—cause, files, implicated ACs, and the
+smallest correction with its owner. The following matrix is exhaustive:
+
+| Concern | Owner/action | Required continuation and gate/audit behavior | Architect | `iteration` delta |
+|---|---|---|---|---:|
+| Mechanical plan repair (references, identifiers, paths, counts, format, or field coherence with no semantic change) | Main repairs the canonical field and records the repair | `phase: implementation`; no new Gate 1; if Freeze was reached, rebuild Freeze and revalidate | prohibited | `0` |
+| Decision-bearing plan resolution, including a structural intent/scope/AC contradiction, security-obligation classification, or a change to intent, scope, behavior, or AC meaning | Main pauses for a bounded live operator decision and transcribes the approved resolution without reinterpretation | `phase: implementation`; `next_action` continues through implementation → Freeze → validation; no new Gate 1 and retain the conditional security review when the classification is sensitive | prohibited unless the separate explicit current live operator request for architect work applies | `0` |
+| Explicit, current live operator request for architect work | Main records the request and dispatches `architect` | `phase: design`; the resulting plan requires a new Gate 1 | allowed only for that request | `0` |
+| Correctable code, test, or documentation defect inside approved scope | Implementation executor (or eligible direct Main executor) applies the smallest correction | Return to implementation → Freeze → validation; a sensitive delta requires a fresh security audit; no new Gate 1 | prohibited | `+1` |
+| Missing or insufficient evidence | `tester` completes or corrects the evidence | Re-run affected validation; tree/package changes reopen Freeze; no new Gate 1 | prohibited | `+1` |
+
+Code, test, or documentation defects in approved scope return to the implementation executor
+(or eligible direct coordinator), then reopen Freeze and revalidate. Missing
+evidence returns to `tester`; a correctable sensitive finding also requires a
+fresh security audit of the changed delta. Decision-bearing concerns, including
+structural intent/scope/AC contradictions, continue at `phase: implementation`
+after Main records a bounded live operator resolution. `phase: design`,
+dispatch of `architect`, and a new Gate 1 are reserved solely for a separate
+explicit current live operator request for architect work. Never rewrite an AC
+to manufacture PASS, and never let a specialist select the owner, phase, or
+next agent.
 
 ## Start
 

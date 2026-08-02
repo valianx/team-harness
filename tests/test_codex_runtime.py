@@ -20,6 +20,194 @@ def fail(message: str) -> None:
     raise AssertionError(message)
 
 
+EXPECTED_POST_GATE1 = {
+    "mechanical": ("main", "implementation", "prohibited", "none", 0),
+    "decision": ("main", "implementation", "explicit-only", "none", 0),
+    "architect-request": ("main", "design", "allowed", "new-gate1", 0),
+    "implementation": ("implementation", "implementation", "prohibited", "none", 1),
+    "evidence": ("tester", "validation", "prohibited", "none", 1),
+}
+
+
+def _routing_cells(line: str) -> list[str]:
+    if not line.lstrip().startswith("|"):
+        return []
+    cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+    if len(cells) < 2 or all(re.fullmatch(r":?-+:?", cell) for cell in cells):
+        return []
+    return cells
+
+
+def _routing_key(label: str) -> str | None:
+    lowered = label.lower()
+    if "mechanical" in lowered:
+        return "mechanical"
+    if "decision-bearing" in lowered or "security-obligation" in lowered:
+        return "decision"
+    if "explicit" in lowered and "architect" in lowered:
+        return "architect-request"
+    if "correctable code" in lowered:
+        return "implementation"
+    if "missing" in lowered or "insufficient evidence" in lowered:
+        return "evidence"
+    return None
+
+
+def _routing_section(text: str) -> str:
+    begin = text.find("### Authoritative post-Gate-1 routing")
+    end = text.find("## Start", begin + 1)
+    if begin < 0 or end < 0:
+        fail("Codex authoritative post-Gate-1 routing section is missing")
+    return text[begin:end]
+
+
+def _routing_owner(owner_text: str) -> str:
+    if re.search(r"\btester\b", owner_text):
+        return "tester"
+    if "implementation executor" in owner_text:
+        return "implementation"
+    if re.search(r"\bmain\b", owner_text):
+        return "main"
+    return ""
+
+
+def _routing_phase(key: str, continuation: str) -> str:
+    phase_match = re.search(r"`phase:\s*(design|implementation|validation)`", continuation)
+    if phase_match:
+        return phase_match.group(1)
+    if key == "evidence" and "affected validation" in continuation:
+        return "validation"
+    if key == "implementation" and "return to implementation" in continuation:
+        return "implementation"
+    return ""
+
+
+def _routing_architect(architect_text: str) -> str:
+    if "prohibited unless" in architect_text or "unless separately" in architect_text:
+        return "explicit-only"
+    if "allowed" in architect_text:
+        return "allowed"
+    if "prohibited" in architect_text:
+        return "prohibited"
+    return ""
+
+
+def _routing_gate(continuation: str) -> str:
+    if re.search(r"\bno new gate 1\b", continuation):
+        return "none"
+    if re.search(r"\bnew gate 1\b", continuation):
+        return "new-gate1"
+    return ""
+
+
+def _routing_row_values(key: str, cells: list[str]) -> tuple[str, str, str, str, int]:
+    owner = _routing_owner(cells[1].lower())
+    continuation = cells[2].lower()
+    phase = _routing_phase(key, continuation)
+    architect = _routing_architect(cells[3].lower())
+    gate = _routing_gate(continuation)
+    delta_match = re.fullmatch(r"`?([+-]?\d+)`?", cells[4].strip())
+    if not delta_match:
+        fail(f"Codex routing row has a non-numeric iteration delta: {cells!r}")
+    return owner, phase, architect, gate, int(delta_match.group(1))
+
+
+def _parse_codex_routing_rows(text: str) -> dict[str, tuple[str, str, str, str, int]]:
+    rows: dict[str, tuple[str, str, str, str, int]] = {}
+    for line in _routing_section(text).splitlines():
+        cells = _routing_cells(line)
+        if len(cells) != 5:
+            continue
+        key = _routing_key(cells[0])
+        if key is None:
+            continue
+        if key in rows:
+            fail(f"Codex routing table repeats {key!r}")
+        rows[key] = _routing_row_values(key, cells)
+    return rows
+
+
+def _assert_markers(text: str, markers: tuple[str, ...], context: str) -> None:
+    for marker in markers:
+        if marker not in text:
+            fail(f"{context} lost required marker {marker!r}")
+
+
+def _assert_no_automatic_design_route(text: str, context: str) -> None:
+    flattened = re.sub(r"\s+", " ", text.lower())
+    concern = r"(?:decision-bearing|structural[^.]{0,80}contradiction)"
+    design = r"(?:reopen|transition(?:s)?(?:\s+to)?|sets?\s+`?phase:?|`?phase:)\s*`?design"
+    gate = r"(?:requires?|releases?)\s+(?:a\s+)?new gate 1"
+    explicit = r"explicit(?:\s+\w+){0,3}\s+decision"
+    for pattern in (
+        rf"{concern}[^.]{0,240}{design}",
+        rf"{concern}[^.]{0,240}{gate}",
+        rf"{explicit}[^.]{0,240}(?:{design}|{gate}|new gate 1)",
+    ):
+        if re.search(pattern, flattened):
+            fail(f"{context} permits a decision-bearing concern to reopen design")
+
+
+def _check_agent_adapter_parity() -> None:
+    generated = ROOT / ".codex/agents"
+    packaged = ROOT / "plugins/team-harness/skills/setup/assets/agents"
+    for role in ("architect", "tester", "qa", "security"):
+        project = (generated / f"{role}.toml").read_bytes().replace(b"\r\n", b"\n")
+        package = (packaged / f"{role}.toml").read_bytes().replace(b"\r\n", b"\n")
+        if project != package:
+            fail(f"generated Codex adapter parity drifted for {role}")
+        adapter = (ROOT / f"runtime/codex/instructions/{role}.md").read_text().lower()
+        if role == "architect" and "only a separate, explicit current live operator request" not in re.sub(r"\s+", " ", adapter):
+            fail("Codex architect adapter permits automatic post-Gate-1 dispatch")
+        if role in {"tester", "qa", "security"} and "do not dispatch" not in adapter:
+            fail(f"Codex {role} adapter can select a post-Gate-1 route")
+
+
+def _check_qa_post_gate1_route(validation: str) -> None:
+    adapter = (ROOT / "runtime/codex/instructions/qa.md").read_text()
+    generated = tomllib.loads((ROOT / ".codex/agents/qa.toml").read_text())
+    packaged = tomllib.loads(
+        (ROOT / "plugins/team-harness/skills/setup/assets/agents/qa.toml").read_text()
+    )
+    sources = (
+        ("Codex validation reference", validation),
+        ("QA instruction adapter", adapter),
+        ("generated QA adapter", generated["developer_instructions"]),
+        ("packaged generated QA adapter", packaged["developer_instructions"]),
+    )
+    for context, text in sources:
+        _assert_no_automatic_design_route(text, context)
+        _assert_markers(
+            re.sub(r"\s+", " ", text.lower()),
+            ("separate explicit current live operator request for architect work",),
+            context,
+        )
+    qa_markers = (
+        "return exactly four-coordinate input to main",
+        "never select `design` or `architect`",
+    )
+    for context, text in sources[1:]:
+        _assert_markers(re.sub(r"\s+", " ", text.lower()), qa_markers, context)
+
+
+def check_post_gate1_projection() -> None:
+    """Parse the Codex routing rows and prove generated adapters preserve them."""
+    pipeline = (ROOT / "plugins/team-harness/skills/pipeline/SKILL.md").read_text()
+    rows = _parse_codex_routing_rows(pipeline)
+    if rows != EXPECTED_POST_GATE1:
+        fail(f"Codex post-Gate-1 transition results drifted: {rows!r}")
+    _assert_markers(
+        re.sub(r"\s+", " ", pipeline.lower()),
+        ("security-obligation classification", "bounded live operator decision", "implementation → freeze → validation", "conditional security review", "new gate 1"),
+        "Codex routing projection",
+    )
+    _assert_no_automatic_design_route(pipeline, "Codex pipeline skill")
+    _check_agent_adapter_parity()
+    _check_qa_post_gate1_route(
+        (ROOT / "plugins/team-harness/skills/pipeline/references/validation.md").read_text()
+    )
+
+
 def main() -> None:
     contract = json.loads((ROOT / "runtime/schema/codex-agents.json").read_text())
     agents = contract["agents"]
@@ -1036,6 +1224,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     try:
+        check_post_gate1_projection()
         main()
     except Exception as error:
         print(f"codex runtime structure: FAIL: {error}", file=sys.stderr)

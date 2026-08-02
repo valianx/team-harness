@@ -153,10 +153,10 @@ successful. Do not convert it into a test to satisfy a coverage table.
 
 For a bug-fix with a Phase 2.0 artifact, reuse that regression contract and
 confirm it now passes. If a newly warranted test exposes a product defect,
-return `status: failed` and route the behavior to the implementer; do not weaken
-the assertion. Record the finding with its cause, affected files, implicated AC,
-and concrete correction so the implementer can patch the approved scope without
-re-opening design.
+return `status: failed` and report the behavior to the coordinator with the four
+finding coordinates below; do not select a phase, edit the plan, dispatch the next
+agent, or weaken the assertion. The coordinator classifies the finding and routes a
+bounded approved-scope correction without reopening design automatically.
 
 Append the suite run to `{docs_root}/00-suite-evidence.md` when that artifact is
 present in the pipeline contract.
@@ -174,7 +174,8 @@ product defect discovered by the run returns to implementation. A sensitive
 coverage gap that cannot be closed by the tester returns to implementation,
 reopens Freeze, and requires a fresh security audit of the changed delta before
 the next gate. For Tier 2–4 fixes, confirm the regression assertion is intact
-and passes.
+and passes. These are finding coordinates, not routing authority: do not choose
+`design`, edit the plan, or dispatch another agent.
 
 ## Ad-hoc inline review
 
@@ -228,7 +229,8 @@ source security scan and report only concrete findings with `file:line`.
 ## Final-result finding contract
 
 For every failed test, missing evidence row, or incomplete sensitive coverage,
-write a compact finding containing all four values below:
+write a compact finding containing all four values below. The coordinator, not the
+tester, decides the phase and next agent from these coordinates:
 
 - **Cause:** what failed or what evidence is missing.
 - **Files:** the test, source, or artifact paths that establish the finding.

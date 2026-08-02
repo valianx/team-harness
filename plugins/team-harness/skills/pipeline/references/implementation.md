@@ -29,8 +29,23 @@ or chronology. Set `phase: validation` and `next_action: run approved acceptance
 Implementation checkpoints (regression evidence when required, constraint reconciliation, hygiene,
 test/evidence authoring, and Freeze) are trace details inside this state, not additional phases.
 A constraint that changes behaviour, scope, or an acceptance promise stops for an operator decision;
-only an explicit decision may reopen design and require a new Gate 1. Never rewrite an acceptance
-criterion merely to manufacture a pass.
+its approved resolution continues in implementation. Only a separate, explicit current live
+operator request for architect work may reopen design and require a new Gate 1. Never rewrite an
+acceptance criterion merely to manufacture a pass.
+
+### Post-Gate-1 plan-write boundary
+
+The coordinator, not a specialist, classifies post-Gate-1 plan concerns. It may
+repair only mechanical fields (references, identifiers, paths, counts, format,
+or field coherence without semantic change), or transcribe the exact canonical
+field required by a live operator-approved resolution. A concern that changes
+intent, scope, behavior, AC meaning, or a security obligation is decision-bearing:
+pause for the bounded operator decision, then record `phase: implementation` and
+continue through implementation → Freeze → validation; retain a conditional
+security review when the decision is sensitive. Plan repair and transcription do
+not increment `iteration` or dispatch `architect`. Only a separate, explicit
+current live operator request may dispatch `architect`, set `phase: design`, and
+require a new Gate 1.
 
 Before validation opens, close Freeze over an immutable base and record the frozen diff/evidence
 anchor. Any later tree change reopens Freeze and the affected validation; nothing ships from stale
