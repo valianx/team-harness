@@ -32,9 +32,17 @@ destructive-action, and outward-action controls remain unchanged. Warnings or au
 informational and do not authorize an edit.
 
 While inline is active, the operator may explicitly request a bounded `tester`, `qa`, or `security`
-review. Such an ad hoc review remains inline: it creates no workspace, state, events, gates, or
-delivery action, and it does not activate or release a pipeline. A coordinator suggestion is
-informational and never dispatches a reviewer without the live request.
+review. `Main` records the requested and required lenses, captures a canonical
+realpath-and-digest evidence manifest, and consolidates each lens independently.
+Such an ad hoc review remains inline: it creates no workspace, state, events, gates,
+Stage Gate, branch, delivery action, or publication. A runtime without an
+enforceable narrow tool profile receives only pre-captured evidence, with no
+shell, network, or direct tree access; missing or mismatched evidence is
+`incomplete`/`untrusted`, and PASS is fail-closed until every required lens is
+complete. A PR, PR number, or PR URL has exclusive `review-pr` precedence; inline
+never intercepts its snapshot, lenses, consolidation, preview, or publication.
+A coordinator suggestion is informational and never dispatches a reviewer
+without the live request.
 
 ### Pipeline
 

@@ -96,15 +96,30 @@ available for direct use when the agents are not installed.
 `Main` stays in ordinary direct mode until the live operator mentions the
 plugin. `@Team-Harness init <task>` loads only the lightweight orchestrator
 kernel: it begins conversational intake and handles simple bounded work directly
-without workspace state, gates, agent preflight, or subagents. If a task would
-benefit from the full workflow, it recommends `@Team-Harness pipeline <task>`
-and waits for the operator.
+without workspace state, gates, or agent preflight. A live request for tester,
+QA, or security is also supported as a workspace-free inline review; it does not
+activate the pipeline or require a six-agent preflight.
 
 Only that explicit pipeline invocation (or explicit approval after intake)
 loads the phase contracts. `Main` then owns pipeline state and delegates
 directly to `architect`, `implementer`, `tester`, `qa`, `security`, and
 `delivery`. It does not spawn a seventh or persistent orchestrator and returns
 to direct behavior when the workflow completes or is explicitly aborted.
+
+### Workspace-free inline review
+
+For a non-PR inline review, `Main` records `requested_lenses` and
+`required_lenses` (every operator-named lens is required), captures a canonical
+realpath-and-digest evidence manifest, and sends each lens the same package with
+`target_id` and `manifest_digest`. Codex uses an effective read-only tool profile
+only when it can prove one; otherwise the lens receives Main-pre-captured bytes
+and results only, with no shell, network, publication, or direct tree access.
+Each lens returns a terminal status and evidence-bound findings; missing or
+mismatched evidence is `incomplete`/`untrusted`, and global PASS requires every
+required lens to be complete and validated. No workspace, state, events, gates,
+Stage Gate, branch, delivery record, or publication is created. Any PR intent,
+number, or URL has exclusive `review-pr` precedence and retains that flow's
+snapshot, lens selection, consolidation, preview, and publication gate.
 
 Skill activation does not change Main's selected model, reasoning effort,
 sandbox, or approval policy. The projection below applies to the six spawned

@@ -632,9 +632,102 @@ def check_ad_hoc_review_boundary() -> None:
         require("live" in lowered and "tester" in lowered and "qa" in lowered and "security" in lowered, f"{label}: live review roles drifted")
     for role in ("tester", "qa", "security"):
         adapter = read(f"runtime/codex/instructions/{role}.md").lower()
-        require("ad-hoc inline review" in adapter, f"Codex {role}: ad-hoc inline review missing")
-        require("creates no workspace" in adapter and "coordination state" in adapter, f"Codex {role}: ad-hoc review can create state")
-        require("delivery record" in adapter and "creates no" in adapter, f"Codex {role}: ad-hoc review can create delivery")
+        require(
+            "mode: inline-review" in adapter,
+            f"Codex {role}: inline-review mode missing",
+        )
+        require(
+            re.search(r"create(?:s)? no workspace", adapter) is not None
+            and "coordination state" in adapter,
+            f"Codex {role}: ad-hoc review can create state",
+        )
+        require(
+            "delivery record" in adapter and "create no" in adapter,
+            f"Codex {role}: ad-hoc review can create delivery",
+        )
+
+
+def check_inline_review_contract() -> None:
+    """Inline evidence, tool, lens, and routing invariants stay fail-closed."""
+    contract = read("agents/_shared/inline-review-contract.md")
+    coordinator = read("agents/orchestrator.md")
+    direct = read("agents/ref-direct-modes.md")
+    init = read("plugins/team-harness/skills/init/SKILL.md")
+
+    for marker in (
+        "mode: inline-review",
+        "requested_lenses",
+        "required_lenses",
+        "read_only: true",
+        "target_id",
+        "manifest_digest",
+        "evidence_id",
+        "realpath",
+        "digest",
+        "allowed root",
+        "`evidence_id` values",
+        "re-resolves and re-hashes",
+        "incomplete|untrusted",
+        "never produce\nPASS",
+    ):
+        require(marker in contract, f"inline contract missing {marker!r}")
+
+    for marker in (
+        "no write",
+        "network",
+        "publication",
+        "commands defined by `Main`",
+        "untrusted data",
+        "evidence-only",
+        "no shell",
+        "no direct tree access",
+    ):
+        require(marker in contract, f"inline tool boundary missing {marker!r}")
+
+    for marker in (
+        "complete|incomplete|failed|unavailable|untrusted",
+        "every `required_lenses`",
+        "no blocker",
+        "unresolved blocking disagreement",
+        "never averages verdicts",
+        "absent return as PASS",
+    ):
+        require(marker in contract, f"inline consolidation rule missing {marker!r}")
+
+    for source, text in (
+        ("coordinator", coordinator),
+        ("direct router", direct),
+        ("Codex init", init),
+    ):
+        lowered = text.lower()
+        require("review-pr" in lowered, f"{source}: review-pr route missing")
+        require(
+            "pr review" in lowered
+            or "pr-review" in lowered
+            or "review a pr" in lowered,
+            f"{source}: textual PR intent alias missing",
+        )
+        require("pr number" in lowered and "pr url" in lowered, f"{source}: PR intent aliases missing")
+        require(
+            "exclusive" in lowered
+            or ("precedence" in lowered and "must not intercept" in lowered),
+            f"{source}: exclusive PR precedence missing",
+        )
+        require("inline-review" in lowered, f"{source}: inline-review route missing")
+
+    for role in ("tester", "qa", "security"):
+        lowered = read(f"runtime/codex/instructions/{role}.md").lower()
+        for marker in (
+            "requested_lenses",
+            "required_lenses",
+            "target_id",
+            "manifest_digest",
+            "lens_status: complete|incomplete|failed|unavailable|untrusted",
+            "output: null",
+            "evidence-only fallback",
+            "incomplete|untrusted",
+        ):
+            require(marker in lowered, f"Codex {role}: inline field missing {marker!r}")
 
 
 def check_single_ship_delivery() -> None:
@@ -830,6 +923,7 @@ def main() -> None:
         ("residual corrections", check_residual_corrections),
         ("sensitive inline authorization", check_sensitive_inline_authorization),
         ("ad-hoc review boundary", check_ad_hoc_review_boundary),
+        ("inline review contract", check_inline_review_contract),
         ("single ship delivery", check_single_ship_delivery),
         ("delivery preview binding", check_delivery_preview_binding),
         ("terminal/transition mapping", check_terminal_and_transition_mapping),

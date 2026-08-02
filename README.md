@@ -96,8 +96,13 @@ available with the plugin alone.
 ```
 
 `init` performs lightweight intake and direct bounded work without pipeline
-state or subagents. `pipeline` explicitly starts the full gated workflow in
-`Main`; it does not create a seventh coordinator or require `/agent`.
+state or agent preflight. A current live request for tester, QA, or security may
+dispatch a workspace-free inline review: `Main` captures the immutable evidence
+manifest, lenses stay read-only (or consume the evidence-only fallback), and no
+pipeline artifacts are created. PR text, numbers, and URLs always route to
+`review-pr`; generic inline review never intercepts that snapshot/publication
+flow. `pipeline` explicitly starts the full gated workflow in `Main`; it does
+not create a seventh coordinator or require `/agent`.
 
 Upgrade, removal, local development, hook trust, and the complete role/model
 roster are documented in [`docs/codex-runtime.md`](./docs/codex-runtime.md).

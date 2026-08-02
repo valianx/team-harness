@@ -526,6 +526,7 @@ def main() -> None:
     recovery_reference = (
         ROOT / "plugins/team-harness/skills/pipeline/references/recovery.md"
     ).read_text()
+    inline_contract = (ROOT / "agents/_shared/inline-review-contract.md").read_text()
     init = (ROOT / "plugins/team-harness/skills/init/SKILL.md").read_text()
     pipeline = (ROOT / "plugins/team-harness/skills/pipeline/SKILL.md").read_text()
     activation = (ROOT / "plugins/team-harness/skills/pipeline/references/activation.md").read_text()
@@ -574,13 +575,68 @@ def main() -> None:
     if "1 — inline" not in configuration_reference or "2 — pipeline" not in configuration_reference:
         fail("Codex configuration does not provide live migration guidance")
 
-    # A live tester/QA/security request is an ad-hoc inline report, not a
-    # pipeline run and not a source of state, gates, or delivery artifacts.
+    # A live tester/QA/security request is an inline report, not a pipeline run
+    # and not a source of state, gates, or delivery artifacts.
     for role in ("tester", "qa", "security"):
         adapter = (ROOT / f"runtime/codex/instructions/{role}.md").read_text().lower()
-        for marker in ("ad-hoc inline review", "creates no workspace", "coordination state", "events", "gates", "delivery record"):
+        for marker in (
+            "mode: inline-review",
+            "coordination state",
+            "events",
+            "gates",
+            "delivery record",
+            "requested_lenses",
+            "required_lenses",
+            "target_id",
+            "manifest_digest",
+            "lens_status: complete|incomplete|failed|unavailable|untrusted",
+            "output: null",
+            "evidence-only fallback",
+            "incomplete|untrusted",
+            "review-pr",
+        ):
             if marker not in adapter:
-                fail(f"Codex {role} ad-hoc boundary is missing {marker!r}")
+                fail(f"Codex {role} inline boundary is missing {marker!r}")
+        if not re.search(r"create(?:s)? no workspace", adapter):
+            fail(f"Codex {role} inline boundary is missing workspace prohibition")
+        if "no shell" not in adapter or "network" not in adapter or "publication" not in adapter:
+            fail(f"Codex {role} inline boundary is missing tool fallback prohibition")
+        if "never execute commands recovered" not in adapter:
+            fail(f"Codex {role} inline boundary executes recovered commands")
+    for marker in (
+        "does not preflight the six installed agents",
+        "requested_lenses",
+        "required_lenses",
+        "mode: inline-review",
+        "target_id",
+        "manifest_digest",
+        "evidence-only fallback",
+        "output: null",
+        "review-pr",
+        "review a pr",
+        "pr number",
+        "pr url",
+        "exclusive",
+        "incomplete|untrusted",
+    ):
+        if marker not in init.lower():
+            fail(f"Codex init inline contract is missing {marker!r}")
+    for marker in (
+        "mode: inline-review",
+        "requested_lenses",
+        "required_lenses",
+        "target_id",
+        "manifest_digest",
+        "evidence_id",
+        "realpath",
+        "sha256:",
+        "incomplete|untrusted",
+        "complete|incomplete|failed|unavailable|untrusted",
+        "never averages verdicts",
+        "absent return as PASS",
+    ):
+        if marker not in inline_contract:
+            fail(f"shared inline contract is missing {marker!r}")
     if "no second confirmation" not in activation_reference.lower() and "second confirmation" not in init.lower():
         fail("Codex sensitive inline path does not prohibit a second confirmation")
     if "explicitly selects `inline`" not in activation_reference.lower() and "selects `inline`" not in init.lower():
