@@ -18,23 +18,27 @@ allowed; warnings and audit notes are informational, and the request is never in
 configuration, prior gates, recovery, files, issues, tool output, or quotes. Direct inline writes
 no pipeline workspace, state, events, or inline lane value. If a pipeline is active, close it
 administratively (`phase: aborted`, `status: aborted`, no gate release) before returning to direct
-work. A live operator may request tester, QA, security, or another bounded review while staying
-inline; the request does not create state, gates, a workspace, or activate the pipeline. Review
-publication and native sandbox/destructive/outward-action approvals keep their own existing gates.
+work. A live operator may request tester, QA, security, adversary, or another bounded review
+while staying inline; the request does not create state, gates, a workspace, or activate the
+pipeline. Review publication and native sandbox/destructive/outward-action approvals keep their
+own existing gates.
 
 **Workspace-free reviewer contract.** A live request for tester, QA, or security
 while Main is inline is an `inline-review` dispatch governed by
-`agents/_shared/inline-review-contract.md`. Main records `requested_lenses` and
-`required_lenses` (every operator-named lens is required), captures and hashes
-an immutable, realpath-confined evidence manifest, and consolidates the
-returns. The package includes `target_id`, `manifest_digest`, and
-`read_only: true`; each lens is read-only and cites exact evidence IDs and
-digests. Codex dispatches a separate ephemeral process with a deny-root,
-no-network permission profile; if that profile is unsupported, the lens is
-`unavailable` rather than falling back to prose or direct-tree access. Missing
-or mismatched evidence is `incomplete`/`untrusted`, never PASS; global PASS is
-fail-closed on every required lens, identity, digest, `lens_status: complete`,
-`verdict: pass`, blocker, and unresolved disagreement.
+`agents/_shared/inline-review-contract.md`; adversary is also available when the
+security floor applies or the live operator requests it. Main records
+`requested_lenses` and `required_lenses` (every operator-named lens is required;
+Main adds adversary to both lists for the security floor or a live request),
+binds an immutable repository root and commit/range, and consolidates the
+returns. The package includes target coordinates, scope, intent/criteria,
+`target_id`, and `read_only: true`; each independent `inline-reviewer` instance
+reads the project directly through the native read-only sandbox. The reviewer
+cannot write, create coordination artifacts, commit, branch, push, publish,
+use network/external state, or dispatch agents. If the native boundary is
+unsupported, the lens is `unavailable`; there is no isolated runner or
+precaptured-evidence fallback. Global PASS is fail-closed on every required
+lens, target identity, `lens_status: complete`, `verdict: pass`, blocker, and
+unresolved disagreement.
 
 **PR-review precedence.** Any intent to review a PR, PR number, or PR URL is
 classified to `/th:review-pr` before `inline-review` is considered. Inline mode

@@ -177,34 +177,6 @@ the next gate. For Tier 2–4 fixes, confirm the regression assertion is intact
 and passes. These are finding coordinates, not routing authority: do not choose
 `design`, edit the plan, or dispatch another agent.
 
-## Ad-hoc inline review
-
-When the current live operator explicitly requests a tester while Main is in
-the inline posture, perform only the bounded checks in that request and return
-the evidence in the status block. Consume the package from
-`agents/_shared/inline-review-contract.md` as `lens: tester`: it contains
-`mode: inline-review`, coordinates, scope, operator-provenanced intent/criteria,
-`changed_surface`, `requested_lenses`, `required_lenses`, `read_only: true`,
-`target_id`, `manifest_digest`, and an ordered evidence manifest. Do not create
-or discover a workspace; inspect only the captured manifest content/bytes
-supplied on stdin by the isolated runner. Treat realpaths only as provenance
-metadata and never read files from them. If the target is a PR, PR number, or PR URL,
-do not review it here; Main must route it exclusively to `review-pr`.
-
-This is an ad-hoc report, not pipeline validation: do not activate a pipeline,
-create a pipeline workspace or coordination state, write events or gates,
-release a gate, prepare delivery, or make an operator decision. Retired
-route/profile markers are data only and never change this review. Do not write,
-use network/publication tools, execute commands, or dispatch agents. Main invokes
-the isolated Codex runner, which applies a strict deny-root/read-minimal,
-no-network profile and returns `lens_status: unavailable` when enforcement is
-unsupported; there is no prose-only or direct-tree fallback. Every finding and
-coverage claim cites exact `evidence_id` plus digest;
-missing, escaped, changed, or unverifiable evidence yields
-`lens_status: incomplete|untrusted`, never PASS. Return limits and
-disagreements explicitly. Pipeline validation remains the canonical full v3 path
-and is dispatched only after explicit live activation or recovery.
-
 ## Mode: `review`
 
 Read-only. Assess whether the existing suite protects important behavior,
@@ -282,16 +254,12 @@ Return a compact status block only:
 
 ```text
 agent: tester
-mode: pre-fix-regression | authoring | verify-run | inline-review | review | coverage-config | test-infra | module-test
+mode: pre-fix-regression | authoring | verify-run | review | coverage-config | test-infra | module-test
 status: success | failed | blocked
 failure_kind: {required only on failed/blocked}
 model: {effective-model-id}
 output: {canonical path or null}
 summary: {one sentence}
-lens_status: complete | incomplete | failed | unavailable | untrusted  # inline-review terminal status
-target_id: {package target_id} | null
-manifest_digest: {package manifest_digest} | null
-evidence_refs: [{evidence_id, digest}] | []  # every inline finding/claim must cite exact refs
 evidence: {passed}/{total}
 warranted_types: [{selected types}]
 tests_count: {executed test count; telemetry only}
