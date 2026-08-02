@@ -105,6 +105,27 @@ The named phase checklist is fixed and remains in the snapshot:
 surfaces any entry without a matching disposition record before preparing a
 gate; it is not a transport for unreviewed specialist output.
 
+`iteration` is retained as a serialized compatibility key, but its only
+meaning is the implementation/validation correction counter (`0` through `3`).
+Increment it only for a code, test, documentation, or evidence correction that
+re-enters implementation or validation. Mechanical plan repairs, operator
+decision transcription (including security-obligation classification), and
+explicit architect work never increment the counter and never emit a new
+`iteration.start`; historical `cause: operator` events remain readable but are
+not produced by new writes.
+
+## Post-Gate-1 coordinator routing
+
+After Gate 1, Main alone classifies findings and may write the bounded canonical
+plan fields needed for a mechanical repair or an approved operator resolution.
+Every specialist reports `Cause`, `Files`, implicated `AC`, and `Correction`;
+none may choose a phase, plan writer, next agent, or gate. A decision-bearing
+plan concern—including a security-obligation classification—continues at
+`phase: implementation` after the live operator resolution. `architect` is
+prohibited unless that same live operator separately and explicitly requests
+architect work; only that request may set `phase: design` and require a new Gate
+1. No plan repair or transcription reopens design or increments `iteration`.
+
 ## Recovery migration contract
 
 New state has no posture/profile field. A current `pipeline_version: 3` snapshot

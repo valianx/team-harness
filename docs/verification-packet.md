@@ -265,16 +265,19 @@ The packet is a snapshot, not a live view. The orchestrator MUST rebuild it in p
 (overwrite, increment `Packet version` — never a sibling file) before the next verifier
 dispatch whenever EITHER of these fire:
 
-1. **Any iteration re-dispatch** (bounded patch or structural, Cases A-D) — rebuild after
-   the producer's patch, before re-running verifiers.
+1. **Any implementation/validation correction re-dispatch** (bounded or structural) —
+   rebuild after the producer's patch, before re-running verifiers. This is the
+   implementation → Freeze → validation route; plan repairs, operator decisions, and
+   explicitly requested design work do not themselves consume a correction round or
+   emit `iteration.start`.
 2. **Non-empty `git diff --name-only`** against the packet's tree anchor at dispatch time.
 
-There is NO AC-edit rebuild trigger. An AC edit (Phase 2.5 late reconciliation, Case C
-reword, operator review-surface edit) does not stale the packet because the packet carries
-no AC (§2) — the edit reaches the next verifier through its live task-shard
-read (§4 Step 0) with no orchestrator action required. Both remaining triggers are
-git-grounded; neither depends on the orchestrator noticing a document edit outside the
-code tree.
+There is NO plan-only rebuild trigger. A mechanical repair or coordinator transcription
+does not stale the packet while no implementation tree has changed because the packet
+carries no AC (§2) — the next verifier reads the live assigned task shard (§4 Step 0).
+An explicit architect request starts a new design/Gate-1 path rather than a correction
+round. Both remaining triggers are implementation-tree grounded; neither depends on the
+orchestrator noticing a document edit outside the code tree.
 
 ---
 

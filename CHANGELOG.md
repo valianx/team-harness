@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.6] - 2026-08-02
+
+### Fixed
+
+- Kept post-Gate-1 corrections in implementation and synchronized OpenCode pipeline projections.
+
 ## [3.6.3] - 2026-08-01
 
 ### Changed

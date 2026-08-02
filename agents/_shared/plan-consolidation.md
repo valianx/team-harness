@@ -61,9 +61,9 @@ Every writer's permitted edit is enumerated below. A writer not listed has no wr
 
 | Writer | Permitted plan-set write | When |
 |---|---|---|
-| architect | all plan artifacts (author + smallest-shard refinement) | Stage 1 |
+| architect | all plan artifacts (author + smallest-shard refinement) | Stage 1, or a new design pass explicitly requested by the live operator after Gate 1 |
 | plan-reviewer | ONLY the `**Reviews:**` line in the title block (replace-in-place) | close of each panel round |
-| orchestrator | operator-decided canonical fields in `plan/delivery.md`; task-index status transitions | gate / post-gate |
+| orchestrator | mechanical canonical-field repairs that preserve every security obligation; canonical-field transcription of one bounded operator decision; and task-index status transitions | post-Gate-1; continue in implementation, never dispatch `architect` automatically |
 | qa (validate) | ONLY AC checkbox flips in assigned task shards | Phase 3 |
 | delivery | task-index status to `merged` | Phase 4 |
 | ux-reviewer | AC additions in affected task shards, contiguous numbering — narrative stays in `reviews/01-ux-review.md` | Phase 1.7 (enrich, Stage 1, before ratification) |
@@ -71,15 +71,32 @@ Every writer's permitted edit is enumerated below. A writer not listed has no wr
 
 (Stage-2 `[CONSTRAINT-DISCOVERED]` annotations are placed in the affected task shard by the **orchestrator**, transcribing an implementer's status field; the implementer never writes the plan set.)
 
+After Gate 1, the coordinator is the only owner of canonical plan-field edits: it may
+repair a mechanical defect, transcribe a bounded resolution explicitly approved by the
+live operator, and perform the existing status transitions. Those edits continue at
+`phase: implementation` and do not create a new architect pass or automatic Gate 1.
+
+**Security-obligation boundary.** Any security-obligation change is never mechanical: it
+is decision-bearing and requires one bounded live operator decision. The coordinator
+transcribes that decision and continues `implementation → Freeze → fresh security audit →
+validation`; architect is prohibited unless the live operator separately and explicitly
+requests architect work; `iteration` delta: `0`. Only that request may set
+`phase: design` and open a new Gate 1.
+
+Specialists do not select a phase, edit canonical plan text, or dispatch the next agent;
+QA's checkbox-only mirror remains the existing validation exception. Only a fresh live
+operator request for architect work permits `phase: design` and a new Gate 1.
+
 ## Final-result finding coordinates
 
 Tester, QA, security, and adversary findings that block acceptance use one
 coordinate set: `Cause`, `Files`, implicated `AC`, and `Correction`. A defect or
 coverage gap inside the approved scope returns to implementation; the
 coordinator reopens Freeze and requests a fresh audit of a sensitive delta.
-Only a structural contradiction between intent, scope, and AC asks the operator
-whether to reopen design. No validator rewrites an AC or edits coordination
-state to manufacture PASS.
+Only a structural contradiction between intent, scope, and AC requires an operator
+decision. That decision continues at `implementation` unless the live operator separately
+and explicitly requests architect work; only that request may open `design` and a new
+Gate 1. No validator rewrites an AC or edits coordination state to manufacture PASS.
 
 ## Write-tool discipline (shared review files)
 
