@@ -35,12 +35,16 @@ While inline is active, the operator may explicitly request a bounded `tester`, 
 review. `Main` records the requested and required lenses, captures a canonical
 realpath-and-digest evidence manifest, and consolidates each lens independently.
 Such an ad hoc review remains inline: it creates no workspace, state, events, gates,
-Stage Gate, branch, delivery action, or publication. A runtime without an
-enforceable narrow tool profile receives only pre-captured evidence, with no
-shell, network, or direct tree access; missing or mismatched evidence is
-`incomplete`/`untrusted`, and PASS is fail-closed until every required lens is
-complete. A PR, PR number, or PR URL has exclusive `review-pr` precedence; inline
-never intercepts its snapshot, lenses, consolidation, preview, or publication.
+Stage Gate, branch, delivery action, or publication. Codex uses the isolated
+`run_inline_review.mjs` runner: a separate ephemeral `codex exec` receives the
+package only on stdin from an empty temporary cwd, with a deny-root/read-minimal,
+no-network profile and shell, apps, multi-agent, MCP, web, and publication tools
+disabled. Unsupported enforcement is `lens_status: unavailable`, never a
+prose-only fallback. Missing or mismatched evidence is `incomplete`/`untrusted`,
+and PASS requires every required lens to be `lens_status: complete` and
+`verdict: pass`. A PR, PR number, or PR URL has exclusive `review-pr` precedence;
+inline never intercepts its snapshot, lenses, consolidation, preview, or
+publication.
 A coordinator suggestion is informational and never dispatches a reviewer
 without the live request.
 

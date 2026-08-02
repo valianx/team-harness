@@ -127,9 +127,9 @@ the role fields cannot see. The current digests are:
 |---|---|
 | `architect` | `6d9b4e503aa0948d7690f26042c6d5123bffa6c2de97a18042d70015360fce31` |
 | `implementer` | `d0a27bc1b21006bd656a70360307fc21901438c4f87d8241acbf4d17f04dfc93` |
-| `tester` | `d9f5a099e4fe5518c7eda6a3c421861212db42d14f2d895fc628cced4c7d0cce` |
-| `qa` | `63a8a4944daaf2e9117432d6fe9e4034da3b5bbb1979113de16b415753e998c8` |
-| `security` | `395b34b480d2980e7ef33eb75cfbd958a6190c7cd028e732d5a97bad172e08aa` |
+| `tester` | `5446551201c1c50fc9e14fa5960369a114a0672746a2da43efaf39943ffb15f7` |
+| `qa` | `0f172b96bfb911f90a2e6046476cce9db073fc716a342696dba055dbc8a9f136` |
+| `security` | `3694c82714ff0dc5dc79338a21f6a97ce42d4feb3b269e061fa2cd6c3f022ef1` |
 | `delivery` | `2a7a88db1a058db03852dbd1c5d47fafb2b2b32c8ec4dead838f19cdefc033d2` |
 
 Do not accept a file solely because its comments or `name` field match. A

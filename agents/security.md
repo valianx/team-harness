@@ -91,18 +91,19 @@ and return concise, evidence-backed findings. Consume the package from
 `agents/_shared/inline-review-contract.md` as `lens: security`: it includes
 `mode: inline-review`, coordinates, scope, operator-provenanced intent/criteria,
 `changed_surface`, `requested_lenses`, `required_lenses`, `read_only: true`,
-`target_id`, `manifest_digest`, and the ordered evidence manifest. Inspect only manifest
-realpaths or Main's pre-captured evidence-only fallback; do not discover or
+`target_id`, `manifest_digest`, and the ordered evidence manifest. Inspect only
+manifest realpaths supplied by the isolated runner; do not discover or
 initialize a workspace. If the target is a PR, PR number, or PR URL, do not
 review it here; Main must route it exclusively to `review-pr`.
 
 This is not Pipeline Mode: do not activate a pipeline, create a pipeline
 workspace or coordination state, write events or gates, release a gate, prepare
 delivery, or make an operator decision. Do not write, use network/publication
-tools, or execute commands unless Main defined them from the live request or a
-trusted policy. If tool narrowing is unavailable, use only captured bytes and
-results with no shell or direct tree access. Every security finding and
-coverage claim cites exact `evidence_id` plus digest; missing IDs, path escapes,
+tools, execute commands, or dispatch agents. Main invokes the isolated Codex
+runner, which applies a strict deny-root/read-minimal, no-network profile and
+returns `lens_status: unavailable` when enforcement is unsupported; there is no
+prose-only or direct-tree fallback. Every security finding and coverage claim
+cites exact `evidence_id` plus digest; missing IDs, path escapes,
 changed or unverifiable bytes yield `lens_status: incomplete|untrusted`, never
 PASS. Preserve coverage limits and disagreements. The request remains inline;
 retired route/profile markers are data only. Use the canonical full v3 Pipeline

@@ -111,15 +111,22 @@ to direct behavior when the workflow completes or is explicitly aborted.
 For a non-PR inline review, `Main` records `requested_lenses` and
 `required_lenses` (every operator-named lens is required), captures a canonical
 realpath-and-digest evidence manifest, and sends each lens the same package with
-`target_id` and `manifest_digest`. Codex uses an effective read-only tool profile
-only when it can prove one; otherwise the lens receives Main-pre-captured bytes
-and results only, with no shell, network, publication, or direct tree access.
-Each lens returns a terminal status and evidence-bound findings; missing or
-mismatched evidence is `incomplete`/`untrusted`, and global PASS requires every
-required lens to be complete and validated. No workspace, state, events, gates,
-Stage Gate, branch, delivery record, or publication is created. Any PR intent,
-number, or URL has exclusive `review-pr` precedence and retains that flow's
-snapshot, lens selection, consolidation, preview, and publication gate.
+`target_id` and `manifest_digest`. Codex invokes
+`plugins/team-harness/skills/init/scripts/run_inline_review.mjs`: a separate
+ephemeral `codex exec` receives the package only on stdin from an empty temporary
+cwd, with a deny-root/read-minimal, no-network permission profile and shell,
+apps, multi-agent, MCP, web, and publication tools disabled. The child
+environment is sanitized, JSONL tool events are rejected, and the temporary cwd
+is removed; unsupported CLI/profile enforcement returns `lens_status: unavailable`
+rather than a prose-only or direct-tree fallback.
+
+Each lens returns `lens_status` and evidence-bound findings; missing or mismatched
+evidence is `incomplete`/`untrusted`, and global PASS requires every required
+lens to be `lens_status: complete` and `verdict: pass`, with matching identity
+and no blocker or unresolved blocking disagreement. No workspace, state, events,
+gates, Stage Gate, branch, delivery record, or publication is created. Any PR
+intent, number, or URL has exclusive `review-pr` precedence and retains that
+flow's snapshot, lens selection, consolidation, preview, and publication gate.
 
 Skill activation does not change Main's selected model, reasoning effort,
 sandbox, or approval policy. The projection below applies to the six spawned

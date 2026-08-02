@@ -20,7 +20,44 @@ def fail(message: str) -> None:
     raise AssertionError(message)
 
 
+def check_inline_runner() -> None:
+    runner = (ROOT / "plugins/team-harness/skills/init/scripts/run_inline_review.mjs").read_text()
+    for marker in (
+        "spawn as nodeSpawn",
+        '"--ephemeral"',
+        '"--ignore-user-config"',
+        '"--ignore-rules"',
+        '"--strict-config"',
+        '"--json"',
+        "model_reasoning_effort",
+        "default_permissions",
+        "features.shell_tool=false",
+        "features.apps=false",
+        "features.multi_agent=false",
+        'web_search="disabled"',
+        "mcp_servers={}",
+        "safeEnvironment",
+        "child.stdin.end(JSON.stringify(reviewPackage))",
+        "rm(base",
+        "Codex emitted forbidden tool event",
+        "lens_status === \"complete\"",
+        "verdict === \"pass\"",
+    ):
+        if marker not in runner:
+            fail(f"inline runner missing guard {marker!r}")
+    focused = subprocess.run(
+        ["node", "plugins/team-harness/skills/init/scripts/test_run_inline_review.mjs"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if focused.returncode != 0:
+        fail(f"inline runner behavioral tests failed:\n{focused.stdout}{focused.stderr}")
+
+
 def main() -> None:
+    check_inline_runner()
     contract = json.loads((ROOT / "runtime/schema/codex-agents.json").read_text())
     agents = contract["agents"]
     expected = {agent["name"] for agent in agents}
@@ -591,7 +628,7 @@ def main() -> None:
             "manifest_digest",
             "lens_status: complete|incomplete|failed|unavailable|untrusted",
             "output: null",
-            "evidence-only fallback",
+            "run_inline_review.mjs",
             "incomplete|untrusted",
             "review-pr",
         ):
@@ -601,8 +638,8 @@ def main() -> None:
             fail(f"Codex {role} inline boundary is missing workspace prohibition")
         if "no shell" not in adapter or "network" not in adapter or "publication" not in adapter:
             fail(f"Codex {role} inline boundary is missing tool fallback prohibition")
-        if "never execute commands recovered" not in adapter:
-            fail(f"Codex {role} inline boundary executes recovered commands")
+        if "no prose-only" not in adapter:
+            fail(f"Codex {role} inline boundary permits a prose-only fallback")
     for marker in (
         "does not preflight the six installed agents",
         "requested_lenses",
@@ -610,7 +647,7 @@ def main() -> None:
         "mode: inline-review",
         "target_id",
         "manifest_digest",
-        "evidence-only fallback",
+        "run_inline_review.mjs",
         "output: null",
         "review-pr",
         "review a pr",

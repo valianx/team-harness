@@ -601,132 +601,61 @@ def check_sensitive_inline_authorization() -> None:
     require("lane:" not in current and "profile:" not in current, "Active state admits an inline/profile route field")
 
 
+def check_review_artifacts(label: str, text: str) -> None:
+    lowered = re.sub(r"\s+", " ", text.lower())
+    require("ad hoc" in lowered or "ad-hoc" in lowered, f"{label}: ad-hoc review boundary missing")
+    for artifact in ("workspace", "state", "events", "gates", "delivery"):
+        require(artifact in lowered, f"{label}: ad-hoc review missing {artifact} prohibition")
+        denied = re.search(rf"(?:\bcreates?\s+no\b|\bwithout\b|\bnever\s+(?:creates?|writes?|records?)\b)[^.;\n]{{0,180}}\b{artifact}\b", lowered)
+        require(denied is not None, f"{label}: ad-hoc review does not clause-scope {artifact}")
+    require(all(marker in lowered for marker in ("live", "tester", "qa", "security")), f"{label}: live roles drifted")
+
+
+def check_codex_adapter_boundary(role: str) -> None:
+    adapter = read(f"runtime/codex/instructions/{role}.md").lower()
+    require("mode: inline-review" in adapter, f"Codex {role}: inline-review missing")
+    require(re.search(r"creates? no workspace", adapter) is not None and "coordination state" in adapter, f"Codex {role}: state boundary missing")
+    require("delivery record" in adapter and re.search(r"creates? no", adapter) is not None, f"Codex {role}: delivery boundary missing")
+    require("run_inline_review.mjs" in adapter and "lens_status: unavailable" in adapter, f"Codex {role}: runner fail-close missing")
+
+
 def check_ad_hoc_review_boundary() -> None:
     """Live tester/QA/security reviews stay inline and artifact-free."""
-    claude_sources = (
-        read("agents/orchestrator.md"),
-        read("agents/ref-direct-modes.md"),
-        read("docs/pipeline-lanes.md"),
-        read("agents/tester.md"),
-        read("agents/qa.md"),
-        read("agents/security.md"),
-    )
-    codex_sources = (
-        read("plugins/team-harness/skills/init/SKILL.md"),
-        read("plugins/team-harness/skills/pipeline/references/activation.md"),
-        read("plugins/team-harness/skills/pipeline/references/validation.md"),
-        read("runtime/codex/instructions/tester.md"),
-        read("runtime/codex/instructions/qa.md"),
-        read("runtime/codex/instructions/security.md"),
-    )
-    for label, text in (("Claude", "\n".join(claude_sources)), ("Codex", "\n".join(codex_sources))):
-        lowered = re.sub(r"\s+", " ", text.lower())
-        require("ad hoc" in lowered or "ad-hoc" in lowered, f"{label}: ad-hoc review boundary missing")
-        for artifact in ("workspace", "state", "events", "gates", "delivery"):
-            require(artifact in lowered, f"{label}: ad-hoc review missing {artifact} prohibition")
-            denied = re.search(
-                rf"(?:\bcreates?\s+no\b|\bwithout\b|\bnever\s+(?:creates?|writes?|records?)\b)[^.;\n]{{0,180}}\b{artifact}\b",
-                lowered,
-            )
-            require(denied is not None, f"{label}: ad-hoc review does not clause-scope the {artifact} prohibition")
-        require("live" in lowered and "tester" in lowered and "qa" in lowered and "security" in lowered, f"{label}: live review roles drifted")
+    claude = "\n".join(read(path) for path in ("agents/orchestrator.md", "agents/ref-direct-modes.md", "docs/pipeline-lanes.md", "agents/tester.md", "agents/qa.md", "agents/security.md"))
+    codex = "\n".join(read(path) for path in ("plugins/team-harness/skills/init/SKILL.md", "plugins/team-harness/skills/pipeline/references/activation.md", "plugins/team-harness/skills/pipeline/references/validation.md", "runtime/codex/instructions/tester.md", "runtime/codex/instructions/qa.md", "runtime/codex/instructions/security.md"))
+    check_review_artifacts("Claude", claude)
+    check_review_artifacts("Codex", codex)
     for role in ("tester", "qa", "security"):
-        adapter = read(f"runtime/codex/instructions/{role}.md").lower()
-        require(
-            "mode: inline-review" in adapter,
-            f"Codex {role}: inline-review mode missing",
-        )
-        require(
-            re.search(r"create(?:s)? no workspace", adapter) is not None
-            and "coordination state" in adapter,
-            f"Codex {role}: ad-hoc review can create state",
-        )
-        require(
-            "delivery record" in adapter and "create no" in adapter,
-            f"Codex {role}: ad-hoc review can create delivery",
-        )
+        check_codex_adapter_boundary(role)
+
+
+def check_inline_markers(contract: str) -> None:
+    markers = ("mode: inline-review", "requested_lenses", "required_lenses", "read_only: true", "target_id", "manifest_digest", "evidence_id", "realpath", "digest", "allowed root", "`evidence_id` values", "re-resolves and re-hashes", "incomplete|untrusted", "never produce\nPASS")
+    for marker in markers:
+        require(marker in contract, f"inline contract missing {marker!r}")
+    for marker in ("no write", "network", "publication", "commands defined by `Main`", "untrusted data", "isolated runner", "no shell", "no direct tree access"):
+        require(marker in contract, f"inline tool boundary missing {marker!r}")
+    for marker in ("complete|incomplete|failed|unavailable|untrusted", "every `required_lenses`", "no blocker", "unresolved blocking disagreement", "never averages verdicts", "absent return as PASS", "verdict: pass"):
+        require(marker in contract, f"inline consolidation rule missing {marker!r}")
+
+
+def check_pr_precedence(source: str, text: str) -> None:
+    lowered = text.lower()
+    require("review-pr" in lowered and "inline-review" in lowered, f"{source}: route missing")
+    require("pr number" in lowered and "pr url" in lowered, f"{source}: PR aliases missing")
+    require("pr review" in lowered or "pr-review" in lowered or "review a pr" in lowered, f"{source}: PR intent missing")
+    require("exclusive" in lowered or ("precedence" in lowered and "must not intercept" in lowered), f"{source}: precedence missing")
 
 
 def check_inline_review_contract() -> None:
     """Inline evidence, tool, lens, and routing invariants stay fail-closed."""
     contract = read("agents/_shared/inline-review-contract.md")
-    coordinator = read("agents/orchestrator.md")
-    direct = read("agents/ref-direct-modes.md")
-    init = read("plugins/team-harness/skills/init/SKILL.md")
-
-    for marker in (
-        "mode: inline-review",
-        "requested_lenses",
-        "required_lenses",
-        "read_only: true",
-        "target_id",
-        "manifest_digest",
-        "evidence_id",
-        "realpath",
-        "digest",
-        "allowed root",
-        "`evidence_id` values",
-        "re-resolves and re-hashes",
-        "incomplete|untrusted",
-        "never produce\nPASS",
-    ):
-        require(marker in contract, f"inline contract missing {marker!r}")
-
-    for marker in (
-        "no write",
-        "network",
-        "publication",
-        "commands defined by `Main`",
-        "untrusted data",
-        "evidence-only",
-        "no shell",
-        "no direct tree access",
-    ):
-        require(marker in contract, f"inline tool boundary missing {marker!r}")
-
-    for marker in (
-        "complete|incomplete|failed|unavailable|untrusted",
-        "every `required_lenses`",
-        "no blocker",
-        "unresolved blocking disagreement",
-        "never averages verdicts",
-        "absent return as PASS",
-    ):
-        require(marker in contract, f"inline consolidation rule missing {marker!r}")
-
-    for source, text in (
-        ("coordinator", coordinator),
-        ("direct router", direct),
-        ("Codex init", init),
-    ):
-        lowered = text.lower()
-        require("review-pr" in lowered, f"{source}: review-pr route missing")
-        require(
-            "pr review" in lowered
-            or "pr-review" in lowered
-            or "review a pr" in lowered,
-            f"{source}: textual PR intent alias missing",
-        )
-        require("pr number" in lowered and "pr url" in lowered, f"{source}: PR intent aliases missing")
-        require(
-            "exclusive" in lowered
-            or ("precedence" in lowered and "must not intercept" in lowered),
-            f"{source}: exclusive PR precedence missing",
-        )
-        require("inline-review" in lowered, f"{source}: inline-review route missing")
-
+    check_inline_markers(contract)
+    for source, path in (("coordinator", "agents/orchestrator.md"), ("direct router", "agents/ref-direct-modes.md"), ("Codex init", "plugins/team-harness/skills/init/SKILL.md")):
+        check_pr_precedence(source, read(path))
     for role in ("tester", "qa", "security"):
         lowered = read(f"runtime/codex/instructions/{role}.md").lower()
-        for marker in (
-            "requested_lenses",
-            "required_lenses",
-            "target_id",
-            "manifest_digest",
-            "lens_status: complete|incomplete|failed|unavailable|untrusted",
-            "output: null",
-            "evidence-only fallback",
-            "incomplete|untrusted",
-        ):
+        for marker in ("requested_lenses", "required_lenses", "target_id", "manifest_digest", "lens_status: complete|incomplete|failed|unavailable|untrusted", "output: null", "run_inline_review.mjs", "no prose-only", "incomplete|untrusted"):
             require(marker in lowered, f"Codex {role}: inline field missing {marker!r}")
 
 

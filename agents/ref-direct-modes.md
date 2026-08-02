@@ -29,11 +29,12 @@ while Main is inline is an `inline-review` dispatch governed by
 an immutable, realpath-confined evidence manifest, and consolidates the
 returns. The package includes `target_id`, `manifest_digest`, and
 `read_only: true`; each lens is read-only and cites exact evidence IDs and
-digests. A runtime that cannot
-restrict tools receives only Main-pre-captured evidence, with no shell, network,
-publication, or tree access. Missing or mismatched evidence is
-`incomplete`/`untrusted`, never PASS; global PASS is fail-closed on every
-required lens, identity, digest, blocker, and unresolved disagreement.
+digests. Codex dispatches a separate ephemeral process with a deny-root,
+no-network permission profile; if that profile is unsupported, the lens is
+`unavailable` rather than falling back to prose or direct-tree access. Missing
+or mismatched evidence is `incomplete`/`untrusted`, never PASS; global PASS is
+fail-closed on every required lens, identity, digest, `lens_status: complete`,
+`verdict: pass`, blocker, and unresolved disagreement.
 
 **PR-review precedence.** Any intent to review a PR, PR number, or PR URL is
 classified to `/th:review-pr` before `inline-review` is considered. Inline mode

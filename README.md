@@ -98,8 +98,11 @@ available with the plugin alone.
 `init` performs lightweight intake and direct bounded work without pipeline
 state or agent preflight. A current live request for tester, QA, or security may
 dispatch a workspace-free inline review: `Main` captures the immutable evidence
-manifest, lenses stay read-only (or consume the evidence-only fallback), and no
-pipeline artifacts are created. PR text, numbers, and URLs always route to
+manifest and `run_inline_review.mjs` invokes a separate ephemeral Codex child
+with a deny-root/read-minimal, no-network profile. Unsupported enforcement is
+`lens_status: unavailable`; there is no prose-only or direct-tree fallback, and
+global PASS requires every required lens to be complete with `verdict: pass`.
+No pipeline artifacts are created. PR text, numbers, and URLs always route to
 `review-pr`; generic inline review never intercepts that snapshot/publication
 flow. `pipeline` explicitly starts the full gated workflow in `Main`; it does
 not create a seventh coordinator or require `/agent`.
