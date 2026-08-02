@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { access, chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { createHash } from "node:crypto";
+import { access, chmod, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
-import { buildManifestDigest, buildTargetId, consolidateInlineReviews, parseLensResult, runInlineReview } from "./run_inline_review.mjs";
+import { buildManifestDigest, buildTargetId, canonicalJson, consolidateInlineReviews, parseLensResult, runInlineReview } from "./run_inline_review.mjs";
 
 const FAKE = `#!/usr/bin/env python3
 import json, os, sys
@@ -17,10 +18,14 @@ result = {"lens": pkg["lens"], "lens_status": "complete", "target_id": pkg["targ
 print(json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": json.dumps(result)}}))
 `;
 
-function packageFor(lens = "qa") {
-  const evidence_manifest = [{ evidence_id: "E-001", realpath: "/captured/evidence.json", digest: `sha256:${"a".repeat(64)}`, kind: "operator-input" }];
+async function packageFor(sourcePath, lens = "qa") {
+  const canonicalSource = await realpath(sourcePath);
+  const content = await readFile(canonicalSource, "utf8");
+  const digest = `sha256:${createHash("sha256").update(content).digest("hex")}`;
+  const evidence_manifest = [{ evidence_id: "E-001", realpath: canonicalSource, digest, kind: "source", encoding: "utf-8", byte_length: Buffer.byteLength(content), content }];
   const reviewPackage = {
     mode: "inline-review",
+    allowed_roots: [await realpath(dirname(canonicalSource))],
     coordinates: { repository: "example/repo", ref: "abc123", source: "live" },
     target: { kind: "workspace", id: "example" },
     scope: { paths: ["src"], symbols: [], constraints: [] },
@@ -48,20 +53,37 @@ async function fakeFixture() {
   return { root, fake, codexHome };
 }
 
+async function writeFake(fixture, name, source) {
+  const path = join(fixture.root, name);
+  await writeFile(path, source, "utf8");
+  await chmod(path, 0o755);
+  return path;
+}
+
+function rebindPackage(pkg, realpath, content, allowedRoots = pkg.allowed_roots) {
+  const changed = structuredClone(pkg);
+  const bytes = Buffer.from(content, "utf8");
+  changed.allowed_roots = allowedRoots;
+  changed.evidence_manifest[0] = { ...changed.evidence_manifest[0], realpath, content, byte_length: bytes.length, digest: `sha256:${createHash("sha256").update(bytes).digest("hex")}` };
+  changed.manifest_digest = buildManifestDigest(changed.evidence_manifest);
+  changed.target_id = buildTargetId(changed);
+  return changed;
+}
+
 async function expectKind(action, kind) {
   await assert.rejects(action, error => error.kind === kind, `expected ${kind}`);
 }
 
 function checkTargetMutations(pkg) {
   const mutations = [
-    ["mode", p => { p.mode = "other"; }], ["target", p => { p.target.id = "other"; }],
+    ["mode", p => { p.mode = "other"; }], ["allowed roots", p => { p.allowed_roots = ["/other/root"]; }], ["target", p => { p.target.id = "other"; }],
     ["coordinates", p => { p.coordinates.ref = "other"; }], ["scope", p => { p.scope.paths = ["other"]; }],
     ["intent", p => { p.intent.text = "other"; }], ["intent provenance", p => { p.intent.provenance = "trusted-policy"; }],
     ["criteria", p => { p.criteria[0].text = "other"; }], ["criteria provenance", p => { p.criteria[0].provenance = "trusted-policy"; }],
     ["changed surface", p => { p.changed_surface[0].change = "added"; }],
     ["requested lenses", p => { p.requested_lenses = ["qa", "tester"]; }],
     ["required lenses", p => { p.required_lenses = ["qa", "tester"]; }], ["current lens", p => { p.lens = "tester"; }],
-    ["read_only", p => { p.read_only = false; }], ["manifest", p => { p.evidence_manifest[0].kind = "diff"; }],
+    ["read_only", p => { p.read_only = false; }], ["manifest", p => { p.evidence_manifest[0].kind = "diff"; }], ["captured content", p => { p.evidence_manifest[0].content = "changed"; }],
     ["manifest digest", p => { p.manifest_digest = `sha256:${"b".repeat(64)}`; }],
   ];
   for (const [label, mutate] of mutations) {
@@ -92,6 +114,8 @@ async function runSuccessfulReview(pkg) {
     ]) assert.equal(record.argv.includes(malformed), false, `malformed per-key override must be absent: ${malformed}`);
     assert.ok(record.argv.includes("gpt-5.6-luna") && record.argv.some(value => value.includes("model_reasoning_effort") && value.includes("max")), "model and effort must be explicit");
     assert.equal(record.input.target_id, pkg.target_id, "package must arrive on stdin");
+    assert.equal(record.input.evidence_manifest[0].content, pkg.evidence_manifest[0].content, "child must receive captured source bytes");
+    assert.equal(record.input.evidence_manifest[0].digest, pkg.evidence_manifest[0].digest, "child must receive content digest");
     assert.ok(record.argv.every(value => !value.includes(pkg.target_id) && !value.includes("example/repo")), "package JSON must not appear in argv");
     assert.deepEqual(record.cwd_entries, [], "child cwd must start empty");
     assert.equal(record.env.SECRET_TOKEN, undefined, "child environment must be sanitized");
@@ -109,6 +133,9 @@ async function runRejectedReviews(pkg) {
   wrongRequired.requested_lenses = ["tester"];
   wrongRequired.required_lenses = ["tester"];
   await expectKind(() => runInlineReview({ reviewPackage: wrongRequired, codexCommand: "/bin/false", env: {} }), "untrusted");
+  const duplicateLenses = structuredClone(pkg);
+  duplicateLenses.requested_lenses = ["qa", "qa"];
+  await expectKind(() => runInlineReview({ reviewPackage: duplicateLenses, codexCommand: "/bin/false", env: {} }), "untrusted");
   let fixture = await fakeFixture();
   try {
     const toolFake = join(fixture.root, "tool-codex");
@@ -126,6 +153,52 @@ async function runRejectedReviews(pkg) {
     await chmod(malformed, 0o755);
     await expectKind(() => runInlineReview({ reviewPackage: pkg, codexCommand: malformed, env: { CODEX_HOME: fixture.codexHome } }), "untrusted");
   } finally { await rm(fixture.root, { recursive: true, force: true }); }
+}
+
+async function runSourceFailures(pkg, source) {
+  const original = pkg.evidence_manifest[0].content;
+  const contentMismatch = structuredClone(pkg);
+  contentMismatch.evidence_manifest[0].content = "tampered bytes\n";
+  await expectKind(() => runInlineReview({ reviewPackage: contentMismatch, codexCommand: "/bin/false", env: {} }), "untrusted");
+  const hashMismatch = structuredClone(pkg);
+  hashMismatch.evidence_manifest[0].digest = `sha256:${"b".repeat(64)}`;
+  hashMismatch.manifest_digest = buildManifestDigest(hashMismatch.evidence_manifest);
+  hashMismatch.target_id = buildTargetId(hashMismatch);
+  await expectKind(() => runInlineReview({ reviewPackage: hashMismatch, codexCommand: "/bin/false", env: {} }), "untrusted");
+  const outsideRoot = await mkdtemp(join(tmpdir(), "team-harness-inline-outside-"));
+  const outside = join(outsideRoot, "outside.txt");
+  await writeFile(outside, original, "utf8");
+  const outsidePackage = rebindPackage(pkg, await realpath(outside), original);
+  await expectKind(() => runInlineReview({ reviewPackage: outsidePackage, codexCommand: "/bin/false", env: {} }), "untrusted");
+  const link = join(pkg.allowed_roots[0], "evidence-link.txt");
+  await symlink(outside, link);
+  await expectKind(() => runInlineReview({ reviewPackage: rebindPackage(pkg, link, original), codexCommand: "/bin/false", env: {} }), "untrusted");
+  await rm(link, { force: true });
+  await rm(source, { force: true });
+  await expectKind(() => runInlineReview({ reviewPackage: pkg, codexCommand: "/bin/false", env: {} }), "unavailable");
+  assert.equal(consolidateInlineReviews(pkg, [validResult(pkg)]).global_verdict, "not-pass", "consolidation must re-verify missing source");
+  await writeFile(source, original, "utf8");
+  await writeFile(source, "changed after dispatch\n", "utf8");
+  assert.equal(consolidateInlineReviews(pkg, [validResult(pkg)]).global_verdict, "not-pass", "consolidation must re-verify changed source");
+  await writeFile(source, original, "utf8");
+  await rm(outsideRoot, { recursive: true, force: true });
+}
+
+async function runLifecycleReviews(pkg) {
+  const fixture = await fakeFixture();
+  try {
+    const hang = await writeFake(fixture, "hang-codex", `#!/usr/bin/env python3\nimport os, time\nopen(os.path.join(os.environ["CODEX_HOME"], "cwd.txt"), "w").write(os.getcwd())\ntime.sleep(30)\n`);
+    await expectKind(() => runInlineReview({ reviewPackage: pkg, codexCommand: hang, env: { CODEX_HOME: fixture.codexHome }, timeoutMs: 100, graceMs: 50 }), "unavailable");
+    const cwd = (await readFile(join(fixture.codexHome, "cwd.txt"), "utf8")).trim();
+    await assert.rejects(access(cwd), "timed-out child cwd must be removed");
+    const flood = await writeFake(fixture, "stdout-flood", "#!/usr/bin/env python3\nprint('x' * 600000)\n");
+    await expectKind(() => runInlineReview({ reviewPackage: pkg, codexCommand: flood, env: { CODEX_HOME: fixture.codexHome }, stdoutBytes: 1024 }), "untrusted");
+    const stderrFlood = await writeFake(fixture, "stderr-flood", "#!/usr/bin/env python3\nimport sys\nsys.stderr.write('x' * 2048)\nsys.stderr.flush()\n");
+    await expectKind(() => runInlineReview({ reviewPackage: pkg, codexCommand: stderrFlood, env: { CODEX_HOME: fixture.codexHome }, stderrBytes: 1024 }), "untrusted");
+    const nonzero = await writeFake(fixture, "nonzero", "#!/usr/bin/env python3\nimport sys\nsys.stderr.write('profile unavailable')\nsys.exit(3)\n");
+    await expectKind(() => runInlineReview({ reviewPackage: pkg, codexCommand: nonzero, env: { CODEX_HOME: fixture.codexHome } }), "unavailable");
+  } finally { await rm(fixture.root, { recursive: true, force: true }); }
+  await expectKind(() => runInlineReview({ reviewPackage: pkg, model: "evil-model", env: {} }), "unavailable");
 }
 
 async function runIdentityFailures(pkg) {
@@ -157,7 +230,7 @@ function checkResultBindings(pkg) {
   const cases = [
     ["finding", result => { result.findings = [{ severity: "high", claim: "unbound", evidence: [] }]; }],
     ["coverage", result => { result.coverage.checked = [{ claim: "unbound", evidence: [] }]; }],
-    ["disagreement", result => { result.disagreements = [{ with: "tester", claim: "unbound", evidence: [] }]; }],
+    ["disagreement", result => { result.disagreements = [{ with: "tester", claim: "unbound", evidence: [], blocking: false, severity: "info" }]; }],
   ];
   for (const [label, mutate] of cases) {
     const invalid = structuredClone(valid);
@@ -165,6 +238,31 @@ function checkResultBindings(pkg) {
     assert.throws(() => parseLensResult(JSON.stringify(invalid), pkg, pkg.lens), /must bind a non-empty claim to evidence/, `${label} must be rejected by parser`);
     assert.equal(consolidateInlineReviews(pkg, [invalid]).global_verdict, "not-pass", `${label} must be rejected by consolidation`);
   }
+}
+
+function checkExactSchemas(pkg) {
+  assert.throws(() => canonicalJson({ value: 2 ** 53 }), /canonical JSON/);
+  assert.throws(() => canonicalJson({ value: 1.5 }), /canonical JSON/);
+  for (const value of [undefined, () => {}, Symbol("x"), 1n, Infinity]) assert.throws(() => canonicalJson({ value }), /canonical JSON/);
+  assert.throws(() => canonicalJson(JSON.parse('{"__proto__":1}')), /canonical JSON/);
+  assert.throws(() => buildTargetId({ ...pkg, scope: { value: 2 ** 53 } }), /canonical JSON/);
+  const valid = validResult(pkg);
+  const unknown = structuredClone(valid);
+  unknown.status = "complete";
+  assert.throws(() => parseLensResult(JSON.stringify(unknown), pkg, pkg.lens), /unexpected or missing keys/);
+  assert.equal(consolidateInlineReviews(pkg, [valid, valid]).global_verdict, "not-pass", "duplicate results must not overwrite");
+  assert.equal(consolidateInlineReviews(pkg, []).global_verdict, "not-pass", "missing results must not pass");
+  const extra = structuredClone(valid);
+  extra.lens = "tester";
+  assert.equal(consolidateInlineReviews(pkg, [extra]).global_verdict, "not-pass", "extra result lens must not pass");
+  const blocking = structuredClone(valid);
+  const evidence = blocking.coverage.checked[0].evidence[0];
+  blocking.disagreements = [{ with: "tester", claim: "blocking", evidence: [evidence], blocking: true, severity: "high" }];
+  assert.equal(consolidateInlineReviews(pkg, [blocking]).global_verdict, "not-pass", "raw blocking disagreement must block");
+  assert.equal(consolidateInlineReviews(pkg, [blocking]).unresolved_blocking_disagreement, true);
+  const resolved = structuredClone(blocking);
+  resolved.disagreements[0].resolved = true;
+  assert.throws(() => parseLensResult(JSON.stringify(resolved), pkg, pkg.lens), /unexpected or missing keys/);
 }
 
 function checkConsolidation(pkg) {
@@ -175,19 +273,32 @@ function checkConsolidation(pkg) {
   const missingOutput = { ...completeFail, verdict: "pass" };
   delete missingOutput.output;
   assert.equal(consolidateInlineReviews(pkg, [missingOutput]).global_verdict, "not-pass", "missing output must not pass");
-  const disagreement = { ...completeFail, verdict: "pass", disagreements: [{ with: "tester", claim: "bad digest", evidence: [{ evidence_id: "E-001", digest: "sha256:bad" }] }] };
+  const disagreement = { ...completeFail, verdict: "pass", disagreements: [{ with: "tester", claim: "bad digest", evidence: [{ evidence_id: "E-001", digest: "sha256:bad" }], blocking: false, severity: "info" }] };
   assert.equal(consolidateInlineReviews(pkg, [disagreement]).global_verdict, "not-pass", "untrusted disagreement evidence must not pass");
 }
 
+async function evidenceFixture() {
+  const root = await mkdtemp(join(tmpdir(), "team-harness-inline-evidence-"));
+  const source = join(root, "evidence.txt");
+  await writeFile(source, "captured source bytes\n", "utf8");
+  return { root, source };
+}
+
 async function main() {
-  const pkg = packageFor();
-  checkTargetMutations(pkg);
-  await runSuccessfulReview(pkg);
-  await runRejectedReviews(pkg);
-  await runIdentityFailures(pkg);
-  checkResultBindings(pkg);
-  checkConsolidation(pkg);
-  console.log("inline review runner: PASS");
+  const evidence = await evidenceFixture();
+  try {
+    const pkg = await packageFor(evidence.source);
+    checkTargetMutations(pkg);
+    await runSuccessfulReview(pkg);
+    await runRejectedReviews(pkg);
+    await runSourceFailures(pkg, evidence.source);
+    await runLifecycleReviews(pkg);
+    await runIdentityFailures(pkg);
+    checkResultBindings(pkg);
+    checkExactSchemas(pkg);
+    checkConsolidation(pkg);
+    console.log("inline review runner: PASS");
+  } finally { await rm(evidence.root, { recursive: true, force: true }); }
 }
 
 main().catch(error => {

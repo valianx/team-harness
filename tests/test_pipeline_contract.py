@@ -630,12 +630,12 @@ def check_ad_hoc_review_boundary() -> None:
 
 
 def check_inline_markers(contract: str) -> None:
-    markers = ("mode: inline-review", "requested_lenses", "required_lenses", "read_only: true", "target_id", "manifest_digest", "evidence_id", "realpath", "digest", "allowed root", "`evidence_id` values", "re-resolves and re-hashes", "incomplete|untrusted", "never produce PASS")
+    markers = ("mode: inline-review", "allowed_roots", "content", "mode: inline-review", "requested_lenses", "required_lenses", "read_only: true", "target_id", "manifest_digest", "evidence_id", "realpath", "digest", "allowed root", "coverage.checked", "`evidence_id` values", "re-realpaths, re-reads", "incomplete|untrusted", "never produce PASS")
     for marker in markers:
         require(marker in contract, f"inline contract missing {marker!r}")
     for marker in ("no write", "network", "publication", "commands defined by `Main`", "untrusted data", "isolated runner", "no shell", "no direct tree access"):
         require(marker in contract, f"inline tool boundary missing {marker!r}")
-    for marker in ("complete|incomplete|failed|unavailable|untrusted", "every `required_lenses`", "no blocker", "unresolved blocking disagreement", "never averages verdicts", "absent return as PASS", "verdict: pass"):
+    for marker in ("complete|incomplete|failed|unavailable|untrusted", "every `required_lenses`", "no blocker", "unresolved blocking disagreement", "never averages verdicts", "absent return as PASS", "verdict: pass", "resolved", "last-write-wins"):
         require(marker in contract, f"inline consolidation rule missing {marker!r}")
 
 

@@ -44,6 +44,13 @@ limits, and identity fields; missing or mismatched evidence is
 with both `lens_status: complete` and `verdict: pass`. `output: null` is
 required; there is no Freeze/Gate semantic in this mode.
 
+The package carries bounded captured UTF-8 content under explicit canonical
+`allowed_roots`, not metadata-only paths. Main verifies realpath containment and
+content hashes before dispatch and again before acceptance. Findings,
+disagreements, and `coverage.checked` entries use exact claim/evidence schemas;
+unknown keys, duplicate/missing lens results, raw `resolved`, and blocking
+disagreements supplied by a lens fail closed.
+
 An intent to review a PR, PR number, or PR URL is routed exclusively to
 `review-pr` before this mode is considered. Inline cannot intercept or rebuild
 its snapshot, lens selection, consolidation, preview, or publication gate.

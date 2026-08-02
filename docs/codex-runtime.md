@@ -132,6 +132,13 @@ gates, Stage Gate, branch, delivery record, or publication is created. Any PR
 intent, number, or URL has exclusive `review-pr` precedence and retains that
 flow's snapshot, lens selection, consolidation, preview, and publication gate.
 
+The package includes bounded captured UTF-8 content under explicit canonical
+`allowed_roots`; the child receives those bytes/results on stdin. Main verifies
+realpaths, containment, byte hashes, and content before dispatch and again
+before acceptance. Unsupported/binary evidence, timeout, or profile/runtime
+failure is fail-closed; stdout, stderr, stdin, package size, and manifest count
+are capped, and POSIX timeout cleanup terminates the child process group.
+
 Skill activation does not change Main's selected model, reasoning effort,
 sandbox, or approval policy. The projection below applies to the six spawned
 specialists:
