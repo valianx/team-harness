@@ -864,44 +864,51 @@ def check_sensitive_inline_authorization() -> None:
     require("lane:" not in current and "profile:" not in current, "Active state admits an inline/profile route field")
 
 
-def check_review_artifacts(label: str, text: str) -> None:
-    lowered = re.sub(r"\s+", " ", text.lower())
-    require("ad hoc" in lowered or "ad-hoc" in lowered, f"{label}: ad-hoc review boundary missing")
-    for artifact in ("workspace", "state", "events", "gates", "delivery"):
-        require(artifact in lowered, f"{label}: ad-hoc review missing {artifact} prohibition")
-        denied = re.search(rf"(?:\bcreates?\s+no\b|\bwithout\b|\bnever\s+(?:creates?|writes?|records?)\b)[^.;\n]{{0,180}}\b{artifact}\b", lowered)
-        require(denied is not None, f"{label}: ad-hoc review does not clause-scope {artifact}")
-    require(all(marker in lowered for marker in ("live", "tester", "qa", "security")), f"{label}: live roles drifted")
-
-
-def check_codex_adapter_boundary(role: str) -> None:
-    adapter = read(f"runtime/codex/instructions/{role}.md").lower()
-    flat = re.sub(r"\s+", " ", adapter)
-    require("mode: inline-review" in adapter, f"Codex {role}: inline-review missing")
-    require(re.search(r"creates? no workspace", adapter) is not None and "coordination state" in adapter, f"Codex {role}: state boundary missing")
-    require("delivery record" in adapter and re.search(r"creates? no", adapter) is not None, f"Codex {role}: delivery boundary missing")
-    require("run_inline_review.mjs" in adapter and "lens_status: unavailable" in adapter, f"Codex {role}: runner fail-close missing")
-    require("captured manifest content/bytes" in flat and "realpaths are provenance metadata" in flat and "never read" in flat, f"Codex {role}: inline evidence must be captured stdin only")
-
-
 def check_ad_hoc_review_boundary() -> None:
-    """Live tester/QA/security reviews stay inline and artifact-free."""
-    claude = "\n".join(read(path) for path in ("agents/orchestrator.md", "agents/ref-direct-modes.md", "docs/pipeline-lanes.md", "agents/tester.md", "agents/qa.md", "agents/security.md"))
-    codex = "\n".join(read(path) for path in ("plugins/team-harness/skills/init/SKILL.md", "plugins/team-harness/skills/pipeline/references/activation.md", "plugins/team-harness/skills/pipeline/references/validation.md", "runtime/codex/instructions/tester.md", "runtime/codex/instructions/qa.md", "runtime/codex/instructions/security.md"))
-    check_review_artifacts("Claude", claude)
-    check_review_artifacts("Codex", codex)
+    """Inline dispatch is direct, read-only, and independent of pipeline artifacts."""
+    sources = {
+        "Claude coordinator": read("agents/orchestrator.md"),
+        "Claude direct router": read("agents/ref-direct-modes.md"),
+        "Codex init": read("plugins/team-harness/skills/init/SKILL.md"),
+        "Pipeline lanes": read("docs/pipeline-lanes.md"),
+        "Shared contract": read("agents/_shared/inline-review-contract.md"),
+        "Inline reviewer": read("agents/inline-reviewer.md"),
+    }
+    for label, text in sources.items():
+        lowered = re.sub(r"\s+", " ", text.lower())
+        for marker in ("inline-review", "inline-reviewer", "read-only", "review-pr"):
+            require(marker in lowered, f"{label}: native inline marker {marker!r} missing")
+        require(
+            "repository root" in lowered or "project root" in lowered or "repository_root" in lowered,
+            f"{label}: canonical root marker missing",
+        )
+    contract_flat = re.sub(r"\s+", " ", sources["Shared contract"].lower())
+    for marker in ("commit or range", "scope", "intent", "criteria", "changed_surface", "requested_lenses", "required_lenses"):
+        require(marker in contract_flat, f"Shared contract: target marker {marker!r} missing")
+    for artifact in ("workspace", "state", "events", "gates", "branch", "delivery record", "publication"):
+        require(artifact in contract_flat, f"Shared contract: inline artifact marker {artifact!r} missing")
+    contract = sources["Shared contract"].lower()
+    for marker in ("native read-only sandbox", "tester|qa|security|adversary", "security floor", "stale", "recaptures", "no blocker", "unresolved blocking disagreement"):
+        require(marker in contract, f"Shared contract: current inline rule {marker!r} missing")
     for role in ("tester", "qa", "security"):
-        check_codex_adapter_boundary(role)
+        semantic = read(f"agents/{role}.md").lower()
+        adapter = read(f"runtime/codex/instructions/{role}.md").lower()
+        for label, text in ((f"Claude {role}", semantic), (f"Codex {role}", adapter)):
+            require("inline-review" not in text, f"{label}: retired inline responsibility remains")
+            require("run_inline_review" not in text and "evidence_manifest" not in text, f"{label}: retired runner protocol remains")
 
 
 def check_inline_markers(contract: str) -> None:
-    markers = ("mode: inline-review", "allowed_roots", "content", "mode: inline-review", "requested_lenses", "required_lenses", "read_only: true", "target_id", "manifest_digest", "evidence_id", "realpath", "digest", "allowed root", "coverage.checked", "`evidence_id` values", "re-realpaths, re-reads", "incomplete|untrusted", "never produce PASS")
+    markers = ("mode: inline-review", "repository_root", "commit_or_range", "scope", "intent", "criteria", "changed_surface", "requested_lenses", "required_lenses", "lens: tester|qa|security|adversary", "read_only: true", "target_id", "native read-only sandbox", "security floor", "currentness", "stale", "lens_status: complete|incomplete|failed|unavailable|untrusted", "verdict: pass", "no blocker", "unresolved blocking disagreement", "never averages verdicts", "absent", "return as pass", "review-pr")
+    contract = contract.lower()
     for marker in markers:
         require(marker in contract, f"inline contract missing {marker!r}")
-    for marker in ("no write", "network", "publication", "commands defined by `Main`", "untrusted data", "isolated runner", "no shell", "no direct tree access"):
+    for marker in ("edit or write", "network", "publication", "external state", "untrusted", "isolated runner", "unavailable"):
         require(marker in contract, f"inline tool boundary missing {marker!r}")
-    for marker in ("complete|incomplete|failed|unavailable|untrusted", "every `required_lenses`", "no blocker", "unresolved blocking disagreement", "never averages verdicts", "absent return as PASS", "verdict: pass", "resolved", "last-write-wins"):
+    for marker in ("every `required_lenses`", "no blocker", "unresolved blocking disagreement", "never averages verdicts", "absent", "return as pass", "verdict: pass"):
         require(marker in contract, f"inline consolidation rule missing {marker!r}")
+    for retired in ("evidence_manifest", "manifest_digest", "allowed_roots", "run_inline_review.mjs"):
+        require(retired not in contract, f"inline contract retains retired protocol field {retired!r}")
 
 
 def check_pr_precedence(source: str, text: str) -> None:
@@ -913,17 +920,24 @@ def check_pr_precedence(source: str, text: str) -> None:
 
 
 def check_inline_review_contract() -> None:
-    """Inline evidence, tool, lens, and routing invariants stay fail-closed."""
+    """Inline native project access, lens selection, currentness, and routing stay fail-closed."""
     contract = read("agents/_shared/inline-review-contract.md")
     check_inline_markers(contract)
     for source, path in (("coordinator", "agents/orchestrator.md"), ("direct router", "agents/ref-direct-modes.md"), ("Codex init", "plugins/team-harness/skills/init/SKILL.md")):
         check_pr_precedence(source, read(path))
-    for role in ("tester", "qa", "security"):
-        role_text = re.sub(r"\s+", " ", read(f"agents/{role}.md").lower())
-        require("captured manifest content/bytes" in role_text and "realpaths only as provenance metadata" in role_text and "never read" in role_text, f"Claude {role}: inline evidence must be captured stdin only")
-        lowered = read(f"runtime/codex/instructions/{role}.md").lower()
-        for marker in ("requested_lenses", "required_lenses", "target_id", "manifest_digest", "lens_status: complete|incomplete|failed|unavailable|untrusted", "output: null", "run_inline_review.mjs", "no prose-only", "incomplete|untrusted"):
-            require(marker in lowered, f"Codex {role}: inline field missing {marker!r}")
+    reviewer = read("agents/inline-reviewer.md").lower()
+    adapter = read("runtime/codex/instructions/inline-reviewer.md").lower()
+    for label, text in (("Claude inline-reviewer", reviewer), ("Codex inline-reviewer", adapter)):
+        for marker in ("tester", "qa", "security", "adversary", "repository_root", "commit_or_range", "sandbox", "read-only", "target_id", "lens_status", "coverage", "disagreements"):
+            require(marker in text, f"{label}: native lens marker {marker!r} missing")
+        for retired in ("run_inline_review.mjs", "evidence_manifest", "manifest_digest", "stdin-only"):
+            require(retired not in text, f"{label}: retired inline protocol {retired!r} remains")
+    init = re.sub(r"\s+", " ", read("plugins/team-harness/skills/init/SKILL.md").lower())
+    for marker in ("inline-reviewer", "commit/range", "sandbox_mode = \"read-only\"", "adversary", "security floor", "stale"):
+        require(marker in init, f"Codex init native route missing {marker!r}")
+    require("repository root" in init or "project root" in init, "Codex init native route missing canonical root")
+    for retired in ("run_inline_review.mjs", "evidence_manifest", "manifest_digest", "stdin-only", "deny-root"):
+        require(retired not in init, f"Codex init retired protocol {retired!r} remains")
 
 
 def _delivery_publish_sources() -> dict[str, str]:
@@ -1084,12 +1098,10 @@ def check_review_comment_regressions() -> None:
     require("[redacted]" in discover, "Discover: secret redaction marker is missing")
     require("survey_effort" not in discover, "Discover: retired survey_effort field remains live")
 
-    qa = read("agents/qa.md")
-    qa_inline = section(qa, "### Ad-hoc inline review", "### Validate Mode")
-    for marker in ("early return", "no workspace discovery", ".gitignore", "output: null"):
-        require(marker in qa_inline, f"QA inline review: missing early-return guard {marker!r}")
-    qa_session = section(qa, "## Session Context Protocol", "## Phase 0")
-    require("inline-review" in qa_session and "never enters this protocol" in qa_session, "QA inline review can enter the workspace protocol")
+    for role in ("tester", "qa", "security"):
+        role_text = read(f"agents/{role}.md").lower()
+        require("inline-review" not in role_text, f"{role}: retired inline role section remains")
+        require("run_inline_review" not in role_text and "evidence_manifest" not in role_text, f"{role}: retired runner protocol remains")
 
     for relative in ("agents/ref-pipeline.md", "docs/reasoning-checkpoint.md"):
         checkpoint = read(relative)

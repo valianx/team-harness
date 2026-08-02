@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inspect or reconcile the ten bundled Team Harness Codex agents."""
+"""Inspect or reconcile the eleven bundled Team Harness Codex agents."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ ROLES = (
     "tester",
     "qa",
     "security",
+    "inline-reviewer",
     "delivery",
     "reviewer",
     "pr-review-qa",

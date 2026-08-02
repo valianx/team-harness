@@ -31,22 +31,21 @@ apply a default-N, veto the choice, or force pipeline activation. Runtime sandbo
 destructive-action, and outward-action controls remain unchanged. Warnings or audit notes are
 informational and do not authorize an edit.
 
-While inline is active, the operator may explicitly request a bounded `tester`, `qa`, or `security`
-review. `Main` records the requested and required lenses, captures a canonical
-realpath-and-digest evidence manifest, and consolidates each lens independently.
-Such an ad hoc review remains inline: it creates no workspace, state, events, gates,
-Stage Gate, branch, delivery action, or publication. Codex uses the isolated
-`run_inline_review.mjs` runner: a separate ephemeral `codex exec` receives the
-package only on stdin from an empty temporary cwd, with a deny-root/read-minimal,
-no-network profile and shell, apps, multi-agent, MCP, web, and publication tools
-disabled. Unsupported enforcement is `lens_status: unavailable`, never a
-prose-only fallback. Missing or mismatched evidence is `incomplete`/`untrusted`,
-and PASS requires every required lens to be `lens_status: complete` and
-`verdict: pass`. A PR, PR number, or PR URL has exclusive `review-pr` precedence;
-inline never intercepts its snapshot, lenses, consolidation, preview, or
-publication.
-A coordinator suggestion is informational and never dispatches a reviewer
-without the live request.
+While inline is active, the operator may explicitly request a bounded `tester`, `qa`,
+`security`, or `adversary` review. `Main` resolves the canonical repository root,
+binds an immutable commit or range, records the requested and required lenses, and
+dispatches one native `inline-reviewer` instance per lens. The reviewer reads the
+anchored project directly through `sandbox_mode = "read-only"`; it creates no
+workspace, state, events, gates, Stage Gate, branch, delivery action, commit,
+publication, or external state. The adversary lens is conditional: Main adds it
+when the security floor applies or the operator requests it, not for an ordinary
+review. A moved root or commit/range is stale and cannot produce PASS; missing,
+failed, unavailable, or untrusted lens results remain explicit, and PASS requires
+every required lens to complete with `verdict: pass` and no blocker or unresolved
+blocking disagreement. A PR, PR number, or PR URL has exclusive `review-pr`
+precedence; inline never intercepts its snapshot, lenses, consolidation, preview,
+or publication. A coordinator suggestion is informational and never dispatches a
+reviewer without the live request.
 
 ### Pipeline
 

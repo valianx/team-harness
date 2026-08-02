@@ -20,50 +20,59 @@ def fail(message: str) -> None:
     raise AssertionError(message)
 
 
-def check_inline_runner() -> None:
-    runner = (ROOT / "plugins/team-harness/skills/init/scripts/run_inline_review.mjs").read_text()
+def check_inline_reviewer_native() -> None:
+    """The generated inline reviewer is direct-project, read-only, and four-lens."""
+    registry = json.loads((ROOT / "runtime/schema/codex-agents.json").read_text())
+    role = next((agent for agent in registry["agents"] if agent["name"] == "inline-reviewer"), None)
+    if role is None:
+        fail("Codex registry is missing inline-reviewer")
+    expected = {
+        "sandbox_mode": "read-only",
+        "capabilities": ["filesystem-read"],
+        "capability_profile": "review-read-only",
+        "semantic_source": "agents/inline-reviewer.md",
+        "instruction_source": "runtime/codex/instructions/inline-reviewer.md",
+        "output_path": ".codex/agents/inline-reviewer.toml",
+    }
+    for key, value in expected.items():
+        if role.get(key) != value:
+            fail(f"inline-reviewer registry {key} drifted: {role.get(key)!r}")
+    adapter = (ROOT / role["instruction_source"]).read_text().lower()
     for marker in (
-        "spawn as nodeSpawn",
-        '"--ephemeral"',
-        '"--ignore-user-config"',
-        '"--ignore-rules"',
-        '"--strict-config"',
-        '"--json"',
-        "model_reasoning_effort",
-        "default_permissions",
-        "features.shell_tool=false",
-        "features.apps=false",
-        "features.multi_agent=false",
-        'web_search="disabled"',
-        "mcp_servers={}",
-        "safeEnvironment",
-        "allowed_roots",
-        "verifyEvidence",
-        "readCapped",
-        "process.kill(-child.pid",
-        "validateResultEvidence",
-        "assertExactKeys",
-        "packageForLens",
-        "stream.destroy",
-        "contentBytes",
-        "RUNTIME_LIMITS",
-        "child.stdin.end(payload)",
-        "rm(base",
-        "Codex emitted forbidden tool event",
-        "lens_status === \"complete\"",
-        "verdict === \"pass\"",
+        "tester", "qa", "security", "adversary", "repository_root", "commit_or_range",
+        "sandbox_mode = \"read-only\"", "lens_status", "coverage", "disagreements",
+        "review-pr", "target currentness", "output: null",
     ):
-        if marker not in runner:
-            fail(f"inline runner missing guard {marker!r}")
-    focused = subprocess.run(
-        ["node", "plugins/team-harness/skills/init/scripts/test_run_inline_review.mjs"],
-        cwd=ROOT,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    if focused.returncode != 0:
-        fail(f"inline runner behavioral tests failed:\n{focused.stdout}{focused.stderr}")
+        if marker not in adapter:
+            fail(f"inline-reviewer adapter missing {marker!r}")
+    for retired in ("run_inline_review.mjs", "evidence_manifest", "manifest_digest", "stdin-only", "deny-root"):
+        if retired in adapter:
+            fail(f"inline-reviewer adapter retains retired protocol {retired!r}")
+    for relative in (".codex/agents/inline-reviewer.toml", "plugins/team-harness/skills/setup/assets/agents/inline-reviewer.toml"):
+        path = ROOT / relative
+        if not path.is_file():
+            fail(f"missing generated inline-reviewer output: {relative}")
+        data = tomllib.loads(path.read_text())
+        if data.get("model") != "gpt-5.6-luna" or data.get("model_reasoning_effort") != "max":
+            fail(f"{relative}: inline-reviewer projection must be gpt-5.6-luna/max")
+        if data.get("sandbox_mode") != "read-only":
+            fail(f"{relative}: inline-reviewer must use read-only sandbox")
+        capabilities = data.get("capabilities", {})
+        if capabilities.get("default") != "deny" or capabilities.get("allow") != ["read", "glob", "grep"]:
+            fail(f"{relative}: inline-reviewer capability profile must allow only read/glob/grep")
+        if data.get("developer_instructions") != (ROOT / role["instruction_source"]).read_text().strip():
+            fail(f"{relative}: generated instructions drift from canonical adapter")
+    if (ROOT / "plugins/team-harness/skills/init/scripts/run_inline_review.mjs").exists():
+        fail("retired inline runner remains")
+    if (ROOT / "plugins/team-harness/skills/init/scripts/test_run_inline_review.mjs").exists():
+        fail("retired inline runner behavioral test remains")
+    init = re.sub(r"\s+", " ", (ROOT / "plugins/team-harness/skills/init/SKILL.md").read_text().lower())
+    for marker in ("inline-reviewer", "project root", "commit/range", "sandbox_mode = \"read-only\"", "adversary", "security floor", "before consolidation", "stale"):
+        if marker not in init:
+            fail(f"Codex init native inline route missing {marker!r}")
+    for retired in ("run_inline_review.mjs", "evidence_manifest", "manifest_digest", "stdin-only", "deny-root"):
+        if retired in init:
+            fail(f"Codex init retains retired inline protocol {retired!r}")
 EXPECTED_POST_GATE1 = {
     "mechanical": ("main", "implementation", "prohibited", "none", 0),
     "decision": ("main", "implementation", "explicit-only", "none", 0),
@@ -253,13 +262,14 @@ def check_post_gate1_projection() -> None:
 
 
 def main() -> None:
-    check_inline_runner()
+    check_inline_reviewer_native()
     contract = json.loads((ROOT / "runtime/schema/codex-agents.json").read_text())
     agents = contract["agents"]
     expected = {agent["name"] for agent in agents}
     pipeline_roles = {"architect", "implementer", "tester", "qa", "security", "delivery"}
     review_roles = {"reviewer", "pr-review-qa", "pr-review-security", "reviewer-consolidator"}
-    if expected != pipeline_roles | review_roles:
+    inline_roles = {"inline-reviewer"}
+    if expected != pipeline_roles | review_roles | inline_roles:
         fail(f"unexpected Codex installed roles: {sorted(expected)}")
     architect_contract = next(agent for agent in agents if agent["name"] == "architect")
     if architect_contract["sandbox_mode"] != "workspace-write":
@@ -294,6 +304,7 @@ def main() -> None:
         "tester": ("sonnet/high", "non-opus"),
         "qa": ("sonnet/high", "non-opus"),
         "security": ("opus/xhigh", "opus-xhigh"),
+        "inline-reviewer": ("sonnet/high", "non-opus"),
         "delivery": ("sonnet/medium", "non-opus"),
         "reviewer": ("sonnet/high", "non-opus"),
         "pr-review-qa": ("sonnet/high", "non-opus"),
@@ -824,7 +835,7 @@ def main() -> None:
             fail(f"Codex bundled-agent sync failed: {synced.stdout}{synced.stderr}")
         sync_result = json.loads(synced.stdout)
         if set(sync_result.get("changed", [])) != expected:
-            fail("Codex bundled-agent sync did not install all ten roles")
+            fail("Codex bundled-agent sync did not install all eleven roles")
         for role in expected:
             installed = temp / "codex-home/agents" / f"{role}.toml"
             packaged = ROOT / "plugins/team-harness/skills/setup/assets/agents" / f"{role}.toml"
@@ -1057,68 +1068,47 @@ def main() -> None:
     if "1 — inline" not in configuration_reference or "2 — pipeline" not in configuration_reference:
         fail("Codex configuration does not provide live migration guidance")
 
-    # A live tester/QA/security request is an inline report, not a pipeline run
-    # and not a source of state, gates, or delivery artifacts.
+    # Inline review is a native read-only project inspection, not a runner or
+    # manifest transport, and pipeline roles retain their existing contracts.
     for role in ("tester", "qa", "security"):
         adapter = (ROOT / f"runtime/codex/instructions/{role}.md").read_text().lower()
-        for marker in (
-            "mode: inline-review",
-            "coordination state",
-            "events",
-            "gates",
-            "delivery record",
-            "requested_lenses",
-            "required_lenses",
-            "target_id",
-            "manifest_digest",
-            "lens_status: complete|incomplete|failed|unavailable|untrusted",
-            "output: null",
-            "run_inline_review.mjs",
-            "incomplete|untrusted",
-            "review-pr",
-        ):
-            if marker not in adapter:
-                fail(f"Codex {role} inline boundary is missing {marker!r}")
-        if not re.search(r"create(?:s)? no workspace", adapter):
-            fail(f"Codex {role} inline boundary is missing workspace prohibition")
-        if "no shell" not in adapter or "network" not in adapter or "publication" not in adapter:
-            fail(f"Codex {role} inline boundary is missing tool fallback prohibition")
-        if "no prose-only" not in adapter:
-            fail(f"Codex {role} inline boundary permits a prose-only fallback")
+        for retired in ("inline-review", "run_inline_review", "evidence_manifest", "manifest_digest"):
+            if retired in adapter:
+                fail(f"Codex pipeline adapter {role} retains retired inline marker {retired!r}")
+    native_adapter = (ROOT / "runtime/codex/instructions/inline-reviewer.md").read_text().lower()
     for marker in (
-        "does not preflight the six installed agents",
-        "requested_lenses",
-        "required_lenses",
-        "mode: inline-review",
-        "target_id",
-        "manifest_digest",
-        "run_inline_review.mjs",
-        "output: null",
-        "review-pr",
-        "review a pr",
-        "pr number",
-        "pr url",
-        "exclusive",
-        "incomplete|untrusted",
+        "tester", "qa", "security", "adversary", "repository_root", "commit_or_range",
+        "sandbox_mode = \"read-only\"", "lens_status", "coverage", "disagreements",
+        "target currentness", "review-pr", "output: null",
     ):
-        if marker not in init.lower():
-            fail(f"Codex init inline contract is missing {marker!r}")
+        if marker not in native_adapter:
+            fail(f"Codex inline-reviewer adapter is missing {marker!r}")
+    for retired in ("run_inline_review", "evidence_manifest", "manifest_digest", "stdin-only", "deny-root"):
+        if retired in native_adapter:
+            fail(f"Codex inline-reviewer adapter retains retired marker {retired!r}")
+    init_lower = re.sub(r"\s+", " ", init.lower())
     for marker in (
-        "mode: inline-review",
-        "requested_lenses",
-        "required_lenses",
-        "target_id",
-        "manifest_digest",
-        "evidence_id",
-        "realpath",
-        "sha256:",
-        "incomplete|untrusted",
-        "complete|incomplete|failed|unavailable|untrusted",
-        "never averages verdicts",
-        "absent return as PASS",
+        "does not preflight the installed agents", "inline-reviewer", "requested_lenses",
+        "required_lenses", "project root", "commit/range", "sandbox_mode = \"read-only\"",
+        "adversary", "security floor", "review-pr", "exclusive", "stale",
+    ):
+        if marker not in init_lower:
+            fail(f"Codex init native inline contract is missing {marker!r}")
+    for retired in ("run_inline_review", "evidence_manifest", "manifest_digest", "stdin-only", "deny-root"):
+        if retired in init_lower:
+            fail(f"Codex init retains retired inline marker {retired!r}")
+    for marker in (
+        "mode: inline-review", "repository_root", "commit_or_range", "requested_lenses",
+        "required_lenses", "lens: tester|qa|security|adversary", "read_only: true",
+        "target_id", "native read-only sandbox", "security floor", "stale",
+        "complete|incomplete|failed|unavailable|untrusted", "never averages verdicts",
+        "absent\nreturn as PASS", "verdict: pass", "review-pr",
     ):
         if marker not in inline_contract:
             fail(f"shared inline contract is missing {marker!r}")
+    for retired in ("evidence_manifest", "manifest_digest", "allowed_roots", "run_inline_review"):
+        if retired in inline_contract:
+            fail(f"shared inline contract retains retired marker {retired!r}")
     if "no second confirmation" not in activation_reference.lower() and "second confirmation" not in init.lower():
         fail("Codex sensitive inline path does not prohibit a second confirmation")
     if "explicitly selects `inline`" not in activation_reference.lower() and "selects `inline`" not in init.lower():

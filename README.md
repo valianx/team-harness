@@ -49,8 +49,8 @@ $team-harness:setup
 ```
 
 The setup skill configures native Team Harness settings, optional MCP servers,
-workspace/language preferences, and ten specialist agents: six for the gated
-pipeline and four for immutable PR review. It preserves
+workspace/language preferences, and eleven specialist agents: six for the gated
+pipeline, one direct read-only inline reviewer, and four for immutable PR review. It preserves
 Codex's native permission and hook-trust prompts. It can also import every
 missing setting from an existing Claude Code or opencode Team Harness config;
 opaque values are copied directly and never displayed.
@@ -58,12 +58,12 @@ opaque values are copied directly and never displayed.
 Review the [plugin hook manifest](./plugins/team-harness/hooks/hooks.json) and
 its referenced scripts, then explicitly trust the repository before enabling
 those hooks. Plugin installation and agent installation are separate. The
-plugin provides the Team Harness skills; the ten generated agents are installed
-by the repository's Go binary.
+plugin provides the Team Harness skills; the eleven generated agents are installed
+by the setup skill from the marketplace snapshot.
 
 The equivalent manual agent-installation fallback, from the project root, is:
 
-From the root of the project where Team Harness will run, install its ten
+From the root of the project where Team Harness will run, install its eleven
    agents (requires Go 1.25.8 or newer):
 ```bash
 cd /path/to/your/project
@@ -82,9 +82,10 @@ chmod +x install-linux-amd64
 The checksum proves that the binary matches the file published in the same
 GitHub release; it does not protect against compromise of the release origin.
 
-Use `--scope global` instead when the ten agents should be available from your
-Codex user configuration rather than only this checkout. Six agents are
-required by the gated `pipeline` workflow and four by `review-pr`; lightweight `init` remains
+Use `--scope global` instead when the eleven agents should be available from your
+Codex user configuration rather than only this checkout. Six agents are required
+by the gated `pipeline` workflow, `inline-reviewer` serves direct read-only
+reviews, and four agents are required by `review-pr`; lightweight `init` remains
 available with the plugin alone.
 
 4. Start another Codex thread so newly configured MCP servers and installed
@@ -108,13 +109,15 @@ opencode. Runtime adapters translate native paths, tools, permissions, and
 delegation without maintaining separate feature lists.
 
 `init` performs lightweight intake and direct bounded work without pipeline
-state or agent preflight. A current live request for tester, QA, or security may
-dispatch a workspace-free inline review: `Main` captures the immutable evidence
-manifest and `run_inline_review.mjs` invokes a separate ephemeral Codex child
-with a deny-root/read-minimal, no-network profile. Unsupported enforcement is
-`lens_status: unavailable`; there is no prose-only or direct-tree fallback, and
-global PASS requires every required lens to be complete with `verdict: pass`.
-No pipeline artifacts are created. PR text, numbers, and URLs always route to
+state or agent preflight. A current live request for tester, QA, security, or
+adversary may dispatch the native `inline-reviewer` over the local project.
+Each requested lens reads the anchored repository root and immutable commit or
+range through a native `read-only` sandbox; no workspace, state, events, gates,
+branch, delivery record, or publication is created. The adversary lens is added
+only when the security floor applies or the operator requests it. A missing or
+stale target, unsupported lens, or unavailable read-only boundary is explicit
+and cannot produce PASS; global PASS requires every required lens to complete
+with `verdict: pass`. PR text, numbers, and URLs always route exclusively to
 `review-pr`; generic inline review never intercepts that snapshot/publication
 flow. `pipeline` explicitly starts the full gated workflow in `Main`; it does
 not create a seventh coordinator or require `/agent`.

@@ -17,8 +17,9 @@ Then invoke `$team-harness:setup`. The marketplace only distributes code;
 setup converges the operational installation. It writes native settings to
 `${CODEX_HOME:-$HOME/.codex}/.team-harness.json`, configures workspace and
 language preferences, offers Memory/context7 MCP registration, verifies hook
-trust, and places ten bundled specialist agents in project or global scope:
-six for the gated pipeline and four for immutable PR review.
+trust, and places eleven bundled specialist agents in project or global scope:
+six for the gated pipeline, one direct read-only inline reviewer, and four for
+immutable PR review.
 An explicit setup import can copy missing values from Claude Code or opencode
 without printing opaque values; normal Codex modes never read another
 runtime's configuration and existing Codex-native values always win.
@@ -37,7 +38,7 @@ codex plugin marketplace add valianx/team-harness \
 Use `$team-harness:update` for the normal update flow. It refreshes the
 marketplace, compares versions, refreshes the installed plugin through an
 idempotent native `codex plugin add` under native permissions, ensures native
-settings exist, and automatically aligns all ten
+settings exist, and automatically aligns all eleven
 bundled agents in the configured scope. It also runs a guarded compatibility
 bridge for the running thread's old versioned cache path. A missing or
 previously bridged path can follow the new snapshot; a real active old snapshot
@@ -90,8 +91,9 @@ pipeline contracts remain hand-authored for Codex; the other 47 are generated
 runtime adapters that package the canonical workflow, references, scripts, and
 assets while translating invocation, configuration paths, tools, delegation,
 and permission boundaries. This includes the diagram family and both GCP
-skills. The ten generated specialist definitions used by the gated pipeline and
-PR review remain a separate setup/update concern. Consumers do not need the Go installer.
+skills. The eleven generated specialist definitions used by the gated pipeline,
+direct inline review, and PR review remain a separate setup/update concern.
+Consumers do not need the Go installer.
 Run `$team-harness:modes` for an alphabetical catalog with concise descriptions,
 or use `/skills` and `$team-harness` completion in the Codex composer.
 These helper commands remain available for diagnostics and manual recovery:
@@ -115,9 +117,11 @@ the primary thread must find a complete set of `architect.toml`,
 `implementer.toml`, `tester.toml`, `qa.toml`, `security.toml`, and
 `delivery.toml` in either the project `.codex/agents/` or global
 `$CODEX_HOME/agents/` scope before it delegates. Setup/update install them from
-the marketplace snapshot. The four read-only review agents (`reviewer`, `pr-review-qa`,
-`pr-review-security`, and `reviewer-consolidator`) are the corresponding prerequisite for
-`review-pr`. A new Codex thread is needed only when Codex must discover changed declarations;
+the marketplace snapshot. The direct read-only `inline-reviewer` is the only specialist used
+by workspace-free inline review; it receives exactly one of the `tester`, `qa`, `security`,
+or conditional `adversary` lenses. The four read-only PR review agents (`reviewer`,
+`pr-review-qa`, `pr-review-security`, and `reviewer-consolidator`) are the corresponding
+prerequisite for `review-pr`. A new Codex thread is needed only when Codex must discover changed declarations;
 the updater's compatibility bridge keeps existing paths live. Shared direct skills remain
 available without either specialist set and execute through Main unless their adapter names a
 bounded native delegation.
@@ -140,40 +144,30 @@ to direct behavior when the workflow completes or is explicitly aborted.
 ### Workspace-free inline review
 
 For a non-PR inline review, `Main` records `requested_lenses` and
-`required_lenses` (every operator-named lens is required), captures a canonical
-realpath-and-digest evidence manifest, and sends each lens the same package with
-`target_id` and `manifest_digest`. Codex invokes
-`plugins/team-harness/skills/init/scripts/run_inline_review.mjs`: a separate
-ephemeral `codex exec` receives the package only on stdin from an empty temporary
-cwd, with a deny-root/read-minimal, no-network permission profile and shell,
-apps, multi-agent, MCP, web, and publication tools disabled. The child
-environment is sanitized, JSONL tool events are rejected, and the temporary cwd
-is removed; unsupported CLI/profile enforcement returns `lens_status: unavailable`
-rather than a prose-only or direct-tree fallback.
+`required_lenses` (every operator-named lens is required), resolves the canonical
+repository root, and binds the review to an immutable commit or range. It
+dispatches one native `inline-reviewer` instance per lens with the same target,
+scope, intent, criteria, changed surface, and `target_id`. The reviewer reads
+the project directly through `sandbox_mode = "read-only"`; it cannot write
+files, create Team Harness workspace/state/events/gates, make a branch or
+commit, perform delivery or publication, mutate external state, use network
+tools, or dispatch another agent. There is no isolated runner, captured-content
+transport, or evidence-manifest protocol.
 
-Each lens returns `lens_status` and claim-bound evidence: every finding,
-disagreement, and `coverage.checked` entry has a non-empty `claim` plus a
-non-empty exact-digest `evidence` array. Top-level `evidence_refs` are
-supplementary; a complete/pass lens must have at least one valid
-`coverage.checked` entry. Missing or mismatched evidence is
-`incomplete`/`untrusted`, and global PASS requires every required lens to be
-`lens_status: complete` and `verdict: pass`, with matching identity
-and no blocker or unresolved blocking disagreement. No workspace, state, events,
-gates, Stage Gate, branch, delivery record, or publication is created. Any PR
-intent, number, or URL has exclusive `review-pr` precedence and retains that
-flow's snapshot, lens selection, consolidation, preview, and publication gate.
-
-The package includes bounded captured UTF-8 content under explicit canonical
-`allowed_roots`; the child receives those bytes/results on stdin. Main verifies
-realpaths, containment, byte hashes, and content before dispatch and again
-before acceptance. Unsupported/binary evidence, timeout, or profile/runtime
-failure is fail-closed; stdout, stderr, stdin, package size, and manifest count
-are capped, and POSIX timeout cleanup terminates the child process group. The
-current lens is part of `target_id`, so consolidation derives and checks a
-distinct expected identity for every required lens.
+The four lenses are `tester`, `qa`, `security`, and conditional `adversary`.
+The adversary lens is required when the security floor applies or the operator
+requests it and is not added to ordinary reviews. A lens reports its status,
+verdict, findings, coverage, limits, and disagreements. Main verifies the root
+and commit/range before dispatch and again before consolidation; a moved target
+is stale and cannot produce PASS. Missing, failed, unavailable, stale, or
+untrusted returns remain explicit, and global PASS requires every required lens
+to be complete with `verdict: pass`, no blocker, and no unresolved blocking
+disagreement. Any PR intent, number, or URL has exclusive `review-pr`
+precedence and retains that flow's snapshot, lens selection, consolidation,
+preview, and publication gate.
 
 Skill activation does not change Main's selected model, reasoning effort,
-sandbox, or approval policy. The projection below applies to all ten installed
+sandbox, or approval policy. The projection below applies to all eleven installed
 specialists:
 
 | Claude role metadata | Codex model | Effort |

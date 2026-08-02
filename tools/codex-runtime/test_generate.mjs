@@ -53,11 +53,11 @@ async function withMutedStderr(action) {
 
 const first = await render();
 const second = await render();
-assert.equal(first.files.size, 22);
+assert.equal(first.files.size, 24);
 assert.deepEqual([...first.files], [...second.files], "identical inputs must render identical bytes");
 
 const agentOutputs = [...first.files].filter(([path]) => path.includes("/.codex/agents/"));
-assert.equal(agentOutputs.length, 10);
+assert.equal(agentOutputs.length, 11);
 for (const [, content] of agentOutputs) {
   assert.match(content, /^name = /m);
   assert.match(content, /^description = /m);
@@ -68,7 +68,7 @@ for (const [, content] of agentOutputs) {
 
 const packagedAgentOutputs = [...first.files].filter(([path]) =>
   path.includes("/plugins/team-harness/skills/setup/assets/agents/"));
-assert.equal(packagedAgentOutputs.length, 10);
+assert.equal(packagedAgentOutputs.length, 11);
 for (const [path, content] of agentOutputs) {
   const name = path.split("/").at(-1);
   assert.equal(
@@ -105,6 +105,13 @@ for (const name of [
   assert.match(content, /^model = "gpt-5\.6-luna"$/m);
   assert.match(content, /^model_reasoning_effort = "max"$/m);
 }
+const inlineReviewer = first.files.get(join(root, ".codex/agents/inline-reviewer.toml"));
+assert.match(inlineReviewer, /^model = "gpt-5\.6-luna"$/m);
+assert.match(inlineReviewer, /^model_reasoning_effort = "max"$/m);
+assert.match(inlineReviewer, /^sandbox_mode = "read-only"$/m);
+assert.match(inlineReviewer, /^\[capabilities\]$/m);
+assert.match(inlineReviewer, /^default = "deny"$/m);
+assert.match(inlineReviewer, /^allow = \["read", "glob", "grep"\]$/m);
 
 for (const name of ["reviewer", "pr-review-qa", "pr-review-security", "reviewer-consolidator"]) {
   const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
@@ -144,6 +151,7 @@ assert.match(roster, /\$sync-codex-agents/);
 assert.match(roster, /\| Agent \| Canonical Claude model \| Canonical source effort \| Codex model \| Codex effort \| Codex availability \|/);
 assert.match(roster, /\| `architect` \| `opus` \| `xhigh` \| `gpt-5\.6-sol` \| `xhigh` \| installed custom agent \|/);
 assert.match(roster, /\| `implementer` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `inline-reviewer` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
 assert.match(roster, /\| `reviewer` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
 assert.match(roster, /\| `pr-review-qa` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
 assert.match(roster, /\| `pr-review-security` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);

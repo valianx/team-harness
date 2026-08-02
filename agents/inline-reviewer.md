@@ -1,6 +1,6 @@
 ---
 name: inline-reviewer
-description: Runtime-native read-only reviewer for one bounded inline lens: tester, QA, security, or adversary.
+description: "Runtime-native read-only reviewer for one bounded inline lens: tester, QA, security, or adversary."
 model: sonnet
 effort: high
 color: yellow
