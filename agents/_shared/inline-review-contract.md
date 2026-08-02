@@ -102,8 +102,7 @@ for each; top-level `evidence_refs` are supplementary and never substitute for
 per-claim binding. An absent ID, an unmanifested path, a path that escapes an
 allowed root, a missing/different digest, or bytes that cannot be verified
 changes the lens to `incomplete` or `untrusted` (`incomplete|untrusted`); it can
-never produce
-PASS. A `complete` + `pass` lens must include at least one valid
+never produce PASS. A `complete` + `pass` lens must include at least one valid
 `coverage.checked` claim. `coverage.limits` remains an explicit list of
 non-factual limit strings. A lens reports limits and disagreements explicitly
 rather than filling gaps with assumptions.

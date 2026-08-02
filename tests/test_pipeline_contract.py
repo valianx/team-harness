@@ -630,7 +630,7 @@ def check_ad_hoc_review_boundary() -> None:
 
 
 def check_inline_markers(contract: str) -> None:
-    markers = ("mode: inline-review", "requested_lenses", "required_lenses", "read_only: true", "target_id", "manifest_digest", "evidence_id", "realpath", "digest", "allowed root", "`evidence_id` values", "re-resolves and re-hashes", "incomplete|untrusted", "never produce\nPASS")
+    markers = ("mode: inline-review", "requested_lenses", "required_lenses", "read_only: true", "target_id", "manifest_digest", "evidence_id", "realpath", "digest", "allowed root", "`evidence_id` values", "re-resolves and re-hashes", "incomplete|untrusted", "never produce PASS")
     for marker in markers:
         require(marker in contract, f"inline contract missing {marker!r}")
     for marker in ("no write", "network", "publication", "commands defined by `Main`", "untrusted data", "isolated runner", "no shell", "no direct tree access"):

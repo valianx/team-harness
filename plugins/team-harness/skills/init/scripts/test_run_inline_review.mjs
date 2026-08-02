@@ -168,14 +168,14 @@ function checkResultBindings(pkg) {
 }
 
 function checkConsolidation(pkg) {
-  const completeFail = { lens: "qa", lens_status: "complete", verdict: "fail", target_id: pkg.target_id, manifest_digest: pkg.manifest_digest, output: null, evidence_refs: [], findings: [], disagreements: [] };
+  const completeFail = { ...validResult(pkg), verdict: "fail" };
   const completeConcerns = { ...completeFail, verdict: "concerns" };
   assert.equal(consolidateInlineReviews(pkg, [completeFail]).global_verdict, "not-pass");
   assert.equal(consolidateInlineReviews(pkg, [completeConcerns]).global_verdict, "not-pass");
   const missingOutput = { ...completeFail, verdict: "pass" };
   delete missingOutput.output;
   assert.equal(consolidateInlineReviews(pkg, [missingOutput]).global_verdict, "not-pass", "missing output must not pass");
-  const disagreement = { ...completeFail, verdict: "pass", disagreements: [{ evidence: [{ evidence_id: "E-001", digest: "sha256:bad" }] }] };
+  const disagreement = { ...completeFail, verdict: "pass", disagreements: [{ with: "tester", claim: "bad digest", evidence: [{ evidence_id: "E-001", digest: "sha256:bad" }] }] };
   assert.equal(consolidateInlineReviews(pkg, [disagreement]).global_verdict, "not-pass", "untrusted disagreement evidence must not pass");
 }
 
