@@ -86,7 +86,7 @@ team-harness/
 
 | Layer | Choice |
 |---|---|
-| Installer | Go 1.25.8+, cross-compiled to GH Release assets. It manages opencode assets and the six generated Codex agent TOMLs (`--runtime codex`), but never installs either marketplace plugin. Claude Code remains marketplace-only. Full lifecycle detail: `docs/lifecycle.md`. |
+| Installer | Go 1.25.8+, cross-compiled to GH Release assets. It manages opencode assets and the ten generated Codex agent TOMLs (`--runtime codex`), but never installs either marketplace plugin. Claude Code remains marketplace-only. Full lifecycle detail: `docs/lifecycle.md`. |
 | Bootstrap scripts | Bash/PowerShell/cmd.exe entry points download the released agent-installer binary. Codex plugin install/update/remove remains a separate marketplace lifecycle. |
 | Agents / skills | Markdown with YAML frontmatter |
 | Complex skills | Markdown + referenced scripts (Python/Node via `uv run` or CLIs) |
@@ -96,7 +96,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin `th`; Codex plugin `team-harness` via `.agents/plugins/marketplace.json`; Go agent installer for opencode and Codex. The tagged Git tree is both plugin artifact—there is no separate Codex archive. |
 
-**Current version:** `3.6.6` (see `.claude-plugin/plugin.json`, the tag authority. Its version is shared by the Claude and Codex plugin manifests, the Claude marketplace entry, and the installer fallback. `CHANGELOG.md` tracks release history).
+**Current version:** `3.6.7` (see `.claude-plugin/plugin.json`, the tag authority. Its version is shared by the Claude and Codex plugin manifests, the Claude marketplace entry, and the installer fallback. `CHANGELOG.md` tracks release history).
 
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
@@ -144,7 +144,7 @@ All commands run from the repo root.
 - **Cross-platform first.** All scripts and agents must work on Windows, macOS, and Linux.
 - **KG content is technical-only.** Never store personal data, preferences, tokens, or stakeholder names. `docs/kg-content-policy.md`.
 - **Knowledge capture is explicit.** Delivery never writes KG or project doctrine. Reusable insights are saved only when the operator invokes the knowledge flow; the conditional Phase-3 security-finding write remains the narrow automatic exception.
-- **Delivery post-create check.** The coordinator's deterministic mechanics query merge state and take one CI snapshot after `gh pr create`; they never wait for CI. `agents/_shared/delivery-mechanics.md § 9`.
+- **Delivery post-create check.** The coordinator's deterministic mechanics query merge state and take one CI snapshot after `gh pr create`; they never wait for CI. `agents/_shared/delivery-mechanics.md § 5`.
 - **Pipeline observability is mandatory.** Every activated pipeline run produces
   `00-execution-events.jsonl`/`.md` and `00-pipeline-summary.md`; inline work has no pipeline
   artifacts. Legacy tier markers never create an observability exemption. Full contract:
@@ -302,14 +302,14 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
   `agents/ref-pipeline.md`
 - **2026-07-27** — Gate-state contract (#530): six named `00-state.md` fields require bare-literal values (no annotation), prose-only enforcement (`gate-guard`/`checkpoint-guard` unwired since v2.139.0), plus the named "No gate-field repair" invariant. → `agents/_shared/gate-contract.md § "The dual-record release"`
 - **2026-07-27** — Canonical dispatch contract (#524): one home for what a dispatch prompt may/must not carry and a single two-halves rule (review scope never bounded by the dispatcher; write scope always bounded by the recipient's own contract, by pointer to `plan-consolidation.md`), asserted via a five-column control rubric instead of prose. → `agents/_shared/dispatch-contract.md`
-- **2026-07-28** — Pipeline dispatch shape collapsed: one `implementer` + one `tester` dispatch, `qa`+`adversary` fan out together in Phase 3; Phase 3.75/3.8 absorb into new Phase 2.8/Phase 3; Phase 4.5 retires (delivery diff bounded by a post-gate write allowlist instead). STAGE-GATE-3 moves immediately before Phase 4. → `agents/ref-pipeline.md § Phase 2.8`
+- **2026-07-28** — Pipeline dispatch shape collapsed: one `implementer` + one `tester` dispatch, `qa`+`adversary` fan out together in Phase 3; Phase 3.75/3.8 absorb into new Phase 2.8/Phase 3; Phase 4.5 retires. Current delivery is publish-only: implementation assembles and commits before Freeze. → `agents/ref-pipeline.md § Phase 2.8`
 
 ## 9. Patterns & Conventions
 <!-- Updated in the reviewed implementation tree when a feature establishes a durable pattern. Empty at init. -->
 > Full history: see `docs/patterns.md`. Recent entries below.
 - **Suite-run evidence ledger** (#532): append-only `docs/suite-evidence.md`-defined per-feature registry, one row per verification-command run; `tree_anchor` reused literally from `docs/verification-packet.md § 2`; strict full-tree-anchor equality (never a "relevant files" heuristic) decides skip-vs-rerun; closed writer list. → `docs/suite-evidence.md`, `agents/ref-pipeline.md § "Phase 2.8 — Freeze"`
 - **Shared-review-file write discipline** (#527): every panel writer (`plan-reviewer`, `qa-plan`, `security`, `adversary`) uses `Edit` (never `Write`) on an existing shared review file, `old_string` anchored to its own section, `replace_all` forbidden; orchestrator runs a header-survival snapshot/compare around each panel dispatch. → `agents/_shared/plan-consolidation.md § "Write-tool discipline (shared review files)"`
-- **Delivery split + retired-token sweep** (pipeline-dispatch-shape): `agents/delivery.md` (prose) + new `agents/_shared/delivery-mechanics.md` (coordinator's deterministic half — bump/branch/changelog-cut/stage/push/`gh pr create`), one dispatch, no `mode: prepare`/`publish` split; a retired-token sweep verifies zero *live* claims (a marker-adjacent mention — `retired`, `retargeted from` — is legitimate history), re-derived from the owning AC each round, never reused. → `agents/_shared/delivery-mechanics.md`
+- **Publish-only delivery**: `agents/_shared/implementation-assembly.md` owns version/changelog and the complete pre-Freeze commit; `agents/delivery.md` prepares PR prose; `agents/_shared/delivery-mechanics.md` verifies the validated commit/tree, pushes, and creates the draft PR without tests or branch mutation. → `agents/_shared/delivery-mechanics.md`
 
 - Self-documenting code first; comment WHY not WHAT; route genuine rationale to `/docs` not to inline comments — see `docs/code-comments.md`.
 

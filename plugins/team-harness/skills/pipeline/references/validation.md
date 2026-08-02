@@ -48,16 +48,21 @@ by changing an AC in place. Plan repair, operator-decision transcription, and
 explicit architect work do not produce an `iteration.start`; only an
 implementation/validation correction consumes the `0`–`3` correction budget.
 
-When all required evidence and reviews pass and the Freeze anchor is still
-current, delegate `delivery` once in pre-gate preparation mode. It may write only
-the workspace PR-body, standalone acceptance-matrix, and changelog-fragment
-drafts. The coordinator validates those paths, computes SHA-256 for every exact
+When all required evidence and reviews pass and the Freeze anchor plus committed
+identity are still current, copy `freeze_commit_sha`/`freeze_tree_sha` to
+`validated_commit_sha`/`validated_tree_sha`, then delegate `delivery` once in
+pre-gate preparation mode. It may write only the workspace PR-body and standalone
+acceptance-matrix drafts. Version and changelog were committed before Freeze. The
+coordinator validates those paths, computes SHA-256 for every exact
 artifact, requires the canonical non-symlink fixed filenames under the selected
 workspace's `inputs/` directory, and records the title, paths, and digests in
 `delivery_preview`; a
 missing or contradictory artifact blocks before the gate. Then set `phase:
 waiting_gate3`, `status: waiting_for_gate`, a fresh `gate_nonce`, and
-`next_action: record Gate 3 decision`. Present the concise delivery summary and
+`next_action: record Gate 3 decision`. Resolve the recorded default-base tip with
+`git ls-remote` and compare its full SHA with `verification_base_ref`; persist
+`delivery_base_status` as `current`, `moved`, or `unknown` without fetching or mutating the
+validated branch. Present the concise delivery summary, diff composition, size result, base status, and
 the exact preview paths/digests with Gate 3's numbered `ship`, `amend`, and
 `abort` options; stop for the live
 operator reply. Gate release remains a dual record and is not inferred from a

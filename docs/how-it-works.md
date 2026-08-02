@@ -111,9 +111,9 @@ states or gates.
 | State | Bug-fix difference |
 |---|---|
 | `design` | Root-cause analysis and a minimal plan identify the regression, file:line mechanism, scope fence, and functional AC. It is not a separate state or automatic review loop. |
-| `implementation` | Tester establishes the regression evidence before source edits where the tier requires it; implementer keeps the fix scoped and records deviations. |
+| `implementation` | Tester establishes regression evidence; implementer keeps the fix scoped; coordinator assembles version/changelog and commits the complete candidate before Freeze. |
 | `validation` | QA validates the regression no longer reproduces. Security review remains conditional on the same fail-closed security floor. Findings route through the common final-result correction path. |
-| `delivery` | Changelog and PR prose use the `Fixed` category and include reproduction/root-cause evidence when applicable. |
+| `delivery` | Verifies the exact validated commit/tree, pushes it, and creates the draft PR; it does not test or mutate the branch. |
 
 For `type: hotfix`, the coordinator may use the documented minimal design artifact, but Gate 1
 still exists and the regression evidence floor remains applicable.

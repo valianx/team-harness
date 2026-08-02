@@ -116,6 +116,46 @@
       "capabilities": ["filesystem-read", "filesystem-write", "command-exec", "external-write"],
       "instruction_source": "runtime/codex/instructions/delivery.md",
       "output_path": ".codex/agents/delivery.toml"
+    },
+    {
+      "name": "reviewer",
+      "description": "Reviews an immutable pull-request snapshot for concrete merge blockers and suggestions.",
+      "semantic_source": "agents/reviewer.md",
+      "sandbox_mode": "read-only",
+      "capabilities": ["filesystem-read", "external-read"],
+      "capability_profile": "review-read-only",
+      "instruction_source": "runtime/codex/instructions/reviewer.md",
+      "output_path": ".codex/agents/reviewer.toml"
+    },
+    {
+      "name": "pr-review-qa",
+      "description": "Validates acceptance criteria against an immutable pull-request snapshot.",
+      "semantic_source": "agents/pr-review-qa.md",
+      "sandbox_mode": "read-only",
+      "capabilities": ["filesystem-read"],
+      "capability_profile": "review-read-only",
+      "instruction_source": "runtime/codex/instructions/pr-review-qa.md",
+      "output_path": ".codex/agents/pr-review-qa.toml"
+    },
+    {
+      "name": "pr-review-security",
+      "description": "Audits an immutable pull-request snapshot for concrete security regressions.",
+      "semantic_source": "agents/pr-review-security.md",
+      "sandbox_mode": "read-only",
+      "capabilities": ["filesystem-read"],
+      "capability_profile": "review-read-only",
+      "instruction_source": "runtime/codex/instructions/pr-review-security.md",
+      "output_path": ".codex/agents/pr-review-security.toml"
+    },
+    {
+      "name": "reviewer-consolidator",
+      "description": "Consolidates PR-review lenses into one de-duplicated review draft.",
+      "semantic_source": "agents/reviewer-consolidator.md",
+      "sandbox_mode": "read-only",
+      "capabilities": ["filesystem-read"],
+      "capability_profile": "review-read-only",
+      "instruction_source": "runtime/codex/instructions/reviewer-consolidator.md",
+      "output_path": ".codex/agents/reviewer-consolidator.toml"
     }
   ]
 }

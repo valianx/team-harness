@@ -1,10 +1,14 @@
 # Delivery phase
 
-Before Gate 3, require passing acceptance evidence and a current Freeze anchor. The primary
-thread deterministically computes the version preview, changed-file summary, standard delivery
-actions, and relevant security findings, then delegates the bounded prose preview. Validate its
-workspace-only outputs and bind their exact paths and SHA-256 digests to `delivery_preview`.
-Present the title, artifact paths/digests, and delivery summary once with:
+Delivery publishes the exact commit validation accepted. Implementation already
+assembled version/changelog, committed the complete branch, and recorded
+`freeze_commit_sha`/`freeze_tree_sha`; acceptance copied them to
+`validated_commit_sha`/`validated_tree_sha`.
+
+Before Gate 3, delegate `delivery` once for workspace-only PR prose: exact title,
+PR body, and standalone acceptance matrix. Validate canonical non-symlink paths
+and SHA-256 digests, bind them to `delivery_preview`, present the committed
+version plus validated commit/tree, and stop for:
 
 ```text
 1 — ship    (ship)
@@ -12,33 +16,33 @@ Present the title, artifact paths/digests, and delivery summary once with:
 3 — abort   (abort)
 ```
 
-Stop for the live reply even when Gate 1 granted `approve autonomous`. `amend` returns to the
-smallest affected implementation delta, rebuilds Freeze, reruns validation, and presents a fresh
-Gate 3 nonce. `abort` stops without delivery or push.
+After a valid dual-record `gate3_release: ship`, do not ask again and do not regenerate prose.
+Re-read the exact recorded PR title/body/digests, then require:
 
-After a valid dual-record `gate3_release: ship`, do not ask the operator for another delivery
-decision and do not regenerate prose. Re-read every preview artifact, require its path and
-SHA-256 to match `delivery_preview`, and require each path to be the canonical non-symlink
-filename under the selected workspace's `inputs/` directory. Materialize the exact approved
-changelog draft at its validated `changelog.d/{slug}.md` target when applicable. Immediately
-before a PR create/update, revalidate the exact recorded PR title, body path, and body digest.
-Any missing, changed, or out-of-scope artifact blocks and requires a fresh Gate 3 presentation;
-never silently recompose it.
+```bash
+git status --porcelain                  # empty
+git branch --show-current               # working_branch
+git rev-parse HEAD                      # validated_commit_sha
+git rev-parse 'HEAD^{tree}'             # validated_tree_sha
+```
 
-Immediately before staging, require that the checked-out branch is non-default, is not `main` or
-`master`, and starts with one of the repository's allowed delivery prefixes: `feature/`, `fix/`,
-`hotfix/`, `refactor/`, `docs/`, `test/`, or `chore/`. An absent, detached, default, or otherwise
-unapproved branch blocks delivery before any commit, push, or PR mutation.
+Use full object IDs. A mismatch blocks and returns to implementation → Freeze →
+validation. Delivery does not run tests, fetch or reconcile the default branch,
+edit version/changelog, stage files, commit, merge, or rebase. Base movement is
+reported without mutating refs: immediately before push, use `git ls-remote` for the recorded
+default-base tip, compare its full SHA with `verification_base_ref`, and report `current`,
+`moved`, or `unknown` with both SHAs. This repeats the Gate-3 signal; it does not invalidate the
+accepted commit or authorize a fetch, merge, or rebase.
 
-The primary thread then applies the previewed version/changelog, stages and commits the frozen
-scope, pushes the feature branch, and creates or updates its draft PR using the exact approved
-body. Native Codex tool approval
-may still appear for a command or connector call, but it is a technical runtime boundary—not a
-new Team Harness question, gate, or operator decision. Never ask separately for version, commit,
-push, or draft PR after `ship`.
+Require one of the repository's allowed delivery prefixes and a non-default `working_branch` that is
+not `main` or `master`. Push that plain branch without force, then create the draft
+PR with exact approved title/body and recorded label/assignee metadata in the
+same command. An existing draft may receive the exact approved update; an
+existing ready-for-review PR is surfaced and never downgraded or mutated. Merge,
+tag, release, publication, issue comments, and board mutations remain excluded.
+Native Codex approval may still appear as a technical runtime boundary; it is
+not a new Team Harness decision or gate.
 
-Keep the delivery artifact at ≤60 lines and ≤12 KB and point to canonical evidence. Never
-force-push or publish broader scope than the approved frozen tree. Merge, tag, release, and
-publication require a separate explicit live request and are not part of `ship`. Set
-`phase: complete` only after the terminal delivery artifacts/events and draft PR are present;
-otherwise record the precise failure and recover without replaying completed phases.
+Poll mergeability once with bounded `UNKNOWN` backoff and report the current CI
+snapshot without waiting. Set `phase: complete` only after terminal artifacts and
+the PR are present; otherwise record the precise recoverable failure.

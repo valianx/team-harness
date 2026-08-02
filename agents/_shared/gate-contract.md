@@ -39,7 +39,7 @@ ordering by refusing to invoke the action before the release exists.
 
 `Gate 3: ship` is the operator's single delivery approval for the previewed frozen tree and the
 exact workspace prose paths/digests presented with it. It authorizes the coordinator's standard
-sequence through version/changelog, commit, feature-branch push, and draft PR creation/update;
+sequence through feature-branch push of the exact validated commit and draft PR creation/update;
 it never authorizes mutating an existing ready-for-review PR. No second conversational
 confirmation is allowed between those steps. Native runtime tool approval may still be required
 to execute a command, but that is
@@ -226,8 +226,8 @@ never changes nonce, dual-record or live-reply requirements.
 ====================================
  STAGE-GATE-3 — Delivery ready for human approval
 ====================================
- {delivery summary + version preview + exact PR title/body, acceptance-matrix, and optional
-  CHANGELOG-entry draft paths with SHA-256 digests + Pre-Delivery Security Audit findings,
+ {delivery summary + committed version + validated commit/tree + exact PR title/body and
+  acceptance-matrix paths with SHA-256 digests + Pre-Delivery Security Audit findings,
   or a stated absence when no audit lens ran (security_floor_applies: false)}
 
  Reply with:

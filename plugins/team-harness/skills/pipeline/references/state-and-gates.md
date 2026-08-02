@@ -73,9 +73,17 @@ code_hygiene: pass|fail|null
 verification_base_source_ref: origin/main|{dep-branch}|{commit}
 verification_base_ref: {immutable commit or null}
 freeze_anchor: {immutable tree anchor or null}
+freeze_commit_sha: {full commit object ID or null}
+freeze_tree_sha: {full tree object ID or null}
+validated_commit_sha: {full commit object ID or null}
+validated_tree_sha: {full tree object ID or null}
 open_findings: [{id, disposition}]|[]
 worktree: {absolute path or null}
 working_branch: {branch or null}
+delivery_diff_composition: {total_lines, total_files, mechanical_files, substantive_files}|null
+delivery_size_result: within-bounds|flagged|null
+delivery_size_justification: {workspace pointer}|null
+delivery_base_status: {base_ref, validated_base_sha, remote_base_sha: {full SHA}|null, status: current|moved|unknown}|null
 delivery_preview: {pr title, workspace paths, and SHA-256 digests bound to Gate 3}|null
 ```
 
@@ -224,8 +232,9 @@ Record a release atomically in both places:
 Consume the nonce and clear `gate_pending`. A field without its event, or an
 event without its field, is not a release. Never repair a malformed field;
 re-present with a fresh nonce. `Gate 3: ship` is the operator's single approval
-for the previewed standard delivery through version/changelog, commit,
-feature-branch push, and draft PR; do not ask again between those steps. Native
+to push the exact validated commit and create/update its draft PR; version,
+changelog, tests, and commit creation already completed before Freeze. Do not ask
+again between push and PR. Native
 Codex tool approval may still be required to execute a command, but it is a
 technical runtime boundary rather than another Team Harness decision. The
 pipeline never force-pushes, and `ship` excludes merge, tag, release, and

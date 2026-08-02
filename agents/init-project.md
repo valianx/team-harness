@@ -371,8 +371,9 @@ Include a routing table based on the detected project type.
 | Test strategy and implementation | `tester` | Test plan + tests with factory mocks |
 | Acceptance criteria and validation | `qa` | QA checklist + validation report |
 | Required product/API documentation | `implementer` or `documenter`, before Freeze | Reviewed tracked documentation |
-| Publication prose | `delivery` | Changelog fragment + acceptance matrix + PR-body draft |
-| Version + commit + push + PR | coordinator mechanics | Deterministic publication actions |
+| Publication prose | `delivery` | Acceptance matrix + PR-body draft |
+| Version/changelog + final commit | coordinator mechanics in implementation | Complete candidate before Freeze |
+| Validated identity + push + PR | coordinator mechanics in delivery | Exact validated commit published |
 
 Escalation rules:
 - Requirements unclear → ask user

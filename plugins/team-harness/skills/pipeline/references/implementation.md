@@ -47,9 +47,15 @@ not increment `iteration` or dispatch `architect`. Only a separate, explicit
 current live operator request may dispatch `architect`, set `phase: design`, and
 require a new Gate 1.
 
-Before validation opens, close Freeze over an immutable base and record the frozen diff/evidence
-anchor. Any later tree change reopens Freeze and the affected validation; nothing ships from stale
-findings.
+Before Freeze and before validation opens, assemble version/changelog and commit the complete candidate. Require a
+clean worktree, then compute size and diff composition from `verification_base_ref...HEAD`.
+Mechanical paths are only `CHANGELOG.md`, `changelog.d/*`, and exact resolved version sites;
+every other path is substantive. The 400-line/8-file caps require a bounded
+`02-implementation.md § Reviewability Exceptions` justification when exceeded. Persist the
+unconditional composition, size result, and optional justification, then record full
+`freeze_commit_sha` and `freeze_tree_sha` together with the frozen diff/evidence anchor. Build, tests, QA, and security see that exact identity. Any later tree change
+reopens Freeze and the affected validation; nothing ships from stale findings. When acceptance
+passes, copy the same values to `validated_commit_sha` and `validated_tree_sha`.
 
 When all approved implementation work and evidence checkpoints are complete, set `phase: validation`,
 `status: in_progress`, and `next_action: run approved acceptance validation`. Record changed files,

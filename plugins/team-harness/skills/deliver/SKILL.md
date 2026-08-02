@@ -20,9 +20,13 @@ For that exact active pipeline, read
 valid dual-record `STAGE-GATE-3: ship` release whose event carries the consumed
 nonce from this run's current presentation. Require `phase: delivery`, `status:
 in_progress`, and unchanged `delivery_preview` paths/digests before any write.
-That live reply is the single
-operator decision for standard delivery through version/changelog, commit,
-feature-branch push, and draft PR creation/update. Do not ask again between
-those steps. Native Codex tool approval may still be surfaced as a technical
+Require a clean worktree and exact equality of current `HEAD`/`HEAD^{tree}` to
+the recorded `validated_commit_sha`/`validated_tree_sha`. That live reply is the
+single operator decision for the feature-branch push and draft PR
+creation/update. Do not ask again between those steps. Do not fetch/reconcile
+the default branch, run tests, edit version/changelog, stage, commit, merge, or
+rebase during delivery. Before push, recompute the non-blocking default-base status with
+`git ls-remote`, compare it with `verification_base_ref`, and report `current`, `moved`, or
+`unknown` without mutating refs or the validated commit. Native Codex tool approval may still be surfaced as a technical
 runtime boundary; it is not another Team Harness decision or gate. Merge, tag,
 release, publication, force-push, and broader scope remain excluded.

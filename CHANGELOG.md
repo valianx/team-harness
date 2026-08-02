@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.7] - 2026-08-02
+
+### Changed
+
+- Moved release assembly, versioning, changelog, and the final commit into implementation so
+  delivery only verifies and publishes the exact commit and tree accepted by validation, while
+  preserving pre-Freeze diff-composition checks and non-mutating base-movement reporting.
+- Added the four read-only Codex agents required by immutable PR review and included them in
+  setup, update, generated runtime artifacts, and installer lifecycle checks.
+
 ## [3.6.6] - 2026-08-02
 
 ### Fixed

@@ -212,8 +212,10 @@ def main() -> None:
     contract = json.loads((ROOT / "runtime/schema/codex-agents.json").read_text())
     agents = contract["agents"]
     expected = {agent["name"] for agent in agents}
-    if expected != {"architect", "implementer", "tester", "qa", "security", "delivery"}:
-        fail(f"unexpected Codex vertical-slice roles: {sorted(expected)}")
+    pipeline_roles = {"architect", "implementer", "tester", "qa", "security", "delivery"}
+    review_roles = {"reviewer", "pr-review-qa", "pr-review-security", "reviewer-consolidator"}
+    if expected != pipeline_roles | review_roles:
+        fail(f"unexpected Codex installed roles: {sorted(expected)}")
     architect_contract = next(agent for agent in agents if agent["name"] == "architect")
     if architect_contract["sandbox_mode"] != "workspace-write":
         fail("Codex architect must be able to write its assigned plan artifacts")
@@ -248,6 +250,10 @@ def main() -> None:
         "qa": ("sonnet/high", "non-opus"),
         "security": ("opus/xhigh", "opus-xhigh"),
         "delivery": ("sonnet/medium", "non-opus"),
+        "reviewer": ("sonnet/high", "non-opus"),
+        "pr-review-qa": ("sonnet/high", "non-opus"),
+        "pr-review-security": ("sonnet/high", "non-opus"),
+        "reviewer-consolidator": ("sonnet/medium", "non-opus"),
     }
     for path in (ROOT / ".codex/agents").glob("*.toml"):
         if path.is_symlink():
@@ -273,6 +279,14 @@ def main() -> None:
                 fail(f"{path}: missing deterministic Team Harness marker {marker!r}")
         if data["sandbox_mode"] == "read-only" and data["name"] in {"architect", "implementer", "tester", "delivery"}:
             fail(f"{path}: write role is unexpectedly read-only")
+        if data["name"] in review_roles and data["sandbox_mode"] != "read-only":
+            fail(f"{path}: PR-review role must be read-only")
+    review_contracts = {agent["name"]: agent for agent in agents if agent["name"] in review_roles}
+    if review_contracts["reviewer"]["capabilities"] != ["filesystem-read", "external-read"]:
+        fail("Codex reviewer capability allowlist drifted")
+    for role in review_roles - {"reviewer"}:
+        if review_contracts[role]["capabilities"] != ["filesystem-read"]:
+            fail(f"Codex {role} capability allowlist drifted")
     if generated != expected:
         fail(f"generated roles do not match contract: {sorted(generated)}")
 
@@ -707,7 +721,7 @@ def main() -> None:
             fail(f"Codex bundled-agent sync failed: {synced.stdout}{synced.stderr}")
         sync_result = json.loads(synced.stdout)
         if set(sync_result.get("changed", [])) != expected:
-            fail("Codex bundled-agent sync did not install all six roles")
+            fail("Codex bundled-agent sync did not install all ten roles")
         for role in expected:
             installed = temp / "codex-home/agents" / f"{role}.toml"
             packaged = ROOT / "plugins/team-harness/skills/setup/assets/agents" / f"{role}.toml"
@@ -956,9 +970,13 @@ def main() -> None:
         ROOT / "plugins/team-harness/skills/pipeline/references/delivery.md"
     ).read_text()
     ship_contract = "\n".join((pipeline, current_state, deliver_skill, delivery_reference)).lower()
-    for marker in ("single", "version", "changelog", "commit", "push", "draft pr"):
+    for marker in ("single", "validated commit", "validated_commit_sha", "validated_tree_sha", "push", "draft pr"):
         if marker not in ship_contract:
             fail(f"Codex Gate 3 ship contract is missing {marker!r}")
+    delivery_lower = delivery_reference.lower()
+    for forbidden in ("run tests", "edit version/changelog", "stage", "commit", "fetch or reconcile"):
+        if forbidden not in delivery_lower:
+            fail(f"Codex publish-only delivery does not prohibit {forbidden!r}")
     for marker in ("merge", "tag", "release", "publication"):
         if marker not in ship_contract:
             fail(f"Codex Gate 3 ship exclusions are missing {marker!r}")
@@ -1049,6 +1067,22 @@ def main() -> None:
             fail(f"pipeline activation preflight is missing {marker!r}")
     if "${CODEX_HOME:-$HOME/.codex}/.team-harness.json" not in activation:
         fail("pipeline activation must prefer the Codex-native Team Harness config")
+
+    review_pr = (ROOT / "plugins/team-harness/skills/review-pr/canonical.md").read_text()
+    for role in ("reviewer", "pr-review-qa", "pr-review-security", "reviewer-consolidator"):
+        if role not in review_pr:
+            fail(f"Codex review-pr preflight does not name {role}")
+    for marker in (
+        "all four exact agent identities",
+        "one complete project or global set only",
+        "regular non-symlink",
+        'sandbox_mode = "read-only"',
+        "filesystem-read plus external-read",
+        "$team-harness:setup agents",
+        "new Codex thread",
+    ):
+        if marker not in review_pr:
+            fail(f"Codex review-pr preflight is missing {marker!r}")
 
     output_contract = (ROOT / "docs/output-contract-patterns.md").read_text()
     for marker in (
@@ -1143,7 +1177,7 @@ def main() -> None:
 
     activation_digests = digest_table(activation)
     pipeline_digests = digest_table(pipeline)
-    if set(activation_digests) != expected or activation_digests != pipeline_digests:
+    if set(activation_digests) != pipeline_roles or activation_digests != pipeline_digests:
         fail("pipeline and activation skill digest tables are not synchronized")
     for role, expected_digest in activation_digests.items():
         normalized = (ROOT / f".codex/agents/{role}.toml").read_bytes().replace(
