@@ -83,18 +83,30 @@ findings:
   - severity: blocker|high|medium|low|info
     claim: <short claim>
     evidence: [{evidence_id: E-001, digest: sha256:<exact-hex>}]
-coverage: {checked, limits}
+coverage:
+  checked:
+    - claim: <short coverage claim>
+      evidence: [{evidence_id: E-001, digest: sha256:<exact-hex>}]
+  limits: [<explicit non-factual limit>]
 evidence_refs: [{evidence_id: E-001, digest: sha256:<exact-hex>}]
-disagreements: [{with: lens, claim, evidence}]
+disagreements:
+  - with: lens
+    claim: <short disagreement claim>
+    evidence: [{evidence_id: E-001, digest: sha256:<exact-hex>}]
 ```
 
-Every finding and coverage claim cites one or more `evidence_id` values and the
-exact digest recorded for each. An absent ID, an unmanifested path, a path that
-escapes an allowed root, a missing/different digest, or bytes that cannot be
-verified changes the lens to `incomplete` or `untrusted` (`incomplete|untrusted`);
-it can never produce
-PASS. A lens reports limits and disagreements explicitly rather than filling
-gaps with assumptions.
+Every finding, disagreement, and entry in `coverage.checked` is a claim-bearing
+object with a non-empty `claim` and a non-empty `evidence` array. Each evidence
+reference cites one or more `evidence_id` values and the exact digest recorded
+for each; top-level `evidence_refs` are supplementary and never substitute for
+per-claim binding. An absent ID, an unmanifested path, a path that escapes an
+allowed root, a missing/different digest, or bytes that cannot be verified
+changes the lens to `incomplete` or `untrusted` (`incomplete|untrusted`); it can
+never produce
+PASS. A `complete` + `pass` lens must include at least one valid
+`coverage.checked` claim. `coverage.limits` remains an explicit list of
+non-factual limit strings. A lens reports limits and disagreements explicitly
+rather than filling gaps with assumptions.
 
 The three lenses remain independent and complete their own bounded work:
 

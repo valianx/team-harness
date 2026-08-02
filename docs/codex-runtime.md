@@ -120,9 +120,13 @@ environment is sanitized, JSONL tool events are rejected, and the temporary cwd
 is removed; unsupported CLI/profile enforcement returns `lens_status: unavailable`
 rather than a prose-only or direct-tree fallback.
 
-Each lens returns `lens_status` and evidence-bound findings; missing or mismatched
-evidence is `incomplete`/`untrusted`, and global PASS requires every required
-lens to be `lens_status: complete` and `verdict: pass`, with matching identity
+Each lens returns `lens_status` and claim-bound evidence: every finding,
+disagreement, and `coverage.checked` entry has a non-empty `claim` plus a
+non-empty exact-digest `evidence` array. Top-level `evidence_refs` are
+supplementary; a complete/pass lens must have at least one valid
+`coverage.checked` entry. Missing or mismatched evidence is
+`incomplete`/`untrusted`, and global PASS requires every required lens to be
+`lens_status: complete` and `verdict: pass`, with matching identity
 and no blocker or unresolved blocking disagreement. No workspace, state, events,
 gates, Stage Gate, branch, delivery record, or publication is created. Any PR
 intent, number, or URL has exclusive `review-pr` precedence and retains that

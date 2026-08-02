@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { access, chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { buildManifestDigest, buildTargetId, consolidateInlineReviews, runInlineReview } from "./run_inline_review.mjs";
+import { buildManifestDigest, buildTargetId, consolidateInlineReviews, parseLensResult, runInlineReview } from "./run_inline_review.mjs";
 
 const FAKE = `#!/usr/bin/env python3
 import json, os, sys
@@ -12,7 +12,8 @@ pkg = json.load(sys.stdin)
 record = {"argv": sys.argv[1:], "cwd": os.getcwd(), "cwd_entries": os.listdir(), "env": dict(os.environ), "input": pkg}
 with open(os.path.join(os.environ["CODEX_HOME"], "record.json"), "w", encoding="utf-8") as stream:
     json.dump(record, stream)
-result = {"lens": pkg["lens"], "lens_status": "complete", "target_id": pkg["target_id"], "manifest_digest": pkg["manifest_digest"], "verdict": "pass", "output": None, "evidence_refs": [{"evidence_id": "E-001", "digest": pkg["evidence_manifest"][0]["digest"]}], "findings": [], "coverage": {"checked": ["package"], "limits": []}, "disagreements": []}
+ref = {"evidence_id": "E-001", "digest": pkg["evidence_manifest"][0]["digest"]}
+result = {"lens": pkg["lens"], "lens_status": "complete", "target_id": pkg["target_id"], "manifest_digest": pkg["manifest_digest"], "verdict": "pass", "output": None, "evidence_refs": [ref], "findings": [], "coverage": {"checked": [{"claim": "package supplied", "evidence": [ref]}], "limits": []}, "disagreements": []}
 print(json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": json.dumps(result)}}))
 `;
 
@@ -140,6 +141,32 @@ async function runIdentityFailures(pkg) {
   } finally { await rm(fixture.root, { recursive: true, force: true }); }
 }
 
+function validResult(pkg) {
+  const evidence = { evidence_id: "E-001", digest: pkg.evidence_manifest[0].digest };
+  return { lens: pkg.lens, lens_status: "complete", target_id: pkg.target_id, manifest_digest: pkg.manifest_digest, verdict: "pass", output: null, evidence_refs: [evidence], findings: [], coverage: { checked: [{ claim: "package supplied", evidence: [evidence] }], limits: [] }, disagreements: [] };
+}
+
+function checkResultBindings(pkg) {
+  const valid = validResult(pkg);
+  assert.deepEqual(parseLensResult(JSON.stringify(valid), pkg, pkg.lens), valid, "valid claim-bound response must parse");
+  assert.equal(consolidateInlineReviews(pkg, [valid]).global_verdict, "pass", "valid claim-bound response must consolidate");
+  const vacuous = structuredClone(valid);
+  vacuous.coverage.checked = [];
+  assert.throws(() => parseLensResult(JSON.stringify(vacuous), pkg, pkg.lens), /complete pass requires/, "vacuous complete pass must be rejected by parser");
+  assert.equal(consolidateInlineReviews(pkg, [vacuous]).global_verdict, "not-pass", "vacuous complete pass must be rejected by consolidation");
+  const cases = [
+    ["finding", result => { result.findings = [{ severity: "high", claim: "unbound", evidence: [] }]; }],
+    ["coverage", result => { result.coverage.checked = [{ claim: "unbound", evidence: [] }]; }],
+    ["disagreement", result => { result.disagreements = [{ with: "tester", claim: "unbound", evidence: [] }]; }],
+  ];
+  for (const [label, mutate] of cases) {
+    const invalid = structuredClone(valid);
+    mutate(invalid);
+    assert.throws(() => parseLensResult(JSON.stringify(invalid), pkg, pkg.lens), /must bind a non-empty claim to evidence/, `${label} must be rejected by parser`);
+    assert.equal(consolidateInlineReviews(pkg, [invalid]).global_verdict, "not-pass", `${label} must be rejected by consolidation`);
+  }
+}
+
 function checkConsolidation(pkg) {
   const completeFail = { lens: "qa", lens_status: "complete", verdict: "fail", target_id: pkg.target_id, manifest_digest: pkg.manifest_digest, output: null, evidence_refs: [], findings: [], disagreements: [] };
   const completeConcerns = { ...completeFail, verdict: "concerns" };
@@ -158,6 +185,7 @@ async function main() {
   await runSuccessfulReview(pkg);
   await runRejectedReviews(pkg);
   await runIdentityFailures(pkg);
+  checkResultBindings(pkg);
   checkConsolidation(pkg);
   console.log("inline review runner: PASS");
 }
