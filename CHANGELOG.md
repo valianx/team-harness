@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.8] - 2026-08-02
+
+### Fixed
+
+- Kept the active Codex plugin runtime installed while update refreshes its snapshot, preventing
+  trusted fail-closed hooks from blocking the replacement command itself.
+
 ## [3.6.7] - 2026-08-02
 
 ### Changed
