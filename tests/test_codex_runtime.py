@@ -554,10 +554,18 @@ def main() -> None:
     for marker in ("native `modes` skill", "read-only"):
         if marker not in opencode_modes:
             fail(f"opencode th-modes command is missing {marker!r}")
+    update_flat = re.sub(r"\s+", " ", update)
     for marker in (
         "codex plugin marketplace upgrade team-harness",
-        "codex plugin remove team-harness@team-harness",
-        "codex plugin add team-harness@team-harness",
+        "codex plugin add team-harness@team-harness --json",
+        "AVAILABLE_VERSION",
+        "installedPath",
+        "NEW_PLUGIN=OLD_PLUGIN",
+        "never authorizes a downgrade",
+        "Never run `codex plugin remove` during update",
+        "prior installation remains the recovery path",
+        "partial-convergence",
+        "one retryable convergence sequence",
         "skills/update/scripts/bridge_snapshot.py",
         "--old-plugin OLD_PLUGIN --new-plugin NEW_PLUGIN",
         "manage_config.py ensure --version NEW_VERSION",
@@ -568,8 +576,58 @@ def main() -> None:
         "do not require a restart merely because the cache version changed",
         "Ask the operator to restart Codex or open a new thread only when",
     ):
-        if marker not in update:
+        if marker not in update_flat:
             fail(f"Codex update skill is missing {marker!r}")
+    update_commands = []
+    in_command_fence = False
+    pending_command = ""
+    for raw_line in update.splitlines():
+        line = raw_line.strip()
+        if line.startswith("```"):
+            if in_command_fence and pending_command:
+                update_commands.append(pending_command)
+                pending_command = ""
+            in_command_fence = not in_command_fence
+            continue
+        if not in_command_fence or not line:
+            continue
+        command_part = line[:-1].rstrip() if line.endswith("\\") else line
+        if pending_command:
+            pending_command = f"{pending_command} {command_part}"
+        elif line.startswith(("codex plugin ", "python3 ")):
+            pending_command = command_part
+        if pending_command and not line.endswith("\\"):
+            update_commands.append(pending_command)
+            pending_command = ""
+
+    if any(
+        re.match(r"^codex plugin remove(?:\s|$)", command)
+        for command in update_commands
+    ):
+        fail("Codex update can remove the live hook runtime before replacement")
+    for forbidden_sample in (
+        'codex plugin remove "$PLUGIN"',
+        "codex plugin remove team-harness@team-harness",
+    ):
+        if not re.match(r"^codex plugin remove(?:\s|$)", forbidden_sample):
+            fail("Codex update remove-command detector does not cover variable selectors")
+    ordered_commands = (
+        "codex plugin marketplace upgrade team-harness --json",
+        "codex plugin add team-harness@team-harness --json",
+        "python3 NEW_PLUGIN/skills/update/scripts/bridge_snapshot.py",
+    )
+    positions = []
+    for command_prefix in ordered_commands:
+        matches = [
+            index
+            for index, command in enumerate(update_commands)
+            if command.startswith(command_prefix)
+        ]
+        if len(matches) != 1:
+            fail(f"Codex update must contain one executable {command_prefix!r}")
+        positions.append(matches[0])
+    if positions != sorted(positions) or len(set(positions)) != len(positions):
+        fail("Codex update command order must be marketplace upgrade, add, then bridge")
 
     bridge_script = ROOT / "plugins/team-harness/skills/update/scripts/bridge_snapshot.py"
     with tempfile.TemporaryDirectory() as temp_root:

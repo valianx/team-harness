@@ -35,22 +35,32 @@ codex plugin marketplace add valianx/team-harness \
 ```
 
 Use `$team-harness:update` for the normal update flow. It refreshes the
-marketplace, compares versions, replaces the installed plugin through native
-permissions, ensures native settings exist, and automatically aligns all ten
-bundled agents in the configured scope. It also leaves a guarded compatibility
-link from the running thread's old versioned cache path to the new snapshot, so
-already-known skill and hook paths keep working without a restart. It never
-overwrites a real cached directory or an unrelated symlink. The updater also
+marketplace, compares versions, refreshes the installed plugin through an
+idempotent native `codex plugin add` under native permissions, ensures native
+settings exist, and automatically aligns all ten
+bundled agents in the configured scope. It also runs a guarded compatibility
+bridge for the running thread's old versioned cache path. A missing or
+previously bridged path can follow the new snapshot; a real active old snapshot
+is preserved so its already-known skill and hook paths remain operational, and
+the updater reports that a restart is required. It never overwrites a real
+cached directory or an unrelated symlink. The updater also
 repairs configuration and agents when the version is current. The underlying
 manual sequence remains `codex plugin marketplace
-upgrade team-harness`, remove `team-harness@team-harness`, then add it again.
+upgrade team-harness`, then `codex plugin add team-harness@team-harness --json`.
+Never remove the active plugin during an update: trusted `PreToolUse` hooks use
+its versioned cache path and fail closed when that runtime disappears.
+If post-install reconciliation stops partway through, rerun
+`$team-harness:update`; bridge, config, and agent operations are idempotent, and
+the updater preserves both the prior snapshot and completed safe writes rather
+than attempting a destructive rollback.
 Run `codex plugin marketplace remove team-harness` only when no installed
 plugin still depends on it.
 
 During local plugin development, make a real file change before reinstalling so
-the development cache key changes; then remove and add
-`team-harness@team-harness` again and start a new thread. If no source byte has
-changed, Codex may correctly reuse the same cached snapshot.
+the development cache key changes; then run
+`codex plugin add team-harness@team-harness --json` again and start a new
+thread. If no source byte has changed, Codex may correctly reuse the same
+cached snapshot.
 
 Codex requires explicit trust before repository hooks execute. The plugin wires
 only deterministic-deny hooks (`policy-block` and the catastrophic branch of
