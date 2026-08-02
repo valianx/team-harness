@@ -13,31 +13,60 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
 
 1. Record `OLD_PLUGIN` as the lexical absolute plugin root that contains this
    loaded `skills/update/SKILL.md`; do not resolve away a versioned symlink.
-   Run `codex plugin list --json` and `codex plugin marketplace list --json`.
+   Read and validate `OLD_VERSION` from its `.codex-plugin/plugin.json`. Run
+   `codex plugin list --json` and `codex plugin marketplace list --json`.
    Require `team-harness@team-harness`; otherwise direct the operator to the
    marketplace install followed by `$team-harness:setup`.
 
-2. Refresh only this marketplace with
-   `codex plugin marketplace upgrade team-harness --json`, then inspect the
-   installed and available semantic versions. A local marketplace is already
-   source-current and is reinstalled only with `--force`.
-
-3. When the available version is newer, or `--force` is present, execute the
-   bounded replacement through Codex's native permission flow:
+2. Refresh only this marketplace, then inspect the refreshed plugin listing:
 
    ```text
-   codex plugin remove team-harness@team-harness
-   codex plugin add team-harness@team-harness
+   codex plugin marketplace upgrade team-harness --json
+   codex plugin list --json
    ```
 
-   Do not remove the marketplace. If add fails after remove, stop and report
-   `codex plugin add team-harness@team-harness` as the recovery command.
+   Resolve the plugin's lexical marketplace
+   `source.path`, validate that source's `.codex-plugin/plugin.json`, and read
+   `AVAILABLE_VERSION` there. Do not treat the version displayed by `plugin
+   list` as the running version: after a marketplace refresh it can describe
+   the refreshed source while the current thread still uses `OLD_PLUGIN`.
+   Compare `OLD_VERSION` and `AVAILABLE_VERSION` semantically:
 
-4. Resolve all remaining helpers from the newly installed plugin path returned
-   by `codex plugin list --json`; the running skill text is still the old
-   snapshot. From this point, `NEW_PLUGIN` and `NEW_VERSION` are the only
-   operational source: never execute a helper, inspect a hook, or derive an
-   installed version from `OLD_PLUGIN`.
+   - newer: continue with installation;
+   - equal with `--force`: continue with an equal-version development refresh;
+   - equal without `--force`: skip installation and use the current snapshot;
+   - older: stop before installation and report the stale marketplace; `--force`
+     never authorizes a downgrade.
+
+   A local marketplace is already source-current and is reinstalled only with
+   `--force`.
+
+3. For the newer and equal-plus-`--force` cases only, install or refresh the
+   marketplace snapshot in place through Codex's native permission flow:
+
+   ```text
+   codex plugin add team-harness@team-harness --json
+   ```
+
+   Capture the command's JSON `installedPath` and `version` as `NEW_PLUGIN` and
+   `NEW_VERSION`, then validate the installed manifest at that exact lexical
+   path. `plugin add` is idempotent for an existing installation and preserves the
+   active plugin until the replacement is ready. **Never run `codex plugin
+   remove` during update:** a live thread's trusted `PreToolUse` hooks resolve
+   through the installed versioned cache path, so removing it first creates a
+   fail-closed gap that can block the subsequent add command itself. Do not
+   remove the marketplace either. If add fails, stop and report the error; the
+   prior installation remains the recovery path and must not be removed or
+   repaired manually by this skill.
+
+   When no install is required, set `NEW_PLUGIN=OLD_PLUGIN` and
+   `NEW_VERSION=OLD_VERSION`.
+
+4. The running skill text is still the old snapshot. Initialize the
+   post-install convergence result as `pending`. From this point,
+   `NEW_PLUGIN` and `NEW_VERSION` are the only operational source: never
+   execute a helper, inspect a hook, or derive the post-update installed
+   version from `OLD_PLUGIN`.
 
    Bridge the current thread's old versioned path to the validated new
    snapshot using the new helper:
@@ -50,9 +79,12 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    The helper writes only inside the common
    `plugins/cache/team-harness/team-harness/` directory. It creates a missing
    old path or atomically repoints an existing in-cache symlink, but never
-   replaces a real directory or an unrelated symlink. This lets already-loaded
-   hook and skill paths continue through the new snapshot without a restart.
-   Preserve its `restartRequired` result for the final report.
+   replaces a real directory or an unrelated symlink. Preserving a real old
+   snapshot is intentional: the running thread remains operational on those
+   already-loaded bytes and the helper reports `restartRequired: true` instead
+   of risking a live-path deletion. A missing or previously bridged old path can
+   still point safely at the new snapshot. Preserve the helper's
+   `restartRequired` result for the final report.
 
    Always create or migrate the independent native configuration:
 
@@ -88,6 +120,19 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    alias without depending on a Claude Code installation, and recover a
    replacement snapshot from the same Codex cache without exiting `127`. Hook
    trust remains an operator action through `/hooks`; never bypass it.
+
+   Steps 4–7 are one retryable convergence sequence. The bridge helper is
+   idempotent; config ensure and agent sync are idempotent and repair partial
+   prior writes; MCP inspection and hook verification are read-only. If any
+   step fails, stop before the success report and return
+   `partial-convergence` with the failed step, `OLD_PLUGIN`/`OLD_VERSION`,
+   `NEW_PLUGIN`/`NEW_VERSION`, and `$team-harness:update` as the exact retry.
+   Never remove or roll back the installed plugin, reverse a completed bridge,
+   restore a config backup, or undo synchronized agents: the prior snapshot
+   remains available, and rerunning update safely recomputes the version state
+   and resumes every idempotent step. A retry that reaches the same bridge,
+   config, or agent state is a no-op; step 8 is emitted only after every step
+   succeeds.
 
 8. Verify the installed plugin version, native settings, ten agent files, MCP
    list, and bridge target. Report old/new versions, marketplace result, config
