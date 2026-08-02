@@ -1,3 +1,3 @@
 ### Added
 
-- Added workspace-free inline tester, QA, and security reviews with captured content-addressed evidence, isolated no-tool Codex execution, exact per-lens identities, and fail-closed consolidation while keeping PR reviews exclusively on `review-pr`.
+- Added workspace-free inline tester, QA, security, and conditional adversary reviews through a native read-only Codex reviewer with direct project access, while keeping PR reviews exclusively on `review-pr`.
