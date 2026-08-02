@@ -39,7 +39,7 @@ evidence_manifest:
 
 `coordinates`, `scope`, `intent`, `criteria`, and `changed_surface` retain
 provenance. `Main` resolves every evidence item to a canonical realpath inside
-an explicit `allowed_roots` entry, rejects symlink escapes, reads the exact
+an explicit canonical, unique `allowed_roots` entry, rejects symlink escapes, reads the exact
 bytes, rejects unsupported/binary content, assigns a stable `evidence_id`, and
 hashes the bounded UTF-8 capture before dispatch. For supplied or command
 evidence, `Main` materializes an ephemeral bounded capture under an allowed
@@ -110,8 +110,11 @@ Every object uses an exact schema: unknown, missing, or legacy keys (including
 `status` or `resolved`) reject the result. `requested_lenses`,
 `required_lenses`, and returned lens results are duplicate-free and complete;
 `Main` rejects extra, missing, or duplicate results rather than applying
-last-write-wins. A raw `blocking: true` disagreement always blocks; resolution
-is owned by `Main` and is never supplied by a lens.
+last-write-wins. Each required lens has a deterministic identity derived from
+the same package with that lens selected; because `lens` is part of
+`target_id`, tester, QA, and security results must carry distinct expected IDs.
+A raw `blocking: true` disagreement always blocks; self-disagreements are
+invalid, and resolution is owned by `Main` and is never supplied by a lens.
 
 Every finding, disagreement, and entry in `coverage.checked` is a claim-bearing
 object with a non-empty `claim` and a non-empty `evidence` array. Each evidence

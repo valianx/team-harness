@@ -106,8 +106,9 @@ request. Consume the package from `agents/_shared/inline-review-contract.md` as
 operator-provenanced intent/criteria, `changed_surface`, both lens lists,
 `requested_lenses`, `required_lenses`, `read_only: true`, `target_id`,
 `manifest_digest`, and the ordered manifest.
-Inspect only manifest realpaths supplied by the isolated runner;
-do not perform workspace discovery or initialization. If the target is a PR, PR
+Inspect only the captured manifest content/bytes supplied on stdin by the
+isolated runner; treat realpaths only as provenance metadata and never read
+files from them. Do not perform workspace discovery or initialization. If the target is a PR, PR
 number, or PR URL, do not review it here; Main must route it exclusively to
 `review-pr`. This is not pipeline
 validation: do not activate a pipeline, create a pipeline workspace or

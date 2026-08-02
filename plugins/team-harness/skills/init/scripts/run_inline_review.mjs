@@ -186,7 +186,7 @@ function assertPackageShape(reviewPackage, lens) {
   if (reviewPackage.read_only !== true) fail("inline review must be read_only");
   if (!Array.isArray(reviewPackage.allowed_roots) || reviewPackage.allowed_roots.length === 0 || reviewPackage.allowed_roots.length > 8) fail("allowed_roots is invalid");
   const roots = [...reviewPackage.allowed_roots].sort();
-  if (roots.some(root => typeof root !== "string" || !root.startsWith("/") || root === "/" || resolve(root) !== root) || canonicalJson(reviewPackage.allowed_roots) !== canonicalJson(roots)) fail("allowed_roots must be canonical and ordered");
+  if (new Set(roots).size !== roots.length || roots.some(root => typeof root !== "string" || !root.startsWith("/") || root === "/" || resolve(root) !== root) || canonicalJson(reviewPackage.allowed_roots) !== canonicalJson(roots)) fail("allowed_roots must be canonical, unique, and ordered");
   for (const key of ["coordinates", "scope"]) assertRecord(reviewPackage[key], `package ${key}`);
   assertExactKeys(reviewPackage.target, ["kind", "id"], "package target");
   assertExactKeys(reviewPackage.intent, ["text", "provenance"], "package intent");
@@ -362,6 +362,7 @@ function readCapped(stream, maxBytes, label, onOverflow) {
         overflowed = true;
         const error = new Error(`${label} exceeded byte limit`);
         error.kind = "untrusted";
+        try { stream.destroy(); } catch { /* already closed */ }
         onOverflow(error);
         settle({ ok: false, error });
       } else if (!overflowed) chunks.push(buffer);
@@ -439,7 +440,7 @@ function validateResultEvidence(result, entries) {
   }
   result.disagreements.forEach((disagreement, index) => {
     assertClaim(disagreement, entries, `disagreement ${index + 1}`, DISAGREEMENT_KEYS);
-    if (!LENSES.has(disagreement.with) || typeof disagreement.blocking !== "boolean" || !FINDING_SEVERITIES.has(disagreement.severity)) fail(`disagreement ${index + 1} metadata is invalid`);
+    if (!LENSES.has(disagreement.with) || disagreement.with === result.lens || typeof disagreement.blocking !== "boolean" || !FINDING_SEVERITIES.has(disagreement.severity)) fail(`disagreement ${index + 1} metadata is invalid`);
   });
 }
 
@@ -468,6 +469,12 @@ export function parseLensResult(text, reviewPackage, lens) {
   return validateLensResult(result, reviewPackage, lens);
 }
 
+function packageForLens(reviewPackage, lens) {
+  const derived = { ...reviewPackage, lens };
+  derived.target_id = buildTargetId(derived);
+  return derived;
+}
+
 export function consolidateInlineReviews(reviewPackage, results) {
   const required = Array.isArray(reviewPackage?.required_lenses) ? reviewPackage.required_lenses : [];
   const invalid = () => ({ global_verdict: "not-pass", lens_statuses: Object.fromEntries(required.map(lens => [lens, "untrusted"])), blockers: true, unresolved_blocking_disagreement: true });
@@ -477,7 +484,9 @@ export function consolidateInlineReviews(reviewPackage, results) {
   try {
     for (const result of results) {
       if (byLens.has(result?.lens) || !reviewPackage.required_lenses.includes(result?.lens)) return invalid();
-      validateLensResult(result, reviewPackage, result.lens);
+      const expectedPackage = packageForLens(reviewPackage, result.lens);
+      assertPackage(expectedPackage, result.lens);
+      validateLensResult(result, expectedPackage, result.lens);
       byLens.set(result.lens, result);
     }
   } catch { return invalid(); }

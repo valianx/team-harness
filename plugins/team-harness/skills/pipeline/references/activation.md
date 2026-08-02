@@ -97,9 +97,9 @@ the normalized (LF) bytes against these canonical SHA-256 digests:
 |---|---|
 | architect | `6d9b4e503aa0948d7690f26042c6d5123bffa6c2de97a18042d70015360fce31` |
 | implementer | `d0a27bc1b21006bd656a70360307fc21901438c4f87d8241acbf4d17f04dfc93` |
-| tester | `5446551201c1c50fc9e14fa5960369a114a0672746a2da43efaf39943ffb15f7` |
-| qa | `0f172b96bfb911f90a2e6046476cce9db073fc716a342696dba055dbc8a9f136` |
-| security | `3694c82714ff0dc5dc79338a21f6a97ce42d4feb3b269e061fa2cd6c3f022ef1` |
+| tester | `aa9fce0b5c46c157ad3ae6433ab17f3248e3890c4100b8f9360fe0301b83e4f9` |
+| qa | `0ee008abedac57720b061c9c40865d3f480cbfa2703d1705e841580375965511` |
+| security | `cb61d7854e67201b71b5cf965aa27272904a887e0263980dcf55e4fd2feb40d8` |
 | delivery | `2a7a88db1a058db03852dbd1c5d47fafb2b2b32c8ec4dead838f19cdefc033d2` |
 
 A digest mismatch is an identity failure; stop before workspace creation or

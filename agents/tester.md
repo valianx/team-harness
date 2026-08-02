@@ -185,8 +185,9 @@ the evidence in the status block. Consume the package from
 `mode: inline-review`, coordinates, scope, operator-provenanced intent/criteria,
 `changed_surface`, `requested_lenses`, `required_lenses`, `read_only: true`,
 `target_id`, `manifest_digest`, and an ordered evidence manifest. Do not create
-or discover a workspace; inspect only manifest realpaths supplied by the
-isolated runner. If the target is a PR, PR number, or PR URL,
+or discover a workspace; inspect only the captured manifest content/bytes
+supplied on stdin by the isolated runner. Treat realpaths only as provenance
+metadata and never read files from them. If the target is a PR, PR number, or PR URL,
 do not review it here; Main must route it exclusively to `review-pr`.
 
 This is an ad-hoc report, not pipeline validation: do not activate a pipeline,

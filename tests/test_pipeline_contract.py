@@ -613,10 +613,12 @@ def check_review_artifacts(label: str, text: str) -> None:
 
 def check_codex_adapter_boundary(role: str) -> None:
     adapter = read(f"runtime/codex/instructions/{role}.md").lower()
+    flat = re.sub(r"\s+", " ", adapter)
     require("mode: inline-review" in adapter, f"Codex {role}: inline-review missing")
     require(re.search(r"creates? no workspace", adapter) is not None and "coordination state" in adapter, f"Codex {role}: state boundary missing")
     require("delivery record" in adapter and re.search(r"creates? no", adapter) is not None, f"Codex {role}: delivery boundary missing")
     require("run_inline_review.mjs" in adapter and "lens_status: unavailable" in adapter, f"Codex {role}: runner fail-close missing")
+    require("captured manifest content/bytes" in flat and "realpaths are provenance metadata" in flat and "never read" in flat, f"Codex {role}: inline evidence must be captured stdin only")
 
 
 def check_ad_hoc_review_boundary() -> None:
@@ -654,6 +656,8 @@ def check_inline_review_contract() -> None:
     for source, path in (("coordinator", "agents/orchestrator.md"), ("direct router", "agents/ref-direct-modes.md"), ("Codex init", "plugins/team-harness/skills/init/SKILL.md")):
         check_pr_precedence(source, read(path))
     for role in ("tester", "qa", "security"):
+        role_text = re.sub(r"\s+", " ", read(f"agents/{role}.md").lower())
+        require("captured manifest content/bytes" in role_text and "realpaths only as provenance metadata" in role_text and "never read" in role_text, f"Claude {role}: inline evidence must be captured stdin only")
         lowered = read(f"runtime/codex/instructions/{role}.md").lower()
         for marker in ("requested_lenses", "required_lenses", "target_id", "manifest_digest", "lens_status: complete|incomplete|failed|unavailable|untrusted", "output: null", "run_inline_review.mjs", "no prose-only", "incomplete|untrusted"):
             require(marker in lowered, f"Codex {role}: inline field missing {marker!r}")

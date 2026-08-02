@@ -49,7 +49,9 @@ The package carries bounded captured UTF-8 content under explicit canonical
 content hashes before dispatch and again before acceptance. Findings,
 disagreements, and `coverage.checked` entries use exact claim/evidence schemas;
 unknown keys, duplicate/missing lens results, raw `resolved`, and blocking
-disagreements supplied by a lens fail closed.
+disagreements supplied by a lens fail closed. Since `lens` is part of
+`target_id`, Main derives and validates the expected identity independently for
+each required lens; self-disagreements and duplicate allowed roots are invalid.
 
 An intent to review a PR, PR number, or PR URL is routed exclusively to
 `review-pr` before this mode is considered. Inline cannot intercept or rebuild

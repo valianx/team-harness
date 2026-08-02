@@ -219,6 +219,25 @@ function validResult(pkg) {
   return { lens: pkg.lens, lens_status: "complete", target_id: pkg.target_id, manifest_digest: pkg.manifest_digest, verdict: "pass", output: null, evidence_refs: [evidence], findings: [], coverage: { checked: [{ claim: "package supplied", evidence: [evidence] }], limits: [] }, disagreements: [] };
 }
 
+function packageForLens(pkg, lens) {
+  const derived = { ...pkg, lens };
+  derived.target_id = buildTargetId(derived);
+  return derived;
+}
+
+function validResultForLens(pkg, lens) {
+  return validResult(packageForLens(pkg, lens));
+}
+
+function multiLensPackage(pkg) {
+  const multi = structuredClone(pkg);
+  multi.requested_lenses = ["tester", "qa", "security"];
+  multi.required_lenses = ["tester", "qa", "security"];
+  multi.lens = "qa";
+  multi.target_id = buildTargetId(multi);
+  return multi;
+}
+
 function checkResultBindings(pkg) {
   const valid = validResult(pkg);
   assert.deepEqual(parseLensResult(JSON.stringify(valid), pkg, pkg.lens), valid, "valid claim-bound response must parse");
@@ -250,6 +269,10 @@ function checkExactSchemas(pkg) {
   const unknown = structuredClone(valid);
   unknown.status = "complete";
   assert.throws(() => parseLensResult(JSON.stringify(unknown), pkg, pkg.lens), /unexpected or missing keys/);
+  const duplicateRoots = structuredClone(pkg);
+  duplicateRoots.allowed_roots = [...pkg.allowed_roots, pkg.allowed_roots[0]];
+  duplicateRoots.target_id = buildTargetId(duplicateRoots);
+  assert.throws(() => parseLensResult(JSON.stringify(valid), duplicateRoots, pkg.lens), /allowed_roots/);
   assert.equal(consolidateInlineReviews(pkg, [valid, valid]).global_verdict, "not-pass", "duplicate results must not overwrite");
   assert.equal(consolidateInlineReviews(pkg, []).global_verdict, "not-pass", "missing results must not pass");
   const extra = structuredClone(valid);
@@ -263,6 +286,21 @@ function checkExactSchemas(pkg) {
   const resolved = structuredClone(blocking);
   resolved.disagreements[0].resolved = true;
   assert.throws(() => parseLensResult(JSON.stringify(resolved), pkg, pkg.lens), /unexpected or missing keys/);
+  const selfDisagreement = structuredClone(valid);
+  selfDisagreement.disagreements = [{ with: pkg.lens, claim: "self", evidence: [evidence], blocking: false, severity: "info" }];
+  assert.throws(() => parseLensResult(JSON.stringify(selfDisagreement), pkg, pkg.lens), /metadata is invalid/);
+}
+
+function checkMultiLensConsolidation(pkg) {
+  const multi = multiLensPackage(pkg);
+  const results = multi.required_lenses.map(lens => validResultForLens(multi, lens));
+  assert.equal(new Set(results.map(result => result.target_id)).size, 3, "each lens must derive a distinct target identity");
+  assert.equal(consolidateInlineReviews(multi, results).global_verdict, "pass", "all correctly bound lenses must consolidate");
+  assert.equal(consolidateInlineReviews(multi, results.slice(0, 2)).global_verdict, "not-pass", "missing lens result must not pass");
+  assert.equal(consolidateInlineReviews(multi, [results[0], results[1], results[1]]).global_verdict, "not-pass", "duplicate lens result must not pass");
+  const wrongIdentity = structuredClone(results[2]);
+  wrongIdentity.target_id = results[0].target_id;
+  assert.equal(consolidateInlineReviews(multi, [results[0], results[1], wrongIdentity]).global_verdict, "not-pass", "wrong lens identity must not pass");
 }
 
 function checkConsolidation(pkg) {
@@ -297,6 +335,7 @@ async function main() {
     checkResultBindings(pkg);
     checkExactSchemas(pkg);
     checkConsolidation(pkg);
+    checkMultiLensConsolidation(pkg);
     console.log("inline review runner: PASS");
   } finally { await rm(evidence.root, { recursive: true, force: true }); }
 }

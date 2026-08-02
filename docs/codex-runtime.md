@@ -137,7 +137,9 @@ The package includes bounded captured UTF-8 content under explicit canonical
 realpaths, containment, byte hashes, and content before dispatch and again
 before acceptance. Unsupported/binary evidence, timeout, or profile/runtime
 failure is fail-closed; stdout, stderr, stdin, package size, and manifest count
-are capped, and POSIX timeout cleanup terminates the child process group.
+are capped, and POSIX timeout cleanup terminates the child process group. The
+current lens is part of `target_id`, so consolidation derives and checks a
+distinct expected identity for every required lens.
 
 Skill activation does not change Main's selected model, reasoning effort,
 sandbox, or approval policy. The projection below applies to the six spawned

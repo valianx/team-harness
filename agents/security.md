@@ -92,8 +92,9 @@ and return concise, evidence-backed findings. Consume the package from
 `mode: inline-review`, coordinates, scope, operator-provenanced intent/criteria,
 `changed_surface`, `requested_lenses`, `required_lenses`, `read_only: true`,
 `target_id`, `manifest_digest`, and the ordered evidence manifest. Inspect only
-manifest realpaths supplied by the isolated runner; do not discover or
-initialize a workspace. If the target is a PR, PR number, or PR URL, do not
+the captured manifest content/bytes supplied on stdin by the isolated runner;
+treat realpaths only as provenance metadata and never read files from them. Do
+not discover or initialize a workspace. If the target is a PR, PR number, or PR URL, do not
 review it here; Main must route it exclusively to `review-pr`.
 
 This is not Pipeline Mode: do not activate a pipeline, create a pipeline

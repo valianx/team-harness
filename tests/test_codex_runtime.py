@@ -43,6 +43,8 @@ def check_inline_runner() -> None:
         "process.kill(-child.pid",
         "validateResultEvidence",
         "assertExactKeys",
+        "packageForLens",
+        "stream.destroy",
         "contentBytes",
         "RUNTIME_LIMITS",
         "child.stdin.end(payload)",
