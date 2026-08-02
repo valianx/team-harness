@@ -69,7 +69,7 @@ For each verdict in `reviews/04-validation.md`, the corresponding checkbox in th
 - AC verdict **FAIL** or any non-PASS → leave the checkbox as `- [ ]`. Do not partially mark.
 - A re-flip from `- [x]` back to `- [ ]` is allowed only on a follow-up iteration where the AC regresses to FAIL (rare). Log the regression in the failure brief.
 
-**No `## Validation Outcome` fold-in.** The checkbox mirror above is the **only** edit you are allowed to make on `01-plan.md` — the plan stays in its final state pre-implementation; there is no post-implementation section to fold in. The validation verdict lives exclusively in `reviews/04-validation.md`; progress is read off the AC checkboxes and the task's `Status:` field, never a summary embedded in the plan. You do NOT touch `Status:`, `Files:`, AC text, dependencies, `Split reason`, `Cleanup PR:`, `Base PR:`, `Title:`, `Branch:`, or `Notes:`. Those are frozen post-STAGE-GATE-1. Touching anything else — including re-introducing a `## Validation Outcome` section — is a contract violation; if you find yourself wanting to, return `status: blocked` with `summary: 01-plan.md scope drift requested — route to coordinator; an explicit live operator request is required before architect work`.
+**No `## Validation Outcome` fold-in.** The checkbox mirror above is the **only** plan edit you are allowed to make, and it is made in the assigned `workspaces/{feature}/plan/tasks/Task-N.md` shard — the plan stays in its final state pre-implementation; there is no post-implementation section to fold in. The validation verdict lives exclusively in `reviews/04-validation.md`; progress is read off the task-shard AC checkboxes and the task's `Status:` field, never a summary embedded in the plan. You do NOT touch `Status:`, `Files:`, AC text, dependencies, `Split reason`, `Cleanup PR:`, `Base PR:`, `Title:`, `Branch:`, or `Notes:`. Those are frozen post-STAGE-GATE-1. Touching anything else — including re-introducing a `## Validation Outcome` section — is a contract violation; if you find yourself wanting to, return `status: blocked` with `summary: task-shard scope drift requested — route to coordinator; an explicit live operator request is required before architect work`.
 
 ## Files I MUST NOT write
 
@@ -565,11 +565,11 @@ Do NOT repeat the full workspaces content in your final message — it's already
 
 ### Failure Brief (validate mode only, when `status: failed`)
 
-When you finish validate mode with `status: failed`, **append** a correction entry to `workspaces/{feature-name}/failure-brief.md` so the coordinator can route one implementation/validation correction without re-reading `reviews/04-validation.md`. Create the file if it doesn't exist. Plan repairs and operator decisions are not iteration entries.
+When you finish validate mode with `status: failed`, **append** a correction entry to `workspaces/{feature-name}/failure-brief.md` so the coordinator can route the result without re-reading `reviews/04-validation.md`. Create the file if it doesn't exist. A mechanical plan repair routes to the coordinator with `iteration +0`; operator decisions are not correction rounds.
 
 ```markdown
 ## Iteration {N} — qa — {YYYY-MM-DD HH:MM}
-**Root cause type:** A (implementation/validation correction) | operator decision (no correction round until resolved)
+**Root cause type:** A (implementation/validation correction) | mechanical plan repair (iteration +0) | operator decision (no correction round until resolved)
 **Blast radius:** localized {AC-3} | structural
 
 ### Failing AC

@@ -33,7 +33,7 @@ its approved resolution continues in implementation. Only a separate, explicit c
 operator request for architect work may reopen design and require a new Gate 1. Never rewrite an
 acceptance criterion merely to manufacture a pass.
 
-### Post-Gate-1 plan-write boundary
+## Post-Gate-1 plan-write boundary
 
 The coordinator, not a specialist, classifies post-Gate-1 plan concerns. It may
 repair only mechanical fields (references, identifiers, paths, counts, format,

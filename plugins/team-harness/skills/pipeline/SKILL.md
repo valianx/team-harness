@@ -129,7 +129,7 @@ the role fields cannot see. The current digests are:
 | `implementer` | `d0a27bc1b21006bd656a70360307fc21901438c4f87d8241acbf4d17f04dfc93` |
 | `tester` | `bbef7aaef37e9124780585bf9687ee289956c5f001315b67629c2b1a12d2e5a3` |
 | `qa` | `28c2938c8b6299dfded6c8709fb8b25012e66561552e502f3222a190b335a13a` |
-| `security` | `f384a721456188e3459cbf481149ff0575cf90595cce967e682978282ac49bf2` |
+| `security` | `55e5d5ac21ec75a461557bbae6e0c0895e2f9348fd07d69f7e10e2b178126dfe` |
 | `delivery` | `2a7a88db1a058db03852dbd1c5d47fafb2b2b32c8ec4dead838f19cdefc033d2` |
 
 Do not accept a file solely because its comments or `name` field match. A
@@ -175,7 +175,7 @@ smallest correction with its owner. The following matrix is exhaustive:
 | Mechanical plan repair (references, identifiers, paths, counts, format, or field coherence with no semantic change) | Main repairs the canonical field and records the repair | `phase: implementation`; no new Gate 1; if Freeze was reached, rebuild Freeze and revalidate | prohibited | `0` |
 | Decision-bearing plan resolution, including a structural intent/scope/AC contradiction, security-obligation classification, or a change to intent, scope, behavior, or AC meaning | Main pauses for a bounded live operator decision and transcribes the approved resolution without reinterpretation | `phase: implementation`; `next_action` continues through implementation → Freeze → validation; no new Gate 1 and retain the conditional security review when the classification is sensitive | prohibited unless the separate explicit current live operator request for architect work applies | `0` |
 | Explicit, current live operator request for architect work | Main records the request and dispatches `architect` | `phase: design`; the resulting plan requires a new Gate 1 | allowed only for that request | `0` |
-| Correctable code, test, or documentation defect inside approved scope | Implementation executor (or eligible direct Main executor) applies the smallest correction | Return to implementation → Freeze → validation; a sensitive delta requires a fresh security audit; no new Gate 1 | prohibited | `+1` |
+| Correctable code, test, documentation, hygiene, or security finding inside approved scope | Implementation executor (or eligible direct Main executor) applies the smallest correction | Return to implementation → Freeze → validation; a sensitive delta requires a fresh security audit; no new Gate 1 | prohibited | `+1` |
 | Missing or insufficient evidence | `tester` completes or corrects the evidence | Re-run affected validation; tree/package changes reopen Freeze; no new Gate 1 | prohibited | `+1` |
 
 Code, test, or documentation defects in approved scope return to the implementation executor

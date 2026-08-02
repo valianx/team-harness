@@ -965,7 +965,7 @@ When you finish pipeline mode and `reviews/04-security.md` reports any **Critica
 
 Medium / Low / Info findings do NOT go in the brief — those are warnings included in the delivery report, not iteration triggers. Keep the brief tight: 5-10 lines per iteration.
 
-**Prose-budget exemption.** The pipeline-mode per-finding prose budget (§ Output Contract above — `file:line` + CWE + ≤1-sentence impact + ≤1-line remediation pointer) governs `reviews/04-security.md` only. It does NOT apply to the remediation lines above: `failure-brief.md` retains `file:line` + actionable remediation guidance for every Critical/High blocking finding, uncapped — this is the Case-D iteration vehicle, exempt from the report's prose budget.
+**Prose-budget exemption.** The pipeline-mode per-finding prose budget (§ Output Contract above — `file:line` + CWE + ≤1-sentence impact + ≤1-line remediation pointer) governs `reviews/04-security.md` only. It does NOT apply to the remediation lines above: `failure-brief.md` retains `file:line` + actionable remediation guidance for every Critical/High blocking finding, uncapped — this is the Case-A iteration vehicle, exempt from the report's prose budget.
 
 ---
 

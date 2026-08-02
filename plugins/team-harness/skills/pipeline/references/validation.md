@@ -6,8 +6,9 @@ criterion-by-criterion review to `qa`, and the required focused audit to `securi
 sensitivity/risk floor applies. Give tester and QA only the assigned task-shard paths plus the
 verification packet; give security the packet and changed attack surface plus named invariant or
 architecture anchors when required. Never attach the full plan set. None may edit coordination
-state, gate fields, or releases. Specialists report only `Cause`, `Files`, implicated `AC`, and
-`Correction`; Main owns disposition, phase, plan writes, and routing.
+state, gate fields, or releases. QA may update only the assigned task-shard AC checkbox mirror;
+all other manifest and shard fields remain unchanged. Specialists report only `Cause`, `Files`,
+implicated `AC`, and `Correction`; Main owns canonical plan fields, disposition, phase, and routing.
 
 A live operator-requested tester, QA, or security review while Main is inline is an ad-hoc report,
 not pipeline validation. It runs without a pipeline workspace, state, events, gates, Stage Gate,

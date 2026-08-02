@@ -140,9 +140,9 @@ def _assert_no_automatic_design_route(text: str, context: str) -> None:
     gate = r"(?:requires?|releases?)\s+(?:a\s+)?new gate 1"
     explicit = r"explicit(?:\s+\w+){0,3}\s+decision"
     for pattern in (
-        rf"{concern}[^.]{0,240}{design}",
-        rf"{concern}[^.]{0,240}{gate}",
-        rf"{explicit}[^.]{0,240}(?:{design}|{gate}|new gate 1)",
+        rf"{concern}[^.]{{0,240}}{design}",
+        rf"{concern}[^.]{{0,240}}{gate}",
+        rf"{explicit}[^.]{{0,240}}(?:{design}|{gate}|new gate 1)",
     ):
         if re.search(pattern, flattened):
             fail(f"{context} permits a decision-bearing concern to reopen design")

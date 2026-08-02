@@ -141,7 +141,7 @@ existing operator-declared fast-path mechanisms.
 correction round in the existing max-3 cap and returns through implementation → Freeze →
 validation. It does not edit the plan, dispatch `architect`, increment the counter for a
 plan repair, or create an `iteration.start` for an operator decision; see
-`agents/ref-pipeline.md § "Iteration"`.
+`agents/ref-pipeline.md § "Iteration rules"`.
 
 **`workspaces/` exclusion is structural, not filtered.** The workspaces directory is git-ignored
 (local mode) or lives outside the repository entirely (obsidian mode) — it never appears in

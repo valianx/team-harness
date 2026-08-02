@@ -120,16 +120,21 @@ design → waiting_gate1 → implementation → validation → waiting_gate3 →
 
 After Gate 1, the coordinator applies one fixed routing matrix: a mechanical plan
 defect is repaired in place and continues `implementation → Freeze → validation` with
-no architect dispatch or iteration change. **Any security-obligation change is never
+no architect dispatch or iteration change (`route: mechanical`; `owner: main`;
+`phase: implementation`; `architect: prohibited`; `gate: none`; `iteration delta: 0`).
+**Any security-obligation change is never
 mechanical: it is decision-bearing and requires one bounded live operator decision.** The
 coordinator transcribes that decision and continues `implementation → Freeze → fresh
 security audit → validation`; architect is prohibited unless the live operator separately
 and explicitly requests architect work; `iteration` delta: `0`. Any other semantic plan
 defect pauses for one bounded live operator decision, is transcribed by the coordinator,
-and continues the same route. A correctable code, test, documentation, hygiene, or
+and continues the same route (`route: decision`; `owner: main`; `phase: implementation`;
+`architect: explicit-only`; `gate: none`; `iteration delta: 0`). A correctable code, test, documentation, hygiene, or
 security defect consumes one implementation/validation correction round and follows the
-same route. Only an explicit live operator request for architect work permits `design`
-and a new Gate 1.
+same route (`route: implementation`; `owner: implementation`; `phase: implementation`;
+`architect: prohibited`; `gate: none`; `iteration delta: +1`). Only an explicit live operator
+request for architect work permits `design` and a new Gate 1 (`route: architect-request`;
+`owner: main`; `phase: design`; `architect: allowed`; `gate: new-gate1`; `iteration delta: 0`).
 
 Every pipeline uses this exact sequence and the same two gates. `inline` remains a
 pre-activation direct-mode posture, never enters this machine, and is never a legal value
@@ -726,7 +731,9 @@ approved preference and predicate allow it), then re-run the affected validation
 Evidence gaps return to `tester`; a correctable security finding returns to implementation
 and receives a delta audit. Every tree change after Freeze reopens Freeze and validation;
 it never reopens design automatically. Each such remediation consumes one
-implementation/validation correction round. Plan repairs and operator-approved plan
+implementation/validation correction round (`route: evidence`; `owner: tester`;
+`phase: validation`; `architect: prohibited`; `gate: none`; `iteration delta: +1`).
+Plan repairs and operator-approved plan
 decisions are not validation findings and do not consume the counter.
 
 A finding is **structural** only when it makes the approved intent, scope fence and ACs

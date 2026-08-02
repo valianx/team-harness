@@ -33,9 +33,10 @@ external delivery precondition failure → `blocked`; explicit cancellation → 
 
 After Gate 1, a mechanical plan repair is coordinator-owned and continues
 `implementation → Freeze → validation` with no architect dispatch and no iteration change.
-Correctable code, test, documentation, hygiene, or security findings consume one
-implementation/validation correction round and follow that same route; a sensitive delta
-requires a fresh audit. `iteration: N/3` counts only those correction rounds. Plan repairs,
+Correctable code, test, documentation, hygiene, or security findings, plus missing or
+insufficient evidence, consume one implementation/validation correction round and follow
+that same route; evidence returns to `tester`, while a sensitive delta requires a fresh audit.
+`iteration: N/3` counts only those correction rounds. Plan repairs,
 operator decisions, and explicitly requested design work do not increment it or emit a new
 `iteration.start`; historical `cause: operator` events remain readable, while new writers
 use `cause: verification`.

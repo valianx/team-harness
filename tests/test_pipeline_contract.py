@@ -204,25 +204,27 @@ def _claude_transition_sections(text: str) -> tuple[str, str]:
 
 
 def _parse_claude_transition_rows(text: str) -> dict[str, TransitionOutcome]:
-    """Extract structured outcomes from Claude's fixed routing projection."""
+    """Parse explicit machine fields from Claude's fixed routing projection."""
     route, final_result = _claude_transition_sections(text)
-    requirements = (
-        ("mechanical", r"a mechanical plan\s+defect.*?no architect dispatch or iteration change", TransitionOutcome("main", "implementation", "prohibited", "none", 0)),
-        ("decision", r"any other semantic plan\s+defect pauses for one bounded.*?continues the same route", TransitionOutcome("main", "implementation", "explicit-only", "none", 0)),
-        ("architect-request", r"only an explicit\s+live operator request for architect work permits `design`\s+and a new gate 1", TransitionOutcome("main", "design", "allowed", "new-gate1", 0)),
-        ("implementation", r"correctable code, test, documentation, hygiene, or\s+security defect consumes one implementation/validation correction round and follows the\s+same route", TransitionOutcome("implementation", "implementation", "prohibited", "none", 1)),
-    )
     rows: dict[str, TransitionOutcome] = {}
-    for key, pattern, outcome in requirements:
-        require(re.search(pattern, route, re.DOTALL) is not None, f"Claude routing prose lost the {key} transition row")
-        rows[key] = outcome
-    require(
-        "evidence gaps return to `tester`" in final_result
-        and "each such remediation consumes one" in final_result
-        and "implementation/validation correction round" in final_result,
-        "Claude final-result contract lost the evidence correction row",
+    field_pattern = re.compile(
+        r"`route: (?P<key>[a-z-]+)`;\s*"
+        r"`owner: (?P<owner>main|implementation|tester)`;\s*"
+        r"`phase: (?P<phase>design|implementation|validation)`;\s*"
+        r"`architect: (?P<architect>prohibited|explicit-only|allowed)`;\s*"
+        r"`gate: (?P<gate>none|new-gate1)`;\s*"
+        r"`iteration delta: (?P<delta>[+-]?\d+)`"
     )
-    rows["evidence"] = TransitionOutcome("tester", "validation", "prohibited", "none", 1)
+    for match in field_pattern.finditer(f"{route}\n{final_result}"):
+        key = match.group("key")
+        require(key not in rows, f"Claude routing prose repeats {key!r}")
+        rows[key] = TransitionOutcome(
+            match.group("owner"),
+            match.group("phase"),
+            match.group("architect"),
+            match.group("gate"),
+            int(match.group("delta")),
+        )
     return rows
 
 
@@ -312,7 +314,7 @@ def _require_iteration_cause_contract() -> None:
     """Keep fresh correction events verification-only while retaining old history."""
     iteration = section(read("agents/ref-pipeline.md"), "### `cause` and the severity floor", "### Pre-dispatch gate over a Phase-3 correction round's findings").lower()
     iteration_flat = re.sub(r"\s+", " ", iteration)
-    state_iteration = read("agents/_shared/orchestrator-state.md").lower()
+    state_iteration = re.sub(r"\s+", " ", read("agents/_shared/orchestrator-state.md").lower())
     require(
         "new `iteration.start` events are correction-only" in iteration_flat
         and "new writers emit only `cause: verification`" in state_iteration
