@@ -130,7 +130,7 @@ the role fields cannot see. The current digests are:
 | `tester` | `bbef7aaef37e9124780585bf9687ee289956c5f001315b67629c2b1a12d2e5a3` |
 | `qa` | `28c2938c8b6299dfded6c8709fb8b25012e66561552e502f3222a190b335a13a` |
 | `security` | `55e5d5ac21ec75a461557bbae6e0c0895e2f9348fd07d69f7e10e2b178126dfe` |
-| `delivery` | `2a7a88db1a058db03852dbd1c5d47fafb2b2b32c8ec4dead838f19cdefc033d2` |
+| `delivery` | `4addff6a8d7cdf0ab05b4ae1fb1c306ed3e350f2df63b325d24ff58e4eee22cb` |
 
 Do not accept a file solely because its comments or `name` field match. A
 digest mismatch is a stale or unrelated shadow; stop before workspace
@@ -224,9 +224,10 @@ edit`, and `4: reason — reject`; Gate 3 offers `1 — ship`, `2 — amend`, an
 Never treat a specialist result as a gate decision. Never let a specialist
 present a gate or write coordination state. Pipeline activation alone does not
 authorize delivery. A later valid `Gate 3: ship` reply is the operator's single
-delivery decision for the frozen tree: it authorizes the coordinator to apply
-the previewed version/changelog, commit, push the feature branch, and create or
-update its draft PR without another conversational confirmation. It never
+delivery decision for the frozen tree: implementation has already assembled
+version/changelog and committed the complete candidate. `ship` authorizes the
+coordinator to push that exact validated commit and create or update its
+draft PR without another conversational confirmation. It never
 authorizes merge, tag, release, publication, force-push, or broader scope.
 
 ## Workspace I/O budget

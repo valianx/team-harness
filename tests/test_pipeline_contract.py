@@ -900,9 +900,8 @@ def check_ad_hoc_review_boundary() -> None:
         require("delivery record" in adapter and "creates no" in adapter, f"Codex {role}: ad-hoc review can create delivery")
 
 
-def check_single_ship_delivery() -> None:
-    """Gate 3 ship is the one operator decision through draft PR."""
-    sources = {
+def _delivery_publish_sources() -> dict[str, str]:
+    return {
         "Claude gate": read("agents/_shared/gate-contract.md"),
         "Claude mechanics": read("agents/_shared/delivery-mechanics.md"),
         "Claude pipeline": read("agents/ref-pipeline.md"),
@@ -911,10 +910,17 @@ def check_single_ship_delivery() -> None:
         "Codex delivery skill": read("plugins/team-harness/skills/deliver/SKILL.md"),
         "Codex delivery reference": read("plugins/team-harness/skills/pipeline/references/delivery.md"),
     }
-    for label, text in sources.items():
+
+
+def _check_publish_contracts(publish_sources: dict[str, str]) -> None:
+    for label, text in publish_sources.items():
         flat = re.sub(r"\s+", " ", text.lower())
-        for marker in ("version", "commit", "push", "draft pr"):
+        for marker in ("push", "draft pr"):
             require(marker in flat, f"{label}: ship delivery omits {marker}")
+        require(
+            "validated commit" in flat or "validated_commit_sha" in flat,
+            f"{label}: ship delivery omits validated commit identity",
+        )
         require(
             "do not ask" in flat
             or "no second conversational" in flat
@@ -924,16 +930,55 @@ def check_single_ship_delivery() -> None:
         )
         require("merge" in flat and "release" in flat, f"{label}: ship exclusions are incomplete")
 
-    codex_pipeline = sources["Codex pipeline"].lower()
+
+def _check_implementation_assembly() -> None:
+    assembly_sources = {
+        "Claude assembly": read("agents/_shared/implementation-assembly.md"),
+        "Codex implementation": read("plugins/team-harness/skills/pipeline/references/implementation.md"),
+    }
+    for label, text in assembly_sources.items():
+        flat = re.sub(r"\s+", " ", text.lower())
+        for marker in ("version", "changelog", "commit", "before freeze"):
+            require(marker in flat, f"{label}: implementation assembly omits {marker}")
+        for marker in ("diff composition", "mechanical", "substantive", "reviewability exceptions"):
+            require(marker in flat, f"{label}: implementation assembly omits {marker}")
+    claude_pipeline = read("agents/ref-pipeline.md")
+    require(
+        "agents/_shared/implementation-assembly.md" in claude_pipeline,
+        "Claude pipeline does not invoke the canonical implementation assembly contract",
+    )
+
+
+def check_single_ship_delivery() -> None:
+    """Implementation freezes a complete commit; delivery only publishes it."""
+    publish_sources = _delivery_publish_sources()
+    _check_publish_contracts(publish_sources)
+    _check_implementation_assembly()
+    mechanics = publish_sources["Claude mechanics"].lower()
+    for forbidden in ("git commit -m", "git add ", "git fetch origin {default-branch}"):
+        require(forbidden not in mechanics, f"Claude delivery still executes {forbidden!r}")
+    for marker in ("validated_commit_sha", "validated_tree_sha", "git status --porcelain"):
+        require(marker in mechanics, f"Claude delivery identity check omits {marker!r}")
+    for marker in ("git ls-remote", "verification_base_ref", "current", "moved", "unknown"):
+        require(marker in mechanics, f"Claude delivery base-status report omits {marker!r}")
+    require("git fetch" not in mechanics, "Claude delivery base-status report mutates remote refs")
+
+    codex_pipeline = publish_sources["Codex pipeline"].lower()
     require(
         "does not authorize a push" not in codex_pipeline,
         "Codex pipeline still says Gate 3 ship cannot authorize push/PR",
     )
-    codex_delivery = re.sub(r"\s+", " ", sources["Codex delivery reference"].lower())
+    codex_delivery = re.sub(r"\s+", " ", publish_sources["Codex delivery reference"].lower())
     require(
         "technical runtime boundary" in codex_delivery
         and "not a new team harness" in codex_delivery,
         "Codex delivery conflates native tool permission with another operator gate",
+    )
+    require(
+        "git ls-remote" in codex_delivery
+        and "verification_base_ref" in codex_delivery
+        and "without mutating refs" in codex_delivery,
+        "Codex delivery omits the non-mutating base-status report",
     )
 
 
@@ -954,20 +999,21 @@ def check_delivery_preview_binding() -> None:
         require("before" in text and "gate 3" in text and "sha-256" in text, f"{label}: exact prose is not bound before Gate 3")
     require("before stage-gate-3" in delivery_role, "Delivery role still runs after Gate 3")
     require("do not modify tracked repository files" in delivery_role, "Delivery preview can change the frozen tree")
+    require("changelog-fragment-draft.md" not in delivery_role, "Delivery preview still owns changelog assembly")
     require("do not regenerate prose" in codex_delivery, "Codex delivery can regenerate approved prose")
     require("never recompose" in claude_delivery_flat, "Claude mechanics can recompose approved prose")
     require("--draft" in claude_delivery and "isdraft" in claude_delivery, "Claude mechanics do not enforce draft-only PR delivery")
-    require("open` with `isdraft: false" in claude_delivery, "Ready-for-review PR mutation is not blocked")
+    require(
+        "ready-for-review" in claude_delivery and "never downgraded" in claude_delivery,
+        "Ready-for-review PR mutation is not blocked",
+    )
     require(
         "approved title from delivery_preview" in claude_delivery_flat
         and "approved pr_body_path from delivery_preview" in claude_delivery_flat,
         "Claude mechanics can regenerate or select a different PR title/body",
     )
-    require(
-        "runs even when the version bump was skipped" in claude_delivery_flat
-        and "stop this section after materialization" in claude_delivery_flat,
-        "Claude mechanics can lose the approved fragment when versioning is deferred",
-    )
+    require("does not run tests" in claude_delivery_flat, "Claude delivery can rerun validated tests")
+    require("moving base" in claude_delivery_flat and "does not change" in claude_delivery_flat, "Claude delivery can invalidate on base movement")
     require("exact `00-state.md`" in deliver_skill and "never scan" in deliver_skill, "Codex deliver can select another active workspace")
     codex_delivery_flat = re.sub(r"\s+", " ", codex_delivery)
     require(

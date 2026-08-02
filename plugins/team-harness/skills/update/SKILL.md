@@ -66,7 +66,7 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    only to an explicit `$team-harness:setup` import.
 
 5. Read `agent-scope` from the native config (the ensured default is
-   `global`) and reconcile all six bundled agents automatically:
+   `global`) and reconcile all ten bundled agents automatically:
 
    ```bash
    python3 NEW_PLUGIN/skills/setup/scripts/manage_agents.py inspect --scope SCOPE
@@ -89,7 +89,7 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    replacement snapshot from the same Codex cache without exiting `127`. Hook
    trust remains an operator action through `/hooks`; never bypass it.
 
-8. Verify the installed plugin version, native settings, six agent files, MCP
+8. Verify the installed plugin version, native settings, ten agent files, MCP
    list, and bridge target. Report old/new versions, marketplace result, config
    migration, agent reconciliation, hook status, bridge status, and any
    recovery command. When the bridge reports `restartRequired: false`, state

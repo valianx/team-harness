@@ -4,9 +4,10 @@
 **Date:** 2026-07-31
 **Scope:** shipped native Codex support without changing the current Claude Code or opencode runtime contracts
 
-**Parity update (2026-08-01):** the canonical 57-skill catalog is now projected
-to Codex and opencode through runtime adapters. The six-agent Codex pipeline
-roster remains intentionally narrower than the full semantic agent fleet. The
+**Parity update (2026-08-02):** the canonical 57-skill catalog is now projected
+to Codex and opencode through runtime adapters. Codex installs the six-agent pipeline
+roster plus the four read-only agents required by `review-pr`; the ten-agent set
+remains intentionally narrower than the full semantic agent fleet. The
 original narrow-beta proposal below is retained as design history.
 
 ## Executive summary

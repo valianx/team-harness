@@ -17,7 +17,8 @@ Then invoke `$team-harness:setup`. The marketplace only distributes code;
 setup converges the operational installation. It writes native settings to
 `${CODEX_HOME:-$HOME/.codex}/.team-harness.json`, configures workspace and
 language preferences, offers Memory/context7 MCP registration, verifies hook
-trust, and places the six bundled specialist agents in project or global scope.
+trust, and places ten bundled specialist agents in project or global scope:
+six for the gated pipeline and four for immutable PR review.
 An explicit setup import can copy missing values from Claude Code or opencode
 without printing opaque values; normal Codex modes never read another
 runtime's configuration and existing Codex-native values always win.
@@ -35,7 +36,7 @@ codex plugin marketplace add valianx/team-harness \
 
 Use `$team-harness:update` for the normal update flow. It refreshes the
 marketplace, compares versions, replaces the installed plugin through native
-permissions, ensures native settings exist, and automatically aligns all six
+permissions, ensures native settings exist, and automatically aligns all ten
 bundled agents in the configured scope. It also leaves a guarded compatibility
 link from the running thread's old versioned cache path to the new snapshot, so
 already-known skill and hook paths keep working without a restart. It never
@@ -79,8 +80,8 @@ pipeline contracts remain hand-authored for Codex; the other 47 are generated
 runtime adapters that package the canonical workflow, references, scripts, and
 assets while translating invocation, configuration paths, tools, delegation,
 and permission boundaries. This includes the diagram family and both GCP
-skills. The six generated specialist definitions used by the gated pipeline
-remain a separate setup/update concern. Consumers do not need the Go installer.
+skills. The ten generated specialist definitions used by the gated pipeline and
+PR review remain a separate setup/update concern. Consumers do not need the Go installer.
 Run `$team-harness:modes` for an alphabetical catalog with concise descriptions,
 or use `/skills` and `$team-harness` completion in the Codex composer.
 These helper commands remain available for diagnostics and manual recovery:
@@ -98,16 +99,17 @@ CI and the prepublish guard require these sites to be changed together when a
 distributed runtime input changes. Repositories that predate the Codex plugin
 or installer path retain optional-site compatibility until that path exists.
 
-The six agents are a mandatory prerequisite for the gated `pipeline` skill,
+The six pipeline agents are a mandatory prerequisite for the gated `pipeline` skill,
 but not for lightweight `init` intake:
 the primary thread must find a complete set of `architect.toml`,
 `implementer.toml`, `tester.toml`, `qa.toml`, `security.toml`, and
 `delivery.toml` in either the project `.codex/agents/` or global
 `$CODEX_HOME/agents/` scope before it delegates. Setup/update install them from
-the marketplace snapshot. A new Codex thread is needed only when Codex must
-discover changed declarations; the updater's compatibility bridge keeps
-existing paths live. Shared direct skills remain available without the six
-pipeline specialists and execute through Main unless their adapter names a
+the marketplace snapshot. The four read-only review agents (`reviewer`, `pr-review-qa`,
+`pr-review-security`, and `reviewer-consolidator`) are the corresponding prerequisite for
+`review-pr`. A new Codex thread is needed only when Codex must discover changed declarations;
+the updater's compatibility bridge keeps existing paths live. Shared direct skills remain
+available without either specialist set and execute through Main unless their adapter names a
 bounded native delegation.
 
 ## Roles and model projection
@@ -126,7 +128,7 @@ directly to `architect`, `implementer`, `tester`, `qa`, `security`, and
 to direct behavior when the workflow completes or is explicitly aborted.
 
 Skill activation does not change Main's selected model, reasoning effort,
-sandbox, or approval policy. The projection below applies to the six spawned
+sandbox, or approval policy. The projection below applies to all ten installed
 specialists:
 
 | Claude role metadata | Codex model | Effort |

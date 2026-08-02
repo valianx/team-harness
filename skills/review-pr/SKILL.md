@@ -194,6 +194,16 @@ read-only. Codex dispatch is unavailable unless a Team Harness Codex projection 
 capability validator confirms the same exact allowlist; never inherit a general agent's authority.
 Host overrides after Team Harness emits an artifact are outside this guarantee.
 
+Before any dispatch, require the selected runtime to expose all four exact agent identities. In
+Codex, accept one complete project or global set only; every file must be a regular non-symlink
+Team Harness-generated TOML with the matching `name`, instruction-source marker, semantic-source
+marker, projection/profile marker, and `sandbox_mode = "read-only"`. The general `reviewer` may
+have only filesystem-read plus external-read capability in the canonical registry; the QA,
+security, and consolidator roles may have only filesystem-read. A missing, mixed, unmanaged, or
+stale set blocks review before snapshot dispatch. Direct the operator to
+`$team-harness:setup agents` or `$team-harness:update`, then require a new Codex thread so newly installed agent
+declarations are discovered.
+
 Pass coordinates and artifact paths, not artifact bodies:
 
 ```text

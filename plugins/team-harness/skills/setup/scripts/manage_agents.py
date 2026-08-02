@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inspect or reconcile the six bundled Team Harness Codex agents."""
+"""Inspect or reconcile the ten bundled Team Harness Codex agents."""
 
 from __future__ import annotations
 
@@ -12,7 +12,18 @@ import stat
 import tempfile
 
 
-ROLES = ("architect", "implementer", "tester", "qa", "security", "delivery")
+ROLES = (
+    "architect",
+    "implementer",
+    "tester",
+    "qa",
+    "security",
+    "delivery",
+    "reviewer",
+    "pr-review-qa",
+    "pr-review-security",
+    "reviewer-consolidator",
+)
 MANAGED_MARKER = "# Code generated from runtime/schema/codex-agents.json; DO NOT EDIT."
 
 

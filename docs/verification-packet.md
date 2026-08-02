@@ -76,11 +76,11 @@ on a clean tree, `{sha}+{dirty_hash}` on a dirty one) — never a partial or SHA
 exists AT THE MOMENT IT RUNS — it cannot detect a file that did not exist yet when the anchor
 was FIRST recorded (Phase 2.8) but exists by the time a LATER comparison runs, unless that
 later comparison also re-runs this same command fresh. Every site that compares against a
-previously-recorded anchor (STAGE-GATE-3 preparation, the push-step precondition) MUST
+previously-recorded anchor (including STAGE-GATE-3 preparation) MUST
 re-run this command fresh at comparison time, never reuse a stale `dirty_hash` — and the
-push-step site additionally runs the independent `git status --porcelain` guard
-(`agents/_shared/delivery-mechanics.md § 6(c)`, mirroring `docs/suite-evidence.md § 4`) as a
-second, unconditional check, regardless of what this comparison alone would have concluded.
+implementation Freeze additionally requires a clean worktree and records exact commit/tree
+object IDs. Delivery compares those IDs directly rather than re-running this dirty-tree
+algorithm.
 
 ---
 
@@ -92,7 +92,7 @@ silently.
 
 | Section | Content | Source |
 |---|---|---|
-| **Header** | `Feature:`, `Task identifier:`, `Built:` (ISO timestamp), `Packet version: N`, `Tree anchor:` (computed per § 1a's canonical algorithm — never re-derived inline), `Base ref:` (copied from state `verification_base_ref`), `Frozen diff:` (`inputs/00-frozen.diff`) | orchestrator |
+| **Header** | `Feature:`, `Task identifier:`, `Built:` (ISO timestamp), `Packet version: N`, `Tree anchor:` (computed per § 1a), `Freeze commit:` and `Freeze tree:` (full object IDs from a clean candidate), `Base ref:` (copied from state `verification_base_ref`), `Frozen diff:` (`inputs/00-frozen.diff`) | orchestrator |
 | **Scope** | `type`, `bug_tier` (1–4 metadata only), `security_sensitive`, `frontend_scope`, `complexity` | `00-state.md` |
 | **Changed files** | Table: path + `new`\|`modify` + one-line role, plus `git diff --stat` output | implementer status block + `git diff --stat` |
 | **Implementation summary** | Implementer status-block summary; `Deviations from Architecture` copied verbatim (or `"none"`); surviving `[CONSTRAINT-DISCOVERED]` annotations verbatim (or `"none"`) | `02-implementation.md` |
@@ -125,7 +125,8 @@ therefore misdirect navigation but can never change a verdict's evidence base.
 # Verification Packet: {feature-name}
 **Feature:** {feature-name}  **Task identifier:** {Task-N}
 **Built:** {ISO timestamp}  **Packet version:** {N}
-**Tree anchor:** {sha [+ dirty-diff-hash]}  **Base ref:** {origin/main}
+**Tree anchor:** {sha [+ dirty-diff-hash]}  **Freeze commit:** {full sha}
+**Freeze tree:** {full tree sha}  **Base ref:** {origin/main}
 **Frozen diff:** inputs/00-frozen.diff
 
 ## Scope

@@ -75,14 +75,14 @@ adapters. Do not assume that editing one agent prompt updates every runtime.
 
 | Change | Shared or canonical source | What Codex receives |
 |---|---|---|
-| Model or effort for any canonical Team Harness agent | Frontmatter in its `agents/{role}.md` | The generator updates the complete comparison roster. For the six installed Codex specialists it also rewrites the generated TOML. |
-| Semantic behavior for one of those six specialists | The matching `agents/{role}.md` role contract | Review and, when necessary, update `runtime/codex/instructions/{role}.md`; Codex adapters are concise and the generator does not translate the full Claude prompt body. |
-| Any other Claude agent | Its file under `agents/` | Nothing automatically. The Codex beta intentionally ships only the six roles registered in `runtime/schema/codex-agents.json`. |
+| Model or effort for any canonical Team Harness agent | Frontmatter in its `agents/{role}.md` | The generator updates the complete comparison roster. For the ten installed Codex specialists it also rewrites the generated TOML. |
+| Semantic behavior for one of those ten specialists | The matching `agents/{role}.md` role contract | Review and, when necessary, update `runtime/codex/instructions/{role}.md`; Codex adapters are concise and the generator does not translate the full Claude prompt body. |
+| Any other Claude agent | Its file under `agents/` | Nothing automatically. Codex ships only the ten roles registered in `runtime/schema/codex-agents.json`. |
 | Orchestrator, intake, pipeline, or workflow behavior | Claude's `agents/orchestrator.md`, pipeline references, and relevant root `skills/` | Update the corresponding Codex plugin skill under `plugins/team-harness/skills/` (`init`, `pipeline`, or another explicit adapter). |
 | General skill behavior | The relevant root `skills/{name}/SKILL.md` | Nothing automatically unless the capability has a Codex plugin counterpart; update that counterpart deliberately. |
 | Hook policy | Shared TypeScript bodies where applicable, plus runtime entrypoints | Build the TypeScript hooks, sync the plugin bundle, and validate the runtime-specific manifest. Codex's native sandbox and approval semantics remain authoritative. |
 
-After changing any canonical agent's model/effort, one of the six installed
+After changing any canonical agent's model/effort, one of the ten installed
 role contracts, its Codex adapter, or the Codex registry, run
 `$sync-codex-agents` in Codex, or run the equivalent commands:
 

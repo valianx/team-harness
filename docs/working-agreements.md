@@ -6,8 +6,8 @@
 
 ## Post-work (deliverables for any user-facing change)
 
-- For the shipped default, Delivery writes `changelog.d/{pr-slug}.md` and the coordinator
-  assembles it into the versioned CHANGELOG section in the **same PR**. Leaving fragments for a
+- For the shipped default, implementation writes `changelog.d/{pr-slug}.md` and the coordinator
+  assembles it into the versioned CHANGELOG section before Freeze in the **same PR**. Leaving fragments for a
   later release cut is allowed only when the repository explicitly declares `skip-version` or a
   grouped batch/fallback flow. Fragment format: a standard Keep-a-Changelog subsection block (`### Added`,
   `### Changed`, `### Fixed`, `### Deprecated`, `### Removed`, `### Security`) with one
@@ -44,7 +44,7 @@
   commit.
 - **Internal distribution rule of the team-harness repository** — matches the shipped pipeline
   default (the coordinator bumps the project version once per PR; see
-  `agents/_shared/delivery-mechanics.md § 1`). Changes touching distributed runtime assets bump
+  `agents/_shared/implementation-assembly.md § 1`). Changes touching distributed runtime assets bump
   all five current version sites in the same PR (Codex/installer sites remain optional for
   historical repositories) and write the `## [X.Y.Z]` CHANGELOG section directly.
   **Trade-off:** concurrent PRs touching distributed assets race on the version line

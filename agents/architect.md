@@ -332,7 +332,7 @@ For each multi-site invariant, list **every** site where it must hold. Fence sit
 | {name of invariant} | {site label} | `{path}` | `{section heading or field name}` |
 | {name of invariant} | {site label — fenced: MUST NOT change} | `{path}` | `{section heading or field name}` |
 
-**Why this block exists:** the implementer uses this table to update every declared site atomically, and the coordinator's deterministic delivery mechanics verify the final MATCH set. A site absent from this table is invisible to that check. See `agents/_shared/delivery-mechanics.md § 1` for the version-literal example.
+**Why this block exists:** the implementer uses this table to update every declared site atomically, and the coordinator's implementation assembly verifies the final MATCH set before Freeze. A site absent from this table is invisible to that check. See `agents/_shared/implementation-assembly.md § 1` for the version-literal example.
 
 <!-- file: plan/architecture.md -->
 # Architecture
@@ -922,11 +922,11 @@ An invariant lives in more than one file when a single logical constraint (a ver
 
 **Whenever your design introduces or modifies such an invariant:**
 
-1. Enumerate the **full site-set** — every file and anchor where the invariant must hold. A site you omit is invisible to the coordinator's delivery MATCH check and to the implementer.
+1. Enumerate the **full site-set** — every file and anchor where the invariant must hold. A site you omit is invisible to the coordinator's implementation-assembly MATCH check and to the implementer.
 2. **Fence sites that MUST NOT change.** Mark them in the `### Multi-site invariants` table in `## Review Summary`. This tells the implementer which sites are frozen and tells the coordinator which fenced sites to verify are unmodified.
 3. **Apply the discipline reflexively.** The `### Multi-site invariants` block in `01-plan.md § Review Summary` IS itself a multi-site invariant: if it names a site that the implementer must edit, the implementer edits ALL sites in the same concern-commit (not piecemeal). The table is the source-of-truth for that atomicity requirement.
 
-The worked example is `agents/_shared/delivery-mechanics.md § 1`: the version-site enumeration table lists every canonical version-literal site explicitly and fences off the top-level marketplace schema version so publication mechanics never modify it accidentally.
+The worked example is `agents/_shared/implementation-assembly.md § 1`: version-site discovery lists canonical version literals and fences schema/format versions before Freeze.
 
 #### PostgreSQL high-volume time-series table (transactions, events, audit logs)
 
