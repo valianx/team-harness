@@ -81,6 +81,14 @@ async function runSuccessfulReview(pkg) {
     for (const marker of ["--ephemeral", "--ignore-user-config", "--ignore-rules", "--strict-config", "--json", "--skip-git-repo-check", "features.shell_tool=false", "features.apps=false", "features.multi_agent=false", "web_search=\"disabled\"", "mcp_servers={}"]) {
       assert.ok(record.argv.includes(marker), `missing child guard ${marker}`);
     }
+    const filesystemOverride = 'permissions.inline-review.filesystem={":root"="deny",":minimal"="read",":tmpdir"="deny",":slash_tmp"="deny"}';
+    assert.ok(record.argv.includes(filesystemOverride), "strict-config filesystem override must be one inline table");
+    for (const malformed of [
+      'permissions.inline-review.filesystem.\":root\"="deny"',
+      'permissions.inline-review.filesystem.\":minimal\"="read"',
+      'permissions.inline-review.filesystem.\":tmpdir\"="deny"',
+      'permissions.inline-review.filesystem.\":slash_tmp\"="deny"',
+    ]) assert.equal(record.argv.includes(malformed), false, `malformed per-key override must be absent: ${malformed}`);
     assert.ok(record.argv.includes("gpt-5.6-luna") && record.argv.some(value => value.includes("model_reasoning_effort") && value.includes("max")), "model and effort must be explicit");
     assert.equal(record.input.target_id, pkg.target_id, "package must arrive on stdin");
     assert.ok(record.argv.every(value => !value.includes(pkg.target_id) && !value.includes("example/repo")), "package JSON must not appear in argv");
