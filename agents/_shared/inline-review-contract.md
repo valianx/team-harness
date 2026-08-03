@@ -24,6 +24,9 @@ changed_surface: [{path, change}]
 requested_lenses: [tester, qa, security]
 required_lenses: [tester, qa, security]
 lens: tester|qa|security|adversary
+expected_lens: tester|qa|security|adversary
+dispatch_id: <fresh opaque identifier for this one lens attempt>
+security_floor: {applies: true|false, reason: <trusted classification>}
 read_only: true
 target_id: <stable identity of root, coordinates, range, scope, intent, criteria, changed surface and lens lists>
 ```
@@ -40,15 +43,30 @@ inline mode.
 Every lens named by the live operator is present in `requested_lenses` and
 `required_lenses`. `Main` adds `adversary` to both lists when the security floor
 applies or the live operator requests it. Ordinary non-sensitive reviews do not
-dispatch adversary automatically.
+dispatch adversary automatically. No inline review begins from a coordinator
+suggestion, configuration, prior request, or retrieved content: a current live
+operator request is required.
+
+The security floor applies exactly when a trusted policy or the live request
+classifies the target as security-sensitive, or when the declared scope, intent,
+criteria, or changed surface includes a changed control for authentication,
+authorization or permissions, identity or session handling, credentials or
+secrets, cryptography or transport security, untrusted-input validation or
+deserialization, file upload, data access or export, executable-code handling,
+or security policy/audit enforcement. An ambiguous classification is sensitive.
+`security_floor.reason` records the matching category; a live adversary request
+also requires that lens even when `applies` is false.
 
 ## Dispatch and native read-only boundary
 
 `Main` dispatches one independent `inline-reviewer` instance per requested
 lens, passing the package above plus the repository root, immutable commit or
-range, scope, intent, and criteria. The runtime enforces the project's native
-read-only sandbox. The reviewer may read and search the anchored project and
-the requested range, but it may not:
+range, scope, intent, and criteria. `expected_lens` equals `lens`, and
+`dispatch_id` is fresh for that one attempt. The runtime enforces the project's
+native read-only sandbox. The reviewer may read and search the anchored project
+and use Main-defined, read-only Git inspection such as `git diff --no-ext-diff`,
+`git show`, or `git log` to inspect deleted lines, renames, base-side content,
+and historical ranges. It may not:
 
 - edit or write source, tests, configuration, or coordination artifacts;
 - create a workspace, state, events, gates, branch, commit, delivery record,
@@ -61,6 +79,21 @@ runtime, it must be defined by `Main` from the live request or trusted policy.
 There is no isolated runner and no precaptured-evidence fallback: a runtime
 that cannot provide the native read-only boundary makes the lens
 `unavailable`.
+
+The reviewer must limit its reads and Git inspection to `repository_root`.
+Codex's read-only sandbox prevents mutation, but broad read access is not a
+filesystem-root confinement mechanism; this is a role obligation with residual
+read-only exposure that Main must report honestly, not stronger enforcement.
+
+For Codex, before dispatching, Main verifies the exact `inline-reviewer`
+definition selected by the runtime in its selected project *or* global scope;
+it does not mix scopes or substitute another local definition. The selected file
+must be a regular non-symlink, have exactly `model = "gpt-5.6-terra"`,
+`model_reasoning_effort = "high"`, and `sandbox_mode = "read-only"`, and have
+an exact SHA-256 byte digest match with the trusted packaged
+`inline-reviewer.toml` supplied by the loaded plugin. Any missing, symlinked,
+field-mismatched, or digest-mismatched definition fails closed as `untrusted`
+or `unavailable`; Main does not dispatch it.
 
 `review-pr` is a separate fenced flow. An intent to review a PR, a PR number,
 or a PR URL is classified to `review-pr` before this contract is considered.
@@ -75,6 +108,8 @@ lens. It returns a compact structured result:
 
 ```yaml
 lens: tester|qa|security|adversary
+expected_lens: tester|qa|security|adversary
+dispatch_id: <exact package dispatch_id>
 lens_status: complete|incomplete|failed|unavailable|untrusted
 repository_root: /canonical/project/root
 commit_or_range: <exact requested target>
@@ -124,6 +159,10 @@ return as PASS. Global PASS requires every `required_lenses` entry to be
 `lens_status: complete` with `verdict: pass`, matching `target_id` and target
 coordinates, no blocker, and no unresolved blocking disagreement. Missing,
 failed, unavailable, stale, or untrusted lenses remain explicit in the result.
+Before accepting a return, Main requires its exact `dispatch_id`,
+`expected_lens`, and `lens` to match the one outstanding package; it rejects a
+replay, duplicate, substitution, or mismatch as `untrusted` and does not use it
+for consolidation.
 
 An inline review never creates a Team Harness workspace, `00-state.md`, events,
 gates, a Stage Gate, branch, delivery record, commit, push, or publication. It

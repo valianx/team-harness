@@ -21,12 +21,25 @@ For a live, non-PR request while `Main` is inline, use the shared contract in
 `agents/_shared/inline-review-contract.md`. `Main` records
 `requested_lenses` and `required_lenses` before dispatch (every lens named by
 the operator is required; `adversary` is added to both lists for the security
-floor or a live request), binds the canonical project root plus immutable
+floor or a live request). The floor covers changed authentication,
+authorization/permissions, identity/session, credential/secret,
+cryptography/transport, untrusted-input, file-upload, data-access/export,
+executable-code, or security-policy/audit controls; an ambiguous
+classification is sensitive. It binds the canonical project root plus immutable
 commit/range, and sends each independent lens the same package with
 `mode: inline-review`, scope, intent/criteria provenance, `changed_surface`,
-`lens`, `read_only: true`, and `target_id`. This path does not preflight the
-installed agents and does not create a workspace, pipeline state/events, gates,
-Stage Gate, branch, or delivery record.
+`lens`, matching `expected_lens`, fresh `dispatch_id`, `security_floor`,
+`read_only: true`, and `target_id`. This path creates no workspace, pipeline
+state/events, gates, Stage Gate, branch, or delivery record.
+
+Before dispatch, determine the exact project-or-global `inline-reviewer`
+definition selected by Codex; never mix scopes or substitute another local
+file. Fail closed if it is not a regular non-symlink or if its
+`model = "gpt-5.6-terra"`, `model_reasoning_effort = "high"`,
+`sandbox_mode = "read-only"`, or SHA-256 raw-byte digest differs from the
+trusted packaged `inline-reviewer.toml` provided by this loaded plugin. Record
+the selected scope/path and digest only in the in-memory review package. A
+mismatch is `untrusted` or `unavailable`, never a dispatch.
 
 Codex dispatches each requested lens as an independent runtime-native
 `inline-reviewer` from the project root. It may inspect the anchored project
@@ -36,9 +49,14 @@ or state, commit, branch, push, publish, use network/external state, or dispatch
 agents. Native project access is the only execution and evidence transport; if
 read-only enforcement is unavailable, return `lens_status: unavailable`. Each result
 returns terminal `lens_status: complete|incomplete|failed|unavailable|untrusted`,
-coverage limits, target identity, and a normalized verdict; global PASS is
-fail-closed on every required lens with both `lens_status: complete` and
-`verdict: pass`. There is no Freeze/Gate semantic in this mode.
+coverage limits, target identity, matching `dispatch_id`/`expected_lens`/lens,
+and a normalized verdict; global PASS is fail-closed on every required lens
+with both `lens_status: complete` and `verdict: pass`. Reject replayed,
+duplicate, substituted, or identity-mismatched returns as `untrusted`. There is
+no Freeze/Gate semantic in this mode. Main-defined read-only Git inspection may
+cover deletions, renames, base-side content, and historical ranges. The reviewer
+must stay under the project root, but broad Codex read access is not filesystem
+confinement and remains an explicitly reported residual read-only exposure.
 
 Before consolidation, Main re-resolves the project root and commit/range. A
 moved HEAD or changed target is stale and must be recaptured. Findings,

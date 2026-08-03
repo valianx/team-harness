@@ -154,9 +154,23 @@ commit, perform delivery or publication, mutate external state, use network
 tools, or dispatch another agent. There is no isolated runner, captured-content
 transport, or evidence-manifest protocol.
 
+Before dispatch, Main validates the exact project-or-global agent definition
+selected by Codex against the trusted packaged `inline-reviewer.toml`: it must
+be a regular non-symlink with the exact Terra/high/read-only fields and raw-byte
+SHA-256 digest. Each lens package and return carry a fresh `dispatch_id` and
+matching `expected_lens`; replay, duplicate, substitution, or identity mismatch
+is untrusted. Read-only Git commands defined by Main may inspect deleted lines,
+renames, base-side content, and historical ranges. The reviewer is obligated to
+stay under the project root, but that is not filesystem confinement: broad
+read-only exposure remains a documented runtime residual.
+
 The four lenses are `tester`, `qa`, `security`, and conditional `adversary`.
 The adversary lens is required when the security floor applies or the operator
-requests it and is not added to ordinary reviews. A lens reports its status,
+requests it and is not added to ordinary reviews. The floor applies to changed
+authentication, authorization/permissions, identity/session, credentials/secrets,
+cryptography/transport, untrusted-input, file-upload, data-access/export,
+executable-code, or security-policy/audit controls; ambiguity is sensitive. A
+lens reports its status,
 verdict, findings, coverage, limits, and disagreements. Main verifies the root
 and commit/range before dispatch and again before consolidation; a moved target
 is stale and cannot produce PASS. Missing, failed, unavailable, stale, or

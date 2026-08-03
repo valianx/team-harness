@@ -7,7 +7,8 @@ import process from "node:process";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const capabilityProfiles = new Map([
-  ["review-read-only", { default: "deny", allow: ["read", "glob", "grep"] }]
+  ["review-read-only", { default: "deny", allow: ["read", "glob", "grep"] }],
+  ["inline-review-read-only", { default: "deny", allow: ["read", "glob", "grep", "command-exec"] }]
 ]);
 
 function fail(message) {

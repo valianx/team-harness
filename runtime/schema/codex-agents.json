@@ -130,8 +130,8 @@
       "description": "Runs one bounded tester, QA, security, or adversary lens over an anchored project.",
       "semantic_source": "agents/inline-reviewer.md",
       "sandbox_mode": "read-only",
-      "capabilities": ["filesystem-read"],
-      "capability_profile": "review-read-only",
+      "capabilities": ["filesystem-read", "command-exec"],
+      "capability_profile": "inline-review-read-only",
       "instruction_source": "runtime/codex/instructions/inline-reviewer.md",
       "output_path": ".codex/agents/inline-reviewer.toml"
     },

@@ -39,9 +39,18 @@ anchored project directly through `sandbox_mode = "read-only"`; it creates no
 workspace, state, events, gates, Stage Gate, branch, delivery action, commit,
 publication, or external state. The adversary lens is conditional: Main adds it
 when the security floor applies or the operator requests it, not for an ordinary
-review. A moved root or commit/range is stale and cannot produce PASS; missing,
-failed, unavailable, or untrusted lens results remain explicit, and PASS requires
-every required lens to complete with `verdict: pass` and no blocker or unresolved
+review. The floor applies to changed authentication, authorization/permissions,
+identity/session, credentials/secrets, cryptography/transport, untrusted-input,
+file-upload, data-access/export, executable-code, or security-policy/audit
+controls; ambiguity is sensitive. Every lens receives a fresh `dispatch_id` and
+matching `expected_lens`; replayed, duplicated, substituted, or mismatched
+returns are untrusted. Reviewers may use Main-defined read-only Git inspection
+for deleted lines, renames, base-side content, and ranges, and must stay under
+the project root. The read-only boundary prevents mutation but does not enforce
+filesystem confinement, so broader read-only exposure remains explicit. A moved
+root or commit/range is stale and cannot produce PASS; missing, failed,
+unavailable, or untrusted lens results remain explicit, and PASS requires every
+required lens to complete with `verdict: pass` and no blocker or unresolved
 blocking disagreement. A PR, PR number, or PR URL has exclusive `review-pr`
 precedence; inline never intercepts its snapshot, lenses, consolidation, preview,
 or publication. A coordinator suggestion is informational and never dispatches a

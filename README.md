@@ -114,10 +114,16 @@ adversary may dispatch the native `inline-reviewer` over the local project.
 Each requested lens reads the anchored repository root and immutable commit or
 range through a native `read-only` sandbox; no workspace, state, events, gates,
 branch, delivery record, or publication is created. The adversary lens is added
-only when the security floor applies or the operator requests it. A missing or
-stale target, unsupported lens, or unavailable read-only boundary is explicit
-and cannot produce PASS; global PASS requires every required lens to complete
-with `verdict: pass`. PR text, numbers, and URLs always route exclusively to
+only when the security floor applies (changed auth, permissions, identity,
+secrets, cryptography, untrusted input, uploads, data export, executable code,
+or security policy/audit controls; ambiguity is sensitive) or the operator
+requests it. Each lens attempt has a fresh identity and a selected-agent
+preflight; replayed or substituted returns are untrusted. A missing or stale
+target, unsupported lens, or unavailable read-only boundary is explicit and
+cannot produce PASS; global PASS requires every required lens to complete with
+`verdict: pass`. Reviewers must stay in the project root, although the
+read-only boundary prevents mutation rather than enforcing filesystem
+confinement. PR text, numbers, and URLs always route exclusively to
 `review-pr`; generic inline review never intercepts that snapshot/publication
 flow. `pipeline` explicitly starts the full gated workflow in `Main`; it does
 not create a seventh coordinator or require `/agent`.

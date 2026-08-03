@@ -28,8 +28,8 @@ def check_inline_reviewer_native() -> None:
         fail("Codex registry is missing inline-reviewer")
     expected = {
         "sandbox_mode": "read-only",
-        "capabilities": ["filesystem-read"],
-        "capability_profile": "review-read-only",
+        "capabilities": ["filesystem-read", "command-exec"],
+        "capability_profile": "inline-review-read-only",
         "semantic_source": "agents/inline-reviewer.md",
         "instruction_source": "runtime/codex/instructions/inline-reviewer.md",
         "output_path": ".codex/agents/inline-reviewer.toml",
@@ -41,13 +41,16 @@ def check_inline_reviewer_native() -> None:
     for marker in (
         "tester", "qa", "security", "adversary", "repository_root", "commit_or_range",
         "sandbox_mode = \"read-only\"", "lens_status", "coverage", "disagreements",
-        "review-pr", "target currentness", "output: null",
+        "review-pr", "target currentness", "output: null", "expected_lens", "dispatch_id",
+        "git diff", "filesystem-root confinement",
     ):
         if marker not in adapter:
             fail(f"inline-reviewer adapter missing {marker!r}")
     for retired in ("run_inline_review.mjs", "evidence_manifest", "manifest_digest", "stdin-only", "deny-root"):
         if retired in adapter:
             fail(f"inline-reviewer adapter retains retired protocol {retired!r}")
+    if "agents/_shared/inline-review-contract.md" in adapter:
+        fail("inline-reviewer adapter depends on target repository contract")
     for relative in (".codex/agents/inline-reviewer.toml", "plugins/team-harness/skills/setup/assets/agents/inline-reviewer.toml"):
         path = ROOT / relative
         if not path.is_file():
@@ -66,7 +69,7 @@ def check_inline_reviewer_native() -> None:
     if (ROOT / "plugins/team-harness/skills/init/scripts/test_run_inline_review.mjs").exists():
         fail("retired inline runner behavioral test remains")
     init = re.sub(r"\s+", " ", (ROOT / "plugins/team-harness/skills/init/SKILL.md").read_text().lower())
-    for marker in ("inline-reviewer", "project root", "commit/range", "sandbox_mode = \"read-only\"", "adversary", "security floor", "before consolidation", "stale"):
+    for marker in ("inline-reviewer", "project root", "commit/range", "sandbox_mode = \"read-only\"", "adversary", "security floor", "dispatch_id", "expected_lens", "regular non-symlink", "sha-256", "before consolidation", "stale"):
         if marker not in init:
             fail(f"Codex init native inline route missing {marker!r}")
     for retired in ("run_inline_review.mjs", "evidence_manifest", "manifest_digest", "stdin-only", "deny-root"):
@@ -1143,7 +1146,8 @@ def main() -> None:
     for marker in (
         "tester", "qa", "security", "adversary", "repository_root", "commit_or_range",
         "sandbox_mode = \"read-only\"", "lens_status", "coverage", "disagreements",
-        "target currentness", "review-pr", "output: null",
+        "target currentness", "review-pr", "output: null", "expected_lens", "dispatch_id",
+        "git diff", "filesystem-root confinement",
     ):
         if marker not in native_adapter:
             fail(f"Codex inline-reviewer adapter is missing {marker!r}")
@@ -1152,9 +1156,10 @@ def main() -> None:
             fail(f"Codex inline-reviewer adapter retains retired marker {retired!r}")
     init_lower = re.sub(r"\s+", " ", init.lower())
     for marker in (
-        "does not preflight the installed agents", "inline-reviewer", "requested_lenses",
+        "inline-reviewer", "requested_lenses",
         "required_lenses", "project root", "commit/range", "sandbox_mode = \"read-only\"",
-        "adversary", "security floor", "review-pr", "exclusive", "stale",
+        "adversary", "security floor", "expected_lens", "dispatch_id", "regular non-symlink",
+        "sha-256", "review-pr", "exclusive", "stale",
     ):
         if marker not in init_lower:
             fail(f"Codex init native inline contract is missing {marker!r}")
@@ -1163,8 +1168,9 @@ def main() -> None:
             fail(f"Codex init retains retired inline marker {retired!r}")
     for marker in (
         "mode: inline-review", "repository_root", "commit_or_range", "requested_lenses",
-        "required_lenses", "lens: tester|qa|security|adversary", "read_only: true",
-        "target_id", "native read-only sandbox", "security floor", "stale",
+        "required_lenses", "lens: tester|qa|security|adversary", "expected_lens",
+        "dispatch_id", "security_floor", "read_only: true", "target_id",
+        "native read-only sandbox", "security floor", "stale",
         "complete|incomplete|failed|unavailable|untrusted", "never averages verdicts",
         "absent\nreturn as PASS", "verdict: pass", "review-pr",
     ):
