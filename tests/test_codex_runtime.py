@@ -151,7 +151,18 @@ def _assert_no_automatic_design_route(text: str, context: str) -> None:
 def _check_agent_adapter_parity() -> None:
     generated = ROOT / ".codex/agents"
     packaged = ROOT / "plugins/team-harness/skills/setup/assets/agents"
-    for role in ("architect", "tester", "qa", "security"):
+    for role in (
+        "architect",
+        "delivery",
+        "implementer",
+        "pr-review-qa",
+        "pr-review-security",
+        "qa",
+        "reviewer-consolidator",
+        "reviewer",
+        "security",
+        "tester",
+    ):
         project = (generated / f"{role}.toml").read_bytes().replace(b"\r\n", b"\n")
         package = (packaged / f"{role}.toml").read_bytes().replace(b"\r\n", b"\n")
         if project != package:
@@ -185,9 +196,23 @@ def _check_qa_post_gate1_route(validation: str) -> None:
     qa_markers = (
         "return exactly four-coordinate input to main",
         "never select `design` or `architect`",
+        "ac-n: pass",
+        "only writer",
+        "checkbox mirror",
     )
     for context, text in sources[1:]:
         _assert_markers(re.sub(r"\s+", " ", text.lower()), qa_markers, context)
+        if re.search(r"\bqa\s+may\s+update\b", text, re.IGNORECASE):
+            fail(f"{context} permits read-only QA to update the checkbox mirror")
+    for context, text in sources:
+        _assert_markers(
+            re.sub(r"\s+", " ", text.lower()),
+            ("ac-n: pass", "only writer", "checkbox mirror"),
+            context,
+        )
+    for context, agent in (("generated QA adapter", generated), ("packaged generated QA adapter", packaged)):
+        if agent["sandbox_mode"] != "read-only":
+            fail(f"{context} must keep QA read-only")
 
 
 def check_post_gate1_projection() -> None:
@@ -225,6 +250,14 @@ def main() -> None:
     config = tomllib.loads((ROOT / ".codex/config.toml").read_text())
     if config["agents"]["enabled"] is not True:
         fail("Codex subagents must be enabled")
+    if "model" in config or "model_reasoning_effort" in config:
+        fail("Codex project fallback must not override Main's selected Sol/xhigh model")
+    if config.get("features", {}).get("multi_agent") is not True:
+        fail("Codex project must explicitly enable multi_agent")
+    if config.get("features", {}).get("multi_agent_v2") is not True:
+        fail("Codex project must explicitly enable multi_agent_v2")
+    if config["agents"].get("default_subagent_model") != "gpt-5.6-terra" or config["agents"].get("default_subagent_reasoning_effort") != "medium":
+        fail("Codex project must declare the generic Terra/medium subagent fallback")
     if config.get("sandbox_mode") != "workspace-write":
         fail("Codex project must use workspace-write sandbox mode")
     if config.get("approval_policy") != "on-request":
@@ -244,16 +277,21 @@ def main() -> None:
 
     generated = set()
     expected_identity = {
-        "architect": ("opus/xhigh", "opus-xhigh"),
-        "implementer": ("sonnet/high", "non-opus"),
-        "tester": ("sonnet/high", "non-opus"),
-        "qa": ("sonnet/high", "non-opus"),
-        "security": ("opus/xhigh", "opus-xhigh"),
-        "delivery": ("sonnet/medium", "non-opus"),
-        "reviewer": ("sonnet/high", "non-opus"),
-        "pr-review-qa": ("sonnet/high", "non-opus"),
-        "pr-review-security": ("sonnet/high", "non-opus"),
-        "reviewer-consolidator": ("sonnet/medium", "non-opus"),
+        "architect": ("opus/xhigh", "opus"),
+        "implementer": ("sonnet/high", "sonnet-high"),
+        "tester": ("sonnet/high", "sonnet-high"),
+        "qa": ("sonnet/high", "sonnet-high"),
+        "security": ("opus/xhigh", "opus"),
+        "delivery": ("sonnet/medium", "sonnet-medium"),
+        "reviewer": ("sonnet/high", "sonnet-high"),
+        "pr-review-qa": ("sonnet/high", "sonnet-high"),
+        "pr-review-security": ("sonnet/high", "sonnet-high"),
+        "reviewer-consolidator": ("sonnet/medium", "sonnet-medium"),
+    }
+    expected_projection = {
+        "opus": ("gpt-5.6-sol", "xhigh"),
+        "sonnet-high": ("gpt-5.6-terra", "high"),
+        "sonnet-medium": ("gpt-5.6-terra", "medium"),
     }
     for path in (ROOT / ".codex/agents").glob("*.toml"):
         if path.is_symlink():
@@ -266,6 +304,10 @@ def main() -> None:
         if data["name"] not in expected_identity:
             fail(f"{path}: unexpected generated agent identity {data['name']!r}")
         source_marker, tier = expected_identity[data["name"]]
+        if (data.get("model"), data.get("model_reasoning_effort")) != expected_projection[tier]:
+            fail(f"{path}: model projection does not match {tier}")
+        if "capabilities" in data:
+            fail(f"{path}: Codex 0.146 role-schema parser rejects capabilities tables")
         content = path.read_text()
         markers = (
             "# Code generated from runtime/schema/codex-agents.json; DO NOT EDIT.",
@@ -358,9 +400,9 @@ def main() -> None:
     ]
     if len(hook_commands) != 2 or not all(
         any(name in command for command in hook_commands)
-        for name in ("policy-block", "gcp-guard")
+        for name in ("policy-block", "gcp-guard", "gate-guard")
     ):
-        fail("Codex plugin must wire exactly the two deterministic-deny hooks")
+        fail("Codex plugin must wire the deterministic-deny hook floors")
     if not all(
         "PLUGIN_ROOT" in command and "CLAUDE_PLUGIN_ROOT" in command
         for command in hook_commands
@@ -369,7 +411,7 @@ def main() -> None:
     if any(
         retired in command
         for command in hook_commands
-        for retired in ("dev-guard", "gate-guard", "prepublish-guard", "worktree-guard")
+        for retired in ("dev-guard", "prepublish-guard", "worktree-guard")
     ):
         fail("Codex plugin still wires an approval-classifying hook")
 
@@ -449,11 +491,34 @@ def main() -> None:
     setup_targets = setup_targets_match.group("targets").lower()
     if "lane-autoselect" in setup_targets:
         fail("Codex setup must not advertise lane-autoselect as a supported target")
+    if "`features`" not in setup_targets:
+        fail("Codex setup must expose an explicit features target")
     if re.search(r"(?im)^\s*-\s*lane auto-select\s+is\b", setup):
         fail("Codex setup must not advertise an active lane-autoselect value")
     for marker in ("migration-only", "1 — inline", "2 — pipeline"):
         if marker not in setup.lower():
             fail(f"Codex setup lane migration guidance is missing {marker!r}")
+    for skill_name, skill_text in (("setup", setup), ("update", update)):
+        for marker in (
+            "codex features enable multi_agent",
+            "codex features enable multi_agent_v2",
+        ):
+            if re.search(rf"(?m)^\s*{re.escape(marker)}\s*$", skill_text) is None:
+                fail(f"Codex {skill_name} skill is missing V2 activation command {marker!r}")
+    setup_flat = re.sub(r"\s+", " ", setup.lower())
+    for marker in (
+        "only for a full setup or an explicit `features` target",
+        "for every other targeted setup, skip both feature-writer commands",
+        "do not change global codex feature state",
+        "re-run `codex features list` only when step 4 ran",
+        "feature-flag status when checked",
+        "does not guarantee detection when a push is assembled from runtime-only shell state",
+        "server-side github branch protection remains authoritative",
+    ):
+        if marker not in setup_flat:
+            fail(f"Codex setup scoped-write/force-push contract is missing {marker!r}")
+    if "wrapped or reconstructed equivalents even after `ship`" in setup_flat:
+        fail("Codex setup still overclaims force-push wrapper coverage")
 
     modes = (ROOT / "plugins/team-harness/skills/modes/SKILL.md").read_text()
     for marker in (
@@ -1105,8 +1170,9 @@ def main() -> None:
         "regular non-symlink file",
         "stale or unrelated shadow",
         "# Code generated from runtime/schema/codex-agents.json; DO NOT EDIT.",
-        "# Projection tier: opus-xhigh; profile: team-harness",
-        "# Projection tier: non-opus; profile: team-harness",
+        "# Projection tier: opus; profile: team-harness",
+        "# Projection tier: sonnet-high; profile: team-harness",
+        "# Projection tier: sonnet-medium; profile: team-harness",
         "@Team-Harness pipeline <task>",
         "`@Team-Harness init` loads only the lightweight intake posture",
         "Do not create or dispatch a separate `orchestrator` agent",
@@ -1172,9 +1238,9 @@ def main() -> None:
             "coordinator-assigned plan artifacts",
             "`status`, `artifact_pointers`",
         ),
-        "implementer": ("plan/tasks/Task-N.md", "never preload sibling tasks"),
-        "tester": ("plan/tasks/Task-N.md", "fixed testing prose within 40 lines"),
-        "qa": ("plan/tasks/Task-N.md", "fixed report prose within 30 lines"),
+        "implementer": ("assigned role packet", "never preload sibling tasks"),
+        "tester": ("assigned task shard", "fixed testing prose within 40 lines"),
+        "qa": ("assigned task shard", "fixed report prose within 30 lines"),
         "security": ("security-relevant task shards", "fixed prose within 20 lines"),
         "delivery": ("plan/delivery.md", "within 60 lines and 12 KB"),
     }
@@ -1223,6 +1289,67 @@ def main() -> None:
         if marker not in observability:
             fail(f"low-cost event contract is missing {marker!r}")
 
+    native_observability = (
+        ROOT / "plugins/team-harness/skills/pipeline/references/observability.md"
+    ).read_text()
+    trace_canonical = (ROOT / "skills/trace/SKILL.md").read_text()
+    trace_projection = (ROOT / "plugins/team-harness/skills/trace/canonical.md").read_text()
+    trace_opencode_projection = (
+        ROOT / "installer-assets/opencode-skills/trace/canonical.md"
+    ).read_text()
+    for marker in (
+        "codex_usage_checkpoint",
+        "codex_usage_delta",
+        "CHECKPOINT_UNAVAILABLE",
+        "never write either one",
+        "Cost: unavailable",
+        '"currency": "USD"',
+        '"effective_from"',
+    ):
+        if marker not in native_observability:
+            fail(f"native Codex observability contract is missing {marker!r}")
+    for marker in (
+        "not native Codex lifecycle telemetry",
+        "`agent.spawn`",
+        "`agent.close`",
+        "`agent.correction.spawn`",
+        "`context_strategy: fresh|continued`",
+        "`follow_up_count`",
+        "codex_agent_attempt_metrics",
+        "PER_ATTEMPT_METRICS_UNAVAILABLE",
+        "cached_input_per_approved_ac",
+        "does not create or promise such telemetry",
+    ):
+        if marker not in native_observability:
+            fail(f"native Codex lifecycle contract is missing {marker!r}")
+    for label, text in (
+        ("canonical trace", trace_canonical),
+        ("Codex trace projection", trace_projection),
+        ("opencode trace projection", trace_opencode_projection),
+    ):
+        for marker in (
+            "Cost: unavailable",
+            "exact, case-sensitive tuple",
+            "reasoning_output_tokens",
+            "Native Codex branch — selected only by `usage.kind`",
+            "Never infer provider/model/rate",
+            "~/.claude/.team-harness.json",
+            "tokens_estimated",
+            "Static opus-agent fallback",
+            "price table not configured",
+        ):
+            if marker not in text:
+                fail(f"{label} is missing native/legacy cost marker {marker!r}")
+        for marker in (
+            "Declared Codex lifecycle efficiency — selected only by `agent.*`",
+            "PER_ATTEMPT_METRICS_UNAVAILABLE",
+            "Cached-input per approved AC",
+            "the legacy output above unchanged",
+            "never changes the legacy Claude cost",
+        ):
+            if marker not in text:
+                fail(f"{label} is missing lifecycle observability marker {marker!r}")
+
     # Activation and pipeline skills carry the same generated-agent identity
     # digests. Verify both tables against the actual normalized TOML bytes.
     def digest_table(text: str) -> dict[str, str]:
@@ -1235,8 +1362,18 @@ def main() -> None:
 
     activation_digests = digest_table(activation)
     pipeline_digests = digest_table(pipeline)
+    expected_updated_digests = {
+        "architect": "f11ceef09bfb9d2839eb2d25adb05d4dcc1188dfacf11e355a9a291c4fcf816f",
+        "implementer": "40a562d3f483502298b3f9ea22de10b9b14839df0d347618a33d3983c8694571",
+        "tester": "e15a282b65847c046306aaa2f056cbfc5e3978d38fa5f7610e9fedd5394fe529",
+        "qa": "693b4396f1ca3257ae8fed68f977dc61bb9426af3fdee0201ba872c17db485c8",
+        "security": "e89425e782a1ad47c32a2e210adaa7ecbe2880dc9c4fcd5a6cf3f509ef590064",
+        "delivery": "1c09a83ea425a6aac283f38406f40ab66954f11ccfe244364afc2177fb54085c",
+    }
     if set(activation_digests) != pipeline_roles or activation_digests != pipeline_digests:
         fail("pipeline and activation skill digest tables are not synchronized")
+    if activation_digests != expected_updated_digests:
+        fail("pipeline identity digest table does not match the approved projection set")
     for role, expected_digest in activation_digests.items():
         normalized = (ROOT / f".codex/agents/{role}.toml").read_bytes().replace(
             b"\r\n", b"\n"

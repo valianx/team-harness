@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.7.0] - 2026-08-02
+
+### Added
+
+- Added native Codex usage attribution and a provenance-attested isolated benchmark runner for
+  comparing pipeline efficiency without provider pricing or shared plugin state.
+
+### Changed
+
+- Made fresh V2 specialist attempts the default, closed terminal sessions, lowered rotation
+  thresholds, and required fresh verification after implementation changes.
+- Reserved bounded command capture for large, verbose, or volume-unknown intermediate output;
+  routine commands with small bounded results now execute directly.
+- Enabled multi-agent V2 during Codex setup and mapped Opus roles to Sol/xhigh, Sonnet roles to
+  tiered Terra high/medium, and Haiku roles to Terra/low without overriding Main's selected model.
+
+### Fixed
+
+- Wired the deterministic force-push floor into the installed Codex hook chain so force flags,
+  force-with-lease, `+refspec`, and reconstructed forms remain denied after Gate 3 ship.
+
 ## [3.6.8] - 2026-08-02
 
 ### Fixed

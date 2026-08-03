@@ -143,9 +143,10 @@ specialists:
 
 | Claude role metadata | Codex model | Effort |
 |---|---|---|
-| `opus` + `xhigh` | `gpt-5.6-sol` | `xhigh` |
-| other `opus` | `gpt-5.6-sol` | `xhigh` |
-| non-`opus` | `gpt-5.6-luna` | `max` |
+| `opus` | `gpt-5.6-sol` | `xhigh` |
+| `sonnet` + `high` or `xhigh` | `gpt-5.6-terra` | `high` |
+| `sonnet` + `medium` | `gpt-5.6-terra` | `medium` |
+| `haiku` | `gpt-5.6-terra` | `low` |
 
 `.codex/README.md` is the generated roster. After editing canonical role
 metadata or adapters, run `$sync-codex-agents`; do not hand-edit generated TOML.
@@ -153,6 +154,78 @@ metadata or adapters, run `$sync-codex-agents`; do not hand-edit generated TOML.
 Codex's native sandbox and permission path remain authoritative. Only
 deterministic deny floors emit a hook decision; hook-level `ask` and classifier
 `allow` are never translated into authorization.
+
+## Controlled pipeline-efficiency A/B benchmark
+
+`tests/evidence/codex-pipeline-efficiency.md` is the reproducible protocol and
+run ledger for the Codex pipeline-efficiency benchmark. It compares a fixed
+baseline with the candidate worktree; it is not a CI timing test and a source
+change alone never implies an efficiency result.
+
+The baseline is immutable (`e31bbd7eb26d24b5075803bed2e3b74621eedd24`). For
+each of the three cases, A and B must start from separate, freshly created
+worktrees. B is a materialization of the candidate's tracked and non-ignored
+untracked working-tree content over that baseline. The benchmark must neither
+fetch, pull, merge, rebase, nor otherwise synchronize `main` while it runs.
+
+Both sides use the same resolved `codex` executable and version, the same
+`gpt-5.6-terra` model and explicitly selected reasoning effort, the same sealed
+prompt digest, and the same live gate decisions. The raw prompt, operator
+messages, session/thread IDs, rollout paths, raw JSONL, command transcript,
+and diff are private measurement inputs: they are not copied into the evidence
+artifact. The artifact records only allowlisted totals, statuses, hashes, and
+quality receipts.
+
+The working-tree contents alone do not prove which plugin runtime an invocation
+uses. A valid pipeline comparison must attest that A loads the fixed installed
+3.6.8 snapshot and B loads the materialized/installed candidate snapshot, while
+both invoke `@Team-Harness pipeline` with equivalent live decisions. If either
+cell falls back to the same installed plugin, or runs direct mode, the run is
+diagnostic-only and cannot support an efficiency conclusion.
+
+Before any live cell, run the local provenance preflight with two explicit,
+existing source roots, an empty safe run root, the private prompt file, and the
+already resolved `codex` executable:
+
+```bash
+node tests/benchmark_codex_pipeline_efficiency.mjs \
+  --baseline-source-root "$BASELINE_SOURCE_ROOT" \
+  --candidate-source-root "$CANDIDATE_SOURCE_ROOT" \
+  --run-root "$RUN_ROOT" \
+  --prompt-file "$PROMPT_FILE" \
+  --codex "$CODEX_RESOLVED"
+```
+
+The preflight never fetches or changes either source root, never invokes an A/B
+`codex exec`, and never creates a quality verdict. It requires distinct source
+plugin tree hashes, an explicit `@Team-Harness pipeline` prompt, two isolated
+`CODEX_HOME`s under an empty `/tmp/team-harness-codex-efficiency-ab.*` root,
+the locally installed cache/provenance match for each side, and the complete
+six-agent pipeline roster. Its only output is a closed allowlisted receipt.
+`status: "PASS"` means **measurement permitted**, not savings demonstrated or
+quality accepted. A live comparison still requires that PASS plus the same
+live gate decisions, independent quality receipts, Freeze, and mandatory
+suites for both cells.
+
+Copy the Task 1 collector once into the isolated benchmark root, hash it, and
+use that exact external copy for both sides. A result is comparable only after
+the collector has passed its root-reachable native-discovery self-check for the
+same CLI release. Collect the token components through checkpoint deltas;
+`reasoning_output_tokens` remains a reported dimension and is never added to
+`total_tokens` again. Wall time, native tool calls, waits, captured-stream
+bytes, compactions, decision rounds, and workspace bytes are independently
+counted from the same externally captured run. If any required native field is
+absent or cannot be stably identified, record it as unavailable rather than
+deriving a plausible value.
+
+The quality floor is independent of cost measurement: both cells must have the
+same acceptance-criterion PASS receipt, green mandatory suites, no new
+Critical/High security finding, an unchanged frozen semantic outcome, and a
+complete human-visible preview. A quality failure rejects B. Missing,
+non-comparable, or unavailable measurement does not become a pass or a price
+estimate; it leaves the candidate not demonstrated. USD is always rendered as
+`Cost: unavailable` unless a separate exact provider/model/dimension/currency
+price tuple, source, and effective date are available.
 
 ## Verify
 

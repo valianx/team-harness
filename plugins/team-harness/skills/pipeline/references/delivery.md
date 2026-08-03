@@ -45,4 +45,9 @@ not a new Team Harness decision or gate.
 
 Poll mergeability once with bounded `UNKNOWN` backoff and report the current CI
 snapshot without waiting. Set `phase: complete` only after terminal artifacts and
-the PR are present; otherwise record the precise recoverable failure.
+the PR are present; otherwise record the precise recoverable failure. Before
+that terminal state transition, close delivery with the measured or unavailable
+`phase.end` from [observability.md](observability.md), update the same current
+usage/cost aggregate as every other phase, and rewrite the summary from the
+trace. A missing native root identifier yields an unavailable result; it never
+authorizes an estimate, a reused subtotal, or a price inference.

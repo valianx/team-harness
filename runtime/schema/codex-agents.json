@@ -13,6 +13,14 @@
       "~/go/pkg/mod"
     ]
   },
+  "project_defaults": {
+    "default_subagent_model": "gpt-5.6-terra",
+    "default_subagent_reasoning_effort": "medium",
+    "features": {
+      "multi_agent": true,
+      "multi_agent_v2": true
+    }
+  },
   "allowed_capabilities": [
     "filesystem-read",
     "filesystem-write",
@@ -27,18 +35,23 @@
   "allowed_runtime_reasoning_efforts": ["low", "medium", "high", "xhigh", "max"],
   "projection_tiers": [
     {
-      "name": "opus-xhigh",
+      "name": "opus",
       "source_models": ["opus"],
-      "source_efforts": ["xhigh"]
+      "source_efforts": ["medium", "high", "xhigh"]
     },
     {
-      "name": "opus-other",
-      "source_models": ["opus"],
-      "source_efforts": ["medium", "high"]
+      "name": "sonnet-high",
+      "source_models": ["sonnet"],
+      "source_efforts": ["high", "xhigh"]
     },
     {
-      "name": "non-opus",
-      "source_models": ["sonnet", "haiku"],
+      "name": "sonnet-medium",
+      "source_models": ["sonnet"],
+      "source_efforts": ["medium"]
+    },
+    {
+      "name": "haiku",
+      "source_models": ["haiku"],
       "source_efforts": ["medium", "high", "xhigh"]
     }
   ],
@@ -47,17 +60,21 @@
     "team-harness": {
       "inherit_parent": false,
       "tiers": {
-        "opus-xhigh": {
+        "opus": {
           "model": "gpt-5.6-sol",
           "reasoning_effort": "xhigh"
         },
-        "opus-other": {
-          "model": "gpt-5.6-sol",
-          "reasoning_effort": "xhigh"
+        "sonnet-high": {
+          "model": "gpt-5.6-terra",
+          "reasoning_effort": "high"
         },
-        "non-opus": {
-          "model": "gpt-5.6-luna",
-          "reasoning_effort": "max"
+        "sonnet-medium": {
+          "model": "gpt-5.6-terra",
+          "reasoning_effort": "medium"
+        },
+        "haiku": {
+          "model": "gpt-5.6-terra",
+          "reasoning_effort": "low"
         }
       }
     }
