@@ -63,10 +63,11 @@ If `audit_required` is absent or false, return `status: blocked` and `failure_ki
 
 The audit result never starts an autonomous patch loop. A reachable `broke-it`
 result, or sensitive coverage that is incomplete for a changed control, is a
-final-result finding: return it to the implementation executor, reopen Freeze,
-and require a fresh audit of the corrected delta. A contradiction between intent,
-scope, and AC is sent to the operator for a design decision; outward `ship`,
-`amend`, or `abort` decisions remain the coordinator's gate.
+final-result finding: return it to Main and stop. Main waits for all lenses,
+consolidates the complete package, and presents the mandatory correction
+decision. A contradiction between intent, scope, and AC is sent to the operator
+for a decision; outward `ship`, `amend`, or `abort` decisions remain the
+coordinator's gate.
 
 ## Inputs and read order
 
@@ -123,11 +124,13 @@ record all four coordinates below in the report and status block:
 - **Cause:** the reachable precondition and observed failure (or unavailable coverage).
 - **Files:** changed source, test, and report paths with `file:line` evidence.
 - **AC:** the exact approved AC identifiers implicated.
-- **Correction:** the smallest concrete implementation or evidence fix and its owner.
+- **Suggested correction:** the smallest advisory implementation or evidence fix.
 
-The coordinator routes these findings to implementation, marks Freeze reopened,
-and schedules a fresh audit of the changed delta. Do not rewrite an AC or claim a
-negative audit result is certification.
+The coordinator includes these findings in the complete validation package and
+waits for the mandatory correction decision. Normal or ineligible autonomous paths require a
+fresh live operator decision; only the closed eligible `gate1-autonomous` path may authorize the
+bounded exception without another live reply. Do not rewrite an AC or claim
+a negative audit result is certification.
 
 ## Report contract
 
@@ -167,16 +170,12 @@ Use this compact structure:
 - **Cause:** {concrete failure or unavailable coverage}
 - **Files:** {changed source, test, and report paths with file:line evidence}
 - **AC:** {exact implicated AC identifiers}
-- **Correction:** {smallest concrete fix and owner}
+- **Suggested correction:** {smallest advisory fix and likely owner}
 - **Verdict:** broke-it | could-not-break {and why incomplete, only when applicable}
 
 ## Limits
 {Unavailable runtime, infrastructure, evidence, or coverage. State "none material" when complete.}
 
-## Routing
-**Correction route:** implementation | operator-decision | none
-**Freeze:** reopened | unchanged
-**Re-audit:** required | not-required
 ```
 
 Target approximately `800 + 600 × in-scope control count` output tokens. This is format guidance, never permission to omit controls or evidence. Expand an actionable break when compression would obscure its precondition or impact.
@@ -208,10 +207,7 @@ packet_escapes: N
 packet_integrity: ok | stale | mismatch | n-a
 tools: read:N write:N edit:N grep:N glob:N
 issues: {break titles, coverage gap, or "none"}
-finding_summary: [{cause, files, ac, correction}] | none
-correction_route: implementation | operator-decision | none
-freeze_reopened: true | false
-reaudit_required: true | false
+finding_summary: [{cause, files, ac, suggested_correction}] | none
 ```
 
 On `failed` or `blocked`, omit unsupported verdict fields. `broke-it` and incomplete coverage are successful audit outcomes, not execution failures; never create `failure-brief.md`.

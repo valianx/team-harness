@@ -72,11 +72,12 @@ only correlation mechanism. Its value grammar is
 | `agent.close` | The same identity fields, final `follow_up_count`, `status`, `quality_verdict`, and `attempt_metrics` | Exactly one closes an open ordinal. A terminal close cannot later receive a continued dispatch. |
 | `agent.correction.spawn` | The spawn fields plus `correction_cause: verification` | Starts a new, strictly larger ordinal with `context_strategy: fresh` and `follow_up_count: 0`, only after the prior related attempt is closed. The bounded correction packet is prompt-only and never becomes an artifact. |
 
-There is no standalone follow-up event. Each deliberate continuation is another
-`agent.spawn` declaration with `context_strategy: continued`; the final
-`agent.close` repeats the accumulated count. A correction never revives a
-terminal attempt. This is the durable form of the fresh-session rule, not a
-claim that a native alias has been observed.
+There is no standalone follow-up event. New pipeline runs never emit a
+deliberate continuation: every spawn uses `context_strategy: fresh` and
+`follow_up_count: 0`. Historical `continued` records remain readable for
+backward-compatible metrics only. A correction never revives a terminal
+attempt. This is the durable form of the fresh-session rule, not a claim that a
+native alias has been observed.
 
 `quality_verdict` on `agent.close` is one of
 `pass|concerns|fail|n-a`. Use `n-a` unless an already-bounded specialist result

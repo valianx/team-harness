@@ -7,7 +7,10 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import os
 import re
+import secrets
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -30,6 +33,187 @@ BOT_STATUS_PATTERNS = (
 
 class ContextError(RuntimeError):
     """Raised when a trustworthy context cannot be captured."""
+
+
+SAFE_LEAF_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
+DIRECTORY = getattr(os, "O_DIRECTORY", 0)
+
+
+def _safe_leaf(name: str) -> str:
+    if name in {".", ".."} or not SAFE_LEAF_RE.fullmatch(name):
+        raise ContextError("artifact leaf name is not safe")
+    return name
+
+
+def _open_directory(path: Path) -> tuple[Path, int]:
+    if path.is_symlink():
+        raise ContextError("artifact directory must not be a symlink")
+    resolved = path.resolve(strict=True)
+    try:
+        fd = os.open(resolved, os.O_RDONLY | DIRECTORY | NOFOLLOW)
+    except OSError as error:
+        raise ContextError("cannot open trusted artifact directory") from error
+    if not stat.S_ISDIR(os.fstat(fd).st_mode):
+        os.close(fd)
+        raise ContextError("trusted artifact root is not a directory")
+    return resolved, fd
+
+
+def _regular_stat_at(directory_fd: int, name: str) -> os.stat_result:
+    try:
+        value = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+    except OSError as error:
+        raise ContextError("cannot inspect artifact leaf") from error
+    if not stat.S_ISREG(value.st_mode):
+        raise ContextError("artifact leaf is not a regular file")
+    return value
+
+
+def safe_read_leaf(root: Path, name: str, *, limit: int = 2_000_000) -> bytes:
+    name = _safe_leaf(name)
+    _, directory_fd = _open_directory(root)
+    try:
+        before = _regular_stat_at(directory_fd, name)
+        try:
+            leaf_fd = os.open(name, os.O_RDONLY | NOFOLLOW, dir_fd=directory_fd)
+        except OSError as error:
+            raise ContextError("cannot open artifact leaf without following links") from error
+        try:
+            after = os.fstat(leaf_fd)
+            if not stat.S_ISREG(after.st_mode) or (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+                raise ContextError("artifact leaf changed before secure read")
+            chunks: list[bytes] = []
+            total = 0
+            while True:
+                chunk = os.read(leaf_fd, min(65_536, limit + 1 - total))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                total += len(chunk)
+                if total > limit:
+                    raise ContextError("artifact leaf exceeds safe read limit")
+            return b"".join(chunks)
+        finally:
+            os.close(leaf_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def promote_artifact(root: Path, temporary_name: str, final_name: str) -> None:
+    temporary_name = _safe_leaf(temporary_name)
+    final_name = _safe_leaf(final_name)
+    _, directory_fd = _open_directory(root)
+    try:
+        before = _regular_stat_at(directory_fd, temporary_name)
+        try:
+            temporary_fd = os.open(
+                temporary_name,
+                os.O_RDONLY | NOFOLLOW,
+                dir_fd=directory_fd,
+            )
+        except OSError as error:
+            raise ContextError("cannot pin temporary artifact without following links") from error
+        staging: str | None = None
+        try:
+            pinned = os.fstat(temporary_fd)
+            if not stat.S_ISREG(pinned.st_mode) or (before.st_dev, before.st_ino) != (pinned.st_dev, pinned.st_ino):
+                raise ContextError("temporary artifact changed before promotion")
+            try:
+                final = os.stat(final_name, dir_fd=directory_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                final = None
+            except OSError as error:
+                raise ContextError("cannot inspect final artifact leaf") from error
+            if final is not None and not stat.S_ISREG(final.st_mode):
+                raise ContextError("final artifact leaf is not a regular file")
+            current = _regular_stat_at(directory_fd, temporary_name)
+            if (current.st_dev, current.st_ino) != (pinned.st_dev, pinned.st_ino):
+                raise ContextError("temporary artifact changed during promotion")
+            staging = f"tmp-pinned-{secrets.token_hex(16)}"
+            try:
+                os.link(
+                    temporary_name,
+                    staging,
+                    src_dir_fd=directory_fd,
+                    dst_dir_fd=directory_fd,
+                    follow_symlinks=False,
+                )
+            except OSError as error:
+                raise ContextError("cannot link pinned temporary artifact") from error
+            staged = _regular_stat_at(directory_fd, staging)
+            if (staged.st_dev, staged.st_ino) != (pinned.st_dev, pinned.st_ino):
+                os.unlink(staging, dir_fd=directory_fd)
+                raise ContextError("pinned staging artifact identity mismatch")
+            os.replace(
+                staging,
+                final_name,
+                src_dir_fd=directory_fd,
+                dst_dir_fd=directory_fd,
+            )
+            promoted = _regular_stat_at(directory_fd, final_name)
+            if (promoted.st_dev, promoted.st_ino) != (pinned.st_dev, pinned.st_ino):
+                raise ContextError("promoted artifact identity mismatch")
+            try:
+                leftover = os.stat(temporary_name, dir_fd=directory_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                leftover = None
+            if leftover is not None and (leftover.st_dev, leftover.st_ino) == (pinned.st_dev, pinned.st_ino):
+                os.unlink(temporary_name, dir_fd=directory_fd)
+        except OSError as error:
+            raise ContextError("cannot atomically promote artifact leaf") from error
+        finally:
+            if staging is not None:
+                try:
+                    os.unlink(staging, dir_fd=directory_fd)
+                except FileNotFoundError:
+                    pass
+            os.close(temporary_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def ensure_workspaces_ignored(repo_root: Path) -> None:
+    resolved, directory_fd = _open_directory(repo_root)
+    del resolved
+    name = ".gitignore"
+    try:
+        try:
+            current = safe_read_leaf(repo_root, name, limit=1_000_000)
+            mode = _regular_stat_at(directory_fd, name).st_mode & 0o777
+        except ContextError:
+            try:
+                existing = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                current = b""
+                mode = 0o644
+            else:
+                if not stat.S_ISREG(existing.st_mode):
+                    raise ContextError(".gitignore is not a regular non-symlink file")
+                raise
+        try:
+            text = current.decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise ContextError(".gitignore is not UTF-8 text") from error
+        if any(line in {"/workspaces", "/workspaces/"} for line in text.splitlines()):
+            return
+        updated = current
+        if updated and not updated.endswith(b"\n"):
+            updated += b"\n"
+        updated += b"/workspaces/\n"
+        temporary = f".gitignore.team-harness-{secrets.token_hex(8)}"
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW
+        temporary_fd = os.open(temporary, flags, mode, dir_fd=directory_fd)
+        try:
+            view = memoryview(updated)
+            while view:
+                view = view[os.write(temporary_fd, view):]
+            os.fsync(temporary_fd)
+        finally:
+            os.close(temporary_fd)
+        os.replace(temporary, name, src_dir_fd=directory_fd, dst_dir_fd=directory_fd)
+    finally:
+        os.close(directory_fd)
 
 
 def run_json(command: list[str], *, cwd: Path | None = None) -> Any:
@@ -794,6 +978,21 @@ def command_select_security(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_ensure_workspaces_ignore(args: argparse.Namespace) -> int:
+    ensure_workspaces_ignored(args.repo_root)
+    return 0
+
+
+def command_promote_artifact(args: argparse.Namespace) -> int:
+    promote_artifact(args.artifact_root, args.temporary_name, args.final_name)
+    return 0
+
+
+def command_safe_read(args: argparse.Namespace) -> int:
+    sys.stdout.buffer.write(safe_read_leaf(args.artifact_root, args.name, limit=args.max_bytes))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -827,6 +1026,22 @@ def build_parser() -> argparse.ArgumentParser:
     security_parser.add_argument("--explicit-security", action="store_true")
     security_parser.add_argument("--tier", type=int)
     security_parser.set_defaults(func=command_select_security)
+
+    ignore_parser = subparsers.add_parser("ensure-workspaces-ignore")
+    ignore_parser.add_argument("--repo-root", required=True, type=Path)
+    ignore_parser.set_defaults(func=command_ensure_workspaces_ignore)
+
+    promote_parser = subparsers.add_parser("promote-artifact")
+    promote_parser.add_argument("--artifact-root", required=True, type=Path)
+    promote_parser.add_argument("--temporary-name", required=True)
+    promote_parser.add_argument("--final-name", required=True)
+    promote_parser.set_defaults(func=command_promote_artifact)
+
+    read_parser = subparsers.add_parser("safe-read")
+    read_parser.add_argument("--artifact-root", required=True, type=Path)
+    read_parser.add_argument("--name", required=True)
+    read_parser.add_argument("--max-bytes", type=int, default=2_000_000)
+    read_parser.set_defaults(func=command_safe_read)
     return parser
 
 

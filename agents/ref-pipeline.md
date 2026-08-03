@@ -112,7 +112,7 @@ design → waiting_gate1 → implementation → validation → waiting_gate3 →
    │          │                 │              │               │             │
    │          │                 │              │               │             └─ external/precondition failure → blocked
    │          │                 │              │               └─ amend → implementation
-   │          │                 │              └─ defect in scope → implementation
+   │          │                 │              └─ failed fan → operator correction decision
    │          │                 └─ constraint changes behaviour → operator decision
    │          └─ edit/reject → design; explicit cancellation → aborted
    └─ invalid artifact → normal design correction; real ambiguity → blocked
@@ -129,10 +129,14 @@ security audit → validation`; architect is prohibited unless the live operator
 and explicitly requests architect work; `iteration` delta: `0`. Any other semantic plan
 defect pauses for one bounded live operator decision, is transcribed by the coordinator,
 and continues the same route (`route: decision`; `owner: main`; `phase: implementation`;
-`architect: explicit-only`; `gate: none`; `iteration delta: 0`). A correctable code, test, documentation, hygiene, or
-security defect consumes one implementation/validation correction round and follows the
-same route (`route: implementation`; `owner: implementation`; `phase: implementation`;
-`architect: prohibited`; `gate: none`; `iteration delta: +1`). Only an explicit live operator
+`architect: explicit-only`; `gate: none`; `iteration delta: 0`). Correctable code, test,
+documentation, hygiene, or security defects join the complete failed fan and pause
+(`route: implementation`; `owner: main`; `phase: validation`; `architect: prohibited`;
+`gate: none`; `iteration delta: +1`). Missing or insufficient evidence joins that same
+package (`route: evidence`; `owner: main`; `phase: validation`; `architect: prohibited`;
+`gate: none`; `iteration delta: +1`). In both rows, the delta applies only after either the live
+operator authorizes choice `1` or the closed eligible autonomous predicate records a bound
+`gate1-autonomous` authorization. Only an explicit live operator
 request for architect work permits `design` and a new Gate 1 (`route: architect-request`;
 `owner: main`; `phase: design`; `architect: allowed`; `gate: new-gate1`; `iteration delta: 0`).
 
@@ -262,9 +266,9 @@ One taxonomy for everything that can go wrong, so the budget question is answere
 | `stale-context` | A snapshot-bound result names a missing or different reviewed head/context identity than its dispatch | review coordinator | no retry against the old snapshot; recapture and re-dispatch under the owning freshness barrier | STOP without publishing if a fresh snapshot cannot be established |
 | `artifact-missing` | A required output **file** is absent, empty, or unparseable while the dispatch reported success | the owning specialist | re-dispatch once | STOP; never author the missing artifact yourself |
 | `execution-failed` | The specialist ran, hit an internal error it cannot classify further, and says so | the specialist | re-dispatch once, carrying the literal error plus its `summary` and `issues` | STOP with those surfaced verbatim |
-| `verification-negative` | A verifying lens returned `fail`/`concerns` over real work — the pipeline produced a defect | implementer | counts against the **max-3** iteration budget | escalate with a `git stash` safety snapshot |
+| `verification-negative` | A verifying lens returned `fail`/`concerns` over real work — the pipeline produced a defect | operator correction decision | counts against the **max-3** limit only after authorization | pause with the consolidated failure; at `3/3`, only an explicitly labelled exceptional decision may authorize one more round |
 | `build-or-lint` | A build or lint command exited non-zero at the implementation Freeze checkpoint | implementer | **max 2** attempts, a budget separate from max-3 | `status: blocked` with the full output |
-| `hygiene-fail` | `qa` returned `code_hygiene: fail` | implementer | shares the **max-3** iteration budget | as `verification-negative` |
+| `hygiene-fail` | `qa` returned `code_hygiene: fail` | operator correction decision | shares the **max-3** limit only after authorization | as `verification-negative` |
 | `contradiction` | The finding cannot be resolved without a decision that is not yours | **operator** | no budget — never becomes a correction round | escalate in the same presentation as any fixable items |
 | `reclassification-needed` | The task is not the type or tier it was dispatched as | **operator** | no budget | STOP with `recommended_type`/`recommended_tier` and the evidence; never auto-route |
 
@@ -274,7 +278,7 @@ One taxonomy for everything that can go wrong, so the budget question is answere
 
 **Scope expansion, and which half of it reaches this table.** `scope_expansion: new-information` is a *successful* classification of something genuinely unknowable at freeze time: the work continues at a re-frozen boundary, it carries its own max-2 bound (§ Scope-freeze convergence gate), and it never appears here — nothing went wrong. `scope_expansion: known-at-freeze` is different: `architect` returns it as `status: blocked` with `failure_kind: contradiction` and a `proposed_scope`, **without having written the revised plan**, because the omission has to reach the operator before it is absorbed into an artifact. That is a real table row — the blocker is a decision that is not the coordinator's — and like every `contradiction` it carries **no budget**. "Budget-neutral" is what "not a failure" means for it; do not read it as "do not block".
 
-**Three invariants across the table.** (a) The separate budgets — max-3 iterations, max-2 build/lint — never draw from each other; a kind consumes only its own. (b) The last two kinds have no budget at all, because the blocker is a missing decision and additional attempts cannot produce one. Spending an iteration on either is the failure mode this table exists to prevent. (c) Nothing an **operator** asks for is a failure of any kind: an operator ruling, edit or change of direction is a transition, and it never consumes a budget in this table.
+**Three invariants across the table.** (a) A correction budget is a limit, never authority: `iteration < 3` and generic continuation text cannot dispatch work. Only a valid `approved-autonomous` Gate-1 dual record plus the closed eligibility predicate may supply bounded autonomous authority. (b) Decision-bearing kinds have no retry budget because additional attempts cannot produce the missing decision. (c) A correction round begins only after one fresh package-bound decision and consumes exactly that one authorization.
 
 **Every specialist reports its kind.** A status block with `status: failed` or `status: blocked` carries `failure_kind: <one of the above>`. A returned failure with no kind is `invalid-return` — the missing thing is a field, not a file. Re-dispatch once naming the field, and never guess the kind on the specialist's behalf: the whole point is that the agent that hit the failure is the one that knows which it was.
 
@@ -297,41 +301,66 @@ You present every STAGE-GATE to the operator inline and record its release. Cont
 
 ## Iteration rules
 
-**Mandatory loops:** a correctable validation finding → implementation fixes → Freeze →
-validation, never skipped. A structural contradiction discovered after implementation is
-presented to the operator; its decision continues at `implementation` unless the live
-operator separately and explicitly requests architect work. Only that request may open
-`design` and a new Gate 1. Plan repairs and operator decisions never create an automatic
-design-perfection loop.
+**Mandatory full fan and triage:** a failed validation fan completes all required lenses,
+then consolidates and triages the complete finding package. Under normal approval it
+pauses at `phase: validation` until the operator authorizes exactly one round. Under a
+valid `approved-autonomous` dual record, Main may authorize one fresh round only when
+every closed eligibility conjunct passes and `iteration < 3`. Plan repairs and decisions
+never create an automatic design-perfection loop.
 
-**Max 3 per loop.** On exceed: `git stash push -m "pipeline-rollback-{feature}-iter3"`, try an alternative, else escalate with the stash reference.
+**Max 3 is a limit, never permission.** At `3/3`, the standard path is pause or abort. An
+exceptional round exists only while `exceptional_correction_count: 0` and when option `1` is explicitly labelled exceptional in the
+post-failure presentation and selected by the live operator. Set
+`correction_exceptional: true` on that presentation, its decision, and the one authorized
+`iteration.start`/`agent.correction.spawn` pair; ordinary decisions use `false`. Increment
+the separate exceptional counter to `1` only for that matching authorize record. Every later
+failure offers only pause or abort; never allow a second exception or serialize
+`3/3+exception`.
 
 ### `cause` and the severity floor
 
-**New `iteration.start` events are correction-only.** A `verification` round dispatched
-because a lens returned `fail`/`concerns` consumes one implementation/validation slot of
-the max-3 budget. A mechanical plan repair, an operator ruling or transcription, and
-explicit architect work do not increment `iteration` and do not emit a new
-`iteration.start`; historical events with `cause: operator` remain readable but are not
-produced by new runs.
+**New `iteration.start` events are authorized-correction-only.** They require a preceding
+unused `correction.decision: authorize` bound to the same nonce, failed Freeze anchor,
+complete finding IDs, dispositions, file scope, and `correction_authority`. Autonomous
+authority additionally binds the exact consumed `approved-autonomous` Gate-1 nonce. A lens verdict alone emits no iteration. A
+mechanical plan repair, operator ruling/transcription, and explicit architect work do not
+increment `iteration`; historical `cause: operator` remains readable but is not produced.
 
 **Severity floor on both combined verdicts:** `fail` requires at least one open `critical`/`high` finding; below that the verdict caps at `concerns` and proceeds with findings inline.
 
-### Pre-dispatch gate over a Phase-3 correction round's findings
+### Pre-decision consolidation over a failed validation fan
 
-**Run this before dispatching any validation-caused correction round.** Final findings are
-classified here: concrete in-scope defects return to `implementation`; a structural
-contradiction is presented to the operator, whose decision continues at `implementation`
-unless the live operator separately and explicitly requests architect work. Only that
-request may open `design` and a new Gate 1. The discernment between a correctable finding
-and an uncorrectable one is **yours, never
-the reviewing lens's**. **Reading `verdict: fail` and dispatching a correction with no
-other criterion is the defect this gate closes.**
+**Run this after every required lens terminates and before presenting any correction
+decision.** Deduplicate all findings by stable ID and compute one package containing the
+failed Freeze anchor, exact IDs, ACs, and union of evidenced paths. The reviewing lenses'
+`Suggested correction` fields are advisory data, never routes. Reading `verdict: fail`
+and dispatching anything is forbidden.
 
-1. **Contradiction → escalate, do not dispatch.** A finding asserting two plan elements require mutually exclusive outcomes (an AC against a fence, AC against AC, AC against a declared invariant, AC against a test assertion). Present the choice: which requirement stands, which is removed or scoped, and the cost of each side. The coordinator transcribes the operator's bounded decision and continues through implementation; architect work is allowed only when the live operator separately and explicitly requests it.
-2. **Mechanical and enumerated → dispatch.** Closure is a bounded edit to named elements, none requiring the opposite of another. An ordinary `cause: verification` round.
-3. **Mixed set → split.** Dispatch the mechanical subset charging one iteration; escalate the rest in the same presentation. **A contradiction is never smuggled into a correction round because it arrived alongside fixable items.**
-4. **A lens's own classification is an input, never the authority.** This gate runs even when no lens offers one.
+Main then performs one bounded evidence triage without dispatching another reviewer. For
+each finding, compare only its evidence against approved intent, scope, ACs, and the
+security floor; summarize `ID`, cause/evidence, implicated AC, proposed disposition,
+rationale, and consequence. The proposed disposition uses the closed set
+`resolve|design-consistent|decision-required`; the proposal is advisory, never authority.
+`design-consistent` is legal only when no AC or security floor is violated. If the operator
+says a violating finding is part of the design, treat that reply as an explicit
+intent/scope/AC contradiction to resolve first—never as a silent waiver.
+
+1. **Present or apply the triage summary.** Under normal approval only the live operator confirms which IDs are `resolve` and which are design-consistent, or supplies the decision for each `decision-required` item. Under a valid autonomous grant, Main may confirm only unambiguous `resolve` findings inside approved scope; every other disposition pauses. Persist the authority and dispositions; Main never stretches its recommendation beyond that closed grant.
+2. **Contradiction → resolve before authorization.** Present the conflicting requirements and costs. Only the operator may resolve them; architect work still requires a separate explicit request.
+3. **Mechanical and enumerated → include together.** Do not split them into micro-rounds; one authorization covers the complete named `resolve` package and scope.
+4. **Mixed set → preserve all findings.** Resolve decision-bearing items first, then present one correction decision over the resulting complete package. Never dispatch a mechanical subset while another finding remains undecided.
+5. **Persist and authorize.** After every disposition is explicit, set the mandatory correction fields from the final `resolve` set and generate a fresh nonce. Under normal approval or when any autonomous eligibility conjunct fails, show exactly the following choices and stop:
+
+```text
+1 — authorize one correction round
+2 — pause without changes
+3 — abort pipeline
+```
+
+Under a valid `approved-autonomous` dual record, when every finding is an unambiguous in-scope
+`resolve`, the package is complete, no decision-bearing or ambiguous item remains, and
+`iteration < 3`, Main instead records one package-bound `gate1-autonomous` authorization without
+a live presentation. It then consumes that single decision through the same correction route.
 
 ### Remediation prefers removal or replacement over addition
 
@@ -353,17 +382,15 @@ This composes with, and does not weaken, "no removal without a named successor" 
 - {file:line} — {concrete fix}
 ```
 
-| Case | Blast radius | Producer | Verifier re-run | Coherence gate |
-|---|---|---|---|---|
-| A | localized | `implementer` BOUNDED-PATCH | `qa` only | `qa` on the patched AC |
-| A | structural | `implementer` full re-implement | `qa` full | standard acceptance gate |
-| B | localized | coordinator transcribes the bounded operator decision; `implementer` applies the approved correction | affected verifiers | on the corrected implementation |
-| B | structural | operator decision, coordinator transcription, then implementation correction | all verifiers | standard acceptance gate |
-| C | any | coordinator records the operator-approved AC resolution; `implementer` applies the resulting correction | all verifiers | standard acceptance gate |
+| Case | Blast radius | Authorized action | Required verification |
+|---|---|---|---|
+| A | localized or structural | live choice `1` or one eligible autonomous decision dispatches a fresh implementer over the complete package | new Freeze plus a fresh full tester/QA/adversary fan |
+| B | localized or structural | coordinator first transcribes the operator resolution; only the subsequent live choice `1` dispatches a fresh implementer | new Freeze plus a fresh full tester/QA/adversary fan |
+| C | any | coordinator first records the operator-approved AC resolution; only the subsequent live choice `1` dispatches a fresh implementer | new Freeze plus a fresh full tester/QA/adversary fan |
 
 **Default to `structural`** when the blast radius is absent, ambiguous, or you cannot confirm the named IDs are self-contained.
 
-**No security-lens iteration exists in this table.** A security concern surfacing mid-implementation is recorded in the brief and carried forward as audit context — it never spawns a `security`/`adversary` dispatch from this loop.
+No row authorizes a partial verifier rerun, agent reuse, or automatic dispatch.
 
 **Case B/C no longer authorize an automatic architect producer or a new Gate 1.** Their
 coordinator-owned transcription continues at implementation. A new design artifact and
@@ -372,21 +399,18 @@ work after Gate 1.
 
 **`code_hygiene: fail` is an implementation correction**, never a plan/criteria edit — a hygiene finding is never "the AC needs revision."
 
-### Cost-ordered re-run — R0 → R1 → R2
+### Authorized correction round
 
-Canonical: `docs/patch-mode.md § Cost-Ordered Patch-Iteration Re-Run Sequencing`. Applies to Case A `localized` only; it fixes the ORDER within one iteration, never which verifiers are eligible.
-
-**Ownership is by brief header, not by Case letter** — the owner is the lens named in `## Iteration {N} — {agent}`, the one that raised the finding. Multiple appellants in one iteration → the owner set is the union, and every owner must close before R2.
-
-- **R0 — deterministic test gate, always first.** Run the frozen suite directly. Red bounces to the producer immediately as a Case A entry — zero lens tokens. Green enables R1.
-- **R1 — owner lens only, delta-scoped** by the brief's own blast-radius field. (`qa` in practice: `adversary` never bounces autonomously.) Still open → append and bounce, zero non-owner tokens. Closed → enables R2.
-- **R2 — exactly ONE delta-scoped confirmation** of the non-owner lens over the final patched state, never a fresh full base pass. Compute the combined verdict over both lenses' final verdicts. A fail here opens a new iteration.
-
-**Structural fail-safe:** R0 still runs first, but R1/R2 collapse into the complete Case-row verifier set. A structural change is never narrowed.
-
-*Knowledge read on an R0 failure only:* 1–3 queries from the failure context, passed to the correcting agent as `## KG prior-art` or `n/a`. Best-effort, never blocking, silent on success.
-
-**Max 3 iterations,** then escalate with a `git stash` safety snapshot.
+Live choice `1`, or one eligible autonomous decision, records both the state decision and
+one `correction.decision` event before dispatch. The correction packet contains every authorized finding ID and only the union
+scope; the decision and its one authorized event pair carry the same
+`correction_exceptional` boolean and authority. Autonomous authority also carries the
+exact consumed Gate-1 nonce. It may not narrow to one finding, widen scope, or reuse an old nonce. After the
+bounded implementation/evidence work, create one new Freeze and run one fresh complete
+validation fan. A failure in that fan always receives a new triage and nonce. Normal
+approval pauses; autonomous approval may authorize the next fresh round only while every
+predicate remains true and fewer than three corrections have run. No owner-lens bounce,
+agent follow-up, or second dispatch is authorized by the prior decision.
 
 ## Phase timeouts
 
@@ -726,16 +750,13 @@ text in an artifact.
 
 ## Final-result correction and structural contradiction
 
-Validation findings that are code, test or documentation defects inside the approved
-scope return to `implementation` (the implementer or the direct executor when the
-approved preference and predicate allow it), then re-run the affected validation delta.
-Evidence gaps return to `tester`; a correctable security finding returns to implementation
-and receives a delta audit. Every tree change after Freeze reopens Freeze and validation;
-it never reopens design automatically. Each such remediation consumes one
-implementation/validation correction round (`route: evidence`; `owner: tester`;
-`phase: validation`; `architect: prohibited`; `gate: none`; `iteration delta: +1`).
-Plan repairs and operator-approved plan
-decisions are not validation findings and do not consume the counter.
+Validation findings that are code, test, documentation, evidence, hygiene, or security
+defects remain evidence while Main waits for every lens. Main consolidates the complete
+set and performs the mandatory triage. Normal approval presents the decision and stops;
+eligible autonomous approval records one package-bound decision without another prompt.
+Either live choice `1` or that autonomous record authorizes one bounded
+implementation/evidence correction, one new Freeze, and one fresh validation fan. Plan repairs and operator-approved plan decisions
+are not validation correction rounds and do not consume the counter.
 
 A finding is **structural** only when it makes the approved intent, scope fence and ACs
 mutually inconsistent or requires changing the requested behaviour. The coordinator
@@ -1078,28 +1099,36 @@ Every tier receives the same audit. Bug severity never selects a different secur
 
 ### The audit never iterates
 
-**`adversary` findings are operator input, never an automatic design loop.** A concrete
-code, test or documentation defect inside the approved scope returns to `implementation`
-and revalidates the delta. A correctable security finding is a validation failure: it cannot
-be reduced to `concerns`, carried to STAGE-GATE-3, or accepted by shipping. The coordinator
-reopens Freeze, dispatches the implementation correction, and requires a fresh audit of the
-changed delta before validation can advance. A structural contradiction is presented to the
+**`adversary` findings are operator input, never an automatic correction or design loop.**
+A concrete code, test, documentation, or security defect inside the approved scope is a
+validation failure: it cannot be reduced to `concerns`, carried to STAGE-GATE-3, or accepted
+by shipping. The coordinator waits for every lens, includes the finding in the complete
+package and applies the correction-decision rules. Under normal approval it presents the
+mandatory decision and stops; only live choice `1` may reopen implementation. Under an
+eligible autonomous grant, Main may instead bind one `gate1-autonomous` decision directly.
+Either authority opens exactly one fresh implementer, Freeze, and full
+tester/QA/adversary validation fan. A
+structural contradiction is presented to the
 operator; its decision continues at `implementation` unless the live operator separately
 and explicitly requests architect work. Only that request may open `design` and a new
 Gate 1.
 
+The resulting fresh full tester/QA/adversary fan includes a fresh security audit; no prior
+audit result is reused for a corrected sensitive finding.
+
 A `broke-it` break that is correctable within the approved scope **fails validation** and
-returns to `implementation` before Gate 3. A `could-not-break` carrying
-`incomplete_on_changed_control: true` on a sensitive pipeline is also a **fail-closed
-validation failure**, with the same implementation → Freeze → fresh-audit route. Only a
+is included in the complete consolidated failed validation package before Gate 3. A
+`could-not-break` carrying `incomplete_on_changed_control: true` on a sensitive
+pipeline is also a **fail-closed validation failure** in that package. Only a
 complete `could-not-break` or a finding explicitly classified as a non-correctable structural
 contradiction may remain a Gate-3 concern; neither case silently certifies changed controls.
 
-**Every correction re-audits the changed sensitive delta.** Whether the correction came
-from an operator `amend` or a correctable validation finding, fixes land in
-`implementation`, Freeze is rebuilt, and `validation` re-runs **delta-scoped** (`Scope:
-localized {files changed since the prior audit}`) alongside `qa`, never as an unrelated
-fresh full pass. Set `audit_run: {cause}-N`, where `{cause}` is `amend` or `correction` and
+**Every authorized correction receives a fresh full validation fan.** Whether the
+correction came from an operator `amend` or an explicitly authorized validation finding,
+fixes land in `implementation`, Freeze is rebuilt, and fresh tester, QA, and adversary
+attempts validate the new current anchor. The adversary's attack surface remains
+delta-scoped (`Scope: localized {files changed since the prior audit}`), but the pipeline
+fan is complete and no prior lens result is reused. Set `audit_run: {cause}-N`, where `{cause}` is `amend` or `correction` and
 `N` is one plus the greatest matching `reviews/04-adversary-{cause}-{N}.md` suffix (or `1`
 when none exists); the output path uses the same value.
 
@@ -1130,10 +1159,11 @@ alone and is never gated, ANDed, or overridden by a profile flag, fast/simple ma
 marker, or direct/pipeline choice. It is not waivable from inside this contract.
 
 An Adversary `broke-it` finding that is correctable within the approved scope, or an
-incomplete sensitive-coverage attempt, fails validation and returns to implementation →
-Freeze → fresh audit before Gate 3. Only a non-correctable structural contradiction may be
-left for operator disposition; it is never treated as a successful audit. A failed tester,
-hygiene, build, or lint result returns to its existing producer before Gate 3.
+incomplete sensitive-coverage attempt, fails validation and joins the complete
+consolidated package. Only a fresh matching operator authorization may then open one
+implementation → Freeze → fresh-full-fan round before Gate 3. Only a non-correctable
+structural contradiction may be left for operator disposition; it is never treated as a
+successful audit. Failed tester, hygiene, build, and lint results join the same package.
 
 **Combined verdict:**
 
@@ -1158,13 +1188,13 @@ concern. It is never silently treated as a clean audit.
 condition is an explicit fail-closed exception to the QA severity floor: a changed control
 that was broken or not substantively covered cannot proceed as a concern.
 
-**Advance requires both conjuncts:** `phase3_combined ∈ {pass, concerns}` AND `qa.code_hygiene == pass`, **with no correctable security finding**. Preserve only non-correctable `concerns` for STAGE-GATE-3. A correctable `broke-it` or incomplete sensitive-coverage finding opens implementation → Freeze → validation before Gate 3; a hygiene `fail` routes back to `implementer` as a Case A bounce **even when every AC is satisfied** — AC satisfaction alone never advances.
+**Advance requires both conjuncts:** `phase3_combined ∈ {pass, concerns}` AND `qa.code_hygiene == pass`, **with no correctable security finding**. Preserve only non-correctable `concerns` for STAGE-GATE-3. Any failing condition completes the full validation fan and mandatory triage. Normal or ineligible autonomous execution pauses; eligible autonomy records one new bounded correction decision.
 
-Validation advance → `waiting_gate3`. Fail on either conjunct → read the failing agent's docs **only then**, subject to the pre-dispatch correction gate (§ Iteration rules) before any correction round is dispatched.
+Validation advance → `waiting_gate3`. Fail on either conjunct → read all required bounded result artifacts and consolidate once; then either record the eligible autonomous decision or persist `correction_pending: true`, present the fresh live decision, and stop.
 
 ### Iteration
 
-**Rebuild the verification packet before re-running verifiers** — every re-dispatch is a staleness trigger.
+**No re-dispatch is legal without an unused matching correction authorization.** After the one authorized correction and new Freeze, rebuild the verification packet before the single fresh validation fan.
 
 **Read `failure-brief.md` only**, never the full workspace docs. The failing agent appends its actionable summary there. When the brief does not exist — an `execution-failed` that fired before the agent wrote anything — read the status block's `summary`, `issues` and literal error instead, and do not treat the absent file as a second failure.
 
@@ -1178,18 +1208,20 @@ the artifacts. The combined verdict never replaces Gate 3.
 3. Verify every AC has relevant successful `test`, `command`, or `inspection` evidence in `03-testing.md`'s evidence map, following `agents/_shared/ac-evidence.md`.
 4. **UX gate (`frontend_scope` only):** any `critical` (WCAG A) finding in `reviews/04-ux-validation.md` fails the gate → Case A. `high`/`medium`/`suggestion` never block.
 5. **Regression still passing (`fix`/`hotfix`, Tier 2–4):** confirm `regression_test_path` shows PASS, not `skip`/`xfail` — then **read the actual assertion body** and confirm it matches the authored pattern. A weakened or replaced assertion fails the gate even with the test name and PASS status intact.
-6. **Test-change integrity:** when tests changed or were deleted, require the exact reason and surviving behavioral evidence. A deletion or weakened assertion whose purpose is to hide a failure routes back to `tester`; test counts never gate acceptance.
+6. **Test-change integrity:** when tests changed or were deleted, require the exact reason and surviving behavioral evidence. A deletion or weakened assertion whose purpose is to hide a failure joins the consolidated correction-decision package; test counts never gate acceptance.
 7. **`code_hygiene` re-assertion.** Re-read the value `qa` recorded. `fail` closes this check regardless of AC, security or build outcome. This is a re-check, not a new evaluation — it exists so a hygiene fail cannot slip through if validation wording is ever loosened.
 
 Security findings are checked here: a correctable `broke-it` or incomplete sensitive-coverage
-finding is a validation failure and must have returned through implementation, Freeze, and a
-fresh audit before this check can pass. Only explicitly non-correctable concerns remain for
+finding is a validation failure and, after explicit authorization, must have passed through
+implementation, Freeze, and a fresh full validation fan before this check can pass. Only explicitly non-correctable concerns remain for
 operator disposition at Gate 3.
 
 **Decision:** all pass → `waiting_gate3` and STAGE-GATE-3 (build and lint already ran at
-Freeze). Any fail → route back with a focused brief (max-3), and **a fail here re-opens
-Freeze → validation** per the staleness invariant, since the tree changes underneath the
-findings. An AC-count mismatch between the `qa` report and the plan → `status: blocked`:
+Freeze). Any fail joins the complete package and persists a fresh correction decision. Under
+normal approval it stops and only live choice `1` re-opens implementation; under autonomous
+approval an eligible bounded decision may re-open it directly. Either route requires a fresh
+implementer → Freeze → full validation fan.
+An AC-count mismatch between the `qa` report and the plan → `status: blocked`:
 the plan drifted and needs reconciliation.
 
 ## STAGE-GATE-3
@@ -1199,8 +1231,9 @@ This gate is the `waiting_gate3` state immediately before delivery. The committe
 summary come from the accepted Freeze identity; after acceptance and while that identity is
 current, one bounded `delivery` dispatch prepares the exact workspace-only PR body and standalone
 acceptance matrix. You validate their paths, compute SHA-256, and persist those coordinates before
-presentation. A correctable `broke-it` or incomplete
-sensitive-coverage finding prevents this state entirely and returns to implementation.
+presentation. A correctable `broke-it` or incomplete sensitive-coverage finding prevents
+this state entirely and never reaches this gate; it requires the consolidated
+correction decision.
 
 **Gate contract:** see `agents/_shared/gate-contract.md` for the dual-record release, the
 prepare/present/record flow, the record-based recovery backstop, numeric shortcuts and
@@ -1215,7 +1248,7 @@ the ambiguous-reply rule. This section implements it for STAGE-GATE-3.
 | Field | Value |
 |---|---|
 | `feature` | — |
-| `delivery_summary` | branch, validated commit/tree, committed version, files touched, **diff composition**, base status |
+| `delivery_summary` | branch, validated commit/tree, committed version, version axis/rationale, files touched, **diff composition**, base status |
 | `delivery_preview` | exact PR title plus PR-body and acceptance-matrix workspace paths with SHA-256 digests |
 | `accumulated_cost` | `~{N}K tokens (~${X})` |
 | `security_audit` | verdict (`could-not-break` / `broke-it` / `not run (security_floor_applies: false)` / `unavailable`), `sec002_verdict`, `open_breaks: [{finding, file:line, impact}]`, `audit_coverage`, `incomplete_on_changed_control` |
@@ -1317,13 +1350,24 @@ Non-iterating: after the separate request, report and continue on failure.
 
 ## Autonomous mode
 
-`autonomous` changes only the approved execution preference recorded at Gate 1. It never
-skips a state, specialist floor, validation, STAGE-GATE or outward-action approval. Both
-gates remain mandatory regardless of `autonomous`.
+`autonomous` preauthorizes at most three consolidated correction rounds after the initial
+implementation. Every round still requires a complete validation fan, bounded Main triage,
+one fresh package-bound `correction.decision`, a fresh implementer, a new Freeze, and fresh
+tester/QA/adversary attempts. It never skips a state, specialist floor, validation,
+STAGE-GATE or outward-action approval. Both gates remain mandatory.
+
+The autonomous eligibility predicate is closed: every blocking finding must be an
+unambiguous `resolve` inside approved scope that preserves intent, behavior, and AC meaning.
+Any scope expansion, conflicting finding, design-consistent/decision-required disposition,
+security ambiguity or waiver, unavailable coverage, infrastructure failure, doubt, budget
+exhaustion, or exceptional round pauses for the operator. Autonomous correction decisions
+record `correction_authority: gate1-autonomous` and the exact consumed Gate-1 release nonce.
 
 **Activation only via an explicit operator declaration at STAGE-GATE-1** — `approve autonomous`. Never via a flag, a skill, an environment variable, or skill metadata.
 
-`autonomous`/`autonomous_granted_at` persist across `/th:recover`. Resetting needs a manual state edit: no later gate reply resets it, since STAGE-GATE-3 carries no `autonomous`-conditional behaviour.
+`autonomous`/`autonomous_granted_at` persist across `/th:recover`; recovery validates the
+Gate-1 dual record and exact authority nonce before accepting any autonomous correction.
+STAGE-GATE-3 remains unconditional.
 
 ## Parallel batch implementation (opt-in)
 

@@ -126,13 +126,36 @@ listed in approved task `Files:` or ACs. Confirm their reviewed evidence exists 
 This is a presence/evidence check, not an implementation review. If an approved
 tracked artifact is absent from the reviewed evidence, block. Never write it now.
 
-### 3. Confirm committed release metadata
+### 3. Confirm committed release metadata and version axis
 
 Read only the recorded version/changelog coordinates from `00-state.md` and the
 accepted evidence. They are already part of `validated_commit_sha` and
-`validated_tree_sha`. Do not draft, classify, materialize, or modify release
-metadata here. A missing required changelog or version is an upstream
-implementation failure and blocks Gate 3.
+`validated_tree_sha`. Do not materialize or modify release metadata here. A
+missing required changelog or version is an upstream implementation failure and
+blocks Gate 3.
+
+Independently check the recorded version choice against this axis guide:
+
+| Axis | Delivery test |
+|---|---|
+| `Z` / PATCH | Default for every backward-compatible fix or bounded improvement that does not add a material new public capability: fixes, security hardening, performance, dependencies, prompts/agents/workflows, internal refactors, tests/docs/build/CI, and small opt-in behavior within an existing capability. |
+| `Y` / MINOR | Require the plan or accepted evidence to name a material new externally consumable capability or a meaningful compatible expansion of a supported public contract. |
+| `X` / MAJOR | Require the plan or accepted evidence to name the supported public contract that existing consumers must change for, plus its migration impact. |
+
+Choose by compatibility and consumer impact, never by diff size, file count,
+commit prefix, number of fixes, or the presence of an added/deleted file. A new
+file is not automatically MINOR, a deletion is not automatically MAJOR, and
+multiple PATCH changes do not accumulate into MINOR. Use the lowest justified
+axis; ambiguity defaults to PATCH unless the evidence explicitly establishes a
+new public capability.
+
+Require a one-sentence `version_rationale`. For MINOR it names the new public
+capability; for MAJOR it names the incompatible public contract and migration
+impact. If the committed axis is higher than the guide supports, return
+`status: blocked`, `failure_kind: version-overbump`; if it is lower than an
+explicitly evidenced public-contract change, use `failure_kind:
+version-underbump`. Either result returns to implementation → Freeze → full
+validation. Never repair the version during delivery.
 
 ### 4. Build the acceptance matrix
 
@@ -207,6 +230,7 @@ Body:
 
 ## Version
 - {old} → {preview}, or `not bumped` when explicitly recorded
+- Axis: {PATCH|MINOR|MAJOR} — {one-sentence version_rationale}
 ```
 
 Conditional additions:
@@ -227,7 +251,7 @@ Check only your outputs:
 
 1. The matrix contains every approved AC exactly once.
 2. Every PASS cites existing evidence; no verdict was invented.
-3. The PR body embeds the same matrix and committed version.
+3. The PR body embeds the same matrix, committed version, axis, and rationale.
 4. The file map equals the recorded changed-file coordinate.
 5. No tracked repository, `git`, or GitHub mutation was performed.
 
@@ -265,6 +289,7 @@ summary: {one sentence}
 pr_title: {title}
 pr_body: {docs_root}/inputs/pr-body-draft.md
 acceptance_matrix: {path}
+version_assessment: {PATCH|MINOR|MAJOR|none} — {one-sentence rationale}
 dod: delivery-writes-clean | flagged: {reason}
 issues: none | {specific blocker}
 ```

@@ -40,12 +40,12 @@ transcript, raw tool output, or stale prior snapshot. Rotation never waives
 required AC evidence, QA, security, Freeze, mandatory suites, or either gate.
 
 Close a terminal implementation attempt and prohibit post-terminal
-`followup_task`. The sole exception is one implementer continuation within the
-same active task/correction lifecycle, on the same file and AC and limited to at most 3 tool calls; a second feedback item, any
-scope expansion, or a substantive correction must use a fresh agent
-(V2 `fork_turns: none`) and a bounded `Cause`/`Files`/`AC`/`Correction` packet with the
-current frozen anchor and required evidence. A continued attempt never absorbs
-another AC, file, or revalidation.
+`followup_task`. Feedback, scope expansion, and every correction require a fresh
+agent (V2 `fork_turns: none`). Only after the mandatory live correction decision
+may Main create the bounded `Cause`/`Files`/`AC`/`Suggested correction` packet
+with its nonce, current frozen anchor, complete finding IDs, scope, and required
+evidence. New pipeline attempts always record `context_strategy: fresh` and
+`follow_up_count: 0`.
 
 Main separately writes a recoverable handoff and requires a fresh user thread
 after its first compaction or before continuing at 100 coordinator tool calls
@@ -130,6 +130,10 @@ require a new Gate 1.
 
 Before Freeze and before validation opens, assemble version/changelog and commit the complete candidate. Require a
 clean worktree, then compute size and diff composition from `verification_base_ref...HEAD`.
+Choose the SemVer axis by supported-contract impact: PATCH is the default for compatible bounded fixes and
+improvements; MINOR requires a named material new public capability; MAJOR requires a named incompatible public
+contract and migration impact. Added/deleted files, diff size, commit prefix, and the number of fixes never decide
+the axis. Persist a one-sentence `version_rationale`; MINOR and MAJOR must name the affected public contract.
 Mechanical paths are only `CHANGELOG.md`, `changelog.d/*`, and exact resolved version sites;
 every other path is substantive. The 400-line/8-file caps require a bounded
 `02-implementation.md § Reviewability Exceptions` justification when exceeded. Persist the

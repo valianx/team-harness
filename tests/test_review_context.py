@@ -43,6 +43,110 @@ def context(**overrides):
 
 
 class ReviewContextTests(unittest.TestCase):
+    def test_workspace_ignore_update_is_atomic_and_rejects_symlink(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ignore = root / ".gitignore"
+            ignore.write_text("/build/\n", encoding="utf-8")
+            MODULE.ensure_workspaces_ignored(root)
+            self.assertEqual(ignore.read_text(encoding="utf-8"), "/build/\n/workspaces/\n")
+            MODULE.ensure_workspaces_ignored(root)
+            self.assertEqual(ignore.read_text(encoding="utf-8").count("/workspaces/"), 1)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            outside = root / "outside"
+            outside.write_text("keep", encoding="utf-8")
+            (root / ".gitignore").symlink_to(outside)
+            with self.assertRaises(MODULE.ContextError):
+                MODULE.ensure_workspaces_ignored(root)
+            self.assertEqual(outside.read_text(encoding="utf-8"), "keep")
+
+    def test_artifact_promotion_and_read_reject_symlink_leaves(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            temporary = root / "tmp-body"
+            temporary.write_text("safe", encoding="utf-8")
+            MODULE.promote_artifact(root, "tmp-body", "review.md")
+            self.assertEqual(MODULE.safe_read_leaf(root, "review.md"), b"safe")
+
+            outside = root / "outside"
+            outside.write_text("secret", encoding="utf-8")
+            link = root / "inline.json"
+            link.symlink_to(outside)
+            with self.assertRaises(MODULE.ContextError):
+                MODULE.safe_read_leaf(root, "inline.json")
+
+            replacement = root / "tmp-inline"
+            replacement.write_text("[]", encoding="utf-8")
+            with self.assertRaises(MODULE.ContextError):
+                MODULE.promote_artifact(root, "tmp-inline", "inline.json")
+            self.assertEqual(outside.read_text(encoding="utf-8"), "secret")
+
+    def test_artifact_promotion_rejects_temporary_inode_swap(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            temporary = root / "tmp-body"
+            temporary.write_text("safe", encoding="utf-8")
+            actual = temporary.stat()
+            calls = 0
+            original = MODULE._regular_stat_at
+
+            def swapped(directory_fd, name):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    return SimpleNamespace(
+                        st_mode=actual.st_mode,
+                        st_dev=actual.st_dev,
+                        st_ino=actual.st_ino + 1,
+                    )
+                return original(directory_fd, name)
+
+            with patch.object(MODULE, "_regular_stat_at", side_effect=swapped):
+                with self.assertRaisesRegex(MODULE.ContextError, "changed during promotion"):
+                    MODULE.promote_artifact(root, "tmp-body", "review.md")
+            self.assertFalse((root / "review.md").exists())
+            self.assertEqual(temporary.read_text(encoding="utf-8"), "safe")
+
+    def test_artifact_promotion_uses_pinned_inode_when_source_name_swaps(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            temporary = root / "tmp-body"
+            temporary.write_text("safe", encoding="utf-8")
+            outside = root / "outside"
+            outside.write_text("secret", encoding="utf-8")
+            real_replace = MODULE.os.replace
+
+            def swap_then_replace(source, destination, **kwargs):
+                temporary.unlink()
+                temporary.symlink_to(outside)
+                return real_replace(source, destination, **kwargs)
+
+            with patch.object(MODULE.os, "replace", side_effect=swap_then_replace):
+                MODULE.promote_artifact(root, "tmp-body", "review.md")
+
+            self.assertEqual((root / "review.md").read_text(encoding="utf-8"), "safe")
+            self.assertTrue(temporary.is_symlink())
+            self.assertEqual(outside.read_text(encoding="utf-8"), "secret")
+
+    def test_artifact_promotion_links_portably_without_procfs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "tmp-body").write_text("safe", encoding="utf-8")
+            real_link = MODULE.os.link
+
+            def portable_link(source, destination, **kwargs):
+                self.assertEqual(source, "tmp-body")
+                self.assertFalse(kwargs["follow_symlinks"])
+                self.assertEqual(kwargs["src_dir_fd"], kwargs["dst_dir_fd"])
+                return real_link(source, destination, **kwargs)
+
+            with patch.object(MODULE.os, "link", side_effect=portable_link):
+                MODULE.promote_artifact(root, "tmp-body", "review.md")
+
+            self.assertEqual((root / "review.md").read_text(encoding="utf-8"), "safe")
+
     def test_security_selection_is_fail_closed_for_every_reason(self):
         cases = [
             ("agents/security.md\n", "+permission boundary\n", "known-sensitive", True),

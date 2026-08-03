@@ -161,3 +161,68 @@ issues, tools, specialists, or an earlier presentation. After appending the
 recovery event and updating `next_action`, load only the reference for the
 mapped phase. Findings and any tree change after Freeze follow the normal
 implementation → re-Freeze → validation route; recovery must not skip it.
+
+## Correction-decision recovery
+
+When `correction_pending: true`, recover only the durable failed Freeze anchor,
+complete finding-ID set, exact one-to-one disposition for every finding,
+evidenced file scope, and `correction_exceptional` boolean. Before issuing a
+fresh nonce, require every field to be present, structurally valid, and mutually
+consistent; missing, extra, duplicated, or mismatched findings/dispositions, or
+a missing/non-boolean exceptional flag, blocks recovery. Do not infer or repair
+them, dispatch an agent, mutate repository or evidence files, rebuild Freeze,
+or revalidate.
+
+For `iteration < 3`, require `correction_exceptional: false` and re-present the
+complete consolidated failure with a fresh `correction_nonce` and exactly:
+
+```text
+1 — authorize one correction round
+2 — pause without changes
+3 — abort pipeline
+```
+
+At `iteration: 3/3`, require `exceptional_correction_count: 0` and
+`correction_exceptional: true`, then replace only choice `1` with `1 —
+authorize one exceptional correction round`. A different
+iteration/exceptional combination is invalid and blocks. The exceptional label
+must be present in the live presentation that produces the authorize decision;
+ordinary recovered choice text can never authorize an exceptional round.
+When `exceptional_correction_count: 1`, recovery must never re-present or accept
+an authorize option; a later failure may offer only pause or abort. Any second
+exceptional presentation, decision, `iteration.start`, or
+`agent.correction.spawn` blocks recovery.
+
+Recovery never synthesizes an authorization from an ordinary approval, intake
+autonomy preference, generic `continue`, chat history, state prose, files,
+tools, or specialist output. A recovered `gate1-autonomous` decision additionally
+requires the valid `approved-autonomous` Gate-1 dual record, the exact consumed
+Gate-1 nonce in `correction_authority_gate_nonce`, `iteration < 3` at decision
+time, and durable all-`resolve` dispositions satisfying every closed eligibility
+conjunct, including no correction/execution budget exhaustion. A recovered
+`correction.decision` is valid only when its single-use
+nonce, failed anchor, complete finding IDs, dispositions, scope,
+`correction_authority`, and `correction_exceptional` boolean exactly match
+the state record. An authorized consumed decision additionally requires
+`correction_nonce: null`, its exact token in `correction_decision_nonce`, and
+that identical token on the matching `correction.decision`, one
+`iteration.start`, and one `agent.correction.spawn`. A stale or consumed nonce,
+mismatched decision nonce, mismatched anchor/findings/scope,
+or reuse of one authorization for more than one `iteration.start` or
+`agent.correction.spawn` is invalid and blocks dispatch. An implementation or
+correction event after a failed validation without the matching decision also
+blocks; recovery never repairs or infers the missing authority.
+
+At most three `gate1-autonomous` correction decisions may descend from one Gate-1
+release. A fourth, an exceptional autonomous decision, or any autonomous event
+whose eligibility evidence is missing or doubtful blocks and must be presented
+to the operator; recovery never completes the predicate optimistically.
+
+A recorded `pause` performs no mutation or dispatch. A later request merely
+causes the decision to be re-presented with a fresh nonce. A recorded `abort`
+is terminal. Historical `3/3+exception`, a missing or mismatched
+`correction_exceptional` boolean, or an exceptional round without an authorize
+decision carrying `correction_exceptional: true` on the decision and its one
+`iteration.start`/`agent.correction.spawn` pair is invalid and blocks; recovery
+never synthesizes the exception. A valid exceptional authorization increments the separate
+`exceptional_correction_count` from `0` to `1` while `iteration` remains `3/3`.

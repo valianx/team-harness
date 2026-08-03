@@ -94,7 +94,7 @@ assert.match(projectConfig, /^default_subagent_model = "gpt-5\.6-terra"$/m);
 assert.match(projectConfig, /^default_subagent_reasoning_effort = "medium"$/m);
 assert.doesNotMatch(projectConfig, /^\[shell_environment_policy\]$/m);
 
-for (const name of ["architect", "security"]) {
+for (const name of ["architect", "qa", "security"]) {
   const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
   assert.match(content, /^model = "gpt-5\.6-sol"$/m);
   assert.match(content, /^model_reasoning_effort = "xhigh"$/m);
@@ -102,7 +102,6 @@ for (const name of ["architect", "security"]) {
 for (const name of [
   "implementer",
   "tester",
-  "qa",
   "inline-reviewer",
   "reviewer",
   "pr-review-qa",
@@ -150,6 +149,7 @@ assert.match(roster, /@Team-Harness pipeline <request>/);
 assert.match(roster, /\$sync-codex-agents/);
 assert.match(roster, /\| Agent \| Canonical Claude model \| Canonical source effort \| Codex model \| Codex effort \| Codex availability \|/);
 assert.match(roster, /\| `architect` \| `opus` \| `xhigh` \| `gpt-5\.6-sol` \| `xhigh` \| installed custom agent \|/);
+assert.match(roster, /\| `qa` \| `opus` \| `xhigh` \| `gpt-5\.6-sol` \| `xhigh` \| installed custom agent \|/);
 assert.match(roster, /\| `adversary` \| `sonnet` \| `xhigh` \| `gpt-5\.6-terra` \| `high` \| not shipped in Codex beta \|/);
 assert.match(roster, /\| `implementer` \| `sonnet` \| `high` \| `gpt-5\.6-terra` \| `high` \| installed custom agent \|/);
 assert.match(roster, /\| `inline-reviewer` \| `sonnet` \| `high` \| `gpt-5\.6-terra` \| `high` \| installed custom agent \|/);

@@ -45,7 +45,7 @@ Generated with the `team-harness` profile. This table includes every canonical T
 | `pr-review-qa` | `sonnet` | `high` | `gpt-5.6-terra` | `high` | installed custom agent |
 | `pr-review-security` | `sonnet` | `high` | `gpt-5.6-terra` | `high` | installed custom agent |
 | `qa-plan` | `sonnet` | `high` | `gpt-5.6-terra` | `high` | not shipped in Codex beta |
-| `qa` | `sonnet` | `high` | `gpt-5.6-terra` | `high` | installed custom agent |
+| `qa` | `opus` | `xhigh` | `gpt-5.6-sol` | `xhigh` | installed custom agent |
 | `research-consolidator` | `sonnet` | `high` | `gpt-5.6-terra` | `high` | not shipped in Codex beta |
 | `researcher` | `haiku` | `medium` | `gpt-5.6-terra` | `low` | not shipped in Codex beta |
 | `reviewer-consolidator` | `sonnet` | `medium` | `gpt-5.6-terra` | `medium` | installed custom agent |

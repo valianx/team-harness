@@ -266,26 +266,26 @@ function readVersionSites(reader: PrepublishReader): VersionSites {
 }
 
 // ---------------------------------------------------------------------------
-// Bump-floor derivation — mechanical SemVer floor from the shipped-path diff.
-// D/R shipped path → major; A shipped path → minor; M-only → patch.
+// Bump-floor derivation — conservative mechanical floor from the shipped-path
+// diff. Additions and modifications are PATCH because path shape cannot prove
+// a material new public capability. D/R remains a MAJOR-candidate advisory;
+// the delivery guide makes the final supported-contract classification.
 // ---------------------------------------------------------------------------
 
 function deriveFloor(changed: ChangedFile[]): "major" | "minor" | "patch" | "none" {
-  let sawAdded = false;
+  let sawChanged = false;
   let sawRemovedOrRenamed = false;
-  let sawModified = false;
 
   for (const c of changed) {
     if (!touchesShippedPath(c)) continue;
     const kind = c.status.charAt(0);
-    if (kind === "A") sawAdded = true;
+    if (kind === "A") sawChanged = true;
     else if (kind === "D" || kind === "R") sawRemovedOrRenamed = true;
-    else sawModified = true;
+    else sawChanged = true;
   }
 
   if (sawRemovedOrRenamed) return "major";
-  if (sawAdded) return "minor";
-  if (sawModified) return "patch";
+  if (sawChanged) return "patch";
   return "none";
 }
 
@@ -406,10 +406,6 @@ function warnUnderBump(reader: PrepublishReader, floor: string, actual: SemverDe
     reader.warn(
       `prepublish-guard: WARN — a shipped asset was DELETED or RENAMED (removed public surface) but the version bump is ${actual}. SemVer suggests MAJOR. If the deleted/renamed file is not a public invocable surface (e.g. an internal include), ignore. (advisory; push not blocked)`
     );
-  } else if (floor === "minor") {
-    reader.warn(
-      `prepublish-guard: WARN — a NEW shipped file was added (new invocable surface) but the version bump is ${actual}. SemVer suggests MINOR. If the new file is not a new invocable surface (e.g. a _shared include), ignore. (advisory; push not blocked)`
-    );
   }
 }
 
@@ -419,7 +415,7 @@ function resolveOverBump(reader: PrepublishReader, floor: string, actual: Semver
     return null;
   }
   return deny(
-    `prepublish-guard: version bump level exceeds the mechanical SemVer floor for this diff. The changed shipped paths only warrant a ${floor} bump, but a ${actual} was applied. If this over-bump is intentional (e.g. a fix + new surface in the same PR), add a commit trailer or push option: bump-override: ${actual} — <reason>. See CLAUDE.md §6.3 and agents/_shared/delivery-mechanics.md §1. Push blocked.`
+    `prepublish-guard: version bump level exceeds the mechanical SemVer floor for this diff. The changed shipped paths only warrant a ${floor} bump, but a ${actual} was applied. If this over-bump is intentional because the delivery guide identifies a material new or incompatible public contract, add a commit trailer or push option: bump-override: ${actual} — <reason>. See agents/delivery.md § "Confirm committed release metadata and version axis". Push blocked.`
   );
 }
 

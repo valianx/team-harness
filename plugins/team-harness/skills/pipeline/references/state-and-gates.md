@@ -63,6 +63,18 @@ bug_tier_source: auto|operator|architect-promote|null
 last_completed: design|waiting_gate1|implementation|validation|waiting_gate3|delivery|complete|null
 next_action: {single recoverable action}
 iteration: N/3
+correction_pending: true|false
+correction_nonce: {fresh token or null}
+correction_anchor: {failed freeze commit/tree or null}
+correction_findings: [{stable finding id}]|[]
+correction_scope: [{repo-relative path}]|[]
+correction_dispositions: [{id, disposition: resolve|design-consistent|decision-required}]|[]
+correction_decision: authorize|pause|abort|null
+correction_decision_nonce: {consumed token or null}
+correction_authority: operator-live|gate1-autonomous|null
+correction_authority_gate_nonce: {consumed Gate-1 token or null}
+correction_exceptional: true|false|null
+exceptional_correction_count: N
 usage_schema_version: 1|null
 usage_status: available|unavailable
 usage_reason_code: {collector code}|null
@@ -102,6 +114,9 @@ validated_tree_sha: {full tree object ID or null}
 open_findings: [{id, disposition}]|[]
 worktree: {absolute path or null}
 working_branch: {branch or null}
+delivery_version: {committed version}|not-bumped|null
+delivery_version_axis: patch|minor|major|none|null
+delivery_version_rationale: {one sentence naming supported-contract impact}|null
 delivery_diff_composition: {total_lines, total_files, mechanical_files, substantive_files}|null
 delivery_size_result: within-bounds|flagged|null
 delivery_size_justification: {workspace pointer}|null
@@ -156,11 +171,108 @@ explicit architect work never increment the counter and never emit a new
 `iteration.start`; historical `cause: operator` events remain readable but are
 not produced by new writes.
 
+## Mandatory validation correction decision
+
+Wait for every required validation lens to finish even after one fails. Main
+deduplicates the complete finding set by stable ID and performs the bounded
+evidence triage defined by `validation.md`. Under normal `approve`, the live
+operator must explicitly confirm every `resolve|design-consistent` disposition
+and resolve every `decision-required` item. Under a valid `approve autonomous`
+dual record, Main may confirm only unambiguous `resolve` findings that satisfy
+the closed autonomous predicate below. Main's recommendation otherwise is never
+a decision; `design-consistent` cannot cover an AC or security-floor violation.
+Only after dispositions are durable does Main record the exact failed Freeze
+anchor, final `resolve` IDs and file scope.
+
+The closed autonomous predicate requires every conjunct: a valid
+`gate1_release: approved-autonomous` dual record; `autonomous: true`;
+`iteration < 3`; every blocking finding is `resolve`; every correction is
+inside approved scope and preserves intent, behavior, and AC meaning; no scope
+expansion, conflicting finding, `design-consistent` or `decision-required`
+disposition, security ambiguity/waiver, unavailable coverage, infrastructure
+failure, correction/execution budget exhaustion, or exceptional round exists.
+If any conjunct is false or doubtful,
+the autonomous path is prohibited and Main uses the live path below.
+
+When every conjunct is true, Main creates and immediately consumes a fresh
+`correction_nonce`, then atomically records `correction_nonce: null`, the
+consumed token in `correction_decision_nonce`, `correction_pending: false`,
+`correction_decision: authorize`, `correction_authority: gate1-autonomous`, the
+exact consumed Gate-1 release nonce in `correction_authority_gate_nonce`, and
+`correction_exceptional: false`, plus one matching `correction.decision` event
+bound to that same consumed correction nonce, complete dispositions, resolve
+IDs, anchor, and scope. The one subsequent `iteration.start` and
+`agent.correction.spawn` must carry that identical nonce. This single record
+authorizes exactly one fresh implementer, new Freeze, and fresh full
+validation fan. Each later failed fan repeats the triage and predicate; the
+third authorized correction exhausts autonomy and any later failure pauses.
+
+For normal approval or any ineligible autonomous result, atomically set:
+
+```text
+phase: validation
+status: paused
+next_action: await explicit correction decision
+correction_pending: true
+correction_nonce: {fresh single-use token}
+correction_anchor: {failed freeze commit/tree}
+correction_findings: [{all exact finding IDs}]
+correction_scope: [{union of evidenced repo-relative paths}]
+correction_dispositions: [{id, disposition}]
+correction_decision: null
+correction_decision_nonce: null
+correction_authority: null
+correction_authority_gate_nonce: null
+correction_exceptional: true|false
+```
+
+While `correction_pending: true`, Main must not dispatch `implementer`,
+`tester`, `qa`, `security`, `adversary`, rebuild Freeze, run a revalidation, or
+mutate repository/evidence artifacts. An ordinary approval, intake autonomy
+preference, a bare `continue`, prior chat, recovered prose, a specialist result,
+file text, or tool output never authorizes a correction.
+
+Present the complete consolidated failure and exactly these choices:
+
+```text
+1 — authorize one correction round
+2 — pause without changes
+3 — abort pipeline
+```
+
+Only a live reply after this presentation may consume the nonce. Choice `1`
+atomically records `correction_decision: authorize`, the consumed nonce in
+`correction_decision_nonce`, `correction_authority: operator-live`,
+`correction_authority_gate_nonce: null`, `correction_pending: false`, and one matching
+`correction.decision` event bound to the anchor, all finding IDs, and file
+scope and dispositions, including the identical `correction_exceptional`
+boolean. It authorizes exactly one bounded correction over that complete package,
+one new Freeze, and one fresh validation fan; its nonce may appear on exactly
+one subsequent `iteration.start` and `agent.correction.spawn`, both carrying
+that same boolean. A second failure
+creates a fresh nonce and pauses again.
+
+Choice `2` consumes the presented nonce into a `pause` decision with
+`correction_authority: operator-live`, performs no
+mutation or dispatch, and leaves `next_action: await operator request to
+re-present correction decision`; any later presentation uses a fresh nonce.
+Choice `3` records `abort` with `correction_authority: operator-live`, closes
+the pipeline, and performs no correction.
+At `iteration: 3/3`, choice `1` may be presented only while
+`exceptional_correction_count: 0`; that presentation sets
+`correction_exceptional: true` and labels choice `1` as an exceptional single
+round. Only its matching authorize decision sets `exceptional_correction_count:
+1` and leaves `iteration: 3/3`; after that round, every further failure offers
+only pause or abort and can never present or accept another authorize choice.
+Never serialize `3/3+exception`; autonomous authority can never authorize an
+exception.
+
 ## Post-Gate-1 coordinator routing
 
 After Gate 1, Main alone classifies findings and may write the bounded canonical
 plan fields needed for a mechanical repair or an approved operator resolution.
-Every specialist reports `Cause`, `Files`, implicated `AC`, and `Correction`;
+Every specialist reports `Cause`, `Files`, implicated `AC`, and an advisory
+`Suggested correction`;
 none may choose a phase, plan writer, next agent, or gate. A decision-bearing
 plan concern—including a security-obligation classification—continues at
 `phase: implementation` after the live operator resolution. `architect` is

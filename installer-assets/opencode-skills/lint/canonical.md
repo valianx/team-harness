@@ -187,7 +187,7 @@ Canonical matrix (must match exactly):
 | Agent | Model | Effort |
 |---|---|---|
 | `orchestrator` | opus | high |
-| `architect` | opus | high |
+| `architect` | opus | xhigh |
 | `agent-builder` | opus | xhigh |
 | `security` | opus | xhigh |
 | `adversary` | sonnet | xhigh |
@@ -195,7 +195,7 @@ Canonical matrix (must match exactly):
 | `pr-review-qa` | sonnet | high |
 | `pr-review-security` | sonnet | high |
 | `reviewer-consolidator` | sonnet | medium |
-| `qa` | sonnet | high |
+| `qa` | opus | xhigh |
 | `qa-plan` | sonnet | high |
 | `gcp-cost-analyzer` | opus | high |
 | `init-project` | haiku | medium |
