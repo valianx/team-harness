@@ -38,8 +38,15 @@ file. Fail closed if it is not a regular non-symlink or if its
 `model = "gpt-5.6-terra"`, `model_reasoning_effort = "high"`,
 `sandbox_mode = "read-only"`, or SHA-256 raw-byte digest differs from the
 trusted packaged `inline-reviewer.toml` provided by this loaded plugin. Record
-the selected scope/path and digest only in the in-memory review package. A
-mismatch is `untrusted` or `unavailable`, never a dispatch.
+the selected scope/path and digest only in the in-memory review package. The
+digest does not attest an already-loaded profile: dispatch only from a fresh
+Codex session that loaded the verified managed profile, recording
+`profile_session` only as that lifecycle marker, never as an in-memory byte
+attestation. After any install, setup, agent sync, mismatch, or scope change,
+require an explicit restart before inline dispatch; otherwise return
+`lens_status: unavailable`. Shipped Codex hooks do not observe session start or
+loaded agent bytes, so no hook attestation is available. A mismatch is
+`untrusted` or `unavailable`, never a dispatch.
 
 Codex dispatches each requested lens as an independent runtime-native
 `inline-reviewer` from the project root. It may inspect the anchored project

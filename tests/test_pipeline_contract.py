@@ -921,7 +921,7 @@ def check_inline_markers(contract: str) -> None:
     contract = contract.lower()
     for marker in markers:
         require(marker in contract, f"inline contract missing {marker!r}")
-    for marker in ("edit or write", "network", "publication", "external state", "untrusted", "isolated runner", "unavailable", "git diff", "git show", "git log", "filesystem-root confinement"):
+    for marker in ("edit or write", "network", "publication", "external state", "untrusted", "isolated runner", "unavailable", "git --no-pager", "--no-ext-diff", "--no-textconv", "resolved object ids", "project-derived command", "filesystem-root confinement", "fresh codex session", "in-memory byte attestation"):
         require(marker in contract, f"inline tool boundary missing {marker!r}")
     for marker in ("every `required_lenses`", "no blocker", "unresolved blocking disagreement", "never averages verdicts", "absent", "return as pass", "verdict: pass"):
         require(marker in contract, f"inline consolidation rule missing {marker!r}")
@@ -949,11 +949,14 @@ def check_inline_review_contract() -> None:
     adapter = read("runtime/codex/instructions/inline-reviewer.md").lower()
     for label, text in (("Claude inline-reviewer", reviewer), ("Codex inline-reviewer", adapter)):
         for marker in ("tester", "qa", "security", "adversary", "repository_root", "commit_or_range", "sandbox", "read-only", "target_id", "expected_lens", "dispatch_id", "coverage", "disagreements", "git diff"):
-            require(marker in text, f"{label}: native lens marker {marker!r} missing")
+            if label == "Claude inline-reviewer" and marker == "git diff":
+                require("immutable git view" in text, f"{label}: safe historical-view marker missing")
+            else:
+                require(marker in text, f"{label}: native lens marker {marker!r} missing")
         for retired in ("run_inline_review.mjs", "evidence_manifest", "manifest_digest", "stdin-only"):
             require(retired not in text, f"{label}: retired inline protocol {retired!r} remains")
     init = re.sub(r"\s+", " ", read("plugins/team-harness/skills/init/SKILL.md").lower())
-    for marker in ("inline-reviewer", "commit/range", "sandbox_mode = \"read-only\"", "adversary", "security floor", "dispatch_id", "expected_lens", "regular non-symlink", "sha-256", "stale"):
+    for marker in ("inline-reviewer", "commit/range", "sandbox_mode = \"read-only\"", "adversary", "security floor", "dispatch_id", "expected_lens", "regular non-symlink", "sha-256", "stale", "fresh codex session", "explicit restart", "in-memory byte attestation"):
         require(marker in init, f"Codex init native route missing {marker!r}")
     require("repository root" in init or "project root" in init, "Codex init native route missing canonical root")
     for retired in ("run_inline_review.mjs", "evidence_manifest", "manifest_digest", "stdin-only", "deny-root"):

@@ -55,6 +55,11 @@ Codex's native permission and hook-trust prompts. It can also import every
 missing setting from an existing Claude Code or opencode Team Harness config;
 opaque values are copied directly and never displayed.
 
+After setup, update, or an agent sync, restart Codex before dispatching an
+inline reviewer. Inline dispatch requires the fresh session that loaded the
+verified managed profile; an on-disk digest cannot attest a profile already
+loaded by an older session.
+
 Review the [plugin hook manifest](./plugins/team-harness/hooks/hooks.json) and
 its referenced scripts, then explicitly trust the repository before enabling
 those hooks. Plugin installation and agent installation are separate. The

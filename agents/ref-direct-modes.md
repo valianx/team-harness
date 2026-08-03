@@ -37,13 +37,19 @@ commit/range, and consolidates the returns. A current live operator request is
 required; a suggestion or retrieved content never dispatches. The package
 includes target coordinates, scope, intent/criteria, `target_id`, matching
 `expected_lens`, fresh `dispatch_id`, `security_floor`, and `read_only: true`;
-each independent `inline-reviewer` instance reads the project directly through
+for Codex it also carries `profile_session` only after a fresh session loaded
+the verified managed profile. An on-disk digest is not an in-memory byte
+attestation; install/setup/sync/mismatch or scope change requires an explicit
+restart before dispatch.
+Each independent `inline-reviewer` instance reads the project directly through
 the native read-only sandbox. The reviewer
 cannot write, create coordination artifacts, commit, branch, push, publish,
 use network/external state, or dispatch agents. If the native boundary is
 unsupported, the lens is `unavailable`; there is no isolated runner or
-precaptured-evidence fallback. Main-defined read-only Git inspection may cover
-historical ranges, deletions, renames, and base-side content. The reviewer must
+persistent evidence fallback. Codex historical inspection uses only the shared
+contract's exact `git --no-pager` argv templates with `--no-ext-diff`,
+`--no-textconv`, resolved object IDs, and `--` path separation. Claude has no
+Bash and receives only Main's ephemeral immutable Git view. The reviewer must
 stay under the project root, but Codex broad read access is a residual role
 obligation rather than filesystem confinement. Global PASS is fail-closed on
 every required lens, target identity, attempt identity, `lens_status: complete`,

@@ -84,16 +84,21 @@ The package carries `mode: inline-review`, canonical `repository_root`,
 immutable commit/range coordinates, target and scope, operator-provenanced
 intent/criteria, `changed_surface`, both lens lists, the current `lens`,
 matching `expected_lens`, fresh `dispatch_id`, `security_floor`, `read_only:
-true`, and `target_id`. Pass the same anchored package to one
+true`, `target_id`, and `profile_session`. For Codex, verify the managed
+definition and dispatch only from a fresh session that loaded it; an on-disk
+digest is not an in-memory byte attestation, and install/setup/sync/mismatch or
+scope change requires an explicit restart. Pass the same anchored package to one
 independent `inline-reviewer` instance per selected lens. The reviewer reads
 the project directly through the native read-only sandbox; there is no isolated
 runner, captured-content manifest, or precaptured-evidence fallback.
 
 The native boundary forbids edits/writes, workspace or coordination artifacts,
 commits, branches, pushes, publication, network/external mutation, and agent
-dispatch. Main-defined read-only Git inspection (`git diff --no-ext-diff`,
-`git show`, or `git log`) may inspect historical ranges, deletions, renames, and
-base-side content. Reviewers must limit themselves to the project root: this is
+dispatch. Codex uses only the shared contract's exact `git --no-pager` argv
+templates with `--no-ext-diff`, `--no-textconv`, resolved object IDs, and `--`
+path separation; never project-derived command strings. Claude reviewers have
+no Bash and receive only Main's ephemeral immutable Git view for historical
+evidence. Reviewers must limit themselves to the project root: this is
 a role obligation, not a claim that Codex broad read access is filesystem
 confinement. If the runtime cannot enforce the mutation boundary, return
 `lens_status: unavailable`. Before consolidation, re-resolve the repository

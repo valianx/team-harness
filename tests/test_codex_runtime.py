@@ -51,6 +51,21 @@ def check_inline_reviewer_native() -> None:
             fail(f"inline-reviewer adapter retains retired protocol {retired!r}")
     if "agents/_shared/inline-review-contract.md" in adapter:
         fail("inline-reviewer adapter depends on target repository contract")
+    for marker in (
+        "git --no-pager -c <canonical-root> diff --no-ext-diff --no-textconv",
+        "git --no-pager -c <canonical-root> show --no-ext-diff --no-textconv",
+        "git --no-pager -c <canonical-root> log -p --no-ext-diff --no-textconv",
+        "resolved object ids", "never interpolate a project-derived command string",
+        "profile_session", "fresh session", "in-memory byte attestation",
+    ):
+        if marker not in adapter:
+            fail(f"inline-reviewer adapter misses hardened dispatch marker {marker!r}")
+    semantic = (ROOT / "agents/inline-reviewer.md").read_text()
+    if re.search(r"^tools:.*\\bBash\\b", semantic, re.MULTILINE):
+        fail("Claude inline-reviewer must not receive unrestricted Bash")
+    for marker in ("ephemeral immutable Git view", "cannot reliably impose a", "per-agent command boundary"):
+        if marker not in semantic:
+            fail(f"Claude inline-reviewer misses safe historical-view marker {marker!r}")
     for relative in (".codex/agents/inline-reviewer.toml", "plugins/team-harness/skills/setup/assets/agents/inline-reviewer.toml"):
         path = ROOT / relative
         if not path.is_file():
@@ -69,7 +84,7 @@ def check_inline_reviewer_native() -> None:
     if (ROOT / "plugins/team-harness/skills/init/scripts/test_run_inline_review.mjs").exists():
         fail("retired inline runner behavioral test remains")
     init = re.sub(r"\s+", " ", (ROOT / "plugins/team-harness/skills/init/SKILL.md").read_text().lower())
-    for marker in ("inline-reviewer", "project root", "commit/range", "sandbox_mode = \"read-only\"", "adversary", "security floor", "dispatch_id", "expected_lens", "regular non-symlink", "sha-256", "before consolidation", "stale"):
+    for marker in ("inline-reviewer", "project root", "commit/range", "sandbox_mode = \"read-only\"", "adversary", "security floor", "dispatch_id", "expected_lens", "regular non-symlink", "sha-256", "before consolidation", "stale", "fresh codex session", "explicit restart", "in-memory byte attestation"):
         if marker not in init:
             fail(f"Codex init native inline route missing {marker!r}")
     for retired in ("run_inline_review.mjs", "evidence_manifest", "manifest_digest", "stdin-only", "deny-root"):
@@ -1147,7 +1162,9 @@ def main() -> None:
         "tester", "qa", "security", "adversary", "repository_root", "commit_or_range",
         "sandbox_mode = \"read-only\"", "lens_status", "coverage", "disagreements",
         "target currentness", "review-pr", "output: null", "expected_lens", "dispatch_id",
-        "git diff", "filesystem-root confinement",
+        "git diff", "filesystem-root confinement", "git --no-pager -c <canonical-root>",
+        "--no-textconv", "resolved object ids", "project-derived command string",
+        "profile_session", "fresh session", "in-memory byte attestation",
     ):
         if marker not in native_adapter:
             fail(f"Codex inline-reviewer adapter is missing {marker!r}")
@@ -1159,7 +1176,8 @@ def main() -> None:
         "inline-reviewer", "requested_lenses",
         "required_lenses", "project root", "commit/range", "sandbox_mode = \"read-only\"",
         "adversary", "security floor", "expected_lens", "dispatch_id", "regular non-symlink",
-        "sha-256", "review-pr", "exclusive", "stale",
+        "sha-256", "review-pr", "exclusive", "stale", "fresh codex session", "explicit restart",
+        "in-memory byte attestation",
     ):
         if marker not in init_lower:
             fail(f"Codex init native inline contract is missing {marker!r}")

@@ -157,10 +157,17 @@ transport, or evidence-manifest protocol.
 Before dispatch, Main validates the exact project-or-global agent definition
 selected by Codex against the trusted packaged `inline-reviewer.toml`: it must
 be a regular non-symlink with the exact Terra/high/read-only fields and raw-byte
-SHA-256 digest. Each lens package and return carry a fresh `dispatch_id` and
+SHA-256 digest. That digest does not attest an already-loaded profile: Main
+dispatches only from a fresh Codex session that loaded the verified managed
+profile and records `profile_session` solely as that lifecycle marker, never as
+an in-memory byte attestation. Any install, setup, agent sync, mismatch, or
+scope change requires an explicit restart before inline dispatch; otherwise the
+lens is unavailable. Shipped Codex hooks cannot attest session start or loaded
+agent bytes. Each lens package and return carry a fresh `dispatch_id` and
 matching `expected_lens`; replay, duplicate, substitution, or identity mismatch
-is untrusted. Read-only Git commands defined by Main may inspect deleted lines,
-renames, base-side content, and historical ranges. The reviewer is obligated to
+is untrusted. Codex uses only the shared contract's exact `git --no-pager` argv
+templates with `--no-ext-diff`, `--no-textconv`, resolved object IDs, and `--`
+path separation. The reviewer is obligated to
 stay under the project root, but that is not filesystem confinement: broad
 read-only exposure remains a documented runtime residual.
 
