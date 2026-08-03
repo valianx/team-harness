@@ -70,18 +70,23 @@ each `<oid>^{tree}` under the same discipline, and uses only those IDs. It
 requires the exact clean status check before dispatch and consolidation; dirty
 or concurrently changed targets are unavailable/stale and recaptured. Main-defined
 read-only Git inspection may cover deletions, renames, base-side content, and
-historical ranges only with the shared hardened argv templates:
-`--no-replace-objects`, `--literal-pathspecs`, `-c log.showSignature=false`,
-`--no-ext-diff`, `--no-textconv`, resolved IDs, and `--`-separated validated
-paths. Claude Main MUST use those same templates for its no-Bash reviewer's
-ephemeral immutable Git view or mark the lens unavailable. The reviewer must
+historical ranges only with the shared exact immutable Git environment and argv
+templates: optional locks, config injection, lazy fetches/transports,
+fsmonitor, and automatic maintenance are disabled; `--no-replace-objects`,
+`--literal-pathspecs`, `-c log.showSignature=false`, `--no-ext-diff`,
+`--no-textconv`, resolved IDs, and `--`-separated validated paths are required.
+Preflight every bound commit/tree/blob locally and obtain all tracked evidence
+from bound blobs, never the worktree. Claude Main MUST use those same controls
+for its no-Bash reviewer's ephemeral immutable Git view or mark the lens unavailable. The reviewer must
 stay under the project root, but broad Codex read access is not filesystem
 confinement and remains an explicitly reported residual read-only exposure.
 
-Before consolidation, Main re-resolves the project root and commit/range. A
-moved HEAD or changed target is stale and must be recaptured. Findings,
-disagreements, and limits remain explicit; missing or failed lenses are never
-treated as PASS.
+Before consolidation, Main repeats the exact hardened clean/local-object
+preflight and re-resolves the project root and commit/range. A moved HEAD,
+missing object, or changed target is stale and must be recaptured. Findings,
+disagreements, and limits remain explicit; exact one-return keyed consolidation
+rejects missing, failed, blocking, replayed, duplicate, or substituted lens
+slots as non-pass rather than treating them as PASS.
 
 An intent to review a PR, PR number, or PR URL is routed exclusively to
 `review-pr` before this mode is considered. Inline cannot intercept or rebuild

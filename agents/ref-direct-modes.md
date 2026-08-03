@@ -51,17 +51,21 @@ cannot write, create coordination artifacts, commit, branch, push, publish,
 use network/external state, or dispatch agents. If the native boundary is
 unsupported, the lens is `unavailable`; there is no isolated runner or
 persistent evidence fallback. Codex historical inspection uses only the shared
-contract's exact `git --no-pager` argv templates with `--no-replace-objects`,
-`--literal-pathspecs`, `-c log.showSignature=false`, `--no-ext-diff`,
-`--no-textconv`, resolved object IDs,
-and `--` path separation. Claude has no Bash, and Main MUST use those same
-templates to provide its ephemeral immutable Git view or mark the lens
+contract's exact immutable Git environment and `git --no-pager` argv templates:
+optional locks, config injection, lazy fetching/transports, fsmonitor, and
+automatic maintenance are disabled; replacement objects, literal pathspecs,
+signature helpers, external diff/textconv, resolved IDs, and `--` path
+separation remain mandatory. Main preflights every bound commit/tree/blob and
+reads tracked evidence only from bound blobs, never the worktree. Claude has no
+Bash, and Main MUST use those same controls to provide its ephemeral immutable Git view or mark the lens
 unavailable. The reviewer must
 stay under the project root, but Codex broad read access is a residual role
-obligation rather than filesystem confinement. Main repeats the exact clean
-status check and resolved commit/tree binding before consolidation; dirty or
-concurrently changed targets are stale and recaptured, never certified from
-mutable worktree bytes. Global PASS is fail-closed on
+obligation rather than filesystem confinement. Main repeats the exact hardened
+clean/local-object preflight and resolved commit/tree binding before consolidation;
+dirty, missing-object, or concurrently changed targets are stale and recaptured,
+never certified from mutable worktree bytes. Consolidation is an exact one-return
+keyed join on `(lens, dispatch_id, target_id, coordinates)`; missing, failed,
+blocking, replay, duplicate, and substitution outcomes are non-pass. Global PASS is fail-closed on
 every required lens, target identity, attempt identity, `lens_status: complete`,
 `verdict: pass`, blocker, and unresolved disagreement; Main rejects replay,
 duplicate, substitution, or identity-mismatched returns as `untrusted`.

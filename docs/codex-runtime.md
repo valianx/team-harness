@@ -170,15 +170,19 @@ is untrusted. Main resolves each range endpoint separately with hardened globals
 and `rev-parse --verify --end-of-options <rev>^{commit}`, accepting one full
 commit OID only, binds `<oid>^{tree}`, and uses only those IDs. It rejects
 dash-prefixed/control/range-as-endpoint/abbreviated/multi-output input. Codex
-uses only the shared contract's exact `git --no-pager` argv templates with
-`--no-replace-objects`, `--literal-pathspecs`, `-c log.showSignature=false`,
-`--no-ext-diff`, `--no-textconv`, resolved object IDs, and `--` path separation. Claude Main
-MUST use those same templates for its no-Bash reviewer's ephemeral immutable
-Git view or mark the lens unavailable. The reviewer is obligated to
+uses only the shared contract's exact immutable Git environment and
+`git --no-pager` argv templates: optional locks, config injection, lazy
+fetches/transports, fsmonitor, and automatic maintenance are disabled; replacement
+objects, literal pathspecs, signature helpers, external diff/textconv, resolved
+object IDs, and `--` path separation remain mandatory. Main preflights every
+bound commit/tree/blob locally and reads tracked evidence only from bound blobs,
+never the worktree. Claude Main MUST use those same controls for its no-Bash
+reviewer's ephemeral immutable Git view or mark the lens unavailable. The reviewer is obligated to
 stay under the project root, but that is not filesystem confinement: broad
 read-only exposure remains a documented runtime residual. Main repeats the
-exact clean status and commit/tree binding before consolidation; dirty or
-concurrently changed targets are stale and recaptured rather than certified.
+exact hardened clean/local-object preflight and commit/tree binding before
+consolidation; dirty, missing-object, or concurrently changed targets are stale
+and recaptured rather than certified.
 
 The four lenses are `tester`, `qa`, `security`, and conditional `adversary`.
 The adversary lens is required when the security floor applies or the operator
@@ -189,9 +193,11 @@ executable-code, or security-policy/audit controls; ambiguity is sensitive. A
 lens reports its status,
 verdict, findings, coverage, limits, and disagreements. Main verifies the root
 and commit/range before dispatch and again before consolidation; a moved target
-is stale and cannot produce PASS. Missing, failed, unavailable, stale, or
-untrusted returns remain explicit, and global PASS requires every required lens
-to be complete with `verdict: pass`, no blocker, and no unresolved blocking
+is stale and cannot produce PASS. Consolidation is an exact one-return keyed
+join on `(lens, dispatch_id, target_id, coordinates)`: missing, failed,
+blocking, replayed, duplicate, substituted, unavailable, stale, or untrusted
+slots remain explicit non-pass outcomes. Global PASS requires every required
+lens to be complete with `verdict: pass`, no blocker, and no unresolved blocking
 disagreement. Any PR intent, number, or URL has exclusive `review-pr`
 precedence and retains that flow's snapshot, lens selection, consolidation,
 preview, and publication gate.

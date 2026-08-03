@@ -100,22 +100,27 @@ each endpoint separately using `rev-parse --verify --end-of-options <rev>^{commi
 with exactly one full OID, bind `<oid>^{tree}`, and use only those IDs. Reject
 dash-prefixed, control, range-as-endpoint, abbreviated, or multi-output input;
 dirty/concurrent changes are unavailable or stale and recaptured. Codex uses
-only the shared contract's exact `git --no-pager` argv templates with
+only the shared contract's exact immutable Git environment and `git --no-pager`
+argv templates: optional locks, config injection, lazy fetches/transports,
+fsmonitor, and automatic maintenance are disabled, while
 `--no-replace-objects`, `--literal-pathspecs`, `-c log.showSignature=false`,
-`--no-ext-diff`, `--no-textconv`, resolved object IDs, and `--` path separation;
-never project-derived command strings. Claude reviewers have no Bash: Main MUST use
-those same templates to provide their ephemeral immutable Git view, or the lens
+`--no-ext-diff`, `--no-textconv`, resolved object IDs, and `--` path separation
+remain mandatory. Preflight every bound commit/tree/blob locally and obtain all
+tracked evidence from bound blobs, never the worktree; missing objects are
+unavailable. Never use project-derived command strings. Claude reviewers have no Bash: Main MUST use
+those same controls to provide their ephemeral immutable Git view, or the lens
 is unavailable. Reviewers must limit themselves to the project root: this is
 a role obligation, not a claim that Codex broad read access is filesystem
 confinement. If the runtime cannot enforce the mutation boundary, return
-`lens_status: unavailable`. Before consolidation, re-resolve the repository
-root and commit/range; a moved HEAD or changed target is stale and must be
+`lens_status: unavailable`. Before consolidation, repeat the hardened clean,
+local-object preflight and binding checks; a moved HEAD, missing object, or changed target is stale and must be
 recaptured. Each result returns `lens`, terminal `lens_status`
 (`complete|incomplete|failed|unavailable|untrusted`), matching `dispatch_id`,
 `expected_lens`, `lens`, and `target_id`, verdict, coverage/limits,
 disagreements, and concrete findings. Reject a replay, duplicate, substitution,
-or identity mismatch as `untrusted`. Preserve
-failures and limits; never average verdicts or treat an absent lens as PASS.
+or identity mismatch as `untrusted`. Consolidate by exact one-result keyed join
+on `(lens, dispatch_id, target_id, coordinates)`; missing, failed, blocking,
+replayed, duplicate, or substituted slots are non-pass. Preserve failures and limits; never average verdicts or treat an absent lens as PASS.
 Global PASS requires every `required_lenses` result to be complete with
 `verdict: pass`, matching target identity, no blocker, and no unresolved
 blocking disagreement.

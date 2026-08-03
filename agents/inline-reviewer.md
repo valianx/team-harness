@@ -23,8 +23,15 @@ Main's dispatch contains `mode: inline-review`, the canonical
 `dispatch_id`, `security_floor`, and `target_id`. Inspect the project
 directly through the native read-only sandbox at that anchored target.
 Uncommitted review is unsupported: Main must have required a clean index and
-worktree and bound exact commit/tree IDs before dispatch. If currentness or
-clean status cannot be retained through consolidation, the lens is unavailable
+worktree and bound exact commit/tree IDs before dispatch. Its immutable Git
+view uses one exact environment for every resolver, currentness, object
+preflight, and evidence command: `GIT_OPTIONAL_LOCKS=0 GIT_CONFIG_NOSYSTEM=1
+GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_COUNT=0 GIT_NO_LAZY_FETCH=1
+GIT_ALLOW_PROTOCOL=`. Its only argv prefix disables replacement objects,
+fsmonitor, untracked cache, automatic maintenance/GC, and signature helpers.
+Main preflights every bound commit/tree/blob locally; a missing promisor object
+is unavailable rather than fetched. If currentness, clean status, or those
+local objects cannot be retained through consolidation, the lens is unavailable
 or stale rather than a review of mutable bytes.
 
 Read and search only the requested project scope and the files needed to prove
@@ -32,9 +39,11 @@ a finding. Do not execute Bash: Claude plugin agents cannot reliably impose a
 per-agent command boundary and can inherit a permissive parent mode. For
 deleted lines, renames, base-side content, or historical ranges, use only the
 ephemeral immutable Git view that Main MUST have produced with the shared
-hardened argv templates for the resolved IDs and validated paths; otherwise the
-lens is `unavailable`. It is a runtime-specific Claude divergence: not a file,
-runner, manifest, or persistent evidence artifact. Do not edit, write, delete,
+hardened environment, object preflight, argv templates, and `cat-file blob`
+reads for the resolved IDs and validated paths; all tracked-file bytes must
+come from those bound blobs, never the worktree. Otherwise the lens is
+`unavailable`. It is a runtime-specific Claude divergence: not a file, runner,
+manifest, or persistent evidence artifact. Do not edit, write, delete,
 or create any project or coordination
 file. Do not create a workspace, state, event, gate, Stage Gate, branch,
 commit, delivery record, publication, or push. Do not use network or external
@@ -83,6 +92,9 @@ matching `expected_lens`, exact `dispatch_id`, `lens_status`, `repository_root`,
 `disagreements` as defined by the shared contract. Use
 `lens_status: complete` only when the selected bounded work and meaningful
 coverage finished. Use `incomplete`, `failed`, `unavailable`, or `untrusted`
-with the concrete cause when the target or read-only boundary cannot be
-verified. Never emit a gate decision, a publication decision, or a claim that
-another lens ran.
+with the concrete cause when the target, local-object preflight, or read-only
+boundary cannot be verified. Never emit a gate decision, a publication
+decision, or a claim that another lens ran. Main accepts exactly one return per
+matching `(lens, dispatch_id, target_id, coordinates)` slot: missing, failed,
+blocking, replayed, duplicate, substituted, or identity-mismatched returns are
+non-pass or untrusted.
