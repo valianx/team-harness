@@ -10,7 +10,9 @@ single-writer ownership, and gate input aliases.
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -921,7 +923,7 @@ def check_inline_markers(contract: str) -> None:
     contract = contract.lower()
     for marker in markers:
         require(marker in contract, f"inline contract missing {marker!r}")
-    for marker in ("edit or write", "network", "publication", "external state", "untrusted", "isolated runner", "unavailable", "git --no-pager", "--no-ext-diff", "--no-textconv", "resolved object ids", "project-derived command", "filesystem-root confinement", "fresh codex session", "in-memory byte attestation"):
+    for marker in ("edit or write", "network", "publication", "external state", "untrusted", "isolated runner", "unavailable", "git --no-pager", "--no-replace-objects", "--literal-pathspecs", "--no-ext-diff", "--no-textconv", "resolved object ids", "canonical repo-relative", "root-contained", "traversal", "control characters", "project-derived command", "filesystem-root confinement", "fresh codex session", "in-memory byte attestation"):
         require(marker in contract, f"inline tool boundary missing {marker!r}")
     for marker in ("every `required_lenses`", "no blocker", "unresolved blocking disagreement", "never averages verdicts", "absent", "return as pass", "verdict: pass"):
         require(marker in contract, f"inline consolidation rule missing {marker!r}")
@@ -929,6 +931,63 @@ def check_inline_markers(contract: str) -> None:
         require(marker in contract, f"inline attempt-identity rule missing {marker!r}")
     for retired in ("evidence_manifest", "manifest_digest", "allowed_roots", "run_inline_review.mjs"):
         require(retired not in contract, f"inline contract retains retired protocol field {retired!r}")
+
+
+def check_inline_git_hardening() -> None:
+    """Replacement refs and pathspec magic cannot alter inline Git evidence."""
+    contract = read("agents/_shared/inline-review-contract.md")
+    templates = (
+        "git --no-pager --no-replace-objects --literal-pathspecs -C <canonical-root> diff --no-ext-diff --no-textconv <base-oid> <head-oid> -- <path>...",
+        "git --no-pager --no-replace-objects --literal-pathspecs -C <canonical-root> show --no-ext-diff --no-textconv <object-oid> -- <path>...",
+        "git --no-pager --no-replace-objects --literal-pathspecs -C <canonical-root> log -p --no-ext-diff --no-textconv <base-oid>..<head-oid> -- <path>...",
+    )
+    for template in templates:
+        require(template in contract, f"inline contract misses hardened template: {template}")
+    require(
+        "For Claude, the\nsemantic reviewer has no Bash capability, so Main MUST use the same hardened\nargv templates" in contract,
+        "Claude Main may diverge from Codex hardened Git templates",
+    )
+
+    with tempfile.TemporaryDirectory() as temporary:
+        repo = Path(temporary)
+
+        def git(*args: str) -> str:
+            result = subprocess.run(
+                ("git", *args), cwd=repo, check=True, text=True,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+            return result.stdout
+
+        git("init", "-q")
+        git("config", "user.email", "inline@example.invalid")
+        git("config", "user.name", "Inline Test")
+        (repo / "normal.txt").write_text("normal\n")
+        (repo / ":(glob)*.txt").write_text("literal\n")
+        git("add", "--all")
+        git("commit", "-qm", "first")
+        first = git("rev-parse", "HEAD").strip()
+        first_tree = git("rev-parse", f"{first}^{{tree}}").strip()
+        (repo / "normal.txt").write_text("replacement\n")
+        git("commit", "-am", "second", "-q")
+        second = git("rev-parse", "HEAD").strip()
+        git("replace", first, second)
+
+        hardened_tree = git(
+            "--no-pager", "--no-replace-objects", "--literal-pathspecs", "-C", str(repo),
+            "rev-parse", f"{first}^{{tree}}",
+        ).strip()
+        require(hardened_tree == first_tree, "replace ref altered hardened revision binding")
+        literal = git(
+            "--no-pager", "--no-replace-objects", "--literal-pathspecs", "-C", str(repo),
+            "show", "--no-ext-diff", "--no-textconv", first, "--", ":(glob)*.txt",
+        )
+        require("+literal" in literal and "+normal" not in literal, "pathspec magic was not treated literally")
+
+    for invalid in ("/absolute", "../traversal", "dir/../traversal", "bad\x00path", "bad\npath"):
+        absolute = invalid.startswith("/")
+        traversal = any(part == ".." for part in invalid.split("/"))
+        control = any(ord(character) < 32 or ord(character) == 127 for character in invalid)
+        require(absolute or traversal or control, f"invalid path escaped validation: {invalid!r}")
 
 
 def check_pr_precedence(source: str, text: str) -> None:
@@ -1773,6 +1832,7 @@ def main() -> None:
         ("sensitive inline authorization", check_sensitive_inline_authorization),
         ("ad-hoc review boundary", check_ad_hoc_review_boundary),
         ("inline review contract", check_inline_review_contract),
+        ("inline Git hardening", check_inline_git_hardening),
         ("single ship delivery", check_single_ship_delivery),
         ("delivery preview binding", check_delivery_preview_binding),
         ("terminal/transition mapping", check_terminal_and_transition_mapping),

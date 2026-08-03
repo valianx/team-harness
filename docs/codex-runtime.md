@@ -166,8 +166,10 @@ lens is unavailable. Shipped Codex hooks cannot attest session start or loaded
 agent bytes. Each lens package and return carry a fresh `dispatch_id` and
 matching `expected_lens`; replay, duplicate, substitution, or identity mismatch
 is untrusted. Codex uses only the shared contract's exact `git --no-pager` argv
-templates with `--no-ext-diff`, `--no-textconv`, resolved object IDs, and `--`
-path separation. The reviewer is obligated to
+templates with `--no-replace-objects`, `--literal-pathspecs`, `--no-ext-diff`,
+`--no-textconv`, resolved object IDs, and `--` path separation. Claude Main
+MUST use those same templates for its no-Bash reviewer's ephemeral immutable
+Git view or mark the lens unavailable. The reviewer is obligated to
 stay under the project root, but that is not filesystem confinement: broad
 read-only exposure remains a documented runtime residual.
 

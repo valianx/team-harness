@@ -45,9 +45,11 @@ file-upload, data-access/export, executable-code, or security-policy/audit
 controls; ambiguity is sensitive. Every lens receives a fresh `dispatch_id` and
 matching `expected_lens`; replayed, duplicated, substituted, or mismatched
 returns are untrusted. Codex historical inspection uses only the shared
-contract's exact `git --no-pager` argv templates with `--no-ext-diff`,
-`--no-textconv`, resolved object IDs, and `--` path separation; Claude has no
-Bash and receives only Main's ephemeral immutable Git view. Reviewers must stay
+contract's exact `git --no-pager` argv templates with `--no-replace-objects`,
+`--literal-pathspecs`, `--no-ext-diff`, `--no-textconv`, resolved object IDs,
+and `--` path separation; Claude has no Bash, so Main MUST use those same
+templates for its ephemeral immutable Git view or mark the lens unavailable.
+Reviewers must stay
 under the project root. The read-only boundary prevents mutation but does not enforce
 filesystem confinement, so broader read-only exposure remains explicit. A moved
 root or commit/range is stale and cannot produce PASS; missing, failed,

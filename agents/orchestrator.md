@@ -95,10 +95,11 @@ runner, captured-content manifest, or precaptured-evidence fallback.
 The native boundary forbids edits/writes, workspace or coordination artifacts,
 commits, branches, pushes, publication, network/external mutation, and agent
 dispatch. Codex uses only the shared contract's exact `git --no-pager` argv
-templates with `--no-ext-diff`, `--no-textconv`, resolved object IDs, and `--`
-path separation; never project-derived command strings. Claude reviewers have
-no Bash and receive only Main's ephemeral immutable Git view for historical
-evidence. Reviewers must limit themselves to the project root: this is
+templates with `--no-replace-objects`, `--literal-pathspecs`, `--no-ext-diff`,
+`--no-textconv`, resolved object IDs, and `--` path separation; never
+project-derived command strings. Claude reviewers have no Bash: Main MUST use
+those same templates to provide their ephemeral immutable Git view, or the lens
+is unavailable. Reviewers must limit themselves to the project root: this is
 a role obligation, not a claim that Codex broad read access is filesystem
 confinement. If the runtime cannot enforce the mutation boundary, return
 `lens_status: unavailable`. Before consolidation, re-resolve the repository

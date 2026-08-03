@@ -47,9 +47,11 @@ cannot write, create coordination artifacts, commit, branch, push, publish,
 use network/external state, or dispatch agents. If the native boundary is
 unsupported, the lens is `unavailable`; there is no isolated runner or
 persistent evidence fallback. Codex historical inspection uses only the shared
-contract's exact `git --no-pager` argv templates with `--no-ext-diff`,
-`--no-textconv`, resolved object IDs, and `--` path separation. Claude has no
-Bash and receives only Main's ephemeral immutable Git view. The reviewer must
+contract's exact `git --no-pager` argv templates with `--no-replace-objects`,
+`--literal-pathspecs`, `--no-ext-diff`, `--no-textconv`, resolved object IDs,
+and `--` path separation. Claude has no Bash, and Main MUST use those same
+templates to provide its ephemeral immutable Git view or mark the lens
+unavailable. The reviewer must
 stay under the project root, but Codex broad read access is a residual role
 obligation rather than filesystem confinement. Global PASS is fail-closed on
 every required lens, target identity, attempt identity, `lens_status: complete`,

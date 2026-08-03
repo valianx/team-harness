@@ -61,8 +61,12 @@ and a normalized verdict; global PASS is fail-closed on every required lens
 with both `lens_status: complete` and `verdict: pass`. Reject replayed,
 duplicate, substituted, or identity-mismatched returns as `untrusted`. There is
 no Freeze/Gate semantic in this mode. Main-defined read-only Git inspection may
-cover deletions, renames, base-side content, and historical ranges. The reviewer
-must stay under the project root, but broad Codex read access is not filesystem
+cover deletions, renames, base-side content, and historical ranges only with the
+shared hardened argv templates: `--no-replace-objects`, `--literal-pathspecs`,
+`--no-ext-diff`, `--no-textconv`, resolved IDs, and `--`-separated validated
+paths. Claude Main MUST use those same templates for its no-Bash reviewer's
+ephemeral immutable Git view or mark the lens unavailable. The reviewer must
+stay under the project root, but broad Codex read access is not filesystem
 confinement and remains an explicitly reported residual read-only exposure.
 
 Before consolidation, Main re-resolves the project root and commit/range. A
