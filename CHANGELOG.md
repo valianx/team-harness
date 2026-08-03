@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Kept plan review explicitly opt-in and moved `qa` from `sonnet/high` to `opus/xhigh`, so
+  both the single authoritative design pass and final evidence-backed acceptance use the most
+  capable tier without adding automatic plan-review rounds.
+
+### Fixed
+
+- Replaced automatic validation correction loops with one explicit live decision over the
+  complete failed fan. Each authorization permits exactly one bounded correction, new Freeze,
+  and fresh full validation; later failures pause again, and recovery rejects stale, reused, or
+  mismatched correction authority.
+
 ## [3.8.0] - 2026-08-03
 
 ### Added

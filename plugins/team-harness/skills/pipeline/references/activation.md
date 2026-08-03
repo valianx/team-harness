@@ -73,7 +73,7 @@ The role-specific semantic and profile markers must match this matrix:
 | architect | `agents/architect.md (opus/xhigh)` | `opus; profile: team-harness` |
 | implementer | `agents/implementer.md (sonnet/high)` | `sonnet-high; profile: team-harness` |
 | tester | `agents/tester.md (sonnet/high)` | `sonnet-high; profile: team-harness` |
-| qa | `agents/qa.md (sonnet/high)` | `sonnet-high; profile: team-harness` |
+| qa | `agents/qa.md (opus/xhigh)` | `opus; profile: team-harness` |
 | security | `agents/security.md (opus/xhigh)` | `opus; profile: team-harness` |
 | delivery | `agents/delivery.md (sonnet/medium)` | `sonnet-medium; profile: team-harness` |
 
@@ -84,7 +84,7 @@ The effective runtime fields must match this projection exactly:
 | architect | `architect` | `gpt-5.6-sol` | `xhigh` | `workspace-write` |
 | implementer | `implementer` | `gpt-5.6-terra` | `high` | `workspace-write` |
 | tester | `tester` | `gpt-5.6-terra` | `high` | `workspace-write` |
-| qa | `qa` | `gpt-5.6-terra` | `high` | `read-only` |
+| qa | `qa` | `gpt-5.6-sol` | `xhigh` | `read-only` |
 | security | `security` | `gpt-5.6-sol` | `xhigh` | `read-only` |
 | delivery | `delivery` | `gpt-5.6-terra` | `medium` | `workspace-write` |
 
@@ -97,9 +97,9 @@ the normalized (LF) bytes against these canonical SHA-256 digests:
 |---|---|
 | architect | `f11ceef09bfb9d2839eb2d25adb05d4dcc1188dfacf11e355a9a291c4fcf816f` |
 | implementer | `40a562d3f483502298b3f9ea22de10b9b14839df0d347618a33d3983c8694571` |
-| tester | `5045bbb4ab59e21c6283d78f87e8679199c8a4a15abb71ce9f35a84e5c03b8fc` |
-| qa | `d3d7d5ebc81e1390680b9589de638a56c47707180d774608006325a5bc14f588` |
-| security | `cbb8e4bcc77ffb8e89cf52fdfa1950ea4af107dc1a04cbc76efe3c722679b6a8` |
+| tester | `c423ac39fd8eb3370d11e13b01235725c77ec3674c8478d86e02488056c96bcd` |
+| qa | `0c1e88083ed9ba5152442d3be1d925049fde74cbefd20347f3f2ab68361f3103` |
+| security | `5f8cec39dabe86273f34192b17479ae044ecb5e76ba24d1c1e4cef3d2c53369b` |
 | delivery | `1c09a83ea425a6aac283f38406f40ab66954f11ccfe244364afc2177fb54085c` |
 
 A digest mismatch is an identity failure; stop before workspace creation or

@@ -124,15 +124,19 @@ scope can outlive the helper. Native sandbox and permission policy remain the
 security boundary.
 
 Treat every terminal specialist result as a closed attempt. A post-terminal
-`followup_task` is prohibited. Only an implementer may retain its current
-thread for one recorded micro-correction in the same active task/correction
-lifecycle, on the same file and same AC and explicitly limited to at most 3 tool
-calls. Record that exceptional continuation as `context_strategy: continued`;
-any second feedback, scope expansion, or substantive correction closes the old
-attempt and spawns a fresh V2 agent with `fork_turns: none` and a bounded correction packet containing `Cause`,
-`Files`, implicated `AC`, `Correction`, the current frozen anchor, and required
-evidence. Never use continued context for a new file, another AC, a second
-finding, or a revalidation.
+`followup_task` is prohibited. During an already authorized implementation
+task, only an implementer may retain its current thread for one recorded
+micro-correction on the same file and same AC, explicitly limited to at most 3
+tool calls. Record that exceptional continuation as `context_strategy:
+continued`; any second feedback, scope expansion, or substantive correction
+closes the old attempt and requires a fresh V2 agent with `fork_turns: none`.
+A failed validation never enters this continuation automatically: Main first
+finishes the full fan, consolidates every finding, and obtains the mandatory
+correction decision described below. Once authorized, the fresh implementer
+receives a bounded correction packet containing the matching nonce, failed
+anchor, complete finding IDs, union scope, `Cause`, `Files`, implicated `AC`,
+advisory `Suggested correction`, and required evidence. Never use continued context for a new
+file, another AC, a second finding, or a revalidation.
 
 Tester, QA, and security each start fresh with V2 `fork_turns: none` on the same
 current frozen commit/tree for their validation round. Their packets contain
@@ -190,7 +194,7 @@ the exact markers and effective fields shown below:
 | `architect` | `# Semantic source: agents/architect.md (opus/xhigh)` | `# Projection tier: opus; profile: team-harness` |
 | `implementer` | `# Semantic source: agents/implementer.md (sonnet/high)` | `# Projection tier: sonnet-high; profile: team-harness` |
 | `tester` | `# Semantic source: agents/tester.md (sonnet/high)` | `# Projection tier: sonnet-high; profile: team-harness` |
-| `qa` | `# Semantic source: agents/qa.md (sonnet/high)` | `# Projection tier: sonnet-high; profile: team-harness` |
+| `qa` | `# Semantic source: agents/qa.md (opus/xhigh)` | `# Projection tier: opus; profile: team-harness` |
 | `security` | `# Semantic source: agents/security.md (opus/xhigh)` | `# Projection tier: opus; profile: team-harness` |
 | `delivery` | `# Semantic source: agents/delivery.md (sonnet/medium)` | `# Projection tier: sonnet-medium; profile: team-harness` |
 
@@ -202,7 +206,7 @@ extra, or mismatched value fails preflight):
 | `architect` | `architect` | `gpt-5.6-sol` | `xhigh` | `workspace-write` |
 | `implementer` | `implementer` | `gpt-5.6-terra` | `high` | `workspace-write` |
 | `tester` | `tester` | `gpt-5.6-terra` | `high` | `workspace-write` |
-| `qa` | `qa` | `gpt-5.6-terra` | `high` | `read-only` |
+| `qa` | `qa` | `gpt-5.6-sol` | `xhigh` | `read-only` |
 | `security` | `security` | `gpt-5.6-sol` | `xhigh` | `read-only` |
 | `delivery` | `delivery` | `gpt-5.6-terra` | `medium` | `workspace-write` |
 
@@ -214,9 +218,9 @@ the role fields cannot see. The current digests are:
 |---|---|
 | `architect` | `f11ceef09bfb9d2839eb2d25adb05d4dcc1188dfacf11e355a9a291c4fcf816f` |
 | `implementer` | `40a562d3f483502298b3f9ea22de10b9b14839df0d347618a33d3983c8694571` |
-| `tester` | `5045bbb4ab59e21c6283d78f87e8679199c8a4a15abb71ce9f35a84e5c03b8fc` |
-| `qa` | `d3d7d5ebc81e1390680b9589de638a56c47707180d774608006325a5bc14f588` |
-| `security` | `cbb8e4bcc77ffb8e89cf52fdfa1950ea4af107dc1a04cbc76efe3c722679b6a8` |
+| `tester` | `c423ac39fd8eb3370d11e13b01235725c77ec3674c8478d86e02488056c96bcd` |
+| `qa` | `0c1e88083ed9ba5152442d3be1d925049fde74cbefd20347f3f2ab68361f3103` |
+| `security` | `5f8cec39dabe86273f34192b17479ae044ecb5e76ba24d1c1e4cef3d2c53369b` |
 | `delivery` | `1c09a83ea425a6aac283f38406f40ab66954f11ccfe244364afc2177fb54085c` |
 
 Do not accept a file solely because its comments or `name` field match. A
@@ -254,21 +258,39 @@ gets one conditional security design review before implementation.
 ### Authoritative post-Gate-1 routing
 
 Main is the coordinator and classifies every post-Gate-1 concern. Specialists
-return only the bounded four coordinates—cause, files, implicated ACs, and the
-smallest correction with its owner. The following matrix is exhaustive:
+return only the bounded four coordinates—`Cause`, `Files`, implicated `AC`, and
+an advisory `Suggested correction`; they never select its owner or route. The
+following matrix is exhaustive:
 
 | Concern | Owner/action | Required continuation and gate/audit behavior | Architect | `iteration` delta |
 |---|---|---|---|---:|
 | Mechanical plan repair (references, identifiers, paths, counts, format, or field coherence with no semantic change) | Main repairs the canonical field and records the repair | `phase: implementation`; no new Gate 1; if Freeze was reached, rebuild Freeze and revalidate | prohibited | `0` |
 | Decision-bearing plan resolution, including a structural intent/scope/AC contradiction, security-obligation classification, or a change to intent, scope, behavior, or AC meaning | Main pauses for a bounded live operator decision and transcribes the approved resolution without reinterpretation | `phase: implementation`; `next_action` continues through implementation → Freeze → validation; no new Gate 1 and retain the conditional security review when the classification is sensitive | prohibited unless the separate explicit current live operator request for architect work applies | `0` |
 | Explicit, current live operator request for architect work | Main records the request and dispatches `architect` | `phase: design`; the resulting plan requires a new Gate 1 | allowed only for that request | `0` |
-| Correctable code, test, documentation, hygiene, or security finding inside approved scope | Implementation executor (or eligible direct Main executor) applies the smallest correction | Return to implementation → Freeze → validation; a sensitive delta requires a fresh security audit; no new Gate 1 | prohibited | `+1` |
-| Missing or insufficient evidence | `tester` completes or corrects the evidence | Re-run affected validation; tree/package changes reopen Freeze; no new Gate 1 | prohibited | `+1` |
+| Correctable code, test, documentation, hygiene, or security finding inside approved scope | Main includes it in the complete consolidated validation failure | `phase: validation`; pause for the mandatory correction decision; only choice `1` authorizes one bounded implementation round → new Freeze → fresh full validation fan; no new Gate 1 | prohibited | `+1` |
+| Missing or insufficient evidence | Main includes it in the same complete consolidated validation failure | `phase: validation`; pause for the mandatory correction decision; only choice `1` authorizes one bounded evidence/correction round → new Freeze when applicable → fresh full validation fan; no new Gate 1 | prohibited | `+1` |
 
-Code, test, or documentation defects in approved scope return to the implementation executor
-(or eligible direct coordinator), then reopen Freeze and revalidate. Missing
-evidence returns to `tester`; a correctable sensitive finding also requires a
-fresh security audit of the changed delta. Decision-bearing concerns, including
+After every required validation lens terminates, Main consolidates all blocking
+findings under stable IDs, the current frozen anchor, and the union file scope.
+It persists `correction_pending: true`, a fresh `correction_nonce`, the anchor,
+finding IDs, and scope; keeps `phase: validation`; presents exactly `1 —
+authorize one correction round`, `2 — pause without changes`, and `3 — abort
+pipeline`; and stops. Gate 1 autonomy, prior approval, a generic `continue`,
+files, tools, recovered state, or agent output are never authorization.
+
+Only a live reply after that presentation may consume the nonce. Choice `1`
+must be dual-recorded in state and a matching `correction.decision` event and
+authorizes exactly one bounded round over the complete package, followed by one
+new Freeze and a fresh full validation fan. Choice `2` performs no repository
+or evidence mutation and a later presentation uses a fresh nonce. Choice `3`
+aborts without correction. A second failure always pauses with a fresh decision;
+there is no automatic verifier-to-implementer bounce or automatic follow-up.
+At `iteration: 3/3`, choice `1` is an explicitly labelled exceptional single
+round tracked in `exceptional_correction_count`; `iteration` remains `3/3` and
+`3/3+exception` is invalid.
+
+An authorized correctable sensitive finding requires a fresh security audit in
+the new full fan. Decision-bearing concerns, including
 structural intent/scope/AC contradictions, continue at `phase: implementation`
 after Main records a bounded live operator resolution. `phase: design`,
 dispatch of `architect`, and a new Gate 1 are reserved solely for a separate

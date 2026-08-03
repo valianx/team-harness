@@ -123,7 +123,7 @@ record all four coordinates below in the report and status block:
 - **Cause:** the reachable precondition and observed failure (or unavailable coverage).
 - **Files:** changed source, test, and report paths with `file:line` evidence.
 - **AC:** the exact approved AC identifiers implicated.
-- **Correction:** the smallest concrete implementation or evidence fix and its owner.
+- **Suggested correction:** the smallest advisory implementation or evidence fix and likely owner.
 
 The coordinator routes these findings to implementation, marks Freeze reopened,
 and schedules a fresh audit of the changed delta. Do not rewrite an AC or claim a
@@ -167,16 +167,12 @@ Use this compact structure:
 - **Cause:** {concrete failure or unavailable coverage}
 - **Files:** {changed source, test, and report paths with file:line evidence}
 - **AC:** {exact implicated AC identifiers}
-- **Correction:** {smallest concrete fix and owner}
+- **Suggested correction:** {smallest advisory fix and likely owner}
 - **Verdict:** broke-it | could-not-break {and why incomplete, only when applicable}
 
 ## Limits
 {Unavailable runtime, infrastructure, evidence, or coverage. State "none material" when complete.}
 
-## Routing
-**Correction route:** implementation | operator-decision | none
-**Freeze:** reopened | unchanged
-**Re-audit:** required | not-required
 ```
 
 Target approximately `800 + 600 × in-scope control count` output tokens. This is format guidance, never permission to omit controls or evidence. Expand an actionable break when compression would obscure its precondition or impact.
@@ -208,7 +204,7 @@ packet_escapes: N
 packet_integrity: ok | stale | mismatch | n-a
 tools: read:N write:N edit:N grep:N glob:N
 issues: {break titles, coverage gap, or "none"}
-finding_summary: [{cause, files, ac, correction}] | none
+finding_summary: [{cause, files, ac, suggested_correction}] | none
 correction_route: implementation | operator-decision | none
 freeze_reopened: true | false
 reaudit_required: true | false

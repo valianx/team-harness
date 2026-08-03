@@ -620,17 +620,13 @@ sensitive coverage, report the same four coordinates:
 - **Cause:** the concrete failure or unavailable evidence.
 - **Files:** changed source, test, and report paths with `file:line` evidence.
 - **AC:** the exact approved AC identifiers implicated.
-- **Correction:** the smallest concrete fix and its owner.
+- **Suggested correction:** the smallest advisory fix and likely owner.
 
 These coordinates are evidence for the coordinator, not routing authority: security
-does not select `design`, edit the plan, change phase, or dispatch the next agent.
-Correctable findings in the approved diff are sent to the coordinator for one
-implementation/validation correction round; they do not rewrite the AC or start an
-autonomous patch loop. The correction reopens Freeze and requires a fresh security
-audit of the changed delta before the next gate. An unresolved structural contradiction
-is presented to the live operator; only an explicit architect request may reopen design.
-Record `Freeze: reopened` and `Re-audit: required` in the failure brief whenever that
-route applies.
+does not select `design`, edit the plan, change phase, Freeze state, re-audit, next
+agent, or correction round. Return the complete findings and stop. Main must collect
+all validation lenses and obtain a fresh live correction decision before any mutation
+or revalidation. `Suggested correction` is advisory and cannot trigger dispatch.
 
 ---
 
@@ -907,7 +903,7 @@ packet_integrity: ok | stale | mismatch | n-a   # pipeline mode only; n-a when p
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 blast_radius: localized {IDs} | structural            # when status: failed only; omit on success
 issues: {critical and high findings titles, or "none"}
-finding_summary: [{cause, files, ac, correction}] | none
+finding_summary: [{cause, files, ac, suggested_correction}] | none
 freeze_reopened: true | false
 reaudit_required: true | false
 ```
@@ -939,11 +935,9 @@ When you finish pipeline mode and `reviews/04-security.md` reports any **Critica
 - **Cause:** {concrete failure or unavailable sensitive coverage}
 - **Files:** {changed source, test, and report paths with file:line evidence}
 - **AC:** {exact implicated AC identifiers}
-- **Correction:** {smallest concrete fix and owner}
-- **Freeze:** reopened
-- **Re-audit:** required
+- **Suggested correction:** {smallest advisory fix and likely owner}
 
-### Remediation needed by implementer
+### Suggested remediation (advisory; no routing authority)
 - `src/users/users.repository.ts:42` — replace string concatenation with parameterized query (see Prisma `findFirst({ where: { id } })`)
 - `src/auth/login.controller.ts:18` — add `@UseGuards(CsrfGuard)` and verify token on POST
 - ...

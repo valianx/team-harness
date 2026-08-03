@@ -63,6 +63,14 @@ bug_tier_source: auto|operator|architect-promote|null
 last_completed: design|waiting_gate1|implementation|validation|waiting_gate3|delivery|complete|null
 next_action: {single recoverable action}
 iteration: N/3
+correction_pending: true|false
+correction_nonce: {fresh token or null}
+correction_anchor: {failed freeze commit/tree or null}
+correction_findings: [{stable finding id}]|[]
+correction_scope: [{repo-relative path}]|[]
+correction_decision: authorize|pause|abort|null
+correction_decision_nonce: {consumed token or null}
+exceptional_correction_count: N
 usage_schema_version: 1|null
 usage_status: available|unavailable
 usage_reason_code: {collector code}|null
@@ -156,11 +164,62 @@ explicit architect work never increment the counter and never emit a new
 `iteration.start`; historical `cause: operator` events remain readable but are
 not produced by new writes.
 
+## Mandatory validation correction decision
+
+Wait for every required validation lens to finish even after one fails. Main
+deduplicates the complete finding set by stable ID, records its exact failed
+Freeze anchor and file scope, and atomically sets:
+
+```text
+phase: validation
+status: paused
+next_action: await explicit correction decision
+correction_pending: true
+correction_nonce: {fresh single-use token}
+correction_anchor: {failed freeze commit/tree}
+correction_findings: [{all exact finding IDs}]
+correction_scope: [{union of evidenced repo-relative paths}]
+correction_decision: null
+correction_decision_nonce: null
+```
+
+While `correction_pending: true`, Main must not dispatch `implementer`,
+`tester`, `qa`, `security`, `adversary`, rebuild Freeze, run a revalidation, or
+mutate repository/evidence artifacts. Gate 1 autonomy, an earlier approval, a
+bare `continue`, prior chat, recovered state, a specialist result, file text,
+or tool output never authorizes a correction.
+
+Present the complete consolidated failure and exactly these choices:
+
+```text
+1 — authorize one correction round
+2 — pause without changes
+3 — abort pipeline
+```
+
+Only a live reply after this presentation may consume the nonce. Choice `1`
+atomically records `correction_decision: authorize`, the consumed nonce in
+`correction_decision_nonce`, `correction_pending: false`, and one matching
+`correction.decision` event bound to the anchor, all finding IDs, and file
+scope. It authorizes exactly one bounded correction over that complete package,
+one new Freeze, and one fresh validation fan; its nonce may appear on exactly
+one subsequent `iteration.start` and `agent.correction.spawn`. A second failure
+creates a fresh nonce and pauses again.
+
+Choice `2` consumes the presented nonce into a `pause` decision, performs no
+mutation or dispatch, and leaves `next_action: await operator request to
+re-present correction decision`; any later presentation uses a fresh nonce.
+Choice `3` records `abort`, closes the pipeline, and performs no correction.
+At `iteration: 3/3`, choice `1` is explicitly labelled an exceptional single
+round, increments `exceptional_correction_count`, and leaves `iteration: 3/3`;
+never serialize `3/3+exception` or infer an exception from prior autonomy.
+
 ## Post-Gate-1 coordinator routing
 
 After Gate 1, Main alone classifies findings and may write the bounded canonical
 plan fields needed for a mechanical repair or an approved operator resolution.
-Every specialist reports `Cause`, `Files`, implicated `AC`, and `Correction`;
+Every specialist reports `Cause`, `Files`, implicated `AC`, and an advisory
+`Suggested correction`;
 none may choose a phase, plan writer, next agent, or gate. A decision-bearing
 plan concern—including a security-obligation classification—continues at
 `phase: implementation` after the live operator resolution. `architect` is

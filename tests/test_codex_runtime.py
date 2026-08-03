@@ -94,8 +94,8 @@ EXPECTED_POST_GATE1 = {
     "mechanical": ("main", "implementation", "prohibited", "none", 0),
     "decision": ("main", "implementation", "explicit-only", "none", 0),
     "architect-request": ("main", "design", "allowed", "new-gate1", 0),
-    "implementation": ("implementation", "implementation", "prohibited", "none", 1),
-    "evidence": ("tester", "validation", "prohibited", "none", 1),
+    "implementation": ("main", "validation", "prohibited", "none", 1),
+    "evidence": ("main", "validation", "prohibited", "none", 1),
 }
 
 
@@ -260,12 +260,13 @@ def _check_qa_post_gate1_route(validation: str) -> None:
         _assert_no_automatic_design_route(text, context)
         _assert_markers(
             re.sub(r"\s+", " ", text.lower()),
-            ("separate explicit current live operator request for architect work",),
+            ("suggested correction",),
             context,
         )
     qa_markers = (
         "return exactly four-coordinate input to main",
         "never select `design` or `architect`",
+        "never request or trigger a follow-up round",
         "ac-n: pass",
         "only writer",
         "checkbox mirror",
@@ -352,7 +353,7 @@ def main() -> None:
         "architect": ("opus/xhigh", "opus"),
         "implementer": ("sonnet/high", "sonnet-high"),
         "tester": ("sonnet/high", "sonnet-high"),
-        "qa": ("sonnet/high", "sonnet-high"),
+        "qa": ("opus/xhigh", "opus"),
         "security": ("opus/xhigh", "opus"),
         "inline-reviewer": ("sonnet/high", "sonnet-high"),
         "delivery": ("sonnet/medium", "sonnet-medium"),
@@ -1479,9 +1480,9 @@ def main() -> None:
     expected_updated_digests = {
         "architect": "f11ceef09bfb9d2839eb2d25adb05d4dcc1188dfacf11e355a9a291c4fcf816f",
         "implementer": "40a562d3f483502298b3f9ea22de10b9b14839df0d347618a33d3983c8694571",
-        "tester": "5045bbb4ab59e21c6283d78f87e8679199c8a4a15abb71ce9f35a84e5c03b8fc",
-        "qa": "d3d7d5ebc81e1390680b9589de638a56c47707180d774608006325a5bc14f588",
-        "security": "cbb8e4bcc77ffb8e89cf52fdfa1950ea4af107dc1a04cbc76efe3c722679b6a8",
+        "tester": "c423ac39fd8eb3370d11e13b01235725c77ec3674c8478d86e02488056c96bcd",
+        "qa": "0c1e88083ed9ba5152442d3be1d925049fde74cbefd20347f3f2ab68361f3103",
+        "security": "5f8cec39dabe86273f34192b17479ae044ecb5e76ba24d1c1e4cef3d2c53369b",
         "delivery": "1c09a83ea425a6aac283f38406f40ab66954f11ccfe244364afc2177fb54085c",
     }
     if set(activation_digests) != pipeline_roles or activation_digests != pipeline_digests:

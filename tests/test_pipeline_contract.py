@@ -84,10 +84,8 @@ EXPECTED_POST_GATE1: dict[str, TransitionOutcome] = {
     "architect-request": TransitionOutcome(
         "main", "design", "allowed", "new-gate1", 0
     ),
-    "implementation": TransitionOutcome(
-        "implementation", "implementation", "prohibited", "none", 1
-    ),
-    "evidence": TransitionOutcome("tester", "validation", "prohibited", "none", 1),
+    "implementation": TransitionOutcome("main", "validation", "prohibited", "none", 1),
+    "evidence": TransitionOutcome("main", "validation", "prohibited", "none", 1),
 }
 
 
@@ -266,7 +264,7 @@ def _claude_decision_route_contracts() -> tuple[tuple[str, str], ...]:
     """Return Claude post-Gate-1 sections where decisions could select a phase."""
     pipeline = read("agents/ref-pipeline.md")
     return _claude_security_obligation_contracts() + (
-        ("Claude iteration rules", section(pipeline, "## Iteration rules", "### Cost-ordered re-run — R0 → R1 → R2")),
+        ("Claude iteration rules", section(pipeline, "## Iteration rules", "## Phase timeouts")),
         ("Claude final-result correction", _claude_transition_sections(pipeline)[1]),
         ("Claude audit correction", section(pipeline, "### The audit never iterates", "### Knowledge write on audit findings")),
     )
@@ -315,14 +313,14 @@ def _require_codex_security_obligation_route() -> None:
 
 def _require_iteration_cause_contract() -> None:
     """Keep fresh correction events verification-only while retaining old history."""
-    iteration = section(read("agents/ref-pipeline.md"), "### `cause` and the severity floor", "### Pre-dispatch gate over a Phase-3 correction round's findings").lower()
+    iteration = section(read("agents/ref-pipeline.md"), "### `cause` and the severity floor", "### Pre-decision consolidation over a failed validation fan").lower()
     iteration_flat = re.sub(r"\s+", " ", iteration)
     state_iteration = re.sub(r"\s+", " ", read("agents/_shared/orchestrator-state.md").lower())
     require(
-        "new `iteration.start` events are correction-only" in iteration_flat
+        "new `iteration.start` events are authorized-correction-only" in iteration_flat
         and "new writers emit only `cause: verification`" in state_iteration
-        and "historical events with `cause: operator` remain readable" in iteration_flat
-        and "are not produced by new runs" in iteration_flat,
+        and "historical `cause: operator` remains readable" in iteration_flat
+        and "is not produced" in iteration_flat,
         "Claude iteration compatibility permits new operator-cause correction events",
     )
     require(
@@ -378,7 +376,7 @@ def check_v3_machine() -> None:
     # same phase and gate edges through its state/recovery references.
     claude_flow = section(read("agents/ref-pipeline.md"), "## Pipeline flow", "## Phase index")
     require(MACHINE_TEXT in claude_flow, "Claude transition diagram does not use v3 machine")
-    require("defect in scope → implementation" in claude_flow, "Claude defect edge drifted")
+    require("failed fan → operator correction decision" in claude_flow, "Claude failed-fan edge drifted")
     require("amend → implementation" in claude_flow, "Claude amend edge drifted")
     require("edit/reject → design" in claude_flow, "Claude Gate 1 edge drifted")
 
@@ -401,14 +399,19 @@ def _corrective_route_contracts() -> dict[str, str]:
 
 
 def _require_ordinary_corrective_routes(contracts: dict[str, str]) -> None:
-    """Require implementation correction and tester-owned evidence repair."""
-    claude = re.sub(r"\s+", " ", contracts["claude_correction"].lower())
+    """Require consolidated, explicitly authorized validation corrections."""
+    claude = re.sub(r"\s+", " ", contracts["claude_pipeline"].lower())
     codex = re.sub(r"\s+", " ", contracts["codex_pipeline"].lower())
-    require("return to `implementation`" in claude, "Claude defect route drifted")
-    require("evidence gaps return to `tester`" in claude, "Claude evidence route drifted")
-    require("return to the implementation executor" in codex, "Codex defect route drifted")
-    require("missing evidence returns to `tester`" in codex, "Codex evidence route drifted")
-    require("`tester`" in contracts["codex_validation"], "Codex evidence route lost tester owner")
+    for label, text in (("Claude", claude), ("Codex", codex)):
+        require("complete" in text and "consolidat" in text, f"{label}: failed fan is not consolidated")
+        require("authorize one correction round" in text, f"{label}: live correction choice missing")
+        require("correction.decision" in text, f"{label}: correction decision is not dual-recorded")
+        require("fresh" in text and "validation fan" in text, f"{label}: authorized round lacks a fresh full fan")
+        require("automatic" in text, f"{label}: automatic correction prohibition missing")
+    validation = re.sub(r"\s+", " ", contracts["codex_validation"].lower())
+    require("choice `2` performs no repository or evidence mutation" in validation, "Codex pause choice can mutate")
+    require("choice `3` aborts without correction" in validation, "Codex abort choice can mutate")
+    require("a second failure requires a fresh presentation and nonce" in validation, "Codex second failure can loop automatically")
 
 
 def _require_sensitive_audit_routes(contracts: dict[str, str]) -> None:
@@ -425,11 +428,11 @@ def _require_sensitive_audit_routes(contracts: dict[str, str]) -> None:
 
 def _require_gate3_security_routes(contracts: dict[str, str]) -> None:
     """Ensure correctable sensitive findings cannot reach shipping approval."""
-    claude_gate3 = contracts["claude_gate3"]
+    claude_gate3 = re.sub(r"\s+", " ", contracts["claude_gate3"])
     require("prevents this state entirely" in claude_gate3 and "never reaches this gate" in claude_gate3, "Claude: correctable sensitive findings can reach Gate 3")
     require("broke-it" in claude_gate3 and "incomplete sensitive-coverage" in claude_gate3, "Claude: Gate 3 does not name both fail-closed security cases")
     validation = re.sub(r"\s+", " ", contracts["codex_validation"].lower())
-    require("do not ship until the audit has seen the current anchor" in validation, "Codex: Gate 3 can ship a sensitive delta before re-audit")
+    require("do not ship until every required audit has seen the current anchor" in validation, "Codex: Gate 3 can ship a sensitive delta before re-audit")
     codex = contracts["codex_pipeline"].lower()
     require("correctable sensitive finding" in codex and "fresh security audit" in codex, "Codex: sensitive correction route is not tied to fresh audit")
 
@@ -450,6 +453,64 @@ def check_corrective_routes() -> None:
     _require_sensitive_audit_routes(contracts)
     _require_gate3_security_routes(contracts)
     _require_structural_contradiction_routes(contracts)
+
+
+def check_explicit_validation_correction_decision() -> None:
+    """A failed fan pauses; one fresh live decision authorizes one round."""
+    claude = "\n".join(
+        (read("agents/ref-pipeline.md"), read("agents/_shared/orchestrator-state.md"))
+    )
+    codex = "\n".join(
+        (
+            read("plugins/team-harness/skills/pipeline/SKILL.md"),
+            read("plugins/team-harness/skills/pipeline/references/state-and-gates.md"),
+            read("plugins/team-harness/skills/pipeline/references/validation.md"),
+        )
+    )
+    for label, text in (("Claude", claude), ("Codex", codex)):
+        flat = re.sub(r"\s+", " ", text.lower())
+        for marker in (
+            "correction_pending: true",
+            "correction_nonce",
+            "correction.decision",
+            "1 — authorize one correction round",
+            "2 — pause without changes",
+            "3 — abort pipeline",
+            "generic `continue`",
+            "3/3+exception",
+            "exceptional_correction_count",
+        ):
+            require(marker in flat, f"{label}: correction-decision marker missing: {marker}")
+        require("every required" in flat and "lens" in flat, f"{label}: validation can short-circuit before the full fan")
+        require("fresh" in flat and "nonce" in flat, f"{label}: repeated failure can reuse a decision")
+        require("exactly one" in flat, f"{label}: authorization is not bounded to one round")
+
+    for relative in (
+        "agents/qa.md",
+        "agents/security.md",
+        "agents/adversary.md",
+        "agents/tester.md",
+        "runtime/codex/instructions/qa.md",
+        "runtime/codex/instructions/security.md",
+        "runtime/codex/instructions/tester.md",
+    ):
+        text = read(relative)
+        flat = re.sub(r"\s+", " ", text.lower())
+        require("suggested correction" in flat, f"{relative}: validator lacks advisory correction coordinate")
+        for forbidden in ("correction route", "freeze: reopened", "re-audit: required"):
+            require(forbidden not in flat, f"{relative}: validator still owns routing: {forbidden}")
+
+    recovery = read("plugins/team-harness/skills/pipeline/references/recovery.md")
+    recovery_flat = re.sub(r"\s+", " ", recovery.lower())
+    for marker in (
+        "stale or consumed nonce",
+        "mismatched anchor/findings/scope",
+        "reuse of one authorization",
+        "without the matching decision",
+        "recovery never synthesizes",
+        "historical `3/3+exception`",
+    ):
+        require(marker in recovery_flat, f"Codex recovery: fail-closed marker missing: {marker}")
 
 
 def check_direct_predicate() -> None:
@@ -794,8 +855,8 @@ def check_residual_corrections() -> None:
     claude = read("agents/ref-pipeline.md")
     validation = section(claude, "### The audit never iterates", "### Knowledge write on audit findings")
     gate3 = section(claude, "## STAGE-GATE-3", "## Delivery")
-    require("returns to `implementation`" in validation.lower(), "Claude validation: security correction route missing")
-    require("fresh audit" in validation.lower(), "Claude validation: fresh audit requirement missing")
+    require("consolidated" in validation.lower() and "package" in validation.lower(), "Claude validation: security failure is not consolidated")
+    require("fresh-audit" in validation.lower() or "fresh audit" in validation.lower(), "Claude validation: fresh audit requirement missing")
     require("operator-disposed" not in validation.lower(), "Claude validation: correctable findings remain operator-disposed")
     require("never reaches this gate" in gate3.lower(), "Claude Gate 3: correctable finding can still ship")
     require("no keyword can waive" in gate3.lower(), "Claude Gate 3: security correction waiver drifted")
@@ -1665,7 +1726,7 @@ def check_context_isolation_rotation_contract() -> None:
         "`cause`",
         "`files`",
         "`ac`",
-        "`correction`",
+        "`suggested correction`",
         "current frozen anchor",
         "required evidence",
     ):
@@ -1700,7 +1761,7 @@ def check_context_isolation_rotation_contract() -> None:
         "current frozen commit/tree",
         "verification facts/evidence",
         "implementer's success narrative",
-        "every revalidation after a correction starts new tester, qa, and security agents",
+        "after an operator-authorized correction, every revalidation starts new tester, qa, and security agents",
         "never reuse a prior verifier",
     ):
         require(marker in validation_flat, f"validation: AC14 isolation marker missing {marker!r}")
@@ -1722,13 +1783,14 @@ def check_context_isolation_rotation_contract() -> None:
             "50 tool calls",
             "75 tool calls",
             "8 m cumulative processed tokens",
-            "same file and ac",
-            "at most 3 tool calls",
             "fresh",
             "correction",
         ):
             require(marker in flat, f"{label}: Task 3 routing marker missing {marker!r}")
         require("150 tool calls" not in flat and "25 m tokens" not in flat, f"{label}: superseded rotation limit remains")
+    implementation_flat = re.sub(r"\s+", " ", implementation.lower())
+    require("same file and ac" in implementation_flat and "at most 3 tool calls" in implementation_flat, "implementation: bounded micro-correction contract missing")
+    require("failed validation never continues a verifier" in validation_flat, "validation: verifier continuation is not prohibited")
 
     for role in ("implementer", "tester", "qa", "security"):
         adapter = re.sub(r"\s+", " ", read(f"runtime/codex/instructions/{role}.md").lower())
@@ -1739,25 +1801,23 @@ def check_context_isolation_rotation_contract() -> None:
             "75 tool calls",
             "8 m cumulative processed tokens",
             "post-terminal `followup_task`",
-            "second feedback",
-            "scope expansion",
-            "substantive correction",
             "`cause`",
             "`files`",
             "`ac`",
-            "`correction`",
         ):
             require(marker in adapter, f"{role}: AC9/AC13 marker missing {marker!r}")
         require("150 tool calls" not in adapter and "25 m tokens" not in adapter, f"{role}: superseded rotation limit remains")
 
     implementer_adapter = re.sub(r"\s+", " ", read("runtime/codex/instructions/implementer.md").lower())
-    for marker in ("same file and ac", "at most 3 tool calls", "same active task/correction lifecycle"):
+    for marker in ("same file and ac", "at most 3 tool calls", "same active task/correction lifecycle", "second feedback", "scope expansion", "substantive correction", "`correction`"):
         require(marker in implementer_adapter, f"implementer: bounded continuity marker missing {marker!r}")
 
     for role in ("tester", "qa", "security"):
         adapter = re.sub(r"\s+", " ", read(f"runtime/codex/instructions/{role}.md").lower())
         require("implementer's success narrative" in adapter, f"{role}: implementer narrative is not excluded")
         require("every revalidation starts a new" in adapter, f"{role}: revalidation is not fresh")
+        require("`suggested correction`" in adapter, f"{role}: advisory correction coordinate missing")
+        require("never request or trigger a follow-up round" in adapter, f"{role}: automatic follow-up is not prohibited")
 
 
 def check_codex_usage_observability_contract() -> None:
@@ -2009,6 +2069,7 @@ def main() -> None:
     checks = (
         ("v3 machine", check_v3_machine),
         ("corrective routes", check_corrective_routes),
+        ("explicit validation correction decision", check_explicit_validation_correction_decision),
         ("authoritative post-Gate-1 transitions", check_authoritative_post_gate1_transitions),
         ("direct predicate", check_direct_predicate),
         ("single writer", check_single_writer),

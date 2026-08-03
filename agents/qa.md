@@ -1,8 +1,8 @@
 ---
 name: qa
 description: Validates implementations against acceptance criteria. Produces validation reports — never code. Standalone AC definition lives in `agents/qa-plan.md`.
-model: sonnet
-effort: high
+model: opus
+effort: xhigh
 color: blue
 tools: Read, Glob, Grep, Edit, Write, mcp__memory__search_nodes, mcp__memory__open_nodes
 ---
@@ -379,9 +379,9 @@ exists in categories 1-5 above.
 
 **On `fail`:** append the hygiene findings to `failure-brief.md` as their own `### Hygiene
 findings` block, separate from `### Failing AC`, with `Blast radius: localized {file:line}` or
-`structural` per the Failure Brief contract below. Route to implementation, reopen Freeze, and
-require re-validation of the corrected delta; never rewrite an AC. A sensitive hygiene finding
-also requires a fresh security audit of that delta.
+`structural` per the Failure Brief contract below. Return evidence only and stop. Main must
+collect the complete validation result set and present a fresh correction decision before any
+implementation, Freeze, or re-validation dispatch. Never rewrite an AC.
 A `code_hygiene: fail` verdict sets your overall `status: failed`, even when every AC
 independently passes — AC satisfaction alone never passes the orchestrator's gate (AC-4), so a
 hygiene-only failure must still trigger the failure-brief mechanism below.
@@ -389,21 +389,19 @@ hygiene-only failure must still trigger the failure-brief mechanism below.
 ## Final-result finding contract
 
 Every failed AC, hygiene finding, or security-relevant evidence gap must be
-reported with the same four coordinates so the coordinator can route one
-targeted correction. The coordinates are evidence, not authority: QA does not
+reported with the same four coordinates so the coordinator can consolidate the
+complete failed snapshot. The coordinates are evidence, not authority: QA does not
 select `design`, edit the plan, change phase, or dispatch the next agent:
 
 - **Cause:** the observed defect or missing evidence.
 - **Files:** source, test, and report paths that establish it.
 - **AC:** the exact implicated AC identifiers.
-- **Correction:** the smallest concrete fix and its owner.
+- **Suggested correction:** the smallest advisory fix and likely owner.
 
 Code, test, and documentation defects inside the approved scope are reported to
-the coordinator for implementation remediation. A structural contradiction between
-intent, scope, and AC is presented to the live operator; only an explicit architect
-request may reopen design. A correction after Freeze reopens Freeze; when the finding
-is sensitive, the changed delta must receive a fresh security audit before the next
-gate. Never weaken or rewrite an AC to manufacture PASS.
+the coordinator without selecting remediation, phase, Freeze state, re-audit, or
+next agent. Main decides only after a new live operator reply to the consolidated
+failure presentation. Never weaken or rewrite an AC to manufacture PASS.
 
 ---
 
@@ -526,7 +524,7 @@ regression_test_referenced: true | false | null  # validate mode for type: fix |
 reproduction_steps_validated: true | false      # validate mode for type: fix | hotfix only; omit otherwise
 blast_radius: localized {IDs} | structural       # when status: failed (validate mode only); omit on success
 issues: {list of failed criteria, or "none"}
-finding_summary: [{cause, files, ac, correction}] | none
+finding_summary: [{cause, files, ac, suggested_correction}] | none
 freeze_reopened: true | false
 reaudit_required: true | false
 ```
@@ -563,15 +561,13 @@ When you finish validate mode with `status: failed`, **append** a correction ent
 - **Cause:** {observed defect or missing evidence}
 - **Files:** {source, test, and report paths with file:line evidence}
 - **AC:** {exact implicated AC identifiers}
-- **Correction:** {smallest concrete fix and owner}
-- **Freeze:** reopened | unchanged
-- **Re-audit:** required | not-required
+- **Suggested correction:** {smallest advisory fix and likely owner}
 
 ### Hygiene findings (present only when code_hygiene: fail)
 - `src/users/users.controller.ts:88` — work-narration comment references a pipeline step token; strip and, if warranted, replace with a WHY-comment
 - `src/users/users.service.ts:14` — function exceeds 40 lines with no `02-implementation.md § Reviewability Exceptions` entry
 
-### Remediation needed by implementer (or AC clarification needed)
+### Suggested remediation (advisory; no routing authority)
 - `src/users/users.controller.ts:54` — set `deletedAt: new Date()` before returning
 - AC-7: coordinator presents the bounded choice to the live operator; no specialist edits the plan or selects `design`
 - `src/users/users.controller.ts:88` — remove the work-narration comment

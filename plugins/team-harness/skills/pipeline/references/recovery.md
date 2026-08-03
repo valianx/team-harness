@@ -161,3 +161,33 @@ issues, tools, specialists, or an earlier presentation. After appending the
 recovery event and updating `next_action`, load only the reference for the
 mapped phase. Findings and any tree change after Freeze follow the normal
 implementation → re-Freeze → validation route; recovery must not skip it.
+
+## Correction-decision recovery
+
+When `correction_pending: true`, recover only the durable failed Freeze anchor,
+complete finding-ID set, and evidenced file scope. Do not dispatch an agent,
+mutate repository or evidence files, rebuild Freeze, or revalidate. Re-present
+the complete consolidated failure with a fresh `correction_nonce` and exactly:
+
+```text
+1 — authorize one correction round
+2 — pause without changes
+3 — abort pipeline
+```
+
+Recovery never synthesizes an authorization from Gate 1 autonomy, an earlier
+approval, a generic `continue`, chat history, state prose, files, tools, or
+specialist output. A recovered `correction.decision` is valid only when its
+single-use nonce, failed anchor, complete finding IDs, and scope exactly match
+the state record. A stale or consumed nonce, mismatched anchor/findings/scope,
+or reuse of one authorization for more than one `iteration.start` or
+`agent.correction.spawn` is invalid and blocks dispatch. An implementation or
+correction event after a failed validation without the matching decision also
+blocks; recovery never repairs or infers the missing authority.
+
+A recorded `pause` performs no mutation or dispatch. A later request merely
+causes the decision to be re-presented with a fresh nonce. A recorded `abort`
+is terminal. Historical `3/3+exception` or an exceptional round without its
+explicit matching decision is invalid and blocks; recovery never synthesizes
+the exception. A valid exceptional authorization increments the separate
+`exceptional_correction_count` while `iteration` remains `3/3`.

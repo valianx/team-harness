@@ -155,8 +155,8 @@ For a bug-fix with a Phase 2.0 artifact, reuse that regression contract and
 confirm it now passes. If a newly warranted test exposes a product defect,
 return `status: failed` and report the behavior to the coordinator with the four
 finding coordinates below; do not select a phase, edit the plan, dispatch the next
-agent, or weaken the assertion. The coordinator classifies the finding and routes a
-bounded approved-scope correction without reopening design automatically.
+agent, or weaken the assertion. The coordinator includes the finding in the
+complete validation package and waits for the mandatory live correction decision.
 
 Append the suite run to `{docs_root}/00-suite-evidence.md` when that artifact is
 present in the pipeline contract.
@@ -169,13 +169,11 @@ still relevant and successful. For inspection evidence, confirm the cited
 artifact location exists and supports the claim.
 
 Do not add or edit tests. Missing or stale evidence is a tester finding: report
-the cause, evidence files, implicated AC, and the exact evidence correction. A
-product defect discovered by the run returns to implementation. A sensitive
-coverage gap that cannot be closed by the tester returns to implementation,
-reopens Freeze, and requires a fresh security audit of the changed delta before
-the next gate. For Tier 2–4 fixes, confirm the regression assertion is intact
-and passes. These are finding coordinates, not routing authority: do not choose
-`design`, edit the plan, or dispatch another agent.
+the cause, evidence files, implicated AC, and an advisory suggested correction.
+Return every finding and stop. Main waits for the complete validation set and a
+fresh live operator decision before selecting implementation, Freeze, re-audit,
+or another agent. For Tier 2–4 fixes, confirm the regression assertion is intact
+and passes. These are finding coordinates, not routing authority.
 
 ## Mode: `review`
 
@@ -223,12 +221,13 @@ tester, decides the phase and next agent from these coordinates:
 - **Cause:** what failed or what evidence is missing.
 - **Files:** the test, source, or artifact paths that establish the finding.
 - **AC:** the exact `AC-N` identifiers implicated.
-- **Correction:** the smallest concrete action and its owner.
+- **Suggested correction:** the smallest advisory action and likely owner.
 
-Use `failure-brief.md` for a finding that blocks acceptance. The brief must also
-state `Freeze: reopened` and `Re-audit: required` when a sensitive coverage gap
-or adversarial/security finding returns work to implementation. Never rewrite an
-AC to make a test pass, and never claim a finding is resolved for QA or security.
+Use `failure-brief.md` for a finding that blocks acceptance. Return evidence only;
+never select implementation, Freeze state, re-audit, next agent, or a correction
+round. Main consolidates every validation result and waits for a fresh live operator
+decision. Never rewrite an AC to make a test pass, and never claim a finding is
+resolved for QA or security.
 
 ## Test changes and failures
 
@@ -277,7 +276,7 @@ packet_escapes: N
 packet_integrity: ok | stale | mismatch | n-a
 tools: read:N write:N edit:N bash:N grep:N glob:N
 issues: {actionable blockers or none}
-finding_summary: [{cause, files, ac, correction}] | none
+finding_summary: [{cause, files, ac, suggested_correction}] | none
 freeze_reopened: true | false
 reaudit_required: true | false
 ```

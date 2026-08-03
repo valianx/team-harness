@@ -21,6 +21,14 @@ stage: 1|2|3|4                 # telemetry grouping; `phase` is the machine auth
 status: in_progress|waiting_for_gate|iterating|paused|paused_for_amend|complete|blocked|blocked-incomplete|aborted
 gate_pending: gate1|gate3|null
 iteration: N/3
+correction_pending: true|false
+correction_nonce: {fresh token or null}
+correction_anchor: {failed freeze commit/tree or null}
+correction_findings: [{stable finding id}]|[]
+correction_scope: [{repo-relative path}]|[]
+correction_decision: authorize|pause|abort|null
+correction_decision_nonce: {consumed token or null}
+exceptional_correction_count: N
 last_completed: design|waiting_gate1|implementation|validation|waiting_gate3|delivery|complete|null
 next_action: {what to do next}      # the successor to a prose recovery section
 total_tokens: N
@@ -32,6 +40,22 @@ and explicitly requested architect work do not increment it and do not emit a ne
 `iteration.start`. New writers emit only `cause: verification` for a correction round;
 `cause: operator` remains readable for historical traces but is not produced for new
 runs.
+
+**Validation correction decisions.** A failed validation fan completes every
+required lens, then Main consolidates all findings and pauses at `phase:
+validation`, `status: paused`, `correction_pending: true`, with a fresh nonce,
+the failed Freeze anchor, exact finding IDs, and evidenced file scope. No
+repository/evidence mutation, specialist dispatch, Freeze rebuild, or
+revalidation is legal while pending. Main presents exactly `1 — authorize one
+correction round`, `2 — pause without changes`, and `3 — abort pipeline`; only a live reply after that presentation may
+consume the nonce. `authorize` requires one matching `correction.decision`
+event and permits exactly one `iteration.start`/`agent.correction.spawn` pair
+bound to the same nonce, anchor, findings, and scope. `pause` and `abort`
+perform no correction. Every later failure gets a fresh nonce and decision.
+Prior gates, autonomy, generic `continue`, recovered prose, files, agents, and
+tools are never authorization. At `3/3`, an explicitly labelled exceptional
+authorization increments `exceptional_correction_count` while `iteration`
+remains `3/3`; `3/3+exception` is invalid.
 
 The seven named states above are the only legal v3 pipeline sequence. `inline` is a
 pre-activation direct-mode outcome and is never a v3 state or field value. Every activated
@@ -318,7 +342,7 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | Field | Required | Notes |
 |---|---|---|
 | `ts` | yes | ISO-8601 with timezone |
-| `event` | yes | `phase.start`, `phase.end`, `agent.spawn`, `agent.close`, `agent.correction.spawn`, `gate`, `gate.pass`, `gate.fail`, `iteration.start`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`, `stage2.hygiene`, `stage2.lane.*`, `plan_structure`, `plan_review.deferred`, `plan_review.offered`, `plan_review.offer_declined`, `plan_review_integrity`, `kg_write`, `artifact.missing`, `operation.started/success/failed`, `pipeline.start`, `pipeline.complete`, `pipeline.incomplete`, `pipeline.end`, `checkpoint.confirmed`, `compaction.trigger` |
+| `event` | yes | `phase.start`, `phase.end`, `agent.spawn`, `agent.close`, `agent.correction.spawn`, `correction.decision`, `gate`, `gate.pass`, `gate.fail`, `iteration.start`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`, `stage2.hygiene`, `stage2.lane.*`, `plan_structure`, `plan_review.deferred`, `plan_review.offered`, `plan_review.offer_declined`, `plan_review_integrity`, `kg_write`, `artifact.missing`, `operation.started/success/failed`, `pipeline.start`, `pipeline.complete`, `pipeline.incomplete`, `pipeline.end`, `checkpoint.confirmed`, `compaction.trigger` |
 | `feature` | yes | kebab-case, matches the workspace folder |
 | `phase`, `stage` | conditional | `stage` required for `stage.gate*` |
 | `agent` | conditional | required for `phase.*` |
@@ -330,8 +354,9 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | `agent_role`, `task`, `attempt_ordinal`, `context_strategy`, `follow_up_count` | conditional | required for `agent.*`; finite lifecycle enums and local ordinal only, never an ID, alias, or free-form label |
 | `attempt_metrics`, `quality_verdict` | conditional | required for `agent.close`; metrics are complete or closed-code unavailable, verdict is `pass`/`concerns`/`fail`/`n-a` |
 | `correction_cause` | conditional | required for `agent.correction.spawn`; literal `verification` only |
+| `correction_nonce`, `correction_anchor`, `correction_findings`, `correction_scope` | conditional | required for `correction.decision` and every authorized `iteration.start`/`agent.correction.spawn`; exact bounded identity, never inferred |
 | `verdict` | conditional | `pass`/`concerns`/`fail`/`partial-fail` |
-| `decision` | conditional | required for `stage.gate.release` |
+| `decision` | conditional | required for `stage.gate.release` and `correction.decision`; correction value is `authorize|pause|abort` |
 | `cause` | conditional | `verification` for new `iteration.start` correction rounds; historical `operator` values remain readable |
 | `provenance` | conditional | required for `checkpoint.confirmed`; a **closed enum, never free text**, and never subject to the bound below |
 | `tools`, `model`, `effort` | optional | propagated verbatim from the returning status block |
