@@ -542,6 +542,24 @@ def check_single_writer() -> None:
         require(gate_denied is not None, f"Codex {role}: may approve or release a gate")
 
 
+def check_codex_qa_checkbox_mirror_owner() -> None:
+    """Read-only QA reports AC PASS; Main alone persists the mirror."""
+    sources = (
+        ("Codex validation", read("plugins/team-harness/skills/pipeline/references/validation.md")),
+        ("Codex QA adapter", read("runtime/codex/instructions/qa.md")),
+        ("Codex pipeline", read("plugins/team-harness/skills/pipeline/SKILL.md")),
+    )
+    for label, text in sources:
+        flat = re.sub(r"\s+", " ", text.lower())
+        require("ac-n: pass" in flat, f"{label}: QA PASS result is missing")
+        require("checkbox mirror" in flat, f"{label}: checkbox-mirror ownership is missing")
+        require("only writer" in flat, f"{label}: Main single-writer ownership is missing")
+    validation = sources[0][1].lower()
+    adapter = sources[1][1].lower()
+    require("qa may update" not in validation, "Codex validation: QA may still update checkbox mirrors")
+    require("never edit a checkbox mirror yourself" in adapter, "Codex QA adapter: read-only mirror edit ban is missing")
+
+
 def check_gate_aliases() -> None:
     """Numeric gate choices are exact text aliases; invalid replies release nothing."""
     claude = read("agents/_shared/gate-contract.md")
@@ -1696,6 +1714,7 @@ def main() -> None:
         ("authoritative post-Gate-1 transitions", check_authoritative_post_gate1_transitions),
         ("direct predicate", check_direct_predicate),
         ("single writer", check_single_writer),
+        ("Codex QA checkbox-mirror owner", check_codex_qa_checkbox_mirror_owner),
         ("gate aliases", check_gate_aliases),
         ("profile/document guards", check_profile_and_document_guards),
         ("recovery fail-closed", check_recovery_fail_closed),

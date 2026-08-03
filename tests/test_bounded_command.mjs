@@ -54,6 +54,30 @@ function runCli(...args) {
   return JSON.parse(child.stdout);
 }
 
+async function eventually(callback, { timeoutMs = 1_000, intervalMs = 10 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError;
+  while (Date.now() < deadline) {
+    try {
+      return await callback();
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+  }
+  throw lastError ?? new Error("condition was not met before its deadline");
+}
+
+function isProcessAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    // EPERM means the process exists but cannot be signalled by this user.
+    return error?.code === "EPERM";
+  }
+}
+
 function assertClosedEnvelope(result) {
   assert.equal(isBoundedCommandEnvelope(result), true);
   assert.equal(result.schema_version, BOUNDED_COMMAND_SCHEMA_VERSION);
@@ -292,6 +316,58 @@ await check("the execution deadline terminates a hung child through the signal e
   assert.equal(result.exit_code, null);
   assert.equal(result.signal, "SIGKILL");
   assert.equal(result.error_code, null);
+});
+
+await check("a deadline kills descendants and releases inherited output pipes", async () => {
+  await temporaryRoot(async (root) => {
+    const descendantPidPath = path.join(root, "descendant.pid");
+    let descendantPid;
+    try {
+      const result = await runBoundedCommand({
+        ...nodeCommand(
+          [
+            "const { spawn } = require('node:child_process');",
+            "const descendant = spawn(process.execPath, ['-e', process.argv[2], process.argv[1]], { stdio: ['ignore', 'inherit', 'inherit', 'ipc'], windowsHide: true });",
+            "descendant.once('message', () => process.stdout.write('descendant-ready'));",
+            "setInterval(() => {}, 1_000);",
+          ].join(" "),
+          descendantPidPath,
+          [
+            "const fs = require('node:fs');",
+            "fs.writeFileSync(process.argv[1], String(process.pid));",
+            "process.send?.('ready');",
+            "setInterval(() => {}, 1_000);",
+          ].join(" "),
+        ),
+        timeoutMs: 300,
+      });
+
+      // Obtain the PID before assertions that can fail so a regression cannot
+      // leave this intentionally long-lived test process behind.
+      descendantPid = Number(await eventually(() => readFile(descendantPidPath, "utf8")));
+      assert.ok(Number.isSafeInteger(descendantPid) && descendantPid > 0);
+
+      assertClosedEnvelope(result);
+      assert.equal(result.outcome, "completed");
+      assert.equal(result.exit_code, null);
+      assert.equal(result.signal, "SIGKILL");
+      // If the descendant still held inherited stdio pipes, settlement would
+      // require the helper's one-second forced-settlement grace period.
+      assert.ok(result.duration_ms < 900, `timeout retained pipes for ${result.duration_ms}ms`);
+
+      await eventually(() => {
+        assert.equal(isProcessAlive(descendantPid), false, "descendant is still alive after timeout");
+      });
+    } finally {
+      if (Number.isSafeInteger(descendantPid) && descendantPid > 0 && isProcessAlive(descendantPid)) {
+        try {
+          process.kill(descendantPid, "SIGKILL");
+        } catch {
+          // Best-effort cleanup if a regression leaves a descendant behind.
+        }
+      }
+    }
+  });
 });
 
 if (failures.length > 0) {

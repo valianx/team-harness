@@ -387,6 +387,57 @@ function normaliseExitCode(exitCode) {
 }
 
 /**
+ * Stop the command and the processes it started, rather than only its direct
+ * PID. POSIX commands run in their own process group; Windows uses taskkill's
+ * documented tree mode. Both paths deliberately use argv execution and
+ * discard the terminator's output so it cannot escape the result envelope.
+ */
+function terminateProcessTree(child) {
+  if (!Number.isSafeInteger(child.pid) || child.pid <= 0) return;
+
+  if (process.platform === "win32") {
+    try {
+      const terminator = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
+        shell: false,
+        stdio: "ignore",
+        windowsHide: true,
+      });
+      // A missing taskkill must not turn the bounded command into an
+      // unhandled-error process. There is no portable Windows fallback that
+      // can enumerate a process tree without introducing a shell.
+      terminator.once("error", () => {
+        try {
+          child.kill("SIGKILL");
+        } catch {
+          // The child may already have exited.
+        }
+      });
+      terminator.unref();
+    } catch {
+      try {
+        child.kill("SIGKILL");
+      } catch {
+        // The child may already have exited.
+      }
+    }
+    return;
+  }
+
+  try {
+    // `detached: true` below makes the direct child the leader of this group.
+    // A negative PID targets the entire group, including grandchildren that
+    // inherited stdout/stderr and would otherwise keep those pipes open.
+    process.kill(-child.pid, "SIGKILL");
+  } catch {
+    try {
+      child.kill("SIGKILL");
+    } catch {
+      // The child may already have exited.
+    }
+  }
+}
+
+/**
  * Execute exactly one argv command. Invalid inputs and spawn failures resolve
  * to a safe envelope rather than throwing or echoing any user-controlled data.
  */
@@ -405,6 +456,10 @@ export async function runBoundedCommand(options) {
   let child;
   try {
     child = spawn(argv[0], argv.slice(1), {
+      // On POSIX this gives the command an isolated process group that can be
+      // terminated as a unit on deadline. Windows receives tree termination
+      // through taskkill instead.
+      detached: process.platform !== "win32",
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
@@ -468,7 +523,7 @@ export async function runBoundedCommand(options) {
     };
 
     const deadline = setTimeout(() => {
-      child.kill("SIGKILL");
+      terminateProcessTree(child);
       terminationGrace = setTimeout(() => {
         settle("completed", null, "SIGKILL", null);
       }, TERMINATION_SETTLEMENT_GRACE_MS);

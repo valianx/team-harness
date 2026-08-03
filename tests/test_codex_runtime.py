@@ -196,9 +196,23 @@ def _check_qa_post_gate1_route(validation: str) -> None:
     qa_markers = (
         "return exactly four-coordinate input to main",
         "never select `design` or `architect`",
+        "ac-n: pass",
+        "only writer",
+        "checkbox mirror",
     )
     for context, text in sources[1:]:
         _assert_markers(re.sub(r"\s+", " ", text.lower()), qa_markers, context)
+        if re.search(r"\bqa\s+may\s+update\b", text, re.IGNORECASE):
+            fail(f"{context} permits read-only QA to update the checkbox mirror")
+    for context, text in sources:
+        _assert_markers(
+            re.sub(r"\s+", " ", text.lower()),
+            ("ac-n: pass", "only writer", "checkbox mirror"),
+            context,
+        )
+    for context, agent in (("generated QA adapter", generated), ("packaged generated QA adapter", packaged)):
+        if agent["sandbox_mode"] != "read-only":
+            fail(f"{context} must keep QA read-only")
 
 
 def check_post_gate1_projection() -> None:
@@ -1350,7 +1364,7 @@ def main() -> None:
         "architect": "f11ceef09bfb9d2839eb2d25adb05d4dcc1188dfacf11e355a9a291c4fcf816f",
         "implementer": "40a562d3f483502298b3f9ea22de10b9b14839df0d347618a33d3983c8694571",
         "tester": "e15a282b65847c046306aaa2f056cbfc5e3978d38fa5f7610e9fedd5394fe529",
-        "qa": "11bfa0c3556bac11b27c3721bba9cb39f800b9d8fdf314b69002c5fa9b95cc2d",
+        "qa": "693b4396f1ca3257ae8fed68f977dc61bb9426af3fdee0201ba872c17db485c8",
         "security": "e89425e782a1ad47c32a2e210adaa7ecbe2880dc9c4fcd5a6cf3f509ef590064",
         "delivery": "1c09a83ea425a6aac283f38406f40ab66954f11ccfe244364afc2177fb54085c",
     }

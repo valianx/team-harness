@@ -11,8 +11,10 @@ assigned task-shard paths, current frozen commit/tree, and verification facts/ev
 security the same frozen identity plus the changed attack surface and named invariant or
 architecture anchors when required. Every tester, QA, and security dispatch uses a fresh
 V2 `fork_turns: none` agent. Never attach the full plan set or the implementer's success narrative.
-None may edit coordination state, gate fields, or releases. QA may update only the assigned
-task-shard AC checkbox mirror; all other manifest and shard fields remain unchanged. Specialists
+None may edit coordination state, gate fields, releases, or task-shard AC checkbox mirrors.
+QA's read-only review returns an explicit `AC-N: PASS` verdict for every verified satisfied
+criterion (and its evidence row); Main, as the only writer, verifies those PASS results and
+updates the assigned task-shard AC checkbox mirror. For failed or concern verdicts, specialists
 report only `Cause`, `Files`, implicated `AC`, and `Correction`; Main owns canonical plan fields,
 disposition, phase, and routing.
 
