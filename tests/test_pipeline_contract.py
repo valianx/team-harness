@@ -13,6 +13,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -934,12 +935,13 @@ def check_inline_markers(contract: str) -> None:
 
 
 def check_inline_git_hardening() -> None:
-    """Replacement refs and pathspec magic cannot alter inline Git evidence."""
+    """Inline Git evidence has exact immutable IDs and no config helper execution."""
     contract = read("agents/_shared/inline-review-contract.md")
+    resolver_contract = re.sub(r"\s+", " ", contract.lower())
     templates = (
-        "git --no-pager --no-replace-objects --literal-pathspecs -C <canonical-root> diff --no-ext-diff --no-textconv <base-oid> <head-oid> -- <path>...",
-        "git --no-pager --no-replace-objects --literal-pathspecs -C <canonical-root> show --no-ext-diff --no-textconv <object-oid> -- <path>...",
-        "git --no-pager --no-replace-objects --literal-pathspecs -C <canonical-root> log -p --no-ext-diff --no-textconv <base-oid>..<head-oid> -- <path>...",
+        "git --no-pager --no-replace-objects --literal-pathspecs -c log.showSignature=false -C <canonical-root> diff --no-ext-diff --no-textconv <base-oid> <head-oid> -- <path>...",
+        "git --no-pager --no-replace-objects --literal-pathspecs -c log.showSignature=false -C <canonical-root> show --no-ext-diff --no-textconv <object-oid> -- <path>...",
+        "git --no-pager --no-replace-objects --literal-pathspecs -c log.showSignature=false -C <canonical-root> log -p --no-ext-diff --no-textconv <base-oid>..<head-oid> -- <path>...",
     )
     for template in templates:
         require(template in contract, f"inline contract misses hardened template: {template}")
@@ -947,6 +949,17 @@ def check_inline_git_hardening() -> None:
         "For Claude, the\nsemantic reviewer has no Bash capability, so Main MUST use the same hardened\nargv templates" in contract,
         "Claude Main may diverge from Codex hardened Git templates",
     )
+    for marker in (
+        "rev-parse --verify --end-of-options <rev>^{commit}",
+        "one newline-terminated full 40- or 64-hex object id",
+        "range resolves each endpoint separately",
+        "<oid>^{tree}",
+        "log.showsignature=false",
+        "uncommitted inline review is explicitly unsupported",
+        "status --porcelain=v1 --untracked-files=all --ignore-submodules=none",
+        "verdict-supporting bytes must come from the recorded resolved",
+    ):
+        require(marker in resolver_contract, f"inline contract misses resolver/currentness rule: {marker}")
 
     with tempfile.TemporaryDirectory() as temporary:
         repo = Path(temporary)
@@ -958,6 +971,52 @@ def check_inline_git_hardening() -> None:
             )
             return result.stdout
 
+        def resolved_endpoint(revision: str) -> str | None:
+            """Executable model of Main's exact single-endpoint resolver."""
+            if not revision or revision.startswith("-") or ".." in revision:
+                return None
+            if any(ord(character) < 32 or ord(character) == 127 for character in revision):
+                return None
+            result = subprocess.run(
+                (
+                    "git", "--no-pager", "--no-replace-objects", "--literal-pathspecs",
+                    "-c", "log.showSignature=false", "-C", str(repo), "rev-parse",
+                    "--verify", "--end-of-options", f"{revision}^{{commit}}",
+                ),
+                text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+            )
+            if result.returncode or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", result.stdout.rstrip("\n")):
+                return None
+            if result.stdout.count("\n") != 1 or not result.stdout.endswith("\n"):
+                return None
+            return result.stdout[:-1]
+
+        def resolved_tree(commit_oid: str) -> str | None:
+            if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", commit_oid):
+                return None
+            result = subprocess.run(
+                (
+                    "git", "--no-pager", "--no-replace-objects", "--literal-pathspecs",
+                    "-c", "log.showSignature=false", "-C", str(repo), "rev-parse",
+                    "--verify", "--end-of-options", f"{commit_oid}^{{tree}}",
+                ),
+                text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+            )
+            if result.returncode or result.stdout.count("\n") != 1 or not result.stdout.endswith("\n"):
+                return None
+            return result.stdout[:-1] if re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", result.stdout[:-1]) else None
+
+        def clean() -> bool:
+            result = subprocess.run(
+                (
+                    "git", "--no-pager", "--no-replace-objects", "--literal-pathspecs",
+                    "-c", "log.showSignature=false", "-C", str(repo), "status",
+                    "--porcelain=v1", "--untracked-files=all", "--ignore-submodules=none",
+                ),
+                text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+            )
+            return result.returncode == 0 and result.stdout == ""
+
         git("init", "-q")
         git("config", "user.email", "inline@example.invalid")
         git("config", "user.name", "Inline Test")
@@ -967,21 +1026,63 @@ def check_inline_git_hardening() -> None:
         git("commit", "-qm", "first")
         first = git("rev-parse", "HEAD").strip()
         first_tree = git("rev-parse", f"{first}^{{tree}}").strip()
+        require(clean(), "clean immutable inline target was rejected")
+        require(resolved_endpoint("HEAD") == first, "exact endpoint resolver did not return HEAD commit ID")
+        require(resolved_tree(first) == first_tree, "exact endpoint resolver did not bind HEAD tree ID")
+        for injection in ("--all", "--show-toplevel", "--revs-only", "HEAD..HEAD", "HEAD\nHEAD"):
+            require(resolved_endpoint(injection) is None, f"injected endpoint was accepted: {injection!r}")
+        require(resolved_tree(f"{first}\n{first}") is None, "multi-output tree binding was accepted")
+        (repo / "dirty.txt").write_text("uncommitted\n")
+        require(not clean(), "dirty worktree was accepted as immutable inline target")
+        (repo / "dirty.txt").unlink()
+        require(clean(), "clean status did not recover after test cleanup")
         (repo / "normal.txt").write_text("replacement\n")
         git("commit", "-am", "second", "-q")
         second = git("rev-parse", "HEAD").strip()
         git("replace", first, second)
 
         hardened_tree = git(
-            "--no-pager", "--no-replace-objects", "--literal-pathspecs", "-C", str(repo),
+            "--no-pager", "--no-replace-objects", "--literal-pathspecs", "-c",
+            "log.showSignature=false", "-C", str(repo),
             "rev-parse", f"{first}^{{tree}}",
         ).strip()
         require(hardened_tree == first_tree, "replace ref altered hardened revision binding")
         literal = git(
-            "--no-pager", "--no-replace-objects", "--literal-pathspecs", "-C", str(repo),
+            "--no-pager", "--no-replace-objects", "--literal-pathspecs", "-c",
+            "log.showSignature=false", "-C", str(repo),
             "show", "--no-ext-diff", "--no-textconv", first, "--", ":(glob)*.txt",
         )
         require("+literal" in literal and "+normal" not in literal, "pathspec magic was not treated literally")
+
+        marker = repo / "gpg-program-ran"
+        gpg_program = repo / "hostile-gpg-program"
+        gpg_program.write_text(f"#!/bin/sh\nprintf invoked > {marker}\nexit 1\n")
+        os.chmod(gpg_program, 0o755)
+        signed_content = (
+            f"tree {first_tree}\n"
+            "author Inline Test <inline@example.invalid> 0 +0000\n"
+            "committer Inline Test <inline@example.invalid> 0 +0000\n"
+            "gpgsig -----BEGIN PGP SIGNATURE-----\n"
+            " invalid test signature\n"
+            " -----END PGP SIGNATURE-----\n\n"
+            "synthetic signed commit\n"
+        )
+        signed = subprocess.run(
+            ("git", "hash-object", "-t", "commit", "-w", "--stdin"), cwd=repo,
+            input=signed_content, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
+        ).stdout.strip()
+        git("update-ref", "refs/heads/signed", signed)
+        git("config", "log.showSignature", "true")
+        git("config", "gpg.program", str(gpg_program))
+        subprocess.run(("git", "log", "-1", "signed"), cwd=repo, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+        require(marker.exists(), "hostile local log.showSignature did not exercise gpg.program regression")
+        marker.unlink()
+        hardened_log = subprocess.run(
+            ("git", "--no-pager", "--no-replace-objects", "--literal-pathspecs", "-c",
+             "log.showSignature=false", "-C", str(repo), "log", "-1", signed),
+            text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+        )
+        require(hardened_log.returncode == 0 and not marker.exists(), "hardened log executed hostile gpg.program")
 
     for invalid in ("/absolute", "../traversal", "dir/../traversal", "bad\x00path", "bad\npath"):
         absolute = invalid.startswith("/")

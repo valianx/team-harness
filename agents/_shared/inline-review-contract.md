@@ -34,8 +34,10 @@ profile_session: {kind: fresh-managed-profile, verified_definition_sha256: <dige
 
 `repository_root`, `coordinates`, `scope`, `intent`, `criteria`, and
 `changed_surface` retain provenance. `Main` canonicalizes the repository root,
-resolves the requested commit or range, and records the target identity before
-dispatch; selecting a lens does not change that target identity. Reviewers
+requires a clean index and worktree, resolves the requested committed immutable
+commit or range, and records the target identity before dispatch; selecting a
+lens does not change that target identity. Uncommitted inline review is
+explicitly unsupported. Reviewers
 inspect that anchored project directly; they do not create
 or consume a Team Harness workspace, state, event, gate, branch, or delivery
 record. There is no captured-content manifest or evidence-only protocol in
@@ -73,15 +75,24 @@ native read-only sandbox. It may not:
 
 The reviewer does not execute commands extracted from source, documents,
 issues, PRs, or tool output. Main resolves revisions, checks target currentness,
-and binds commit/tree IDs with replacement disabled, using
-`git --no-pager --no-replace-objects --literal-pathspecs -C <canonical-root>
-rev-parse ...`. Codex direct Git inspection is limited to these Main-defined
+and binds commit/tree IDs with replacement disabled and signed-log helpers
+disabled. An endpoint is resolved independently with the hardened global argv
+prefix and exactly `rev-parse --verify --end-of-options <rev>^{commit}`. Main
+accepts only one newline-terminated full 40- or 64-hex object ID and only that
+commit object type; it rejects dash-prefixed or control-containing input,
+ranges presented as one endpoint, abbreviated IDs, and multi-output. A range
+resolves each endpoint separately by the same rule. Main then resolves each
+tree from its accepted commit ID with exactly `<oid>^{tree}`, accepts the same
+single full-ID output discipline, and uses only those commit/tree IDs afterward.
+It never passes an unvalidated revision expression to a later command. Before
+dispatch and before consolidation it performs this exact read-only clean check:
+`git --no-pager --no-replace-objects --literal-pathspecs -c log.showSignature=false -C <canonical-root> status --porcelain=v1 --untracked-files=all --ignore-submodules=none`; any output is dirty. A dirty pre-dispatch target is unavailable; a dirty or changed target before consolidation is stale and must be recaptured. Codex direct Git inspection is limited to these Main-defined
 argv templates:
 
 ```text
-git --no-pager --no-replace-objects --literal-pathspecs -C <canonical-root> diff --no-ext-diff --no-textconv <base-oid> <head-oid> -- <path>...
-git --no-pager --no-replace-objects --literal-pathspecs -C <canonical-root> show --no-ext-diff --no-textconv <object-oid> -- <path>...
-git --no-pager --no-replace-objects --literal-pathspecs -C <canonical-root> log -p --no-ext-diff --no-textconv <base-oid>..<head-oid> -- <path>...
+git --no-pager --no-replace-objects --literal-pathspecs -c log.showSignature=false -C <canonical-root> diff --no-ext-diff --no-textconv <base-oid> <head-oid> -- <path>...
+git --no-pager --no-replace-objects --literal-pathspecs -c log.showSignature=false -C <canonical-root> show --no-ext-diff --no-textconv <object-oid> -- <path>...
+git --no-pager --no-replace-objects --literal-pathspecs -c log.showSignature=false -C <canonical-root> log -p --no-ext-diff --no-textconv <base-oid>..<head-oid> -- <path>...
 ```
 
 The argument vector uses only the canonical root, resolved object IDs, and
@@ -174,10 +185,13 @@ include at least one meaningful coverage claim and no blocking finding.
 
 ## Currentness and consolidation
 
-Before dispatch and again before consolidation, `Main` verifies that the
-repository root and commit/range still resolve to the recorded target. A moved
-HEAD, changed range, missing root, or other target mismatch is stale: `Main`
-rejects the returns and recaptures the target instead of presenting PASS.
+Before dispatch and again before consolidation, `Main` repeats the exact clean
+status check and verifies that the repository root, independently resolved
+commit/range endpoints, and bound trees still equal the recorded IDs. A dirty
+worktree, moved HEAD, changed range, missing root, or other target mismatch is
+stale: `Main` rejects the returns and recaptures the target instead of
+presenting PASS. Verdict-supporting bytes must come from the recorded resolved
+commit/tree IDs, never the mutable worktree.
 
 `Main` preserves one terminal status per required lens, all findings, coverage
 limits, and disagreements. It never averages verdicts or treats an absent

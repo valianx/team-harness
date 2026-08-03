@@ -145,7 +145,8 @@ to direct behavior when the workflow completes or is explicitly aborted.
 
 For a non-PR inline review, `Main` records `requested_lenses` and
 `required_lenses` (every operator-named lens is required), resolves the canonical
-repository root, and binds the review to an immutable commit or range. It
+repository root, requires a clean index/worktree, and binds the review to a
+committed immutable commit or range; uncommitted inline review is unsupported. It
 dispatches one native `inline-reviewer` instance per lens with the same target,
 scope, intent, criteria, changed surface, and `target_id`. The reviewer reads
 the project directly through `sandbox_mode = "read-only"`; it cannot write
@@ -165,13 +166,19 @@ scope change requires an explicit restart before inline dispatch; otherwise the
 lens is unavailable. Shipped Codex hooks cannot attest session start or loaded
 agent bytes. Each lens package and return carry a fresh `dispatch_id` and
 matching `expected_lens`; replay, duplicate, substitution, or identity mismatch
-is untrusted. Codex uses only the shared contract's exact `git --no-pager` argv
-templates with `--no-replace-objects`, `--literal-pathspecs`, `--no-ext-diff`,
-`--no-textconv`, resolved object IDs, and `--` path separation. Claude Main
+is untrusted. Main resolves each range endpoint separately with hardened globals
+and `rev-parse --verify --end-of-options <rev>^{commit}`, accepting one full
+commit OID only, binds `<oid>^{tree}`, and uses only those IDs. It rejects
+dash-prefixed/control/range-as-endpoint/abbreviated/multi-output input. Codex
+uses only the shared contract's exact `git --no-pager` argv templates with
+`--no-replace-objects`, `--literal-pathspecs`, `-c log.showSignature=false`,
+`--no-ext-diff`, `--no-textconv`, resolved object IDs, and `--` path separation. Claude Main
 MUST use those same templates for its no-Bash reviewer's ephemeral immutable
 Git view or mark the lens unavailable. The reviewer is obligated to
 stay under the project root, but that is not filesystem confinement: broad
-read-only exposure remains a documented runtime residual.
+read-only exposure remains a documented runtime residual. Main repeats the
+exact clean status and commit/tree binding before consolidation; dirty or
+concurrently changed targets are stale and recaptured rather than certified.
 
 The four lenses are `tester`, `qa`, `security`, and conditional `adversary`.
 The adversary lens is required when the security floor applies or the operator

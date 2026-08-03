@@ -52,9 +52,9 @@ def check_inline_reviewer_native() -> None:
     if "agents/_shared/inline-review-contract.md" in adapter:
         fail("inline-reviewer adapter depends on target repository contract")
     for marker in (
-        "git --no-pager --no-replace-objects --literal-pathspecs -c <canonical-root> diff --no-ext-diff --no-textconv",
-        "git --no-pager --no-replace-objects --literal-pathspecs -c <canonical-root> show --no-ext-diff --no-textconv",
-        "git --no-pager --no-replace-objects --literal-pathspecs -c <canonical-root> log -p --no-ext-diff --no-textconv",
+        "git --no-pager --no-replace-objects --literal-pathspecs -c log.showsignature=false -c <canonical-root> diff --no-ext-diff --no-textconv",
+        "git --no-pager --no-replace-objects --literal-pathspecs -c log.showsignature=false -c <canonical-root> show --no-ext-diff --no-textconv",
+        "git --no-pager --no-replace-objects --literal-pathspecs -c log.showsignature=false -c <canonical-root> log -p --no-ext-diff --no-textconv",
         "resolved object ids", "never interpolate a project-derived command string",
         "profile_session", "fresh session", "in-memory byte attestation",
     ):
@@ -1162,7 +1162,7 @@ def main() -> None:
         "tester", "qa", "security", "adversary", "repository_root", "commit_or_range",
         "sandbox_mode = \"read-only\"", "lens_status", "coverage", "disagreements",
         "target currentness", "review-pr", "output: null", "expected_lens", "dispatch_id",
-        "git diff", "filesystem-root confinement", "git --no-pager --no-replace-objects --literal-pathspecs -c <canonical-root>",
+        "git diff", "filesystem-root confinement", "git --no-pager --no-replace-objects --literal-pathspecs -c log.showsignature=false -c <canonical-root>",
         "--no-ext-diff", "--no-textconv", "resolved object ids", "project-derived command string",
         "profile_session", "fresh session", "in-memory byte attestation",
     ):

@@ -17,11 +17,15 @@ coordinator.
 ## Target and boundary
 
 Main's dispatch contains `mode: inline-review`, the canonical
-`repository_root`, an immutable `commit_or_range`, `scope`, operator-provenanced
+`repository_root`, a committed immutable `commit_or_range`, `scope`, operator-provenanced
 `intent` and `criteria`, `changed_surface`, `requested_lenses`,
 `required_lenses`, the selected `lens`, matching `expected_lens`, fresh
 `dispatch_id`, `security_floor`, and `target_id`. Inspect the project
 directly through the native read-only sandbox at that anchored target.
+Uncommitted review is unsupported: Main must have required a clean index and
+worktree and bound exact commit/tree IDs before dispatch. If currentness or
+clean status cannot be retained through consolidation, the lens is unavailable
+or stale rather than a review of mutable bytes.
 
 Read and search only the requested project scope and the files needed to prove
 a finding. Do not execute Bash: Claude plugin agents cannot reliably impose a

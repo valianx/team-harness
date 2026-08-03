@@ -25,8 +25,10 @@ floor or a live request). The floor covers changed authentication,
 authorization/permissions, identity/session, credential/secret,
 cryptography/transport, untrusted-input, file-upload, data-access/export,
 executable-code, or security-policy/audit controls; an ambiguous
-classification is sensitive. It binds the canonical project root plus immutable
-commit/range, and sends each independent lens the same package with
+classification is sensitive. Inline review supports only committed immutable
+commit/range targets, not uncommitted review: it requires a clean index/worktree,
+binds the canonical project root plus exact resolved commit/tree IDs, and sends
+each independent lens the same package with
 `mode: inline-review`, scope, intent/criteria provenance, `changed_surface`,
 `lens`, matching `expected_lens`, fresh `dispatch_id`, `security_floor`,
 `read_only: true`, and `target_id`. This path creates no workspace, pipeline
@@ -60,9 +62,16 @@ coverage limits, target identity, matching `dispatch_id`/`expected_lens`/lens,
 and a normalized verdict; global PASS is fail-closed on every required lens
 with both `lens_status: complete` and `verdict: pass`. Reject replayed,
 duplicate, substituted, or identity-mismatched returns as `untrusted`. There is
-no Freeze/Gate semantic in this mode. Main-defined read-only Git inspection may
-cover deletions, renames, base-side content, and historical ranges only with the
-shared hardened argv templates: `--no-replace-objects`, `--literal-pathspecs`,
+no Freeze/Gate semantic in this mode. Main independently resolves each endpoint
+with hardened globals plus `rev-parse --verify --end-of-options <rev>^{commit}`;
+it accepts exactly one newline-terminated full 40/64-hex commit ID, rejects
+dash-prefixed/control/range-as-endpoint/abbreviated/multi-output input, binds
+each `<oid>^{tree}` under the same discipline, and uses only those IDs. It
+requires the exact clean status check before dispatch and consolidation; dirty
+or concurrently changed targets are unavailable/stale and recaptured. Main-defined
+read-only Git inspection may cover deletions, renames, base-side content, and
+historical ranges only with the shared hardened argv templates:
+`--no-replace-objects`, `--literal-pathspecs`, `-c log.showSignature=false`,
 `--no-ext-diff`, `--no-textconv`, resolved IDs, and `--`-separated validated
 paths. Claude Main MUST use those same templates for its no-Bash reviewer's
 ephemeral immutable Git view or mark the lens unavailable. The reviewer must

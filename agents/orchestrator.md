@@ -94,10 +94,16 @@ runner, captured-content manifest, or precaptured-evidence fallback.
 
 The native boundary forbids edits/writes, workspace or coordination artifacts,
 commits, branches, pushes, publication, network/external mutation, and agent
-dispatch. Codex uses only the shared contract's exact `git --no-pager` argv
-templates with `--no-replace-objects`, `--literal-pathspecs`, `--no-ext-diff`,
-`--no-textconv`, resolved object IDs, and `--` path separation; never
-project-derived command strings. Claude reviewers have no Bash: Main MUST use
+dispatch. Inline review supports only committed immutable commit/range targets:
+require the exact clean status check before dispatch and consolidation, resolve
+each endpoint separately using `rev-parse --verify --end-of-options <rev>^{commit}`
+with exactly one full OID, bind `<oid>^{tree}`, and use only those IDs. Reject
+dash-prefixed, control, range-as-endpoint, abbreviated, or multi-output input;
+dirty/concurrent changes are unavailable or stale and recaptured. Codex uses
+only the shared contract's exact `git --no-pager` argv templates with
+`--no-replace-objects`, `--literal-pathspecs`, `-c log.showSignature=false`,
+`--no-ext-diff`, `--no-textconv`, resolved object IDs, and `--` path separation;
+never project-derived command strings. Claude reviewers have no Bash: Main MUST use
 those same templates to provide their ephemeral immutable Git view, or the lens
 is unavailable. Reviewers must limit themselves to the project root: this is
 a role obligation, not a claim that Codex broad read access is filesystem
