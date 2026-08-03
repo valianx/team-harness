@@ -20,7 +20,7 @@ write:
 
 - `scripts/manage_config.py` validates, backs up, and atomically writes native
   settings with mode `0o600`.
-- `scripts/manage_agents.py` installs or refreshes the ten bundled generated
+- `scripts/manage_agents.py` installs or refreshes the eleven bundled generated
   agents without overwriting an unmanaged same-name file.
 
 ## Routing
@@ -115,7 +115,7 @@ migration, and preserve every unrelated value.
    - Agent scope is `global` (default, available to every project) or `project`.
      Persist it as `agent-scope`.
 
-6. Reconcile all ten bundled specialists in the persisted scope on every full
+6. Reconcile all eleven bundled specialists in the persisted scope on every full
    setup, and whenever `agents` is targeted:
 
    ```bash
@@ -124,8 +124,9 @@ migration, and preserve every unrelated value.
    ```
 
    The pipeline set is `architect`, `implementer`, `tester`, `qa`, `security`,
-   and `delivery`; the PR-review set is `reviewer`, `pr-review-qa`,
-   `pr-review-security`, and `reviewer-consolidator`. Missing files are installed and stale Team Harness-managed
+   and `delivery`; the direct inline review set is `inline-reviewer`; the PR-review
+   set is `reviewer`, `pr-review-qa`, `pr-review-security`, and
+   `reviewer-consolidator`. Missing files are installed and stale Team Harness-managed
    files are refreshed automatically. A same-name unmanaged file is a blocking
    conflict: report it and do not overwrite it. Writes outside the repository
    use Codex's native permission prompt. Do not use or download the separate Go
@@ -157,11 +158,11 @@ migration, and preserve every unrelated value.
    never approve or bypass trust.
 
 9. Re-run both helper inspections and `codex mcp list --json`; re-run
-   `codex features list` only when step 4 ran. Report one compact result:
-   native config path, workspace/language, agent scope and ten agent statuses,
-   feature-flag status when checked, MCP registrations, hook
-   verification/trust, and whether a new thread is required. Never print
-   imported opaque values, secrets, or environment-variable values.
+    `codex features list` only when step 4 ran. Report one compact result:
+    native config path, workspace/language, agent scope and eleven agent statuses,
+    feature-flag status when checked, MCP registrations, hook
+    verification/trust, and whether a new thread is required. Never print
+    imported opaque values, secrets, or environment-variable values.
 
 The flow is idempotent. Blank input preserves current values; unrelated native
 keys remain untouched; unchanged config and agent files are not rewritten.

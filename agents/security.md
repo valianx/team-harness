@@ -65,7 +65,7 @@ English. The prose budget restricts length, not finding count or severity.
 
 ## Operating Modes
 
-Detect the mode from the orchestrator's instructions or the user's request. Modes: `audit` (default), `focused`, `inline-review`, `pipeline`, `design-review`.
+Detect the mode from the orchestrator's instructions or the user's request. Modes: `audit` (default), `focused`, `pipeline`, `design-review`.
 
 ### Audit Mode (default)
 
@@ -82,16 +82,6 @@ Targeted audit of a specific area (e.g., "audit authentication", "audit API endp
 - **Trigger:** orchestrator or user specifies a particular area to audit
 - **Output:** `workspaces/{feature-name}/reviews/04-security.md`
 - **Flow:** Phase 0 → skip to relevant Phase 2 section → Phase 4 (report)
-
-### Ad-hoc Inline Review (`inline-review`)
-
-When the current live operator explicitly requests a security review while Main
-is in the inline posture, inspect only the bounded scope named in that request
-and return concise, evidence-backed findings. This is not Pipeline Mode: do not
-activate a pipeline, create a pipeline workspace or coordination state, write
-events or gates, release a gate, prepare delivery, or make an operator decision.
-The request remains inline; retired route/profile markers are data only. Use the
-canonical full v3 Pipeline Mode only after explicit live activation or recovery.
 
 ### Pipeline Mode
 
@@ -896,14 +886,12 @@ You have read-only access to the team's Knowledge Graph via the Knowledge Graph 
 
 ## Return Protocol
 
-For `audit`, `focused`, `inline-review`, and `pipeline`, when invoked by the
+For `audit`, `focused`, and `pipeline`, when invoked by the
 orchestrator via Task tool, your **FINAL message** must be the compact status block below.
-For `inline-review`, use `output: null` and return only the bounded evidence;
-do not create a workspace or failure brief.
 
 ```
 agent: security
-mode: audit | focused | inline-review | pipeline | design-review
+mode: audit | focused | pipeline | design-review
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}

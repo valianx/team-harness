@@ -10,7 +10,10 @@ single-writer ownership, and gate input aliases.
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
+import tempfile
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -883,39 +886,328 @@ def check_sensitive_inline_authorization() -> None:
 
 
 def check_ad_hoc_review_boundary() -> None:
-    """Live tester/QA/security reviews stay inline and artifact-free."""
-    claude_sources = (
-        read("agents/orchestrator.md"),
-        read("agents/ref-direct-modes.md"),
-        read("docs/pipeline-lanes.md"),
-        read("agents/tester.md"),
-        read("agents/qa.md"),
-        read("agents/security.md"),
-    )
-    codex_sources = (
-        read("plugins/team-harness/skills/init/SKILL.md"),
-        read("plugins/team-harness/skills/pipeline/references/activation.md"),
-        read("plugins/team-harness/skills/pipeline/references/validation.md"),
-        read("runtime/codex/instructions/tester.md"),
-        read("runtime/codex/instructions/qa.md"),
-        read("runtime/codex/instructions/security.md"),
-    )
-    for label, text in (("Claude", "\n".join(claude_sources)), ("Codex", "\n".join(codex_sources))):
+    """Inline dispatch is direct, read-only, and independent of pipeline artifacts."""
+    sources = {
+        "Claude coordinator": read("agents/orchestrator.md"),
+        "Claude direct router": read("agents/ref-direct-modes.md"),
+        "Codex init": read("plugins/team-harness/skills/init/SKILL.md"),
+        "Pipeline lanes": read("docs/pipeline-lanes.md"),
+        "Shared contract": read("agents/_shared/inline-review-contract.md"),
+        "Inline reviewer": read("agents/inline-reviewer.md"),
+    }
+    for label, text in sources.items():
         lowered = re.sub(r"\s+", " ", text.lower())
-        require("ad hoc" in lowered or "ad-hoc" in lowered, f"{label}: ad-hoc review boundary missing")
-        for artifact in ("workspace", "state", "events", "gates", "delivery"):
-            require(artifact in lowered, f"{label}: ad-hoc review missing {artifact} prohibition")
-            denied = re.search(
-                rf"(?:\bcreates?\s+no\b|\bwithout\b|\bnever\s+(?:creates?|writes?|records?)\b)[^.;\n]{{0,180}}\b{artifact}\b",
-                lowered,
-            )
-            require(denied is not None, f"{label}: ad-hoc review does not clause-scope the {artifact} prohibition")
-        require("live" in lowered and "tester" in lowered and "qa" in lowered and "security" in lowered, f"{label}: live review roles drifted")
+        for marker in ("inline-review", "inline-reviewer", "read-only", "review-pr"):
+            require(marker in lowered, f"{label}: native inline marker {marker!r} missing")
+        require(
+            "repository root" in lowered or "project root" in lowered or "repository_root" in lowered,
+            f"{label}: canonical root marker missing",
+        )
+    contract_flat = re.sub(r"\s+", " ", sources["Shared contract"].lower())
+    for marker in ("commit or range", "scope", "intent", "criteria", "changed_surface", "requested_lenses", "required_lenses"):
+        require(marker in contract_flat, f"Shared contract: target marker {marker!r} missing")
+    for artifact in ("workspace", "state", "events", "gates", "branch", "delivery record", "publication"):
+        require(artifact in contract_flat, f"Shared contract: inline artifact marker {artifact!r} missing")
+    contract = sources["Shared contract"].lower()
+    for marker in ("native read-only sandbox", "tester|qa|security|adversary", "security floor", "security_floor", "dispatch_id", "expected_lens", "stale", "recaptures", "no blocker", "unresolved blocking disagreement"):
+        require(marker in contract, f"Shared contract: current inline rule {marker!r} missing")
     for role in ("tester", "qa", "security"):
+        semantic = read(f"agents/{role}.md").lower()
         adapter = read(f"runtime/codex/instructions/{role}.md").lower()
-        require("ad-hoc inline review" in adapter, f"Codex {role}: ad-hoc inline review missing")
-        require("creates no workspace" in adapter and "coordination state" in adapter, f"Codex {role}: ad-hoc review can create state")
-        require("delivery record" in adapter and "creates no" in adapter, f"Codex {role}: ad-hoc review can create delivery")
+        for label, text in ((f"Claude {role}", semantic), (f"Codex {role}", adapter)):
+            require("inline-review" not in text, f"{label}: retired inline responsibility remains")
+            require("run_inline_review" not in text and "evidence_manifest" not in text, f"{label}: retired runner protocol remains")
+
+
+def check_inline_markers(contract: str) -> None:
+    markers = ("mode: inline-review", "repository_root", "commit_or_range", "scope", "intent", "criteria", "changed_surface", "requested_lenses", "required_lenses", "lens: tester|qa|security|adversary", "expected_lens", "dispatch_id", "security_floor", "read_only: true", "target_id", "native read-only sandbox", "security floor", "authentication", "authorization", "ambiguous classification", "currentness", "stale", "lens_status: complete|incomplete|failed|unavailable|untrusted", "verdict: pass", "no blocker", "unresolved blocking disagreement", "never averages verdicts", "absent", "return as pass", "review-pr")
+    contract = contract.lower()
+    for marker in markers:
+        require(marker in contract, f"inline contract missing {marker!r}")
+    for marker in ("edit or write", "network", "publication", "external state", "untrusted", "isolated runner", "unavailable", "git --no-pager", "--no-replace-objects", "--literal-pathspecs", "--no-ext-diff", "--no-textconv", "resolved object ids", "canonical repo-relative", "root-contained", "traversal", "control characters", "project-derived command", "filesystem-root confinement", "fresh codex session", "in-memory byte attestation"):
+        require(marker in contract, f"inline tool boundary missing {marker!r}")
+    for marker in ("every `required_lenses`", "no blocker", "unresolved blocking disagreement", "never averages verdicts", "absent", "return as pass", "verdict: pass"):
+        require(marker in contract, f"inline consolidation rule missing {marker!r}")
+    for marker in ("replay", "duplicate", "substitution", "mismatch"):
+        require(marker in contract, f"inline attempt-identity rule missing {marker!r}")
+    for retired in ("evidence_manifest", "manifest_digest", "allowed_roots", "run_inline_review.mjs"):
+        require(retired not in contract, f"inline contract retains retired protocol field {retired!r}")
+
+
+def check_inline_git_hardening() -> None:
+    """Inline Git evidence has exact immutable IDs and no config helper execution."""
+    contract = read("agents/_shared/inline-review-contract.md")
+    resolver_contract = re.sub(r"\s+", " ", contract.lower())
+    templates = (
+        "git --no-pager --no-replace-objects --literal-pathspecs -c core.fsmonitor=false -c core.untrackedCache=false -c maintenance.auto=false -c gc.auto=0 -c log.showSignature=false -C <canonical-root> diff --no-ext-diff --no-textconv <base-oid> <head-oid> -- <path>...",
+        "git --no-pager --no-replace-objects --literal-pathspecs -c core.fsmonitor=false -c core.untrackedCache=false -c maintenance.auto=false -c gc.auto=0 -c log.showSignature=false -C <canonical-root> show --no-ext-diff --no-textconv <object-oid> -- <path>...",
+        "git --no-pager --no-replace-objects --literal-pathspecs -c core.fsmonitor=false -c core.untrackedCache=false -c maintenance.auto=false -c gc.auto=0 -c log.showSignature=false -C <canonical-root> log -p --no-ext-diff --no-textconv <base-oid>..<head-oid> -- <path>...",
+    )
+    for template in templates:
+        require(template in contract, f"inline contract misses hardened template: {template}")
+    require(
+        "For Claude, the\nsemantic reviewer has no Bash capability, so Main MUST use the same hardened\nenvironment, object preflight, argv templates" in contract,
+        "Claude Main may diverge from Codex hardened Git templates",
+    )
+    for marker in (
+        "rev-parse --verify --end-of-options <rev>^{commit}",
+        "one newline-terminated full 40- or 64-hex object id",
+        "range resolves each endpoint separately",
+        "<oid>^{tree}",
+        "log.showsignature=false",
+        "uncommitted inline review is explicitly unsupported",
+        "status --porcelain=v1 --untracked-files=all --ignore-submodules=none",
+        "verdict-supporting tracked-file bytes",
+        "git_optional_locks=0",
+        "git_no_lazy_fetch=1",
+        "git_allow_protocol=",
+        "cat-file -e <full-oid>^{commit|tree|blob}",
+        "cat-file blob <blob-oid>",
+        "exact keyed join",
+    ):
+        require(marker in resolver_contract, f"inline contract misses resolver/currentness rule: {marker}")
+
+    with tempfile.TemporaryDirectory() as temporary:
+        repo = Path(temporary)
+        immutable_env = {
+            **os.environ,
+            "GIT_OPTIONAL_LOCKS": "0",
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_CONFIG_COUNT": "0",
+            "GIT_NO_LAZY_FETCH": "1",
+            "GIT_ALLOW_PROTOCOL": "",
+        }
+        immutable_prefix = (
+            "git", "--no-pager", "--no-replace-objects", "--literal-pathspecs",
+            "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false",
+            "-c", "maintenance.auto=false", "-c", "gc.auto=0",
+            "-c", "log.showSignature=false", "-C", str(repo),
+        )
+
+        def git(*args: str) -> str:
+            result = subprocess.run(
+                ("git", *args), cwd=repo, check=True, text=True,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+            return result.stdout
+
+        def immutable(*args: str) -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                (*immutable_prefix, *args), text=True, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, check=False, env=immutable_env,
+            )
+
+        def resolved_endpoint(revision: str) -> str | None:
+            """Executable model of Main's exact single-endpoint resolver."""
+            if not revision or revision.startswith("-") or ".." in revision:
+                return None
+            if any(ord(character) < 32 or ord(character) == 127 for character in revision):
+                return None
+            result = immutable("rev-parse", "--verify", "--end-of-options", f"{revision}^{{commit}}")
+            if result.returncode or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", result.stdout.rstrip("\n")):
+                return None
+            if result.stdout.count("\n") != 1 or not result.stdout.endswith("\n"):
+                return None
+            return result.stdout[:-1]
+
+        def resolved_tree(commit_oid: str) -> str | None:
+            if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", commit_oid):
+                return None
+            result = immutable("rev-parse", "--verify", "--end-of-options", f"{commit_oid}^{{tree}}")
+            if result.returncode or result.stdout.count("\n") != 1 or not result.stdout.endswith("\n"):
+                return None
+            return result.stdout[:-1] if re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", result.stdout[:-1]) else None
+
+        def clean() -> bool:
+            result = immutable("status", "--porcelain=v1", "--untracked-files=all", "--ignore-submodules=none")
+            return result.returncode == 0 and result.stdout == ""
+
+        git("init", "-q")
+        git("config", "user.email", "inline@example.invalid")
+        git("config", "user.name", "Inline Test")
+        (repo / "normal.txt").write_text("normal\n")
+        (repo / ":(glob)*.txt").write_text("literal\n")
+        git("add", "--all")
+        git("commit", "-qm", "first")
+        first = git("rev-parse", "HEAD").strip()
+        first_tree = git("rev-parse", f"{first}^{{tree}}").strip()
+        require(clean(), "clean immutable inline target was rejected")
+        require(resolved_endpoint("HEAD") == first, "exact endpoint resolver did not return HEAD commit ID")
+        require(resolved_tree(first) == first_tree, "exact endpoint resolver did not bind HEAD tree ID")
+        for injection in ("--all", "--show-toplevel", "--revs-only", "HEAD..HEAD", "HEAD\nHEAD"):
+            require(resolved_endpoint(injection) is None, f"injected endpoint was accepted: {injection!r}")
+        require(resolved_tree(f"{first}\n{first}") is None, "multi-output tree binding was accepted")
+        (repo / "dirty.txt").write_text("uncommitted\n")
+        require(not clean(), "dirty worktree was accepted as immutable inline target")
+        (repo / "dirty.txt").unlink()
+        require(clean(), "clean status did not recover after test cleanup")
+        (repo / "normal.txt").write_text("replacement\n")
+        git("commit", "-am", "second", "-q")
+        second = git("rev-parse", "HEAD").strip()
+        git("replace", first, second)
+
+        hardened_tree = immutable("rev-parse", f"{first}^{{tree}}").stdout.strip()
+        require(hardened_tree == first_tree, "replace ref altered hardened revision binding")
+        literal = immutable("show", "--no-ext-diff", "--no-textconv", first, "--", ":(glob)*.txt").stdout
+        require("+literal" in literal and "+normal" not in literal, "pathspec magic was not treated literally")
+
+        marker = repo / ".git" / "gpg-program-ran"
+        gpg_program = repo / ".git" / "hostile-gpg-program"
+        gpg_program.write_text(f"#!/bin/sh\nprintf invoked > {marker}\nexit 1\n")
+        os.chmod(gpg_program, 0o755)
+        signed_content = (
+            f"tree {first_tree}\n"
+            "author Inline Test <inline@example.invalid> 0 +0000\n"
+            "committer Inline Test <inline@example.invalid> 0 +0000\n"
+            "gpgsig -----BEGIN PGP SIGNATURE-----\n"
+            " invalid test signature\n"
+            " -----END PGP SIGNATURE-----\n\n"
+            "synthetic signed commit\n"
+        )
+        signed = subprocess.run(
+            ("git", "hash-object", "-t", "commit", "-w", "--stdin"), cwd=repo,
+            input=signed_content, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
+        ).stdout.strip()
+        git("update-ref", "refs/heads/signed", signed)
+        git("config", "log.showSignature", "true")
+        git("config", "gpg.program", str(gpg_program))
+        subprocess.run(("git", "log", "-1", "signed"), cwd=repo, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+        require(marker.exists(), "hostile local log.showSignature did not exercise gpg.program regression")
+        marker.unlink()
+        hardened_log = immutable("log", "-1", signed)
+        require(hardened_log.returncode == 0 and not marker.exists(), "hardened log executed hostile gpg.program")
+
+        fsmonitor_marker = repo / ".git" / "fsmonitor-ran"
+        fsmonitor = repo / ".git" / "hostile-fsmonitor"
+        fsmonitor.write_text(f"#!/bin/sh\nprintf invoked > {fsmonitor_marker}\nexit 0\n")
+        os.chmod(fsmonitor, 0o755)
+        git("config", "core.fsmonitor", str(fsmonitor))
+        git("status", "--porcelain")
+        require(fsmonitor_marker.exists(), "fixture did not exercise configured fsmonitor")
+        fsmonitor_marker.unlink()
+        index = repo / ".git" / "index"
+        index_before = index.stat()
+        require(clean(), "hardened clean status rejected clean fsmonitor fixture")
+        index_after = index.stat()
+        require(not fsmonitor_marker.exists(), "hardened status executed configured fsmonitor")
+        require(
+            (index_before.st_mtime_ns, index_before.st_size) == (index_after.st_mtime_ns, index_after.st_size),
+            "hardened status refreshed the index",
+        )
+        require(not (repo / ".git" / "index.lock").exists(), "hardened status left an index lock")
+
+        bound_blob = git("rev-parse", f"{first}:normal.txt").strip()
+        require(immutable("cat-file", "-e", f"{bound_blob}^{{blob}}").returncode == 0, "bound blob preflight failed")
+        original_bytes = immutable("cat-file", "blob", bound_blob).stdout
+        (repo / "normal.txt").write_text("attacker edit\n")
+        require(immutable("cat-file", "blob", bound_blob).stdout == original_bytes, "mutable worktree edit changed bound blob evidence")
+        (repo / "normal.txt").write_text("replacement\n")
+        require(clean(), "worktree restore did not return fixture to clean state")
+        require(immutable("cat-file", "blob", bound_blob).stdout == original_bytes, "read/restore changed bound blob evidence")
+
+        origin = Path(temporary) / "origin.git"
+        source = Path(temporary) / "source"
+        partial = Path(temporary) / "partial"
+        subprocess.run(("git", "init", "--bare", "-q", str(origin)), check=True)
+        subprocess.run(("git", "init", "-q", str(source)), check=True)
+        subprocess.run(("git", "-C", str(source), "config", "user.email", "inline@example.invalid"), check=True)
+        subprocess.run(("git", "-C", str(source), "config", "user.name", "Inline Test"), check=True)
+        (source / "promisor.txt").write_text("promisor-only\n")
+        subprocess.run(("git", "-C", str(source), "add", "promisor.txt"), check=True)
+        subprocess.run(("git", "-C", str(source), "commit", "-qm", "promisor"), check=True)
+        subprocess.run(("git", "-C", str(source), "remote", "add", "origin", str(origin)), check=True)
+        subprocess.run(("git", "-C", str(source), "push", "-q", "origin", "HEAD"), check=True)
+        subprocess.run(("git", "-C", str(origin), "config", "uploadpack.allowFilter", "true"), check=True)
+        subprocess.run(("git", "clone", "-q", "--no-checkout", "--no-local", "--filter=blob:none", str(origin), str(partial)), check=True)
+        promisor_blob = subprocess.run(
+            ("git", "-C", str(partial), "rev-parse", "HEAD:promisor.txt"), text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
+        ).stdout.strip()
+        partial_env = {**immutable_env, "GIT_DIR": str(partial / ".git"), "GIT_WORK_TREE": str(partial)}
+        objects = partial / ".git" / "objects"
+        object_state = sorted((path.relative_to(objects), path.read_bytes()) for path in objects.rglob("*") if path.is_file())
+        missing = subprocess.run(
+            (*immutable_prefix[:-1], str(partial), "cat-file", "-e", f"{promisor_blob}^{{blob}}"),
+            text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, env=partial_env,
+        )
+        object_state_after = sorted((path.relative_to(objects), path.read_bytes()) for path in objects.rglob("*") if path.is_file())
+        require(missing.returncode != 0, "hardened promisor preflight fetched a missing blob")
+        require(object_state == object_state_after, "hardened promisor preflight mutated the object database")
+
+    for invalid in ("/absolute", "../traversal", "dir/../traversal", "bad\x00path", "bad\npath"):
+        absolute = invalid.startswith("/")
+        traversal = any(part == ".." for part in invalid.split("/"))
+        control = any(ord(character) < 32 or ord(character) == 127 for character in invalid)
+        require(absolute or traversal or control, f"invalid path escaped validation: {invalid!r}")
+
+    def consolidate(required: list[tuple[str, str, str, str]], returns: list[dict[str, object]]) -> tuple[bool, dict[tuple[str, str, str, str], str]]:
+        """Executable contract model for Main's one-result keyed consolidation."""
+        slots = {slot: "missing" for slot in required}
+        trusted = True
+        for returned in returns:
+            slot = (returned["lens"], returned["dispatch_id"], returned["target_id"], returned["coordinates"])
+            if slot not in slots or returned["expected_lens"] != returned["lens"]:
+                trusted = False
+                continue
+            if slots[slot] != "missing":
+                slots[slot] = "untrusted"
+                continue
+            if returned["lens_status"] != "complete" or returned["verdict"] != "pass" or returned["blocker"] or returned["blocking_disagreement"]:
+                slots[slot] = "non-pass"
+            else:
+                slots[slot] = "pass"
+        return trusted and all(value == "pass" for value in slots.values()), slots
+
+    tester_slot = ("tester", "attempt-t", "target", "base..head")
+    qa_slot = ("qa", "attempt-q", "target", "base..head")
+    passing_tester = {"lens": "tester", "expected_lens": "tester", "dispatch_id": "attempt-t", "target_id": "target", "coordinates": "base..head", "lens_status": "complete", "verdict": "pass", "blocker": False, "blocking_disagreement": False}
+    passing_qa = {**passing_tester, "lens": "qa", "expected_lens": "qa", "dispatch_id": "attempt-q"}
+    passed, slots = consolidate([tester_slot, qa_slot], [passing_tester, passing_qa])
+    require(passed and set(slots.values()) == {"pass"}, "valid distinct lens returns did not pass keyed consolidation")
+    matrix = {
+        "missing": [passing_tester],
+        "failed": [{**passing_tester, "lens_status": "failed"}, passing_qa],
+        "blocker": [{**passing_tester, "blocker": True}, passing_qa],
+        "replay": [passing_tester, passing_qa, {**passing_tester, "dispatch_id": "old-attempt"}],
+        "duplicate": [passing_tester, passing_tester, passing_qa],
+        "substitution": [{**passing_tester, "lens": "qa"}, passing_qa],
+    }
+    for outcome, returns in matrix.items():
+        passed, _ = consolidate([tester_slot, qa_slot], returns)
+        require(not passed, f"{outcome} return incorrectly produced global PASS")
+
+
+def check_pr_precedence(source: str, text: str) -> None:
+    lowered = text.lower()
+    require("review-pr" in lowered and "inline-review" in lowered, f"{source}: route missing")
+    require("pr number" in lowered and "pr url" in lowered, f"{source}: PR aliases missing")
+    require("pr review" in lowered or "pr-review" in lowered or "review a pr" in lowered, f"{source}: PR intent missing")
+    require("exclusive" in lowered or ("precedence" in lowered and "must not intercept" in lowered), f"{source}: precedence missing")
+
+
+def check_inline_review_contract() -> None:
+    """Inline native project access, lens selection, currentness, and routing stay fail-closed."""
+    contract = read("agents/_shared/inline-review-contract.md")
+    check_inline_markers(contract)
+    for source, path in (("coordinator", "agents/orchestrator.md"), ("direct router", "agents/ref-direct-modes.md"), ("Codex init", "plugins/team-harness/skills/init/SKILL.md")):
+        check_pr_precedence(source, read(path))
+    reviewer = read("agents/inline-reviewer.md").lower()
+    adapter = read("runtime/codex/instructions/inline-reviewer.md").lower()
+    for label, text in (("Claude inline-reviewer", reviewer), ("Codex inline-reviewer", adapter)):
+        for marker in ("tester", "qa", "security", "adversary", "repository_root", "commit_or_range", "sandbox", "read-only", "target_id", "expected_lens", "dispatch_id", "coverage", "disagreements", "git diff"):
+            if label == "Claude inline-reviewer" and marker == "git diff":
+                require("immutable git view" in text, f"{label}: safe historical-view marker missing")
+            else:
+                require(marker in text, f"{label}: native lens marker {marker!r} missing")
+        for retired in ("run_inline_review.mjs", "evidence_manifest", "manifest_digest", "stdin-only"):
+            require(retired not in text, f"{label}: retired inline protocol {retired!r} remains")
+    init = re.sub(r"\s+", " ", read("plugins/team-harness/skills/init/SKILL.md").lower())
+    for marker in ("inline-reviewer", "commit/range", "sandbox_mode = \"read-only\"", "adversary", "security floor", "dispatch_id", "expected_lens", "regular non-symlink", "sha-256", "stale", "fresh codex session", "explicit restart", "in-memory byte attestation"):
+        require(marker in init, f"Codex init native route missing {marker!r}")
+    require("repository root" in init or "project root" in init, "Codex init native route missing canonical root")
+    for retired in ("run_inline_review.mjs", "evidence_manifest", "manifest_digest", "stdin-only", "deny-root"):
+        require(retired not in init, f"Codex init retired protocol {retired!r} remains")
 
 
 def _delivery_publish_sources() -> dict[str, str]:
@@ -1076,12 +1368,10 @@ def check_review_comment_regressions() -> None:
     require("[redacted]" in discover, "Discover: secret redaction marker is missing")
     require("survey_effort" not in discover, "Discover: retired survey_effort field remains live")
 
-    qa = read("agents/qa.md")
-    qa_inline = section(qa, "### Ad-hoc inline review", "### Validate Mode")
-    for marker in ("early return", "no workspace discovery", ".gitignore", "output: null"):
-        require(marker in qa_inline, f"QA inline review: missing early-return guard {marker!r}")
-    qa_session = section(qa, "## Session Context Protocol", "## Phase 0")
-    require("inline-review" in qa_session and "never enters this protocol" in qa_session, "QA inline review can enter the workspace protocol")
+    for role in ("tester", "qa", "security"):
+        role_text = read(f"agents/{role}.md").lower()
+        require("inline-review" not in role_text, f"{role}: retired inline role section remains")
+        require("run_inline_review" not in role_text and "evidence_manifest" not in role_text, f"{role}: retired runner protocol remains")
 
     for relative in ("agents/ref-pipeline.md", "docs/reasoning-checkpoint.md"):
         checkpoint = read(relative)
@@ -1729,6 +2019,8 @@ def main() -> None:
         ("residual corrections", check_residual_corrections),
         ("sensitive inline authorization", check_sensitive_inline_authorization),
         ("ad-hoc review boundary", check_ad_hoc_review_boundary),
+        ("inline review contract", check_inline_review_contract),
+        ("inline Git hardening", check_inline_git_hardening),
         ("single ship delivery", check_single_ship_delivery),
         ("delivery preview binding", check_delivery_preview_binding),
         ("terminal/transition mapping", check_terminal_and_transition_mapping),

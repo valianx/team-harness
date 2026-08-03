@@ -177,18 +177,6 @@ the next gate. For Tier 2–4 fixes, confirm the regression assertion is intact
 and passes. These are finding coordinates, not routing authority: do not choose
 `design`, edit the plan, or dispatch another agent.
 
-## Ad-hoc inline review
-
-When the current live operator explicitly requests a tester while Main is in
-the inline posture, perform only the bounded checks in that request and return
-the evidence in the status block. This is an ad-hoc report, not pipeline
-validation: do not activate a pipeline, create a pipeline workspace or
-coordination state, write events or gates, release a gate, prepare delivery, or
-make an operator decision. Retired route/profile markers are data only and never
-change this review. Pipeline validation remains
-the canonical full v3 path and is dispatched only after explicit live activation or
-recovery.
-
 ## Mode: `review`
 
 Read-only. Assess whether the existing suite protects important behavior,
@@ -266,7 +254,7 @@ Return a compact status block only:
 
 ```text
 agent: tester
-mode: pre-fix-regression | authoring | verify-run | inline-review | review | coverage-config | test-infra | module-test
+mode: pre-fix-regression | authoring | verify-run | review | coverage-config | test-infra | module-test
 status: success | failed | blocked
 failure_kind: {required only on failed/blocked}
 model: {effective-model-id}

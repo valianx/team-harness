@@ -8,7 +8,7 @@ Start Codex from the repository root. Use `@Team-Harness init <request>` for lig
 
 Author shared role intent in `agents/*.md`. Codex model and effort values are projected from that frontmatter, while Codex-specific execution instructions live in `runtime/codex/instructions/*.md` and workflow adapters live in `plugins/team-harness/skills/`. A semantic prompt change is not translated automatically into those adapters, so review both surfaces when behavior should change in Claude Code and Codex.
 
-After changing any canonical agent's model or effort, one of the ten installed role contracts, a Codex instruction adapter, or `runtime/schema/codex-agents.json`, run `$sync-codex-agents`. The equivalent repository commands are:
+After changing any canonical agent's model or effort, one of the eleven installed role contracts, a Codex instruction adapter, or `runtime/schema/codex-agents.json`, run `$sync-codex-agents`. The equivalent repository commands are:
 
 ```bash
 node tools/codex-runtime/generate.mjs
@@ -37,6 +37,7 @@ Generated with the `team-harness` profile. This table includes every canonical T
 | `gcp-infra` | `opus` | `xhigh` | `gpt-5.6-sol` | `xhigh` | not shipped in Codex beta |
 | `implementer` | `sonnet` | `high` | `gpt-5.6-terra` | `high` | installed custom agent |
 | `init-project` | `haiku` | `medium` | `gpt-5.6-terra` | `low` | not shipped in Codex beta |
+| `inline-reviewer` | `sonnet` | `high` | `gpt-5.6-terra` | `high` | installed custom agent |
 | `likec4-diagrammer` | `sonnet` | `medium` | `gpt-5.6-terra` | `medium` | not shipped in Codex beta |
 | `mentor` | `opus` | `high` | `gpt-5.6-sol` | `xhigh` | not shipped in Codex beta |
 | `orchestrator` | `opus` | `high` | `gpt-5.6-sol` | `xhigh` | Main via `init` / `pipeline` skills |

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.8.0] - 2026-08-03
+
+### Added
+
+- Added a native read-only inline reviewer for high-quality review outside a pipeline workspace,
+  while preserving the full immutable-snapshot `review-pr` workflow for pull requests.
+
 ## [3.7.0] - 2026-08-02
 
 ### Added

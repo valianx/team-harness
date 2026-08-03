@@ -20,6 +20,76 @@ def fail(message: str) -> None:
     raise AssertionError(message)
 
 
+def check_inline_reviewer_native() -> None:
+    """The generated inline reviewer is direct-project, read-only, and four-lens."""
+    registry = json.loads((ROOT / "runtime/schema/codex-agents.json").read_text())
+    role = next((agent for agent in registry["agents"] if agent["name"] == "inline-reviewer"), None)
+    if role is None:
+        fail("Codex registry is missing inline-reviewer")
+    expected = {
+        "sandbox_mode": "read-only",
+        "capabilities": ["filesystem-read", "command-exec"],
+        "capability_profile": "inline-review-read-only",
+        "semantic_source": "agents/inline-reviewer.md",
+        "instruction_source": "runtime/codex/instructions/inline-reviewer.md",
+        "output_path": ".codex/agents/inline-reviewer.toml",
+    }
+    for key, value in expected.items():
+        if role.get(key) != value:
+            fail(f"inline-reviewer registry {key} drifted: {role.get(key)!r}")
+    adapter = (ROOT / role["instruction_source"]).read_text().lower()
+    for marker in (
+        "tester", "qa", "security", "adversary", "repository_root", "commit_or_range",
+        "sandbox_mode = \"read-only\"", "lens_status", "coverage", "disagreements",
+        "review-pr", "target currentness", "output: null", "expected_lens", "dispatch_id",
+        "git diff", "filesystem-root confinement",
+    ):
+        if marker not in adapter:
+            fail(f"inline-reviewer adapter missing {marker!r}")
+    for retired in ("run_inline_review.mjs", "evidence_manifest", "manifest_digest", "stdin-only", "deny-root"):
+        if retired in adapter:
+            fail(f"inline-reviewer adapter retains retired protocol {retired!r}")
+    if "agents/_shared/inline-review-contract.md" in adapter:
+        fail("inline-reviewer adapter depends on target repository contract")
+    for marker in (
+        "git --no-pager --no-replace-objects --literal-pathspecs -c core.fsmonitor=false -c core.untrackedcache=false -c maintenance.auto=false -c gc.auto=0 -c log.showsignature=false -c <canonical-root> diff --no-ext-diff --no-textconv",
+        "git --no-pager --no-replace-objects --literal-pathspecs -c core.fsmonitor=false -c core.untrackedcache=false -c maintenance.auto=false -c gc.auto=0 -c log.showsignature=false -c <canonical-root> show --no-ext-diff --no-textconv",
+        "git --no-pager --no-replace-objects --literal-pathspecs -c core.fsmonitor=false -c core.untrackedcache=false -c maintenance.auto=false -c gc.auto=0 -c log.showsignature=false -c <canonical-root> log -p --no-ext-diff --no-textconv",
+        "resolved object ids", "never interpolate a project-derived command string",
+        "profile_session", "fresh session", "in-memory byte attestation",
+    ):
+        if marker not in adapter:
+            fail(f"inline-reviewer adapter misses hardened dispatch marker {marker!r}")
+    semantic = (ROOT / "agents/inline-reviewer.md").read_text()
+    if re.search(r"^tools:.*\\bBash\\b", semantic, re.MULTILINE):
+        fail("Claude inline-reviewer must not receive unrestricted Bash")
+    for marker in ("ephemeral immutable Git view", "cannot reliably impose a", "per-agent command boundary"):
+        if marker not in semantic:
+            fail(f"Claude inline-reviewer misses safe historical-view marker {marker!r}")
+    for relative in (".codex/agents/inline-reviewer.toml", "plugins/team-harness/skills/setup/assets/agents/inline-reviewer.toml"):
+        path = ROOT / relative
+        if not path.is_file():
+            fail(f"missing generated inline-reviewer output: {relative}")
+        data = tomllib.loads(path.read_text())
+        if data.get("model") != "gpt-5.6-terra" or data.get("model_reasoning_effort") != "high":
+            fail(f"{relative}: inline-reviewer projection must be gpt-5.6-terra/high")
+        if data.get("sandbox_mode") != "read-only":
+            fail(f"{relative}: inline-reviewer must use read-only sandbox")
+        if "capabilities" in data:
+            fail(f"{relative}: Codex 0.146 role-schema parser rejects capabilities tables")
+        if data.get("developer_instructions") != (ROOT / role["instruction_source"]).read_text().strip():
+            fail(f"{relative}: generated instructions drift from canonical adapter")
+    if (ROOT / "plugins/team-harness/skills/init/scripts/run_inline_review.mjs").exists():
+        fail("retired inline runner remains")
+    if (ROOT / "plugins/team-harness/skills/init/scripts/test_run_inline_review.mjs").exists():
+        fail("retired inline runner behavioral test remains")
+    init = re.sub(r"\s+", " ", (ROOT / "plugins/team-harness/skills/init/SKILL.md").read_text().lower())
+    for marker in ("inline-reviewer", "project root", "commit/range", "sandbox_mode = \"read-only\"", "adversary", "security floor", "dispatch_id", "expected_lens", "regular non-symlink", "sha-256", "before consolidation", "stale", "fresh codex session", "explicit restart", "in-memory byte attestation"):
+        if marker not in init:
+            fail(f"Codex init native inline route missing {marker!r}")
+    for retired in ("run_inline_review.mjs", "evidence_manifest", "manifest_digest", "stdin-only", "deny-root"):
+        if retired in init:
+            fail(f"Codex init retains retired inline protocol {retired!r}")
 EXPECTED_POST_GATE1 = {
     "mechanical": ("main", "implementation", "prohibited", "none", 0),
     "decision": ("main", "implementation", "explicit-only", "none", 0),
@@ -234,12 +304,14 @@ def check_post_gate1_projection() -> None:
 
 
 def main() -> None:
+    check_inline_reviewer_native()
     contract = json.loads((ROOT / "runtime/schema/codex-agents.json").read_text())
     agents = contract["agents"]
     expected = {agent["name"] for agent in agents}
     pipeline_roles = {"architect", "implementer", "tester", "qa", "security", "delivery"}
     review_roles = {"reviewer", "pr-review-qa", "pr-review-security", "reviewer-consolidator"}
-    if expected != pipeline_roles | review_roles:
+    inline_roles = {"inline-reviewer"}
+    if expected != pipeline_roles | review_roles | inline_roles:
         fail(f"unexpected Codex installed roles: {sorted(expected)}")
     architect_contract = next(agent for agent in agents if agent["name"] == "architect")
     if architect_contract["sandbox_mode"] != "workspace-write":
@@ -282,6 +354,7 @@ def main() -> None:
         "tester": ("sonnet/high", "sonnet-high"),
         "qa": ("sonnet/high", "sonnet-high"),
         "security": ("opus/xhigh", "opus"),
+        "inline-reviewer": ("sonnet/high", "sonnet-high"),
         "delivery": ("sonnet/medium", "sonnet-medium"),
         "reviewer": ("sonnet/high", "sonnet-high"),
         "pr-review-qa": ("sonnet/high", "sonnet-high"),
@@ -844,7 +917,7 @@ def main() -> None:
             fail(f"Codex bundled-agent sync failed: {synced.stdout}{synced.stderr}")
         sync_result = json.loads(synced.stdout)
         if set(sync_result.get("changed", [])) != expected:
-            fail("Codex bundled-agent sync did not install all ten roles")
+            fail("Codex bundled-agent sync did not install all eleven roles")
         for role in expected:
             installed = temp / "codex-home/agents" / f"{role}.toml"
             packaged = ROOT / "plugins/team-harness/skills/setup/assets/agents" / f"{role}.toml"
@@ -1028,6 +1101,7 @@ def main() -> None:
     recovery_reference = (
         ROOT / "plugins/team-harness/skills/pipeline/references/recovery.md"
     ).read_text()
+    inline_contract = (ROOT / "agents/_shared/inline-review-contract.md").read_text()
     init = (ROOT / "plugins/team-harness/skills/init/SKILL.md").read_text()
     pipeline = (ROOT / "plugins/team-harness/skills/pipeline/SKILL.md").read_text()
     activation = (ROOT / "plugins/team-harness/skills/pipeline/references/activation.md").read_text()
@@ -1076,13 +1150,53 @@ def main() -> None:
     if "1 — inline" not in configuration_reference or "2 — pipeline" not in configuration_reference:
         fail("Codex configuration does not provide live migration guidance")
 
-    # A live tester/QA/security request is an ad-hoc inline report, not a
-    # pipeline run and not a source of state, gates, or delivery artifacts.
+    # Inline review is a native read-only project inspection, not a runner or
+    # manifest transport, and pipeline roles retain their existing contracts.
     for role in ("tester", "qa", "security"):
         adapter = (ROOT / f"runtime/codex/instructions/{role}.md").read_text().lower()
-        for marker in ("ad-hoc inline review", "creates no workspace", "coordination state", "events", "gates", "delivery record"):
-            if marker not in adapter:
-                fail(f"Codex {role} ad-hoc boundary is missing {marker!r}")
+        for retired in ("inline-review", "run_inline_review", "evidence_manifest", "manifest_digest"):
+            if retired in adapter:
+                fail(f"Codex pipeline adapter {role} retains retired inline marker {retired!r}")
+    native_adapter = (ROOT / "runtime/codex/instructions/inline-reviewer.md").read_text().lower()
+    for marker in (
+        "tester", "qa", "security", "adversary", "repository_root", "commit_or_range",
+        "sandbox_mode = \"read-only\"", "lens_status", "coverage", "disagreements",
+        "target currentness", "review-pr", "output: null", "expected_lens", "dispatch_id",
+        "git diff", "filesystem-root confinement", "git --no-pager --no-replace-objects --literal-pathspecs -c core.fsmonitor=false -c core.untrackedcache=false -c maintenance.auto=false -c gc.auto=0 -c log.showsignature=false -c <canonical-root>",
+        "--no-ext-diff", "--no-textconv", "resolved object ids", "project-derived command string",
+        "profile_session", "fresh session", "in-memory byte attestation",
+    ):
+        if marker not in native_adapter:
+            fail(f"Codex inline-reviewer adapter is missing {marker!r}")
+    for retired in ("run_inline_review", "evidence_manifest", "manifest_digest", "stdin-only", "deny-root"):
+        if retired in native_adapter:
+            fail(f"Codex inline-reviewer adapter retains retired marker {retired!r}")
+    init_lower = re.sub(r"\s+", " ", init.lower())
+    for marker in (
+        "inline-reviewer", "requested_lenses",
+        "required_lenses", "project root", "commit/range", "sandbox_mode = \"read-only\"",
+        "adversary", "security floor", "expected_lens", "dispatch_id", "regular non-symlink",
+        "sha-256", "review-pr", "exclusive", "stale", "fresh codex session", "explicit restart",
+        "in-memory byte attestation",
+    ):
+        if marker not in init_lower:
+            fail(f"Codex init native inline contract is missing {marker!r}")
+    for retired in ("run_inline_review", "evidence_manifest", "manifest_digest", "stdin-only", "deny-root"):
+        if retired in init_lower:
+            fail(f"Codex init retains retired inline marker {retired!r}")
+    for marker in (
+        "mode: inline-review", "repository_root", "commit_or_range", "requested_lenses",
+        "required_lenses", "lens: tester|qa|security|adversary", "expected_lens",
+        "dispatch_id", "security_floor", "read_only: true", "target_id",
+        "native read-only sandbox", "security floor", "stale",
+        "complete|incomplete|failed|unavailable|untrusted", "never averages verdicts",
+        "absent return as PASS", "verdict: pass", "review-pr",
+    ):
+        if marker not in inline_contract:
+            fail(f"shared inline contract is missing {marker!r}")
+    for retired in ("evidence_manifest", "manifest_digest", "allowed_roots", "run_inline_review"):
+        if retired in inline_contract:
+            fail(f"shared inline contract retains retired marker {retired!r}")
     if "no second confirmation" not in activation_reference.lower() and "second confirmation" not in init.lower():
         fail("Codex sensitive inline path does not prohibit a second confirmation")
     if "explicitly selects `inline`" not in activation_reference.lower() and "selects `inline`" not in init.lower():
@@ -1365,9 +1479,9 @@ def main() -> None:
     expected_updated_digests = {
         "architect": "f11ceef09bfb9d2839eb2d25adb05d4dcc1188dfacf11e355a9a291c4fcf816f",
         "implementer": "40a562d3f483502298b3f9ea22de10b9b14839df0d347618a33d3983c8694571",
-        "tester": "e15a282b65847c046306aaa2f056cbfc5e3978d38fa5f7610e9fedd5394fe529",
-        "qa": "693b4396f1ca3257ae8fed68f977dc61bb9426af3fdee0201ba872c17db485c8",
-        "security": "e89425e782a1ad47c32a2e210adaa7ecbe2880dc9c4fcd5a6cf3f509ef590064",
+        "tester": "5045bbb4ab59e21c6283d78f87e8679199c8a4a15abb71ce9f35a84e5c03b8fc",
+        "qa": "d3d7d5ebc81e1390680b9589de638a56c47707180d774608006325a5bc14f588",
+        "security": "cbb8e4bcc77ffb8e89cf52fdfa1950ea4af107dc1a04cbc76efe3c722679b6a8",
         "delivery": "1c09a83ea425a6aac283f38406f40ab66954f11ccfe244364afc2177fb54085c",
     }
     if set(activation_digests) != pipeline_roles or activation_digests != pipeline_digests:

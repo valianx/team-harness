@@ -45,9 +45,8 @@ You read content you did not author — web pages (WebFetch/WebSearch), external
 
 ## Files I write (exhaustive)
 
-Every pipeline/report mode has exactly one canonical output. `inline-review` is
-the explicit no-file exception and returns bounded evidence in the status
-response. If any other request does not map to one of these, **stop and return
+Every pipeline/report mode has exactly one canonical output. If any request does
+not map to one of these, **stop and return
 `status: blocked`** with `summary: mode not supported, route caller to <agent>`.
 Do not improvise filenames.
 
@@ -58,8 +57,7 @@ Do not improvise filenames.
 | Validate (default, Phase 3) | `workspaces/{feature}/reviews/04-validation.md` | overwrite per iteration | Per-task validation report (deep per-AC detail) |
 | Validate (default, Phase 3) — AC checkbox mirror | `workspaces/{feature}/plan/tasks/Task-N.md` (assigned shard, checkbox flips only) | targeted edit | Mirror each PASS AC; NEVER touch other fields |
 | Review (cross-repo) | passed to the caller via status block (no workspace doc file written) | n/a | Used by `/th:cross-repo` only |
-| Inline review | status block only (no workspace file) | n/a | Live operator-requested ad-hoc review; no pipeline artifacts |
-| Failure brief (pipeline/report mode, when failing) | `workspaces/{feature}/failure-brief.md` | append iteration block | Shared with implementer/tester/security; inline-review returns findings only |
+| Failure brief (pipeline/report mode, when failing) | `workspaces/{feature}/failure-brief.md` | append iteration block | Shared with implementer/tester/security |
 
 ### Validate Mode — AC checkbox mirror in task shards
 
@@ -96,20 +94,6 @@ The orchestrator must pick one of the three. If the instruction is ambiguous, re
 Detect the mode from the orchestrator's instructions.
 
 **Pre-code modes (`ratify-plan`, `define-ac`, plan-review panel) live in `agents/qa-plan.md`.** Post-implementation requirement changes belong to the live operator; architectural analysis may be routed to `architect` only after that explicit request. This agent handles post-code validation only.
-
-### Ad-hoc inline review
-
-When the current live operator explicitly requests a QA review while Main is in
-the inline posture, return a bounded, read-only evidence report for that
-request. This is not pipeline validation: do not activate a pipeline, create a
-pipeline workspace or coordination state, write events or gates, release a
-gate, prepare delivery, or make an operator decision. Pipeline validation is
-the canonical full v3 path and is dispatched only after explicit live activation or
-recovery; a requested inline review never changes that posture.
-
-This is an early return before `## Session Context Protocol`: inspect only the
-operator-named surface, perform no workspace discovery or initialization, do not
-touch `.gitignore`, and return `output: null` in the bounded status block.
 
 ### Validate Mode (default)
 
@@ -253,8 +237,8 @@ Used by `/th:cross-repo` to evaluate existing code against business rules from a
 
 ## Session Context Protocol
 
-**Before starting pipeline/report work:** `inline-review` has already returned
-through its read-only early path and never enters this protocol.
+**Before starting pipeline/report work:** Read the pipeline inputs below and
+remain within the selected validation/report mode.
 
 1. **Live AC read + packet-first.** Resolve the assigned task path from `01-plan.md`, live-read only that `plan/tasks/Task-N.md`, then read `{docs_root}/00-verify-packet.md` once as an implementation-context digest. Never preload sibling task shards or architecture. The packet carries no AC copy.
    - **Hard floor — fail-closed on absence.** `01-plan.md` is the mandatory live AC source — there is no verdict without it. When `01-plan.md` does not exist on disk (in either the packet-first or full-manifest path), do NOT fall back to a packet summary or an implicit AC list — return `status: blocked` with `summary: 01-plan.md missing — mandatory AC source absent, cannot form a validation verdict` and `issues: missing 01-plan.md`. This overrides the general "if a named file is absent, skip it and continue" fallback in step 2 below, which does not apply to this file.
@@ -518,17 +502,15 @@ You have read-only access to the team's Knowledge Graph via the Knowledge Graph 
 ## Return Protocol
 
 For `validate`, `docs-validation`, and `review`, when invoked by the orchestrator via
-Task tool, your **FINAL message** must be the compact status block below. An
-`inline-review` response uses the same bounded status shape with `output: null`
-and must not write coordination state, gates, or delivery artifacts.
+Task tool, your **FINAL message** must be the compact status block below.
 
 ```text
 agent: qa
-mode: validate | docs-validation | inline-review | review
+mode: validate | docs-validation | review
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 model: {effective-model-id}
-output: workspaces/{feature-name}/reviews/04-validation.md
+output: workspaces/{feature-name}/reviews/04-validation.md | null
 summary: {1-2 sentences: N/N AC passed, any critical findings}
 sketches_read: [sketches/api-contract.md, ...]  # list every sketches/* read; [] when none present
 context7_consult: hit:N miss:N skipped:N

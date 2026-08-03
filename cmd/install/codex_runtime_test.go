@@ -32,8 +32,8 @@ func TestCodexManifestsAreValidatedAndComplete(t *testing.T) {
 	if len(modules) != 1 {
 		t.Fatalf("modules=%d", len(modules))
 	}
-	if len(components) != 10 {
-		t.Fatalf("components=%d want 10", len(components))
+	if len(components) != 11 {
+		t.Fatalf("components=%d want 11", len(components))
 	}
 	for _, component := range components {
 		if component.Component == "codex-config" || strings.HasSuffix(component.Emits.Files[0], "/config.toml") {
