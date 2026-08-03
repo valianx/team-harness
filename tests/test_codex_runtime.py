@@ -471,6 +471,13 @@ def main() -> None:
     for marker in ("migration-only", "1 — inline", "2 — pipeline"):
         if marker not in setup.lower():
             fail(f"Codex setup lane migration guidance is missing {marker!r}")
+    for skill_name, skill_text in (("setup", setup), ("update", update)):
+        for marker in (
+            "codex features enable multi_agent",
+            "codex features enable multi_agent_v2",
+        ):
+            if re.search(rf"(?m)^\s*{re.escape(marker)}\s*$", skill_text) is None:
+                fail(f"Codex {skill_name} skill is missing V2 activation command {marker!r}")
 
     modes = (ROOT / "plugins/team-harness/skills/modes/SKILL.md").read_text()
     for marker in (
