@@ -143,9 +143,10 @@ specialists:
 
 | Claude role metadata | Codex model | Effort |
 |---|---|---|
-| `opus` + `xhigh` | `gpt-5.6-sol` | `xhigh` |
-| other `opus` | `gpt-5.6-sol` | `xhigh` |
-| non-`opus` | `gpt-5.6-luna` | `max` |
+| `opus` | `gpt-5.6-sol` | `xhigh` |
+| `sonnet` + `high` or `xhigh` | `gpt-5.6-terra` | `high` |
+| `sonnet` + `medium` | `gpt-5.6-terra` | `medium` |
+| `haiku` | `gpt-5.6-terra` | `low` |
 
 `.codex/README.md` is the generated roster. After editing canonical role
 metadata or adapters, run `$sync-codex-agents`; do not hand-edit generated TOML.

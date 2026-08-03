@@ -138,12 +138,22 @@ for force_command in \
   'git push --force origin feat/codex-force-floor' \
   'git push --force-with-lease origin feat/codex-force-floor' \
   'git push origin +feat/codex-force-floor:feat/codex-force-floor' \
+  'git push --fo\rce origin feat/codex-force-floor' \
+  "git push \$'--force' origin feat/codex-force-floor" \
   'bash -c "git push --force origin feat/codex-force-floor"' \
   'eval "git push -f origin feat/codex-force-floor"'; do
   payload="$(node -e 'process.stdout.write(JSON.stringify({tool_name:"Bash",tool_input:{command:process.argv[1]}}))' "$force_command")"
   out="$(cd "$lane_root" && PLUGIN_ROOT="$ROOT/plugins/team-harness" /bin/bash -c "$gate_manifest_command" <<< "$payload")"
   [ "$(printf '%s' "$out" | json_value 'd.hookSpecificOutput?.permissionDecision')" = "deny" ] \
     && pass || fail "installed gate-guard must deny force push after ship: $force_command"
+done
+for benign_command in \
+  'git push origin feat/codex-force-floor' \
+  'gh pr create --title "Codex hook control"'; do
+  payload="$(node -e 'process.stdout.write(JSON.stringify({tool_name:"Bash",tool_input:{command:process.argv[1]}}))' "$benign_command")"
+  out="$(cd "$lane_root" && PLUGIN_ROOT="$ROOT/plugins/team-harness" /bin/bash -c "$gate_manifest_command" <<< "$payload")"
+  [ -z "$out" ] \
+    && pass || fail "installed gate-guard must stay silent for shipped benign action: $benign_command"
 done
 rm -rf "$lane_root"
 out="$(
