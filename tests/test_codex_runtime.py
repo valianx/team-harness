@@ -151,7 +151,18 @@ def _assert_no_automatic_design_route(text: str, context: str) -> None:
 def _check_agent_adapter_parity() -> None:
     generated = ROOT / ".codex/agents"
     packaged = ROOT / "plugins/team-harness/skills/setup/assets/agents"
-    for role in ("architect", "tester", "qa", "security"):
+    for role in (
+        "architect",
+        "delivery",
+        "implementer",
+        "pr-review-qa",
+        "pr-review-security",
+        "qa",
+        "reviewer-consolidator",
+        "reviewer",
+        "security",
+        "tester",
+    ):
         project = (generated / f"{role}.toml").read_bytes().replace(b"\r\n", b"\n")
         package = (packaged / f"{role}.toml").read_bytes().replace(b"\r\n", b"\n")
         if project != package:
@@ -466,6 +477,8 @@ def main() -> None:
     setup_targets = setup_targets_match.group("targets").lower()
     if "lane-autoselect" in setup_targets:
         fail("Codex setup must not advertise lane-autoselect as a supported target")
+    if "`features`" not in setup_targets:
+        fail("Codex setup must expose an explicit features target")
     if re.search(r"(?im)^\s*-\s*lane auto-select\s+is\b", setup):
         fail("Codex setup must not advertise an active lane-autoselect value")
     for marker in ("migration-only", "1 — inline", "2 — pipeline"):
@@ -478,6 +491,18 @@ def main() -> None:
         ):
             if re.search(rf"(?m)^\s*{re.escape(marker)}\s*$", skill_text) is None:
                 fail(f"Codex {skill_name} skill is missing V2 activation command {marker!r}")
+    setup_flat = re.sub(r"\s+", " ", setup.lower())
+    for marker in (
+        "only for a full setup or an explicit `features` target",
+        "for every other targeted setup, skip both feature-writer commands",
+        "do not change global codex feature state",
+        "does not guarantee detection when a push is assembled from runtime-only shell state",
+        "server-side github branch protection remains authoritative",
+    ):
+        if marker not in setup_flat:
+            fail(f"Codex setup scoped-write/force-push contract is missing {marker!r}")
+    if "wrapped or reconstructed equivalents even after `ship`" in setup_flat:
+        fail("Codex setup still overclaims force-push wrapper coverage")
 
     modes = (ROOT / "plugins/team-harness/skills/modes/SKILL.md").read_text()
     for marker in (
@@ -1197,9 +1222,9 @@ def main() -> None:
             "coordinator-assigned plan artifacts",
             "`status`, `artifact_pointers`",
         ),
-        "implementer": ("plan/tasks/Task-N.md", "never preload sibling tasks"),
-        "tester": ("plan/tasks/Task-N.md", "fixed testing prose within 40 lines"),
-        "qa": ("plan/tasks/Task-N.md", "fixed report prose within 30 lines"),
+        "implementer": ("assigned role packet", "never preload sibling tasks"),
+        "tester": ("assigned task shard", "fixed testing prose within 40 lines"),
+        "qa": ("assigned task shard", "fixed report prose within 30 lines"),
         "security": ("security-relevant task shards", "fixed prose within 20 lines"),
         "delivery": ("plan/delivery.md", "within 60 lines and 12 KB"),
     }
@@ -1323,10 +1348,10 @@ def main() -> None:
     pipeline_digests = digest_table(pipeline)
     expected_updated_digests = {
         "architect": "f11ceef09bfb9d2839eb2d25adb05d4dcc1188dfacf11e355a9a291c4fcf816f",
-        "implementer": "2778b3e72833e982773379ff39e73014b1892f46261ba17c3b82ea655cda2110",
-        "tester": "acd703b7df2b2b3629c6532f7ac827fda51376bbf2ee99276ba472fa02233f57",
-        "qa": "b321817996079b76a49da13c1a8f7663f1d1462e68c3071339d5271b6d26ffef",
-        "security": "3c14f6a99f593fb202658a81941bb956a1e336d447138c28d3e01c17ef49211d",
+        "implementer": "40a562d3f483502298b3f9ea22de10b9b14839df0d347618a33d3983c8694571",
+        "tester": "e15a282b65847c046306aaa2f056cbfc5e3978d38fa5f7610e9fedd5394fe529",
+        "qa": "11bfa0c3556bac11b27c3721bba9cb39f800b9d8fdf314b69002c5fa9b95cc2d",
+        "security": "e89425e782a1ad47c32a2e210adaa7ecbe2880dc9c4fcd5a6cf3f509ef590064",
         "delivery": "1c09a83ea425a6aac283f38406f40ab66954f11ccfe244364afc2177fb54085c",
     }
     if set(activation_digests) != pipeline_roles or activation_digests != pipeline_digests:

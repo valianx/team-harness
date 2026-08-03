@@ -107,17 +107,7 @@ function isSafeReasonCode(value) {
 }
 
 function unavailable(reasonCode, kind = "codex_usage") {
-  if (kind === "codex_usage_delta") {
-    return {
-      schema_version: USAGE_SCHEMA_VERSION,
-      kind,
-      usage_status: "unavailable",
-      reason_code: reasonCode,
-      components: null,
-    };
-  }
-
-  if (kind === "codex_usage_checkpoint") {
+  if (kind === "codex_usage_delta" || kind === "codex_usage_checkpoint") {
     return {
       schema_version: USAGE_SCHEMA_VERSION,
       kind,
@@ -205,6 +195,10 @@ function validateRawComponents(value, code = "SCHEMA_INVALID") {
   for (const component of RAW_COMPONENTS) {
     if (!isSafeCounter(value[component])) fail("COUNTER_INVALID");
   }
+  // Cached input is a subset of input in a native cumulative counter. The
+  // output clamp is only for a valid zero uncached delta, never a repair for
+  // an internally inconsistent native pair.
+  if (value.cached_input_tokens > value.input_tokens) fail("COUNTER_INVALID");
   return cloneRawComponents(value);
 }
 
@@ -339,6 +333,8 @@ function finalizeSession(state) {
   const final = state.usages.at(-1);
   const rawUsage = {};
   for (const component of RAW_COMPONENTS) {
+    // The first cumulative total already includes prior inherited usage. Add
+    // its last-turn delta back after subtraction to count this session only.
     const value = final.total[component] - first.total[component] + first.last[component];
     if (!isSafeCounter(value)) fail("COUNTER_INVALID");
     rawUsage[component] = value;
@@ -829,6 +825,11 @@ function parseCli(argv) {
 }
 
 async function main(argv) {
+  const failureKind = argv.includes("--compare-start") || argv.includes("--compare-end")
+    ? "codex_usage_delta"
+    : argv.includes("--checkpoint")
+      ? "codex_usage_checkpoint"
+      : "codex_usage";
   try {
     const parsed = parseCli(argv);
     if (parsed.compareStart !== null) {
@@ -837,7 +838,7 @@ async function main(argv) {
     const usage = await collectCodexUsage(parsed.options);
     return parsed.checkpoint ? checkpointFromUsage(usage) : usage;
   } catch (error) {
-    return unavailable(reasonFor(error));
+    return unavailable(reasonFor(error), failureKind);
   }
 }
 

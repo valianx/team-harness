@@ -38,6 +38,26 @@ out="$(cd "$ROOT" && printf '%s' '{"tool_name":"Bash","tool_input":{"command":"g
 out="$(cd "$ROOT" && printf '%s' '{"tool_name":"Bash","tool_input":{"command":"gcloud compute instances create demo"}}' | bash "$ADAPTER" gcp-guard)"
 [ -z "$out" ] && pass || fail "unsupported gcp ask must be left to native Codex permissions"
 
+# A stale hook name must not suppress a later registered deny floor when a host
+# batches hook names in one launcher invocation.
+out="$(cd "$ROOT" && printf '%s' '{"tool_name":"Bash","tool_input":{"command":"rm -rf /"}}' | bash "$ADAPTER" unknown-hook policy-block)"
+[ "$(printf '%s' "$out" | json_value 'd.hookSpecificOutput?.permissionDecision')" = "deny" ] \
+  && pass || fail "unknown batched hook names must not skip later deny floors"
+
+# Approval-classifying decisions are intentionally left to native Codex
+# permissions, but they must not suppress a later deterministic deny floor.
+batch_plugin="$(mktemp -d)"
+mkdir -p "$batch_plugin/dist"
+cp "$ADAPTER" "$batch_plugin/run-codex-hook.sh"
+printf '%s\n' 'process.stdout.write(JSON.stringify({hookSpecificOutput:{permissionDecision:"ask"}}));' \
+  > "$batch_plugin/dist/gcp-guard.cjs"
+printf '%s\n' 'process.stdout.write(JSON.stringify({hookSpecificOutput:{permissionDecision:"deny"}}));' \
+  > "$batch_plugin/dist/gate-guard.cjs"
+out="$(printf '%s' '{"tool_name":"Bash","tool_input":{}}' | bash "$batch_plugin/run-codex-hook.sh" gcp-guard gate-guard)"
+[ "$(printf '%s' "$out" | json_value 'd.hookSpecificOutput?.permissionDecision')" = "deny" ] \
+  && pass || fail "unsupported ask must not suppress a later deterministic deny"
+rm -rf "$batch_plugin"
+
 # Retired approval-classifying hooks are neither callable nor shipped. The
 # deny-only gate guard is shipped because it provides the non-waivable
 # force-push floor; ordinary approval ownership remains native to Codex.

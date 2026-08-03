@@ -202,14 +202,10 @@ async function makeInputs(root, { mode = "success", prompt = "PRIVATE_PROMPT_SEC
   return { baseline, candidate, promptFile, codex, runRoot };
 }
 
-function runRunner(inputs) {
+function runRunnerArguments(args) {
   const result = spawnSync(process.execPath, [
     runner,
-    "--baseline-source-root", inputs.baseline,
-    "--candidate-source-root", inputs.candidate,
-    "--run-root", inputs.runRoot,
-    "--prompt-file", inputs.promptFile,
-    "--codex", inputs.codex,
+    ...args,
   ], {
     encoding: "utf8",
     env: { ...process.env, OPENAI_API_KEY: "ENV_SECRET_CANARY" },
@@ -219,6 +215,16 @@ function runRunner(inputs) {
   const receipt = JSON.parse(result.stdout);
   assert.equal(isProvenanceReceipt(receipt), true);
   return { ...result, receipt };
+}
+
+function runRunner(inputs) {
+  return runRunnerArguments([
+    "--baseline-source-root", inputs.baseline,
+    "--candidate-source-root", inputs.candidate,
+    "--run-root", inputs.runRoot,
+    "--prompt-file", inputs.promptFile,
+    "--codex", inputs.codex,
+  ]);
 }
 
 async function cleanInputs(inputs) {
@@ -234,6 +240,36 @@ await check("pure receipt and invocation guards are deterministic and closed", a
   assert.equal(containsExplicitPipelineInvocation("use @Team-Harness init first"), false);
   assert.equal(isSafeRunRootPath("/tmp/team-harness-codex-efficiency-ab.safe_1"), true);
   assert.equal(isSafeRunRootPath("/tmp/not-the-runner-root"), false);
+});
+
+await check("entry-point guards fail closed before provenance work", async () => {
+  const missingFlag = runRunnerArguments([]);
+  assert.equal(missingFlag.status, 1);
+  assert.equal(missingFlag.receipt.reason_code, "ARGUMENT_INVALID");
+
+  await temporaryRoot(async (root) => {
+    const inputs = await makeInputs(root);
+    try {
+      const outsideRunRoot = path.join(root, "outside-run-root");
+      await mkdir(outsideRunRoot);
+      const unsafe = runRunnerArguments([
+        "--baseline-source-root", inputs.baseline,
+        "--candidate-source-root", inputs.candidate,
+        "--run-root", outsideRunRoot,
+        "--prompt-file", inputs.promptFile,
+        "--codex", inputs.codex,
+      ]);
+      assert.equal(unsafe.status, 1);
+      assert.equal(unsafe.receipt.reason_code, "RUN_ROOT_UNSAFE");
+
+      await writeFile(path.join(inputs.runRoot, "unexpected"), "x");
+      const nonempty = runRunner(inputs);
+      assert.equal(nonempty.status, 1);
+      assert.equal(nonempty.receipt.reason_code, "RUN_ROOT_NOT_EMPTY");
+    } finally {
+      await cleanInputs(inputs);
+    }
+  });
 });
 
 await check("success attests distinct local sources, isolated caches, and the six-agent roster", async () => {

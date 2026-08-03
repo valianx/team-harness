@@ -531,7 +531,7 @@ def check_single_writer() -> None:
     for role in ("architect", "implementer", "tester", "qa", "security", "delivery"):
         adapter = read(f"runtime/codex/instructions/{role}.md").lower()
         state_denied = re.search(
-            r"\b(?:do not|never|must not)\b[^.;\n]*(?:\bwrite\b[^.;\n]*\b00-state\b|\bwrite coordination state\b)",
+            r"\b(?:do not|never|must not|may not)\b[^.;\n]*\bwrite\b[^.;\n]*(?:\b00-state\b|\bcoordination state\b)",
             adapter,
         )
         gate_denied = re.search(
@@ -1166,6 +1166,13 @@ def check_execution_efficiency_contract() -> None:
 
     for label, text in contracts.items():
         for marker in (
+            "execution tool receives a hard output cap before launch",
+            "no larger than the known-small result budget",
+            "classify the volume as unknown and use the helper before execution",
+        ):
+            require(marker in text, f"{label}: direct-route hard-cap contract missing {marker!r}")
+
+        for marker in (
             "completion or live operator input",
             "60 seconds",
             "`list_agents`",
@@ -1294,13 +1301,13 @@ def check_execution_efficiency_contract() -> None:
         for marker in (
             "before execution",
             "expected output volume",
-            "expected small, bounded results execute directly",
-            "targeted reads/searches",
-            "focused tests configured for concise output",
+            "expected-small command may execute directly only",
+            "predeclared output cap",
+            "no greater than the known-small result budget",
+            "otherwise classify it as volume-unknown",
             "large, verbose, or volume-unknown intermediate data",
             "full suites",
             "broad logs, diffs, or searches",
-            "unknown volume selects the helper",
             "reactively retry it through another route",
         ):
             require(marker in adapter, f"{role}: AC20 routing marker missing {marker!r}")
@@ -1458,7 +1465,7 @@ def check_codex_usage_observability_contract() -> None:
         require(marker in source, f"native usage contract is not linked by {marker!r}")
 
     for marker in (
-        "collectCodexUsage({ rolloutsRoot, rootThreadId })",
+        "checkpointFromUsage(await collectCodexUsage({ rolloutsRoot, rootThreadId }))",
         "checkpointFromUsage",
         "compareCheckpoints(start, end)",
         '"event":"phase.start"',
@@ -1486,7 +1493,15 @@ def check_codex_usage_observability_contract() -> None:
         ):
             require(marker in source, f"state projection misses {marker!r}")
 
-    require("total_tokens: N" in shared_state, "shared state lost the legacy total_tokens schema")
+    legacy_shared_schema = section(
+        shared_state,
+        "## Current State — the schema you write",
+        "**Native Codex accounting overlay — conditional.**",
+    )
+    require(
+        re.search(r"(?m)^total_tokens:\s*N\s*$", legacy_shared_schema) is not None,
+        "shared state lost the exact legacy total_tokens schema",
+    )
     require(
         "Native Codex accounting overlay — conditional" in shared_state,
         "shared state does not make the Codex overlay conditional",
@@ -1506,6 +1521,7 @@ def check_codex_usage_observability_contract() -> None:
 
     for marker in (
         "Cost: unavailable",
+        "strictly positive decimal",
         "Native Codex branch — selected only by `usage.kind`",
         "exact, case-sensitive tuple",
         "provider",
@@ -1534,7 +1550,7 @@ def check_codex_usage_observability_contract() -> None:
         "price table not configured",
         "Static opus-agent fallback",
         "all others → sonnet",
-        "duration_min × 1500",
+        "duration_min × 1500",  # noqa: RUF001 - exact canonical contract marker
     ):
         require(marker in docs or marker in trace, f"legacy Claude contract lost {marker!r}")
 
@@ -1565,9 +1581,16 @@ def check_declared_agent_lifecycle_contract() -> None:
     """AC17: lifecycle facts are finite, privacy-safe coordinator declarations."""
     observability = read("plugins/team-harness/skills/pipeline/references/observability.md")
     pipeline = read("plugins/team-harness/skills/pipeline/SKILL.md")
+    codex_state = read("plugins/team-harness/skills/pipeline/references/state-and-gates.md")
     shared_state = read("agents/_shared/orchestrator-state.md")
     docs = read("docs/observability.md")
     trace = read("skills/trace/SKILL.md")
+    observability_flat = re.sub(r"\s+", " ", observability)
+    pipeline_flat = re.sub(r"\s+", " ", pipeline)
+    codex_state_flat = re.sub(r"\s+", " ", codex_state)
+    shared_state_flat = re.sub(r"\s+", " ", shared_state)
+    docs_flat = re.sub(r"\s+", " ", docs)
+    trace_flat = re.sub(r"\s+", " ", trace)
 
     for marker in (
         "not native Codex lifecycle telemetry",
@@ -1583,12 +1606,12 @@ def check_declared_agent_lifecycle_contract() -> None:
         "`quality_verdict`",
         "codex_agent_attempt_metrics",
         "PER_ATTEMPT_METRICS_UNAVAILABLE",
-        "MUST use\n`unavailable`",
+        "MUST use `unavailable`",
         "cached_input_per_approved_ac",
         "never reconstructs one from rollout files, callbacks,",
         "does not create or promise such telemetry",
     ):
-        require(marker in observability, f"AC17 lifecycle reference misses {marker!r}")
+        require(marker in observability_flat, f"AC17 lifecycle reference misses {marker!r}")
 
     for role, task in (
         ("architect", "design"),
@@ -1605,10 +1628,10 @@ def check_declared_agent_lifecycle_contract() -> None:
 
     for marker in (
         "Declared specialist lifecycle",
-        "coordinator\nbookkeeping declarations, not native Codex telemetry",
+        "coordinator bookkeeping declarations, not native Codex telemetry",
         "strict native usage/cost branch or the legacy Claude route",
     ):
-        require(marker in pipeline, f"pipeline lifecycle instruction misses {marker!r}")
+        require(marker in pipeline_flat, f"pipeline lifecycle instruction misses {marker!r}")
 
     for marker in (
         "Declared Codex agent-lifecycle overlay — conditional",
@@ -1621,9 +1644,19 @@ def check_declared_agent_lifecycle_contract() -> None:
         "agent_lifecycle_metrics:",
         "approved_ac_count: N|null",
         "cached_input_per_approved_ac: decimal|unavailable",
-        "does not divide, attribute, or\ncopy a root/phase usage delta",
+        "n_a:N",
+        "does not divide, attribute, or copy a root/phase usage delta",
     ):
-        require(marker in shared_state, f"lifecycle state overlay misses {marker!r}")
+        require(marker in shared_state_flat, f"lifecycle state overlay misses {marker!r}")
+
+    for marker in (
+        "agent_lifecycle_schema_version: 1|null",
+        "agent_lifecycle_metrics_status: available|unavailable|null",
+        "agent_lifecycle_quality_verdicts: {pass:N,concerns:N,fail:N,n_a:N}|null",
+        "cached_input_per_approved_ac: decimal|unavailable",
+        "The state key `n_a` aggregates only the closed event value `n-a`",
+    ):
+        require(marker in codex_state_flat, f"Codex lifecycle state schema misses {marker!r}")
 
     for marker in (
         "Declared Codex agent lifecycle",
@@ -1631,19 +1664,20 @@ def check_declared_agent_lifecycle_contract() -> None:
         "Declared lifecycle efficiency render",
         "## Lifecycle Efficiency",
         "Cached-input per approved AC",
-        "does **not** select the\nNative Codex cost branch",
+        "does **not** select the Native Codex cost branch",
         "PER_ATTEMPT_METRICS_UNAVAILABLE",
     ):
-        require(marker in docs, f"observability docs AC17 marker missing {marker!r}")
+        require(marker in docs_flat, f"observability docs AC17 marker missing {marker!r}")
 
     for marker in (
         "Declared Codex lifecycle efficiency — selected only by `agent.*`",
         "the legacy output above unchanged",
         "PER_ATTEMPT_METRICS_UNAVAILABLE",
+        "aggregate key `n_a` represents only the closed event enum `n-a`",
         "Cached-input per approved AC",
-        "never changes the legacy Claude cost\nroute or the strict Native Codex cost semantics",
+        "never changes the legacy Claude cost route or the strict Native Codex cost semantics",
     ):
-        require(marker in trace, f"trace lifecycle renderer misses {marker!r}")
+        require(marker in trace_flat, f"trace lifecycle renderer misses {marker!r}")
 
     require(
         "never selects the Native Codex cost branch" in docs,

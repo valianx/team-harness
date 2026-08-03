@@ -7,6 +7,8 @@ import {
   copyFile,
   mkdtemp,
   mkdir,
+  readdir,
+  readFile,
   rename,
   rm,
   stat,
@@ -99,6 +101,13 @@ async function fixtureRoot(names, callback) {
   });
 }
 
+async function snapshotFiles(directory) {
+  const names = (await readdir(directory)).sort();
+  return Promise.all(
+    names.map(async (name) => [name, (await readFile(path.join(directory, name))).toString("base64")]),
+  );
+}
+
 function assertUnavailable(result, reason) {
   assert.equal(result.usage_status, "unavailable");
   assert.equal(result.reason_code, reason);
@@ -120,9 +129,10 @@ async function check(name, callback) {
   try {
     await callback();
     console.log(`  [PASS] ${name}`);
-  } catch {
-    failures.push(name);
-    console.log(`  [FAIL] ${name}`);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message.replace(/\s+/g, " ").slice(0, 240) : "non-Error throw";
+    failures.push(`${name}: ${reason}`);
+    console.log(`  [FAIL] ${name}: ${reason}`);
   }
 }
 
@@ -281,12 +291,11 @@ await check("AC3: native usage drift, unsafe integer, regression, and conflict f
   });
 });
 
-await check("AC3: uncached input is max(0, input - cached)", async () => {
+await check("AC3: invalid cached-input counters fail instead of clamping", async () => {
   await temporaryRoot(async (root) => {
     await writeFile(path.join(root, "cached.jsonl"), rollout("cached-real-id", null, raw(5, 8, 0, 5, 0, 5)));
     const result = await collectCodexUsage({ rolloutsRoot: root, rootThreadId: "cached-real-id" });
-    assert.equal(result.usage_status, "available");
-    assert.deepEqual(result.components, components(5, 8, 0, 5, 0, 5));
+    assertUnavailable(result, "COUNTER_INVALID");
   });
 });
 
@@ -462,6 +471,7 @@ await check("comparison CLI accepts only serialized checkpoints and does not wri
     const endPath = path.join(root, "end.json");
     await writeFile(startPath, JSON.stringify(start));
     await writeFile(endPath, JSON.stringify(end));
+    const beforeFiles = await snapshotFiles(root);
     const invocation = spawnSync(process.execPath, [script, "--compare-start", startPath, "--compare-end", endPath], {
       encoding: "utf8",
     });
@@ -469,6 +479,31 @@ await check("comparison CLI accepts only serialized checkpoints and does not wri
     const result = JSON.parse(invocation.stdout);
     assert.equal(result.usage_status, "available");
     assert.deepEqual(result.components, components(75, 25, 10, 37, 10, 112));
+    assert.deepEqual(await snapshotFiles(root), beforeFiles);
+  });
+});
+
+await check("CLI failures preserve the selected checkpoint or comparison schema", async () => {
+  const checkpointFailure = spawnSync(process.execPath, [script, "--checkpoint"], { encoding: "utf8" });
+  assert.equal(checkpointFailure.status, 0);
+  assert.deepEqual(JSON.parse(checkpointFailure.stdout), {
+    schema_version: 1,
+    kind: "codex_usage_checkpoint",
+    usage_status: "unavailable",
+    reason_code: "ARGUMENT_INVALID",
+    components: null,
+  });
+
+  const comparisonFailure = spawnSync(process.execPath, [script, "--compare-start", "missing", "--compare-end", "missing"], {
+    encoding: "utf8",
+  });
+  assert.equal(comparisonFailure.status, 0);
+  assert.deepEqual(JSON.parse(comparisonFailure.stdout), {
+    schema_version: 1,
+    kind: "codex_usage_delta",
+    usage_status: "unavailable",
+    reason_code: "CHECKPOINT_INVALID",
+    components: null,
   });
 });
 

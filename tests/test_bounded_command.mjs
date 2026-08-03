@@ -6,9 +6,11 @@ import { spawnSync } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   BOUNDED_COMMAND_SCHEMA_VERSION,
+  DEFAULT_EXECUTION_TIMEOUT_MS,
   MAX_CAPTURE_BYTES_PER_STREAM,
   MAX_RENDERED_TAIL_BYTES_PER_STREAM,
   isBoundedCommandEnvelope,
@@ -17,7 +19,9 @@ import {
 
 const failures = [];
 const node = process.execPath;
-const boundedCommandPath = path.resolve("plugins/team-harness/skills/pipeline/scripts/bounded-command.mjs");
+const boundedCommandPath = fileURLToPath(
+  new URL("../plugins/team-harness/skills/pipeline/scripts/bounded-command.mjs", import.meta.url),
+);
 
 async function check(name, callback) {
   try {
@@ -130,6 +134,20 @@ await check("an explicit success diagnostic exposes only sanitized bounded tails
   assert.equal(result.stderr.bytes, 11);
   assert.equal(result.stderr.truncated, false);
   assert.equal(result.stderr.tail, "OK");
+});
+
+await check("tail truncation is reported at the rendered 8 KiB boundary", async () => {
+  const result = await runBoundedCommand({
+    ...nodeCommand(
+      `process.stdout.write(Buffer.alloc(${MAX_RENDERED_TAIL_BYTES_PER_STREAM + 1}, 0x58)); process.exitCode = 1;`,
+    ),
+    includeSuccessDiagnostic: true,
+  });
+
+  assertClosedEnvelope(result);
+  assert.equal(result.stdout.bytes, MAX_RENDERED_TAIL_BYTES_PER_STREAM + 1);
+  assert.equal(result.stdout.truncated, true);
+  assert.equal(Buffer.byteLength(result.stdout.tail, "utf8"), MAX_RENDERED_TAIL_BYTES_PER_STREAM);
 });
 
 await check("the success-diagnostic CLI flag must appear before the separator", async () => {
@@ -260,6 +278,20 @@ await check("spawn and argument failures are structured, bounded, and do not lea
   assert.equal(invalid.outcome, "argument_invalid");
   assert.equal(invalid.error_code, "ARGUMENT_INVALID");
   assert.equal(invalid.duration_ms, 0);
+});
+
+await check("the execution deadline terminates a hung child through the signal envelope", async () => {
+  assert.equal(DEFAULT_EXECUTION_TIMEOUT_MS, 5 * 60 * 1000);
+  const result = await runBoundedCommand({
+    ...nodeCommand("setInterval(() => {}, 1_000);"),
+    timeoutMs: 25,
+  });
+
+  assertClosedEnvelope(result);
+  assert.equal(result.outcome, "completed");
+  assert.equal(result.exit_code, null);
+  assert.equal(result.signal, "SIGKILL");
+  assert.equal(result.error_code, null);
 });
 
 if (failures.length > 0) {

@@ -1,7 +1,7 @@
 # Codex pipeline-efficiency A/B evidence
 
 Date: 2026-08-02
-Task: Task 4 — Benchmark y no regresión (AC10–AC11; AC18 provenance preflight)
+Task: Task 4 — Benchmark and no regression (AC10–AC11; AC18 provenance preflight)
 
 ## Current run state
 
@@ -414,6 +414,5 @@ If an interrupted run leaves additional case worktrees, enumerate them with
 `git -C "$SOURCE_ROOT" worktree list` and remove only paths underneath the
 validated `$RUN_ROOT` one at a time. If a private directory remains nonempty,
 inspect the exact file names before deleting them; do not use a recursive
-cleanup. This Task 4 attempt created a validated temporary root and retains it
-for the root coordinator's cleanup decision. Its local path is supplied only to
-the authorized runner and is not persisted in this evidence artifact.
+cleanup. A validated temporary root path is supplied only to the authorized
+runner and is never persisted in this evidence artifact.

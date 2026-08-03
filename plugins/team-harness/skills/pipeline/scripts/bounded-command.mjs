@@ -21,10 +21,13 @@ export const BOUNDED_COMMAND_SCHEMA_VERSION = 1;
 export const MAX_CAPTURE_BYTES_PER_STREAM = 64 * 1024;
 export const MAX_RENDERED_TAIL_BYTES_PER_STREAM = 8 * 1024;
 export const SUCCESS_DIAGNOSTIC_FLAG = "--success-diagnostic";
+export const DEFAULT_EXECUTION_TIMEOUT_MS = 5 * 60 * 1000;
 
 const MAX_ARGV_ITEMS = 128;
 const MAX_ARGV_ITEM_BYTES = 8 * 1024;
 const MAX_ARGV_BYTES = 64 * 1024;
+const MAX_EXECUTION_TIMEOUT_MS = 60 * 60 * 1000;
+const TERMINATION_SETTLEMENT_GRACE_MS = 1_000;
 const SAFE_SIGNAL = /^SIG[A-Z0-9]+$/;
 const SAFE_TAIL = /^[\x20-\x7E]*$/;
 const RESULT_KEYS = [
@@ -133,7 +136,9 @@ function validateOptions(options) {
   if (options === null || typeof options !== "object" || Array.isArray(options)) throw new TypeError("invalid options");
   if (
     !Object.hasOwn(options, "argv") ||
-    !Object.keys(options).every((key) => key === "argv" || key === "includeSuccessDiagnostic") ||
+    !Object.keys(options).every(
+      (key) => key === "argv" || key === "includeSuccessDiagnostic" || key === "timeoutMs",
+    ) ||
     !Array.isArray(options.argv)
   ) {
     throw new TypeError("invalid options");
@@ -142,6 +147,10 @@ function validateOptions(options) {
     ? options.includeSuccessDiagnostic
     : false;
   if (typeof includeSuccessDiagnostic !== "boolean") throw new TypeError("invalid options");
+  const timeoutMs = Object.hasOwn(options, "timeoutMs") ? options.timeoutMs : DEFAULT_EXECUTION_TIMEOUT_MS;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > MAX_EXECUTION_TIMEOUT_MS) {
+    throw new TypeError("invalid options");
+  }
   if (options.argv.length === 0 || options.argv.length > MAX_ARGV_ITEMS) throw new TypeError("invalid argv");
 
   let totalBytes = 0;
@@ -153,7 +162,7 @@ function validateOptions(options) {
     if (bytes > MAX_ARGV_ITEM_BYTES || totalBytes > MAX_ARGV_BYTES - bytes) throw new TypeError("invalid argv");
     totalBytes += bytes;
   }
-  return { argv: options.argv.slice(), includeSuccessDiagnostic };
+  return { argv: options.argv.slice(), includeSuccessDiagnostic, timeoutMs };
 }
 
 /**
@@ -164,6 +173,7 @@ class RenderedTail {
   #chunks = [];
   #first = 0;
   #bytes = 0;
+  #truncated = false;
 
   append(value) {
     if (value.length === 0) return;
@@ -171,6 +181,7 @@ class RenderedTail {
     this.#bytes += value.length;
 
     while (this.#bytes > MAX_RENDERED_TAIL_BYTES_PER_STREAM) {
+      this.#truncated = true;
       const excess = this.#bytes - MAX_RENDERED_TAIL_BYTES_PER_STREAM;
       const firstChunk = this.#chunks[this.#first];
       if (firstChunk.length <= excess) {
@@ -194,6 +205,10 @@ class RenderedTail {
     if (this.#bytes === 0) return null;
     return this.#chunks.slice(this.#first).join("");
   }
+
+  isTruncated() {
+    return this.#truncated;
+  }
 }
 
 /**
@@ -206,11 +221,25 @@ class AnsiSafeRenderer {
   #state = "text";
 
   write(chunk) {
-    for (let index = 0; index < chunk.length; index += 1) this.#writeByte(chunk[index]);
+    for (let index = 0; index < chunk.length;) {
+      if (this.#state === "text" && chunk[index] >= 0x20 && chunk[index] <= 0x7e) {
+        let end = index + 1;
+        while (end < chunk.length && chunk[end] >= 0x20 && chunk[end] <= 0x7e) end += 1;
+        this.#tail.append(chunk.subarray(index, end).toString("ascii"));
+        index = end;
+      } else {
+        this.#writeByte(chunk[index]);
+        index += 1;
+      }
+    }
   }
 
   tail() {
     return this.#tail.value();
+  }
+
+  isTruncated() {
+    return this.#tail.isTruncated();
   }
 
   #writeByte(byte) {
@@ -297,7 +326,7 @@ class StreamCapture {
   snapshot(includeTail) {
     return {
       bytes: this.#bytes,
-      truncated: this.#truncated,
+      truncated: this.#truncated || this.#renderer.isTruncated(),
       tail: includeTail ? this.#renderer.tail() : null,
     };
   }
@@ -368,7 +397,7 @@ export async function runBoundedCommand(options) {
   } catch {
     return invalidArgumentsEnvelope();
   }
-  const { argv, includeSuccessDiagnostic } = command;
+  const { argv, includeSuccessDiagnostic, timeoutMs } = command;
 
   const startedAt = process.hrtime.bigint();
   const stdout = new StreamCapture();
@@ -397,12 +426,21 @@ export async function runBoundedCommand(options) {
     let settled = false;
     let spawnFailed = false;
     let streamFailed = false;
+    let terminationGrace;
 
     const settle = (outcome, exitCode, signal, errorCode) => {
       if (settled) return;
       settled = true;
       const safeExitCode = normaliseExitCode(exitCode);
       const safeSignal = normaliseSignal(signal);
+      clearTimeout(deadline);
+      clearTimeout(terminationGrace);
+      child.removeAllListeners("error");
+      child.removeAllListeners("close");
+      child.stdout?.removeAllListeners("data");
+      child.stdout?.removeAllListeners("error");
+      child.stderr?.removeAllListeners("data");
+      child.stderr?.removeAllListeners("error");
       const diagnostic =
         includeSuccessDiagnostic || outcome !== "completed" || safeExitCode !== 0 || safeSignal !== null;
       resolve(
@@ -428,6 +466,13 @@ export async function runBoundedCommand(options) {
         streamFailed = true;
       }
     };
+
+    const deadline = setTimeout(() => {
+      child.kill("SIGKILL");
+      terminationGrace = setTimeout(() => {
+        settle("completed", null, "SIGKILL", null);
+      }, TERMINATION_SETTLEMENT_GRACE_MS);
+    }, timeoutMs);
 
     if (child.stdout === null || child.stderr === null) {
       streamFailed = true;

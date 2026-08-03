@@ -454,8 +454,9 @@ After every phase transition, update `00-state.md`. This is the orchestrator's p
    shape from `plugins/team-harness/skills/pipeline/references/observability.md`
    instead of using the legacy token estimate for accounting. Every started
    native phase is measured by checkpoint subtraction or records a
-   collector-safe unavailable result; aliases, zero substitution, and partial
-   totals are forbidden only in this branch.
+   collector-safe unavailable result. Zero substitution is forbidden in both
+   branches; aliases and partial totals are additionally forbidden in this
+   native branch.
 
    **Declared specialist lifecycle.** Immediately before a deliberate
    specialist dispatch or continuation, append the matching allowlisted

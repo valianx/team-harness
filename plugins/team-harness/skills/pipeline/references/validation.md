@@ -57,7 +57,11 @@ summaries, or workspace artifacts. Before execution, Main, tester, QA, and
 security classify expected output volume from the known command scope and
 output mode. Routine commands with expected small, bounded results run
 directly, including targeted reads/searches, concise status checks, and focused
-tests configured for concise output. Use the helper only for large, verbose,
+tests configured for concise output. The direct route is valid only when the
+execution tool receives a hard output cap before launch (for example, its
+native output-token limit) that is no larger than the known-small result
+budget. If no such cap exists or the command can exceed it, classify the volume
+as unknown and use the helper before execution. Use the helper only for large, verbose,
 or volume-unknown intermediate data such as full suites, verbose builds, and
 broad logs, diffs, or searches. Unknown volume selects the helper; it does not
 make the wrapper the default for known-small results. Never probe a command or

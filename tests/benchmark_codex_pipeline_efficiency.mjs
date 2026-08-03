@@ -38,6 +38,7 @@ export const MAX_PROMPT_BYTES = 16 * 1024 * 1024;
 export const MAX_COMMAND_STREAM_BYTES = 64 * 1024;
 export const COMMAND_TIMEOUT_MS = 30_000;
 
+const COMMAND_TERMINATION_GRACE_MS = 1_000;
 const HOME_TREE_LIMITS = Object.freeze({
   maxFiles: 1024,
   maxBytes: MAX_TREE_BYTES,
@@ -245,6 +246,14 @@ async function existingFile(value, invalidCode) {
   return existingPath(value, "file", invalidCode);
 }
 
+async function listDirectory(target, code) {
+  try {
+    return await readdir(target);
+  } catch {
+    fail(code);
+  }
+}
+
 function sameFileStats(before, after) {
   return before.dev === after.dev
     && before.ino === after.ino
@@ -317,7 +326,7 @@ export async function hashDirectoryTree(root, limits = TREE_LIMITS) {
     } catch {
       fail("TREE_INVALID");
     }
-    entries.sort((left, right) => left.name.localeCompare(right.name));
+    entries.sort((left, right) => Buffer.compare(Buffer.from(left.name), Buffer.from(right.name)));
     for (const entry of entries) {
       const absolute = path.join(current, entry.name);
       const childRelative = relative === "" ? entry.name : `${relative}/${entry.name}`;
@@ -539,14 +548,28 @@ async function captureCommand(executable, args, home) {
     let timedOut = false;
     let spawnFailed = false;
     let settled = false;
+    let settlementGrace;
     const finish = (result) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
+      clearTimeout(settlementGrace);
       resolve(result);
     };
     const stop = () => {
       if (!child.killed) child.kill("SIGKILL");
+      if (settlementGrace === undefined) {
+        settlementGrace = setTimeout(() => {
+          finish({
+            exitCode: null,
+            timedOut,
+            exceeded,
+            spawnFailed,
+            stdout: Buffer.concat(stdout),
+            stderr: Buffer.concat(stderr),
+          });
+        }, COMMAND_TERMINATION_GRACE_MS);
+      }
     };
     const append = (target, chunk, stream) => {
       const size = Buffer.byteLength(chunk);
@@ -766,24 +789,24 @@ async function assertHomeLayout(home) {
   await existingDirectory(plugins, "HOME_UNEXPECTED_CONTENT");
   await existingDirectory(temporary, "HOME_UNEXPECTED_CONTENT");
   await existingDirectory(codexTemporary, "HOME_UNEXPECTED_CONTENT");
-  const pluginEntries = await readdir(plugins);
+  const pluginEntries = await listDirectory(plugins, "HOME_UNEXPECTED_CONTENT");
   if (pluginEntries.some((name) => name !== "cache" && name !== "marketplaces")) fail("HOME_UNEXPECTED_CONTENT");
   await validateDirectoryShape(plugins, HOME_TREE_LIMITS);
-  const temporaryEntries = await readdir(temporary);
+  const temporaryEntries = await listDirectory(temporary, "HOME_UNEXPECTED_CONTENT");
   if (temporaryEntries.length !== 1 || temporaryEntries[0] !== "arg0") {
     fail("HOME_UNEXPECTED_CONTENT");
   }
   const temporaryArg0 = path.join(temporary, "arg0");
   await existingDirectory(temporaryArg0, "HOME_UNEXPECTED_CONTENT");
-  const temporaryArg0Entries = await readdir(temporaryArg0);
+  const temporaryArg0Entries = await listDirectory(temporaryArg0, "HOME_UNEXPECTED_CONTENT");
   if (temporaryArg0Entries.length !== 0) fail("HOME_UNEXPECTED_CONTENT");
-  const codexTemporaryEntries = await readdir(codexTemporary);
+  const codexTemporaryEntries = await listDirectory(codexTemporary, "HOME_UNEXPECTED_CONTENT");
   if (codexTemporaryEntries.length !== 1 || codexTemporaryEntries[0] !== "marketplaces") {
     fail("HOME_UNEXPECTED_CONTENT");
   }
   const marketplaces = path.join(codexTemporary, "marketplaces");
   await existingDirectory(marketplaces, "HOME_UNEXPECTED_CONTENT");
-  const marketplaceEntries = await readdir(marketplaces);
+  const marketplaceEntries = await listDirectory(marketplaces, "HOME_UNEXPECTED_CONTENT");
   if (marketplaceEntries.length !== 0) fail("HOME_UNEXPECTED_CONTENT");
 }
 

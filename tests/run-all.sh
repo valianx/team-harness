@@ -56,6 +56,21 @@ run_ts_hook_suite() {
     fi
 }
 
+# run_node_suite <suite_label> <test_script> <missing_node_reason>
+# Runs a Node.js suite with the same CI-required runtime semantics used by the
+# rest of this wrapper.
+run_node_suite() {
+    local label="$1" script="$2" missing_reason="$3"
+    if ! command -v node >/dev/null 2>&1; then
+        report_skip_or_fail "$label" "$missing_reason"
+    elif node "$TESTS_DIR/$script"; then
+        echo "${label}: PASS"
+    else
+        echo "${label}: FAIL"
+        FAILED=$((FAILED + 1))
+    fi
+}
+
 echo "############################################################"
 echo "# Suite 1: hooks/ts/bodies/policy-block.ts — functional tests"
 echo "############################################################"
@@ -290,42 +305,21 @@ echo "############################################################"
 echo "# Suite 160: local Codex usage collector (AC1–AC5)"
 echo "# Requires: node. Skipped when absent (NOT a pass — see output)."
 echo "############################################################"
-if ! command -v node >/dev/null 2>&1; then
-    report_skip_or_fail "codex-usage" "node not found — install Node.js to run this suite"
-elif node "$TESTS_DIR/test_codex_usage.mjs"; then
-    echo "codex-usage: PASS"
-else
-    echo "codex-usage: FAIL"
-    FAILED=$((FAILED + 1))
-fi
+run_node_suite "codex-usage" "test_codex_usage.mjs" "node not found — install Node.js to run this suite"
 
 echo
 echo "############################################################"
 echo "# Suite 161: bounded argv command output (AC12)"
 echo "# Requires: node. Skipped when absent (NOT a pass — see output)."
 echo "############################################################"
-if ! command -v node >/dev/null 2>&1; then
-    report_skip_or_fail "bounded-command" "node not found — install Node.js to run this suite"
-elif node "$TESTS_DIR/test_bounded_command.mjs"; then
-    echo "bounded-command: PASS"
-else
-    echo "bounded-command: FAIL"
-    FAILED=$((FAILED + 1))
-fi
+run_node_suite "bounded-command" "test_bounded_command.mjs" "node not found — install Node.js to run this suite"
 
 echo
 echo "############################################################"
 echo "# Suite 162: Codex pipeline-efficiency provenance preflight (AC18)"
 echo "# Requires: node. Skipped when absent (NOT a pass — see output)."
 echo "############################################################"
-if ! command -v node >/dev/null 2>&1; then
-    report_skip_or_fail "codex-pipeline-benchmark" "node not found — install Node.js to run this suite"
-elif node "$TESTS_DIR/test_codex_pipeline_benchmark.mjs"; then
-    echo "codex-pipeline-benchmark: PASS"
-else
-    echo "codex-pipeline-benchmark: FAIL"
-    FAILED=$((FAILED + 1))
-fi
+run_node_suite "codex-pipeline-benchmark" "test_codex_pipeline_benchmark.mjs" "node not found — install Node.js to run this suite"
 
 echo
 echo "############################################################"

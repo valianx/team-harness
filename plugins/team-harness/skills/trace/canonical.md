@@ -543,7 +543,9 @@ Cost: unavailable
 A future native USD amount is allowed only if every non-overlapping priced
 dimension has a current, exact, case-sensitive tuple `provider`, `model`,
 `dimension`, `currency: USD`, a non-empty `source`, and an effective date
-range covering the measurement date. The native `pricing_identity.provider`
+range covering the measurement date, and a finite strictly positive
+`rate_per_million`. The rate must be a strictly positive decimal. The native
+`pricing_identity.provider`
 and `.model` must match exactly. Never infer provider/model/rate from a role,
 event model, frontmatter default, prefix, family, or alias; never blend rates
 or convert currency. These restrictions apply only to this selected Native
@@ -567,6 +569,8 @@ and `agent.close.attempt_metrics`, plus the current state snapshot's
 `approved_ac_count`. Do not read rollouts, native IDs, aliases, paths,
 transcripts, prompts, tool output, or free-form labels. Do not print the local
 ordinal; it is a privacy-safe ordering pseudonym, not a diagnostic handle.
+The aggregate key `n_a` represents only the closed event enum `n-a`; it is not
+an additional verdict value.
 
 Count a fresh `agent.spawn` and an `agent.correction.spawn` once as a declared
 attempt. A continued spawn contributes only its final close's follow-up count.

@@ -71,6 +71,16 @@ total_tokens: N|unavailable
 cost_status: available|unavailable
 cost_reason_code: {closed pricing code}|null
 cost_usd: decimal|null
+agent_lifecycle_schema_version: 1|null
+agent_lifecycle_metrics_status: available|unavailable|null
+agent_lifecycle_metrics_reason_code: {closed lifecycle code}|null
+agent_lifecycle_attempt_count: N|null
+agent_lifecycle_follow_up_count: N|null
+agent_lifecycle_correction_count: N|null
+agent_lifecycle_quality_verdicts: {pass:N,concerns:N,fail:N,n_a:N}|null
+agent_lifecycle_metrics: {cached_input_tokens,uncached_input_tokens,output_tokens,wall_time_ms,tool_calls}|null
+approved_ac_count: N|null
+cached_input_per_approved_ac: decimal|unavailable
 autonomous: true|false
 autonomous_granted_at: STAGE-GATE-1|null
 gate_pending: gate1|gate3|null
@@ -110,6 +120,11 @@ contain no root or session identifier, rollout path, raw rollout payload, or
 session list. An unavailable phase makes the aggregate unavailable rather than
 leaving a plausible subtotal; `reasoning_output_tokens` remains a component and
 is never added to `total_tokens` a second time.
+
+When lifecycle declarations exist, `agent_lifecycle_*`, `approved_ac_count`,
+and `cached_input_per_approved_ac` are the conditional aggregate defined in
+[observability.md](observability.md). The state key `n_a` aggregates only the
+closed event value `n-a`; it never introduces a new quality-verdict enum.
 
 Routine operator updates follow `plan-shards.md`: at most
 five lines containing only outcome, changed state, blocker/risk, next action,

@@ -22,8 +22,8 @@ artifact.
 
 Only these allowlisted objects may cross the boundary:
 
-- `checkpointFromUsage(collectCodexUsage({ rolloutsRoot, rootThreadId }))` for
-  a start or end checkpoint; and
+- `checkpointFromUsage(await collectCodexUsage({ rolloutsRoot, rootThreadId }))`
+  for a start or end checkpoint; and
 - `compareCheckpoints(start, end)` for a phase delta.
 
 Their `schema_version`, `kind`, `usage_status`, `reason_code`, and
@@ -81,6 +81,9 @@ claim that a native alias has been observed.
 `quality_verdict` on `agent.close` is one of
 `pass|concerns|fail|n-a`. Use `n-a` unless an already-bounded specialist result
 contains that exact value; never infer, translate, or copy an explanation.
+When aggregating this event enum into an object key, map `n-a` to `n_a`; the
+other three values retain their spellings. The underscore is an aggregate-key
+encoding, never an additional event value.
 
 `attempt_metrics` is an aggregate for that one declared attempt, including all
 of its continued dispatches. Its only permitted shape is:
@@ -241,6 +244,9 @@ dimension has one active quote whose tuple matches exactly, case-sensitively:
   "effective_until": null
 }
 ```
+
+This example describes tuple shape only; it does not authorize its illustrative
+numeric value. `rate_per_million` must be a finite, strictly positive decimal.
 
 The phase must also carry a native, exact `pricing_identity` with the same
 `provider` and `model`; a role name, an agent TOML default, a model prefix, a

@@ -96,10 +96,10 @@ the normalized (LF) bytes against these canonical SHA-256 digests:
 | Role | SHA-256 of normalized TOML |
 |---|---|
 | architect | `f11ceef09bfb9d2839eb2d25adb05d4dcc1188dfacf11e355a9a291c4fcf816f` |
-| implementer | `2778b3e72833e982773379ff39e73014b1892f46261ba17c3b82ea655cda2110` |
-| tester | `acd703b7df2b2b3629c6532f7ac827fda51376bbf2ee99276ba472fa02233f57` |
-| qa | `b321817996079b76a49da13c1a8f7663f1d1462e68c3071339d5271b6d26ffef` |
-| security | `3c14f6a99f593fb202658a81941bb956a1e336d447138c28d3e01c17ef49211d` |
+| implementer | `40a562d3f483502298b3f9ea22de10b9b14839df0d347618a33d3983c8694571` |
+| tester | `e15a282b65847c046306aaa2f056cbfc5e3978d38fa5f7610e9fedd5394fe529` |
+| qa | `11bfa0c3556bac11b27c3721bba9cb39f800b9d8fdf314b69002c5fa9b95cc2d` |
+| security | `e89425e782a1ad47c32a2e210adaa7ecbe2880dc9c4fcd5a6cf3f509ef590064` |
 | delivery | `1c09a83ea425a6aac283f38406f40ab66954f11ccfe244364afc2177fb54085c` |
 
 A digest mismatch is an identity failure; stop before workspace creation or

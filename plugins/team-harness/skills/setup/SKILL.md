@@ -28,7 +28,8 @@ write:
 With no targeted intent, run the complete flow. For a targeted request, change
 only that concern and still ensure the native settings document exists.
 Supported targets are `workspace`, `language`, `english-learning`, `memory`,
-`context7`, `agents`, `clickup`, `obsidian-tasks`, and `flow-telemetry`.
+`context7`, `agents`, `features`, `clickup`, `obsidian-tasks`, and
+`flow-telemetry`.
 
 `lane-autoselect` is legacy migration metadata, not a supported target or an
 active selector. Never use it to choose a route; require the live operator's
@@ -79,15 +80,18 @@ migration, and preserve every unrelated value.
    before continuing. An unavailable network is non-blocking when the installed
    snapshot is usable.
 
-4. Explicitly enable Codex multi-agent V2 with Codex's native feature writer;
-   do not hand-rewrite the global `config.toml`:
+4. Only for a full setup or an explicit `features` target, enable Codex
+   multi-agent V2 with Codex's native feature writer; do not hand-rewrite the
+   global `config.toml`:
 
    ```bash
    codex features enable multi_agent
    codex features enable multi_agent_v2
    ```
 
-   Confirm both flags with `codex features list`. The generated project config
+   For every other targeted setup, skip both feature-writer commands and do not
+   change global Codex feature state. Confirm both flags with
+   `codex features list` only when this step runs. The generated project config
    also enables both flags and supplies the generic `gpt-5.6-terra` / `medium`
    subagent fallback under `[agents]`; it never overrides Main's selected
    Sol/xhigh model. Global installation synchronizes the ten role files with
@@ -140,11 +144,15 @@ migration, and preserve every unrelated value.
 8. Verify the installed plugin's `hooks/hooks.json`. Codex supports the
    deterministic deny hooks only: `policy-block`, the catastrophic-deny
    portion of `gcp-guard`, and `gate-guard`'s force-push floor. `gate-guard`
-   denies force flags, `--force-with-lease`, `+refspec` forms, and wrapped or
-   reconstructed equivalents even after `ship`; benign push and ordinary
-   GitHub approval ownership remain native. Approval-classifying `ask` guards
-   are intentionally not registered because Codex's native permission flow
-   owns approvals.
+   denies direct force flags, `--force-with-lease`, `+refspec` forms, and the
+   statically resolved wrapper forms covered by its bounded command analyzer,
+   even after `ship`. It does not guarantee detection when a push is assembled
+   from runtime-only shell state such as variables, aliases, functions, PATH,
+   or Git configuration; this accepted limitation is not expanded in setup,
+   and server-side GitHub branch protection remains authoritative. Benign push
+   and ordinary GitHub approval ownership remain native. Approval-classifying
+   `ask` guards are intentionally not registered because Codex's native
+   permission flow owns approvals.
    Explain that the operator must review and trust hooks through `/hooks`;
    never approve or bypass trust.
 
