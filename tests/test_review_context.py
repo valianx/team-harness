@@ -83,6 +83,32 @@ class ReviewContextTests(unittest.TestCase):
                 MODULE.promote_artifact(root, "tmp-inline", "inline.json")
             self.assertEqual(outside.read_text(encoding="utf-8"), "secret")
 
+    def test_artifact_promotion_rejects_temporary_inode_swap(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            temporary = root / "tmp-body"
+            temporary.write_text("safe", encoding="utf-8")
+            actual = temporary.stat()
+            calls = 0
+            original = MODULE._regular_stat_at
+
+            def swapped(directory_fd, name):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    return SimpleNamespace(
+                        st_mode=actual.st_mode,
+                        st_dev=actual.st_dev,
+                        st_ino=actual.st_ino + 1,
+                    )
+                return original(directory_fd, name)
+
+            with patch.object(MODULE, "_regular_stat_at", side_effect=swapped):
+                with self.assertRaisesRegex(MODULE.ContextError, "changed during promotion"):
+                    MODULE.promote_artifact(root, "tmp-body", "review.md")
+            self.assertFalse((root / "review.md").exists())
+            self.assertEqual(temporary.read_text(encoding="utf-8"), "safe")
+
     def test_security_selection_is_fail_closed_for_every_reason(self):
         cases = [
             ("agents/security.md\n", "+permission boundary\n", "known-sensitive", True),

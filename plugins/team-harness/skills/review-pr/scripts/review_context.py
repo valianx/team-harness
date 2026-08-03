@@ -105,24 +105,43 @@ def promote_artifact(root: Path, temporary_name: str, final_name: str) -> None:
     final_name = _safe_leaf(final_name)
     _, directory_fd = _open_directory(root)
     try:
-        _regular_stat_at(directory_fd, temporary_name)
+        before = _regular_stat_at(directory_fd, temporary_name)
         try:
-            final = os.stat(final_name, dir_fd=directory_fd, follow_symlinks=False)
-        except FileNotFoundError:
-            final = None
+            temporary_fd = os.open(
+                temporary_name,
+                os.O_RDONLY | NOFOLLOW,
+                dir_fd=directory_fd,
+            )
         except OSError as error:
-            raise ContextError("cannot inspect final artifact leaf") from error
-        if final is not None and not stat.S_ISREG(final.st_mode):
-            raise ContextError("final artifact leaf is not a regular file")
+            raise ContextError("cannot pin temporary artifact without following links") from error
         try:
+            pinned = os.fstat(temporary_fd)
+            if not stat.S_ISREG(pinned.st_mode) or (before.st_dev, before.st_ino) != (pinned.st_dev, pinned.st_ino):
+                raise ContextError("temporary artifact changed before promotion")
+            try:
+                final = os.stat(final_name, dir_fd=directory_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                final = None
+            except OSError as error:
+                raise ContextError("cannot inspect final artifact leaf") from error
+            if final is not None and not stat.S_ISREG(final.st_mode):
+                raise ContextError("final artifact leaf is not a regular file")
+            current = _regular_stat_at(directory_fd, temporary_name)
+            if (current.st_dev, current.st_ino) != (pinned.st_dev, pinned.st_ino):
+                raise ContextError("temporary artifact changed during promotion")
             os.replace(
                 temporary_name,
                 final_name,
                 src_dir_fd=directory_fd,
                 dst_dir_fd=directory_fd,
             )
+            promoted = _regular_stat_at(directory_fd, final_name)
+            if (promoted.st_dev, promoted.st_ino) != (pinned.st_dev, pinned.st_ino):
+                raise ContextError("promoted artifact identity mismatch")
         except OSError as error:
             raise ContextError("cannot atomically promote artifact leaf") from error
+        finally:
+            os.close(temporary_fd)
     finally:
         os.close(directory_fd)
 
