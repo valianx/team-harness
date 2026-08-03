@@ -13,7 +13,7 @@ preflight its exact `plan/tasks/Task-N.md` and fail closed unless its
 Pass only that shard, its named architecture/invariant anchors, frozen identity
 when present, and the role's necessary environment; never compensate with a
 transcript, implementer history, sibling tasks, or the full plan set. Delegate
-bounded, file-scoped work to a fresh `implementer` with `fork_turns: none`;
+bounded, file-scoped work to a fresh V2 `implementer` with `fork_turns: none`;
 state that other agents may be editing the repository and unrelated changes
 must be preserved. Parallelize only tasks with disjoint ownership. The primary
 thread records dispatches and results, waits for all tasks in a round, and
@@ -40,10 +40,10 @@ transcript, raw tool output, or stale prior snapshot. Rotation never waives
 required AC evidence, QA, security, Freeze, mandatory suites, or either gate.
 
 Close a terminal implementation attempt and prohibit post-terminal
-`followup_task`. The sole exception is one recorded micro-correction on the
-same file and AC, limited to at most 3 tool calls; a second feedback item, any
+`followup_task`. The sole exception is one implementer continuation within the
+same active task/correction lifecycle, on the same file and AC and limited to at most 3 tool calls; a second feedback item, any
 scope expansion, or a substantive correction must use a fresh agent
-(`fork_turns: none`) and a bounded `Cause`/`Files`/`AC`/`Correction` packet with the
+(V2 `fork_turns: none`) and a bounded `Cause`/`Files`/`AC`/`Correction` packet with the
 current frozen anchor and required evidence. A continued attempt never absorbs
 another AC, file, or revalidation.
 
@@ -57,10 +57,20 @@ Only in this explicitly activated pipeline, preflight resolves the helper's
 absolute path relative to the loaded pipeline skill/reference and fails closed
 if unavailable; include it in the implementer role packet only as
 `bounded_command_path`. Never persist that value in state, events, reports,
-summaries, or workspace artifacts. Main and the implementer route every command
-through `node <bounded_command_path> -- <argv...>` by default. A read/search
-command, or any command whose result text is required, uses
-`node <bounded_command_path> --success-diagnostic -- <argv...>`.
+summaries, or workspace artifacts. Before executing a command, Main and the
+implementer classify its expected output volume from the known command scope
+and output mode. Routine commands with an expected small, bounded result run
+directly, including targeted file reads and searches, concise status checks,
+and focused tests configured for concise results. Use the resolved helper only
+for large, verbose, or volume-unknown intermediate data such as full suites,
+verbose builds, and broad logs, diffs, or searches. Unknown volume selects the
+helper; it does not make the wrapper the default for known-small results.
+
+For a command assigned to the bounded route, use
+`node <bounded_command_path> -- <argv...>`. Add `--success-diagnostic` before
+`--` only when the bounded result text is required. The routing decision occurs
+before execution; never probe a command and never reactively retry it through
+a different route after its output has entered the transcript.
 
 The helper captures stdout and stderr independently to a 64 KiB maximum buffer
 per stream while separately counting all received bytes. Render its envelope
@@ -69,8 +79,8 @@ an 8 KiB sanitized tail per stream. Strip ANSI control sequences and render
 binary/control data safely before display. A successful command normally needs
 only the envelope; a failing command may use its sanitized failure tail for
 diagnosis. If either stream truncates, make a narrow follow-up as a narrower
-helper-wrapped query and never bypass the helper or replay the original raw/full output or command just
-to obtain it. Outside pipeline mode, do not create, infer, or claim that
+query through the helper and never replay the original raw/full output or command
+just to obtain it. Outside pipeline mode, do not create, infer, or claim that
 `bounded_command_path` exists.
 
 A live operator request that explicitly selects `inline` is not an in-place pipeline downgrade:

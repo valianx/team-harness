@@ -67,8 +67,8 @@ a gate. Gate releases remain dual-recorded and live-operator decisions.
 ## Specialist context, lifecycle, and Main rotation
 
 Every new specialist attempt, correction, and revalidation starts a fresh
-native agent with `fork_turns: none`; only the bounded micro-correction
-exception below may continue an open attempt. Send only its exact role packet: the role
+native V2 agent with `fork_turns: none`; only an implementer's bounded micro-correction
+within the same active task/correction lifecycle may continue its open attempt. Send only its exact role packet: the role
 instruction, assigned task shard, that shard's named invariants and evidence
 anchors, its `cross_runtime_preservation` obligation, the current frozen
 identity when one exists, and the minimal role-specific environment or facts.
@@ -85,7 +85,7 @@ or sibling shard is never a substitute for a missing declaration. This
 preflight preserves the existing Claude and other-runtime contracts; it changes
 neither their models, gates, permissions, nor lifecycle routes.
 
-### AC12 bounded command route
+### AC12/AC20 pre-execution command-output route
 
 Only while this pipeline is explicitly activated, pipeline preflight resolves
 the helper's absolute path relative to the loaded pipeline skill/reference
@@ -96,26 +96,36 @@ in each role packet only as `bounded_command_path` with that absolute path. It
 is transient: never persist `bounded_command_path` in state, events, reports,
 summaries, or workspace artifacts.
 
-In pipeline mode, Main and specialists route every command through
-`node <bounded_command_path> -- <argv...>` by default. For a read/search
-command, or any command whose result text is required, use
-`node <bounded_command_path> --success-diagnostic -- <argv...>` so only its
-sanitized bounded tails can be rendered on success. On `truncated: true`, issue
-a narrower helper-wrapped query; never bypass the helper or replay raw/full
-output. Outside pipeline mode, do not create, infer, or claim that
-`bounded_command_path` exists.
+Classify expected output volume before execution. Routine commands whose result
+is expected to be small and bounded execute directly; this includes targeted
+file reads and searches, concise status checks, and focused tests configured to
+emit concise results. Reserve `bounded-command.mjs` for large, verbose, or
+volume-unknown intermediate data, including full suites, verbose builds, and
+broad logs, diffs, or searches. Base the route on the command's known scope and
+output mode before it runs. If the volume cannot be predicted, use the helper.
+Never execute first and reactively retry through a different route to undo
+output already admitted to the transcript.
+
+For commands assigned to the bounded route, use
+`node <bounded_command_path> -- <argv...>`. Add `--success-diagnostic` before
+`--` only when the bounded result text is required, so only sanitized bounded
+tails can be rendered on success. On `truncated: true`, issue a narrower query
+through the helper; never replay raw/full output. Direct execution remains the
+normal route for small, bounded results. Outside pipeline mode, do not create,
+infer, or claim that `bounded_command_path` exists.
 
 Treat every terminal specialist result as a closed attempt. A post-terminal
-`followup_task` is prohibited, except for one recorded micro-correction of the
-same file and same AC that is explicitly limited to at most 3 tool calls. Record
-that exceptional continuation as `context_strategy: continued`; any second
-feedback, scope expansion, or substantive correction closes the old attempt and
-spawns a fresh agent with a bounded correction packet containing `Cause`,
+`followup_task` is prohibited. Only an implementer may retain its current
+thread for one recorded micro-correction in the same active task/correction
+lifecycle, on the same file and same AC and explicitly limited to at most 3 tool
+calls. Record that exceptional continuation as `context_strategy: continued`;
+any second feedback, scope expansion, or substantive correction closes the old
+attempt and spawns a fresh V2 agent with `fork_turns: none` and a bounded correction packet containing `Cause`,
 `Files`, implicated `AC`, `Correction`, the current frozen anchor, and required
 evidence. Never use continued context for a new file, another AC, a second
 finding, or a revalidation.
 
-Tester, QA, and security each start fresh with `fork_turns: none` on the same
+Tester, QA, and security each start fresh with V2 `fork_turns: none` on the same
 current frozen commit/tree for their validation round. Their packets contain
 the executable ACs or review surface plus verifiable facts and evidence, never
 the implementer's success narrative. Every revalidation after a correction
@@ -168,12 +178,12 @@ the exact markers and effective fields shown below:
 
 | Role | Semantic source marker | Projection/profile marker |
 |---|---|---|
-| `architect` | `# Semantic source: agents/architect.md (opus/xhigh)` | `# Projection tier: opus-xhigh; profile: team-harness` |
-| `implementer` | `# Semantic source: agents/implementer.md (sonnet/high)` | `# Projection tier: non-opus; profile: team-harness` |
-| `tester` | `# Semantic source: agents/tester.md (sonnet/high)` | `# Projection tier: non-opus; profile: team-harness` |
-| `qa` | `# Semantic source: agents/qa.md (sonnet/high)` | `# Projection tier: non-opus; profile: team-harness` |
-| `security` | `# Semantic source: agents/security.md (opus/xhigh)` | `# Projection tier: opus-xhigh; profile: team-harness` |
-| `delivery` | `# Semantic source: agents/delivery.md (sonnet/medium)` | `# Projection tier: non-opus; profile: team-harness` |
+| `architect` | `# Semantic source: agents/architect.md (opus/xhigh)` | `# Projection tier: opus; profile: team-harness` |
+| `implementer` | `# Semantic source: agents/implementer.md (sonnet/high)` | `# Projection tier: sonnet-high; profile: team-harness` |
+| `tester` | `# Semantic source: agents/tester.md (sonnet/high)` | `# Projection tier: sonnet-high; profile: team-harness` |
+| `qa` | `# Semantic source: agents/qa.md (sonnet/high)` | `# Projection tier: sonnet-high; profile: team-harness` |
+| `security` | `# Semantic source: agents/security.md (opus/xhigh)` | `# Projection tier: opus; profile: team-harness` |
+| `delivery` | `# Semantic source: agents/delivery.md (sonnet/medium)` | `# Projection tier: sonnet-medium; profile: team-harness` |
 
 The parsed fields must also match this projection matrix exactly (a missing,
 extra, or mismatched value fails preflight):
@@ -181,11 +191,11 @@ extra, or mismatched value fails preflight):
 | Role | `name` | `model` | `model_reasoning_effort` | `sandbox_mode` |
 |---|---|---|---|---|
 | `architect` | `architect` | `gpt-5.6-sol` | `xhigh` | `workspace-write` |
-| `implementer` | `implementer` | `gpt-5.6-luna` | `max` | `workspace-write` |
-| `tester` | `tester` | `gpt-5.6-luna` | `max` | `workspace-write` |
-| `qa` | `qa` | `gpt-5.6-luna` | `max` | `read-only` |
+| `implementer` | `implementer` | `gpt-5.6-terra` | `high` | `workspace-write` |
+| `tester` | `tester` | `gpt-5.6-terra` | `high` | `workspace-write` |
+| `qa` | `qa` | `gpt-5.6-terra` | `high` | `read-only` |
 | `security` | `security` | `gpt-5.6-sol` | `xhigh` | `read-only` |
-| `delivery` | `delivery` | `gpt-5.6-luna` | `max` | `workspace-write` |
+| `delivery` | `delivery` | `gpt-5.6-terra` | `medium` | `workspace-write` |
 
 Finally, compare each normalized (LF) file's SHA-256 against the canonical
 identity digest shipped with this plugin. This catches instruction drift that
@@ -193,12 +203,12 @@ the role fields cannot see. The current digests are:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| `architect` | `1079cc6bd4654c78a010dec4b2bf00761eef51cab2c8458931e0582caa232f66` |
-| `implementer` | `c5dc7c498dfef243f25600a769e8d6d31fd69d197e1dbf9ccfbf25a746068d31` |
-| `tester` | `6701d974f0433a95b952d19b65f0180c102572093efb3ecf53ad3cfde7ae825d` |
-| `qa` | `7cd842cbc3cf03e08d1208d14f8cd1b2fcc64c194d682cf0380dcb48a6a3d3c1` |
-| `security` | `91d5f0a379b447e470e8f5c28218acea1a9e9f53cd59d8b6328f3a7d5a00aa8f` |
-| `delivery` | `4addff6a8d7cdf0ab05b4ae1fb1c306ed3e350f2df63b325d24ff58e4eee22cb` |
+| `architect` | `f11ceef09bfb9d2839eb2d25adb05d4dcc1188dfacf11e355a9a291c4fcf816f` |
+| `implementer` | `2778b3e72833e982773379ff39e73014b1892f46261ba17c3b82ea655cda2110` |
+| `tester` | `acd703b7df2b2b3629c6532f7ac827fda51376bbf2ee99276ba472fa02233f57` |
+| `qa` | `b321817996079b76a49da13c1a8f7663f1d1462e68c3071339d5271b6d26ffef` |
+| `security` | `3c14f6a99f593fb202658a81941bb956a1e336d447138c28d3e01c17ef49211d` |
+| `delivery` | `1c09a83ea425a6aac283f38406f40ab66954f11ccfe244364afc2177fb54085c` |
 
 Do not accept a file solely because its comments or `name` field match. A
 digest mismatch is a stale or unrelated shadow; stop before workspace

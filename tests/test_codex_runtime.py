@@ -225,6 +225,14 @@ def main() -> None:
     config = tomllib.loads((ROOT / ".codex/config.toml").read_text())
     if config["agents"]["enabled"] is not True:
         fail("Codex subagents must be enabled")
+    if "model" in config or "model_reasoning_effort" in config:
+        fail("Codex project fallback must not override Main's selected Sol/xhigh model")
+    if config.get("features", {}).get("multi_agent") is not True:
+        fail("Codex project must explicitly enable multi_agent")
+    if config.get("features", {}).get("multi_agent_v2") is not True:
+        fail("Codex project must explicitly enable multi_agent_v2")
+    if config["agents"].get("default_subagent_model") != "gpt-5.6-terra" or config["agents"].get("default_subagent_reasoning_effort") != "medium":
+        fail("Codex project must declare the generic Terra/medium subagent fallback")
     if config.get("sandbox_mode") != "workspace-write":
         fail("Codex project must use workspace-write sandbox mode")
     if config.get("approval_policy") != "on-request":
@@ -244,16 +252,21 @@ def main() -> None:
 
     generated = set()
     expected_identity = {
-        "architect": ("opus/xhigh", "opus-xhigh"),
-        "implementer": ("sonnet/high", "non-opus"),
-        "tester": ("sonnet/high", "non-opus"),
-        "qa": ("sonnet/high", "non-opus"),
-        "security": ("opus/xhigh", "opus-xhigh"),
-        "delivery": ("sonnet/medium", "non-opus"),
-        "reviewer": ("sonnet/high", "non-opus"),
-        "pr-review-qa": ("sonnet/high", "non-opus"),
-        "pr-review-security": ("sonnet/high", "non-opus"),
-        "reviewer-consolidator": ("sonnet/medium", "non-opus"),
+        "architect": ("opus/xhigh", "opus"),
+        "implementer": ("sonnet/high", "sonnet-high"),
+        "tester": ("sonnet/high", "sonnet-high"),
+        "qa": ("sonnet/high", "sonnet-high"),
+        "security": ("opus/xhigh", "opus"),
+        "delivery": ("sonnet/medium", "sonnet-medium"),
+        "reviewer": ("sonnet/high", "sonnet-high"),
+        "pr-review-qa": ("sonnet/high", "sonnet-high"),
+        "pr-review-security": ("sonnet/high", "sonnet-high"),
+        "reviewer-consolidator": ("sonnet/medium", "sonnet-medium"),
+    }
+    expected_projection = {
+        "opus": ("gpt-5.6-sol", "xhigh"),
+        "sonnet-high": ("gpt-5.6-terra", "high"),
+        "sonnet-medium": ("gpt-5.6-terra", "medium"),
     }
     for path in (ROOT / ".codex/agents").glob("*.toml"):
         if path.is_symlink():
@@ -266,6 +279,10 @@ def main() -> None:
         if data["name"] not in expected_identity:
             fail(f"{path}: unexpected generated agent identity {data['name']!r}")
         source_marker, tier = expected_identity[data["name"]]
+        if (data.get("model"), data.get("model_reasoning_effort")) != expected_projection[tier]:
+            fail(f"{path}: model projection does not match {tier}")
+        if "capabilities" in data:
+            fail(f"{path}: Codex 0.146 role-schema parser rejects capabilities tables")
         content = path.read_text()
         markers = (
             "# Code generated from runtime/schema/codex-agents.json; DO NOT EDIT.",
@@ -1105,8 +1122,9 @@ def main() -> None:
         "regular non-symlink file",
         "stale or unrelated shadow",
         "# Code generated from runtime/schema/codex-agents.json; DO NOT EDIT.",
-        "# Projection tier: opus-xhigh; profile: team-harness",
-        "# Projection tier: non-opus; profile: team-harness",
+        "# Projection tier: opus; profile: team-harness",
+        "# Projection tier: sonnet-high; profile: team-harness",
+        "# Projection tier: sonnet-medium; profile: team-harness",
         "@Team-Harness pipeline <task>",
         "`@Team-Harness init` loads only the lightweight intake posture",
         "Do not create or dispatch a separate `orchestrator` agent",
@@ -1297,12 +1315,12 @@ def main() -> None:
     activation_digests = digest_table(activation)
     pipeline_digests = digest_table(pipeline)
     expected_updated_digests = {
-        "architect": "1079cc6bd4654c78a010dec4b2bf00761eef51cab2c8458931e0582caa232f66",
-        "implementer": "c5dc7c498dfef243f25600a769e8d6d31fd69d197e1dbf9ccfbf25a746068d31",
-        "tester": "6701d974f0433a95b952d19b65f0180c102572093efb3ecf53ad3cfde7ae825d",
-        "qa": "7cd842cbc3cf03e08d1208d14f8cd1b2fcc64c194d682cf0380dcb48a6a3d3c1",
-        "security": "91d5f0a379b447e470e8f5c28218acea1a9e9f53cd59d8b6328f3a7d5a00aa8f",
-        "delivery": "4addff6a8d7cdf0ab05b4ae1fb1c306ed3e350f2df63b325d24ff58e4eee22cb",
+        "architect": "f11ceef09bfb9d2839eb2d25adb05d4dcc1188dfacf11e355a9a291c4fcf816f",
+        "implementer": "2778b3e72833e982773379ff39e73014b1892f46261ba17c3b82ea655cda2110",
+        "tester": "acd703b7df2b2b3629c6532f7ac827fda51376bbf2ee99276ba472fa02233f57",
+        "qa": "b321817996079b76a49da13c1a8f7663f1d1462e68c3071339d5271b6d26ffef",
+        "security": "3c14f6a99f593fb202658a81941bb956a1e336d447138c28d3e01c17ef49211d",
+        "delivery": "1c09a83ea425a6aac283f38406f40ab66954f11ccfe244364afc2177fb54085c",
     }
     if set(activation_digests) != pipeline_roles or activation_digests != pipeline_digests:
         fail("pipeline and activation skill digest tables are not synchronized")

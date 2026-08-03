@@ -75,6 +75,14 @@ function assertClosedEnvelope(result) {
 
 console.log("=== Bounded command output (AC12) ===");
 
+await check("the helper remains a bounded executor rather than an exact-command route manifest", async () => {
+  const source = await readFile(boundedCommandPath, "utf8");
+  assert.match(source, /large, verbose, or\s+\* volume-unknown intermediate output/);
+  assert.match(source, /Routine commands with expected small,\s+\* bounded results execute directly/);
+  assert.doesNotMatch(source, /DIRECT_COMMAND_MANIFEST|classifyCommandOutputRoute/);
+  assert.doesNotMatch(source, /\/usr\/bin\/(?:true|false)/);
+});
+
 await check("success counts stdout and stderr independently but exposes no payload", async () => {
   const argvSecret = "COMMAND_ARGV_SECRET_CANARY";
   const result = await runBoundedCommand(

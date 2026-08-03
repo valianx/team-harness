@@ -70,23 +70,23 @@ The role-specific semantic and profile markers must match this matrix:
 
 | Role | Semantic source | Projection/profile |
 |---|---|---|
-| architect | `agents/architect.md (opus/xhigh)` | `opus-xhigh; profile: team-harness` |
-| implementer | `agents/implementer.md (sonnet/high)` | `non-opus; profile: team-harness` |
-| tester | `agents/tester.md (sonnet/high)` | `non-opus; profile: team-harness` |
-| qa | `agents/qa.md (sonnet/high)` | `non-opus; profile: team-harness` |
-| security | `agents/security.md (opus/xhigh)` | `opus-xhigh; profile: team-harness` |
-| delivery | `agents/delivery.md (sonnet/medium)` | `non-opus; profile: team-harness` |
+| architect | `agents/architect.md (opus/xhigh)` | `opus; profile: team-harness` |
+| implementer | `agents/implementer.md (sonnet/high)` | `sonnet-high; profile: team-harness` |
+| tester | `agents/tester.md (sonnet/high)` | `sonnet-high; profile: team-harness` |
+| qa | `agents/qa.md (sonnet/high)` | `sonnet-high; profile: team-harness` |
+| security | `agents/security.md (opus/xhigh)` | `opus; profile: team-harness` |
+| delivery | `agents/delivery.md (sonnet/medium)` | `sonnet-medium; profile: team-harness` |
 
 The effective runtime fields must match this projection exactly:
 
 | Role | `name` | `model` | `model_reasoning_effort` | `sandbox_mode` |
 |---|---|---|---|---|
 | architect | `architect` | `gpt-5.6-sol` | `xhigh` | `workspace-write` |
-| implementer | `implementer` | `gpt-5.6-luna` | `max` | `workspace-write` |
-| tester | `tester` | `gpt-5.6-luna` | `max` | `workspace-write` |
-| qa | `qa` | `gpt-5.6-luna` | `max` | `read-only` |
+| implementer | `implementer` | `gpt-5.6-terra` | `high` | `workspace-write` |
+| tester | `tester` | `gpt-5.6-terra` | `high` | `workspace-write` |
+| qa | `qa` | `gpt-5.6-terra` | `high` | `read-only` |
 | security | `security` | `gpt-5.6-sol` | `xhigh` | `read-only` |
-| delivery | `delivery` | `gpt-5.6-luna` | `max` | `workspace-write` |
+| delivery | `delivery` | `gpt-5.6-terra` | `medium` | `workspace-write` |
 
 In the files, these appear as `# Semantic source: ...` and
 `# Projection tier: ...` comments. A missing, edited, or mismatched marker or
@@ -95,12 +95,12 @@ the normalized (LF) bytes against these canonical SHA-256 digests:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| architect | `1079cc6bd4654c78a010dec4b2bf00761eef51cab2c8458931e0582caa232f66` |
-| implementer | `c5dc7c498dfef243f25600a769e8d6d31fd69d197e1dbf9ccfbf25a746068d31` |
-| tester | `6701d974f0433a95b952d19b65f0180c102572093efb3ecf53ad3cfde7ae825d` |
-| qa | `7cd842cbc3cf03e08d1208d14f8cd1b2fcc64c194d682cf0380dcb48a6a3d3c1` |
-| security | `91d5f0a379b447e470e8f5c28218acea1a9e9f53cd59d8b6328f3a7d5a00aa8f` |
-| delivery | `4addff6a8d7cdf0ab05b4ae1fb1c306ed3e350f2df63b325d24ff58e4eee22cb` |
+| architect | `f11ceef09bfb9d2839eb2d25adb05d4dcc1188dfacf11e355a9a291c4fcf816f` |
+| implementer | `2778b3e72833e982773379ff39e73014b1892f46261ba17c3b82ea655cda2110` |
+| tester | `acd703b7df2b2b3629c6532f7ac827fda51376bbf2ee99276ba472fa02233f57` |
+| qa | `b321817996079b76a49da13c1a8f7663f1d1462e68c3071339d5271b6d26ffef` |
+| security | `3c14f6a99f593fb202658a81941bb956a1e336d447138c28d3e01c17ef49211d` |
+| delivery | `1c09a83ea425a6aac283f38406f40ab66954f11ccfe244364afc2177fb54085c` |
 
 A digest mismatch is an identity failure; stop before workspace creation or
 delegation. Ask the operator to run `$team-harness:update` to

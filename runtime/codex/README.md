@@ -16,9 +16,10 @@ follows:
 
 | Canonical source | Codex model | Codex effort |
 |---|---|---|
-| `opus` + `xhigh` | `gpt-5.6-sol` | `xhigh` |
-| `opus` + any other allowed effort | `gpt-5.6-sol` | `xhigh` |
-| any allowed non-`opus` model | `gpt-5.6-luna` | `max` |
+| `opus` + any allowed effort | `gpt-5.6-sol` | `xhigh` |
+| `sonnet` + `high` or `xhigh` | `gpt-5.6-terra` | `high` |
+| `sonnet` + `medium` | `gpt-5.6-terra` | `medium` |
+| `haiku` + any allowed effort | `gpt-5.6-terra` | `low` |
 
 Every role must match exactly one data-driven tier. The generator rejects an
 unmapped or multiply mapped role, invalid role/source/output paths,
@@ -34,8 +35,9 @@ installed custom agents, the Main-hosted orchestrator posture, and roles not yet
 shipped in the Codex beta. These files are committed so a trusted checkout works
 without a build step. Do not edit generated files directly.
 
-The generated project config uses `workspace-write` with `on-request`
-approvals, enables dependency network access, and grants narrowly scoped write
+The generated project config uses `gpt-5.6-terra` at `medium` as its generic
+subagent fallback without overriding Main's selected model, enables both `multi_agent` and `multi_agent_v2`, and uses
+`workspace-write` with `on-request` approvals. It enables dependency network access and grants narrowly scoped write
 access to the current user's standard Go, uv, npm, and Go module cache paths.
 This keeps routine builds inside the sandbox without shared predictable `/tmp`
 directories or broad write access to the user home. Codex still

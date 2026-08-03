@@ -64,6 +64,7 @@ for (const [, content] of agentOutputs) {
   assert.match(content, /^developer_instructions = /m);
   assert.match(content, /^# Semantic source: agents\//m);
   assert.match(content, /^# Projection tier: /m);
+  assert.doesNotMatch(content, /^\[capabilities\]$/m, "Codex 0.146 role-schema parser rejects capability tables");
 }
 
 const packagedAgentOutputs = [...first.files].filter(([path]) =>
@@ -79,11 +80,18 @@ for (const [path, content] of agentOutputs) {
 }
 
 const projectConfig = first.files.get(join(root, ".codex/config.toml"));
+assert.doesNotMatch(projectConfig, /^model = /m, "project fallback must not override Main's model");
+assert.doesNotMatch(projectConfig, /^model_reasoning_effort = /m, "project fallback must not override Main's effort");
 assert.match(projectConfig, /^sandbox_mode = "workspace-write"$/m);
 assert.match(projectConfig, /^approval_policy = "on-request"$/m);
+assert.match(projectConfig, /^\[features\]$/m);
+assert.match(projectConfig, /^multi_agent = true$/m);
+assert.match(projectConfig, /^multi_agent_v2 = true$/m);
 assert.match(projectConfig, /^\[sandbox_workspace_write\]$/m);
 assert.match(projectConfig, /^network_access = true$/m);
 assert.match(projectConfig, /^writable_roots = \["~\/\.cache\/go-build", "~\/\.cache\/uv", "~\/\.npm", "~\/go\/pkg\/mod"\]$/m);
+assert.match(projectConfig, /^default_subagent_model = "gpt-5\.6-terra"$/m);
+assert.match(projectConfig, /^default_subagent_reasoning_effort = "medium"$/m);
 assert.doesNotMatch(projectConfig, /^\[shell_environment_policy\]$/m);
 
 for (const name of ["architect", "security"]) {
@@ -95,26 +103,18 @@ for (const name of [
   "implementer",
   "tester",
   "qa",
-  "delivery",
   "reviewer",
   "pr-review-qa",
-  "pr-review-security",
-  "reviewer-consolidator"
+  "pr-review-security"
 ]) {
   const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
-  assert.match(content, /^model = "gpt-5\.6-luna"$/m);
-  assert.match(content, /^model_reasoning_effort = "max"$/m);
+  assert.match(content, /^model = "gpt-5\.6-terra"$/m);
+  assert.match(content, /^model_reasoning_effort = "high"$/m);
 }
-
-for (const name of ["reviewer", "pr-review-qa", "pr-review-security", "reviewer-consolidator"]) {
+for (const name of ["delivery", "reviewer-consolidator"]) {
   const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
-  assert.match(content, /^\[capabilities\]$/m);
-  assert.match(content, /^default = "deny"$/m);
-  assert.match(content, /^allow = \["read", "glob", "grep"\]$/m);
-}
-for (const name of ["architect", "implementer", "tester", "qa", "security", "delivery"]) {
-  const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
-  assert.doesNotMatch(content, /^\[capabilities\]$/m);
+  assert.match(content, /^model = "gpt-5\.6-terra"$/m);
+  assert.match(content, /^model_reasoning_effort = "medium"$/m);
 }
 
 // The pipeline skill preflight uses a canonical digest in addition to the
@@ -143,11 +143,13 @@ assert.match(roster, /@Team-Harness pipeline <request>/);
 assert.match(roster, /\$sync-codex-agents/);
 assert.match(roster, /\| Agent \| Canonical Claude model \| Canonical source effort \| Codex model \| Codex effort \| Codex availability \|/);
 assert.match(roster, /\| `architect` \| `opus` \| `xhigh` \| `gpt-5\.6-sol` \| `xhigh` \| installed custom agent \|/);
-assert.match(roster, /\| `implementer` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
-assert.match(roster, /\| `reviewer` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
-assert.match(roster, /\| `pr-review-qa` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
-assert.match(roster, /\| `pr-review-security` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
-assert.match(roster, /\| `reviewer-consolidator` \| `sonnet` \| `medium` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `adversary` \| `sonnet` \| `xhigh` \| `gpt-5\.6-terra` \| `high` \| not shipped in Codex beta \|/);
+assert.match(roster, /\| `implementer` \| `sonnet` \| `high` \| `gpt-5\.6-terra` \| `high` \| installed custom agent \|/);
+assert.match(roster, /\| `reviewer` \| `sonnet` \| `high` \| `gpt-5\.6-terra` \| `high` \| installed custom agent \|/);
+assert.match(roster, /\| `pr-review-qa` \| `sonnet` \| `high` \| `gpt-5\.6-terra` \| `high` \| installed custom agent \|/);
+assert.match(roster, /\| `pr-review-security` \| `sonnet` \| `high` \| `gpt-5\.6-terra` \| `high` \| installed custom agent \|/);
+assert.match(roster, /\| `reviewer-consolidator` \| `sonnet` \| `medium` \| `gpt-5\.6-terra` \| `medium` \| installed custom agent \|/);
+assert.match(roster, /\| `researcher` \| `haiku` \| `medium` \| `gpt-5\.6-terra` \| `low` \| not shipped in Codex beta \|/);
 assert.match(roster, /\| `orchestrator` \| `opus` \| `high` \| `gpt-5\.6-sol` \| `xhigh` \| Main via `init` \/ `pipeline` skills \|/);
 assert.match(roster, /\| `agent-builder` \| `opus` \| `xhigh` \| `gpt-5\.6-sol` \| `xhigh` \| not shipped in Codex beta \|/);
 
@@ -162,6 +164,18 @@ try {
   assert.match(output, /^model_reasoning_effort = "xhigh"$/m);
 } finally {
   await rm(opusOtherFixture, { recursive: true, force: true });
+}
+
+const haikuFixture = await makeFixture();
+try {
+  const source = join(haikuFixture, "agents/init-project.md");
+  const content = await readFile(source, "utf8");
+  await writeFile(source, content.replace("model: haiku\neffort: medium", "model: haiku\neffort: xhigh"));
+  const projected = await render({ rootDir: haikuFixture });
+  const roster = projected.files.get(join(haikuFixture, ".codex/README.md"));
+  assert.match(roster, /\| `init-project` \| `haiku` \| `xhigh` \| `gpt-5\.6-terra` \| `low` \| not shipped in Codex beta \|/);
+} finally {
+  await rm(haikuFixture, { recursive: true, force: true });
 }
 
 await expectRegistryFailure(registry => {
@@ -206,10 +220,10 @@ await expectRegistryFailure(registry => {
   });
 }, /map to exactly one projection tier \(matched 2\)/);
 await expectRegistryFailure(registry => {
-  registry.projection_tiers = registry.projection_tiers.filter(tier => tier.name !== "non-opus");
+  registry.projection_tiers = registry.projection_tiers.filter(tier => tier.name !== "sonnet-high");
 }, /map to exactly one projection tier \(matched 0\)/);
 await expectRegistryFailure(registry => {
-  registry.profiles["team-harness"].tiers["non-opus"].reasoning_effort = "unbounded";
+  registry.profiles["team-harness"].tiers["sonnet-high"].reasoning_effort = "unbounded";
 }, /unsupported runtime reasoning effort/);
 
 const checkFixture = await makeFixture();

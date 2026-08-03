@@ -2,6 +2,10 @@
 /**
  * Execute one argv command with bounded, terminal-safe diagnostic output.
  *
+ * Callers choose this helper before execution only for large, verbose, or
+ * volume-unknown intermediate output. Routine commands with expected small,
+ * bounded results execute directly; this module does not classify routes.
+ *
  * This helper deliberately accepts only an argv array. It never invokes a
  * shell and its envelope never contains the argv, environment, cwd, native
  * process identifiers, or a raw spawn error. Successful commands expose

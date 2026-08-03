@@ -16,8 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Made fresh specialist attempts the default, closed terminal sessions, bounded command output,
-  lowered rotation thresholds, and required fresh verification after implementation changes.
+- Made fresh V2 specialist attempts the default, closed terminal sessions, lowered rotation
+  thresholds, and required fresh verification after implementation changes.
+- Reserved bounded command capture for large, verbose, or volume-unknown intermediate output;
+  routine commands with small bounded results now execute directly.
+- Enabled multi-agent V2 during Codex setup and mapped Opus roles to Sol/xhigh, Sonnet roles to
+  tiered Terra high/medium, and Haiku roles to Terra/low without overriding Main's selected model.
 
 ## [3.6.8] - 2026-08-02
 

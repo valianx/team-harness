@@ -10,7 +10,7 @@ transcript, implementer narrative, sibling task, or full plan. Give tester and Q
 assigned task-shard paths, current frozen commit/tree, and verification facts/evidence; give
 security the same frozen identity plus the changed attack surface and named invariant or
 architecture anchors when required. Every tester, QA, and security dispatch uses a fresh
-`fork_turns: none` agent. Never attach the full plan set or the implementer's success narrative.
+V2 `fork_turns: none` agent. Never attach the full plan set or the implementer's success narrative.
 None may edit coordination state, gate fields, or releases. QA may update only the assigned
 task-shard AC checkbox mirror; all other manifest and shard fields remain unchanged. Specialists
 report only `Cause`, `Files`, implicated `AC`, and `Correction`; Main owns canonical plan fields,
@@ -53,10 +53,19 @@ Only in this explicitly activated pipeline, preflight resolves the helper's
 absolute path relative to the loaded pipeline skill/reference and fails closed
 if unavailable; include it in each validation role packet only as
 `bounded_command_path`. Never persist that value in state, events, reports,
-summaries, or workspace artifacts. Main, tester, QA, and security route every
-command through `node <bounded_command_path> -- <argv...>` by default. A
-read/search command, or any command whose result text is required, uses
-`node <bounded_command_path> --success-diagnostic -- <argv...>`.
+summaries, or workspace artifacts. Before execution, Main, tester, QA, and
+security classify expected output volume from the known command scope and
+output mode. Routine commands with expected small, bounded results run
+directly, including targeted reads/searches, concise status checks, and focused
+tests configured for concise output. Use the helper only for large, verbose,
+or volume-unknown intermediate data such as full suites, verbose builds, and
+broad logs, diffs, or searches. Unknown volume selects the helper; it does not
+make the wrapper the default for known-small results. Never probe a command or
+reactively retry it through another route after output enters the transcript.
+
+For a command assigned to the bounded route, use
+`node <bounded_command_path> -- <argv...>`. Add `--success-diagnostic` before
+`--` only when the bounded result text is required.
 
 The helper captures each command's stdout and stderr separately with a maximum
 64 KiB buffer per stream, total byte counters, and a `truncated` flag. Render
@@ -64,8 +73,8 @@ exit code, duration, bytes, `truncated`, and only a sanitized tail of at most 8
 KiB per stream; remove ANSI control sequences and render binary/control data
 safely. A successful command records only that envelope; on a failure, diagnose
 from the sanitized tail rather than replaying the command's full output; on
-truncation, make a narrow follow-up as a narrower helper-wrapped query and never bypass the helper or
-replay raw/full output. Test this contract with ANSI, binary data, one giant
+truncation, make a narrow follow-up through the helper and never replay raw/full
+output. Test this contract with ANSI, binary data, one giant
 line beyond 64 KiB, and a nonzero failure without replay. Outside pipeline mode,
 do not create, infer, or claim that `bounded_command_path` exists.
 

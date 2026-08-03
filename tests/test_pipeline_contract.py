@@ -1145,13 +1145,24 @@ def check_execution_efficiency_contract() -> None:
         "`bounded_command_path`",
         "state, events, reports",
         "node <bounded_command_path> -- <argv...>",
-        "--success-diagnostic -- <argv...>",
-        "read/search",
-        "narrower helper-wrapped query",
-        "never bypass the helper",
+        "`--success-diagnostic` before",
+        "narrower query through the helper",
         "outside pipeline mode",
     ):
         require(marker in pipeline, f"pipeline: AC12 helper-route marker missing {marker!r}")
+
+    for marker in (
+        "classify expected output volume before execution",
+        "small and bounded execute directly",
+        "targeted file reads and searches",
+        "focused tests configured to emit concise results",
+        "large, verbose, or volume-unknown intermediate data",
+        "full suites",
+        "broad logs, diffs, or searches",
+        "reactively retry through a different route",
+        "direct execution remains the normal route",
+    ):
+        require(marker in pipeline, f"pipeline: AC20 pre-execution routing marker missing {marker!r}")
 
     for label, text in contracts.items():
         for marker in (
@@ -1205,13 +1216,42 @@ def check_execution_efficiency_contract() -> None:
             "`bounded_command_path`",
             "state, events, reports",
             "node <bounded_command_path> -- <argv...>",
-            "--success-diagnostic -- <argv...>",
-            "read/search",
-            "narrower helper-wrapped query",
-            "never bypass the helper",
+            "`--success-diagnostic` before",
+            "narrow",
+            "through the helper",
             "outside pipeline mode",
         ):
             require(marker in text, f"{label}: AC12 helper-route marker missing {marker!r}")
+
+    for marker in (
+        "before execution",
+        "expected output volume",
+        "expected small, bounded results run directly",
+        "targeted reads/searches",
+        "focused tests configured for concise output",
+        "large, verbose, or volume-unknown intermediate data",
+        "full suites",
+        "broad logs, diffs, or searches",
+        "unknown volume selects the helper",
+        "does not make the wrapper the default",
+        "reactively retry it through another route",
+    ):
+        require(marker in contracts["validation"], f"validation: AC20 pre-execution routing marker missing {marker!r}")
+
+    for marker in (
+        "before executing a command",
+        "expected output volume",
+        "expected small, bounded result run directly",
+        "targeted file reads and searches",
+        "focused tests configured for concise results",
+        "large, verbose, or volume-unknown intermediate data",
+        "full suites",
+        "broad logs, diffs, or searches",
+        "unknown volume selects the helper",
+        "does not make the wrapper the default",
+        "never reactively retry it through a different route",
+    ):
+        require(marker in contracts["implementation"], f"implementation: AC20 pre-execution routing marker missing {marker!r}")
 
     require(
         "giant line beyond 64 kib" in contracts["validation"],
@@ -1239,19 +1279,43 @@ def check_execution_efficiency_contract() -> None:
             "`truncated`",
             "strip ansi",
             "binary/control data safely",
-            "successful commands report only the envelope",
+            "successful bounded commands report only the envelope",
             "without replaying full output",
             "never waive acs, qa, security, freeze, mandatory suites, or gates",
             "explicitly activated pipeline",
             "`bounded_command_path`",
             "node <bounded_command_path> -- <argv...>",
-            "--success-diagnostic -- <argv...>",
-            "read/search",
-            "narrower helper-wrapped query",
-            "never bypass the helper",
+            "`--success-diagnostic` before `--`",
+            "narrow follow-up through the helper",
             "outside pipeline mode",
         ):
             require(marker in adapter, f"{role}: execution contract missing {marker!r}")
+
+        for marker in (
+            "before execution",
+            "expected output volume",
+            "expected small, bounded results execute directly",
+            "targeted reads/searches",
+            "focused tests configured for concise output",
+            "large, verbose, or volume-unknown intermediate data",
+            "full suites",
+            "broad logs, diffs, or searches",
+            "unknown volume selects the helper",
+            "reactively retry it through another route",
+        ):
+            require(marker in adapter, f"{role}: AC20 routing marker missing {marker!r}")
+
+    bounded_helper = read("plugins/team-harness/skills/pipeline/scripts/bounded-command.mjs")
+    for forbidden in (
+        "DIRECT_COMMAND_MANIFEST",
+        "classifyCommandOutputRoute",
+        "/usr/bin/true",
+        "/usr/bin/false",
+    ):
+        require(forbidden not in bounded_helper, f"bounded helper: misleading route manifest remains {forbidden!r}")
+
+    for label, text in {"pipeline": pipeline, **contracts}.items():
+        require("route every command" not in text, f"{label}: universal wrapper policy remains")
 
 
 def check_context_isolation_rotation_contract() -> None:
@@ -1265,7 +1329,7 @@ def check_context_isolation_rotation_contract() -> None:
     shards_flat = re.sub(r"\s+", " ", shards.lower())
 
     for marker in (
-        "`fork_turns: none`",
+        "v2 `fork_turns: none`",
         "exact role packet",
         "terminal specialist result",
         "`followup_task` is prohibited",
@@ -1309,7 +1373,7 @@ def check_context_isolation_rotation_contract() -> None:
 
     for marker in (
         "every tester, qa, and security dispatch uses a fresh",
-        "`fork_turns: none` agent",
+        "v2 `fork_turns: none` agent",
         "current frozen commit/tree",
         "verification facts/evidence",
         "implementer's success narrative",
@@ -1346,14 +1410,12 @@ def check_context_isolation_rotation_contract() -> None:
     for role in ("implementer", "tester", "qa", "security"):
         adapter = re.sub(r"\s+", " ", read(f"runtime/codex/instructions/{role}.md").lower())
         for marker in (
-            "fresh `fork_turns: none` attempt",
+            "fresh v2 `fork_turns: none` attempt",
             "at most 30 tool calls",
             "50 tool calls",
             "75 tool calls",
             "8 m cumulative processed tokens",
             "post-terminal `followup_task`",
-            "same file and ac",
-            "at most 3 tool calls",
             "second feedback",
             "scope expansion",
             "substantive correction",
@@ -1364,6 +1426,10 @@ def check_context_isolation_rotation_contract() -> None:
         ):
             require(marker in adapter, f"{role}: AC9/AC13 marker missing {marker!r}")
         require("150 tool calls" not in adapter and "25 m tokens" not in adapter, f"{role}: superseded rotation limit remains")
+
+    implementer_adapter = re.sub(r"\s+", " ", read("runtime/codex/instructions/implementer.md").lower())
+    for marker in ("same file and ac", "at most 3 tool calls", "same active task/correction lifecycle"):
+        require(marker in implementer_adapter, f"implementer: bounded continuity marker missing {marker!r}")
 
     for role in ("tester", "qa", "security"):
         adapter = re.sub(r"\s+", " ", read(f"runtime/codex/instructions/{role}.md").lower())

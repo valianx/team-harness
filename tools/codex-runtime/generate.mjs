@@ -143,6 +143,19 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
   if (typeof projectExecution.network_access !== "boolean") {
     fail("project_execution.network_access must be a boolean");
   }
+  const projectDefaults = contract.project_defaults;
+  if (!projectDefaults || typeof projectDefaults !== "object" || Array.isArray(projectDefaults)) {
+    fail("project_defaults must be an object");
+  }
+  if (projectDefaults.default_subagent_model !== "gpt-5.6-terra"
+      || projectDefaults.default_subagent_reasoning_effort !== "medium") {
+    fail("project_defaults must set the generic Terra/medium fallback");
+  }
+  if (!projectDefaults.features || typeof projectDefaults.features !== "object" || Array.isArray(projectDefaults.features)
+      || projectDefaults.features.multi_agent !== true || projectDefaults.features.multi_agent_v2 !== true
+      || Object.keys(projectDefaults.features).length !== 2) {
+    fail("project_defaults must enable exactly multi_agent and multi_agent_v2");
+  }
   const writableRoots = assertUniqueStringArray(
     projectExecution.writable_roots,
     "project_execution.writable_roots",
@@ -287,12 +300,6 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
       ]),
       `sandbox_mode = ${JSON.stringify(agent.sandbox_mode)}`,
       `developer_instructions = ${JSON.stringify(instructions)}`,
-      ...(agent.capabilityProfile ? [
-        "",
-        "[capabilities]",
-        `default = ${JSON.stringify(agent.capabilityProfile.default)}`,
-        `allow = [${agent.capabilityProfile.allow.map(capability => JSON.stringify(capability)).join(", ")}]`
-      ] : []),
       ""
     ].join("\n");
     files.set(repositoryPath(rootDir, agent.output_path, `${agent.name}.output_path`), generated);
@@ -304,12 +311,18 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     `sandbox_mode = ${JSON.stringify(projectExecution.sandbox_mode)}`,
     `approval_policy = ${JSON.stringify(projectExecution.approval_policy)}`,
     "",
+    "[features]",
+    "multi_agent = true",
+    "multi_agent_v2 = true",
+    "",
     "[sandbox_workspace_write]",
     `network_access = ${projectExecution.network_access}`,
     `writable_roots = [${[...writableRoots].map(root => JSON.stringify(root)).join(", ")}]`,
     "",
     "[agents]",
     "enabled = true",
+    `default_subagent_model = ${JSON.stringify(projectDefaults.default_subagent_model)}`,
+    `default_subagent_reasoning_effort = ${JSON.stringify(projectDefaults.default_subagent_reasoning_effort)}`,
     `max_concurrent_threads_per_session = ${contract.max_concurrent_threads_per_session}`,
     "interrupt_message = true",
     ""
