@@ -84,6 +84,13 @@ output. Test this contract with ANSI, binary data, one giant
 line beyond 64 KiB, and a nonzero failure without replay. Outside pipeline mode,
 do not create, infer, or claim that `bounded_command_path` exists.
 
+The helper is a development-output control, not a process-containment sandbox.
+The operator remains responsible for launched commands. Deadline cleanup
+covers the managed POSIX process group or the tree confirmed by Windows
+`taskkill`; a deliberately detached or reparented descendant outside that
+scope can outlive the helper. Native sandbox and permission policy remain the
+security boundary.
+
 Wait for all required results. Record one evidence-map row per criterion and one-line command
 outcomes; never paste raw runner output or repeat AC text. Use the verification packet first and
 open a source section only when the verdict requires it. A failed criterion remains failed; do not

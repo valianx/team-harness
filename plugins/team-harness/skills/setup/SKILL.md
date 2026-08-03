@@ -156,11 +156,12 @@ migration, and preserve every unrelated value.
    Explain that the operator must review and trust hooks through `/hooks`;
    never approve or bypass trust.
 
-9. Re-run both helper inspections, `codex features list`, and `codex mcp list --json`. Report one
-   compact result: native config path, workspace/language, agent scope and ten
-   agent statuses, MCP registrations, hook verification/trust, and whether a
-   new thread is required. Never print imported opaque values, secrets, or
-   environment-variable values.
+9. Re-run both helper inspections and `codex mcp list --json`; re-run
+   `codex features list` only when step 4 ran. Report one compact result:
+   native config path, workspace/language, agent scope and ten agent statuses,
+   feature-flag status when checked, MCP registrations, hook
+   verification/trust, and whether a new thread is required. Never print
+   imported opaque values, secrets, or environment-variable values.
 
 The flow is idempotent. Blank input preserves current values; unrelated native
 keys remain untouched; unchanged config and agent files are not rewritten.

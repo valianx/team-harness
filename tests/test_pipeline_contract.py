@@ -1179,6 +1179,10 @@ def check_execution_efficiency_contract() -> None:
         "broad logs, diffs, or searches",
         "reactively retry through a different route",
         "direct execution remains the normal route",
+        "development-output control, not a process-containment sandbox",
+        "operator remains responsible for launched commands",
+        "detached or reparented descendant",
+        "native sandbox and permission policy remain the security boundary",
     ):
         require(marker in pipeline, f"pipeline: AC20 pre-execution routing marker missing {marker!r}")
 
@@ -1187,6 +1191,10 @@ def check_execution_efficiency_contract() -> None:
             "execution tool receives a hard output cap before launch",
             "no larger than the known-small result budget",
             "classify the volume as unknown and use the helper before execution",
+            "development-output control, not a process-containment sandbox",
+            "operator remains responsible for launched commands",
+            "detached or reparented descendant",
+            "native sandbox and permission policy remain the security boundary",
         ):
             require(marker in text, f"{label}: direct-route hard-cap contract missing {marker!r}")
 

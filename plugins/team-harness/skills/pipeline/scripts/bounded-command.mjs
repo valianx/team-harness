@@ -12,6 +12,12 @@
  * accounting only unless their caller explicitly requests a bounded
  * success diagnostic; bounded rendered tails are otherwise reserved for
  * failures.
+ *
+ * This is a development-output control, not a process-containment sandbox.
+ * The operator remains responsible for launched commands. Deadline cleanup
+ * covers the managed POSIX process group or the tree confirmed by Windows
+ * taskkill; a deliberately detached or reparented descendant outside that
+ * scope can outlive the helper.
  */
 
 import { spawn } from "node:child_process";
@@ -392,10 +398,27 @@ function normaliseExitCode(exitCode) {
  * documented tree mode. Both paths deliberately use argv execution and
  * discard the terminator's output so it cannot escape the result envelope.
  */
-function terminateProcessTree(child) {
-  if (!Number.isSafeInteger(child.pid) || child.pid <= 0) return;
+function terminateProcessTree(child, onResult) {
+  if (!Number.isSafeInteger(child.pid) || child.pid <= 0) {
+    onResult(false);
+    return;
+  }
 
   if (process.platform === "win32") {
+    let reported = false;
+    const report = (confirmed) => {
+      if (reported) return;
+      reported = true;
+      if (!confirmed) {
+        try {
+          child.kill("SIGKILL");
+        } catch {
+          // The direct child may already have exited. This fallback cannot
+          // prove that descendants were terminated, so the result stays false.
+        }
+      }
+      onResult(confirmed);
+    };
     try {
       const terminator = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
         shell: false,
@@ -405,20 +428,11 @@ function terminateProcessTree(child) {
       // A missing taskkill must not turn the bounded command into an
       // unhandled-error process. There is no portable Windows fallback that
       // can enumerate a process tree without introducing a shell.
-      terminator.once("error", () => {
-        try {
-          child.kill("SIGKILL");
-        } catch {
-          // The child may already have exited.
-        }
-      });
+      terminator.once("error", () => report(false));
+      terminator.once("close", (exitCode) => report(exitCode === 0));
       terminator.unref();
     } catch {
-      try {
-        child.kill("SIGKILL");
-      } catch {
-        // The child may already have exited.
-      }
+      report(false);
     }
     return;
   }
@@ -428,12 +442,15 @@ function terminateProcessTree(child) {
     // A negative PID targets the entire group, including grandchildren that
     // inherited stdout/stderr and would otherwise keep those pipes open.
     process.kill(-child.pid, "SIGKILL");
+    onResult(true);
   } catch {
     try {
       child.kill("SIGKILL");
     } catch {
       // The child may already have exited.
     }
+    // Direct-child fallback cannot prove that the process tree terminated.
+    onResult(false);
   }
 }
 
@@ -481,7 +498,19 @@ export async function runBoundedCommand(options) {
     let settled = false;
     let spawnFailed = false;
     let streamFailed = false;
+    let deadlineExpired = false;
+    let treeTerminationConfirmed = null;
+    let deadlineClosed = false;
     let terminationGrace;
+
+    const settleDeadlineIfReady = () => {
+      if (!deadlineExpired || treeTerminationConfirmed === null || !deadlineClosed) return;
+      if (treeTerminationConfirmed) {
+        settle("completed", null, "SIGKILL", null);
+      } else {
+        settle("internal_error", null, null, "INTERNAL_ERROR");
+      }
+    };
 
     const settle = (outcome, exitCode, signal, errorCode) => {
       if (settled) return;
@@ -496,6 +525,13 @@ export async function runBoundedCommand(options) {
       child.stdout?.removeAllListeners("error");
       child.stderr?.removeAllListeners("data");
       child.stderr?.removeAllListeners("error");
+      if (outcome === "internal_error" && deadlineExpired) {
+        // An unconfirmed tree termination must not keep the bounded executor
+        // alive through inherited pipes after it reports the closed failure.
+        child.stdout?.destroy();
+        child.stderr?.destroy();
+        child.unref();
+      }
       const diagnostic =
         includeSuccessDiagnostic || outcome !== "completed" || safeExitCode !== 0 || safeSignal !== null;
       resolve(
@@ -523,10 +559,14 @@ export async function runBoundedCommand(options) {
     };
 
     const deadline = setTimeout(() => {
-      terminateProcessTree(child);
+      deadlineExpired = true;
       terminationGrace = setTimeout(() => {
-        settle("completed", null, "SIGKILL", null);
+        settle("internal_error", null, null, "INTERNAL_ERROR");
       }, TERMINATION_SETTLEMENT_GRACE_MS);
+      terminateProcessTree(child, (confirmed) => {
+        treeTerminationConfirmed = confirmed;
+        settleDeadlineIfReady();
+      });
     }, timeoutMs);
 
     if (child.stdout === null || child.stderr === null) {
@@ -551,6 +591,12 @@ export async function runBoundedCommand(options) {
         settle("spawn_error", null, null, "SPAWN_FAILED");
       } else if (streamFailed || (exitCode !== null && !Number.isSafeInteger(exitCode))) {
         settle("internal_error", null, null, "INTERNAL_ERROR");
+      } else if (deadlineExpired) {
+        // External Windows taskkill termination reports an ordinary Windows
+        // exit status rather than a libuv signal. Normalize only after the
+        // tree terminator succeeded and the child emitted close.
+        deadlineClosed = true;
+        settleDeadlineIfReady();
       } else {
         settle("completed", exitCode, signal, null);
       }

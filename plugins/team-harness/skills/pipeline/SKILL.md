@@ -116,6 +116,13 @@ through the helper; never replay raw/full output. Direct execution remains the
 normal route for small, bounded results. Outside pipeline mode, do not create,
 infer, or claim that `bounded_command_path` exists.
 
+The helper is a development-output control, not a process-containment sandbox.
+The operator remains responsible for launched commands. Deadline cleanup
+covers the managed POSIX process group or the tree confirmed by Windows
+`taskkill`; a deliberately detached or reparented descendant outside that
+scope can outlive the helper. Native sandbox and permission policy remain the
+security boundary.
+
 Treat every terminal specialist result as a closed attempt. A post-terminal
 `followup_task` is prohibited. Only an implementer may retain its current
 thread for one recorded micro-correction in the same active task/correction

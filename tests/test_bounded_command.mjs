@@ -101,12 +101,24 @@ function assertClosedEnvelope(result) {
   }
 }
 
+function assertDeadlineEnvelope(result) {
+  assertClosedEnvelope(result);
+  assert.equal(result.outcome, "completed");
+  assert.equal(result.exit_code, null);
+  // taskkill reports a Windows exit status rather than a libuv signal. After
+  // confirmed tree termination, the helper normalizes the deadline intent.
+  assert.equal(result.signal, "SIGKILL");
+  assert.equal(result.error_code, null);
+}
+
 console.log("=== Bounded command output (AC12) ===");
 
 await check("the helper remains a bounded executor rather than an exact-command route manifest", async () => {
   const source = await readFile(boundedCommandPath, "utf8");
   assert.match(source, /large, verbose, or\s+\* volume-unknown intermediate output/);
   assert.match(source, /Routine commands with expected small,\s+\* bounded results execute directly/);
+  assert.match(source, /development-output control, not a process-containment sandbox/);
+  assert.match(source, /deliberately detached or reparented descendant/);
   assert.doesNotMatch(source, /DIRECT_COMMAND_MANIFEST|classifyCommandOutputRoute/);
   assert.doesNotMatch(source, /\/usr\/bin\/(?:true|false)/);
 });
@@ -311,11 +323,7 @@ await check("the execution deadline terminates a hung child through the signal e
     timeoutMs: 25,
   });
 
-  assertClosedEnvelope(result);
-  assert.equal(result.outcome, "completed");
-  assert.equal(result.exit_code, null);
-  assert.equal(result.signal, "SIGKILL");
-  assert.equal(result.error_code, null);
+  assertDeadlineEnvelope(result);
 });
 
 await check("a deadline kills descendants and releases inherited output pipes", async () => {
@@ -347,10 +355,7 @@ await check("a deadline kills descendants and releases inherited output pipes", 
       descendantPid = Number(await eventually(() => readFile(descendantPidPath, "utf8")));
       assert.ok(Number.isSafeInteger(descendantPid) && descendantPid > 0);
 
-      assertClosedEnvelope(result);
-      assert.equal(result.outcome, "completed");
-      assert.equal(result.exit_code, null);
-      assert.equal(result.signal, "SIGKILL");
+      assertDeadlineEnvelope(result);
       // If the descendant still held inherited stdio pipes, settlement would
       // require the helper's one-second forced-settlement grace period.
       assert.ok(result.duration_ms < 900, `timeout retained pipes for ${result.duration_ms}ms`);
@@ -364,6 +369,55 @@ await check("a deadline kills descendants and releases inherited output pipes", 
           process.kill(descendantPid, "SIGKILL");
         } catch {
           // Best-effort cleanup if a regression leaves a descendant behind.
+        }
+      }
+    }
+  });
+});
+
+await check("a deadline never claims tree termination before inherited pipes close", async () => {
+  if (process.platform === "win32") return;
+
+  await temporaryRoot(async (root) => {
+    const descendantPidPath = path.join(root, "detached-descendant.pid");
+    let descendantPid;
+    try {
+      const result = await runBoundedCommand({
+        ...nodeCommand(
+          [
+            "const { spawn } = require('node:child_process');",
+            "spawn(process.execPath, ['-e', process.argv[2], process.argv[1]], { detached: true, stdio: ['ignore', 'inherit', 'inherit', 'ipc'], windowsHide: true }).unref();",
+            "setInterval(() => {}, 1_000);",
+          ].join(" "),
+          descendantPidPath,
+          [
+            "const fs = require('node:fs');",
+            "fs.writeFileSync(process.argv[1], String(process.pid));",
+            "setInterval(() => {}, 1_000);",
+          ].join(" "),
+        ),
+        timeoutMs: 300,
+      });
+
+      descendantPid = Number(await eventually(() => readFile(descendantPidPath, "utf8")));
+      assert.ok(Number.isSafeInteger(descendantPid) && descendantPid > 0);
+
+      assertClosedEnvelope(result);
+      assert.equal(result.outcome, "internal_error");
+      assert.equal(result.exit_code, null);
+      assert.equal(result.signal, null);
+      assert.equal(result.error_code, "INTERNAL_ERROR");
+      assert.equal(isProcessAlive(descendantPid), true);
+    } finally {
+      if (Number.isSafeInteger(descendantPid) && descendantPid > 0 && isProcessAlive(descendantPid)) {
+        try {
+          process.kill(-descendantPid, "SIGKILL");
+        } catch {
+          try {
+            process.kill(descendantPid, "SIGKILL");
+          } catch {
+            // Best-effort cleanup of the deliberately detached descendant.
+          }
         }
       }
     }

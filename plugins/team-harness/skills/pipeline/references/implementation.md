@@ -87,6 +87,13 @@ query through the helper and never replay the original raw/full output or comman
 just to obtain it. Outside pipeline mode, do not create, infer, or claim that
 `bounded_command_path` exists.
 
+The helper is a development-output control, not a process-containment sandbox.
+The operator remains responsible for launched commands. Deadline cleanup
+covers the managed POSIX process group or the tree confirmed by Windows
+`taskkill`; a deliberately detached or reparented descendant outside that
+scope can outlive the helper. Native sandbox and permission policy remain the
+security boundary.
+
 A live operator request that explicitly selects `inline` is not an in-place pipeline downgrade:
 close the active run administratively first (`phase: aborted`/`status: aborted`, clear a pending
 gate, and write no gate release), then evaluate the bounded direct request outside the machine.

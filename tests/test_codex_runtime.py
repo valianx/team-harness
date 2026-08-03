@@ -510,6 +510,8 @@ def main() -> None:
         "only for a full setup or an explicit `features` target",
         "for every other targeted setup, skip both feature-writer commands",
         "do not change global codex feature state",
+        "re-run `codex features list` only when step 4 ran",
+        "feature-flag status when checked",
         "does not guarantee detection when a push is assembled from runtime-only shell state",
         "server-side github branch protection remains authoritative",
     ):
