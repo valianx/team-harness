@@ -69,8 +69,8 @@ a gate. Gate releases remain dual-recorded and live-operator decisions.
 ## Specialist context, lifecycle, and Main rotation
 
 Every new specialist attempt, correction, and revalidation starts a fresh
-native V2 agent with `fork_turns: none`; only an implementer's bounded micro-correction
-within the same active task/correction lifecycle may continue its open attempt. Send only its exact role packet: the role
+native V2 agent with `fork_turns: none`; no specialist attempt is continued for
+feedback or correction. Send only its exact role packet: the role
 instruction, assigned task shard, that shard's named invariants and evidence
 anchors, its `cross_runtime_preservation` obligation, the current frozen
 identity when one exists, and the minimal role-specific environment or facts.
@@ -124,19 +124,15 @@ scope can outlive the helper. Native sandbox and permission policy remain the
 security boundary.
 
 Treat every terminal specialist result as a closed attempt. A post-terminal
-`followup_task` is prohibited. During an already authorized implementation
-task, only an implementer may retain its current thread for one recorded
-micro-correction on the same file and same AC, explicitly limited to at most 3
-tool calls. Record that exceptional continuation as `context_strategy:
-continued`; any second feedback, scope expansion, or substantive correction
-closes the old attempt and requires a fresh V2 agent with `fork_turns: none`.
-A failed validation never enters this continuation automatically: Main first
+`followup_task` is prohibited for implementers and reviewers alike. Feedback,
+scope expansion, and every correction require a fresh V2 agent with
+`fork_turns: none`; new pipeline events use `context_strategy: fresh` and
+`follow_up_count: 0`. A failed validation never dispatches automatically: Main first
 finishes the full fan, consolidates every finding, and obtains the mandatory
 correction decision described below. Once authorized, the fresh implementer
 receives a bounded correction packet containing the matching nonce, failed
 anchor, complete finding IDs, union scope, `Cause`, `Files`, implicated `AC`,
-advisory `Suggested correction`, and required evidence. Never use continued context for a new
-file, another AC, a second finding, or a revalidation.
+advisory `Suggested correction`, and required evidence.
 
 Tester, QA, and security each start fresh with V2 `fork_turns: none` on the same
 current frozen commit/tree for their validation round. Their packets contain
@@ -217,7 +213,7 @@ the role fields cannot see. The current digests are:
 | Role | SHA-256 of normalized TOML |
 |---|---|
 | `architect` | `f11ceef09bfb9d2839eb2d25adb05d4dcc1188dfacf11e355a9a291c4fcf816f` |
-| `implementer` | `40a562d3f483502298b3f9ea22de10b9b14839df0d347618a33d3983c8694571` |
+| `implementer` | `c749244e2ef04e203ff16f5e1762241b190ae710a1c9977c5c6c7912dfe933a7` |
 | `tester` | `c423ac39fd8eb3370d11e13b01235725c77ec3674c8478d86e02488056c96bcd` |
 | `qa` | `0c1e88083ed9ba5152442d3be1d925049fde74cbefd20347f3f2ab68361f3103` |
 | `security` | `5f8cec39dabe86273f34192b17479ae044ecb5e76ba24d1c1e4cef3d2c53369b` |
@@ -267,26 +263,54 @@ following matrix is exhaustive:
 | Mechanical plan repair (references, identifiers, paths, counts, format, or field coherence with no semantic change) | Main repairs the canonical field and records the repair | `phase: implementation`; no new Gate 1; if Freeze was reached, rebuild Freeze and revalidate | prohibited | `0` |
 | Decision-bearing plan resolution, including a structural intent/scope/AC contradiction, security-obligation classification, or a change to intent, scope, behavior, or AC meaning | Main pauses for a bounded live operator decision and transcribes the approved resolution without reinterpretation | `phase: implementation`; `next_action` continues through implementation → Freeze → validation; no new Gate 1 and retain the conditional security review when the classification is sensitive | prohibited unless the separate explicit current live operator request for architect work applies | `0` |
 | Explicit, current live operator request for architect work | Main records the request and dispatches `architect` | `phase: design`; the resulting plan requires a new Gate 1 | allowed only for that request | `0` |
-| Correctable code, test, documentation, hygiene, or security finding inside approved scope | Main includes it in the complete consolidated validation failure | `phase: validation`; pause for the mandatory correction decision; only choice `1` authorizes one bounded implementation round → new Freeze → fresh full validation fan; no new Gate 1 | prohibited | `+1` |
-| Missing or insufficient evidence | Main includes it in the same complete consolidated validation failure | `phase: validation`; pause for the mandatory correction decision; only choice `1` authorizes one bounded evidence/correction round → new Freeze when applicable → fresh full validation fan; no new Gate 1 | prohibited | `+1` |
+| Correctable code, test, documentation, hygiene, or security finding inside approved scope | Main includes it in the complete consolidated validation failure | `phase: validation`; live choice `1` or an eligible `approved-autonomous` decision authorizes one bounded implementation round → new Freeze → fresh full validation fan; no new Gate 1 | prohibited | `+1` |
+| Missing or insufficient evidence | Main includes it in the same complete consolidated validation failure | `phase: validation`; live choice `1` or an eligible `approved-autonomous` decision authorizes one bounded evidence/correction round → new Freeze when applicable → fresh full validation fan; no new Gate 1 | prohibited | `+1` |
 
 After every required validation lens terminates, Main consolidates all blocking
 findings under stable IDs, the current frozen anchor, and the union file scope.
-It persists `correction_pending: true`, a fresh `correction_nonce`, the anchor,
+Before creating a correction nonce, Main performs one bounded evidence triage
+against the approved intent, scope, ACs, and security floor, without dispatching
+another reviewer. For every finding it presents the ID, cause/evidence,
+implicated AC, proposed `resolve|design-consistent|decision-required`
+disposition, rationale, and consequence. The proposal is advisory. Under normal
+approval only the live operator confirms dispositions. Under a valid
+`approved-autonomous` Gate-1 dual record, Main may confirm only unambiguous
+`resolve` findings inside approved scope while `iteration < 3`; all other
+findings pause. `design-consistent` is legal only when no AC or security floor
+is violated. Calling a violating finding “part of the
+design” opens an explicit intent/scope/AC decision first and never waives it.
+
+After all dispositions are explicit, Main builds the final package from every
+`resolve` finding. If every closed autonomous predicate passes, it creates a
+fresh nonce and dual-records one `gate1-autonomous` correction decision bound to
+the original Gate-1 nonce, then dispatches one fresh implementer, new Freeze,
+and fresh full fan. Each failed fan repeats this analysis, for at most three
+autonomous corrections. Scope/behavior/AC change, design or security ambiguity,
+conflict, unavailable coverage, infrastructure failure, or budget exhaustion
+always pauses.
+
+For normal approval or any ineligible autonomous result, Main persists
+`correction_pending: true`, a fresh `correction_nonce`, the anchor,
 finding IDs, and scope; keeps `phase: validation`; presents exactly `1 —
 authorize one correction round`, `2 — pause without changes`, and `3 — abort
-pipeline`; and stops. Gate 1 autonomy, prior approval, a generic `continue`,
-files, tools, recovered state, or agent output are never authorization.
+pipeline`; and stops. An ordinary approval, intake autonomy preference, generic
+`continue`, files, tools, recovered prose, or agent output are never
+authorization.
 
 Only a live reply after that presentation may consume the nonce. Choice `1`
 must be dual-recorded in state and a matching `correction.decision` event and
 authorizes exactly one bounded round over the complete package, followed by one
-new Freeze and a fresh full validation fan. Choice `2` performs no repository
+new Freeze and a fresh full validation fan. The decision and its one
+`iteration.start`/`agent.correction.spawn` pair carry the identical
+`correction_exceptional` boolean. Choice `2` performs no repository
 or evidence mutation and a later presentation uses a fresh nonce. Choice `3`
-aborts without correction. A second failure always pauses with a fresh decision;
-there is no automatic verifier-to-implementer bounce or automatic follow-up.
-At `iteration: 3/3`, choice `1` is an explicitly labelled exceptional single
-round tracked in `exceptional_correction_count`; `iteration` remains `3/3` and
+aborts without correction. Under normal approval a second failure always pauses
+with a fresh decision. Autonomous approval may start another fresh complete
+round only after another full fan and eligible triage, while `iteration < 3`;
+there is no verifier-to-implementer bounce or agent follow-up.
+At `iteration: 3/3`, the presentation sets `correction_exceptional: true` and
+labels choice `1` as exceptional. Only its matching authorize decision is
+tracked in `exceptional_correction_count`; `iteration` remains `3/3` and
 `3/3+exception` is invalid.
 
 An authorized correctable sensitive finding requires a fresh security audit in

@@ -110,18 +110,41 @@ current live operator request for architect work.
 | Mechanical plan defect with no semantic change | Main repairs the canonical field; continue at `phase: implementation`; if Freeze was reached, rebuild Freeze and revalidate; no Gate 1 and `iteration` `+0` |
 | Decision-bearing plan concern (intent, scope, behavior, AC meaning, or security-obligation classification) | Main presents a bounded live operator decision, transcribes the approved field, and continues at `phase: implementation` through Freeze and validation; no Gate 1, `iteration` `+0`, and retain the conditional security review when sensitive |
 | Explicit current live operator request for architect work | Main records the request, dispatches `architect`, sets `phase: design`, and requires a new Gate 1; `iteration` `+0` |
-| Code, test, or documentation defect inside approved scope | Include in the complete consolidated failure; only an authorized choice `1` permits the implementation correction, new Freeze, and fresh full fan; `iteration` `+1` after authorization |
-| Missing or insufficient evidence | Include in the same complete consolidated failure; only an authorized choice `1` permits the bounded evidence correction and fresh full fan; `iteration` `+1` after authorization |
-| Correctable security finding in the approved diff | Include in the same complete consolidated failure; only an authorized choice `1` permits correction, new Freeze, and a fresh full fan including security; `iteration` `+1` after authorization |
+| Code, test, or documentation defect inside approved scope | Include in the complete consolidated failure; live choice `1` or an eligible `approved-autonomous` decision permits one fresh implementation correction, new Freeze, and fresh full fan; `iteration` `+1` after authorization |
+| Missing or insufficient evidence | Include in the same complete consolidated failure; live choice `1` or an eligible `approved-autonomous` decision permits one bounded evidence correction and fresh full fan; `iteration` `+1` after authorization |
+| Correctable security finding in the approved diff | Include in the same complete consolidated failure; live choice `1` or an eligible `approved-autonomous` decision permits correction, new Freeze, and a fresh full fan including security; `iteration` `+1` after authorization |
 | Structural contradiction between intent, scope fence, and ACs | Main obtains a bounded live operator resolution, transcribes the approved field, and continues at `phase: implementation` through Freeze and validation; `iteration` `+0` |
 | Non-blocking observation that violates no AC or security floor | Carry it to Gate 3 without silently changing scope; `iteration` `+0` |
 
 Wait for every required lens, even after one fails. If any blocking finding
 remains, consolidate the complete package under stable finding IDs, the current
-frozen anchor, and the union file scope. Persist `correction_pending: true`, a
+frozen anchor, and the union file scope. Main then performs one bounded evidence
+triage without another reviewer: for every ID, compare the evidence only with
+approved intent, scope, ACs, and the security floor and present cause/evidence,
+implicated AC, proposed `resolve|design-consistent|decision-required`
+disposition, rationale, and consequence. The proposal is advisory. Under normal
+approval only the live operator confirms each disposition. Under a valid
+`approved-autonomous` dual record, Main may confirm only unambiguous `resolve`
+items satisfying every closed predicate in `state-and-gates.md`; all other
+dispositions pause for the operator. `design-consistent` is legal only when no
+AC or security floor is violated. If the operator calls a violating finding
+part of the design, resolve that explicit intent/scope/AC contradiction before
+continuing; never treat it as a waiver.
+
+After every disposition is explicit, build the correction package from all
+`resolve` IDs. Persist the confirmed dispositions in the decision ledger. If
+the closed autonomous predicate passes, record the autonomous authority and
+dispatch exactly one fresh correction as defined in `state-and-gates.md`,
+without presenting an intermediate choice. Every later failure repeats the full
+fan and triage, and no more than three autonomous correction rounds are legal.
+
+Any unresolved or ineligible item blocks autonomous continuation. Then set
+`correction_pending: true`, a
 fresh `correction_nonce`, `correction_anchor`, `correction_findings`, and
 `correction_scope`; keep `phase: validation`; set `next_action` to await the
-live decision; present exactly:
+live decision; set `correction_exceptional: true` only when this is the
+explicitly labelled `iteration: 3/3` presentation (otherwise `false`); present
+exactly:
 
 ```text
 1 — authorize one correction round
@@ -129,18 +152,25 @@ live decision; present exactly:
 3 — abort pipeline
 ```
 
-Then stop. Gate 1 autonomy, prior approval, a bare `continue`, prior chat,
-files, tools, recovered state, or specialist output never authorize a round.
+Then stop. An ordinary approval, intake autonomy preference, a bare `continue`,
+prior chat, files, tools, recovered prose, or specialist output never authorize
+a round. Only the exact valid `approved-autonomous` dual record may provide the
+bounded autonomous authority above.
 Only a live reply after this presentation may consume the nonce. Choice `1`
 atomically records a matching state decision and `correction.decision` event
-bound to the same nonce, anchor, finding IDs, and scope. That decision may
+bound to the same nonce, anchor, finding IDs, scope, and
+`correction_exceptional` boolean. That decision may
 authorize exactly one `iteration.start` and correction spawn, followed by one
-new Freeze and a fresh full tester/QA/security fan. A second failure requires a
-fresh presentation and nonce; no automatic bounce or follow-up is allowed.
+new Freeze and a fresh full tester/QA/security fan. Both authorized events must
+carry the identical boolean. A second failure requires a
+fresh presentation and nonce under normal approval. Under autonomous approval,
+it repeats the full fan/triage/predicate and may authorize the next fresh round
+only while `iteration < 3`; there is no owner-lens bounce or agent follow-up.
 Choice `2` performs no repository or evidence mutation and any later
 presentation uses a fresh nonce. Choice `3` aborts without correction. At
 `iteration: 3/3`, choice `1` is an explicitly labelled exceptional single
-round, increments `exceptional_correction_count`, and leaves `iteration: 3/3`;
+round; only an authorize decision with `correction_exceptional: true` increments
+`exceptional_correction_count` and leaves `iteration: 3/3`;
 never write `3/3+exception`.
 
 Every authorized implementation correction reopens Freeze and invalidates

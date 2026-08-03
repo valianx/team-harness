@@ -904,8 +904,6 @@ tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 blast_radius: localized {IDs} | structural            # when status: failed only; omit on success
 issues: {critical and high findings titles, or "none"}
 finding_summary: [{cause, files, ac, suggested_correction}] | none
-freeze_reopened: true | false
-reaudit_required: true | false
 ```
 
 **Mandatory tool-usage fields:**

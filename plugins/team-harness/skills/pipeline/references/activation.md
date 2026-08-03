@@ -96,7 +96,7 @@ the normalized (LF) bytes against these canonical SHA-256 digests:
 | Role | SHA-256 of normalized TOML |
 |---|---|
 | architect | `f11ceef09bfb9d2839eb2d25adb05d4dcc1188dfacf11e355a9a291c4fcf816f` |
-| implementer | `40a562d3f483502298b3f9ea22de10b9b14839df0d347618a33d3983c8694571` |
+| implementer | `c749244e2ef04e203ff16f5e1762241b190ae710a1c9977c5c6c7912dfe933a7` |
 | tester | `c423ac39fd8eb3370d11e13b01235725c77ec3674c8478d86e02488056c96bcd` |
 | qa | `0c1e88083ed9ba5152442d3be1d925049fde74cbefd20347f3f2ab68361f3103` |
 | security | `5f8cec39dabe86273f34192b17479ae044ecb5e76ba24d1c1e4cef3d2c53369b` |

@@ -15,10 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Replaced automatic validation correction loops with one explicit live decision over the
-  complete failed fan. Each authorization permits exactly one bounded correction, new Freeze,
-  and fresh full validation; later failures pause again, and recovery rejects stale, reused, or
-  mismatched correction authority.
+- Replaced reviewer-owned correction loops with one package-bound decision over each complete
+  failed fan. Normal approval pauses for the operator; `approve autonomous` may authorize up to
+  three unambiguous in-scope corrections after orchestration triage. Each decision permits one
+  fresh implementer, new Freeze, and fresh full validation, while recovery rejects stale,
+  reused, mismatched, or over-budget authority.
+- Removed post-terminal implementer and reviewer continuations. Main now performs one bounded
+  evidence triage, presents advisory `resolve|design-consistent|decision-required` dispositions,
+  and pauses on every design, scope, AC, security, conflict, infrastructure, or budget decision.
 
 ## [3.8.0] - 2026-08-03
 

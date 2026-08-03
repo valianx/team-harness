@@ -40,12 +40,12 @@ transcript, raw tool output, or stale prior snapshot. Rotation never waives
 required AC evidence, QA, security, Freeze, mandatory suites, or either gate.
 
 Close a terminal implementation attempt and prohibit post-terminal
-`followup_task`. The sole exception is one implementer continuation within the
-same active task/correction lifecycle, on the same file and AC and limited to at most 3 tool calls; a second feedback item, any
-scope expansion, or a substantive correction must use a fresh agent
-(V2 `fork_turns: none`) and a bounded `Cause`/`Files`/`AC`/`Correction` packet with the
-current frozen anchor and required evidence. A continued attempt never absorbs
-another AC, file, or revalidation.
+`followup_task`. Feedback, scope expansion, and every correction require a fresh
+agent (V2 `fork_turns: none`). Only after the mandatory live correction decision
+may Main create the bounded `Cause`/`Files`/`AC`/`Suggested correction` packet
+with its nonce, current frozen anchor, complete finding IDs, scope, and required
+evidence. New pipeline attempts always record `context_strategy: fresh` and
+`follow_up_count: 0`.
 
 Main separately writes a recoverable handoff and requires a fresh user thread
 after its first compaction or before continuing at 100 coordinator tool calls

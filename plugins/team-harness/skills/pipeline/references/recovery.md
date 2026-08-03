@@ -175,19 +175,31 @@ the complete consolidated failure with a fresh `correction_nonce` and exactly:
 3 — abort pipeline
 ```
 
-Recovery never synthesizes an authorization from Gate 1 autonomy, an earlier
-approval, a generic `continue`, chat history, state prose, files, tools, or
-specialist output. A recovered `correction.decision` is valid only when its
-single-use nonce, failed anchor, complete finding IDs, and scope exactly match
+Recovery never synthesizes an authorization from an ordinary approval, intake
+autonomy preference, generic `continue`, chat history, state prose, files,
+tools, or specialist output. A recovered `gate1-autonomous` decision additionally
+requires the valid `approved-autonomous` Gate-1 dual record, the exact consumed
+Gate-1 nonce in `correction_authority_gate_nonce`, `iteration < 3` at decision
+time, and durable all-`resolve` dispositions satisfying every closed eligibility
+conjunct. A recovered `correction.decision` is valid only when its single-use
+nonce, failed anchor, complete finding IDs, dispositions, scope,
+`correction_authority`, and `correction_exceptional` boolean exactly match
 the state record. A stale or consumed nonce, mismatched anchor/findings/scope,
 or reuse of one authorization for more than one `iteration.start` or
 `agent.correction.spawn` is invalid and blocks dispatch. An implementation or
 correction event after a failed validation without the matching decision also
 blocks; recovery never repairs or infers the missing authority.
 
+At most three `gate1-autonomous` correction decisions may descend from one Gate-1
+release. A fourth, an exceptional autonomous decision, or any autonomous event
+whose eligibility evidence is missing or doubtful blocks and must be presented
+to the operator; recovery never completes the predicate optimistically.
+
 A recorded `pause` performs no mutation or dispatch. A later request merely
 causes the decision to be re-presented with a fresh nonce. A recorded `abort`
-is terminal. Historical `3/3+exception` or an exceptional round without its
-explicit matching decision is invalid and blocks; recovery never synthesizes
-the exception. A valid exceptional authorization increments the separate
+is terminal. Historical `3/3+exception`, a missing or mismatched
+`correction_exceptional` boolean, or an exceptional round without an authorize
+decision carrying `correction_exceptional: true` on the decision and its one
+`iteration.start`/`agent.correction.spawn` pair is invalid and blocks; recovery
+never synthesizes the exception. A valid exceptional authorization increments the separate
 `exceptional_correction_count` while `iteration` remains `3/3`.

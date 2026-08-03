@@ -239,13 +239,13 @@ A test may be removed or changed under
 - what evidence still protects the behavior.
 
 Never remove, skip, weaken, or mark expected-fail because it is broken, flaky,
-or inconvenient. A failing product behavior routes to the implementer. A
-malformed or isolated test may be corrected by the tester.
+or inconvenient. A failing product behavior or malformed/isolated test is a
+finding with an advisory suggested correction; return it to Main and stop
+without choosing an owner or route.
 
-On failure append only the actionable iteration to
-`workspaces/{feature}/failure-brief.md`: cause, affected files, implicated AC,
-required correction, and the owner. Keep the evidence concise and preserve the
-approved AC text.
+On failure return the complete evidence and finding coordinates. Do not append
+an iteration/routing brief or select the next agent. Keep the evidence concise
+and preserve the approved AC text.
 
 ## Return protocol
 
@@ -277,8 +277,6 @@ packet_integrity: ok | stale | mismatch | n-a
 tools: read:N write:N edit:N bash:N grep:N glob:N
 issues: {actionable blockers or none}
 finding_summary: [{cause, files, ac, suggested_correction}] | none
-freeze_reopened: true | false
-reaudit_required: true | false
 ```
 
 Omit mode-specific fields when they do not apply. `tests_count` is observational

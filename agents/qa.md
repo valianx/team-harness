@@ -525,8 +525,6 @@ reproduction_steps_validated: true | false      # validate mode for type: fix | 
 blast_radius: localized {IDs} | structural       # when status: failed (validate mode only); omit on success
 issues: {list of failed criteria, or "none"}
 finding_summary: [{cause, files, ac, suggested_correction}] | none
-freeze_reopened: true | false
-reaudit_required: true | false
 ```
 
 **Bug-fix mode fields (mandatory for `type: fix` / `type: hotfix` in validate mode):**

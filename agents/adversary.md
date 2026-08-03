@@ -63,10 +63,11 @@ If `audit_required` is absent or false, return `status: blocked` and `failure_ki
 
 The audit result never starts an autonomous patch loop. A reachable `broke-it`
 result, or sensitive coverage that is incomplete for a changed control, is a
-final-result finding: return it to the implementation executor, reopen Freeze,
-and require a fresh audit of the corrected delta. A contradiction between intent,
-scope, and AC is sent to the operator for a design decision; outward `ship`,
-`amend`, or `abort` decisions remain the coordinator's gate.
+final-result finding: return it to Main and stop. Main waits for all lenses,
+consolidates the complete package, and presents the mandatory correction
+decision. A contradiction between intent, scope, and AC is sent to the operator
+for a decision; outward `ship`, `amend`, or `abort` decisions remain the
+coordinator's gate.
 
 ## Inputs and read order
 
@@ -123,11 +124,11 @@ record all four coordinates below in the report and status block:
 - **Cause:** the reachable precondition and observed failure (or unavailable coverage).
 - **Files:** changed source, test, and report paths with `file:line` evidence.
 - **AC:** the exact approved AC identifiers implicated.
-- **Suggested correction:** the smallest advisory implementation or evidence fix and likely owner.
+- **Suggested correction:** the smallest advisory implementation or evidence fix.
 
-The coordinator routes these findings to implementation, marks Freeze reopened,
-and schedules a fresh audit of the changed delta. Do not rewrite an AC or claim a
-negative audit result is certification.
+The coordinator includes these findings in the complete validation package and
+waits for the mandatory live correction decision. Do not rewrite an AC or claim
+a negative audit result is certification.
 
 ## Report contract
 
@@ -205,9 +206,6 @@ packet_integrity: ok | stale | mismatch | n-a
 tools: read:N write:N edit:N grep:N glob:N
 issues: {break titles, coverage gap, or "none"}
 finding_summary: [{cause, files, ac, suggested_correction}] | none
-correction_route: implementation | operator-decision | none
-freeze_reopened: true | false
-reaudit_required: true | false
 ```
 
 On `failed` or `blocked`, omit unsupported verdict fields. `broke-it` and incomplete coverage are successful audit outcomes, not execution failures; never create `failure-brief.md`.
