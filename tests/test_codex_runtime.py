@@ -375,9 +375,9 @@ def main() -> None:
     ]
     if len(hook_commands) != 2 or not all(
         any(name in command for command in hook_commands)
-        for name in ("policy-block", "gcp-guard")
+        for name in ("policy-block", "gcp-guard", "gate-guard")
     ):
-        fail("Codex plugin must wire exactly the two deterministic-deny hooks")
+        fail("Codex plugin must wire the deterministic-deny hook floors")
     if not all(
         "PLUGIN_ROOT" in command and "CLAUDE_PLUGIN_ROOT" in command
         for command in hook_commands
@@ -386,7 +386,7 @@ def main() -> None:
     if any(
         retired in command
         for command in hook_commands
-        for retired in ("dev-guard", "gate-guard", "prepublish-guard", "worktree-guard")
+        for retired in ("dev-guard", "prepublish-guard", "worktree-guard")
     ):
         fail("Codex plugin still wires an approval-classifying hook")
 

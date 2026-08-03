@@ -3,14 +3,15 @@
 # hooks are intentionally not registered: native Codex permissions own asks.
 set -u
 
-HOOK_NAME="${1:-}"
+HOOK_NAMES=("$@")
 HOOK_ROOT="$(cd "${BASH_SOURCE[0]%/*}" && pwd)"
-ARTIFACT="$HOOK_ROOT/dist/$HOOK_NAME.cjs"
 
-case "$HOOK_NAME" in
-  policy-block|gcp-guard) ;;
-  *) exit 0 ;;
-esac
+for HOOK_NAME in "${HOOK_NAMES[@]}"; do
+  case "$HOOK_NAME" in
+    policy-block|gcp-guard|gate-guard) ;;
+    *) exit 0 ;;
+  esac
+done
 
 deny_adapter_failure() {
   case "$1" in
@@ -27,7 +28,6 @@ deny_adapter_failure() {
 }
 
 command -v node >/dev/null 2>&1 || deny_adapter_failure node-missing
-[ -s "$ARTIFACT" ] || deny_adapter_failure artifact-missing
 
 INPUT="$(node -e '
   let raw="";
@@ -46,27 +46,32 @@ INPUT="$(node -e '
       process.stdout.write(JSON.stringify(value));
     } catch { process.exitCode = 1; }
   });
-' "$HOOK_NAME")" || deny_adapter_failure invalid-input
+' "${HOOK_NAMES[0]:-}")" || deny_adapter_failure invalid-input
 
-OUTPUT="$(printf '%s' "$INPUT" | TEAM_HARNESS_CODEX_HOOK=1 node "$ARTIFACT" 2>/dev/null)"
-[ "$?" -eq 0 ] || deny_adapter_failure execution-failed
-[ -n "$OUTPUT" ] || exit 0
+for HOOK_NAME in "${HOOK_NAMES[@]}"; do
+  ARTIFACT="$HOOK_ROOT/dist/$HOOK_NAME.cjs"
+  [ -s "$ARTIFACT" ] || deny_adapter_failure artifact-missing
 
-DECISION="$(printf '%s' "$OUTPUT" | node -e '
-  let raw="";
-  process.stdin.on("data", c => raw += c);
-  process.stdin.on("end", () => {
-    try {
-      const parsed = JSON.parse(raw);
-      const decision = parsed?.hookSpecificOutput?.permissionDecision;
-      if (typeof decision !== "string") throw new Error();
-      process.stdout.write(decision);
-    } catch { process.exitCode = 1; }
-  });
-' 2>/dev/null)" || deny_adapter_failure invalid-output
+  OUTPUT="$(printf '%s' "$INPUT" | TEAM_HARNESS_CODEX_HOOK=1 node "$ARTIFACT" 2>/dev/null)"
+  [ "$?" -eq 0 ] || deny_adapter_failure execution-failed
+  [ -n "$OUTPUT" ] || continue
 
-case "$DECISION" in
-  deny) printf '%s\n' "$OUTPUT" ;;
-  ask|allow) exit 0 ;;
-  *) deny_adapter_failure invalid-decision ;;
-esac
+  DECISION="$(printf '%s' "$OUTPUT" | node -e '
+    let raw="";
+    process.stdin.on("data", c => raw += c);
+    process.stdin.on("end", () => {
+      try {
+        const parsed = JSON.parse(raw);
+        const decision = parsed?.hookSpecificOutput?.permissionDecision;
+        if (typeof decision !== "string") throw new Error();
+        process.stdout.write(decision);
+      } catch { process.exitCode = 1; }
+    });
+  ' 2>/dev/null)" || deny_adapter_failure invalid-output
+
+  case "$DECISION" in
+    deny) printf '%s\n' "$OUTPUT"; exit 0 ;;
+    ask|allow) continue ;;
+    *) deny_adapter_failure invalid-decision ;;
+  esac
+done

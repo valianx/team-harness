@@ -123,8 +123,9 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    replace an MCP or reveal credentials during an update.
 
 7. Verify the new snapshot's `hooks/hooks.json` contains only the supported
-   deterministic deny hooks (`policy-block` and `gcp-guard`) and no
-   `PermissionRequest` or approval-classifying guards. Verify both commands
+   deterministic deny hooks (`policy-block`, `gcp-guard`, and the deny-only
+   `gate-guard` force-push floor) and no `PermissionRequest` or
+   approval-classifying guards. Verify both commands
    prefer `PLUGIN_ROOT`, accept Codex's `CLAUDE_PLUGIN_ROOT` compatibility
    alias without depending on a Claude Code installation, and recover a
    replacement snapshot from the same Codex cache without exiting `127`. Hook

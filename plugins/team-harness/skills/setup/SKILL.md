@@ -138,9 +138,13 @@ migration, and preserve every unrelated value.
      `codex mcp add context7 --env DEFAULT_MINIMUM_TOKENS=10000 -- npx -y @upstash/context7-mcp@3.2.5`.
 
 8. Verify the installed plugin's `hooks/hooks.json`. Codex supports the
-   deterministic deny hooks only: `policy-block` and the catastrophic-deny
-   portion of `gcp-guard`. Approval-classifying `ask` guards are intentionally
-   not registered because Codex's native permission flow owns approvals.
+   deterministic deny hooks only: `policy-block`, the catastrophic-deny
+   portion of `gcp-guard`, and `gate-guard`'s force-push floor. `gate-guard`
+   denies force flags, `--force-with-lease`, `+refspec` forms, and wrapped or
+   reconstructed equivalents even after `ship`; benign push and ordinary
+   GitHub approval ownership remain native. Approval-classifying `ask` guards
+   are intentionally not registered because Codex's native permission flow
+   owns approvals.
    Explain that the operator must review and trust hooks through `/hooks`;
    never approve or bypass trust.
 

@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enabled multi-agent V2 during Codex setup and mapped Opus roles to Sol/xhigh, Sonnet roles to
   tiered Terra high/medium, and Haiku roles to Terra/low without overriding Main's selected model.
 
+### Fixed
+
+- Wired the deterministic force-push floor into the installed Codex hook chain so force flags,
+  force-with-lease, `+refspec`, and reconstructed forms remain denied after Gate 3 ship.
+
 ## [3.6.8] - 2026-08-02
 
 ### Fixed
