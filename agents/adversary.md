@@ -127,7 +127,9 @@ record all four coordinates below in the report and status block:
 - **Suggested correction:** the smallest advisory implementation or evidence fix.
 
 The coordinator includes these findings in the complete validation package and
-waits for the mandatory live correction decision. Do not rewrite an AC or claim
+waits for the mandatory correction decision. Normal or ineligible autonomous paths require a
+fresh live operator decision; only the closed eligible `gate1-autonomous` path may authorize the
+bounded exception without another live reply. Do not rewrite an AC or claim
 a negative audit result is certification.
 
 ## Report contract

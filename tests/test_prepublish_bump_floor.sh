@@ -365,16 +365,17 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# AC-1: ADD agents/foo.md + PATCH delta → under-bump MINOR WARN; nodecision
+# AC-1: ADD agents/foo.md + PATCH delta → PATCH default; nodecision
 #
 # Universal path: any branch touching a shipped asset must bump all version
 # sites vs origin/main. This fixture bumps both plugin.json and
 # marketplace.json (CLAUDE.md is absent from the fixture entirely, so the
-# third site is fail-open/exempt) to a PATCH delta while ADDing a new file —
-# under the mechanical floor an ADD warrants MINOR, so a WARN is expected.
+# third site is fail-open/exempt) to a PATCH delta while ADDing a new file.
+# Path shape alone cannot prove a material new public capability, so PATCH is
+# the mechanical default and no warning is expected.
 # ---------------------------------------------------------------------------
 echo
-echo "--- AC-1: feat branch + ADD agents/foo.md + PATCH delta (both sites bumped+matching) → MINOR WARN ---"
+echo "--- AC-1: feat branch + ADD agents/foo.md + PATCH delta (both sites bumped+matching) → PATCH default ---"
 
 _bare1=$(_new_tmp)
 _clone1=$(_new_tmp)
@@ -387,7 +388,7 @@ _make_repo "$_bare1" "$_clone1" "2.107.0"
     git checkout -b feat/ac1-under-bump -q 2>/dev/null
     mkdir -p agents
     echo "# new agent" > agents/foo.md
-    # PATCH bump (2.107.0 → 2.107.1) — under-bump for ADD (minor floor)
+    # PATCH bump (2.107.0 → 2.107.1) — default for a compatible bounded addition
     _write_plugin_json "2.107.1" .claude-plugin/plugin.json
     _write_market_json "2.107.1" .claude-plugin/marketplace.json
     git add .
@@ -397,9 +398,7 @@ _make_repo "$_bare1" "$_clone1" "2.107.0"
 _run_hook "$_clone1"
 
 assert_nodecision "AC-1: feat branch + ADD agents/foo.md + PATCH delta — stdout empty"
-assert_stderr_contains "AC-1: MINOR WARN present in stderr" "WARN"
-assert_stderr_contains "AC-1: MINOR WARN mentions MINOR" "MINOR"
-assert_stderr_contains "AC-1: advisory note present" "advisory"
+assert_stderr_not_contains "AC-1: added file alone does not produce a MINOR warning" "WARN"
 
 # ---------------------------------------------------------------------------
 # AC-2: docs/ payload + MINOR delta → explicit override, WARN + nodecision
@@ -1003,10 +1002,10 @@ assert_nodecision "Suite15/AC-7: old-version non-X.Y.Z → semver_delta=unknown 
 assert_stderr_contains "Suite15/AC-7: skip note in stderr mentions version" "skipping bump-floor check"
 
 # ---------------------------------------------------------------------------
-# Correct case: ADD agents/new.md + MINOR delta → NO WARN
+# Correct default: ADD agents/new.md + PATCH delta → NO WARN
 # ---------------------------------------------------------------------------
 echo
-echo "--- Correct case: feat branch + ADD agents/new.md + MINOR delta → NO WARN ---"
+echo "--- Correct default: feat branch + ADD agents/new.md + PATCH delta → NO WARN ---"
 
 _barec=$(_new_tmp)
 _clonec=$(_new_tmp)
@@ -1019,15 +1018,15 @@ _make_repo "$_barec" "$_clonec" "2.107.0"
     git checkout -b feat/ac-correct -q 2>/dev/null
     mkdir -p agents
     echo "# new agent" > agents/new.md
-    _write_plugin_json "2.108.0" .claude-plugin/plugin.json
-    _write_market_json "2.108.0" .claude-plugin/marketplace.json
+    _write_plugin_json "2.107.1" .claude-plugin/plugin.json
+    _write_market_json "2.107.1" .claude-plugin/marketplace.json
     git add .
-    git commit -m "feat: add agents/new.md (minor bump)" -q 2>/dev/null
+    git commit -m "feat: add agents/new.md (patch bump)" -q 2>/dev/null
 )
 
 _run_hook "$_clonec"
 
-assert_nodecision "correct: feat branch + ADD + MINOR delta — stdout empty"
+assert_nodecision "correct: feat branch + ADD + PATCH delta — stdout empty"
 assert_stderr_not_contains "correct: no WARN when actual meets floor" "WARN"
 
 # ---------------------------------------------------------------------------
@@ -1214,11 +1213,11 @@ rm -f "$_tmpout_a2c" "$_tmperr_a2c"
 assert_deny "Suite16/AC-2c: control-char override token rejected → falls through to over-bump deny"
 
 echo
-echo "--- Suite 16 (AC-3/#383 regression): under-bump WARN still emitted; hard-block still fires ---"
+echo "--- Suite 16 (AC-3/#383 regression): ADD defaults to PATCH; hard-block still fires ---"
 
-# AC-3 regression (a): ADD agents/new.md + PATCH delta → MINOR WARN still present.
-# All-three sites bumped and matching, but ADD (minor floor) with PATCH
-# applied → UNDER-BUMP WARN emitted. Verifies the bump-floor sub-stage still runs.
+# AC-3 regression (a): ADD agents/new.md + PATCH delta → no MINOR warning.
+# All-three sites are bumped and matching. A path addition does not establish a
+# material public capability, so the mechanical guide keeps PATCH as default.
 _bare_a3w=$(_new_tmp)
 _clone_a3w=$(_new_tmp)
 _make_repo "$_bare_a3w" "$_clone_a3w" "2.107.0"
@@ -1232,18 +1231,18 @@ _make_repo "$_bare_a3w" "$_clone_a3w" "2.107.0"
     git add agents/rg.md
     git commit -m "base: add agents/rg.md" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Feature branch: ADD a new agent with only PATCH bump → under-bump WARN expected
+    # Feature branch: ADD a new agent with PATCH bump → default accepted
     git checkout -b feat/s16-ac3a -q 2>/dev/null
     echo "# new regression-guard agent" > agents/rg2.md
     _write_plugin_json "2.107.1" .claude-plugin/plugin.json
     _write_market_json "2.107.1" .claude-plugin/marketplace.json
     git add agents/rg2.md .claude-plugin/
-    git commit -m "feat: ADD rg2 with PATCH bump (under-bump regression)" -q 2>/dev/null
+    git commit -m "feat: ADD rg2 with PATCH bump (axis regression)" -q 2>/dev/null
 )
 
 _run_hook "$_clone_a3w"
-assert_nodecision "Suite16/AC-3a: under-bump WARN (ADD + PATCH) → still nodecision (no block)"
-assert_stderr_contains "Suite16/AC-3a: under-bump WARN still emitted in stderr" "WARN"
+assert_nodecision "Suite16/AC-3a: ADD + PATCH default → nodecision"
+assert_stderr_not_contains "Suite16/AC-3a: ADD alone does not suggest MINOR" "WARN"
 
 # AC-3b regression: MODIFY agent + NO bump anywhere → hard-block still fires.
 _bare_a3d=$(_new_tmp)

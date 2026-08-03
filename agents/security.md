@@ -620,13 +620,15 @@ sensitive coverage, report the same four coordinates:
 - **Cause:** the concrete failure or unavailable evidence.
 - **Files:** changed source, test, and report paths with `file:line` evidence.
 - **AC:** the exact approved AC identifiers implicated.
-- **Suggested correction:** the smallest advisory fix and likely owner.
+- **Suggested correction:** the smallest advisory fix.
 
 These coordinates are evidence for the coordinator, not routing authority: security
 does not select `design`, edit the plan, change phase, Freeze state, re-audit, next
 agent, or correction round. Return the complete findings and stop. Main must collect
-all validation lenses and obtain a fresh live correction decision before any mutation
-or revalidation. `Suggested correction` is advisory and cannot trigger dispatch.
+all validation lenses and obtain the mandatory correction decision before any mutation or
+revalidation. Normal or ineligible autonomous paths require a fresh live operator decision;
+only the closed eligible `gate1-autonomous` path may authorize the bounded exception.
+`Suggested correction` is advisory and cannot trigger dispatch.
 
 ---
 
@@ -933,7 +935,7 @@ When you finish pipeline mode and `reviews/04-security.md` reports any **Critica
 - **Cause:** {concrete failure or unavailable sensitive coverage}
 - **Files:** {changed source, test, and report paths with file:line evidence}
 - **AC:** {exact implicated AC identifiers}
-- **Suggested correction:** {smallest advisory fix and likely owner}
+- **Suggested correction:** {smallest advisory fix}
 
 ### Suggested remediation (advisory; no routing authority)
 - `src/users/users.repository.ts:42` — replace string concatenation with parameterized query (see Prisma `findFirst({ where: { id } })`)

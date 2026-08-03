@@ -6,7 +6,11 @@ assembled version/changelog, committed the complete branch, and recorded
 `validated_commit_sha`/`validated_tree_sha`.
 
 Before Gate 3, delegate `delivery` once for workspace-only PR prose: exact title,
-PR body, and standalone acceptance matrix. Validate canonical non-symlink paths
+PR body, standalone acceptance matrix, and an independent version-axis assessment. PATCH is the default for a
+backward-compatible bounded fix or improvement; MINOR requires a named material new public capability; MAJOR
+requires a named incompatible supported contract and migration impact. File additions/deletions, diff size,
+commit prefix, and accumulated PATCH changes never choose the axis. An unsupported over- or under-bump returns to
+implementation → Freeze → full validation; delivery never repairs it. Validate canonical non-symlink paths
 and SHA-256 digests, bind them to `delivery_preview`, present the committed
 version plus validated commit/tree, and stop for:
 

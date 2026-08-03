@@ -313,19 +313,17 @@ function readVersionSites(reader) {
   };
 }
 function deriveFloor(changed) {
-  let sawAdded = false;
+  let sawChanged = false;
   let sawRemovedOrRenamed = false;
-  let sawModified = false;
   for (const c of changed) {
     if (!touchesShippedPath(c)) continue;
     const kind = c.status.charAt(0);
-    if (kind === "A") sawAdded = true;
+    if (kind === "A") sawChanged = true;
     else if (kind === "D" || kind === "R") sawRemovedOrRenamed = true;
-    else sawModified = true;
+    else sawChanged = true;
   }
   if (sawRemovedOrRenamed) return "major";
-  if (sawAdded) return "minor";
-  if (sawModified) return "patch";
+  if (sawChanged) return "patch";
   return "none";
 }
 function findOverrideToken(reader) {
@@ -407,10 +405,6 @@ function warnUnderBump(reader, floor, actual) {
     reader.warn(
       `prepublish-guard: WARN \u2014 a shipped asset was DELETED or RENAMED (removed public surface) but the version bump is ${actual}. SemVer suggests MAJOR. If the deleted/renamed file is not a public invocable surface (e.g. an internal include), ignore. (advisory; push not blocked)`
     );
-  } else if (floor === "minor") {
-    reader.warn(
-      `prepublish-guard: WARN \u2014 a NEW shipped file was added (new invocable surface) but the version bump is ${actual}. SemVer suggests MINOR. If the new file is not a new invocable surface (e.g. a _shared include), ignore. (advisory; push not blocked)`
-    );
   }
 }
 function resolveOverBump(reader, floor, actual) {
@@ -419,7 +413,7 @@ function resolveOverBump(reader, floor, actual) {
     return null;
   }
   return deny(
-    `prepublish-guard: version bump level exceeds the mechanical SemVer floor for this diff. The changed shipped paths only warrant a ${floor} bump, but a ${actual} was applied. If this over-bump is intentional (e.g. a fix + new surface in the same PR), add a commit trailer or push option: bump-override: ${actual} \u2014 <reason>. See CLAUDE.md \xA76.3 and agents/_shared/delivery-mechanics.md \xA71. Push blocked.`
+    `prepublish-guard: version bump level exceeds the mechanical SemVer floor for this diff. The changed shipped paths only warrant a ${floor} bump, but a ${actual} was applied. If this over-bump is intentional because the delivery guide identifies a material new or incompatible public contract, add a commit trailer or push option: bump-override: ${actual} \u2014 <reason>. See agents/delivery.md \xA7 "Confirm committed release metadata and version axis". Push blocked.`
   );
 }
 function runBumpFloorSubstage(reader, changed, pluginOrigin, pluginHead) {

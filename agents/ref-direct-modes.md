@@ -547,7 +547,7 @@ Require the exact reviewed SHA and context hash in the status block. Run the req
 worktree and review-artifact-root snapshot comparison before trusting the return. Only after both
 snapshots match may the coordinator write `reply_body` to `{review artifacts root}/pr-review-reply-draft.md`.
 Return to the skill:
-```
+```text
 Reply draft written to {review artifacts root}/pr-review-reply-draft.md
 Thread ID: {comment_id}
 ```
@@ -583,7 +583,7 @@ coordinator persists them to `{review artifacts root}/pr-review-final.md` and
 `{review artifacts root}/pr-review-inline.json`.
 
 Return to the skill:
-```
+```text
 Consolidated review draft written to {review artifacts root}/pr-review-final.md
 Decision: {APPROVE, CHANGES_REQUESTED, or COMMENT}
 Contradictions: {true|false}
@@ -604,7 +604,7 @@ array whose objects contain only `path`, `line`, `side`, and `body`; `side` is r
 `LEFT` or `RIGHT`. Preview and validate the full `(path, line, side)` anchor against the frozen diff.
 
 Return to the skill:
-```
+```text
 Review draft written to {review artifacts root}/pr-review-draft.md
 Decision: {APPROVE, CHANGES_REQUESTED, or COMMENT}
 ```

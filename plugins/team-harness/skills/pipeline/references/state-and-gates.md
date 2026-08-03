@@ -114,6 +114,9 @@ validated_tree_sha: {full tree object ID or null}
 open_findings: [{id, disposition}]|[]
 worktree: {absolute path or null}
 working_branch: {branch or null}
+delivery_version: {committed version}|not-bumped|null
+delivery_version_axis: patch|minor|major|none|null
+delivery_version_rationale: {one sentence naming supported-contract impact}|null
 delivery_diff_composition: {total_lines, total_files, mechanical_files, substantive_files}|null
 delivery_size_result: within-bounds|flagged|null
 delivery_size_justification: {workspace pointer}|null

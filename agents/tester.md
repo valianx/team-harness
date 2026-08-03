@@ -170,9 +170,10 @@ artifact location exists and supports the claim.
 
 Do not add or edit tests. Missing or stale evidence is a tester finding: report
 the cause, evidence files, implicated AC, and an advisory suggested correction.
-Return every finding and stop. Main waits for the complete validation set and a
-fresh live operator decision before selecting implementation, Freeze, re-audit,
-or another agent. For Tier 2–4 fixes, confirm the regression assertion is intact
+Return every finding and stop. Main waits for the complete validation set and the mandatory
+correction decision before selecting implementation, Freeze, re-audit, or another agent. Normal
+or ineligible autonomous paths require a fresh live operator decision; only the closed eligible
+`gate1-autonomous` path may authorize the bounded exception. For Tier 2–4 fixes, confirm the regression assertion is intact
 and passes. These are finding coordinates, not routing authority.
 
 ## Mode: `review`
@@ -221,12 +222,14 @@ tester, decides the phase and next agent from these coordinates:
 - **Cause:** what failed or what evidence is missing.
 - **Files:** the test, source, or artifact paths that establish the finding.
 - **AC:** the exact `AC-N` identifiers implicated.
-- **Suggested correction:** the smallest advisory action and likely owner.
+- **Suggested correction:** the smallest advisory action.
 
 Use `failure-brief.md` for a finding that blocks acceptance. Return evidence only;
 never select implementation, Freeze state, re-audit, next agent, or a correction
-round. Main consolidates every validation result and waits for a fresh live operator
-decision. Never rewrite an AC to make a test pass, and never claim a finding is
+round. Main consolidates every validation result and waits for the mandatory correction
+decision. Normal or ineligible autonomous paths require a fresh live operator decision; only the
+closed eligible `gate1-autonomous` path may authorize the bounded exception. Never rewrite an AC
+to make a test pass, and never claim a finding is
 resolved for QA or security.
 
 ## Test changes and failures

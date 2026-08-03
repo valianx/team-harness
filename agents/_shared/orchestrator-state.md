@@ -268,6 +268,8 @@ Live consumers, so it is never treated as documentation: the record-based recove
 ```
 delivery_issue: {number, title, labels, project}|null
 delivery_version: {committed version}|not-bumped|null
+delivery_version_axis: patch|minor|major|none|null
+delivery_version_rationale: {one sentence naming supported-contract impact}|null
 delivery_changed_files: [{path}, ...]|[]
 delivery_diff_composition: {total_lines, total_files, mechanical_files, substantive_files}|null
 delivery_size_result: within-bounds|flagged|null
@@ -376,7 +378,7 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | `correction_nonce`, `correction_anchor`, `correction_findings`, `correction_scope`, `correction_dispositions`, `correction_exceptional` | conditional | required for `correction.decision` and every authorized `iteration.start`/`agent.correction.spawn`; exact bounded identity, never inferred; dispositions and the exceptional boolean must match all records |
 | `correction_authority`, `correction_authority_gate_nonce` | conditional | required for `correction.decision`; `operator-live` uses no Gate nonce, while `gate1-autonomous` requires the exact nonce from the valid `approved-autonomous` release and is prohibited at `iteration: 3/3` |
 | `verdict` | conditional | `pass`/`concerns`/`fail`/`partial-fail` |
-| `decision` | conditional | required for `stage.gate.release` and `correction.decision`; correction value is `authorize|pause|abort` |
+| `decision` | conditional | required for `stage.gate.release` and `correction.decision`; correction value is `authorize\|pause\|abort` |
 | `cause` | conditional | `verification` for new `iteration.start` correction rounds; historical `operator` values remain readable |
 | `provenance` | conditional | required for `checkpoint.confirmed`; a **closed enum, never free text**, and never subject to the bound below |
 | `tools`, `model`, `effort` | optional | propagated verbatim from the returning status block |

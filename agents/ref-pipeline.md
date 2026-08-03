@@ -134,8 +134,9 @@ documentation, hygiene, or security defects join the complete failed fan and pau
 (`route: implementation`; `owner: main`; `phase: validation`; `architect: prohibited`;
 `gate: none`; `iteration delta: +1`). Missing or insufficient evidence joins that same
 package (`route: evidence`; `owner: main`; `phase: validation`; `architect: prohibited`;
-`gate: none`; `iteration delta: +1`). In both rows, the delta applies only after the live
-operator authorizes choice `1`. Only an explicit live operator
+`gate: none`; `iteration delta: +1`). In both rows, the delta applies only after either the live
+operator authorizes choice `1` or the closed eligible autonomous predicate records a bound
+`gate1-autonomous` authorization. Only an explicit live operator
 request for architect work permits `design` and a new Gate 1 (`route: architect-request`;
 `owner: main`; `phase: design`; `architect: allowed`; `gate: new-gate1`; `iteration delta: 0`).
 
@@ -348,13 +349,18 @@ intent/scope/AC contradiction to resolve first—never as a silent waiver.
 2. **Contradiction → resolve before authorization.** Present the conflicting requirements and costs. Only the operator may resolve them; architect work still requires a separate explicit request.
 3. **Mechanical and enumerated → include together.** Do not split them into micro-rounds; one authorization covers the complete named `resolve` package and scope.
 4. **Mixed set → preserve all findings.** Resolve decision-bearing items first, then present one correction decision over the resulting complete package. Never dispatch a mechanical subset while another finding remains undecided.
-5. **Persist and present.** After every disposition is explicit, set the mandatory correction fields from the final `resolve` set, generate a fresh nonce, show exactly the following choices, and stop:
+5. **Persist and authorize.** After every disposition is explicit, set the mandatory correction fields from the final `resolve` set and generate a fresh nonce. Under normal approval or when any autonomous eligibility conjunct fails, show exactly the following choices and stop:
 
 ```text
 1 — authorize one correction round
 2 — pause without changes
 3 — abort pipeline
 ```
+
+Under a valid `approved-autonomous` dual record, when every finding is an unambiguous in-scope
+`resolve`, the package is complete, no decision-bearing or ambiguous item remains, and
+`iteration < 3`, Main instead records one package-bound `gate1-autonomous` authorization without
+a live presentation. It then consumes that single decision through the same correction route.
 
 ### Remediation prefers removal or replacement over addition
 
@@ -1242,7 +1248,7 @@ the ambiguous-reply rule. This section implements it for STAGE-GATE-3.
 | Field | Value |
 |---|---|
 | `feature` | — |
-| `delivery_summary` | branch, validated commit/tree, committed version, files touched, **diff composition**, base status |
+| `delivery_summary` | branch, validated commit/tree, committed version, version axis/rationale, files touched, **diff composition**, base status |
 | `delivery_preview` | exact PR title plus PR-body and acceptance-matrix workspace paths with SHA-256 digests |
 | `accumulated_cost` | `~{N}K tokens (~${X})` |
 | `security_audit` | verdict (`could-not-break` / `broke-it` / `not run (security_floor_applies: false)` / `unavailable`), `sec002_verdict`, `open_breaks: [{finding, file:line, impact}]`, `audit_coverage`, `incomplete_on_changed_control` |

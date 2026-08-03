@@ -396,12 +396,14 @@ select `design`, edit the plan, change phase, or dispatch the next agent:
 - **Cause:** the observed defect or missing evidence.
 - **Files:** source, test, and report paths that establish it.
 - **AC:** the exact implicated AC identifiers.
-- **Suggested correction:** the smallest advisory fix and likely owner.
+- **Suggested correction:** the smallest advisory fix.
 
 Code, test, and documentation defects inside the approved scope are reported to
 the coordinator without selecting remediation, phase, Freeze state, re-audit, or
-next agent. Main decides only after a new live operator reply to the consolidated
-failure presentation. Never weaken or rewrite an AC to manufacture PASS.
+next agent. Main decides only after the mandatory correction decision. Normal or ineligible
+autonomous paths require a new live operator reply; only the closed eligible
+`gate1-autonomous` path may authorize the bounded exception. Never weaken or rewrite an AC to
+manufacture PASS.
 
 ---
 
@@ -559,7 +561,7 @@ When you finish validate mode with `status: failed`, **append** a correction ent
 - **Cause:** {observed defect or missing evidence}
 - **Files:** {source, test, and report paths with file:line evidence}
 - **AC:** {exact implicated AC identifiers}
-- **Suggested correction:** {smallest advisory fix and likely owner}
+- **Suggested correction:** {smallest advisory fix}
 
 ### Hygiene findings (present only when code_hygiene: fail)
 - `src/users/users.controller.ts:88` — work-narration comment references a pipeline step token; strip and, if warranted, replace with a WHY-comment

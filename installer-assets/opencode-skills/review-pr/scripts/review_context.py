@@ -133,10 +133,11 @@ def promote_artifact(root: Path, temporary_name: str, final_name: str) -> None:
             staging = f"tmp-pinned-{secrets.token_hex(16)}"
             try:
                 os.link(
-                    f"/proc/self/fd/{temporary_fd}",
+                    temporary_name,
                     staging,
+                    src_dir_fd=directory_fd,
                     dst_dir_fd=directory_fd,
-                    follow_symlinks=True,
+                    follow_symlinks=False,
                 )
             except OSError as error:
                 raise ContextError("cannot link pinned temporary artifact") from error

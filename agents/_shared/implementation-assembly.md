@@ -25,16 +25,29 @@ Resolve version sites in this order:
    `package.json`, `pyproject.toml`, `Cargo.toml`, `build.gradle`, `pom.xml`,
    `mix.exs`, `version.txt`, `VERSION`).
 
-Never edit a schema or manifest-format version. Classify the reviewed change
-using SemVer: observable additions and compatible new public surface are MINOR;
-fixes, compatible internal changes, performance work, and shipped dependency
-updates are PATCH; incompatible removals or defaults are MAJOR. Repository-only
-tests, CI, and internal documentation may remain unbumped only when repository
-policy permits it. A documented `skip-version: true` policy skips this step.
+Never edit a schema or manifest-format version. Calculate the release axis from
+the externally supported contract, not from diff size, file count, commit type,
+or whether a file was added:
+
+| Axis | Use only when | Typical examples |
+|---|---|---|
+| `Z` / PATCH | The release is backward-compatible and does not add a material new public capability. This is the default. | bug/security fix, compatible refinement, performance work, dependency update, prompt/agent/workflow adjustment, internal refactor, tests/docs/build/CI, or a small opt-in behavior inside an existing capability |
+| `Y` / MINOR | The release adds a material, externally consumable capability or meaningfully expands a supported public contract without breaking existing consumers. | new public command, endpoint, integration, supported workflow, configuration surface, or library API that users can deliberately adopt |
+| `X` / MAJOR | Existing consumers must change because a supported public contract is removed or becomes incompatible. | removed/renamed public API, incompatible schema or CLI syntax, changed public default with migration impact, or dropped supported runtime |
+
+Use the lowest axis whose condition is actually satisfied. A new file is not by
+itself MINOR; a deletion is not by itself MAJOR; several PATCH-sized changes do
+not add up to MINOR. When evidence is ambiguous, choose PATCH unless the plan
+names the new public capability, or stop for an operator decision when the
+choice would misrepresent compatibility. Repository-only tests, CI, and
+internal documentation may remain unbumped only when repository policy permits
+it. A documented `skip-version: true` policy skips this step.
 
 For a multi-site invariant, update every site in one assembly and require exact
-MATCH before continuing. An over-bump requires the existing
-`bump-override: {level} — <reason>` coordinate for Gate 3.
+MATCH before continuing. Record a one-sentence `version_rationale` naming the
+supported-contract effect. A MINOR or MAJOR choice must name the new or broken
+public contract explicitly. An over-bump above the mechanical PATCH floor
+requires the existing `bump-override: {level} — <reason>` coordinate for Gate 3.
 
 ## 2. Materialize changelog
 

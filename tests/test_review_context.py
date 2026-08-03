@@ -130,6 +130,23 @@ class ReviewContextTests(unittest.TestCase):
             self.assertTrue(temporary.is_symlink())
             self.assertEqual(outside.read_text(encoding="utf-8"), "secret")
 
+    def test_artifact_promotion_links_portably_without_procfs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "tmp-body").write_text("safe", encoding="utf-8")
+            real_link = MODULE.os.link
+
+            def portable_link(source, destination, **kwargs):
+                self.assertEqual(source, "tmp-body")
+                self.assertFalse(kwargs["follow_symlinks"])
+                self.assertEqual(kwargs["src_dir_fd"], kwargs["dst_dir_fd"])
+                return real_link(source, destination, **kwargs)
+
+            with patch.object(MODULE.os, "link", side_effect=portable_link):
+                MODULE.promote_artifact(root, "tmp-body", "review.md")
+
+            self.assertEqual((root / "review.md").read_text(encoding="utf-8"), "safe")
+
     def test_security_selection_is_fail_closed_for_every_reason(self):
         cases = [
             ("agents/security.md\n", "+permission boundary\n", "known-sensitive", True),

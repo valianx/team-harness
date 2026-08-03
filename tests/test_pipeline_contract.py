@@ -456,7 +456,7 @@ def check_corrective_routes() -> None:
 
 
 def check_explicit_validation_correction_decision() -> None:
-    """A failed fan pauses; one fresh live decision authorizes one round."""
+    """A failed fan requires one bound live or eligible autonomous decision."""
     claude = "\n".join(
         (read("agents/ref-pipeline.md"), read("agents/_shared/orchestrator-state.md"))
     )
@@ -522,6 +522,7 @@ def check_explicit_validation_correction_decision() -> None:
         text = read(relative)
         flat = re.sub(r"\s+", " ", text.lower())
         require("suggested correction" in flat, f"{relative}: validator lacks advisory correction coordinate")
+        require("gate1-autonomous" in flat, f"{relative}: validator incorrectly excludes eligible autonomous authority")
         for forbidden in (
             "correction route",
             "freeze: reopened",
@@ -1455,6 +1456,7 @@ def check_delivery_preview_binding() -> None:
     claude_delivery = read("agents/_shared/delivery-mechanics.md").lower()
     claude_delivery_flat = re.sub(r"\s+", " ", claude_delivery)
     delivery_role = read("agents/delivery.md").lower()
+    delivery_role_flat = re.sub(r"\s+", " ", delivery_role)
     codex_validation = read("plugins/team-harness/skills/pipeline/references/validation.md").lower()
     codex_delivery = read("plugins/team-harness/skills/pipeline/references/delivery.md").lower()
     deliver_skill = read("plugins/team-harness/skills/deliver/SKILL.md").lower()
@@ -1467,6 +1469,30 @@ def check_delivery_preview_binding() -> None:
     require("before stage-gate-3" in delivery_role, "Delivery role still runs after Gate 3")
     require("do not modify tracked repository files" in delivery_role, "Delivery preview can change the frozen tree")
     require("changelog-fragment-draft.md" not in delivery_role, "Delivery preview still owns changelog assembly")
+    for marker in (
+        "`z` / patch",
+        "`y` / minor",
+        "`x` / major",
+        "a new file is not automatically minor",
+        "multiple patch changes do not accumulate into minor",
+        "failure_kind: version-overbump",
+        "failure_kind: version-underbump",
+        "version_assessment:",
+    ):
+        require(marker in delivery_role_flat, f"Delivery version-axis guide omits {marker!r}")
+    require(
+        "patch is the default" in codex_delivery.lower()
+        and "material new public capability" in codex_delivery.lower()
+        and "migration impact" in codex_delivery.lower(),
+        "Codex delivery reference does not preserve the version-axis guide",
+    )
+    for relative in (
+        "agents/_shared/orchestrator-state.md",
+        "plugins/team-harness/skills/pipeline/references/state-and-gates.md",
+    ):
+        state_contract = read(relative)
+        require("delivery_version_axis:" in state_contract, f"{relative}: version axis is not recoverable")
+        require("delivery_version_rationale:" in state_contract, f"{relative}: version rationale is not recoverable")
     require("do not regenerate prose" in codex_delivery, "Codex delivery can regenerate approved prose")
     require("never recompose" in claude_delivery_flat, "Claude mechanics can recompose approved prose")
     require("--draft" in claude_delivery and "isdraft" in claude_delivery, "Claude mechanics do not enforce draft-only PR delivery")
@@ -1558,9 +1584,13 @@ def check_pr_review_workspace_isolation() -> None:
     require(".claude/pr-review" not in canonical, "PR review retains a .claude artifact path")
     require("ensure-workspaces-ignore --repo-root" in canonical, "PR review does not safely add the workspace ignore rule")
     require("git -C \"$REVIEW_ROOT\" check-ignore" in canonical, "PR review does not verify ignore coverage")
+    probe = 'check-ignore -q -- "workspaces/.team-harness-ignore-probe"'
+    create = 'mkdir -m 700 "$ARTIFACTS"'
+    require(probe in canonical, "PR review does not probe effective ignore coverage")
+    require(create in canonical, "PR review does not create a mode-700 artifact root")
     ignore_write = canonical.index("ensure-workspaces-ignore --repo-root")
-    ignore_probe = canonical.index('check-ignore -q -- "workspaces/.team-harness-ignore-probe"')
-    workspace_create = canonical.index('mkdir -m 700 "$ARTIFACTS"')
+    ignore_probe = canonical.index(probe)
+    workspace_create = canonical.index(create)
     require(ignore_write < ignore_probe < workspace_create, "PR review creates its workspace before effective ignore verification")
     require('[ -L "$WORKSPACES_ROOT" ]' in canonical, "PR review does not reject a symlinked workspace root")
     require('[ -L "$ARTIFACTS" ]' in canonical, "PR review does not reject a symlinked review workspace")
