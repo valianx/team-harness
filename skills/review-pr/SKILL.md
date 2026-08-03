@@ -68,14 +68,7 @@ Do not recreate the helper inline.
 
 ```bash
 REVIEW_ROOT="$(git rev-parse --show-toplevel)"
-GITIGNORE="$REVIEW_ROOT/.gitignore"
-if [ -L "$GITIGNORE" ] || { [ -e "$GITIGNORE" ] && [ ! -f "$GITIGNORE" ]; }; then
-  echo "cannot create a safe local review workspace — .gitignore is not a regular file" >&2
-  exit 1
-fi
-if ! grep -Eq '^/workspaces/?$' "$GITIGNORE" 2>/dev/null; then
-  printf '\n/workspaces/\n' >> "$GITIGNORE"
-fi
+python3 "$REVIEW_CONTEXT_HELPER" ensure-workspaces-ignore --repo-root "$REVIEW_ROOT"
 WORKSPACES_ROOT="$REVIEW_ROOT/workspaces"
 ARTIFACTS="$REVIEW_ROOT/workspaces/pr-review-{number}"
 if ! git -C "$REVIEW_ROOT" check-ignore -q -- "workspaces/.team-harness-ignore-probe"; then
@@ -131,15 +124,17 @@ if [ "${RESUME_FROM_DRAFT:-false}" = "true" ]; then
   done
 fi
 
-CONTEXT_TMP="$(mktemp "$ARTIFACTS/.pr-review-context.XXXXXX")"
-CONVERSATION_TMP="$(mktemp "$ARTIFACTS/.pr-review-conversation.XXXXXX")"
+CONTEXT_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-context.XXXXXX")"
+CONVERSATION_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-conversation.XXXXXX")"
 python3 "$REVIEW_CONTEXT_HELPER" capture \
   --repo "{owner}/{repo}" --pr {number} --git-dir "$REVIEW_ROOT" \
   --output "$CONTEXT_TMP"
 python3 "$REVIEW_CONTEXT_HELPER" render \
   --context "$CONTEXT_TMP" --output "$CONVERSATION_TMP"
-mv -f -- "$CONTEXT_TMP" "$CONTEXT"
-mv -f -- "$CONVERSATION_TMP" "$CONVERSATION"
+python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
+  --temporary-name "${CONTEXT_TMP##*/}" --final-name "${CONTEXT##*/}"
+python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
+  --temporary-name "${CONVERSATION_TMP##*/}" --final-name "${CONVERSATION##*/}"
 ```
 
 Every later artifact write follows the same leaf-safe rule: create a unique
@@ -164,16 +159,19 @@ inside Task prompts.
 DIFF="$ARTIFACTS/pr-review-diff.patch"
 FILES="$ARTIFACTS/pr-review-files.txt"
 CHECKS="$ARTIFACTS/pr-review-checks.txt"
-DIFF_TMP="$(mktemp "$ARTIFACTS/.pr-review-diff.XXXXXX")"
-FILES_TMP="$(mktemp "$ARTIFACTS/.pr-review-files.XXXXXX")"
-CHECKS_TMP="$(mktemp "$ARTIFACTS/.pr-review-checks.XXXXXX")"
+DIFF_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-diff.XXXXXX")"
+FILES_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-files.XXXXXX")"
+CHECKS_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-checks.XXXXXX")"
 
 git diff "{frozen_base_ref}...{frozen_head_ref}" > "$DIFF_TMP"
 git diff --name-only "{frozen_base_ref}...{frozen_head_ref}" > "$FILES_TMP"
 gh pr checks {number} --repo "{owner}/{repo}" > "$CHECKS_TMP" 2>&1 || true
-mv -f -- "$DIFF_TMP" "$DIFF"
-mv -f -- "$FILES_TMP" "$FILES"
-mv -f -- "$CHECKS_TMP" "$CHECKS"
+python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
+  --temporary-name "${DIFF_TMP##*/}" --final-name "${DIFF##*/}"
+python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
+  --temporary-name "${FILES_TMP##*/}" --final-name "${FILES##*/}"
+python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
+  --temporary-name "${CHECKS_TMP##*/}" --final-name "${CHECKS##*/}"
 ```
 
 Do not execute the PR's code or install dependencies. Existing CI results are evidence; local
@@ -463,10 +461,10 @@ Map the operator choice to `APPROVE`, `REQUEST_CHANGES`, or `COMMENT`. Submit ex
 
 ```bash
 jq -n \
-  --arg body "$(cat "$CANONICAL_DRAFT")" \
+  --arg body "$(python3 "$REVIEW_CONTEXT_HELPER" safe-read --artifact-root "$ARTIFACTS" --name "${CANONICAL_DRAFT##*/}")" \
   --arg event "$EVENT" \
   --arg commit_id "$head_oid" \
-  --argjson comments "$(cat "$ARTIFACTS/pr-review-inline.json" 2>/dev/null || echo '[]')" \
+  --argjson comments "$(python3 "$REVIEW_CONTEXT_HELPER" safe-read --artifact-root "$ARTIFACTS" --name pr-review-inline.json)" \
   '{body: $body, event: $event, commit_id: $commit_id, comments: $comments}' \
 | gh api -X POST "repos/{owner}/{repo}/pulls/{number}/reviews" --input -
 ```

@@ -43,6 +43,46 @@ def context(**overrides):
 
 
 class ReviewContextTests(unittest.TestCase):
+    def test_workspace_ignore_update_is_atomic_and_rejects_symlink(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ignore = root / ".gitignore"
+            ignore.write_text("/build/\n", encoding="utf-8")
+            MODULE.ensure_workspaces_ignored(root)
+            self.assertEqual(ignore.read_text(encoding="utf-8"), "/build/\n/workspaces/\n")
+            MODULE.ensure_workspaces_ignored(root)
+            self.assertEqual(ignore.read_text(encoding="utf-8").count("/workspaces/"), 1)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            outside = root / "outside"
+            outside.write_text("keep", encoding="utf-8")
+            (root / ".gitignore").symlink_to(outside)
+            with self.assertRaises(MODULE.ContextError):
+                MODULE.ensure_workspaces_ignored(root)
+            self.assertEqual(outside.read_text(encoding="utf-8"), "keep")
+
+    def test_artifact_promotion_and_read_reject_symlink_leaves(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            temporary = root / "tmp-body"
+            temporary.write_text("safe", encoding="utf-8")
+            MODULE.promote_artifact(root, "tmp-body", "review.md")
+            self.assertEqual(MODULE.safe_read_leaf(root, "review.md"), b"safe")
+
+            outside = root / "outside"
+            outside.write_text("secret", encoding="utf-8")
+            link = root / "inline.json"
+            link.symlink_to(outside)
+            with self.assertRaises(MODULE.ContextError):
+                MODULE.safe_read_leaf(root, "inline.json")
+
+            replacement = root / "tmp-inline"
+            replacement.write_text("[]", encoding="utf-8")
+            with self.assertRaises(MODULE.ContextError):
+                MODULE.promote_artifact(root, "tmp-inline", "inline.json")
+            self.assertEqual(outside.read_text(encoding="utf-8"), "secret")
+
     def test_security_selection_is_fail_closed_for_every_reason(self):
         cases = [
             ("agents/security.md\n", "+permission boundary\n", "known-sensitive", True),
