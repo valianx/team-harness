@@ -131,9 +131,11 @@ require a new Gate 1.
 Before Freeze and before validation opens, assemble version/changelog and commit the complete candidate. Require a
 clean worktree, then compute size and diff composition from `verification_base_ref...HEAD`.
 Choose the SemVer axis by supported-contract impact: PATCH is the default for compatible bounded fixes and
-improvements; MINOR requires a named material new public capability; MAJOR requires a named incompatible public
-contract and migration impact. Added/deleted files, diff size, commit prefix, and the number of fixes never decide
-the axis. Persist a one-sentence `version_rationale`; MINOR and MAJOR must name the affected public contract.
+improvements; MINOR requires a named material new public capability. Added/deleted files, diff size, commit prefix,
+and the number of fixes never decide the axis. Persist a one-sentence `version_rationale`; MINOR must name the new
+public contract. If the change is incompatible with a supported public contract, do not select or recommend MAJOR
+and do not edit version sites. Block as `major-release-required`, name the contract and migration impact, and require
+a separate explicitly scoped operator-led release-planning task.
 Mechanical paths are only `CHANGELOG.md`, `changelog.d/*`, and exact resolved version sites;
 every other path is substantive. The 400-line/8-file caps require a bounded
 `02-implementation.md § Reviewability Exceptions` justification when exceeded. Persist the

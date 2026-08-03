@@ -268,7 +268,7 @@ Live consumers, so it is never treated as documentation: the record-based recove
 ```
 delivery_issue: {number, title, labels, project}|null
 delivery_version: {committed version}|not-bumped|null
-delivery_version_axis: patch|minor|major|none|null
+delivery_version_axis: patch|minor|none|null
 delivery_version_rationale: {one sentence naming supported-contract impact}|null
 delivery_changed_files: [{path}, ...]|[]
 delivery_diff_composition: {total_lines, total_files, mechanical_files, substantive_files}|null
