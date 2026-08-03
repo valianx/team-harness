@@ -97,6 +97,15 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    writes Claude Code or opencode configuration. Cross-runtime copying belongs
    only to an explicit `$team-harness:setup` import.
 
+   Reconcile the native multi-agent backend on every update, including an
+   equal-version repair. These commands are idempotent and make the V2 runtime
+   requirement explicit instead of relying on a prior setup:
+
+   ```text
+   codex features enable multi_agent
+   codex features enable multi_agent_v2
+   ```
+
 5. Read `agent-scope` from the native config (the ensured default is
    `global`) and reconcile all ten bundled agents automatically:
 
@@ -114,8 +123,9 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    replace an MCP or reveal credentials during an update.
 
 7. Verify the new snapshot's `hooks/hooks.json` contains only the supported
-   deterministic deny hooks (`policy-block` and `gcp-guard`) and no
-   `PermissionRequest` or approval-classifying guards. Verify both commands
+   deterministic deny hooks (`policy-block`, `gcp-guard`, and the deny-only
+   `gate-guard` force-push floor) and no `PermissionRequest` or
+   approval-classifying guards. Verify both commands
    prefer `PLUGIN_ROOT`, accept Codex's `CLAUDE_PLUGIN_ROOT` compatibility
    alias without depending on a Claude Code installation, and recover a
    replacement snapshot from the same Codex cache without exiting `127`. Hook
@@ -134,10 +144,11 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    config, or agent state is a no-op; step 8 is emitted only after every step
    succeeds.
 
-8. Verify the installed plugin version, native settings, ten agent files, MCP
-   list, and bridge target. Report old/new versions, marketplace result, config
-   migration, agent reconciliation, hook status, bridge status, and any
-   recovery command. When the bridge reports `restartRequired: false`, state
+8. Verify the installed plugin version, native settings, both multi-agent
+   features, ten agent files, MCP list, and bridge target. Report old/new
+   versions, marketplace result, config migration, V2 feature reconciliation,
+   agent reconciliation, hook status, bridge status, and any recovery command.
+   When the bridge reports `restartRequired: false`, state
    that the current thread can continue with its already-known skill and hook
    paths; do not require a restart merely because the cache version changed.
 

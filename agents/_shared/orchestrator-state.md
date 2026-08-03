@@ -59,6 +59,62 @@ field and its matching `stage.gate.release` event both exist, carry the same dec
 nonce, and pass the dual-record contract. An absent, stale, or mismatched half fails closed
 and blocks recovery; phase names or legacy status alone never release a gate.
 
+**Native Codex accounting overlay — conditional.** Apply this overlay only when
+a `phase.end` contains `usage.kind: codex_usage_delta`; a trace without that
+object remains on the legacy/Claude `total_tokens: N` and pricing contract
+above. The selected Codex snapshot changes the value grammar and adds only
+these fields:
+
+```text
+usage_schema_version: 1|null
+usage_status: available|unavailable
+usage_reason_code: {collector code}|null
+usage_components: {allowlisted components}|null
+total_tokens: N|unavailable
+cost_status: available|unavailable
+cost_reason_code: {closed pricing code}|null
+cost_usd: decimal|null
+```
+
+The overlay never contains a root/session identifier, rollout path, raw rollout
+content, or session alias. See
+`plugins/team-harness/skills/pipeline/references/observability.md` for the only
+permitted checkpoint/delta shapes. A single unavailable, invalid, regressive,
+or conflicting native delta makes the Codex aggregate unavailable; do not retain
+a partial total. `reasoning_output_tokens` remains a reported component and is
+never added to `total_tokens` again. Do not apply this rule to an event stream
+without native `usage`.
+
+**Declared Codex agent-lifecycle overlay — conditional.** Apply this overlay
+only when the trace contains `agent.spawn`, `agent.close`, or
+`agent.correction.spawn`; a trace without those records retains its existing
+state grammar. These are coordinator-declared lifecycle records, not native
+session telemetry. The selected snapshot adds only these fields:
+
+```text
+agent_lifecycle_schema_version: 1|null
+agent_lifecycle_metrics_status: available|unavailable|null
+agent_lifecycle_metrics_reason_code: {closed lifecycle code}|null
+agent_lifecycle_attempt_count: N|null
+agent_lifecycle_follow_up_count: N|null
+agent_lifecycle_correction_count: N|null
+agent_lifecycle_quality_verdicts: {pass:N,concerns:N,fail:N,n_a:N}|null
+agent_lifecycle_metrics: {cached_input_tokens,uncached_input_tokens,output_tokens,wall_time_ms,tool_calls}|null
+approved_ac_count: N|null
+cached_input_per_approved_ac: decimal|unavailable
+```
+
+The snapshot aggregates only terminal `agent.close.attempt_metrics` records as
+defined by `references/observability.md`; it does not divide, attribute, or
+copy a root/phase usage delta. A missing, duplicate, open, malformed,
+unavailable, or conflicting attempt makes `agent_lifecycle_metrics_status:
+unavailable`, clears `agent_lifecycle_metrics`, and renders
+`cached_input_per_approved_ac: unavailable`. Count follow-ups from final
+closes, corrections from correction spawns, and quality verdicts from their
+closed enum only. `approved_ac_count` is a current approved-plan count with no
+AC text or identifier. Never write a native ID, alias, rollout path,
+transcript, prompt, tool output, or free-form task label into this overlay.
+
 **Intake classification** — the orchestrator produces the initial values at intake. `security_sensitive` is monotonic: the named plan and Phase-2-close backstops may escalate `false → true`, but no downstream step may change `true → false`. The other fields are never re-derived downstream.
 ```
 security_sensitive: true|false
@@ -262,12 +318,18 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | Field | Required | Notes |
 |---|---|---|
 | `ts` | yes | ISO-8601 with timezone |
-| `event` | yes | `phase.start`, `phase.end`, `gate`, `gate.pass`, `gate.fail`, `iteration.start`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`, `stage2.hygiene`, `stage2.lane.*`, `plan_structure`, `plan_review.deferred`, `plan_review.offered`, `plan_review.offer_declined`, `plan_review_integrity`, `kg_write`, `artifact.missing`, `operation.started/success/failed`, `pipeline.start`, `pipeline.complete`, `pipeline.incomplete`, `pipeline.end`, `checkpoint.confirmed`, `compaction.trigger` |
+| `event` | yes | `phase.start`, `phase.end`, `agent.spawn`, `agent.close`, `agent.correction.spawn`, `gate`, `gate.pass`, `gate.fail`, `iteration.start`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`, `stage2.hygiene`, `stage2.lane.*`, `plan_structure`, `plan_review.deferred`, `plan_review.offered`, `plan_review.offer_declined`, `plan_review_integrity`, `kg_write`, `artifact.missing`, `operation.started/success/failed`, `pipeline.start`, `pipeline.complete`, `pipeline.incomplete`, `pipeline.end`, `checkpoint.confirmed`, `compaction.trigger` |
 | `feature` | yes | kebab-case, matches the workspace folder |
 | `phase`, `stage` | conditional | `stage` required for `stage.gate*` |
 | `agent` | conditional | required for `phase.*` |
 | `status` | conditional | `success`/`failed`/`blocked`/`skipped` |
-| `duration_ms`, `tokens`, `tokens_in`, `tokens_out`, `tokens_estimated` | conditional | per the token-tracking rule |
+| `duration_ms`, `tokens`, `tokens_in`, `tokens_out`, `tokens_estimated` | conditional | per the token-tracking rule (legacy/Claude branch when no native `usage` is selected) |
+| `usage_scope`, `usage_checkpoint` | conditional | native Codex branch only: safe root-reachable scope plus a `codex_usage_checkpoint`; never an identifier or path |
+| `usage` | conditional | native Codex branch only: a `codex_usage_delta`, measured or unavailable; no estimate or partial subtotal |
+| `pricing_identity`, `cost` | conditional | native Codex branch only: exact provider/model and complete quote provenance |
+| `agent_role`, `task`, `attempt_ordinal`, `context_strategy`, `follow_up_count` | conditional | required for `agent.*`; finite lifecycle enums and local ordinal only, never an ID, alias, or free-form label |
+| `attempt_metrics`, `quality_verdict` | conditional | required for `agent.close`; metrics are complete or closed-code unavailable, verdict is `pass`/`concerns`/`fail`/`n-a` |
+| `correction_cause` | conditional | required for `agent.correction.spawn`; literal `verification` only |
 | `verdict` | conditional | `pass`/`concerns`/`fail`/`partial-fail` |
 | `decision` | conditional | required for `stage.gate.release` |
 | `cause` | conditional | `verification` for new `iteration.start` correction rounds; historical `operator` values remain readable |
@@ -303,6 +365,12 @@ One event per write batch, stamping the literal `site`. With capture off the aut
 
 At every gate emission, before the block: count `[x]` checklist rows against `phase.end` events and backfill any gap with `tokens_estimated: true` + `backfilled: true`, deriving `duration_ms` from trace breadcrumbs when available, else the heuristic. **Never overwrite a measured event.**
 
+**Native Codex exception, selected only by `phase.end.usage`.** When the trace
+contains `usage.kind: codex_usage_delta`, do not use the legacy heuristic for
+that trace. Repair a missing native closure only with one `phase.end` carrying
+an unavailable collector-safe `usage` result and `backfilled: true`; never
+estimate, use zero, or preserve a partial native subtotal.
+
 ## Decision ledger
 
 `{docs_root}/00-decision-ledger.{jsonl|md}` — append-only, distinct from the events file. Records durable decision dispositions, rationale, and dry-run enforcement **only** — never phase timing, tokens, or tool counts, which stay in the trace. **The orchestrator is the exclusive writer.**
@@ -315,9 +383,24 @@ At every gate emission, before the block: count `[x]` checklist rows against `ph
 
 `{docs_root}/00-pipeline-summary.md` — rewritten **in full, never appended**, at four mandatory checkpoints: the STAGE-GATE-1 emission, Freeze, every `iteration.start`, and pipeline end. Rewriting at other transitions is best-effort.
 
-Sections: `## TL;DR`, `## Phase Timeline`, `## Dispatch Issues`, `## Tool Effectiveness`, `## Verification Packet`, `## Cost`, `## Iterations`, `## Files Changed`. Field-by-field derivation: `docs/observability.md § Pipeline Summary Protocol` and `§ Cost rollup`.
+Sections: `## TL;DR`, `## Phase Timeline`, `## Dispatch Issues`, `## Tool Effectiveness`, `## Verification Packet`, `## Cost`, `## Lifecycle Efficiency` (only for a selected declared lifecycle trace), `## Iterations`, `## Files Changed`. Field-by-field derivation: `docs/observability.md § Pipeline Summary Protocol` and `§ Cost rollup`.
 
 **Every number derives from the trace — never re-invented by walking workspaces.** The summary is a render of the trace, not an independent source of truth. `## Iterations` references each round **by ID only** and never re-tells what happened in it; the narrative lives only in `failure-brief.md`.
+
+**Native Codex summary branch.** Only when `phase.end.usage.kind` is
+`codex_usage_delta`, render the safe native aggregate from
+`references/observability.md`; unavailable usage or exact USD provenance then
+renders `Cost: unavailable`. A summary with no such object retains the legacy
+token and price rendering unchanged.
+
+**Declared lifecycle summary branch.** Only when an `agent.*` lifecycle event
+exists, render `## Lifecycle Efficiency` from the conditional lifecycle
+overlay: declared attempts, final follow-ups, corrections, closed quality
+verdict counts, cached input, uncached input, output, wall time, tool calls,
+approved-AC count, and cached-input-per-approved-AC. If the attempt aggregate
+or denominator fails closed, render every affected metric as `unavailable`;
+never attribute phase usage to an attempt or retain a partial total. This
+additive section does not select or alter either cost branch.
 
 **Failures:** a failed write logs and retries at the next transition. Counts disagreeing with the trace → the trace wins. Trace missing → render `(no trace recorded)` placeholders, never crash.
 
@@ -356,8 +439,33 @@ After every phase transition, update `00-state.md`. This is the orchestrator's p
 
 **Marking a checklist item `[x]` and appending its `phase.end` are ONE inseparable step** — never write one without the other in the same pass.
 
-1. **Append the event first.** `phase.start` before dispatch, `phase.end` after the agent returns (with `tokens`, `duration_ms`, `tools`, `model`, `effort`), `gate` when a gate is reached. **First, because events are append-only and must reflect real time** — backfilling later loses timestamp accuracy.
-   **Token tracking is mandatory.** Every `phase.end` carries `tokens`: from the call result metadata when available, otherwise estimated (`duration_min × 1500` opus-heavy, `× 800` sonnet-heavy) with `tokens_estimated: true`. **`"tokens": 0` is forbidden.**
+1. **Append the event first.** `phase.start` before dispatch, `phase.end` after
+   the agent returns (with `tokens`, `duration_ms`, `tools`, `model`, `effort`),
+   `gate` when a gate is reached. **First, because events are append-only and
+   must reflect real time** — backfilling later loses timestamp accuracy.
+   **Legacy Claude branch — no native `usage` object.** **Token tracking is
+   mandatory.** Every `phase.end` carries `tokens`: from the call result
+   metadata when available, otherwise estimated (`duration_min × 1500`
+   opus-heavy, `× 800` sonnet-heavy) with `tokens_estimated: true`.
+   **`"tokens": 0` is forbidden.**
+
+   **Native Codex branch, selected only by `phase.end.usage.kind`.** For a
+   native `codex_usage_delta`, append the safe `usage` object and checkpoint
+   shape from `plugins/team-harness/skills/pipeline/references/observability.md`
+   instead of using the legacy token estimate for accounting. Every started
+   native phase is measured by checkpoint subtraction or records a
+   collector-safe unavailable result. Zero substitution is forbidden in both
+   branches; aliases and partial totals are additionally forbidden in this
+   native branch.
+
+   **Declared specialist lifecycle.** Immediately before a deliberate
+   specialist dispatch or continuation, append the matching allowlisted
+   `agent.spawn`; on a terminal return append exactly one `agent.close` before
+   the enclosing `phase.end`. A verification correction emits a fresh
+   `agent.correction.spawn`, never a continuation of a terminal ordinal. These
+   coordinator declarations use only the finite fields in
+   `references/observability.md`; they are not a request to recover native
+   lifecycle telemetry or attribute phase usage to an attempt.
 2. **Update `00-state.md`** — the `§ Current State` fields, the completed state `[x]`, and the `§ Agent Results` row **upserted by `(agent, phase)` key**: overwrite in place on a same-key re-run across iterations, never append a duplicate. A new row appears only for a genuinely new key, so `qa` and `adversary` in validation each keep their own current verdict and are never collapsed to one last-writer-wins value.
    *Narrative sections are gone.* There is no TL;DR to rewrite, no Hot Context to overwrite, and no prose recovery section: the events file carries the narrative and the `next_action` field carries the recovery instruction.
 3. **Only then dispatch.**

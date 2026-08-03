@@ -38,13 +38,37 @@ out="$(cd "$ROOT" && printf '%s' '{"tool_name":"Bash","tool_input":{"command":"g
 out="$(cd "$ROOT" && printf '%s' '{"tool_name":"Bash","tool_input":{"command":"gcloud compute instances create demo"}}' | bash "$ADAPTER" gcp-guard)"
 [ -z "$out" ] && pass || fail "unsupported gcp ask must be left to native Codex permissions"
 
-# Retired approval-classifying hooks are neither callable nor shipped.
+# A stale hook name must not suppress a later registered deny floor when a host
+# batches hook names in one launcher invocation.
+out="$(cd "$ROOT" && printf '%s' '{"tool_name":"Bash","tool_input":{"command":"rm -rf /"}}' | bash "$ADAPTER" unknown-hook policy-block)"
+[ "$(printf '%s' "$out" | json_value 'd.hookSpecificOutput?.permissionDecision')" = "deny" ] \
+  && pass || fail "unknown batched hook names must not skip later deny floors"
+
+# Approval-classifying decisions are intentionally left to native Codex
+# permissions, but they must not suppress a later deterministic deny floor.
+batch_plugin="$(mktemp -d)"
+mkdir -p "$batch_plugin/dist"
+cp "$ADAPTER" "$batch_plugin/run-codex-hook.sh"
+printf '%s\n' 'process.stdout.write(JSON.stringify({hookSpecificOutput:{permissionDecision:"ask"}}));' \
+  > "$batch_plugin/dist/gcp-guard.cjs"
+printf '%s\n' 'process.stdout.write(JSON.stringify({hookSpecificOutput:{permissionDecision:"deny"}}));' \
+  > "$batch_plugin/dist/gate-guard.cjs"
+out="$(printf '%s' '{"tool_name":"Bash","tool_input":{}}' | bash "$batch_plugin/run-codex-hook.sh" gcp-guard gate-guard)"
+[ "$(printf '%s' "$out" | json_value 'd.hookSpecificOutput?.permissionDecision')" = "deny" ] \
+  && pass || fail "unsupported ask must not suppress a later deterministic deny"
+rm -rf "$batch_plugin"
+
+# Retired approval-classifying hooks are neither callable nor shipped. The
+# deny-only gate guard is shipped because it provides the non-waivable
+# force-push floor; ordinary approval ownership remains native to Codex.
 out="$(run_fixture dev-guard pretool-destructive.json)"
 [ -z "$out" ] && pass || fail "retired dev-guard adapter invocation must be silent"
-for name in dev-guard gate-guard prepublish-guard worktree-guard; do
+for name in dev-guard prepublish-guard worktree-guard; do
   [ ! -e "$ROOT/plugins/team-harness/hooks/dist/$name.cjs" ] \
     && pass || fail "$name must not ship in the Codex plugin"
 done
+[ -s "$ROOT/plugins/team-harness/hooks/dist/gate-guard.cjs" ] \
+  && pass || fail "deny-only gate-guard must ship in the Codex plugin"
 
 marker='DO_NOT_REFLECT_INPUT_7f3a'
 for name in policy-block gcp-guard; do
@@ -82,7 +106,8 @@ const commands = Object.values(manifest.hooks)
 if (commands.length !== 2) process.exit(1);
 if (!commands.some(command => command.includes("policy-block"))) process.exit(1);
 if (!commands.some(command => command.includes("gcp-guard"))) process.exit(1);
-if (commands.some(command => /dev-guard|gate-guard|prepublish-guard|worktree-guard/.test(command))) process.exit(1);
+if (!commands.some(command => command.includes("gate-guard"))) process.exit(1);
+if (commands.some(command => /dev-guard|prepublish-guard|worktree-guard/.test(command))) process.exit(1);
 if (!manifest.description.includes("Native Codex permissions") || !manifest.description.includes("review/trust")) process.exit(1);
 NODE
 then pass; else fail "manifest must wire only deterministic deny hooks"; fi
@@ -101,6 +126,56 @@ if (!command) process.exit(1);
 process.stdout.write(command);
 NODE
 )"
+
+gate_manifest_command="$(node - "$ROOT/plugins/team-harness/hooks/hooks.json" <<'NODE'
+const fs = require("node:fs");
+const manifest = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const command = manifest.hooks.PreToolUse
+  .flatMap(group => group.hooks || [])
+  .map(hook => hook.command)
+  .find(value => value.includes("gate-guard"));
+if (!command) process.exit(1);
+process.stdout.write(command);
+NODE
+)"
+
+# Exercise the literal installed Codex hook command after ship, rather than
+# only gate-guard's standalone artifact. Every force shape must still deny.
+lane_root="$(mktemp -d)"
+git -C "$lane_root" init -q
+git -C "$lane_root" config user.email "th-test@example.com"
+git -C "$lane_root" config user.name "th-test"
+git -C "$lane_root" commit -q --allow-empty -m init
+git -C "$lane_root" checkout -q -b "feat/codex-force-floor"
+mkdir -p "$lane_root/workspaces/x"
+printf '%s\n' \
+  '- gate3_release: ship' \
+  '- working_branch: feat/codex-force-floor' \
+  '- worktree: null' \
+  '- status: in-progress' > "$lane_root/workspaces/x/00-state.md"
+for force_command in \
+  'git push -f origin feat/codex-force-floor' \
+  'git push --force origin feat/codex-force-floor' \
+  'git push --force-with-lease origin feat/codex-force-floor' \
+  'git push origin +feat/codex-force-floor:feat/codex-force-floor' \
+  'git push --fo\rce origin feat/codex-force-floor' \
+  "git push \$'--force' origin feat/codex-force-floor" \
+  'bash -c "git push --force origin feat/codex-force-floor"' \
+  'eval "git push -f origin feat/codex-force-floor"'; do
+  payload="$(node -e 'process.stdout.write(JSON.stringify({tool_name:"Bash",tool_input:{command:process.argv[1]}}))' "$force_command")"
+  out="$(cd "$lane_root" && PLUGIN_ROOT="$ROOT/plugins/team-harness" /bin/bash -c "$gate_manifest_command" <<< "$payload")"
+  [ "$(printf '%s' "$out" | json_value 'd.hookSpecificOutput?.permissionDecision')" = "deny" ] \
+    && pass || fail "installed gate-guard must deny force push after ship: $force_command"
+done
+for benign_command in \
+  'git push origin feat/codex-force-floor' \
+  'gh pr create --title "Codex hook control"'; do
+  payload="$(node -e 'process.stdout.write(JSON.stringify({tool_name:"Bash",tool_input:{command:process.argv[1]}}))' "$benign_command")"
+  out="$(cd "$lane_root" && PLUGIN_ROOT="$ROOT/plugins/team-harness" /bin/bash -c "$gate_manifest_command" <<< "$payload")"
+  [ -z "$out" ] \
+    && pass || fail "installed gate-guard must stay silent for shipped benign action: $benign_command"
+done
+rm -rf "$lane_root"
 out="$(
   cd "$ROOT" &&
   env -i PATH=/usr/bin:/bin \
@@ -220,7 +295,7 @@ import { join } from "node:path";
 import { sync } from "./tools/codex-runtime/sync-hooks.mjs";
 
 const root = process.argv[3];
-const names = ["policy-block", "gcp-guard"];
+const names = ["policy-block", "gcp-guard", "gate-guard"];
 const source = name => join(root, "hooks/ts/dist", `${name}.cjs`);
 const target = name => join(root, "plugins/team-harness/hooks/dist", `${name}.cjs`);
 for (const name of names) await writeFile(source(name), `source-${name}\n`);

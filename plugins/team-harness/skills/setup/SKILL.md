@@ -28,7 +28,8 @@ write:
 With no targeted intent, run the complete flow. For a targeted request, change
 only that concern and still ensure the native settings document exists.
 Supported targets are `workspace`, `language`, `english-learning`, `memory`,
-`context7`, `agents`, `clickup`, `obsidian-tasks`, and `flow-telemetry`.
+`context7`, `agents`, `features`, `clickup`, `obsidian-tasks`, and
+`flow-telemetry`.
 
 `lane-autoselect` is legacy migration metadata, not a supported target or an
 active selector. Never use it to choose a route; require the live operator's
@@ -79,7 +80,25 @@ migration, and preserve every unrelated value.
    before continuing. An unavailable network is non-blocking when the installed
    snapshot is usable.
 
-4. Gather only requested values, showing current values as defaults. Apply all
+4. Only for a full setup or an explicit `features` target, enable Codex
+   multi-agent V2 with Codex's native feature writer; do not hand-rewrite the
+   global `config.toml`:
+
+   ```bash
+   codex features enable multi_agent
+   codex features enable multi_agent_v2
+   ```
+
+   For every other targeted setup, skip both feature-writer commands and do not
+   change global Codex feature state. Confirm both flags with
+   `codex features list` only when this step runs. The generated project config
+   also enables both flags and supplies the generic `gpt-5.6-terra` / `medium`
+   subagent fallback under `[agents]`; it never overrides Main's selected
+   Sol/xhigh model. Global installation synchronizes the ten role files with
+   their exact per-role mappings rather than attempting a fragile global model
+   config rewrite.
+
+5. Gather only requested values, showing current values as defaults. Apply all
    selected settings in one `manage_config.py set` command.
 
    - Workspace defaults to `local`. For `obsidian`, require an existing
@@ -96,7 +115,7 @@ migration, and preserve every unrelated value.
    - Agent scope is `global` (default, available to every project) or `project`.
      Persist it as `agent-scope`.
 
-5. Reconcile all eleven bundled specialists in the persisted scope on every full
+6. Reconcile all eleven bundled specialists in the persisted scope on every full
    setup, and whenever `agents` is targeted:
 
    ```bash
@@ -113,7 +132,7 @@ migration, and preserve every unrelated value.
    use Codex's native permission prompt. Do not use or download the separate Go
    installer; the marketplace snapshot is the source of these agent bytes.
 
-6. Configure selected MCP servers after `codex mcp list --json`. Preserve an
+7. Configure selected MCP servers after `codex mcp list --json`. Preserve an
    existing registration unless the operator explicitly requests replacement.
 
    - Memory: register a streamable HTTP URL, optionally with the name (not the
@@ -123,18 +142,27 @@ migration, and preserve every unrelated value.
      printing it, then run
      `codex mcp add context7 --env DEFAULT_MINIMUM_TOKENS=10000 -- npx -y @upstash/context7-mcp@3.2.5`.
 
-7. Verify the installed plugin's `hooks/hooks.json`. Codex supports the
-   deterministic deny hooks only: `policy-block` and the catastrophic-deny
-   portion of `gcp-guard`. Approval-classifying `ask` guards are intentionally
-   not registered because Codex's native permission flow owns approvals.
+8. Verify the installed plugin's `hooks/hooks.json`. Codex supports the
+   deterministic deny hooks only: `policy-block`, the catastrophic-deny
+   portion of `gcp-guard`, and `gate-guard`'s force-push floor. `gate-guard`
+   denies direct force flags, `--force-with-lease`, `+refspec` forms, and the
+   statically resolved wrapper forms covered by its bounded command analyzer,
+   even after `ship`. It does not guarantee detection when a push is assembled
+   from runtime-only shell state such as variables, aliases, functions, PATH,
+   or Git configuration; this accepted limitation is not expanded in setup,
+   and server-side GitHub branch protection remains authoritative. Benign push
+   and ordinary GitHub approval ownership remain native. Approval-classifying
+   `ask` guards are intentionally not registered because Codex's native
+   permission flow owns approvals.
    Explain that the operator must review and trust hooks through `/hooks`;
    never approve or bypass trust.
 
-8. Re-run both helper inspections and `codex mcp list --json`. Report one
-   compact result: native config path, workspace/language, agent scope and eleven
-   agent statuses, MCP registrations, hook verification/trust, and whether a
-   new thread is required. Never print imported opaque values, secrets, or
-   environment-variable values.
+9. Re-run both helper inspections and `codex mcp list --json`; re-run
+    `codex features list` only when step 4 ran. Report one compact result:
+    native config path, workspace/language, agent scope and eleven agent statuses,
+    feature-flag status when checked, MCP registrations, hook
+    verification/trust, and whether a new thread is required. Never print
+    imported opaque values, secrets, or environment-variable values.
 
 The flow is idempotent. Blank input preserves current values; unrelated native
 keys remain untouched; unchanged config and agent files are not rewritten.

@@ -46,11 +46,18 @@ Analyze the input: $ARGUMENTS
 
 Parse `$ARGUMENTS`:
 - Positional: feature name (kebab-case, matches the `workspaces/{feature}/` folder).
-- Optional flag: one of `--jsonl`, `--tools`, `--fails`.
+- Optional flag: one of `--jsonl`, `--tools`, `--fails`, `--cost`.
 
 If `$ARGUMENTS` is empty or just whitespace, print the usage block above and exit cleanly.
 
-**Step 0 — Resolve workspaces path.** Read `~/.claude/.team-harness.json`. If it exists and `logs-mode` is `"obsidian"`, use `{logs-path}/{logs-subfolder}/{repo-name}` as the base path (where `repo-name` is the basename of the current working directory). If `logs-mode` is `"local"` or the file is missing, use `workspaces/` (relative to cwd). Replace all `workspaces/{feature-name}` references below with `{resolved-path}/{feature-name}`.
+**Step 0 — Resolve workspaces path.** For the legacy Claude branch, read
+`~/.claude/.team-harness.json`. If it exists and `logs-mode` is `"obsidian"`,
+use `{logs-path}/{logs-subfolder}/{repo-name}` as the base path (where
+`repo-name` is the basename of the current working directory). If `logs-mode`
+is `"local"` or the file is missing, use `workspaces/` (relative to cwd).
+Replace all `workspaces/{feature-name}` references below with
+`{resolved-path}/{feature-name}`. A selected Native Codex branch follows its
+runtime adapter's native configuration rule without changing this legacy path.
 
 ## File locations
 
@@ -343,6 +350,15 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
 1. Detect the events file: check for `00-execution-events.md` first (Glob), then
    `00-execution-events.jsonl`. If neither exists, report and exit cleanly.
 
+
+**Branch selection.** Inspect only `phase.end` records. When no record contains
+an object with `usage.kind == "codex_usage_delta"`, execute legacy steps 2–6
+below unchanged. Select the Native Codex branch only when a `phase.end`
+contains that exact object; a `phase.start` checkpoint, route, model, agent,
+or other field cannot select it. A selected native trace never mixes its
+accounting with legacy `tokens` fields or pricing; malformed/mixed native
+usage is unavailable, not a fallback to legacy pricing.
+
 2. Read the price table from `~/.claude/.team-harness.json` (key `pricing`). If
    the key is absent, malformed, or any required sub-field is missing, set
    `has_pricing = false` — the mode continues but shows tokens only with the line:
@@ -501,6 +517,102 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
    read/parse error → omit the rollup silently; the per-feature cost output is
    unaffected.
 
+
+
+### Native Codex branch — selected only by `usage.kind`
+
+Read only the allowlisted native `phase.end.usage` delta and its safe
+checkpoints. Do not scan rollouts. Every started native phase must close
+measured or with a collector-safe unavailable reason. A missing, malformed,
+unavailable, regressive, conflicting, or mixed delta makes the full native
+aggregate unavailable; never use `0`, an estimate, a previous delta, an alias,
+or a legacy subtotal.
+
+Sum each `usage.components.total_tokens` exactly once. Display
+`reasoning_output_tokens` as its own dimension and never add it to
+`total_tokens` again. Reused sessions are already handled by checkpoint
+subtraction and never render as identifiers.
+
+Current native data has neither a bundled quote nor an exact provider/model
+identity, so render:
+
+```text
+Cost Breakdown — {feature-name}
+================================
+Usage: {measured|unavailable (REASON_CODE)}
+Total tokens: {N|unavailable}
+Cost: unavailable
+```
+
+A future native USD amount is allowed only if every non-overlapping priced
+dimension has a current, exact, case-sensitive tuple `provider`, `model`,
+`dimension`, `currency: USD`, a non-empty `source`, and an effective date
+range covering the measurement date, and a finite strictly positive
+`rate_per_million`. The rate must be a strictly positive decimal. The native
+`pricing_identity.provider`
+and `.model` must match exactly. Never infer provider/model/rate from a role,
+event model, frontmatter default, prefix, family, or alias; never blend rates
+or convert currency. These restrictions apply only to this selected Native
+Codex branch.
+
+**Native initiative rollup (reader-only).** Apply the same native branch to
+every child trace. Any unavailable child delta makes the native initiative
+total unavailable; absent exact quotes render `Cost: unavailable`. Never form
+a plausible partial subtotal.
+
+### Declared Codex lifecycle efficiency — selected only by `agent.*`
+
+This is an additive reader-only view. It is selected only when an
+`agent.spawn`, `agent.close`, or `agent.correction.spawn` record exists; it
+does not select the Native Codex usage/cost branch, and a trace without
+`agent.*` retains the legacy output above unchanged.
+
+Read only the lifecycle record's finite role/task enums, local ordinal,
+`fresh|continued` context strategy, follow-up count, closed quality verdict,
+and `agent.close.attempt_metrics`, plus the current state snapshot's
+`approved_ac_count`. Do not read rollouts, native IDs, aliases, paths,
+transcripts, prompts, tool output, or free-form labels. Do not print the local
+ordinal; it is a privacy-safe ordering pseudonym, not a diagnostic handle.
+The aggregate key `n_a` represents only the closed event enum `n-a`; it is not
+an additional verdict value.
+
+Count a fresh `agent.spawn` and an `agent.correction.spawn` once as a declared
+attempt. A continued spawn contributes only its final close's follow-up count.
+For metric aggregation, require exactly one valid close per fresh ordinal and
+one complete available `attempt_metrics` object for every closed attempt. Any
+open, duplicate, missing, malformed, unavailable, or conflicting record makes
+all attempt components unavailable. The current collector has no trustworthy
+per-attempt attribution, so `PER_ATTEMPT_METRICS_UNAVAILABLE` is the normal
+current outcome; never split a phase/root delta, estimate, substitute zero, or
+retain a partial subtotal.
+
+When selected, append this block to `--cost` output (the default mode gets the
+same section from `00-pipeline-summary.md`):
+
+```text
+Lifecycle Efficiency
+====================
+Declared attempts: {N}
+Follow-ups: {N|unavailable}
+Corrections: {N}
+Quality verdicts: pass:{N}, concerns:{N}, fail:{N}, n-a:{N}
+Metrics: {measured|unavailable (REASON_CODE)}
+Cached input: {N|unavailable}
+Uncached input: {N|unavailable}
+Output: {N|unavailable}
+Wall time: {N ms|unavailable}
+Tool calls: {N|unavailable}
+Approved ACs: {N|unavailable}
+Cached-input per approved AC: {decimal|unavailable}
+```
+
+`Cached-input per approved AC` is available only when the complete closed
+attempt aggregate and the positive current `approved_ac_count` are available.
+It contains no AC identifier or text. Corrections and quality verdicts are
+closed-enum counts only. The renderer never turns an unavailable lifecycle
+aggregate into a plausible number and never changes the legacy Claude cost
+route or the strict Native Codex cost semantics.
+
 ---
 
 ## Initiative region rendering (serial multi-project sequencing)
@@ -534,7 +646,16 @@ initiative.converge  {ts | "(not yet — projects still pending)"}
 
 Projects render in `eligible_projects[]` order (not start-time order), so the same project always occupies the same row across repeated invocations while the initiative is in progress.
 
+**Legacy Claude selection.** When no child trace has a selected native `usage` object, retain this existing rollup unchanged.
+
 **`--cost` interaction (reader-only rollup).** Executed by `--cost` mode step 6 above — the initiative-level trace is resolved during `--cost` execution, not only default-mode rendering. When an `initiative.start` is present, `--cost` sums token counts across all projects' own `{project}/00-execution-events.*` files (each project keeps its full per-phase trace) to produce one initiative-level cost figure, appended below the per-feature cost table with the header `Initiative cost rollup — {initiative}`. This is a pure read of each project's OWN events file — it never writes to any project's events file or `00-state.md` and never touches the gate seam.
+
+**Native selection.** If any child trace is selected by a `phase.end` object
+with `usage.kind: codex_usage_delta`, apply the Native Codex branch to every
+child instead. A missing/unavailable native delta makes initiative tokens
+unavailable, and absent exact current USD provenance renders
+`Cost: unavailable`; never emit a plausible partial subtotal.
+
 
 **Fail-soft.** No `initiative` field, no initiative-level events file, or a read/parse error → omit this section silently. It never blocks or degrades any other mode.
 

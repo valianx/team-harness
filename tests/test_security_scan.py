@@ -70,7 +70,6 @@ PR_REVIEW_AGENT_TOOLS = {
 }
 
 NO_MUTATION_AGENTS = set(PR_REVIEW_AGENT_TOOLS)
-CODEX_PR_REVIEW_CAPABILITIES = {"read", "glob", "grep"}
 
 # The full agent roster. check_0_roster_reachability() below fails when a name
 # here no longer resolves to a file.
@@ -187,21 +186,14 @@ def repo_rel(path: Path) -> str:
         return str(path)
 
 
-def codex_capability_errors(manifest: dict[object, object]) -> list[str]:
-    capabilities = manifest.get("capabilities")
-    if not isinstance(capabilities, dict):
-        return ["missing capabilities table"]
-    if capabilities.get("default") != "deny":
-        return ["capabilities.default must be deny"]
-    allowed = capabilities.get("allow")
-    if not isinstance(allowed, list) or not all(isinstance(item, str) for item in allowed):
-        return ["capabilities.allow must be a string array"]
-    if len(allowed) != len(set(allowed)) or set(allowed) != CODEX_PR_REVIEW_CAPABILITIES:
-        return ["capabilities.allow must contain exactly read, glob, and grep"]
-    unexpected = set(capabilities) - {"default", "allow"}
-    if unexpected:
-        return [f"unexpected capability fields: {sorted(unexpected)!r}"]
-    return []
+def codex_projection_errors(manifest: dict[object, object]) -> list[str]:
+    """Validate the Codex 0.146 read-only projection boundary."""
+    errors: list[str] = []
+    if "capabilities" in manifest:
+        errors.append("Codex 0.146 rejects capabilities tables in custom-agent TOML")
+    if manifest.get("sandbox_mode") != "read-only":
+        errors.append("sandbox_mode must be read-only")
+    return errors
 
 
 def scan_codex_pr_review_projections(directory: Path) -> tuple[int, list[tuple[Path, str]]]:
@@ -217,7 +209,7 @@ def scan_codex_pr_review_projections(directory: Path) -> tuple[int, list[tuple[P
         except (OSError, tomllib.TOMLDecodeError) as error:
             errors.append((path, f"invalid Codex projection: {error}"))
             continue
-        errors.extend((path, error) for error in codex_capability_errors(manifest))
+        errors.extend((path, error) for error in codex_projection_errors(manifest))
     return discovered, errors
 
 
@@ -322,7 +314,7 @@ def check_1_readonly_bash() -> int:
 
 
 # ---------------------------------------------------------------------------
-# Check 2 — optional Codex PR-review projections must fail closed
+# Check 2 — optional Codex PR-review projections stay read-only
 # ---------------------------------------------------------------------------
 
 def check_2_codex_pr_review_capabilities() -> int:
@@ -335,7 +327,7 @@ def check_2_codex_pr_review_capabilities() -> int:
     if len(findings) == before:
         print(
             f"  [PASS] check-2 — {discovered} optional Codex PR-review projections"
-            " discovered; every discovered projection has an exact fail-closed allowlist"
+            " discovered; every projection is read-only and omits unsupported capability tables"
         )
     return len(findings) - before
 
@@ -629,11 +621,12 @@ def _self_test_check_1() -> None:
 
 
 def _self_test_check_2() -> None:
-    """Check 2 fixture: an added Codex capability must be rejected."""
+    """Check 2 fixture: Codex 0.146 must reject a capabilities table."""
     with tempfile.TemporaryDirectory() as directory:
         projection = Path(directory) / "reviewer.toml"
         projection.write_text(
-            '[capabilities]\ndefault = "deny"\nallow = ["read", "glob", "grep", "bash"]\n',
+            'name = "reviewer"\nsandbox_mode = "read-only"\n'
+            '[capabilities]\ndefault = "deny"\nallow = ["read", "glob", "grep"]\n',
             encoding="utf-8",
         )
         discovered, errors = scan_codex_pr_review_projections(Path(directory))
@@ -718,7 +711,7 @@ def run_positive_fixtures() -> None:
     fixture_errors: list[str] = []
     for name, fn in [
         ("check-1: read-only agent with Bash", _self_test_check_1),
-        ("check-2: Codex projection with added capability", _self_test_check_2),
+        ("check-2: Codex 0.146 projection with capabilities table", _self_test_check_2),
         ("check-3: curl | bash injection", _self_test_check_3),
         ("check-4: non-canonical chained manifest command", _self_test_check_4),
         ("check-5: programmatic AWS key fixture", _self_test_check_5),

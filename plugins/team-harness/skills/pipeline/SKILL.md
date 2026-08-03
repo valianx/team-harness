@@ -49,6 +49,8 @@ behavior for the initialized workflow:
   `security`, and `delivery`;
 * never let a specialist approve a gate, speak for the operator, or become a
   second coordinator;
+* as the only writer of task-shard AC checkbox mirrors, verify QA's
+  criterion-specific `AC-N: PASS` results before updating the assigned mirror;
 * re-read the bounded durable state snapshot once before every continuation,
   then load only the section/artifact named by `next_action`; and
 * return to ordinary direct behavior after the workflow completes or the live
@@ -63,6 +65,91 @@ The primary thread is the only writer of `00-state.md`, execution events,
 nonces, and gate releases. Specialists return bounded results and may edit only
 their assigned repository/report files; they never approve, release, or present
 a gate. Gate releases remain dual-recorded and live-operator decisions.
+
+## Specialist context, lifecycle, and Main rotation
+
+Every new specialist attempt, correction, and revalidation starts a fresh
+native V2 agent with `fork_turns: none`; only an implementer's bounded micro-correction
+within the same active task/correction lifecycle may continue its open attempt. Send only its exact role packet: the role
+instruction, assigned task shard, that shard's named invariants and evidence
+anchors, its `cross_runtime_preservation` obligation, the current frozen
+identity when one exists, and the minimal role-specific environment or facts.
+Never compensate for a missing packet fact with Main's transcript, an
+implementer's narrative, sibling shards, the full plan, historical tool output,
+or a prompt recap.
+
+Before a dispatch that uses a task shard, preflight the exact shard and fail
+closed unless it declares usable `required_invariants`,
+`required_evidence_anchors`, and `cross_runtime_preservation` values for the
+applicable work. Resolve only those named anchors into the packet; do not
+delegate until each applicable obligation is present. A transcript, full plan,
+or sibling shard is never a substitute for a missing declaration. This
+preflight preserves the existing Claude and other-runtime contracts; it changes
+neither their models, gates, permissions, nor lifecycle routes.
+
+### AC12/AC20 pre-execution command-output route
+
+Only while this pipeline is explicitly activated, pipeline preflight resolves
+the helper's absolute path relative to the loaded pipeline skill/reference
+(`scripts/bounded-command.mjs` from the skill directory or
+`../scripts/bounded-command.mjs` from a reference), never from the workspace
+or current directory; fail closed if it cannot be resolved. Include the helper
+in each role packet only as `bounded_command_path` with that absolute path. It
+is transient: never persist `bounded_command_path` in state, events, reports,
+summaries, or workspace artifacts.
+
+Classify expected output volume before execution. Routine commands whose result
+is expected to be small and bounded execute directly; this includes targeted
+file reads and searches, concise status checks, and focused tests configured to
+emit concise results. Reserve `bounded-command.mjs` for large, verbose, or
+volume-unknown intermediate data, including full suites, verbose builds, and
+broad logs, diffs, or searches. Base the route on the command's known scope and
+output mode before it runs. If the volume cannot be predicted, use the helper.
+Never execute first and reactively retry through a different route to undo
+output already admitted to the transcript.
+
+For commands assigned to the bounded route, use
+`node <bounded_command_path> -- <argv...>`. Add `--success-diagnostic` before
+`--` only when the bounded result text is required, so only sanitized bounded
+tails can be rendered on success. On `truncated: true`, issue a narrower query
+through the helper; never replay raw/full output. Direct execution remains the
+normal route for small, bounded results. Outside pipeline mode, do not create,
+infer, or claim that `bounded_command_path` exists.
+
+The helper is a development-output control, not a process-containment sandbox.
+The operator remains responsible for launched commands. Deadline cleanup
+covers the managed POSIX process group or the tree confirmed by Windows
+`taskkill`; a deliberately detached or reparented descendant outside that
+scope can outlive the helper. Native sandbox and permission policy remain the
+security boundary.
+
+Treat every terminal specialist result as a closed attempt. A post-terminal
+`followup_task` is prohibited. Only an implementer may retain its current
+thread for one recorded micro-correction in the same active task/correction
+lifecycle, on the same file and same AC and explicitly limited to at most 3 tool
+calls. Record that exceptional continuation as `context_strategy: continued`;
+any second feedback, scope expansion, or substantive correction closes the old
+attempt and spawns a fresh V2 agent with `fork_turns: none` and a bounded correction packet containing `Cause`,
+`Files`, implicated `AC`, `Correction`, the current frozen anchor, and required
+evidence. Never use continued context for a new file, another AC, a second
+finding, or a revalidation.
+
+Tester, QA, and security each start fresh with V2 `fork_turns: none` on the same
+current frozen commit/tree for their validation round. Their packets contain
+the executable ACs or review surface plus verifiable facts and evidence, never
+the implementer's success narrative. Every revalidation after a correction
+uses new tester, QA, and security agents against the rebuilt current frozen
+identity; it does not reuse a prior verification thread.
+
+Main has a separate coordinator boundary. On its first compaction, or before
+continuing after 100 coordinator tool calls or 20 M cumulative processed
+tokens, Main writes a recoverable handoff with the durable state, exact phase
+and task, frozen identities/anchors, evidence pointers, remaining work, and
+pending gate decision. It then requires a fresh user thread before continuing;
+the new Main resumes from that handoff, durable artifacts, and anchors rather
+than a transcript. When near this boundary, prefer an implementation →
+validation handoff when the approved work is ready. This is not an automatic
+native Main replacement and never creates a nested orchestrator.
 
 ## Mandatory agent prerequisite
 
@@ -100,12 +187,12 @@ the exact markers and effective fields shown below:
 
 | Role | Semantic source marker | Projection/profile marker |
 |---|---|---|
-| `architect` | `# Semantic source: agents/architect.md (opus/xhigh)` | `# Projection tier: opus-xhigh; profile: team-harness` |
-| `implementer` | `# Semantic source: agents/implementer.md (sonnet/high)` | `# Projection tier: non-opus; profile: team-harness` |
-| `tester` | `# Semantic source: agents/tester.md (sonnet/high)` | `# Projection tier: non-opus; profile: team-harness` |
-| `qa` | `# Semantic source: agents/qa.md (sonnet/high)` | `# Projection tier: non-opus; profile: team-harness` |
-| `security` | `# Semantic source: agents/security.md (opus/xhigh)` | `# Projection tier: opus-xhigh; profile: team-harness` |
-| `delivery` | `# Semantic source: agents/delivery.md (sonnet/medium)` | `# Projection tier: non-opus; profile: team-harness` |
+| `architect` | `# Semantic source: agents/architect.md (opus/xhigh)` | `# Projection tier: opus; profile: team-harness` |
+| `implementer` | `# Semantic source: agents/implementer.md (sonnet/high)` | `# Projection tier: sonnet-high; profile: team-harness` |
+| `tester` | `# Semantic source: agents/tester.md (sonnet/high)` | `# Projection tier: sonnet-high; profile: team-harness` |
+| `qa` | `# Semantic source: agents/qa.md (sonnet/high)` | `# Projection tier: sonnet-high; profile: team-harness` |
+| `security` | `# Semantic source: agents/security.md (opus/xhigh)` | `# Projection tier: opus; profile: team-harness` |
+| `delivery` | `# Semantic source: agents/delivery.md (sonnet/medium)` | `# Projection tier: sonnet-medium; profile: team-harness` |
 
 The parsed fields must also match this projection matrix exactly (a missing,
 extra, or mismatched value fails preflight):
@@ -113,11 +200,11 @@ extra, or mismatched value fails preflight):
 | Role | `name` | `model` | `model_reasoning_effort` | `sandbox_mode` |
 |---|---|---|---|---|
 | `architect` | `architect` | `gpt-5.6-sol` | `xhigh` | `workspace-write` |
-| `implementer` | `implementer` | `gpt-5.6-luna` | `max` | `workspace-write` |
-| `tester` | `tester` | `gpt-5.6-luna` | `max` | `workspace-write` |
-| `qa` | `qa` | `gpt-5.6-luna` | `max` | `read-only` |
+| `implementer` | `implementer` | `gpt-5.6-terra` | `high` | `workspace-write` |
+| `tester` | `tester` | `gpt-5.6-terra` | `high` | `workspace-write` |
+| `qa` | `qa` | `gpt-5.6-terra` | `high` | `read-only` |
 | `security` | `security` | `gpt-5.6-sol` | `xhigh` | `read-only` |
-| `delivery` | `delivery` | `gpt-5.6-luna` | `max` | `workspace-write` |
+| `delivery` | `delivery` | `gpt-5.6-terra` | `medium` | `workspace-write` |
 
 Finally, compare each normalized (LF) file's SHA-256 against the canonical
 identity digest shipped with this plugin. This catches instruction drift that
@@ -125,12 +212,12 @@ the role fields cannot see. The current digests are:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| `architect` | `1079cc6bd4654c78a010dec4b2bf00761eef51cab2c8458931e0582caa232f66` |
-| `implementer` | `d0a27bc1b21006bd656a70360307fc21901438c4f87d8241acbf4d17f04dfc93` |
-| `tester` | `4ea8bdc2c147cf94dd5de670e089cf791dc3cbf5c3569154af327db26ba37a89` |
-| `qa` | `42ef94101164e8c2ddc367d5ad2f928eaae8e983e0df77d9fb6884e6beb0bc2f` |
-| `security` | `969ca514b0072dfc186907110e7bbc4d83c72254125d44b50572dd3bd95a5ec0` |
-| `delivery` | `4addff6a8d7cdf0ab05b4ae1fb1c306ed3e350f2df63b325d24ff58e4eee22cb` |
+| `architect` | `f11ceef09bfb9d2839eb2d25adb05d4dcc1188dfacf11e355a9a291c4fcf816f` |
+| `implementer` | `40a562d3f483502298b3f9ea22de10b9b14839df0d347618a33d3983c8694571` |
+| `tester` | `5045bbb4ab59e21c6283d78f87e8679199c8a4a15abb71ce9f35a84e5c03b8fc` |
+| `qa` | `d3d7d5ebc81e1390680b9589de638a56c47707180d774608006325a5bc14f588` |
+| `security` | `cbb8e4bcc77ffb8e89cf52fdfa1950ea4af107dc1a04cbc76efe3c722679b6a8` |
+| `delivery` | `1c09a83ea425a6aac283f38406f40ab66954f11ccfe244364afc2177fb54085c` |
 
 Do not accept a file solely because its comments or `name` field match. A
 digest mismatch is a stale or unrelated shadow; stop before workspace
@@ -195,10 +282,13 @@ next agent.
    and stop without creating a workspace.
 2. Read [activation.md](references/activation.md), resolve the workspace, and
    initialize its state. Do not preload later phase references.
-3. Read [state-and-gates.md](references/state-and-gates.md) before the first
+3. Read [observability.md](references/observability.md) before the first
+   `phase.start`; it is the sole contract for native Codex usage checkpoints,
+   unavailable measurement, and cost provenance.
+4. Read [state-and-gates.md](references/state-and-gates.md) before the first
    state write. The primary thread remains the sole state writer, gate
    presenter, approval interpreter, and result consolidator.
-4. Read [design.md](references/design.md), delegate the bounded design task to
+5. Read [design.md](references/design.md), delegate the bounded design task to
    `architect`, write the returned plan, present `STAGE-GATE-1`, and stop.
 
 ## Continue
@@ -211,6 +301,10 @@ the recorded `phase`/`next_action`:
 - `validation` or `waiting_gate3`: [validation.md](references/validation.md)
 - `delivery`: [delivery.md](references/delivery.md)
 - `blocked` or ambiguous state: [recovery.md](references/recovery.md)
+
+Before every `phase.start`, `phase.end`, state aggregate, summary rewrite, or
+trace cost render, apply [observability.md](references/observability.md). It
+does not authorize a state write by a specialist or relax any gate rule.
 
 `complete` and `aborted` are terminal. Report their recorded outcome and return
 to ordinary direct behavior; never route either one back through recovery.
@@ -248,3 +342,25 @@ Dispatch only the assigned shard and named anchors. Testing, validation, and
 review reports keep bounded fixed prose plus one compact row per distinct AC,
 finding, test, or changed control. Never omit an item, block, or split
 operator-approved scope solely to meet a total-size target.
+
+## Native Codex observability
+
+Every started pipeline phase closes with the measured or unavailable
+`phase.end` defined in [observability.md](references/observability.md). The
+root thread identifier and rollout path stay ephemeral; the append-only events,
+current state, summary, and `$team-harness:trace` retain only the collector's
+allowlisted checkpoint and delta shapes. Do not estimate usage or cost.
+
+### Declared specialist lifecycle
+
+Before a deliberate specialist dispatch, continued follow-up, terminal return,
+or verification correction, apply the declared lifecycle protocol in
+[observability.md](references/observability.md). Emit only the allowlisted
+`agent.spawn`, `agent.close`, or `agent.correction.spawn` record with its
+finite role/task pair, local ordinal, and `fresh|continued` strategy. A
+terminal correction is always a fresh ordinal. These are coordinator
+bookkeeping declarations, not native Codex telemetry: never recover or persist
+a native ID, alias, rollout path, transcript, prompt, tool output, or
+free-form label, and never attribute a root/phase delta to one agent attempt.
+Unavailable per-attempt metrics remain unavailable; they do not change the
+strict native usage/cost branch or the legacy Claude route.

@@ -70,23 +70,23 @@ The role-specific semantic and profile markers must match this matrix:
 
 | Role | Semantic source | Projection/profile |
 |---|---|---|
-| architect | `agents/architect.md (opus/xhigh)` | `opus-xhigh; profile: team-harness` |
-| implementer | `agents/implementer.md (sonnet/high)` | `non-opus; profile: team-harness` |
-| tester | `agents/tester.md (sonnet/high)` | `non-opus; profile: team-harness` |
-| qa | `agents/qa.md (sonnet/high)` | `non-opus; profile: team-harness` |
-| security | `agents/security.md (opus/xhigh)` | `opus-xhigh; profile: team-harness` |
-| delivery | `agents/delivery.md (sonnet/medium)` | `non-opus; profile: team-harness` |
+| architect | `agents/architect.md (opus/xhigh)` | `opus; profile: team-harness` |
+| implementer | `agents/implementer.md (sonnet/high)` | `sonnet-high; profile: team-harness` |
+| tester | `agents/tester.md (sonnet/high)` | `sonnet-high; profile: team-harness` |
+| qa | `agents/qa.md (sonnet/high)` | `sonnet-high; profile: team-harness` |
+| security | `agents/security.md (opus/xhigh)` | `opus; profile: team-harness` |
+| delivery | `agents/delivery.md (sonnet/medium)` | `sonnet-medium; profile: team-harness` |
 
 The effective runtime fields must match this projection exactly:
 
 | Role | `name` | `model` | `model_reasoning_effort` | `sandbox_mode` |
 |---|---|---|---|---|
 | architect | `architect` | `gpt-5.6-sol` | `xhigh` | `workspace-write` |
-| implementer | `implementer` | `gpt-5.6-luna` | `max` | `workspace-write` |
-| tester | `tester` | `gpt-5.6-luna` | `max` | `workspace-write` |
-| qa | `qa` | `gpt-5.6-luna` | `max` | `read-only` |
+| implementer | `implementer` | `gpt-5.6-terra` | `high` | `workspace-write` |
+| tester | `tester` | `gpt-5.6-terra` | `high` | `workspace-write` |
+| qa | `qa` | `gpt-5.6-terra` | `high` | `read-only` |
 | security | `security` | `gpt-5.6-sol` | `xhigh` | `read-only` |
-| delivery | `delivery` | `gpt-5.6-luna` | `max` | `workspace-write` |
+| delivery | `delivery` | `gpt-5.6-terra` | `medium` | `workspace-write` |
 
 In the files, these appear as `# Semantic source: ...` and
 `# Projection tier: ...` comments. A missing, edited, or mismatched marker or
@@ -95,12 +95,12 @@ the normalized (LF) bytes against these canonical SHA-256 digests:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| architect | `1079cc6bd4654c78a010dec4b2bf00761eef51cab2c8458931e0582caa232f66` |
-| implementer | `d0a27bc1b21006bd656a70360307fc21901438c4f87d8241acbf4d17f04dfc93` |
-| tester | `4ea8bdc2c147cf94dd5de670e089cf791dc3cbf5c3569154af327db26ba37a89` |
-| qa | `42ef94101164e8c2ddc367d5ad2f928eaae8e983e0df77d9fb6884e6beb0bc2f` |
-| security | `969ca514b0072dfc186907110e7bbc4d83c72254125d44b50572dd3bd95a5ec0` |
-| delivery | `4addff6a8d7cdf0ab05b4ae1fb1c306ed3e350f2df63b325d24ff58e4eee22cb` |
+| architect | `f11ceef09bfb9d2839eb2d25adb05d4dcc1188dfacf11e355a9a291c4fcf816f` |
+| implementer | `40a562d3f483502298b3f9ea22de10b9b14839df0d347618a33d3983c8694571` |
+| tester | `5045bbb4ab59e21c6283d78f87e8679199c8a4a15abb71ce9f35a84e5c03b8fc` |
+| qa | `d3d7d5ebc81e1390680b9589de638a56c47707180d774608006325a5bc14f588` |
+| security | `cbb8e4bcc77ffb8e89cf52fdfa1950ea4af107dc1a04cbc76efe3c722679b6a8` |
+| delivery | `1c09a83ea425a6aac283f38406f40ab66954f11ccfe244364afc2177fb54085c` |
 
 A digest mismatch is an identity failure; stop before workspace creation or
 delegation. Ask the operator to run `$team-harness:update` to
@@ -156,3 +156,10 @@ Create:
 Initialize state before dispatch so an interrupted design is recoverable.
 The primary thread remains the only writer of this state and of gate releases;
 specialists receive the workspace as input and return bounded artifacts.
+
+Before the first `phase.start`, follow [observability.md](observability.md).
+The active root-thread identifier and rollout root are measurement inputs only:
+keep them in memory or an ephemeral environment variable, never in the newly
+created artifacts. Append only the allowlisted checkpoint shape. If the native
+runtime cannot provide the root identifier, start honestly with the collector's
+unavailable checkpoint; do not infer a replacement from files or state.

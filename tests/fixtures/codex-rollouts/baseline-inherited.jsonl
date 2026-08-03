@@ -1,0 +1,4 @@
+{"type":"session_meta","payload":{"session_id":"root-real-id-baseline","id":"root-real-id-baseline","source":"cli"}}
+{"type":"response_item","payload":{"message":"IGNORED-ROLL-OUT-CONTENT"}}
+{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"cached_input_tokens":40,"cache_write_input_tokens":12,"output_tokens":50,"reasoning_output_tokens":10,"total_tokens":150},"last_token_usage":{"input_tokens":15,"cached_input_tokens":5,"cache_write_input_tokens":2,"output_tokens":7,"reasoning_output_tokens":2,"total_tokens":22}}}}
+{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":160,"cached_input_tokens":60,"cache_write_input_tokens":20,"output_tokens":80,"reasoning_output_tokens":18,"total_tokens":240},"last_token_usage":{"input_tokens":4,"cached_input_tokens":1,"cache_write_input_tokens":1,"output_tokens":2,"reasoning_output_tokens":1,"total_tokens":6}}}}
