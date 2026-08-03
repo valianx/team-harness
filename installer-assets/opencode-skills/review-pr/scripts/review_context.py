@@ -114,6 +114,7 @@ def promote_artifact(root: Path, temporary_name: str, final_name: str) -> None:
             )
         except OSError as error:
             raise ContextError("cannot pin temporary artifact without following links") from error
+        staging: str | None = None
         try:
             pinned = os.fstat(temporary_fd)
             if not stat.S_ISREG(pinned.st_mode) or (before.st_dev, before.st_ino) != (pinned.st_dev, pinned.st_ino):
@@ -129,8 +130,22 @@ def promote_artifact(root: Path, temporary_name: str, final_name: str) -> None:
             current = _regular_stat_at(directory_fd, temporary_name)
             if (current.st_dev, current.st_ino) != (pinned.st_dev, pinned.st_ino):
                 raise ContextError("temporary artifact changed during promotion")
+            staging = f"tmp-pinned-{secrets.token_hex(16)}"
+            try:
+                os.link(
+                    f"/proc/self/fd/{temporary_fd}",
+                    staging,
+                    dst_dir_fd=directory_fd,
+                    follow_symlinks=True,
+                )
+            except OSError as error:
+                raise ContextError("cannot link pinned temporary artifact") from error
+            staged = _regular_stat_at(directory_fd, staging)
+            if (staged.st_dev, staged.st_ino) != (pinned.st_dev, pinned.st_ino):
+                os.unlink(staging, dir_fd=directory_fd)
+                raise ContextError("pinned staging artifact identity mismatch")
             os.replace(
-                temporary_name,
+                staging,
                 final_name,
                 src_dir_fd=directory_fd,
                 dst_dir_fd=directory_fd,
@@ -138,9 +153,20 @@ def promote_artifact(root: Path, temporary_name: str, final_name: str) -> None:
             promoted = _regular_stat_at(directory_fd, final_name)
             if (promoted.st_dev, promoted.st_ino) != (pinned.st_dev, pinned.st_ino):
                 raise ContextError("promoted artifact identity mismatch")
+            try:
+                leftover = os.stat(temporary_name, dir_fd=directory_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                leftover = None
+            if leftover is not None and (leftover.st_dev, leftover.st_ino) == (pinned.st_dev, pinned.st_ino):
+                os.unlink(temporary_name, dir_fd=directory_fd)
         except OSError as error:
             raise ContextError("cannot atomically promote artifact leaf") from error
         finally:
+            if staging is not None:
+                try:
+                    os.unlink(staging, dir_fd=directory_fd)
+                except FileNotFoundError:
+                    pass
             os.close(temporary_fd)
     finally:
         os.close(directory_fd)

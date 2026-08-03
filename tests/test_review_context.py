@@ -109,6 +109,27 @@ class ReviewContextTests(unittest.TestCase):
             self.assertFalse((root / "review.md").exists())
             self.assertEqual(temporary.read_text(encoding="utf-8"), "safe")
 
+    def test_artifact_promotion_uses_pinned_inode_when_source_name_swaps(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            temporary = root / "tmp-body"
+            temporary.write_text("safe", encoding="utf-8")
+            outside = root / "outside"
+            outside.write_text("secret", encoding="utf-8")
+            real_replace = MODULE.os.replace
+
+            def swap_then_replace(source, destination, **kwargs):
+                temporary.unlink()
+                temporary.symlink_to(outside)
+                return real_replace(source, destination, **kwargs)
+
+            with patch.object(MODULE.os, "replace", side_effect=swap_then_replace):
+                MODULE.promote_artifact(root, "tmp-body", "review.md")
+
+            self.assertEqual((root / "review.md").read_text(encoding="utf-8"), "safe")
+            self.assertTrue(temporary.is_symlink())
+            self.assertEqual(outside.read_text(encoding="utf-8"), "secret")
+
     def test_security_selection_is_fail_closed_for_every_reason(self):
         cases = [
             ("agents/security.md\n", "+permission boundary\n", "known-sensitive", True),
