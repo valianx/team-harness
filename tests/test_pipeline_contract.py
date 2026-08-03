@@ -566,6 +566,9 @@ def check_explicit_validation_correction_decision() -> None:
         "at `iteration: 3/3`, require `correction_exceptional: true`",
         "authorize one exceptional correction round",
         "ordinary recovered choice text can never authorize an exceptional round",
+        "`correction_nonce: null`",
+        "exact token in `correction_decision_nonce`",
+        "mismatched decision nonce",
     ):
         require(marker in recovery_flat, f"Codex recovery: fail-closed marker missing: {marker}")
 
@@ -573,6 +576,11 @@ def check_explicit_validation_correction_decision() -> None:
     require(
         "correction/execution budget exhaustion" in state_gate,
         "Codex autonomous closed predicate omits budget exhaustion",
+    )
+    require(
+        "consumed token in `correction_decision_nonce`" in state_gate
+        and "`correction_nonce: null`" in state_gate,
+        "Codex autonomous correction does not persist exact nonce consumption",
     )
 
     planning = re.sub(
@@ -1542,8 +1550,12 @@ def check_pr_review_workspace_isolation() -> None:
     require("printf '\\n/workspaces/\\n' >> \"$GITIGNORE\"" in canonical, "PR review does not add the workspace ignore rule")
     require("git -C \"$REVIEW_ROOT\" check-ignore" in canonical, "PR review does not verify ignore coverage")
     ignore_write = canonical.index("printf '\\n/workspaces/\\n'")
+    ignore_probe = canonical.index('check-ignore -q -- "workspaces/.team-harness-ignore-probe"')
     workspace_create = canonical.index('mkdir -p "$ARTIFACTS"')
-    require(ignore_write < workspace_create, "PR review creates its workspace before updating .gitignore")
+    require(ignore_write < ignore_probe < workspace_create, "PR review creates its workspace before effective ignore verification")
+    require('[ -L "$WORKSPACES_ROOT" ]' in canonical, "PR review does not reject a symlinked workspace root")
+    require('[ -L "$ARTIFACTS" ]' in canonical, "PR review does not reject a symlinked review workspace")
+    require(canonical.count("candidate.relative_to(root)") == 2, "PR review lacks pre/post-create canonical containment checks")
     require(re.search(r"(?m)^/workspaces/$", read(".gitignore")) is not None, "repository workspace ignore rule is not canonical")
     require(".claude/pr-review" not in read("agents/ref-direct-modes.md"), "Claude direct review contract retains .claude artifacts")
 

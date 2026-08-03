@@ -57,9 +57,11 @@ With a valid `approved-autonomous` Gate-1 dual record, `iteration < 3`, no
 correction/execution budget exhaustion, and only unambiguous `resolve` findings
 inside approved scope, Main may consume the nonce
 without another presentation using `correction_authority: gate1-autonomous` and
-the exact consumed Gate-1 nonce. `authorize` requires one matching `correction.decision`
+the exact consumed Gate-1 nonce. Consumption atomically sets `correction_nonce:
+null` and copies the consumed token to `correction_decision_nonce`. `authorize`
+requires one matching `correction.decision`
 event and permits exactly one `iteration.start`/`agent.correction.spawn` pair
-bound to the same nonce, anchor, findings, scope, and `correction_exceptional`
+bound to that same decision nonce, anchor, findings, scope, and `correction_exceptional`
 value. `pause` and `abort`
 perform no correction. Every later failure gets a fresh nonce and decision.
 An ordinary approval, intake autonomy preference, generic `continue`, recovered

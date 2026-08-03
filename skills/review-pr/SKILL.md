@@ -76,10 +76,37 @@ fi
 if ! grep -Eq '^/workspaces/?$' "$GITIGNORE" 2>/dev/null; then
   printf '\n/workspaces/\n' >> "$GITIGNORE"
 fi
+WORKSPACES_ROOT="$REVIEW_ROOT/workspaces"
 ARTIFACTS="$REVIEW_ROOT/workspaces/pr-review-{number}"
-mkdir -p "$ARTIFACTS"
-if ! git -C "$REVIEW_ROOT" check-ignore -q -- "$ARTIFACTS"; then
+if ! git -C "$REVIEW_ROOT" check-ignore -q -- "workspaces/.team-harness-ignore-probe"; then
   echo "cannot create a safe local review workspace — workspaces/ is not ignored" >&2
+  exit 1
+fi
+if [ -L "$WORKSPACES_ROOT" ] || { [ -e "$WORKSPACES_ROOT" ] && [ ! -d "$WORKSPACES_ROOT" ]; }; then
+  echo "cannot create a safe local review workspace — workspaces is not a real directory" >&2
+  exit 1
+fi
+if [ -L "$ARTIFACTS" ] || { [ -e "$ARTIFACTS" ] && [ ! -d "$ARTIFACTS" ]; }; then
+  echo "cannot create a safe local review workspace — review workspace is not a real directory" >&2
+  exit 1
+fi
+python3 - "$REVIEW_ROOT" "$ARTIFACTS" <<'PY'
+from pathlib import Path
+import sys
+root = Path(sys.argv[1]).resolve(strict=True)
+candidate = Path(sys.argv[2]).resolve(strict=False)
+candidate.relative_to(root)
+PY
+mkdir -p "$ARTIFACTS"
+python3 - "$REVIEW_ROOT" "$ARTIFACTS" <<'PY'
+from pathlib import Path
+import sys
+root = Path(sys.argv[1]).resolve(strict=True)
+candidate = Path(sys.argv[2]).resolve(strict=True)
+candidate.relative_to(root)
+PY
+if ! git -C "$REVIEW_ROOT" check-ignore -q -- "$ARTIFACTS"; then
+  echo "cannot use the local review workspace — created directory is not ignored" >&2
   exit 1
 fi
 CONTEXT="$ARTIFACTS/pr-review-context.json"

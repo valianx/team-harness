@@ -192,12 +192,15 @@ If any conjunct is false or doubtful,
 the autonomous path is prohibited and Main uses the live path below.
 
 When every conjunct is true, Main creates and immediately consumes a fresh
-`correction_nonce`, records `correction_pending: false`, `correction_decision:
-authorize`, `correction_authority: gate1-autonomous`, the exact consumed Gate-1
-release nonce in `correction_authority_gate_nonce`, and
+`correction_nonce`, then atomically records `correction_nonce: null`, the
+consumed token in `correction_decision_nonce`, `correction_pending: false`,
+`correction_decision: authorize`, `correction_authority: gate1-autonomous`, the
+exact consumed Gate-1 release nonce in `correction_authority_gate_nonce`, and
 `correction_exceptional: false`, plus one matching `correction.decision` event
-bound to the complete dispositions, resolve IDs, anchor, and scope. This single
-record authorizes exactly one fresh implementer, new Freeze, and fresh full
+bound to that same consumed correction nonce, complete dispositions, resolve
+IDs, anchor, and scope. The one subsequent `iteration.start` and
+`agent.correction.spawn` must carry that identical nonce. This single record
+authorizes exactly one fresh implementer, new Freeze, and fresh full
 validation fan. Each later failed fan repeats the triage and predicate; the
 third authorized correction exhausts autonomy and any later failure pauses.
 

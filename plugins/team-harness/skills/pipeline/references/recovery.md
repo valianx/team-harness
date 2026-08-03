@@ -198,7 +198,11 @@ conjunct, including no correction/execution budget exhaustion. A recovered
 `correction.decision` is valid only when its single-use
 nonce, failed anchor, complete finding IDs, dispositions, scope,
 `correction_authority`, and `correction_exceptional` boolean exactly match
-the state record. A stale or consumed nonce, mismatched anchor/findings/scope,
+the state record. An authorized consumed decision additionally requires
+`correction_nonce: null`, its exact token in `correction_decision_nonce`, and
+that identical token on the matching `correction.decision`, one
+`iteration.start`, and one `agent.correction.spawn`. A stale or consumed nonce,
+mismatched decision nonce, mismatched anchor/findings/scope,
 or reuse of one authorization for more than one `iteration.start` or
 `agent.correction.spawn` is invalid and blocks dispatch. An implementation or
 correction event after a failed validation without the matching decision also
