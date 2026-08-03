@@ -86,10 +86,6 @@ if [ -L "$WORKSPACES_ROOT" ] || { [ -e "$WORKSPACES_ROOT" ] && [ ! -d "$WORKSPAC
   echo "cannot create a safe local review workspace — workspaces is not a real directory" >&2
   exit 1
 fi
-if [ -L "$ARTIFACTS" ] || { [ -e "$ARTIFACTS" ] && [ ! -d "$ARTIFACTS" ]; }; then
-  echo "cannot create a safe local review workspace — review workspace is not a real directory" >&2
-  exit 1
-fi
 python3 - "$REVIEW_ROOT" "$ARTIFACTS" <<'PY'
 from pathlib import Path
 import sys
@@ -97,7 +93,21 @@ root = Path(sys.argv[1]).resolve(strict=True)
 candidate = Path(sys.argv[2]).resolve(strict=False)
 candidate.relative_to(root)
 PY
-mkdir -p "$ARTIFACTS"
+if [ ! -e "$WORKSPACES_ROOT" ]; then
+  mkdir -m 700 "$WORKSPACES_ROOT"
+fi
+if [ "${RESUME_FROM_DRAFT:-false}" = "true" ]; then
+  if [ -L "$ARTIFACTS" ] || [ ! -d "$ARTIFACTS" ]; then
+    echo "cannot resume review — review workspace is not a real directory" >&2
+    exit 1
+  fi
+else
+  if [ -e "$ARTIFACTS" ] || [ -L "$ARTIFACTS" ]; then
+    echo "cannot start a fresh review — review workspace already exists; resume or cancel it first" >&2
+    exit 1
+  fi
+  mkdir -m 700 "$ARTIFACTS"
+fi
 python3 - "$REVIEW_ROOT" "$ARTIFACTS" <<'PY'
 from pathlib import Path
 import sys
@@ -112,12 +122,34 @@ fi
 CONTEXT="$ARTIFACTS/pr-review-context.json"
 CONVERSATION="$ARTIFACTS/pr-review-conversation.md"
 
+if [ "${RESUME_FROM_DRAFT:-false}" = "true" ]; then
+  for leaf in "$CONTEXT" "$ARTIFACTS/pr-review-final.md" "$ARTIFACTS/pr-review-inline.json"; do
+    if [ -L "$leaf" ] || [ ! -f "$leaf" ]; then
+      echo "cannot resume review — required artifact is not a regular non-symlink file" >&2
+      exit 1
+    fi
+  done
+fi
+
+CONTEXT_TMP="$(mktemp "$ARTIFACTS/.pr-review-context.XXXXXX")"
+CONVERSATION_TMP="$(mktemp "$ARTIFACTS/.pr-review-conversation.XXXXXX")"
 python3 "$REVIEW_CONTEXT_HELPER" capture \
   --repo "{owner}/{repo}" --pr {number} --git-dir "$REVIEW_ROOT" \
-  --output "$CONTEXT"
+  --output "$CONTEXT_TMP"
 python3 "$REVIEW_CONTEXT_HELPER" render \
-  --context "$CONTEXT" --output "$CONVERSATION"
+  --context "$CONTEXT_TMP" --output "$CONVERSATION_TMP"
+mv -f -- "$CONTEXT_TMP" "$CONTEXT"
+mv -f -- "$CONVERSATION_TMP" "$CONVERSATION"
 ```
+
+Every later artifact write follows the same leaf-safe rule: create a unique
+regular temporary file inside `$ARTIFACTS`, write only that temporary file,
+verify with `lstat` that it is regular and non-symlink and canonically contained
+under `$ARTIFACTS`, reject an existing final leaf unless it is also regular and
+non-symlink, then atomically rename the temporary file over the final leaf.
+Never redirect or open a fixed final artifact path directly. The exclusive
+fresh-directory creation and these atomic promotions are mandatory, not
+best-effort snapshot checks.
 
 Read metadata and immutable refs from `$CONTEXT`. Store `head_oid`, `base_oid`,
 `merge_base_oid`, `context_hash`, `fetched_at`, `is_cross_repository`, and the classified and raw
@@ -132,10 +164,16 @@ inside Task prompts.
 DIFF="$ARTIFACTS/pr-review-diff.patch"
 FILES="$ARTIFACTS/pr-review-files.txt"
 CHECKS="$ARTIFACTS/pr-review-checks.txt"
+DIFF_TMP="$(mktemp "$ARTIFACTS/.pr-review-diff.XXXXXX")"
+FILES_TMP="$(mktemp "$ARTIFACTS/.pr-review-files.XXXXXX")"
+CHECKS_TMP="$(mktemp "$ARTIFACTS/.pr-review-checks.XXXXXX")"
 
-git diff "{frozen_base_ref}...{frozen_head_ref}" > "$DIFF"
-git diff --name-only "{frozen_base_ref}...{frozen_head_ref}" > "$FILES"
-gh pr checks {number} --repo "{owner}/{repo}" > "$CHECKS" 2>&1 || true
+git diff "{frozen_base_ref}...{frozen_head_ref}" > "$DIFF_TMP"
+git diff --name-only "{frozen_base_ref}...{frozen_head_ref}" > "$FILES_TMP"
+gh pr checks {number} --repo "{owner}/{repo}" > "$CHECKS_TMP" 2>&1 || true
+mv -f -- "$DIFF_TMP" "$DIFF"
+mv -f -- "$FILES_TMP" "$FILES"
+mv -f -- "$CHECKS_TMP" "$CHECKS"
 ```
 
 Do not execute the PR's code or install dependencies. Existing CI results are evidence; local

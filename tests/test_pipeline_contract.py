@@ -563,9 +563,13 @@ def check_explicit_validation_correction_decision() -> None:
         "before issuing a fresh nonce",
         "missing, extra, duplicated, or mismatched findings/dispositions",
         "for `iteration < 3`, require `correction_exceptional: false`",
-        "at `iteration: 3/3`, require `correction_exceptional: true`",
+        "at `iteration: 3/3`, require `exceptional_correction_count: 0`",
+        "`correction_exceptional: true`",
         "authorize one exceptional correction round",
         "ordinary recovered choice text can never authorize an exceptional round",
+        "require `exceptional_correction_count: 0`",
+        "may offer only pause or abort",
+        "any second exceptional presentation",
         "`correction_nonce: null`",
         "exact token in `correction_decision_nonce`",
         "mismatched decision nonce",
@@ -581,6 +585,12 @@ def check_explicit_validation_correction_decision() -> None:
         "consumed token in `correction_decision_nonce`" in state_gate
         and "`correction_nonce: null`" in state_gate,
         "Codex autonomous correction does not persist exact nonce consumption",
+    )
+    require(
+        "only while `exceptional_correction_count: 0`" in state_gate
+        and "sets `exceptional_correction_count: 1`" in state_gate
+        and "only pause or abort" in state_gate,
+        "Codex permits repeated exceptional correction rounds",
     )
 
     planning = re.sub(
@@ -1551,11 +1561,16 @@ def check_pr_review_workspace_isolation() -> None:
     require("git -C \"$REVIEW_ROOT\" check-ignore" in canonical, "PR review does not verify ignore coverage")
     ignore_write = canonical.index("printf '\\n/workspaces/\\n'")
     ignore_probe = canonical.index('check-ignore -q -- "workspaces/.team-harness-ignore-probe"')
-    workspace_create = canonical.index('mkdir -p "$ARTIFACTS"')
+    workspace_create = canonical.index('mkdir -m 700 "$ARTIFACTS"')
     require(ignore_write < ignore_probe < workspace_create, "PR review creates its workspace before effective ignore verification")
     require('[ -L "$WORKSPACES_ROOT" ]' in canonical, "PR review does not reject a symlinked workspace root")
     require('[ -L "$ARTIFACTS" ]' in canonical, "PR review does not reject a symlinked review workspace")
     require(canonical.count("candidate.relative_to(root)") == 2, "PR review lacks pre/post-create canonical containment checks")
+    require("review workspace already exists; resume or cancel it first" in canonical, "fresh PR review can reuse a pre-existing artifact root")
+    require("required artifact is not a regular non-symlink file" in canonical, "PR review resume accepts unsafe artifact leaves")
+    require("Never redirect or open a fixed final artifact path directly" in canonical, "PR review lacks the leaf no-follow rule")
+    require("atomically rename the temporary file over the final leaf" in canonical, "PR review lacks atomic artifact promotion")
+    require('> "$DIFF"' not in canonical and '> "$FILES"' not in canonical and '> "$CHECKS"' not in canonical, "PR review writes a fixed artifact leaf directly")
     require(re.search(r"(?m)^/workspaces/$", read(".gitignore")) is not None, "repository workspace ignore rule is not canonical")
     require(".claude/pr-review" not in read("agents/ref-direct-modes.md"), "Claude direct review contract retains .claude artifacts")
 

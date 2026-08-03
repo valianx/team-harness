@@ -308,10 +308,12 @@ aborts without correction. Under normal approval a second failure always pauses
 with a fresh decision. Autonomous approval may start another fresh complete
 round only after another full fan and eligible triage, while `iteration < 3`;
 there is no verifier-to-implementer bounce or agent follow-up.
-At `iteration: 3/3`, the presentation sets `correction_exceptional: true` and
-labels choice `1` as exceptional. Only its matching authorize decision is
-tracked in `exceptional_correction_count`; `iteration` remains `3/3` and
-`3/3+exception` is invalid.
+At `iteration: 3/3`, choice `1` exists only while
+`exceptional_correction_count: 0`; the presentation sets
+`correction_exceptional: true` and labels that choice exceptional. Its matching
+authorize decision sets the counter to `1`; every later failure offers only
+pause or abort. `iteration` remains `3/3`, a second exceptional decision is
+invalid, and `3/3+exception` is never serialized.
 
 An authorized correctable sensitive finding requires a fresh security audit in
 the new full fan. Decision-bearing concerns, including

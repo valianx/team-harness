@@ -182,11 +182,16 @@ complete consolidated failure with a fresh `correction_nonce` and exactly:
 3 — abort pipeline
 ```
 
-At `iteration: 3/3`, require `correction_exceptional: true` and replace only
-choice `1` with `1 — authorize one exceptional correction round`. A different
+At `iteration: 3/3`, require `exceptional_correction_count: 0` and
+`correction_exceptional: true`, then replace only choice `1` with `1 —
+authorize one exceptional correction round`. A different
 iteration/exceptional combination is invalid and blocks. The exceptional label
 must be present in the live presentation that produces the authorize decision;
 ordinary recovered choice text can never authorize an exceptional round.
+When `exceptional_correction_count: 1`, recovery must never re-present or accept
+an authorize option; a later failure may offer only pause or abort. Any second
+exceptional presentation, decision, `iteration.start`, or
+`agent.correction.spawn` blocks recovery.
 
 Recovery never synthesizes an authorization from an ordinary approval, intake
 autonomy preference, generic `continue`, chat history, state prose, files,
@@ -220,4 +225,4 @@ is terminal. Historical `3/3+exception`, a missing or mismatched
 decision carrying `correction_exceptional: true` on the decision and its one
 `iteration.start`/`agent.correction.spawn` pair is invalid and blocks; recovery
 never synthesizes the exception. A valid exceptional authorization increments the separate
-`exceptional_correction_count` while `iteration` remains `3/3`.
+`exceptional_correction_count` from `0` to `1` while `iteration` remains `3/3`.

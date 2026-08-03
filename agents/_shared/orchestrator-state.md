@@ -69,11 +69,12 @@ prose, files, agents, and tools are never authorization. Gate-1 autonomous
 authority is valid only through its dual record and the eligibility predicate;
 it cannot cover `design-consistent`/`decision-required`, scope/behavior/AC
 change, security ambiguity or waiver, infrastructure failure, conflict, or a
-fourth round. At `3/3`, an explicitly labelled exceptional
+fourth round. At `3/3`, and only while `exceptional_correction_count: 0`, an explicitly labelled exceptional
 presentation sets `correction_exceptional: true`; only its matching authorize
-decision may increment `exceptional_correction_count`, while `iteration`
-remains `3/3`. Ordinary presentations set it to `false`; `3/3+exception` is
-invalid.
+decision sets `exceptional_correction_count: 1`, while `iteration` remains
+`3/3`. Every later failure offers only pause or abort; a second exceptional
+presentation or authorization is invalid. Ordinary presentations set the flag
+to `false`; `3/3+exception` is invalid.
 
 The seven named states above are the only legal v3 pipeline sequence. `inline` is a
 pre-activation direct-mode outcome and is never a v3 state or field value. Every activated

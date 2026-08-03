@@ -308,12 +308,13 @@ every closed eligibility conjunct passes and `iteration < 3`. Plan repairs and d
 never create an automatic design-perfection loop.
 
 **Max 3 is a limit, never permission.** At `3/3`, the standard path is pause or abort. An
-exceptional round exists only when option `1` is explicitly labelled exceptional in the
+exceptional round exists only while `exceptional_correction_count: 0` and when option `1` is explicitly labelled exceptional in the
 post-failure presentation and selected by the live operator. Set
 `correction_exceptional: true` on that presentation, its decision, and the one authorized
 `iteration.start`/`agent.correction.spawn` pair; ordinary decisions use `false`. Increment
-the separate exceptional counter only for that matching authorize record and
-never serialize `3/3+exception`.
+the separate exceptional counter to `1` only for that matching authorize record. Every later
+failure offers only pause or abort; never allow a second exception or serialize
+`3/3+exception`.
 
 ### `cause` and the severity floor
 

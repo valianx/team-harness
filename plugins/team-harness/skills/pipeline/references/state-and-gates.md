@@ -255,10 +255,13 @@ mutation or dispatch, and leaves `next_action: await operator request to
 re-present correction decision`; any later presentation uses a fresh nonce.
 Choice `3` records `abort` with `correction_authority: operator-live`, closes
 the pipeline, and performs no correction.
-At `iteration: 3/3`, the presentation sets `correction_exceptional: true` and
-labels choice `1` as an exceptional single round. Only its matching authorize
-decision increments `exceptional_correction_count` and leaves `iteration: 3/3`;
-never serialize `3/3+exception`; autonomous authority can never authorize an
+At `iteration: 3/3`, choice `1` may be presented only while
+`exceptional_correction_count: 0`; that presentation sets
+`correction_exceptional: true` and labels choice `1` as an exceptional single
+round. Only its matching authorize decision sets `exceptional_correction_count:
+1` and leaves `iteration: 3/3`; after that round, every further failure offers
+only pause or abort and can never present or accept another authorize choice.
+Never serialize `3/3+exception`; autonomous authority can never authorize an
 exception.
 
 ## Post-Gate-1 coordinator routing
