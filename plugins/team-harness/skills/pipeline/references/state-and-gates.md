@@ -187,7 +187,8 @@ The closed autonomous predicate requires every conjunct: a valid
 inside approved scope and preserves intent, behavior, and AC meaning; no scope
 expansion, conflicting finding, `design-consistent` or `decision-required`
 disposition, security ambiguity/waiver, unavailable coverage, infrastructure
-failure, or exceptional round exists. If any conjunct is false or doubtful,
+failure, correction/execution budget exhaustion, or exceptional round exists.
+If any conjunct is false or doubtful,
 the autonomous path is prohibited and Main uses the live path below.
 
 When every conjunct is true, Main creates and immediately consumes a fresh

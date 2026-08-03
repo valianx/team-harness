@@ -1,5 +1,5 @@
 # Ephemeral agent pipeline workspaces
-/workspaces
+/workspaces/
 
 # OS junk
 .DS_Store

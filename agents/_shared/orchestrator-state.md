@@ -53,8 +53,9 @@ specialist dispatch, Freeze rebuild, or revalidation is legal before authority
 is recorded. With `autonomous: false`, Main pauses and presents exactly `1 —
 authorize one correction round`, `2 — pause without changes`, and `3 — abort
 pipeline`; only a live reply after that presentation may consume the nonce.
-With a valid `approved-autonomous` Gate-1 dual record, `iteration < 3`, and only
-unambiguous `resolve` findings inside approved scope, Main may consume the nonce
+With a valid `approved-autonomous` Gate-1 dual record, `iteration < 3`, no
+correction/execution budget exhaustion, and only unambiguous `resolve` findings
+inside approved scope, Main may consume the nonce
 without another presentation using `correction_authority: gate1-autonomous` and
 the exact consumed Gate-1 nonce. `authorize` requires one matching `correction.decision`
 event and permits exactly one `iteration.start`/`agent.correction.spawn` pair

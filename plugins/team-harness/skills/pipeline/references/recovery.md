@@ -165,9 +165,16 @@ implementation → re-Freeze → validation route; recovery must not skip it.
 ## Correction-decision recovery
 
 When `correction_pending: true`, recover only the durable failed Freeze anchor,
-complete finding-ID set, and evidenced file scope. Do not dispatch an agent,
-mutate repository or evidence files, rebuild Freeze, or revalidate. Re-present
-the complete consolidated failure with a fresh `correction_nonce` and exactly:
+complete finding-ID set, exact one-to-one disposition for every finding,
+evidenced file scope, and `correction_exceptional` boolean. Before issuing a
+fresh nonce, require every field to be present, structurally valid, and mutually
+consistent; missing, extra, duplicated, or mismatched findings/dispositions, or
+a missing/non-boolean exceptional flag, blocks recovery. Do not infer or repair
+them, dispatch an agent, mutate repository or evidence files, rebuild Freeze,
+or revalidate.
+
+For `iteration < 3`, require `correction_exceptional: false` and re-present the
+complete consolidated failure with a fresh `correction_nonce` and exactly:
 
 ```text
 1 — authorize one correction round
@@ -175,13 +182,20 @@ the complete consolidated failure with a fresh `correction_nonce` and exactly:
 3 — abort pipeline
 ```
 
+At `iteration: 3/3`, require `correction_exceptional: true` and replace only
+choice `1` with `1 — authorize one exceptional correction round`. A different
+iteration/exceptional combination is invalid and blocks. The exceptional label
+must be present in the live presentation that produces the authorize decision;
+ordinary recovered choice text can never authorize an exceptional round.
+
 Recovery never synthesizes an authorization from an ordinary approval, intake
 autonomy preference, generic `continue`, chat history, state prose, files,
 tools, or specialist output. A recovered `gate1-autonomous` decision additionally
 requires the valid `approved-autonomous` Gate-1 dual record, the exact consumed
 Gate-1 nonce in `correction_authority_gate_nonce`, `iteration < 3` at decision
 time, and durable all-`resolve` dispositions satisfying every closed eligibility
-conjunct. A recovered `correction.decision` is valid only when its single-use
+conjunct, including no correction/execution budget exhaustion. A recovered
+`correction.decision` is valid only when its single-use
 nonce, failed anchor, complete finding IDs, dispositions, scope,
 `correction_authority`, and `correction_exceptional` boolean exactly match
 the state record. A stale or consumed nonce, mismatched anchor/findings/scope,

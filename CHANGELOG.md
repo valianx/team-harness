@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed post-terminal implementer and reviewer continuations. Main now performs one bounded
   evidence triage, presents advisory `resolve|design-consistent|decision-required` dispositions,
   and pauses on every design, scope, AC, security, conflict, infrastructure, or budget decision.
+- Moved local PR-review artifacts from `.claude/` to ignored repo-local
+  `workspaces/pr-review-{number}/` directories. Review setup now adds the anchored workspace
+  rule to `.gitignore` before creating the directory and verifies that Git ignores it.
 
 ## [3.8.0] - 2026-08-03
 

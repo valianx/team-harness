@@ -558,8 +558,22 @@ def check_explicit_validation_correction_decision() -> None:
         "at most three `gate1-autonomous` correction decisions",
         "a fourth",
         "exact consumed gate-1 nonce",
+        "no correction/execution budget exhaustion",
+        "exact one-to-one disposition for every finding",
+        "before issuing a fresh nonce",
+        "missing, extra, duplicated, or mismatched findings/dispositions",
+        "for `iteration < 3`, require `correction_exceptional: false`",
+        "at `iteration: 3/3`, require `correction_exceptional: true`",
+        "authorize one exceptional correction round",
+        "ordinary recovered choice text can never authorize an exceptional round",
     ):
         require(marker in recovery_flat, f"Codex recovery: fail-closed marker missing: {marker}")
+
+    state_gate = re.sub(r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/state-and-gates.md").lower())
+    require(
+        "correction/execution budget exhaustion" in state_gate,
+        "Codex autonomous closed predicate omits budget exhaustion",
+    )
 
     planning = re.sub(
         r"\s+",
@@ -1517,6 +1531,23 @@ def check_review_comment_regressions() -> None:
     require("flow-telemetry: unavailable" not in observability, "Observability: obsolete telemetry failure event remains")
 
 
+def check_pr_review_workspace_isolation() -> None:
+    """PR review artifacts stay in an ignored repo-local workspace, never .claude."""
+    canonical = read("skills/review-pr/SKILL.md")
+    flattened = re.sub(r"\s+", " ", canonical.lower())
+    require("workspaces/pr-review-{number}" in canonical, "PR review workspace is not repo-local")
+    require("never use `.claude/` for review state" in flattened, "PR review can still use .claude for local state")
+    require(".claude/pr-review" not in canonical, "PR review retains a .claude artifact path")
+    require("^/workspaces/?$" in canonical, "PR review does not recognize the anchored workspace ignore rule")
+    require("printf '\\n/workspaces/\\n' >> \"$GITIGNORE\"" in canonical, "PR review does not add the workspace ignore rule")
+    require("git -C \"$REVIEW_ROOT\" check-ignore" in canonical, "PR review does not verify ignore coverage")
+    ignore_write = canonical.index("printf '\\n/workspaces/\\n'")
+    workspace_create = canonical.index('mkdir -p "$ARTIFACTS"')
+    require(ignore_write < workspace_create, "PR review creates its workspace before updating .gitignore")
+    require(re.search(r"(?m)^/workspaces/$", read(".gitignore")) is not None, "repository workspace ignore rule is not canonical")
+    require(".claude/pr-review" not in read("agents/ref-direct-modes.md"), "Claude direct review contract retains .claude artifacts")
+
+
 def check_claude_codex_parity() -> None:
     """The two runtime projections expose the same posture and migration rules."""
     claude = "\n".join(
@@ -2148,6 +2179,7 @@ def main() -> None:
         ("delivery preview binding", check_delivery_preview_binding),
         ("terminal/transition mapping", check_terminal_and_transition_mapping),
         ("PR review regressions", check_review_comment_regressions),
+        ("PR review workspace isolation", check_pr_review_workspace_isolation),
         ("Claude/Codex parity", check_claude_codex_parity),
         ("execution efficiency", check_execution_efficiency_contract),
         ("context isolation and rotation", check_context_isolation_rotation_contract),

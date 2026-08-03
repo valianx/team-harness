@@ -30,11 +30,15 @@ Remove options before parsing the PR identifier.
    - a genuinely cross-file finding lives in the review body;
    - the body may count inline findings but must not repeat them.
 8. Preserve every supported blocking finding. Brevity removes repetition and optional commentary, never blockers.
+9. Store every local review artifact under the repository's `workspaces/pr-review-{number}/`.
+   Before creating that directory, ensure the repository `.gitignore` contains an anchored
+   `/workspaces` or `/workspaces/` entry; add `/workspaces/` when neither exists. Never use
+   `.claude/` for review state.
 
 ## Resume
 
-Require `.claude/pr-review-context.json`, a non-empty body draft, and
-`.claude/pr-review-inline.json` (an empty JSON array is valid). Capture a fresh context and run
+Require `workspaces/pr-review-{number}/pr-review-context.json`, a non-empty body draft, and
+`workspaces/pr-review-{number}/pr-review-inline.json` (an empty JSON array is valid). Capture a fresh context and run
 `review_context.py compare`.
 
 - `current`: continue at Preview.
@@ -64,7 +68,20 @@ Do not recreate the helper inline.
 
 ```bash
 REVIEW_ROOT="$(git rev-parse --show-toplevel)"
-ARTIFACTS="$REVIEW_ROOT/.claude"
+GITIGNORE="$REVIEW_ROOT/.gitignore"
+if [ -L "$GITIGNORE" ] || { [ -e "$GITIGNORE" ] && [ ! -f "$GITIGNORE" ]; }; then
+  echo "cannot create a safe local review workspace — .gitignore is not a regular file" >&2
+  exit 1
+fi
+if ! grep -Eq '^/workspaces/?$' "$GITIGNORE" 2>/dev/null; then
+  printf '\n/workspaces/\n' >> "$GITIGNORE"
+fi
+ARTIFACTS="$REVIEW_ROOT/workspaces/pr-review-{number}"
+mkdir -p "$ARTIFACTS"
+if ! git -C "$REVIEW_ROOT" check-ignore -q -- "$ARTIFACTS"; then
+  echo "cannot create a safe local review workspace — workspaces/ is not ignored" >&2
+  exit 1
+fi
 CONTEXT="$ARTIFACTS/pr-review-context.json"
 CONVERSATION="$ARTIFACTS/pr-review-conversation.md"
 
@@ -98,7 +115,7 @@ Do not execute the PR's code or install dependencies. Existing CI results are ev
 test execution is an explicit operator action outside this skill.
 
 If the PR body links an issue with `Closes`, `Fixes`, or `Resolves`, fetch its number, title,
-body, and labels once into `.claude/pr-review-issue.json`. Treat failure as
+body, and labels once into `$ARTIFACTS/pr-review-issue.json`. Treat failure as
 `linked issue: unavailable`, not as a reason to weaken snapshot checks.
 
 ### 4. Create the frozen worktree and cleanup trap
@@ -109,14 +126,14 @@ git worktree add --detach "$WORKTREE" "$head_oid"
 ```
 
 Register an EXIT trap immediately. It removes the worktree, all
-`.claude/pr-review-{context*,conversation,diff,files,checks,issue,draft*,final*,inline*,qa,security,payload}.*`
-artifacts, and `refs/team-harness/review-pr/{number}/{base,head}`. Never force-remove an
+artifacts inside the exact `$ARTIFACTS` directory, that now-empty directory, and
+`refs/team-harness/review-pr/{number}/{base,head}`. Never remove any sibling workspace or force-remove an
 unexpected dirty worktree; surface it.
 
 Capture `git status --untracked-files=all` and `git diff HEAD` for both the frozen worktree and
 review-artifact root before dispatch. Repeat after all agents finish. The snapshots must be
 byte-identical; surface any mutation as a defect before trusting a returned draft. Only after this
-check may the coordinator persist inline returns to the fixed `.claude/pr-review-*` paths.
+check may the coordinator persist inline returns to the fixed `$ARTIFACTS/pr-review-*` paths.
 
 Detect an existing pipeline workspace from `workspaces/*/01-plan.md` or
 `workspaces/*/02-implementation.md` inside `$WORKTREE`. If present:
@@ -232,9 +249,9 @@ Direct Mode Task:
 - Checks Path: {CHECKS}
 - Policy Path: {policy_path or "none"}
 - Workspace Path: {workspace_path or "none"}
-- Linked Issue Path: {.claude/pr-review-issue.json absolute path or "none"}
-- Draft Output: .claude/pr-review-draft{suffix}.md
-- Inline Output: .claude/pr-review-inline{suffix}.json
+- Linked Issue Path: {$ARTIFACTS/pr-review-issue.json absolute path or "none"}
+- Draft Output: $ARTIFACTS/pr-review-draft{suffix}.md
+- Inline Output: $ARTIFACTS/pr-review-inline{suffix}.json
 ```
 
 For explicit general/architecture passes, change `Focus` and use a focus suffix. Dispatch
@@ -258,17 +275,17 @@ Changed Files Path: {FILES}
 
 Every lens returns its draft inline with the exact reviewed SHA and context hash. Reject a missing
 or mismatched value. After the strict post-dispatch snapshots pass, the coordinator alone persists
-returns using this fixed mapping: reviewer body → `.claude/pr-review-draft.md`, reviewer findings →
-`.claude/pr-review-draft-inline.json`, QA → `.claude/pr-review-qa.md`, security →
-`.claude/pr-review-security.md`, consolidator body → `.claude/pr-review-final.md`, and consolidator
-findings → `.claude/pr-review-inline.json`. Ignore any output path proposed by an agent.
+returns using this fixed mapping: reviewer body → `$ARTIFACTS/pr-review-draft.md`, reviewer findings →
+`$ARTIFACTS/pr-review-draft-inline.json`, QA → `$ARTIFACTS/pr-review-qa.md`, security →
+`$ARTIFACTS/pr-review-security.md`, consolidator body → `$ARTIFACTS/pr-review-final.md`, and consolidator
+findings → `$ARTIFACTS/pr-review-inline.json`. Ignore any output path proposed by an agent.
 
 If only the general reviewer ran, its body and inline JSON are canonical. If any additional
 draft exists, dispatch `review-consolidate` once with the source file paths, `head_oid`, and
 `context_hash`. The consolidator produces:
 
-- `.claude/pr-review-final.md`
-- `.claude/pr-review-inline.json`
+- `$ARTIFACTS/pr-review-final.md`
+- `$ARTIFACTS/pr-review-inline.json`
 
 There is no automatic convergence loop.
 
@@ -354,7 +371,7 @@ Then ask:
 (e) cancel
 ```
 
-`defer` copies the canonical body to `.claude/pr-review-final.md`, preserves that file, inline
+`defer` copies the canonical body to `$ARTIFACTS/pr-review-final.md`, preserves that file, inline
 JSON, and context for `--resume-from-draft`, removes the worktree/nonessential artifacts, and
 disables the EXIT trap before returning. `cancel` removes all artifacts. Operator edits require
 another complete preview.
@@ -384,7 +401,7 @@ jq -n \
   --arg body "$(cat "$CANONICAL_DRAFT")" \
   --arg event "$EVENT" \
   --arg commit_id "$head_oid" \
-  --argjson comments "$(cat .claude/pr-review-inline.json 2>/dev/null || echo '[]')" \
+  --argjson comments "$(cat "$ARTIFACTS/pr-review-inline.json" 2>/dev/null || echo '[]')" \
   '{body: $body, event: $event, commit_id: $commit_id, comments: $comments}' \
 | gh api -X POST "repos/{owner}/{repo}/pulls/{number}/reviews" --input -
 ```
