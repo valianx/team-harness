@@ -30,6 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `workspaces/pr-review-{number}/` directories. Review setup now adds the anchored workspace
   rule to `.gitignore` before creating the directory and verifies that Git ignores it.
 
+## [3.8.3] - 2026-08-03
+
+### Changed
+
+- Simplified native inline-reviewer isolation to Codex read-only access, removing redundant
+  Team Harness workspace, attestation, and Git-confinement controls while retaining the full
+  tester, QA, security, and adversarial review lenses.
+
 ## [3.8.0] - 2026-08-03
 
 ### Added
