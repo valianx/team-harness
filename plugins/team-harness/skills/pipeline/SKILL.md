@@ -217,7 +217,7 @@ the role fields cannot see. The current digests are:
 | `tester` | `69595191f2f532c3af96e1163325fa6cc778df5b54c6a66cb230221633961f8a` |
 | `qa` | `0baf6a9fdb3af2918650aec5453e68f58d1414b889e90759b83465a959e25ba2` |
 | `security` | `8687f298b7608e63095f29e047209f37d98a006ca6c33b8283291872274f03e1` |
-| `delivery` | `4b010bd26fb2afaeb7f2506872c105df6e3fadcc11c101861b8784b4c5674083` |
+| `delivery` | `07a5997769adbb2b3304b7640e2f9a701a38564a4f58d192548390b15ffbf7d5` |
 
 Do not accept a file solely because its comments or `name` field match. A
 digest mismatch is a stale or unrelated shadow; stop before workspace

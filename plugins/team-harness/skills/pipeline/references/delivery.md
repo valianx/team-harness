@@ -8,10 +8,11 @@ assembled version/changelog, committed the complete branch, and recorded
 Before Gate 3, delegate `delivery` once for workspace-only PR prose: exact title,
 PR body, standalone acceptance matrix, and an independent version-axis assessment. PATCH is the default for a
 backward-compatible bounded fix or improvement; MINOR requires a named material new public capability. File additions/deletions, diff size,
-commit prefix, and accumulated PATCH changes never choose the axis. An unsupported over- or under-bump returns to
-implementation → Freeze → full validation; delivery never repairs it. An incompatible supported-contract
-change or committed MAJOR candidate blocks as `major-release-required` and requires a separate explicitly scoped
-operator-led release-planning task; delivery never selects, recommends, or validates MAJOR. Validate canonical non-symlink paths
+commit prefix, and accumulated PATCH changes never choose the axis. An incompatible supported-contract change or
+committed MAJOR candidate blocks as `major-release-required` and requires a separate explicitly scoped
+operator-led release-planning task; this classification takes precedence over `version-overbump` and
+`version-underbump`, and delivery never selects, recommends, or validates MAJOR. Otherwise, an unsupported over- or
+under-bump returns to implementation → Freeze → full validation; delivery never repairs it. Validate canonical non-symlink paths
 and SHA-256 digests, bind them to `delivery_preview`, present the committed
 version plus validated commit/tree, and stop for:
 

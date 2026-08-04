@@ -878,6 +878,7 @@ assert_nodecision "AC-4: feat branch + DELETE + MINOR delta — stdout empty"
 assert_stderr_contains "AC-4: MAJOR-candidate WARN present" "WARN"
 assert_stderr_contains "AC-4: mentions MAJOR" "MAJOR"
 assert_stderr_contains "AC-4: escalates instead of selecting MAJOR" "major-release-required"
+assert_stderr_contains "AC-4: prohibits agent-selected MAJOR" "Agents must not infer a MAJOR release"
 assert_stderr_contains "AC-4: advisory note present" "advisory"
 
 # ---------------------------------------------------------------------------
@@ -923,6 +924,7 @@ assert_nodecision "AC-4b: feat branch + RENAME shipped->non-shipped + MINOR delt
 assert_stderr_contains "AC-4b: MAJOR-candidate WARN present" "WARN"
 assert_stderr_contains "AC-4b: mentions MAJOR" "MAJOR"
 assert_stderr_contains "AC-4b: escalates instead of selecting MAJOR" "major-release-required"
+assert_stderr_contains "AC-4b: prohibits agent-selected MAJOR" "Agents must not infer a MAJOR release"
 assert_stderr_contains "AC-4b: advisory note present" "advisory"
 
 # ---------------------------------------------------------------------------
@@ -1314,6 +1316,7 @@ assert_nodecision "AC-12: DELETE (MAJOR floor) + PATCH-only bump → nodecision 
 assert_stderr_contains "AC-12: WARN present for worst-case under-bump" "WARN"
 assert_stderr_contains "AC-12: WARN names MAJOR floor" "MAJOR"
 assert_stderr_contains "AC-12: escalates instead of selecting MAJOR" "major-release-required"
+assert_stderr_contains "AC-12: prohibits agent-selected MAJOR" "Agents must not infer a MAJOR release"
 assert_stderr_contains "AC-12: advisory note present" "advisory"
 
 # ---------------------------------------------------------------------------

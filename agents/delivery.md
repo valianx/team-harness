@@ -149,18 +149,19 @@ axis; ambiguity defaults to PATCH unless the evidence explicitly establishes a
 new public capability.
 
 Require a one-sentence `version_rationale`. For MINOR it names the new public
-capability. If the committed axis is higher than the guide supports, return
-`status: blocked`, `failure_kind: version-overbump`; if it is lower than an
-explicitly evidenced public-contract change, use `failure_kind:
-version-underbump`. Either result returns to implementation → Freeze → full
-validation. Never repair the version during delivery.
-
-If accepted evidence says existing consumers must change because a supported
+capability. First, if accepted evidence says existing consumers must change because a supported
 public contract is removed or incompatible, or the committed candidate uses a
 MAJOR axis, do not select, recommend, or validate MAJOR. Return `status:
 blocked`, `failure_kind: major-release-required`, name the affected contract and
 migration impact, and require a separate explicitly scoped operator-led release
-planning task. This is not an implementation correction loop.
+planning task. This classification takes precedence over `version-overbump` and
+`version-underbump` and is not an implementation correction loop.
+
+Otherwise, if the committed axis is higher than the guide supports, return
+`status: blocked`, `failure_kind: version-overbump`; if it is lower than an
+explicitly evidenced compatible public-contract expansion, use `failure_kind:
+version-underbump`. Either result returns to implementation → Freeze → full
+validation. Never repair the version during delivery.
 
 ### 4. Build the acceptance matrix
 

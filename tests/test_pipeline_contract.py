@@ -1485,6 +1485,11 @@ def check_delivery_preview_binding() -> None:
         require(marker in delivery_role_flat, f"Delivery version-axis guide omits {marker!r}")
     require("`x` / major" not in delivery_role_flat, "Delivery still exposes MAJOR as an agent-selected axis")
     require("{patch|minor|major" not in delivery_role_flat, "Delivery return protocol still permits a MAJOR assessment")
+    require(
+        delivery_role_flat.index("failure_kind: major-release-required")
+        < delivery_role_flat.index("failure_kind: version-overbump"),
+        "Delivery does not classify major-release-required before generic bump errors",
+    )
     for label, text in (
         ("Implementation assembly", implementation_assembly_flat),
         ("Codex implementation", codex_implementation),
@@ -1498,6 +1503,10 @@ def check_delivery_preview_binding() -> None:
         and "major-release-required" in codex_delivery.lower()
         and "operator-led release-planning task" in codex_delivery.lower(),
         "Codex delivery reference does not preserve the version-axis guide",
+    )
+    require(
+        codex_delivery.index("major-release-required") < codex_delivery.index("version-overbump"),
+        "Codex delivery reference does not preserve major-release-required precedence",
     )
     for relative in (
         "agents/_shared/orchestrator-state.md",
