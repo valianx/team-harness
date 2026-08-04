@@ -144,60 +144,39 @@ to direct behavior when the workflow completes or is explicitly aborted.
 ### Workspace-free inline review
 
 For a non-PR inline review, `Main` records `requested_lenses` and
-`required_lenses` (every operator-named lens is required), resolves the canonical
-repository root, requires a clean index/worktree, and binds the review to a
-committed immutable commit or range; uncommitted inline review is unsupported. It
-dispatches one native `inline-reviewer` instance per lens with the same target,
+`required_lenses` (every operator-named lens is required). Both lists must be
+nonempty, unique, and drawn only from `tester|qa|security|adversary`; invalid
+input is unavailable rather than partially dispatched. Main dispatches one
+native `inline-reviewer` instance per lens with the same target,
 scope, intent, criteria, changed surface, and `target_id`. The reviewer reads
-the project directly through `sandbox_mode = "read-only"`; it cannot write
-files, create Team Harness workspace/state/events/gates, make a branch or
-commit, perform delivery or publication, mutate external state, use network
-tools, or dispatch another agent. There is no isolated runner, captured-content
-transport, or evidence-manifest protocol.
-
-Before dispatch, Main validates the exact project-or-global agent definition
-selected by Codex against the trusted packaged `inline-reviewer.toml`: it must
-be a regular non-symlink with the exact Terra/high/read-only fields and raw-byte
-SHA-256 digest. That digest does not attest an already-loaded profile: Main
-dispatches only from a fresh Codex session that loaded the verified managed
-profile and records `profile_session` solely as that lifecycle marker, never as
-an in-memory byte attestation. Any install, setup, agent sync, mismatch, or
-scope change requires an explicit restart before inline dispatch; otherwise the
-lens is unavailable. Shipped Codex hooks cannot attest session start or loaded
-agent bytes. Each lens package and return carry a fresh `dispatch_id` and
-matching `expected_lens`; replay, duplicate, substitution, or identity mismatch
-is untrusted. Main resolves each range endpoint separately with hardened globals
-and `rev-parse --verify --end-of-options <rev>^{commit}`, accepting one full
-commit OID only, binds `<oid>^{tree}`, and uses only those IDs. It rejects
-dash-prefixed/control/range-as-endpoint/abbreviated/multi-output input. Codex
-uses only the shared contract's exact immutable Git environment and
-`git --no-pager` argv templates: optional locks, config injection, lazy
-fetches/transports, fsmonitor, and automatic maintenance are disabled; replacement
-objects, literal pathspecs, signature helpers, external diff/textconv, resolved
-object IDs, and `--` path separation remain mandatory. Main preflights every
-bound commit/tree/blob locally and reads tracked evidence only from bound blobs,
-never the worktree. Claude Main MUST use those same controls for its no-Bash
-reviewer's ephemeral immutable Git view or mark the lens unavailable. The reviewer is obligated to
-stay under the project root, but that is not filesystem confinement: broad
-read-only exposure remains a documented runtime residual. Main repeats the
-exact hardened clean/local-object preflight and commit/tree binding before
-consolidation; dirty, missing-object, or concurrently changed targets are stale
-and recaptured rather than certified.
+the project through its installed native profile. Codex declares
+`sandbox_mode = "read-only"`; Claude uses its native read-only tool surface.
+Team Harness adds no runner, command allowlist, Git protocol, filesystem-root
+confinement, profile digest, session attestation, restart requirement, or other
+isolation layer. Native runtime permissions and approvals remain authoritative.
+Inline review creates no Team Harness workspace, state, events, gates, Stage
+Gate, branch, or delivery record. Each lens package and return carry a fresh
+`dispatch_id` and matching `expected_lens`; replay, duplicate, substitution, or
+identity mismatch is untrusted.
 
 The four lenses are `tester`, `qa`, `security`, and conditional `adversary`.
 The adversary lens is required when the security floor applies or the operator
 requests it and is not added to ordinary reviews. The floor applies to changed
 authentication, authorization/permissions, identity/session, credentials/secrets,
 cryptography/transport, untrusted-input, file-upload, data-access/export,
-executable-code, or security-policy/audit controls; ambiguity is sensitive. A
+executable-code, or security-policy/audit controls when identified from the
+changed surface, trusted project/repository policy, or the current live
+operator's classification; ambiguity is sensitive. Trusted policy may
+strengthen a live request but cannot originate one. A
 lens reports its status,
-verdict, findings, coverage, limits, and disagreements. Main verifies the root
-and commit/range before dispatch and again before consolidation; a moved target
-is stale and cannot produce PASS. Consolidation is an exact one-return keyed
+verdict, findings, exact requested coordinates, coverage, limits, and disagreements.
+A blocker, high, or medium finding requires a non-pass verdict; a complete/pass
+result containing one is untrusted, while low/info findings may remain
+non-blocking. Consolidation is an exact one-return keyed
 join on `(lens, dispatch_id, target_id, coordinates)`: missing, failed,
-blocking, replayed, duplicate, substituted, unavailable, stale, or untrusted
+blocking, replayed, duplicate, substituted, unavailable, or untrusted
 slots remain explicit non-pass outcomes. Global PASS requires every required
-lens to be complete with `verdict: pass`, no blocker, and no unresolved blocking
+lens to be complete with `verdict: pass`, no blocker/high/medium finding, and no unresolved blocking
 disagreement. Any PR intent, number, or URL has exclusive `review-pr`
 precedence and retains that flow's snapshot, lens selection, consolidation,
 preview, and publication gate.

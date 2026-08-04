@@ -86,7 +86,7 @@ team-harness/
 
 | Layer | Choice |
 |---|---|
-| Installer | Go 1.25.8+, cross-compiled to GH Release assets. It manages opencode assets and the ten generated Codex agent TOMLs (`--runtime codex`), but never installs either marketplace plugin. Claude Code remains marketplace-only. Full lifecycle detail: `docs/lifecycle.md`. |
+| Installer | Go 1.25.8+, cross-compiled to GH Release assets. It manages opencode assets and the eleven generated Codex agent TOMLs (`--runtime codex`), but never installs either marketplace plugin. Claude Code remains marketplace-only. Full lifecycle detail: `docs/lifecycle.md`. |
 | Bootstrap scripts | Bash/PowerShell/cmd.exe entry points download the released agent-installer binary. Codex plugin install/update/remove remains a separate marketplace lifecycle. |
 | Agents / skills | Markdown with YAML frontmatter |
 | Complex skills | Markdown + referenced scripts (Python/Node via `uv run` or CLIs) |

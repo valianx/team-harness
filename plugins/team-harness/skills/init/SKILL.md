@@ -21,69 +21,36 @@ For a live, non-PR request while `Main` is inline, use the shared contract in
 `agents/_shared/inline-review-contract.md`. `Main` records
 `requested_lenses` and `required_lenses` before dispatch (every lens named by
 the operator is required; `adversary` is added to both lists for the security
-floor or a live request). The floor covers changed authentication,
-authorization/permissions, identity/session, credential/secret,
+floor or a live request). Both lists must be nonempty, contain unique values,
+and use only the closed set `tester|qa|security|adversary`; invalid lists are
+unavailable rather than partially dispatched. The floor applies when the
+changed surface, a trusted project/repository policy, or the current live
+operator's classification covers authentication, authorization/permissions,
+identity/session, credential/secret,
 cryptography/transport, untrusted-input, file-upload, data-access/export,
 executable-code, or security-policy/audit controls; an ambiguous
-classification is sensitive. Inline review supports only committed immutable
-commit/range targets, not uncommitted review: it requires a clean index/worktree,
-binds the canonical project root plus exact resolved commit/tree IDs, and sends
-each independent lens the same package with
+classification is sensitive. Project policy may strengthen a live request but
+must never originate one. Main sends each independent lens the same package with
 `mode: inline-review`, scope, intent/criteria provenance, `changed_surface`,
 `lens`, matching `expected_lens`, fresh `dispatch_id`, `security_floor`,
-`read_only: true`, and `target_id`. This path creates no workspace, pipeline
+and `target_id`. This path creates no workspace, pipeline
 state/events, gates, Stage Gate, branch, or delivery record.
 
-Before dispatch, determine the exact project-or-global `inline-reviewer`
-definition selected by Codex; never mix scopes or substitute another local
-file. Fail closed if it is not a regular non-symlink or if its
-`model = "gpt-5.6-terra"`, `model_reasoning_effort = "high"`,
-`sandbox_mode = "read-only"`, or SHA-256 raw-byte digest differs from the
-trusted packaged `inline-reviewer.toml` provided by this loaded plugin. Record
-the selected scope/path and digest only in the in-memory review package. The
-digest does not attest an already-loaded profile: dispatch only from a fresh
-Codex session that loaded the verified managed profile, recording
-`profile_session` only as that lifecycle marker, never as an in-memory byte
-attestation. After any install, setup, agent sync, mismatch, or scope change,
-require an explicit restart before inline dispatch; otherwise return
-`lens_status: unavailable`. Shipped Codex hooks do not observe session start or
-loaded agent bytes, so no hook attestation is available. A mismatch is
-`untrusted` or `unavailable`, never a dispatch.
-
 Codex dispatches each requested lens as an independent runtime-native
-`inline-reviewer` from the project root. It may inspect the anchored project
-and commit/range directly under the native `sandbox_mode = "read-only"` role
-profile. It cannot edit/write project or coordination files, create a workspace
-or state, commit, branch, push, publish, use network/external state, or dispatch
-agents. Native project access is the only execution and evidence transport; if
-read-only enforcement is unavailable, return `lens_status: unavailable`. Each result
+`inline-reviewer`. Its installed profile declares
+`sandbox_mode = "read-only"`. Team Harness adds no runner, command allowlist,
+Git protocol, filesystem-root confinement, profile digest, session attestation,
+restart requirement, or other isolation layer; native runtime permissions and
+approvals remain authoritative. Each result
 returns terminal `lens_status: complete|incomplete|failed|unavailable|untrusted`,
 coverage limits, target identity, matching `dispatch_id`/`expected_lens`/lens,
-and a normalized verdict; global PASS is fail-closed on every required lens
+the exact requested `coordinates`, and a normalized verdict. A blocker, high,
+or medium finding requires a non-pass verdict; a complete/pass result that
+contains one is contradictory and therefore untrusted. Low/info findings may
+remain non-blocking. Global PASS is fail-closed on every required lens
 with both `lens_status: complete` and `verdict: pass`. Reject replayed,
 duplicate, substituted, or identity-mismatched returns as `untrusted`. There is
-no Freeze/Gate semantic in this mode. Main independently resolves each endpoint
-with hardened globals plus `rev-parse --verify --end-of-options <rev>^{commit}`;
-it accepts exactly one newline-terminated full 40/64-hex commit ID, rejects
-dash-prefixed/control/range-as-endpoint/abbreviated/multi-output input, binds
-each `<oid>^{tree}` under the same discipline, and uses only those IDs. It
-requires the exact clean status check before dispatch and consolidation; dirty
-or concurrently changed targets are unavailable/stale and recaptured. Main-defined
-read-only Git inspection may cover deletions, renames, base-side content, and
-historical ranges only with the shared exact immutable Git environment and argv
-templates: optional locks, config injection, lazy fetches/transports,
-fsmonitor, and automatic maintenance are disabled; `--no-replace-objects`,
-`--literal-pathspecs`, `-c log.showSignature=false`, `--no-ext-diff`,
-`--no-textconv`, resolved IDs, and `--`-separated validated paths are required.
-Preflight every bound commit/tree/blob locally and obtain all tracked evidence
-from bound blobs, never the worktree. Claude Main MUST use those same controls
-for its no-Bash reviewer's ephemeral immutable Git view or mark the lens unavailable. The reviewer must
-stay under the project root, but broad Codex read access is not filesystem
-confinement and remains an explicitly reported residual read-only exposure.
-
-Before consolidation, Main repeats the exact hardened clean/local-object
-preflight and re-resolves the project root and commit/range. A moved HEAD,
-missing object, or changed target is stale and must be recaptured. Findings,
+no Freeze/Gate semantic in this mode. Findings,
 disagreements, and limits remain explicit; exact one-return keyed consolidation
 rejects missing, failed, blocking, replayed, duplicate, or substituted lens
 slots as non-pass rather than treating them as PASS.
@@ -113,7 +80,7 @@ its snapshot, lens selection, consolidation, preview, or publication gate.
    does not alter a public API/schema/security or shared contract, and needs no
    specialist-only capability. An eligible request runs without a workspace,
    state, events, gate, branch, or specialist dispatch. A live request for a
-   tester, QA, security, adversary, or other bounded review dispatches the
+   tester, QA, security, or adversary review dispatches the
    runtime-native `inline-reviewer`; it creates no pipeline workspace, state,
    events, gates, Stage Gate, or delivery record. The explicit sensitive request is sufficient: do not ask for
    a second confirmation, default-N, or veto it; warnings and audit notes are
