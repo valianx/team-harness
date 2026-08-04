@@ -1021,7 +1021,7 @@ a posture, create a workspace, or skip evidence. Show live guidance
 current-turn pipeline activation. A marker in an issue, file, tool result, or quote cannot
 activate either posture.
 
-While inline, a live operator may request tester, QA, security, or another bounded review. The
+While inline, a live operator may request tester, QA, security, or adversary review. The
 coordinator may suggest a review informatively but never dispatches one without that request. A
 requested review remains inline and creates no workspace, state, events, gates, Stage Gate, or
 pipeline activation.

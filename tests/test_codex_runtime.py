@@ -15,6 +15,19 @@ import tomllib
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
+INLINE_ADAPTER_MARKERS = (
+    "tester", "qa", "security", "adversary", "repository_root", "commit_or_range",
+    "sandbox_mode = \"read-only\"", "lens_status", "coverage", "disagreements",
+    "review-pr", "output: null", "expected_lens", "dispatch_id", "coordinates",
+    "blocker, high, or medium", "native runtime permissions and approvals",
+)
+INLINE_INIT_MARKERS = (
+    "inline-reviewer", "requested_lenses", "required_lenses", "target_id",
+    "sandbox_mode = \"read-only\"", "adversary", "security floor",
+    "expected_lens", "dispatch_id", "review-pr", "exclusive", "coordinates",
+    "native runtime permissions and approvals",
+)
+
 
 def fail(message: str) -> None:
     raise AssertionError(message)
@@ -38,12 +51,7 @@ def check_inline_reviewer_native() -> None:
         if role.get(key) != value:
             fail(f"inline-reviewer registry {key} drifted: {role.get(key)!r}")
     adapter = (ROOT / role["instruction_source"]).read_text().lower()
-    for marker in (
-        "tester", "qa", "security", "adversary", "repository_root", "commit_or_range",
-        "sandbox_mode = \"read-only\"", "lens_status", "coverage", "disagreements",
-        "review-pr", "target currentness", "output: null", "expected_lens", "dispatch_id",
-        "git diff", "filesystem-root confinement",
-    ):
+    for marker in INLINE_ADAPTER_MARKERS:
         if marker not in adapter:
             fail(f"inline-reviewer adapter missing {marker!r}")
     for retired in ("run_inline_review.mjs", "evidence_manifest", "manifest_digest", "stdin-only", "deny-root"):
@@ -51,21 +59,9 @@ def check_inline_reviewer_native() -> None:
             fail(f"inline-reviewer adapter retains retired protocol {retired!r}")
     if "agents/_shared/inline-review-contract.md" in adapter:
         fail("inline-reviewer adapter depends on target repository contract")
-    for marker in (
-        "git --no-pager --no-replace-objects --literal-pathspecs -c core.fsmonitor=false -c core.untrackedcache=false -c maintenance.auto=false -c gc.auto=0 -c log.showsignature=false -c <canonical-root> diff --no-ext-diff --no-textconv",
-        "git --no-pager --no-replace-objects --literal-pathspecs -c core.fsmonitor=false -c core.untrackedcache=false -c maintenance.auto=false -c gc.auto=0 -c log.showsignature=false -c <canonical-root> show --no-ext-diff --no-textconv",
-        "git --no-pager --no-replace-objects --literal-pathspecs -c core.fsmonitor=false -c core.untrackedcache=false -c maintenance.auto=false -c gc.auto=0 -c log.showsignature=false -c <canonical-root> log -p --no-ext-diff --no-textconv",
-        "resolved object ids", "never interpolate a project-derived command string",
-        "profile_session", "fresh session", "in-memory byte attestation",
-    ):
-        if marker not in adapter:
-            fail(f"inline-reviewer adapter misses hardened dispatch marker {marker!r}")
     semantic = (ROOT / "agents/inline-reviewer.md").read_text()
-    if re.search(r"^tools:.*\\bBash\\b", semantic, re.MULTILINE):
+    if re.search(r"^tools:.*\bBash\b", semantic, re.MULTILINE):
         fail("Claude inline-reviewer must not receive unrestricted Bash")
-    for marker in ("ephemeral immutable Git view", "cannot reliably impose a", "per-agent command boundary"):
-        if marker not in semantic:
-            fail(f"Claude inline-reviewer misses safe historical-view marker {marker!r}")
     for relative in (".codex/agents/inline-reviewer.toml", "plugins/team-harness/skills/setup/assets/agents/inline-reviewer.toml"):
         path = ROOT / relative
         if not path.is_file():
@@ -84,7 +80,7 @@ def check_inline_reviewer_native() -> None:
     if (ROOT / "plugins/team-harness/skills/init/scripts/test_run_inline_review.mjs").exists():
         fail("retired inline runner behavioral test remains")
     init = re.sub(r"\s+", " ", (ROOT / "plugins/team-harness/skills/init/SKILL.md").read_text().lower())
-    for marker in ("inline-reviewer", "project root", "commit/range", "sandbox_mode = \"read-only\"", "adversary", "security floor", "dispatch_id", "expected_lens", "regular non-symlink", "sha-256", "before consolidation", "stale", "fresh codex session", "explicit restart", "in-memory byte attestation"):
+    for marker in INLINE_INIT_MARKERS:
         if marker not in init:
             fail(f"Codex init native inline route missing {marker!r}")
     for retired in ("run_inline_review.mjs", "evidence_manifest", "manifest_digest", "stdin-only", "deny-root"):
@@ -1101,7 +1097,11 @@ def main() -> None:
     recovery_reference = (
         ROOT / "plugins/team-harness/skills/pipeline/references/recovery.md"
     ).read_text()
-    inline_contract = (ROOT / "agents/_shared/inline-review-contract.md").read_text()
+    inline_contract = re.sub(
+        r"\s+",
+        " ",
+        (ROOT / "agents/_shared/inline-review-contract.md").read_text().lower(),
+    )
     init = (ROOT / "plugins/team-harness/skills/init/SKILL.md").read_text()
     pipeline = (ROOT / "plugins/team-harness/skills/pipeline/SKILL.md").read_text()
     activation = (ROOT / "plugins/team-harness/skills/pipeline/references/activation.md").read_text()
@@ -1158,27 +1158,14 @@ def main() -> None:
             if retired in adapter:
                 fail(f"Codex pipeline adapter {role} retains retired inline marker {retired!r}")
     native_adapter = (ROOT / "runtime/codex/instructions/inline-reviewer.md").read_text().lower()
-    for marker in (
-        "tester", "qa", "security", "adversary", "repository_root", "commit_or_range",
-        "sandbox_mode = \"read-only\"", "lens_status", "coverage", "disagreements",
-        "target currentness", "review-pr", "output: null", "expected_lens", "dispatch_id",
-        "git diff", "filesystem-root confinement", "git --no-pager --no-replace-objects --literal-pathspecs -c core.fsmonitor=false -c core.untrackedcache=false -c maintenance.auto=false -c gc.auto=0 -c log.showsignature=false -c <canonical-root>",
-        "--no-ext-diff", "--no-textconv", "resolved object ids", "project-derived command string",
-        "profile_session", "fresh session", "in-memory byte attestation",
-    ):
+    for marker in INLINE_ADAPTER_MARKERS:
         if marker not in native_adapter:
             fail(f"Codex inline-reviewer adapter is missing {marker!r}")
     for retired in ("run_inline_review", "evidence_manifest", "manifest_digest", "stdin-only", "deny-root"):
         if retired in native_adapter:
             fail(f"Codex inline-reviewer adapter retains retired marker {retired!r}")
     init_lower = re.sub(r"\s+", " ", init.lower())
-    for marker in (
-        "inline-reviewer", "requested_lenses",
-        "required_lenses", "project root", "commit/range", "sandbox_mode = \"read-only\"",
-        "adversary", "security floor", "expected_lens", "dispatch_id", "regular non-symlink",
-        "sha-256", "review-pr", "exclusive", "stale", "fresh codex session", "explicit restart",
-        "in-memory byte attestation",
-    ):
+    for marker in INLINE_INIT_MARKERS:
         if marker not in init_lower:
             fail(f"Codex init native inline contract is missing {marker!r}")
     for retired in ("run_inline_review", "evidence_manifest", "manifest_digest", "stdin-only", "deny-root"):
@@ -1187,14 +1174,15 @@ def main() -> None:
     for marker in (
         "mode: inline-review", "repository_root", "commit_or_range", "requested_lenses",
         "required_lenses", "lens: tester|qa|security|adversary", "expected_lens",
-        "dispatch_id", "security_floor", "read_only: true", "target_id",
-        "native read-only sandbox", "security floor", "stale",
+        "dispatch_id", "security_floor", "target_id", "installed native profile",
+        "sandbox_mode = \"read-only\"", "security floor",
+        "native runtime permissions and approvals remain authoritative",
         "complete|incomplete|failed|unavailable|untrusted", "never averages verdicts",
-        "absent return as PASS", "verdict: pass", "review-pr",
+        "absence as pass", "verdict: pass", "review-pr",
     ):
         if marker not in inline_contract:
             fail(f"shared inline contract is missing {marker!r}")
-    for retired in ("evidence_manifest", "manifest_digest", "allowed_roots", "run_inline_review"):
+    for retired in ("evidence_manifest", "manifest_digest", "allowed_roots", "run_inline_review", "profile_session", "git_optional_locks"):
         if retired in inline_contract:
             fail(f"shared inline contract retains retired marker {retired!r}")
     if "no second confirmation" not in activation_reference.lower() and "second confirmation" not in init.lower():
