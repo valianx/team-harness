@@ -123,7 +123,7 @@ The `plan-review` direct mode runs a panel of up to three reviewers that write t
 3. Resolve the complete task-shard list from the manifest and invoke `qa-plan`
    (mode: `ratify-plan`) with that full list. Wait for the consolidated status
    block; feature-level ratification never samples an assigned subset.
-4. Determine security-sensitivity (per gating above). If security-sensitive, invoke `security` (mode: `design-review`) via Task tool. Wait for status block. This is the explicit review's conditional lens; the normal pipeline's security design-review remains a separate pre-implementation check.
+4. Determine security-sensitivity (per gating above). If security-sensitive, invoke `security` (mode: `design-review`) via Task tool. Wait for status block. This lens belongs only to the explicitly invoked plan review; the normal pipeline keeps planning architect-only and relies on final validation for its security specialist.
 5. Invoke `plan-reviewer` via Task tool (always runs last). Wait for status block. Read `verdict` and `findings` counts from the combined verdict it writes.
 6. Surface the combined verdict to the user (Output Discipline #186 — the combined verdict IS operator-facing; per-reviewer chatter is NOT). Direct mode does NOT emit a STAGE-GATE-1 STOP block.
 

@@ -1,22 +1,23 @@
 # Validation phase
 
-This reference applies only to an explicitly activated pipeline. Validate the approved acceptance
-criteria against the actual frozen tree and diff. Delegate executable evidence to `tester`,
-criterion-by-criterion review to `qa`, and the required focused audit to `security` when the
+This reference applies only to an explicitly activated pipeline. Validate approved functional
+ACs and technical constraints against the actual frozen tree and diff. Delegate executable evidence to `tester`,
+criterion-by-criterion review to `qa`, and require `security` to perform a focused audit when the
 sensitivity/risk floor applies. Before each dispatch, preflight the exact task shard and fail
 closed if its `required_invariants`, `required_evidence_anchors`, or
 `cross_runtime_preservation` declaration lacks an applicable value; do not fill a gap from a
 transcript, implementer narrative, sibling task, or full plan. Give tester and QA only the
 assigned task-shard paths, current frozen commit/tree, and verification facts/evidence; give
 security the same frozen identity plus the changed attack surface and named invariant or
-architecture anchors when required. Every tester, QA, and security dispatch uses a fresh
+architecture anchors when required. Every dispatched tester, QA, and security attempt uses a fresh
 V2 `fork_turns: none` agent. Never attach the full plan set or the implementer's success narrative.
 None may edit coordination state, gate fields, releases, or task-shard AC checkbox mirrors.
 QA's read-only review returns an explicit `AC-N: PASS` verdict for every verified satisfied
 criterion (and its evidence row); Main, as the only writer, verifies those PASS results and
 updates the assigned task-shard AC checkbox mirror. For failed or concern
-verdicts, specialists report only `Cause`, `Files`, implicated `AC`, and an
-advisory `Suggested correction`; Main owns canonical plan fields, disposition,
+verdicts, specialists report only `Cause`, `Files`, implicated `AC-N|TC-N`, an
+advisory `Suggested correction`, and deterministic closure evidence with its expected
+result; Main owns canonical plan fields, disposition,
 phase, and routing.
 
 A live operator-requested tester, QA, or security review while Main is inline is an ad-hoc report,
@@ -45,9 +46,37 @@ review, Freeze, mandatory suite, and gate.
 Treat each terminal tester, QA, or security result as closed and prohibit
 post-terminal `followup_task`. A failed validation never continues a verifier
 or dispatches a correction automatically. After an operator-authorized
-correction, every revalidation starts new tester, QA, and security agents on the
-same current frozen commit/tree for that validation round; never reuse a prior
-verifier or its narrative.
+correction, QA is always a new agent on the rebuilt frozen identity. Tester runs
+fresh only for stale evidence rows, and security runs fresh only when the closed
+impact predicate below requires it. Never reuse a prior verifier thread or narrative.
+
+## Correction closure and impact-derived validation
+
+Every correction package contains one deterministic closure check and expected result per
+finding. The implementer records each result and Main verifies complete PASS before Freeze.
+A missing or failed result is `correction-incomplete`: the authorized round remains consumed,
+but no tester refresh or Freeze opens and no final validator runs.
+
+After closure passes, apply this order:
+
+1. Compare the prior frozen commit to current HEAD. Every tester evidence row declares the
+   complete dependency set consumed by its proof: implementation, test, fixture,
+   configuration, and argument-file inputs. A row is stale when its requirement
+   text, exact command/arguments, or any declared dependency path/blob hash changed.
+   Dispatch one fresh tester for all stale rows; carry other rows provisionally
+   only when every one of those values is unchanged.
+2. Complete and commit warranted test/evidence changes, then rebuild Freeze. Never freeze before
+   the stale-row tester refresh terminates.
+3. Dispatch fresh QA over every functional AC on the new frozen identity.
+4. Compare the prior and new frozen commits. Dispatch fresh security when the package contains a
+   security finding, the final delta changes a security-relevant TC/anchor or attack-surface path,
+   or impact is unknown. Otherwise carry a prior successful security result only with its audit
+   anchor, exact final-delta paths, and unchanged blob hashes for every audited attack-surface path.
+5. Missing declarations, hashes, unclassified paths, conflicting impact metadata, or unexpected
+   tester-produced paths fail closed to tester refresh plus QA and the applicable security lens.
+
+Carry-forward reuses evidence only; it never reuses an agent or its narrative. The correction
+still consumes one authorized round and remains bounded by max-3.
 
 Only in this explicitly activated pipeline, preflight resolves the helper's
 absolute path relative to the loaded pipeline skill/reference and fails closed
@@ -89,7 +118,7 @@ covers the managed POSIX process group or the tree confirmed by Windows
 scope can outlive the helper. Native sandbox and permission policy remain the
 security boundary.
 
-Wait for all required results. Record one evidence-map row per criterion and one-line command
+Wait for all required results. Record one evidence-map row per AC and TC with its evidence paths and one-line command
 outcomes; never paste raw runner output or repeat AC text. Use the verification packet first and
 open a source section only when the verdict requires it. A failed criterion remains failed; do not
 rewrite acceptance criteria to manufacture a pass.
@@ -108,20 +137,21 @@ current live operator request for architect work.
 | Finding | Route |
 |---|---|
 | Mechanical plan defect with no semantic change | Main repairs the canonical field; continue at `phase: implementation`; if Freeze was reached, rebuild Freeze and revalidate; no Gate 1 and `iteration` `+0` |
-| Decision-bearing plan concern (intent, scope, behavior, AC meaning, or security-obligation classification) | Main presents a bounded live operator decision, transcribes the approved field, and continues at `phase: implementation` through Freeze and validation; no Gate 1, `iteration` `+0`, and retain the conditional security review when sensitive |
+| Decision-bearing plan concern (intent, scope, behavior, AC meaning, or security-obligation classification) | Main presents a bounded live operator decision, transcribes the approved field, and continues at `phase: implementation` through Freeze and validation; no Gate 1, `iteration` `+0`, and retain the final security floor when sensitive |
 | Explicit current live operator request for architect work | Main records the request, dispatches `architect`, sets `phase: design`, and requires a new Gate 1; `iteration` `+0` |
-| Code, test, or documentation defect inside approved scope | Include in the complete consolidated failure; live choice `1` or an eligible `approved-autonomous` decision permits one fresh implementation correction, new Freeze, and fresh full fan; `iteration` `+1` after authorization |
-| Missing or insufficient evidence | Include in the same complete consolidated failure; live choice `1` or an eligible `approved-autonomous` decision permits one bounded evidence correction and fresh full fan; `iteration` `+1` after authorization |
-| Correctable security finding in the approved diff | Include in the same complete consolidated failure; live choice `1` or an eligible `approved-autonomous` decision permits correction, new Freeze, and a fresh full fan including security; `iteration` `+1` after authorization |
+| Code, test, or documentation defect inside approved scope | Include in the complete consolidated failure; live choice `1` or an eligible `approved-autonomous` decision permits one fresh implementation correction, closure gate, stale-row tester refresh, new Freeze, fresh QA, and impact-required security; `iteration` `+1` after authorization |
+| Missing or insufficient evidence | Include in the same complete consolidated failure; live choice `1` or an eligible `approved-autonomous` decision permits one bounded evidence correction, closure gate, stale-row tester refresh, new Freeze, fresh QA, and impact-required security; `iteration` `+1` after authorization |
+| Correctable security finding in the approved diff | Include in the same complete consolidated failure; live choice `1` or an eligible `approved-autonomous` decision permits correction, closure gate, stale-row tester refresh, new Freeze, fresh QA, and fresh security; `iteration` `+1` after authorization |
 | Structural contradiction between intent, scope fence, and ACs | Main obtains a bounded live operator resolution, transcribes the approved field, and continues at `phase: implementation` through Freeze and validation; `iteration` `+0` |
 | Non-blocking observation that violates no AC or security floor | Carry it to Gate 3 without silently changing scope; `iteration` `+0` |
 
 Wait for every required lens, even after one fails. If any blocking finding
 remains, consolidate the complete package under stable finding IDs, the current
-frozen anchor, and the union file scope. Main then performs one bounded evidence
+frozen anchor, implicated `AC-N|TC-N`, union file scope, and deterministic closure
+checks with expected results. Main then performs one bounded evidence
 triage without another reviewer: for every ID, compare the evidence only with
-approved intent, scope, ACs, and the security floor and present cause/evidence,
-implicated AC, proposed `resolve|design-consistent|decision-required`
+approved intent, scope, ACs/TCs, and the security floor and present cause/evidence,
+implicated requirement, closure check, proposed `resolve|design-consistent|decision-required`
 disposition, rationale, and consequence. The proposal is advisory. Under normal
 approval only the live operator confirms each disposition. Under a valid
 `approved-autonomous` dual record, Main may confirm only unambiguous `resolve`
@@ -135,8 +165,8 @@ After every disposition is explicit, build the correction package from all
 `resolve` IDs. Persist the confirmed dispositions in the decision ledger. If
 the closed autonomous predicate passes, record the autonomous authority and
 dispatch exactly one fresh correction as defined in `state-and-gates.md`,
-without presenting an intermediate choice. Every later failure repeats the full
-fan and triage, and no more than three autonomous correction rounds are legal.
+without presenting an intermediate choice. Every later failure repeats the complete required
+validation set and triage, and no more than three autonomous correction rounds are legal.
 
 Any unresolved or ineligible item blocks autonomous continuation. Then set
 `correction_pending: true`, a
@@ -158,13 +188,15 @@ a round. Only the exact valid `approved-autonomous` dual record may provide the
 bounded autonomous authority above.
 Only a live reply after this presentation may consume the nonce. Choice `1`
 atomically records a matching state decision and `correction.decision` event
-bound to the same nonce, anchor, finding IDs, scope, and
-`correction_exceptional` boolean. That decision may
-authorize exactly one `iteration.start` and correction spawn, followed by one
-new Freeze and a fresh full tester/QA/security fan. Both authorized events must
-carry the identical boolean. A second failure requires a
+bound to the same nonce, anchor, finding IDs, implicated requirements, scope,
+one deterministic closure check/expected result per finding, dispositions, and
+`correction_exceptional` boolean. That decision may authorize exactly one
+`iteration.start` and correction spawn, followed by the closure gate, stale-row
+tester refresh, one new Freeze, fresh QA, and impact-required security. Both
+authorized events must repeat that complete package byte-for-byte; sharing only
+the nonce is invalid. A second failure requires a
 fresh presentation and nonce under normal approval. Under autonomous approval,
-it repeats the full fan/triage/predicate and may authorize the next fresh round
+it repeats the required-set/triage/predicate and may authorize the next fresh round
 only while `iteration < 3`; there is no owner-lens bounce or agent follow-up.
 Choice `2` performs no repository or evidence mutation and any later
 presentation uses a fresh nonce. Choice `3` aborts without correction. At
@@ -173,11 +205,13 @@ round; only an authorize decision with `correction_exceptional: true` increments
 `exceptional_correction_count` and leaves `iteration: 3/3`;
 never write `3/3+exception`.
 
-Every authorized implementation correction reopens Freeze and invalidates
-validation that saw the old tree. Re-run the full validation fan, and do not
-ship until every required audit has seen the current anchor. An
-operator-approved Gate 3 amend follows the same implementation → Freeze →
-validation route. A contradiction is never resolved
+Every authorized implementation correction invalidates the old Freeze and its QA verdict.
+After closure, refresh stale tester rows, rebuild Freeze, run fresh QA and impact-required
+security, and do not
+ship until every changed requirement has current evidence and every security-relevant
+surface has a fresh or hash-proven carried audit. An
+operator-approved Gate 3 amend follows the same implementation → closure → tester refresh →
+Freeze → validation route. A contradiction is never resolved
 by changing an AC in place. Plan repair, operator-decision transcription, and
 explicit architect work do not produce an `iteration.start`; only an
 explicitly authorized implementation/validation correction consumes the

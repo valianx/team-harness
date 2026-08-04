@@ -306,7 +306,7 @@ def _require_codex_security_obligation_route() -> None:
         "security-obligation classification",
         "bounded live operator decision",
         "implementation → freeze → validation",
-        "conditional security review",
+        "retain the final security floor",
     )
     require(all(marker in block for marker in markers), "Codex security-obligation transition lost operator/Freeze/security validation")
 
@@ -406,7 +406,7 @@ def _require_ordinary_corrective_routes(contracts: dict[str, str]) -> None:
         require("complete" in text and "consolidat" in text, f"{label}: failed fan is not consolidated")
         require("authorize one correction round" in text, f"{label}: live correction choice missing")
         require("correction.decision" in text, f"{label}: correction decision is not dual-recorded")
-        require("fresh" in text and "validation fan" in text, f"{label}: authorized round lacks a fresh full fan")
+        require("closure" in text and "tester refresh" in text and "fresh qa" in text, f"{label}: authorized round lacks closure-gated impact validation")
         require("automatic" in text, f"{label}: automatic correction prohibition missing")
     validation = re.sub(r"\s+", " ", contracts["codex_validation"].lower())
     require("choice `2` performs no repository or evidence mutation" in validation, "Codex pause choice can mutate")
@@ -420,7 +420,7 @@ def _require_sensitive_audit_routes(contracts: dict[str, str]) -> None:
         lowered = text.lower()
         require("implementation" in lowered, f"{label}: sensitive route lacks implementation")
         require("freeze" in lowered, f"{label}: sensitive route lacks Freeze reopening")
-        require_any(text, ("fresh security audit", "fresh audit", "fresh full tester/qa/adversary", "re-audit", "re-audit required"), f"{label}: sensitive route lacks fresh audit requirement")
+        require_any(text, ("fresh security audit", "fresh audit", "re-audit", "re-audit required"), f"{label}: sensitive route lacks fresh audit requirement")
     require("broke-it" in contracts["claude_audit"], "Claude audit route lost broke-it handling")
     require("incomplete_on_changed_control" in contracts["claude_audit"], "Claude audit route lost incomplete sensitive-coverage handling")
     require("sensitive coverage gap" in contracts["codex_routes"].lower(), "Codex route lost sensitive coverage handling")
@@ -432,7 +432,11 @@ def _require_gate3_security_routes(contracts: dict[str, str]) -> None:
     require("prevents this state entirely" in claude_gate3 and "never reaches this gate" in claude_gate3, "Claude: correctable sensitive findings can reach Gate 3")
     require("broke-it" in claude_gate3 and "incomplete sensitive-coverage" in claude_gate3, "Claude: Gate 3 does not name both fail-closed security cases")
     validation = re.sub(r"\s+", " ", contracts["codex_validation"].lower())
-    require("do not ship until every required audit has seen the current anchor" in validation, "Codex: Gate 3 can ship a sensitive delta before re-audit")
+    require(
+        "do not ship until every changed requirement has current evidence" in validation
+        and "security-relevant surface has a fresh or hash-proven carried audit" in validation,
+        "Codex: Gate 3 can ship with stale requirement or security evidence",
+    )
     codex = contracts["codex_pipeline"].lower()
     require("correctable sensitive finding" in codex and "fresh security audit" in codex, "Codex: sensitive correction route is not tied to fresh audit")
 
@@ -472,6 +476,8 @@ def check_explicit_validation_correction_decision() -> None:
         for marker in (
             "correction_pending: true",
             "correction_nonce",
+            "correction_requirements",
+            "correction_closure",
             "correction.decision",
             "1 — authorize one correction round",
             "2 — pause without changes",
@@ -504,10 +510,8 @@ def check_explicit_validation_correction_decision() -> None:
             "security ambiguity",
         ):
             require(marker in flat, f"{label}: bounded autonomous-loop marker missing: {marker}")
-        require(
-            "fresh full validation fan" in flat or "fresh complete validation fan" in flat,
-            f"{label}: autonomous correction lacks a fresh complete validation fan",
-        )
+        require("correction-incomplete" in flat, f"{label}: incomplete correction can reach Freeze")
+        require("impact-derived validation" in flat, f"{label}: autonomous correction lacks impact-derived validation")
         require("normal approval" in flat and "paus" in flat, f"{label}: ordinary approve can loop automatically")
 
     for relative in (
@@ -522,6 +526,7 @@ def check_explicit_validation_correction_decision() -> None:
         text = read(relative)
         flat = re.sub(r"\s+", " ", text.lower())
         require("suggested correction" in flat, f"{relative}: validator lacks advisory correction coordinate")
+        require("closure evidence" in flat, f"{relative}: validator lacks a deterministic closure coordinate")
         require("gate1-autonomous" in flat, f"{relative}: validator incorrectly excludes eligible autonomous authority")
         for forbidden in (
             "correction route",
@@ -538,18 +543,55 @@ def check_explicit_validation_correction_decision() -> None:
         "### Remediation prefers removal or replacement over addition",
         "### Authorized correction round",
     ).lower()
-    for forbidden in ("`qa` only", "affected verifiers", "`qa` full"):
-        require(forbidden not in claude_iteration, f"Claude correction table retains partial verifier rerun: {forbidden}")
-    require(
-        claude_iteration.count("fresh full tester/qa/adversary fan") == 3,
-        "Claude correction cases do not all require the fresh full fan",
+    for marker in (
+        "closure gate",
+        "fresh qa",
+        "stale-evidence tester refresh",
+        "security re-audit when impact requires it",
+        "ambiguity fails closed to every applicable lens",
+        "changed requirement text makes its evidence stale",
+    ):
+        require(marker in claude_iteration, f"Claude correction impact table misses {marker!r}")
+
+    claude_impact = re.sub(
+        r"\s+",
+        " ",
+        section(
+            read("agents/ref-pipeline.md"),
+            "### Correction impact and evidence freshness",
+            "**Staleness invariant",
+        ).lower(),
     )
+    claude_order = (
+        claude_impact.index("pre-freeze tester impact"),
+        claude_impact.index("freeze after tester"),
+        claude_impact.index("every corrected frozen identity"),
+        claude_impact.index("compare the prior frozen commit with the new frozen commit"),
+    )
+    require(tuple(sorted(claude_order)) == claude_order, "Claude correction order can Freeze before tester or validate a stale tree")
+
+    codex_impact = re.sub(
+        r"\s+",
+        " ",
+        section(
+            read("plugins/team-harness/skills/pipeline/references/validation.md"),
+            "## Correction closure and impact-derived validation",
+            "Only in this explicitly activated pipeline",
+        ).lower(),
+    )
+    codex_order = (
+        codex_impact.index("compare the prior frozen commit to current head"),
+        codex_impact.index("never freeze before"),
+        codex_impact.index("dispatch fresh qa"),
+        codex_impact.index("compare the prior and new frozen commits"),
+    )
+    require(tuple(sorted(codex_order)) == codex_order, "Codex correction order can Freeze before tester or validate a stale tree")
 
     recovery = read("plugins/team-harness/skills/pipeline/references/recovery.md")
     recovery_flat = re.sub(r"\s+", " ", recovery.lower())
     for marker in (
         "stale or consumed nonce",
-        "mismatched anchor/findings/scope",
+        "mismatched anchor/findings/requirements/closure/scope",
         "reuse of one authorization",
         "without the matching decision",
         "recovery never synthesizes",
@@ -560,9 +602,9 @@ def check_explicit_validation_correction_decision() -> None:
         "a fourth",
         "exact consumed gate-1 nonce",
         "no correction/execution budget exhaustion",
-        "exact one-to-one disposition for every finding",
+        "disposition and deterministic closure check/expected result for every finding",
         "before issuing a fresh nonce",
-        "missing, extra, duplicated, or mismatched findings/dispositions",
+        "missing, extra, duplicated, or mismatched findings, requirements, dispositions, or closure records",
         "for `iteration < 3`, require `correction_exceptional: false`",
         "at `iteration: 3/3`, require `exceptional_correction_count: 0`",
         "`correction_exceptional: true`",
@@ -605,9 +647,109 @@ def check_explicit_validation_correction_decision() -> None:
     )
     require("stage 1 is one bounded architect pass" in planning, "Codex planning is not Architect-only by default")
     require("do not run an automatic" in planning and "`qa-plan`" in planning and "`plan-reviewer`" in planning, "Codex planning can auto-dispatch plan reviewers")
+    require("security design review" in planning and "architect's security assessment" in planning, "Codex planning can still auto-dispatch security")
     require("only when the operator explicitly invokes it" in planning, "Codex plan review is not explicit-only")
     claude_planning = re.sub(r"\s+", " ", read("agents/ref-pipeline.md").lower())
     require("`/th:plan-review` is an explicit operator flow only" in claude_planning, "Claude plan review is not explicit-only")
+    require("planning dispatches only `architect`" in claude_planning, "Claude planning is not architect-only")
+
+    architect = re.sub(r"\s+", " ", read("agents/architect.md").lower())
+    ac_evidence = re.sub(r"\s+", " ", read("agents/_shared/ac-evidence.md").lower())
+    claude_shards = re.sub(r"\s+", " ", read("docs/plan-shards.md").lower())
+    codex_shards = re.sub(r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/plan-shards.md").lower())
+    for label, text in (("architect", architect), ("AC evidence", ac_evidence), ("Claude shards", claude_shards), ("Codex shards", codex_shards)):
+        require("technical constraints" in text and "tc-n" in text, f"{label}: functional ACs are not separated from technical constraints")
+        require("observable" in text and "given" in text and "when" in text and "then" in text, f"{label}: functional AC shape is missing")
+        require("private" in text, f"{label}: private implementation names are not excluded from ACs")
+    require("implementation_references_in_ac: 0" in architect, "architect does not report implementation-specific AC leakage")
+    require("never use `verify:` inside" in ac_evidence, "new ACs can still use VERIFY")
+    require("new plans never emit it" in claude_shards, "Claude plan shards can still emit VERIFY ACs")
+    require("never emitted by a new plan" in codex_shards, "Codex plan shards can still emit VERIFY ACs")
+
+
+def check_review_feedback_closures() -> None:
+    """PR #588 review fixes remain explicit and mechanically aligned."""
+    tester_adapter = read("runtime/codex/instructions/tester.md").lower()
+    for marker in (
+        "`test`, `command`, or `inspection` evidence",
+        "requirement text, exact command/arguments",
+        "fixture, configuration, and argument-file",
+    ):
+        require(marker in tester_adapter, f"tester adapter misses {marker!r}")
+
+    evidence = read("agents/_shared/ac-evidence.md").lower()
+    require("complete dependency set" in evidence, "evidence rows do not declare complete dependencies")
+    require("exact command/arguments" in evidence, "command changes do not stale evidence")
+
+    for relative in (
+        "agents/_shared/delivery-mechanics.md",
+        "plugins/team-harness/skills/pipeline/references/delivery.md",
+    ):
+        delivery = read(relative).lower()
+        for marker in ("snapshot_status: query-failed", "ci_snapshot: unavailable", "never retry"):
+            require(marker in delivery, f"{relative}: failed PR snapshot misses {marker!r}")
+
+    dispatch = read("agents/_shared/dispatch-contract.md").lower()
+    require("security assessment anchors" in dispatch, "adversary dispatch lost security anchors")
+    require("design-review verdict" not in dispatch, "adversary dispatch still depends on retired design review")
+
+    correction_contracts = (
+        "agents/_shared/orchestrator-state.md",
+        "plugins/team-harness/skills/pipeline/references/recovery.md",
+        "plugins/team-harness/skills/pipeline/references/state-and-gates.md",
+        "plugins/team-harness/skills/pipeline/references/validation.md",
+    )
+    for relative in correction_contracts:
+        contract = re.sub(r"\s+", " ", read(relative).lower())
+        require("byte-for-byte" in contract, f"{relative}: correction package is not immutable")
+        nonce_markers = ("nonce alone", "nonce-only", "not merely share a nonce", "shared nonce", "sharing only the nonce")
+        require("nonce" in contract and any(marker in contract for marker in nonce_markers), f"{relative}: nonce can substitute for the correction package")
+
+    architect = read("agents/architect.md")
+    require("Emit this block for every plan" in architect, "direct plans may omit Scope Shape")
+    task_template = architect.split("<!-- file: plan/tasks/Task-1.md -->", 1)[1].split("<!-- file: plan/tasks/Task-2.md -->", 1)[0]
+    require("#### Verification" in task_template, "task template misses Verification")
+
+    vocabulary_pattern = re.compile(r"`SECURITY_CONTROL_VOCABULARY: ([^`\n]+)`")
+    architect_vocabulary = vocabulary_pattern.findall(architect)
+    adversary_vocabulary = vocabulary_pattern.findall(read("agents/adversary.md"))
+    require(len(architect_vocabulary) == 1, "architect must declare one canonical security vocabulary")
+    require(len(adversary_vocabulary) == 1, "adversary must declare one canonical security vocabulary")
+    require(architect_vocabulary == adversary_vocabulary, "architect/adversary security vocabularies drifted")
+
+    implementer = read("agents/implementer.md")
+    require("finding_resolutions:" in implementer and "finding_id" in implementer, "implementer cannot resolve every finding")
+    require("finding_resolution:" not in implementer, "singular implementer finding resolution remains")
+
+    reviewer = read("agents/plan-reviewer.md")
+    reviewer_flat = re.sub(r"\s+", " ", reviewer.lower())
+    for marker in (
+        "require every normalized criterion",
+        "reject duplicate ac identifiers",
+        "ac/tc section ownership is invalid",
+        "regression checkpoint is closed but 02-regression-test.md is missing",
+    ):
+        require(marker in reviewer_flat, f"plan reviewer misses {marker!r}")
+    require(reviewer.count("```text\n- **TC-N**: regression test exists at") == 2, "regression examples need text fence languages")
+
+    qa_failure = section(read("agents/qa.md"), "### Finding Coordinates", "### Hygiene findings")
+    require("**Requirement:**" in qa_failure and "**Closure evidence:**" in qa_failure, "QA failure brief lacks five coordinates")
+    require("with the five" in read("agents/tester.md"), "tester prose still counts four coordinates")
+
+    adversary = read("agents/adversary.md")
+    require("initial | amend-N | correction-N" in adversary, "adversary rejects correction audit runs")
+    dispatch_route = read("agents/ref-pipeline.md")
+    require("Stage-1 sensitivity timing" in dispatch_route, "adversary dispatch omits Stage-1 timing")
+    require("applicable current security result anchored to the exact frozen identity" in dispatch_route, "security-relevant TCs lack current-result acceptance mapping")
+
+    design = read("plugins/team-harness/skills/pipeline/references/design.md")
+    for marker in ("request_shape: adaptation | new-capability | fix | refactor", "realized_scope: aligned | expanded", "aligned plan must omit"):
+        require(marker in design, f"Gate 1 scope-shape validation misses {marker!r}")
+
+    validation = read("plugins/team-harness/skills/pipeline/references/validation.md")
+    require("require `security` to perform a focused audit" in validation, "security-audit wording remains ambiguous")
+    security_adapter = read("runtime/codex/instructions/security.md").lower()
+    require("changed a security anchor or invariant" in security_adapter, "security adapter can carry stale anchor/invariant evidence")
 
 
 def check_direct_predicate() -> None:
@@ -951,9 +1093,11 @@ def check_residual_corrections() -> None:
 
     claude = read("agents/ref-pipeline.md")
     validation = section(claude, "### The audit never iterates", "### Knowledge write on audit findings")
+    validation_flat = re.sub(r"\s+", " ", validation.lower())
     gate3 = section(claude, "## STAGE-GATE-3", "## Delivery")
     require("consolidated" in validation.lower() and "package" in validation.lower(), "Claude validation: security failure is not consolidated")
-    require("fresh full tester/qa/adversary" in validation.lower(), "Claude validation: fresh audit requirement missing")
+    require("fresh security audit for every corrected sensitive finding" in validation_flat, "Claude validation: fresh sensitive-audit requirement missing")
+    require("qa is fresh" in validation_flat and "tester refreshes stale evidence rows" in validation_flat, "Claude validation: impact-derived acceptance refresh missing")
     require("operator-disposed" not in validation.lower(), "Claude validation: correctable findings remain operator-disposed")
     require("never reaches this gate" in gate3.lower(), "Claude Gate 3: correctable finding can still ship")
     require("no keyword can waive" in gate3.lower(), "Claude Gate 3: security correction waiver drifted")
@@ -1448,6 +1592,14 @@ def check_single_ship_delivery() -> None:
         and "without mutating refs" in codex_delivery,
         "Codex delivery omits the non-mutating base-status report",
     )
+    for label, text in (
+        ("Claude delivery", mechanics),
+        ("Codex delivery", codex_delivery),
+    ):
+        require("exactly once" in text, f"{label}: PR state is not a one-shot snapshot")
+        require("undetermined" in text, f"{label}: UNKNOWN mergeability is not terminally reported")
+        require("poll" in text and "wait" in text and "merge" in text, f"{label}: no-wait delivery rule missing")
+        require("complete" in text and "immediately" in text, f"{label}: delivery can remain open after PR creation")
 
 
 def check_delivery_preview_binding() -> None:
@@ -1902,10 +2054,11 @@ def check_context_isolation_rotation_contract() -> None:
         "bounded correction packet",
         "`cause`",
         "`files`",
-        "`ac`",
+        "`ac-n|tc-n`",
         "`suggested correction`",
+        "deterministic closure evidence",
         "current frozen anchor",
-        "required evidence",
+        "expected result",
     ):
         require(marker in pipeline_flat, f"pipeline: AC13 lifecycle marker missing {marker!r}")
 
@@ -1933,12 +2086,14 @@ def check_context_isolation_rotation_contract() -> None:
         require(marker in pipeline_flat, f"pipeline: AC16 Main-rotation marker missing {marker!r}")
 
     for marker in (
-        "every tester, qa, and security dispatch uses a fresh",
+        "every dispatched tester, qa, and security attempt uses a fresh",
         "v2 `fork_turns: none` agent",
         "current frozen commit/tree",
         "verification facts/evidence",
         "implementer's success narrative",
-        "after an operator-authorized correction, every revalidation starts new tester, qa, and security agents",
+        "after an operator-authorized correction, qa is always a new agent",
+        "tester runs fresh only for stale evidence rows",
+        "security runs fresh only when the closed impact predicate",
         "never reuse a prior verifier",
     ):
         require(marker in validation_flat, f"validation: AC14 isolation marker missing {marker!r}")
@@ -1981,7 +2136,7 @@ def check_context_isolation_rotation_contract() -> None:
             "post-terminal `followup_task`",
             "`cause`",
             "`files`",
-            "`ac`",
+            "`ac-n|tc-n`",
         ):
             require(marker in adapter, f"{role}: AC9/AC13 marker missing {marker!r}")
         require("150 tool calls" not in adapter and "25 m tokens" not in adapter, f"{role}: superseded rotation limit remains")
@@ -1993,9 +2148,15 @@ def check_context_isolation_rotation_contract() -> None:
     for role in ("tester", "qa", "security"):
         adapter = re.sub(r"\s+", " ", read(f"runtime/codex/instructions/{role}.md").lower())
         require("implementer's success narrative" in adapter, f"{role}: implementer narrative is not excluded")
-        require("every revalidation starts a new" in adapter, f"{role}: revalidation is not fresh")
         require("`suggested correction`" in adapter, f"{role}: advisory correction coordinate missing")
+        require("closure evidence" in adapter, f"{role}: correction closure coordinate missing")
         require("never request or trigger a follow-up round" in adapter, f"{role}: automatic follow-up is not prohibited")
+    tester_adapter = re.sub(r"\s+", " ", read("runtime/codex/instructions/tester.md").lower())
+    qa_adapter = re.sub(r"\s+", " ", read("runtime/codex/instructions/qa.md").lower())
+    security_adapter = re.sub(r"\s+", " ", read("runtime/codex/instructions/security.md").lower())
+    require("re-dispatches tester only for evidence rows" in tester_adapter and "exact path/hash" in tester_adapter, "tester: stale evidence is not impact-routed")
+    require("every corrected frozen identity receives a new qa reviewer" in qa_adapter, "qa: corrected identity is not freshly reviewed")
+    require("revalidation starts a new security reviewer only when" in security_adapter and "impact is unknown" in security_adapter, "security: fail-closed impact routing missing")
 
 
 def check_codex_usage_observability_contract() -> None:
@@ -2248,6 +2409,7 @@ def main() -> None:
         ("v3 machine", check_v3_machine),
         ("corrective routes", check_corrective_routes),
         ("explicit validation correction decision", check_explicit_validation_correction_decision),
+        ("PR 588 review closures", check_review_feedback_closures),
         ("authoritative post-Gate-1 transitions", check_authoritative_post_gate1_transitions),
         ("direct predicate", check_direct_predicate),
         ("single writer", check_single_writer),

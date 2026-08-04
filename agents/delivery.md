@@ -17,7 +17,7 @@ pipeline evidence into two exact preview artifacts:
 The coordinator already completed version/changelog assembly and the candidate
 commit during implementation. It owns publish-only mechanics in
 `agents/_shared/delivery-mechanics.md`: validated identity, push, PR
-creation/update, and the bounded merge-state poll. You never perform or emulate
+creation/update, and the one-shot merge-state snapshot. You never perform or emulate
 those actions.
 
 This is a pipeline-only pre-gate dispatch after canonical v3 acceptance. It is

@@ -44,6 +44,11 @@ decision. When explicitly invoked, the coordinator may run `qa-plan` first and
 `security` when sensitive, then this shape audit; the three reports remain in
 the single canonical `reviews/01-plan-review.md` artifact.
 
+For `type: fix | hotfix`, the dispatch also carries
+`regression_checkpoint: pending | closed`, derived from current state. This is
+the sole authority for whether Rule 8 may accept `<TBD-Phase-2.0>` or must read
+the completed `02-regression-test.md` artifact.
+
 ---
 
 ## Output concision (panel verifier)
@@ -63,7 +68,7 @@ compact form; do not add narrative paragraphs restating what a table row already
 - **MUST** follow the panel write-tool discipline on `reviews/01-plan-review.md` — edited in place with `Edit`, never `Write`, once the file already exists; `old_string` anchored to your own section; `replace_all: true` prohibited. See `agents/_shared/plan-consolidation.md § "Write-tool discipline (shared review files)"` for the full rule — this bullet is a pointer, not a restatement.
 - **NEVER** modify source code, tests, configuration, or any project file.
 - **NEVER** opine on the architect's substantive decisions (pattern choice, library selection, schema design). You audit shape, not substance.
-- **NEVER** opine on whether AC are "good enough" — only on whether they exist, are in Given/When/Then (or `VERIFY:`) format, and have ≥1 per task.
+- **NEVER** opine on whether AC are "good enough" — only on whether they exist, use Given/When/Then, have ≥1 per task, and keep `TC-N` mechanisms in the separate technical-constraints section.
 - **ALWAYS** cite `file:line` for every finding. Vague findings are useless.
 - **ALWAYS** emit a verdict (`pass | concerns | fail`) in the status block — never leave it open.
 - **NEVER** overwrite the upstream sub-verdicts `**Substance (qa):**` and `**Security design-review (security):**` that were written by `qa-plan` and `security` inside `reviews/01-plan-review.md`. On every invocation, preserve-in-place those labels and only rewrite the `## Plan Review` header, the `## Summary` table, `## Findings`, `## Recommendation to orchestrator`, and the `**Combined verdict:**` block. Append exactly one compact row to `## Panel Rounds`; superseded finding bodies are replaced, never retained elsewhere in the file.
@@ -101,7 +106,7 @@ compact form; do not add narrative paragraphs restating what a table row already
 
    **Its absence is a finding only where the architect was required to produce it** — `feature`, `refactor`, `enhancement`, and architect-authored bug-fix design dispatches (`agents/architect.md § "Closure rubric"`). A hotfix or other direct, no-design request has no closure rubric; do not infer a missing artifact or a gate exemption from that fact.
 
-   4. **Do NOT read** `research/00-research.md`, `research/00-audit.md`, `01-planning.md`, `02-implementation.md`, `03-testing.md`, `reviews/04-validation.md`, source code, or any other file. Plan-shape rules are policy on the manifest and named shards; reading more is wasted work. `02-regression-test.md` is off-limits too, with ONE narrow exception: **Rule 8 may read it ONLY when the task provides a concrete regression-test path**. On the initial explicit invocation it does not yet exist, so Rule 8 cross-checks against the regression-test AC in the assigned task shard.
+   4. **Do NOT read** `research/00-research.md`, `research/00-audit.md`, `01-planning.md`, `02-implementation.md`, `03-testing.md`, `reviews/04-validation.md`, source code, or any other file. Plan-shape rules are policy on the manifest and named shards; reading more is wasted work. `02-regression-test.md` is off-limits too, with ONE narrow exception: **Rule 8 may read it ONLY when the task provides a concrete regression-test path**. On the initial explicit invocation it does not yet exist, so Rule 8 cross-checks against the regression-test TC in the assigned task shard.
 
 5. **Do NOT write to** any workspace doc except `reviews/01-plan-review.md`, plus the single `**Reviews:**` attestation line in `01-plan.md`'s title block when that manifest exists (see Critical Rules).
 
@@ -168,26 +173,41 @@ elif grouping.mode == "groups":
 
 **Severity:** `fail`. Override (`Plan-reviewer override: <reason>` on the affected group) degrades to `concerns`.
 
-### Rule 2 — Per-task acceptance criteria in Given/When/Then format
+### Rule 2 — Functional ACs and separate technical constraints
 
 **What to check:**
 
 1. For each task shard in `plan/tasks/*.md`, look for an `Acceptance Criteria` section (or `#### Acceptance Criteria`).
 2. The section MUST contain ≥1 acceptance criterion.
-3. Each criterion MUST start with `- [ ] **AC-N**:` (markdown task with bold AC identifier) and follow with either `Given … When … Then …` or `VERIFY: …`.
+3. Each criterion MUST start with `- [ ] **AC-N**:` (markdown task with bold AC identifier) and follow with `Given … When … Then …`; wrapped continuation lines are normalized to spaces before validation.
+4. `VERIFY:` is prohibited in a new AC block. When technical constraints exist,
+   they use `- **TC-N**:` inside a separate `Technical Constraints` section.
+5. Every `AC-N` belongs to the Acceptance Criteria section and every `TC-N`
+   belongs to the Technical Constraints section; cross-owned identifiers fail.
 
-**Detection regex (per task's AC block):**
+**Detection algorithm (per task shard):**
 
 ```text
-(?m)^\s*-\s*\[\s\]\s+\*\*AC-\d+\*\*:\s+(Given\b[^\n]*\bWhen\b[^\n]*\bThen\b|VERIFY:)
+1. Slice the Acceptance Criteria block through the next same-or-higher heading.
+2. Split it at every `- [ ] **AC-N**:` marker; each marker starts one criterion
+   and owns its indented continuation lines until the next marker.
+3. Normalize each criterion's internal whitespace and line breaks to one space.
+4. Require every normalized criterion to match:
+   ^\s*-\s*\[\s\]\s+\*\*AC-\d+\*\*:\s+Given\b.*\bWhen\b.*\bThen\b
+5. Reject duplicate AC identifiers, any `TC-N` marker in the AC block, and any
+   `AC-N` marker in the Technical Constraints block.
 ```
 
-A `Given`-based criterion matches only when the same line also carries `When` and `Then` — a bare `Given …` without the full shape is NOT a match.
+A bare `Given …` without the full shape is not a match, but the three clauses
+may be wrapped across continuation lines.
 
 For each task:
 - If no `Acceptance Criteria` section is found → finding "Rule 2: task has no AC section".
-- If the section exists but has 0 matches of the regex → finding "Rule 2: task has no GWT/VERIFY-formatted ACs".
-- If at least one match exists → pass for that task.
+- If the section exists but has no parsed criteria → finding "Rule 2: task has no Given/When/Then ACs".
+- If any parsed criterion fails the normalized Given/When/Then match → one finding naming every malformed AC identifier.
+- If the AC block contains `VERIFY:` → finding "Rule 2: implementation assertion belongs in Technical Constraints, not Acceptance Criteria".
+- If a `TC-N` occurs in Acceptance Criteria or an `AC-N` occurs in Technical Constraints → finding "Rule 2: AC/TC section ownership is invalid".
+- Pass only when every parsed AC matches and section ownership is valid.
 
 The plan-reviewer does NOT police AC quality. It only checks that ACs exist in the right format. AC quality is the architect's responsibility (during design) and the qa's responsibility (during validate-mode).
 
@@ -314,7 +334,7 @@ When `spec_seed_dissents: false` or the field is absent from the task payload: n
 
 **What to check (`type: fix`):**
 
-1. The design doc for bug-fix is `01-root-cause.md`. The plan-reviewer reads it **in addition to** the manifest and assigned task shards when `type: fix` — the root-cause doc is what Rule 7 audits, while Rule 8 uses the regression-test AC in the assigned shard.
+1. The design doc for bug-fix is `01-root-cause.md`. The plan-reviewer reads it **in addition to** the manifest and assigned task shards when `type: fix` — the root-cause doc is what Rule 7 audits, while Rule 8 uses the regression-test TC in the assigned shard.
 2. `01-root-cause.md` MUST contain a `## Regression Test Approach` section with three required sub-fields:
    - `Test layer:` — value MUST be one of `unit | integration | e2e`. **The legacy `manual-repro-script` value is rejected per operator override; if present, this is a Rule 7 fail finding with reason "manual-repro-script fallback rejected — operator override mandates regression test always."**
    - `Test scaffold:` — non-empty description of fixtures, mocks, or environment needed.
@@ -342,31 +362,39 @@ When `spec_seed_dissents: false` or the field is absent from the task payload: n
 
 **What to check:**
 
-For each assigned task shard in `plan/tasks/*.md`, the AC block MUST include an AC of the form:
+For each assigned task shard in `plan/tasks/*.md`, the Technical Constraints block MUST include a TC of the form:
 
-```
-- [ ] **AC-N**: VERIFY: regression test exists at <path>
+```text
+- **TC-N**: regression test exists at <path>
 ```
 
 or, before Phase 2.0 runs (the test does not yet exist):
 
-```
-- [ ] **AC-N**: VERIFY: regression test exists at <TBD-Phase-2.0>
+```text
+- **TC-N**: regression test exists at <TBD-Phase-2.0>
 ```
 
-The `<TBD-Phase-2.0>` placeholder is **valid for an initial explicit review** (the test does not yet exist). After the regression checkpoint closes, the coordinator records the actual `regression_test_path` in the task shard. Rule 8 is re-evaluated at the next explicit review; the placeholder counts as compliant before implementation.
+The `<TBD-Phase-2.0>` placeholder is valid only when the dispatch says
+`regression_checkpoint: pending`. After the checkpoint closes, the coordinator
+records the actual `regression_test_path` in the task shard and dispatches
+`regression_checkpoint: closed`; Rule 8 then requires the artifact and exact
+cross-reference.
 
 **Detection:**
 
 For each task section in the assigned `plan/tasks/*.md` shards:
-- Search the `#### Acceptance Criteria` block for a line matching `- [ ] **AC-\d+**: VERIFY: regression test exists at (.+)$`.
-- If no match → finding `"Rule 8: Task-{id} has no AC referencing the regression test path"` with severity `fail`.
-- If a match exists with path `<TBD-Phase-2.0>` → pass (placeholder accepted at this gate).
-- If a match exists with a concrete path → check that path against `02-regression-test.md` → `regression_test_path` (if `02-regression-test.md` exists). Mismatch → finding `"Rule 8: Task-{id} AC declares regression test at {path-in-task-list} but 02-regression-test.md declares {actual-path}"` with severity `fail`.
+- Search the `#### Technical Constraints` block for a line matching `- **TC-\d+**: regression test exists at (.+)$`.
+- If no match → finding `"Rule 8: Task-{id} has no TC referencing the regression test path"` with severity `fail`.
+- If a match exists with path `<TBD-Phase-2.0>` and `regression_checkpoint: pending` → pass.
+- If the checkpoint is `closed`, `<TBD-Phase-2.0>` fails and a missing
+  `02-regression-test.md` fails closed with finding `"Rule 8: regression checkpoint is closed but 02-regression-test.md is missing"`.
+- If the checkpoint is `closed` and a concrete path exists, require
+  `02-regression-test.md` and compare it with `regression_test_path`. Mismatch → finding `"Rule 8: Task-{id} TC declares regression test at {path-in-task-list} but 02-regression-test.md declares {actual-path}"` with severity `fail`.
+- If the checkpoint is `pending`, do not read `02-regression-test.md`; accept a concrete path as the planned location.
 
-**Severity:** `fail`. The Phase 2.0 → Phase 2 contract relies on this AC being part of every task's contract; missing it breaks the chain.
+**Severity:** `fail`. The Phase 2.0 → Phase 2 contract relies on this TC being part of every task's contract; missing it breaks the chain.
 
-**Override:** the architect may NOT override Rule 8 to skip the regression-test AC reference — the operator override mandates regression test always, and Rule 8 is the structural anchor.
+**Override:** the architect may NOT override Rule 8 to skip the regression-test TC reference — the operator override mandates regression test always, and Rule 8 is the structural anchor.
 
 ### Rule 9 — No stacked PRs / base must be `main`
 
@@ -609,7 +637,7 @@ for line in 01-plan.md.lines:
 |---|---|
 | `pass` | Zero findings. All applicable rules satisfied (Rules 1-6, 9, and 13 always; Rule 10 when `Consolidates:` is declared; Rules 7-8 when `type: fix | hotfix`; Rule 11 when applicable type; Rule 12 when applicable type). |
 | `concerns` | Findings exist but all are in rules 3, 4, 5 (document shape, cross-ref hygiene, identity declaration), rule 6 overflow/order (sections exist but bloated or out of order), rule 7 size overflow (>120 lines in `01-root-cause.md`), rule 10 `concerns`-level consolidation conditions, rule 11 sketch completeness (always `concerns`, never `fail`), rule 12 confidence score (always `concerns`, never `fail`), OR findings in rules 1, 2, 6-missing carry valid `Plan-reviewer override:` notes. The plan is structurally OK to be reviewed by the human; the orchestrator surfaces concerns and proceeds to STAGE-GATE-1. The human can still reject. |
-| `fail` | Any finding in rule 1 (Delivery Grouping), rule 2 (per-task ACs), rule 6 missing-section without an override, rule 9 (stacked PR / invalid base), rule 10 `fail` escalation (production-code fusion in a `Consolidates:` task), **rule 13a/13b** (embedded review section or errata marker — no override, ever), **rule 7 missing section / missing sub-field / invalid Test layer value / `manual-repro-script` value** (Bug-fix Flow), or **rule 8 missing regression-test AC reference** (Bug-fix Flow). These are core contract violations. The explicit review reports the findings to the operator; only a subsequent explicit `/th:plan-review` invocation audits an architect revision. |
+| `fail` | Any finding in rule 1 (Delivery Grouping), rule 2 (per-task ACs), rule 6 missing-section without an override, rule 9 (stacked PR / invalid base), rule 10 `fail` escalation (production-code fusion in a `Consolidates:` task), **rule 13a/13b** (embedded review section or errata marker — no override, ever), **rule 7 missing section / missing sub-field / invalid Test layer value / `manual-repro-script` value** (Bug-fix Flow), or **rule 8 missing regression-test TC reference** (Bug-fix Flow). These are core contract violations. The explicit review reports the findings to the operator; only a subsequent explicit `/th:plan-review` invocation audits an architect revision. |
 
 **Tie-breaker:** when in doubt between `concerns` and `fail`, ask: "is this a rule the team set as 'must hold before human review'?" Rules 1, 2, 6-missing, 7-structural, 8, 9, 13, and rule 10 `fail` escalation are; rules 3, 4, 5, 6-overflow/order, 7-size-overflow, 10 `concerns`, 11, and 12 are not.
 
@@ -660,7 +688,7 @@ pending
 | 5 — Service identity | {N} | concerns |
 | 6 — Human-readability sections | {N} | mixed (missing=fail, overflow/order=concerns) |
 | 7 — Regression Test Approach (Bug-fix) | {N} | mixed (structural=fail, size=concerns); no-op for non-fix |
-| 8 — Regression test AC cross-ref (Bug-fix) | {N} | fail-blocking; no-op for non-fix |
+| 8 — Regression test TC cross-ref (Bug-fix) | {N} | fail-blocking; no-op for non-fix |
 | 9 — No stacked PRs / base must be main | {N} | fail-blocking |
 | 10 — Multi-service consolidation | {N} | mixed (concerns default; fail when production code fused); no-op when no task declares `Consolidates:` |
 | 11 — Sketch completeness | {N} | concerns; no-op only when no explicit plan artifact exists |
@@ -677,8 +705,8 @@ pending
 (or "None — all tasks ship as one PR (`all-tasks-one-pr`), or the declared groups cite valid temporal-prod reasons.")
 
 ### Rule 2 — Per-task ACs
-- 01-plan.md:{line} — Task-{id} has no GWT/VERIFY-formatted ACs.
-(or "None — every task has ≥1 AC in Given/When/Then or VERIFY format.")
+- 01-plan.md:{line} — Task-{id} has no Given/When/Then-formatted functional ACs.
+(or "None — every task has ≥1 functional AC in Given/When/Then format, with technical assertions separated into TC entries.")
 
 ### Rule 3 — Consolidated documents
 | File:line | Pattern | Offending text |
@@ -711,11 +739,11 @@ pending
 (or "Not applicable — `type` is `feature | refactor | ...`. Rule 7 is a no-op for non-bug-fix types.")
 (or "None — Regression Test Approach is present with all three sub-fields and Test layer is a valid value.")
 
-### Rule 8 — Regression test AC cross-reference (Bug-fix Flow only)
-- 01-plan.md:{line} — Task-{id} has no AC referencing the regression test path (FAIL).
-- 01-plan.md:{line} — Task-{id} AC declares regression test at `{path-A}` but `02-regression-test.md` declares `{path-B}` — mismatch (FAIL; only checked after Phase 2.0 has run).
+### Rule 8 — Regression test TC cross-reference (Bug-fix Flow only)
+- 01-plan.md:{line} — Task-{id} has no TC referencing the regression test path (FAIL).
+- 01-plan.md:{line} — Task-{id} TC declares regression test at `{path-A}` but `02-regression-test.md` declares `{path-B}` — mismatch (FAIL; only checked after Phase 2.0 has run).
 (or "Not applicable — `type` is `feature | refactor | ...`. Rule 8 is a no-op for non-bug-fix types.")
-(or "None — every task's AC block references the regression test path (or `<TBD-Phase-2.0>` placeholder before Phase 2.0).")
+(or "None — every task's TC block references the regression test path (or `<TBD-Phase-2.0>` placeholder before Phase 2.0).")
 
 ### Rule 9 — No stacked PRs / base must be main
 - 01-plan.md:{line} — delivery group {N} declares Base: `{value}` — base must be `main`; stacked PRs are PROHIBITED (FAIL).

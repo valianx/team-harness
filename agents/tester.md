@@ -53,10 +53,10 @@ actually adds or modifies a comment.
 
 ## Discovery and reference routing
 
-Read the ACs, changed files, existing tests, test commands, and triggered
+Read the ACs, TCs, changed files, existing tests, test commands, and triggered
 `sketches/*.md`. Record `sketches_read`.
 
-For each AC classify the strongest suitable evidence as `test`, `command`, or
+For each AC and TC classify the strongest suitable evidence as `test`, `command`, or
 `inspection`. For a warranted test, select only the necessary test type:
 
 - `unit`: isolated logic;
@@ -72,8 +72,8 @@ Read `agents/testing-refs/_index.md` and only the files for selected types. The
 repository's existing framework wins over a reference's suggested tool. Load
 `agents/testing-refs/cross-browser.md` only when `cross_browser: true`.
 
-Record each selection in `03-testing.md` as AC, selected type, reason, and loaded
-reference. Do not load test-type references for ACs classified as `command` or
+Record each selection in `03-testing.md` as requirement, selected type, reason, and loaded
+reference. Do not load test-type references for requirements classified as `command` or
 `inspection`.
 
 ## Evidence map
@@ -84,11 +84,11 @@ reference. Do not load test-type references for ACs classified as `command` or
 # Testing Evidence: {feature}
 
 ## Evidence Map
-| AC | Type | Evidence | Result |
-|---|---|---|---|
-| T1-AC-1 | test | `path:line` — `test name`; `{command}` | PASS |
-| T1-AC-2 | command | `{command}` — {relevant output} | PASS |
-| T1-AC-3 | inspection | `path:line` — {what was verified} | PASS |
+| Requirement | Type | Evidence | Evidence paths | Result |
+|---|---|---|---|---|
+| T1-AC-1 | test | `path:line` — `test name`; `{command}` | `[path]` | PASS |
+| T1-TC-1 | command | `{command}` — {relevant output} | `[path]` | PASS |
+| T1-AC-2 | inspection | `path:line` — {what was verified} | `[path]` | PASS |
 
 ## Tests Authored
 - {path and behavior protected, or "None — existing evidence was sufficient."}
@@ -139,7 +139,7 @@ passing regression.
 
 ## Mode: `authoring`
 
-Classify every AC using the shared contract. Then:
+Classify every AC and TC using the shared contract. Then:
 
 1. reuse sufficient existing tests and commands;
 2. author only missing warranted tests;
@@ -153,7 +153,7 @@ successful. Do not convert it into a test to satisfy a coverage table.
 
 For a bug-fix with a Phase 2.0 artifact, reuse that regression contract and
 confirm it now passes. If a newly warranted test exposes a product defect,
-return `status: failed` and report the behavior to the coordinator with the four
+return `status: failed` and report the behavior to the coordinator with the five
 finding coordinates below; do not select a phase, edit the plan, dispatch the next
 agent, or weaken the assertion. The coordinator includes the finding in the
 complete validation package and waits for the mandatory live correction decision.
@@ -169,7 +169,8 @@ still relevant and successful. For inspection evidence, confirm the cited
 artifact location exists and supports the claim.
 
 Do not add or edit tests. Missing or stale evidence is a tester finding: report
-the cause, evidence files, implicated AC, and an advisory suggested correction.
+the cause, evidence files, implicated AC/TC, an advisory suggested correction,
+and deterministic closure evidence with its expected result.
 Return every finding and stop. Main waits for the complete validation set and the mandatory
 correction decision before selecting implementation, Freeze, re-audit, or another agent. Normal
 or ineligible autonomous paths require a fresh live operator decision; only the closed eligible
@@ -216,13 +217,14 @@ source security scan and report only concrete findings with `file:line`.
 ## Final-result finding contract
 
 For every failed test, missing evidence row, or incomplete sensitive coverage,
-write a compact finding containing all four values below. The coordinator, not the
+write a compact finding containing all five values below. The coordinator, not the
 tester, decides the phase and next agent from these coordinates:
 
 - **Cause:** what failed or what evidence is missing.
 - **Files:** the test, source, or artifact paths that establish the finding.
-- **AC:** the exact `AC-N` identifiers implicated.
+- **Requirement:** the exact `AC-N` or `TC-N` identifiers implicated.
 - **Suggested correction:** the smallest advisory action.
+- **Closure evidence:** a deterministic command or inspection plus the expected result.
 
 Use `failure-brief.md` for a finding that blocks acceptance. Return evidence only;
 never select implementation, Freeze state, re-audit, next agent, or a correction
@@ -279,7 +281,7 @@ packet_escapes: N
 packet_integrity: ok | stale | mismatch | n-a
 tools: read:N write:N edit:N bash:N grep:N glob:N
 issues: {actionable blockers or none}
-finding_summary: [{cause, files, ac, suggested_correction}] | none
+finding_summary: [{cause, files, requirement, suggested_correction, closure_evidence}] | none
 ```
 
 Omit mode-specific fields when they do not apply. `tests_count` is observational

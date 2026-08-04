@@ -8,23 +8,33 @@ New Tier 2-4 plans use `plan_format: sharded-v1`:
 | `plan/architecture.md` | decisions, services, assessments, file-level work plan |
 | `plan/delivery.md` | dependencies, bases, version, PR grouping |
 | `plan/invariants.md` | cross-project/multi-site invariants; omit when none |
-| `plan/tasks/Task-N.md` | one task's scope, files, seams, notes, and AC checkboxes |
+| `plan/tasks/Task-N.md` | one task's scope, files, seams, notes, functional AC checkboxes, and technical constraints |
 
 The index begins with `**Plan format:** sharded-v1` and maps every artifact and
 task to an exact path. Each fact has one canonical home; never copy
 architecture, invariant, task, or AC prose into the index.
 
+Every new task shard has separate `## Acceptance Criteria`,
+`## Technical Constraints`, and `## Verification` sections. `AC-N` uses
+Given/When/Then and describes only behavior observable by a user, API consumer,
+operator, or another system. It does not name private files, functions,
+components, frameworks, mocks, or test mechanics unless that name is itself a
+supported public contract. `TC-N` owns mandatory internal mechanisms and
+engineering invariants. `VERIFY:` acceptance criteria are legacy-recovery input
+only and are never emitted by a new plan. Gates count ACs and TCs separately.
+
 Resolve paths from the index once. Implementer reads its task plus named design
-anchors. Tester and QA read their task plus the verification packet. Security
+anchors. Tester reads task ACs and TCs plus the verification packet; QA grades
+the task ACs and consumes only relevant TC evidence. Security
 reads classification, security anchors, affected invariants, and only
 security-relevant tasks. Delivery reads delivery, conditional invariants, and
 accepted evidence. Recovery reads the index plus the shard named by
 `next_action`. Only the plan panel may inspect every shard.
 
-Targets constrain fixed prose, never item counts: index 80 lines/12 KB,
+Targets constrain fixed prose, never AC or TC item counts: index 80 lines/12 KB,
 architecture 120 lines/20 KB, delivery 80 lines/12 KB, invariant prose at most
 two lines per invariant, and task fixed prose 30 lines plus at most two prose
-lines per AC. Preserve all required items and record
+lines per AC or TC. Preserve all required items and record
 `size_reason: required-items` above a target.
 
 Gates synthesize decision, material risks, counts, links, options, and nonce in

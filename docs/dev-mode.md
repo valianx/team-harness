@@ -259,7 +259,7 @@ The following security mechanisms run **input-independent** and are NOT waivable
 
 - **HI-2 (discover-phase.md §3):** the security floor non-waivability invariant. No disposition signal can bypass the security gate. The gate fires whenever `security_sensitive: true` is set, regardless of session state.
 - **Path-pattern auto-escalation (`agents/ref-pipeline.md § "13 — Classify"`, deriving from `agents/ref-intake-flows.md § "Lane Classification"`):** sets `security_sensitive: true` based on file paths touched by the PR. This runs on the diff, not on the session state.
-- **Bug-fix forcing rule:** for `type: fix` and `type: hotfix`, `security_sensitive: true` is forced. On a sensitive task the non-waivable floor is: SEC-002 design-review at Stage 1, plus `adversary` at the Pre-Delivery Security Audit (within Phase 3); code-level audit is delegated to PR review, referred to generically (not dependent on any specific configured tool).
+- **Bug-fix forcing rule:** for `type: fix` and `type: hotfix`, `security_sensitive: true` is forced. Planning remains architect-only. On a sensitive task the non-waivable specialist floor is the final `adversary` audit within Phase 3, using the architect's security assessment and security-relevant TCs as claims to invert; code-level audit is delegated to PR review, referred to generically (not dependent on any specific configured tool).
 
 ---
 
@@ -324,7 +324,7 @@ Only that obfuscation-evasion residual of string-matching gates is a documented,
 
 A limitation qualifies as "documented, not chased" only when it is BOTH (a) disclosed in-place where it lives, AND (b) scoped out through a legitimate mechanism — the architectural-inevitability limit for the string-matching-gate case is the canonical example. (A previously-tracked second example, the mid-iteration classification-timing gap in the retired per-task Phase-3 security dispatch, is addressed by the Pre-Delivery Security Audit's positional design: `adversary` reviews the consolidated final diff once per delivery group when `security_floor_applies` holds, so a control introduced by any patch iteration on a sensitive task is reviewed regardless of which iteration introduced it. This coverage is scoped to `security_floor_applies == true`, not classification-independent — code-level review on a non-sensitive task is delegated to PR review — `agents/ref-pipeline.md § "Phase 3 — Verify"`.) Cross-ref: this file's "Residual static-resolution limits" section.
 
-This disposition is narrowly scoped to the residual class described above. It does NOT license skipping any real in-scope finding, does NOT weaken or waive any floor, and does NOT change when or whether the SEC-002 design-review or `adversary` dispatch — security floors stay non-waivable.
+This disposition is narrowly scoped to the residual class described above. It does NOT license skipping any real in-scope finding, does NOT weaken or waive any floor, and does NOT change when the final `adversary` dispatch runs — the final security floor stays non-waivable when its impact predicate applies.
 
 ---
 

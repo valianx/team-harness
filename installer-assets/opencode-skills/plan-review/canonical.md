@@ -12,6 +12,10 @@ phase, a Gate 1 prerequisite, or a post-approval offer. The canonical pipeline r
 2. Without a name, find active workspace plans. If none exist, report that the operator must run
    `/th:design` or `/th:plan` first. If several exist, ask which plan to review.
 3. Read the current plan and its state. Never infer a gate release or modify `00-state.md`.
+4. For `type: fix | hotfix`, derive `regression_checkpoint: pending | closed`
+   from current state and pass it to `plan-reviewer`. A closed checkpoint requires
+   the existing `02-regression-test.md`; never infer completion from a concrete
+   task-shard path alone.
 
 ## Review
 

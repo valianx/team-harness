@@ -9,13 +9,34 @@ small canonical artifacts, not a monolith copied between roles:
 | `plan/architecture.md` | decisions, services, assessments, and file-level work plan | architect, plan panel; referenced slices for implementer/security |
 | `plan/delivery.md` | task ordering, dependencies, branches, bases, and PR grouping | orchestrator, delivery |
 | `plan/invariants.md` | cross-project or multi-site invariants; omit when none | affected implementers, security, delivery |
-| `plan/tasks/Task-N.md` | one task's scope, files, seams, dispatch declarations, ACs, and AC checkboxes | assigned implementer, tester, QA |
+| `plan/tasks/Task-N.md` | one task's scope, files, seams, dispatch declarations, functional ACs, technical constraints, and AC checkboxes | assigned implementer, tester, QA |
 
 `01-plan.md` begins with `**Plan format:** sharded-v1` and contains a
 `## Plan Manifest` table with one row per artifact. Its task index contains the
-task ID, service, status, AC count, and exact task-shard path. Task status is
-canonical in the index; task scope and AC state are canonical in the task
-shard. Do not repeat architecture, task prose, or AC text in the index.
+task ID, service, status, functional AC count, technical-constraint count, and
+exact task-shard path. Task status is canonical in the index; task scope,
+constraint set, and AC state are canonical in the task shard. Do not repeat
+architecture, task prose, constraint prose, or AC text in the index.
+
+Every new task shard separates these three concerns:
+
+```markdown
+## Acceptance Criteria
+- [ ] **AC-1**: Given {context}, When {action}, Then {observable result}.
+
+## Technical Constraints
+- **TC-1**: {mandatory internal mechanism or engineering invariant}.
+
+## Verification
+- {tests, commands, or inspections that can prove ACs and TCs}
+```
+
+`AC-N` is reserved for observable behavior. Private files, functions, classes,
+frameworks, mocks, internal symbols, and test mechanics are prohibited in AC
+prose unless the named element is itself part of a supported public contract.
+Technical precision belongs in `TC-N`, task scope/notes, shared invariants, or
+verification. `VERIFY:` is accepted only when recovering an older workspace;
+new plans never emit it inside `## Acceptance Criteria`.
 
 ## Read routing
 
@@ -24,8 +45,9 @@ required by the dispatch. A role must not preload every shard:
 
 - implementer: assigned task shard plus only its named architecture or
   invariant anchors;
-- tester and QA: assigned task shard and verification packet;
-- security design review: classification, security assessment, affected
+- tester: assigned task shard, including ACs and TCs, plus the verification packet;
+- QA: assigned task shard's ACs plus the verification packet and TC evidence needed to interpret behavior;
+- explicitly requested standalone security design review: classification, security assessment, affected
   invariants, and security-relevant task shards;
 - delivery: delivery shard, invariant shard when present, and accepted evidence
   pointers;
@@ -61,10 +83,10 @@ they never regenerate the whole plan set. Review history remains in
 round table.
 
 Budgets apply per artifact and to fixed prose, never to the number of approved
-projects, tasks, ACs, invariants, findings, or controls. The ordinary targets
+projects, tasks, ACs, TCs, invariants, findings, or controls. The ordinary targets
 are: index 80 lines/12 KB, architecture 120 lines/20 KB, delivery 80 lines/12
 KB, invariant prose at most two lines per invariant, and task fixed prose 30
-lines plus at most two prose lines per AC. When required items exceed a target,
+lines plus at most two prose lines per AC or TC. When required items exceed a target,
 keep them and record `size_reason: required-items` in the index.
 
 ## Operator voice

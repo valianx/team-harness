@@ -26,6 +26,8 @@ correction_nonce: {fresh token or null}
 correction_anchor: {failed freeze commit/tree or null}
 correction_findings: [{stable finding id}]|[]
 correction_scope: [{repo-relative path}]|[]
+correction_requirements: [{AC-N|TC-N}]|[]
+correction_closure: [{id, check, expected}]|[]
 correction_dispositions: [{id, disposition: resolve|design-consistent|decision-required}]|[]
 correction_decision: authorize|pause|abort|null
 correction_decision_nonce: {consumed token or null}
@@ -375,7 +377,7 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | `agent_role`, `task`, `attempt_ordinal`, `context_strategy`, `follow_up_count` | conditional | required for `agent.*`; finite lifecycle enums and local ordinal only, never an ID, alias, or free-form label |
 | `attempt_metrics`, `quality_verdict` | conditional | required for `agent.close`; metrics are complete or closed-code unavailable, verdict is `pass`/`concerns`/`fail`/`n-a` |
 | `correction_cause` | conditional | required for `agent.correction.spawn`; literal `verification` only |
-| `correction_nonce`, `correction_anchor`, `correction_findings`, `correction_scope`, `correction_dispositions`, `correction_exceptional` | conditional | required for `correction.decision` and every authorized `iteration.start`/`agent.correction.spawn`; exact bounded identity, never inferred; dispositions and the exceptional boolean must match all records |
+| `correction_nonce`, `correction_anchor`, `correction_findings`, `correction_scope`, `correction_requirements`, `correction_closure`, `correction_dispositions`, `correction_exceptional` | conditional | required for `correction.decision` and every authorized `iteration.start`/`agent.correction.spawn`; the complete eight-field package must be byte-for-byte identical across all three events, not merely share a nonce; exact bounded identity, never inferred; closure has one deterministic check/expected result per finding |
 | `correction_authority`, `correction_authority_gate_nonce` | conditional | required for `correction.decision`; `operator-live` uses no Gate nonce, while `gate1-autonomous` requires the exact nonce from the valid `approved-autonomous` release and is prohibited at `iteration: 3/3` |
 | `verdict` | conditional | `pass`/`concerns`/`fail`/`partial-fail` |
 | `decision` | conditional | required for `stage.gate.release` and `correction.decision`; correction value is `authorize\|pause\|abort` |

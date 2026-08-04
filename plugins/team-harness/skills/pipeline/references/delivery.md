@@ -49,8 +49,12 @@ tag, release, publication, issue comments, and board mutations remain excluded.
 Native Codex approval may still appear as a technical runtime boundary; it is
 not a new Team Harness decision or gate.
 
-Poll mergeability once with bounded `UNKNOWN` backoff and report the current CI
-snapshot without waiting. Set `phase: complete` only after terminal artifacts and
+Query mergeability exactly once, report `UNKNOWN` as `UNDETERMINED`, and report the current CI
+snapshot without retry, backoff, polling, or waiting for CI/merge. A non-zero
+query or response missing requested fields consumes that one attempt: report the
+known PR URL/number with `mergeability: UNDETERMINED`,
+`ci_snapshot: unavailable`, `snapshot_status: query-failed`, and one sanitized
+error line. Never retry or reopen delivery for the failed read. Set `phase: complete` immediately after terminal artifacts and
 the PR are present; otherwise record the precise recoverable failure. Before
 that terminal state transition, close delivery with the measured or unavailable
 `phase.end` from [observability.md](observability.md), update the same current

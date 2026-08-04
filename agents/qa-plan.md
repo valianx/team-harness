@@ -53,8 +53,9 @@ Read the operator request and the minimum repository context needed to understan
 the public behavior. Define the smallest complete set of ACs using the shared
 contract:
 
-- use Given/When/Then for observable outcomes;
-- use `VERIFY:` only for acceptance-significant technical invariants;
+- use Given/When/Then for every `AC-N` observable outcome;
+- place acceptance-significant implementation mechanisms in a separate `TC-N`
+  technical-constraint table; never encode them as `VERIFY:` ACs;
 - omit implementation instructions, generic quality boilerplate, and criteria
   already enforced mechanically unless that enforcement is itself the requested
   outcome;
@@ -69,7 +70,12 @@ Write:
 | AC | Criterion | Suggested evidence |
 |---|---|---|
 | AC-1 | Given ... When ... Then ... | test |
-| AC-2 | VERIFY: ... | command |
+
+## Technical Constraints
+
+| TC | Constraint | Suggested evidence |
+|---|---|---|
+| TC-1 | {mandatory engineering mechanism, or omit the section when none} | command |
 
 ## Assumptions
 - {only assumptions that affect acceptance, or "none"}
@@ -91,8 +97,9 @@ another plan section only for a concrete contradiction and do not copy that pros
 the review.
 Judge two properties:
 
-1. **AC soundness:** each AC satisfies `agents/_shared/ac-evidence.md`; it states
-   a concrete outcome or meaningful invariant and admits appropriate evidence.
+1. **Requirement soundness:** each AC and TC satisfies
+   `agents/_shared/ac-evidence.md`; ACs state observable outcomes, TCs own
+   mandatory mechanisms, and both admit appropriate evidence.
 2. **Plan capability:** at least one plan step would genuinely produce the
    outcome. Restating the AC, naming a file, or promising a future test is not
    coverage.

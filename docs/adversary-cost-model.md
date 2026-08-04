@@ -45,7 +45,7 @@ Additional structural reductions:
 - no Web or direct Knowledge Graph tools;
 - no mandatory full `02-implementation.md` or `01-plan.md` read; the audit keeps the targeted
   approach, risk, classification, key-decision, security-assessment, and in-scope AC sections;
-- only the Security Design-Review section of the Stage-1 panel artifact;
+- only the architect security-assessment anchors and implicated security TCs required to challenge the changed controls;
 - no per-file packet-membership reread;
 - targeted source reads only when the frozen diff lacks evidence needed to establish a precondition;
 - one combined per-control attempt instead of separate attempt and inverted-claim narratives.

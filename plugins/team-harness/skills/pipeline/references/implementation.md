@@ -42,9 +42,9 @@ required AC evidence, QA, security, Freeze, mandatory suites, or either gate.
 Close a terminal implementation attempt and prohibit post-terminal
 `followup_task`. Feedback, scope expansion, and every correction require a fresh
 agent (V2 `fork_turns: none`). Only after the mandatory live correction decision
-may Main create the bounded `Cause`/`Files`/`AC`/`Suggested correction` packet
-with its nonce, current frozen anchor, complete finding IDs, scope, and required
-evidence. New pipeline attempts always record `context_strategy: fresh` and
+may Main create the bounded `Cause`/`Files`/`AC-N|TC-N`/`Suggested correction`
+packet with its nonce, current frozen anchor, complete finding IDs, scope, and
+one deterministic closure check plus expected result per finding. New pipeline attempts always record `context_strategy: fresh` and
 `follow_up_count: 0`.
 
 Main separately writes a recoverable handoff and requires a fresh user thread
@@ -114,6 +114,15 @@ its approved resolution continues in implementation. Only a separate, explicit c
 operator request for architect work may reopen design and require a new Gate 1. Never rewrite an
 acceptance criterion merely to manufacture a pass.
 
+## Correction closure before Freeze
+
+For an authorized correction, the implementer runs every package closure check and records the
+actual result in `02-implementation.md`. Main verifies that every finding ID has one successful
+result before any Freeze rebuild. Missing or failed closure evidence is
+`failure_kind: correction-incomplete`: the consumed correction round remains consumed, no Freeze
+opens, and no validator is dispatched. Main consolidates the failed checks as the next package;
+normal approval pauses, while eligible autonomy may authorize another round only within max-3.
+
 ## Post-Gate-1 plan-write boundary
 
 The coordinator, not a specialist, classifies post-Gate-1 plan concerns. It may
@@ -122,8 +131,8 @@ or field coherence without semantic change), or transcribe the exact canonical
 field required by a live operator-approved resolution. A concern that changes
 intent, scope, behavior, AC meaning, or a security obligation is decision-bearing:
 pause for the bounded operator decision, then record `phase: implementation` and
-continue through implementation → Freeze → validation; retain a conditional
-security review when the decision is sensitive. Plan repair and transcription do
+continue through implementation → Freeze → validation; retain the final security
+floor when the decision is sensitive. Plan repair and transcription do
 not increment `iteration` or dispatch `architect`. Only a separate, explicit
 current live operator request may dispatch `architect`, set `phase: design`, and
 require a new Gate 1.

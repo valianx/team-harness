@@ -37,9 +37,10 @@ A dispatch prompt is built from three things only:
 A dispatch may also hand the recipient an **affirmation to invert** — a claim, produced by
 an earlier stage, that the recipient's own method exists to attack or falsify. This is
 permitted and is not a restatement of the recipient's contract: it is the recipient's own
-raw material. The canonical example is `adversary` receiving the Stage-1 SEC-002
-design-review verdict within the Phase 3 parallel validation block — the verdict is not a
-conclusion the dispatcher is handing down, it is the thing `adversary`'s own
+raw material. The canonical example is `adversary` receiving the architect's
+Stage-1 security assessment anchors and implicated security TCs within the Phase
+3 parallel validation block. Those claimed mitigations are not conclusions the
+dispatcher is handing down; they are the affirmations `adversary`'s own
 break-the-design method is built to attack.
 
 **Coordinate-in, content-out.** A value travels inline in the dispatch prompt exactly when

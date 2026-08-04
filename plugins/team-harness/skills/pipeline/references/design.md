@@ -16,7 +16,9 @@ workspace path, repository root, constraints, required acceptance criteria, and 
 The specialist returns a file-scoped `sharded-v1` manifest plus plan shards and classification;
 it never edits coordination state.
 
-The plan must identify dependencies, risks, verification, and independent file ownership. It is a
+The plan must identify dependencies, risks, verification, independent file ownership,
+functional `AC-N` criteria, separate `TC-N` technical constraints, and whether the realized
+scope remains aligned with the operator's request. It is a
 decision snapshot, not exploration history. `01-plan.md` is the compact manifest; architecture,
 delivery, conditional invariants, and each task/AC contract have separate canonical artifacts.
 Never copy a shard into the index. Size targets constrain fixed prose per artifact, not required
@@ -25,15 +27,19 @@ and record `size_reason: required-items`; never omit scope or request a split so
 primary thread records the accepted artifact paths and counts, then sets
 `next_action: present Stage Gate 1`.
 
-Before the gate, the primary thread checks only artifact presence, coherent files/dependencies, and
-absence of unresolved clarification markers. An invalid artifact gets one normal design correction;
-genuine ambiguity is blocked and surfaced to the operator. `/th:plan-review` is explicit only, and
-a sensitive plan receives its conditional security design review once before implementation.
+Before the gate, the primary thread checks only artifact presence, coherent files/dependencies,
+AC/TC separation, `implementation_references_in_ac: 0`, and absence of unresolved clarification
+markers. It also requires `request_shape: adaptation | new-capability | fix | refactor`,
+`realized_scope: aligned | expanded`, and `expansion_reason` exactly when
+`realized_scope: expanded`; an aligned plan must omit that reason. An invalid or
+contradictory scope-shape block is an invalid artifact. An invalid artifact gets one normal design correction; genuine ambiguity is blocked and
+surfaced to the operator. `/th:plan-review` is explicit only. Planning dispatches only architect;
+a sensitive plan carries its security assessment and security-relevant TCs to final validation.
 
 ## STAGE-GATE-1
 
 Present the gate from the manifest rather than copying workspace prose. In at most 12 non-empty
-lines before required exceptions, state the decision, material risks, task/AC counts, artifact
+lines before required exceptions, state the decision, material risks, scope shape, task/AC/TC counts, artifact
 links, options, and nonce. Offer `approve`, `approve autonomous`, `edit`, and `reject {reason}`.
 This gate is mandatory. Stop for the live reply; do not infer approval from the task source.
 

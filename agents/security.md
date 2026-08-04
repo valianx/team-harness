@@ -100,7 +100,7 @@ Invoked once for a security-sensitive **plan or design** (`01-plan.md`) before i
 
 **Premise:** There is NO code yet. This mode reviews the DESIGN / the plan (`01-plan.md`), not an implementation. Do NOT audit code. Do NOT Grep source directories. Do NOT report `file:line` of source files. Do NOT scan dependencies. Do NOT calculate risk scores of code. Do NOT produce `reviews/04-security.md` or any other `*-review.md` side-file in this mode — your output goes to the single canonical `reviews/01-plan-review.md` (the plan-review panel's consolidated file), not to a security-specific side-file.
 
-- **Trigger:** orchestrator invokes with `mode: design-review`, only when the task or plan is security-sensitive.
+- **Trigger:** the live operator explicitly invokes `/th:plan-review` with the security lens or directly requests a security design review. The normal pipeline never dispatches this mode automatically.
 - **Scope (`sharded-v1`):** read classification from `01-plan.md`, security anchors from `plan/architecture.md`, `plan/invariants.md` when present, and only security-relevant task shards. Never preload the full plan set. Legacy workspaces resolve the old logical locators.
 - **Explicit-review trigger:** the operator may also request this mode through `/th:plan-review`.
 - **Scope:** in a sharded workspace, read the manifest classification, security anchors, and only
@@ -129,11 +129,12 @@ When the design introduces or modifies a control path, a safety enforcement mech
 - No parallel correction files. All output goes in-place into `reviews/01-plan-review.md` (creating it with the full skeleton if absent).
 - **Write-tool discipline (shared review files).** MUST follow `agents/_shared/plan-consolidation.md § "Write-tool discipline (shared review files)"` — edited in place with `Edit`, never `Write`, once `reviews/01-plan-review.md` already exists. This is TWO SEPARATE `Edit` operations, each anchored ONLY within its own target — never one broad match spanning both, which could clobber unrelated panel content in between: one `old_string` anchored to your own `**Security design-review (security):**` label (within `## Plan Review`), and a second, independent `old_string` anchored to your own `## Security Design-Review` section. `replace_all: true` prohibited on both.
 
-**No automatic design-review loop.** A sensitive plan receives one design-review result before
-implementation. If the operator explicitly edits a security-relevant criterion or invokes
-`/th:plan-review` again, the coordinator may request a fresh review against the edited plan; no
-sub-verdict is carried forward and no reviewer starts a second round on its own. When in doubt
-whether an explicit edit touches the security-relevant surface, treat it as a touch.
+**Explicit-only design review.** Planning in the normal pipeline has only the architect specialist.
+This mode runs only from a current live operator request. If the operator explicitly edits a
+security-relevant criterion or invokes `/th:plan-review` again, the coordinator may request a
+fresh review against the edited plan; no sub-verdict is carried forward and no reviewer starts a
+second round on its own. When in doubt whether an explicit edit touches the security-relevant
+surface, treat it as a touch.
 
 **Panel-verifier concision (silence-default).** Larger reasoning models narrate more by default
 (Opus 4.8 included) — this mode's output is a compact verdict, not a narrated audit trail. Report
@@ -615,12 +616,13 @@ No security findings in the scanned changed files.
 ### Final-result finding contract
 
 For every Critical/High finding, broken security control, or incomplete
-sensitive coverage, report the same four coordinates:
+sensitive coverage, report the same five coordinates:
 
 - **Cause:** the concrete failure or unavailable evidence.
 - **Files:** changed source, test, and report paths with `file:line` evidence.
-- **AC:** the exact approved AC identifiers implicated.
+- **Requirement:** the exact approved `AC-N` or security-relevant `TC-N` identifiers implicated.
 - **Suggested correction:** the smallest advisory fix.
+- **Closure evidence:** a deterministic command or inspection plus its expected result.
 
 These coordinates are evidence for the coordinator, not routing authority: security
 does not select `design`, edit the plan, change phase, Freeze state, re-audit, next
@@ -905,7 +907,7 @@ packet_integrity: ok | stale | mismatch | n-a   # pipeline mode only; n-a when p
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 blast_radius: localized {IDs} | structural            # when status: failed only; omit on success
 issues: {critical and high findings titles, or "none"}
-finding_summary: [{cause, files, ac, suggested_correction}] | none
+finding_summary: [{cause, files, requirement, suggested_correction, closure_evidence}] | none
 ```
 
 **Mandatory tool-usage fields:**
@@ -934,8 +936,9 @@ When you finish pipeline mode and `reviews/04-security.md` reports any **Critica
 ### Finding Coordinates
 - **Cause:** {concrete failure or unavailable sensitive coverage}
 - **Files:** {changed source, test, and report paths with file:line evidence}
-- **AC:** {exact implicated AC identifiers}
+- **Requirement:** {exact implicated AC-N or TC-N identifiers}
 - **Suggested correction:** {smallest advisory fix}
+- **Closure evidence:** {deterministic command or inspection and expected result}
 
 ### Suggested remediation (advisory; no routing authority)
 - `src/users/users.repository.ts:42` — replace string concatenation with parameterized query (see Prisma `findFirst({ where: { id } })`)

@@ -264,7 +264,8 @@ def _check_qa_post_gate1_route(validation: str) -> None:
             context,
         )
     qa_markers = (
-        "return exactly four-coordinate input to main",
+        "return exactly five-coordinate input to main",
+        "closure evidence",
         "never select `design` or `architect`",
         "never request or trigger a follow-up round",
         "ac-n: pass",
@@ -294,7 +295,7 @@ def check_post_gate1_projection() -> None:
         fail(f"Codex post-Gate-1 transition results drifted: {rows!r}")
     _assert_markers(
         re.sub(r"\s+", " ", pipeline.lower()),
-        ("security-obligation classification", "bounded live operator decision", "implementation → freeze → validation", "conditional security review", "new gate 1"),
+        ("security-obligation classification", "bounded live operator decision", "implementation → freeze → validation", "retain the final security floor", "new gate 1"),
         "Codex routing projection",
     )
     _assert_no_automatic_design_route(pipeline, "Codex pipeline skill")
@@ -1478,11 +1479,11 @@ def main() -> None:
     activation_digests = digest_table(activation)
     pipeline_digests = digest_table(pipeline)
     expected_updated_digests = {
-        "architect": "f11ceef09bfb9d2839eb2d25adb05d4dcc1188dfacf11e355a9a291c4fcf816f",
-        "implementer": "c749244e2ef04e203ff16f5e1762241b190ae710a1c9977c5c6c7912dfe933a7",
-        "tester": "69595191f2f532c3af96e1163325fa6cc778df5b54c6a66cb230221633961f8a",
-        "qa": "0baf6a9fdb3af2918650aec5453e68f58d1414b889e90759b83465a959e25ba2",
-        "security": "8687f298b7608e63095f29e047209f37d98a006ca6c33b8283291872274f03e1",
+        "architect": "17f8df98cc2b5b9c4703c79493da40c141394f8b8076fb71b1512318592f894f",
+        "implementer": "76cd8d007b91411377b6401c9def7076f49e42868928010168cca17ad5778449",
+        "tester": "31a902a24dd23e838e7dc260c15fd8aa08bcfd703f56956194ff56ca810cf52e",
+        "qa": "2612528da833bcb5cf2db981ac586320a0ad06ac407d38beb564b64880cc24c8",
+        "security": "06434dd772dfff170529c67e15c91c08311329e66f364eb220298a2d0dd2f997",
         "delivery": "07a5997769adbb2b3304b7640e2f9a701a38564a4f58d192548390b15ffbf7d5",
     }
     if set(activation_digests) != pipeline_roles or activation_digests != pipeline_digests:

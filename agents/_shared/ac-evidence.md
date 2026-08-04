@@ -5,29 +5,58 @@ orchestrator's acceptance gate.
 
 ## Acceptance criteria
 
-An AC describes either:
+An `AC-N` describes an observable functional outcome in Given/When/Then form.
+The observer may be a user, API consumer, operator, or another system. Public
+routes, request fields, status codes, accessibility behavior, and externally
+meaningful security or performance outcomes may appear when they are part of
+the supported contract.
 
-- an observable functional outcome, preferably as Given/When/Then; or
-- a meaningful technical invariant, written as `VERIFY:`, when the operator,
-  public contract, repository convention, security, performance, compatibility,
-  or data-integrity requirement makes that invariant part of acceptance.
+An AC is never an implementation instruction. Private files, classes, methods,
+dependencies, frameworks, mocks, internal symbols, test mechanics, and
+literal-text presence do not belong in AC prose. Neither "implement X", "use
+Zod", "call function Y", nor "the code compiles" is a sound AC.
 
-An AC is not an implementation instruction. File, class, method, dependency,
-pattern, symbol, or literal-text presence is not acceptance by itself. Neither
-"implement X" nor "the code compiles" is a sound AC.
+## Technical constraints
+
+A `TC-N` records a meaningful implementation or engineering constraint when the
+operator, public contract, repository convention, security, performance,
+compatibility, or data-integrity requirement makes the mechanism itself
+mandatory. Examples include preserving a shared authorization guard, forbidding
+client-side sorting of a paginated slice, or keeping a multi-site literal in
+sync. Technical constraints live in the task shard's separate
+`## Technical Constraints` section; they never use `VERIFY:` inside
+`## Acceptance Criteria` and never contribute to the AC count presented at a
+gate.
+
+Every TC remains an implementation and evidence obligation. Tester records
+evidence for ACs and TCs; QA returns criterion verdicts for ACs; the security
+lens also evaluates every security-relevant TC. Exact files, commands, and test
+mechanics stay in task scope, notes, invariants, or verification rather than in
+acceptance prose.
 
 ## Evidence types
 
-Every AC needs appropriate evidence, not necessarily a newly authored test.
+Every AC and TC needs appropriate evidence, not necessarily a newly authored
+test.
 
 | Type | Use when | Minimum record |
 |---|---|---|
-| `test` | Executable behavior or invariant can regress and the suite is the clearest durable proof | test name, path, command, result |
-| `command` | An existing build, lint, parser, schema, or repository validator directly proves the claim | exact command, result, relevant output |
-| `inspection` | Prose, metadata, static configuration, or another artifact is best verified directly | artifact plus `file:line` or equivalent precise location |
+| `test` | Executable behavior or invariant can regress and the suite is the clearest durable proof | test name, command, result, and every source, test, fixture, configuration, and argument-file path consumed by the proof |
+| `command` | An existing build, lint, parser, schema, or repository validator directly proves the claim | exact command, result, relevant output, and every implementation, fixture, configuration, and argument-file path consumed by the command |
+| `inspection` | Prose, metadata, static configuration, or another artifact is best verified directly | artifact plus `file:line` and inspected paths |
 
-One item of evidence may satisfy several ACs. An AC may combine evidence types.
-Existing evidence is preferred when it directly proves the criterion.
+One item of evidence may satisfy several requirements. A requirement may combine
+evidence types. Existing evidence is preferred when it directly proves the
+requirement.
+
+Every evidence-map row declares `Evidence paths` as the complete dependency set
+for that proof. For executable evidence this includes every consumed
+implementation, test, fixture, configuration, and argument-file input, not only
+the command or test file named in the row. After a correction, unchanged rows
+may carry forward only when the requirement text, exact command/arguments, and
+every declared dependency path's blob hash are unchanged. A missing dependency,
+path declaration, or hash makes the row stale; the tester refreshes it before
+the next Freeze.
 
 ## When to author a test
 
@@ -55,7 +84,9 @@ failure.
 
 ## Acceptance gate
 
-The gate passes an AC when its recorded evidence is relevant, successful, and
-traceable to the criterion. It fails missing, irrelevant, fabricated, stale, or
-unsuccessful evidence. The number of authored tests is telemetry, never a quota
-or pass condition.
+The gate passes an AC or TC when its recorded evidence is relevant, successful,
+current, and traceable to the requirement. It fails missing, irrelevant,
+fabricated, stale, or unsuccessful evidence. QA must additionally return a
+criterion-specific verdict for every AC. Security-relevant TCs require the
+applicable security result. The number of authored tests is telemetry, never a
+quota or pass condition.
