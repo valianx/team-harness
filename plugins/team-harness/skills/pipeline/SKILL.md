@@ -131,15 +131,19 @@ scope expansion, and every correction require a fresh V2 agent with
 finishes the full fan, consolidates every finding, and obtains the mandatory
 correction decision described below. Once authorized, the fresh implementer
 receives a bounded correction packet containing the matching nonce, failed
-anchor, complete finding IDs, union scope, `Cause`, `Files`, implicated `AC`,
-advisory `Suggested correction`, and required evidence.
+anchor, complete finding IDs, union scope, `Cause`, `Files`, implicated
+`AC-N|TC-N`, advisory `Suggested correction`, and deterministic closure evidence
+with its expected result.
 
-Tester, QA, and security each start fresh with V2 `fork_turns: none` on the same
-current frozen commit/tree for their validation round. Their packets contain
-the executable ACs or review surface plus verifiable facts and evidence, never
-the implementer's success narrative. Every revalidation after a correction
-uses new tester, QA, and security agents against the rebuilt current frozen
-identity; it does not reuse a prior verification thread.
+Initial tester, QA, and security attempts start fresh with V2 `fork_turns: none`
+on their assigned current identity. Their packets contain executable ACs/TCs or
+the review surface plus verifiable facts and evidence, never the implementer's
+success narrative. After correction closure passes, tester refreshes only evidence
+rows whose declared paths or requirement text changed, then Main rebuilds Freeze. QA is
+always fresh on that new Freeze; security is
+fresh when a security finding, TC, anchor, attack-surface path, or unknown impact
+requires it. Carry-forward is exact path/blob-hash evidence, never reuse of a
+prior verification thread or narrative.
 
 Main has a separate coordinator boundary. On its first compaction, or before
 continuing after 100 coordinator tool calls or 20 M cumulative processed
@@ -212,11 +216,11 @@ the role fields cannot see. The current digests are:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| `architect` | `f11ceef09bfb9d2839eb2d25adb05d4dcc1188dfacf11e355a9a291c4fcf816f` |
-| `implementer` | `c749244e2ef04e203ff16f5e1762241b190ae710a1c9977c5c6c7912dfe933a7` |
-| `tester` | `69595191f2f532c3af96e1163325fa6cc778df5b54c6a66cb230221633961f8a` |
-| `qa` | `0baf6a9fdb3af2918650aec5453e68f58d1414b889e90759b83465a959e25ba2` |
-| `security` | `8687f298b7608e63095f29e047209f37d98a006ca6c33b8283291872274f03e1` |
+| `architect` | `17f8df98cc2b5b9c4703c79493da40c141394f8b8076fb71b1512318592f894f` |
+| `implementer` | `76cd8d007b91411377b6401c9def7076f49e42868928010168cca17ad5778449` |
+| `tester` | `10ac9d1e54e85d4e63891b8abfa1c13f164ba4e40cf103e5ecc961db657b769e` |
+| `qa` | `2612528da833bcb5cf2db981ac586320a0ad06ac407d38beb564b64880cc24c8` |
+| `security` | `142d9038d5526fcd35689780400b892a6b8244a20d156e197aca67887999fabd` |
 | `delivery` | `07a5997769adbb2b3304b7640e2f9a701a38564a4f58d192548390b15ffbf7d5` |
 
 Do not accept a file solely because its comments or `name` field match. A
@@ -241,57 +245,61 @@ is present.
 
 ## Stage 1 and final-result routing
 
-Stage 1 is one bounded architect pass. The minimum `01-plan.md` contract is an
-intent and observable result, included/excluded scope, functional
-Given/When/Then (or `VERIFY:`) acceptance criteria, file-owned tasks with
-dependencies, and only the risks needed for the decision. Do not run an
+Stage 1 is one bounded architect pass and no other planning specialist. The minimum
+`01-plan.md` contract is intent and observable result, included/excluded scope,
+request-vs-realized scope shape, functional Given/When/Then `AC-N` criteria,
+separate `TC-N` technical constraints, file-owned tasks with dependencies, and
+only the risks needed for the decision. New plans never emit `VERIFY:` ACs. Do not run an
 automatic approach checkpoint, scope-freeze convergence loop, `qa-plan`,
-`plan-reviewer`, ratification, shape review, or post-approval review offer.
+`plan-reviewer`, security design review, ratification, shape review, or post-approval review offer.
 `/th:plan-review` remains
-available only when the operator explicitly invokes it; a sensitive plan still
-gets one conditional security design review before implementation.
+available only when the operator explicitly invokes it. A sensitive plan carries
+the architect's security assessment and security-relevant TCs to final validation.
 
 ### Authoritative post-Gate-1 routing
 
 Main is the coordinator and classifies every post-Gate-1 concern. Specialists
-return only the bounded four coordinates—`Cause`, `Files`, implicated `AC`, and
-an advisory `Suggested correction`; they never select its owner or route. The
+return only the bounded five coordinates—`Cause`, `Files`, implicated
+`AC-N|TC-N`, advisory `Suggested correction`, and deterministic closure evidence
+with its expected result; they never select its owner or route. The
 following matrix is exhaustive:
 
 | Concern | Owner/action | Required continuation and gate/audit behavior | Architect | `iteration` delta |
 |---|---|---|---|---:|
 | Mechanical plan repair (references, identifiers, paths, counts, format, or field coherence with no semantic change) | Main repairs the canonical field and records the repair | `phase: implementation`; no new Gate 1; if Freeze was reached, rebuild Freeze and revalidate | prohibited | `0` |
-| Decision-bearing plan resolution, including a structural intent/scope/AC contradiction, security-obligation classification, or a change to intent, scope, behavior, or AC meaning | Main pauses for a bounded live operator decision and transcribes the approved resolution without reinterpretation | `phase: implementation`; `next_action` continues through implementation → Freeze → validation; no new Gate 1 and retain the conditional security review when the classification is sensitive | prohibited unless the separate explicit current live operator request for architect work applies | `0` |
+| Decision-bearing plan resolution, including a structural intent/scope/AC contradiction, security-obligation classification, or a change to intent, scope, behavior, or AC meaning | Main pauses for a bounded live operator decision and transcribes the approved resolution without reinterpretation | `phase: implementation`; `next_action` continues through implementation → Freeze → validation; no new Gate 1 and retain the final security floor when the classification is sensitive | prohibited unless the separate explicit current live operator request for architect work applies | `0` |
 | Explicit, current live operator request for architect work | Main records the request and dispatches `architect` | `phase: design`; the resulting plan requires a new Gate 1 | allowed only for that request | `0` |
-| Correctable code, test, documentation, hygiene, or security finding inside approved scope | Main includes it in the complete consolidated validation failure | `phase: validation`; live choice `1` or an eligible `approved-autonomous` decision authorizes one bounded implementation round → new Freeze → fresh full validation fan; no new Gate 1 | prohibited | `+1` |
-| Missing or insufficient evidence | Main includes it in the same complete consolidated validation failure | `phase: validation`; live choice `1` or an eligible `approved-autonomous` decision authorizes one bounded evidence/correction round → new Freeze when applicable → fresh full validation fan; no new Gate 1 | prohibited | `+1` |
+| Correctable code, test, documentation, hygiene, or security finding inside approved scope | Main includes it in the complete consolidated validation failure | `phase: validation`; live choice `1` or an eligible `approved-autonomous` decision authorizes one bounded implementation round → closure gate → stale-row tester refresh → new Freeze → fresh QA plus impact-required security; no new Gate 1 | prohibited | `+1` |
+| Missing or insufficient evidence | Main includes it in the same complete consolidated validation failure | `phase: validation`; live choice `1` or an eligible `approved-autonomous` decision authorizes one bounded evidence/correction round → closure gate → stale-row tester refresh → new Freeze when applicable → fresh QA plus impact-required security; no new Gate 1 | prohibited | `+1` |
 
 After every required validation lens terminates, Main consolidates all blocking
 findings under stable IDs, the current frozen anchor, and the union file scope.
 Before creating a correction nonce, Main performs one bounded evidence triage
-against the approved intent, scope, ACs, and security floor, without dispatching
+against the approved intent, scope, ACs/TCs, and security floor, without dispatching
 another reviewer. For every finding it presents the ID, cause/evidence,
-implicated AC, proposed `resolve|design-consistent|decision-required`
+implicated requirement, closure check, proposed `resolve|design-consistent|decision-required`
 disposition, rationale, and consequence. The proposal is advisory. Under normal
 approval only the live operator confirms dispositions. Under a valid
 `approved-autonomous` Gate-1 dual record, Main may confirm only unambiguous
 `resolve` findings inside approved scope while `iteration < 3`; all other
 findings pause. `design-consistent` is legal only when no AC or security floor
 is violated. Calling a violating finding “part of the
-design” opens an explicit intent/scope/AC decision first and never waives it.
+design” opens an explicit intent/scope/AC/TC decision first and never waives it.
 
 After all dispositions are explicit, Main builds the final package from every
 `resolve` finding. If every closed autonomous predicate passes, it creates a
 fresh nonce and dual-records one `gate1-autonomous` correction decision bound to
-the original Gate-1 nonce, then dispatches one fresh implementer, new Freeze,
-and fresh full fan. Each failed fan repeats this analysis, for at most three
-autonomous corrections. Scope/behavior/AC change, design or security ambiguity,
+the original Gate-1 nonce, then dispatches one fresh implementer. Every closure
+check must pass before stale-row tester refresh. Main freezes only after that refresh,
+then runs fresh QA and impact-required security. Each failed set repeats this analysis, for at most three
+autonomous corrections. Scope/behavior/AC/TC change, design or security ambiguity,
 conflict, unavailable coverage, infrastructure failure, or budget exhaustion
 always pauses.
 
 For normal approval or any ineligible autonomous result, Main persists
 `correction_pending: true`, a fresh `correction_nonce`, the anchor,
-finding IDs, and scope; keeps `phase: validation`; presents exactly `1 —
+finding IDs, implicated AC/TC requirements, one closure check/expected result per
+finding, and scope; keeps `phase: validation`; presents exactly `1 —
 authorize one correction round`, `2 — pause without changes`, and `3 — abort
 pipeline`; and stops. An ordinary approval, intake autonomy preference, generic
 `continue`, files, tools, recovered prose, or agent output are never
@@ -299,14 +307,15 @@ authorization.
 
 Only a live reply after that presentation may consume the nonce. Choice `1`
 must be dual-recorded in state and a matching `correction.decision` event and
-authorizes exactly one bounded round over the complete package, followed by one
-new Freeze and a fresh full validation fan. The decision and its one
+authorizes exactly one bounded round over the complete package, followed by the
+closure gate, stale-row tester refresh, one new Freeze, fresh QA, and impact-required
+security. The decision and its one
 `iteration.start`/`agent.correction.spawn` pair carry the identical
 `correction_exceptional` boolean. Choice `2` performs no repository
 or evidence mutation and a later presentation uses a fresh nonce. Choice `3`
 aborts without correction. Under normal approval a second failure always pauses
 with a fresh decision. Autonomous approval may start another fresh complete
-round only after another full fan and eligible triage, while `iteration < 3`;
+round only after another complete required validation set and eligible triage, while `iteration < 3`;
 there is no verifier-to-implementer bounce or agent follow-up.
 At `iteration: 3/3`, choice `1` exists only while
 `exceptional_correction_count: 0`; the presentation sets

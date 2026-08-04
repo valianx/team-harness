@@ -96,7 +96,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin `th`; Codex plugin `team-harness` via `.agents/plugins/marketplace.json`; Go agent installer for opencode and Codex. The tagged Git tree is both plugin artifact—there is no separate Codex archive. |
 
-**Current version:** `3.8.2` (see `.claude-plugin/plugin.json`, the tag authority. Its version is shared by the Claude and Codex plugin manifests, the Claude marketplace entry, and the installer fallback. `CHANGELOG.md` tracks release history).
+**Current version:** `3.8.3` (see `.claude-plugin/plugin.json`, the tag authority. Its version is shared by the Claude and Codex plugin manifests, the Claude marketplace entry, and the installer fallback. `CHANGELOG.md` tracks release history).
 
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
@@ -292,6 +292,13 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 ## 8. Architecture Decisions
 <!-- Updated in the reviewed implementation tree when a feature establishes a durable decision. Empty at init. -->
 > Full history: see `docs/decisions.md`. Recent entries below.
+- **2026-08-03** — Pipeline planning is one architect-only pass. Acceptance criteria describe
+  observable behavior in Given/When/Then form; mandatory implementation mechanisms live in
+  separate `TC-N` technical constraints. Automatic plan reviewers and the security design-review
+  dispatch are retired; sensitive work carries the architect's assessment and security TCs into
+  final adversarial validation. Corrections must pass finding-specific closure checks before
+  Freeze and then revalidate by evidence/security impact. → `agents/architect.md`,
+  `agents/ref-pipeline.md`, `agents/_shared/ac-evidence.md`
 - **2026-07-31 (superseded by the two-posture convergence)** — Historical decision: every
   activated `full` or `express` run used
   `design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete`.

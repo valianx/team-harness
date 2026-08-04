@@ -165,11 +165,13 @@ implementation → re-Freeze → validation route; recovery must not skip it.
 ## Correction-decision recovery
 
 When `correction_pending: true`, recover only the durable failed Freeze anchor,
-complete finding-ID set, exact one-to-one disposition for every finding,
+complete finding-ID set, implicated AC/TC requirement set, exact one-to-one
+disposition and deterministic closure check/expected result for every finding,
 evidenced file scope, and `correction_exceptional` boolean. Before issuing a
 fresh nonce, require every field to be present, structurally valid, and mutually
-consistent; missing, extra, duplicated, or mismatched findings/dispositions, or
-a missing/non-boolean exceptional flag, blocks recovery. Do not infer or repair
+consistent; missing, extra, duplicated, or mismatched findings, requirements,
+dispositions, or closure records, or a missing/non-boolean exceptional flag,
+blocks recovery. Do not infer or repair
 them, dispatch an agent, mutate repository or evidence files, rebuild Freeze,
 or revalidate.
 
@@ -201,13 +203,14 @@ Gate-1 nonce in `correction_authority_gate_nonce`, `iteration < 3` at decision
 time, and durable all-`resolve` dispositions satisfying every closed eligibility
 conjunct, including no correction/execution budget exhaustion. A recovered
 `correction.decision` is valid only when its single-use
-nonce, failed anchor, complete finding IDs, dispositions, scope,
+nonce, failed anchor, complete finding IDs, implicated requirements, dispositions,
+closure checks, scope,
 `correction_authority`, and `correction_exceptional` boolean exactly match
 the state record. An authorized consumed decision additionally requires
 `correction_nonce: null`, its exact token in `correction_decision_nonce`, and
 that identical token on the matching `correction.decision`, one
 `iteration.start`, and one `agent.correction.spawn`. A stale or consumed nonce,
-mismatched decision nonce, mismatched anchor/findings/scope,
+mismatched decision nonce, mismatched anchor/findings/requirements/closure/scope,
 or reuse of one authorization for more than one `iteration.start` or
 `agent.correction.spawn` is invalid and blocks dispatch. An implementation or
 correction event after a failed validation without the matching decision also

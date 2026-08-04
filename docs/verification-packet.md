@@ -255,7 +255,7 @@ explicitly per agent so the floor is auditable, not implied:
 | Agent | Preserved read (unaffected by the packet) |
 |---|---|
 | `qa` | Source-code reads for file:line AC evidence; the mandatory sketch reads (`qa.md` Phase 0 step 3) |
-| `adversary` | `inputs/00-frozen.diff` and `reviews/01-plan-review.md § Security Design-Review` when present — its zero-overlap contract stays a mandatory independent read |
+| `adversary` | `inputs/00-frozen.diff`, architect security-assessment anchors, and implicated security TCs — its zero-overlap contract stays a mandatory independent read; a standalone design-review section is optional only when explicitly named |
 | `ux-reviewer` (validate) | `reviews/01-ux-review.md` — the Stage-1 UI/UX AC baseline stays a mandatory read |
 
 ---

@@ -68,6 +68,8 @@ correction_nonce: {fresh token or null}
 correction_anchor: {failed freeze commit/tree or null}
 correction_findings: [{stable finding id}]|[]
 correction_scope: [{repo-relative path}]|[]
+correction_requirements: [{AC-N|TC-N}]|[]
+correction_closure: [{id, check, expected}]|[]
 correction_dispositions: [{id, disposition: resolve|design-consistent|decision-required}]|[]
 correction_decision: authorize|pause|abort|null
 correction_decision_nonce: {consumed token or null}
@@ -203,8 +205,8 @@ exact consumed Gate-1 release nonce in `correction_authority_gate_nonce`, and
 bound to that same consumed correction nonce, complete dispositions, resolve
 IDs, anchor, and scope. The one subsequent `iteration.start` and
 `agent.correction.spawn` must carry that identical nonce. This single record
-authorizes exactly one fresh implementer, new Freeze, and fresh full
-validation fan. Each later failed fan repeats the triage and predicate; the
+authorizes exactly one fresh implementer, a mandatory correction-closure gate,
+stale-row tester refresh, new Freeze, fresh QA, and impact-required security. Each later failed set repeats the triage and predicate; the
 third authorized correction exhausts autonomy and any later failure pauses.
 
 For normal approval or any ineligible autonomous result, atomically set:
@@ -218,6 +220,8 @@ correction_nonce: {fresh single-use token}
 correction_anchor: {failed freeze commit/tree}
 correction_findings: [{all exact finding IDs}]
 correction_scope: [{union of evidenced repo-relative paths}]
+correction_requirements: [{all exact implicated AC-N|TC-N IDs}]
+correction_closure: [{one deterministic check and expected result per finding ID}]
 correction_dispositions: [{id, disposition}]
 correction_decision: null
 correction_decision_nonce: null
@@ -247,7 +251,8 @@ atomically records `correction_decision: authorize`, the consumed nonce in
 `correction.decision` event bound to the anchor, all finding IDs, and file
 scope and dispositions, including the identical `correction_exceptional`
 boolean. It authorizes exactly one bounded correction over that complete package,
-one new Freeze, and one fresh validation fan; its nonce may appear on exactly
+closure gate, stale-row tester refresh, one new Freeze, fresh QA, and impact-required
+security; its nonce may appear on exactly
 one subsequent `iteration.start` and `agent.correction.spawn`, both carrying
 that same boolean. A second failure
 creates a fresh nonce and pauses again.
@@ -271,8 +276,8 @@ exception.
 
 After Gate 1, Main alone classifies findings and may write the bounded canonical
 plan fields needed for a mechanical repair or an approved operator resolution.
-Every specialist reports `Cause`, `Files`, implicated `AC`, and an advisory
-`Suggested correction`;
+Every specialist reports `Cause`, `Files`, implicated `AC-N|TC-N`, an advisory
+`Suggested correction`, and deterministic closure evidence with its expected result;
 none may choose a phase, plan writer, next agent, or gate. A decision-bearing
 plan concern—including a security-obligation classification—continues at
 `phase: implementation` after the live operator resolution. `architect` is

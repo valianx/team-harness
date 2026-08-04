@@ -173,7 +173,7 @@ Two columns only, because two facts are all you need: when to call it, and what 
 | `tester` | `implementation` evidence checkpoint; bug-fix regression setup first | `03-testing.md` |
 | `qa` | `validation`, over the frozen tree | `reviews/04-validation.md` + `code_hygiene: pass\|fail` |
 | `adversary` | `validation` when the derived security floor applies | `reviews/04-adversary.md` + `broke-it \| could-not-break` |
-| `security` | `design` review when `security_sensitive` | `reviews/01-plan-review.md § Security Design-Review` |
+| `security` | explicit operator-requested standalone design review only; never automatic pipeline planning | `reviews/01-plan-review.md § Security Design-Review` |
 | `qa-plan` | explicit `/th:plan-review` only | `reviews/01-plan-review.md § Plan Ratification` + `pass\|concerns\|fail` |
 | `plan-reviewer` | explicit `/th:plan-review` only | `reviews/01-plan-review.md § Plan Review` + `pass\|concerns\|fail` |
 | `ux-reviewer` | `design` and `validation` when `frontend_scope` | `reviews/01-ux-review.md`, `reviews/04-ux-validation.md` |
@@ -267,6 +267,7 @@ One taxonomy for everything that can go wrong, so the budget question is answere
 | `artifact-missing` | A required output **file** is absent, empty, or unparseable while the dispatch reported success | the owning specialist | re-dispatch once | STOP; never author the missing artifact yourself |
 | `execution-failed` | The specialist ran, hit an internal error it cannot classify further, and says so | the specialist | re-dispatch once, carrying the literal error plus its `summary` and `issues` | STOP with those surfaced verbatim |
 | `verification-negative` | A verifying lens returned `fail`/`concerns` over real work — the pipeline produced a defect | operator correction decision | counts against the **max-3** limit only after authorization | pause with the consolidated failure; at `3/3`, only an explicitly labelled exceptional decision may authorize one more round |
+| `correction-incomplete` | An authorized correction returned without every package closure check passing | implementer | no Freeze and no validation fan; the consumed correction round remains consumed | consolidate the failed closure evidence as the next correction package; normal approval pauses, eligible autonomy may authorize another round within max-3 |
 | `build-or-lint` | A build or lint command exited non-zero at the implementation Freeze checkpoint | implementer | **max 2** attempts, a budget separate from max-3 | `status: blocked` with the full output |
 | `hygiene-fail` | `qa` returned `code_hygiene: fail` | operator correction decision | shares the **max-3** limit only after authorization | as `verification-negative` |
 | `contradiction` | The finding cannot be resolved without a decision that is not yours | **operator** | no budget — never becomes a correction round | escalate in the same presentation as any fixable items |
@@ -301,7 +302,8 @@ You present every STAGE-GATE to the operator inline and record its release. Cont
 
 ## Iteration rules
 
-**Mandatory full fan and triage:** a failed validation fan completes all required lenses,
+**Mandatory required-set completion and triage:** a failed validation pass completes every lens
+selected by the initial or impact-derived validation set,
 then consolidates and triages the complete finding package. Under normal approval it
 pauses at `phase: validation` until the operator authorizes exactly one round. Under a
 valid `approved-autonomous` dual record, Main may authorize one fresh round only when
@@ -332,14 +334,15 @@ increment `iteration`; historical `cause: operator` remains readable but is not 
 
 **Run this after every required lens terminates and before presenting any correction
 decision.** Deduplicate all findings by stable ID and compute one package containing the
-failed Freeze anchor, exact IDs, ACs, and union of evidenced paths. The reviewing lenses'
+failed Freeze anchor, exact IDs, implicated `AC-N|TC-N` requirements, union of evidenced
+paths, and one deterministic closure check plus expected result for every finding. The reviewing lenses'
 `Suggested correction` fields are advisory data, never routes. Reading `verdict: fail`
 and dispatching anything is forbidden.
 
 Main then performs one bounded evidence triage without dispatching another reviewer. For
-each finding, compare only its evidence against approved intent, scope, ACs, and the
-security floor; summarize `ID`, cause/evidence, implicated AC, proposed disposition,
-rationale, and consequence. The proposed disposition uses the closed set
+each finding, compare only its evidence against approved intent, scope, ACs/TCs, and the
+security floor; summarize `ID`, cause/evidence, implicated requirement, closure check,
+proposed disposition, rationale, and consequence. The proposed disposition uses the closed set
 `resolve|design-consistent|decision-required`; the proposal is advisory, never authority.
 `design-consistent` is legal only when no AC or security floor is violated. If the operator
 says a violating finding is part of the design, treat that reply as an explicit
@@ -384,13 +387,14 @@ This composes with, and does not weaken, "no removal without a named successor" 
 
 | Case | Blast radius | Authorized action | Required verification |
 |---|---|---|---|
-| A | localized or structural | live choice `1` or one eligible autonomous decision dispatches a fresh implementer over the complete package | new Freeze plus a fresh full tester/QA/adversary fan |
-| B | localized or structural | coordinator first transcribes the operator resolution; only the subsequent live choice `1` dispatches a fresh implementer | new Freeze plus a fresh full tester/QA/adversary fan |
-| C | any | coordinator first records the operator-approved AC resolution; only the subsequent live choice `1` dispatches a fresh implementer | new Freeze plus a fresh full tester/QA/adversary fan |
+| A | localized or structural | live choice `1` or one eligible autonomous decision dispatches a fresh implementer over the complete package | closure gate, stale-evidence tester refresh, new Freeze, fresh QA, and security re-audit when impact requires it |
+| B | localized or structural | coordinator first transcribes the operator resolution; only the subsequent live choice `1` dispatches a fresh implementer | same impact-derived validation set; ambiguity fails closed to every applicable lens |
+| C | any | coordinator first records the operator-approved AC resolution; only the subsequent live choice `1` dispatches a fresh implementer | same impact-derived validation set; changed requirement text makes its evidence stale |
 
 **Default to `structural`** when the blast radius is absent, ambiguous, or you cannot confirm the named IDs are self-contained.
 
-No row authorizes a partial verifier rerun, agent reuse, or automatic dispatch.
+No row authorizes agent reuse or automatic dispatch. Carry-forward is evidence reuse, never
+thread reuse, and is legal only under the exact path/hash predicates below.
 
 **Case B/C no longer authorize an automatic architect producer or a new Gate 1.** Their
 coordinator-owned transcription continues at implementation. A new design artifact and
@@ -406,8 +410,11 @@ one `correction.decision` event before dispatch. The correction packet contains 
 scope; the decision and its one authorized event pair carry the same
 `correction_exceptional` boolean and authority. Autonomous authority also carries the
 exact consumed Gate-1 nonce. It may not narrow to one finding, widen scope, or reuse an old nonce. After the
-bounded implementation/evidence work, create one new Freeze and run one fresh complete
-validation fan. A failure in that fan always receives a new triage and nonce. Normal
+bounded implementation/evidence work, require a recorded PASS for every package closure check
+before any tester refresh or Freeze. Missing or failed closure evidence is `correction-incomplete`:
+do not dispatch tester, create a Freeze, or spend a final validation fan. After successful closure,
+refresh stale tester evidence, create one new Freeze, and run fresh QA plus security when the
+impact predicate requires it. A failure in that set always receives a new triage and nonce. Normal
 approval pauses; autonomous approval may authorize the next fresh round only while every
 predicate remains true and fewer than three corrections have run. No owner-lens bounce,
 agent follow-up, or second dispatch is authorized by the prior decision.
@@ -664,7 +671,10 @@ scope flagged `[ALREADY-FIXED]` / `[PARTIALLY-FIXED]` / `[SCOPE-SHIFTED]`, and f
 into the AC. **Empty residual → do not start a pipeline:** record a close-with-evidence
 recommendation instead, and **never auto-close the issue.**
 
-**2 — Build the functional spec.** User stories, Given/When/Then AC (or `VERIFY:` for non-behavioural criteria), scope included and excluded, codebase context, and `[NEEDS CLARIFICATION: question]` markers for anything unclear.
+**2 — Build the functional spec.** User stories, observable Given/When/Then ACs, separately
+named technical constraints, scope included and excluded, codebase context, and
+`[NEEDS CLARIFICATION: question]` markers for anything unclear. Data permutations belong in a
+verification matrix rather than one AC per case.
 
 **3 — Resolve ambiguities.** Ask every clarification question before proceeding; remove the markers once resolved.
 
@@ -672,7 +682,10 @@ recommendation instead, and **never auto-close the issue.**
 
 **5 — Write the spec to the board.** The classification block, the spec, the resolved config and the real residual scope go into `00-request.md` and `00-state.md`. **There is no payload to compose:** the next phase reads the board.
 
-**6 — Spec quality auto-lint.** AC count between 2 and 20; AC format Given/When/Then or `VERIFY:`; both scope halves non-empty; zero unresolved clarification markers. Fix what is mechanical; block and ask only for genuine ambiguity.
+**6 — Spec quality auto-lint.** At least one functional AC; Given/When/Then only; private
+implementation references absent from AC prose; technical requirements separated from ACs; both
+scope halves non-empty; zero unresolved clarification markers. Fix what is mechanical; block and
+ask only for genuine ambiguity.
 
 **7 — Announce, then `design`.** Announce the spec with its verified claims as `file:line` pairs, so an objection lands before the most expensive dispatch rather than after it. Skipped for inline work.
 
@@ -695,8 +708,9 @@ writes coordination state.
 | `hotfix` | any | skipped | one-sentence prose plan at the gate |
 
 The minimum Stage-1 contract is: intent and observable result; included and excluded
-scope; functional Given/When/Then or `VERIFY:` acceptance criteria; tasks with file
-ownership and dependencies; required risks, rollback/mitigation and verification. A
+scope; functional Given/When/Then `AC-N` criteria; separate `TC-N` technical constraints;
+request-vs-realized scope shape; tasks with file ownership and dependencies; required risks,
+rollback/mitigation and verification. A
 plan may include sketches only when they make an acceptance surface concrete. There is
 no automatic approach checkpoint, structure loop, ratification loop, shape panel, or
 post-approval offer on the normal path. `/th:plan-review` remains available only when the
@@ -708,17 +722,20 @@ dispatch with the controlled `TH-STATE-REF` first line, and clear the boundary a
 return. A missing live reply may be recorded as `provenance: inferred`; it keeps the checkpoint
 open and blocks the architect dispatch. It never releases Gate 1 or becomes operator approval.
 
-For `security_sensitive: true`, run the security design review before implementation as
-the conditional security floor. It is a single review, not an automatic correction loop.
-For any other plan, the coordinator performs only a deterministic presence/coherence
-check before Gate 1: required sections exist, files/dependencies are coherent, and no
-clarification marker remains. An invalid artifact receives one normal design correction;
-an unresolved ambiguity blocks and is surfaced to the operator. There is no automatic
-Stage-1 perfection cycle.
+Planning dispatches only `architect`. For every plan, the coordinator performs only a
+deterministic presence/coherence check before Gate 1: required sections exist, ACs and TCs
+are separated, files/dependencies are coherent, `implementation_references_in_ac: 0`, and no
+clarification marker remains. Security-sensitive plans carry the architect's security
+assessment and security-relevant TCs forward to the final security lens; they do not add a
+design-review dispatch. An invalid artifact receives one normal design correction; an
+unresolved ambiguity blocks and is surfaced to the operator. There is no automatic Stage-1
+perfection cycle.
 
 The `sharded-v1` plan set remains canonical: `01-plan.md` is the compact manifest and
 operator summary, while architecture, delivery/dependencies, conditional invariants, and
-task/AC contracts live in the relevant `plan/**` shards. `/th:plan-review` is an explicit
+task AC/TC contracts live in the relevant `plan/**` shards. Gate 1 surfaces
+`realized_scope: expanded` with task, file, AC, and TC counts so the operator can proceed or
+narrow the request. `/th:plan-review` is an explicit
 operator flow only; it may dispatch `qa-plan`, `security`, and `plan-reviewer` without
 creating a pipeline state or gate.
 The stable options are shown with their numeric shortcuts and textual equivalents:
@@ -755,7 +772,8 @@ defects remain evidence while Main waits for every lens. Main consolidates the c
 set and performs the mandatory triage. Normal approval presents the decision and stops;
 eligible autonomous approval records one package-bound decision without another prompt.
 Either live choice `1` or that autonomous record authorizes one bounded
-implementation/evidence correction, one new Freeze, and one fresh validation fan. Plan repairs and operator-approved plan decisions
+implementation/evidence correction, closure gate, stale-row tester refresh, one new Freeze,
+fresh QA, and impact-required security. Plan repairs and operator-approved plan decisions
 are not validation correction rounds and do not consume the counter.
 
 A finding is **structural** only when it makes the approved intent, scope fence and ACs
@@ -926,11 +944,11 @@ Shares the max-3 cap for implementation bounces. A clean scan is a trace event o
 
 ### Implementation checkpoint — evidence authoring
 
-**Agent:** `tester`, `mode: authoring`. Runs before Freeze and the validation state, over a tree that is immutable afterward. The tester classifies each AC as `test`, `command`, or `inspection`, reuses sufficient evidence, authors only warranted missing tests, runs the relevant suite/commands, and writes `03-testing.md`'s evidence map. **This is the only `tester` dispatch in the non-bug-fix flow** — there is no second run-only dispatch in validation.
+**Agent:** `tester`, `mode: authoring`. Runs before Freeze and the validation state, over a tree that is immutable afterward. The tester classifies each AC and TC as `test`, `command`, or `inspection`, records evidence paths, reuses sufficient evidence, authors only warranted missing tests, runs the relevant suite/commands, and writes `03-testing.md`'s evidence map. This is the only full tester authoring dispatch in the non-bug-fix flow; a correction may dispatch one fresh tester only for rows made stale by changed requirement text or evidence-path blobs.
 
 Bug-fix flow: resume the regression contract started at the implementation checkpoint and complete the remaining evidence-map rows.
 
-**Advance:** `success` requires relevant successful evidence for every AC. `tests_authored: 0` and `commit: none — no source change` are valid. Re-run commit integrity only when `commit:` is a SHA. `failed` → back to the appropriate owner (max-3); Freeze does not open until the evidence map is complete.
+**Advance:** `success` requires relevant successful evidence and declared evidence paths for every AC and TC. `tests_authored: 0` and `commit: none — no source change` are valid. Re-run commit integrity only when `commit:` is a SHA. `failed` → back to the appropriate owner (max-3); Freeze does not open until the evidence map is complete.
 
 **Browser readiness (non-blocking).** When `warranted_types` includes `e2e`/`browser-mode` and tooling is missing, surface the proposed setup commands and wait for confirmation or an explicit decline.
 
@@ -1077,7 +1095,33 @@ validation floor and both gates; no marker or posture reduces specialist coverag
 dispatches run over the tree Freeze produced and no lens reads another's output. There is
 no second run-only `tester` dispatch here.
 
-**Staleness invariant: nothing ships that the audit did not see.** `adversary` reads the consolidated `inputs/00-frozen.diff` generated from `verification_base_ref...HEAD` — the same range `qa` validates, frozen at the implementation Freeze checkpoint.
+### Correction impact and evidence freshness
+
+After an authorized correction passes every closure check, apply this closed, fail-closed order:
+
+1. **Pre-Freeze tester impact.** Compare the prior frozen commit with current HEAD. Every
+   `03-testing.md` row declares its evidence paths. A row is stale when its requirement text changed
+   or any declared evidence path changed. Dispatch one fresh tester only for the complete stale-row
+   set; carry other rows provisionally by exact unchanged path/blob hash. Missing paths, hashes, or
+   a classification error make every affected row stale.
+2. **Freeze after tester.** Complete and commit any warranted test/evidence change, then rebuild
+   Freeze. Never freeze before the stale-row tester refresh has terminated.
+3. **QA.** Every corrected frozen identity receives one fresh QA pass over all functional ACs.
+   QA is the final acceptance owner and never carries a prior verdict to a changed tree.
+4. **Security.** Compare the prior frozen commit with the new frozen commit. Re-run the final
+   security lens when the correction package contains a security finding, the final delta changes a
+   security-relevant TC/anchor or attack-surface path, or impact is unknown. Otherwise carry the
+   prior successful audit forward only with the prior audit anchor, the exact final delta paths,
+   and unchanged blob hashes for every previously audited attack-surface path.
+5. **Unknown means full.** Missing evidence-path declarations, an unclassified path, a failed hash
+   comparison, conflicting impact metadata, or tester-produced paths outside the preliminary
+   classification selects tester refresh plus QA and the applicable security lens. Impact
+   classification never weakens the security floor.
+
+This routing changes validation cost, not correction authority: every correction still consumes
+one authorized round, creates one new Freeze only after closure, and remains bounded by max-3.
+
+**Staleness invariant: nothing ships from unreviewed relevant evidence.** `adversary` reads the consolidated `inputs/00-frozen.diff` generated from `verification_base_ref...HEAD` — the same range `qa` validates, frozen at the implementation Freeze checkpoint. The only exception is an impact-derived security carry-forward whose record proves that every previously audited attack-surface blob is unchanged and the correction touched no security finding, TC, anchor, or classified attack-surface path.
 
 **Any tree change after this fan opens re-opens Freeze → validation → STAGE-GATE-3** — not merely the gate preparation. Triggers: a validation bounce, a `[CONSTRAINT-DISCOVERED]` fold-back, an operator-directed amend, and any other change the anchor comparison detects.
 
@@ -1095,7 +1139,7 @@ validator. After `ship`, no tracked or untracked write is allowed before push.
 
 Every tier receives the same audit. Bug severity never selects a different security lens: the audit reviews the consolidated final diff regardless of tier. At `bug_tier: 4` on a sensitive task the dispatch carries the extended-analysis instruction against `01-root-cause.md ## Prior Art`.
 
-**What each dispatch carries.** `qa`: the assigned task-shard path and implementation record; for `fix`/`hotfix`, the reproduction and regression flags. `adversary`: audit flag, worktree, docs root, exact frozen-diff path, only in-scope task shards and named design anchors, scope/run fields, the SEC-002 pointer, affirmation, packet deviation pointer, and its output budget. **No diff summary, task summaries, sibling shards, or enumeration of what to confirm** — the frozen artifact is authoritative.
+**What each dispatch carries.** `qa`: the assigned task-shard path and implementation record; for `fix`/`hotfix`, the reproduction and regression flags. `adversary`: audit flag, worktree, docs root, exact frozen-diff path, only in-scope task shards, security-relevant TCs, the architect's named security-assessment anchors, scope/run fields, packet deviation pointer, and its output budget. The adversary treats every claimed mitigation in those anchors as an affirmation to invert; no planning reviewer is required. **No diff summary, task summaries, sibling shards, or enumeration of what to confirm** — the frozen artifact is authoritative.
 
 ### The audit never iterates
 
@@ -1106,15 +1150,15 @@ by shipping. The coordinator waits for every lens, includes the finding in the c
 package and applies the correction-decision rules. Under normal approval it presents the
 mandatory decision and stops; only live choice `1` may reopen implementation. Under an
 eligible autonomous grant, Main may instead bind one `gate1-autonomous` decision directly.
-Either authority opens exactly one fresh implementer, Freeze, and full
-tester/QA/adversary validation fan. A
+Either authority opens exactly one fresh implementer, closure gate, stale-row tester refresh,
+Freeze, and fresh QA plus impact-required security. A
 structural contradiction is presented to the
 operator; its decision continues at `implementation` unless the live operator separately
 and explicitly requests architect work. Only that request may open `design` and a new
 Gate 1.
 
-The resulting fresh full tester/QA/adversary fan includes a fresh security audit; no prior
-audit result is reused for a corrected sensitive finding.
+The resulting validation set includes a fresh security audit for every corrected sensitive
+finding; no prior audit result is reused in that case.
 
 A `broke-it` break that is correctable within the approved scope **fails validation** and
 is included in the complete consolidated failed validation package before Gate 3. A
@@ -1123,12 +1167,11 @@ pipeline is also a **fail-closed validation failure** in that package. Only a
 complete `could-not-break` or a finding explicitly classified as a non-correctable structural
 contradiction may remain a Gate-3 concern; neither case silently certifies changed controls.
 
-**Every authorized correction receives a fresh full validation fan.** Whether the
+**Every authorized correction receives fresh acceptance over its new anchor.** Whether the
 correction came from an operator `amend` or an explicitly authorized validation finding,
-fixes land in `implementation`, Freeze is rebuilt, and fresh tester, QA, and adversary
-attempts validate the new current anchor. The adversary's attack surface remains
-delta-scoped (`Scope: localized {files changed since the prior audit}`), but the pipeline
-fan is complete and no prior lens result is reused. Set `audit_run: {cause}-N`, where `{cause}` is `amend` or `correction` and
+fixes land in `implementation`, closure checks pass, tester refreshes stale evidence rows before
+Freeze is rebuilt, QA is fresh on that Freeze, and adversary reruns whenever the closed impact predicate requires
+it. The adversary's attack surface remains delta-scoped (`Scope: localized {files changed since the prior audit}`). Set `audit_run: {cause}-N`, where `{cause}` is `amend` or `correction` and
 `N` is one plus the greatest matching `reviews/04-adversary-{cause}-{N}.md` suffix (or `1`
 when none exists); the output path uses the same value.
 
@@ -1150,7 +1193,7 @@ Best-effort: MCP unreachable → log `operation.failed` and continue. Silent on 
 security_floor_applies = security_sensitive == true
 ```
 
-This is a pure derived predicate, evaluated at each dispatch decision and never persisted in `00-state.md`. `security_sensitive` is the one state field: intake initializes it and named backstops may only escalate it `false → true`. The SEC-002 design review and the `adversary` dispatch are consumers; neither writes or re-derives a second state field. Once the orchestrator dispatches Adversary, `audit_required: true` in the dispatch is sufficient context — Adversary does not gate itself again.
+This is a pure derived predicate, evaluated at each dispatch decision and never persisted in `00-state.md`. `security_sensitive` is the one state field: intake initializes it and named backstops may only escalate it `false → true`. The final `adversary` dispatch is its only specialist consumer and never writes or re-derives a second state field. Once the orchestrator dispatches Adversary, `audit_required: true` in the dispatch is sufficient context — Adversary does not gate itself again.
 
 **Fail closed:** an absent or doubtful value reads as `true`. Absence is never "do not dispatch."
 
@@ -1160,8 +1203,9 @@ marker, or direct/pipeline choice. It is not waivable from inside this contract.
 
 An Adversary `broke-it` finding that is correctable within the approved scope, or an
 incomplete sensitive-coverage attempt, fails validation and joins the complete
-consolidated package. Only a fresh matching operator authorization may then open one
-implementation → Freeze → fresh-full-fan round before Gate 3. Only a non-correctable
+consolidated package. Only a fresh matching operator authorization or eligible
+`gate1-autonomous` decision may then open one implementation → closure gate → stale-row
+tester refresh → Freeze → fresh QA plus impact-required security round before Gate 3. Only a non-correctable
 structural contradiction may be left for operator disposition; it is never treated as a
 successful audit. Failed tester, hygiene, build, and lint results join the same package.
 
@@ -1188,13 +1232,18 @@ concern. It is never silently treated as a clean audit.
 condition is an explicit fail-closed exception to the QA severity floor: a changed control
 that was broken or not substantively covered cannot proceed as a concern.
 
-**Advance requires both conjuncts:** `phase3_combined ∈ {pass, concerns}` AND `qa.code_hygiene == pass`, **with no correctable security finding**. Preserve only non-correctable `concerns` for STAGE-GATE-3. Any failing condition completes the full validation fan and mandatory triage. Normal or ineligible autonomous execution pauses; eligible autonomy records one new bounded correction decision.
+**Advance requires both conjuncts:** `phase3_combined ∈ {pass, concerns}` AND `qa.code_hygiene == pass`, **with no correctable security finding**. Preserve only non-correctable `concerns` for STAGE-GATE-3. Any failing condition completes the required validation set and mandatory triage. Normal or ineligible autonomous execution pauses; eligible autonomy records one new bounded correction decision.
 
-Validation advance → `waiting_gate3`. Fail on either conjunct → read all required bounded result artifacts and consolidate once; then either record the eligible autonomous decision or persist `correction_pending: true`, present the fresh live decision, and stop.
+Validation advance → `waiting_gate3`. Fail on either conjunct → read all required bounded
+result artifacts and consolidate once; then either record the eligible autonomous decision or
+persist `correction_pending: true` with the exact finding IDs, requirements, closure checks,
+expected results, and union scope, present the fresh live decision, and stop.
 
 ### Iteration
 
-**No re-dispatch is legal without an unused matching correction authorization.** After the one authorized correction and new Freeze, rebuild the verification packet before the single fresh validation fan.
+**No re-dispatch is legal without an unused matching correction authorization.** After the
+authorized correction passes closure, refresh stale tester rows, create the new Freeze, and
+rebuild the verification packet before fresh QA and any impact-required security audit.
 
 **Read `failure-brief.md` only**, never the full workspace docs. The failing agent appends its actionable summary there. When the brief does not exist — an `execution-failed` that fired before the agent wrote anything — read the status block's `summary`, `issues` and literal error instead, and do not treat the absent file as a second failure.
 
@@ -1203,9 +1252,9 @@ Validation advance → `waiting_gate3`. Fail on either conjunct → read all req
 After validation succeeds and before `waiting_gate3`, re-verify traceability directly from
 the artifacts. The combined verdict never replaces Gate 3.
 
-1. Sum AC counts from the task index and verify them against task shards.
+1. Sum AC and TC counts from the task index and verify them against task shards.
 2. Count PASS vs FAIL per AC in `reviews/04-validation.md`.
-3. Verify every AC has relevant successful `test`, `command`, or `inspection` evidence in `03-testing.md`'s evidence map, following `agents/_shared/ac-evidence.md`.
+3. Verify every AC and TC has relevant successful, current `test`, `command`, or `inspection` evidence with declared evidence paths in `03-testing.md`, following `agents/_shared/ac-evidence.md`.
 4. **UX gate (`frontend_scope` only):** any `critical` (WCAG A) finding in `reviews/04-ux-validation.md` fails the gate → Case A. `high`/`medium`/`suggestion` never block.
 5. **Regression still passing (`fix`/`hotfix`, Tier 2–4):** confirm `regression_test_path` shows PASS, not `skip`/`xfail` — then **read the actual assertion body** and confirm it matches the authored pattern. A weakened or replaced assertion fails the gate even with the test name and PASS status intact.
 6. **Test-change integrity:** when tests changed or were deleted, require the exact reason and surviving behavioral evidence. A deletion or weakened assertion whose purpose is to hide a failure joins the consolidated correction-decision package; test counts never gate acceptance.
@@ -1213,14 +1262,14 @@ the artifacts. The combined verdict never replaces Gate 3.
 
 Security findings are checked here: a correctable `broke-it` or incomplete sensitive-coverage
 finding is a validation failure and, after explicit authorization, must have passed through
-implementation, Freeze, and a fresh full validation fan before this check can pass. Only explicitly non-correctable concerns remain for
+implementation, closure, stale-row tester refresh, Freeze, fresh QA, and a fresh security audit before this check can pass. Only explicitly non-correctable concerns remain for
 operator disposition at Gate 3.
 
 **Decision:** all pass → `waiting_gate3` and STAGE-GATE-3 (build and lint already ran at
 Freeze). Any fail joins the complete package and persists a fresh correction decision. Under
 normal approval it stops and only live choice `1` re-opens implementation; under autonomous
 approval an eligible bounded decision may re-open it directly. Either route requires a fresh
-implementer → Freeze → full validation fan.
+implementer → closure gate → stale-row tester refresh → Freeze → fresh QA plus impact-required security.
 An AC-count mismatch between the `qa` report and the plan → `status: blocked`:
 the plan drifted and needs reconciliation.
 
@@ -1243,7 +1292,7 @@ the ambiguous-reply rule. This section implements it for STAGE-GATE-3.
 
 **Never skippable regardless of `autonomous`. The push is irreversible.** Fresh single-use nonce at every preparation, including every re-presentation.
 
-**The field set below is mandatory for a security-relevant decision, not a formatting choice.** Omitting the `broke-it` findings verbatim with `file:line` and impact, the SEC-002 verdict, `audit_coverage`, `incomplete_on_changed_control`, or the diff composition is a contract violation.
+**The field set below is mandatory for a security-relevant decision, not a formatting choice.** Omitting the `broke-it` findings verbatim with `file:line` and impact, `audit_coverage`, `incomplete_on_changed_control`, or the diff composition is a contract violation.
 
 | Field | Value |
 |---|---|
@@ -1251,7 +1300,7 @@ the ambiguous-reply rule. This section implements it for STAGE-GATE-3.
 | `delivery_summary` | branch, validated commit/tree, committed version, version axis/rationale, files touched, **diff composition**, base status |
 | `delivery_preview` | exact PR title plus PR-body and acceptance-matrix workspace paths with SHA-256 digests |
 | `accumulated_cost` | `~{N}K tokens (~${X})` |
-| `security_audit` | verdict (`could-not-break` / `broke-it` / `not run (security_floor_applies: false)` / `unavailable`), `sec002_verdict`, `open_breaks: [{finding, file:line, impact}]`, `audit_coverage`, `incomplete_on_changed_control` |
+| `security_audit` | verdict (`could-not-break` / `broke-it` / `not run (security_floor_applies: false)` / `unavailable`), `open_breaks: [{finding, file:line, impact}]`, `audit_coverage`, `incomplete_on_changed_control` |
 | `bump_override` | `{level} — <reason>`, present **only** when the computed version sits above the mechanical SemVer floor for the diff |
 | `options`, `gate_nonce` | the closed allowlist; fresh nonce |
 
@@ -1310,7 +1359,9 @@ require a clean worktree with `HEAD == validated_commit_sha` and
 report merge state once. Delivery runs no tests, fetch, base-advance reconcile, version/changelog
 edit, staging, commit, merge, or rebase. That file is the single source; this is the pointer.
 
-*No worktree teardown here, and no CI wait* — report URL, number, merge state and `CI: pending — check with gh pr checks`, then close.
+*No worktree teardown and no CI/merge wait* — query mergeability exactly once, report URL,
+number, merge state and `CI: pending — check with gh pr checks`, set the terminal state, and
+close. `UNKNOWN` is `UNDETERMINED`; it never triggers retry, backoff, polling, or another turn.
 
 **Order:** verify the gate-bound preview and exact validated identity, then publish. Never
 recompose approved prose or mutate the branch after `ship`.
@@ -1351,9 +1402,10 @@ Non-iterating: after the separate request, report and continue on failure.
 ## Autonomous mode
 
 `autonomous` preauthorizes at most three consolidated correction rounds after the initial
-implementation. Every round still requires a complete validation fan, bounded Main triage,
-one fresh package-bound `correction.decision`, a fresh implementer, a new Freeze, and fresh
-tester/QA/adversary attempts. It never skips a state, specialist floor, validation,
+implementation. Every round still requires bounded Main triage, one fresh package-bound
+`correction.decision`, a fresh implementer, passing closure checks, tester refresh for stale
+evidence before a new Freeze, fresh QA on that Freeze, and security re-audit whenever its closed
+impact predicate applies. It never skips a state, specialist floor, validation,
 STAGE-GATE or outward-action approval. Both gates remain mandatory.
 
 The autonomous eligibility predicate is closed: every blocking finding must be an

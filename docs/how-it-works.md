@@ -58,7 +58,8 @@ transcribes the architect's classification, and remains the sole writer of `00-s
 
 There is no automatic approach checkpoint, ratification loop, structure loop, or post-approval
 review offer. `/th:plan-review` remains available only when explicitly invoked. A sensitive
-plan still receives its required security design review before Gate 1.
+plan carries the architect's security assessment and security TCs to the final adversarial
+validation; planning itself dispatches no security reviewer.
 
 At **STAGE-GATE-1**, the operator sees a short summary and an artifact pointer. The stable
 options are `1 approve`, `2 approve autonomous`, `3 edit`, `4 reject`; a number alone is enough

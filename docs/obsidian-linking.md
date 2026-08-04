@@ -79,7 +79,7 @@ When scanning a feature folder for docs to link, the scan recurses one level int
 - Plumbing: `00-state.md`, `00-execution-events.md`, `00-execution-events.jsonl`, `session.json`
 - The feature-index note itself (`{feature_dir}.md`) — excluded to avoid self-reference
 
-Rationale: `01-plan.md` is the consolidated knowledge record (it embeds Stage-1 ratification, plan-review, risks, and security design); research + plan + root-cause carry all durable knowledge. Process and verification docs are useful detail during a pipeline run but clutter the knowledge graph hub with ephemeral content.
+Rationale: `01-plan.md` plus its shards form the consolidated design and decision record; the manifest carries pointers while architecture, risks, functional ACs, and technical constraints remain in their canonical shards. Research + plan + root-cause carry all durable knowledge. Process and verification docs are useful detail during a pipeline run but clutter the knowledge graph hub with ephemeral content.
 
 ---
 
