@@ -140,20 +140,26 @@ Independently check the recorded version choice against this axis guide:
 |---|---|
 | `Z` / PATCH | Default for every backward-compatible fix or bounded improvement that does not add a material new public capability: fixes, security hardening, performance, dependencies, prompts/agents/workflows, internal refactors, tests/docs/build/CI, and small opt-in behavior within an existing capability. |
 | `Y` / MINOR | Require the plan or accepted evidence to name a material new externally consumable capability or a meaningful compatible expansion of a supported public contract. |
-| `X` / MAJOR | Require the plan or accepted evidence to name the supported public contract that existing consumers must change for, plus its migration impact. |
 
 Choose by compatibility and consumer impact, never by diff size, file count,
 commit prefix, number of fixes, or the presence of an added/deleted file. A new
-file is not automatically MINOR, a deletion is not automatically MAJOR, and
+file is not automatically MINOR, a deletion does not authorize a version decision, and
 multiple PATCH changes do not accumulate into MINOR. Use the lowest justified
 axis; ambiguity defaults to PATCH unless the evidence explicitly establishes a
 new public capability.
 
 Require a one-sentence `version_rationale`. For MINOR it names the new public
-capability; for MAJOR it names the incompatible public contract and migration
-impact. If the committed axis is higher than the guide supports, return
+capability. First, if accepted evidence says existing consumers must change because a supported
+public contract is removed or incompatible, or the committed candidate uses a
+MAJOR axis, do not select, recommend, or validate MAJOR. Return `status:
+blocked`, `failure_kind: major-release-required`, name the affected contract and
+migration impact, and require a separate explicitly scoped operator-led release
+planning task. This classification takes precedence over `version-overbump` and
+`version-underbump` and is not an implementation correction loop.
+
+Otherwise, if the committed axis is higher than the guide supports, return
 `status: blocked`, `failure_kind: version-overbump`; if it is lower than an
-explicitly evidenced public-contract change, use `failure_kind:
+explicitly evidenced compatible public-contract expansion, use `failure_kind:
 version-underbump`. Either result returns to implementation → Freeze → full
 validation. Never repair the version during delivery.
 
@@ -230,7 +236,7 @@ Body:
 
 ## Version
 - {old} → {preview}, or `not bumped` when explicitly recorded
-- Axis: {PATCH|MINOR|MAJOR} — {one-sentence version_rationale}
+- Axis: {PATCH|MINOR} — {one-sentence version_rationale}
 ```
 
 Conditional additions:
@@ -289,7 +295,7 @@ summary: {one sentence}
 pr_title: {title}
 pr_body: {docs_root}/inputs/pr-body-draft.md
 acceptance_matrix: {path}
-version_assessment: {PATCH|MINOR|MAJOR|none} — {one-sentence rationale}
+version_assessment: {PATCH|MINOR|none} — {one-sentence rationale}
 dod: delivery-writes-clean | flagged: {reason}
 issues: none | {specific blocker}
 ```

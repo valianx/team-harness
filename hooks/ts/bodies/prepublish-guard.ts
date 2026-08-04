@@ -268,8 +268,8 @@ function readVersionSites(reader: PrepublishReader): VersionSites {
 // ---------------------------------------------------------------------------
 // Bump-floor derivation — conservative mechanical floor from the shipped-path
 // diff. Additions and modifications are PATCH because path shape cannot prove
-// a material new public capability. D/R remains a MAJOR-candidate advisory;
-// the delivery guide makes the final supported-contract classification.
+// a material new public capability. D/R remains a breaking-change candidate;
+// agents must escalate rather than infer a MAJOR release from path shape.
 // ---------------------------------------------------------------------------
 
 function deriveFloor(changed: ChangedFile[]): "major" | "minor" | "patch" | "none" {
@@ -404,7 +404,7 @@ function runVersionSiteCheck(
 function warnUnderBump(reader: PrepublishReader, floor: string, actual: SemverDelta): void {
   if (floor === "major") {
     reader.warn(
-      `prepublish-guard: WARN — a shipped asset was DELETED or RENAMED (removed public surface) but the version bump is ${actual}. SemVer suggests MAJOR. If the deleted/renamed file is not a public invocable surface (e.g. an internal include), ignore. (advisory; push not blocked)`
+      `prepublish-guard: WARN — a shipped asset was DELETED or RENAMED (possible incompatible public-surface change) but the version bump is ${actual}. Agents must not infer a MAJOR release: verify whether the path is a supported public contract and, if it is incompatible, block as major-release-required for separate operator-led planning. Internal includes may be ignored. (advisory; push not blocked)`
     );
   }
 }

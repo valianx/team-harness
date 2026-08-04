@@ -403,7 +403,7 @@ function runVersionSiteCheck(reader, changed, sites) {
 function warnUnderBump(reader, floor, actual) {
   if (floor === "major") {
     reader.warn(
-      `prepublish-guard: WARN \u2014 a shipped asset was DELETED or RENAMED (removed public surface) but the version bump is ${actual}. SemVer suggests MAJOR. If the deleted/renamed file is not a public invocable surface (e.g. an internal include), ignore. (advisory; push not blocked)`
+      `prepublish-guard: WARN \u2014 a shipped asset was DELETED or RENAMED (possible incompatible public-surface change) but the version bump is ${actual}. Agents must not infer a MAJOR release: verify whether the path is a supported public contract and, if it is incompatible, block as major-release-required for separate operator-led planning. Internal includes may be ignored. (advisory; push not blocked)`
     );
   }
 }

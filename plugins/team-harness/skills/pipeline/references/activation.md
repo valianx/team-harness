@@ -100,7 +100,7 @@ the normalized (LF) bytes against these canonical SHA-256 digests:
 | tester | `69595191f2f532c3af96e1163325fa6cc778df5b54c6a66cb230221633961f8a` |
 | qa | `0baf6a9fdb3af2918650aec5453e68f58d1414b889e90759b83465a959e25ba2` |
 | security | `8687f298b7608e63095f29e047209f37d98a006ca6c33b8283291872274f03e1` |
-| delivery | `3cc5cd5b60933932048bba6b5fa1ae325d473d90d8057d295f5fe212fa125728` |
+| delivery | `07a5997769adbb2b3304b7640e2f9a701a38564a4f58d192548390b15ffbf7d5` |
 
 A digest mismatch is an identity failure; stop before workspace creation or
 delegation. Ask the operator to run `$team-harness:update` to

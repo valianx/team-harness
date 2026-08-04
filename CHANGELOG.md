@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Limited agent-selected release axes to PATCH and MINOR. Incompatible supported-contract
+  changes now block as `major-release-required` for a separate operator-led release plan;
+  agents never infer, recommend, or validate a MAJOR release.
 - Kept plan review explicitly opt-in and moved `qa` from `sonnet/high` to `opus/xhigh`, so
   both the single authoritative design pass and final evidence-backed acceptance use the most
   capable tier without adding automatic plan-review rounds.

@@ -1457,8 +1457,11 @@ def check_delivery_preview_binding() -> None:
     claude_delivery_flat = re.sub(r"\s+", " ", claude_delivery)
     delivery_role = read("agents/delivery.md").lower()
     delivery_role_flat = re.sub(r"\s+", " ", delivery_role)
+    implementation_assembly = read("agents/_shared/implementation-assembly.md").lower()
+    implementation_assembly_flat = re.sub(r"\s+", " ", implementation_assembly)
     codex_validation = read("plugins/team-harness/skills/pipeline/references/validation.md").lower()
     codex_delivery = read("plugins/team-harness/skills/pipeline/references/delivery.md").lower()
+    codex_implementation = read("plugins/team-harness/skills/pipeline/references/implementation.md").lower()
     deliver_skill = read("plugins/team-harness/skills/deliver/SKILL.md").lower()
 
     for label, text in (
@@ -1472,19 +1475,38 @@ def check_delivery_preview_binding() -> None:
     for marker in (
         "`z` / patch",
         "`y` / minor",
-        "`x` / major",
         "a new file is not automatically minor",
         "multiple patch changes do not accumulate into minor",
         "failure_kind: version-overbump",
         "failure_kind: version-underbump",
+        "failure_kind: major-release-required",
         "version_assessment:",
     ):
         require(marker in delivery_role_flat, f"Delivery version-axis guide omits {marker!r}")
+    require("`x` / major" not in delivery_role_flat, "Delivery still exposes MAJOR as an agent-selected axis")
+    require("{patch|minor|major" not in delivery_role_flat, "Delivery return protocol still permits a MAJOR assessment")
+    require(
+        delivery_role_flat.index("failure_kind: major-release-required")
+        < delivery_role_flat.index("failure_kind: version-overbump"),
+        "Delivery does not classify major-release-required before generic bump errors",
+    )
+    for label, text in (
+        ("Implementation assembly", implementation_assembly_flat),
+        ("Codex implementation", codex_implementation),
+    ):
+        require("major-release-required" in text, f"{label} does not escalate incompatible changes")
+        require("do not select or recommend major" in text, f"{label} can still infer a MAJOR axis")
+    require("`x` / major" not in implementation_assembly_flat, "Implementation still exposes MAJOR as an agent-selected axis")
     require(
         "patch is the default" in codex_delivery.lower()
         and "material new public capability" in codex_delivery.lower()
-        and "migration impact" in codex_delivery.lower(),
+        and "major-release-required" in codex_delivery.lower()
+        and "operator-led release-planning task" in codex_delivery.lower(),
         "Codex delivery reference does not preserve the version-axis guide",
+    )
+    require(
+        codex_delivery.index("major-release-required") < codex_delivery.index("version-overbump"),
+        "Codex delivery reference does not preserve major-release-required precedence",
     )
     for relative in (
         "agents/_shared/orchestrator-state.md",
@@ -1492,6 +1514,10 @@ def check_delivery_preview_binding() -> None:
     ):
         state_contract = read(relative)
         require("delivery_version_axis:" in state_contract, f"{relative}: version axis is not recoverable")
+        require(
+            "delivery_version_axis: patch|minor|none|null" in state_contract,
+            f"{relative}: version axis permits values outside PATCH/MINOR",
+        )
         require("delivery_version_rationale:" in state_contract, f"{relative}: version rationale is not recoverable")
     require("do not regenerate prose" in codex_delivery, "Codex delivery can regenerate approved prose")
     require("never recompose" in claude_delivery_flat, "Claude mechanics can recompose approved prose")
