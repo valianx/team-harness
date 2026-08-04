@@ -2,7 +2,7 @@
 
 This reference applies only to an explicitly activated pipeline. Validate approved functional
 ACs and technical constraints against the actual frozen tree and diff. Delegate executable evidence to `tester`,
-criterion-by-criterion review to `qa`, and the required focused audit to `security` when the
+criterion-by-criterion review to `qa`, and require `security` to perform a focused audit when the
 sensitivity/risk floor applies. Before each dispatch, preflight the exact task shard and fail
 closed if its `required_invariants`, `required_evidence_anchors`, or
 `cross_runtime_preservation` declaration lacks an applicable value; do not fill a gap from a
@@ -59,9 +59,12 @@ but no tester refresh or Freeze opens and no final validator runs.
 
 After closure passes, apply this order:
 
-1. Compare the prior frozen commit to current HEAD. A tester evidence row is stale when its
-   requirement text or any declared evidence path changed. Dispatch one fresh tester for all stale
-   rows; carry other rows provisionally only by unchanged path/blob hash.
+1. Compare the prior frozen commit to current HEAD. Every tester evidence row declares the
+   complete dependency set consumed by its proof: implementation, test, fixture,
+   configuration, and argument-file inputs. A row is stale when its requirement
+   text, exact command/arguments, or any declared dependency path/blob hash changed.
+   Dispatch one fresh tester for all stale rows; carry other rows provisionally
+   only when every one of those values is unchanged.
 2. Complete and commit warranted test/evidence changes, then rebuild Freeze. Never freeze before
    the stale-row tester refresh terminates.
 3. Dispatch fresh QA over every functional AC on the new frozen identity.
@@ -185,11 +188,13 @@ a round. Only the exact valid `approved-autonomous` dual record may provide the
 bounded autonomous authority above.
 Only a live reply after this presentation may consume the nonce. Choice `1`
 atomically records a matching state decision and `correction.decision` event
-bound to the same nonce, anchor, finding IDs, scope, and
-`correction_exceptional` boolean. That decision may
-authorize exactly one `iteration.start` and correction spawn, followed by the closure
-gate, stale-row tester refresh, one new Freeze, fresh QA, and impact-required security. Both authorized events must
-carry the identical boolean. A second failure requires a
+bound to the same nonce, anchor, finding IDs, implicated requirements, scope,
+one deterministic closure check/expected result per finding, dispositions, and
+`correction_exceptional` boolean. That decision may authorize exactly one
+`iteration.start` and correction spawn, followed by the closure gate, stale-row
+tester refresh, one new Freeze, fresh QA, and impact-required security. Both
+authorized events must repeat that complete package byte-for-byte; sharing only
+the nonce is invalid. A second failure requires a
 fresh presentation and nonce under normal approval. Under autonomous approval,
 it repeats the required-set/triage/predicate and may authorize the next fresh round
 only while `iteration < 3`; there is no owner-lens bounce or agent follow-up.

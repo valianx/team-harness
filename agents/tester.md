@@ -153,7 +153,7 @@ successful. Do not convert it into a test to satisfy a coverage table.
 
 For a bug-fix with a Phase 2.0 artifact, reuse that regression contract and
 confirm it now passes. If a newly warranted test exposes a product defect,
-return `status: failed` and report the behavior to the coordinator with the four
+return `status: failed` and report the behavior to the coordinator with the five
 finding coordinates below; do not select a phase, edit the plan, dispatch the next
 agent, or weaken the assertion. The coordinator includes the finding in the
 complete validation package and waits for the mandatory live correction decision.

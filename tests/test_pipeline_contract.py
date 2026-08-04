@@ -667,6 +667,91 @@ def check_explicit_validation_correction_decision() -> None:
     require("never emitted by a new plan" in codex_shards, "Codex plan shards can still emit VERIFY ACs")
 
 
+def check_review_feedback_closures() -> None:
+    """PR #588 review fixes remain explicit and mechanically aligned."""
+    tester_adapter = read("runtime/codex/instructions/tester.md").lower()
+    for marker in (
+        "`test`, `command`, or `inspection` evidence",
+        "requirement text, exact command/arguments",
+        "fixture, configuration, and argument-file",
+    ):
+        require(marker in tester_adapter, f"tester adapter misses {marker!r}")
+
+    evidence = read("agents/_shared/ac-evidence.md").lower()
+    require("complete dependency set" in evidence, "evidence rows do not declare complete dependencies")
+    require("exact command/arguments" in evidence, "command changes do not stale evidence")
+
+    for relative in (
+        "agents/_shared/delivery-mechanics.md",
+        "plugins/team-harness/skills/pipeline/references/delivery.md",
+    ):
+        delivery = read(relative).lower()
+        for marker in ("snapshot_status: query-failed", "ci_snapshot: unavailable", "never retry"):
+            require(marker in delivery, f"{relative}: failed PR snapshot misses {marker!r}")
+
+    dispatch = read("agents/_shared/dispatch-contract.md").lower()
+    require("security assessment anchors" in dispatch, "adversary dispatch lost security anchors")
+    require("design-review verdict" not in dispatch, "adversary dispatch still depends on retired design review")
+
+    correction_contracts = (
+        "agents/_shared/orchestrator-state.md",
+        "plugins/team-harness/skills/pipeline/references/recovery.md",
+        "plugins/team-harness/skills/pipeline/references/state-and-gates.md",
+        "plugins/team-harness/skills/pipeline/references/validation.md",
+    )
+    for relative in correction_contracts:
+        contract = re.sub(r"\s+", " ", read(relative).lower())
+        require("byte-for-byte" in contract, f"{relative}: correction package is not immutable")
+        nonce_markers = ("nonce alone", "nonce-only", "not merely share a nonce", "shared nonce", "sharing only the nonce")
+        require("nonce" in contract and any(marker in contract for marker in nonce_markers), f"{relative}: nonce can substitute for the correction package")
+
+    architect = read("agents/architect.md")
+    require("Emit this block for every plan" in architect, "direct plans may omit Scope Shape")
+    task_template = architect.split("<!-- file: plan/tasks/Task-1.md -->", 1)[1].split("<!-- file: plan/tasks/Task-2.md -->", 1)[0]
+    require("#### Verification" in task_template, "task template misses Verification")
+
+    vocabulary_pattern = re.compile(r"`SECURITY_CONTROL_VOCABULARY: ([^`\n]+)`")
+    architect_vocabulary = vocabulary_pattern.findall(architect)
+    adversary_vocabulary = vocabulary_pattern.findall(read("agents/adversary.md"))
+    require(len(architect_vocabulary) == 1, "architect must declare one canonical security vocabulary")
+    require(len(adversary_vocabulary) == 1, "adversary must declare one canonical security vocabulary")
+    require(architect_vocabulary == adversary_vocabulary, "architect/adversary security vocabularies drifted")
+
+    implementer = read("agents/implementer.md")
+    require("finding_resolutions:" in implementer and "finding_id" in implementer, "implementer cannot resolve every finding")
+    require("finding_resolution:" not in implementer, "singular implementer finding resolution remains")
+
+    reviewer = read("agents/plan-reviewer.md")
+    reviewer_flat = re.sub(r"\s+", " ", reviewer.lower())
+    for marker in (
+        "require every normalized criterion",
+        "reject duplicate ac identifiers",
+        "ac/tc section ownership is invalid",
+        "regression checkpoint is closed but 02-regression-test.md is missing",
+    ):
+        require(marker in reviewer_flat, f"plan reviewer misses {marker!r}")
+    require(reviewer.count("```text\n- **TC-N**: regression test exists at") == 2, "regression examples need text fence languages")
+
+    qa_failure = section(read("agents/qa.md"), "### Finding Coordinates", "### Hygiene findings")
+    require("**Requirement:**" in qa_failure and "**Closure evidence:**" in qa_failure, "QA failure brief lacks five coordinates")
+    require("with the five" in read("agents/tester.md"), "tester prose still counts four coordinates")
+
+    adversary = read("agents/adversary.md")
+    require("initial | amend-N | correction-N" in adversary, "adversary rejects correction audit runs")
+    dispatch_route = read("agents/ref-pipeline.md")
+    require("Stage-1 sensitivity timing" in dispatch_route, "adversary dispatch omits Stage-1 timing")
+    require("applicable current security result anchored to the exact frozen identity" in dispatch_route, "security-relevant TCs lack current-result acceptance mapping")
+
+    design = read("plugins/team-harness/skills/pipeline/references/design.md")
+    for marker in ("request_shape: adaptation | new-capability | fix | refactor", "realized_scope: aligned | expanded", "aligned plan must omit"):
+        require(marker in design, f"Gate 1 scope-shape validation misses {marker!r}")
+
+    validation = read("plugins/team-harness/skills/pipeline/references/validation.md")
+    require("require `security` to perform a focused audit" in validation, "security-audit wording remains ambiguous")
+    security_adapter = read("runtime/codex/instructions/security.md").lower()
+    require("changed a security anchor or invariant" in security_adapter, "security adapter can carry stale anchor/invariant evidence")
+
+
 def check_direct_predicate() -> None:
     """Direct eligibility and a live `hazlo tú` preference cannot dispatch silently."""
     claude = "\n".join(
@@ -2324,6 +2409,7 @@ def main() -> None:
         ("v3 machine", check_v3_machine),
         ("corrective routes", check_corrective_routes),
         ("explicit validation correction decision", check_explicit_validation_correction_decision),
+        ("PR 588 review closures", check_review_feedback_closures),
         ("authoritative post-Gate-1 transitions", check_authoritative_post_gate1_transitions),
         ("direct predicate", check_direct_predicate),
         ("single writer", check_single_writer),

@@ -301,7 +301,9 @@ failure_kind: {kind}   # required on failed/blocked; omit on success
 model: {effective-model-id}
 output: workspaces/{feature-name}/02-implementation.md | none — inline
 summary: {1-2 sentences; N files changed, behavior delivered, deviation if any}
-finding_resolution: {cause, files, requirement: AC-N|TC-N, correction, closure_evidence, closure_result: pass|fail} | none
+finding_resolutions:
+  - {finding_id, cause, files, requirement: AC-N|TC-N, correction, closure_evidence, closure_result: pass|fail}
+  # one entry for every finding in the assigned correction package; [] outside correction work
 commit: {sha} | lane-deferred | none — no source change
 context7_consult: hit:N miss:N skipped:M
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N

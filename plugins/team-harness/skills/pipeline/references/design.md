@@ -29,7 +29,10 @@ primary thread records the accepted artifact paths and counts, then sets
 
 Before the gate, the primary thread checks only artifact presence, coherent files/dependencies,
 AC/TC separation, `implementation_references_in_ac: 0`, and absence of unresolved clarification
-markers. An invalid artifact gets one normal design correction; genuine ambiguity is blocked and
+markers. It also requires `request_shape: adaptation | new-capability | fix | refactor`,
+`realized_scope: aligned | expanded`, and `expansion_reason` exactly when
+`realized_scope: expanded`; an aligned plan must omit that reason. An invalid or
+contradictory scope-shape block is an invalid artifact. An invalid artifact gets one normal design correction; genuine ambiguity is blocked and
 surfaced to the operator. `/th:plan-review` is explicit only. Planning dispatches only architect;
 a sensitive plan carries its security assessment and security-relevant TCs to final validation.
 

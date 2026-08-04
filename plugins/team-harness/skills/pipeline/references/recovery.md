@@ -208,9 +208,11 @@ closure checks, scope,
 `correction_authority`, and `correction_exceptional` boolean exactly match
 the state record. An authorized consumed decision additionally requires
 `correction_nonce: null`, its exact token in `correction_decision_nonce`, and
-that identical token on the matching `correction.decision`, one
-`iteration.start`, and one `agent.correction.spawn`. A stale or consumed nonce,
-mismatched decision nonce, mismatched anchor/findings/requirements/closure/scope,
+that the complete anchor, findings, requirements, closure, scope, dispositions,
+and exceptional-value package is byte-for-byte identical on the matching
+`correction.decision`, one `iteration.start`, and one `agent.correction.spawn`.
+A shared nonce never substitutes for this full-package comparison. A stale or consumed nonce,
+mismatched decision nonce, mismatched anchor/findings/requirements/closure/scope/dispositions/exceptional value,
 or reuse of one authorization for more than one `iteration.start` or
 `agent.correction.spawn` is invalid and blocks dispatch. An implementation or
 correction event after a failed validation without the matching decision also

@@ -121,12 +121,29 @@ backoff, polling, or another agent turn. Do not wait for CI or merge. `BEHIND`, 
 review-time signal, not permission to mutate the validated branch. Offer an
 operator-directed rebase only when needed; never execute it automatically.
 
+If that single `gh pr view` invocation exits non-zero or omits the requested
+fields, it still consumes the one snapshot attempt. Record and report this
+terminal block from already-known PR coordinates; sanitize the error to one
+line and never retry:
+
+```yaml
+pr_url: {known URL}
+pr_number: {known number}
+mergeability: UNDETERMINED
+ci_snapshot: unavailable
+snapshot_status: query-failed
+snapshot_error: {sanitized one-line error}
+```
+
+The failed read does not wait, poll, reopen delivery, or prevent terminal
+completion when the validated commit is published and the PR already exists.
+
 ## Terminal boundary
 
 Success requires the validated commit to be published and a draft PR to exist
 or an operator-confirmed ready-for-review PR to own the exact head/base pair.
 Then write terminal artifacts/events and set `phase/status: complete` immediately
-after the one snapshot. The pipeline stops; a later merge is external state and
+after the one snapshot attempt, including a terminal `query-failed` attempt. The pipeline stops; a later merge is external state and
 requires a separate live request if the operator wants an update.
 
 Gate 3 `ship` authorizes only this feature-branch push and draft-PR

@@ -41,18 +41,22 @@ test.
 
 | Type | Use when | Minimum record |
 |---|---|---|
-| `test` | Executable behavior or invariant can regress and the suite is the clearest durable proof | test name, command, result, and every source/test path whose blob makes the evidence current |
-| `command` | An existing build, lint, parser, schema, or repository validator directly proves the claim | exact command, result, relevant output, and inspected paths |
+| `test` | Executable behavior or invariant can regress and the suite is the clearest durable proof | test name, command, result, and every source, test, fixture, configuration, and argument-file path consumed by the proof |
+| `command` | An existing build, lint, parser, schema, or repository validator directly proves the claim | exact command, result, relevant output, and every implementation, fixture, configuration, and argument-file path consumed by the command |
 | `inspection` | Prose, metadata, static configuration, or another artifact is best verified directly | artifact plus `file:line` and inspected paths |
 
 One item of evidence may satisfy several requirements. A requirement may combine
 evidence types. Existing evidence is preferred when it directly proves the
 requirement.
 
-Every evidence-map row declares `Evidence paths`. After a correction, unchanged
-rows may carry forward only when the requirement text and every declared path's
-blob hash are unchanged. A missing path declaration or hash makes the row stale;
-the tester refreshes it before the next Freeze.
+Every evidence-map row declares `Evidence paths` as the complete dependency set
+for that proof. For executable evidence this includes every consumed
+implementation, test, fixture, configuration, and argument-file input, not only
+the command or test file named in the row. After a correction, unchanged rows
+may carry forward only when the requirement text, exact command/arguments, and
+every declared dependency path's blob hash are unchanged. A missing dependency,
+path declaration, or hash makes the row stale; the tester refreshes it before
+the next Freeze.
 
 ## When to author a test
 

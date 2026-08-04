@@ -553,16 +553,18 @@ When you finish validate mode with `status: failed`, **append** a correction ent
 **Root cause type:** A (implementation/validation correction) | mechanical plan repair (iteration +0) | operator decision (no correction round until resolved)
 **Blast radius:** localized {AC-3} | structural
 
-### Failing AC
+### Failing requirements
 - AC-3: Given admin role, When DELETE /users/{id} is called, Then user is soft-deleted — `src/users/users.controller.ts:54` returns 200 but does NOT mark deletedAt
+- TC-2: the authorization guard must remain shared — `src/users/users.controller.ts:41` bypasses the shared guard
 - AC-7 ambiguous: spec says "rate limit per merchant" but doesn't define window — report the ambiguity to the coordinator; the live operator decides any bounded resolution.
 - ...
 
 ### Finding Coordinates
 - **Cause:** {observed defect or missing evidence}
 - **Files:** {source, test, and report paths with file:line evidence}
-- **AC:** {exact implicated AC identifiers}
+- **Requirement:** {exact implicated AC-N or TC-N identifiers}
 - **Suggested correction:** {smallest advisory fix}
+- **Closure evidence:** {deterministic command or inspection plus expected result}
 
 ### Hygiene findings (present only when code_hygiene: fail)
 - `src/users/users.controller.ts:88` — work-narration comment references a pipeline step token; strip and, if warranted, replace with a WHY-comment

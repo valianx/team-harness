@@ -944,7 +944,7 @@ Shares the max-3 cap for implementation bounces. A clean scan is a trace event o
 
 ### Implementation checkpoint — evidence authoring
 
-**Agent:** `tester`, `mode: authoring`. Runs before Freeze and the validation state, over a tree that is immutable afterward. The tester classifies each AC and TC as `test`, `command`, or `inspection`, records evidence paths, reuses sufficient evidence, authors only warranted missing tests, runs the relevant suite/commands, and writes `03-testing.md`'s evidence map. This is the only full tester authoring dispatch in the non-bug-fix flow; a correction may dispatch one fresh tester only for rows made stale by changed requirement text or evidence-path blobs.
+**Agent:** `tester`, `mode: authoring`. Runs before Freeze and the validation state, over a tree that is immutable afterward. The tester classifies each AC and TC as `test`, `command`, or `inspection`, records the complete evidence dependency paths, reuses sufficient evidence, authors only warranted missing tests, runs the relevant suite/commands, and writes `03-testing.md`'s evidence map. This is the only full tester authoring dispatch in the non-bug-fix flow; a correction may dispatch one fresh tester only for rows made stale by changed requirement text, exact command/arguments, or any consumed implementation, test, fixture, configuration, or argument-file dependency blob.
 
 Bug-fix flow: resume the regression contract started at the implementation checkpoint and complete the remaining evidence-map rows.
 
@@ -1100,10 +1100,12 @@ no second run-only `tester` dispatch here.
 After an authorized correction passes every closure check, apply this closed, fail-closed order:
 
 1. **Pre-Freeze tester impact.** Compare the prior frozen commit with current HEAD. Every
-   `03-testing.md` row declares its evidence paths. A row is stale when its requirement text changed
-   or any declared evidence path changed. Dispatch one fresh tester only for the complete stale-row
-   set; carry other rows provisionally by exact unchanged path/blob hash. Missing paths, hashes, or
-   a classification error make every affected row stale.
+   `03-testing.md` row declares its complete evidence dependency set, including each implementation,
+   test, fixture, configuration, and argument-file input consumed by an executable command. A row is
+   stale when its requirement text, exact command/arguments, or any declared dependency path/blob
+   changed. Dispatch one fresh tester only for the complete stale-row set; carry other rows
+   provisionally by exact unchanged values and path/blob hashes. Missing dependencies, paths,
+   hashes, or a classification error make every affected row stale.
 2. **Freeze after tester.** Complete and commit any warranted test/evidence change, then rebuild
    Freeze. Never freeze before the stale-row tester refresh has terminated.
 3. **QA.** Every corrected frozen identity receives one fresh QA pass over all functional ACs.
@@ -1139,7 +1141,7 @@ validator. After `ship`, no tracked or untracked write is allowed before push.
 
 Every tier receives the same audit. Bug severity never selects a different security lens: the audit reviews the consolidated final diff regardless of tier. At `bug_tier: 4` on a sensitive task the dispatch carries the extended-analysis instruction against `01-root-cause.md ## Prior Art`.
 
-**What each dispatch carries.** `qa`: the assigned task-shard path and implementation record; for `fix`/`hotfix`, the reproduction and regression flags. `adversary`: audit flag, worktree, docs root, exact frozen-diff path, only in-scope task shards, security-relevant TCs, the architect's named security-assessment anchors, scope/run fields, packet deviation pointer, and its output budget. The adversary treats every claimed mitigation in those anchors as an affirmation to invert; no planning reviewer is required. **No diff summary, task summaries, sibling shards, or enumeration of what to confirm** — the frozen artifact is authoritative.
+**What each dispatch carries.** `qa`: the assigned task-shard path and implementation record; for `fix`/`hotfix`, the reproduction and regression flags. `adversary`: audit flag, worktree, docs root, exact frozen-diff path, only in-scope task shards, security-relevant TCs, the Stage-1 sensitivity timing, the architect's named security-assessment anchors, scope/run fields, packet deviation pointer, and its output budget. The adversary treats every claimed mitigation in those anchors as an affirmation to invert; no planning reviewer is required. **No diff summary, task summaries, sibling shards, or enumeration of what to confirm** — the frozen artifact is authoritative.
 
 ### The audit never iterates
 
@@ -1255,10 +1257,11 @@ the artifacts. The combined verdict never replaces Gate 3.
 1. Sum AC and TC counts from the task index and verify them against task shards.
 2. Count PASS vs FAIL per AC in `reviews/04-validation.md`.
 3. Verify every AC and TC has relevant successful, current `test`, `command`, or `inspection` evidence with declared evidence paths in `03-testing.md`, following `agents/_shared/ac-evidence.md`.
-4. **UX gate (`frontend_scope` only):** any `critical` (WCAG A) finding in `reviews/04-ux-validation.md` fails the gate → Case A. `high`/`medium`/`suggestion` never block.
-5. **Regression still passing (`fix`/`hotfix`, Tier 2–4):** confirm `regression_test_path` shows PASS, not `skip`/`xfail` — then **read the actual assertion body** and confirm it matches the authored pattern. A weakened or replaced assertion fails the gate even with the test name and PASS status intact.
-6. **Test-change integrity:** when tests changed or were deleted, require the exact reason and surviving behavioral evidence. A deletion or weakened assertion whose purpose is to hide a failure joins the consolidated correction-decision package; test counts never gate acceptance.
-7. **`code_hygiene` re-assertion.** Re-read the value `qa` recorded. `fail` closes this check regardless of AC, security or build outcome. This is a re-check, not a new evaluation — it exists so a hygiene fail cannot slip through if validation wording is ever loosened.
+4. Map every security-relevant TC to an applicable current security result anchored to the exact frozen identity. A missing, stale, or non-applicable result fails acceptance.
+5. **UX gate (`frontend_scope` only):** any `critical` (WCAG A) finding in `reviews/04-ux-validation.md` fails the gate → Case A. `high`/`medium`/`suggestion` never block.
+6. **Regression still passing (`fix`/`hotfix`, Tier 2–4):** confirm `regression_test_path` shows PASS, not `skip`/`xfail` — then **read the actual assertion body** and confirm it matches the authored pattern. A weakened or replaced assertion fails the gate even with the test name and PASS status intact.
+7. **Test-change integrity:** when tests changed or were deleted, require the exact reason and surviving behavioral evidence. A deletion or weakened assertion whose purpose is to hide a failure joins the consolidated correction-decision package; test counts never gate acceptance.
+8. **`code_hygiene` re-assertion.** Re-read the value `qa` recorded. `fail` closes this check regardless of AC, security or build outcome. This is a re-check, not a new evaluation — it exists so a hygiene fail cannot slip through if validation wording is ever loosened.
 
 Security findings are checked here: a correctable `broke-it` or incomplete sensitive-coverage
 finding is a validation failure and, after explicit authorization, must have passed through

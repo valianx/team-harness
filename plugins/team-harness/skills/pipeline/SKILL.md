@@ -139,7 +139,8 @@ Initial tester, QA, and security attempts start fresh with V2 `fork_turns: none`
 on their assigned current identity. Their packets contain executable ACs/TCs or
 the review surface plus verifiable facts and evidence, never the implementer's
 success narrative. After correction closure passes, tester refreshes only evidence
-rows whose declared paths or requirement text changed, then Main rebuilds Freeze. QA is
+rows whose requirement text, exact command/arguments, or complete declared dependency
+path/blob set changed, then Main rebuilds Freeze. QA is
 always fresh on that new Freeze; security is
 fresh when a security finding, TC, anchor, attack-surface path, or unknown impact
 requires it. Carry-forward is exact path/blob-hash evidence, never reuse of a
@@ -218,9 +219,9 @@ the role fields cannot see. The current digests are:
 |---|---|
 | `architect` | `17f8df98cc2b5b9c4703c79493da40c141394f8b8076fb71b1512318592f894f` |
 | `implementer` | `76cd8d007b91411377b6401c9def7076f49e42868928010168cca17ad5778449` |
-| `tester` | `10ac9d1e54e85d4e63891b8abfa1c13f164ba4e40cf103e5ecc961db657b769e` |
+| `tester` | `31a902a24dd23e838e7dc260c15fd8aa08bcfd703f56956194ff56ca810cf52e` |
 | `qa` | `2612528da833bcb5cf2db981ac586320a0ad06ac407d38beb564b64880cc24c8` |
-| `security` | `142d9038d5526fcd35689780400b892a6b8244a20d156e197aca67887999fabd` |
+| `security` | `06434dd772dfff170529c67e15c91c08311329e66f364eb220298a2d0dd2f997` |
 | `delivery` | `07a5997769adbb2b3304b7640e2f9a701a38564a4f58d192548390b15ffbf7d5` |
 
 Do not accept a file solely because its comments or `name` field match. A

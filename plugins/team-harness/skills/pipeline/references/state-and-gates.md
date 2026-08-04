@@ -203,8 +203,11 @@ consumed token in `correction_decision_nonce`, `correction_pending: false`,
 exact consumed Gate-1 release nonce in `correction_authority_gate_nonce`, and
 `correction_exceptional: false`, plus one matching `correction.decision` event
 bound to that same consumed correction nonce, complete dispositions, resolve
-IDs, anchor, and scope. The one subsequent `iteration.start` and
-`agent.correction.spawn` must carry that identical nonce. This single record
+IDs, anchor, scope, implicated requirements, and one deterministic closure
+check/expected result per finding. The one subsequent `iteration.start` and
+`agent.correction.spawn` must carry the byte-for-byte identical nonce, anchor,
+findings, scope, requirements, closure, dispositions, and exceptional value.
+Matching the nonce alone never authorizes either event. This single record
 authorizes exactly one fresh implementer, a mandatory correction-closure gate,
 stale-row tester refresh, new Freeze, fresh QA, and impact-required security. Each later failed set repeats the triage and predicate; the
 third authorized correction exhausts autonomy and any later failure pauses.
@@ -249,12 +252,14 @@ atomically records `correction_decision: authorize`, the consumed nonce in
 `correction_decision_nonce`, `correction_authority: operator-live`,
 `correction_authority_gate_nonce: null`, `correction_pending: false`, and one matching
 `correction.decision` event bound to the anchor, all finding IDs, and file
-scope and dispositions, including the identical `correction_exceptional`
-boolean. It authorizes exactly one bounded correction over that complete package,
+scope, implicated requirements, one deterministic closure check/expected result
+per finding, and dispositions, including the identical `correction_exceptional`
+boolean. It authorizes exactly one bounded correction over that complete package;
+the subsequent `iteration.start` and `agent.correction.spawn` must repeat every
+package field byte-for-byte, and a nonce-only match is invalid. Its authorization includes the
 closure gate, stale-row tester refresh, one new Freeze, fresh QA, and impact-required
 security; its nonce may appear on exactly
-one subsequent `iteration.start` and `agent.correction.spawn`, both carrying
-that same boolean. A second failure
+one subsequent `iteration.start` and `agent.correction.spawn`. A second failure
 creates a fresh nonce and pauses again.
 
 Choice `2` consumes the presented nonce into a `pause` decision with

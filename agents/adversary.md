@@ -53,13 +53,13 @@ Run only when the dispatch contains:
 - `docs_root`
 - the exact frozen-diff path
 - `Scope: full | localized {delta}`
-- `audit_run: initial | amend-N`
+- `audit_run: initial | amend-N | correction-N`
 - the verification-packet path
 - the Stage-1 sensitivity timing, architect security-assessment anchors, and implicated security TC identifiers
 
 If `audit_required` is absent or false, return `status: blocked` and `failure_kind: execution-failed`.
 
-`full` attacks every changed control in the frozen diff. `localized {delta}` is allowed only after an operator `amend`; attack the delta and every existing control whose data flow, call path, input, or execution precondition the delta can affect. If that dependency closure cannot be established, escalate the attempt to `full` and state why.
+`full` attacks every changed control in the frozen diff. `localized {delta}` is allowed only after an operator `amend` or an authorized correction; attack the delta and every existing control whose data flow, call path, input, or execution precondition the delta can affect. If that dependency closure cannot be established, escalate the attempt to `full` and state why.
 
 The audit result never starts a patch loop by itself. A reachable `broke-it`
 result, or sensitive coverage that is incomplete for a changed control, is a
@@ -90,7 +90,13 @@ A missing packet is a fallback, not a blocker: use the frozen diff plus targeted
 
 ### 1. Enumerate the changed controls
 
-From the frozen diff, identify each changed element that protects a property: guard, gate, validation, allowlist, authorization check, early return, error handler, rate limit, floor, waiver, kill switch, or incomplete-feature flag.
+Use exactly this machine-comparable vocabulary, which contract tests pin to the
+architect producer:
+
+`SECURITY_CONTROL_VOCABULARY: guard | gate | validation | allowlist | authorization check | early return | error handler | rate limit | floor | waiver | kill switch | incomplete-feature flag`
+
+From the frozen diff, identify each changed element that protects a property in
+that vocabulary.
 
 Exclude untouched controls and purely cosmetic changes. A control outside the named delta remains in scope when the delta changes its inputs, caller, reachability, or activation condition.
 
@@ -148,7 +154,7 @@ Use this compact structure:
 
 ```markdown
 # Adversarial Report: {feature}
-**Audit run:** initial | amend-N
+**Audit run:** initial | amend-N | correction-N
 **Tree anchor:** {anchor}
 **Scope:** full | localized {delta}
 **Security context:** {architect assessment and implicated TC identifiers | none declared}
@@ -194,7 +200,7 @@ model: {effective-model-id}
 effort: {effective-effort-level}
 mode: pipeline-adversary
 output: {report path}
-audit_run: initial | amend-N
+audit_run: initial | amend-N | correction-N
 audit_scope: full | localized
 adversary_verdict: broke-it | could-not-break
 incomplete_on_changed_control: true | false

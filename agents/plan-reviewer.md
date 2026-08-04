@@ -44,6 +44,11 @@ decision. When explicitly invoked, the coordinator may run `qa-plan` first and
 `security` when sensitive, then this shape audit; the three reports remain in
 the single canonical `reviews/01-plan-review.md` artifact.
 
+For `type: fix | hotfix`, the dispatch also carries
+`regression_checkpoint: pending | closed`, derived from current state. This is
+the sole authority for whether Rule 8 may accept `<TBD-Phase-2.0>` or must read
+the completed `02-regression-test.md` artifact.
+
 ---
 
 ## Output concision (panel verifier)
@@ -174,23 +179,35 @@ elif grouping.mode == "groups":
 
 1. For each task shard in `plan/tasks/*.md`, look for an `Acceptance Criteria` section (or `#### Acceptance Criteria`).
 2. The section MUST contain ≥1 acceptance criterion.
-3. Each criterion MUST start with `- [ ] **AC-N**:` (markdown task with bold AC identifier) and follow with `Given … When … Then …`.
+3. Each criterion MUST start with `- [ ] **AC-N**:` (markdown task with bold AC identifier) and follow with `Given … When … Then …`; wrapped continuation lines are normalized to spaces before validation.
 4. `VERIFY:` is prohibited in a new AC block. When technical constraints exist,
    they use `- **TC-N**:` inside a separate `Technical Constraints` section.
+5. Every `AC-N` belongs to the Acceptance Criteria section and every `TC-N`
+   belongs to the Technical Constraints section; cross-owned identifiers fail.
 
-**Detection regex (per task's AC block):**
+**Detection algorithm (per task shard):**
 
 ```text
-(?m)^\s*-\s*\[\s\]\s+\*\*AC-\d+\*\*:\s+Given\b[^\n]*\bWhen\b[^\n]*\bThen\b
+1. Slice the Acceptance Criteria block through the next same-or-higher heading.
+2. Split it at every `- [ ] **AC-N**:` marker; each marker starts one criterion
+   and owns its indented continuation lines until the next marker.
+3. Normalize each criterion's internal whitespace and line breaks to one space.
+4. Require every normalized criterion to match:
+   ^\s*-\s*\[\s\]\s+\*\*AC-\d+\*\*:\s+Given\b.*\bWhen\b.*\bThen\b
+5. Reject duplicate AC identifiers, any `TC-N` marker in the AC block, and any
+   `AC-N` marker in the Technical Constraints block.
 ```
 
-A `Given`-based criterion matches only when the same line also carries `When` and `Then` — a bare `Given …` without the full shape is NOT a match.
+A bare `Given …` without the full shape is not a match, but the three clauses
+may be wrapped across continuation lines.
 
 For each task:
 - If no `Acceptance Criteria` section is found → finding "Rule 2: task has no AC section".
-- If the section exists but has 0 matches of the regex → finding "Rule 2: task has no Given/When/Then ACs".
+- If the section exists but has no parsed criteria → finding "Rule 2: task has no Given/When/Then ACs".
+- If any parsed criterion fails the normalized Given/When/Then match → one finding naming every malformed AC identifier.
 - If the AC block contains `VERIFY:` → finding "Rule 2: implementation assertion belongs in Technical Constraints, not Acceptance Criteria".
-- If at least one match exists → pass for that task.
+- If a `TC-N` occurs in Acceptance Criteria or an `AC-N` occurs in Technical Constraints → finding "Rule 2: AC/TC section ownership is invalid".
+- Pass only when every parsed AC matches and section ownership is valid.
 
 The plan-reviewer does NOT police AC quality. It only checks that ACs exist in the right format. AC quality is the architect's responsibility (during design) and the qa's responsibility (during validate-mode).
 
@@ -347,25 +364,33 @@ When `spec_seed_dissents: false` or the field is absent from the task payload: n
 
 For each assigned task shard in `plan/tasks/*.md`, the Technical Constraints block MUST include a TC of the form:
 
-```
+```text
 - **TC-N**: regression test exists at <path>
 ```
 
 or, before Phase 2.0 runs (the test does not yet exist):
 
-```
+```text
 - **TC-N**: regression test exists at <TBD-Phase-2.0>
 ```
 
-The `<TBD-Phase-2.0>` placeholder is **valid for an initial explicit review** (the test does not yet exist). After the regression checkpoint closes, the coordinator records the actual `regression_test_path` in the task shard. Rule 8 is re-evaluated at the next explicit review; the placeholder counts as compliant before implementation.
+The `<TBD-Phase-2.0>` placeholder is valid only when the dispatch says
+`regression_checkpoint: pending`. After the checkpoint closes, the coordinator
+records the actual `regression_test_path` in the task shard and dispatches
+`regression_checkpoint: closed`; Rule 8 then requires the artifact and exact
+cross-reference.
 
 **Detection:**
 
 For each task section in the assigned `plan/tasks/*.md` shards:
 - Search the `#### Technical Constraints` block for a line matching `- **TC-\d+**: regression test exists at (.+)$`.
 - If no match → finding `"Rule 8: Task-{id} has no TC referencing the regression test path"` with severity `fail`.
-- If a match exists with path `<TBD-Phase-2.0>` → pass (placeholder accepted at this gate).
-- If a match exists with a concrete path → check that path against `02-regression-test.md` → `regression_test_path` (if `02-regression-test.md` exists). Mismatch → finding `"Rule 8: Task-{id} TC declares regression test at {path-in-task-list} but 02-regression-test.md declares {actual-path}"` with severity `fail`.
+- If a match exists with path `<TBD-Phase-2.0>` and `regression_checkpoint: pending` → pass.
+- If the checkpoint is `closed`, `<TBD-Phase-2.0>` fails and a missing
+  `02-regression-test.md` fails closed with finding `"Rule 8: regression checkpoint is closed but 02-regression-test.md is missing"`.
+- If the checkpoint is `closed` and a concrete path exists, require
+  `02-regression-test.md` and compare it with `regression_test_path`. Mismatch → finding `"Rule 8: Task-{id} TC declares regression test at {path-in-task-list} but 02-regression-test.md declares {actual-path}"` with severity `fail`.
+- If the checkpoint is `pending`, do not read `02-regression-test.md`; accept a concrete path as the planned location.
 
 **Severity:** `fail`. The Phase 2.0 → Phase 2 contract relies on this TC being part of every task's contract; missing it breaks the chain.
 
