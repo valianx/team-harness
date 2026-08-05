@@ -75,6 +75,7 @@ Everything below has inputs, outputs, and exit codes.
 | `test_th_update_block_sync.sh` | The `/th:update` managed-block sync matrix |
 | `test_update_opencode_sh.sh` | `update-opencode.sh` non-interactive pre-check |
 | `test_bin_tty_execbit.py`, `test_bin_tty_behavioral.sh` | `bin/` TTY openability and exec bit (#473) |
+| `test_github_identity_routes.py` | Cross-runtime GitHub route validation, longest-prefix resolution, isolated/account-switch strategies, config preservation, secret rejection, and generated-helper byte/mode identity |
 | `tools/harness-migrate/test_harness_migrate.mjs`, `test_transform_conformance.mjs` | The bidirectional transform and its cross-language conformance |
 
 **Runners.** `tests/run-all.sh` runs the suites above and exits non-zero if any fail; `TH_REQUIRE_RUNTIMES=1` (set in CI) converts a missing-runtime SKIP into a FAIL, so a green run means verified and never unchecked. `tests/run-behavioral.sh` runs the slower end-to-end tests that need environment the default run cannot guarantee.

@@ -10,7 +10,7 @@ This document describes the working model that governs how Team Harness is insta
 
 | What | Owner | Frequency |
 |------|-------|-----------|
-| Operator KEYS — Memory MCP URL + token, context7 API key, workspace mode (`logs-mode`, `logs-path`, `logs-subfolder`), default `language` | `/th:setup` | One-time bootstrap; re-run to reconfigure |
+| Operator KEYS — Memory MCP URL + token, context7 API key, workspace mode (`logs-mode`, `logs-path`, `logs-subfolder`), default `language`, GitHub identity routes (`github.account_routes`) | `/th:setup` | One-time bootstrap; re-run to reconfigure |
 | Architecture prerequisites — fixed constants the pipeline itself needs to run correctly, with no operator value to elicit (e.g. the subagent nesting-depth env var below) | **BOTH** `/th:setup` and `/th:update` | One-time write per prerequisite; self-healing (re-checked, silently) on every run of either command |
 | FILES — managed `~/.claude/CLAUDE.md` blocks, `output-styles/developer-mode.md` | `/th:update` | Every release |
 | FLOWS — marketplace catalog refresh, plugin version download | `/th:update` | Every release |

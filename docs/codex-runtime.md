@@ -16,8 +16,9 @@ codex plugin add team-harness@team-harness
 Then invoke `$team-harness:setup`. The marketplace only distributes code;
 setup converges the operational installation. It writes native settings to
 `${CODEX_HOME:-$HOME/.codex}/.team-harness.json`, configures workspace and
-language preferences, offers Memory/context7 MCP registration, verifies hook
-trust, and places eleven bundled specialist agents in project or global scope:
+language preferences and optional GitHub identity routes, offers Memory/context7
+MCP registration, verifies hook trust, and places eleven bundled specialist
+agents in project or global scope:
 six for the gated pipeline, one direct read-only inline reviewer, and four for
 immutable PR review.
 An explicit setup import can copy missing values from Claude Code or opencode

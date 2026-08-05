@@ -49,7 +49,8 @@ $team-harness:setup
 ```
 
 The setup skill configures native Team Harness settings, optional MCP servers,
-workspace/language preferences, and eleven specialist agents: six for the gated
+workspace/language preferences, optional workspace-to-GitHub identity routes,
+and eleven specialist agents: six for the gated
 pipeline, one direct read-only inline reviewer, and four for immutable PR review. It preserves
 Codex's native permission and hook-trust prompts. It can also import every
 missing setting from an existing Claude Code or opencode Team Harness config;
@@ -186,7 +187,12 @@ The installer writes only the Memory URL literally to `opencode.json`. Both secr
 
 **Security note:** The downloaded binary is verified against the published `SHA256SUMS` before it runs. The checksum file is served over HTTPS from the GitHub release origin but is not cryptographically signed — verification protects against corruption and tampering of the binary relative to the checksum, not against a compromise of the release origin (TOFU over HTTPS).
 
-`/th:setup` configures the two required MCP servers (Memory and context7) and the **logs mode** — where pipeline workspaces are stored:
+`/th:setup` configures the two required MCP servers (Memory and context7), the
+**logs mode**, and optional workspace-to-GitHub identity routes. The identity
+routes use the same token-free schema in Claude Code, Codex, and opencode; see
+[GitHub identity routing](./docs/github-identities.md).
+
+Logs mode controls where pipeline workspaces are stored:
 
 | Mode | Where | When to use |
 |---|---|---|
