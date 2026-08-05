@@ -37,10 +37,15 @@ the repository. `status: no-match` preserves the current active-account
 behavior with one warning. For `strategy: isolated-config`, set the returned
 `GH_CONFIG_DIR` on every subsequent `git` and `gh` command. For
 `strategy: account-switch`, inspect `gh auth status`, switch only when required,
-and serialize GitHub writes for that host. A sandbox denial on `gh auth switch`,
-credential storage, `.git`, network, or a required CLI is retried immediately
-with narrowly scoped native escalation. Do not recommend login or token refresh
-when authentication state is successful.
+and first acquire the cross-runtime `team-harness-gh-account-switch/v1` lock
+defined in `docs/github-identities.md`. Keep its ownership nonce across account
+switching, login verification, all remote reads, push, PR creation/mutation, and
+the final snapshot; refresh its heartbeat before each protected command and
+release it in a `finally` path. Its 60-second acquisition timeout, ownership
+checks, and conservative stale-lock recovery fail closed. A sandbox denial on
+`gh auth switch`, credential storage, `.git`, network, or a required CLI is
+retried immediately with narrowly scoped native escalation. Do not recommend
+login or token refresh when authentication state is successful.
 
 Before an outward write, require `gh api user -q .login` to equal the resolved
 account. A mismatch or failed verification blocks. Never read, print, store, or

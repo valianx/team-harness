@@ -72,10 +72,16 @@ operator-owned runtime config and uses the longest matching workspace prefix.
   subsequent `git` and `gh` command in this delivery, including remote-tip
   reads, push, PR creation/update, and the final snapshot.
 - `strategy: account-switch`: inspect `gh auth status` first, run
-  `gh auth switch -h <host> -u <account>` only when necessary, and serialize
-  GitHub writes for that host. A sandbox or credential-store denial is retried
-  through the runtime's narrowly scoped approval/escalation mechanism; it is
-  not diagnosed as an invalid token.
+  `gh auth switch -h <host> -u <account>` only when necessary. Before that
+  inspection, acquire the cross-runtime `team-harness-gh-account-switch/v1`
+  lock defined in `docs/github-identities.md`. Hold the same ownership nonce
+  across account switching, login verification, every remote read, push, PR
+  creation/update, and the final snapshot; refresh its heartbeat before each
+  protected command and release it in a `finally` path. Timeout, stale-lock,
+  and ownership checks follow that canonical protocol and fail closed. A
+  sandbox or credential-store denial is retried through the runtime's narrowly
+  scoped approval/escalation mechanism; it is not diagnosed as an invalid
+  token.
 
 For either matched strategy, verify the effective login and require exact
 equality with the resolved account before any outward write:

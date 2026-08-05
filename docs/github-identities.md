@@ -45,15 +45,32 @@ do not mutate one shared active account.
 
 Without `config_dir`, delivery uses the existing multi-account gh store. It
 checks the active login, runs `gh auth switch` only when necessary, verifies the
-effective login, and serializes GitHub writes for that host. This compatibility
-strategy may require a scoped sandbox or credential-store approval.
+effective login, and uses the cross-runtime `team-harness-gh-account-switch/v1`
+lock for that host. This compatibility strategy may require a scoped sandbox or
+credential-store approval.
+
+The lock is a per-OS-user, per-host directory named
+`team-harness-gh-auth-<user-id>-<sha256(host)>.lock` under the user's private runtime
+temporary directory. The delivery coordinator owns it and creates it atomically
+before inspecting or switching the active account. Its `owner.json` contains
+only the runtime, process/session identifier, random ownership nonce, creation
+time, and heartbeat time. Acquisition waits at most 60 seconds and then fails
+closed. The owner refreshes the heartbeat before each protected command and
+holds the lock across account inspection and switching, login verification,
+remote reads, push, PR creation or mutation, and the final remote snapshot.
+Release occurs in a `finally` path and removes the directory only when the nonce
+still matches. A waiter may recover a stale lock only when its heartbeat is more
+than 30 minutes old and the recorded owner can be proven inactive; it first
+renames the directory atomically, then removes it and retries acquisition. If
+ownership or liveness cannot be proven, the waiter must not break the lock.
 
 ## Security boundaries
 
 - Setup and resolution accept account names, hostnames, and paths only.
 - Token-shaped input is rejected; `hosts.yml` bytes are never read or copied.
-- Repository content cannot select an identity. Only the runtime-native private
-  settings document participates in route resolution.
+- Repository content cannot supply or alter identity routes. The runtime-native
+  private settings document supplies the routes; the canonical repository root
+  and remote host remain read-only matching inputs during resolution.
 - A route selects identity but never authorizes push, PR mutation, merge, tag,
   release, or another outward action.
 - Successful authentication with the wrong active account is an identity

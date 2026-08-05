@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import {
+  chmod,
   lstat,
   mkdir,
   readFile,
@@ -316,19 +317,31 @@ async function syncSharedSetupAssets({ check, rootDir }) {
   let stale = false;
   for (const target of targets) {
     let current;
+    let currentMode;
     try {
-      current = await readFile(target);
+      const [bytesAtTarget, targetStat] = await Promise.all([
+        readFile(target),
+        lstat(target),
+      ]);
+      current = bytesAtTarget;
+      currentMode = targetStat.mode & 0o777;
     } catch (error) {
       if (error?.code !== "ENOENT") throw error;
     }
-    if (current?.equals(bytes)) continue;
+    const bytesMatch = current?.equals(bytes) ?? false;
+    const modeMatches = currentMode === 0o755;
+    if (bytesMatch && modeMatches) continue;
     stale = true;
     if (check) {
-      process.stderr.write(`stale shared setup asset: ${relative(rootDir, target)}\n`);
+      const drift = [!bytesMatch && "content", !modeMatches && "mode"]
+        .filter(Boolean)
+        .join("+");
+      process.stderr.write(`stale shared setup asset (${drift}): ${relative(rootDir, target)}\n`);
       continue;
     }
     await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, bytes, { mode: 0o755 });
+    if (!bytesMatch) await writeFile(target, bytes, { mode: 0o755 });
+    await chmod(target, 0o755);
   }
   if (check && stale) throw new Error("shared setup assets are stale");
 }

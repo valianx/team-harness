@@ -45,8 +45,10 @@ def config_path(runtime: str, home: Path, codex: Path, opencode: Path) -> Path:
 
 def main() -> int:
     canonical_bytes = CANONICAL.read_bytes()
+    for helper in (CANONICAL, *COPIES):
+        require(stat.S_IMODE(helper.stat().st_mode) == 0o755, f"helper mode drifted: {helper}")
     for copy in COPIES:
-        require(copy.read_bytes() == canonical_bytes, f"generated helper drifted: {copy}")
+        require(copy.read_bytes() == canonical_bytes, f"generated helper content drifted: {copy}")
 
     with tempfile.TemporaryDirectory() as raw_temp:
         temp = Path(raw_temp)
@@ -161,6 +163,9 @@ def main() -> int:
         invalid_cases = (
             [{"workspace": str(workspace), "account": "account-a", "extra": "reject"}],
             [{"workspace": str(workspace), "account": "account-a", "config_dir": "ghp_secret"}],
+            [{"workspace": str(workspace), "account": "account-"}],
+            [{"workspace": str(workspace), "account": "account--a"}],
+            [{"workspace": str(workspace), "account": "a" * 40}],
             [
                 {"workspace": str(workspace), "account": "account-a"},
                 {"workspace": str(workspace), "account": "account-b"},
