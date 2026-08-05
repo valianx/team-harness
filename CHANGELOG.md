@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.9.0] - 2026-08-05
+
+### Added
+
+- Added token-free workspace-to-GitHub identity routing for Claude Code, Codex,
+  and opencode, with isolated `GH_CONFIG_DIR` support and a verified multi-account
+  compatibility strategy for publication commands.
+
 ### Changed
 
 - Limited agent-selected release axes to PATCH and MINOR. Incompatible supported-contract

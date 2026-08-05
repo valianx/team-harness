@@ -31,7 +31,7 @@ Match on the normalized argument containing any listed cue (substring or close s
 | **obsidian-tasks** | § Targeted: Obsidian Tasks | `obsidian tasks`, `obsidian-tasks`, `tasks plugin` | `tareas de obsidian`, `obsidian tasks` |
 | **flow-telemetry** | Step 4f — flow telemetry opt-in | `flow telemetry`, `flow-telemetry`, `telemetry`, `friction events` | `telemetría`, `telemetría de flujo`, `eventos de fricción` |
 | **python / deps** | Step 6b — python3 probe | `python`, `python3`, `dependencies`, `deps`, `secret scan`, `entropy` | `python`, `dependencias`, `escaneo de secretos` |
-| **gh-accounts** | Step 3b — per-account gh identity map | `gh accounts`, `gh config dir`, `gh_config_dir`, `gh identity`, `per-account gh`, `github accounts` | `cuentas gh`, `identidad gh`, `directorio de configuración gh`, `cuentas de github` |
+| **github-accounts** | Step 3b — workspace/account identity routes | `github-accounts`, `gh-accounts`, `gh accounts`, `gh config dir`, `gh_config_dir`, `gh identity`, `github accounts` | `cuentas gh`, `identidad gh`, `directorio de configuración gh`, `cuentas de github` |
 | **capability** | Step 6c — retired, reports the retirement | `capability`, `probe`, `probe result`, `probe_result`, `nested lane`, `nested-lane`, `gate messaging` | `capacidad`, `probe`, `resultado de probe`, `verificación de capacidad`, `carril anidado` |
 
 ### No-match fallback
@@ -51,7 +51,7 @@ Routable concerns for /th:setup <intent>:
   obsidian-tasks   — Obsidian Tasks integration
   flow-telemetry   — cross-user flow telemetry opt-in (default: off)
   python           — python3 presence and dependency probe
-  gh-accounts      — per-account GH_CONFIG_DIR identity map (paths only, no tokens)
+  github-accounts  — workspace/account identity routes (paths and logins, no tokens)
   capability       — retired; the coordinator fusion removed the split this probe verified
 
 Retype the command with one of the above concerns, or run /th:setup with no argument to walk the full configuration flow.
@@ -221,42 +221,67 @@ This sub-step never adds a rule for an outward action (`git push`, `gh pr *`, an
 
 **Existing-install coverage.** This is a KEYS-once offer — an operator who already ran `/th:setup` before this sub-step existed, or who declined it here, is covered by a second, recurring offer at the orchestrator's own Intake (site B — detects a missing rule on every pipeline start in obsidian mode and re-offers it there). See `docs/permission-provisioning.md § Provisioning sites`.
 
-### 3b. Configure per-account gh identity map (gated)
+### 3b. Configure GitHub identity routes (gated)
 
-**Optional, gated. Skipped silently unless the operator opts in.** Records an account→`GH_CONFIG_DIR` **PATH** map so pipeline lanes select a gh identity by an isolated config directory rather than by a single, drift-prone global active account. This step **NEVER** stores, reads into a payload, or emits a gh token literal — no `ghp_…`, `github_pat_…`, `gho_…`, `ghs_…`, `ghu_…`, or `ghr_…` value is ever written to a payload, command, or file (AC-9.2; the `policy-block` deny floor treats such a literal as a hard block regardless). It records only directory **PATHS**; the tokens stay inside each `GH_CONFIG_DIR/hosts.yml`, owned by `gh`, never by this config file. This step **NEVER** runs `gh auth switch`, and it NEVER logs into any account for the operator — provisioning each `GH_CONFIG_DIR` (via `GH_CONFIG_DIR={dir} gh auth login`) is the operator's own prior action; this step only records the resulting PATHS. No account switch is ever performed automatically in a hook (AC-9.2).
+**Optional, gated. Skipped silently unless the operator opts in.** Configure
+portable workspace-prefix routes using the packaged
+`scripts/manage_github_identities.py` helper. The schema is runtime-neutral:
 
-Why per-account config dirs: `gh` reads its credentials from `$GH_CONFIG_DIR/hosts.yml`. Pointing each account at its own directory lets a lane pin its identity by PATH (`GH_CONFIG_DIR={dir} gh --repo {owner/repo} …`) instead of relying on the single global `~/.config/gh/hosts.yml` whose "active account" drifts between runs (the diagnostic capture is documented in `agents/_shared/delivery-mechanics.md § 3`).
+```json
+{
+  "github": {
+    "account_routes": [
+      {
+        "workspace": "/absolute/workspace/prefix",
+        "host": "github.com",
+        "account": "github-login",
+        "config_dir": "/optional/isolated/GH_CONFIG_DIR"
+      }
+    ]
+  }
+}
+```
 
-1. **Offer the gate.** Read the current `gh_config_dirs` map from `~/.claude/.team-harness.json` (if present) and show it as the default hint (PATHS only). Then:
-   ```text
-   Configure a per-account gh identity map (account → GH_CONFIG_DIR path)?
-   Records directory PATHS only — never a token — so each pipeline lane selects a gh
-   identity by an isolated config dir instead of a drift-prone global active account. [y/N]
+`config_dir` is optional. When present, it is the preferred isolated strategy:
+every `git`/`gh` publication command receives that `GH_CONFIG_DIR`. When absent,
+delivery may select the configured account just in time with `gh auth switch`.
+The latter is a compatibility strategy for an existing multi-account
+`hosts.yml`; never use it concurrently for two GitHub writes in the same host.
+
+1. Run `python3 scripts/manage_github_identities.py --runtime claude show` and
+   show only the current paths, hosts, and account names.
+2. Ask whether to configure routes. On `n`/Enter, write nothing and continue.
+3. Collect zero or more entries: absolute workspace prefix, host (default
+   `github.com`), account login, and optional absolute isolated
+   `GH_CONFIG_DIR`. Do not infer values from this repository or ship example
+   accounts/paths as defaults. Longest matching workspace prefix wins.
+4. When `config_dir` is provided, require a regular `hosts.yml` at mode `0600`,
+   a private directory, and a location outside every git worktree. Provisioning
+   it with `GH_CONFIG_DIR=<dir> gh auth login` is an operator action; setup never
+   reads, prints, copies, or stores token bytes.
+5. Pass the complete JSON array to:
+
+   ```bash
+   python3 scripts/manage_github_identities.py --runtime claude configure \
+     --routes-json '<validated JSON array>'
    ```
-   On `n`/Enter (decline) → write nothing, continue to Step 3.5.
 
-2. **Collect entries.** For each account the operator wants to map, prompt for (a) the account login (e.g. `valianx`) and (b) the absolute path to its `GH_CONFIG_DIR` — the directory that contains `hosts.yml` (e.g. `~/.config/gh-accounts/valianx`). Repeat until the operator enters a blank login.
+   The helper validates paths and account/host grammar, rejects token-shaped
+   input, preserves unrelated settings, backs up an existing document, and
+   writes atomically at mode `0600`.
+6. Publication resolves the identity immediately before its first GitHub call:
 
-3. **Validate each path — all four checks must pass. On any failure, report the one-line reason and re-prompt or skip that entry; never record a rejected entry:**
-   - **Outside any repo worktree (AC-9.5).** Run `git -C {dir} rev-parse --is-inside-work-tree 2>/dev/null`. If it prints `true`, the directory sits inside a git worktree — REJECT (a `GH_CONFIG_DIR` under version control is stageable and committable, and would leak `hosts.yml`). Require a path outside every repo worktree (e.g. under `~/.config/`). The recorded PATH must never resolve inside a project working tree.
-   - **`hosts.yml` present.** Confirm `{dir}/hosts.yml` exists (the directory has been provisioned by a prior `gh auth login`). If absent, tell the operator to run `GH_CONFIG_DIR={dir} gh auth login` first, then re-run this step; do not record the entry.
-   - **`hosts.yml` is `0o600` (AC-9.5).** Stat `{dir}/hosts.yml`. If the mode is not `0o600`, tighten it in place — `chmod 600 {dir}/hosts.yml` — and tighten the directory to `0o700` (`chmod 700 {dir}`); report the tightening. The token file must never be group- or world-readable, and this step keeps it at `0o600`.
-   - **No token bytes read into this process's output (AC-9.2).** Do NOT `cat`, echo, print, or otherwise surface `hosts.yml`; do NOT copy any of its bytes into the map. Only the directory PATH and, optionally, the login string are recorded.
-
-4. **Optional login verification (advisory, no token emitted).** To confirm a path resolves to the expected account, the operator may allow `GH_CONFIG_DIR={dir} gh api user -q .login` — this returns only the login string; the token stays inside the `gh` process and is never printed. Record only the returned login. Skip on any error; verification is advisory and never blocks.
-
-5. **Persist via merge-write-whole-document.** Write the `gh_config_dirs` object (`{ "<login>": "<dir>", … }`) into `~/.claude/.team-harness.json` — read the full JSON, replace or add only the `gh_config_dirs` key, write the whole document back. Never emit a partial payload — this preserves `logs-mode`, `logs-path`, `logs-subfolder`, `files`, `clickup`, `pricing`, `language`, and every other existing key. Every value is a PATH; before writing, assert no value matches a gh token shape (`ghp_`, `github_pat_`, `gho_`, `ghs_`, `ghu_`, `ghr_`) — abort the write and re-prompt if one does.
-
-6. **How the map is consumed (AC-9.1, AC-9.3).** The recorded map is the source the lane environment reads. Each `th:orchestrator` lane exports its OWN `GH_CONFIG_DIR` in its environment, and the `delivery` specialist the orchestrator dispatches selects gh identity by that PATH — `GH_CONFIG_DIR={dir} gh --repo {owner/repo} …` — never by a literal token in a payload, command, or file (AC-9.1). Because each lane's `GH_CONFIG_DIR` is isolated, a stray `gh auth switch` inside one lane mutates only that lane's own `hosts.yml`, never a sibling lane's config dir nor the global `~/.config/gh/hosts.yml` (AC-9.3). Identity is selected by the exported PATH, not by an automatic account flip — no `gh auth switch` is ever run automatically in a hook.
-
-7. **Allowlist evaluation note (AC-9.3).** Once identity is pinned per-lane by `GH_CONFIG_DIR`, the documented residual behind keeping `Bash(gh auth switch:*)` on the read-only allowlist — a repo-embedded instruction flipping the *global* active account ahead of a later auto-allowed push (`docs/permission-provisioning.md § Documented residuals`) — is neutralized: a switch can only touch the calling lane's isolated config dir. Removing `Bash(gh auth switch:*)` from the read-only allowlist (setup § 3a, `agents/ref-pipeline.md § Intake`'s own permission-provisioning step, and the canonical set in `docs/permission-provisioning.md`) is therefore **under evaluation**. It is deferred here — not performed by this step — because that allowlist is a three-site invariant enforced by `tests/test_permission_disjointness.py`; this step only records the map and never edits the allowlist.
-
-8. **Report.**
-   ```text
-   Per-account gh identity map recorded in ~/.claude/.team-harness.json:
-     <login> → <dir>   (hosts.yml 0o600, outside worktree)
-   Lanes select gh identity by GH_CONFIG_DIR path; no token stored.
+   ```bash
+   python3 scripts/manage_github_identities.py --runtime claude resolve \
+     --repo-root '<absolute repo root>' --host '<remote host>'
    ```
+
+   A matched isolated route pins `GH_CONFIG_DIR` for every subsequent `git` and
+   `gh` call. A matched account-switch route verifies the active account,
+   switches only when required, and verifies `gh api user -q .login` before the
+   outward write. A failed verification blocks publication; it never recommends
+   login while `gh auth status` reports valid credentials. No hook auto-switches
+   accounts.
 
 ### 3.5. Configure default language
 
@@ -431,7 +456,7 @@ Write `~/.claude/.team-harness.json` with:
 }
 ```
 
-Preserve ALL existing unrelated fields (like `files`, `clickup`, `pricing`, `gh_config_dirs`, `nested_lane_capability`, and `nested_spawn_depth`) if the manifest already exists. Legacy route/profile selectors are not active settings: report `1 — inline` / `2 — pipeline` when present and remove only those legacy keys during this legitimate manifest write. Use the **merge-write-whole-document** contract: read the full JSON, replace or add only the keys this step owns (`format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, and optionally `language`, and optionally `english_learning`, and optionally `flow_telemetry.enabled`), write the whole document back. NEVER emit a partial payload — that would destroy unrelated operator-configured keys.
+Preserve ALL existing unrelated fields (like `files`, `clickup`, `pricing`, `github`, `nested_lane_capability`, and `nested_spawn_depth`) if the manifest already exists. Legacy route/profile selectors are not active settings: report `1 — inline` / `2 — pipeline` when present and remove only those legacy keys during this legitimate manifest write. Use the **merge-write-whole-document** contract: read the full JSON, replace or add only the keys this step owns (`format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, and optionally `language`, and optionally `english_learning`, and optionally `flow_telemetry.enabled`), write the whole document back. NEVER emit a partial payload — that would destroy unrelated operator-configured keys.
 
 The `language` key is written only when the operator provided a value in Step 3.5; if they left it blank and no prior value existed, omit the key entirely (absence of the key means detection-based behavior, which is the default).
 

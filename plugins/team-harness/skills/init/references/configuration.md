@@ -25,10 +25,18 @@ a direct mode.
    - `clickup.workspace_id`: a string.
    - `agent-scope`: `global` or `project` (default `global`); it controls where
      the ten bundled agent files are installed, never the inline/pipeline posture.
+   - `github.account_routes`: an array of at most 64 objects containing an
+     absolute non-root `workspace`, a valid `account`, a hostname `host`, and an
+     optional absolute isolated `config_dir`. Reject unknown route fields,
+     duplicate host/workspace pairs, token-shaped values, and credential paths
+     inside a worktree. Longest matching workspace prefix wins.
 5. Apply `language` to responses and operator-facing workspace prose.
    `english_learning: true` adds the configured brief correction signal only
    when the operator writes in English; it never changes the response language.
    Other keys apply only when the requested direct operation uses that surface.
+   GitHub routes are consulted only immediately before a GitHub CLI or git
+   remote operation; they never authorize an outward write or choose a pipeline
+   posture.
 6. Reading workspace settings does not authorize creating a workspace. Direct
    mode remains workspace-free unless the operator's actual bounded task asks
    for a file output. Pipeline activation independently revalidates the same

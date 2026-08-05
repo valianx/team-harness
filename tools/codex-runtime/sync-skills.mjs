@@ -306,6 +306,33 @@ async function syncProjection({ check, rootDir, names, runtime, targetRoot, over
   return names.filter(name => !overrides.has(name));
 }
 
+async function syncSharedSetupAssets({ check, rootDir }) {
+  const source = join(rootDir, "skills/setup/scripts/manage_github_identities.py");
+  const bytes = await readFile(source);
+  const targets = [
+    join(rootDir, "plugins/team-harness/skills/setup/scripts/manage_github_identities.py"),
+    join(rootDir, "installer-assets/opencode-skills/setup/scripts/manage_github_identities.py"),
+  ];
+  let stale = false;
+  for (const target of targets) {
+    let current;
+    try {
+      current = await readFile(target);
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+    if (current?.equals(bytes)) continue;
+    stale = true;
+    if (check) {
+      process.stderr.write(`stale shared setup asset: ${relative(rootDir, target)}\n`);
+      continue;
+    }
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, bytes, { mode: 0o755 });
+  }
+  if (check && stale) throw new Error("shared setup assets are stale");
+}
+
 export async function syncSkills({ check = false, rootDir = defaultRoot } = {}) {
   rootDir = resolve(rootDir);
   const names = await canonicalNames(rootDir);
@@ -325,6 +352,7 @@ export async function syncSkills({ check = false, rootDir = defaultRoot } = {}) 
     targetRoot: join(rootDir, "installer-assets/opencode-skills"),
     overrides: opencodeOverrides,
   });
+  await syncSharedSetupAssets({ check, rootDir });
   return { names, codexGenerated, opencodeGenerated };
 }
 

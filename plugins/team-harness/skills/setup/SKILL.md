@@ -15,20 +15,22 @@ opencode settings during ordinary operation and never modify their files.
 The only cross-runtime operation allowed here is an explicit one-time copy of
 values selected by the operator.
 
-Resolve both helpers relative to this skill and use them for every managed
+Resolve all helpers relative to this skill and use them for every managed
 write:
 
 - `scripts/manage_config.py` validates, backs up, and atomically writes native
   settings with mode `0o600`.
 - `scripts/manage_agents.py` installs or refreshes the eleven bundled generated
   agents without overwriting an unmanaged same-name file.
+- `scripts/manage_github_identities.py` validates and atomically manages the
+  runtime-neutral GitHub workspace/account routes without reading token bytes.
 
 ## Routing
 
 With no targeted intent, run the complete flow. For a targeted request, change
 only that concern and still ensure the native settings document exists.
 Supported targets are `workspace`, `language`, `english-learning`, `memory`,
-`context7`, `agents`, `features`, `clickup`, `obsidian-tasks`, and
+`context7`, `agents`, `features`, `github-accounts`, `clickup`, `obsidian-tasks`, and
 `flow-telemetry`.
 
 `lane-autoselect` is legacy migration metadata, not a supported target or an
@@ -115,6 +117,32 @@ migration, and preserve every unrelated value.
    - Agent scope is `global` (default, available to every project) or `project`.
      Persist it as `agent-scope`.
 
+   For a full setup or the explicit `github-accounts` target, configure the
+   runtime-neutral `github.account_routes` array with
+   `scripts/manage_github_identities.py`. First run:
+
+   ```bash
+   python3 scripts/manage_github_identities.py --runtime codex show
+   ```
+
+   Each entry contains an absolute `workspace` prefix, `host` (default
+   `github.com`), `account`, and optional isolated `config_dir`. Ask for values;
+   never ship or infer developer-specific accounts or paths. Longest matching
+   workspace prefix wins. An isolated `config_dir` is preferred and must contain
+   a regular mode-`0600` `hosts.yml` outside every git worktree. Without it,
+   delivery uses a just-in-time `gh auth switch` compatibility strategy and
+   must serialize GitHub writes for that host. Persist the complete array with:
+
+   ```bash
+   python3 scripts/manage_github_identities.py --runtime codex configure \
+     --routes-json '<validated JSON array>'
+   ```
+
+   The helper rejects token-shaped input and stores only paths, hosts, and login
+   names. It preserves every unrelated native setting. Provisioning an isolated
+   directory with `GH_CONFIG_DIR=<dir> gh auth login` remains an operator action;
+   never read, print, copy, or store token bytes.
+
 6. Reconcile all eleven bundled specialists in the persisted scope on every full
    setup, and whenever `agents` is targeted:
 
@@ -157,10 +185,10 @@ migration, and preserve every unrelated value.
    Explain that the operator must review and trust hooks through `/hooks`;
    never approve or bypass trust.
 
-9. Re-run both helper inspections and `codex mcp list --json`; re-run
+9. Re-run the applicable helper inspections and `codex mcp list --json`; re-run
     `codex features list` only when step 4 ran. Report one compact result:
     native config path, workspace/language, agent scope and eleven agent statuses,
-    feature-flag status when checked, MCP registrations, hook
+    GitHub route count when configured, feature-flag status when checked, MCP registrations, hook
     verification/trust, and whether a new thread is required. Never print
     imported opaque values, secrets, or environment-variable values.
 

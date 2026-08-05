@@ -23,7 +23,28 @@ version plus validated commit/tree, and stop for:
 ```
 
 After a valid dual-record `gate3_release: ship`, do not ask again and do not regenerate prose.
-Re-read the exact recorded PR title/body/digests, then require:
+Re-read the exact recorded PR title/body/digests. Before the first GitHub remote
+query, resolve the operator-owned identity route with the helper relative to the
+loaded setup skill:
+
+```bash
+python3 ../../setup/scripts/manage_github_identities.py --runtime codex resolve \
+  --repo-root '<absolute repo root>' --host '<remote host>'
+```
+
+Resolve the helper to an absolute path before execution; never derive it from
+the repository. `status: no-match` preserves the current active-account
+behavior with one warning. For `strategy: isolated-config`, set the returned
+`GH_CONFIG_DIR` on every subsequent `git` and `gh` command. For
+`strategy: account-switch`, inspect `gh auth status`, switch only when required,
+and serialize GitHub writes for that host. A sandbox denial on `gh auth switch`,
+credential storage, `.git`, network, or a required CLI is retried immediately
+with narrowly scoped native escalation. Do not recommend login or token refresh
+when authentication state is successful.
+
+Before an outward write, require `gh api user -q .login` to equal the resolved
+account. A mismatch or failed verification blocks. Never read, print, store, or
+dispatch token bytes. Then require:
 
 ```bash
 git status --porcelain                  # empty
