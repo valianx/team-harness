@@ -13,11 +13,49 @@ preflight its exact `plan/tasks/Task-N.md` and fail closed unless its
 Pass only that shard, its named architecture/invariant anchors, frozen identity
 when present, and the role's necessary environment; never compensate with a
 transcript, implementer history, sibling tasks, or the full plan set. Delegate
-bounded, file-scoped work to a fresh V2 `implementer` with `fork_turns: none`;
+bounded, file-scoped work to fresh V2 specialists with `fork_turns: none`;
 state that other agents may be editing the repository and unrelated changes
 must be preserved. Parallelize only tasks with disjoint ownership. The primary
 thread records dispatches and results, waits for all tasks in a round, and
 consolidates their evidence.
+
+## Pre-implementation behavioral test contract
+
+This is an implementation checkpoint, not a phase or gate. For every task whose
+Verification section declares `Pre-implementation test: required`, preflight
+the repository's `.team-harness/quality.json`, the `quality-runner.mjs` and
+`test-transition.mjs` helpers relative to this loaded skill, and a clean current
+commit. Missing `commands.test`, `test_contract.path_rules`, or either helper
+blocks; never downgrade a required task to not-applicable during implementation.
+
+Immediately before the task's tester dispatch, record the current full commit
+as that task's test baseline. Dispatch a fresh `tester` in
+`mode: pre-implementation-contract` with only its task shard, named anchors,
+manifest path, worktree/branch, and a coordinator-owned workspace contract path.
+The tester may commit only the declared test files and writes the closed contract
+JSON outside the source commit. Verify commit integrity and that no production
+path changed.
+
+Main then invokes `node <test-transition-path> --transition red` against that
+task baseline and current `HEAD`, persists the complete JSON result plus its
+SHA-256, and requires both machine `verdict: pass` and tester
+`failure_matches_contract: true`. Machine pass here means the exact manifest
+test command completed nonzero, every changed path is a declared test path that
+matches manifest rules, and test blob identities were recorded. Syntax,
+fixture, dependency, infrastructure, unrelated-suite, already-green, or
+semantic mismatch blocks before any implementer runs.
+
+Only after every required task in the dispatch has valid red evidence may the
+fresh implementer receive its assigned shards plus the corresponding contract
+and red-evidence pointers/hashes. Contract test paths are frozen inputs: the
+implementer never edits or deletes them. After its implementation commit, Main
+runs `--transition green` once per required task with the same contract hash and
+hashed red-evidence file. Green requires the same manifest, exact test command,
+task baseline, and test blobs, with the red candidate ancestral to current
+`HEAD`; any mismatch or nonzero result returns to bounded implementation
+correction and consumes the normal max-3 budget. A task explicitly marked
+`not-applicable` records that state and its plan-time reason without running the
+checkpoint.
 
 ## Efficient execution, rotation, and tool diagnostics
 
@@ -107,8 +145,9 @@ Do not silently widen the approved scope. When implementation is complete, write
 commit, and unresolved issues. Git is the changed-file authority; do not paste the diff, raw logs,
 or chronology. Set `phase: validation` and `next_action: run approved acceptance validation`.
 
-Implementation checkpoints (regression evidence when required, constraint reconciliation, hygiene,
-test/evidence authoring, and Freeze) are trace details inside this state, not additional phases.
+Implementation checkpoints (pre-implementation red/green evidence when required,
+constraint reconciliation, hygiene, test/evidence authoring, and Freeze) are trace
+details inside this state, not additional phases.
 A constraint that changes behaviour, scope, or an acceptance promise stops for an operator decision;
 its approved resolution continues in implementation. Only a separate, explicit current live
 operator request for architect work may reopen design and require a new Gate 1. Never rewrite an

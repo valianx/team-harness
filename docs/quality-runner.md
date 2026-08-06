@@ -6,8 +6,8 @@ candidate and emits a closed JSON evidence record. It does not select tools,
 install dependencies, edit source, or decide whether a test expresses the
 approved behavior.
 
-This first delivery is intentionally standalone. It defines and tests the
-runner contract before the pipeline routes tester or cleaner through it.
+The base runner is also used by the pre-implementation test-transition
+checkpoint. Cleaner routing remains a later delivery.
 
 ## Functional contract
 
@@ -58,6 +58,12 @@ identity and invalidate older evidence.
   "crap": {
     "new_function_max": 10,
     "changed_function_may_worsen": false
+  },
+  "test_contract": {
+    "path_rules": [
+      { "type": "prefix", "value": "tests/" },
+      { "type": "suffix", "value": "_test.go" }
+    ]
   }
 }
 ```
@@ -80,6 +86,13 @@ Node repositories can declare npm commands instead:
 
 The runner itself needs Node.js because it is distributed as an `.mjs` script.
 The repository does not need npm unless its manifest declares an npm command.
+
+`test_contract.path_rules` opts the repository into deterministic
+pre-implementation testing. Every declared test path must match at least one
+`prefix`, `suffix`, or directory-`segment` rule. The transition runner also
+requires the red commit's complete diff to equal the contract's test paths, so
+a permissive suffix cannot hide a production change. See
+[Pre-implementation Test Contract](test-contract-runner.md).
 
 Supported command identifiers are `test`, `format_check`, `lint`, `coverage`,
 and `crap`. Every command is an argument array. Shell expansion, redirection,
@@ -174,9 +187,6 @@ the security boundary.
 
 ## Current boundary
 
-This delivery provides the deterministic substrate only. A later delivery will
-add pipeline state fields and route the pre-implementation tester through red
-and green checkpoints. A subsequent delivery will add the cleaner role and the
-pre-/post-cleaner CRAP policy. Until those integrations land, the runner is an
-explicit standalone tool and does not change the v3 state machine or either
-Stage Gate.
+The test-transition integration adds checkpoints inside `implementation`; it
+does not change the v3 state machine or either Stage Gate. A subsequent delivery
+will add the cleaner role and pre-/post-cleaner CRAP enforcement.

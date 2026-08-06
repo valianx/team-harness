@@ -162,6 +162,15 @@ recovery event and updating `next_action`, load only the reference for the
 mapped phase. Findings and any tree change after Freeze follow the normal
 implementation → re-Freeze → validation route; recovery must not skip it.
 
+When `phase: implementation`, validate each `test_contract_evidence` entry
+before resuming the named task. `pending` resumes at the fresh tester dispatch;
+`red` requires readable contract and red-result files whose SHA-256 values match
+state before any implementer dispatch; `green` requires both hashed records;
+`not-applicable` requires the task shard's exact plan-time reason. Missing,
+mismatched, duplicated, unknown-task, or partially populated evidence blocks.
+Never infer red or green from a test name, current suite result, agent prose, or
+an unhashed workspace artifact.
+
 ## Correction-decision recovery
 
 When `correction_pending: true`, recover only the durable failed Freeze anchor,

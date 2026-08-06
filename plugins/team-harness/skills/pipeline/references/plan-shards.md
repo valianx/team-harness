@@ -22,6 +22,11 @@ components, frameworks, mocks, or test mechanics unless that name is itself a
 supported public contract. `TC-N` owns mandatory internal mechanisms and
 engineering invariants. `VERIFY:` acceptance criteria are legacy-recovery input
 only and are never emitted by a new plan. Gates count ACs and TCs separately.
+The Verification section also declares exactly one
+`Pre-implementation test: required | not-applicable — {reason}` routing field.
+Use `required` only when the repository quality manifest has `test_contract`
+and the task changes observable runtime behavior. Otherwise use
+`not-applicable` with the concrete reason; this field is neither an AC nor a TC.
 
 Resolve paths from the index once. Implementer reads its task plus named design
 anchors. Tester reads task ACs and TCs plus the verification packet; QA grades

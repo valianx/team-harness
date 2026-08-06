@@ -224,6 +224,16 @@ await check("invalid manifests and missing selected commands fail closed", async
     assert.equal(result.verdict, "fail");
     assert.equal(result.error_code, "MANIFEST_INVALID");
   });
+
+  const invalidTestContract = {
+    ...baseManifest({ test: command() }),
+    test_contract: { path_rules: [{ type: "glob", value: "tests/**" }] },
+  };
+  await temporaryRepository({ manifest: invalidTestContract }, async ({ repo, base }) => {
+    const result = await runQualityChecks(options(repo, base, ["test"]));
+    assert.equal(result.verdict, "fail");
+    assert.equal(result.error_code, "MANIFEST_INVALID");
+  });
 });
 
 await check("dirty candidates and quality commands that mutate tracked files fail closed", async () => {

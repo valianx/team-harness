@@ -11,8 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added a standalone deterministic quality runner with a versioned repository
   manifest, immutable Git evidence, bounded argv-only execution, normalized
-  complexity/coverage input, and before/after CRAP policy enforcement. Pipeline
-  routing remains unchanged until the tester and cleaner integration stages.
+  complexity/coverage input, and before/after CRAP policy enforcement.
+- Added opt-in pre-implementation behavioral test contracts with hashed,
+  test-only red evidence and immutable red-to-green verification before the
+  implementation tree can advance to validation.
+
+### Changed
+
+- Made behavior-changing manifest-enabled tasks route through a tester before
+  implementation while keeping the checkpoint inside the existing
+  implementation phase and preserving both Stage Gates.
 
 ## [3.9.0] - 2026-08-05
 
