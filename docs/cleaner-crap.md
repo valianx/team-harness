@@ -5,6 +5,10 @@ the existing `implementation` phase. It runs once per consolidated candidate,
 after implementation evidence is green and immediately before Freeze. It adds
 no phase, gate, or architecture review.
 
+Claude Code, Codex, and opencode resolve the same runner bytes from the loaded
+pipeline skill. The canonical copies live under `skills/pipeline/scripts/`;
+runtime projections must remain byte-identical.
+
 ## Applicability
 
 The checkpoint applies only when `.team-harness/quality.json` declares all four

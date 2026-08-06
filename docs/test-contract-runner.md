@@ -42,7 +42,7 @@ Use the full commit immediately before tester authoring as `--base`; the test
 commit must be current clean `HEAD`.
 
 ```bash
-node plugins/team-harness/skills/pipeline/scripts/test-transition.mjs \
+node /absolute/path/to/loaded/pipeline/skill/scripts/test-transition.mjs \
   --transition red \
   --repo /absolute/path/to/repository \
   --manifest .team-harness/quality.json \
@@ -65,7 +65,7 @@ unrelated suite failure, or already-passing test is not acceptable red.
 After implementation, run the same test command with both persisted hashes:
 
 ```bash
-node plugins/team-harness/skills/pipeline/scripts/test-transition.mjs \
+node /absolute/path/to/loaded/pipeline/skill/scripts/test-transition.mjs \
   --transition green \
   --repo /absolute/path/to/repository \
   --manifest .team-harness/quality.json \

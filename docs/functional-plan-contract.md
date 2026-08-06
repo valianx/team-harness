@@ -37,7 +37,7 @@ Technical realization remains mandatory but has a different owner:
 Before Gate 1, Main runs:
 
 ```bash
-node plugins/team-harness/skills/pipeline/scripts/plan-contract.mjs \
+node /absolute/path/to/loaded/pipeline/skill/scripts/plan-contract.mjs \
   --workspace /absolute/path/to/workspace \
   --plan 01-plan.md
 ```
