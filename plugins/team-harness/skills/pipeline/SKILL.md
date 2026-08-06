@@ -45,8 +45,8 @@ behavior for the initialized workflow:
 
 * own intake, workspace selection, durable state, execution events, gate
   presentation and interpretation, recovery, and result consolidation;
-* delegate only bounded work to `architect`, `implementer`, `tester`, `qa`,
-  `security`, and `delivery`;
+* delegate only bounded work to `architect`, `implementer`, `tester`, `cleaner`,
+  `qa`, `security`, and `delivery`;
 * never let a specialist approve a gate, speak for the operator, or become a
   second coordinator;
 * as the only writer of task-shard AC checkbox mirrors, verify QA's
@@ -161,12 +161,13 @@ native Main replacement and never creates a nested orchestrator.
 The plugin supplies the workflow skills and bundled custom-agent definitions;
 setup/update materialize the TOML into a Codex agent scope. Before creating a
 workspace, dispatching `architect`,
-or presenting any gate, preflight all six required regular files:
+or presenting any gate, preflight all seven required regular files:
 
 ```text
 architect.toml
 implementer.toml
 tester.toml
+cleaner.toml
 qa.toml
 security.toml
 delivery.toml
@@ -182,7 +183,7 @@ run the lifecycle configuration for the desired scope:
 $team-harness:setup agents
 ```
 
-The six files are an identity boundary, not just a name lookup. Use one scope
+The seven files are an identity boundary, not just a name lookup. Use one scope
 only (never combine project and global files), require each path to be a
 regular non-symlink file, and inspect its parsed TOML fields before creating a
 workspace or dispatching a specialist. Comments are useful diagnostics but
@@ -195,6 +196,7 @@ the exact markers and effective fields shown below:
 | `architect` | `# Semantic source: agents/architect.md (opus/xhigh)` | `# Projection tier: opus; profile: team-harness` |
 | `implementer` | `# Semantic source: agents/implementer.md (sonnet/high)` | `# Projection tier: sonnet-high; profile: team-harness` |
 | `tester` | `# Semantic source: agents/tester.md (sonnet/high)` | `# Projection tier: sonnet-high; profile: team-harness` |
+| `cleaner` | `# Semantic source: agents/cleaner.md (sonnet/medium)` | `# Projection tier: sonnet-medium; profile: team-harness` |
 | `qa` | `# Semantic source: agents/qa.md (opus/xhigh)` | `# Projection tier: opus; profile: team-harness` |
 | `security` | `# Semantic source: agents/security.md (opus/xhigh)` | `# Projection tier: opus; profile: team-harness` |
 | `delivery` | `# Semantic source: agents/delivery.md (sonnet/medium)` | `# Projection tier: sonnet-medium; profile: team-harness` |
@@ -207,6 +209,7 @@ extra, or mismatched value fails preflight):
 | `architect` | `architect` | `gpt-5.6-sol` | `xhigh` | `workspace-write` |
 | `implementer` | `implementer` | `gpt-5.6-terra` | `high` | `workspace-write` |
 | `tester` | `tester` | `gpt-5.6-terra` | `high` | `workspace-write` |
+| `cleaner` | `cleaner` | `gpt-5.6-terra` | `medium` | `workspace-write` |
 | `qa` | `qa` | `gpt-5.6-sol` | `xhigh` | `read-only` |
 | `security` | `security` | `gpt-5.6-sol` | `xhigh` | `read-only` |
 | `delivery` | `delivery` | `gpt-5.6-terra` | `medium` | `workspace-write` |
@@ -220,13 +223,14 @@ the role fields cannot see. The current digests are:
 | `architect` | `17f8df98cc2b5b9c4703c79493da40c141394f8b8076fb71b1512318592f894f` |
 | `implementer` | `76cd8d007b91411377b6401c9def7076f49e42868928010168cca17ad5778449` |
 | `tester` | `7519e2980d21e6f3116da32169386f0531450cf60b6404d7553985879e966c91` |
+| `cleaner` | `915358d8f37295574093839387eb47edf86e83d8c92f42cbdbc2ec14d677f485` |
 | `qa` | `2612528da833bcb5cf2db981ac586320a0ad06ac407d38beb564b64880cc24c8` |
 | `security` | `06434dd772dfff170529c67e15c91c08311329e66f364eb220298a2d0dd2f997` |
 | `delivery` | `07a5997769adbb2b3304b7640e2f9a701a38564a4f58d192548390b15ffbf7d5` |
 
 Do not accept a file solely because its comments or `name` field match. A
 digest mismatch is a stale or unrelated shadow; stop before workspace
-creation or delegation and ask the operator to reinstall or update the six
+creation or delegation and ask the operator to reinstall or update the seven
 agents.
 
 Also require the deterministic first line
@@ -241,7 +245,7 @@ so the custom-agent registry is rediscovered.
 
 After installation, start a new Codex thread so the custom-agent registry is
 discovered. The plugin-only skills remain usable without these files in direct
-mode, but the gated pipeline cannot delegate until the complete six-agent set
+mode, but the gated pipeline cannot delegate until the complete seven-agent set
 is present.
 
 ## Stage 1 and final-result routing

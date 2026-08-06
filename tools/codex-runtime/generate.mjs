@@ -352,7 +352,7 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     "",
     "Author shared role intent in `agents/*.md`. Codex model and effort values are projected from that frontmatter, while Codex-specific execution instructions live in `runtime/codex/instructions/*.md` and workflow adapters live in `plugins/team-harness/skills/`. A semantic prompt change is not translated automatically into those adapters, so review both surfaces when behavior should change in Claude Code and Codex.",
     "",
-    "After changing any canonical agent's model or effort, one of the eleven installed role contracts, a Codex instruction adapter, or `runtime/schema/codex-agents.json`, run `$sync-codex-agents`. The equivalent repository commands are:",
+    "After changing any canonical agent's model or effort, one of the twelve installed role contracts, a Codex instruction adapter, or `runtime/schema/codex-agents.json`, run `$sync-codex-agents`. The equivalent repository commands are:",
     "",
     "```bash",
     "node tools/codex-runtime/generate.mjs",

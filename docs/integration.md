@@ -6,7 +6,7 @@ This document describes the end-to-end integration between **team-harness** (the
 
 ## 1. Overview
 
-**team-harness** is a Claude Code plugin that turns the chat into a Spec-Driven Development pipeline. It dispatches specialized subagents (architect, implementer, tester, qa, security, delivery) that coordinate across three mandatory stages. Between pipeline runs, agents need a place to store and retrieve technical memory — patterns discovered, errors fixed, architectural decisions made.
+**team-harness** is a Claude Code plugin that turns the chat into a Spec-Driven Development pipeline. It dispatches specialized subagents (architect, implementer, tester, cleaner, qa, security, delivery) that coordinate across three mandatory stages. Between pipeline runs, agents need a place to store and retrieve technical memory — patterns discovered, errors fixed, architectural decisions made.
 
 **context-harness-mcp** is the server that provides that memory. It is a Go-based MCP (Model Context Protocol) server backed by Postgres with pgvector for semantic search, ONNX embeddings computed locally, and a content filter (gitleaks + taxonomy) that enforces the write-time content policy. It exposes 16 MCP tools used by the orchestrator for discovery-time reads, explicit knowledge saves, session lifecycle, and narrow security-finding writes. Delivery does not access it.
 

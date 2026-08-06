@@ -384,6 +384,44 @@ await check("CRAP thresholds and stale baseline manifests cannot be converted in
   );
 });
 
+await check("CRAP enforcement rejects baseline functions omitted after cleanup", async () => {
+  const manifest = baseManifest(
+    { crap: crapCommand() },
+    { new_function_max: 12, changed_function_may_worsen: false },
+  );
+  await temporaryRepository(
+    {
+      manifest,
+      candidateFiles: {
+        "src/calc.go": "package calc\nfunc Calculate() {}\n",
+        "metrics.json": crapReport({ complexity: 8, coverage: 80 }),
+      },
+    },
+    async ({ repo, base }) => {
+      const measured = await runQualityChecks(options(repo, base, ["crap"]));
+      assert.equal(measured.verdict, "pass");
+      const baselinePath = path.join(repo, ".git", "quality-baseline.json");
+      await writeFile(baselinePath, `${JSON.stringify(measured)}\n`, "utf8");
+      const baselineSha256 = await fileSha256(baselinePath);
+
+      await writeFile(path.join(repo, "src", "calc.go"), "package calc\nfunc Calculate() { /* hidden */ }\n", "utf8");
+      await writeJson(path.join(repo, "metrics.json"), { schema_version: 1, functions: [] });
+      git(repo, "add", "src/calc.go", "metrics.json");
+      git(repo, "commit", "-q", "-m", "hide metric");
+      const result = await runQualityChecks(
+        options(repo, base, ["crap"], {
+          policyMode: "enforce",
+          baseline: baselinePath,
+          baselineSha256,
+        }),
+      );
+      assertClosedResult(result);
+      assert.equal(result.verdict, "fail");
+      assert.equal(result.error_code, "CRAP_REPORT_INCOMPLETE");
+    },
+  );
+});
+
 await check("CRAP reports cannot claim unchanged or out-of-scope functions", async () => {
   const manifest = baseManifest(
     { crap: crapCommand() },

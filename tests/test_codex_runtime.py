@@ -310,7 +310,7 @@ def main() -> None:
     contract = json.loads((ROOT / "runtime/schema/codex-agents.json").read_text())
     agents = contract["agents"]
     expected = {agent["name"] for agent in agents}
-    pipeline_roles = {"architect", "implementer", "tester", "qa", "security", "delivery"}
+    pipeline_roles = {"architect", "implementer", "tester", "cleaner", "qa", "security", "delivery"}
     review_roles = {"reviewer", "pr-review-qa", "pr-review-security", "reviewer-consolidator"}
     inline_roles = {"inline-reviewer"}
     if expected != pipeline_roles | review_roles | inline_roles:
@@ -354,6 +354,7 @@ def main() -> None:
         "architect": ("opus/xhigh", "opus"),
         "implementer": ("sonnet/high", "sonnet-high"),
         "tester": ("sonnet/high", "sonnet-high"),
+        "cleaner": ("sonnet/medium", "sonnet-medium"),
         "qa": ("opus/xhigh", "opus"),
         "security": ("opus/xhigh", "opus"),
         "inline-reviewer": ("sonnet/high", "sonnet-high"),
@@ -394,7 +395,7 @@ def main() -> None:
         for marker in markers:
             if marker not in content.splitlines():
                 fail(f"{path}: missing deterministic Team Harness marker {marker!r}")
-        if data["sandbox_mode"] == "read-only" and data["name"] in {"architect", "implementer", "tester", "delivery"}:
+        if data["sandbox_mode"] == "read-only" and data["name"] in {"architect", "implementer", "tester", "cleaner", "delivery"}:
             fail(f"{path}: write role is unexpectedly read-only")
         if data["name"] in review_roles and data["sandbox_mode"] != "read-only":
             fail(f"{path}: PR-review role must be read-only")
@@ -919,7 +920,7 @@ def main() -> None:
             fail(f"Codex bundled-agent sync failed: {synced.stdout}{synced.stderr}")
         sync_result = json.loads(synced.stdout)
         if set(sync_result.get("changed", [])) != expected:
-            fail("Codex bundled-agent sync did not install all eleven roles")
+            fail("Codex bundled-agent sync did not install all twelve roles")
         for role in expected:
             installed = temp / "codex-home/agents" / f"{role}.toml"
             packaged = ROOT / "plugins/team-harness/skills/setup/assets/agents" / f"{role}.toml"
@@ -1275,7 +1276,7 @@ def main() -> None:
         if "../init/references/configuration.md" not in direct:
             fail(f"{direct_name} direct fallback does not load persistent configuration")
 
-    for role in ("architect", "implementer", "tester", "qa", "security", "delivery"):
+    for role in ("architect", "implementer", "tester", "cleaner", "qa", "security", "delivery"):
         if f"{role}.toml" not in pipeline:
             fail(f"pipeline preflight does not name {role}.toml")
     for marker in (
@@ -1471,7 +1472,7 @@ def main() -> None:
     def digest_table(text: str) -> dict[str, str]:
         return dict(
             re.findall(
-                r"\|\s+`?(architect|implementer|tester|qa|security|delivery)`?\s+\|\s+`([0-9a-f]{64})`\s+\|",
+                r"\|\s+`?(architect|implementer|tester|cleaner|qa|security|delivery)`?\s+\|\s+`([0-9a-f]{64})`\s+\|",
                 text,
             )
         )
@@ -1482,6 +1483,7 @@ def main() -> None:
         "architect": "17f8df98cc2b5b9c4703c79493da40c141394f8b8076fb71b1512318592f894f",
         "implementer": "76cd8d007b91411377b6401c9def7076f49e42868928010168cca17ad5778449",
         "tester": "7519e2980d21e6f3116da32169386f0531450cf60b6404d7553985879e966c91",
+        "cleaner": "915358d8f37295574093839387eb47edf86e83d8c92f42cbdbc2ec14d677f485",
         "qa": "2612528da833bcb5cf2db981ac586320a0ad06ac407d38beb564b64880cc24c8",
         "security": "06434dd772dfff170529c67e15c91c08311329e66f364eb220298a2d0dd2f997",
         "delivery": "07a5997769adbb2b3304b7640e2f9a701a38564a4f58d192548390b15ffbf7d5",

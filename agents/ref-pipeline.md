@@ -153,7 +153,7 @@ Read this at boot. Read a phase's own section when you reach it.
 |---|---|---|---|---|
 | `design` | `architect` | the spec and codebase context on the board | `01-plan.md` manifest + `plan/**` shards | — |
 | `waiting_gate1` | **the operator** | the sharded plan set and review result | approve / edit / reject | **mandatory stop** |
-| `implementation` | `implementer` (+ `tester` for evidence) | released task shards and named anchors | code, implementation record and evidence | — |
+| `implementation` | `implementer` (+ `tester` and one bounded `cleaner`) | released task shards and named anchors | code, implementation record and evidence | — |
 | `validation` | `qa`, `adversary` when the security floor applies | the frozen tree and assigned shards | validation and audit findings | — |
 | `waiting_gate3` | `delivery` preview, then **the operator** | validated tree and exact delivery coordinates/digests | ship / amend / abort | **mandatory stop** |
 | `delivery` | **you** mechanics | `gate3_release: ship`, exact preview, validated commit/tree | push, draft PR, merge-state snapshot | — |
@@ -171,6 +171,7 @@ Two columns only, because two facts are all you need: when to call it, and what 
 | `architect` | `design`, or after an explicit live operator request for post-Gate-1 architect work | `01-plan.md` + classification |
 | `implementer` | `implementation`, after Gate 1 is released | `02-implementation.md` |
 | `tester` | `implementation` evidence checkpoint; bug-fix regression setup first | `03-testing.md` |
+| `cleaner` | once after green evidence and before Freeze, when the repository declares the full cleaner quality command set | cleanup commit or evidenced no-op |
 | `qa` | `validation`, over the frozen tree | `reviews/04-validation.md` + `code_hygiene: pass\|fail` |
 | `adversary` | `validation` when the derived security floor applies | `reviews/04-adversary.md` + `broke-it \| could-not-break` |
 | `security` | explicit operator-requested standalone design review only; never automatic pipeline planning | `reviews/01-plan-review.md § Security Design-Review` |
@@ -967,7 +968,7 @@ does not arbitrate post-implementation requirement changes.
 
 ### Implementation checkpoint — code-hygiene scan
 
-**Yours, not a dispatch.** Run after implementation edits and before evidence is frozen. The fixed `git diff` + `grep -E` pipeline is pinned in `docs/code-hygiene-gate.md § 3.1` and run against `verification_base_ref` from state — never against a packet that does not exist yet. That file is the single source for this scan and for `qa`'s Layer-2 audit.
+**Yours, not a dispatch.** Run after evidence authoring and the cleaner checkpoint (or its recorded not-applicable disposition), immediately before evidence is frozen. The fixed `git diff` + `grep -E` pipeline is pinned in `docs/code-hygiene-gate.md § 3.1` and run against `verification_base_ref` from state — never against a packet that does not exist yet. That file is the single source for this scan and for `qa`'s Layer-2 audit.
 
 | Result | Action |
 |---|---|
@@ -988,6 +989,54 @@ Bug-fix flow: resume the regression contract started at the implementation check
 **Browser readiness (non-blocking).** When `warranted_types` includes `e2e`/`browser-mode` and tooling is missing, surface the proposed setup commands and wait for confirmation or an explicit decline.
 
 **jsdom-only soft gate (non-blocking).** When `frontend_scope: true`, no browser-real type was warranted, and the decision log shows a browser-API AC routed to jsdom, note it and proceed unless the operator asks for a re-route.
+
+### Implementation checkpoint — behavior-preserving cleaner and CRAP
+
+This is one post-green checkpoint over the consolidated tree, not one dispatch
+per task and not a phase or gate. It applies only when the repository quality
+manifest declares `test`, `format_check`, `lint`, and `crap` commands plus the
+CRAP policy. Otherwise record `cleaner_evidence.status: not-applicable` with
+`reason: repository-quality-manifest-incomplete`; do not infer metrics or ask an
+agent to substitute for missing deterministic tooling.
+
+After evidence authoring has committed all warranted tests, require a clean
+tree. Derive the cleaner allowlist as existing production paths that are both in
+the approved task `Files:` union and changed from `verification_base_ref` to
+current `HEAD`. Exclude every test/evidence dependency path, fixture, snapshot,
+manifest, generated file, lockfile, migration, public schema, version site,
+changelog, and workspace artifact. Persist the sorted allowlist and SHA-256; an
+empty allowlist is an evidenced no-op.
+
+Main resolves and runs `cleaner-transition.mjs --transition pre` with the
+repository, manifest, `verification_base_ref`, `HEAD`, and allowlist. The helper
+runs the embedded `quality-runner.mjs` `pre_cleaner` checks `test,crap` in
+`measure` mode, validates the allowlist against the immutable changed surface,
+and returns one closed wrapper. Persist that complete result and SHA-256 and
+record its candidate commit/tree. Any failure blocks cleanup: no agent may
+reinterpret it.
+On pass, dispatch exactly one fresh `cleaner` at `sonnet/medium` with the
+allowlist, functional AC summary, applicable TCs, manifest, and hashed baseline.
+The cleaner may edit only allowlisted existing production paths, never tests or
+quality inputs, and returns a cleanup commit or justified no-op.
+
+Main then runs `cleaner-transition.mjs --transition post` with the exact
+allowlist path/hash and pre-transition path/hash. The helper proves the cleaner
+commit descends from the baseline, rejects additions, deletions, renames, type
+changes, and modifications outside the allowlist, then runs the embedded
+`post_cleaner` checks `test,format_check,lint,crap` in `enforce` mode. Pass
+requires all commands green, no changed or new function over policy, no CRAP
+worsening when forbidden, and every baseline function still present in the
+normalized report. Missing functions fail as
+`CRAP_REPORT_INCOMPLETE`; they cannot disappear from measurement by renaming,
+splitting, exclusion, or adapter omission.
+
+A post-check failure dispatches a fresh cleaner with only the bounded failure
+coordinates and consumes the normal max-3 implementation budget. Tests or
+behavior failing, any protected/out-of-scope change, threshold/config changes,
+or an unavailable required tool blocks rather than being waived. Persist the
+post result and SHA-256, cleaner commit, candidate identity, and pass status;
+then run the code-hygiene scan and proceed to Freeze. QA remains an independent
+auditor of the frozen result.
 
 > **Automatic knowledge capture is removed.** Doctrine and KG capture leave delivery entirely. When the operator asks, use the explicit knowledge/documentation flow outside the automatic pipeline; never add a second `delivery` dispatch.
 

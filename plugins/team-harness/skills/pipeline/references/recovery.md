@@ -171,6 +171,16 @@ mismatched, duplicated, unknown-task, or partially populated evidence blocks.
 Never infer red or green from a test name, current suite result, agent prose, or
 an unhashed workspace artifact.
 
+Also validate `cleaner_evidence` before resuming implementation. `pending`
+resumes at allowlist construction; `baseline` requires readable allowlist and
+pre-cleaner result files whose SHA-256 values and candidate commit/tree match
+state before dispatching a fresh cleaner; `pass` additionally requires the
+hashed post-cleaner result and matching current commit/tree; `not-applicable`
+requires the closed `repository-quality-manifest-incomplete` reason. Missing,
+stale, partially populated, out-of-scope, or mismatched cleaner evidence blocks.
+Never infer a baseline, formatter/lint result, CRAP value, or behavior-preserving
+verdict from cleaner prose or the current worktree.
+
 ## Correction-decision recovery
 
 When `correction_pending: true`, recover only the durable failed Freeze anchor,

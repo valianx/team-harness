@@ -827,6 +827,66 @@ def check_preimplementation_test_contract() -> None:
     require("changed a security anchor or invariant" in security_adapter, "security adapter can carry stale anchor/invariant evidence")
 
 
+def check_cleaner_crap_contract() -> None:
+    """The cleaner remains one bounded, tool-owned pre-Freeze checkpoint."""
+    claude = re.sub(r"\s+", " ", read("agents/ref-pipeline.md").lower())
+    codex = re.sub(
+        r"\s+",
+        " ",
+        read("plugins/team-harness/skills/pipeline/references/implementation.md").lower(),
+    )
+    for label, text in (("Claude", claude), ("Codex", codex)):
+        for marker in (
+            "repository-quality-manifest-incomplete",
+            "exactly one fresh",
+            "cleaner-transition.mjs",
+            "--transition pre",
+            "--transition post",
+            "test,format_check,lint,crap",
+            "crap_report_incomplete",
+            "allowlist",
+            "freeze",
+        ):
+            require(marker in text, f"{label}: cleaner checkpoint misses {marker!r}")
+        require(
+            "not a phase or gate" in text or "not another phase or gate" in text,
+            f"{label}: cleaner checkpoint creates a phase or gate",
+        )
+
+    for label, relative in (
+        ("Claude cleaner", "agents/cleaner.md"),
+        ("Codex cleaner", "runtime/codex/instructions/cleaner.md"),
+    ):
+        cleaner = re.sub(r"\s+", " ", read(relative).lower())
+        for marker in (
+            "existing production files",
+            "allowlist",
+            "never edit",
+            "tests",
+            "never weaken",
+            "crap",
+            "observable behavior",
+        ):
+            require(marker in cleaner, f"{label}: scope contract misses {marker!r}")
+
+    state = read("plugins/team-harness/skills/pipeline/references/state-and-gates.md").lower()
+    recovery = read("plugins/team-harness/skills/pipeline/references/recovery.md").lower()
+    require("cleaner_evidence" in state, "cleaner evidence is not durable state")
+    for marker in ("allowlist_sha256", "baseline_sha256", "post_sha256"):
+        require(marker in state, f"cleaner state misses immutable field {marker!r}")
+    require(
+        "cleaner_evidence" in recovery
+        and "never infer" in recovery
+        and "sha-256" in recovery,
+        "recovery can trust inferred or unhashed cleaner evidence",
+    )
+    require(
+        (ROOT / "plugins/team-harness/skills/pipeline/scripts/cleaner-transition.mjs").is_file(),
+        "deterministic cleaner transition helper is missing",
+    )
+    require((ROOT / "docs/cleaner-crap.md").is_file(), "cleaner operator documentation is missing")
+
+
 def check_direct_predicate() -> None:
     """Direct eligibility and a live `hazlo tú` preference cannot dispatch silently."""
     claude = "\n".join(
@@ -906,7 +966,7 @@ def check_single_writer() -> None:
 
     # Runtime adapters are the executable role boundary. Every specialist must
     # explicitly deny both coordination-state writes and gate decisions.
-    for role in ("architect", "implementer", "tester", "qa", "security", "delivery"):
+    for role in ("architect", "implementer", "tester", "cleaner", "qa", "security", "delivery"):
         adapter = read(f"runtime/codex/instructions/{role}.md").lower()
         state_denied = re.search(
             r"\b(?:do not|never|must not|may not)\b[^.;\n]*\bwrite\b[^.;\n]*(?:\b00-state\b|\bcoordination state\b)",
@@ -1066,8 +1126,8 @@ def check_profile_and_document_guards() -> None:
     # Coordinator ownership remains explicit in both projections. This also
     # guards against reintroducing specialist writes while changing routing.
     specialist_write = re.compile(
-        r"(?:`(?:architect|implementer|tester|qa|security|delivery|specialist)`|"
-        r"\b(?:architect|implementer|tester|qa|security|delivery|specialist)\b(?!['’]s))"
+        r"(?:`(?:architect|implementer|tester|cleaner|qa|security|delivery|specialist)`|"
+        r"\b(?:architect|implementer|tester|cleaner|qa|security|delivery|specialist)\b(?!['’]s))"
         r"[^\.\n]*(?:\bwrite\w*|\bedit\w*|\brepair\w*|\bcreate\w*)[^\.\n]*00-state",
         re.IGNORECASE,
     )
@@ -2486,6 +2546,7 @@ def main() -> None:
         ("explicit validation correction decision", check_explicit_validation_correction_decision),
         ("PR 588 review closures", check_review_feedback_closures),
         ("pre-implementation test contract", check_preimplementation_test_contract),
+        ("cleaner and CRAP contract", check_cleaner_crap_contract),
         ("authoritative post-Gate-1 transitions", check_authoritative_post_gate1_transitions),
         ("direct predicate", check_direct_predicate),
         ("single writer", check_single_writer),

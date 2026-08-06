@@ -15,12 +15,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added opt-in pre-implementation behavioral test contracts with hashed,
   test-only red evidence and immutable red-to-green verification before the
   implementation tree can advance to validation.
+- Added one opt-in pre-Freeze cleaner pass over a hashed production allowlist,
+  with deterministic behavior, scope, formatter, lint, and before/after CRAP
+  enforcement.
 
 ### Changed
 
 - Made behavior-changing manifest-enabled tasks route through a tester before
   implementation while keeping the checkpoint inside the existing
   implementation phase and preserving both Stage Gates.
+- Made incomplete post-cleaner CRAP reports fail closed so measured functions
+  cannot disappear from the comparison.
 
 ## [3.9.0] - 2026-08-05
 
