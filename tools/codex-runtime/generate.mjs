@@ -152,6 +152,11 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
       || projectDefaults.default_subagent_reasoning_effort !== "medium") {
     fail("project_defaults must set the generic Terra/medium fallback");
   }
+  if (!Array.isArray(projectDefaults.project_doc_fallback_filenames)
+      || projectDefaults.project_doc_fallback_filenames.length !== 1
+      || projectDefaults.project_doc_fallback_filenames[0] !== "CLAUDE.md") {
+    fail("project_defaults must set CLAUDE.md as the project instruction fallback");
+  }
   if (!projectDefaults.features || typeof projectDefaults.features !== "object" || Array.isArray(projectDefaults.features)
       || projectDefaults.features.multi_agent !== true || projectDefaults.features.multi_agent_v2 !== true
       || Object.keys(projectDefaults.features).length !== 2) {
@@ -311,6 +316,7 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     "# Code generated from runtime/schema/codex-agents.json; DO NOT EDIT.",
     `sandbox_mode = ${JSON.stringify(projectExecution.sandbox_mode)}`,
     `approval_policy = ${JSON.stringify(projectExecution.approval_policy)}`,
+    `project_doc_fallback_filenames = [${projectDefaults.project_doc_fallback_filenames.map(value => JSON.stringify(value)).join(", ")}]`,
     "",
     "[features]",
     "multi_agent = true",

@@ -221,6 +221,14 @@ explicit operator-selected fallback is preserved as `custom-preserved`. A
 fallback or named-role change reports `restartRequired: true`; the active Codex
 thread must be replaced because it does not hot-reload its agent registry.
 
+Generated project configuration and global setup/update also include
+`CLAUDE.md` in `project_doc_fallback_filenames`. Existing ordered fallback names
+are preserved and `CLAUDE.md` is appended once. Codex still checks
+`AGENTS.override.md` and `AGENTS.md` first at each directory level, so this
+provides compatibility for repositories that only ship Claude instructions
+without weakening native Codex guidance. A changed fallback list requires a new
+session because project instructions are discovered at startup.
+
 `.codex/README.md` is the generated roster. After editing canonical role
 metadata or adapters, run `$sync-codex-agents`; do not hand-edit generated TOML.
 

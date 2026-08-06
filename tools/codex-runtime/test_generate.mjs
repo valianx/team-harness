@@ -99,6 +99,11 @@ for (const [path, content] of agentOutputs) {
 const projectConfig = first.files.get(join(root, ".codex/config.toml"));
 assert.doesNotMatch(projectConfig, /^model = /m, "project fallback must not override Main's model");
 assert.doesNotMatch(projectConfig, /^model_reasoning_effort = /m, "project fallback must not override Main's effort");
+assert.match(
+  projectConfig,
+  /^project_doc_fallback_filenames = \["CLAUDE\.md"\]$/m,
+  "project config must load CLAUDE.md only when AGENTS.md is absent",
+);
 assert.match(projectConfig, /^sandbox_mode = "workspace-write"$/m);
 assert.match(projectConfig, /^approval_policy = "on-request"$/m);
 assert.match(projectConfig, /^\[features\]$/m);
