@@ -33,7 +33,7 @@ the new direct run creates no workspace or pipeline state.
 
 ## Custom-agent preflight
 
-The Codex plugin bundles the six custom-agent definitions, while setup/update
+The Codex plugin bundles the seven custom-agent definitions, while setup/update
 materialize them into a Codex agent scope. Before
 initializing a pipeline workspace or dispatching `architect`, resolve the
 repository root and require all of these regular files in one scope:
@@ -42,14 +42,15 @@ repository root and require all of these regular files in one scope:
 <repo>/.codex/agents/architect.toml
 <repo>/.codex/agents/implementer.toml
 <repo>/.codex/agents/tester.toml
+<repo>/.codex/agents/cleaner.toml
 <repo>/.codex/agents/qa.toml
 <repo>/.codex/agents/security.toml
 <repo>/.codex/agents/delivery.toml
 ```
 
-If the project scope is incomplete, check the equivalent six paths under
+If the project scope is incomplete, check the equivalent seven paths under
 `$CODEX_HOME/agents/` (normally `~/.codex/agents/`). Do not mix a partial
-project set with a partial global set. If neither scope contains all six,
+project set with a partial global set. If neither scope contains all seven,
 stop without creating a gate and instruct the operator to run
 `$team-harness:setup agents`, select project or global scope, then
 start a new Codex thread. Plugin skills such as `design` or `recover` may be
@@ -73,6 +74,7 @@ The role-specific semantic and profile markers must match this matrix:
 | architect | `agents/architect.md (opus/xhigh)` | `opus; profile: team-harness` |
 | implementer | `agents/implementer.md (sonnet/high)` | `sonnet-high; profile: team-harness` |
 | tester | `agents/tester.md (sonnet/high)` | `sonnet-high; profile: team-harness` |
+| cleaner | `agents/cleaner.md (sonnet/medium)` | `sonnet-medium; profile: team-harness` |
 | qa | `agents/qa.md (opus/xhigh)` | `opus; profile: team-harness` |
 | security | `agents/security.md (opus/xhigh)` | `opus; profile: team-harness` |
 | delivery | `agents/delivery.md (sonnet/medium)` | `sonnet-medium; profile: team-harness` |
@@ -84,6 +86,7 @@ The effective runtime fields must match this projection exactly:
 | architect | `architect` | `gpt-5.6-sol` | `xhigh` | `workspace-write` |
 | implementer | `implementer` | `gpt-5.6-terra` | `high` | `workspace-write` |
 | tester | `tester` | `gpt-5.6-terra` | `high` | `workspace-write` |
+| cleaner | `cleaner` | `gpt-5.6-terra` | `medium` | `workspace-write` |
 | qa | `qa` | `gpt-5.6-sol` | `xhigh` | `read-only` |
 | security | `security` | `gpt-5.6-sol` | `xhigh` | `read-only` |
 | delivery | `delivery` | `gpt-5.6-terra` | `medium` | `workspace-write` |
@@ -98,13 +101,14 @@ the normalized (LF) bytes against these canonical SHA-256 digests:
 | architect | `17f8df98cc2b5b9c4703c79493da40c141394f8b8076fb71b1512318592f894f` |
 | implementer | `76cd8d007b91411377b6401c9def7076f49e42868928010168cca17ad5778449` |
 | tester | `7519e2980d21e6f3116da32169386f0531450cf60b6404d7553985879e966c91` |
+| cleaner | `915358d8f37295574093839387eb47edf86e83d8c92f42cbdbc2ec14d677f485` |
 | qa | `2612528da833bcb5cf2db981ac586320a0ad06ac407d38beb564b64880cc24c8` |
 | security | `06434dd772dfff170529c67e15c91c08311329e66f364eb220298a2d0dd2f997` |
 | delivery | `07a5997769adbb2b3304b7640e2f9a701a38564a4f58d192548390b15ffbf7d5` |
 
 A digest mismatch is an identity failure; stop before workspace creation or
 delegation. Ask the operator to run `$team-harness:update` to
-regenerate/reinstall the six files, then start a new Codex thread. In a Team
+regenerate/reinstall the seven files, then start a new Codex thread. In a Team
 Harness checkout, `node tools/codex-runtime/generate.mjs --check` is the
 read-only freshness check; it does not replace reinstalling a consumer's
 agents.

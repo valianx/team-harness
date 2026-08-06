@@ -108,6 +108,15 @@
       "output_path": ".codex/agents/tester.toml"
     },
     {
+      "name": "cleaner",
+      "description": "Cleans the approved changed production surface without changing behavior or tests.",
+      "semantic_source": "agents/cleaner.md",
+      "sandbox_mode": "workspace-write",
+      "capabilities": ["filesystem-read", "filesystem-write", "command-exec"],
+      "instruction_source": "runtime/codex/instructions/cleaner.md",
+      "output_path": ".codex/agents/cleaner.toml"
+    },
+    {
       "name": "qa",
       "description": "Validates delivered behavior against the approved acceptance criteria.",
       "semantic_source": "agents/qa.md",

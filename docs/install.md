@@ -141,7 +141,7 @@ The canonical entry point after install is the `orchestrator` agent — the top-
 | `/recover <feature>` | Resumes an interrupted pipeline |
 | `/th:pipelines` | Shows current pipeline state |
 
-**No nested-coordinator dispatch exists to trip an anti-recursion limit.** The orchestrator has `Task` from the start of the session and dispatches every specialist (`architect`, `implementer`, `tester`, `qa`, `security`, and the rest) directly, as a leaf agent — never another coordinator, never itself. There is no second coordinator to hand off to and no dispatch-handoff round-trip on this path (`docs/subagent-orchestration.md`).
+**No nested-coordinator dispatch exists to trip an anti-recursion limit.** The orchestrator has `Task` from the start of the session and dispatches every specialist (`architect`, `implementer`, `tester`, `cleaner`, `qa`, `security`, and the rest) directly, as a leaf agent — never another coordinator, never itself. There is no second coordinator to hand off to and no dispatch-handoff round-trip on this path (`docs/subagent-orchestration.md`).
 
 ---
 

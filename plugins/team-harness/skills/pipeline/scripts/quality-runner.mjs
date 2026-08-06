@@ -50,6 +50,7 @@ const ERROR_CODES = new Set([
   "SCOPE_TOO_LARGE",
   "COMMAND_FAILED",
   "CRAP_REPORT_INVALID",
+  "CRAP_REPORT_INCOMPLETE",
   "CRAP_POLICY_FAILED",
   "BASELINE_INVALID",
   "INTERNAL_ERROR",
@@ -914,7 +915,7 @@ function applyCrapPolicy(functions, config, policyMode, baselineResult) {
   const evaluated = functions.map((entry) => {
     const prior = baselineFunctions.get(`${entry.path}\u0000${entry.symbol}`);
     if (policyMode === "enforce" && entry.status === "changed" && prior === undefined) {
-      throw new QualityError("BASELINE_INVALID");
+      throw new QualityError("CRAP_REPORT_INCOMPLETE");
     }
     const baselineCrap = prior?.crap ?? null;
     const delta = baselineCrap === null ? null : roundMetric(entry.crap - baselineCrap);
@@ -926,6 +927,12 @@ function applyCrapPolicy(functions, config, policyMode, baselineResult) {
     if (violations.length > 0) failed = true;
     return { ...entry, baseline_crap: baselineCrap, delta, violations };
   });
+  if (policyMode === "enforce") {
+    const currentKeys = new Set(functions.map((entry) => `${entry.path}\u0000${entry.symbol}`));
+    if ([...baselineFunctions.keys()].some((key) => !currentKeys.has(key))) {
+      throw new QualityError("CRAP_REPORT_INCOMPLETE");
+    }
+  }
   return { functions: evaluated, verdict: policyMode === "measure" ? "not_applied" : failed ? "fail" : "pass" };
 }
 

@@ -272,7 +272,7 @@ await check("entry-point guards fail closed before provenance work", async () =>
   });
 });
 
-await check("success attests distinct local sources, isolated caches, and the six-agent roster", async () => {
+await check("success attests distinct local sources, isolated caches, and the seven-agent roster", async () => {
   await temporaryRoot(async (root) => {
     const inputs = await makeInputs(root);
     try {

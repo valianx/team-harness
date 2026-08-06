@@ -20,7 +20,7 @@ recovery, and result consolidation without spawning a separate orchestrator
 agent. Loading either skill does not change Main's model or native permission
 policy.
 For approved development work it delegates bounded tasks to the custom agents
-in `.codex/agents/`: `architect`, `implementer`, `tester`, `qa`, `security`, and
+in `.codex/agents/`: `architect`, `implementer`, `tester`, `cleaner`, `qa`, `security`, and
 `delivery`.
 
 ## Pipeline

@@ -104,6 +104,7 @@ gate3_release: ship|amend|abort|null
 regression_test_path: {path}|null
 regression_test_status: failing|passing|skipped|null
 test_contract_evidence: [{task_id, status: pending|red|green|not-applicable, not_applicable_reason, contract_path, contract_sha256, red_evidence_path, red_evidence_sha256, red_commit_sha, red_tree_sha, green_evidence_path, green_evidence_sha256}]|[]
+cleaner_evidence: {status: pending|baseline|pass|not-applicable, reason, allowlist_path, allowlist_sha256, baseline_path, baseline_sha256, baseline_commit_sha, baseline_tree_sha, cleaner_commit_sha, post_path, post_sha256, post_commit_sha, post_tree_sha}|null
 plan_review_status: not-requested|requested|pass|concerns|fail|null
 audit_status: pending|done|unavailable|null
 code_hygiene: pass|fail|null

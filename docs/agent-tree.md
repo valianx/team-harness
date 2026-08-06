@@ -12,7 +12,7 @@ th:orchestrator  ── top-level session agent · the operator's single point o
 │
 ├─ dispatches pipeline specialists (leaf agents — no further orchestration):
 │    Design                     architect · security (design-review when sensitive)
-│    Implementation             implementer · tester
+│    Implementation             tester · implementer · cleaner
 │    Validation                 qa · adversary (when the security floor applies)
 │    Delivery                   delivery
 │    UI / diagrams (triggered) ux-reviewer · diagrammer · d2-diagrammer ·
@@ -51,6 +51,7 @@ release a gate.
 | `plan-reviewer` | analysis | orchestrator (explicit `/th:plan-review` only) | No |
 | `implementer` | implementation | orchestrator after Gate 1 | No |
 | `tester` | implementation | orchestrator | No |
+| `cleaner` | implementation | orchestrator after green evidence, before Freeze | No |
 | `qa` | implementation | orchestrator | No |
 | `security` | design review | orchestrator when `security_sensitive` | No |
 | `adversary` | validation | orchestrator when the security floor applies | No |

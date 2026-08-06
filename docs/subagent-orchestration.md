@@ -7,7 +7,7 @@
 `th:orchestrator` IS the top-level Claude Code session agent — not a subagent spawned by anything.
 There is no second coordinator to hand off to and no `dispatch_handoff` round-trip on this path:
 the top-level agent has `Task` from the start of the session and dispatches leaf agents
-(`architect`, `implementer`, `tester`, `qa`, `security`, `adversary`, `plan-reviewer`, `delivery`,
+(`architect`, `implementer`, `tester`, `cleaner`, `qa`, `security`, `adversary`, `plan-reviewer`, `delivery`,
 `ux-reviewer`, `diagrammer`, `gcp-cost-analyzer`, `gcp-infra`) directly. Full contract:
 `docs/dev-mode.md`. The optional `developer-mode` output style (`/config` → Output style →
 `developer-mode`) provides a strong base-replacement floor (`keep-coding-instructions: false`).
@@ -94,7 +94,7 @@ On recovery, the resolved config is re-read from `00-state.md` § Current State 
 | Visualize agent flow | `diagrammer` / `likec4-diagrammer` / `d2-diagrammer` | Diagram file + preview |
 | Documentation (`type: docs`) | orchestrator → `architect` (research mode) → `documenter` → `diagrammer` (conditional) → `qa` | `research/00-research.md` + Obsidian vault pages + `02-documentation.md` manifest + `reviews/04-validation.md` |
 | Frontend-scope tasks (`frontend_scope: true`) | Standard pipeline + `ux-reviewer` (enrich after architect in Stage 1, validate in parallel in Stage 3) | `reviews/01-ux-review.md` + `reviews/04-ux-validation.md` |
-| Bug fix (`type: fix`) | orchestrator → `architect` (root-cause mode) → `tester` (Phase 2.0 regression test) → `implementer` (scope-discipline) → `tester` + `qa` + `security` (always, parallel) → `delivery` | `01-root-cause.md` + `02-regression-test.md` + full feature backbone + `### Fixed` CHANGELOG + `fix(area):` PR title |
+| Bug fix (`type: fix`) | orchestrator → `architect` (root-cause mode) → `tester` (pre-implementation regression test) → `implementer` (scope-discipline) → eligible `cleaner` → Freeze → `tester` + `qa` + applicable security validation → `delivery` | `01-root-cause.md` + `02-regression-test.md` + full feature backbone + `### Fixed` CHANGELOG + `fix(area):` PR title |
 | Hotfix (`type: hotfix`) | same as bug fix, Phase 1 skipped (no `01-root-cause.md`); orchestrator emits 1-sentence prose plan at STAGE-GATE-1 | full feature backbone minus `01-root-cause.md`; PR title appends `(hotfix)` suffix |
 
 **Escalation rules.**

@@ -6,8 +6,8 @@ candidate and emits a closed JSON evidence record. It does not select tools,
 install dependencies, edit source, or decide whether a test expresses the
 approved behavior.
 
-The base runner is also used by the pre-implementation test-transition
-checkpoint. Cleaner routing remains a later delivery.
+The base runner is used by both the pre-implementation test-transition and the
+pre-Freeze cleaner checkpoints.
 
 ## Functional contract
 
@@ -142,7 +142,10 @@ with `--baseline` pointing to that result and `--baseline-sha256` carrying the
 recorded identity. Enforcement rejects a new function over
 `new_function_max`, a worsening score when policy
 forbids it, a changed function missing from the baseline, a changed manifest,
-or a baseline candidate that is not an ancestor of the current candidate.
+or a baseline candidate that is not an ancestor of the current candidate. It
+also rejects a post-cleaner report that omits any function present in the
+baseline (`CRAP_REPORT_INCOMPLETE`); cleanup cannot improve the metric by
+renaming, splitting, or suppressing measured functions.
 
 ## Invocation
 
@@ -185,8 +188,11 @@ written by repository tools. The runner is an evidence and output-control
 layer, not a process sandbox; the active runtime's native permissions remain
 the security boundary.
 
-## Current boundary
+## Cleaner integration
 
-The test-transition integration adds checkpoints inside `implementation`; it
-does not change the v3 state machine or either Stage Gate. A subsequent delivery
-will add the cleaner role and pre-/post-cleaner CRAP enforcement.
+The cleaner companion wraps the raw quality records with a hashed production
+allowlist and verifies the exact pre/post transition. See
+[Cleaner and CRAP Checkpoint](cleaner-crap.md).
+
+Both deterministic checkpoints live inside `implementation`; they do not
+change the v3 state machine or either Stage Gate.
