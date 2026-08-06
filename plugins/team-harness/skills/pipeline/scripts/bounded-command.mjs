@@ -32,6 +32,7 @@ export const DEFAULT_EXECUTION_TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_ARGV_ITEMS = 128;
 const MAX_ARGV_ITEM_BYTES = 8 * 1024;
 const MAX_ARGV_BYTES = 64 * 1024;
+const MAX_CWD_BYTES = 32 * 1024;
 const MAX_EXECUTION_TIMEOUT_MS = 60 * 60 * 1000;
 const TERMINATION_SETTLEMENT_GRACE_MS = 1_000;
 const SAFE_SIGNAL = /^SIG[A-Z0-9]+$/;
@@ -143,7 +144,7 @@ function validateOptions(options) {
   if (
     !Object.hasOwn(options, "argv") ||
     !Object.keys(options).every(
-      (key) => key === "argv" || key === "includeSuccessDiagnostic" || key === "timeoutMs",
+      (key) => key === "argv" || key === "cwd" || key === "includeSuccessDiagnostic" || key === "timeoutMs",
     ) ||
     !Array.isArray(options.argv)
   ) {
@@ -157,6 +158,13 @@ function validateOptions(options) {
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > MAX_EXECUTION_TIMEOUT_MS) {
     throw new TypeError("invalid options");
   }
+  const cwd = Object.hasOwn(options, "cwd") ? options.cwd : undefined;
+  if (
+    cwd !== undefined &&
+    (typeof cwd !== "string" || cwd.length === 0 || cwd.includes("\u0000") || Buffer.byteLength(cwd, "utf8") > MAX_CWD_BYTES)
+  ) {
+    throw new TypeError("invalid cwd");
+  }
   if (options.argv.length === 0 || options.argv.length > MAX_ARGV_ITEMS) throw new TypeError("invalid argv");
 
   let totalBytes = 0;
@@ -168,7 +176,7 @@ function validateOptions(options) {
     if (bytes > MAX_ARGV_ITEM_BYTES || totalBytes > MAX_ARGV_BYTES - bytes) throw new TypeError("invalid argv");
     totalBytes += bytes;
   }
-  return { argv: options.argv.slice(), includeSuccessDiagnostic, timeoutMs };
+  return { argv: options.argv.slice(), cwd, includeSuccessDiagnostic, timeoutMs };
 }
 
 /**
@@ -465,7 +473,7 @@ export async function runBoundedCommand(options) {
   } catch {
     return invalidArgumentsEnvelope();
   }
-  const { argv, includeSuccessDiagnostic, timeoutMs } = command;
+  const { argv, cwd, includeSuccessDiagnostic, timeoutMs } = command;
 
   const startedAt = process.hrtime.bigint();
   const stdout = new StreamCapture();
@@ -477,6 +485,7 @@ export async function runBoundedCommand(options) {
       // terminated as a unit on deadline. Windows receives tree termination
       // through taskkill instead.
       detached: process.platform !== "win32",
+      cwd,
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,

@@ -316,6 +316,25 @@ await check("spawn and argument failures are structured, bounded, and do not lea
   assert.equal(invalid.duration_ms, 0);
 });
 
+await check("library callers may select a working directory without exposing it", async () => {
+  await temporaryRoot(async (root) => {
+    const result = await runBoundedCommand({
+      ...nodeCommand("process.stdout.write(process.cwd());"),
+      cwd: root,
+      includeSuccessDiagnostic: true,
+    });
+    assertClosedEnvelope(result);
+    assert.equal(result.outcome, "completed");
+    assert.equal(result.exit_code, 0);
+    assert.equal(result.stdout.tail, root);
+
+    const invalid = await runBoundedCommand({ ...nodeCommand("process.exit(0)"), cwd: "bad\u0000cwd" });
+    assertClosedEnvelope(invalid);
+    assert.equal(invalid.outcome, "argument_invalid");
+    assert.equal(JSON.stringify(invalid).includes("bad"), false);
+  });
+});
+
 await check("the execution deadline terminates a hung child through the signal envelope", async () => {
   assert.equal(DEFAULT_EXECUTION_TIMEOUT_MS, 5 * 60 * 1000);
   const result = await runBoundedCommand({

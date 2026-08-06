@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added a standalone deterministic quality runner with a versioned repository
+  manifest, immutable Git evidence, bounded argv-only execution, normalized
+  complexity/coverage input, and before/after CRAP policy enforcement. Pipeline
+  routing remains unchanged until the tester and cleaner integration stages.
+
 ## [3.9.0] - 2026-08-05
 
 ### Added
