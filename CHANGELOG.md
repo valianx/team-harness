@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a deterministic functional-first plan validator with closed hashed
+  evidence for plan structure, manifest/task consistency, and recovery.
 - Added a standalone deterministic quality runner with a versioned repository
   manifest, immutable Git evidence, bounded argv-only execution, normalized
   complexity/coverage input, and before/after CRAP policy enforcement.
@@ -21,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Made Stage 1 and Gate 1 lead with observable outcomes, actors, flows, rules,
+  examples, errors, unchanged behavior, and non-goals while keeping technical
+  realization in sharded architecture and task artifacts.
 - Made behavior-changing manifest-enabled tasks route through a tester before
   implementation while keeping the checkpoint inside the existing
   implementation phase and preserving both Stage Gates.

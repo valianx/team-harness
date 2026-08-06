@@ -1,0 +1,68 @@
+# Functional-First Plan Contract
+
+Stage 1 establishes what observable behavior the operator is approving before
+describing how it will be implemented. It preserves the v3 state machine, one
+architect dispatch, and the existing Stage Gate 1.
+
+## Operator contract
+
+For every new `sharded-v1` plan, `01-plan.md § Review Summary` contains these
+sections in order:
+
+1. Problem and observable outcome.
+2. Actors and flows.
+3. Business rules and examples.
+4. Alternate and error behavior.
+5. Unchanged behavior.
+6. Non-goals.
+7. Decisions for human review.
+
+The first sections use stable bullet labels (`Problem`, `Observable outcome`,
+`Actor`, `Rule`, and `Example`). An empty list is explicit as
+`None — {reason}`. The summary contains no code fence, implementation
+chronology, private symbol, command, file ownership, or `file:line` reference.
+A public API or CLI name may appear when that name is itself part of the
+supported behavior.
+
+Technical realization remains mandatory but has a different owner:
+
+- `plan/architecture.md`: approach, patterns and evidence, services,
+  engineering risks/trade-offs, assessments, and file-level work plan;
+- `plan/invariants.md`: cross-site invariants and fenced sites;
+- `plan/delivery.md`: dependencies and delivery grouping; and
+- `plan/tasks/Task-N.md`: exact scope, ACs, TCs, and verification.
+
+## Deterministic evidence
+
+Before Gate 1, Main runs:
+
+```bash
+node plugins/team-harness/skills/pipeline/scripts/plan-contract.mjs \
+  --workspace /absolute/path/to/workspace \
+  --plan 01-plan.md
+```
+
+The helper reads only regular, non-symlink artifacts declared by the plan
+manifest, bounds their size and count, and emits one closed JSON result. It
+verifies functional-section order and labels, path-free summary boundaries,
+manifest completeness, architecture section ownership, task-index consistency,
+Given/When/Then ACs, separate TCs, and pre-implementation-test routing. The
+record includes the plan hash, every artifact hash, and one artifact-set hash.
+
+Main persists the result and hashes as `plan_contract_evidence`. Missing,
+failing, stale, or mismatched evidence blocks Gate 1. The tool owns structure,
+counts, paths, and identity; Architect and the operator own whether the stated
+behavior is the right behavior.
+
+Legacy recovery is not migrated implicitly. Historical workspaces and the
+documented self-authored minimal-plan routes use only their closed
+not-applicable reason.
+
+## Gate 1
+
+Gate 1 synthesizes the observable delta, principal actor/flow, one
+representative rule/example, alternate/error behavior, unchanged behavior,
+non-goals, and open decisions. It includes technical detail only when the
+operator must decide compatibility, security, irreversibility, a public
+contract, cost, or an explicit trade-off. No additional review agent, phase, or
+gate is introduced.

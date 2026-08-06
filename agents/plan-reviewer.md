@@ -26,9 +26,15 @@ Concretely, the team's rules are:
 1. **Delivery Grouping.** Every plan declares how its tasks map to PRs — the default is `all-tasks-one-pr`; a split into N groups is allowed only when a temporal-prod reason exists. Splits multiply review surface and ship risk.
 2. **Per-task acceptance criteria.** Every task carries its own AC block in Given/When/Then format so the implementer has a contract, the tester writes tests against it, and the qa validates the right scope.
 3. **Consolidated final documents.** Analysis artifacts in `workspaces/` are deliverables, not iteration logs. Version markers, strikethrough, "previously decided", inline changelogs, dated section headers contaminate the deliverable.
-4. **Cross-reference integrity.** Every file in the Work Plan (§ Architecture `### Work Plan`) appears in some task's `Files:` field in `## Task List`.
+4. **Cross-reference integrity.** Every file in
+   `plan/architecture.md § Work Plan` appears in some task shard's `Files:`
+   field.
 5. **Service identity.** `plan/architecture.md § Services Touched` matches the union of `Service:` fields across task shards.
-6. **Human-readability and routing.** `01-plan.md` opens with `## Review Summary`, contains `### Decisions for human review` (hard cap 7), `## Plan Manifest`, and a task index with one valid shard path per task. Architecture and AC prose must not be copied into the index.
+6. **Functional-first readability and routing.** `01-plan.md` opens with a
+   structured functional `## Review Summary`, contains `### Decisions for human
+   review` (hard cap 7), `## Plan Manifest`, and a task index with one valid
+   shard path per task. Architecture and AC prose must not be copied into the
+   index.
 9. **No stacked PRs.** The base of every delivery group is `main`. Stacked PRs (a group's branch based off a sibling group's branch instead of `main`) are unconditionally prohibited — GitHub's async auto-retargeting on merge silently loses commits.
 
 None of these can be audited by `qa` without folding plan-shape into an agent that already has a distinct concern. A separate, narrow, read-only agent keeps responsibilities clean and the audit deterministic.
@@ -228,13 +234,19 @@ The plan-reviewer does NOT police AC quality. It only checks that ACs exist in t
 | 3e | Timestamped section headers (date in a header that is NOT the top-of-document date stamp) | `(?im)^##+ .*\b\d{4}-\d{2}-\d{2}\b` excluding the line beginning `**Date:**` | `## Decision — 2026-05-10` |
 | 3f | "Edit:" / "EDIT:" / "Update:" / "UPDATE:" prefixes on paragraphs | `(?m)^\s*(edit:\|update:)` | "Edit: changed batch size" |
 | 3g | "WIP" / "TODO" / "FIXME" markers in artifacts that are supposed to be final | `\b(WIP\|TODO\|FIXME)\b` (case-sensitive) | "TODO: revisit" |
-| 3h | Mutually contradictory canonical field (semantic, not regex) | Collect distinct values of each canonical field (base branch, version bump) across `## Review Summary`, `### Work Plan`, `## Task List`; emit finding when >1 mutually-exclusive value for the same field | Base branch declared `main` in `## Task List` but `release/test` in `### Work Plan Notes` |
+| 3h | Mutually contradictory canonical field (semantic, not regex) | Collect values across their technical owning shards; emit a finding when one field has mutually-exclusive values | Base branch is `main` in `plan/delivery.md` but `release/test` in a task note |
 
 **Block-quote tolerance:** patterns 3b and 3c tolerate matches on lines that begin with `>` (markdown block-quote) — user-quoted text is preserved verbatim. Other patterns apply regardless.
 
 **The top-of-document `**Date:** YYYY-MM-DD` stamp is allowed** — rule 3e explicitly excludes that line.
 
-**Pattern 3h — Mutually contradictory canonical field (detection notes).** For each field in the canonical-field set defined in `agents/_shared/plan-consolidation.md` § "Canonical-field set" (base branch, version bump): collect the distinct intended values it carries across `## Review Summary`, `### Work Plan`, and `## Task List` of the same plan. If a single canonical field holds more than one mutually-exclusive value, emit: `Rule 3h: canonical field '{field}' holds contradictory values {v1, v2, …} across {sections}`. Precision boundaries: for **base branch**, parse the `Base:` column of every group in `### Delivery Grouping` and any explicit base-branch statement in Review Summary/Work Plan Notes — all must agree per group. For **version bump**, parse the intended target version from the suggested-bump notes across the three sections (the canonical *target*, not each version-site token — listing five version sites all at the same version is not a contradiction). Cross-repo legitimacy: when `### Delivery Grouping` declares a `Repo` column, two different groups legitimately carrying two different `Base:` values because they target two different repositories is NOT a 3h contradiction — 3h's per-group agreement check is intra-group (the same group's base must agree across `## Review Summary`, `### Work Plan`, and `## Task List`), never across two different groups' `Repo` values. Severity: `concerns` (consistent with the rest of Rule 3). A contradictory base or version is a real defect but never fail-blocks the gate.
+**Pattern 3h — Mutually contradictory canonical field (detection notes).**
+For each canonical base-branch or version-bump field, compare its value in
+`plan/delivery.md`, `plan/architecture.md` notes, and applicable task shards.
+Never look for technical values in the functional Review Summary. If one field
+has mutually-exclusive values, emit the values and owning artifacts. Different
+repositories may legitimately use different bases; agreement is per delivery
+group. Severity remains `concerns`.
 
 **Severity:** `concerns` (the architect can rewrite in place; the human at STAGE-GATE-1 sees the concerns and can bounce them back via `reject`).
 
@@ -270,17 +282,26 @@ The plan-reviewer does NOT police AC quality. It only checks that ACs exist in t
 
 **What to check:**
 
-1. `01-plan.md` contains a top-of-document `## Review Summary` section. The section body has between 1 and 50 non-empty lines (excluding the heading itself and blank lines). 0 lines = section missing or empty. The cap is 50, not 30, because the section's own eleven blocks — eight always present, three conditional (`agents/architect.md § "## Review Summary content requirements"`) — cannot fit in 30 — a lower cap made a fully compliant plan fail this rule.
-2. `01-plan.md` contains a `### Decisions for human review` section (inside `## Review Summary`) with 1-7 bullets.
+1. `01-plan.md` contains a top-of-document `## Review Summary` functional
+   contract with 1–50 non-empty lines.
+2. It contains, in order, `### Problem and Observable Outcome`, `### Actors and
+   Flows`, `### Business Rules and Examples`, `### Alternate and Error
+   Behavior`, `### Unchanged Behavior`, `### Non-Goals`, and `### Decisions for
+   human review`. Each is non-empty and uses the canonical labels from
+   `docs/plan-shards.md`; decisions contain 1–7 bullets.
 3. `01-plan.md` contains `## Plan Manifest` and `### Task Index`; every indexed task has exactly one existing shard and every task shard is indexed. Empty or duplicate rows fail.
 4. `## Review Summary` appears as the FIRST section of `01-plan.md` (positional check — it must be the entry point).
-5. `### Decisions for human review` appears INSIDE `## Review Summary` (before `## Architecture`).
+5. The functional contract contains no code fence, command, private
+   implementation symbol, file ownership, or `file:line`; technical approach,
+   patterns, engineering risks/trade-offs, services, and file work exist in
+   `plan/architecture.md` instead.
 
 **Detection algorithm:**
 
 ```
 plan = read 01-plan.md
 review_summary_section = extract section "## Review Summary" body up to next "## "
+functional_headings = canonical ordered headings from docs/plan-shards.md
 decisions_section = extract subsection "### Decisions for human review" from review_summary_section
 
 if review_summary_section is None:
@@ -306,8 +327,10 @@ elif data_row_count(task_index_table) < declared_task_count:
 # Positional checks
 if 01-plan.md's first ## heading is not ## Review Summary:
     findings.append(("Rule 6: ## Review Summary must be the first section of 01-plan.md", CONCERNS))
-if decisions_section is not inside review_summary_section:
-    findings.append(("Rule 6: ### Decisions for human review must appear inside ## Review Summary", CONCERNS))
+if functional_headings are missing, empty, or out of order:
+    findings.append(("Rule 6: functional contract is incomplete or out of order", FAIL))
+if review_summary contains technical-only content or file:line:
+    findings.append(("Rule 6: functional contract contains implementation detail", FAIL))
 ```
 
 **Severity:**
@@ -427,7 +450,10 @@ Note: Rule 9's split-check is complementary to Rule 1's split-check. Rule 1 fire
 
 ### Rule 10 — Multi-service consolidation (disjoint from Rule 1/9; fires only when `Consolidates:` is declared)
 
-**This rule is DISJOINT from Rule 1 and Rule 9.** Rule 1 audits Delivery Groupings with `>1 group` (the split path). Rule 9 prohibits stacked PRs and invalid base branches. Rule 10 audits the opposite case: a single task that claims to consolidate concerns from multiple distinct services into one PR. It fires ONLY when a task in `## Task List` explicitly declares the field `Consolidates: <svc-a>, <svc-b>, …`. A task without `Consolidates:` is never audited by Rule 10.
+**This rule is DISJOINT from Rule 1 and Rule 9.** Rule 1 audits Delivery
+Groupings with `>1 group`; Rule 9 prohibits stacked PRs and invalid bases. Rule
+10 fires only when a task shard declares
+`Consolidates: <svc-a>, <svc-b>, …`.
 
 **What to check (only when a task declares `Consolidates:`):**
 
@@ -713,8 +739,8 @@ pending
 |-----------|---------|----------------|
 | 01-plan.md:{line} | 3a (version marker) | `## Approach v2 — 2026-05-14` |
 | 01-plan.md:{line} | 3c (strikethrough) | `~~old approach~~` |
-| 01-plan.md | 3h (canonical-field contradiction) | `Rule 3h: canonical field 'base branch' holds contradictory values {main, release/test} across {## Task List, ### Work Plan Notes}` |
-(or "None — document is consolidated. Canonical-field consistency (3h): base branch and version bump hold single consistent values across all three sections.")
+| plan/delivery.md + task shard | 3h (canonical-field contradiction) | `Rule 3h: canonical field 'base branch' holds contradictory values {main, release/test}` |
+(or "None — document set is consolidated. Canonical fields are consistent across their technical owning shards.")
 
 ### Rule 4 — Cross-reference integrity
 - 01-plan.md:{line} — Work Plan file `src/foo.ts` not covered by any task in § Task List.

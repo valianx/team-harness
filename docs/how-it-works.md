@@ -42,19 +42,23 @@ posture or release a gate.
 
 ### `design` and `waiting_gate1`
 
-The architect produces the `sharded-v1` plan set: `01-plan.md` is the compact operator summary
-and manifest, while architecture, delivery/dependencies, conditional invariants, and each task/AC
+The architect produces the `sharded-v1` plan set: `01-plan.md` is the functional
+contract and manifest, leading with observable outcome, actors/flows, rules and
+examples, errors, unchanged behavior, non-goals, and human decisions. Technical
+architecture, delivery/dependencies, conditional invariants, and each task/AC
 contract live under `plan/`. Roles resolve only the shards their decision needs. It also writes
 plan sketches when the change touches those surfaces. `qa-plan` and `plan-reviewer` are available
 only through an explicit `/th:plan-review`; their panel output stays in
 `reviews/01-plan-review.md` and never creates an automatic pipeline state.
 
 `th:orchestrator` runs Discover first, asks for an explicit advance, then dispatches one
-`architect` pass. The architect produces the manifest plus required plan shards with intention,
-included/excluded scope, functional Given/When/Then acceptance criteria, tasks with file ownership
-and dependencies, and only the risks needed to make the decision. Required sketches are emitted
-when their classification triggers them. The coordinator validates the minimum artifact,
-transcribes the architect's classification, and remains the sole writer of `00-state.md`.
+`architect` pass. The coordinator runs the deterministic functional plan
+validator over the resulting manifest and shards, persists their hashes, and
+blocks Gate 1 on missing or stale evidence. Gate 1 synthesizes the functional
+contract and includes technical detail only when it is decision-bearing.
+Required sketches are emitted when their classification triggers them. The
+coordinator transcribes the architect's classification and remains the sole
+writer of `00-state.md`.
 
 There is no automatic approach checkpoint, ratification loop, structure loop, or post-approval
 review offer. `/th:plan-review` remains available only when explicitly invoked. A sensitive

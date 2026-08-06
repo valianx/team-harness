@@ -113,6 +113,8 @@ These are improvements to the harness's own pipeline, surfaced by running it on 
 
 ### Make Stage 1 functional-first
 
+**Status:** implemented in the first adoption slice.
+
 **What it is.** Rebalance planning so the operator-facing contract establishes the functional change before the implementation mechanism. Stage 1 should lead with the problem and observable outcome, actors and user flows, business rules and examples, alternate and error behavior, non-goals, and functional Given/When/Then acceptance criteria. Architecture, files, dependencies, evidence anchors, invariants, and technical constraints remain required, but move into a subordinate realization layer instead of dominating the plan and Gate 1 summary.
 
 **Why (protects the collaboration).** The current sharded plan contract correctly asks for functional acceptance criteria, but its file ownership, architecture, anchor, and task machinery can pull the planning conversation toward *how* before *what* is settled. That creates a specific failure mode: the team can implement and verify a technically coherent solution precisely while still solving the wrong user problem. A functional-first plan gives the developer a clearer contract to approve and gives tester and QA a stronger behavioral authority downstream.

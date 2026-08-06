@@ -887,6 +887,76 @@ def check_cleaner_crap_contract() -> None:
     require((ROOT / "docs/cleaner-crap.md").is_file(), "cleaner operator documentation is missing")
 
 
+def check_functional_first_plan_contract() -> None:
+    """Stage 1 leads with behavior while deterministic evidence owns shape."""
+    canonical = re.sub(r"\s+", " ", read("docs/plan-shards.md").lower())
+    codex_shards = re.sub(
+        r"\s+",
+        " ",
+        read("plugins/team-harness/skills/pipeline/references/plan-shards.md").lower(),
+    )
+    architect = re.sub(r"\s+", " ", read("agents/architect.md").lower())
+    adapter = re.sub(r"\s+", " ", read("runtime/codex/instructions/architect.md").lower())
+    required = (
+        "problem and observable outcome",
+        "actors and flows",
+        "business rules and examples",
+        "alternate and error behavior",
+        "unchanged behavior",
+        "non-goals",
+        "decisions for human review",
+        "plan/architecture.md",
+    )
+    for label, text in (
+        ("canonical plan shards", canonical),
+        ("Codex plan shards", codex_shards),
+        ("Claude architect", architect),
+        ("Codex architect", adapter),
+    ):
+        for marker in required:
+            require(marker in text, f"{label}: functional-first marker missing {marker!r}")
+
+    for label, relative in (
+        ("Claude", "agents/ref-pipeline.md"),
+        ("Codex", "plugins/team-harness/skills/pipeline/references/design.md"),
+    ):
+        text = re.sub(r"\s+", " ", read(relative).lower())
+        for marker in (
+            "plan-contract.mjs",
+            "plan_contract_evidence",
+            "artifact-set sha-256",
+            "observable delta",
+            "representative rule/example",
+            "unchanged behavior",
+            "non-goals",
+        ):
+            require(marker in text, f"{label}: Stage 1 route misses {marker!r}")
+        require(
+            "planning dispatches only `architect`" in text or "planning dispatches only architect" in text,
+            f"{label}: functional-first planning added a specialist dispatch",
+        )
+
+    state_sources = (
+        read("agents/_shared/orchestrator-state.md").lower(),
+        read("plugins/team-harness/skills/pipeline/references/state-and-gates.md").lower(),
+    )
+    for text in state_sources:
+        for marker in ("plan_contract_evidence", "result_sha256", "plan_sha256", "artifact_set_sha256"):
+            require(marker in text, f"plan evidence state misses {marker!r}")
+    recovery = read("plugins/team-harness/skills/pipeline/references/recovery.md").lower()
+    for marker in ("plan_contract_evidence", "legacy-recovery", "self-authored-minimal-plan", "never infer functional completeness"):
+        require(marker in recovery, f"plan evidence recovery misses {marker!r}")
+
+    reviewer = re.sub(r"\s+", " ", read("agents/plan-reviewer.md").lower())
+    require("functional-first readability" in reviewer, "explicit plan review still prioritizes technical layout")
+    require("functional contract contains implementation detail" in reviewer, "plan reviewer cannot reject functional/technical leakage")
+    require(
+        (ROOT / "plugins/team-harness/skills/pipeline/scripts/plan-contract.mjs").is_file(),
+        "functional plan validator is missing",
+    )
+    require((ROOT / "docs/functional-plan-contract.md").is_file(), "functional plan documentation is missing")
+
+
 def check_direct_predicate() -> None:
     """Direct eligibility and a live `hazlo tú` preference cannot dispatch silently."""
     claude = "\n".join(
@@ -2547,6 +2617,7 @@ def main() -> None:
         ("PR 588 review closures", check_review_feedback_closures),
         ("pre-implementation test contract", check_preimplementation_test_contract),
         ("cleaner and CRAP contract", check_cleaner_crap_contract),
+        ("functional-first Stage 1 contract", check_functional_first_plan_contract),
         ("authoritative post-Gate-1 transitions", check_authoritative_post_gate1_transitions),
         ("direct predicate", check_direct_predicate),
         ("single writer", check_single_writer),

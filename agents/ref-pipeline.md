@@ -708,10 +708,13 @@ writes coordination state.
 | `fix` | 4 | `root-cause`, `full-root-cause` + mandatory `## Prior Art` | both |
 | `hotfix` | any | skipped | one-sentence prose plan at the gate |
 
-The minimum Stage-1 contract is: intent and observable result; included and excluded
-scope; functional Given/When/Then `AC-N` criteria; separate `TC-N` technical constraints;
-request-vs-realized scope shape; tasks with file ownership and dependencies; required risks,
-rollback/mitigation and verification. A
+The minimum Stage-1 contract leads with the problem and observable outcome,
+actors and flows, business rules and examples, alternate/error behavior,
+unchanged behavior, non-goals, and decisions for human review. Functional
+Given/When/Then `AC-N` criteria remain in task shards. Separate `TC-N` technical
+constraints, request-vs-realized scope shape, architecture, patterns, tasks with
+file ownership and dependencies, risks, rollback/mitigation, and verification
+remain required in their technical shards. A
 plan may include sketches only when they make an acceptance surface concrete. There is
 no automatic approach checkpoint, structure loop, ratification loop, shape panel, or
 post-approval offer on the normal path. `/th:plan-review` remains available only when the
@@ -723,20 +726,30 @@ dispatch with the controlled `TH-STATE-REF` first line, and clear the boundary a
 return. A missing live reply may be recorded as `provenance: inferred`; it keeps the checkpoint
 open and blocks the architect dispatch. It never releases Gate 1 or becomes operator approval.
 
-Planning dispatches only `architect`. For every plan, the coordinator performs only a
-deterministic presence/coherence check before Gate 1: required sections exist, ACs and TCs
-are separated, files/dependencies are coherent, `implementation_references_in_ac: 0`, and no
-clarification marker remains. Security-sensitive plans carry the architect's security
+Planning dispatches only `architect`. For every new `sharded-v1` plan, Main
+resolves `plan-contract.mjs` from the pipeline skill, runs it with the workspace
+and `01-plan.md`, and persists the complete JSON result, result SHA-256, plan
+SHA-256, and artifact-set SHA-256 in `plan_contract_evidence`. The tool requires
+the ordered functional surface, path-free operator summary, manifest and task
+coherence, AC/TC separation and counts, pre-implementation routing, and the
+technical architecture sections. A missing, malformed, stale, or failing record
+blocks Gate 1; agent prose cannot replace it. Legacy recovery and the documented
+self-authored hotfix/Tier-1 routes record the closed not-applicable reason instead
+of being silently migrated. Security-sensitive plans carry the architect's security
 assessment and security-relevant TCs forward to the final security lens; they do not add a
 design-review dispatch. An invalid artifact receives one normal design correction; an
 unresolved ambiguity blocks and is surfaced to the operator. There is no automatic Stage-1
 perfection cycle.
 
-The `sharded-v1` plan set remains canonical: `01-plan.md` is the compact manifest and
-operator summary, while architecture, delivery/dependencies, conditional invariants, and
-task AC/TC contracts live in the relevant `plan/**` shards. Gate 1 surfaces
-`realized_scope: expanded` with task, file, AC, and TC counts so the operator can proceed or
-narrow the request. `/th:plan-review` is an explicit
+The `sharded-v1` plan set remains canonical: `01-plan.md` is the compact
+functional contract and manifest, while architecture, delivery/dependencies, conditional invariants, and
+task AC/TC contracts live in the relevant `plan/**` shards. Gate 1 synthesizes
+the observable delta, principal actor/flow, representative rule/example,
+alternate/error behavior, unchanged behavior, non-goals, open decisions, and
+only decision-bearing technical risks involving compatibility, security,
+irreversibility, public contracts, cost, or an explicit trade-off. It also
+surfaces `realized_scope: expanded` with task, file, AC, and TC counts so the
+operator can proceed or narrow the request. `/th:plan-review` is an explicit
 operator flow only; it may dispatch `qa-plan`, `security`, and `plan-reviewer` without
 creating a pipeline state or gate.
 The stable options are shown with their numeric shortcuts and textual equivalents:
