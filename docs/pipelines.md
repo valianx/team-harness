@@ -33,6 +33,9 @@ Retired route markers are compatibility data only; they do not select a posture 
 | Publication mechanics: version bump, branch, changelog, push, PR | `agents/_shared/delivery-mechanics.md` |
 | Event schema, cost formula, trace fields | `docs/observability.md` |
 | Suite-run evidence and tree anchors | `docs/suite-evidence.md` |
+| Deterministic pre-implementation red→green contract | `docs/test-contract-runner.md` |
+| Deterministic pre-Freeze cleaner and CRAP contract | `docs/cleaner-crap.md` |
+| Deterministic functional-first Stage 1 contract | `docs/functional-plan-contract.md` |
 | Code-hygiene pattern set | `docs/code-hygiene-gate.md` |
 | Concise gate options and numeric shortcuts | `agents/_shared/gate-contract.md` |
 

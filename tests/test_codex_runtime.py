@@ -310,7 +310,7 @@ def main() -> None:
     contract = json.loads((ROOT / "runtime/schema/codex-agents.json").read_text())
     agents = contract["agents"]
     expected = {agent["name"] for agent in agents}
-    pipeline_roles = {"architect", "implementer", "tester", "qa", "security", "delivery"}
+    pipeline_roles = {"architect", "implementer", "tester", "cleaner", "qa", "security", "delivery"}
     review_roles = {"reviewer", "pr-review-qa", "pr-review-security", "reviewer-consolidator"}
     inline_roles = {"inline-reviewer"}
     if expected != pipeline_roles | review_roles | inline_roles:
@@ -354,6 +354,7 @@ def main() -> None:
         "architect": ("opus/xhigh", "opus"),
         "implementer": ("sonnet/high", "sonnet-high"),
         "tester": ("sonnet/high", "sonnet-high"),
+        "cleaner": ("sonnet/medium", "sonnet-medium"),
         "qa": ("opus/xhigh", "opus"),
         "security": ("opus/xhigh", "opus"),
         "inline-reviewer": ("sonnet/high", "sonnet-high"),
@@ -394,7 +395,7 @@ def main() -> None:
         for marker in markers:
             if marker not in content.splitlines():
                 fail(f"{path}: missing deterministic Team Harness marker {marker!r}")
-        if data["sandbox_mode"] == "read-only" and data["name"] in {"architect", "implementer", "tester", "delivery"}:
+        if data["sandbox_mode"] == "read-only" and data["name"] in {"architect", "implementer", "tester", "cleaner", "delivery"}:
             fail(f"{path}: write role is unexpectedly read-only")
         if data["name"] in review_roles and data["sandbox_mode"] != "read-only":
             fail(f"{path}: PR-review role must be read-only")
@@ -908,6 +909,18 @@ def main() -> None:
             fail("Codex config ensure did not install safe local defaults")
         if ensured_doc.get("agent-scope") != "global":
             fail("Codex config ensure did not persist the global agent default")
+        inspected = subprocess.run(
+            [sys.executable, str(agents_script), "inspect", "--scope", "global"],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if inspected.returncode != 0:
+            fail(f"Codex bundled-agent inspect failed: {inspected.stdout}{inspected.stderr}")
+        inspected_result = json.loads(inspected.stdout)
+        if inspected_result.get("runtimeConfig", {}).get("status") != "missing":
+            fail("Codex bundled-agent inspect did not report a missing runtime fallback")
         synced = subprocess.run(
             [sys.executable, str(agents_script), "sync", "--scope", "global"],
             text=True,
@@ -919,7 +932,19 @@ def main() -> None:
             fail(f"Codex bundled-agent sync failed: {synced.stdout}{synced.stderr}")
         sync_result = json.loads(synced.stdout)
         if set(sync_result.get("changed", [])) != expected:
-            fail("Codex bundled-agent sync did not install all eleven roles")
+            fail("Codex bundled-agent sync did not install all twelve roles")
+        runtime_config = temp / "codex-home/config.toml"
+        runtime_doc = tomllib.loads(runtime_config.read_text())
+        if runtime_doc.get("agents", {}).get("default_subagent_model") != "gpt-5.6-terra":
+            fail("Codex bundled-agent sync did not install the Terra fallback")
+        if runtime_doc.get("agents", {}).get("default_subagent_reasoning_effort") != "medium":
+            fail("Codex bundled-agent sync did not install the medium fallback effort")
+        if sync_result.get("runtimeConfig", {}).get("status") != "current":
+            fail("Codex bundled-agent sync did not report the runtime fallback current")
+        if sync_result.get("runtimeConfigChanged") is not True or sync_result.get("restartRequired") is not True:
+            fail("Codex bundled-agent sync did not require restart after runtime reconciliation")
+        if stat.S_IMODE(runtime_config.stat().st_mode) != 0o600:
+            fail("Codex bundled-agent sync did not protect the runtime config")
         for role in expected:
             installed = temp / "codex-home/agents" / f"{role}.toml"
             packaged = ROOT / "plugins/team-harness/skills/setup/assets/agents" / f"{role}.toml"
@@ -934,8 +959,69 @@ def main() -> None:
             env=env,
             check=False,
         )
-        if repeated.returncode != 0 or json.loads(repeated.stdout).get("changed") != []:
+        repeated_result = json.loads(repeated.stdout) if repeated.returncode == 0 else {}
+        if repeated.returncode != 0 or repeated_result.get("changed") != []:
             fail("Codex bundled-agent sync is not idempotent")
+        if repeated_result.get("runtimeConfigChanged") is not False or repeated_result.get("restartRequired") is not False:
+            fail("Codex bundled-agent sync rewrote a current runtime fallback")
+
+        legacy_runtime = (
+            'model = "operator-main"\n'
+            'operator_key = "preserve-me"\n\n'
+            '[agents]\n'
+            'default_subagent_model = "gpt-5.6-luna" # managed legacy\n'
+            'default_subagent_reasoning_effort = "max"\n'
+            'max_threads = 9\n\n'
+            '[projects."/tmp/example"]\n'
+            'trust_level = "trusted"\n'
+        )
+        runtime_config.write_text(legacy_runtime)
+        migrated = subprocess.run(
+            [sys.executable, str(agents_script), "sync", "--scope", "global"],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if migrated.returncode != 0:
+            fail(f"Codex legacy fallback migration failed: {migrated.stdout}{migrated.stderr}")
+        migrated_result = json.loads(migrated.stdout)
+        migrated_text = runtime_config.read_text()
+        migrated_doc = tomllib.loads(migrated_text)
+        if migrated_doc["agents"].get("default_subagent_model") != "gpt-5.6-terra":
+            fail("Codex agent sync retained the obsolete Luna fallback")
+        if migrated_doc["agents"].get("default_subagent_reasoning_effort") != "medium":
+            fail("Codex agent sync retained the obsolete fallback effort")
+        for marker in ('model = "operator-main"', 'operator_key = "preserve-me"', 'max_threads = 9', '[projects."/tmp/example"]'):
+            if marker not in migrated_text:
+                fail(f"Codex fallback migration dropped operator config {marker!r}")
+        if not runtime_config.with_name("config.toml.bak").is_file():
+            fail("Codex fallback migration did not back up the runtime config")
+        if migrated_result.get("runtimeConfigChanged") is not True or migrated_result.get("restartRequired") is not True:
+            fail("Codex fallback migration did not report the required session restart")
+
+        custom_runtime = (
+            '[agents]\n'
+            'default_subagent_model = "operator/custom-model"\n'
+            'default_subagent_reasoning_effort = "high"\n'
+        )
+        runtime_config.write_text(custom_runtime)
+        custom = subprocess.run(
+            [sys.executable, str(agents_script), "sync", "--scope", "global"],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if custom.returncode != 0:
+            fail(f"Codex custom fallback preservation failed: {custom.stdout}{custom.stderr}")
+        custom_result = json.loads(custom.stdout)
+        if runtime_config.read_text() != custom_runtime:
+            fail("Codex agent sync overwrote an operator-selected fallback")
+        if custom_result.get("runtimeConfig", {}).get("status") != "custom-preserved":
+            fail("Codex agent sync did not report the preserved custom fallback")
+        if custom_result.get("runtimeConfigChanged") is not False or custom_result.get("restartRequired") is not False:
+            fail("Codex agent sync required restart for an untouched custom fallback")
         conflict = temp / "codex-home/agents/architect.toml"
         conflict.write_text("operator-owned\n")
         refused = subprocess.run(
@@ -1275,7 +1361,7 @@ def main() -> None:
         if "../init/references/configuration.md" not in direct:
             fail(f"{direct_name} direct fallback does not load persistent configuration")
 
-    for role in ("architect", "implementer", "tester", "qa", "security", "delivery"):
+    for role in ("architect", "implementer", "tester", "cleaner", "qa", "security", "delivery"):
         if f"{role}.toml" not in pipeline:
             fail(f"pipeline preflight does not name {role}.toml")
     for marker in (
@@ -1471,7 +1557,7 @@ def main() -> None:
     def digest_table(text: str) -> dict[str, str]:
         return dict(
             re.findall(
-                r"\|\s+`?(architect|implementer|tester|qa|security|delivery)`?\s+\|\s+`([0-9a-f]{64})`\s+\|",
+                r"\|\s+`?(architect|implementer|tester|cleaner|qa|security|delivery)`?\s+\|\s+`([0-9a-f]{64})`\s+\|",
                 text,
             )
         )
@@ -1479,9 +1565,10 @@ def main() -> None:
     activation_digests = digest_table(activation)
     pipeline_digests = digest_table(pipeline)
     expected_updated_digests = {
-        "architect": "17f8df98cc2b5b9c4703c79493da40c141394f8b8076fb71b1512318592f894f",
+        "architect": "c968fdc18524199ff7a2f71cf5e461ddade593db451a12cbd080416af2828956",
         "implementer": "76cd8d007b91411377b6401c9def7076f49e42868928010168cca17ad5778449",
-        "tester": "31a902a24dd23e838e7dc260c15fd8aa08bcfd703f56956194ff56ca810cf52e",
+        "tester": "7519e2980d21e6f3116da32169386f0531450cf60b6404d7553985879e966c91",
+        "cleaner": "6b4054f59a3bf6d3a98ce6ef1407a786d03c9169ac741b58e9fe0fe19d453f7f",
         "qa": "2612528da833bcb5cf2db981ac586320a0ad06ac407d38beb564b64880cc24c8",
         "security": "06434dd772dfff170529c67e15c91c08311329e66f364eb220298a2d0dd2f997",
         "delivery": "07a5997769adbb2b3304b7640e2f9a701a38564a4f58d192548390b15ffbf7d5",

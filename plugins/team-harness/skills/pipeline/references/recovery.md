@@ -154,6 +154,15 @@ terminal run. For corrupt, incomplete, oversized, or unmappable state, report
 only the path and failed structural checks; never echo raw snapshot or event
 content.
 
+Before resuming `design` or presenting Gate 1, validate
+`plan_contract_evidence`. `pending` resumes at deterministic plan validation;
+`pass` requires a readable `plan-contract.mjs` result whose SHA-256, embedded
+plan SHA-256, and artifact-set SHA-256 match state and the current complete plan
+set. `not-applicable` is valid only for `legacy-recovery` or
+`self-authored-minimal-plan`. Missing, stale, partially populated, mismatched, or
+failing evidence blocks Gate 1. Never infer functional completeness from the
+architect result, current Markdown, or an earlier gate presentation.
+
 For any pending or partially recorded gate, regenerate evidence from durable
 artifacts, write a fresh nonce, re-present the numbered gate in the primary
 conversation, and stop. Never repair a field or copy a decision from prose,
@@ -161,6 +170,30 @@ issues, tools, specialists, or an earlier presentation. After appending the
 recovery event and updating `next_action`, load only the reference for the
 mapped phase. Findings and any tree change after Freeze follow the normal
 implementation → re-Freeze → validation route; recovery must not skip it.
+
+When `phase: implementation`, first validate that `test_contract_evidence`
+points to a bounded regular non-symlink `evidence/test-contracts.json`, that its
+SHA-256 matches `index_sha256`, and that its closed schema, task count, aggregate
+status, and four status counts match the state summary. Then validate each task
+entry before resuming the named task. `pending` resumes at the fresh tester
+dispatch; `red` requires readable contract and red-result files whose
+`contract_sha256` and `red_evidence_sha256` match the index before any
+implementer dispatch; `green` additionally requires matching
+`green_evidence_sha256`; `not-applicable` requires the task shard's exact
+plan-time reason. Missing, mismatched, duplicated, unknown-task, oversized, or
+partially populated evidence blocks.
+Never infer red or green from a test name, current suite result, agent prose, or
+an unhashed workspace artifact.
+
+Also validate `cleaner_evidence` before resuming implementation. `pending`
+resumes at allowlist construction; `baseline` requires readable allowlist and
+pre-cleaner result files whose SHA-256 values and candidate commit/tree match
+state before dispatching a fresh cleaner; `pass` additionally requires the
+hashed post-cleaner result and matching current commit/tree; `not-applicable`
+requires the closed `repository-quality-manifest-incomplete` reason. Missing,
+stale, partially populated, out-of-scope, or mismatched cleaner evidence blocks.
+Never infer a baseline, formatter/lint result, CRAP value, or behavior-preserving
+verdict from cleaner prose or the current worktree.
 
 ## Correction-decision recovery
 

@@ -36,7 +36,7 @@ Each agent the pipeline dispatches via the Task tool starts its own isolated con
 
 **Implications for a pipeline run:**
 
-- **Cold start per agent.** On the first turn of each dispatched agent (architect, implementer, tester, qa, security, delivery), there are no cache hits. The agent warms its own cache across its own subsequent turns.
+- **Cold start per agent.** On the first turn of each dispatched agent (architect, implementer, tester, qa, security, delivery), there are no cache hits; cleaner incurs that cold start only when its checkpoint is applicable. The agent warms its own cache across its own subsequent turns.
 - **5-minute TTL for subagents.** Subagents use the 5-minute cache write TTL even when the operator is on a Claude subscription — the automatic 1-hour TTL applies only to the main conversation.
 - **Model tiering means separate caches by design.** opus agents (architect, agent-builder, security, …), sonnet agents (implementer, tester, qa, delivery, …), and haiku agents (researcher, init-project) each have independent per-model caches. This is expected, not a defect; model tiering reduces absolute cost because cheaper models have lower base input prices.
 - **Re-dispatch reuse window.** Re-dispatching the same agent type within 5 minutes reuses that agent's warm cache (the prefix bytes are identical). Iteration loops, patch-mode selective re-runs, and parallel same-agent lanes all benefit when they stay inside this window.

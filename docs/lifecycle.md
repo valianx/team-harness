@@ -5,7 +5,7 @@ opencode. The table retains the detailed CC/opencode comparison; Codex uses the
 same tag/version namespace, consumes the tagged Git tree through its repository
 marketplace whose `init` skill loads lightweight intake into a clean `Main`
 thread and whose `pipeline` skill explicitly loads full orchestration,
-and has a separate ten-agent installer lifecycle. See
+and has a separate twelve-agent installer lifecycle. See
 [`codex-runtime.md`](./codex-runtime.md).
 
 Each stage is marked:
@@ -52,14 +52,14 @@ One tag, one release event, N runtime artifacts, one version namespace. Re-runni
 
 ## Installer identity
 
-The Go installer (`cmd/install/`) manages opencode assets and the ten generated Codex agent TOMLs. It does not install marketplace plugins and does not modify Codex `config.toml`; plugin install/update/remove remains marketplace-owned. Claude Code has no reachable binary-install path.
+The Go installer (`cmd/install/`) manages opencode assets and the twelve generated Codex agent TOMLs. It does not install marketplace plugins and does not modify Codex `config.toml`; plugin install/update/remove remains marketplace-owned. Claude Code has no reachable binary-install path.
 
 The Claude marketplace is the Claude Code install channel. All three runtimes
 now expose the same 57 canonical skill names. Claude Code consumes the source
 skills directly; Codex packages ten native contracts plus 47 generated
 adapters; opencode receives generated adapters plus six native lifecycle or
-session overrides. The Codex setup/update flow separately places six specialists for the gated
-pipeline and four read-only specialists for PR review. The Go binary remains the opencode
+session overrides. The Codex setup/update flow separately places seven specialists for the gated
+pipeline, one direct inline reviewer, and four read-only specialists for PR review. The Go binary remains the opencode
 install channel.
 
 ---

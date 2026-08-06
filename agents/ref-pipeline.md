@@ -153,7 +153,7 @@ Read this at boot. Read a phase's own section when you reach it.
 |---|---|---|---|---|
 | `design` | `architect` | the spec and codebase context on the board | `01-plan.md` manifest + `plan/**` shards | — |
 | `waiting_gate1` | **the operator** | the sharded plan set and review result | approve / edit / reject | **mandatory stop** |
-| `implementation` | `implementer` (+ `tester` for evidence) | released task shards and named anchors | code, implementation record and evidence | — |
+| `implementation` | `implementer` (+ `tester` and one bounded `cleaner`) | released task shards and named anchors | code, implementation record and evidence | — |
 | `validation` | `qa`, `adversary` when the security floor applies | the frozen tree and assigned shards | validation and audit findings | — |
 | `waiting_gate3` | `delivery` preview, then **the operator** | validated tree and exact delivery coordinates/digests | ship / amend / abort | **mandatory stop** |
 | `delivery` | **you** mechanics | `gate3_release: ship`, exact preview, validated commit/tree | push, draft PR, merge-state snapshot | — |
@@ -171,6 +171,7 @@ Two columns only, because two facts are all you need: when to call it, and what 
 | `architect` | `design`, or after an explicit live operator request for post-Gate-1 architect work | `01-plan.md` + classification |
 | `implementer` | `implementation`, after Gate 1 is released | `02-implementation.md` |
 | `tester` | `implementation` evidence checkpoint; bug-fix regression setup first | `03-testing.md` |
+| `cleaner` | once after green evidence and before Freeze, when the repository declares the full cleaner quality command set | cleanup commit or evidenced no-op |
 | `qa` | `validation`, over the frozen tree | `reviews/04-validation.md` + `code_hygiene: pass\|fail` |
 | `adversary` | `validation` when the derived security floor applies | `reviews/04-adversary.md` + `broke-it \| could-not-break` |
 | `security` | explicit operator-requested standalone design review only; never automatic pipeline planning | `reviews/01-plan-review.md § Security Design-Review` |
@@ -707,10 +708,13 @@ writes coordination state.
 | `fix` | 4 | `root-cause`, `full-root-cause` + mandatory `## Prior Art` | both |
 | `hotfix` | any | skipped | one-sentence prose plan at the gate |
 
-The minimum Stage-1 contract is: intent and observable result; included and excluded
-scope; functional Given/When/Then `AC-N` criteria; separate `TC-N` technical constraints;
-request-vs-realized scope shape; tasks with file ownership and dependencies; required risks,
-rollback/mitigation and verification. A
+The minimum Stage-1 contract leads with the problem and observable outcome,
+actors and flows, business rules and examples, alternate/error behavior,
+unchanged behavior, non-goals, and decisions for human review. Functional
+Given/When/Then `AC-N` criteria remain in task shards. Separate `TC-N` technical
+constraints, request-vs-realized scope shape, architecture, patterns, tasks with
+file ownership and dependencies, risks, rollback/mitigation, and verification
+remain required in their technical shards. A
 plan may include sketches only when they make an acceptance surface concrete. There is
 no automatic approach checkpoint, structure loop, ratification loop, shape panel, or
 post-approval offer on the normal path. `/th:plan-review` remains available only when the
@@ -722,20 +726,30 @@ dispatch with the controlled `TH-STATE-REF` first line, and clear the boundary a
 return. A missing live reply may be recorded as `provenance: inferred`; it keeps the checkpoint
 open and blocks the architect dispatch. It never releases Gate 1 or becomes operator approval.
 
-Planning dispatches only `architect`. For every plan, the coordinator performs only a
-deterministic presence/coherence check before Gate 1: required sections exist, ACs and TCs
-are separated, files/dependencies are coherent, `implementation_references_in_ac: 0`, and no
-clarification marker remains. Security-sensitive plans carry the architect's security
+Planning dispatches only `architect`. For every new `sharded-v1` plan, Main
+resolves `plan-contract.mjs` from the pipeline skill, runs it with the workspace
+and `01-plan.md`, and persists the complete JSON result, result SHA-256, plan
+SHA-256, and artifact-set SHA-256 in `plan_contract_evidence`. The tool requires
+the ordered functional surface, path-free operator summary, manifest and task
+coherence, AC/TC separation and counts, pre-implementation routing, and the
+technical architecture sections. A missing, malformed, stale, or failing record
+blocks Gate 1; agent prose cannot replace it. Legacy recovery and the documented
+self-authored hotfix/Tier-1 routes record the closed not-applicable reason instead
+of being silently migrated. Security-sensitive plans carry the architect's security
 assessment and security-relevant TCs forward to the final security lens; they do not add a
 design-review dispatch. An invalid artifact receives one normal design correction; an
 unresolved ambiguity blocks and is surfaced to the operator. There is no automatic Stage-1
 perfection cycle.
 
-The `sharded-v1` plan set remains canonical: `01-plan.md` is the compact manifest and
-operator summary, while architecture, delivery/dependencies, conditional invariants, and
-task AC/TC contracts live in the relevant `plan/**` shards. Gate 1 surfaces
-`realized_scope: expanded` with task, file, AC, and TC counts so the operator can proceed or
-narrow the request. `/th:plan-review` is an explicit
+The `sharded-v1` plan set remains canonical: `01-plan.md` is the compact
+functional contract and manifest, while architecture, delivery/dependencies, conditional invariants, and
+task AC/TC contracts live in the relevant `plan/**` shards. Gate 1 synthesizes
+the observable delta, principal actor/flow, representative rule/example,
+alternate/error behavior, unchanged behavior, non-goals, open decisions, and
+only decision-bearing technical risks involving compatibility, security,
+irreversibility, public contracts, cost, or an explicit trade-off. It also
+surfaces `realized_scope: expanded` with task, file, AC, and TC counts so the
+operator can proceed or narrow the request. `/th:plan-review` is an explicit
 operator flow only; it may dispatch `qa-plan`, `security`, and `plan-reviewer` without
 creating a pipeline state or gate.
 The stable options are shown with their numeric shortcuts and textual equivalents:
@@ -789,6 +803,11 @@ contradiction through an implementation correction without the operator's decisi
 
 **Agent:** `tester`, `mode: pre-fix-regression`. `type: fix`/`hotfix`, mandatory by default.
 
+When the task uses the manifest-enabled pre-implementation behavioral contract
+below, that generalized checkpoint owns the same regression obligation and this
+legacy checkpoint does not dispatch a second tester. This route remains for
+bug-fix repositories that have not adopted `test_contract`.
+
 **No fallback.** If the tester cannot author a regression test the pipeline blocks. There is no manual-repro-script exit.
 
 | `bug_tier` | Condition | Action |
@@ -834,6 +853,38 @@ resulting full commit SHA as `verification_base_ref`. An absent or unresolvable 
 implementation. Every implementation diff consumer and Freeze use only the immutable SHA; the
 source ref exists solely for Freeze's movement check. The verification packet later copies the
 SHA and never becomes its producer.
+
+### Implementation checkpoint — pre-implementation behavioral test contract
+
+This checkpoint is task-gated and creates no phase or gate. A task with
+`Pre-implementation test: required` must have a repository quality manifest
+whose `commands.test` is an exact argv array and whose
+`test_contract.path_rules` declares test-only paths. Main resolves
+`quality-runner.mjs` and `test-transition.mjs` relative to the loaded pipeline
+skill/reference and fails closed if the manifest or either helper is absent.
+
+Immediately before each applicable task, record current `HEAD` as its test
+baseline and dispatch one fresh `tester`, `mode: pre-implementation-contract`,
+with only that task shard, named anchors, manifest path, branch/worktree, and a
+coordinator-owned workspace contract path. Tester reads functional ACs first,
+authors the smallest behavior test expected to fail, commits only the declared
+test paths, and returns `failure_matches_contract: true|false`. Main verifies
+commit integrity and no production changes, runs `test-transition.mjs
+--transition red`, persists its complete JSON and SHA-256, and advances only on
+machine `verdict: pass` plus semantic `failure_matches_contract: true`. A syntax,
+fixture, dependency, infrastructure, unrelated-suite, or already-green failure
+blocks; agent prose cannot override the machine result.
+
+The implementer receives the contract/red evidence pointers and hashes and may
+not edit or delete their test paths. After implementation, Main runs the same
+helper with `--transition green`. It requires the identical contract, manifest,
+test command, task baseline, and test blob identities, plus red-candidate
+ancestry and an exit-zero test result. A mismatch or remaining red result is an
+implementation bounce under max-3. Record one entry per task in the bounded,
+hashed `evidence/test-contracts.json` index and keep only its digest, counts,
+and aggregate status in `test_contract_evidence` state. `not-applicable` is
+valid only when the task shard already carries its plan-time reason;
+implementation never infers or rewrites that decision.
 
 **Register `base_sha` before EVERY `implementer`/`tester` dispatch.** `git rev-parse HEAD`, recorded as an attribute of that dispatch's `phase.start`. This is the external baseline the commit-integrity check anchors against — without it a dispatch that produced nothing could report a stale-but-ancestor sha and pass a bare ancestry check trivially.
 
@@ -932,7 +983,7 @@ does not arbitrate post-implementation requirement changes.
 
 ### Implementation checkpoint — code-hygiene scan
 
-**Yours, not a dispatch.** Run after implementation edits and before evidence is frozen. The fixed `git diff` + `grep -E` pipeline is pinned in `docs/code-hygiene-gate.md § 3.1` and run against `verification_base_ref` from state — never against a packet that does not exist yet. That file is the single source for this scan and for `qa`'s Layer-2 audit.
+**Yours, not a dispatch.** Run after evidence authoring and the cleaner checkpoint (or its recorded not-applicable disposition), immediately before evidence is frozen. The fixed `git diff` + `grep -E` pipeline is pinned in `docs/code-hygiene-gate.md § 3.1` and run against `verification_base_ref` from state — never against a packet that does not exist yet. That file is the single source for this scan and for `qa`'s Layer-2 audit.
 
 | Result | Action |
 |---|---|
@@ -944,7 +995,7 @@ Shares the max-3 cap for implementation bounces. A clean scan is a trace event o
 
 ### Implementation checkpoint — evidence authoring
 
-**Agent:** `tester`, `mode: authoring`. Runs before Freeze and the validation state, over a tree that is immutable afterward. The tester classifies each AC and TC as `test`, `command`, or `inspection`, records the complete evidence dependency paths, reuses sufficient evidence, authors only warranted missing tests, runs the relevant suite/commands, and writes `03-testing.md`'s evidence map. This is the only full tester authoring dispatch in the non-bug-fix flow; a correction may dispatch one fresh tester only for rows made stale by changed requirement text, exact command/arguments, or any consumed implementation, test, fixture, configuration, or argument-file dependency blob.
+**Agent:** `tester`, `mode: authoring`. Runs before Freeze and the validation state, over a tree that is immutable afterward. The tester classifies each AC and TC as `test`, `command`, or `inspection`, records the complete evidence dependency paths, reuses sufficient evidence, authors only warranted missing tests, runs the relevant suite/commands, and writes `03-testing.md`'s evidence map. For tasks with a pre-implementation contract, reuse its frozen test paths and complete only missing evidence rows; never rewrite those tests. For other non-bug tasks this remains the full authoring write point. A correction may dispatch one fresh tester only for rows made stale by changed requirement text, exact command/arguments, or any consumed implementation, test, fixture, configuration, or argument-file dependency blob.
 
 Bug-fix flow: resume the regression contract started at the implementation checkpoint and complete the remaining evidence-map rows.
 
@@ -953,6 +1004,55 @@ Bug-fix flow: resume the regression contract started at the implementation check
 **Browser readiness (non-blocking).** When `warranted_types` includes `e2e`/`browser-mode` and tooling is missing, surface the proposed setup commands and wait for confirmation or an explicit decline.
 
 **jsdom-only soft gate (non-blocking).** When `frontend_scope: true`, no browser-real type was warranted, and the decision log shows a browser-API AC routed to jsdom, note it and proceed unless the operator asks for a re-route.
+
+### Implementation checkpoint — behavior-preserving cleaner and CRAP
+
+This is one post-green checkpoint over the consolidated tree, not one dispatch
+per task and not a phase or gate. It applies only when the repository quality
+manifest declares `test`, `format_check`, `lint`, and `crap` commands,
+`test_contract.path_rules`, and the CRAP policy. Otherwise record
+`cleaner_evidence.status: not-applicable` with
+`reason: repository-quality-manifest-incomplete`; do not infer metrics or ask an
+agent to substitute for missing deterministic tooling.
+
+After evidence authoring has committed all warranted tests, require a clean
+tree. Derive the cleaner allowlist as existing production paths that are both in
+the approved task `Files:` union and changed from `verification_base_ref` to
+current `HEAD`. Exclude every test/evidence dependency path, fixture, snapshot,
+manifest, generated file, lockfile, migration, public schema, version site,
+changelog, and workspace artifact. Persist the sorted allowlist and SHA-256; an
+empty allowlist is an evidenced no-op.
+
+Main resolves and runs `cleaner-transition.mjs --transition pre` with the
+repository, manifest, `verification_base_ref`, `HEAD`, and allowlist. The helper
+runs the embedded `quality-runner.mjs` `pre_cleaner` checks `test,crap` in
+`measure` mode, validates the allowlist against the immutable changed surface,
+and returns one closed wrapper. Persist that complete result and SHA-256 and
+record its candidate commit/tree. Any failure blocks cleanup: no agent may
+reinterpret it.
+On pass, dispatch exactly one fresh `cleaner` at `sonnet/medium` with the
+allowlist, functional AC summary, applicable TCs, manifest, and hashed baseline.
+The cleaner may edit only allowlisted existing production paths, never tests or
+quality inputs, and returns a cleanup commit or justified no-op.
+
+Main then runs `cleaner-transition.mjs --transition post` with the exact
+allowlist path/hash and pre-transition path/hash. The helper proves the cleaner
+commit descends from the baseline, rejects additions, deletions, renames, type
+changes, and modifications outside the allowlist, then runs the embedded
+`post_cleaner` checks `test,format_check,lint,crap` in `enforce` mode. Pass
+requires all commands green, no changed or new function over policy, no CRAP
+worsening when forbidden, and every baseline function still present in the
+normalized report. Missing functions fail as
+`CRAP_REPORT_INCOMPLETE`; they cannot disappear from measurement by renaming,
+splitting, exclusion, or adapter omission.
+
+A post-check failure dispatches a fresh cleaner with only the bounded failure
+coordinates and consumes the normal max-3 implementation budget. Tests or
+behavior failing, any protected/out-of-scope change, threshold/config changes,
+or an unavailable required tool blocks rather than being waived. Persist the
+post result and SHA-256, cleaner commit, candidate identity, and pass status;
+then run the code-hygiene scan and proceed to Freeze. QA remains an independent
+auditor of the frozen result.
 
 > **Automatic knowledge capture is removed.** Doctrine and KG capture leave delivery entirely. When the operator asks, use the explicit knowledge/documentation flow outside the automatic pipeline; never add a second `delivery` dispatch.
 

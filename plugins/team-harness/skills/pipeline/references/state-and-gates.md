@@ -103,6 +103,9 @@ gate1_release: approved|approved-autonomous|rejected|edit|null
 gate3_release: ship|amend|abort|null
 regression_test_path: {path}|null
 regression_test_status: failing|passing|skipped|null
+test_contract_evidence: {status: pending|red|green|not-applicable|mixed, index_path, index_sha256, task_count, status_counts: {pending, red, green, not_applicable}}|null
+plan_contract_evidence: {status: pending|pass|not-applicable, reason, result_path, result_sha256, plan_sha256, artifact_set_sha256}|null
+cleaner_evidence: {status: pending|baseline|pass|not-applicable, reason, allowlist_path, allowlist_sha256, baseline_path, baseline_sha256, baseline_commit_sha, baseline_tree_sha, cleaner_commit_sha, post_path, post_sha256, post_commit_sha, post_tree_sha}|null
 plan_review_status: not-requested|requested|pass|concerns|fail|null
 audit_status: pending|done|unavailable|null
 code_hygiene: pass|fail|null
@@ -130,6 +133,17 @@ Also keep a short phase checklist and a bounded specialist-results table with
 only the latest result per role. The complete file must stay ≤160 lines and
 ≤16 KB. Update existing fields in place; do not grow narrative inside the
 snapshot.
+
+`test_contract_evidence` is always a bounded pointer and summary, never an
+inline per-task array. `index_path` names the workspace-owned
+`evidence/test-contracts.json` artifact and `index_sha256` binds its exact
+bytes. That closed schema-versioned artifact contains at most 128 task records
+with `task_id`, status, `not_applicable_reason`, `contract_path`,
+`contract_sha256`, `red_evidence_path`, `red_evidence_sha256`,
+`red_commit_sha`, `red_tree_sha`, `green_evidence_path`, and
+`green_evidence_sha256`. Main atomically replaces the artifact and recomputes
+the digest, task count, overall status, and four status counts after every task
+transition. This keeps the snapshot below 16 KB even at the maximum task count.
 
 `usage_*`, `total_tokens`, and `cost_*` are the current aggregate rendered from
 `phase.end.usage` records under [observability.md](observability.md). They

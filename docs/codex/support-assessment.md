@@ -5,8 +5,8 @@
 **Scope:** shipped native Codex support without changing the current Claude Code or opencode runtime contracts
 
 **Parity update (2026-08-02):** the canonical 57-skill catalog is now projected
-to Codex and opencode through runtime adapters. Codex installs the six-agent pipeline
-roster plus the four read-only agents required by `review-pr`; the ten-agent set
+to Codex and opencode through runtime adapters. Codex installs the seven-agent pipeline
+roster, one direct inline reviewer, and the four read-only agents required by `review-pr`; the twelve-agent set
 remains intentionally narrower than the full semantic agent fleet. The
 original narrow-beta proposal below is retained as design history.
 
@@ -122,7 +122,7 @@ Include:
 - install, update, and uninstall ownership tracking;
 - explicit pipeline activation;
 - progressively loaded coordinator instructions;
-- `architect`, `implementer`, `tester`, `qa`, `security`, and `delivery`;
+- `architect`, `implementer`, `tester`, `cleaner`, `qa`, `security`, and `delivery`;
 - Markdown-to-TOML custom-agent rendering;
 - deterministic Sol/Luna model and effort projection;
 - the minimum pipeline skills;
@@ -132,7 +132,7 @@ Include:
 
 Defer from the original beta scope:
 
-- full custom-agent projection beyond the six pipeline specialists;
+- full custom-agent projection beyond the seven pipeline specialists;
 - complete observability parity;
 - prose-presence or snapshot tests over agent wording;
 - process gates removed from the current Claude Code flow; and

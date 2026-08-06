@@ -4,7 +4,7 @@ New Tier 2-4 plans use `plan_format: sharded-v1`:
 
 | Artifact | Authority |
 |---|---|
-| `01-plan.md` | operator summary, review attestation, classification, manifest, task status index |
+| `01-plan.md` | functional contract, review attestation, classification, manifest, task status index |
 | `plan/architecture.md` | decisions, services, assessments, file-level work plan |
 | `plan/delivery.md` | dependencies, bases, version, PR grouping |
 | `plan/invariants.md` | cross-project/multi-site invariants; omit when none |
@@ -14,6 +14,23 @@ The index begins with `**Plan format:** sharded-v1` and maps every artifact and
 task to an exact path. Each fact has one canonical home; never copy
 architecture, invariant, task, or AC prose into the index.
 
+`## Review Summary` is the operator-facing functional contract and the first
+`##` section. Require these subsections in order: `### Problem and Observable
+Outcome` (`- Problem:`, `- Observable outcome:`), `### Actors and Flows` (an
+`- Actor:`), `### Business Rules and Examples` (a `- Rule:` and an
+`- Example:`), `### Alternate and Error Behavior`, `### Unchanged Behavior`,
+`### Non-Goals`, and `### Decisions for human review` (1–7 bullets). Every
+decision bullet ends with `→ decided ...` or `→ open question`; when none
+remain, use a validator-compatible declaration such as
+`- None — no operator decisions remain → decided by approved request`. Use an
+explicit `None — {reason}` bullet for any other genuinely empty list. No code fence,
+private implementation symbol, file ownership, command, or `file:line`
+reference belongs in this functional surface. Public contract names are the
+only exception. Confidence, scope shape, classification, and conditional
+operator-facing scope/dissent blocks follow it. Technical approach, patterns,
+engineering risks/trade-offs, services, and file work live in
+`plan/architecture.md`.
+
 Every new task shard has separate `## Acceptance Criteria`,
 `## Technical Constraints`, and `## Verification` sections. `AC-N` uses
 Given/When/Then and describes only behavior observable by a user, API consumer,
@@ -22,6 +39,13 @@ components, frameworks, mocks, or test mechanics unless that name is itself a
 supported public contract. `TC-N` owns mandatory internal mechanisms and
 engineering invariants. `VERIFY:` acceptance criteria are legacy-recovery input
 only and are never emitted by a new plan. Gates count ACs and TCs separately.
+The Verification section also declares exactly one literal routing line:
+`- **Pre-implementation test:** required` or
+`- **Pre-implementation test:** not-applicable — {reason}`.
+Use `required` only when the repository quality manifest has both
+`commands.test` and `test_contract.path_rules` and the task changes observable runtime behavior.
+Otherwise use
+`not-applicable` with the concrete reason; this field is neither an AC nor a TC.
 
 Resolve paths from the index once. Implementer reads its task plus named design
 anchors. Tester reads task ACs and TCs plus the verification packet; QA grades
@@ -37,8 +61,12 @@ two lines per invariant, and task fixed prose 30 lines plus at most two prose
 lines per AC or TC. Preserve all required items and record
 `size_reason: required-items` above a target.
 
-Gates synthesize decision, material risks, counts, links, options, and nonce in
-at most 12 non-empty lines before required exceptions. Routine updates use at
+Gates synthesize observable delta, actor/flow, representative rule/example,
+alternate/error behavior, unchanged behavior, non-goals, open decisions,
+decision-bearing risks, counts, links, options, and nonce in at most 12
+non-empty lines before required exceptions. Include technical detail only for
+compatibility, security, irreversibility, public contracts, cost, or an explicit
+trade-off. Routine updates use at
 most five lines: outcome, changed state, blocker/risk, next action, link.
 
 A workspace without the format marker is legacy `monolith-v1`. Recovery may

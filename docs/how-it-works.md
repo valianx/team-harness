@@ -42,19 +42,24 @@ posture or release a gate.
 
 ### `design` and `waiting_gate1`
 
-The architect produces the `sharded-v1` plan set: `01-plan.md` is the compact operator summary
-and manifest, while architecture, delivery/dependencies, conditional invariants, and each task/AC
-contract live under `plan/`. Roles resolve only the shards their decision needs. It also writes
+The architect produces the generated `sharded-v1` workspace plan set: its plan
+index is the functional contract and manifest, leading with observable outcome,
+actors/flows, rules and examples, errors, unchanged behavior, non-goals, and
+human decisions. Generated architecture, delivery/dependency, conditional
+invariant, and task/AC shards hold the technical realization. Roles resolve
+only the shards their decision needs. It also writes
 plan sketches when the change touches those surfaces. `qa-plan` and `plan-reviewer` are available
 only through an explicit `/th:plan-review`; their panel output stays in
 `reviews/01-plan-review.md` and never creates an automatic pipeline state.
 
 `th:orchestrator` runs Discover first, asks for an explicit advance, then dispatches one
-`architect` pass. The architect produces the manifest plus required plan shards with intention,
-included/excluded scope, functional Given/When/Then acceptance criteria, tasks with file ownership
-and dependencies, and only the risks needed to make the decision. Required sketches are emitted
-when their classification triggers them. The coordinator validates the minimum artifact,
-transcribes the architect's classification, and remains the sole writer of `00-state.md`.
+`architect` pass. The coordinator runs the deterministic functional plan
+validator over the resulting manifest and shards, persists their hashes, and
+blocks Gate 1 on missing or stale evidence. Gate 1 synthesizes the functional
+contract and includes technical detail only when it is decision-bearing.
+Required sketches are emitted when their classification triggers them. The
+coordinator transcribes the architect's classification and remains the sole
+writer of `00-state.md`.
 
 There is no automatic approach checkpoint, ratification loop, structure loop, or post-approval
 review offer. `/th:plan-review` remains available only when explicitly invoked. A sensitive
@@ -67,7 +72,12 @@ for the decision, while `3: detail` and `4: reason` carry edits or rejection con
 
 ### `implementation` and `validation`
 
-After Gate 1, the coordinator dispatches the approved implementation work and evidence pass.
+After Gate 1, a manifest-enabled task that changes observable runtime behavior first goes to a
+fresh tester. The tester commits only the behavioral contract tests; a deterministic runner proves
+that the test-only commit is red, freezes its hashes, and later proves the identical tests and exact
+command are green after implementation. Documentation and repositories that have not adopted the
+manifest record a plan-time not-applicable reason. This is an implementation checkpoint, not a new
+phase or gate. The coordinator then dispatches the approved implementation work and evidence pass.
 Tester, QA, and the applicable security lens inspect the resulting tree. A code, test, or
 documentation defect inside scope returns to the implementation executor and the affected
 validation delta is rerun. Missing evidence returns to tester. A correctable security
@@ -112,7 +122,7 @@ states or gates.
 | State | Bug-fix difference |
 |---|---|
 | `design` | Root-cause analysis and a minimal plan identify the regression, file:line mechanism, scope fence, and functional AC. It is not a separate state or automatic review loop. |
-| `implementation` | Tester establishes regression evidence; implementer keeps the fix scoped; coordinator assembles version/changelog and commits the complete candidate before Freeze. |
+| `implementation` | Tester establishes regression evidence; implementer keeps the fix scoped; when the repository declares the complete quality contract, one bounded cleaner improves the changed production surface under deterministic test, formatter, lint, scope, and CRAP checks before Freeze. |
 | `validation` | QA validates the regression no longer reproduces. Security review remains conditional on the same fail-closed security floor. Findings route through the common final-result correction path. |
 | `delivery` | Verifies the exact validated commit/tree, pushes it, and creates the draft PR; it does not test or mutate the branch. |
 
@@ -175,7 +185,7 @@ Each row is a real failure mode encountered and patched. See [`docs/knowledge.md
 
 ## What ships
 
-- **Agents.** 28 agents. The coordination agent — `orchestrator` (top-level session agent) — plus the specialists: `architect`, `implementer`, `tester`, `qa`, `qa-plan`, `pr-review-qa`, `plan-reviewer`, `delivery`, `reviewer`, `reviewer-consolidator`, `pr-review-security`, `security`, `ux-reviewer`, `diagrammer`, `likec4-diagrammer`, `d2-diagrammer`, `documenter`, `translator`, `gcp-cost-analyzer`, `gcp-infra`, `init-project`, `agent-builder`, `mentor`, `researcher`, `research-consolidator`, `code-researcher`, `adversary`. How they relate at runtime: [`docs/agent-tree.md`](./agent-tree.md). Full roster, model tier (opus / sonnet / haiku), and effort matrix: [`agents/README.md`](../agents/README.md).
+- **Agents.** 29 agents. The coordination agent — `orchestrator` (top-level session agent) — plus the specialists: `architect`, `implementer`, `tester`, `cleaner`, `qa`, `qa-plan`, `pr-review-qa`, `plan-reviewer`, `delivery`, `reviewer`, `reviewer-consolidator`, `pr-review-security`, `security`, `ux-reviewer`, `diagrammer`, `likec4-diagrammer`, `d2-diagrammer`, `documenter`, `translator`, `gcp-cost-analyzer`, `gcp-infra`, `init-project`, `agent-builder`, `mentor`, `researcher`, `research-consolidator`, `code-researcher`, `adversary`. How they relate at runtime: [`docs/agent-tree.md`](./agent-tree.md). Full roster, model tier (opus / sonnet / haiku), and effort matrix: [`agents/README.md`](../agents/README.md).
 - **Skills** (slash commands). `/th:pipeline` explicitly activates the gated flow; most others route through the direct kernel. Standalone utilities include `/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:update`, and `/th:background`. Common routed entries include `/th:design`, `/th:plan`, `/th:recover`, `/th:deliver`, `/th:review-pr`, and `/th:issue`. `/th:background` launches a background `claude -p` headless session for eligible long-running tasks — it does not route through `th:orchestrator`.
 - **Hooks.** Registered boundary hooks are intentionally narrow: `policy-block` blocks catastrophic recursive deletion and provider-shaped credentials; `dev-guard` gates Git/GitHub/ClickUp outward actions; `gcp-guard` classifies mutating gcloud verbs. Additional retained hook bodies may be unwired; `.claude-plugin/hooks.json` is the authority. Notification scripts are optional. Full catalog: [`hooks/README.md`](../hooks/README.md).
 - **External Memory MCP** server. Semantic memory across projects. The server (`context-harness-mcp` or any MCP-compatible service) lives outside this repo. Reference: [`docs/kg-content-policy.md`](./kg-content-policy.md).

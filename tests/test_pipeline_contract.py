@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Structural checks for the converged Claude/Codex pipeline contract.
+"""Structural checks for the converged Claude/Codex/opencode pipeline contract.
 
 The pipeline is specified by Markdown because both runtimes consume prose.  This
 suite checks the small set of machine-shaped invariants that must not drift across
@@ -689,6 +689,83 @@ def check_review_feedback_closures() -> None:
         for marker in ("snapshot_status: query-failed", "ci_snapshot: unavailable", "never retry"):
             require(marker in delivery, f"{relative}: failed PR snapshot misses {marker!r}")
 
+
+def check_preimplementation_test_contract() -> None:
+    """Test-first routing stays functional, deterministic, and recoverable."""
+    planning_sources = {
+        "architect": read("agents/architect.md").lower(),
+        "Claude shards": read("docs/plan-shards.md").lower(),
+        "Codex shards": read(
+            "plugins/team-harness/skills/pipeline/references/plan-shards.md"
+        ).lower(),
+    }
+    for label, text in planning_sources.items():
+        require(
+            "pre-implementation test" in text
+            and "required" in text
+            and "not-applicable" in text,
+            f"{label}: pre-implementation applicability field is missing",
+        )
+        require(
+            "observable runtime behavior" in text and "test_contract" in text,
+            f"{label}: applicability is not functional and manifest-gated",
+        )
+
+    tester = read("agents/tester.md").lower()
+    tester_adapter = read("runtime/codex/instructions/tester.md").lower()
+    for label, text in (("Claude tester", tester), ("Codex tester", tester_adapter)):
+        for marker in (
+            "pre-implementation-contract",
+            "failure_matches_contract",
+            "never edit production source",
+            "already",
+        ):
+            require(marker in text, f"{label}: test-first marker missing: {marker}")
+
+    claude = re.sub(r"\s+", " ", read("agents/ref-pipeline.md").lower())
+    codex = re.sub(
+        r"\s+",
+        " ",
+        read("plugins/team-harness/skills/pipeline/references/implementation.md").lower(),
+    )
+    for label, text in (("Claude", claude), ("Codex", codex)):
+        for marker in (
+            "test-transition.mjs",
+            "--transition red",
+            "--transition green",
+            "failure_matches_contract",
+            "test blob",
+            "phase or gate",
+        ):
+            require(marker in text, f"{label}: deterministic transition marker missing: {marker}")
+
+    state = read(
+        "plugins/team-harness/skills/pipeline/references/state-and-gates.md"
+    ).lower()
+    recovery = read(
+        "plugins/team-harness/skills/pipeline/references/recovery.md"
+    ).lower()
+    require("test_contract_evidence" in state, "test contract evidence is not durable state")
+    for marker in ("index_path", "index_sha256", "status_counts", "inline per-task array"):
+        require(marker in state, f"test evidence index contract misses {marker}")
+    for marker in ("contract_sha256", "red_evidence_sha256", "green_evidence_sha256"):
+        require(marker in state, f"state misses immutable test evidence field {marker}")
+    require(
+        "test_contract_evidence" in recovery
+        and "never infer red or green" in recovery
+        and "sha-256" in recovery,
+        "recovery can trust unhashed or inferred test transition evidence",
+    )
+
+    require(
+        (ROOT / "plugins/team-harness/skills/pipeline/scripts/test-transition.mjs").is_file(),
+        "deterministic test transition helper is missing",
+    )
+    require(
+        (ROOT / "docs/test-contract-runner.md").is_file(),
+        "test transition operator documentation is missing",
+    )
+
     dispatch = read("agents/_shared/dispatch-contract.md").lower()
     require("security assessment anchors" in dispatch, "adversary dispatch lost security anchors")
     require("design-review verdict" not in dispatch, "adversary dispatch still depends on retired design review")
@@ -750,6 +827,160 @@ def check_review_feedback_closures() -> None:
     require("require `security` to perform a focused audit" in validation, "security-audit wording remains ambiguous")
     security_adapter = read("runtime/codex/instructions/security.md").lower()
     require("changed a security anchor or invariant" in security_adapter, "security adapter can carry stale anchor/invariant evidence")
+
+
+def check_cleaner_crap_contract() -> None:
+    """The cleaner remains one bounded, tool-owned pre-Freeze checkpoint."""
+    claude = re.sub(r"\s+", " ", read("agents/ref-pipeline.md").lower())
+    codex = re.sub(
+        r"\s+",
+        " ",
+        read("plugins/team-harness/skills/pipeline/references/implementation.md").lower(),
+    )
+    for label, text in (("Claude", claude), ("Codex", codex)):
+        for marker in (
+            "repository-quality-manifest-incomplete",
+            "exactly one fresh",
+            "cleaner-transition.mjs",
+            "--transition pre",
+            "--transition post",
+            "test,format_check,lint,crap",
+            "crap_report_incomplete",
+            "allowlist",
+            "freeze",
+        ):
+            require(marker in text, f"{label}: cleaner checkpoint misses {marker!r}")
+        require(
+            "not a phase or gate" in text or "not another phase or gate" in text,
+            f"{label}: cleaner checkpoint creates a phase or gate",
+        )
+
+    for label, relative in (
+        ("Claude cleaner", "agents/cleaner.md"),
+        ("Codex cleaner", "runtime/codex/instructions/cleaner.md"),
+    ):
+        cleaner = re.sub(r"\s+", " ", read(relative).lower())
+        for marker in (
+            "existing production files",
+            "allowlist",
+            "never edit",
+            "tests",
+            "never weaken",
+            "crap",
+            "observable behavior",
+        ):
+            require(marker in cleaner, f"{label}: scope contract misses {marker!r}")
+
+    state = read("plugins/team-harness/skills/pipeline/references/state-and-gates.md").lower()
+    recovery = read("plugins/team-harness/skills/pipeline/references/recovery.md").lower()
+    shared_state = read("agents/_shared/orchestrator-state.md").lower()
+    require("cleaner_evidence" in state, "cleaner evidence is not durable state")
+    require("cleaner_evidence" in shared_state, "agent state schema misses cleaner evidence")
+    for marker in ("allowlist_sha256", "baseline_sha256", "post_sha256"):
+        require(marker in state, f"cleaner state misses immutable field {marker!r}")
+    require(
+        "cleaner_evidence" in recovery
+        and "never infer" in recovery
+        and "sha-256" in recovery,
+        "recovery can trust inferred or unhashed cleaner evidence",
+    )
+    require(
+        (ROOT / "plugins/team-harness/skills/pipeline/scripts/cleaner-transition.mjs").is_file(),
+        "deterministic cleaner transition helper is missing",
+    )
+    require((ROOT / "docs/cleaner-crap.md").is_file(), "cleaner operator documentation is missing")
+
+
+def check_functional_first_plan_contract() -> None:
+    """Stage 1 leads with behavior while deterministic evidence owns shape."""
+    canonical = re.sub(r"\s+", " ", read("docs/plan-shards.md").lower())
+    codex_shards = re.sub(
+        r"\s+",
+        " ",
+        read("plugins/team-harness/skills/pipeline/references/plan-shards.md").lower(),
+    )
+    architect = re.sub(r"\s+", " ", read("agents/architect.md").lower())
+    adapter = re.sub(r"\s+", " ", read("runtime/codex/instructions/architect.md").lower())
+    required = (
+        "problem and observable outcome",
+        "actors and flows",
+        "business rules and examples",
+        "alternate and error behavior",
+        "unchanged behavior",
+        "non-goals",
+        "decisions for human review",
+        "plan/architecture.md",
+    )
+    for label, text in (
+        ("canonical plan shards", canonical),
+        ("Codex plan shards", codex_shards),
+        ("Claude architect", architect),
+        ("Codex architect", adapter),
+    ):
+        for marker in required:
+            require(marker in text, f"{label}: functional-first marker missing {marker!r}")
+
+    for label, relative in (
+        ("Claude", "agents/ref-pipeline.md"),
+        ("Codex", "plugins/team-harness/skills/pipeline/references/design.md"),
+    ):
+        text = re.sub(r"\s+", " ", read(relative).lower())
+        for marker in (
+            "plan-contract.mjs",
+            "plan_contract_evidence",
+            "artifact-set sha-256",
+            "observable delta",
+            "representative rule/example",
+            "unchanged behavior",
+            "non-goals",
+        ):
+            require(marker in text, f"{label}: Stage 1 route misses {marker!r}")
+        require(
+            "planning dispatches only `architect`" in text or "planning dispatches only architect" in text,
+            f"{label}: functional-first planning added a specialist dispatch",
+        )
+
+    state_sources = (
+        read("agents/_shared/orchestrator-state.md").lower(),
+        read("plugins/team-harness/skills/pipeline/references/state-and-gates.md").lower(),
+    )
+    for text in state_sources:
+        for marker in ("plan_contract_evidence", "result_sha256", "plan_sha256", "artifact_set_sha256"):
+            require(marker in text, f"plan evidence state misses {marker!r}")
+    recovery = read("plugins/team-harness/skills/pipeline/references/recovery.md").lower()
+    for marker in ("plan_contract_evidence", "legacy-recovery", "self-authored-minimal-plan", "never infer functional completeness"):
+        require(marker in recovery, f"plan evidence recovery misses {marker!r}")
+
+    reviewer = re.sub(r"\s+", " ", read("agents/plan-reviewer.md").lower())
+    require("functional-first readability" in reviewer, "explicit plan review still prioritizes technical layout")
+    require("functional contract contains implementation detail" in reviewer, "plan reviewer cannot reject functional/technical leakage")
+    require(
+        (ROOT / "plugins/team-harness/skills/pipeline/scripts/plan-contract.mjs").is_file(),
+        "functional plan validator is missing",
+    )
+    require((ROOT / "docs/functional-plan-contract.md").is_file(), "functional plan documentation is missing")
+
+
+def check_cross_runtime_pipeline_runners() -> None:
+    """Every runtime receives the same deterministic pipeline runner bytes."""
+    names = (
+        "bounded-command.mjs",
+        "cleaner-transition.mjs",
+        "plan-contract.mjs",
+        "quality-runner.mjs",
+        "test-transition.mjs",
+    )
+    for name in names:
+        canonical_path = ROOT / "skills/pipeline/scripts" / name
+        codex_path = ROOT / "plugins/team-harness/skills/pipeline/scripts" / name
+        opencode_path = ROOT / "installer-assets/opencode-skills/pipeline/scripts" / name
+        require(canonical_path.is_file(), f"canonical pipeline runner is missing: {name}")
+        canonical = canonical_path.read_bytes()
+        require(codex_path.is_file() and codex_path.read_bytes() == canonical, f"Codex pipeline runner drifted: {name}")
+        require(opencode_path.is_file() and opencode_path.read_bytes() == canonical, f"opencode pipeline runner drifted: {name}")
+
+    opencode_registry = read("cmd/install/manifest_registry.go")
+    require('".mjs":  true' in opencode_registry, "opencode installer does not emit pipeline runner assets")
 
 
 def check_direct_predicate() -> None:
@@ -831,7 +1062,7 @@ def check_single_writer() -> None:
 
     # Runtime adapters are the executable role boundary. Every specialist must
     # explicitly deny both coordination-state writes and gate decisions.
-    for role in ("architect", "implementer", "tester", "qa", "security", "delivery"):
+    for role in ("architect", "implementer", "tester", "cleaner", "qa", "security", "delivery"):
         adapter = read(f"runtime/codex/instructions/{role}.md").lower()
         state_denied = re.search(
             r"\b(?:do not|never|must not|may not)\b[^.;\n]*\bwrite\b[^.;\n]*(?:\b00-state\b|\bcoordination state\b)",
@@ -991,8 +1222,8 @@ def check_profile_and_document_guards() -> None:
     # Coordinator ownership remains explicit in both projections. This also
     # guards against reintroducing specialist writes while changing routing.
     specialist_write = re.compile(
-        r"(?:`(?:architect|implementer|tester|qa|security|delivery|specialist)`|"
-        r"\b(?:architect|implementer|tester|qa|security|delivery|specialist)\b(?!['’]s))"
+        r"(?:`(?:architect|implementer|tester|cleaner|qa|security|delivery|specialist)`|"
+        r"\b(?:architect|implementer|tester|cleaner|qa|security|delivery|specialist)\b(?!['\u2019]s))"
         r"[^\.\n]*(?:\bwrite\w*|\bedit\w*|\brepair\w*|\bcreate\w*)[^\.\n]*00-state",
         re.IGNORECASE,
     )
@@ -2410,6 +2641,10 @@ def main() -> None:
         ("corrective routes", check_corrective_routes),
         ("explicit validation correction decision", check_explicit_validation_correction_decision),
         ("PR 588 review closures", check_review_feedback_closures),
+        ("pre-implementation test contract", check_preimplementation_test_contract),
+        ("cleaner and CRAP contract", check_cleaner_crap_contract),
+        ("functional-first Stage 1 contract", check_functional_first_plan_contract),
+        ("cross-runtime deterministic runners", check_cross_runtime_pipeline_runners),
         ("authoritative post-Gate-1 transitions", check_authoritative_post_gate1_transitions),
         ("direct predicate", check_direct_predicate),
         ("single writer", check_single_writer),

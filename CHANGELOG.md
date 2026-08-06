@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.10.0] - 2026-08-06
+
+### Added
+
+- Added a deterministic functional-first plan validator with closed hashed
+  evidence for plan structure, manifest/task consistency, and recovery.
+- Added a standalone deterministic quality runner with a versioned repository
+  manifest, immutable Git evidence, bounded argv-only execution, normalized
+  complexity/coverage input, and before/after CRAP policy enforcement.
+- Added opt-in pre-implementation behavioral test contracts with hashed,
+  test-only red evidence and immutable red-to-green verification before the
+  implementation tree can advance to validation.
+- Added one opt-in pre-Freeze cleaner pass over a hashed production allowlist,
+  with deterministic behavior, scope, formatter, lint, and before/after CRAP
+  enforcement.
+
+### Changed
+
+- Made Stage 1 and Gate 1 lead with observable outcomes, actors, flows, rules,
+  examples, errors, unchanged behavior, and non-goals while keeping technical
+  realization in sharded architecture and task artifacts.
+- Made behavior-changing manifest-enabled tasks route through a tester before
+  implementation while keeping the checkpoint inside the existing
+  implementation phase and preserving both Stage Gates.
+- Made incomplete post-cleaner CRAP reports fail closed so measured functions
+  cannot disappear from the comparison.
+
 ## [3.9.0] - 2026-08-05
 
 ### Added
@@ -2883,7 +2910,8 @@ Initial release of the `claude-dev-team` agent system distribution.
 - `gh` — GitHub CLI (used by several skills).
 - **context7 API key** — for library docs retrieval.
 
-[Unreleased]: https://github.com/valianx/team-harness/compare/v2.138.0...HEAD
+[Unreleased]: https://github.com/valianx/team-harness/compare/v3.10.0...HEAD
+[3.10.0]: https://github.com/valianx/team-harness/compare/v3.9.0...v3.10.0
 [2.138.0]: https://github.com/valianx/team-harness/compare/v2.137.0...v2.138.0
 [2.131.0]: https://github.com/valianx/team-harness/compare/v2.130.1...v2.131.0
 [2.15.1]: https://github.com/valianx/team-harness/compare/v2.15.0...v2.15.1

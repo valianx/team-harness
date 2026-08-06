@@ -316,6 +316,61 @@ run_node_suite "bounded-command" "test_bounded_command.mjs" "node not found — 
 
 echo
 echo "############################################################"
+echo "# Suite 164: deterministic repository quality runner"
+echo "# Requires: node and git. Missing runtimes follow CI-required semantics."
+echo "############################################################"
+if ! command -v node >/dev/null 2>&1; then
+    report_skip_or_fail "quality-runner" "node not found — install Node.js to run this suite"
+elif ! command -v git >/dev/null 2>&1; then
+    report_skip_or_fail "quality-runner" "git not found — install Git to run this suite"
+elif node "$TESTS_DIR/test_quality_runner.mjs"; then
+    echo "quality-runner: PASS"
+else
+    echo "quality-runner: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 165: deterministic red-to-green test transition"
+echo "# Requires: node and git. Missing runtimes follow CI-required semantics."
+echo "############################################################"
+if ! command -v node >/dev/null 2>&1; then
+    report_skip_or_fail "test-transition" "node not found — install Node.js to run this suite"
+elif ! command -v git >/dev/null 2>&1; then
+    report_skip_or_fail "test-transition" "git not found — install Git to run this suite"
+elif node "$TESTS_DIR/test_test_transition.mjs"; then
+    echo "test-transition: PASS"
+else
+    echo "test-transition: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 166: deterministic cleaner and CRAP transition"
+echo "# Requires: node and git. Missing runtimes follow CI-required semantics."
+echo "############################################################"
+if ! command -v node >/dev/null 2>&1; then
+    report_skip_or_fail "cleaner-transition" "node not found — install Node.js to run this suite"
+elif ! command -v git >/dev/null 2>&1; then
+    report_skip_or_fail "cleaner-transition" "git not found — install Git to run this suite"
+elif node "$TESTS_DIR/test_cleaner_transition.mjs"; then
+    echo "cleaner-transition: PASS"
+else
+    echo "cleaner-transition: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 167: deterministic functional-first plan contract"
+echo "# Requires: node. Missing runtime follows CI-required semantics."
+echo "############################################################"
+run_node_suite "functional-plan-contract" "test_plan_contract.mjs" "node not found — install Node.js to run this suite"
+
+echo
+echo "############################################################"
 echo "# Suite 162: Codex pipeline-efficiency provenance preflight (AC18)"
 echo "# Requires: node. Skipped when absent (NOT a pass — see output)."
 echo "############################################################"

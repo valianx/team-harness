@@ -20,7 +20,7 @@ write:
 
 - `scripts/manage_config.py` validates, backs up, and atomically writes native
   settings with mode `0o600`.
-- `scripts/manage_agents.py` installs or refreshes the eleven bundled generated
+- `scripts/manage_agents.py` installs or refreshes the twelve bundled generated
   agents without overwriting an unmanaged same-name file.
 - `scripts/manage_github_identities.py` validates and atomically manages the
   runtime-neutral GitHub workspace/account routes without reading token bytes.
@@ -96,9 +96,12 @@ migration, and preserve every unrelated value.
    `codex features list` only when this step runs. The generated project config
    also enables both flags and supplies the generic `gpt-5.6-terra` / `medium`
    subagent fallback under `[agents]`; it never overrides Main's selected
-   Sol/xhigh model. Global installation synchronizes the ten role files with
-   their exact per-role mappings rather than attempting a fragile global model
-   config rewrite.
+   model. Global installation applies the same fallback narrowly: agent sync
+   installs a missing fallback and migrates only the known obsolete
+   `gpt-5.6-luna` value to `gpt-5.6-terra` / `medium`. It preserves any other
+   explicit operator-selected fallback as `custom-preserved`. Named specialists
+   always retain the generated per-role projection table rather than inheriting
+   this generic fallback.
 
 5. Gather only requested values, showing current values as defaults. Apply all
    selected settings in one `manage_config.py set` command.
@@ -143,7 +146,7 @@ migration, and preserve every unrelated value.
    directory with `GH_CONFIG_DIR=<dir> gh auth login` remains an operator action;
    never read, print, copy, or store token bytes.
 
-6. Reconcile all eleven bundled specialists in the persisted scope on every full
+6. Reconcile all twelve bundled specialists in the persisted scope on every full
    setup, and whenever `agents` is targeted:
 
    ```bash
@@ -151,7 +154,7 @@ migration, and preserve every unrelated value.
    python3 scripts/manage_agents.py sync --scope SCOPE
    ```
 
-   The pipeline set is `architect`, `implementer`, `tester`, `qa`, `security`,
+   The pipeline set is `architect`, `implementer`, `tester`, `cleaner`, `qa`, `security`,
    and `delivery`; the direct inline review set is `inline-reviewer`; the PR-review
    set is `reviewer`, `pr-review-qa`, `pr-review-security`, and
    `reviewer-consolidator`. Missing files are installed and stale Team Harness-managed
@@ -159,6 +162,10 @@ migration, and preserve every unrelated value.
    conflict: report it and do not overwrite it. Writes outside the repository
    use Codex's native permission prompt. Do not use or download the separate Go
    installer; the marketplace snapshot is the source of these agent bytes.
+   Inspect and sync output includes `runtimeConfig`, `runtimeConfigChanged`, and
+   `restartRequired`. When sync changes any role or the fallback, require a new
+   Codex thread before declaring the runtime ready; Codex does not hot-reload the
+   custom-agent registry in the active thread.
 
 7. Configure selected MCP servers after `codex mcp list --json`. Preserve an
    existing registration unless the operator explicitly requests replacement.
@@ -187,7 +194,7 @@ migration, and preserve every unrelated value.
 
 9. Re-run the applicable helper inspections and `codex mcp list --json`; re-run
     `codex features list` only when step 4 ran. Report one compact result:
-    native config path, workspace/language, agent scope and eleven agent statuses,
+    native config path, workspace/language, agent scope and twelve agent statuses,
     GitHub route count when configured, feature-flag status when checked, MCP registrations, hook
     verification/trust, and whether a new thread is required. Never print
     imported opaque values, secrets, or environment-variable values.

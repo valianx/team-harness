@@ -17,9 +17,9 @@ Then invoke `$team-harness:setup`. The marketplace only distributes code;
 setup converges the operational installation. It writes native settings to
 `${CODEX_HOME:-$HOME/.codex}/.team-harness.json`, configures workspace and
 language preferences and optional GitHub identity routes, offers Memory/context7
-MCP registration, verifies hook trust, and places eleven bundled specialist
+MCP registration, verifies hook trust, and places twelve bundled specialist
 agents in project or global scope:
-six for the gated pipeline, one direct read-only inline reviewer, and four for
+seven for the gated pipeline, one direct read-only inline reviewer, and four for
 immutable PR review.
 An explicit setup import can copy missing values from Claude Code or opencode
 without printing opaque values; normal Codex modes never read another
@@ -39,7 +39,7 @@ codex plugin marketplace add valianx/team-harness \
 Use `$team-harness:update` for the normal update flow. It refreshes the
 marketplace, compares versions, refreshes the installed plugin through an
 idempotent native `codex plugin add` under native permissions, ensures native
-settings exist, and automatically aligns all eleven
+settings exist, and automatically aligns all twelve
 bundled agents in the configured scope. It also runs a guarded compatibility
 bridge for the running thread's old versioned cache path. A missing or
 previously bridged path can follow the new snapshot; a real active old snapshot
@@ -92,7 +92,7 @@ pipeline contracts remain hand-authored for Codex; the other 47 are generated
 runtime adapters that package the canonical workflow, references, scripts, and
 assets while translating invocation, configuration paths, tools, delegation,
 and permission boundaries. This includes the diagram family and both GCP
-skills. The eleven generated specialist definitions used by the gated pipeline,
+skills. The twelve generated specialist definitions used by the gated pipeline,
 direct inline review, and PR review remain a separate setup/update concern.
 Consumers do not need the Go installer.
 Run `$team-harness:modes` for an alphabetical catalog with concise descriptions,
@@ -112,10 +112,10 @@ CI and the prepublish guard require these sites to be changed together when a
 distributed runtime input changes. Repositories that predate the Codex plugin
 or installer path retain optional-site compatibility until that path exists.
 
-The six pipeline agents are a mandatory prerequisite for the gated `pipeline` skill,
+The seven pipeline agents are a mandatory prerequisite for the gated `pipeline` skill,
 but not for lightweight `init` intake:
 the primary thread must find a complete set of `architect.toml`,
-`implementer.toml`, `tester.toml`, `qa.toml`, `security.toml`, and
+`implementer.toml`, `tester.toml`, `cleaner.toml`, `qa.toml`, `security.toml`, and
 `delivery.toml` in either the project `.codex/agents/` or global
 `$CODEX_HOME/agents/` scope before it delegates. Setup/update install them from
 the marketplace snapshot. The direct read-only `inline-reviewer` is the only specialist used
@@ -134,11 +134,11 @@ plugin. `@Team-Harness init <task>` loads only the lightweight orchestrator
 kernel: it begins conversational intake and handles simple bounded work directly
 without workspace state, gates, or agent preflight. A live request for tester,
 QA, or security is also supported as a workspace-free inline review; it does not
-activate the pipeline or require a six-agent preflight.
+activate the pipeline or require a seven-agent preflight.
 
 Only that explicit pipeline invocation (or explicit approval after intake)
 loads the phase contracts. `Main` then owns pipeline state and delegates
-directly to `architect`, `implementer`, `tester`, `qa`, `security`, and
+directly to `architect`, `implementer`, `tester`, `cleaner`, `qa`, `security`, and
 `delivery`. It does not spawn a seventh or persistent orchestrator and returns
 to direct behavior when the workflow completes or is explicitly aborted.
 
@@ -204,7 +204,7 @@ precedence and retains that flow's snapshot, lens selection, consolidation,
 preview, and publication gate.
 
 Skill activation does not change Main's selected model, reasoning effort,
-sandbox, or approval policy. The projection below applies to all eleven installed
+sandbox, or approval policy. The projection below applies to all twelve installed
 specialists:
 
 | Claude role metadata | Codex model | Effort |
@@ -213,6 +213,13 @@ specialists:
 | `sonnet` + `high` or `xhigh` | `gpt-5.6-terra` | `high` |
 | `sonnet` + `medium` | `gpt-5.6-terra` | `medium` |
 | `haiku` | `gpt-5.6-terra` | `low` |
+
+The role table is independent from the generic fallback. Global setup and
+update install a missing fallback and atomically migrate the known obsolete
+`gpt-5.6-luna` value to `gpt-5.6-terra` / `medium`, with a backup. Any other
+explicit operator-selected fallback is preserved as `custom-preserved`. A
+fallback or named-role change reports `restartRequired: true`; the active Codex
+thread must be replaced because it does not hot-reload its agent registry.
 
 `.codex/README.md` is the generated roster. After editing canonical role
 metadata or adapters, run `$sync-codex-agents`; do not hand-edit generated TOML.
@@ -267,7 +274,7 @@ The preflight never fetches or changes either source root, never invokes an A/B
 plugin tree hashes, an explicit `@Team-Harness pipeline` prompt, two isolated
 `CODEX_HOME`s under an empty `/tmp/team-harness-codex-efficiency-ab.*` root,
 the locally installed cache/provenance match for each side, and the complete
-six-agent pipeline roster. Its only output is a closed allowlisted receipt.
+seven-agent pipeline roster. Its only output is a closed allowlisted receipt.
 `status: "PASS"` means **measurement permitted**, not savings demonstrated or
 quality accepted. A live comparison still requires that PASS plus the same
 live gate decisions, independent quality receipts, Freeze, and mandatory

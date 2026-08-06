@@ -27,6 +27,7 @@ export const EXPECTED_PIPELINE_ROSTER = Object.freeze([
   "architect.toml",
   "implementer.toml",
   "tester.toml",
+  "cleaner.toml",
   "qa.toml",
   "security.toml",
   "delivery.toml",

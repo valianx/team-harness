@@ -107,7 +107,7 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    ```
 
 5. Read `agent-scope` from the native config (the ensured default is
-   `global`) and reconcile all ten bundled agents automatically:
+   `global`) and reconcile all twelve bundled agents automatically:
 
    ```bash
    python3 NEW_PLUGIN/skills/setup/scripts/manage_agents.py inspect --scope SCOPE
@@ -115,8 +115,13 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    ```
 
    Install missing agents and replace only stale Team Harness-generated files.
-   Stop on an unmanaged same-name conflict. Do not call or download the
-   separate Go installer; agent bytes are part of the marketplace snapshot.
+   The same sync installs a missing generic fallback or migrates the obsolete
+   `gpt-5.6-luna` fallback to `gpt-5.6-terra` / `medium`; any other explicit
+   operator-selected fallback is preserved and reported as `custom-preserved`.
+   Named roles keep their exact generated model/effort mappings. Stop on an
+   unmanaged same-name conflict. Do not call or download the separate Go
+   installer; agent bytes are part of the marketplace snapshot. Preserve
+   `runtimeConfigChanged` and `restartRequired` from sync for the final report.
 
 6. Inspect `codex mcp list --json`. Preserve registered MCP definitions and
    report missing registrations that native configuration expects; never
@@ -145,7 +150,7 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    succeeds.
 
 8. Verify the installed plugin version, native settings, both multi-agent
-   features, ten agent files, MCP list, and bridge target. Report old/new
+   features, twelve agent files, MCP list, and bridge target. Report old/new
    versions, marketplace result, config migration, V2 feature reconciliation,
    agent reconciliation, hook status, bridge status, and any recovery command.
    When the bridge reports `restartRequired: false`, state

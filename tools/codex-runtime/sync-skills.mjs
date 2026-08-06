@@ -88,6 +88,14 @@ const opencodeSpecialMappings = new Map([
   ["trace", "Resolve workspace and pricing settings from opencode-native Team Harness configuration and remain read-only."],
 ]);
 
+const sharedPipelineScripts = [
+  "bounded-command.mjs",
+  "cleaner-transition.mjs",
+  "plan-contract.mjs",
+  "quality-runner.mjs",
+  "test-transition.mjs",
+];
+
 function yamlString(value) {
   return JSON.stringify(value);
 }
@@ -346,6 +354,66 @@ async function syncSharedSetupAssets({ check, rootDir }) {
   if (check && stale) throw new Error("shared setup assets are stale");
 }
 
+async function assertSafeDestinationPath(rootDir, target, leafKind) {
+  const relativeTarget = relative(rootDir, target);
+  if (relativeTarget === ".." || relativeTarget.startsWith(`..${sep}`)) {
+    throw new Error(`shared pipeline destination escapes root: ${target}`);
+  }
+  const components = [rootDir];
+  let current = rootDir;
+  for (const part of relativeTarget.split(sep).filter(Boolean)) {
+    current = join(current, part);
+    components.push(current);
+  }
+  for (const [index, component] of components.entries()) {
+    let stat;
+    try {
+      stat = await lstat(component);
+    } catch (error) {
+      if (error?.code === "ENOENT") continue;
+      throw error;
+    }
+    if (stat.isSymbolicLink()) throw new Error(`refusing symbolic-link pipeline destination: ${component}`);
+    const isLeaf = index === components.length - 1;
+    if ((!isLeaf || leafKind === "directory") && !stat.isDirectory()) {
+      throw new Error(`pipeline destination component is not a directory: ${component}`);
+    }
+    if (isLeaf && leafKind === "file" && !stat.isFile()) {
+      throw new Error(`pipeline destination is not a regular file: ${component}`);
+    }
+  }
+}
+
+export async function syncSharedPipelineAssets({ check, rootDir }) {
+  const sourceRoot = join(rootDir, "skills/pipeline/scripts");
+  const targetRoot = join(rootDir, "plugins/team-harness/skills/pipeline/scripts");
+  await assertSafeDestinationPath(rootDir, targetRoot, "directory");
+  let stale = false;
+  for (const name of sharedPipelineScripts) {
+    const source = join(sourceRoot, name);
+    const target = join(targetRoot, name);
+    const expected = await readFile(source);
+    let current;
+    try {
+      await assertSafeDestinationPath(rootDir, target, "file");
+      current = await readFile(target);
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+    if (current?.equals(expected)) continue;
+    stale = true;
+    if (check) {
+      process.stderr.write(`stale shared pipeline asset: ${relative(rootDir, target)}\n`);
+      continue;
+    }
+    await assertSafeDestinationPath(rootDir, targetRoot, "directory");
+    await mkdir(dirname(target), { recursive: true });
+    await assertSafeDestinationPath(rootDir, target, "file");
+    await writeFile(target, expected);
+  }
+  if (check && stale) throw new Error("shared pipeline assets are stale");
+}
+
 export async function syncSkills({ check = false, rootDir = defaultRoot } = {}) {
   rootDir = resolve(rootDir);
   const names = await canonicalNames(rootDir);
@@ -366,6 +434,7 @@ export async function syncSkills({ check = false, rootDir = defaultRoot } = {}) 
     overrides: opencodeOverrides,
   });
   await syncSharedSetupAssets({ check, rootDir });
+  await syncSharedPipelineAssets({ check, rootDir });
   return { names, codexGenerated, opencodeGenerated };
 }
 
