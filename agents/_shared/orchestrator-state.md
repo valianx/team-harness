@@ -231,6 +231,7 @@ task_decomposition: {...}|null              # implementation decomposition, not 
 ```
 regression_test_path: {path}|null
 regression_test_status: failing|passing|skipped|null
+plan_contract_evidence: {status: pending|pass|not-applicable, reason, result_path, result_sha256, plan_sha256, artifact_set_sha256}|null
 plan_review_status: not-requested|requested|pass|concerns|fail|null  # only explicit /th:plan-review
 audit_status: pending|done|unavailable|null  # set in validation: pending on dispatch, done on report, unavailable after a second audit failure. STAGE-GATE-3 states it in the block; it is not a machine-checked precondition — the tree anchor is the only one (agents/ref-pipeline.md § STAGE-GATE-3)
 code_hygiene: pass|fail|null                # docs/code-hygiene-gate.md

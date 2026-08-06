@@ -154,6 +154,15 @@ terminal run. For corrupt, incomplete, oversized, or unmappable state, report
 only the path and failed structural checks; never echo raw snapshot or event
 content.
 
+Before resuming `design` or presenting Gate 1, validate
+`plan_contract_evidence`. `pending` resumes at deterministic plan validation;
+`pass` requires a readable `plan-contract.mjs` result whose SHA-256, embedded
+plan SHA-256, and artifact-set SHA-256 match state and the current complete plan
+set. `not-applicable` is valid only for `legacy-recovery` or
+`self-authored-minimal-plan`. Missing, stale, partially populated, mismatched, or
+failing evidence blocks Gate 1. Never infer functional completeness from the
+architect result, current Markdown, or an earlier gate presentation.
+
 For any pending or partially recorded gate, regenerate evidence from durable
 artifacts, write a fresh nonce, re-present the numbered gate in the primary
 conversation, and stop. Never repair a field or copy a decision from prose,

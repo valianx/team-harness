@@ -154,7 +154,7 @@ Mandatory output for `feature`, `refactor`, `enhancement`, and `fix` Tier 2-4 de
 2. **Provenance** — `claim → file:line`. One row per factual claim the plan makes about the current tree (a count, a line range, a contradiction), grounding it in a citable location so a reviewer can check the claim against the diff rather than against the prose.
 3. **Removed-control** — `removal → worst-case cost → named successor`. One row per control, gate, phase, or field this plan removes, stating what the worst case looks like if the removal is wrong and which surviving mechanism (or explicitly: none) stands in its place. No removal ships in the plan without a row here.
 
-Populate the rubric from the plan's own content — it is a structural index over decisions already made in `## Architecture`, not a place to introduce new ones.
+Populate the rubric from the plan's own content — it is a structural index over decisions already made in `plan/architecture.md`, not a place to introduce new ones.
 
 ### Design Mode — Plan Output (`sharded-v1`)
 
@@ -258,40 +258,41 @@ is missing or empty.
 
 ## Review Summary
 
-> One-paragraph scope: what this feature does and why.
-
 **Tasks:** {N} | **Services:** {comma-separated list} | **Estimated complexity:** standard|complex
 
+### Problem and Observable Outcome
+- Problem: {current user/operator/system problem, without implementation detail}
+- Observable outcome: {what becomes observably different when the work succeeds}
+
+### Actors and Flows
+- Actor: {actor} → {trigger or action} → {observable result}
+
+### Business Rules and Examples
+- Rule: {business or supported-product rule}
+- Example: Given {context}, when {action}, then {observable result}
+
+### Alternate and Error Behavior
+- {alternate path, rejected input, failure behavior, or `None — {reason}`}
+
+### Unchanged Behavior
+- {observable behavior or supported contract that must remain unchanged}
+
+### Non-Goals
+- {explicit exclusion or `None — {reason}`}
+
 ### Decisions for human review
-- **{short label}** — {one-sentence context}. {Your reasoning in one sentence}. → decided as {X} | → open question
-- ...
-(or "- No human-judgement decisions required — all trade-offs follow established project patterns. → decided")
+- **{short label}** — {decision-bearing functional context}. → decided as {X} | → open question
+(or "- No human-judgement decisions required — the functional contract follows the approved request. → decided")
+
+### Confidence Score
+**Confidence:** N/10 (single-pass)
+- {spec clarity | prior art | blast radius | unknowns}: {one sentence}
 
 ### Architect Dissent on Seed
 <!-- Mandatory when spec_seed_dissent: true; OMIT entirely when no seed or no dissent -->
 > {1-2 sentences: what the seed proposed and why it is deficient.}
 > {The approach actually taken, with rationale.}
 > {Any open question for the operator if the fork is genuinely ambiguous.}
-
-### Proposed Approach
-{1 paragraph: the chosen approach and any material alternatives the operator must decide between.}
-
-### Confidence Score
-**Confidence:** N/10 (single-pass)
-- {factor name}: {one sentence on how this factor influenced the score}
-- {factor name}: {one sentence on how this factor influenced the score}
-
-### Patterns to Mirror
-- `{path}:{line}` — {what pattern to copy}
-(or "- No in-repo pattern to mirror — this introduces a new surface. → noted")
-
-### Risks
-| Risk | Severity | Mitigation |
-|------|----------|------------|
-| {risk} | {high/medium/low} | {mitigation} |
-
-### Trade-offs
-- Chose X over Y because {reason}
 
 ### Real-vs-Stated Scope
 
@@ -362,9 +363,19 @@ For each multi-site invariant, list **every** site where it must hold. Fence sit
 
 ### Key Decisions
 {The architectural decisions and their rationale, at implementation depth. This is the
-detailed counterpart to `## Review Summary § Proposed Approach`, which states the chosen
-approach in one paragraph for the operator. Never repeat the heading `### Proposed Approach`
-here — one heading, one meaning, one location.}
+detailed realization of the approved functional contract.}
+
+### Proposed Approach
+{The chosen technical approach and its rationale.}
+
+### Patterns to Mirror
+- `{path}:{line}` — {what pattern to copy}
+(or "- No in-repo pattern to mirror — this introduces a new surface.")
+
+### Engineering Risks and Trade-offs
+| Concern | Severity | Disposition |
+|---------|----------|-------------|
+| {risk or trade-off} | {high/medium/low} | {mitigation or chosen alternative and reason} |
 
 ### Services Touched
 {list of services, one per line}
@@ -679,7 +690,12 @@ Structurally identical to the feature-flow plan schema (see "Design Mode — Pla
 
 **Root-Cause classification.** Because root-cause mode's `01-plan.md § Review Summary` inherits the same `### Classification block` subsection as Design mode ("Structurally identical" above), it carries the same nine values — including `changes_security_control: true|false` — set per "Phase 2 — Plan Sketches (Design Mode) § Step 1" (the "(Design Mode)" heading label is historical; the mandate there explicitly covers `fix` Tier 2-4, i.e., every root-cause dispatch that reaches the classification step). Apply the same fail-closed default and the same diff-grounded justification requirement for a `false` declaration on a `security_sensitive: true` bug fix — a mischaracterized regression fix is exactly the kind of change the field exists to catch.
 
-**Required capabilities, not a line count.** The `## Task List` covers three things, which may be combined into as few tasks as the fix genuinely needs: **confirm the mechanism**, **apply the correction**, **verify the result** — plus authoring the regression test when one is required (§ "Regression Test Approach"). A trivial fix may close all of them in one task; a line minimum would only pad it, which fights the point of a light root-cause. `01-plan.md` is always produced for a `type: fix` dispatch, never stripped.
+**Required capabilities, not a line count.** The task shards collectively cover
+three things, which may be combined into as few tasks as the fix genuinely
+needs: **confirm the mechanism**, **apply the correction**, and **verify the
+result** — plus authoring the regression test when required. A trivial fix may
+close them in one task; a line minimum would only pad it. `01-plan.md` is always
+produced for a `type: fix` dispatch, never stripped.
 
 `type: hotfix` is not your concern: you are never dispatched for it (see the mode's own preamble above). The hotfix plan is authored inline by the coordinator, which owns that flow end to end — `agents/ref-special-flows.md § Hotfix sub-flow` is its single authority. Describing a mode you are never dispatched into creates a second source that drifts from the first.
 
@@ -930,19 +946,24 @@ Use Glob, Grep, and Read to understand:
 
 When requirements are ambiguous, what you do depends on whether being wrong is recoverable.
 
-- **Reversible technical ambiguity** — which pattern to follow, how to structure a module, where a boundary sits. Decide it from the codebase's own patterns, document the assumption in `01-plan.md`, and keep moving. Do not stop to ask; a wrong call here costs a refactor.
+- **Reversible technical ambiguity** — which pattern to follow, how to structure a module, where a boundary sits. Decide it from the codebase's own patterns, document the assumption in `plan/architecture.md`, and keep moving. Do not stop to ask; a wrong call here costs a refactor.
 - **Irreversible or contractual ambiguity** — a business rule, a public API or wire contract, a data-retention or deletion policy, a migration that discards data, anything touching authentication, authorization, payments or PII. Do not decide it. Return `status: blocked` with `failure_kind: contradiction`, name the fork, and state what each branch commits the project to. A wrong call here ships a decision the operator never made and may not be able to unmake.
 - **Ambiguity that contradicts an AC** — the spec asks for two things that cannot both hold. Never resolve it by picking the branch that is easier to plan. Surface the contradiction; it blocks ratification.
 
 The distinction is *cost of being wrong*, not *difficulty of deciding*. A hard technical call you are well-placed to make is still yours; an easy call about someone else's business rule is still theirs.
 
-**External-report tasks:** when the task originated from a GitHub issue, issue comment, PR review comment, or ClickUp-routed task, apply **Spec Feedback Protocol Channel 3 — Stale external-report scope** during this phase — re-verify each claimed item against the tree and write `### Real-vs-Stated Scope` into `## Review Summary`. See `docs/discover-phase.md §13` for the full procedure.
+**External-report tasks:** when the task originated from a GitHub issue, issue
+comment, PR review comment, or ClickUp-routed task, apply **Spec Feedback
+Protocol Channel 3 — Stale external-report scope** during this phase. Put the
+path-free functional disposition in `01-plan.md § Review Summary` and the
+evidence table in `plan/architecture.md § Real-vs-Stated Evidence`. See
+`docs/discover-phase.md §13` for the full procedure.
 
 ---
 
 ## Phase 2 — Architecture Design
 
-**Minimum-plan contract (Design Mode only).** Produce one functional plan in one pass. The plan must state the requested intent and observable result, included and excluded scope, functional Given/When/Then ACs, separately identified `TC-N` engineering constraints, request-vs-realized scope shape, tasks with file ownership and dependencies, and only the risks needed to make the decision. Keep `### Proposed Approach` as a concise rationale in `## Review Summary`, but do not emit an approach checkpoint, automatic convergence loop, ratification pass, or post-approval review offer. A plan is valid when the minimum contract is coherent; `/th:plan-review` is available only after an explicit operator invocation.
+**Minimum-plan contract (Design Mode only).** Produce one functional plan in one pass. `01-plan.md` leads with the problem and observable outcome, actors and flows, business rules and examples, alternate/error behavior, unchanged behavior, non-goals, and human decisions. It then carries scope shape, classification, the artifact manifest, and task counts. Functional Given/When/Then ACs remain in the task shards; separately identified `TC-N` engineering constraints, architecture, patterns, file ownership, dependencies, commands, risks, and technical trade-offs live only in their technical shards. Do not emit an approach checkpoint, automatic convergence loop, ratification pass, or post-approval review offer. A plan is valid when both the functional contract and its technical realization are coherent; `/th:plan-review` is available only after an explicit operator invocation.
 
 If analysis finds a genuine contradiction between intent, scope, and AC, return `status: blocked` with the conflicting elements and the decision required. Do not widen or rewrite the plan through an automatic refinement cycle. Planning has one specialist only: architect. A security-sensitive plan records its security assessment and security-relevant TCs for the final security lens; it does not dispatch an automatic design reviewer.
 
@@ -971,8 +992,12 @@ An invariant lives in more than one file when a single logical constraint (a ver
 **Whenever your design introduces or modifies such an invariant:**
 
 1. Enumerate the **full site-set** — every file and anchor where the invariant must hold. A site you omit is invisible to the coordinator's implementation-assembly MATCH check and to the implementer.
-2. **Fence sites that MUST NOT change.** Mark them in the `### Multi-site invariants` table in `## Review Summary`. This tells the implementer which sites are frozen and tells the coordinator which fenced sites to verify are unmodified.
-3. **Apply the discipline reflexively.** The `### Multi-site invariants` block in `01-plan.md § Review Summary` IS itself a multi-site invariant: if it names a site that the implementer must edit, the implementer edits ALL sites in the same concern-commit (not piecemeal). The table is the source-of-truth for that atomicity requirement.
+2. **Fence sites that MUST NOT change.** Mark them in `plan/invariants.md`. This
+   tells the implementer which sites are frozen and tells the coordinator which
+   fenced sites to verify are unmodified.
+3. **Apply the discipline reflexively.** If the invariant shard names a site
+   that the implementer must edit, the implementer edits every named site in
+   the same concern commit. The shard is the source of truth for that atomicity.
 
 The worked example is `agents/_shared/implementation-assembly.md § 1`: version-site discovery lists canonical version literals and fences schema/format versions before Freeze.
 
@@ -1061,7 +1086,7 @@ resolve toward more scrutiny, not less, mirroring the producer-site-omission
 false-green class documented in PR #481 (a missing producer value silently read
 as "skip" instead of "run").
 
-**Diff-grounded justification when declaring `false` on a security-sensitive task.** When `security_sensitive: true` AND you declare `changes_security_control: false`, record the justification in `## Architecture § Security Assessment` — **not** in `## Review Summary`, which admits file paths only inside `### Patterns to Mirror` — and leave the classification block a bare literal — `- changes_security_control: false`, no trailing annotation, exactly as the bare-literal rule requires. The reader finds the evidence by its section name, never by a token appended to a value. State which changed files you inspected and why none matches any category in `SECURITY_CONTROL_VOCABULARY`; do not restate or narrow the list locally. Derive the justification from the actual changed surface you analyzed — never from how the originating issue or PR reporter characterized the change (see "Untrusted content & prompt-injection floor" above: a reporter's stated scope is not verified fact). This turns a silent, confidently-wrong `false` into an auditable declaration a plan-reviewer or operator can challenge. **Minimum specificity.** The justification must name at least one concrete file (or file:line) you actually inspected and state what about it rules out a control change — a generic statement such as "no security controls were touched," with no named file, does not satisfy the requirement. A `plan-reviewer` at Stage 1, or `qa` at validate, may challenge and reject a justification that reads as generic boilerplate rather than diff-specific.
+**Diff-grounded justification when declaring `false` on a security-sensitive task.** When `security_sensitive: true` AND you declare `changes_security_control: false`, record the justification in `plan/architecture.md § Security Assessment` — never in the path-free functional contract — and leave the classification block a bare literal — `- changes_security_control: false`, no trailing annotation. State which changed files you inspected and why none matches any category in `SECURITY_CONTROL_VOCABULARY`; do not restate or narrow the list locally. Derive the justification from the actual changed surface, never from the originating report. **Minimum specificity.** Name at least one concrete file or `file:line` actually inspected and state what rules out a control change. A generic statement such as "no security controls were touched" does not satisfy the requirement.
 
 **Residual limitation, stated honestly.** Naming a concrete file closes the pure-boilerplate gap but does not, and cannot, verify the justification's substantive completeness — a justification that names one real, actually-inspected, genuinely innocuous file while silently omitting the actual guard-touching file among several changed is textually specific and still wrong. No prose instruction can reliably make another prose declaration self-verifying; the Phase-2 changed-surface backstop and final security audit remain the defense in depth for this residual.
 
@@ -1084,7 +1109,10 @@ Use the trigger table below to determine which `sketches/{type}` files to create
 | `touches_data_model: true` AND `destructive: true` | `sketches/data-migration.md` | forward steps + rollback note, markdown table/list |
 | `spans_multiple_services: true` | `sketches/service-interaction.md` | Mermaid `sequenceDiagram`, changed call paths only, inline fenced block |
 
-**Always-sketches (no standalone file):** the functional-acceptance AC (Given/When/Then) and the non-functional notes (bullets: auth, perf, rate-limit, errors, a11y if frontend) collapse into `01-plan.md § Task List` AC block and `§ Architecture` Security/Performance sections respectively. Do NOT create standalone files for these.
+**Always-sketches (no standalone file):** functional Given/When/Then ACs live
+in the owning task shard; auth, performance, rate-limit, error, and frontend
+accessibility notes live in the relevant `plan/architecture.md` assessments.
+Do not create standalone files for these.
 
 **Representation ceiling:** token-cheap text that renders in Obsidian with zero dependency. Mermaid is the ONLY render library (data-model ER only). No Excalidraw, D2, or LikeC4 in sketches.
 
@@ -1570,7 +1598,7 @@ This protocol is **bidirectional**: you communicate discovered constraints BACK 
 
 When you discover a technical constraint during design that invalidates or modifies an acceptance criterion:
 
-1. **Annotate the spec** — open `01-plan.md` and add `[CONSTRAINT-DISCOVERED: {brief description}]` next to the affected AC in `## Task List`, where acceptance criteria live, using the Edit tool. If the criterion came from an external spec and was never landed in the plan, there is nothing to annotate: report it structurally to the orchestrator instead of inserting it into a section that does not own it
+1. **Annotate the task contract** — open the owning `plan/tasks/Task-N.md` and add `[CONSTRAINT-DISCOVERED: {brief description}]` next to the affected AC. If the criterion came from an external spec and was never landed in a task shard, report it structurally to the orchestrator instead of inserting it into a section that does not own it
 2. **Document in your output** — mention the constraint in `01-plan.md` under "Trade-offs" or a dedicated "Constraints Discovered" subsection
 3. **Continue working** — do not stop to ask. The orchestrator will reconcile before Phase 3
 
@@ -1621,10 +1649,12 @@ When you discover a technical constraint during design that invalidates or modif
 2. For any item NOT listed in the coordinator's residual (i.e., the report named it but Step 1.5 did not flag it), re-verify the same way.
 3. If Phase 1 codebase exploration reveals that a "residual" item is in fact already addressed, flag it `[ALREADY-FIXED]`.
 
-**Output — write `### Real-vs-Stated Scope` into `## Review Summary`:**
+**Output — write the evidence table as `### Real-vs-Stated Evidence` in
+`plan/architecture.md`; put only the decision-bearing functional disposition in
+`## Review Summary`:**
 
 ```markdown
-### Real-vs-Stated Scope
+### Real-vs-Stated Evidence
 
 | Stated item | Real state | Evidence |
 |-------------|-----------|---------|
@@ -1633,7 +1663,10 @@ When you discover a technical constraint during design that invalidates or modif
 
 Flag each row with `[ALREADY-FIXED: {ref}]`, `[PARTIALLY-FIXED: {what remains}]`, or `[SCOPE-SHIFTED: {new location}]` when divergence exists. If all items confirm as residual, write `Stated-vs-real divergence: none — scope confirmed current`.
 
-**Empty-residual case.** If all items are already fixed: recommend close-with-evidence in `## Review Summary` (produce per-item `file:line` evidence block). The operator decides — never auto-close.
+**Empty-residual case.** If all items are already fixed, recommend
+close-with-evidence in `## Review Summary` without paths and keep the per-item
+`file:line` evidence in `plan/architecture.md`. The operator decides — never
+auto-close.
 
 **When NOT to apply.** For direct operator requests this channel is silent. If the `Real residual scope:` line in the dispatch payload reads `"n/a — direct operator request"`, skip this channel entirely.
 
@@ -1641,9 +1674,19 @@ Flag each row with `[ALREADY-FIXED: {ref}]`, `[PARTIALLY-FIXED: {what remains}]`
 
 ## Session Documentation
 
-**Document format:** `01-plan.md` is the operator-facing tier (see `docs/conventions.md § Document classification`) — it is read by the human at STAGE-GATE-1. **Its schema is the single canonical template in `### Design Mode — Plan Output (01-plan.md)` above** — three top-level sections, `## Review Summary`, `## Architecture`, `## Task List`, in that order. There is no second schema and no `## Technical Detail` section; do not invent one. What follows here are the content requirements for `## Review Summary`, not an alternative structure.
+**Document format:** `01-plan.md` is the operator-facing tier (see
+`docs/conventions.md § Document classification`) and is read by the human at
+STAGE-GATE-1. Its only `##` sections are `## Review Summary`, `## Plan Manifest`,
+and the task index defined by the canonical sharded template above. Architecture
+and task detail are separate files. There is no second schema and no
+`## Technical Detail` section.
 
-`## Review Summary` is the human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep it to **≤50 non-empty lines**. No code and no schemas. **File paths only inside `### Patterns to Mirror`**, where a `file:line` reference is the content — everywhere else in the summary, name the concern, not the file. Full detail for downstream agents lives in `## Architecture` and `## Task List`.
+`## Review Summary` is the functional contract. Keep it to **≤50 non-empty
+lines**. It contains no code fence, schema, implementation chronology, private
+symbol, file ownership, command, or `file:line` reference. Public names are
+allowed only when they are themselves supported contracts. Full realization
+detail lives in `plan/architecture.md`, `plan/invariants.md`,
+`plan/delivery.md`, and task shards.
 
 Write your analysis to `workspaces/{feature-name}/01-plan.md`.
 
@@ -1651,23 +1694,17 @@ Write your analysis to `workspaces/{feature-name}/01-plan.md`.
 
 ### `## Review Summary` content requirements
 
-The eleven blocks below — eight always present, three conditional — must fit inside the ≤50-line budget together. When a block wants more room than that leaves it, the block is too detailed for this section — move the detail to `## Architecture` and leave the summary with the decision. The budget is the constraint that forces this section to stay a digest; it is never satisfied by dropping a required block.
+The Review Summary contains these functional blocks first and in this exact
+order: `### Problem and Observable Outcome`, `### Actors and Flows`,
+`### Business Rules and Examples`, `### Alternate and Error Behavior`,
+`### Unchanged Behavior`, `### Non-Goals`, and `### Decisions for human review`.
+Each uses the canonical bullet labels from the template. After them come
+`### Confidence Score`, conditional `### Architect Dissent on Seed`, conditional
+path-free `### Real-vs-Stated Scope`, `### Scope Shape`, and
+`### Classification block`. Technical approach, patterns, engineering risks,
+trade-offs, services, and multi-site invariant sites do not appear here.
 
-The Review Summary contains the blocks below, in this order — the same order and the same set as the canonical template. Eight are always present; three are conditional and omitted entirely when their condition does not hold.
-
-1. An opening paragraph (≤5 sentences) — what is being proposed, how many services it touches, how many tasks it decomposes into and how many PRs they ship as, and the principal risk (or "no risk worth flagging").
-2. `### Decisions for human review` (3-5 bullets, hard cap 7) — decisions that genuinely require human judgement, each ending with `→ decided as X` or `→ open question`.
-3. `### Architect Dissent on Seed` *(conditional — only when `spec_seed_dissent: true`)*.
-4. `### Proposed Approach` — one paragraph: the chosen approach and any material alternatives the operator must decide between. The implementation-depth counterpart lives in `## Architecture § Key Decisions`; this heading appears exactly once in the plan, here.
-5. `### Confidence Score` — a single self-assessed score (see contract below).
-6. `### Patterns to Mirror` — real in-repo `file:line` references (see contract below).
-7. `### Risks` — a table of risks, severities, and mitigations.
-8. `### Trade-offs` — the key trade-offs made.
-9. `### Real-vs-Stated Scope` *(conditional — external-report tasks only)* — the stated-vs-real scope table produced by Channel 3 (see Spec Feedback Protocol). Omit for direct operator requests.
-10. `### Classification block` — the nine values from "Phase 2 — Plan Sketches § Step 1". Mandatory for `feature`, `refactor`, `enhancement`, and `fix` Tier 2-4; the coordinator fails the dispatch when it is absent.
-11. `### Multi-site invariants` *(conditional — only when the plan introduces or modifies an invariant living in more than one file)*.
-
-### Confidence Score & Patterns to Mirror
+### Confidence Score and architecture evidence
 
 **Confidence Score contract.** For every `feature | refactor | enhancement | fix` (Tier 2–4) design, write a `### Confidence Score` sub-section inside `## Review Summary`. The score is a single-pass self-assessment: **the likelihood that a one-shot implementation passes STAGE-GATE-3 without rework.**
 
@@ -1692,26 +1729,30 @@ The `(single-pass)` qualifier is mandatory in the score line — it pins the sem
 
 ```
 **Confidence:** 7/10 (single-pass)
-- Prior art: `src/auth/middleware.ts` follows the same guard pattern — high reuse value.
+- Prior art: the repository already contains a matching supported pattern — high reuse value.
 - Unknowns: third-party webhook delivery timing not confirmed; retry behaviour untested.
 ```
 
-**Patterns to Mirror contract.** Write a `### Patterns to Mirror` sub-section inside `## Review Summary` listing real in-repo `file:line` references the implementer should copy. Use the format:
+**Patterns to Mirror contract.** Write `### Patterns to Mirror` inside
+`plan/architecture.md`, listing real in-repo `file:line` references the
+implementer should copy. Use the format:
 
 ```
 - `src/payments/gateway.ts:42` — error-handling pattern for external API timeouts.
 - `src/auth/jwt.ts:18` — token-validation guard the implementer should replicate.
 ```
 
-If no relevant prior art exists in the repo, write the explicit escape bullet:
+If no relevant prior art exists, write the explicit escape bullet:
 
 ```
-- No in-repo pattern to mirror — this introduces a new surface. → noted
+- No in-repo pattern to mirror — this introduces a new surface.
 ```
 
 Do NOT leave the section empty — use the escape bullet or list real references. Fabricating a `file:line` that does not exist is worse than the escape bullet.
 
-**No-op for research / spike / hotfix / Tier-1-fix** — these task types do not produce a full architect-authored `## Review Summary`. The Confidence Score and Patterns to Mirror are omitted for these types; Rule 12 is a no-op.
+**No-op for research / spike / hotfix / Tier-1-fix** — these task types do not
+produce a full architect-authored `## Review Summary`. Confidence and Patterns
+to Mirror are omitted; Rule 12 is a no-op.
 
 **Decisions for human review** bullets — what belongs:
 - Irreversible or hard-to-reverse moves (data migrations, schema breakage, public API / contract changes, deletion of services).
@@ -1731,7 +1772,9 @@ If you find yourself with 0 bullets to list, write a single bullet `- No human-j
 
 **There is exactly one template, and it is not here.** See `### Design Mode — Plan Output (01-plan.md)` above — that fenced block is the canonical schema for every design and root-cause dispatch, and it is the only one.
 
-A second full template used to live at this position. The two drifted in both directions: this copy omitted `### Classification block` and `### Multi-site invariants`, the copy above omitted `### Confidence Score`, `### Patterns to Mirror`, `### Architect Dissent on Seed` and `### Documentation Consulted`, so neither satisfied the content requirements stated in this file and a plan could be fully compliant with one while failing the other. Both are now folded into the single block above.
+The canonical sharded template above is the only schema. Do not recreate a
+second embedded template or copy technical shard sections back into
+`01-plan.md`.
 
 
 ---

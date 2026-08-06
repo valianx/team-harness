@@ -1480,7 +1480,7 @@ def main() -> None:
     activation_digests = digest_table(activation)
     pipeline_digests = digest_table(pipeline)
     expected_updated_digests = {
-        "architect": "17f8df98cc2b5b9c4703c79493da40c141394f8b8076fb71b1512318592f894f",
+        "architect": "edd9da908456a5df452a790664db3c3bc4fe4875ce2ba3b7a832d0fcb7dfae5a",
         "implementer": "76cd8d007b91411377b6401c9def7076f49e42868928010168cca17ad5778449",
         "tester": "7519e2980d21e6f3116da32169386f0531450cf60b6404d7553985879e966c91",
         "cleaner": "915358d8f37295574093839387eb47edf86e83d8c92f42cbdbc2ec14d677f485",

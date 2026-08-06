@@ -5,7 +5,7 @@ small canonical artifacts, not a monolith copied between roles:
 
 | Artifact | Canonical content | Normal readers |
 |---|---|---|
-| `01-plan.md` | operator summary, review attestation, classification, and manifest | operator, orchestrator, plan panel |
+| `01-plan.md` | functional contract, review attestation, classification, manifest, and task status index | operator, orchestrator, plan panel |
 | `plan/architecture.md` | decisions, services, assessments, and file-level work plan | architect, plan panel; referenced slices for implementer/security |
 | `plan/delivery.md` | task ordering, dependencies, branches, bases, and PR grouping | orchestrator, delivery |
 | `plan/invariants.md` | cross-project or multi-site invariants; omit when none | affected implementers, security, delivery |
@@ -17,6 +17,29 @@ task ID, service, status, functional AC count, technical-constraint count, and
 exact task-shard path. Task status is canonical in the index; task scope,
 constraint set, and AC state are canonical in the task shard. Do not repeat
 architecture, task prose, constraint prose, or AC text in the index.
+
+`## Review Summary` is the functional contract and the first `##` section. Its
+required subsections appear in this exact order:
+
+1. `### Problem and Observable Outcome` with `- Problem:` and
+   `- Observable outcome:` bullets;
+2. `### Actors and Flows` with at least one `- Actor:` bullet;
+3. `### Business Rules and Examples` with at least one `- Rule:` and one
+   `- Example:` bullet;
+4. `### Alternate and Error Behavior`;
+5. `### Unchanged Behavior`;
+6. `### Non-Goals`; and
+7. `### Decisions for human review` with 1–7 decision bullets.
+
+Use an explicit `None — {reason}` bullet when a list is genuinely empty. The
+functional contract contains no code fences, implementation chronology,
+private symbols, file ownership, commands, or `file:line` references. Public
+API names may appear only when they are themselves part of the supported
+behavior. `### Confidence Score`, `### Scope Shape`, the classification block,
+and conditional operator-facing scope/dissent sections follow the functional
+subsections. Technical approach, patterns to mirror, engineering risks,
+trade-offs, services, and file-level work live only in
+`plan/architecture.md`.
 
 Every new task shard separates these three concerns:
 
@@ -101,9 +124,13 @@ keep them and record `size_reason: required-items` in the index.
 ## Operator voice
 
 Gates and progress updates synthesize the current manifest; they do not paste
-workspace sections. A gate contains the decision, material risks, task/AC
-counts, evidence links, options, and nonce in at most 12 non-empty lines before
-any required itemized exceptions. Routine phase updates use at most five lines:
+workspace sections. A gate contains the observable delta, principal actor/flow,
+representative rule/example, alternate/error behavior, unchanged behavior,
+non-goals, open product decisions, decision-bearing risks, task/AC counts,
+evidence links, options, and nonce in at most 12 non-empty lines before any
+required itemized exceptions. Technical detail appears only when it changes
+compatibility, security, irreversibility, a public contract, cost, or an
+explicit trade-off. Routine phase updates use at most five lines:
 outcome, changed state, blocker or risk, next action, and artifact link. Omit
 chronology, greetings, repeated context, and conclusions.
 

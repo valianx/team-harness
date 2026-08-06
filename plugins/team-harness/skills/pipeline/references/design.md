@@ -16,31 +16,46 @@ workspace path, repository root, constraints, required acceptance criteria, and 
 The specialist returns a file-scoped `sharded-v1` manifest plus plan shards and classification;
 it never edits coordination state.
 
-The plan must identify dependencies, risks, verification, independent file ownership,
-functional `AC-N` criteria, separate `TC-N` technical constraints, and whether the realized
-scope remains aligned with the operator's request. It is a
-decision snapshot, not exploration history. `01-plan.md` is the compact manifest; architecture,
+The plan must lead with problem/outcome, actors/flows, business rules/examples,
+alternate/error behavior, unchanged behavior, non-goals, and human decisions.
+It also identifies dependencies, risks, verification, independent file
+ownership, functional `AC-N` criteria, separate `TC-N` technical constraints,
+and whether realized scope remains aligned with the request. It is a decision
+snapshot, not exploration history. `01-plan.md` is the functional contract and compact manifest; architecture,
 delivery, conditional invariants, and each task/AC contract have separate canonical artifacts.
 Never copy a shard into the index. Size targets constrain fixed prose per artifact, not required
 projects, tasks, ACs, invariants, findings, or controls. Above a target preserve required items
 and record `size_reason: required-items`; never omit scope or request a split solely for size. The
-primary thread records the accepted artifact paths and counts, then sets
-`next_action: present Stage Gate 1`.
+primary thread does not set `next_action: present Stage Gate 1` until the
+deterministic plan evidence below passes.
 
-Before the gate, the primary thread checks only artifact presence, coherent files/dependencies,
-AC/TC separation, `implementation_references_in_ac: 0`, and absence of unresolved clarification
-markers. It also requires `request_shape: adaptation | new-capability | fix | refactor`,
+Before the gate, resolve `scripts/plan-contract.mjs` relative to the loaded
+pipeline skill and run it with the workspace and `01-plan.md`. Persist the
+complete JSON, its SHA-256, the plan SHA-256, and artifact-set SHA-256 as
+`plan_contract_evidence`. It deterministically requires the ordered functional
+surface, manifest/artifact set, path-free summary, AC/TC separation and counts,
+pre-implementation test field, and technical architecture sections. Main also
+requires `implementation_references_in_ac: 0`, no unresolved clarification
+markers, `request_shape: adaptation | new-capability | fix | refactor`,
 `realized_scope: aligned | expanded`, and `expansion_reason` exactly when
 `realized_scope: expanded`; an aligned plan must omit that reason. An invalid or
 contradictory scope-shape block is an invalid artifact. An invalid artifact gets one normal design correction; genuine ambiguity is blocked and
-surfaced to the operator. `/th:plan-review` is explicit only. Planning dispatches only architect;
+surfaced to the operator. A missing, stale, or failing evidence record blocks
+Gate 1 and cannot be replaced by architect prose. Legacy recovery and documented
+self-authored hotfix/Tier-1 plans use only their closed not-applicable reason;
+never migrate them implicitly. `/th:plan-review` is explicit only. Planning dispatches only architect;
 a sensitive plan carries its security assessment and security-relevant TCs to final validation.
 
 ## STAGE-GATE-1
 
-Present the gate from the manifest rather than copying workspace prose. In at most 12 non-empty
-lines before required exceptions, state the decision, material risks, scope shape, task/AC/TC counts, artifact
-links, options, and nonce. Offer `approve`, `approve autonomous`, `edit`, and `reject {reason}`.
+Present the gate from the validated functional contract rather than copying
+workspace prose. In at most 12 non-empty lines before required exceptions,
+state the observable delta, principal actor/flow, representative rule/example,
+alternate/error behavior, unchanged behavior, non-goals, open decisions,
+decision-bearing risks, scope shape, task/AC/TC counts, artifact links, options,
+and nonce. Technical detail is allowed only for compatibility, security,
+irreversibility, public contracts, cost, or an explicit trade-off. Offer
+`approve`, `approve autonomous`, `edit`, and `reject {reason}`.
 This gate is mandatory. Stop for the live reply; do not infer approval from the task source.
 
 On success, set `phase: waiting_gate1`, `status: waiting_for_gate`, a fresh `gate_nonce`, and

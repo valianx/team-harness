@@ -364,6 +364,13 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 167: deterministic functional-first plan contract"
+echo "# Requires: node. Missing runtime follows CI-required semantics."
+echo "############################################################"
+run_node_suite "functional-plan-contract" "test_plan_contract.mjs" "node not found — install Node.js to run this suite"
+
+echo
+echo "############################################################"
 echo "# Suite 162: Codex pipeline-efficiency provenance preflight (AC18)"
 echo "# Requires: node. Skipped when absent (NOT a pass — see output)."
 echo "############################################################"
