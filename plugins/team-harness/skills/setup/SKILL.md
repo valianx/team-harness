@@ -96,7 +96,7 @@ migration, and preserve every unrelated value.
    `codex features list` only when this step runs. The generated project config
    also enables both flags and supplies the generic `gpt-5.6-terra` / `medium`
    subagent fallback under `[agents]`; it never overrides Main's selected
-   Sol/xhigh model. Global installation synchronizes the ten role files with
+   Sol/xhigh model. Global installation synchronizes the twelve role files with
    their exact per-role mappings rather than attempting a fragile global model
    config rewrite.
 

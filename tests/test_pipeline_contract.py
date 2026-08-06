@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Structural checks for the converged Claude/Codex pipeline contract.
+"""Structural checks for the converged Claude/Codex/opencode pipeline contract.
 
 The pipeline is specified by Markdown because both runtimes consume prose.  This
 suite checks the small set of machine-shaped invariants that must not drift across
@@ -955,6 +955,28 @@ def check_functional_first_plan_contract() -> None:
         "functional plan validator is missing",
     )
     require((ROOT / "docs/functional-plan-contract.md").is_file(), "functional plan documentation is missing")
+
+
+def check_cross_runtime_pipeline_runners() -> None:
+    """Every runtime receives the same deterministic pipeline runner bytes."""
+    names = (
+        "bounded-command.mjs",
+        "cleaner-transition.mjs",
+        "plan-contract.mjs",
+        "quality-runner.mjs",
+        "test-transition.mjs",
+    )
+    for name in names:
+        canonical_path = ROOT / "skills/pipeline/scripts" / name
+        codex_path = ROOT / "plugins/team-harness/skills/pipeline/scripts" / name
+        opencode_path = ROOT / "installer-assets/opencode-skills/pipeline/scripts" / name
+        require(canonical_path.is_file(), f"canonical pipeline runner is missing: {name}")
+        canonical = canonical_path.read_bytes()
+        require(codex_path.is_file() and codex_path.read_bytes() == canonical, f"Codex pipeline runner drifted: {name}")
+        require(opencode_path.is_file() and opencode_path.read_bytes() == canonical, f"opencode pipeline runner drifted: {name}")
+
+    opencode_registry = read("cmd/install/manifest_registry.go")
+    require('".mjs":  true' in opencode_registry, "opencode installer does not emit pipeline runner assets")
 
 
 def check_direct_predicate() -> None:
@@ -2618,6 +2640,7 @@ def main() -> None:
         ("pre-implementation test contract", check_preimplementation_test_contract),
         ("cleaner and CRAP contract", check_cleaner_crap_contract),
         ("functional-first Stage 1 contract", check_functional_first_plan_contract),
+        ("cross-runtime deterministic runners", check_cross_runtime_pipeline_runners),
         ("authoritative post-Gate-1 transitions", check_authoritative_post_gate1_transitions),
         ("direct predicate", check_direct_predicate),
         ("single writer", check_single_writer),

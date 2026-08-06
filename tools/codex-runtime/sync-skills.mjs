@@ -88,6 +88,14 @@ const opencodeSpecialMappings = new Map([
   ["trace", "Resolve workspace and pricing settings from opencode-native Team Harness configuration and remain read-only."],
 ]);
 
+const sharedPipelineScripts = [
+  "bounded-command.mjs",
+  "cleaner-transition.mjs",
+  "plan-contract.mjs",
+  "quality-runner.mjs",
+  "test-transition.mjs",
+];
+
 function yamlString(value) {
   return JSON.stringify(value);
 }
@@ -346,6 +354,32 @@ async function syncSharedSetupAssets({ check, rootDir }) {
   if (check && stale) throw new Error("shared setup assets are stale");
 }
 
+async function syncSharedPipelineAssets({ check, rootDir }) {
+  const sourceRoot = join(rootDir, "skills/pipeline/scripts");
+  const targetRoot = join(rootDir, "plugins/team-harness/skills/pipeline/scripts");
+  let stale = false;
+  for (const name of sharedPipelineScripts) {
+    const source = join(sourceRoot, name);
+    const target = join(targetRoot, name);
+    const expected = await readFile(source);
+    let current;
+    try {
+      current = await readFile(target);
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+    if (current?.equals(expected)) continue;
+    stale = true;
+    if (check) {
+      process.stderr.write(`stale shared pipeline asset: ${relative(rootDir, target)}\n`);
+      continue;
+    }
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, expected);
+  }
+  if (check && stale) throw new Error("shared pipeline assets are stale");
+}
+
 export async function syncSkills({ check = false, rootDir = defaultRoot } = {}) {
   rootDir = resolve(rootDir);
   const names = await canonicalNames(rootDir);
@@ -366,6 +400,7 @@ export async function syncSkills({ check = false, rootDir = defaultRoot } = {}) 
     overrides: opencodeOverrides,
   });
   await syncSharedSetupAssets({ check, rootDir });
+  await syncSharedPipelineAssets({ check, rootDir });
   return { names, codexGenerated, opencodeGenerated };
 }
 

@@ -6,7 +6,7 @@
 
 **Parity update (2026-08-02):** the canonical 57-skill catalog is now projected
 to Codex and opencode through runtime adapters. Codex installs the seven-agent pipeline
-roster plus the four read-only agents required by `review-pr`; the ten-agent set
+roster, one direct inline reviewer, and the four read-only agents required by `review-pr`; the twelve-agent set
 remains intentionally narrower than the full semantic agent fleet. The
 original narrow-beta proposal below is retained as design history.
 

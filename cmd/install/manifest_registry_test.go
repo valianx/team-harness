@@ -135,6 +135,35 @@ func TestBuildOpencodeManifests_ReportIssuePresent(t *testing.T) {
 	}
 }
 
+func TestBuildOpencodeManifests_PipelineRunnersPresent(t *testing.T) {
+	_, components, err := buildOpencodeManifests()
+	if err != nil {
+		t.Fatalf("buildOpencodeManifests: %v", err)
+	}
+
+	required := map[string]bool{
+		"bounded-command.mjs":    false,
+		"cleaner-transition.mjs": false,
+		"plan-contract.mjs":      false,
+		"quality-runner.mjs":     false,
+		"test-transition.mjs":    false,
+	}
+	for _, component := range components {
+		for _, emitted := range component.Emits.Files {
+			for name := range required {
+				if emitted == "{config_root}/skills/pipeline/scripts/"+name {
+					required[name] = true
+				}
+			}
+		}
+	}
+	for name, found := range required {
+		if !found {
+			t.Errorf("opencode pipeline runner %q is not emitted", name)
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // AC-3: dot/underscore paths (.venv etc.) never emitted
 // ---------------------------------------------------------------------------

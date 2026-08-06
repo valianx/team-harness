@@ -24,7 +24,7 @@ a direct mode.
      booleans.
    - `clickup.workspace_id`: a string.
    - `agent-scope`: `global` or `project` (default `global`); it controls where
-     the ten bundled agent files are installed, never the inline/pipeline posture.
+     the twelve bundled agent files are installed, never the inline/pipeline posture.
    - `github.account_routes`: an array of at most 64 objects containing an
      absolute non-root `workspace`, a valid `account`, a hostname `host`, and an
      optional absolute isolated `config_dir`. Reject unknown route fields,

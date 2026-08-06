@@ -154,7 +154,7 @@ full commit ID or `HEAD`, but it must resolve to the currently checked-out clean
 commit.
 
 ```bash
-node plugins/team-harness/skills/pipeline/scripts/quality-runner.mjs \
+node /absolute/path/to/loaded/pipeline/skill/scripts/quality-runner.mjs \
   --repo /absolute/path/to/repository \
   --manifest .team-harness/quality.json \
   --base 0123456789abcdef0123456789abcdef01234567 \
@@ -167,7 +167,7 @@ node plugins/team-harness/skills/pipeline/scripts/quality-runner.mjs \
 After cleanup:
 
 ```bash
-node plugins/team-harness/skills/pipeline/scripts/quality-runner.mjs \
+node /absolute/path/to/loaded/pipeline/skill/scripts/quality-runner.mjs \
   --repo /absolute/path/to/repository \
   --manifest .team-harness/quality.json \
   --base 0123456789abcdef0123456789abcdef01234567 \
