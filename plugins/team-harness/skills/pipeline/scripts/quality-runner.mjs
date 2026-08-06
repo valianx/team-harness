@@ -111,6 +111,27 @@ export const QUALITY_MANIFEST_SCHEMA = {
         changed_function_may_worsen: { type: "boolean" },
       },
     },
+    test_contract: {
+      type: "object",
+      additionalProperties: false,
+      required: ["path_rules"],
+      properties: {
+        path_rules: {
+          type: "array",
+          minItems: 1,
+          maxItems: 32,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["type", "value"],
+            properties: {
+              type: { enum: ["prefix", "suffix", "segment"] },
+              value: { type: "string" },
+            },
+          },
+        },
+      },
+    },
   },
 };
 
@@ -219,8 +240,38 @@ function validateCommand(command, id) {
   return normalized;
 }
 
-function validateManifest(value) {
-  if (!hasOnlyKeys(value, ["schema_version", "commands", "crap"], ["schema_version", "commands"])) {
+function validateTestPathRule(rule) {
+  if (!hasExactlyKeys(rule, ["type", "value"]) || !["prefix", "suffix", "segment"].includes(rule.type)) {
+    throw new QualityError("MANIFEST_INVALID");
+  }
+  if (typeof rule.value !== "string" || rule.value.length === 0 || rule.value.includes("\u0000")) {
+    throw new QualityError("MANIFEST_INVALID");
+  }
+  if (rule.type === "prefix" && !isSafeRelativePath(rule.value)) throw new QualityError("MANIFEST_INVALID");
+  if (
+    rule.type !== "prefix" &&
+    (rule.value.includes("/") || rule.value.includes("\\") || rule.value === "." || rule.value === "..")
+  ) {
+    throw new QualityError("MANIFEST_INVALID");
+  }
+  if (Buffer.byteLength(rule.value, "utf8") > 128) throw new QualityError("MANIFEST_INVALID");
+  return { type: rule.type, value: rule.value };
+}
+
+function validateTestContractConfig(value) {
+  if (
+    !hasExactlyKeys(value, ["path_rules"]) ||
+    !Array.isArray(value.path_rules) ||
+    value.path_rules.length === 0 ||
+    value.path_rules.length > 32
+  ) {
+    throw new QualityError("MANIFEST_INVALID");
+  }
+  return { path_rules: value.path_rules.map(validateTestPathRule) };
+}
+
+export function validateQualityManifest(value) {
+  if (!hasOnlyKeys(value, ["schema_version", "commands", "crap", "test_contract"], ["schema_version", "commands"])) {
     throw new QualityError("MANIFEST_INVALID");
   }
   if (value.schema_version !== QUALITY_MANIFEST_SCHEMA_VERSION) throw new QualityError("MANIFEST_INVALID");
@@ -252,7 +303,10 @@ function validateManifest(value) {
   } else if (Object.hasOwn(commands, "crap")) {
     throw new QualityError("MANIFEST_INVALID");
   }
-  return { schema_version: QUALITY_MANIFEST_SCHEMA_VERSION, commands, crap };
+  const testContract = Object.hasOwn(value, "test_contract")
+    ? validateTestContractConfig(value.test_contract)
+    : null;
+  return { schema_version: QUALITY_MANIFEST_SCHEMA_VERSION, commands, crap, test_contract: testContract };
 }
 
 async function readBoundedJson(filePath, errorCode) {
@@ -392,7 +446,7 @@ async function resolveManifest(repo, manifestInput) {
   }
   if (!isContained(repo, filePath)) throw new QualityError("MANIFEST_INVALID");
   const loaded = await readBoundedJson(filePath, "MANIFEST_INVALID");
-  const manifest = validateManifest(loaded.value);
+  const manifest = validateQualityManifest(loaded.value);
   return {
     value: manifest,
     evidence: {

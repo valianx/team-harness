@@ -789,6 +789,11 @@ contradiction through an implementation correction without the operator's decisi
 
 **Agent:** `tester`, `mode: pre-fix-regression`. `type: fix`/`hotfix`, mandatory by default.
 
+When the task uses the manifest-enabled pre-implementation behavioral contract
+below, that generalized checkpoint owns the same regression obligation and this
+legacy checkpoint does not dispatch a second tester. This route remains for
+bug-fix repositories that have not adopted `test_contract`.
+
 **No fallback.** If the tester cannot author a regression test the pipeline blocks. There is no manual-repro-script exit.
 
 | `bug_tier` | Condition | Action |
@@ -834,6 +839,36 @@ resulting full commit SHA as `verification_base_ref`. An absent or unresolvable 
 implementation. Every implementation diff consumer and Freeze use only the immutable SHA; the
 source ref exists solely for Freeze's movement check. The verification packet later copies the
 SHA and never becomes its producer.
+
+### Implementation checkpoint — pre-implementation behavioral test contract
+
+This checkpoint is task-gated and creates no phase or gate. A task with
+`Pre-implementation test: required` must have a repository quality manifest
+whose `commands.test` is an exact argv array and whose
+`test_contract.path_rules` declares test-only paths. Main resolves
+`quality-runner.mjs` and `test-transition.mjs` relative to the loaded pipeline
+skill/reference and fails closed if the manifest or either helper is absent.
+
+Immediately before each applicable task, record current `HEAD` as its test
+baseline and dispatch one fresh `tester`, `mode: pre-implementation-contract`,
+with only that task shard, named anchors, manifest path, branch/worktree, and a
+coordinator-owned workspace contract path. Tester reads functional ACs first,
+authors the smallest behavior test expected to fail, commits only the declared
+test paths, and returns `failure_matches_contract: true|false`. Main verifies
+commit integrity and no production changes, runs `test-transition.mjs
+--transition red`, persists its complete JSON and SHA-256, and advances only on
+machine `verdict: pass` plus semantic `failure_matches_contract: true`. A syntax,
+fixture, dependency, infrastructure, unrelated-suite, or already-green failure
+blocks; agent prose cannot override the machine result.
+
+The implementer receives the contract/red evidence pointers and hashes and may
+not edit or delete their test paths. After implementation, Main runs the same
+helper with `--transition green`. It requires the identical contract, manifest,
+test command, task baseline, and test blob identities, plus red-candidate
+ancestry and an exit-zero test result. A mismatch or remaining red result is an
+implementation bounce under max-3. Record one `test_contract_evidence` entry per
+task. `not-applicable` is valid only when the task shard already carries its
+plan-time reason; implementation never infers or rewrites that decision.
 
 **Register `base_sha` before EVERY `implementer`/`tester` dispatch.** `git rev-parse HEAD`, recorded as an attribute of that dispatch's `phase.start`. This is the external baseline the commit-integrity check anchors against — without it a dispatch that produced nothing could report a stale-but-ancestor sha and pass a bare ancestry check trivially.
 
@@ -944,7 +979,7 @@ Shares the max-3 cap for implementation bounces. A clean scan is a trace event o
 
 ### Implementation checkpoint — evidence authoring
 
-**Agent:** `tester`, `mode: authoring`. Runs before Freeze and the validation state, over a tree that is immutable afterward. The tester classifies each AC and TC as `test`, `command`, or `inspection`, records the complete evidence dependency paths, reuses sufficient evidence, authors only warranted missing tests, runs the relevant suite/commands, and writes `03-testing.md`'s evidence map. This is the only full tester authoring dispatch in the non-bug-fix flow; a correction may dispatch one fresh tester only for rows made stale by changed requirement text, exact command/arguments, or any consumed implementation, test, fixture, configuration, or argument-file dependency blob.
+**Agent:** `tester`, `mode: authoring`. Runs before Freeze and the validation state, over a tree that is immutable afterward. The tester classifies each AC and TC as `test`, `command`, or `inspection`, records the complete evidence dependency paths, reuses sufficient evidence, authors only warranted missing tests, runs the relevant suite/commands, and writes `03-testing.md`'s evidence map. For tasks with a pre-implementation contract, reuse its frozen test paths and complete only missing evidence rows; never rewrite those tests. For other non-bug tasks this remains the full authoring write point. A correction may dispatch one fresh tester only for rows made stale by changed requirement text, exact command/arguments, or any consumed implementation, test, fixture, configuration, or argument-file dependency blob.
 
 Bug-fix flow: resume the regression contract started at the implementation checkpoint and complete the remaining evidence-map rows.
 

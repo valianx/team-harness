@@ -689,6 +689,81 @@ def check_review_feedback_closures() -> None:
         for marker in ("snapshot_status: query-failed", "ci_snapshot: unavailable", "never retry"):
             require(marker in delivery, f"{relative}: failed PR snapshot misses {marker!r}")
 
+
+def check_preimplementation_test_contract() -> None:
+    """Test-first routing stays functional, deterministic, and recoverable."""
+    planning_sources = {
+        "architect": read("agents/architect.md").lower(),
+        "Claude shards": read("docs/plan-shards.md").lower(),
+        "Codex shards": read(
+            "plugins/team-harness/skills/pipeline/references/plan-shards.md"
+        ).lower(),
+    }
+    for label, text in planning_sources.items():
+        require(
+            "pre-implementation test" in text
+            and "required" in text
+            and "not-applicable" in text,
+            f"{label}: pre-implementation applicability field is missing",
+        )
+        require(
+            "observable runtime behavior" in text and "test_contract" in text,
+            f"{label}: applicability is not functional and manifest-gated",
+        )
+
+    tester = read("agents/tester.md").lower()
+    tester_adapter = read("runtime/codex/instructions/tester.md").lower()
+    for label, text in (("Claude tester", tester), ("Codex tester", tester_adapter)):
+        for marker in (
+            "pre-implementation-contract",
+            "failure_matches_contract",
+            "never edit production source",
+            "already",
+        ):
+            require(marker in text, f"{label}: test-first marker missing: {marker}")
+
+    claude = re.sub(r"\s+", " ", read("agents/ref-pipeline.md").lower())
+    codex = re.sub(
+        r"\s+",
+        " ",
+        read("plugins/team-harness/skills/pipeline/references/implementation.md").lower(),
+    )
+    for label, text in (("Claude", claude), ("Codex", codex)):
+        for marker in (
+            "test-transition.mjs",
+            "--transition red",
+            "--transition green",
+            "failure_matches_contract",
+            "test blob",
+            "phase or gate",
+        ):
+            require(marker in text, f"{label}: deterministic transition marker missing: {marker}")
+
+    state = read(
+        "plugins/team-harness/skills/pipeline/references/state-and-gates.md"
+    ).lower()
+    recovery = read(
+        "plugins/team-harness/skills/pipeline/references/recovery.md"
+    ).lower()
+    require("test_contract_evidence" in state, "test contract evidence is not durable state")
+    for marker in ("contract_sha256", "red_evidence_sha256", "green_evidence_sha256"):
+        require(marker in state, f"state misses immutable test evidence field {marker}")
+    require(
+        "test_contract_evidence" in recovery
+        and "never infer red or green" in recovery
+        and "sha-256" in recovery,
+        "recovery can trust unhashed or inferred test transition evidence",
+    )
+
+    require(
+        (ROOT / "plugins/team-harness/skills/pipeline/scripts/test-transition.mjs").is_file(),
+        "deterministic test transition helper is missing",
+    )
+    require(
+        (ROOT / "docs/test-contract-runner.md").is_file(),
+        "test transition operator documentation is missing",
+    )
+
     dispatch = read("agents/_shared/dispatch-contract.md").lower()
     require("security assessment anchors" in dispatch, "adversary dispatch lost security anchors")
     require("design-review verdict" not in dispatch, "adversary dispatch still depends on retired design review")
@@ -2410,6 +2485,7 @@ def main() -> None:
         ("corrective routes", check_corrective_routes),
         ("explicit validation correction decision", check_explicit_validation_correction_decision),
         ("PR 588 review closures", check_review_feedback_closures),
+        ("pre-implementation test contract", check_preimplementation_test_contract),
         ("authoritative post-Gate-1 transitions", check_authoritative_post_gate1_transitions),
         ("direct predicate", check_direct_predicate),
         ("single writer", check_single_writer),

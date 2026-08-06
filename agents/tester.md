@@ -109,7 +109,7 @@ long runner output.
 
 ## Commit contract
 
-In `pre-fix-regression` and `authoring`, commit only test files changed by this
+In `pre-implementation-contract`, `pre-fix-regression`, and `authoring`, commit only test files changed by this
 dispatch. Before committing, confirm the current branch equals `working_branch`
 from `00-state.md`, is not the default branch, and the repository root equals the
 declared worktree. Stage explicit paths; never sweep the tree.
@@ -117,6 +117,29 @@ declared worktree. Stage explicit paths; never sweep the tree.
 Return `commit: {sha}` when test files changed. If classification and execution
 required no test diff, return `commit: none — no source change`. Workspace
 documents are not part of the source commit.
+
+## Mode: `pre-implementation-contract`
+
+Use this mode only when the task shard says `Pre-implementation test: required`
+and the repository quality manifest declares `test_contract`. Read the assigned
+task's functional ACs before its technical constraints. Author the smallest
+observable-behavior test set that is expected to fail before implementation;
+never edit production source, existing tests unrelated to the contract, or the
+manifest.
+
+Write the coordinator-provided contract path as schema-versioned JSON with only
+`schema_version`, `requirements`, `test_identifiers`, and `test_paths`. Every
+path must be a test file changed by this dispatch and satisfy a manifest
+`test_contract.path_rules` entry. Commit those explicit test paths only. Main,
+not this role, runs the deterministic red checkpoint and owns its JSON evidence.
+
+Inspect the bounded failing assertion and return
+`failure_matches_contract: true|false` with a one-line reason. `true` means the
+failure is caused by the expected missing behavior named by the AC, not a syntax,
+fixture, dependency, infrastructure, or unrelated-suite failure. An already
+passing test, a non-contract failure, or an inability to express the behavior
+deterministically returns `status: blocked`; never weaken the test or fabricate
+red evidence.
 
 ## Mode: `pre-fix-regression`
 
@@ -258,7 +281,7 @@ Return a compact status block only:
 
 ```text
 agent: tester
-mode: pre-fix-regression | authoring | verify-run | review | coverage-config | test-infra | module-test
+mode: pre-implementation-contract | pre-fix-regression | authoring | verify-run | review | coverage-config | test-infra | module-test
 status: success | failed | blocked
 failure_kind: {required only on failed/blocked}
 model: {effective-model-id}
@@ -275,6 +298,8 @@ commit: {sha} | none — no source change
 pre_fix_test_status: authored | skipped
 regression_test_path: {path when applicable}
 regression_test_status: failing | passing | skipped
+test_contract_path: {coordinator-provided path when applicable}
+failure_matches_contract: true | false | not-applicable
 sketches_read: [{paths}]
 packet_used: true | false | absent
 packet_escapes: N

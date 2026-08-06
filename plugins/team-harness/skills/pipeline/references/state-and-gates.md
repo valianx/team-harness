@@ -103,6 +103,7 @@ gate1_release: approved|approved-autonomous|rejected|edit|null
 gate3_release: ship|amend|abort|null
 regression_test_path: {path}|null
 regression_test_status: failing|passing|skipped|null
+test_contract_evidence: [{task_id, status: pending|red|green|not-applicable, not_applicable_reason, contract_path, contract_sha256, red_evidence_path, red_evidence_sha256, red_commit_sha, red_tree_sha, green_evidence_path, green_evidence_sha256}]|[]
 plan_review_status: not-requested|requested|pass|concerns|fail|null
 audit_status: pending|done|unavailable|null
 code_hygiene: pass|fail|null

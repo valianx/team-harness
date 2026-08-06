@@ -67,7 +67,12 @@ for the decision, while `3: detail` and `4: reason` carry edits or rejection con
 
 ### `implementation` and `validation`
 
-After Gate 1, the coordinator dispatches the approved implementation work and evidence pass.
+After Gate 1, a manifest-enabled task that changes observable runtime behavior first goes to a
+fresh tester. The tester commits only the behavioral contract tests; a deterministic runner proves
+that the test-only commit is red, freezes its hashes, and later proves the identical tests and exact
+command are green after implementation. Documentation and repositories that have not adopted the
+manifest record a plan-time not-applicable reason. This is an implementation checkpoint, not a new
+phase or gate. The coordinator then dispatches the approved implementation work and evidence pass.
 Tester, QA, and the applicable security lens inspect the resulting tree. A code, test, or
 documentation defect inside scope returns to the implementation executor and the affected
 validation delta is rerun. Missing evidence returns to tester. A correctable security

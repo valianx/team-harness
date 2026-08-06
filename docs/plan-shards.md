@@ -28,6 +28,7 @@ Every new task shard separates these three concerns:
 - **TC-1**: {mandatory internal mechanism or engineering invariant}.
 
 ## Verification
+- **Pre-implementation test:** required | not-applicable — {reason when not applicable}
 - {tests, commands, or inspections that can prove ACs and TCs}
 ```
 
@@ -37,6 +38,14 @@ prose unless the named element is itself part of a supported public contract.
 Technical precision belongs in `TC-N`, task scope/notes, shared invariants, or
 verification. `VERIFY:` is accepted only when recovering an older workspace;
 new plans never emit it inside `## Acceptance Criteria`.
+
+`Pre-implementation test` is a required routing field, not a requirement. It is
+`required` when the repository quality manifest declares `test_contract` and
+the task changes observable runtime behavior. It is `not-applicable` for docs,
+assets, comments, or other no-behavior work, and when the repository has not
+adopted the manifest contract; the shard records the concrete reason. This
+keeps the plan functional while letting implementation select the deterministic
+test-first checkpoint without inferring behavior from file extensions alone.
 
 ## Read routing
 

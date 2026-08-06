@@ -332,6 +332,22 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 165: deterministic red-to-green test transition"
+echo "# Requires: node, git. Skipped when absent."
+echo "############################################################"
+if ! command -v node >/dev/null 2>&1; then
+    report_skip_or_fail "test-transition" "node not found — install Node.js to run this suite"
+elif ! command -v git >/dev/null 2>&1; then
+    report_skip_or_fail "test-transition" "git not found — install Git to run this suite"
+elif node "$TESTS_DIR/test_test_transition.mjs"; then
+    echo "test-transition: PASS"
+else
+    echo "test-transition: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 echo "# Suite 162: Codex pipeline-efficiency provenance preflight (AC18)"
 echo "# Requires: node. Skipped when absent (NOT a pass — see output)."
 echo "############################################################"
