@@ -96,9 +96,12 @@ migration, and preserve every unrelated value.
    `codex features list` only when this step runs. The generated project config
    also enables both flags and supplies the generic `gpt-5.6-terra` / `medium`
    subagent fallback under `[agents]`; it never overrides Main's selected
-   Sol/xhigh model. Global installation synchronizes the twelve role files with
-   their exact per-role mappings rather than attempting a fragile global model
-   config rewrite.
+   model. Global installation applies the same fallback narrowly: agent sync
+   installs a missing fallback and migrates only the known obsolete
+   `gpt-5.6-luna` value to `gpt-5.6-terra` / `medium`. It preserves any other
+   explicit operator-selected fallback as `custom-preserved`. Named specialists
+   always retain the generated per-role projection table rather than inheriting
+   this generic fallback.
 
 5. Gather only requested values, showing current values as defaults. Apply all
    selected settings in one `manage_config.py set` command.
@@ -159,6 +162,10 @@ migration, and preserve every unrelated value.
    conflict: report it and do not overwrite it. Writes outside the repository
    use Codex's native permission prompt. Do not use or download the separate Go
    installer; the marketplace snapshot is the source of these agent bytes.
+   Inspect and sync output includes `runtimeConfig`, `runtimeConfigChanged`, and
+   `restartRequired`. When sync changes any role or the fallback, require a new
+   Codex thread before declaring the runtime ready; Codex does not hot-reload the
+   custom-agent registry in the active thread.
 
 7. Configure selected MCP servers after `codex mcp list --json`. Preserve an
    existing registration unless the operator explicitly requests replacement.

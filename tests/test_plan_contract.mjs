@@ -237,6 +237,25 @@ await check("missing, empty, or out-of-order functional sections fail closed", a
   }
 });
 
+await check("genuinely empty actor and rule lists accept the documented None form", async () => {
+  const plan = planText()
+    .replace(
+      "- Actor: checkout operator → retries an interrupted payment → observes either completion or a stable terminal error.",
+      "- None — no actor flow changes are required.",
+    )
+    .replace(
+      "- Rule: Only retryable interruptions offer another attempt.\n- Example: Given a retryable interruption, when the operator retries, then checkout resumes once.",
+      "- None — no business rule changes are required.",
+    );
+  const workspace = await fixture({ plan });
+  try {
+    const result = await run(workspace);
+    assert.equal(result.verdict, "pass", JSON.stringify(result));
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
 await check("implementation detail cannot leak back into the functional contract", async () => {
   for (const insertion of [
     "\n### Proposed Approach\nUse a state enum.\n",
@@ -299,18 +318,55 @@ await check("every manifest task is represented exactly once in the task index",
   }
 });
 
+await check("task rows without a trailing pipe preserve the complete shard path", async () => {
+  const plan = planText().replace(
+    "| Task-1 | checkout | pending | 1 | 1 | `plan/tasks/Task-1.md` |",
+    "| Task-1 | checkout | pending | 1 | 1 | `plan/tasks/Task-1.md`",
+  );
+  const workspace = await fixture({ plan });
+  try {
+    const result = await run(workspace);
+    assert.equal(result.verdict, "pass", JSON.stringify(result));
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+await check("malformed task rows retain TASK_INDEX_INVALID diagnostics", async () => {
+  const plan = planText().replace(
+    "| Task-1 | checkout | pending | 1 | 1 | `plan/tasks/Task-1.md` |",
+    "| Task-1 | checkout | pending | invalid | 1 | `plan/tasks/not-canonical.md` |",
+  );
+  const workspace = await fixture({ plan });
+  try {
+    const result = await run(workspace);
+    assert.equal(result.verdict, "fail");
+    assert.equal(result.error_code, "TASK_INDEX_INVALID");
+    assert(result.findings.some((entry) => entry.code === "TASK_INDEX_INVALID" && entry.section === "Task-1"));
+    assert.notEqual(result.error_code, "INTERNAL_ERROR");
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
 await check("manifest traversal, missing artifacts, and symlinks fail closed", async () => {
   const workspace = await fixture();
+  const externalRoot = await mkdtemp(path.join(tmpdir(), "th-plan-external-"));
   try {
-    const external = path.join(await mkdtemp(path.join(tmpdir(), "th-plan-external-")), "architecture.md");
+    const external = path.join(externalRoot, "architecture.md");
     await writeFile(external, architecture);
     await rm(path.join(workspace, "plan/architecture.md"));
-    await symlink(external, path.join(workspace, "plan/architecture.md"));
+    try {
+      await symlink(external, path.join(workspace, "plan/architecture.md"));
+    } catch (error) {
+      if (process.platform === "win32" && ["EPERM", "EACCES"].includes(error?.code)) return;
+      throw error;
+    }
     const result = await run(workspace);
     assert.equal(result.verdict, "fail");
     assert.equal(result.error_code, "MANIFEST_INVALID");
-    await rm(path.dirname(external), { recursive: true, force: true });
   } finally {
+    await rm(externalRoot, { recursive: true, force: true });
     await rm(workspace, { recursive: true, force: true });
   }
 });

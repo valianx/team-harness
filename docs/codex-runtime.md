@@ -214,6 +214,13 @@ specialists:
 | `sonnet` + `medium` | `gpt-5.6-terra` | `medium` |
 | `haiku` | `gpt-5.6-terra` | `low` |
 
+The role table is independent from the generic fallback. Global setup and
+update install a missing fallback and atomically migrate the known obsolete
+`gpt-5.6-luna` value to `gpt-5.6-terra` / `medium`, with a backup. Any other
+explicit operator-selected fallback is preserved as `custom-preserved`. A
+fallback or named-role change reports `restartRequired: true`; the active Codex
+thread must be replaced because it does not hot-reload its agent registry.
+
 `.codex/README.md` is the generated roster. After editing canonical role
 metadata or adapters, run `$sync-codex-agents`; do not hand-edit generated TOML.
 

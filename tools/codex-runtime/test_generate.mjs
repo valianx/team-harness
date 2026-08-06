@@ -1,11 +1,28 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { cp, mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { generate, render } from "./generate.mjs";
+import { syncSharedPipelineAssets } from "./sync-skills.mjs";
 
 const root = new URL("../..", import.meta.url).pathname;
+const pipelineScripts = [
+  "bounded-command.mjs",
+  "cleaner-transition.mjs",
+  "plan-contract.mjs",
+  "quality-runner.mjs",
+  "test-transition.mjs",
+];
+
+async function makePipelineFixture() {
+  const fixture = await mkdtemp(join(tmpdir(), "codex-pipeline-sync-"));
+  await mkdir(join(fixture, "skills/pipeline/scripts"), { recursive: true });
+  for (const name of pipelineScripts) {
+    await writeFile(join(fixture, "skills/pipeline/scripts", name), `source:${name}\n`);
+  }
+  return fixture;
+}
 
 async function makeFixture() {
   const fixture = await mkdtemp(join(tmpdir(), "codex-runtime-"));
@@ -127,6 +144,21 @@ const cleaner = first.files.get(join(root, ".codex/agents/cleaner.toml"));
 assert.match(cleaner, /^model = "gpt-5\.6-terra"$/m);
 assert.match(cleaner, /^model_reasoning_effort = "medium"$/m);
 assert.match(cleaner, /^sandbox_mode = "workspace-write"$/m);
+
+const architect = first.files.get(join(root, ".codex/agents/architect.toml"));
+for (const marker of [
+  "Plan format:",
+  "## Plan Manifest",
+  "### Task Index",
+  "### Services Touched",
+  "### Work Plan",
+  "Pre-implementation test:",
+  "classification",
+  "touches_http_api",
+  "changes_security_control",
+]) {
+  assert.match(architect, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `architect adapter misses ${marker}`);
+}
 
 // The pipeline skill preflight uses a canonical digest in addition to the
 // human-readable generated markers. Keep both copies of that allowlist in
@@ -262,6 +294,30 @@ try {
   assert.equal(await readFile(extraPath, "utf8"), "extra\n", "--check must not remove extra files");
 } finally {
   await rm(checkFixture, { recursive: true, force: true });
+}
+
+const pipelineSyncFixture = await makePipelineFixture();
+const pipelineSyncOutside = await mkdtemp(join(tmpdir(), "codex-pipeline-sync-outside-"));
+try {
+  const targetRoot = join(pipelineSyncFixture, "plugins/team-harness/skills/pipeline/scripts");
+  await mkdir(join(pipelineSyncFixture, "plugins/team-harness/skills/pipeline"), { recursive: true });
+  let symlinkAvailable = true;
+  try {
+    await symlink(pipelineSyncOutside, targetRoot, "dir");
+  } catch (error) {
+    if (process.platform === "win32" && ["EPERM", "EACCES"].includes(error?.code)) symlinkAvailable = false;
+    else throw error;
+  }
+  if (symlinkAvailable) {
+    await assert.rejects(
+      () => syncSharedPipelineAssets({ check: false, rootDir: pipelineSyncFixture }),
+      /symbolic-link pipeline destination/,
+    );
+    assert.deepEqual(await readdir(pipelineSyncOutside), []);
+  }
+} finally {
+  await rm(pipelineSyncFixture, { recursive: true, force: true });
+  await rm(pipelineSyncOutside, { recursive: true, force: true });
 }
 
 console.log("codex runtime generator: PASS");

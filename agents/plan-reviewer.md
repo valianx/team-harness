@@ -298,7 +298,7 @@ group. Severity remains `concerns`.
 
 **Detection algorithm:**
 
-```
+```text
 plan = read 01-plan.md
 review_summary_section = extract section "## Review Summary" body up to next "## "
 functional_headings = canonical ordered headings from docs/plan-shards.md

@@ -167,6 +167,9 @@ await check("a bounded cleanup preserves behavior and improves CRAP before Freez
     assertClosedResult(pre);
     assert.equal(pre.verdict, "pass");
     assert.equal(pre.quality.crap.functions[0].crap, 22.5);
+    const reordered = structuredClone(pre);
+    reordered.quality.commands.reverse();
+    assert.equal(isCleanerTransitionResult(reordered), true);
     const evidence = await persistBaseline(context, pre);
     await commitFiles(context.repo, "clean changed source", {
       "src/feature.js": "behavior-ok simple well-covered\n",
@@ -222,14 +225,43 @@ await check("post-check rejects added, deleted, or out-of-allowlist paths", asyn
   await repository(async (context) => {
     const pre = await runCleanerTransition(preOptions(context));
     const evidence = await persistBaseline(context, pre);
+    await rm(path.join(context.repo, "src/feature.js"));
     await commitFiles(context.repo, "escape cleaner scope", {
-      "src/feature.js": "behavior-ok simple well-covered\n",
       "src/unplanned.js": "new abstraction\n",
     });
     const post = await runCleanerTransition(postOptions(context, evidence));
     assertClosedResult(post);
     assert.equal(post.verdict, "fail");
     assert.equal(post.error_code, "CLEANER_SCOPE_INVALID");
+  });
+});
+
+await check("non-repository inputs and incomplete manifests use specific errors", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "th-cleaner-non-repo-"));
+  try {
+    const nonRepository = await runCleanerTransition({
+      transition: "pre",
+      repo: directory,
+      manifest: ".team-harness/quality.json",
+      base: "HEAD",
+      candidate: "HEAD",
+      allowlist: path.join(directory, "allowlist.json"),
+    });
+    assertClosedResult(nonRepository);
+    assert.equal(nonRepository.error_code, "ARGUMENT_INVALID");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+
+  await repository(async (context) => {
+    const value = manifest();
+    delete value.test_contract;
+    await writeJson(path.join(context.repo, ".team-harness/quality.json"), value);
+    git(context.repo, "add", ".team-harness/quality.json");
+    git(context.repo, "commit", "-q", "-m", "remove test contract");
+    const result = await runCleanerTransition(preOptions(context));
+    assertClosedResult(result);
+    assert.equal(result.error_code, "MANIFEST_INVALID");
   });
 });
 

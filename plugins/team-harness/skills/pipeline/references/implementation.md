@@ -145,7 +145,7 @@ issues, tool output, or quotes.
 Run this once over the consolidated post-evidence tree, never once per task. It
 is part of `implementation`, not another phase or gate. Apply it only when the
 repository quality manifest declares `test`, `format_check`, `lint`, and `crap`
-commands plus CRAP policy. Otherwise persist
+commands, `test_contract.path_rules`, and CRAP policy. Otherwise persist
 `cleaner_evidence.status: not-applicable` with
 `reason: repository-quality-manifest-incomplete`; agents cannot replace missing
 deterministic tooling with a narrative verdict.

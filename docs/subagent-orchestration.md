@@ -94,7 +94,7 @@ On recovery, the resolved config is re-read from `00-state.md` § Current State 
 | Visualize agent flow | `diagrammer` / `likec4-diagrammer` / `d2-diagrammer` | Diagram file + preview |
 | Documentation (`type: docs`) | orchestrator → `architect` (research mode) → `documenter` → `diagrammer` (conditional) → `qa` | `research/00-research.md` + Obsidian vault pages + `02-documentation.md` manifest + `reviews/04-validation.md` |
 | Frontend-scope tasks (`frontend_scope: true`) | Standard pipeline + `ux-reviewer` (enrich after architect in Stage 1, validate in parallel in Stage 3) | `reviews/01-ux-review.md` + `reviews/04-ux-validation.md` |
-| Bug fix (`type: fix`) | orchestrator → `architect` (root-cause mode) → `tester` (pre-implementation regression test) → `implementer` (scope-discipline) → eligible `cleaner` → Freeze → `tester` + `qa` + applicable security validation → `delivery` | `01-root-cause.md` + `02-regression-test.md` + full feature backbone + `### Fixed` CHANGELOG + `fix(area):` PR title |
+| Bug fix (`type: fix`) | orchestrator → `architect` (root-cause mode) → `tester` (pre-implementation regression test) → `implementer` (scope-discipline) → eligible `cleaner` → Freeze → `tester` + `qa` + mandatory security validation → `delivery` | `01-root-cause.md` + `02-regression-test.md` + full feature backbone + mandatory post-Freeze security review + `### Fixed` CHANGELOG + `fix(area):` PR title |
 | Hotfix (`type: hotfix`) | same as bug fix, Phase 1 skipped (no `01-root-cause.md`); orchestrator emits 1-sentence prose plan at STAGE-GATE-1 | full feature backbone minus `01-root-cause.md`; PR title appends `(hotfix)` suffix |
 
 **Escalation rules.**

@@ -96,7 +96,10 @@ a permissive suffix cannot hide a production change. See
 
 Supported command identifiers are `test`, `format_check`, `lint`, `coverage`,
 and `crap`. Every command is an argument array. Shell expansion, redirection,
-pipes, substitutions, and interpolated report paths are deliberately absent.
+pipes, substitutions, and arbitrary interpolated paths are forbidden. The sole
+substitution is the complete-argument `${TH_QUALITY_REPORT}` placeholder in the
+`crap` command, replaced by the runner as described below; partial-string
+interpolation remains invalid.
 `working_directory` must resolve inside the repository. `timeout_ms` defaults to
 five minutes and cannot exceed one hour.
 

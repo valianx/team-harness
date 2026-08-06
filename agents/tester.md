@@ -121,7 +121,8 @@ documents are not part of the source commit.
 ## Mode: `pre-implementation-contract`
 
 Use this mode only when the task shard says `Pre-implementation test: required`
-and the repository quality manifest declares `test_contract`. Read the assigned
+and the repository quality manifest declares both `commands.test` and
+`test_contract.path_rules`. Read the assigned
 task's functional ACs before its technical constraints. Author the smallest
 observable-behavior test set that is expected to fail before implementation;
 never edit production source, existing tests unrelated to the contract, or the

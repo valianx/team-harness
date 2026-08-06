@@ -408,12 +408,8 @@ async function resolveChangedPaths(repo, identity) {
     .toString("utf8")
     .split("\u0000")
     .filter(Boolean);
-  if (
-    changedPaths.length > MAX_CHANGED_PATHS ||
-    changedPaths.some((entry) => !isSafeRelativePath(entry))
-  ) {
-    throw new QualityError("SCOPE_TOO_LARGE");
-  }
+  if (changedPaths.length > MAX_CHANGED_PATHS) throw new QualityError("SCOPE_TOO_LARGE");
+  if (changedPaths.some((entry) => !isSafeRelativePath(entry))) throw new QualityError("REPOSITORY_INVALID");
   return changedPaths;
 }
 
@@ -540,13 +536,14 @@ function validateCrapReport(value, changedPaths) {
     const key = `${entry.path}\u0000${entry.symbol}`;
     if (seen.has(key)) throw new QualityError("CRAP_REPORT_INVALID");
     seen.add(key);
+    const coveragePercent = roundMetric(entry.coverage_percent);
     return {
       path: entry.path,
       symbol: entry.symbol,
       status: entry.status,
       complexity: entry.complexity,
-      coverage_percent: roundMetric(entry.coverage_percent),
-      crap: computeCrap(entry.complexity, entry.coverage_percent),
+      coverage_percent: coveragePercent,
+      crap: computeCrap(entry.complexity, coveragePercent),
     };
   });
   return functions.sort((left, right) => left.path.localeCompare(right.path) || left.symbol.localeCompare(right.symbol));

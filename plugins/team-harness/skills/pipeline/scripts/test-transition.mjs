@@ -169,6 +169,8 @@ async function loadContract(repo, contractPath) {
   if (typeof repo !== "string" || typeof contractPath !== "string" || contractPath.length === 0) {
     throw new TransitionError("ARGUMENT_INVALID");
   }
+  // Coordinator-owned contract evidence may live outside the repository;
+  // unlike the manifest, this path is deliberately resolved independently.
   let file;
   try {
     file = await realpath(path.resolve(contractPath));
@@ -204,6 +206,21 @@ async function gitText(repo, args, code) {
       windowsHide: true,
     });
     return result.stdout.trim();
+  } catch {
+    throw new TransitionError(code);
+  }
+}
+
+async function gitBytes(repo, args, code) {
+  try {
+    const result = await execFileAsync("git", args, {
+      cwd: repo,
+      encoding: null,
+      maxBuffer: MAX_JSON_BYTES,
+      timeout: 30_000,
+      windowsHide: true,
+    });
+    return result.stdout;
   } catch {
     throw new TransitionError(code);
   }
@@ -270,14 +287,24 @@ function assertGreenQuality(quality) {
 }
 
 async function resolveTestInputs(repo, candidateCommit, testPaths) {
-  const inputs = [];
-  for (const testPath of testPaths) {
-    const blob = await gitText(repo, ["rev-parse", "--verify", `${candidateCommit}:${testPath}`], "TEST_SCOPE_INVALID");
-    const type = await gitText(repo, ["cat-file", "-t", blob], "TEST_SCOPE_INVALID");
-    if (type !== "blob" || !SAFE_COMMIT.test(blob)) throw new TransitionError("TEST_SCOPE_INVALID");
-    inputs.push({ path: testPath, blob_sha: blob });
+  if (testPaths.length === 0) return [];
+  const bytes = await gitBytes(repo, ["ls-tree", "-z", "--full-tree", candidateCommit, "--", ...testPaths], "TEST_SCOPE_INVALID");
+  const requested = new Set(testPaths);
+  const blobs = new Map();
+  for (const record of bytes.toString("utf8").split("\u0000").filter(Boolean)) {
+    const separator = record.indexOf("\t");
+    const [mode, type, object, ...extra] = record.slice(0, separator).split(" ");
+    const testPath = record.slice(separator + 1);
+    if (
+      separator < 0 || extra.length !== 0 || !/^[0-7]{6}$/.test(mode) || type !== "blob" ||
+      !SAFE_COMMIT.test(object) || !requested.has(testPath) || blobs.has(testPath)
+    ) {
+      throw new TransitionError("TEST_SCOPE_INVALID");
+    }
+    blobs.set(testPath, object);
   }
-  return inputs;
+  if (blobs.size !== requested.size) throw new TransitionError("TEST_SCOPE_INVALID");
+  return testPaths.map((testPath) => ({ path: testPath, blob_sha: blobs.get(testPath) }));
 }
 
 function contractEvidence(contract, contractSha256, testInputs) {

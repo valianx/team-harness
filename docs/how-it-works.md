@@ -42,11 +42,12 @@ posture or release a gate.
 
 ### `design` and `waiting_gate1`
 
-The architect produces the `sharded-v1` plan set: `01-plan.md` is the functional
-contract and manifest, leading with observable outcome, actors/flows, rules and
-examples, errors, unchanged behavior, non-goals, and human decisions. Technical
-architecture, delivery/dependencies, conditional invariants, and each task/AC
-contract live under `plan/`. Roles resolve only the shards their decision needs. It also writes
+The architect produces the generated `sharded-v1` workspace plan set: its plan
+index is the functional contract and manifest, leading with observable outcome,
+actors/flows, rules and examples, errors, unchanged behavior, non-goals, and
+human decisions. Generated architecture, delivery/dependency, conditional
+invariant, and task/AC shards hold the technical realization. Roles resolve
+only the shards their decision needs. It also writes
 plan sketches when the change touches those surfaces. `qa-plan` and `plan-reviewer` are available
 only through an explicit `/th:plan-review`; their panel output stays in
 `reviews/01-plan-review.md` and never creates an automatic pipeline state.

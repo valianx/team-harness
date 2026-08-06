@@ -100,7 +100,7 @@ async function resolveRepository(repoInput) {
   if (typeof repoInput !== "string" || repoInput.length === 0) throw new CleanerError("ARGUMENT_INVALID");
   try {
     const repo = await realpath(path.resolve(repoInput));
-    const top = await gitText(repo, ["rev-parse", "--show-toplevel"], "MANIFEST_INVALID");
+    const top = await gitText(repo, ["rev-parse", "--show-toplevel"], "ARGUMENT_INVALID");
     const canonicalTop = await realpath(top);
     if (canonicalTop !== repo) throw new Error("not repository root");
     return repo;
@@ -130,7 +130,7 @@ async function resolveManifest(repo, manifestInput) {
     throw new CleanerError("MANIFEST_INVALID");
   }
   const required = ["test", "format_check", "lint", "crap"];
-  if (value.crap === null || required.some((id) => !Object.hasOwn(value.commands, id))) {
+  if (value.crap === null || value.test_contract === null || required.some((id) => !Object.hasOwn(value.commands, id))) {
     throw new CleanerError("MANIFEST_INVALID");
   }
   return { value, sha256: sha256(loaded.bytes) };
@@ -203,16 +203,41 @@ function pathMatchesRule(candidate, rule) {
   return normalized.split("/").includes(rule.value);
 }
 
+async function resolveBlobsAtCommit(repo, commit, paths, code) {
+  if (paths.length === 0) return new Map();
+  const bytes = await gitBytes(repo, ["ls-tree", "-z", "--full-tree", commit, "--", ...paths], code);
+  const requested = new Set(paths);
+  const blobs = new Map();
+  for (const record of bytes.toString("utf8").split("\u0000").filter(Boolean)) {
+    const separator = record.indexOf("\t");
+    const [mode, type, object, ...extra] = record.slice(0, separator).split(" ");
+    const candidate = record.slice(separator + 1);
+    if (
+      separator < 0 || extra.length !== 0 || !/^[0-7]{6}$/.test(mode) || type !== "blob" ||
+      !SAFE_GIT_ID.test(object) || !requested.has(candidate) || blobs.has(candidate)
+    ) {
+      throw new CleanerError(code);
+    }
+    blobs.set(candidate, object);
+  }
+  if (blobs.size !== requested.size) throw new CleanerError(code);
+  return blobs;
+}
+
 async function assertBaselineAllowlist(repo, allowlist, quality, manifest) {
   const changed = new Set(quality.repository.changed_paths);
-  const testRules = manifest.value.test_contract?.path_rules ?? [];
+  const testRules = manifest.value.test_contract.path_rules;
+  const blobs = await resolveBlobsAtCommit(
+    repo,
+    quality.repository.candidate_commit,
+    allowlist.paths,
+    "ALLOWLIST_INVALID",
+  );
   for (const candidate of allowlist.paths) {
     if (!changed.has(candidate) || testRules.some((rule) => pathMatchesRule(candidate, rule))) {
       throw new CleanerError("ALLOWLIST_INVALID");
     }
-    const blob = await gitText(repo, ["rev-parse", "--verify", `${quality.repository.candidate_commit}:${candidate}`], "ALLOWLIST_INVALID");
-    const type = await gitText(repo, ["cat-file", "-t", blob], "ALLOWLIST_INVALID");
-    if (!SAFE_GIT_ID.test(blob) || type !== "blob") throw new CleanerError("ALLOWLIST_INVALID");
+    if (!blobs.has(candidate)) throw new CleanerError("ALLOWLIST_INVALID");
   }
 }
 
@@ -260,10 +285,14 @@ export function isCleanerTransitionResult(value) {
   ) {
     return false;
   }
-  const expectedCommands = value.transition === "pre" ? ["test", "crap"] : ["test", "format_check", "lint", "crap"];
+  const expectedCommands = (value.transition === "pre"
+    ? ["test", "crap"]
+    : ["test", "format_check", "lint", "crap"]).sort();
+  const actualCommands = value.quality?.commands.map((entry) => entry.id).sort() ?? [];
   if (
     value.verdict === "pass" &&
-    JSON.stringify(value.quality.commands.map((entry) => entry.id)) !== JSON.stringify(expectedCommands)
+    (new Set(actualCommands).size !== actualCommands.length ||
+      JSON.stringify(actualCommands) !== JSON.stringify(expectedCommands))
   ) {
     return false;
   }
@@ -391,9 +420,17 @@ async function changedPaths(repo, baselineCommit, candidateCommit) {
   return bytes.toString("utf8").split("\u0000").filter(Boolean);
 }
 
-async function assertPostScope(repo, allowlist, baseline, currentQuality) {
+async function currentRepositoryIdentity(repo) {
+  const candidate_commit = await gitText(repo, ["rev-parse", "--verify", "HEAD^{commit}"], "CLEANER_SCOPE_INVALID");
+  const candidate_tree = await gitText(repo, ["rev-parse", "--verify", "HEAD^{tree}"], "CLEANER_SCOPE_INVALID");
+  if (!SAFE_GIT_ID.test(candidate_commit) || !SAFE_GIT_ID.test(candidate_tree)) {
+    throw new CleanerError("CLEANER_SCOPE_INVALID");
+  }
+  return { candidate_commit, candidate_tree };
+}
+
+async function assertPostScope(repo, allowlist, baseline, current) {
   const prior = baseline.result.quality.repository;
-  const current = currentQuality.repository;
   const mergeBase = await gitText(repo, ["merge-base", prior.candidate_commit, current.candidate_commit], "BASELINE_INVALID");
   if (mergeBase !== prior.candidate_commit) throw new CleanerError("BASELINE_INVALID");
   const structural = await gitBytes(
@@ -424,10 +461,17 @@ async function executePost(options, state, repo, manifest, allowlist) {
   ) {
     throw new CleanerError("BASELINE_INVALID");
   }
+  const current = await currentRepositoryIdentity(repo);
+  await assertPostScope(repo, allowlist, baseline, current);
   state.quality = await runPostQuality(options, baseline);
   if (!isQualityResult(state.quality) || state.quality.verdict !== "pass") throw new CleanerError("QUALITY_FAILED");
   if (state.quality.manifest.sha256 !== manifest.sha256) throw new CleanerError("MANIFEST_INVALID");
-  await assertPostScope(repo, allowlist, baseline, state.quality);
+  if (
+    state.quality.repository.candidate_commit !== current.candidate_commit ||
+    state.quality.repository.candidate_tree !== current.candidate_tree
+  ) {
+    throw new CleanerError("CLEANER_SCOPE_INVALID");
+  }
   state.allowlist = allowlistEvidence(allowlist);
   state.baseline = {
     sha256: baseline.sha256,

@@ -333,7 +333,7 @@ fi
 echo
 echo "############################################################"
 echo "# Suite 165: deterministic red-to-green test transition"
-echo "# Requires: node, git. Skipped when absent."
+echo "# Requires: node and git. Missing runtimes follow CI-required semantics."
 echo "############################################################"
 if ! command -v node >/dev/null 2>&1; then
     report_skip_or_fail "test-transition" "node not found — install Node.js to run this suite"

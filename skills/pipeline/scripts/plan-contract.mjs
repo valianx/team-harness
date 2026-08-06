@@ -30,6 +30,7 @@ const ERROR_CODES = new Set([
   "PLAN_INVALID",
   "FUNCTIONAL_CONTRACT_INVALID",
   "MANIFEST_INVALID",
+  "TASK_INDEX_INVALID",
   "TASK_INVALID",
   "INTERNAL_ERROR",
 ]);
@@ -175,10 +176,11 @@ function inspectFunctional(lines, findings) {
       (!body?.some((line) => line.startsWith("- Problem:")) || !body.some((line) => line.startsWith("- Observable outcome:")))) {
       findings.push(finding("FUNCTIONAL_LABEL_MISSING", "01-plan.md", name));
     }
-    if (name === "Actors and Flows" && !body?.some((line) => line.startsWith("- Actor:"))) {
+    const declaredNone = body?.length === 1 && /^- None — .+/.test(body[0]);
+    if (name === "Actors and Flows" && !declaredNone && !body?.some((line) => line.startsWith("- Actor:"))) {
       findings.push(finding("FUNCTIONAL_LABEL_MISSING", "01-plan.md", name));
     }
-    if (name === "Business Rules and Examples" &&
+    if (name === "Business Rules and Examples" && !declaredNone &&
       (!body?.some((line) => line.startsWith("- Rule:")) || !body.some((line) => line.startsWith("- Example:")))) {
       findings.push(finding("FUNCTIONAL_LABEL_MISSING", "01-plan.md", name));
     }
@@ -207,8 +209,10 @@ function inspectFunctional(lines, findings) {
 }
 
 function tableCells(line) {
-  if (!line.trim().startsWith("|")) return [];
-  return line.trim().slice(1, -1).split("|").map((cell) => cell.trim());
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("|")) return [];
+  const inner = trimmed.endsWith("|") ? trimmed.slice(1, -1) : trimmed.slice(1);
+  return inner.split("|").map((cell) => cell.trim());
 }
 
 function inspectIndex(lines, findings) {
@@ -231,19 +235,19 @@ function inspectIndex(lines, findings) {
   for (const line of index.lines) {
     const cells = tableCells(line);
     if (!/^Task-\d+$/.test(cells[0] ?? "")) continue;
-    const task = {
-      id: cells[0],
-      status: cells[2],
-      ac_count: Number(cells[3]),
-      tc_count: Number(cells[4]),
-      path: (cells[5] ?? "").replaceAll("`", ""),
-    };
-    if (task.status !== "pending" || !Number.isSafeInteger(task.ac_count) || task.ac_count < 1 ||
-      !Number.isSafeInteger(task.tc_count) || task.tc_count < 0 || task.path !== `plan/tasks/${task.id}.md` ||
-      !paths.includes(task.path)) {
-      findings.push(finding("TASK_INDEX_INVALID", "01-plan.md", task.id));
+    const id = cells[0];
+    const status = cells[2];
+    const acCount = Number(cells[3]);
+    const tcCount = Number(cells[4]);
+    const declaredPath = (cells[5] ?? "").replaceAll("`", "");
+    const canonicalPath = `plan/tasks/${id}.md`;
+    if (status !== "pending" || !Number.isSafeInteger(acCount) || acCount < 1 ||
+      !Number.isSafeInteger(tcCount) || tcCount < 0 || declaredPath !== canonicalPath ||
+      !paths.includes(canonicalPath)) {
+      findings.push(finding("TASK_INDEX_INVALID", "01-plan.md", id));
+      continue;
     }
-    tasks.push(task);
+    tasks.push({ id, status, ac_count: acCount, tc_count: tcCount, path: canonicalPath });
   }
   if (tasks.length === 0 || new Set(tasks.map((task) => task.id)).size !== tasks.length) {
     findings.push(finding("TASK_INDEX_INVALID", "01-plan.md", "Task Index"));
@@ -417,6 +421,7 @@ export async function validatePlanContract(options) {
       const codes = new Set(state.findings.map((entry) => entry.code));
       state.error_code = [...codes].some((code) => code.startsWith("FUNCTIONAL_") || code === "DECISION_INVALID")
         ? "FUNCTIONAL_CONTRACT_INVALID"
+        : codes.has("TASK_INDEX_INVALID") ? "TASK_INDEX_INVALID"
         : [...codes].some((code) => code.startsWith("TASK_")) ? "TASK_INVALID" : "MANIFEST_INVALID";
     }
   } catch (error) {

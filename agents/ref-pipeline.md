@@ -880,9 +880,11 @@ not edit or delete their test paths. After implementation, Main runs the same
 helper with `--transition green`. It requires the identical contract, manifest,
 test command, task baseline, and test blob identities, plus red-candidate
 ancestry and an exit-zero test result. A mismatch or remaining red result is an
-implementation bounce under max-3. Record one `test_contract_evidence` entry per
-task. `not-applicable` is valid only when the task shard already carries its
-plan-time reason; implementation never infers or rewrites that decision.
+implementation bounce under max-3. Record one entry per task in the bounded,
+hashed `evidence/test-contracts.json` index and keep only its digest, counts,
+and aggregate status in `test_contract_evidence` state. `not-applicable` is
+valid only when the task shard already carries its plan-time reason;
+implementation never infers or rewrites that decision.
 
 **Register `base_sha` before EVERY `implementer`/`tester` dispatch.** `git rev-parse HEAD`, recorded as an attribute of that dispatch's `phase.start`. This is the external baseline the commit-integrity check anchors against — without it a dispatch that produced nothing could report a stale-but-ancestor sha and pass a bare ancestry check trivially.
 
@@ -1007,8 +1009,9 @@ Bug-fix flow: resume the regression contract started at the implementation check
 
 This is one post-green checkpoint over the consolidated tree, not one dispatch
 per task and not a phase or gate. It applies only when the repository quality
-manifest declares `test`, `format_check`, `lint`, and `crap` commands plus the
-CRAP policy. Otherwise record `cleaner_evidence.status: not-applicable` with
+manifest declares `test`, `format_check`, `lint`, and `crap` commands,
+`test_contract.path_rules`, and the CRAP policy. Otherwise record
+`cleaner_evidence.status: not-applicable` with
 `reason: repository-quality-manifest-incomplete`; do not infer metrics or ask an
 agent to substitute for missing deterministic tooling.
 

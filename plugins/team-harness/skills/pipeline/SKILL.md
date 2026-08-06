@@ -220,10 +220,10 @@ the role fields cannot see. The current digests are:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| `architect` | `edd9da908456a5df452a790664db3c3bc4fe4875ce2ba3b7a832d0fcb7dfae5a` |
+| `architect` | `c968fdc18524199ff7a2f71cf5e461ddade593db451a12cbd080416af2828956` |
 | `implementer` | `76cd8d007b91411377b6401c9def7076f49e42868928010168cca17ad5778449` |
 | `tester` | `7519e2980d21e6f3116da32169386f0531450cf60b6404d7553985879e966c91` |
-| `cleaner` | `915358d8f37295574093839387eb47edf86e83d8c92f42cbdbc2ec14d677f485` |
+| `cleaner` | `6b4054f59a3bf6d3a98ce6ef1407a786d03c9169ac741b58e9fe0fe19d453f7f` |
 | `qa` | `2612528da833bcb5cf2db981ac586320a0ad06ac407d38beb564b64880cc24c8` |
 | `security` | `06434dd772dfff170529c67e15c91c08311329e66f364eb220298a2d0dd2f997` |
 | `delivery` | `07a5997769adbb2b3304b7640e2f9a701a38564a4f58d192548390b15ffbf7d5` |

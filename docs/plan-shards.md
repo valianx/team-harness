@@ -5,7 +5,7 @@ small canonical artifacts, not a monolith copied between roles:
 
 | Artifact | Canonical content | Normal readers |
 |---|---|---|
-| `01-plan.md` | functional contract, review attestation, classification, manifest, and task status index | operator, orchestrator, plan panel |
+| Generated plan index | functional contract, review attestation, classification, manifest, and task status index | operator, orchestrator, plan panel |
 | `plan/architecture.md` | decisions, services, assessments, and file-level work plan | architect, plan panel; referenced slices for implementer/security |
 | `plan/delivery.md` | task ordering, dependencies, branches, bases, and PR grouping | orchestrator, delivery |
 | `plan/invariants.md` | cross-project or multi-site invariants; omit when none | affected implementers, security, delivery |
@@ -63,8 +63,9 @@ verification. `VERIFY:` is accepted only when recovering an older workspace;
 new plans never emit it inside `## Acceptance Criteria`.
 
 `Pre-implementation test` is a required routing field, not a requirement. It is
-`required` when the repository quality manifest declares `test_contract` and
-the task changes observable runtime behavior. It is `not-applicable` for docs,
+`required` when the repository quality manifest declares both `commands.test`
+and `test_contract.path_rules` and the task changes observable runtime behavior.
+It is `not-applicable` for docs,
 assets, comments, or other no-behavior work, and when the repository has not
 adopted the manifest contract; the shard records the concrete reason. This
 keeps the plan functional while letting implementation select the deterministic

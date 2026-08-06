@@ -260,13 +260,7 @@ class AnsiSafeRenderer {
     if (this.#state === "text") {
       if (byte === 0x1b) {
         this.#state = "escape";
-      } else if (byte === 0x9b) {
-        this.#state = "csi";
-      } else if (byte === 0x9d) {
-        this.#state = "string";
-      } else if ([0x90, 0x98, 0x9e, 0x9f].includes(byte)) {
-        this.#state = "string";
-      } else if (byte !== 0x9c) {
+      } else {
         this.#tail.append(renderByte(byte));
       }
       return;

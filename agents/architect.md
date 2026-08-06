@@ -1727,7 +1727,7 @@ The `(single-pass)` qualifier is mandatory in the score line — it pins the sem
 
 **Rationale requirement.** After the score line, write ≥1 bullet naming the factor(s) that most influenced the number. A bare score with no rationale is flagged as `concerns` by the plan-reviewer (Rule 12). Example:
 
-```
+```text
 **Confidence:** 7/10 (single-pass)
 - Prior art: the repository already contains a matching supported pattern — high reuse value.
 - Unknowns: third-party webhook delivery timing not confirmed; retry behaviour untested.
@@ -1737,14 +1737,14 @@ The `(single-pass)` qualifier is mandatory in the score line — it pins the sem
 `plan/architecture.md`, listing real in-repo `file:line` references the
 implementer should copy. Use the format:
 
-```
+```text
 - `src/payments/gateway.ts:42` — error-handling pattern for external API timeouts.
 - `src/auth/jwt.ts:18` — token-validation guard the implementer should replicate.
 ```
 
 If no relevant prior art exists, write the explicit escape bullet:
 
-```
+```text
 - No in-repo pattern to mirror — this introduces a new surface.
 ```
 

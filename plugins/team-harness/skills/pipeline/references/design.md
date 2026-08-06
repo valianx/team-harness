@@ -34,11 +34,16 @@ pipeline skill and run it with the workspace and `01-plan.md`. Persist the
 complete JSON, its SHA-256, the plan SHA-256, and artifact-set SHA-256 as
 `plan_contract_evidence`. It deterministically requires the ordered functional
 surface, manifest/artifact set, path-free summary, AC/TC separation and counts,
-pre-implementation test field, and technical architecture sections. Main also
-requires `implementation_references_in_ac: 0`, no unresolved clarification
-markers, `request_shape: adaptation | new-capability | fix | refactor`,
-`realized_scope: aligned | expanded`, and `expansion_reason` exactly when
-`realized_scope: expanded`; an aligned plan must omit that reason. An invalid or
+pre-implementation test field, and technical architecture sections. Its result
+envelope does not carry the following coordinator checks: Main derives
+`implementation_references_in_ac: 0` by inspecting AC prose in the indexed task
+shards, checks unresolved clarification markers across the generated plan set,
+and reads `request_shape`, `realized_scope`, and conditional `expansion_reason`
+from the generated plan index's `Scope Shape` block. Main records evidence for
+those reads before asserting them. The literal values are
+`request_shape: adaptation | new-capability | fix | refactor` and
+`realized_scope: aligned | expanded`; `expansion_reason` is required only when
+expanded, and an aligned plan must omit it. An invalid or
 contradictory scope-shape block is an invalid artifact. An invalid artifact gets one normal design correction; genuine ambiguity is blocked and
 surfaced to the operator. A missing, stale, or failing evidence record blocks
 Gate 1 and cannot be replaced by architect prose. Legacy recovery and documented

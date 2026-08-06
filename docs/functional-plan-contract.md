@@ -6,8 +6,8 @@ architect dispatch, and the existing Stage Gate 1.
 
 ## Operator contract
 
-For every new `sharded-v1` plan, `01-plan.md § Review Summary` contains these
-sections in order:
+For every new `sharded-v1` plan, the generated workspace's operator-facing plan
+index contains these Review Summary sections in order:
 
 1. Problem and observable outcome.
 2. Actors and flows.
@@ -24,22 +24,23 @@ chronology, private symbol, command, file ownership, or `file:line` reference.
 A public API or CLI name may appear when that name is itself part of the
 supported behavior.
 
-Technical realization remains mandatory but has a different owner:
+Technical realization remains mandatory but lives in generated workspace
+shards identified by the plan manifest:
 
-- `plan/architecture.md`: approach, patterns and evidence, services,
+- architecture shard: approach, patterns and evidence, services,
   engineering risks/trade-offs, assessments, and file-level work plan;
-- `plan/invariants.md`: cross-site invariants and fenced sites;
-- `plan/delivery.md`: dependencies and delivery grouping; and
-- `plan/tasks/Task-N.md`: exact scope, ACs, TCs, and verification.
+- conditional invariants shard: cross-site invariants and fenced sites;
+- delivery shard: dependencies and delivery grouping; and
+- task shards: exact scope, ACs, TCs, and verification.
 
 ## Deterministic evidence
 
 Before Gate 1, Main runs:
 
-```bash
-node /absolute/path/to/loaded/pipeline/skill/scripts/plan-contract.mjs \
-  --workspace /absolute/path/to/workspace \
-  --plan 01-plan.md
+```text
+node <loaded-pipeline-skill>/scripts/plan-contract.mjs \
+  --workspace <generated-workspace-root> \
+  --plan <generated-plan-index>
 ```
 
 The helper reads only regular, non-symlink artifacts declared by the plan

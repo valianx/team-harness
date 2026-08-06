@@ -321,6 +321,46 @@ await check("CRAP is computed from complexity and coverage and improves against 
   );
 });
 
+await check("CRAP derives from the same rounded coverage stored in evidence", async () => {
+  const manifest = baseManifest(
+    { crap: crapCommand() },
+    { new_function_max: 20, changed_function_may_worsen: false },
+  );
+  await temporaryRepository(
+    {
+      manifest,
+      candidateFiles: {
+        "src/calc.go": "package calc\nfunc Calculate() {}\n",
+        "metrics.json": crapReport({ complexity: 5, coverage: 33.333333 }),
+      },
+    },
+    async ({ repo, base }) => {
+      const result = await runQualityChecks(options(repo, base, ["crap"]));
+      assertClosedResult(result);
+      assert.equal(result.verdict, "pass", JSON.stringify(result));
+      const measured = result.crap.functions[0];
+      assert.equal(measured.coverage_percent, 33.3333);
+      const expected = Number((5 ** 2 * (1 - measured.coverage_percent / 100) ** 3 + 5).toFixed(4));
+      assert.equal(measured.crap, expected);
+      assert.notEqual(result.error_code, "INTERNAL_ERROR");
+    },
+  );
+});
+
+await check("unsafe changed paths use REPOSITORY_INVALID rather than a size error", async () => {
+  const longPath = `${"a".repeat(180)}/${"b".repeat(180)}/${"c".repeat(180)}.go`;
+  const manifest = baseManifest({ test: command() });
+  await temporaryRepository(
+    { manifest, candidateFiles: { [longPath]: "package invalid\n" } },
+    async ({ repo, base }) => {
+      const result = await runQualityChecks(options(repo, base, ["test"]));
+      assertClosedResult(result);
+      assert.equal(result.verdict, "fail");
+      assert.equal(result.error_code, "REPOSITORY_INVALID");
+    },
+  );
+});
+
 await check("CRAP thresholds and stale baseline manifests cannot be converted into a pass", async () => {
   const manifest = baseManifest(
     { crap: crapCommand() },

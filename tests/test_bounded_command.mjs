@@ -234,6 +234,15 @@ await check("failure tails strip ANSI and safely render binary/control bytes per
   assert.equal(result.stderr.tail.includes("\u001b"), false);
 });
 
+await check("UTF-8 continuation bytes cannot enter raw C1 control states", async () => {
+  const result = await runBoundedCommand(
+    nodeCommand("process.stdout.write(Buffer.from([0xc2, 0x9b, 0x41])); process.exitCode = 3;"),
+  );
+  assertClosedEnvelope(result);
+  assert.equal(result.exit_code, 3);
+  assert.equal(result.stdout.tail, "\\xC2\\x9BA");
+});
+
 await check("a giant single line stays bounded, reports every byte, and marks truncation", async () => {
   const marker = "GIANT-LINE-TAIL";
   const giantStdoutBytes = MAX_CAPTURE_BYTES_PER_STREAM + 4096;
@@ -331,6 +340,7 @@ await check("library callers may select a working directory without exposing it"
     const invalid = await runBoundedCommand({ ...nodeCommand("process.exit(0)"), cwd: "bad\u0000cwd" });
     assertClosedEnvelope(invalid);
     assert.equal(invalid.outcome, "argument_invalid");
+    assert.equal(invalid.error_code, "ARGUMENT_INVALID");
     assert.equal(JSON.stringify(invalid).includes("bad"), false);
   });
 });

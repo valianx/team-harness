@@ -171,12 +171,17 @@ recovery event and updating `next_action`, load only the reference for the
 mapped phase. Findings and any tree change after Freeze follow the normal
 implementation → re-Freeze → validation route; recovery must not skip it.
 
-When `phase: implementation`, validate each `test_contract_evidence` entry
-before resuming the named task. `pending` resumes at the fresh tester dispatch;
-`red` requires readable contract and red-result files whose SHA-256 values match
-state before any implementer dispatch; `green` requires both hashed records;
-`not-applicable` requires the task shard's exact plan-time reason. Missing,
-mismatched, duplicated, unknown-task, or partially populated evidence blocks.
+When `phase: implementation`, first validate that `test_contract_evidence`
+points to a bounded regular non-symlink `evidence/test-contracts.json`, that its
+SHA-256 matches `index_sha256`, and that its closed schema, task count, aggregate
+status, and four status counts match the state summary. Then validate each task
+entry before resuming the named task. `pending` resumes at the fresh tester
+dispatch; `red` requires readable contract and red-result files whose
+`contract_sha256` and `red_evidence_sha256` match the index before any
+implementer dispatch; `green` additionally requires matching
+`green_evidence_sha256`; `not-applicable` requires the task shard's exact
+plan-time reason. Missing, mismatched, duplicated, unknown-task, oversized, or
+partially populated evidence blocks.
 Never infer red or green from a test name, current suite result, agent prose, or
 an unhashed workspace artifact.
 

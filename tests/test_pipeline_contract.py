@@ -746,6 +746,8 @@ def check_preimplementation_test_contract() -> None:
         "plugins/team-harness/skills/pipeline/references/recovery.md"
     ).lower()
     require("test_contract_evidence" in state, "test contract evidence is not durable state")
+    for marker in ("index_path", "index_sha256", "status_counts", "inline per-task array"):
+        require(marker in state, f"test evidence index contract misses {marker}")
     for marker in ("contract_sha256", "red_evidence_sha256", "green_evidence_sha256"):
         require(marker in state, f"state misses immutable test evidence field {marker}")
     require(
@@ -871,7 +873,9 @@ def check_cleaner_crap_contract() -> None:
 
     state = read("plugins/team-harness/skills/pipeline/references/state-and-gates.md").lower()
     recovery = read("plugins/team-harness/skills/pipeline/references/recovery.md").lower()
+    shared_state = read("agents/_shared/orchestrator-state.md").lower()
     require("cleaner_evidence" in state, "cleaner evidence is not durable state")
+    require("cleaner_evidence" in shared_state, "agent state schema misses cleaner evidence")
     for marker in ("allowlist_sha256", "baseline_sha256", "post_sha256"):
         require(marker in state, f"cleaner state misses immutable field {marker!r}")
     require(
@@ -1219,7 +1223,7 @@ def check_profile_and_document_guards() -> None:
     # guards against reintroducing specialist writes while changing routing.
     specialist_write = re.compile(
         r"(?:`(?:architect|implementer|tester|cleaner|qa|security|delivery|specialist)`|"
-        r"\b(?:architect|implementer|tester|cleaner|qa|security|delivery|specialist)\b(?!['’]s))"
+        r"\b(?:architect|implementer|tester|cleaner|qa|security|delivery|specialist)\b(?!['\u2019]s))"
         r"[^\.\n]*(?:\bwrite\w*|\bedit\w*|\brepair\w*|\bcreate\w*)[^\.\n]*00-state",
         re.IGNORECASE,
     )

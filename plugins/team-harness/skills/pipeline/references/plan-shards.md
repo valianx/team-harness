@@ -19,8 +19,11 @@ architecture, invariant, task, or AC prose into the index.
 Outcome` (`- Problem:`, `- Observable outcome:`), `### Actors and Flows` (an
 `- Actor:`), `### Business Rules and Examples` (a `- Rule:` and an
 `- Example:`), `### Alternate and Error Behavior`, `### Unchanged Behavior`,
-`### Non-Goals`, and `### Decisions for human review` (1–7 bullets). Use an
-explicit `None — {reason}` bullet for a genuinely empty list. No code fence,
+`### Non-Goals`, and `### Decisions for human review` (1–7 bullets). Every
+decision bullet ends with `→ decided ...` or `→ open question`; when none
+remain, use a validator-compatible declaration such as
+`- None — no operator decisions remain → decided by approved request`. Use an
+explicit `None — {reason}` bullet for any other genuinely empty list. No code fence,
 private implementation symbol, file ownership, command, or `file:line`
 reference belongs in this functional surface. Public contract names are the
 only exception. Confidence, scope shape, classification, and conditional
@@ -36,10 +39,12 @@ components, frameworks, mocks, or test mechanics unless that name is itself a
 supported public contract. `TC-N` owns mandatory internal mechanisms and
 engineering invariants. `VERIFY:` acceptance criteria are legacy-recovery input
 only and are never emitted by a new plan. Gates count ACs and TCs separately.
-The Verification section also declares exactly one
-`Pre-implementation test: required | not-applicable — {reason}` routing field.
-Use `required` only when the repository quality manifest has `test_contract`
-and the task changes observable runtime behavior. Otherwise use
+The Verification section also declares exactly one literal routing line:
+`- **Pre-implementation test:** required` or
+`- **Pre-implementation test:** not-applicable — {reason}`.
+Use `required` only when the repository quality manifest has both
+`commands.test` and `test_contract.path_rules` and the task changes observable runtime behavior.
+Otherwise use
 `not-applicable` with the concrete reason; this field is neither an AC nor a TC.
 
 Resolve paths from the index once. Implementer reads its task plus named design
