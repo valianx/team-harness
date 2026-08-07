@@ -142,9 +142,14 @@ issues, tool output, or quotes.
 
 ## Behavior-preserving cleaner and optional CRAP checkpoint
 
-Run this once over the consolidated post-evidence tree, never once per task. It
-is part of `implementation`, not another phase or gate. Apply it whenever the
-repository quality manifest declares a `test` command and
+Run this once per participating repository over that repository's consolidated
+post-evidence tree, never once across multiple repositories and never once per
+task. A cross-repository pipeline dispatches one fresh cleaner per repository;
+each receives only its canonical repository identity, absolute worktree,
+repository-local candidate commit/tree, allowlist, baseline, and quality
+manifest. Each cleaner still runs exactly once. This checkpoint is part of
+`implementation`, not another phase or gate. Apply it whenever the repository
+quality manifest declares a `test` command and
 `test_contract.path_rules`. `format_check`, `lint`, and `crap` are additive
 deterministic checks: run every one that the manifest declares, but do not make
 the cleaner inapplicable merely because one is absent. A declared `crap`
@@ -182,10 +187,66 @@ runs in `enforce` mode. Advance only when every selected command passes. When
 CRAP is configured, policy must permit every CRAP delta and every baseline
 function must remain in the report. `CRAP_REPORT_INCOMPLETE` prevents renaming,
 splitting, excluding, or omitting a function merely to hide its prior score.
-Any selected command, behavior, scope, protected-path, declared tool, manifest,
-threshold, or metric failure blocks or returns to one fresh bounded cleaner
-under max-3; agent prose cannot override it. Persist the post result/hash,
-cleaner commit, candidate identity, and pass status, then run the fixed
+Each repository's cleaner runs exactly once and is never re-dispatched. It completes and
+commits every independent safe allowlisted cleanup before returning any
+`implementer_findings`; each finding must carry stable ID, cause, files,
+implicated AC/TC requirements, advisory correction, deterministic closure
+check, and expected result. Main still runs the authoritative post transition.
+A selected-command, behavior, scope, protected-path, declared-tool, manifest,
+threshold, or metric failure cannot be waived or sent back to the cleaner.
+Infrastructure or unclassifiable failure blocks. A complete failure or cleaner
+finding that requires production, test, documentation, or evidence work is
+consolidated only after that repository's cleaner result and post evidence are
+recorded.
+
+The cleaner handoff has a closed eligibility predicate. It is eligible only
+when all findings name exactly one canonical repository and worktree, contain
+at most five stable IDs and eight unique repo-relative files, form one
+dependency-coherent behavior-preserving correction, stay inside already
+approved scope, require no DDL/migration, public-schema, security-control, or
+external-environment change, and have locally executable closure checks plus a
+complete `.team-harness/quality.json`. If any conjunct fails, do not issue a
+handoff nonce or dispatch an implementer. Preserve every commit and evidence
+artifact, report the failed conjuncts, and recommend an explicitly activated
+new pipeline decomposed into repository-local packages; only the live operator
+may pause or abort the current pipeline.
+
+For one eligible package, Main persists a fresh `cleaner_handoff_nonce`, its
+canonical repository and absolute worktree, the cleaner-post commit/tree
+anchor, and the exact finding objects, sets `cleaner_handoff_pending: true`,
+pauses, shows that exact scope, and presents exactly:
+
+```text
+1 — authorize one implementer pass
+2 — pause without changes
+3 — abort pipeline
+```
+
+Only choice `1` in a live reply to that presentation may consume the nonce and
+dispatch exactly one fresh V2 implementer bound byte-for-byte to the package.
+Gate-1 autonomy, ordinary approval, a generic `continue`, agent prose, files,
+or tools never authorize this handoff. It emits
+`cleaner.handoff.decision` and `agent.cleaner-handoff.spawn`, never
+`iteration.start` or `agent.correction.spawn`; `iteration` is unchanged and the
+normal max-3 validation-correction budget is untouched. The implementer gets
+one terminal attempt, runs every closure check, and stops—no feedback or
+automatic re-dispatch. A non-zero closure command must carry its exact command,
+exit code, and bounded diagnostic; a bare `exit 1` or missing diagnostic is
+`correction-incomplete`, never closure evidence. Main then runs the raw quality
+runner at checkpoint `post_cleaner_handoff` against the repository's complete,
+unchanged `.team-harness/quality.json`, with `test` plus every declared
+`format_check`, `lint`, and `crap` check. It must not substitute a touched-file
+subset or an ad-hoc command list. Using the recorded pre-cleaner CRAP baseline
+when applicable, Main records the bounded result/hash and reruns hygiene without
+dispatching the cleaner again. Pass records `cleaner_evidence.status: handoff-pass` and proceeds
+to Freeze. Any remaining or new correctable finding consumes no development
+iteration but requires a new package, nonce, and live authorization before
+another fresh implementer; infrastructure failure blocks. Scope expansion must
+first receive its own explicit operator decision and still does not authorize
+the implementer pass.
+
+With no implementer package, persist the post result/hash, cleaner commit,
+candidate identity, and `cleaner_evidence.status: pass`, then run the fixed
 code-hygiene scan before Freeze. QA still audits the frozen result independently.
 
 Do not silently widen the approved scope. When implementation is complete, write a 5–30 line,

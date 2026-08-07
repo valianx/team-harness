@@ -1404,6 +1404,12 @@ def main() -> None:
         "@Team-Harness pipeline <task>",
         "read `../pipeline/SKILL.md`",
         "does not change `Main`'s model",
+        "1 — start the full pipeline for the framed task",
+        "2 — continue inline with a reduced scope",
+        "3 — pause without changes",
+        "never make copying or repeating it the only way to continue",
+        "workspace setup, commit anchoring",
+        "Never narrate that approval was explicit",
     ):
         if marker not in init:
             fail(f"lightweight init contract is missing {marker!r}")
@@ -1444,6 +1450,9 @@ def main() -> None:
         "`@Team-Harness init` loads only the lightweight intake posture",
         "Do not create or dispatch a separate `orchestrator` agent",
         "does not change `Main`'s selected model",
+        "intake-bound live numeric choice `1`",
+        "keep successful boot mechanics silent",
+        "Do not tell the operator that activation was explicit",
     ):
         if marker not in pipeline:
             fail(f"pipeline preflight is missing {marker!r}")
@@ -1631,9 +1640,9 @@ def main() -> None:
     pipeline_digests = digest_table(pipeline)
     expected_updated_digests = {
         "architect": "c968fdc18524199ff7a2f71cf5e461ddade593db451a12cbd080416af2828956",
-        "implementer": "76cd8d007b91411377b6401c9def7076f49e42868928010168cca17ad5778449",
+        "implementer": "0f77ca26bb5ad7b884ccec48d57102c9470c6bbec8566a1b0f54ded7737f6960",
         "tester": "7519e2980d21e6f3116da32169386f0531450cf60b6404d7553985879e966c91",
-        "cleaner": "bd11fd3ad3c770c4aba8d20929b7e915cef5bb04ef602009b029320aca21e965",
+        "cleaner": "b2da1e953ad822124830363edf8a3be58aa12935024a0448bec066b587e3fc5e",
         "qa": "2612528da833bcb5cf2db981ac586320a0ad06ac407d38beb564b64880cc24c8",
         "security": "06434dd772dfff170529c67e15c91c08311329e66f364eb220298a2d0dd2f997",
         "delivery": "07a5997769adbb2b3304b7640e2f9a701a38564a4f58d192548390b15ffbf7d5",

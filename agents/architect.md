@@ -987,7 +987,7 @@ These heuristics encode lessons learned across past pipelines. Walk through them
 
 #### Multi-site invariants (applies to every feature, refactor, or enhancement)
 
-An invariant lives in more than one file when a single logical constraint (a version literal, a status-block field, a seam-contract token) must be present and consistent at N ≥ 2 locations. Examples: a version number that appears in `plugin.json`, `marketplace.json`, and `CLAUDE.md §3`; a status-block field declared in a leaf-agent prompt and documented in the orchestrator's aggregation note; a canonicalized convention declared in a doc and enforced in a test.
+An invariant lives in more than one file when a single logical constraint (a version literal, a status-block field, a seam-contract token) must be present and consistent at N ≥ 2 locations. Examples: a version number that appears in the Claude plugin manifest, marketplace entry, Codex plugin manifest, and installer fallback; a status-block field declared in a leaf-agent prompt and documented in the orchestrator's aggregation note; a canonicalized convention declared in a doc and enforced in a test.
 
 **Whenever your design introduces or modifies such an invariant:**
 

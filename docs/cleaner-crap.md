@@ -1,9 +1,12 @@
 # Cleaner Checkpoint with Optional CRAP
 
 The cleaner checkpoint is a behavior-preserving cleanup pass inside the
-existing `implementation` phase. It runs once per consolidated candidate with
-an eligible changed production surface, after implementation evidence is green
-and immediately before Freeze. It adds no phase, gate, or architecture review.
+existing `implementation` phase. It runs once per repository candidate with an
+eligible changed production surface, after implementation evidence is green and
+immediately before Freeze. A multi-repository pipeline launches one isolated
+cleaner per repository, each with its own worktree, allowlist, baseline,
+candidate identity, and quality manifest; one cleaner never receives several
+projects. It adds no phase, gate, or architecture review.
 
 Claude Code, Codex, and opencode resolve the same runner bytes from the loaded
 pipeline skill. The canonical copies live under `skills/pipeline/scripts/`;
@@ -41,6 +44,33 @@ files remain outside the cleaner's authority.
    added/deleted/renamed/type-changed paths, and proves every modified path
    belongs to the allowlist.
 5. Persist the closed evidence, run the existing hygiene scan, then Freeze.
+
+Each repository's cleaner is dispatched exactly once. If it finds both safe allowlisted
+cleanup and work that requires production, migration, test, documentation, or
+evidence authority, it commits the safe cleanup first and reports the remainder
+as complete implementer findings. A cleaner finding never triggers another
+cleaner pass.
+
+After the cleaner result and post-transition evidence are recorded, only a
+small repository-local remainder may become a cleaner handoff: exactly one
+repository/worktree, one coherent behavior-preserving objective, at most five
+finding IDs and eight files, already-approved scope, no DDL/migration,
+public-schema, security-control, external environment or new decision, local
+closure checks, and a complete quality manifest. Anything larger preserves its
+commits and evidence but requires a newly activated pipeline decomposed by
+repository; it is never packed into one large implementer prompt.
+
+An eligible implementer package pauses with a fresh nonce and asks the operator
+to authorize one implementer pass. Neither normal nor autonomous Gate-1
+approval authorizes that pass. The authorized implementer gets one terminal
+attempt; the handoff does not increment the pipeline `iteration` counter or
+consume its max-3 validation-correction budget. A non-zero closure result must
+include the exact command, exit code, and bounded diagnostic—`exit 1` alone is
+not evidence. Main then runs the complete, unchanged
+`.team-harness/quality.json` at `post_cleaner_handoff`, including every declared
+test, format, lint, and CRAP check rather than a touched-file subset, followed by
+hygiene. Remaining work requires a new package and another live authorization;
+the cleaner still does not run again.
 
 When configured, CRAP is not a prose score supplied by an agent. The repository
 adapter reports complexity and coverage; the quality runner computes:

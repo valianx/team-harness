@@ -841,6 +841,11 @@ def check_cleaner_crap_contract() -> None:
         for marker in (
             "repository-quality-manifest-incomplete",
             "exactly one fresh",
+            "repository's cleaner runs exactly once",
+            "authorize one implementer pass",
+            "post_cleaner_handoff",
+            "iteration",
+            "new package",
             "cleaner-transition.mjs",
             "--transition pre",
             "--transition post",
@@ -849,6 +854,10 @@ def check_cleaner_crap_contract() -> None:
             "crap_report_incomplete",
             "allowlist",
             "freeze",
+            "per participating repository",
+            "at most five",
+            "complete `.team-harness/quality.json`",
+            "bare `exit 1`",
         ):
             require(marker in text, f"{label}: cleaner checkpoint misses {marker!r}")
         require(
@@ -869,6 +878,10 @@ def check_cleaner_crap_contract() -> None:
             "never weaken",
             "crap",
             "observable behavior",
+            "implementer_findings",
+            "only execution",
+            "repository",
+            "multiple repositories",
         ):
             require(marker in cleaner, f"{label}: scope contract misses {marker!r}")
 
@@ -885,6 +898,47 @@ def check_cleaner_crap_contract() -> None:
         and "sha-256" in recovery,
         "recovery can trust inferred or unhashed cleaner evidence",
     )
+    for marker in (
+        "cleaner_handoff_pending",
+        "cleaner_handoff_nonce",
+        "cleaner_handoff_repository",
+        "cleaner_handoff_worktree",
+        "cleaner_handoff_findings",
+        "cleaner_handoff_eligibility",
+        "cleaner_handoff_decision_nonce",
+        "authorize one implementer pass",
+        "cleaner_repo_evidence",
+    ):
+        require(marker in state, f"cleaner handoff state misses {marker!r}")
+        require(marker in shared_state, f"shared cleaner handoff state misses {marker!r}")
+    for marker in (
+        "cleaner-handoff recovery",
+        "agent.cleaner-handoff.spawn",
+        "never follow up",
+        "iteration",
+        "one to five",
+        "touched-file subset",
+        "bare non-zero exit",
+    ):
+        require(marker in recovery, f"cleaner handoff recovery misses {marker!r}")
+    implementer = re.sub(r"\s+", " ", read("agents/implementer.md").lower())
+    codex_implementer = re.sub(
+        r"\s+", " ", read("runtime/codex/instructions/implementer.md").lower()
+    )
+    for marker in (
+        "bare `exit 1`",
+        "bounded diagnostic",
+        "correction-incomplete",
+        "spanning repositories",
+    ):
+        require(marker in implementer, f"implementer diagnostic contract misses {marker!r}")
+    for marker in (
+        "bare exit code",
+        "bounded diagnostic",
+        "correction-incomplete",
+        "multiple repositories",
+    ):
+        require(marker in codex_implementer, f"Codex implementer diagnostic contract misses {marker!r}")
     require(
         (ROOT / "plugins/team-harness/skills/pipeline/scripts/cleaner-transition.mjs").is_file(),
         "deterministic cleaner transition helper is missing",

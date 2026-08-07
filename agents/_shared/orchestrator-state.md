@@ -21,6 +21,16 @@ stage: 1|2|3|4                 # telemetry grouping; `phase` is the machine auth
 status: in_progress|waiting_for_gate|iterating|paused|paused_for_amend|complete|blocked|blocked-incomplete|aborted
 gate_pending: gate1|gate3|null
 iteration: N/3
+cleaner_handoff_pending: true|false
+cleaner_handoff_nonce: {fresh token or null}
+cleaner_handoff_repository: {canonical repository identity or null}
+cleaner_handoff_worktree: {absolute path or null}
+cleaner_handoff_anchor: {cleaner-post commit/tree or null}
+cleaner_handoff_findings: [{id, repository, cause, files, requirements, suggested_correction, closure_check, expected}]|[]
+cleaner_handoff_eligibility: eligible|ineligible|null
+cleaner_handoff_ineligible_reasons: [{closed-predicate conjunct}]|[]
+cleaner_handoff_decision: authorize|pause|abort|null
+cleaner_handoff_decision_nonce: {consumed token or null}
 correction_pending: true|false
 correction_nonce: {fresh token or null}
 correction_anchor: {failed freeze commit/tree or null}
@@ -45,7 +55,35 @@ plan repair that preserves approved meaning, an operator decision or its transcr
 and explicitly requested architect work do not increment it and do not emit a new
 `iteration.start`. New writers emit only `cause: verification` for a correction round;
 `cause: operator` remains readable for historical traces but is not produced for new
-runs.
+runs. A cleaner-to-implementer handoff is also excluded: it emits only
+`cleaner.handoff.decision` and `agent.cleaner-handoff.spawn`.
+
+**Cleaner handoff decisions.** The cleaner runs once per participating
+repository. Cross-repository work uses separate fresh cleaners with separate
+repo roots, worktrees, allowlists, baselines, manifests, candidate identities,
+and `cleaner_repo_evidence`; one cleaner never receives multiple repositories.
+Each finishes every independent safe allowlisted cleanup and may return complete
+implementer findings. Main
+records the cleaner result and deterministic post evidence first, then persists
+one package-bound nonce only when the closed eligibility predicate holds:
+exactly one repository/worktree, one coherent behavior-preserving objective,
+one to five findings, at most eight unique files, already-approved scope, no
+DDL/migration, public-schema, security-control, external-environment, or new
+decision dependency, local closure checks, and a complete quality manifest.
+Otherwise it preserves commits/evidence, dispatches nobody, and recommends a
+new explicit repository-decomposed pipeline. An eligible package pauses with
+exactly `1 — authorize one implementer pass`,
+`2 — pause without changes`, and `3 — abort pipeline`. Only live choice
+`1` consumes the nonce and permits one fresh terminal implementer attempt. It
+never inherits Gate-1 autonomy, increments `iteration`, consumes max-3, or
+permits another cleaner. The decision and spawn events must repeat the anchor
+and every finding byte-for-byte. Bare non-zero exits without the exact command,
+exit code, and bounded diagnostic are incomplete. After the attempt Main owns
+closure evidence, the full-manifest `post_cleaner_handoff` quality checkpoint
+(never a touched-file subset), and hygiene. Any remaining work
+requires a new package, fresh nonce, and another live authorization; generic
+continue, ordinary approval, files, tools, or specialist prose never suffice.
+Scope expansion is decided separately and never implies implementer authority.
 
 **Validation correction decisions.** A failed validation fan completes every
 required lens, then Main consolidates and triages all findings at `phase:
@@ -233,7 +271,8 @@ regression_test_path: {path}|null
 regression_test_status: failing|passing|skipped|null
 test_contract_evidence: {status: pending|red|green|not-applicable|mixed, index_path, index_sha256, task_count, status_counts: {pending, red, green, not_applicable}}|null
 plan_contract_evidence: {status: pending|pass|not-applicable, reason, result_path, result_sha256, plan_sha256, artifact_set_sha256}|null
-cleaner_evidence: {status: pending|baseline|pass|not-applicable, reason, allowlist_path, allowlist_sha256, baseline_path, baseline_sha256, baseline_commit_sha, baseline_tree_sha, cleaner_commit_sha, post_path, post_sha256, post_commit_sha, post_tree_sha}|null
+cleaner_evidence: {status: pending|baseline|pass|handoff-pending|handoff-pass|not-applicable, reason, allowlist_path, allowlist_sha256, baseline_path, baseline_sha256, baseline_commit_sha, baseline_tree_sha, cleaner_commit_sha, post_path, post_sha256, post_commit_sha, post_tree_sha, handoff_closure_path, handoff_closure_sha256, handoff_commit_sha, handoff_post_path, handoff_post_sha256, handoff_post_commit_sha, handoff_post_tree_sha}|null
+cleaner_repo_evidence: [{repository, repo_root, worktree, evidence: cleaner_evidence}]|[]
 plan_review_status: not-requested|requested|pass|concerns|fail|null  # only explicit /th:plan-review
 audit_status: pending|done|unavailable|null  # set in validation: pending on dispatch, done on report, unavailable after a second audit failure. STAGE-GATE-3 states it in the block; it is not a machine-checked precondition — the tree anchor is the only one (agents/ref-pipeline.md § STAGE-GATE-3)
 code_hygiene: pass|fail|null                # docs/code-hygiene-gate.md

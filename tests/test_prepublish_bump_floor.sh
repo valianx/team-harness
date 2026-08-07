@@ -18,9 +18,9 @@
 # Universal-path model: the guard enforces ONE invariant on ANY branch that
 # touches a distributed asset (Claude plugin files, Codex marketplace/generator
 # inputs, generated agents, or installer source) — all version sites present
-# in the repository (five in the current tree: .claude-plugin/plugin.json,
+# in the repository (four in the current tree: .claude-plugin/plugin.json,
 # .claude-plugin/marketplace.json, plugins/team-harness/.codex-plugin/plugin.json,
-# CLAUDE.md §3, and cmd/install/main.go var version) must be bumped vs
+# and cmd/install/main.go var version) must be bumped vs
 # origin/main and mutually matching, then the
 # mechanical SemVer floor applies. There is no branch-name discriminator, no
 # release-cut marker/trailer, and no changelog.d/version.d fragment escape
@@ -359,9 +359,9 @@ else
 fi
 
 if [ -n "$_plugin_ver" ] && [ "$_plugin_ver" = "$_market_ver" ] && [ "$_plugin_ver" = "$_codex_ver" ] && [ "$_plugin_ver" = "$_installer_ver" ]; then
-    pass "current five version sites are synchronized"
+    pass "current four version sites are synchronized"
 else
-    fail "current five version sites synchronization" "plugin=$_plugin_ver marketplace=$_market_ver codex=$_codex_ver installer=$_installer_ver"
+    fail "current four version sites synchronization" "plugin=$_plugin_ver marketplace=$_market_ver codex=$_codex_ver installer=$_installer_ver"
 fi
 
 # ---------------------------------------------------------------------------
@@ -369,8 +369,8 @@ fi
 #
 # Universal path: any branch touching a shipped asset must bump all version
 # sites vs origin/main. This fixture bumps both plugin.json and
-# marketplace.json (CLAUDE.md is absent from the fixture entirely, so the
-# third site is fail-open/exempt) to a PATCH delta while ADDing a new file.
+# marketplace.json and the generated Codex manifest to a PATCH delta while
+# ADDing a new file.
 # Path shape alone cannot prove a material new public capability, so PATCH is
 # the mechanical default and no warning is expected.
 # ---------------------------------------------------------------------------
@@ -403,8 +403,8 @@ assert_stderr_not_contains "AC-1: added file alone does not produce a MINOR warn
 # ---------------------------------------------------------------------------
 # AC-2: docs/ payload + MINOR delta → explicit override, WARN + nodecision
 #
-# The Codex manifest is now a shipped path, so synchronizing it (along with
-# the Claude manifests and CLAUDE.md) makes this a PATCH-floor diff. A MINOR
+# The Codex manifest is now a shipped path, so synchronizing it with the
+# Claude manifests makes this a PATCH-floor diff. A MINOR
 # bump is therefore an intentional over-bump under Suite 16's policy and must
 # carry a valid bump-override token. The hook still emits a WARN, but push is
 # allowed (nodecision, stdout empty).
@@ -420,19 +420,12 @@ _make_repo "$_bare2" "$_clone2" "2.107.0"
     cd "$_clone2"
     git config user.email "test@test.com"
     git config user.name "Test"
-    # Seed every version site in origin/main. The feature commit below
-    # updates all four sites, avoiding a missing-origin-site fail-open path.
-    printf '**Current version:** `2.107.0`\n' > CLAUDE.md
-    git add CLAUDE.md
-    git commit -m "base: add CLAUDE version site" -q 2>/dev/null
-    git push origin HEAD:main -q 2>/dev/null
     mkdir -p docs
     echo "# Some docs" > docs/guide.md
     # MINOR bump (2.107.0 → 2.108.0) — docs payload plus synchronized
     # version sites; Codex makes the manifest update a shipped-path change.
     _write_plugin_json "2.108.0" .claude-plugin/plugin.json
     _write_market_json "2.108.0" .claude-plugin/marketplace.json
-    printf '**Current version:** `2.108.0`\n' > CLAUDE.md
     git add .
     git commit -m "docs update (minor bump)" -q 2>/dev/null
 )
@@ -524,7 +517,7 @@ _make_repo "$_bare3" "$_clone3" "2.107.0"
 _run_hook "$_clone3"
 
 assert_deny "AC-3: MODIFY without any version bump → deny"
-assert_deny_reason_contains "AC-3: deny reason names the four-site bump requirement" "all four version sites"
+assert_deny_reason_contains "AC-3: deny reason names the three-site fixture requirement" "all three version sites"
 assert_stderr_not_contains "AC-3: no WARN alongside the deny" "WARN"
 
 # ---------------------------------------------------------------------------
@@ -587,7 +580,7 @@ _make_repo "$_bare3installer" "$_clone3installer" "2.107.0"
     _write_plugin_json "2.107.1" .claude-plugin/plugin.json
     _write_market_json "2.107.1" .claude-plugin/marketplace.json
     # Codex manifest is updated, but cmd/install/main.go intentionally remains
-    # at 2.107.0 — the five-site current contract must reject this partial bump.
+    # at 2.107.0 — the four-site current contract must reject this partial bump.
     git add agents .claude-plugin/ plugins/team-harness/.codex-plugin/
     git commit -m "feat: partial bump leaves installer fallback stale" -q 2>/dev/null
 )
@@ -599,12 +592,12 @@ assert_stderr_not_contains "Installer fallback stale: no WARN alongside deny" "W
 
 # ---------------------------------------------------------------------------
 # Codex compatibility boundary: repositories where the Codex plugin manifest
-# is absent at both origin/main and HEAD retain historical three-site behavior.
+# is absent at both origin/main and HEAD retain historical two-site behavior.
 # Once the manifest exists on either side, it is mandatory: deleting it cannot
-# silently downgrade enforcement back to three sites.
+# silently downgrade enforcement back to two sites.
 # ---------------------------------------------------------------------------
 echo
-echo "--- Codex compatibility: absent at origin+HEAD stays legacy; origin deletion requires four sites ---"
+echo "--- Codex compatibility: absent at origin+HEAD stays legacy; origin deletion requires three sites ---"
 
 _bare3legacy=$(_new_tmp)
 _clone3legacy=$(_new_tmp)
@@ -657,8 +650,8 @@ _make_repo "$_bare3delete" "$_clone3delete" "2.107.0"
 )
 
 _run_hook "$_clone3delete"
-assert_deny "Codex present at origin but deleted at HEAD: four-site bump required"
-assert_deny_reason_contains "Codex deletion: deny names four-site requirement" "all four version sites"
+assert_deny "Codex present at origin but deleted at HEAD: three-site fixture bump required"
+assert_deny_reason_contains "Codex deletion: deny names three-site fixture requirement" "all three version sites"
 
 # ---------------------------------------------------------------------------
 # AC-2/AC-3 regression (inverted): a changelog.d/ fragment no longer bypasses
@@ -766,15 +759,15 @@ assert_deny "AC-3: plugin.json and marketplace.json bumped to different values �
 assert_deny_reason_contains "AC-3: deny reason names the mismatch" "do not match"
 
 # ---------------------------------------------------------------------------
-# AC-1 (positive): feature branch + all-four sites bumped+matching + override
+# AC-1 (positive): feature branch + all-three fixture sites bumped+matching + override
 #
-# A feature branch with all four version sites bumped and mutually matching
+# A feature branch with all three fixture version sites bumped and mutually matching
 # must be allowed (nodecision) — the branch name carries no meaning. Since
 # updating the Codex manifest is itself a shipped M-only diff, the MINOR
 # metadata bump also needs an explicit over-bump override.
 # ---------------------------------------------------------------------------
 echo
-echo "--- AC-1 (positive): feat/ac-positive + all-four bumped+matching + override → nodecision ---"
+echo "--- AC-1 (positive): feat/ac-positive + all-three bumped+matching + override → nodecision ---"
 
 _bare_ac7p=$(_new_tmp)
 _clone_ac7p=$(_new_tmp)
@@ -786,25 +779,20 @@ _make_repo "$_bare_ac7p" "$_clone_ac7p" "2.107.0"
     git config user.name "Test"
     mkdir -p agents
     echo "# release agent" > agents/release.md
-    # Seed CLAUDE.md in origin/main so this fixture exercises all four version
-    # sites rather than the optional third-site fail-open behavior.
-    printf '**Current version:** `2.107.0`\n' > CLAUDE.md
-    git add agents/release.md CLAUDE.md
-    git commit -m "base: add agents/release.md and CLAUDE version site" -q 2>/dev/null
+    git add agents/release.md
+    git commit -m "base: add agents/release.md" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Ordinary feature branch, bump all four sites to a matching X.Y.Z.
+    # Ordinary feature branch, bump all three present sites to a matching X.Y.Z.
     git checkout -b feat/ac-positive -q 2>/dev/null
     _write_plugin_json "2.108.0" .claude-plugin/plugin.json
     _write_market_json "2.108.0" .claude-plugin/marketplace.json
-    # CLAUDE.md §3 simulation: update the version site.
-    printf '**Current version:** `2.108.0`\n' > CLAUDE.md
     git add .
-    git commit -m "feat: bump all four version sites" -q 2>/dev/null
+    git commit -m "feat: bump all three version sites" -q 2>/dev/null
 )
 
 _run_hook_with_commit_msg "$_clone_ac7p" "bump-override: minor — synchronize all version sites"
 
-assert_nodecision "AC-1 positive: feat/ac-positive + all-four bumped + override → nodecision"
+assert_nodecision "AC-1 positive: feat/ac-positive + all-three bumped + override → nodecision"
 assert_stderr_contains "AC-1 positive: valid bump-override acknowledged" "bump-override"
 
 # ---------------------------------------------------------------------------
@@ -1320,140 +1308,42 @@ assert_stderr_contains "AC-12: prohibits agent-selected MAJOR" "Agents must not 
 assert_stderr_contains "AC-12: advisory note present" "advisory"
 
 # ---------------------------------------------------------------------------
-# Suite 17: SEC-001 closure — third-site (CLAUDE.md §3) enforcement
-#
-# These cases close the gap between the guard's declared contract (three
-# sites) and a two-site reality. Fixture discipline: origin/main must carry
-# CLAUDE.md with the old version so that the guard can read _claude_origin
-# and detect divergence.
+# Suite 17: CLAUDE.md is contributor guidance, not release metadata.
+# A stale version-looking line must not participate in release-site matching.
 # ---------------------------------------------------------------------------
 
 echo
-echo "=== Suite 17: SEC-001 — CLAUDE.md §3 third-site enforcement ==="
+echo "=== Suite 17: CLAUDE.md is not a version site ==="
 
-# ---------------------------------------------------------------------------
-# SEC-001-A: feature branch bumps ONLY CLAUDE.md §3, leaves plugin.json and
-# marketplace.json stale → DENY (missing mandatory three-site bump)
-# ---------------------------------------------------------------------------
-echo
-echo "--- SEC-001-A: feature branch + bump ONLY CLAUDE.md §3, plugin/market stale → DENY ---"
-
-_bare_s17a=$(_new_tmp)
-_clone_s17a=$(_new_tmp)
-
-git init --bare "$_bare_s17a" -q 2>/dev/null
-git clone "$_bare_s17a" "$_clone_s17a" -q 2>/dev/null
+_bare_s17=$(_new_tmp)
+_clone_s17=$(_new_tmp)
+_make_repo "$_bare_s17" "$_clone_s17" "2.107.0"
 
 (
-    cd "$_clone_s17a"
+    cd "$_clone_s17"
     git config user.email "test@test.com"
     git config user.name "Test"
-    mkdir -p .claude-plugin agents
-    _write_plugin_json "2.107.0" .claude-plugin/plugin.json
-    _write_market_json "2.107.0" .claude-plugin/marketplace.json
-    # CLAUDE.md §3 at origin/main: old version
-    printf '**Current version:** `2.107.0`\n' > CLAUDE.md
-    echo "# base agent" > agents/sec001.md
-    git add .
-    git commit -m "initial: version 2.107.0" -q 2>/dev/null
+    printf '**Current version:** `0.0.1`\n' > CLAUDE.md
+    git add CLAUDE.md
+    git commit -m "docs: add stale version-looking guidance" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Feature branch: modify shipped asset, bump ONLY CLAUDE.md §3
-    # (plugin.json + marketplace.json unchanged — mandatory bump missing).
-    echo "# base agent — updated" > agents/sec001.md
-    printf '**Current version:** `2.108.0`\n' > CLAUDE.md
-    git add agents/sec001.md CLAUDE.md
-    git commit -m "feat: bump only CLAUDE.md §3, leaving plugin/market stale (should deny)" -q 2>/dev/null
-)
-
-_run_hook "$_clone_s17a"
-assert_deny "SEC-001-A: bump only CLAUDE.md §3, plugin.json/marketplace.json stale → deny"
-
-# ---------------------------------------------------------------------------
-# SEC-001-B: feature branch with plugin.json + marketplace.json bumped+matching
-# but CLAUDE.md §3 left stale (partial-bump) → DENY
-# ---------------------------------------------------------------------------
-echo
-echo "--- SEC-001-B: feat branch + plugin.json + marketplace.json bumped but CLAUDE.md §3 stale → DENY ---"
-
-_bare_s17b=$(_new_tmp)
-_clone_s17b=$(_new_tmp)
-
-git init --bare "$_bare_s17b" -q 2>/dev/null
-git clone "$_bare_s17b" "$_clone_s17b" -q 2>/dev/null
-
-(
-    cd "$_clone_s17b"
-    git config user.email "test@test.com"
-    git config user.name "Test"
-    mkdir -p .claude-plugin agents
-    _write_plugin_json "2.107.0" .claude-plugin/plugin.json
-    _write_market_json "2.107.0" .claude-plugin/marketplace.json
-    # CLAUDE.md §3 at origin/main: old version
-    printf '**Current version:** `2.107.0`\n' > CLAUDE.md
-    echo "# release agent" > agents/sec001b.md
-    git add .
-    git commit -m "initial: version 2.107.0" -q 2>/dev/null
-    git push origin HEAD:main -q 2>/dev/null
-    # Feature branch: bump plugin.json + marketplace.json to 2.108.0,
-    # MODIFY shipped asset, but leave CLAUDE.md §3 stale at 2.107.0.
-    git checkout -b feat/sec001b -q 2>/dev/null
-    echo "# release agent — updated" > agents/sec001b.md
-    _write_plugin_json "2.108.0" .claude-plugin/plugin.json
-    _write_market_json "2.108.0" .claude-plugin/marketplace.json
-    # CLAUDE.md stays at 2.107.0 — stale, partial-bump should deny
-    git add agents/sec001b.md .claude-plugin/plugin.json .claude-plugin/marketplace.json
-    git commit -m "feat: partial-bump (CLAUDE.md §3 stale)" -q 2>/dev/null
-)
-
-_run_hook "$_clone_s17b"
-assert_deny "SEC-001-B: feature branch partial-bump (CLAUDE.md §3 stale) → deny"
-
-# ---------------------------------------------------------------------------
-# SEC-001-C: feature branch with all THREE sites bumped+matching → nodecision (ALLOW)
-#
-# This is the true three-site positive case: plugin.json, marketplace.json,
-# AND CLAUDE.md §3 all set to 2.107.1 on an ordinary feature branch. This
-# fixture seeds CLAUDE.md at origin/main to exercise the full three-site
-# compare path (the AC-1-positive fixture above creates CLAUDE.md fresh, with
-# no origin/main counterpart).
-# ---------------------------------------------------------------------------
-echo
-echo "--- SEC-001-C: feat branch + all THREE sites bumped+matching → nodecision ---"
-
-# Use a PATCH bump (2.107.0 → 2.107.1) to stay within the M-only (PATCH) floor
-# and avoid the over-bump hard-deny.
-_bare_s17c=$(_new_tmp)
-_clone_s17c=$(_new_tmp)
-
-git init --bare "$_bare_s17c" -q 2>/dev/null
-git clone "$_bare_s17c" "$_clone_s17c" -q 2>/dev/null
-
-(
-    cd "$_clone_s17c"
-    git config user.email "test@test.com"
-    git config user.name "Test"
-    mkdir -p .claude-plugin agents
-    _write_plugin_json "2.107.0" .claude-plugin/plugin.json
-    _write_market_json "2.107.0" .claude-plugin/marketplace.json
-    # CLAUDE.md §3 at origin/main: old version (seeded so the full compare runs)
-    printf '**Current version:** `2.107.0`\n' > CLAUDE.md
-    echo "# release agent" > agents/sec001c.md
-    git add .
-    git commit -m "initial: version 2.107.0" -q 2>/dev/null
-    git push origin HEAD:main -q 2>/dev/null
-    # Feature branch: MODIFY shipped asset (M-only → PATCH floor) and bump ALL
-    # THREE sites to 2.107.1 (PATCH bump = meets floor, no over-bump deny).
-    git checkout -b feat/sec001c -q 2>/dev/null
-    echo "# release agent — updated on feature branch" > agents/sec001c.md
+    git checkout -b feat/claude-not-version-site -q 2>/dev/null
+    mkdir -p agents
+    printf '# changed agent\n' > agents/claude-not-version-site.md
     _write_plugin_json "2.107.1" .claude-plugin/plugin.json
     _write_market_json "2.107.1" .claude-plugin/marketplace.json
-    printf '**Current version:** `2.107.1`\n' > CLAUDE.md
-    git add .
-    git commit -m "feat: bump all three version sites (PATCH)" -q 2>/dev/null
+    git add agents .claude-plugin plugins/team-harness/.codex-plugin
+    git commit -m "feat: bump release metadata without CLAUDE.md" -q 2>/dev/null
 )
 
-_run_hook "$_clone_s17c"
-assert_nodecision "SEC-001-C: feat/sec001c + all three sites bumped+matching → nodecision (ALLOW)"
+_run_hook "$_clone_s17"
+assert_nodecision "Suite17: stale CLAUDE.md version-looking prose is ignored"
+
+if ! grep -Eq 'CLAUDE_VERSION_RE|extractClaudeVersion|claudeHead|claudeBumped' "$REPO_ROOT/hooks/ts/bodies/prepublish-guard.ts"; then
+    pass "Suite17: guard source has no CLAUDE.md version parser or state"
+else
+    fail "Suite17: guard source has no CLAUDE.md version parser or state" "retired CLAUDE.md version symbols remain"
+fi
 
 # ---------------------------------------------------------------------------
 # AC-7 structural check: --name-status in the git invocation; every git show
@@ -1769,8 +1659,8 @@ assert_stderr_contains "NEW-6: non-existent-dir warning in stderr" "does not exi
 # (version.d/.release-cut) and the release-cut: commit trailer carried no
 # meaning after the universal-path collapse — the guard no longer reads
 # either signal. This is the deliberate inversion of the old Suite 19: under
-# the retired model a malformed marker/trailer would hard-deny even when all
-# three version sites were bumped and matching; under the universal model
+# the retired model a malformed marker/trailer would hard-deny even when both
+# fixture version sites were bumped and matching; under the universal model
 # only the version sites and the bump floor matter, so the same push is
 # nodecision.
 # ---------------------------------------------------------------------------
@@ -1791,20 +1681,18 @@ git clone "$_bare_m1" "$_clone_m1" -q 2>/dev/null
     mkdir -p .claude-plugin agents
     _write_plugin_json "2.107.0" .claude-plugin/plugin.json
     _write_market_json "2.107.0" .claude-plugin/marketplace.json
-    printf '**Current version:** `2.107.0`\n' > CLAUDE.md
     echo "# marker agent" > agents/marker-a.md
     git add .
     git commit -m "initial: version 2.107.0" -q 2>/dev/null
     git push origin HEAD:main -q 2>/dev/null
-    # Feature branch: modify shipped asset, bump all three sites, and write a
+    # Feature branch: modify shipped asset, bump both fixture sites, and write a
     # version.d/.release-cut file with MALFORMED (non-semver) content — under
     # the retired model this would have hard-denied regardless of the valid
-    # three-site bump. The universal model never reads this file.
+    # two-site bump. The universal model never reads this file.
     git checkout -b feat/s19-retired-marker -q 2>/dev/null
     echo "# marker agent — updated" > agents/marker-a.md
     _write_plugin_json "2.107.1" .claude-plugin/plugin.json
     _write_market_json "2.107.1" .claude-plugin/marketplace.json
-    printf '**Current version:** `2.107.1`\n' > CLAUDE.md
     mkdir -p version.d
     printf 'not-a-version\n' > version.d/.release-cut
     git add .
@@ -1823,7 +1711,7 @@ _HOOK_STDOUT=$(cat "$_tmpout_m1")
 _HOOK_STDERR=$(cat "$_tmperr_m1")
 rm -f "$_tmpout_m1" "$_tmperr_m1"
 
-assert_nodecision "Suite19 (retired): malformed marker + malformed trailer + valid three-site bump → nodecision (both signals inert)"
+assert_nodecision "Suite19 (retired): malformed marker + malformed trailer + valid two-site bump → nodecision (both signals inert)"
 
 # ---------------------------------------------------------------------------
 # Summary

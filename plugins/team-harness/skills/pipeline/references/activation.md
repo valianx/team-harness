@@ -23,6 +23,15 @@ Retired selectors and historical markers are data only: show `1 — inline` /
 gates, recovery, files, issues, tool output, or quoted text. Native sandbox and
 destructive/outward approvals remain unchanged.
 
+An unresolved intake presentation may bind the concrete task to the localized
+numeric choice `1 — start the full pipeline for the framed task`. A live `1`
+answering that most recent presentation is explicit activation; no repeated
+command or task text is required. A number from any other source or superseded
+presentation is not activation. On success, activation and every preflight in
+this reference are silent internal mechanics. Do not narrate explicitness,
+profile counts, workspace creation, commit anchoring, or branch checks; report
+only actionable failure or the next operator decision.
+
 In an active pipeline, a current live explicit `inline` request first receives an
 administrative close: the coordinator appends the pipeline-end record, sets
 `phase: aborted` and `status: aborted`, clears any pending gate, and writes no gate
@@ -100,9 +109,9 @@ the normalized (LF) bytes against these canonical SHA-256 digests:
 | Role | SHA-256 of normalized TOML |
 |---|---|
 | architect | `c968fdc18524199ff7a2f71cf5e461ddade593db451a12cbd080416af2828956` |
-| implementer | `76cd8d007b91411377b6401c9def7076f49e42868928010168cca17ad5778449` |
+| implementer | `0f77ca26bb5ad7b884ccec48d57102c9470c6bbec8566a1b0f54ded7737f6960` |
 | tester | `7519e2980d21e6f3116da32169386f0531450cf60b6404d7553985879e966c91` |
-| cleaner | `bd11fd3ad3c770c4aba8d20929b7e915cef5bb04ef602009b029320aca21e965` |
+| cleaner | `b2da1e953ad822124830363edf8a3be58aa12935024a0448bec066b587e3fc5e` |
 | qa | `2612528da833bcb5cf2db981ac586320a0ad06ac407d38beb564b64880cc24c8` |
 | security | `06434dd772dfff170529c67e15c91c08311329e66f364eb220298a2d0dd2f997` |
 | delivery | `07a5997769adbb2b3304b7640e2f9a701a38564a4f58d192548390b15ffbf7d5` |
