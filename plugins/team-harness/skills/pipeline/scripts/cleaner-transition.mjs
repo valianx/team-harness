@@ -380,13 +380,15 @@ function normalizeOptions(options) {
 }
 
 async function runPreQuality(options, manifest) {
+  const checks = cleanerChecks(manifest, "pre");
   return runQualityChecks({
     repo: options.repo,
     manifest: options.manifest,
     base: options.base,
     candidate: options.candidate,
     checkpoint: "pre_cleaner",
-    checks: cleanerChecks(manifest, "pre"),
+    checks,
+    requiredChecks: checks,
     policyMode: "measure",
   });
 }
@@ -415,6 +417,7 @@ async function withQualityBaseline(baselineResult, callback) {
 }
 
 async function runPostQuality(options, baseline, manifest) {
+  const checks = cleanerChecks(manifest, "post");
   return withQualityBaseline(baseline.result, ({ file, sha256: baselineSha256 }) =>
     runQualityChecks({
       repo: options.repo,
@@ -422,7 +425,8 @@ async function runPostQuality(options, baseline, manifest) {
       base: options.base,
       candidate: options.candidate,
       checkpoint: "post_cleaner",
-      checks: cleanerChecks(manifest, "post"),
+      checks,
+      requiredChecks: checks,
       policyMode: "enforce",
       baseline: file,
       baselineSha256,

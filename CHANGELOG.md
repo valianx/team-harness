@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.11.2] - 2026-08-06
+
+### Changed
+
+- Made the pre-Freeze cleaner a single autonomous pass per repository that
+  finishes safe cleanup before requesting a separately authorized,
+  non-iterative implementer handoff for a small repository-local remainder.
+  Cross-repository or oversized work now requires a new pipeline; full manifest
+  quality evidence and diagnosed command failures are mandatory.
+- Reduced Team Harness release metadata from five synchronized sites to four by
+  removing the redundant current-version mirror from contributor `CLAUDE.md`.
+- Replaced the post-intake copy-paste pipeline command with a task-bound numeric
+  decision and made successful activation/preflight mechanics silent in
+  operator-facing chat.
+
+### Fixed
+
+- Added one transactional pre-Gate-1 normalization pass for canonical task
+  index order, existing manifest routes, heading levels, and literal AC/TC
+  grammar. Eligible format repairs need no operator authorization, architect
+  redispatch, or iteration; missing or semantic content still fails closed.
+- Bound final repository quality to the task-declared required control set.
+  Build/typecheck, invariants, permissions, accessibility, contract,
+  integration, and database checks can no longer be omitted from a green
+  result, and missing declared environment prerequisites report unavailable.
+
+## [3.11.1] - 2026-08-06
+
 ### Added
 
 - Added `CLAUDE.md` as an additive Codex project-instruction fallback during

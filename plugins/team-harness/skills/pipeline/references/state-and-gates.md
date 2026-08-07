@@ -63,6 +63,16 @@ bug_tier_source: auto|operator|architect-promote|null
 last_completed: design|waiting_gate1|implementation|validation|waiting_gate3|delivery|complete|null
 next_action: {single recoverable action}
 iteration: N/3
+cleaner_handoff_pending: true|false
+cleaner_handoff_nonce: {fresh token or null}
+cleaner_handoff_repository: {canonical repository identity or null}
+cleaner_handoff_worktree: {absolute path or null}
+cleaner_handoff_anchor: {cleaner-post commit/tree or null}
+cleaner_handoff_findings: [{id, repository, cause, files, requirements, suggested_correction, closure_check, expected}]|[]
+cleaner_handoff_eligibility: eligible|ineligible|null
+cleaner_handoff_ineligible_reasons: [{closed-predicate conjunct}]|[]
+cleaner_handoff_decision: authorize|pause|abort|null
+cleaner_handoff_decision_nonce: {consumed token or null}
 correction_pending: true|false
 correction_nonce: {fresh token or null}
 correction_anchor: {failed freeze commit/tree or null}
@@ -105,7 +115,10 @@ regression_test_path: {path}|null
 regression_test_status: failing|passing|skipped|null
 test_contract_evidence: {status: pending|red|green|not-applicable|mixed, index_path, index_sha256, task_count, status_counts: {pending, red, green, not_applicable}}|null
 plan_contract_evidence: {status: pending|pass|not-applicable, reason, result_path, result_sha256, plan_sha256, artifact_set_sha256}|null
-cleaner_evidence: {status: pending|baseline|pass|not-applicable, reason, allowlist_path, allowlist_sha256, baseline_path, baseline_sha256, baseline_commit_sha, baseline_tree_sha, cleaner_commit_sha, post_path, post_sha256, post_commit_sha, post_tree_sha}|null
+plan_contract_repair_evidence: {status: not-needed|repaired|blocked, reason, result_path, result_sha256, before_sha256, after_sha256, added_paths, artifact_changes: [{path, before_sha256, after_sha256, operations}], contract_result_sha256}|null
+participating_repositories: [{repository, repo_root, worktree}]|[]
+cleaner_evidence: {status: pending|baseline|pass|cleaner-failed|cleaner-blocked|handoff-pending|handoff-pass|handoff-failed|handoff-blocked|not-applicable, reason, allowlist_path, allowlist_sha256, baseline_path, baseline_sha256, baseline_commit_sha, baseline_tree_sha, cleaner_commit_sha, post_path, post_sha256, post_commit_sha, post_tree_sha, handoff_closure_path, handoff_closure_sha256, handoff_commit_sha, handoff_post_path, handoff_post_sha256, handoff_post_commit_sha, handoff_post_tree_sha}|null
+cleaner_repo_evidence: [{repository, repo_root, worktree, evidence: cleaner_evidence}]|[]
 plan_review_status: not-requested|requested|pass|concerns|fail|null
 audit_status: pending|done|unavailable|null
 code_hygiene: pass|fail|null
@@ -128,6 +141,14 @@ delivery_size_justification: {workspace pointer}|null
 delivery_base_status: {base_ref, validated_base_sha, remote_base_sha: {full SHA}|null, status: current|moved|unknown}|null
 delivery_preview: {pr title, workspace paths, and SHA-256 digests bound to Gate 3}|null
 ```
+
+`cleaner_repo_evidence` is complete only when its canonical identity set equals
+`participating_repositories` exactly, with neither missing, extra, nor duplicate
+identities, and one terminal evidence entry exists for every participating
+repository. Main maps cleaner `failed`/`blocked` returns to
+`cleaner-failed`/`cleaner-blocked` and authorized implementer failures or blocks
+to `handoff-failed`/`handoff-blocked`. These terminal non-pass states never
+alias `pending` or `pass` and block Freeze.
 
 Also keep a short phase checklist and a bounded specialist-results table with
 only the latest result per role. The complete file must stay ≤160 lines and
@@ -185,7 +206,75 @@ re-enters implementation or validation. Mechanical plan repairs, operator
 decision transcription (including security-obligation classification), and
 explicit architect work never increment the counter and never emit a new
 `iteration.start`; historical `cause: operator` events remain readable but are
-not produced by new writes.
+not produced by new writes. The pre-Freeze cleaner handoff is also excluded: it
+uses `cleaner.handoff.decision` and `agent.cleaner-handoff.spawn`, never an
+iteration or validation-correction event.
+
+## Mandatory cleaner-to-implementer decision
+
+The cleaner is a one-shot-per-repository implementation checkpoint, not a
+correction round. A cross-repository pipeline dispatches separate fresh
+cleaners with separate worktrees, allowlists, baselines, manifests, candidate
+identities, and `cleaner_repo_evidence`; no cleaner receives multiple
+repositories. Each finishes all independent safe allowlisted work before returning complete
+`implementer_findings`. Main records the cleaner result and deterministic post
+evidence before considering a handoff. A machine failure joins the handoff only
+when its cause, paths, implicated requirements, bounded correction, closure
+check, and expected result are complete and the correction belongs to the
+implementer; infrastructure or ambiguous failures block.
+
+Before creating a nonce, require the closed handoff predicate: exactly one
+repository/worktree, one dependency-coherent behavior-preserving objective,
+one to five findings, no more than eight unique files, already-approved scope,
+no DDL/migration, public-schema, security-control, external-environment, or new
+decision dependency, locally executable closure checks, and a complete
+repository `.team-harness/quality.json`. Persist `ineligible` plus every failed
+conjunct when it does not hold, issue no nonce, and dispatch nobody. Preserve
+the existing commits/evidence and recommend a new explicit pipeline decomposed
+by repository; recommendation never authorizes or aborts anything.
+
+For a non-empty complete package, atomically set `phase: implementation`,
+`status: paused`, `cleaner_evidence.status: handoff-pending`, a fresh
+`cleaner_handoff_nonce`, `cleaner_handoff_pending: true`, eligibility,
+repository, absolute worktree, the exact cleaner-post anchor and finding
+objects, with both decision fields null. While pending, do
+not mutate repository/evidence artifacts, dispatch a specialist, run another
+cleaner, or open Freeze. Present exactly:
+
+```text
+1 — authorize one implementer pass
+2 — pause without changes
+3 — abort pipeline
+```
+
+Only a live reply after this presentation may consume the nonce. Choice `1`
+atomically records `cleaner_handoff_pending: false`, moves the token to
+`cleaner_handoff_decision_nonce`, records `cleaner_handoff_decision: authorize`
+and one package-identical `cleaner.handoff.decision` event, and authorizes one
+fresh V2 implementer plus one package-identical
+`agent.cleaner-handoff.spawn`. Gate-1 autonomous approval never applies. The
+nonce may appear on one decision and one spawn only. This path never increments
+`iteration`, consumes max-3, emits `iteration.start`, or emits
+`agent.correction.spawn`.
+
+The implementer receives one terminal attempt and every closure check. No
+follow-up or automatic re-dispatch is legal. A non-zero check is incomplete
+unless its exact command, exit code, and bounded diagnostic are present; bare
+`exit 1` is never closure evidence. After success Main records hashed closure
+evidence and joins the same raw `post_implementation` quality checkpoint used
+by every repository path. It runs against the complete unchanged repository
+manifest and every declared check—never a touched-file subset or ad-hoc command
+list—then runs hygiene once and sets
+`cleaner_evidence.status: handoff-pass` only when all
+evidence matches the current commit/tree. The cleaner never runs again. An
+incomplete attempt consumes that authorization; any remaining correctable work
+requires a new complete package, nonce, presentation, and live choice `1`.
+Choice `2` consumes the nonce into `pause` without mutation or dispatch; a later
+presentation uses a fresh nonce. Choice `3` records `abort` and closes the
+pipeline. A generic `continue`, ordinary approval, autonomy, prior chat, files,
+tools, or specialist prose never authorizes a pass. Scope expansion requires a
+separate explicit decision before this presentation and does not itself consume
+or replace the handoff authorization.
 
 ## Mandatory validation correction decision
 

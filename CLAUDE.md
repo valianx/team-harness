@@ -96,8 +96,6 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin `th`; Codex plugin `team-harness` via `.agents/plugins/marketplace.json`; Go agent installer for opencode and Codex. The tagged Git tree is both plugin artifact—there is no separate Codex archive. |
 
-**Current version:** `3.11.1` (see `.claude-plugin/plugin.json`, the tag authority. Its version is shared by the Claude and Codex plugin manifests, the Claude marketplace entry, and the installer fallback. `CHANGELOG.md` tracks release history).
-
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
 **Dependencies.** TUI: `charm.land/huh/v2` (bubbletea v2, lipgloss v2, bubbles v2 transitive). Binary size: 7.9–8.5 MB. No build step beyond `go build`.
@@ -202,8 +200,8 @@ README.md, any `docs/` knowledge/architecture file, and CHANGELOG.md's latest bl
 
 Post-work deliverable rules now live in [`docs/working-agreements.md`](./docs/working-agreements.md):
 the `changelog.d/{pr-slug}.md` fragment mechanism (Keep-a-Changelog subsection; direct
-`## [Unreleased]` edits stay a valid fallback), CLAUDE.md §3/§4 sync, `docs/knowledge.md` capture,
-the OpenAPI version-bump rule, the internal-distribution version rule (five sites per PR in
+`## [Unreleased]` edits stay a valid fallback), CLAUDE.md §3/§4 accuracy, `docs/knowledge.md` capture,
+the OpenAPI version-bump rule, the internal-distribution version rule (four sites per PR in
 the current tree; Codex/installer sites remain optional for historical repositories);
 rebase-and-rebump trade-off; `changelog.d/` remains the batch/fallback path), and the
 TypeScript-hooks mandate. This section is intentionally a pointer to keep one source of truth.

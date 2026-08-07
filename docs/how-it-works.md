@@ -2,6 +2,11 @@
 
 Team Harness starts as a lightweight direct assistant and offers an explicit Spec-Driven Development pipeline. Pipeline state lives in `workspaces/{feature}/`, so an activated run can resume cold.
 
+When intake has already framed a task that needs the full pipeline, the
+operator starts it with a localized numeric choice instead of repeating a
+copy-paste command. The coordinator acknowledges the outcome briefly and keeps
+successful profile, workspace, commit-anchor, and branch checks silent.
+
 ---
 
 ## Entry point: talk to th:orchestrator
@@ -122,7 +127,7 @@ states or gates.
 | State | Bug-fix difference |
 |---|---|
 | `design` | Root-cause analysis and a minimal plan identify the regression, file:line mechanism, scope fence, and functional AC. It is not a separate state or automatic review loop. |
-| `implementation` | Tester establishes regression evidence; implementer keeps the fix scoped; when the repository declares deterministic tests and path rules, one bounded cleaner improves the changed production surface before Freeze. Test always runs; declared formatter, lint, and CRAP checks remain additive. |
+| `implementation` | Tester establishes regression evidence; implementer keeps the fix scoped; when a repository declares deterministic tests and path rules, one bounded cleaner for that repository improves its changed production surface before Freeze. Multi-repository work gets one isolated cleaner per repository, each exactly once. Only a small repository-local remainder may use the separately authorized one-pass implementer handoff; larger or cross-repository work requires a new pipeline. Before Freeze, every repository runs one full-manifest `post_implementation` checkpoint selecting all declared commands. Missing or unselected required controls, unavailable prerequisites, a missing configured CRAP baseline, or any failed command blocks Freeze. |
 | `validation` | QA validates the regression no longer reproduces. Security review remains conditional on the same fail-closed security floor. Findings route through the common final-result correction path. |
 | `delivery` | Verifies the exact validated commit/tree, pushes it, and creates the draft PR; it does not test or mutate the branch. |
 

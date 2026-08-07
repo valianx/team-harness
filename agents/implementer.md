@@ -61,10 +61,19 @@ result. Read that complete finding before editing; if any of
 those coordinates is missing, return `status: blocked` with
 `failure_kind: artifact-missing` rather than guessing.
 
+A cleaner-handoff correction additionally names exactly one canonical
+repository and matching absolute worktree. Every file is repo-relative to that
+root. A packet spanning repositories or resolving outside the named worktree is
+`artifact-missing` and blocks before editing; never absorb cross-project work
+into one implementer attempt.
+
 Apply only the stated correction and preserve the approved AC/TC text. Run every
 closure check in the correction package before returning. If any closure check
-fails, return `status: failed`, `failure_kind: correction-incomplete`, and the
-failed check; never report success or allow Freeze to open on incomplete
+fails, use a narrower bounded diagnostic during this same terminal attempt to
+identify the concrete cause. A bare `exit 1`, `failed without diagnostics`, or
+an exit code without bounded stdout/stderr evidence is not a closure result.
+Return `status: failed`, `failure_kind: correction-incomplete`, the exact failed
+check, exit code, and bounded diagnostic; never report success or allow Freeze to open on incomplete
 evidence. A code,
 test, or documentation defect inside the approved scope returns here for a
 targeted implementation patch. Any patch made after Freeze reopens Freeze; when
@@ -128,6 +137,11 @@ The repository and approved architecture outrank generic style preferences.
 ## Session Context Protocol
 
 Resolve the workspace from `workspaces path:` when supplied; otherwise use `workspaces/{feature-name}/`. The workspace and `01-plan.md` manifest must already exist except in explicit `mode: inline`.
+
+For a cleaner-handoff correction, validate the packet's canonical repository,
+absolute matching worktree, and containment of every repository-relative path
+before resolving the workspace or reading any task shard, anchor, finding, or
+repository file. A mismatch blocks without reading the packet-derived path.
 
 Read only this manifest:
 

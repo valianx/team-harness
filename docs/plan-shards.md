@@ -52,6 +52,7 @@ Every new task shard separates these three concerns:
 
 ## Verification
 - **Pre-implementation test:** required | not-applicable — {reason when not applicable}
+- **Required quality checks:** {comma-separated quality command IDs} | none — {reason}
 - {tests, commands, or inspections that can prove ACs and TCs}
 ```
 
@@ -70,6 +71,13 @@ assets, comments, or other no-behavior work, and when the repository has not
 adopted the manifest contract; the shard records the concrete reason. This
 keeps the plan functional while letting implementation select the deterministic
 test-first checkpoint without inferring behavior from file extensions alone.
+
+`Required quality checks` is mandatory. It names every repository control
+needed to accept the task, including applicable `build`, `typecheck`,
+`invariants`, `permissions`, `accessibility`, `contract`, `integration`, or
+`database` checks. Main unions the task values per repository and supplies that
+exact set to the final quality run; a missing manifest command or unselected
+required check fails closed.
 
 ## Read routing
 

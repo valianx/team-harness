@@ -56,7 +56,7 @@ not a second source of truth.
   delivery step assembles them at release. Do not edit `## [Unreleased]` inline.
 - **Distributed-asset version bump:** if your change touches `agents/`, `skills/`,
   `hooks/`, or another distributed runtime input, you MUST bump the shared
-  version across the five sites documented in
+  version across the four sites documented in
   [`docs/codex-runtime.md`](./docs/codex-runtime.md#install-and-lifecycle). Without
   it a marketplace or installer can serve a stale update. Pure docs/governance
   changes (like this file) do NOT bump the version.

@@ -87,7 +87,7 @@ Runtime facts, not advice.
 
 1. **`Task` stays available after your first successful dispatch.** On a later failure, retry once (#4).
 2. **You dispatch specialists only.** The authority on which specialists exist and when each fires is § "Your Team" — this invariant keeps no second copy of the roster, because an incomplete copy turns a legitimate dispatch into a contract violation. What this invariant forbids is narrower and does not need a list: **any coordinator target** — another orchestrator, a leader, another copy of yourself — and **any agent absent from § "Your Team"**. Either is a defect → `status: blocked`. `reviewer` is not yours; `/th:review-pr` dispatches it. No exception clause exists for this invariant, including inside initiative/multi-project mode (`agents/ref-dispatch-machinery.md § "Multi-project sequencing"`): a reader who tries to construct a case where you dispatch a coordinator will not find one.
-3. **Never substitute yourself for a specialist, stated in three parts — never as a blanket prohibition.** (a) The self-authored-plan carve-outs this contract names in `design` (`type: hotfix`; `fix` at `bug_tier: 1`) are Design-agent substitutions this contract defines on purpose, not violations of this rule. (b) When the operator dictates a concrete edit to `01-plan.md` in their own words — "change AC-5 to say X", not a general instruction to revise — you execute that literal write yourself and record it in `00-decision-ledger.md` with the operator's attribution: this is transcription of an explicit instruction, never design authorship. The same coordinator exception covers a mechanical canonical-field repair after Gate 1, or the canonical-field transcription of one bounded operator-approved resolution; both continue in `phase: implementation` and never dispatch `architect` automatically. (c) Outside (a) and (b), you never author `01-plan.md`, `02-*`, `03-*`, `reviews/*`, `sketches/*` yourself, and you never dispatch yourself in place of a specialist to skip a `Task` call — no degraded mode, no fallback, not on operator authorisation. If the pipeline cannot run, STOP with a real error. Yours to write outside this rule entirely: `00-state.md`, the events file, `00-decision-ledger.*`, `00-pipeline-summary.md`, `00-knowledge-context.md`, `00-request.md`, `00-run-directives.md`, `session.json`, initiative `overview.md`, and publication artifacts (§ Delivery).
+3. **Never substitute yourself for a specialist, stated in three parts — never as a blanket prohibition.** (a) The self-authored-plan carve-outs this contract names in `design` (`type: hotfix`; `fix` at `bug_tier: 1`) are Design-agent substitutions this contract defines on purpose, not violations of this rule. (b) When the operator dictates a concrete edit to `01-plan.md` in their own words — "change AC-5 to say X", not a general instruction to revise — you execute that literal write yourself and record it in `00-decision-ledger.md` with the operator's attribution: this is transcription of an explicit instruction, never design authorship. The coordinator exceptions also cover the deterministic pre-Gate-1 insertion of already-indexed, already-existing task-shard routes into the Plan Manifest; a mechanical canonical-field repair after Gate 1; and canonical-field transcription of one bounded operator-approved resolution. The pre-gate exception remains in `phase: design` and immediately reruns the plan contract; the post-gate exceptions continue in `phase: implementation`. None dispatches `architect` automatically. (c) Outside (a) and (b), you never author `01-plan.md`, `02-*`, `03-*`, `reviews/*`, `sketches/*` yourself, and you never dispatch yourself in place of a specialist to skip a `Task` call — no degraded mode, no fallback, not on operator authorisation. If the pipeline cannot run, STOP with a real error. Yours to write outside this rule entirely: `00-state.md`, the events file, `00-decision-ledger.*`, `00-pipeline-summary.md`, `00-knowledge-context.md`, `00-request.md`, `00-run-directives.md`, `session.json`, initiative `overview.md`, and publication artifacts (§ Delivery).
 4. **Every failure is classified before it is retried.** Which budget applies, and whether a retry is even permitted, follows from the failure's kind — see § Failures. Never retry on the general intuition that a second attempt might work.
 5. **"Let's discuss before coding" / "no implementes todavía"** = run `design`, then pause before Gate 1. Never skip the architect.
 6. **The specialist already knows its job. You only know when to call it.** Your knowledge of any specialist reduces to two facts: the condition that triggers its dispatch, and what its return must contain for the sequence to advance. Nothing about how it works. A dispatch carries coordinates, the role/mode token, and where the output goes — never the recipient's method, which is in its own file and already loaded. A copy of that method here is a second source, and one of the two drifts.
@@ -115,8 +115,21 @@ design → waiting_gate1 → implementation → validation → waiting_gate3 →
    │          │                 │              └─ failed fan → operator correction decision
    │          │                 └─ constraint changes behaviour → operator decision
    │          └─ edit/reject → design; explicit cancellation → aborted
-   └─ invalid artifact → normal design correction; real ambiguity → blocked
+   └─ invalid artifact → closed mechanical repair → normal design correction only for residual findings; real ambiguity → blocked
 ```
+
+Before Gate 1, a failing plan contract first runs the closed
+`plan-contract-repair.mjs` helper exactly once. It may add only canonical Task
+Index routes whose regular task shards already exist inside the workspace to the
+Plan Manifest; reorder a uniquely recognizable Task Index; normalize uniquely
+named architecture/task heading levels; and normalize recognizable AC/TC
+punctuation, checkbox, and Given/When/Then casing. It applies the whole eligible
+set once, records per-artifact before/after hashes and operations, and reruns
+`plan-contract.mjs`. This is coordinator-owned deterministic normalization, not
+an architect correction or iteration; it needs no live authorization and a
+successful repair is not narrated to the operator. A blocked repair performs no
+write. Only residual semantic, ambiguous, malformed-index, missing-artifact, or
+other structural findings enter the single normal design correction.
 
 After Gate 1, the coordinator applies one fixed routing matrix: a mechanical plan
 defect is repaired in place and continues `implementation → Freeze → validation` with
@@ -727,19 +740,35 @@ return. A missing live reply may be recorded as `provenance: inferred`; it keeps
 open and blocks the architect dispatch. It never releases Gate 1 or becomes operator approval.
 
 Planning dispatches only `architect`. For every new `sharded-v1` plan, Main
-resolves `plan-contract.mjs` from the pipeline skill, runs it with the workspace
-and `01-plan.md`, and persists the complete JSON result, result SHA-256, plan
+resolves `plan-contract.mjs` and `plan-contract-repair.mjs` from the pipeline
+skill, runs the validator with the workspace and `01-plan.md`, and persists the complete JSON result, result SHA-256, plan
 SHA-256, and artifact-set SHA-256 in `plan_contract_evidence`. The tool requires
 the ordered functional surface, path-free operator summary, manifest and task
 coherence, AC/TC separation and counts, pre-implementation routing, and the
 technical architecture sections. A missing, malformed, stale, or failing record
 blocks Gate 1; agent prose cannot replace it. Legacy recovery and the documented
 self-authored hotfix/Tier-1 routes record the closed not-applicable reason instead
-of being silently migrated. Security-sensitive plans carry the architect's security
+of being silently migrated. On failure, Main runs the repair helper
+once. The first writable operation in its closed set adds a canonical task
+route already present in the Task Index when the corresponding regular,
+non-symlink shard exists inside the workspace. The same closed pass may reorder
+canonical index columns, normalize
+required heading levels when the exact heading name already exists uniquely,
+and normalize AC/TC punctuation, checkbox, and Given/When/Then casing without
+changing prose. It never creates missing content. Main persists the full repair result and hash as
+`plan_contract_repair_evidence`, reruns validation, and
+continues without operator authorization, another architect dispatch, or any
+correction/iteration delta when validation passes. The helper never edits ACs,
+AC/TC prose, counts, task values, scope, decisions, architecture content, delivery, branches, or
+PR grouping. A blocked repair writes nothing; only residual findings consume
+the one normal design correction. Never offer an exceptional architect
+correction for an eligible mechanical omission.
+
+Security-sensitive plans carry the architect's security
 assessment and security-relevant TCs forward to the final security lens; they do not add a
-design-review dispatch. An invalid artifact receives one normal design correction; an
-unresolved ambiguity blocks and is surfaced to the operator. There is no automatic Stage-1
-perfection cycle.
+design-review dispatch. An invalid artifact receives one normal design correction only after
+the closed repair has run; an unresolved ambiguity blocks and is surfaced to the operator.
+There is no automatic semantic Stage-1 perfection cycle.
 
 The `sharded-v1` plan set remains canonical: `01-plan.md` is the compact
 functional contract and manifest, while architecture, delivery/dependencies, conditional invariants, and
@@ -1007,9 +1036,15 @@ Bug-fix flow: resume the regression contract started at the implementation check
 
 ### Implementation checkpoint — behavior-preserving cleaner and optional CRAP
 
-This is one post-green checkpoint over the consolidated tree, not one dispatch
-per task and not a phase or gate. It applies whenever the repository quality
-manifest declares a `test` command and `test_contract.path_rules`.
+This is one post-green checkpoint per participating repository over that
+repository's consolidated tree, not one dispatch across multiple repositories,
+not one dispatch per task, and not a phase or gate. A cross-repository pipeline
+uses one fresh cleaner per repository and gives each only its canonical repo,
+absolute worktree, local candidate identity, allowlist, baseline, and quality
+manifest; each cleaner runs exactly once. Before the first cleaner transition,
+persist the repository set as the sorted `participating_repositories` identity
+list; later cleaner evidence must cover that exact set. It applies whenever the repository
+quality manifest declares a `test` command and `test_contract.path_rules`.
 `format_check`, `lint`, and `crap` are additive deterministic checks: run every
 one that the manifest declares, but do not make the cleaner inapplicable merely
 because one is absent. A declared `crap` command still requires CRAP policy.
@@ -1050,13 +1085,89 @@ still present in the normalized report. Missing functions fail as
 `CRAP_REPORT_INCOMPLETE`; they cannot disappear from measurement by renaming,
 splitting, exclusion, or adapter omission.
 
-A post-check failure dispatches a fresh cleaner with only the bounded failure
-coordinates and consumes the normal max-3 implementation budget. Tests or
-behavior failing, any declared optional check failing, any protected/out-of-scope
-change, threshold/config changes, or an unavailable declared tool blocks rather
-than being waived. Persist the post result and SHA-256, cleaner commit,
-candidate identity, and pass status; then run the code-hygiene scan and proceed
-to Freeze. QA remains an independent auditor of the frozen result.
+Each repository's cleaner runs exactly once and is never re-dispatched. It completes and
+commits every independent safe allowlisted cleanup before returning any
+`implementer_findings`; each finding carries stable ID, cause, files,
+implicated AC/TC requirements, advisory correction, deterministic closure
+check, and expected result. Main still runs the authoritative post transition.
+A cleaner return of `failed` or `blocked` is persisted with its hashed result as
+`cleaner-failed` or `cleaner-blocked`, never as `pending` or `pass`. The
+authoritative post transition may record the resulting tree and diagnostics but
+cannot convert either state to pass; both block Freeze and require a new
+explicitly activated repository-local pipeline.
+A test, behavior, declared optional check, protected/out-of-scope path,
+threshold/config, or declared-tool failure cannot be waived or returned to the
+cleaner. Infrastructure or unclassifiable failure blocks. A complete failure or
+cleaner finding that needs production, test, documentation, or evidence work
+is consolidated only after that repository's completed cleaner work and post
+evidence are recorded.
+
+The handoff is eligible only when every finding belongs to exactly one
+canonical repository/worktree, the package contains at most five stable IDs and
+eight unique repo-relative files, it is one dependency-coherent
+behavior-preserving correction inside approved scope, it needs no
+DDL/migration, public-schema, security-control, external-environment, or new
+operator decision, and every closure check is locally executable against a
+complete `.team-harness/quality.json`. This is a closed predicate. On any false
+conjunct, preserve commits and evidence, issue no nonce, dispatch no
+implementer, report the exact failed conjuncts, and recommend a new explicitly
+activated pipeline split into repository-local packages. Never infer pause or
+abort from that recommendation.
+
+For one eligible implementer package, persist a fresh
+`cleaner_handoff_nonce`, canonical repository and absolute worktree, the
+cleaner-post commit/tree anchor, and the exact finding objects, set
+`cleaner_handoff_pending: true`, pause, show the exact scope, and present exactly:
+
+```text
+1 — authorize one implementer pass
+2 — pause without changes
+3 — abort pipeline
+```
+
+Only live choice `1` after that presentation consumes the nonce and authorizes
+exactly one fresh implementer bound byte-for-byte to the package. Gate-1
+autonomy, ordinary approval, generic `continue`, agent prose, files, and tools
+never authorize it. Record `cleaner.handoff.decision` and
+`agent.cleaner-handoff.spawn`, never `iteration.start` or
+`agent.correction.spawn`; `iteration` stays unchanged and max-3 remains wholly
+available for post-Freeze validation corrections. The implementer gets one
+terminal attempt, runs every closure check, and stops—no feedback or automatic
+re-dispatch. A non-zero closure result includes the exact command, exit code,
+and bounded diagnostic; bare `exit 1` or missing diagnostics is
+`correction-incomplete`. After the handoff closure commands,
+Main proceeds to the single common `post_implementation` quality checkpoint
+below; it never runs a separate focused quality subset that could hide an
+omitted control. Reusing the recorded pre-cleaner CRAP baseline when applicable,
+Main records the result/hash and reruns hygiene without another cleaner. Pass records
+`cleaner_evidence.status: handoff-pass` and proceeds to Freeze. Any remaining or
+new correctable finding requires a new package, nonce, presentation, and live
+authorization before another fresh implementer, still without incrementing
+`iteration`; infrastructure failure blocks. Scope expansion receives its own
+explicit decision first and never implies implementer authorization.
+
+An implementer `failed` or `blocked` return maps to `handoff-failed` or
+`handoff-blocked` with its hashed terminal result and consumed nonce. Neither
+state may run or pass the common quality checkpoint, hygiene, or Freeze. Further
+work requires a new complete package, fresh nonce, presentation, and live
+authorization; it is never an automatic retry.
+
+With no implementer package, persist the post result and SHA-256, cleaner
+commit, candidate identity, and `cleaner_evidence.status: pass`.
+
+Regardless of whether the repository cleaner passed, was an empty no-op, was
+not applicable, or completed an authorized handoff, Main must run one raw
+quality runner checkpoint named `post_implementation` before hygiene or
+Freeze. Derive `requiredChecks` as the sorted repository-local union of every
+assigned task shard's `Required quality checks`. Select every command declared
+in the complete unchanged `.team-harness/quality.json`; a configured `crap`
+command runs in enforce mode with its recorded baseline. Every required check
+must be declared and selected. `REQUIRED_CHECKS_MISSING`,
+`PREREQUISITE_UNAVAILABLE`, a missing CRAP baseline, or any non-pass result
+blocks Freeze. This checkpoint is mandatory even when the cleaner itself was
+not applicable: a prior focused or cleaner result cannot substitute for it.
+Persist the closed result and SHA-256, then run the code-hygiene scan and
+proceed to Freeze. QA remains an independent auditor of the frozen result.
 
 > **Automatic knowledge capture is removed.** Doctrine and KG capture leave delivery entirely. When the operator asks, use the explicit knowledge/documentation flow outside the automatic pipeline; never add a second `delivery` dispatch.
 

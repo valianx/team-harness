@@ -46,7 +46,7 @@ jobs:
               while IFS= read -r f; do
                 [ -z "$f" ] && continue
                 case "$f" in
-                  .claude-plugin/plugin.json|.claude-plugin/marketplace.json|plugins/team-harness/.codex-plugin/plugin.json|CLAUDE.md|cmd/install/main.go|CHANGELOG.md|changelog.d/*.md)
+                  .claude-plugin/plugin.json|.claude-plugin/marketplace.json|plugins/team-harness/.codex-plugin/plugin.json|cmd/install/main.go|CHANGELOG.md|changelog.d/*.md)
                     ;;
                   *)
                     is_release_only=false
@@ -94,24 +94,13 @@ jobs:
 
           # Codex and installer sites are required once present at BASE or
           # HEAD. This keeps the guard/CI compatible with the historical
-          # three-site repository while enforcing all five sites today.
+          # two-site repository while enforcing all four sites today.
           has_codex=false
           if git cat-file -e "$BASE_SHA:plugins/team-harness/.codex-plugin/plugin.json" 2>/dev/null || [ -f plugins/team-harness/.codex-plugin/plugin.json ]; then
             has_codex=true
             codex="$(jq -er '.version' plugins/team-harness/.codex-plugin/plugin.json)"
             versions+=("$codex")
             sites+=(plugins/team-harness/.codex-plugin/plugin.json)
-          fi
-          claude="$(sed -nE 's/.*\*\*Current version:\*\* `([0-9]+\.[0-9]+\.[0-9]+)`.*/\1/p' CLAUDE.md | head -n1)"
-          has_claude=false
-          if git cat-file -e "$BASE_SHA:CLAUDE.md" 2>/dev/null || [ -f CLAUDE.md ]; then
-            has_claude=true
-            if [ -z "$claude" ]; then
-              echo "::error::CLAUDE.md exists but its Current version site is missing or malformed" >&2
-              exit 1
-            fi
-            versions+=("$claude")
-            sites+=(CLAUDE.md)
           fi
           has_installer=false
           if git cat-file -e "$BASE_SHA:cmd/install/main.go" 2>/dev/null || [ -f cmd/install/main.go ]; then
@@ -134,7 +123,7 @@ jobs:
               exit 1
             fi
           done
-          echo "Shared version sites are changed, parseable, and equal at $plugin (Codex=$has_codex CLAUDE=$has_claude installer=$has_installer)."
+          echo "Shared version sites are changed, parseable, and equal at $plugin (Codex=$has_codex installer=$has_installer)."
 
       # Python and Node are set up UNCONDITIONALLY: the policy-block functional
       # suite validates .claude-plugin/plugin.json, which is IN the release-only

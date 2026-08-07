@@ -87,7 +87,6 @@ function isShippedPath(path: string): boolean {
     SHIPPED_PATH_RE.test(path) || SHIPPED_FILE_RE.test(path) || INSTALLER_SOURCE_RE.test(path)
   );
 }
-const CLAUDE_VERSION_RE = /\*\*Current version:\*\* `([0-9]+\.[0-9]+\.[0-9]+)`/;
 const INSTALLER_VERSION_RE = /\bvar\s+version\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"/;
 
 // Token format: bump-override: minor — <reason> (em dash, matches the Bash oracle literally).
@@ -177,12 +176,6 @@ function extractMarketVersion(content: string | null): string {
   }
 }
 
-function extractClaudeVersion(content: string | null): string {
-  if (!content) return "";
-  const m = CLAUDE_VERSION_RE.exec(content);
-  return m ? m[1] : "";
-}
-
 function extractInstallerVersion(content: string | null): string {
   if (!content) return "";
   const m = INSTALLER_VERSION_RE.exec(content);
@@ -202,9 +195,6 @@ interface VersionSites {
   marketHead: string;
   marketOrigin: string;
   marketBumped: boolean;
-  claudeHead: string;
-  claudeOrigin: string;
-  claudeBumped: boolean;
   codexHead: string;
   codexOrigin: string;
   codexBumped: boolean;
@@ -218,7 +208,6 @@ interface VersionSites {
 function readVersionSites(reader: PrepublishReader): VersionSites {
   const pluginHead = extractJsonVersion(reader.readFile(".claude-plugin/plugin.json"));
   const marketHead = extractMarketVersion(reader.readFile(".claude-plugin/marketplace.json"));
-  const claudeHead = extractClaudeVersion(reader.readFile("CLAUDE.md"));
   const codexPath = "plugins/team-harness/.codex-plugin/plugin.json";
   const codexHeadContent = reader.readFile(codexPath);
   const codexHead = extractJsonVersion(codexHeadContent);
@@ -228,7 +217,6 @@ function readVersionSites(reader: PrepublishReader): VersionSites {
 
   const pluginOrigin = extractJsonVersion(reader.gitShow("origin/main:.claude-plugin/plugin.json"));
   const marketOrigin = extractMarketVersion(reader.gitShow("origin/main:.claude-plugin/marketplace.json"));
-  const claudeOrigin = extractClaudeVersion(reader.gitShow("origin/main:CLAUDE.md"));
   const codexOriginContent = reader.gitShow(`origin/main:${codexPath}`);
   const codexOrigin = extractJsonVersion(codexOriginContent);
   const installerOriginContent = reader.gitShow(`origin/main:${installerPath}`);
@@ -241,16 +229,13 @@ function readVersionSites(reader: PrepublishReader): VersionSites {
     marketHead,
     marketOrigin,
     marketBumped: isBumped(marketHead, marketOrigin),
-    claudeHead,
-    claudeOrigin,
-    claudeBumped: isBumped(claudeHead, claudeOrigin),
     codexHead,
     codexOrigin,
     codexBumped: isBumped(codexHead, codexOrigin),
-    // Preserve the historical three-site contract when Codex was never part
+    // Preserve the historical two-site contract when Codex was never part
     // of the repository. Once the path exists at HEAD or origin/main, though,
     // it is a required version site; deletion and malformed content must not
-    // silently turn four-site enforcement back into the legacy contract.
+    // silently turn three-site enforcement back into the legacy contract.
     codexRequired:
       reader.fileExists(codexPath) || codexHeadContent !== null || codexOriginContent !== null,
     // The installer fallback is a shared release/version site for current
@@ -335,7 +320,7 @@ function runNoAssetAdvisory(reader: PrepublishReader, pluginOrigin: string, plug
 
 // ---------------------------------------------------------------------------
 // Version-site check — universal invariant, any branch. Every version site
-// present in the repository (five in the current tree) must be bumped vs
+// present in the repository (four in the current tree) must be bumped vs
 // origin/main and mutually matching, then the mechanical SemVer floor applies.
 // ---------------------------------------------------------------------------
 
@@ -345,12 +330,11 @@ function runVersionSiteCheck(
   sites: VersionSites
 ): NormalizedDecision | null {
   const countWord = (count: number): string =>
-    ({ 3: "three", 4: "four", 5: "five" } as Record<number, string>)[count] ?? String(count);
+    ({ 2: "two", 3: "three", 4: "four" } as Record<number, string>)[count] ?? String(count);
   const siteListParts = [
     ".claude-plugin/plugin.json",
     ".claude-plugin/marketplace.json",
     ...(sites.codexRequired ? ["plugins/team-harness/.codex-plugin/plugin.json"] : []),
-    "CLAUDE.md §3",
     ...(sites.installerRequired ? ["cmd/install/main.go var version"] : []),
   ];
   const siteCount = countWord(siteListParts.length);
@@ -366,21 +350,9 @@ function runVersionSiteCheck(
       `prepublish-guard: a distributed asset changed, but all ${siteCount} version sites (${siteList}) must be bumped vs origin/main. Bump all ${siteCount} to the same X.Y.Z and re-push. See CLAUDE.md §6.3 and agents/_shared/delivery-mechanics.md §1. Push blocked.`
     );
   }
-  // Third site: only fires when CLAUDE.md §3 was parseable at HEAD (fail-open otherwise).
-  if (sites.claudeHead && !sites.claudeBumped) {
-    return deny(
-      `prepublish-guard: a distributed asset changed, but CLAUDE.md §3 was not bumped vs origin/main while the plugin manifests were. Bump all ${siteCount} version sites to the same X.Y.Z and re-push. Push blocked.`
-    );
-  }
-
   if (sites.pluginHead !== sites.marketHead) {
     return deny(
       `prepublish-guard: version sites do not match — .claude-plugin/plugin.json is '${sites.pluginHead}' but .claude-plugin/marketplace.json plugins[0].version is '${sites.marketHead}'. All version sites must be bumped to the same X.Y.Z. Push blocked.`
-    );
-  }
-  if (sites.claudeHead && sites.pluginHead !== sites.claudeHead) {
-    return deny(
-      `prepublish-guard: version sites do not match — .claude-plugin/plugin.json is '${sites.pluginHead}' but CLAUDE.md §3 Current version is '${sites.claudeHead}'. All version sites must be bumped to the same X.Y.Z. Push blocked.`
     );
   }
   if (sites.codexRequired && sites.pluginHead !== sites.codexHead) {

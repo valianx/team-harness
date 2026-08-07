@@ -125,6 +125,7 @@ function options(repo, base, checks, extra = {}) {
     candidate: "HEAD",
     checkpoint: "quality-test",
     checks,
+    requiredChecks: checks,
     ...extra,
   };
 }
@@ -198,6 +199,8 @@ await check("the CLI returns the same closed JSON contract and a useful process 
         "cli-test",
         "--checks",
         "test",
+        "--required-checks",
+        "test",
       ],
       { encoding: "utf8", windowsHide: true },
     );
@@ -206,6 +209,32 @@ await check("the CLI returns the same closed JSON contract and a useful process 
     const result = JSON.parse(child.stdout);
     assertClosedResult(result);
     assert.equal(result.verdict, "pass");
+
+    const emptyRequired = spawnSync(
+      node,
+      [
+        runnerPath,
+        "--repo",
+        repo,
+        "--manifest",
+        ".team-harness/quality.json",
+        "--base",
+        base,
+        "--candidate",
+        "HEAD",
+        "--checkpoint",
+        "cli-empty-required",
+        "--checks",
+        "test",
+        "--required-checks",
+        "",
+      ],
+      { encoding: "utf8", windowsHide: true },
+    );
+    assert.equal(emptyRequired.status, 0, emptyRequired.stderr);
+    const emptyResult = JSON.parse(emptyRequired.stdout);
+    assertClosedResult(emptyResult);
+    assert.equal(emptyResult.verdict, "pass");
   });
 });
 
@@ -222,7 +251,7 @@ await check("invalid manifests and missing selected commands fail closed", async
   await temporaryRepository({ manifest }, async ({ repo, base }) => {
     const result = await runQualityChecks(options(repo, base, ["test"]));
     assert.equal(result.verdict, "fail");
-    assert.equal(result.error_code, "MANIFEST_INVALID");
+    assert.equal(result.error_code, "REQUIRED_CHECKS_MISSING");
   });
 
   const invalidTestContract = {
@@ -233,6 +262,51 @@ await check("invalid manifests and missing selected commands fail closed", async
     const result = await runQualityChecks(options(repo, base, ["test"]));
     assert.equal(result.verdict, "fail");
     assert.equal(result.error_code, "MANIFEST_INVALID");
+  });
+});
+
+await check("required quality coverage cannot pass with omitted controls", async () => {
+  const manifest = baseManifest({ test: command(), build: command(), accessibility: command() });
+  await temporaryRepository({ manifest }, async ({ repo, base }) => {
+    const incomplete = await runQualityChecks(options(repo, base, ["test"], {
+      requiredChecks: ["test", "build", "accessibility"],
+    }));
+    assert.equal(incomplete.verdict, "fail");
+    assert.equal(incomplete.error_code, "REQUIRED_CHECKS_MISSING");
+    assert.deepEqual(incomplete.commands, []);
+
+    const complete = await runQualityChecks(options(repo, base, ["test", "build", "accessibility"], {
+      requiredChecks: ["test", "build", "accessibility"],
+    }));
+    assert.equal(complete.verdict, "pass", JSON.stringify(complete));
+    assert.deepEqual(complete.commands.map((entry) => entry.id), ["test", "build", "accessibility"]);
+  });
+});
+
+await check("callers cannot omit the required quality set", async () => {
+  const manifest = baseManifest({ test: command() });
+  await temporaryRepository({ manifest }, async ({ repo, base }) => {
+    const withoutRequiredChecks = options(repo, base, ["test"]);
+    delete withoutRequiredChecks.requiredChecks;
+    const result = await runQualityChecks(withoutRequiredChecks);
+    assertClosedResult(result);
+    assert.equal(result.verdict, "fail");
+    assert.equal(result.error_code, "ARGUMENT_INVALID");
+    assert.deepEqual(result.commands, []);
+  });
+});
+
+await check("missing external prerequisites are unavailable rather than pass", async () => {
+  const manifest = baseManifest({
+    permissions: { ...command(), required_environment: ["TH_TEST_AUTH0_IDENTIFIER_MISSING"] },
+  });
+  await temporaryRepository({ manifest }, async ({ repo, base }) => {
+    const result = await runQualityChecks(options(repo, base, ["permissions"], {
+      requiredChecks: ["permissions"],
+    }));
+    assert.equal(result.verdict, "fail");
+    assert.equal(result.error_code, "PREREQUISITE_UNAVAILABLE");
+    assert.equal(JSON.stringify(result).includes("AUTH0"), false);
   });
 });
 

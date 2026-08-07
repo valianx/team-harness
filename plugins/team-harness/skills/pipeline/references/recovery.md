@@ -163,6 +163,24 @@ set. `not-applicable` is valid only for `legacy-recovery` or
 failing evidence blocks Gate 1. Never infer functional completeness from the
 architect result, current Markdown, or an earlier gate presentation.
 
+When the pending or failing validator result has no repair record, run
+`plan-contract-repair.mjs` once before any design correction. A recovered
+`plan_contract_repair_evidence.status: repaired` is valid only when its readable
+result hash, before/after plan hashes, added route list, per-artifact
+before/after hashes and operations, and embedded post-repair
+contract-result hash match the durable artifacts. `not-needed` must have equal
+before/after hashes and no added paths. `blocked` must also have equal hashes
+and no added paths; continue with the residual failure classification without
+asking the operator to authorize a repair. Never rerun a recorded repair,
+convert it into an exceptional architect pass, or infer success without a fresh
+passing `plan_contract_evidence` record.
+
+The sole exception is `reason: rollback-failed`: its evidence enumerates every
+residual artifact with the bytes actually observed after rollback. Treat the
+workspace as recovery-required, surface the affected paths, and do not
+validate, dispatch, or offer an architect correction until those artifacts
+match their recorded before hashes.
+
 For any pending or partially recorded gate, regenerate evidence from durable
 artifacts, write a fresh nonce, re-present the numbered gate in the primary
 conversation, and stop. Never repair a field or copy a decision from prose,
@@ -185,15 +203,81 @@ partially populated evidence blocks.
 Never infer red or green from a test name, current suite result, agent prose, or
 an unhashed workspace artifact.
 
-Also validate `cleaner_evidence` before resuming implementation. `pending`
+Also validate `cleaner_evidence` before resuming implementation. Read the exact
+expected identities from `participating_repositories`, then require the
+canonical identity set in `cleaner_repo_evidence` to equal it before accepting
+any cleaner evidence or dispatching a cleaner. Missing, extra, or duplicate
+repositories block. Validate every entry separately and require a unique
+canonical repository, absolute worktree, manifest, allowlist, baseline,
+candidate identity, and at most one terminal cleaner result per repository; a
+single cleaner result spanning repositories blocks. `pending`
 resumes at allowlist construction; `baseline` requires readable allowlist and
 pre-cleaner result files whose SHA-256 values and candidate commit/tree match
-state before dispatching a fresh cleaner; `pass` additionally requires the
-hashed post-cleaner result and matching current commit/tree; `not-applicable`
-requires the closed `repository-quality-manifest-incomplete` reason. Missing,
-stale, partially populated, out-of-scope, or mismatched cleaner evidence blocks.
-Never infer a baseline, formatter/lint result, CRAP value, or behavior-preserving
-verdict from cleaner prose or the current worktree.
+state before dispatching the one allowed fresh cleaner; `pass` additionally
+requires the hashed post-cleaner result and matching current commit/tree.
+`handoff-pending` requires the same valid cleaner post evidence plus a complete
+pending handoff package anchored to its commit/tree. `handoff-pass` requires
+that ancestry, the package-identical consumed decision and single implementer
+spawn, readable hashed closure and the common `post_implementation` quality
+result, and matching current commit/tree. `not-applicable` requires the closed
+`repository-quality-manifest-incomplete` reason. Missing, stale, partially
+populated, out-of-scope, or mismatched cleaner or handoff evidence blocks.
+`cleaner-failed`, `cleaner-blocked`, `handoff-failed`, and `handoff-blocked`
+require a readable hashed terminal result, exact reason, and matching
+commit/tree. They remain non-pass and block Freeze. A cleaner terminal failure
+requires a new explicitly activated repository-local pipeline; a handoff
+terminal failure requires a new complete package, fresh nonce, presentation,
+and live authorization before any further implementer dispatch.
+Never infer a baseline, formatter/lint result, CRAP value, behavior-preserving
+verdict, authorization, or closure from cleaner/implementer prose or the
+current worktree.
+
+## Cleaner-handoff recovery
+
+When `cleaner_handoff_pending: true`, recover only the durable canonical
+repository, absolute worktree, cleaner-post anchor, eligibility record, and
+complete findings, each with repository, stable ID, cause, files, implicated
+requirements, advisory correction, deterministic closure check, and expected
+result. Re-evaluate the closed eligibility predicate: exactly one repository
+and worktree, one to five IDs, at most eight unique paths, one coherent
+behavior-preserving correction in approved scope, no DDL/migration,
+public-schema, security-control, external-environment, or new decision, local
+closure checks, and a complete quality manifest. Require uniqueness, bounded
+safe paths, one closure per ID, and exact
+agreement with `cleaner_evidence.status: handoff-pending`. Missing, extra,
+duplicated, ineligible, or mismatched coordinates block; never repair or infer
+them or convert them into a multi-repository dispatch. An ineligible recovered
+package preserves commits/evidence and may only recommend a new explicit
+repository-decomposed pipeline.
+
+Issue a fresh nonce and re-present exactly:
+
+```text
+1 — authorize one implementer pass
+2 — pause without changes
+3 — abort pipeline
+```
+
+Only a new live reply consumes it. A recovered authorize decision is valid only
+when the consumed nonce, anchor, and full finding objects match one
+`cleaner.handoff.decision` and no more than one
+`agent.cleaner-handoff.spawn`. If the decision exists without its spawn, resume
+the one fresh V2 implementer in that exact worktree; if the spawn already
+terminated, never follow up or re-dispatch it. Successful recovery rejects any
+bare non-zero exit without its exact command, exit code, and bounded diagnostic,
+then requires hashed closure plus the single common full unchanged-manifest
+`post_implementation` result for every declared check before `handoff-pass`.
+A touched-file subset is invalid. An incomplete result may
+only create a new pending package and live decision. These events never pair
+with `iteration.start` or `agent.correction.spawn`, and recovery must prove the
+serialized `iteration` value did not change across the handoff.
+
+Gate-1 autonomy, ordinary approval, generic `continue`, earlier chat, files,
+tools, and agent output never authorize or reconstruct a cleaner handoff.
+`pause` performs no mutation or dispatch and any later presentation uses a new
+nonce. `abort` is terminal. The cleaner itself is never recovered into a second
+dispatch after its terminal result; a stale baseline may resume the original
+single dispatch only when no terminal cleaner result exists.
 
 ## Correction-decision recovery
 

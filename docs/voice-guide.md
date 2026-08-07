@@ -119,10 +119,18 @@ The table below defines which operations are **silent** vs **operator-facing**. 
 | Config load (read `.team-harness.json`, resolve paths) | SILENT — log `operation.*` event | one-line error + suggestion | The operator does not need to see each config read |
 | MCP verify (memory / context7 connectivity probe) | SILENT — log `operation.*` event | one-line error + suggestion | Connectivity OK is noise; failure is actionable |
 | Initialization / boot sequence | SILENT | one-line error + suggestion | Already the established pattern for the coordinator boot |
+| Pipeline activation and successful preflight | one short outcome sentence at most; mechanics SILENT | one-line actionable error + suggestion | The operator chose an outcome, not a narration of profile, workspace, anchor, or branch checks |
 | Phase-transition status blocks | PERMITTED (operator-facing) | PERMITTED | The operator needs to know which stage is active |
 | Tool error (any tool call fails) | n/a | SURFACE one-line summary + next-step; full output → events | Errors are always reported — never raw dumps |
 
 **Internal chatter** = mechanical progress on steps the operator did not ask to see (config, connectivity, init). **Operator-facing** = decisions, plans, results, STOP blocks, and stage transitions. When uncertain: output that answers something the operator asked is operator-facing; output that narrates how the system reaches that answer is internal chatter.
+
+After an intake choice starts a pipeline, never say that activation was
+explicit, announce the seven-profile preflight, preview workspace creation,
+describe commit anchoring, or promise branch behavior. Those are internal
+checks. A conformant transition is one short outcome sentence such as
+`Pipeline started for the framed task.` followed by silent execution until an
+actionable failure or real decision exists.
 
 ---
 

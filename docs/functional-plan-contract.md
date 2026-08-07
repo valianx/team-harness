@@ -55,6 +55,23 @@ failing, stale, or mismatched evidence blocks Gate 1. The tool owns structure,
 counts, paths, and identity; Architect and the operator own whether the stated
 behavior is the right behavior.
 
+When validation fails, Main runs `plan-contract-repair.mjs` once. Its closed
+write scope covers canonical reordering of a recognizable Task Index, adding
+existing indexed task-shard routes to the manifest, normalizing uniquely named
+required heading levels, and converting recognizable AC/TC punctuation,
+checkbox, and Given/When/Then casing to the literal grammar. It applies all
+eligible transformations in one transaction and records per-artifact hashes,
+operations, added routes, and the post-repair validator result hash. Main reruns validation
+and continues to Gate 1 without asking the operator or dispatching Architect
+when the contract passes.
+
+The helper cannot edit behavior, scope, decisions, AC/TC prose, task values or
+counts, architecture content, delivery, branches, or PR grouping, and it cannot
+create a missing heading, section, shard, or prose. Ineligible input is unchanged and returns `blocked`; only the
+remaining findings use the one normal Architect correction. Mechanical repair
+does not consume a correction or development iteration and never opens an
+exceptional Architect round.
+
 Legacy recovery is not migrated implicitly. Historical workspaces and the
 documented self-authored minimal-plan routes use only their closed
 not-applicable reason.

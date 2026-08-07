@@ -841,6 +841,15 @@ def check_cleaner_crap_contract() -> None:
         for marker in (
             "repository-quality-manifest-incomplete",
             "exactly one fresh",
+            "repository's cleaner runs exactly once",
+            "authorize one implementer pass",
+            "post_implementation",
+            "requiredchecks",
+            "required_checks_missing",
+            "prerequisite_unavailable",
+            "select every command declared",
+            "iteration",
+            "new package",
             "cleaner-transition.mjs",
             "--transition pre",
             "--transition post",
@@ -849,6 +858,10 @@ def check_cleaner_crap_contract() -> None:
             "crap_report_incomplete",
             "allowlist",
             "freeze",
+            "per participating repository",
+            "at most five",
+            "complete `.team-harness/quality.json`",
+            "bare `exit 1`",
         ):
             require(marker in text, f"{label}: cleaner checkpoint misses {marker!r}")
         require(
@@ -869,11 +882,19 @@ def check_cleaner_crap_contract() -> None:
             "never weaken",
             "crap",
             "observable behavior",
+            "implementer_findings",
+            "only execution",
+            "repository",
+            "multiple repositories",
         ):
             require(marker in cleaner, f"{label}: scope contract misses {marker!r}")
 
     state = read("plugins/team-harness/skills/pipeline/references/state-and-gates.md").lower()
-    recovery = read("plugins/team-harness/skills/pipeline/references/recovery.md").lower()
+    recovery = re.sub(
+        r"\s+",
+        " ",
+        read("plugins/team-harness/skills/pipeline/references/recovery.md").lower(),
+    )
     shared_state = read("agents/_shared/orchestrator-state.md").lower()
     require("cleaner_evidence" in state, "cleaner evidence is not durable state")
     require("cleaner_evidence" in shared_state, "agent state schema misses cleaner evidence")
@@ -885,6 +906,55 @@ def check_cleaner_crap_contract() -> None:
         and "sha-256" in recovery,
         "recovery can trust inferred or unhashed cleaner evidence",
     )
+    for marker in (
+        "cleaner_handoff_pending",
+        "cleaner_handoff_nonce",
+        "cleaner_handoff_repository",
+        "cleaner_handoff_worktree",
+        "cleaner_handoff_findings",
+        "cleaner_handoff_eligibility",
+        "cleaner_handoff_decision_nonce",
+        "authorize one implementer pass",
+        "cleaner_repo_evidence",
+        "participating_repositories",
+        "cleaner-failed",
+        "cleaner-blocked",
+        "handoff-failed",
+        "handoff-blocked",
+    ):
+        require(marker in state, f"cleaner handoff state misses {marker!r}")
+        require(marker in shared_state, f"shared cleaner handoff state misses {marker!r}")
+    for marker in (
+        "cleaner-handoff recovery",
+        "agent.cleaner-handoff.spawn",
+        "never follow up",
+        "iteration",
+        "one to five",
+        "touched-file subset",
+        "bare non-zero exit",
+        "expected identities",
+        "missing, extra, or duplicate",
+    ):
+        require(marker in recovery, f"cleaner handoff recovery misses {marker!r}")
+    implementer = re.sub(r"\s+", " ", read("agents/implementer.md").lower())
+    codex_implementer = re.sub(
+        r"\s+", " ", read("runtime/codex/instructions/implementer.md").lower()
+    )
+    for marker in (
+        "bare `exit 1`",
+        "bounded diagnostic",
+        "correction-incomplete",
+        "spanning repositories",
+    ):
+        require(marker in implementer, f"implementer diagnostic contract misses {marker!r}")
+    for marker in (
+        "bare exit code",
+        "bounded diagnostic",
+        "correction-incomplete",
+        "multiple repositories",
+        "before any repository or workspace read",
+    ):
+        require(marker in codex_implementer, f"Codex implementer diagnostic contract misses {marker!r}")
     require(
         (ROOT / "plugins/team-harness/skills/pipeline/scripts/cleaner-transition.mjs").is_file(),
         "deterministic cleaner transition helper is missing",
@@ -921,6 +991,14 @@ def check_functional_first_plan_contract() -> None:
         for marker in required:
             require(marker in text, f"{label}: functional-first marker missing {marker!r}")
 
+    for label, text in (("Claude architect", architect), ("Codex architect", adapter)):
+        for marker in (
+            "`contract` for cross-repository api/schema compatibility",
+            "`integration` for multi-repository behavior",
+            "never emit `cross-repository` as an id",
+        ):
+            require(marker in text, f"{label}: cross-repository quality mapping misses {marker!r}")
+
     for label, relative in (
         ("Claude", "agents/ref-pipeline.md"),
         ("Codex", "plugins/team-harness/skills/pipeline/references/design.md"),
@@ -928,7 +1006,9 @@ def check_functional_first_plan_contract() -> None:
         text = re.sub(r"\s+", " ", read(relative).lower())
         for marker in (
             "plan-contract.mjs",
+            "plan-contract-repair.mjs",
             "plan_contract_evidence",
+            "plan_contract_repair_evidence",
             "artifact-set sha-256",
             "observable delta",
             "representative rule/example",
@@ -940,16 +1020,35 @@ def check_functional_first_plan_contract() -> None:
             "planning dispatches only `architect`" in text or "planning dispatches only architect" in text,
             f"{label}: functional-first planning added a specialist dispatch",
         )
+        repair_markers = (
+            ("without operator authorization", "another architect dispatch", "exceptional architect correction")
+            if label == "Claude"
+            else ("no operator authorization", "architect dispatch", "exceptional architect correction")
+        )
+        for marker in repair_markers:
+            require(marker in text, f"{label}: mechanical plan repair misses {marker!r}")
 
     state_sources = (
         read("agents/_shared/orchestrator-state.md").lower(),
         read("plugins/team-harness/skills/pipeline/references/state-and-gates.md").lower(),
     )
     for text in state_sources:
-        for marker in ("plan_contract_evidence", "result_sha256", "plan_sha256", "artifact_set_sha256"):
+        for marker in ("plan_contract_evidence", "plan_contract_repair_evidence", "result_sha256", "plan_sha256", "artifact_set_sha256"):
             require(marker in text, f"plan evidence state misses {marker!r}")
-    recovery = read("plugins/team-harness/skills/pipeline/references/recovery.md").lower()
-    for marker in ("plan_contract_evidence", "legacy-recovery", "self-authored-minimal-plan", "never infer functional completeness"):
+    recovery = re.sub(
+        r"\s+",
+        " ",
+        read("plugins/team-harness/skills/pipeline/references/recovery.md").lower(),
+    )
+    for marker in (
+        "plan_contract_evidence",
+        "plan_contract_repair_evidence",
+        "plan-contract-repair.mjs",
+        "without asking the operator",
+        "legacy-recovery",
+        "self-authored-minimal-plan",
+        "never infer functional completeness",
+    ):
         require(marker in recovery, f"plan evidence recovery misses {marker!r}")
 
     reviewer = re.sub(r"\s+", " ", read("agents/plan-reviewer.md").lower())
@@ -958,6 +1057,10 @@ def check_functional_first_plan_contract() -> None:
     require(
         (ROOT / "plugins/team-harness/skills/pipeline/scripts/plan-contract.mjs").is_file(),
         "functional plan validator is missing",
+    )
+    require(
+        (ROOT / "plugins/team-harness/skills/pipeline/scripts/plan-contract-repair.mjs").is_file(),
+        "mechanical plan repair helper is missing",
     )
     require((ROOT / "docs/functional-plan-contract.md").is_file(), "functional plan documentation is missing")
 
@@ -968,6 +1071,7 @@ def check_cross_runtime_pipeline_runners() -> None:
         "bounded-command.mjs",
         "cleaner-transition.mjs",
         "plan-contract.mjs",
+        "plan-contract-repair.mjs",
         "quality-runner.mjs",
         "test-transition.mjs",
     )

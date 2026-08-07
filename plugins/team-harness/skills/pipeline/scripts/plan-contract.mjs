@@ -216,9 +216,15 @@ function tableCells(line) {
 }
 
 function inspectIndex(lines, findings) {
-  const manifest = sectionLines(lines, "Plan Manifest", 2);
-  const index = sectionLines(lines, "Task Index", 3);
-  if (manifest === null || index === null) {
+  const manifestHeadings = lines
+    .map((line, position) => ({ line, position }))
+    .filter((entry) => entry.line === "## Plan Manifest");
+  const indexHeadings = lines
+    .map((line, position) => ({ line, position }))
+    .filter((entry) => entry.line === "### Task Index");
+  const manifest = manifestHeadings.length === 1 ? sectionLines(lines, "Plan Manifest", 2) : null;
+  const index = indexHeadings.length === 1 ? sectionLines(lines, "Task Index", 3) : null;
+  if (manifest === null || index === null || index.start <= manifest.start || index.start >= manifest.end) {
     findings.push(finding("TASK_INDEX_INVALID", "01-plan.md", "Plan Manifest/Task Index"));
     return { paths: [], tasks: [] };
   }
@@ -274,7 +280,7 @@ function inspectTask(task, text, findings) {
   const verification = sectionLines(lines, "Verification", 4);
   if ([acceptance, constraints, verification].some((section) => section === null)) {
     findings.push(finding("TASK_SECTION_MISSING", task.path, task.id));
-    return { ...task, actual_ac_count: 0, actual_tc_count: 0, pre_implementation_test: null };
+    return { ...task, actual_ac_count: 0, actual_tc_count: 0, pre_implementation_test: null, required_quality_checks: [] };
   }
   const acLines = acceptance.lines.filter((line) => /^- \[[ x]\] \*\*AC-\d+\*\*:/.test(line));
   const tcLines = constraints.lines.filter((line) => /^- \*\*TC-\d+\*\*:/.test(line));
@@ -286,7 +292,14 @@ function inspectTask(task, text, findings) {
   }
   if (new Set(tcIds).size !== tcIds.length) findings.push(finding("TASK_TECHNICAL_CONSTRAINT_INVALID", task.path, "Technical Constraints"));
   const pretest = verification.lines.filter((line) => /^- \*\*Pre-implementation test:\*\* (?:required|not-applicable — .+)$/.test(line));
-  if (pretest.length !== 1) findings.push(finding("TASK_VERIFICATION_INVALID", task.path, "Verification"));
+  const quality = verification.lines.filter((line) => /^- \*\*Required quality checks:\*\* (?:none — .+|[a-z][a-z0-9_]*(?:, [a-z][a-z0-9_]*)*)$/.test(line));
+  const parsedQuality = quality.length === 1 && !quality[0].includes("none —")
+    ? quality[0].replace("- **Required quality checks:** ", "").split(", ")
+    : [];
+  const duplicateQuality = new Set(parsedQuality).size !== parsedQuality.length;
+  if (pretest.length !== 1 || quality.length !== 1 || duplicateQuality) {
+    findings.push(finding("TASK_VERIFICATION_INVALID", task.path, "Verification"));
+  }
   if (acLines.length !== task.ac_count || tcLines.length !== task.tc_count) {
     findings.push(finding("TASK_COUNT_MISMATCH", task.path, task.id));
   }
@@ -295,6 +308,7 @@ function inspectTask(task, text, findings) {
     actual_ac_count: acLines.length,
     actual_tc_count: tcLines.length,
     pre_implementation_test: pretest[0]?.includes("not-applicable") ? "not-applicable" : pretest.length === 1 ? "required" : null,
+    required_quality_checks: duplicateQuality ? [] : parsedQuality,
   };
 }
 
@@ -330,14 +344,17 @@ function isFunctional(value) {
 function isTask(value) {
   return exactlyKeys(value, [
     "id", "status", "ac_count", "tc_count", "path", "actual_ac_count",
-    "actual_tc_count", "pre_implementation_test",
+    "actual_tc_count", "pre_implementation_test", "required_quality_checks",
   ]) && /^Task-\d+$/.test(value.id) && typeof value.status === "string" &&
     Number.isSafeInteger(value.ac_count) && value.ac_count >= 0 &&
     Number.isSafeInteger(value.tc_count) && value.tc_count >= 0 &&
     value.path === `plan/tasks/${value.id}.md` &&
     Number.isSafeInteger(value.actual_ac_count) && value.actual_ac_count >= 0 &&
     Number.isSafeInteger(value.actual_tc_count) && value.actual_tc_count >= 0 &&
-    [null, "required", "not-applicable"].includes(value.pre_implementation_test);
+    [null, "required", "not-applicable"].includes(value.pre_implementation_test) &&
+    Array.isArray(value.required_quality_checks) &&
+    value.required_quality_checks.every((entry) => typeof entry === "string" && /^[a-z][a-z0-9_]*$/.test(entry)) &&
+    new Set(value.required_quality_checks).size === value.required_quality_checks.length;
 }
 
 export function isPlanContractResult(value) {
@@ -409,7 +426,13 @@ export async function validatePlanContract(options) {
       const artifact = loaded.get(task.path);
       if (artifact === undefined) {
         state.findings.push(finding("MANIFEST_REQUIRED_ARTIFACT_MISSING", "01-plan.md", task.path));
-        return { ...task, actual_ac_count: 0, actual_tc_count: 0, pre_implementation_test: null };
+        return {
+          ...task,
+          actual_ac_count: 0,
+          actual_tc_count: 0,
+          pre_implementation_test: null,
+          required_quality_checks: [],
+        };
       }
       return inspectTask(task, artifact.text, state.findings);
     });

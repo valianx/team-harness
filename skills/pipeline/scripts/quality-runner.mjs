@@ -34,9 +34,12 @@ const MAX_ARGV_ITEMS = 128;
 const MAX_ARGV_ITEM_BYTES = 8 * 1024;
 const MAX_ARGV_BYTES = 64 * 1024;
 const SAFE_CHECKPOINT = /^[a-z][a-z0-9_-]{0,63}$/;
-const SAFE_COMMAND_ID = /^(test|format_check|lint|coverage|crap)$/;
+const SAFE_COMMAND_ID = /^[a-z][a-z0-9_]{0,63}$/;
 const SAFE_COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
-const KNOWN_COMMANDS = ["test", "format_check", "lint", "coverage", "crap"];
+const KNOWN_COMMANDS = [
+  "test", "build", "typecheck", "format_check", "lint", "coverage", "crap",
+  "invariants", "permissions", "accessibility", "contract", "integration", "database",
+];
 const ERROR_CODES = new Set([
   null,
   "ARGUMENT_INVALID",
@@ -53,6 +56,8 @@ const ERROR_CODES = new Set([
   "CRAP_REPORT_INCOMPLETE",
   "CRAP_POLICY_FAILED",
   "BASELINE_INVALID",
+  "REQUIRED_CHECKS_MISSING",
+  "PREREQUISITE_UNAVAILABLE",
   "INTERNAL_ERROR",
 ]);
 const RESULT_KEYS = [
@@ -97,6 +102,12 @@ export const QUALITY_MANIFEST_SCHEMA = {
                 minItems: 1,
                 maxItems: MAX_ARGV_ITEMS,
                 items: { type: "string" },
+              },
+              required_environment: {
+                type: "array",
+                maxItems: 32,
+                uniqueItems: true,
+                items: { type: "string", pattern: "^[A-Z][A-Z0-9_]{0,127}$" },
               },
             },
           },
@@ -222,7 +233,7 @@ function validateArgv(argv, { requireReportToken = false } = {}) {
 }
 
 function validateCommand(command, id) {
-  if (!hasOnlyKeys(command, ["argv", "working_directory", "timeout_ms", "version_argv"], ["argv"])) {
+  if (!hasOnlyKeys(command, ["argv", "working_directory", "timeout_ms", "version_argv", "required_environment"], ["argv"])) {
     throw new QualityError("MANIFEST_INVALID");
   }
   const workingDirectory = Object.hasOwn(command, "working_directory") ? command.working_directory : ".";
@@ -236,8 +247,17 @@ function validateCommand(command, id) {
     working_directory: workingDirectory,
     timeout_ms: timeoutMs,
     version_argv: null,
+    required_environment: [],
   };
   if (Object.hasOwn(command, "version_argv")) normalized.version_argv = validateArgv(command.version_argv);
+  if (Object.hasOwn(command, "required_environment")) {
+    if (!Array.isArray(command.required_environment) || command.required_environment.length > 32 ||
+      new Set(command.required_environment).size !== command.required_environment.length ||
+      command.required_environment.some((name) => typeof name !== "string" || !/^[A-Z][A-Z0-9_]{0,127}$/.test(name))) {
+      throw new QualityError("MANIFEST_INVALID");
+    }
+    normalized.required_environment = command.required_environment.slice().sort();
+  }
   return normalized;
 }
 
@@ -280,7 +300,7 @@ export function validateQualityManifest(value) {
     throw new QualityError("MANIFEST_INVALID");
   }
   const commandIds = Object.keys(value.commands);
-  if (commandIds.length === 0 || commandIds.some((id) => !SAFE_COMMAND_ID.test(id))) {
+  if (commandIds.length === 0 || commandIds.some((id) => !SAFE_COMMAND_ID.test(id) || !KNOWN_COMMANDS.includes(id))) {
     throw new QualityError("MANIFEST_INVALID");
   }
   const commands = Object.fromEntries(commandIds.sort().map((id) => [id, validateCommand(value.commands[id], id)]));
@@ -769,6 +789,7 @@ const RUN_OPTION_KEYS = [
   "policyMode",
   "baseline",
   "baselineSha256",
+  "requiredChecks",
 ];
 
 function normalizeRunOptions(options) {
@@ -776,7 +797,7 @@ function normalizeRunOptions(options) {
     options === null ||
     typeof options !== "object" ||
     Array.isArray(options) ||
-    !hasOnlyKeys(options, RUN_OPTION_KEYS, ["repo", "manifest", "base", "candidate", "checkpoint", "checks"])
+    !hasOnlyKeys(options, RUN_OPTION_KEYS, ["repo", "manifest", "base", "candidate", "checkpoint", "checks", "requiredChecks"])
   ) {
     throw new QualityError("ARGUMENT_INVALID");
   }
@@ -787,13 +808,18 @@ function normalizeRunOptions(options) {
     !Array.isArray(options.checks) ||
     options.checks.length === 0 ||
     new Set(options.checks).size !== options.checks.length ||
-    options.checks.some((id) => typeof id !== "string" || !SAFE_COMMAND_ID.test(id))
+    options.checks.some((id) => typeof id !== "string" || !SAFE_COMMAND_ID.test(id) || !KNOWN_COMMANDS.includes(id))
   ) {
     throw new QualityError("ARGUMENT_INVALID");
   }
   const policyMode = Object.hasOwn(options, "policyMode") ? options.policyMode : "measure";
   if (!["measure", "enforce"].includes(policyMode)) throw new QualityError("ARGUMENT_INVALID");
-  return { ...options, policyMode };
+  const requiredChecks = options.requiredChecks;
+  if (!Array.isArray(requiredChecks) || new Set(requiredChecks).size !== requiredChecks.length ||
+    requiredChecks.some((id) => typeof id !== "string" || !KNOWN_COMMANDS.includes(id))) {
+    throw new QualityError("ARGUMENT_INVALID");
+  }
+  return { ...options, policyMode, requiredChecks };
 }
 
 function repositoryEvidence(repository) {
@@ -811,6 +837,10 @@ async function prepareRun(options, state) {
   state.repository = repositoryEvidence(repository);
   const manifest = await resolveManifest(repository.root, options.manifest);
   state.manifest = manifest.evidence;
+  if (options.requiredChecks.some((id) =>
+    !Object.hasOwn(manifest.value.commands, id) || !options.checks.includes(id))) {
+    throw new QualityError("REQUIRED_CHECKS_MISSING");
+  }
   if (options.checks.some((id) => !Object.hasOwn(manifest.value.commands, id))) {
     throw new QualityError("MANIFEST_INVALID");
   }
@@ -859,6 +889,9 @@ async function runVersionCheck(context, id, command, cwd) {
 
 async function runManifestCommand(context, id) {
   const command = context.manifest.value.commands[id];
+  if (command.required_environment.some((name) => !Object.hasOwn(process.env, name) || process.env[name] === "")) {
+    throw new QualityError("PREREQUISITE_UNAVAILABLE");
+  }
   const cwd = await commandWorkingDirectory(context.repository.root, command.working_directory);
   const version = await runVersionCheck(context, id, command, cwd);
   const reportPath = id === "crap" ? path.join(context.reportRoot, "crap-report.json") : null;
@@ -977,14 +1010,14 @@ function parseCli(argv) {
     const value = argv[index + 1];
     if (
       value === undefined ||
-      !["--repo", "--manifest", "--base", "--candidate", "--checkpoint", "--checks", "--policy-mode", "--baseline", "--baseline-sha256"].includes(flag) ||
+      !["--repo", "--manifest", "--base", "--candidate", "--checkpoint", "--checks", "--required-checks", "--policy-mode", "--baseline", "--baseline-sha256"].includes(flag) ||
       Object.hasOwn(values, flag)
     ) {
       return null;
     }
     values[flag] = value;
   }
-  for (const required of ["--repo", "--manifest", "--base", "--candidate", "--checkpoint", "--checks"]) {
+  for (const required of ["--repo", "--manifest", "--base", "--candidate", "--checkpoint", "--checks", "--required-checks"]) {
     if (!Object.hasOwn(values, required)) return null;
   }
   const checks = values["--checks"].split(",");
@@ -995,6 +1028,7 @@ function parseCli(argv) {
     candidate: values["--candidate"],
     checkpoint: values["--checkpoint"],
     checks,
+    requiredChecks: values["--required-checks"] === "" ? [] : values["--required-checks"].split(","),
     policyMode: values["--policy-mode"] ?? "measure",
     ...(Object.hasOwn(values, "--baseline") ? { baseline: values["--baseline"] } : {}),
     ...(Object.hasOwn(values, "--baseline-sha256") ? { baselineSha256: values["--baseline-sha256"] } : {}),

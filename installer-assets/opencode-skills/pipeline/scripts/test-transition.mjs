@@ -462,6 +462,7 @@ async function runQuality(options) {
     candidate: options.candidate,
     checkpoint: `test_contract_${options.transition}`,
     checks: ["test"],
+    requiredChecks: ["test"],
   });
 }
 
