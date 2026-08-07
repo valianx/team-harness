@@ -24,7 +24,7 @@ const REASONS = new Set([
   "arguments-invalid", "workspace-invalid", "path-invalid", "artifact-invalid", "artifact-escaped",
   "manifest-or-index-missing", "manifest-paths-invalid", "task-index-semantic-or-format-defect",
   "task-index-invalid", "no-eligible-mechanical-repair", "post-repair-validation-unavailable",
-  "repair-failed", "contract-already-passes", "mechanical-format-normalized",
+  "repair-failed", "rollback-failed", "contract-already-passes", "mechanical-format-normalized",
   "mechanical-format-normalized-with-residual-findings",
 ]);
 const RESULT_KEYS = [
@@ -274,7 +274,17 @@ async function applyChanges(changes, useCandidate) {
     }
   } catch (error) {
     if (useCandidate) {
-      for (const change of applied.reverse()) await atomicReplace(change.requested, change.bytes, change.stat.mode).catch(() => {});
+      let rollbackFailed = false;
+      for (const change of applied.reverse()) {
+        try {
+          await atomicReplace(change.requested, change.bytes, change.stat.mode);
+        } catch {
+          rollbackFailed = true;
+        }
+      }
+      if (rollbackFailed) throw new RepairError("rollback-failed");
+    } else {
+      throw new RepairError("rollback-failed");
     }
     throw error;
   }
@@ -320,7 +330,10 @@ export function isPlanContractRepairResult(value) {
     !isDigest(value.contract_result_sha256)) return false;
   if (value.verdict === "repaired") {
     if (value.artifact_changes.length === 0 || !value.reason.startsWith("mechanical-format-normalized")) return false;
-  } else if (value.added_paths.length !== 0 || value.artifact_changes.length !== 0 || value.before_sha256 !== value.after_sha256) return false;
+  } else if (value.verdict === "not-needed" &&
+    (value.added_paths.length !== 0 || value.artifact_changes.length !== 0 || value.before_sha256 !== value.after_sha256)) return false;
+  else if (value.verdict === "blocked" && value.reason !== "rollback-failed" &&
+    (value.added_paths.length !== 0 || value.artifact_changes.length !== 0 || value.before_sha256 !== value.after_sha256)) return false;
   return value.verdict !== "not-needed" || (value.reason === "contract-already-passes" && value.contract_verdict === "pass");
 }
 
@@ -390,6 +403,23 @@ export async function repairPlanContract(options) {
       before, after: finalPlan, addedPaths: parsed.missing.map((task) => task.path), changes, contract: postContract,
     });
   } catch (error) {
+    if (error instanceof RepairError && error.code === "rollback-failed") {
+      const residual = [];
+      for (const change of changes) {
+        let current;
+        try {
+          current = await readFile(change.requested);
+        } catch {
+          current = Buffer.alloc(0);
+        }
+        if (!current.equals(change.bytes)) residual.push({ ...change, candidate: current });
+      }
+      const currentPlan = residual.find((change) => change.path === "01-plan.md")?.candidate ?? before;
+      return result({
+        verdict: "blocked", reason: "rollback-failed", before, after: currentPlan,
+        addedPaths: [], changes: residual, contract,
+      });
+    }
     return result({
       verdict: "blocked",
       reason: error instanceof RepairError && REASONS.has(error.code) ? error.code : "repair-failed",

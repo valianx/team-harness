@@ -406,6 +406,13 @@ await check("all layered mechanical format defects normalize in one pass", async
     assert.match(taskAfter, /^#### Acceptance Criteria$/m);
     assert.match(taskAfter, /^- \[ \] \*\*AC-1\*\*: Given .+, When .+, Then .+\.$/m);
     assert.match(taskAfter, /^- \*\*TC-1\*\*: Preserve .+\.$/m);
+
+    const rollbackFailure = { ...repaired, verdict: "blocked", reason: "rollback-failed" };
+    assert.equal(isPlanContractRepairResult(rollbackFailure), true);
+    assert.equal(isPlanContractRepairResult({
+      ...rollbackFailure,
+      reason: "no-eligible-mechanical-repair",
+    }), false);
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }

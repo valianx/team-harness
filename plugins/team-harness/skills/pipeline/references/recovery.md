@@ -175,6 +175,12 @@ asking the operator to authorize a repair. Never rerun a recorded repair,
 convert it into an exceptional architect pass, or infer success without a fresh
 passing `plan_contract_evidence` record.
 
+The sole exception is `reason: rollback-failed`: its evidence enumerates every
+residual artifact with the bytes actually observed after rollback. Treat the
+workspace as recovery-required, surface the affected paths, and do not
+validate, dispatch, or offer an architect correction until those artifacts
+match their recorded before hashes.
+
 For any pending or partially recorded gate, regenerate evidence from durable
 artifacts, write a fresh nonce, re-present the numbered gate in the primary
 conversation, and stop. Never repair a field or copy a decision from prose,

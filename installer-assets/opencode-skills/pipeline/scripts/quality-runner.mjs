@@ -797,7 +797,7 @@ function normalizeRunOptions(options) {
     options === null ||
     typeof options !== "object" ||
     Array.isArray(options) ||
-    !hasOnlyKeys(options, RUN_OPTION_KEYS, ["repo", "manifest", "base", "candidate", "checkpoint", "checks"])
+    !hasOnlyKeys(options, RUN_OPTION_KEYS, ["repo", "manifest", "base", "candidate", "checkpoint", "checks", "requiredChecks"])
   ) {
     throw new QualityError("ARGUMENT_INVALID");
   }
@@ -814,7 +814,7 @@ function normalizeRunOptions(options) {
   }
   const policyMode = Object.hasOwn(options, "policyMode") ? options.policyMode : "measure";
   if (!["measure", "enforce"].includes(policyMode)) throw new QualityError("ARGUMENT_INVALID");
-  const requiredChecks = Object.hasOwn(options, "requiredChecks") ? options.requiredChecks : [];
+  const requiredChecks = options.requiredChecks;
   if (!Array.isArray(requiredChecks) || new Set(requiredChecks).size !== requiredChecks.length ||
     requiredChecks.some((id) => typeof id !== "string" || !KNOWN_COMMANDS.includes(id))) {
     throw new QualityError("ARGUMENT_INVALID");
@@ -1017,7 +1017,7 @@ function parseCli(argv) {
     }
     values[flag] = value;
   }
-  for (const required of ["--repo", "--manifest", "--base", "--candidate", "--checkpoint", "--checks"]) {
+  for (const required of ["--repo", "--manifest", "--base", "--candidate", "--checkpoint", "--checks", "--required-checks"]) {
     if (!Object.hasOwn(values, required)) return null;
   }
   const checks = values["--checks"].split(",");
@@ -1028,7 +1028,7 @@ function parseCli(argv) {
     candidate: values["--candidate"],
     checkpoint: values["--checkpoint"],
     checks,
-    ...(Object.hasOwn(values, "--required-checks") ? { requiredChecks: values["--required-checks"].split(",") } : {}),
+    requiredChecks: values["--required-checks"].split(","),
     policyMode: values["--policy-mode"] ?? "measure",
     ...(Object.hasOwn(values, "--baseline") ? { baseline: values["--baseline"] } : {}),
     ...(Object.hasOwn(values, "--baseline-sha256") ? { baselineSha256: values["--baseline-sha256"] } : {}),

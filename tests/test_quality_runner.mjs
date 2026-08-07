@@ -125,6 +125,7 @@ function options(repo, base, checks, extra = {}) {
     candidate: "HEAD",
     checkpoint: "quality-test",
     checks,
+    requiredChecks: checks,
     ...extra,
   };
 }
@@ -198,6 +199,8 @@ await check("the CLI returns the same closed JSON contract and a useful process 
         "cli-test",
         "--checks",
         "test",
+        "--required-checks",
+        "test",
       ],
       { encoding: "utf8", windowsHide: true },
     );
@@ -222,7 +225,7 @@ await check("invalid manifests and missing selected commands fail closed", async
   await temporaryRepository({ manifest }, async ({ repo, base }) => {
     const result = await runQualityChecks(options(repo, base, ["test"]));
     assert.equal(result.verdict, "fail");
-    assert.equal(result.error_code, "MANIFEST_INVALID");
+    assert.equal(result.error_code, "REQUIRED_CHECKS_MISSING");
   });
 
   const invalidTestContract = {
@@ -251,6 +254,19 @@ await check("required quality coverage cannot pass with omitted controls", async
     }));
     assert.equal(complete.verdict, "pass", JSON.stringify(complete));
     assert.deepEqual(complete.commands.map((entry) => entry.id), ["test", "build", "accessibility"]);
+  });
+});
+
+await check("callers cannot omit the required quality set", async () => {
+  const manifest = baseManifest({ test: command() });
+  await temporaryRepository({ manifest }, async ({ repo, base }) => {
+    const withoutRequiredChecks = options(repo, base, ["test"]);
+    delete withoutRequiredChecks.requiredChecks;
+    const result = await runQualityChecks(withoutRequiredChecks);
+    assertClosedResult(result);
+    assert.equal(result.verdict, "fail");
+    assert.equal(result.error_code, "ARGUMENT_INVALID");
+    assert.deepEqual(result.commands, []);
   });
 });
 

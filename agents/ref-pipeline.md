@@ -1127,15 +1127,11 @@ available for post-Freeze validation corrections. The implementer gets one
 terminal attempt, runs every closure check, and stops—no feedback or automatic
 re-dispatch. A non-zero closure result includes the exact command, exit code,
 and bounded diagnostic; bare `exit 1` or missing diagnostics is
-`correction-incomplete`. Main then runs the raw quality runner at checkpoint
-`post_cleaner_handoff` against the complete unchanged repository
-`.team-harness/quality.json`. Derive `requiredChecks` as the sorted union of
-every assigned task shard's `Required quality checks` for that repository and
-run that exact set plus any additional declared checks; every required check
-must be both declared and selected or the runner returns
-`REQUIRED_CHECKS_MISSING`. A touched-file subset, declared-only subset, or
-ad-hoc replacement command set is invalid. Reusing the recorded pre-cleaner CRAP baseline when applicable, Main
-records the result/hash and reruns hygiene without another cleaner. Pass records
+`correction-incomplete`. After the `post_cleaner_handoff` closure commands,
+Main proceeds to the single common `post_implementation` quality checkpoint
+below; it never runs a separate focused quality subset that could hide an
+omitted control. Reusing the recorded pre-cleaner CRAP baseline when applicable,
+Main records the result/hash and reruns hygiene without another cleaner. Pass records
 `cleaner_evidence.status: handoff-pass` and proceeds to Freeze. Any remaining or
 new correctable finding requires a new package, nonce, presentation, and live
 authorization before another fresh implementer, still without incrementing
@@ -1143,9 +1139,21 @@ authorization before another fresh implementer, still without incrementing
 explicit decision first and never implies implementer authorization.
 
 With no implementer package, persist the post result and SHA-256, cleaner
-commit, candidate identity, and `cleaner_evidence.status: pass`; then run the
-code-hygiene scan and proceed to Freeze. QA remains an independent auditor of
-the frozen result.
+commit, candidate identity, and `cleaner_evidence.status: pass`.
+
+Regardless of whether the repository cleaner passed, was an empty no-op, was
+not applicable, or completed an authorized handoff, Main must run one raw
+quality runner checkpoint named `post_implementation` before hygiene or
+Freeze. Derive `requiredChecks` as the sorted repository-local union of every
+assigned task shard's `Required quality checks`. Select every command declared
+in the complete unchanged `.team-harness/quality.json`; a configured `crap`
+command runs in enforce mode with its recorded baseline. Every required check
+must be declared and selected. `REQUIRED_CHECKS_MISSING`,
+`PREREQUISITE_UNAVAILABLE`, a missing CRAP baseline, or any non-pass result
+blocks Freeze. This checkpoint is mandatory even when the cleaner itself was
+not applicable: a prior focused or cleaner result cannot substitute for it.
+Persist the closed result and SHA-256, then run the code-hygiene scan and
+proceed to Freeze. QA remains an independent auditor of the frozen result.
 
 > **Automatic knowledge capture is removed.** Doctrine and KG capture leave delivery entirely. When the operator asks, use the explicit knowledge/documentation flow outside the automatic pipeline; never add a second `delivery` dispatch.
 
