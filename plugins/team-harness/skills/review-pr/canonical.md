@@ -31,6 +31,35 @@ Remove options before parsing the PR identifier.
    `/workspaces` or `/workspaces/` entry; add `/workspaces/` when neither exists. Never use
    `.claude/` for review state.
 
+## Operator-facing communication
+
+Keep snapshot mechanics internal. Operator updates explain who is working, what each specialist
+is checking, and what decision comes next; they do not narrate skill reads, preflight checks,
+worktree setup, immutable-SHA binding, context hashes, artifact paths, or wait-tool lifecycle.
+
+At startup, announce only that Team Harness will prepare a PR review. When `--auto-publish` is
+absent, state that nothing will be published before approval. When `--auto-publish` was supplied,
+state that the operator opted into automatic publication after validation and that no preview menu
+will be shown. After selecting specialists, announce the exact agents and their useful scope:
+
+- `reviewer`: functional correctness, regressions, and API/data contracts;
+- `pr-review-qa`: acceptance evidence, when selected;
+- `pr-review-security`: permissions, input validation, and trust/data boundaries, when selected;
+- `reviewer-consolidator`: de-duplication and one final draft, only when more than one review
+  result exists.
+
+Use concrete changed surfaces when known, such as query semantics, DTO contracts, migrations, or
+authorization boundaries. Do not call agents abstract "lenses" in operator-facing prose.
+
+Do not emit messages whose only content is `waiting for agents`, `no agents completed yet`, or an
+equivalent tool-status narration. During an extended wait, send a concise value-bearing update
+that names the active specialists and the affected surfaces they are inspecting. Do not expose
+head/base SHAs or the context hash unless identity drift blocks the review, the values are needed
+to distinguish a superseded review, or the operator explicitly requests technical details.
+
+If `ensure-workspaces-ignore` adds a tracked `.gitignore` entry, report that material change once
+after it happens. Do not repeat it in progress updates or the review preview.
+
 ## Resume
 
 Require `workspaces/pr-review-{number}/pr-review-context.json`, a non-empty body draft, and
@@ -248,11 +277,8 @@ The general reviewer owns goal fit, correctness, public contracts, error behavio
 change-caused regressions. QA owns acceptance evidence. Security owns exploitability and trust
 boundaries. Do not ask two lenses to perform the same generic review.
 
-Emit one line:
-
-```text
-Review lenses: general{, qa}{, security}{, explicit: focus...}.
-```
+Announce the selected specialists using the operator-facing communication contract above. Include
+`reviewer-consolidator` in that announcement only when the selected set will require it.
 
 ## Pre-dispatch freshness
 
@@ -348,6 +374,10 @@ draft exists, dispatch `review-consolidate` once with the source file paths, `he
 
 There is no automatic convergence loop.
 
+While agents run, keep raw dispatch coordinates and identity validation silent. If a progress
+update is warranted, name the active agents and summarize their distinct review responsibilities
+against the concrete changed surfaces; never relay raw agent status blocks or waiting-tool output.
+
 ## Output contract
 
 The canonical GitHub review has two surfaces.
@@ -359,11 +389,9 @@ Use a compact index:
 ```markdown
 ## Review
 
-Reviewed: head `{head_oid}` against base `{base_oid}` at `{fetched_at}`
 Verdict: **APPROVE | REQUEST CHANGES | COMMENT**
 Findings: **{N} blocking**, **{M} suggestions**
 Checks: {concise CI summary or "not available"}
-Mergeability at capture: **{clean|conflicting|indeterminate}** (`mergeable={raw}`, `mergeStateStatus={raw}`)
 
 {Only cross-file findings that cannot be anchored to one changed line. Omit when empty.}
 ```
@@ -413,22 +441,48 @@ invalid artifact; then stop.
 
 Unless `--auto-publish` was supplied, show:
 
-1. reviewed head SHA, base SHA, and capture time;
-2. classified mergeability and both raw GitHub values;
+1. `PR #{number} review ready — nothing has been published.`;
+2. a leading `Recommendation:` with the event in plain language and one concise rationale grounded
+   in the supported findings and available checks;
 3. the exact body;
 4. every inline comment with path, line, and side;
-5. any superseded review ID;
-6. the recommended event.
+5. a superseded-review note when applicable, without exposing snapshot identity unless needed to
+   disambiguate it;
+6. five numeric choices with the recommended publish event first and marked `**(recommended)**`.
 
-Then ask:
+Build the rationale without adding new findings: for `REQUEST_CHANGES`, state the blocking count
+and concrete consequence category; for `APPROVE`, state that no supported blockers remain and
+qualify the available check evidence; for `COMMENT`, state why the draft is informational rather
+than an approval or change request.
+
+Use exactly one of these menus, matching the recommendation:
 
 ```text
-(a) approve
-(b) request changes
-(c) comment only
-(d) defer
-(e) cancel
+REQUEST_CHANGES:
+1 — Request changes **(recommended)**
+2 — Comment only
+3 — Approve
+4 — Defer
+5 — Cancel
+
+APPROVE:
+1 — Approve **(recommended)**
+2 — Comment only
+3 — Request changes
+4 — Defer
+5 — Cancel
+
+COMMENT:
+1 — Comment only **(recommended)**
+2 — Request changes
+3 — Approve
+4 — Defer
+5 — Cancel
 ```
+
+Accept the number or an unambiguous action phrase. Keep head/base SHAs, capture time, raw
+mergeability, context hash, and snapshot/worktree details hidden by default; provide them only on
+explicit request or when an integrity/freshness problem requires operator action.
 
 `defer` copies the canonical body to `$ARTIFACTS/pr-review-final.md`, preserves that file, inline
 JSON, and context for `--resume-from-draft`, removes the worktree/nonessential artifacts, and
@@ -453,7 +507,8 @@ readiness. State that the external system can change after Team Harness's final 
 
 ## Publish
 
-Map the operator choice to `APPROVE`, `REQUEST_CHANGES`, or `COMMENT`. Submit exactly once:
+Map the operator's numeric or textual choice to `APPROVE`, `REQUEST_CHANGES`, or `COMMENT`.
+Submit exactly once:
 
 ```bash
 jq -n \
@@ -471,8 +526,7 @@ exact error on failure, and run cleanup on every terminal path.
 Final response:
 
 ```text
-Review on PR #{number} published against {head_oid}.
-Run /compact before reviewing another PR in this session.
+Review on PR #{number} published as {APPROVE | REQUEST CHANGES | COMMENT}.
 ```
 
 ## No input

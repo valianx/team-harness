@@ -108,16 +108,14 @@ Return this body inline:
 ```markdown
 ## Review
 
-Reviewed: head `{reviewed_head_sha}` against base `{base_oid}` at `{fetched_at}`
 Verdict: **APPROVE | REQUEST CHANGES | COMMENT**
 Findings: **{N} blocking**, **{M} suggestions**
 Checks: {single concise CI line or "not available"}
-Mergeability at capture: **{clean|conflicting|indeterminate}** (`mergeable={raw}`, `mergeStateStatus={raw}`)
 
 {Cross-file findings or unresolved evidence contradiction only. Omit when empty.}
 ```
 
-Preserve the general reviewer's CI and mergeability lines; do not manufacture stronger claims.
+Preserve the general reviewer's CI line; do not manufacture stronger claims.
 Never describe the captured mergeability as current external readiness.
 
 Do not include focus summaries, clean-lens confirmations, reviewability/time estimates, file
@@ -140,6 +138,7 @@ consolidated_sources: [reviewer, qa, security]
 blocking_count: N
 suggestion_count: N
 event: APPROVE | REQUEST_CHANGES | COMMENT
+recommendation_rationale: one concise evidence-grounded sentence for the operator
 decision: APPROVE | CHANGES_REQUESTED | COMMENT
 inline_findings: [{path, line, side, body}]
 review_body: complete concise body
