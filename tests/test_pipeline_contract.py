@@ -843,7 +843,6 @@ def check_cleaner_crap_contract() -> None:
             "exactly one fresh",
             "repository's cleaner runs exactly once",
             "authorize one implementer pass",
-            "post_cleaner_handoff",
             "post_implementation",
             "requiredchecks",
             "required_checks_missing",

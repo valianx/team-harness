@@ -1127,7 +1127,7 @@ available for post-Freeze validation corrections. The implementer gets one
 terminal attempt, runs every closure check, and stops—no feedback or automatic
 re-dispatch. A non-zero closure result includes the exact command, exit code,
 and bounded diagnostic; bare `exit 1` or missing diagnostics is
-`correction-incomplete`. After the `post_cleaner_handoff` closure commands,
+`correction-incomplete`. After the handoff closure commands,
 Main proceeds to the single common `post_implementation` quality checkpoint
 below; it never runs a separate focused quality subset that could hide an
 omitted control. Reusing the recorded pre-cleaner CRAP baseline when applicable,

@@ -215,8 +215,8 @@ requires the hashed post-cleaner result and matching current commit/tree.
 `handoff-pending` requires the same valid cleaner post evidence plus a complete
 pending handoff package anchored to its commit/tree. `handoff-pass` requires
 that ancestry, the package-identical consumed decision and single implementer
-spawn, readable hashed closure and `post_cleaner_handoff` quality results, and
-matching current commit/tree. `not-applicable` requires the closed
+spawn, readable hashed closure and the common `post_implementation` quality
+result, and matching current commit/tree. `not-applicable` requires the closed
 `repository-quality-manifest-incomplete` reason. Missing, stale, partially
 populated, out-of-scope, or mismatched cleaner or handoff evidence blocks.
 Never infer a baseline, formatter/lint result, CRAP value, behavior-preserving
@@ -256,8 +256,8 @@ when the consumed nonce, anchor, and full finding objects match one
 the one fresh V2 implementer in that exact worktree; if the spawn already
 terminated, never follow up or re-dispatch it. Successful recovery rejects any
 bare non-zero exit without its exact command, exit code, and bounded diagnostic,
-then requires hashed closure plus full unchanged-manifest
-`post_cleaner_handoff` evidence for every declared check before `handoff-pass`.
+then requires hashed closure plus the single common full unchanged-manifest
+`post_implementation` result for every declared check before `handoff-pass`.
 A touched-file subset is invalid. An incomplete result may
 only create a new pending package and live decision. These events never pair
 with `iteration.start` or `agent.correction.spawn`, and recovery must prove the

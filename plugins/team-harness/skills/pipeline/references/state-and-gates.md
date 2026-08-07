@@ -252,9 +252,10 @@ The implementer receives one terminal attempt and every closure check. No
 follow-up or automatic re-dispatch is legal. A non-zero check is incomplete
 unless its exact command, exit code, and bounded diagnostic are present; bare
 `exit 1` is never closure evidence. After success Main records hashed closure
-evidence, runs `post_cleaner_handoff` through the raw quality runner against the
-complete unchanged repository manifest and every declared check—never a
-touched-file subset or ad-hoc command list—then reruns hygiene and sets
+evidence and joins the same raw `post_implementation` quality checkpoint used
+by every repository path. It runs against the complete unchanged repository
+manifest and every declared check—never a touched-file subset or ad-hoc command
+list—then runs hygiene once and sets
 `cleaner_evidence.status: handoff-pass` only when all
 evidence matches the current commit/tree. The cleaner never runs again. An
 incomplete attempt consumes that authorization; any remaining correctable work

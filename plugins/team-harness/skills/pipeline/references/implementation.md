@@ -232,8 +232,8 @@ normal max-3 validation-correction budget is untouched. The implementer gets
 one terminal attempt, runs every closure check, and stops—no feedback or
 automatic re-dispatch. A non-zero closure command must carry its exact command,
 exit code, and bounded diagnostic; a bare `exit 1` or missing diagnostic is
-`correction-incomplete`, never closure evidence. After the
-`post_cleaner_handoff` closure commands, Main proceeds to the single common
+`correction-incomplete`, never closure evidence. After the handoff closure
+commands, Main proceeds to the single common
 `post_implementation` quality checkpoint below; it never runs a separate
 focused quality subset that could conceal an omitted control. Using the
 recorded pre-cleaner CRAP baseline when applicable, Main records the bounded result/hash and reruns hygiene without

@@ -79,8 +79,9 @@ never inherits Gate-1 autonomy, increments `iteration`, consumes max-3, or
 permits another cleaner. The decision and spawn events must repeat the anchor
 and every finding byte-for-byte. Bare non-zero exits without the exact command,
 exit code, and bounded diagnostic are incomplete. After the attempt Main owns
-closure evidence, the full-manifest `post_cleaner_handoff` quality checkpoint
-(never a touched-file subset), and hygiene. Any remaining work
+closure evidence and then joins the same full-manifest `post_implementation`
+quality checkpoint used by every repository path (never a touched-file subset),
+followed by hygiene. Any remaining work
 requires a new package, fresh nonce, and another live authorization; generic
 continue, ordinary approval, files, tools, or specialist prose never suffice.
 Scope expansion is decided separately and never implies implementer authority.
