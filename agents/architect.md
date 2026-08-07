@@ -465,6 +465,7 @@ Stacked PRs within the SAME repository (a group's Base = a sibling group's branc
 #### Verification
 
 - **Pre-implementation test:** required | not-applicable — {for not-applicable: no observable runtime behavior, or repository manifest has no test_contract}
+- **Required quality checks:** {comma-separated command IDs} | none — {reason}
 - {tests, commands, or inspections that prove each AC and TC}
 
 ACs describe behavior observable by a user, API consumer, operator, or another
@@ -518,6 +519,11 @@ Split reason, Cleanup PR/Base PR, Title, Branch, and Notes remain frozen otherwi
   has `test_contract` and the task changes observable runtime behavior. Otherwise
   declare `not-applicable` with the concrete reason. This is execution routing,
   not an AC or a technical design choice.
+- Declare every acceptance-required repository control in `Required quality
+  checks`, including applicable build/typecheck, invariant, permission,
+  accessibility, cross-repository contract, integration, or database checks.
+  Never treat the commands currently present in `quality.json` as proof that the
+  required set is complete.
 - The **union** of task-shard ACs covers the approved request. If an AC spans multiple tasks, reference one canonical AC ID from each affected task rather than copying its prose.
 - The **intersection** is empty when possible (every feature AC owned by exactly one task, except shared ones explicitly noted).
 - ACs in each task shard are the **contract for Stage 2**. Implementer and QA read only the assigned shard.

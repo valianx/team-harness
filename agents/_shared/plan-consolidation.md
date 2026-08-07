@@ -63,7 +63,7 @@ Every writer's permitted edit is enumerated below. A writer not listed has no wr
 |---|---|---|
 | architect | all plan artifacts (author + smallest-shard refinement) | Stage 1, or a new design pass explicitly requested by the live operator after Gate 1 |
 | plan-reviewer | ONLY the `**Reviews:**` line in the title block (replace-in-place) | close of each panel round |
-| orchestrator | deterministic insertion of already-indexed, existing task-shard routes into the Plan Manifest; mechanical canonical-field repairs that preserve every security obligation; canonical-field transcription of one bounded operator decision; and task-index status transitions | manifest-route insertion before Gate 1; all other repairs post-Gate-1; never dispatch `architect` automatically |
+| orchestrator | deterministic pre-Gate-1 format normalization (canonical index order, existing task routes, uniquely named heading levels, AC/TC literal grammar); mechanical canonical-field repairs that preserve every security obligation; canonical-field transcription of one bounded operator decision; and task-index status transitions | closed format normalization before Gate 1; all other repairs post-Gate-1; never dispatch `architect` automatically |
 | qa (validate) | ONLY AC checkbox flips in assigned task shards | Phase 3 |
 | delivery | task-index status to `merged` | Phase 4 |
 | ux-reviewer | AC additions in affected task shards, contiguous numbering — narrative stays in `reviews/01-ux-review.md` | Phase 1.7 (enrich, Stage 1, before ratification) |
@@ -71,12 +71,14 @@ Every writer's permitted edit is enumerated below. A writer not listed has no wr
 
 (Stage-2 `[CONSTRAINT-DISCOVERED]` annotations are placed in the affected task shard by the **orchestrator**, transcribing an implementer's status field; the implementer never writes the plan set.)
 
-Before Gate 1, the coordinator may run the deterministic manifest-route repair
-exactly once after failed validation. That helper may add only a canonical task
-route already present in the Task Index when its regular, non-symlink shard
-already exists inside the workspace. It cannot change task rows, counts, ACs,
-TCs, scope, decisions, architecture, delivery, branches, or PR grouping. It
-records before/after hashes, reruns validation, and consumes no architect
+Before Gate 1, the coordinator may run the deterministic format repair exactly
+once after failed validation. Its closed transformations are canonical index
+column order, existing task routes in the manifest, uniquely named required
+heading levels, and recognizable AC/TC delimiter, checkbox, and
+Given/When/Then casing. It applies all eligible transformations transactionally
+and cannot create missing content or change task values, counts, AC/TC prose,
+scope, decisions, architecture content, delivery, branches, or PR grouping. It
+records per-artifact before/after hashes and operations, reruns validation, and consumes no architect
 correction or iteration.
 
 After Gate 1, the coordinator is the only owner of canonical plan-field edits: it may

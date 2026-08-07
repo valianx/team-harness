@@ -171,15 +171,16 @@ ${tc}
 #### Verification
 
 ${pretest}
+- **Required quality checks:** test, build, typecheck, format_check, lint
 - Exercise retryable and terminal checkout outcomes.
 `;
 }
 
-async function fixture({ plan = planText(), task = taskText() } = {}) {
+async function fixture({ plan = planText(), task = taskText(), architectureText = architecture } = {}) {
   const workspace = await mkdtemp(path.join(tmpdir(), "th-functional-plan-"));
   await mkdir(path.join(workspace, "plan/tasks"), { recursive: true });
   await writeFile(path.join(workspace, "01-plan.md"), plan);
-  await writeFile(path.join(workspace, "plan/architecture.md"), architecture);
+  await writeFile(path.join(workspace, "plan/architecture.md"), architectureText);
   await writeFile(path.join(workspace, "plan/delivery.md"), delivery);
   await writeFile(path.join(workspace, "plan/tasks/Task-1.md"), task);
   return workspace;
@@ -358,6 +359,53 @@ await check("missing task routes are repaired once without another architect pas
     assert.equal(isPlanContractRepairResult(second), true);
     assert.deepEqual(second.added_paths, []);
     assert.deepEqual(await readFile(path.join(workspace, "01-plan.md")), repaired);
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+await check("all layered mechanical format defects normalize in one pass", async () => {
+  const plan = planText()
+    .replace("| task | Task-1 | `plan/tasks/Task-1.md` | AC-1 |\n", "")
+    .replace(
+      "| Task | Service | Status | AC count | TC count | Path |\n|------|---------|--------|----------|----------|------|\n| Task-1 | checkout | pending | 1 | 1 | `plan/tasks/Task-1.md` |",
+      "| Service | Task | Path | Status | TC count | AC count |\n|---------|------|------|--------|----------|----------|\n| checkout | Task-1 | `plan/tasks/Task-1.md` | pending | 1 | 1 |",
+    );
+  const task = taskText({
+    ac: "- [ ] **AC-1** — Given a retryable interruption, when the operator retries, then checkout resumes once.",
+    tc: "- [ ] **TC-1** — Preserve the current idempotency boundary.",
+  })
+    .replace("#### Acceptance Criteria", "## Acceptance Criteria")
+    .replace("#### Technical Constraints", "## Technical Constraints")
+    .replace("#### Verification", "## Verification");
+  const architectureText = architecture
+    .replace("# Architecture", "## Architecture")
+    .replace("### Proposed Approach", "## Proposed Approach")
+    .replace("### Patterns to Mirror", "#### Patterns to Mirror")
+    .replace("### Engineering Risks and Trade-offs", "## Engineering Risks and Trade-offs");
+  const workspace = await fixture({ plan, task, architectureText });
+  try {
+    const initial = await run(workspace);
+    assert.equal(initial.verdict, "fail");
+    const repaired = await repairPlanContract({ workspace, plan: "01-plan.md" });
+    assert.equal(repaired.verdict, "repaired", JSON.stringify(repaired));
+    assert.equal(repaired.contract_verdict, "pass", JSON.stringify(repaired));
+    assert.equal(repaired.schema_version, 2);
+    assert.equal(isPlanContractRepairResult(repaired), true);
+    assert.deepEqual(repaired.added_paths, ["plan/tasks/Task-1.md"]);
+    const operations = new Set(repaired.artifact_changes.flatMap((entry) => entry.operations));
+    assert.deepEqual(operations, new Set([
+      "task-index-columns",
+      "manifest-task-routes",
+      "architecture-heading-levels",
+      "task-heading-levels",
+      "acceptance-grammar",
+      "technical-constraint-grammar",
+    ]));
+    const taskAfter = await readFile(path.join(workspace, "plan/tasks/Task-1.md"), "utf8");
+    assert.match(taskAfter, /^#### Acceptance Criteria$/m);
+    assert.match(taskAfter, /^- \[ \] \*\*AC-1\*\*: Given .+, When .+, Then .+\.$/m);
+    assert.match(taskAfter, /^- \*\*TC-1\*\*: Preserve .+\.$/m);
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }

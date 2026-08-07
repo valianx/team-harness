@@ -234,9 +234,11 @@ automatic re-dispatch. A non-zero closure command must carry its exact command,
 exit code, and bounded diagnostic; a bare `exit 1` or missing diagnostic is
 `correction-incomplete`, never closure evidence. Main then runs the raw quality
 runner at checkpoint `post_cleaner_handoff` against the repository's complete,
-unchanged `.team-harness/quality.json`, with `test` plus every declared
-`format_check`, `lint`, and `crap` check. It must not substitute a touched-file
-subset or an ad-hoc command list. Using the recorded pre-cleaner CRAP baseline
+unchanged `.team-harness/quality.json`. Derive `requiredChecks` as the sorted
+union of the assigned task shards' `Required quality checks` and run that exact
+set plus additional declared checks. Missing or unselected required controls
+return `REQUIRED_CHECKS_MISSING`; a declared-only subset, touched-file subset,
+or ad-hoc command list is invalid. Using the recorded pre-cleaner CRAP baseline
 when applicable, Main records the bounded result/hash and reruns hygiene without
 dispatching the cleaner again. Pass records `cleaner_evidence.status: handoff-pass` and proceeds
 to Freeze. Any remaining or new correctable finding consumes no development

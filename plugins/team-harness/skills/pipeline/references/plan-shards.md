@@ -46,6 +46,11 @@ Use `required` only when the repository quality manifest has both
 `commands.test` and `test_contract.path_rules` and the task changes observable runtime behavior.
 Otherwise use
 `not-applicable` with the concrete reason; this field is neither an AC nor a TC.
+It also declares exactly one
+`- **Required quality checks:** {comma-separated command IDs}` line, or
+`none — {reason}`. Include every applicable repository control. Main unions
+these values per repository and binds the final quality run to that exact set;
+a missing manifest command or unselected required check fails closed.
 
 Resolve paths from the index once. Implementer reads its task plus named design
 anchors. Tester reads task ACs and TCs plus the verification packet; QA grades

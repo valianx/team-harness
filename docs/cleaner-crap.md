@@ -68,7 +68,13 @@ consume its max-3 validation-correction budget. A non-zero closure result must
 include the exact command, exit code, and bounded diagnostic—`exit 1` alone is
 not evidence. Main then runs the complete, unchanged
 `.team-harness/quality.json` at `post_cleaner_handoff`, including every declared
-test, format, lint, and CRAP check rather than a touched-file subset, followed by
+check plus the per-repository union of task-declared `Required quality checks`.
+The runner supports build/typecheck, invariants, permissions, accessibility,
+contract, integration, and database controls in addition to test, format, lint,
+coverage, and CRAP. A required command that is missing or unselected fails with
+`REQUIRED_CHECKS_MISSING`; a declared required environment variable that is
+absent fails with `PREREQUISITE_UNAVAILABLE` rather than producing a false
+green. This is never replaced by a touched-file subset, followed by
 hygiene. Remaining work requires a new package and another live authorization;
 the cleaner still does not run again.
 

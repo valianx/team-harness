@@ -48,14 +48,18 @@ expanded, and an aligned plan must omit it. An invalid or contradictory
 scope-shape block is an invalid artifact.
 
 When validation fails, run the mechanical repair helper once before classifying
-the failure. Its closed authority is adding Task Index routes to the Plan
-Manifest only when every indexed route is canonical and its regular,
-non-symlink task shard already exists inside the workspace. Persist its complete
+the failure. Its closed authority is reordering a recognizable Task Index by
+its canonical headers; adding canonical Task Index routes whose regular,
+non-symlink shards already exist to the Plan Manifest; normalizing the levels
+of uniquely named required architecture/task headings; and converting
+recognizable AC/TC delimiter, checkbox, and Given/When/Then casing to the
+literal contract grammar. It applies every eligible normalization in one
+transaction and never invents a missing heading, section, shard, or prose. Persist its complete
 JSON and hash as `plan_contract_repair_evidence`, then rerun the validator. A
 `repaired` or `not-needed` result needs no operator authorization, architect
 dispatch, correction allowance, or iteration. Do not narrate this internal
 checkpoint when it succeeds; present Gate 1 normally. A `blocked` result writes
-nothing. Remaining semantic, ambiguous, malformed-index, missing-artifact, or
+nothing. Remaining semantic, ambiguous, unrecognized-index, missing-content, missing-artifact, or
 other structural findings receive the one normal design correction; genuine
 ambiguity is blocked and surfaced to the operator. Never create an exceptional
 architect correction for an eligible mechanical omission. A missing, stale, or failing evidence record blocks

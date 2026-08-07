@@ -24,10 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Added a deterministic pre-Gate-1 repair for omitted task-shard routes in the
-  Plan Manifest. Eligible repairs run once without operator authorization,
-  architect redispatch, or iteration cost; semantic defects and missing shards
-  still fail closed.
+- Added one transactional pre-Gate-1 normalization pass for canonical task
+  index order, existing manifest routes, heading levels, and literal AC/TC
+  grammar. Eligible format repairs need no operator authorization, architect
+  redispatch, or iteration; missing or semantic content still fails closed.
+- Bound final repository quality to the task-declared required control set.
+  Build/typecheck, invariants, permissions, accessibility, contract,
+  integration, and database checks can no longer be omitted from a green
+  result, and missing declared environment prerequisites report unavailable.
 
 ## [3.11.1] - 2026-08-06
 

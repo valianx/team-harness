@@ -121,7 +121,10 @@ design → waiting_gate1 → implementation → validation → waiting_gate3 →
 Before Gate 1, a failing plan contract first runs the closed
 `plan-contract-repair.mjs` helper exactly once. It may add only canonical Task
 Index routes whose regular task shards already exist inside the workspace to the
-Plan Manifest, records before/after hashes and the added routes, and reruns
+Plan Manifest; reorder a uniquely recognizable Task Index; normalize uniquely
+named architecture/task heading levels; and normalize recognizable AC/TC
+punctuation, checkbox, and Given/When/Then casing. It applies the whole eligible
+set once, records per-artifact before/after hashes and operations, and reruns
 `plan-contract.mjs`. This is coordinator-owned deterministic normalization, not
 an architect correction or iteration; it needs no live authorization and a
 successful repair is not narrated to the operator. A blocked repair performs no
@@ -748,11 +751,14 @@ self-authored hotfix/Tier-1 routes record the closed not-applicable reason inste
 of being silently migrated. On failure, Main runs the repair helper
 once. Its only writable case adds a canonical task route already present in the
 Task Index when the corresponding regular, non-symlink shard exists inside the
-workspace. Main persists the full repair result and hash as
+workspace. The same closed pass may reorder canonical index columns, normalize
+required heading levels when the exact heading name already exists uniquely,
+and normalize AC/TC punctuation, checkbox, and Given/When/Then casing without
+changing prose. It never creates missing content. Main persists the full repair result and hash as
 `plan_contract_repair_evidence`, reruns validation, and
 continues without operator authorization, another architect dispatch, or any
 correction/iteration delta when validation passes. The helper never edits ACs,
-TCs, counts, task rows, scope, decisions, architecture, delivery, branches, or
+AC/TC prose, counts, task values, scope, decisions, architecture content, delivery, branches, or
 PR grouping. A blocked repair writes nothing; only residual findings consume
 the one normal design correction. Never offer an exceptional architect
 correction for an eligible mechanical omission.
@@ -1123,9 +1129,12 @@ re-dispatch. A non-zero closure result includes the exact command, exit code,
 and bounded diagnostic; bare `exit 1` or missing diagnostics is
 `correction-incomplete`. Main then runs the raw quality runner at checkpoint
 `post_cleaner_handoff` against the complete unchanged repository
-`.team-harness/quality.json`, with `test` plus every declared `format_check`,
-`lint`, and `crap`; a touched-file subset or ad-hoc replacement command set is
-invalid. Reusing the recorded pre-cleaner CRAP baseline when applicable, Main
+`.team-harness/quality.json`. Derive `requiredChecks` as the sorted union of
+every assigned task shard's `Required quality checks` for that repository and
+run that exact set plus any additional declared checks; every required check
+must be both declared and selected or the runner returns
+`REQUIRED_CHECKS_MISSING`. A touched-file subset, declared-only subset, or
+ad-hoc replacement command set is invalid. Reusing the recorded pre-cleaner CRAP baseline when applicable, Main
 records the result/hash and reruns hygiene without another cleaner. Pass records
 `cleaner_evidence.status: handoff-pass` and proceeds to Freeze. Any remaining or
 new correctable finding requires a new package, nonce, presentation, and live

@@ -56,16 +56,18 @@ counts, paths, and identity; Architect and the operator own whether the stated
 behavior is the right behavior.
 
 When validation fails, Main runs `plan-contract-repair.mjs` once. Its closed
-write scope is limited to adding a canonical task-shard route already present
-in the Task Index when that shard is a regular, non-symlink file inside the
-workspace. The helper records the original and resulting plan hashes, the exact
-routes added, and the post-repair validator result hash. Main reruns validation
+write scope covers canonical reordering of a recognizable Task Index, adding
+existing indexed task-shard routes to the manifest, normalizing uniquely named
+required heading levels, and converting recognizable AC/TC punctuation,
+checkbox, and Given/When/Then casing to the literal grammar. It applies all
+eligible transformations in one transaction and records per-artifact hashes,
+operations, added routes, and the post-repair validator result hash. Main reruns validation
 and continues to Gate 1 without asking the operator or dispatching Architect
 when the contract passes.
 
-The helper cannot edit behavior, scope, decisions, ACs, TCs, task counts,
-architecture, delivery, branches, or PR grouping, and it cannot create a
-missing shard. Ineligible input is unchanged and returns `blocked`; only the
+The helper cannot edit behavior, scope, decisions, AC/TC prose, task values or
+counts, architecture content, delivery, branches, or PR grouping, and it cannot
+create a missing heading, section, shard, or prose. Ineligible input is unchanged and returns `blocked`; only the
 remaining findings use the one normal Architect correction. Mechanical repair
 does not consume a correction or development iteration and never opens an
 exceptional Architect round.

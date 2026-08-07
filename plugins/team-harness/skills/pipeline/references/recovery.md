@@ -166,7 +166,8 @@ architect result, current Markdown, or an earlier gate presentation.
 When the pending or failing validator result has no repair record, run
 `plan-contract-repair.mjs` once before any design correction. A recovered
 `plan_contract_repair_evidence.status: repaired` is valid only when its readable
-result hash, before/after plan hashes, added route list, and embedded post-repair
+result hash, before/after plan hashes, added route list, per-artifact
+before/after hashes and operations, and embedded post-repair
 contract-result hash match the durable artifacts. `not-needed` must have equal
 before/after hashes and no added paths. `blocked` must also have equal hashes
 and no added paths; continue with the residual failure classification without
