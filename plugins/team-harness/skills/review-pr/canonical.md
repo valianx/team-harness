@@ -37,9 +37,10 @@ Keep snapshot mechanics internal. Operator updates explain who is working, what 
 is checking, and what decision comes next; they do not narrate skill reads, preflight checks,
 worktree setup, immutable-SHA binding, context hashes, artifact paths, or wait-tool lifecycle.
 
-At startup, announce only that Team Harness will prepare a PR review and that nothing will be
-published before approval. After selecting specialists, announce the exact agents and their useful
-scope:
+At startup, announce only that Team Harness will prepare a PR review. When `--auto-publish` is
+absent, state that nothing will be published before approval. When `--auto-publish` was supplied,
+state that the operator opted into automatic publication after validation and that no preview menu
+will be shown. After selecting specialists, announce the exact agents and their useful scope:
 
 - `reviewer`: functional correctness, regressions, and API/data contracts;
 - `pr-review-qa`: acceptance evidence, when selected;

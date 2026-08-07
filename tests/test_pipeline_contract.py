@@ -2123,24 +2123,37 @@ def check_pr_review_workspace_isolation() -> None:
 
 def check_pr_review_operator_visibility() -> None:
     """PR review chat stays useful, specialist-visible, and decision-oriented."""
-    canonical = read("skills/review-pr/SKILL.md")
-    flattened = re.sub(r"\s+", " ", canonical.lower())
-    for marker in (
-        "keep snapshot mechanics internal",
-        "announce the exact agents",
-        "reviewer-consolidator",
-        "concrete changed surfaces",
-        "do not call agents abstract \"lenses\"",
-        "waiting for agents",
-        "value-bearing update",
-        "nothing has been published",
-        "recommendation:",
-        "one concise rationale",
-        "numeric choices",
-        "accept the number",
-        "hidden by default",
-    ):
-        require(marker in flattened, f"PR review operator contract misses {marker!r}")
+    canonical_paths = (
+        "skills/review-pr/SKILL.md",
+        "plugins/team-harness/skills/review-pr/canonical.md",
+        "installer-assets/opencode-skills/review-pr/canonical.md",
+    )
+    for relative in canonical_paths:
+        flattened = re.sub(r"\s+", " ", read(relative).lower())
+        for marker in (
+            "keep snapshot mechanics internal",
+            "announce the exact agents",
+            "reviewer-consolidator",
+            "concrete changed surfaces",
+            "do not call agents abstract \"lenses\"",
+            "waiting for agents",
+            "value-bearing update",
+            "nothing has been published",
+            "recommendation:",
+            "one concise rationale",
+            "numeric choices",
+            "accept the number",
+            "hidden by default",
+        ):
+            require(marker in flattened, f"{relative}: PR review operator contract misses {marker!r}")
+        require(
+            "when `--auto-publish` is absent" in flattened
+            and "when `--auto-publish` was supplied" in flattened
+            and "opted into automatic publication" in flattened,
+            f"{relative}: startup publication promise ignores --auto-publish",
+        )
+
+    canonical = read(canonical_paths[0])
 
     preview = section(canonical, "## Preview", "## Pre-publish freshness")
     for marker in (
