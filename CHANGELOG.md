@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `CLAUDE.md` as an additive Codex project-instruction fallback during
+  generated project setup and global setup/update reconciliation, while
+  preserving `AGENTS.md` precedence and existing operator fallbacks.
+
 ## [3.10.0] - 2026-08-06
 
 ### Added

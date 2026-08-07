@@ -36,7 +36,9 @@ shipped in the Codex beta. These files are committed so a trusted checkout works
 without a build step. Do not edit generated files directly.
 
 The generated project config uses `gpt-5.6-terra` at `medium` as its generic
-subagent fallback without overriding Main's selected model, enables both `multi_agent` and `multi_agent_v2`, and uses
+subagent fallback without overriding Main's selected model, adds `CLAUDE.md` as
+an ordered project-instruction fallback when `AGENTS.md` is absent, enables both
+`multi_agent` and `multi_agent_v2`, and uses
 `workspace-write` with `on-request` approvals. It enables dependency network access and grants narrowly scoped write
 access to the current user's standard Go, uv, npm, and Go module cache paths.
 This keeps routine builds inside the sandbox without shared predictable `/tmp`

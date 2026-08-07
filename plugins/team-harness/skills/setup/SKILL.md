@@ -95,13 +95,17 @@ migration, and preserve every unrelated value.
    change global Codex feature state. Confirm both flags with
    `codex features list` only when this step runs. The generated project config
    also enables both flags and supplies the generic `gpt-5.6-terra` / `medium`
-   subagent fallback under `[agents]`; it never overrides Main's selected
-   model. Global installation applies the same fallback narrowly: agent sync
+   subagent fallback under `[agents]`. It also sets
+   `project_doc_fallback_filenames = ["CLAUDE.md"]`, so Codex reads `CLAUDE.md`
+   only at directory levels where `AGENTS.md` is absent; it never overrides
+   Main's selected model. Global installation applies both defaults narrowly:
+   agent sync
    installs a missing fallback and migrates only the known obsolete
    `gpt-5.6-luna` value to `gpt-5.6-terra` / `medium`. It preserves any other
    explicit operator-selected fallback as `custom-preserved`. Named specialists
-   always retain the generated per-role projection table rather than inheriting
-   this generic fallback.
+   always retain the generated per-role projection table. For project-document
+   fallbacks, sync preserves their order and appends `CLAUDE.md` once when it is
+   absent.
 
 5. Gather only requested values, showing current values as defaults. Apply all
    selected settings in one `manage_config.py set` command.
@@ -163,9 +167,10 @@ migration, and preserve every unrelated value.
    use Codex's native permission prompt. Do not use or download the separate Go
    installer; the marketplace snapshot is the source of these agent bytes.
    Inspect and sync output includes `runtimeConfig`, `runtimeConfigChanged`, and
-   `restartRequired`. When sync changes any role or the fallback, require a new
-   Codex thread before declaring the runtime ready; Codex does not hot-reload the
-   custom-agent registry in the active thread.
+   `restartRequired`. When sync changes any role, model fallback, or project
+   document fallback, require a new Codex thread before declaring the runtime
+   ready; Codex loads its agent registry and project instruction chain only at
+   session start.
 
 7. Configure selected MCP servers after `codex mcp list --json`. Preserve an
    existing registration unless the operator explicitly requests replacement.

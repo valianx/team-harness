@@ -118,10 +118,13 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    The same sync installs a missing generic fallback or migrates the obsolete
    `gpt-5.6-luna` fallback to `gpt-5.6-terra` / `medium`; any other explicit
    operator-selected fallback is preserved and reported as `custom-preserved`.
+   It also preserves the ordered `project_doc_fallback_filenames` array and
+   appends `CLAUDE.md` once when absent, so `AGENTS.md` retains precedence.
    Named roles keep their exact generated model/effort mappings. Stop on an
    unmanaged same-name conflict. Do not call or download the separate Go
    installer; agent bytes are part of the marketplace snapshot. Preserve
-   `runtimeConfigChanged` and `restartRequired` from sync for the final report.
+   `runtimeConfigChanged` and `restartRequired` from sync for the final report;
+   a project-document fallback change requires a fresh Codex thread.
 
 6. Inspect `codex mcp list --json`. Preserve registered MCP definitions and
    report missing registrations that native configuration expects; never

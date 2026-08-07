@@ -16,6 +16,7 @@
   "project_defaults": {
     "default_subagent_model": "gpt-5.6-terra",
     "default_subagent_reasoning_effort": "medium",
+    "project_doc_fallback_filenames": ["CLAUDE.md"],
     "features": {
       "multi_agent": true,
       "multi_agent_v2": true

@@ -32,6 +32,7 @@ MANAGED_MARKER = "# Code generated from runtime/schema/codex-agents.json; DO NOT
 DEFAULT_SUBAGENT_MODEL = "gpt-5.6-terra"
 DEFAULT_SUBAGENT_REASONING_EFFORT = "medium"
 LEGACY_SUBAGENT_MODELS = frozenset({"gpt-5.6-luna"})
+PROJECT_DOC_FALLBACK = "CLAUDE.md"
 RUNTIME_KEYS = (
     "default_subagent_model",
     "default_subagent_reasoning_effort",
@@ -74,11 +75,16 @@ def read_runtime_config(path: Path) -> tuple[bytes | None, dict[str, object]]:
     agents = parsed.get("agents", {})
     if not isinstance(agents, dict):
         raise ValueError(f"Codex runtime config [agents] must be a table: {path}")
-    return raw, agents
+    fallbacks = parsed.get("project_doc_fallback_filenames", [])
+    if not isinstance(fallbacks, list) or any(not isinstance(value, str) for value in fallbacks):
+        raise ValueError("project_doc_fallback_filenames must be an array of strings")
+    return raw, parsed
 
 
 def classify_runtime_config(path: Path) -> dict[str, object]:
-    raw, agents = read_runtime_config(path)
+    raw, parsed = read_runtime_config(path)
+    agents = parsed.get("agents", {})
+    fallbacks = parsed.get("project_doc_fallback_filenames", [])
     model = agents.get("default_subagent_model")
     effort = agents.get("default_subagent_reasoning_effort")
     if model is not None and not isinstance(model, str):
@@ -98,13 +104,91 @@ def classify_runtime_config(path: Path) -> dict[str, object]:
         "status": status,
         "model": model,
         "reasoningEffort": effort,
+        "projectDocFallbackFilenames": fallbacks,
+        "projectDocFallbackStatus": "current" if PROJECT_DOC_FALLBACK in fallbacks else "missing",
         "exists": raw is not None,
     }
 
 
-def render_runtime_config(raw: bytes | None, *, replace_existing: bool) -> bytes:
+def render_project_doc_fallback(text: str, fallbacks: list[str], newline: str) -> str:
+    desired = fallbacks if PROJECT_DOC_FALLBACK in fallbacks else [*fallbacks, PROJECT_DOC_FALLBACK]
+    rendered = json.dumps(desired, ensure_ascii=False)
+    lines = text.splitlines(keepends=True)
+    first_table = next(
+        (index for index, line in enumerate(lines) if line.lstrip().startswith("[")),
+        len(lines),
+    )
+    assignment = re.compile(r"^\s*project_doc_fallback_filenames\s*=")
+    start = next(
+        (index for index, line in enumerate(lines[:first_table]) if assignment.match(line)),
+        None,
+    )
+    if start is None:
+        insertion = f"project_doc_fallback_filenames = {rendered}{newline}"
+        lines[first_table:first_table] = [insertion]
+        return "".join(lines)
+
+    prefix = "".join(lines[:start])
+    candidate = "".join(lines[start:first_table])
+    key_end = candidate.find("=")
+    open_bracket = candidate.find("[", key_end + 1)
+    if open_bracket < 0:
+        raise ValueError("unsupported project_doc_fallback_filenames layout")
+    quote = None
+    triple_quoted = False
+    escaped = False
+    in_comment = False
+    close_bracket = None
+    index = open_bracket + 1
+    while index < len(candidate):
+        char = candidate[index]
+        if in_comment:
+            if char in "\r\n":
+                in_comment = False
+            index += 1
+            continue
+        if quote is not None:
+            if triple_quoted and candidate.startswith(quote * 3, index):
+                quote = None
+                triple_quoted = False
+                index += 3
+                continue
+            if escaped:
+                escaped = False
+            elif quote == '"' and char == "\\":
+                escaped = True
+            elif not triple_quoted and char == quote:
+                quote = None
+            index += 1
+            continue
+        if char == "#":
+            in_comment = True
+        elif char in {'"', "'"}:
+            quote = char
+            triple_quoted = candidate.startswith(char * 3, index)
+            if triple_quoted:
+                index += 3
+                continue
+        elif char == "]":
+            close_bracket = index
+            break
+        index += 1
+    if close_bracket is None:
+        raise ValueError("unsupported project_doc_fallback_filenames layout")
+    replacement = f"project_doc_fallback_filenames = {rendered}"
+    suffix = candidate[close_bracket + 1:]
+    return prefix + replacement + suffix + "".join(lines[first_table:])
+
+
+def render_runtime_config(
+    raw: bytes | None,
+    *,
+    fallbacks: list[str],
+    replace_existing: bool,
+) -> bytes:
     text = raw.decode("utf-8") if raw is not None else ""
     newline = "\r\n" if "\r\n" in text else "\n"
+    text = render_project_doc_fallback(text, fallbacks, newline)
     lines = text.splitlines(keepends=True)
     section_start = None
     section_end = len(lines)
@@ -151,7 +235,7 @@ def render_runtime_config(raw: bytes | None, *, replace_existing: bool) -> bytes
                         raise ValueError(f"unsupported Codex runtime key layout: {key}")
                     lines[index] = f'{match.group(1)}"{desired[key]}"{match.group(2)}{newline}'
                 break
-    missing = [key for key in RUNTIME_KEYS if key not in found]
+    missing = [key for key in RUNTIME_KEYS if key not in found] if replace_existing else []
     if missing:
         insertion = [f'{key} = "{desired[key]}"{newline}' for key in missing]
         lines[section_end:section_end] = insertion
@@ -185,10 +269,16 @@ def write_runtime_config(path: Path, content: bytes) -> None:
 def sync_runtime_config(path: Path) -> tuple[bool, dict[str, object]]:
     before = classify_runtime_config(path)
     status = before["status"]
-    if status == "custom-preserved" or status == "current":
+    fallback_status = before["projectDocFallbackStatus"]
+    if status in {"custom-preserved", "current"} and fallback_status == "current":
         return False, before
-    raw, _ = read_runtime_config(path)
-    rendered = render_runtime_config(raw, replace_existing=status in {"legacy", "missing"})
+    raw, parsed_before = read_runtime_config(path)
+    fallbacks = parsed_before.get("project_doc_fallback_filenames", [])
+    rendered = render_runtime_config(
+        raw,
+        fallbacks=fallbacks,
+        replace_existing=status in {"legacy", "missing"},
+    )
     if raw == rendered:
         return False, before
     try:
@@ -196,7 +286,9 @@ def sync_runtime_config(path: Path) -> tuple[bool, dict[str, object]]:
     except (UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
         raise ValueError(f"unsupported Codex runtime config layout: {path}: {error}") from error
     rendered_agents = parsed.get("agents")
-    if not isinstance(rendered_agents, dict) or any(
+    if not isinstance(rendered_agents, dict):
+        raise ValueError(f"Codex runtime fallback reconciliation incomplete: {path}")
+    if status in {"legacy", "missing"} and any(
         rendered_agents.get(key) != value
         for key, value in {
             "default_subagent_model": DEFAULT_SUBAGENT_MODEL,
@@ -204,10 +296,16 @@ def sync_runtime_config(path: Path) -> tuple[bool, dict[str, object]]:
         }.items()
     ):
         raise ValueError(f"Codex runtime fallback reconciliation incomplete: {path}")
+    rendered_fallbacks = parsed.get("project_doc_fallback_filenames")
+    expected_fallbacks = fallbacks if PROJECT_DOC_FALLBACK in fallbacks else [*fallbacks, PROJECT_DOC_FALLBACK]
+    if rendered_fallbacks != expected_fallbacks:
+        raise ValueError(f"Codex project instruction fallback reconciliation incomplete: {path}")
     write_runtime_config(path, rendered)
     after = classify_runtime_config(path)
-    if after["status"] != "current":
+    if after["status"] not in {"current", "custom-preserved"}:
         raise ValueError(f"Codex runtime fallback reconciliation incomplete: {path}")
+    if after["projectDocFallbackStatus"] != "current":
+        raise ValueError(f"Codex project instruction fallback reconciliation incomplete: {path}")
     return True, after
 
 

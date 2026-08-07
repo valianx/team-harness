@@ -332,6 +332,8 @@ def main() -> None:
         fail("Codex project must explicitly enable multi_agent_v2")
     if config["agents"].get("default_subagent_model") != "gpt-5.6-terra" or config["agents"].get("default_subagent_reasoning_effort") != "medium":
         fail("Codex project must declare the generic Terra/medium subagent fallback")
+    if config.get("project_doc_fallback_filenames") != ["CLAUDE.md"]:
+        fail("Codex project must use CLAUDE.md only when AGENTS.md is absent")
     if config.get("sandbox_mode") != "workspace-write":
         fail("Codex project must use workspace-write sandbox mode")
     if config.get("approval_policy") != "on-request":
@@ -553,6 +555,7 @@ def main() -> None:
         "codex mcp add memory",
         "@upstash/context7-mcp@3.2.5",
         "manage_agents.py sync --scope SCOPE",
+        'project_doc_fallback_filenames = ["CLAUDE.md"]',
         "never modify their files",
     ):
         if marker not in setup:
@@ -666,6 +669,8 @@ def main() -> None:
         "--old-plugin OLD_PLUGIN --new-plugin NEW_PLUGIN",
         "manage_config.py ensure --version NEW_VERSION",
         "manage_agents.py sync --scope SCOPE",
+        "project_doc_fallback_filenames",
+        "appends `CLAUDE.md` once",
         "Even when plugin versions compare equal",
         "NEW_PLUGIN` and `NEW_VERSION` are the only",
         "without exiting `127`",
@@ -921,6 +926,8 @@ def main() -> None:
         inspected_result = json.loads(inspected.stdout)
         if inspected_result.get("runtimeConfig", {}).get("status") != "missing":
             fail("Codex bundled-agent inspect did not report a missing runtime fallback")
+        if inspected_result.get("runtimeConfig", {}).get("projectDocFallbackStatus") != "missing":
+            fail("Codex bundled-agent inspect did not report a missing CLAUDE.md fallback")
         synced = subprocess.run(
             [sys.executable, str(agents_script), "sync", "--scope", "global"],
             text=True,
@@ -939,8 +946,12 @@ def main() -> None:
             fail("Codex bundled-agent sync did not install the Terra fallback")
         if runtime_doc.get("agents", {}).get("default_subagent_reasoning_effort") != "medium":
             fail("Codex bundled-agent sync did not install the medium fallback effort")
+        if runtime_doc.get("project_doc_fallback_filenames") != ["CLAUDE.md"]:
+            fail("Codex bundled-agent sync did not install the CLAUDE.md fallback")
         if sync_result.get("runtimeConfig", {}).get("status") != "current":
             fail("Codex bundled-agent sync did not report the runtime fallback current")
+        if sync_result.get("runtimeConfig", {}).get("projectDocFallbackStatus") != "current":
+            fail("Codex bundled-agent sync did not report the CLAUDE.md fallback current")
         if sync_result.get("runtimeConfigChanged") is not True or sync_result.get("restartRequired") is not True:
             fail("Codex bundled-agent sync did not require restart after runtime reconciliation")
         if stat.S_IMODE(runtime_config.stat().st_mode) != 0o600:
@@ -1001,6 +1012,7 @@ def main() -> None:
             fail("Codex fallback migration did not report the required session restart")
 
         custom_runtime = (
+            'project_doc_fallback_filenames = ["CLAUDE.md"]\n'
             '[agents]\n'
             'default_subagent_model = "operator/custom-model"\n'
             'default_subagent_reasoning_effort = "high"\n'
@@ -1022,6 +1034,59 @@ def main() -> None:
             fail("Codex agent sync did not report the preserved custom fallback")
         if custom_result.get("runtimeConfigChanged") is not False or custom_result.get("restartRequired") is not False:
             fail("Codex agent sync required restart for an untouched custom fallback")
+
+        additive_runtime = (
+            'model = "operator-main"\n'
+            'project_doc_fallback_filenames = [\n'
+            "  'TEAM]GUIDE.md', # preserve this literal string and bracket\n"
+            '  ".agents.md",\n'
+            ']\n\n'
+            '[agents]\n'
+            'default_subagent_model = "operator/custom-model"\n'
+            'max_threads = 7\n'
+        )
+        runtime_config.write_text(additive_runtime)
+        additive = subprocess.run(
+            [sys.executable, str(agents_script), "sync", "--scope", "global"],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if additive.returncode != 0:
+            fail(f"Codex CLAUDE.md fallback reconciliation failed: {additive.stdout}{additive.stderr}")
+        additive_result = json.loads(additive.stdout)
+        additive_text = runtime_config.read_text()
+        additive_doc = tomllib.loads(additive_text)
+        if additive_doc.get("project_doc_fallback_filenames") != ["TEAM]GUIDE.md", ".agents.md", "CLAUDE.md"]:
+            fail("Codex fallback reconciliation did not preserve ordered operator fallbacks")
+        if additive_doc.get("agents", {}).get("default_subagent_model") != "operator/custom-model":
+            fail("Codex CLAUDE.md reconciliation changed the operator-selected model fallback")
+        if "default_subagent_reasoning_effort" in additive_doc.get("agents", {}):
+            fail("Codex CLAUDE.md reconciliation added an operator-omitted reasoning fallback")
+        for marker in ('model = "operator-main"', 'max_threads = 7'):
+            if marker not in additive_text:
+                fail(f"Codex CLAUDE.md reconciliation dropped operator config {marker!r}")
+        if additive_result.get("changed") != [] or additive_result.get("runtimeConfigChanged") is not True:
+            fail("Codex CLAUDE.md reconciliation changed agent files or missed the config change")
+        if additive_result.get("restartRequired") is not True:
+            fail("Codex CLAUDE.md reconciliation did not require a fresh session")
+        if additive_result.get("runtimeConfig", {}).get("projectDocFallbackStatus") != "current":
+            fail("Codex CLAUDE.md reconciliation did not report the fallback current")
+        additive_repeat = subprocess.run(
+            [sys.executable, str(agents_script), "sync", "--scope", "global"],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if additive_repeat.returncode != 0:
+            fail(f"Codex CLAUDE.md idempotency check failed: {additive_repeat.stdout}{additive_repeat.stderr}")
+        additive_repeat_result = json.loads(additive_repeat.stdout)
+        if runtime_config.read_text() != additive_text:
+            fail("Codex CLAUDE.md reconciliation duplicated or rewrote the current fallback")
+        if additive_repeat_result.get("runtimeConfigChanged") is not False or additive_repeat_result.get("restartRequired") is not False:
+            fail("Codex CLAUDE.md reconciliation is not idempotent")
         conflict = temp / "codex-home/agents/architect.toml"
         conflict.write_text("operator-owned\n")
         refused = subprocess.run(
