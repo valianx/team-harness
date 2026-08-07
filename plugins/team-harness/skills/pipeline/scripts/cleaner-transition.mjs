@@ -129,11 +129,21 @@ async function resolveManifest(repo, manifestInput) {
   } catch {
     throw new CleanerError("MANIFEST_INVALID");
   }
-  const required = ["test", "format_check", "lint", "crap"];
-  if (value.crap === null || value.test_contract === null || required.some((id) => !Object.hasOwn(value.commands, id))) {
+  if (value.test_contract === null || !Object.hasOwn(value.commands, "test")) {
     throw new CleanerError("MANIFEST_INVALID");
   }
   return { value, sha256: sha256(loaded.bytes) };
+}
+
+function cleanerChecks(manifest, transition) {
+  const checks = ["test"];
+  if (transition === "post") {
+    for (const id of ["format_check", "lint"]) {
+      if (Object.hasOwn(manifest.value.commands, id)) checks.push(id);
+    }
+  }
+  if (manifest.value.crap !== null) checks.push("crap");
+  return checks;
 }
 
 function validateAllowlist(value) {
@@ -285,14 +295,19 @@ export function isCleanerTransitionResult(value) {
   ) {
     return false;
   }
-  const expectedCommands = (value.transition === "pre"
+  const allowedCommands = new Set(value.transition === "pre"
     ? ["test", "crap"]
-    : ["test", "format_check", "lint", "crap"]).sort();
-  const actualCommands = value.quality?.commands.map((entry) => entry.id).sort() ?? [];
+    : ["test", "format_check", "lint", "crap"]);
+  const actualCommands = value.quality?.commands.map((entry) => entry.id) ?? [];
+  const actualCommandSet = new Set(actualCommands);
+  const hasCrap = actualCommandSet.has("crap");
   if (
     value.verdict === "pass" &&
-    (new Set(actualCommands).size !== actualCommands.length ||
-      JSON.stringify(actualCommands) !== JSON.stringify(expectedCommands))
+    (actualCommandSet.size !== actualCommands.length ||
+      !actualCommandSet.has("test") ||
+      actualCommands.some((id) => !allowedCommands.has(id)) ||
+      hasCrap !== (value.quality?.crap !== null) ||
+      (hasCrap && value.quality?.crap?.policy_mode !== (value.transition === "pre" ? "measure" : "enforce")))
   ) {
     return false;
   }
@@ -364,14 +379,14 @@ function normalizeOptions(options) {
   return options;
 }
 
-async function runPreQuality(options) {
+async function runPreQuality(options, manifest) {
   return runQualityChecks({
     repo: options.repo,
     manifest: options.manifest,
     base: options.base,
     candidate: options.candidate,
     checkpoint: "pre_cleaner",
-    checks: ["test", "crap"],
+    checks: cleanerChecks(manifest, "pre"),
     policyMode: "measure",
   });
 }
@@ -399,7 +414,7 @@ async function withQualityBaseline(baselineResult, callback) {
   }
 }
 
-async function runPostQuality(options, baseline) {
+async function runPostQuality(options, baseline, manifest) {
   return withQualityBaseline(baseline.result, ({ file, sha256: baselineSha256 }) =>
     runQualityChecks({
       repo: options.repo,
@@ -407,7 +422,7 @@ async function runPostQuality(options, baseline) {
       base: options.base,
       candidate: options.candidate,
       checkpoint: "post_cleaner",
-      checks: ["test", "format_check", "lint", "crap"],
+      checks: cleanerChecks(manifest, "post"),
       policyMode: "enforce",
       baseline: file,
       baselineSha256,
@@ -445,7 +460,7 @@ async function assertPostScope(repo, allowlist, baseline, current) {
 }
 
 async function executePre(options, state, repo, manifest, allowlist) {
-  state.quality = await runPreQuality(options);
+  state.quality = await runPreQuality(options, manifest);
   if (!isQualityResult(state.quality) || state.quality.verdict !== "pass") throw new CleanerError("QUALITY_FAILED");
   if (state.quality.manifest.sha256 !== manifest.sha256) throw new CleanerError("MANIFEST_INVALID");
   await assertBaselineAllowlist(repo, allowlist.value, state.quality, manifest);
@@ -463,7 +478,7 @@ async function executePost(options, state, repo, manifest, allowlist) {
   }
   const current = await currentRepositoryIdentity(repo);
   await assertPostScope(repo, allowlist, baseline, current);
-  state.quality = await runPostQuality(options, baseline);
+  state.quality = await runPostQuality(options, baseline, manifest);
   if (!isQualityResult(state.quality) || state.quality.verdict !== "pass") throw new CleanerError("QUALITY_FAILED");
   if (state.quality.manifest.sha256 !== manifest.sha256) throw new CleanerError("MANIFEST_INVALID");
   if (

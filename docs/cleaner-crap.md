@@ -1,9 +1,9 @@
-# Cleaner and CRAP Checkpoint
+# Cleaner Checkpoint with Optional CRAP
 
-The cleaner checkpoint is an opt-in, behavior-preserving cleanup pass inside
-the existing `implementation` phase. It runs once per consolidated candidate,
-after implementation evidence is green and immediately before Freeze. It adds
-no phase, gate, or architecture review.
+The cleaner checkpoint is a behavior-preserving cleanup pass inside the
+existing `implementation` phase. It runs once per consolidated candidate with
+an eligible changed production surface, after implementation evidence is green
+and immediately before Freeze. It adds no phase, gate, or architecture review.
 
 Claude Code, Codex, and opencode resolve the same runner bytes from the loaded
 pipeline skill. The canonical copies live under `skills/pipeline/scripts/`;
@@ -11,10 +11,13 @@ runtime projections must remain byte-identical.
 
 ## Applicability
 
-The checkpoint applies only when `.team-harness/quality.json` declares all four
-commands—`test`, `format_check`, `lint`, and `crap`—plus CRAP policy. Otherwise
-the coordinator records `not-applicable` with reason
-`repository-quality-manifest-incomplete`; it never invents repository commands.
+The checkpoint applies when `.team-harness/quality.json` declares `test` and
+`test_contract.path_rules`. `format_check`, `lint`, and `crap` are optional,
+additive checks: the transition executes each one when declared, and a declared
+`crap` command still requires CRAP policy. Missing optional checks never disable
+the cleaner. If `test` or the path rules are absent, the coordinator records
+`not-applicable` with reason `repository-quality-manifest-incomplete`; it never
+invents repository commands.
 
 The coordinator derives an exact allowlist of existing changed production
 files, stores its SHA-256, and excludes every path matched by
@@ -26,19 +29,21 @@ files remain outside the cleaner's authority.
 
 1. Commit the consolidated implementation candidate.
 2. Run `cleaner-transition.mjs --transition pre` to prove the candidate is
-   clean, hash the allowlist, execute `test`, and measure per-function CRAP.
+   clean, hash the allowlist, execute `test`, and measure per-function CRAP when
+   configured.
 3. Dispatch one fresh `cleaner` with only that allowlist and baseline evidence.
    The cleaner may simplify the approved production surface without changing
    behavior, dependencies, configuration, public contracts, or tests, then
    commits its bounded result.
 4. Run `cleaner-transition.mjs --transition post` with the recorded allowlist
-   and baseline hashes. It executes `test`, `format_check`, `lint`, and CRAP
-   enforcement, rejects added/deleted/renamed/type-changed paths, and proves
-   every modified path belongs to the allowlist.
+   and baseline hashes. It always executes `test`, executes every declared
+   `format_check` and `lint`, enforces CRAP when configured, rejects
+   added/deleted/renamed/type-changed paths, and proves every modified path
+   belongs to the allowlist.
 5. Persist the closed evidence, run the existing hygiene scan, then Freeze.
 
-CRAP is not a prose score supplied by an agent. The repository adapter reports
-complexity and coverage; the quality runner computes:
+When configured, CRAP is not a prose score supplied by an agent. The repository
+adapter reports complexity and coverage; the quality runner computes:
 
 ```text
 CRAP = complexity² × (1 − coverage)³ + complexity

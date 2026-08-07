@@ -139,10 +139,10 @@ The adapter never supplies the CRAP score. The runner computes it consistently:
 CRAP = complexity² × (1 − coverage)³ + complexity
 ```
 
-Use `--policy-mode measure` before cleanup. Persist the result and record its
-SHA-256 in coordinator-owned state. Use `--policy-mode enforce` after cleanup
-with `--baseline` pointing to that result and `--baseline-sha256` carrying the
-recorded identity. Enforcement rejects a new function over
+When CRAP is configured, use `--policy-mode measure` before cleanup. Persist the
+result and record its SHA-256 in coordinator-owned state. Use
+`--policy-mode enforce` after cleanup with `--baseline` pointing to that result
+and `--baseline-sha256` carrying the recorded identity. Enforcement rejects a new function over
 `new_function_max`, a worsening score when policy
 forbids it, a changed function missing from the baseline, a changed manifest,
 or a baseline candidate that is not an ancestor of the current candidate. It
@@ -163,7 +163,7 @@ node /absolute/path/to/loaded/pipeline/skill/scripts/quality-runner.mjs \
   --base 0123456789abcdef0123456789abcdef01234567 \
   --candidate HEAD \
   --checkpoint pre-cleaner \
-  --checks test,format_check,lint,crap \
+  --checks test,crap \
   --policy-mode measure
 ```
 
@@ -194,8 +194,9 @@ the security boundary.
 ## Cleaner integration
 
 The cleaner companion wraps the raw quality records with a hashed production
-allowlist and verifies the exact pre/post transition. See
-[Cleaner and CRAP Checkpoint](cleaner-crap.md).
+allowlist and verifies the exact pre/post transition. It always requires
+`test`; `format_check`, `lint`, and `crap` are selected when declared by the
+manifest. See [Cleaner Checkpoint with Optional CRAP](cleaner-crap.md).
 
 Both deterministic checkpoints live inside `implementation`; they do not
 change the v3 state machine or either Stage Gate.
