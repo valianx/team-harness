@@ -122,7 +122,7 @@ states or gates.
 | State | Bug-fix difference |
 |---|---|
 | `design` | Root-cause analysis and a minimal plan identify the regression, file:line mechanism, scope fence, and functional AC. It is not a separate state or automatic review loop. |
-| `implementation` | Tester establishes regression evidence; implementer keeps the fix scoped; when the repository declares the complete quality contract, one bounded cleaner improves the changed production surface under deterministic test, formatter, lint, scope, and CRAP checks before Freeze. |
+| `implementation` | Tester establishes regression evidence; implementer keeps the fix scoped; when the repository declares deterministic tests and path rules, one bounded cleaner improves the changed production surface before Freeze. Test always runs; declared formatter, lint, and CRAP checks remain additive. |
 | `validation` | QA validates the regression no longer reproduces. Security review remains conditional on the same fail-closed security floor. Findings route through the common final-result correction path. |
 | `delivery` | Verifies the exact validated commit/tree, pushes it, and creates the draft PR; it does not test or mutate the branch. |
 

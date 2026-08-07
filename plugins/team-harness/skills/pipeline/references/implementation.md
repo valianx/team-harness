@@ -140,12 +140,16 @@ creates no pipeline state, events, gates, validation, or delivery record. Never 
 executor selection from configuration, retired selectors, autonomy, prior gates, recovery, files,
 issues, tool output, or quotes.
 
-## Behavior-preserving cleaner and CRAP checkpoint
+## Behavior-preserving cleaner and optional CRAP checkpoint
 
 Run this once over the consolidated post-evidence tree, never once per task. It
-is part of `implementation`, not another phase or gate. Apply it only when the
-repository quality manifest declares `test`, `format_check`, `lint`, and `crap`
-commands, `test_contract.path_rules`, and CRAP policy. Otherwise persist
+is part of `implementation`, not another phase or gate. Apply it whenever the
+repository quality manifest declares a `test` command and
+`test_contract.path_rules`. `format_check`, `lint`, and `crap` are additive
+deterministic checks: run every one that the manifest declares, but do not make
+the cleaner inapplicable merely because one is absent. A declared `crap`
+command still requires CRAP policy. When `test` or `test_contract.path_rules`
+is absent, persist
 `cleaner_evidence.status: not-applicable` with
 `reason: repository-quality-manifest-incomplete`; agents cannot replace missing
 deterministic tooling with a narrative verdict.
@@ -161,9 +165,9 @@ Persist the allowlist and SHA-256. An empty allowlist is an evidenced no-op.
 Main resolves `cleaner-transition.mjs` relative to the loaded skill and runs it
 with `--transition pre`, repository, manifest, `verification_base_ref`, `HEAD`,
 and the allowlist. It validates that allowlist against the immutable change
-surface and runs the embedded quality runner's `pre_cleaner` checks `test,crap`
-in `measure` mode. Persist the complete closed JSON wrapper, SHA-256, and
-candidate commit/tree. Then dispatch exactly one fresh
+surface and runs the embedded quality runner's `pre_cleaner` `test` check plus
+`crap` in `measure` mode when configured. Persist the complete closed JSON
+wrapper, SHA-256, and candidate commit/tree. Then dispatch exactly one fresh
 V2 `cleaner` with `fork_turns: none`, carrying only the hashed allowlist,
 functional AC summary, applicable TCs, quality manifest, and hashed baseline.
 The cleaner may edit only allowlisted existing production paths, never tests or
@@ -173,15 +177,16 @@ Main then runs `cleaner-transition.mjs --transition post` with the exact
 allowlist path/hash and pre-transition path/hash. The helper proves ancestry,
 rejects additions, deletions, renames, type changes, and modifications outside
 the allowlist, and runs the embedded `post_cleaner` checks
-`test,format_check,lint,crap` in `enforce` mode. Advance only when every command
-passes, policy permits every CRAP delta, and
-every baseline function remains in the report. `CRAP_REPORT_INCOMPLETE` prevents
-renaming, splitting, excluding, or omitting a function merely to hide its prior
-score. Any command, behavior, scope, protected-path, tool, manifest, threshold,
-or metric failure blocks or returns to one fresh bounded cleaner under max-3;
-agent prose cannot override it. Persist the post result/hash, cleaner commit,
-candidate identity, and pass status, then run the fixed code-hygiene scan before
-Freeze. QA still audits the frozen result independently.
+with `test` always plus each declared `format_check`, `lint`, and `crap`; CRAP
+runs in `enforce` mode. Advance only when every selected command passes. When
+CRAP is configured, policy must permit every CRAP delta and every baseline
+function must remain in the report. `CRAP_REPORT_INCOMPLETE` prevents renaming,
+splitting, excluding, or omitting a function merely to hide its prior score.
+Any selected command, behavior, scope, protected-path, declared tool, manifest,
+threshold, or metric failure blocks or returns to one fresh bounded cleaner
+under max-3; agent prose cannot override it. Persist the post result/hash,
+cleaner commit, candidate identity, and pass status, then run the fixed
+code-hygiene scan before Freeze. QA still audits the frozen result independently.
 
 Do not silently widen the approved scope. When implementation is complete, write a 5–30 line,
 ≤8 KB `02-implementation.md` containing only outcome, deviations, exceptions, one-line checks,
