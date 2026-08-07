@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.11.3] - 2026-08-07
+
+### Changed
+
+- Made PR-review progress operator-oriented: selected specialists now announce
+  their responsibilities, extended waits report concrete review surfaces, and
+  snapshot mechanics stay internal unless they block the review.
+- Added a reasoned recommendation and numeric decision menu to review previews,
+  while keeping snapshot identity and mergeability out of the public body.
+
 ## [3.11.2] - 2026-08-06
 
 ### Changed

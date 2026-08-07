@@ -2121,6 +2121,63 @@ def check_pr_review_workspace_isolation() -> None:
     require(".claude/pr-review" not in read("agents/ref-direct-modes.md"), "Claude direct review contract retains .claude artifacts")
 
 
+def check_pr_review_operator_visibility() -> None:
+    """PR review chat stays useful, specialist-visible, and decision-oriented."""
+    canonical = read("skills/review-pr/SKILL.md")
+    flattened = re.sub(r"\s+", " ", canonical.lower())
+    for marker in (
+        "keep snapshot mechanics internal",
+        "announce the exact agents",
+        "reviewer-consolidator",
+        "concrete changed surfaces",
+        "do not call agents abstract \"lenses\"",
+        "waiting for agents",
+        "value-bearing update",
+        "nothing has been published",
+        "recommendation:",
+        "one concise rationale",
+        "numeric choices",
+        "accept the number",
+        "hidden by default",
+    ):
+        require(marker in flattened, f"PR review operator contract misses {marker!r}")
+
+    preview = section(canonical, "## Preview", "## Pre-publish freshness")
+    for marker in (
+        "1 — Request changes **(recommended)**",
+        "1 — Approve **(recommended)**",
+        "1 — Comment only **(recommended)**",
+        "4 — Defer",
+        "5 — Cancel",
+    ):
+        require(marker in preview, f"PR review numeric menu misses {marker!r}")
+    require("(a) approve" not in preview.lower(), "PR review still asks for letter choices")
+
+    public_body_sections = {
+        "canonical": section(canonical, "### Body", "### Inline threads"),
+        "reviewer": section(read("agents/reviewer.md"), "## GitHub body", "## Operating modes"),
+        "consolidator": section(read("agents/reviewer-consolidator.md"), "## Body", "## Return"),
+    }
+    for label, body in public_body_sections.items():
+        template = re.search(r"```markdown\n(.*?)\n```", body, re.DOTALL)
+        require(template is not None, f"{label} public review body template is missing")
+        template_flat = re.sub(r"\s+", " ", template.group(1).lower())
+        require("reviewed:" not in template_flat, f"{label} public review body exposes snapshot identity")
+        require("mergeability" not in template_flat, f"{label} public review body exposes capture mechanics")
+
+    for relative in (
+        "agents/reviewer.md",
+        "agents/reviewer-consolidator.md",
+        "runtime/codex/instructions/reviewer.md",
+        "runtime/codex/instructions/reviewer-consolidator.md",
+    ):
+        require(
+            "recommendation_rationale" in read(relative)
+            or "recommendation rationale" in read(relative),
+            f"{relative}: recommendation rationale is missing",
+        )
+
+
 def check_claude_codex_parity() -> None:
     """The two runtime projections expose the same posture and migration rules."""
     claude = "\n".join(
@@ -2767,6 +2824,7 @@ def main() -> None:
         ("terminal/transition mapping", check_terminal_and_transition_mapping),
         ("PR review regressions", check_review_comment_regressions),
         ("PR review workspace isolation", check_pr_review_workspace_isolation),
+        ("PR review operator visibility", check_pr_review_operator_visibility),
         ("Claude/Codex parity", check_claude_codex_parity),
         ("execution efficiency", check_execution_efficiency_contract),
         ("context isolation and rotation", check_context_isolation_rotation_contract),

@@ -192,11 +192,9 @@ Return a body that acts as an index, not a second copy of the review:
 ```markdown
 ## Review
 
-Reviewed: `{reviewed_head_sha}`
 Verdict: **APPROVE | REQUEST CHANGES | COMMENT**
 Findings: **{N} blocking**, **{M} suggestions**
 Checks: {one concise line from the supplied CI artifact or "not available"}
-Mergeability: **{clean|conflicting|indeterminate}** (`mergeable={raw}`, `mergeStateStatus={raw}`)
 
 {Cross-file findings only. Omit this paragraph/section when none exist.}
 ```
@@ -249,6 +247,7 @@ reviewed_head_sha: exact supplied SHA
 context_hash: exact supplied hash
 decision: APPROVE | CHANGES_REQUESTED | COMMENT
 event: APPROVE | REQUEST_CHANGES | COMMENT
+recommendation_rationale: one concise evidence-grounded sentence for the operator
 blocking_count: N
 suggestion_count: N
 existing_open_count: N
@@ -266,13 +265,9 @@ inline_findings:
 review_body: |
   ## Review
 
-  Reviewed: `exact supplied SHA`
-  Base: `exact supplied base SHA`
-  Captured: `snapshot fetched_at`
   Verdict: **REQUEST CHANGES**
   Findings: **1 blocking**, **0 suggestions**
   Checks: passing
-  Mergeability at capture: **clean | conflicting | indeterminate** (`mergeable={raw}`, `mergeStateStatus={raw}`)
 reference_loaded: lens names | none | unavailable
 summary: one sentence with counts and verdict
 issues: blocker headlines | none
