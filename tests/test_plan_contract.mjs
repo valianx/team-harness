@@ -380,6 +380,34 @@ await check("mechanical repair fails closed for semantic index defects", async (
   }
 });
 
+await check("duplicated or misplaced task indexes are never repaired", async () => {
+  const strayIndex = `### Task Index
+
+| Task | Service | Status | AC count | TC count | Path |
+|------|---------|--------|----------|----------|------|
+| Task-1 | checkout | pending | 1 | 1 | \`plan/tasks/Task-1.md\` |
+
+`;
+  const plan = planText()
+    .replace("| task | Task-1 | `plan/tasks/Task-1.md` | AC-1 |\n", "")
+    .replace("## Plan Manifest", `${strayIndex}## Plan Manifest`);
+  const workspace = await fixture({ plan });
+  try {
+    const before = await readFile(path.join(workspace, "01-plan.md"));
+    const validation = await run(workspace);
+    assert.equal(validation.verdict, "fail", JSON.stringify(validation));
+    assert(validation.findings.some((entry) =>
+      entry.code === "TASK_INDEX_INVALID" && entry.section === "Plan Manifest/Task Index"));
+    const repair = await repairPlanContract({ workspace, plan: "01-plan.md" });
+    assert.equal(repair.verdict, "blocked", JSON.stringify(repair));
+    assert.equal(repair.reason, "manifest-or-index-missing");
+    assert.equal(isPlanContractRepairResult(repair), true);
+    assert.deepEqual(await readFile(path.join(workspace, "01-plan.md")), before);
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
 await check("mechanical repair never manufactures a missing task shard", async () => {
   const plan = planText().replace("| task | Task-1 | `plan/tasks/Task-1.md` | AC-1 |\n", "");
   const workspace = await fixture({ plan });

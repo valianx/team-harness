@@ -103,9 +103,27 @@ async function readRegularContained(workspace, relative, maxBytes = MAX_PLAN_BYT
 function parseRepairCandidate(text) {
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   const lines = text.split(/\r?\n/);
-  const manifestStart = lines.indexOf("## Plan Manifest");
-  const taskIndexStart = lines.indexOf("### Task Index", manifestStart + 1);
-  if (manifestStart < 0 || taskIndexStart < 0) throw new RepairError("manifest-or-index-missing");
+  const manifestHeadings = lines
+    .map((line, position) => ({ line, position }))
+    .filter((entry) => entry.line === "## Plan Manifest");
+  const indexHeadings = lines
+    .map((line, position) => ({ line, position }))
+    .filter((entry) => entry.line === "### Task Index");
+  if (manifestHeadings.length !== 1 || indexHeadings.length !== 1) {
+    throw new RepairError("manifest-or-index-missing");
+  }
+  const manifestStart = manifestHeadings[0].position;
+  const taskIndexStart = indexHeadings[0].position;
+  let manifestEnd = lines.length;
+  for (let index = manifestStart + 1; index < lines.length; index += 1) {
+    if (/^#{1,2}\s/.test(lines[index])) {
+      manifestEnd = index;
+      break;
+    }
+  }
+  if (taskIndexStart <= manifestStart || taskIndexStart >= manifestEnd) {
+    throw new RepairError("manifest-or-index-missing");
+  }
 
   let taskIndexEnd = lines.length;
   for (let index = taskIndexStart + 1; index < lines.length; index += 1) {

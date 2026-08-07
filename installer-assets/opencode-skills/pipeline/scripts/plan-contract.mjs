@@ -216,9 +216,15 @@ function tableCells(line) {
 }
 
 function inspectIndex(lines, findings) {
-  const manifest = sectionLines(lines, "Plan Manifest", 2);
-  const index = sectionLines(lines, "Task Index", 3);
-  if (manifest === null || index === null) {
+  const manifestHeadings = lines
+    .map((line, position) => ({ line, position }))
+    .filter((entry) => entry.line === "## Plan Manifest");
+  const indexHeadings = lines
+    .map((line, position) => ({ line, position }))
+    .filter((entry) => entry.line === "### Task Index");
+  const manifest = manifestHeadings.length === 1 ? sectionLines(lines, "Plan Manifest", 2) : null;
+  const index = indexHeadings.length === 1 ? sectionLines(lines, "Task Index", 3) : null;
+  if (manifest === null || index === null || index.start <= manifest.start || index.start >= manifest.end) {
     findings.push(finding("TASK_INDEX_INVALID", "01-plan.md", "Plan Manifest/Task Index"));
     return { paths: [], tasks: [] };
   }
