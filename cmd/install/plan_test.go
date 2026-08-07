@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -193,6 +195,87 @@ func TestComputePlan_ToRemove(t *testing.T) {
 
 	if len(diff.ToRemove) != 1 || diff.ToRemove[0].Component != "hook-plugin-entry" {
 		t.Errorf("expected comp-old in ToRemove, got %v", diff.ToRemove)
+	}
+}
+
+// TestComputePlan_OpencodeRetiresRenamedInitAgent covers the v3.4.2 -> v3.6.1+
+// update path. v3.4.2 recorded agent-init in the OpenCode ledger; the agent was
+// later renamed to init-project, so the old managed file must be removable.
+func TestComputePlan_OpencodeRetiresRenamedInitAgent(t *testing.T) {
+	dataDir, cleanup := ledgerTestEnv(t)
+	defer cleanup()
+
+	configRoot := t.TempDir()
+	placer := newOpencodePlacerAt(configRoot)
+	configureLedger(placer)
+	defer setActiveLedgerContext(ledgerFilename, "")
+
+	oldEntry := LedgerEntry{
+		TS:            "2026-07-31T00:00:00Z",
+		Op:            "install",
+		Component:     "agent-init",
+		Owns:          OwnershipTags{Files: []string{"{config_root}/agents/init.md"}, ConfigKeys: []string{}},
+		SchemaVersion: 1,
+		ConfigRoot:    configRoot,
+	}
+	oldLine, err := json.Marshal(oldEntry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dataDir, ledgerFilenameOpencode), append(oldLine, '\n'), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	diff, err := ComputePlan(nil, nil, nil, placer, fstest.MapFS{}, nil)
+	if err != nil {
+		t.Fatalf("ComputePlan: %v", err)
+	}
+	if len(diff.LedgerErrors) != 0 {
+		t.Fatalf("unexpected ledger errors: %v", diff.LedgerErrors)
+	}
+	if len(diff.ToRemove) != 1 || diff.ToRemove[0].Component != "agent-init" {
+		t.Fatalf("expected agent-init in ToRemove, got %v", diff.ToRemove)
+	}
+	wantPath := filepath.Join(configRoot, "agents", "init.md")
+	if len(diff.ToRemove[0].Files) != 1 || diff.ToRemove[0].Files[0] != wantPath {
+		t.Fatalf("retired file = %v, want %q", diff.ToRemove[0].Files, wantPath)
+	}
+}
+
+func TestComputePlan_UnknownAgentStillFailsClosed(t *testing.T) {
+	dataDir, cleanup := ledgerTestEnv(t)
+	defer cleanup()
+
+	configRoot := t.TempDir()
+	oldLine := `{"ts":"2026-07-31T00:00:00Z","op":"install","component":"agent-unknown","owns":{"files":["{config_root}/agents/unknown.md"],"configKeys":[]},"schemaVersion":1}`
+	writeLedgerLines(t, dataDir, []string{oldLine})
+
+	diff, err := ComputePlan(nil, nil, nil, newClaudeCodePlacerAt(configRoot), fstest.MapFS{}, nil)
+	if err != nil {
+		t.Fatalf("ComputePlan: %v", err)
+	}
+	if len(diff.ToRemove) != 0 {
+		t.Fatalf("unknown component was scheduled for removal: %v", diff.ToRemove)
+	}
+	if len(diff.LedgerErrors) != 1 || !strings.Contains(diff.LedgerErrors[0].Reason, "neither currently managed") {
+		t.Fatalf("expected fail-closed ledger error, got %v", diff.LedgerErrors)
+	}
+}
+
+func TestComputePlan_RetiredAgentOwnershipMustMatchHistory(t *testing.T) {
+	dataDir, cleanup := ledgerTestEnv(t)
+	defer cleanup()
+
+	configRoot := t.TempDir()
+	forgedLine := `{"ts":"2026-07-31T00:00:00Z","op":"install","component":"agent-init","owns":{"files":["{config_root}/agents/init.md"],"configKeys":["logs-mode"]},"schemaVersion":1}`
+	writeLedgerLines(t, dataDir, []string{forgedLine})
+
+	diff, err := ComputePlan(nil, nil, nil, newClaudeCodePlacerAt(configRoot), fstest.MapFS{}, nil)
+	if err != nil {
+		t.Fatalf("ComputePlan: %v", err)
+	}
+	if len(diff.ToRemove) != 0 || len(diff.LedgerErrors) != 1 {
+		t.Fatalf("forged historical ownership did not fail closed: removals=%v errors=%v", diff.ToRemove, diff.LedgerErrors)
 	}
 }
 

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.11.4] - 2026-08-07
+
+### Fixed
+
+- Allowed OpenCode updates from 3.4.2 to retire the renamed `agent-init`
+  component only when its ownership exactly matches the historical managed
+  file, while preserving fail-closed rejection for unknown or forged ledger
+  entries.
+
 ## [3.11.3] - 2026-08-07
 
 ### Changed
