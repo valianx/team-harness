@@ -2,7 +2,7 @@
 /** Behavioral coverage for the deterministic functional-first plan contract. */
 
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -19,6 +19,7 @@ import {
 
 const testsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const runner = path.resolve(testsDirectory, "../plugins/team-harness/skills/pipeline/scripts/plan-contract.mjs");
+const repairRunner = path.resolve(testsDirectory, "../plugins/team-harness/skills/pipeline/scripts/plan-contract-repair.mjs");
 const failures = [];
 
 async function check(name, callback) {
@@ -152,7 +153,7 @@ const delivery = `# Delivery
 Grouping: all-tasks-one-pr
 `;
 
-function taskText({ ac = "- [ ] **AC-1**: Given a retryable interruption, When the operator retries, Then checkout resumes once.", tc = "- **TC-1**: Preserve the current idempotency boundary.", pretest = "- **Pre-implementation test:** not-applicable — repository manifest has no test_contract" } = {}) {
+function taskText({ ac = "- [ ] **AC-1**: Given a retryable interruption, When the operator retries, Then checkout resumes once.", tc = "- **TC-1**: Preserve the current idempotency boundary.", pretest = "- **Pre-implementation test:** not-applicable — repository manifest has no test_contract", quality = "- **Required quality checks:** test, build, typecheck, format_check, lint" } = {}) {
   return `# Task-1: expose retry state
 
 - **Service:** checkout
@@ -171,7 +172,7 @@ ${tc}
 #### Verification
 
 ${pretest}
-- **Required quality checks:** test, build, typecheck, format_check, lint
+${quality}
 - Exercise retryable and terminal checkout outcomes.
 `;
 }
@@ -223,6 +224,16 @@ await check("the CLI emits the same closed contract and useful exit status", asy
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
+});
+
+await check("the repair CLI returns closed evidence for invalid arguments", async () => {
+  const child = spawnSync(process.execPath, [repairRunner], { encoding: "utf8", windowsHide: true });
+  assert.equal(child.status, 1);
+  assert.equal(child.stderr, "");
+  const result = JSON.parse(child.stdout);
+  assert.equal(result.verdict, "blocked");
+  assert.equal(result.reason, "arguments-invalid");
+  assert.equal(isPlanContractRepairResult(result), true);
 });
 
 await check("missing, empty, or out-of-order functional sections fail closed", async () => {
@@ -283,6 +294,7 @@ await check("task AC, TC, pre-test, and index counts are verified rather than tr
     taskText({ ac: "- [ ] **AC-1**: Update the private result enum." }),
     taskText({ tc: "- **TC-1**: first\n- **TC-1**: duplicate" }),
     taskText({ pretest: "- Run tests later." }),
+    taskText({ quality: "- **Required quality checks:** test, test" }),
   ];
   for (const task of invalidTasks) {
     const workspace = await fixture({ task });
@@ -290,6 +302,10 @@ await check("task AC, TC, pre-test, and index counts are verified rather than tr
       const result = await run(workspace);
       assert.equal(result.verdict, "fail");
       assert.equal(result.error_code, "TASK_INVALID");
+      assert.equal(isPlanContractResult(result), true);
+      if (task.includes("test, test")) {
+        assert(result.findings.some((entry) => entry.code === "TASK_VERIFICATION_INVALID"));
+      }
     } finally {
       await rm(workspace, { recursive: true, force: true });
     }
@@ -413,6 +429,26 @@ await check("all layered mechanical format defects normalize in one pass", async
       ...rollbackFailure,
       reason: "no-eligible-mechanical-repair",
     }), false);
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+await check("index formatting changes always carry repair operations", async () => {
+  const plan = planText()
+    .replace(
+      "| Task | Service | Status | AC count | TC count | Path |\n|------|---------|--------|----------|----------|------|",
+      "|Task|Service|Status|AC count|TC count|Path|\n|:---|---:|:---:|----|-----|---:|",
+    );
+  const task = taskText().replace("#### Verification", "## Verification");
+  const workspace = await fixture({ plan, task });
+  try {
+    const repaired = await repairPlanContract({ workspace, plan: "01-plan.md" });
+    assert.equal(repaired.verdict, "repaired", JSON.stringify(repaired));
+    assert.equal(isPlanContractRepairResult(repaired), true);
+    const planChange = repaired.artifact_changes.find((entry) => entry.path === "01-plan.md");
+    assert(planChange);
+    assert(planChange.operations.includes("task-index-columns"));
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }

@@ -293,7 +293,13 @@ function inspectTask(task, text, findings) {
   if (new Set(tcIds).size !== tcIds.length) findings.push(finding("TASK_TECHNICAL_CONSTRAINT_INVALID", task.path, "Technical Constraints"));
   const pretest = verification.lines.filter((line) => /^- \*\*Pre-implementation test:\*\* (?:required|not-applicable — .+)$/.test(line));
   const quality = verification.lines.filter((line) => /^- \*\*Required quality checks:\*\* (?:none — .+|[a-z][a-z0-9_]*(?:, [a-z][a-z0-9_]*)*)$/.test(line));
-  if (pretest.length !== 1 || quality.length !== 1) findings.push(finding("TASK_VERIFICATION_INVALID", task.path, "Verification"));
+  const parsedQuality = quality.length === 1 && !quality[0].includes("none —")
+    ? quality[0].replace("- **Required quality checks:** ", "").split(", ")
+    : [];
+  const duplicateQuality = new Set(parsedQuality).size !== parsedQuality.length;
+  if (pretest.length !== 1 || quality.length !== 1 || duplicateQuality) {
+    findings.push(finding("TASK_VERIFICATION_INVALID", task.path, "Verification"));
+  }
   if (acLines.length !== task.ac_count || tcLines.length !== task.tc_count) {
     findings.push(finding("TASK_COUNT_MISMATCH", task.path, task.id));
   }
@@ -302,9 +308,7 @@ function inspectTask(task, text, findings) {
     actual_ac_count: acLines.length,
     actual_tc_count: tcLines.length,
     pre_implementation_test: pretest[0]?.includes("not-applicable") ? "not-applicable" : pretest.length === 1 ? "required" : null,
-    required_quality_checks: quality.length === 1 && !quality[0].includes("none —")
-      ? quality[0].replace("- **Required quality checks:** ", "").split(", ")
-      : [],
+    required_quality_checks: duplicateQuality ? [] : parsedQuality,
   };
 }
 
@@ -422,7 +426,13 @@ export async function validatePlanContract(options) {
       const artifact = loaded.get(task.path);
       if (artifact === undefined) {
         state.findings.push(finding("MANIFEST_REQUIRED_ARTIFACT_MISSING", "01-plan.md", task.path));
-        return { ...task, actual_ac_count: 0, actual_tc_count: 0, pre_implementation_test: null };
+        return {
+          ...task,
+          actual_ac_count: 0,
+          actual_tc_count: 0,
+          pre_implementation_test: null,
+          required_quality_checks: [],
+        };
       }
       return inspectTask(task, artifact.text, state.findings);
     });

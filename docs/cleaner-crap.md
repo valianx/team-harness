@@ -67,7 +67,7 @@ attempt; the handoff does not increment the pipeline `iteration` counter or
 consume its max-3 validation-correction budget. A non-zero closure result must
 include the exact command, exit code, and bounded diagnostic—`exit 1` alone is
 not evidence. Main then runs the complete, unchanged
-`.team-harness/quality.json` at `post_cleaner_handoff`, including every declared
+`.team-harness/quality.json` at `post_implementation`, including every declared
 check plus the per-repository union of task-declared `Required quality checks`.
 The runner supports build/typecheck, invariants, permissions, accessibility,
 contract, integration, and database controls in addition to test, format, lint,

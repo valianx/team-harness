@@ -203,11 +203,14 @@ partially populated evidence blocks.
 Never infer red or green from a test name, current suite result, agent prose, or
 an unhashed workspace artifact.
 
-Also validate `cleaner_evidence` before resuming implementation. For
-cross-repository work, validate every `cleaner_repo_evidence` entry separately
-and require a unique canonical repository, absolute worktree, manifest,
-allowlist, baseline, candidate identity, and at most one terminal cleaner result
-per repository; a single cleaner result spanning repositories blocks. `pending`
+Also validate `cleaner_evidence` before resuming implementation. Read the exact
+expected identities from `participating_repositories`, then require the
+canonical identity set in `cleaner_repo_evidence` to equal it before accepting
+any cleaner evidence or dispatching a cleaner. Missing, extra, or duplicate
+repositories block. Validate every entry separately and require a unique
+canonical repository, absolute worktree, manifest, allowlist, baseline,
+candidate identity, and at most one terminal cleaner result per repository; a
+single cleaner result spanning repositories blocks. `pending`
 resumes at allowlist construction; `baseline` requires readable allowlist and
 pre-cleaner result files whose SHA-256 values and candidate commit/tree match
 state before dispatching the one allowed fresh cleaner; `pass` additionally
@@ -219,6 +222,12 @@ spawn, readable hashed closure and the common `post_implementation` quality
 result, and matching current commit/tree. `not-applicable` requires the closed
 `repository-quality-manifest-incomplete` reason. Missing, stale, partially
 populated, out-of-scope, or mismatched cleaner or handoff evidence blocks.
+`cleaner-failed`, `cleaner-blocked`, `handoff-failed`, and `handoff-blocked`
+require a readable hashed terminal result, exact reason, and matching
+commit/tree. They remain non-pass and block Freeze. A cleaner terminal failure
+requires a new explicitly activated repository-local pipeline; a handoff
+terminal failure requires a new complete package, fresh nonce, presentation,
+and live authorization before any further implementer dispatch.
 Never infer a baseline, formatter/lint result, CRAP value, behavior-preserving
 verdict, authorization, or closure from cleaner/implementer prose or the
 current worktree.

@@ -1295,6 +1295,15 @@ def main() -> None:
         fail("Codex activation does not present the exact live 1/2 posture choices")
     if "never infer a posture from configuration" not in activation_reference.lower():
         fail("Codex activation lets configuration choose a posture")
+    activation_lower = activation_reference.lower()
+    for marker in (
+        "a live `2` answering",
+        "explicit pipeline activation",
+        "applies only to that exact legacy presentation",
+        "choice `2` in the current three-choice intake",
+    ):
+        if marker not in activation_lower:
+            fail(f"Codex activation does not safely route the legacy numeric choice: {marker!r}")
     config_lower = configuration_reference.lower()
     if "legacy route/profile keys" not in config_lower:
         fail("Codex configuration does not identify legacy route keys")
@@ -1639,8 +1648,8 @@ def main() -> None:
     activation_digests = digest_table(activation)
     pipeline_digests = digest_table(pipeline)
     expected_updated_digests = {
-        "architect": "7964d2838b0df24299610976b9fe9f8bd9fafd794b0fbc96c90482e36cf03ac5",
-        "implementer": "0f77ca26bb5ad7b884ccec48d57102c9470c6bbec8566a1b0f54ded7737f6960",
+        "architect": "f9f05dafa38564aeb8714e2293d565e78be03f6e11e4775801a5344117c44c18",
+        "implementer": "a9c44f6560aae90a03060bba0e192e4b092c25523279bafbe3e31eeaadc4be13",
         "tester": "7519e2980d21e6f3116da32169386f0531450cf60b6404d7553985879e966c91",
         "cleaner": "b2da1e953ad822124830363edf8a3be58aa12935024a0448bec066b587e3fc5e",
         "qa": "2612528da833bcb5cf2db981ac586320a0ad06ac407d38beb564b64880cc24c8",

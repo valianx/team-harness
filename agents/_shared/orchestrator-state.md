@@ -273,7 +273,8 @@ regression_test_status: failing|passing|skipped|null
 test_contract_evidence: {status: pending|red|green|not-applicable|mixed, index_path, index_sha256, task_count, status_counts: {pending, red, green, not_applicable}}|null
 plan_contract_evidence: {status: pending|pass|not-applicable, reason, result_path, result_sha256, plan_sha256, artifact_set_sha256}|null
 plan_contract_repair_evidence: {status: not-needed|repaired|blocked, reason, result_path, result_sha256, before_sha256, after_sha256, added_paths, artifact_changes: [{path, before_sha256, after_sha256, operations}], contract_result_sha256}|null
-cleaner_evidence: {status: pending|baseline|pass|handoff-pending|handoff-pass|not-applicable, reason, allowlist_path, allowlist_sha256, baseline_path, baseline_sha256, baseline_commit_sha, baseline_tree_sha, cleaner_commit_sha, post_path, post_sha256, post_commit_sha, post_tree_sha, handoff_closure_path, handoff_closure_sha256, handoff_commit_sha, handoff_post_path, handoff_post_sha256, handoff_post_commit_sha, handoff_post_tree_sha}|null
+participating_repositories: [{repository, repo_root, worktree}]|[]
+cleaner_evidence: {status: pending|baseline|pass|cleaner-failed|cleaner-blocked|handoff-pending|handoff-pass|handoff-failed|handoff-blocked|not-applicable, reason, allowlist_path, allowlist_sha256, baseline_path, baseline_sha256, baseline_commit_sha, baseline_tree_sha, cleaner_commit_sha, post_path, post_sha256, post_commit_sha, post_tree_sha, handoff_closure_path, handoff_closure_sha256, handoff_commit_sha, handoff_post_path, handoff_post_sha256, handoff_post_commit_sha, handoff_post_tree_sha}|null
 cleaner_repo_evidence: [{repository, repo_root, worktree, evidence: cleaner_evidence}]|[]
 plan_review_status: not-requested|requested|pass|concerns|fail|null  # only explicit /th:plan-review
 audit_status: pending|done|unavailable|null  # set in validation: pending on dispatch, done on report, unavailable after a second audit failure. STAGE-GATE-3 states it in the block; it is not a machine-checked precondition — the tree anchor is the only one (agents/ref-pipeline.md § STAGE-GATE-3)
@@ -286,6 +287,13 @@ validated_commit_sha: {full commit object ID}|null          # copied from Freeze
 validated_tree_sha: {full tree object ID}|null
 open_findings: [{id, disposition}]|[]       # dispositions live in 00-decision-ledger.md
 ```
+
+`cleaner_repo_evidence` is complete only when its canonical identity set equals
+`participating_repositories` exactly and it contains one terminal evidence entry
+per repository. Main maps a cleaner return of `failed` to `cleaner-failed` and
+`blocked` to `cleaner-blocked`; an authorized implementer return that fails or
+blocks maps to `handoff-failed` or `handoff-blocked`. These terminal non-pass
+states never alias `pending` or `pass` and block Freeze.
 
 **`open_findings` — kept, with a schema and a named reader, never left as an unread promise.** The reader is the Recover safety contract: on `/th:recover`, any entry present with no matching `disposition` row in `00-decision-ledger.md` is surfaced to the operator as an unresolved carry-over before the next gate is prepared. An entry is written only by the orchestrator, only when a finding lands as a task AC or when `agents/ref-pipeline.md § "Finding disposition"` records it as accepted-without-AC — never populated speculatively, and never treated as the transport for a finding that has not gone through that disposition path.
 

@@ -148,7 +148,10 @@ task. A cross-repository pipeline dispatches one fresh cleaner per repository;
 each receives only its canonical repository identity, absolute worktree,
 repository-local candidate commit/tree, allowlist, baseline, and quality
 manifest. Each cleaner still runs exactly once. This checkpoint is part of
-`implementation`, not another phase or gate. Apply it whenever the repository
+`implementation`, not another phase or gate. Before the first cleaner
+transition, persist the sorted exact identity list as
+`participating_repositories`; all later cleaner evidence must cover that set.
+Apply it whenever the repository
 quality manifest declares a `test` command and
 `test_contract.path_rules`. `format_check`, `lint`, and `crap` are additive
 deterministic checks: run every one that the manifest declares, but do not make
@@ -192,6 +195,11 @@ commits every independent safe allowlisted cleanup before returning any
 `implementer_findings`; each finding must carry stable ID, cause, files,
 implicated AC/TC requirements, advisory correction, deterministic closure
 check, and expected result. Main still runs the authoritative post transition.
+A cleaner return of `failed` or `blocked` is persisted with its hashed result as
+`cleaner-failed` or `cleaner-blocked`, never as `pending` or `pass`. The
+authoritative post transition may record the resulting tree and diagnostics but
+cannot convert either state to pass; both block Freeze and require a new
+explicitly activated repository-local pipeline.
 A selected-command, behavior, scope, protected-path, declared-tool, manifest,
 threshold, or metric failure cannot be waived or sent back to the cleaner.
 Infrastructure or unclassifiable failure blocks. A complete failure or cleaner
@@ -243,6 +251,12 @@ iteration but requires a new package, nonce, and live authorization before
 another fresh implementer; infrastructure failure blocks. Scope expansion must
 first receive its own explicit operator decision and still does not authorize
 the implementer pass.
+
+An implementer `failed` or `blocked` return maps to `handoff-failed` or
+`handoff-blocked` with its hashed terminal result and consumed nonce. Neither
+state may run or pass the common quality checkpoint, hygiene, or Freeze. Further
+work requires a new complete package, fresh nonce, presentation, and live
+authorization; it is never an automatic retry.
 
 With no implementer package, persist the post result/hash, cleaner commit,
 candidate identity, and `cleaner_evidence.status: pass`.

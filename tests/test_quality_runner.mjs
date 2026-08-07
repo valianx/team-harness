@@ -209,6 +209,32 @@ await check("the CLI returns the same closed JSON contract and a useful process 
     const result = JSON.parse(child.stdout);
     assertClosedResult(result);
     assert.equal(result.verdict, "pass");
+
+    const emptyRequired = spawnSync(
+      node,
+      [
+        runnerPath,
+        "--repo",
+        repo,
+        "--manifest",
+        ".team-harness/quality.json",
+        "--base",
+        base,
+        "--candidate",
+        "HEAD",
+        "--checkpoint",
+        "cli-empty-required",
+        "--checks",
+        "test",
+        "--required-checks",
+        "",
+      ],
+      { encoding: "utf8", windowsHide: true },
+    );
+    assert.equal(emptyRequired.status, 0, emptyRequired.stderr);
+    const emptyResult = JSON.parse(emptyRequired.stdout);
+    assertClosedResult(emptyResult);
+    assert.equal(emptyResult.verdict, "pass");
   });
 });
 

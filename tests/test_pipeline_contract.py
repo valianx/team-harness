@@ -916,6 +916,11 @@ def check_cleaner_crap_contract() -> None:
         "cleaner_handoff_decision_nonce",
         "authorize one implementer pass",
         "cleaner_repo_evidence",
+        "participating_repositories",
+        "cleaner-failed",
+        "cleaner-blocked",
+        "handoff-failed",
+        "handoff-blocked",
     ):
         require(marker in state, f"cleaner handoff state misses {marker!r}")
         require(marker in shared_state, f"shared cleaner handoff state misses {marker!r}")
@@ -927,6 +932,8 @@ def check_cleaner_crap_contract() -> None:
         "one to five",
         "touched-file subset",
         "bare non-zero exit",
+        "expected identities",
+        "missing, extra, or duplicate",
     ):
         require(marker in recovery, f"cleaner handoff recovery misses {marker!r}")
     implementer = re.sub(r"\s+", " ", read("agents/implementer.md").lower())
@@ -945,6 +952,7 @@ def check_cleaner_crap_contract() -> None:
         "bounded diagnostic",
         "correction-incomplete",
         "multiple repositories",
+        "before any repository or workspace read",
     ):
         require(marker in codex_implementer, f"Codex implementer diagnostic contract misses {marker!r}")
     require(
@@ -982,6 +990,14 @@ def check_functional_first_plan_contract() -> None:
     ):
         for marker in required:
             require(marker in text, f"{label}: functional-first marker missing {marker!r}")
+
+    for label, text in (("Claude architect", architect), ("Codex architect", adapter)):
+        for marker in (
+            "`contract` for cross-repository api/schema compatibility",
+            "`integration` for multi-repository behavior",
+            "never emit `cross-repository` as an id",
+        ):
+            require(marker in text, f"{label}: cross-repository quality mapping misses {marker!r}")
 
     for label, relative in (
         ("Claude", "agents/ref-pipeline.md"),

@@ -138,6 +138,11 @@ The repository and approved architecture outrank generic style preferences.
 
 Resolve the workspace from `workspaces path:` when supplied; otherwise use `workspaces/{feature-name}/`. The workspace and `01-plan.md` manifest must already exist except in explicit `mode: inline`.
 
+For a cleaner-handoff correction, validate the packet's canonical repository,
+absolute matching worktree, and containment of every repository-relative path
+before resolving the workspace or reading any task shard, anchor, finding, or
+repository file. A mismatch blocks without reading the packet-derived path.
+
 Read only this manifest:
 
 1. **Runtime project instructions.** Use the `CLAUDE.md` already present in runtime context. Do not issue a second full-file read. Read a specific section only when the task needs a detail not already available.

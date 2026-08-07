@@ -102,7 +102,10 @@ its snapshot, lens selection, consolidation, preview, or publication gate.
    task. This read is not pipeline activation and must not create any artifact.
    If the configuration or historical evidence contains a retired route/profile
    marker, show the live choices `1 — inline` / `2 — pipeline`; never map the
-   marker silently or treat it as authorization.
+   marker silently or treat it as authorization. Bind that exact legacy
+   presentation separately: only a live `2` answering its most recent unresolved
+   instance activates the pipeline for the framed task, while its live `1`
+   selects inline. This does not change the current three-choice mapping below.
 3. If there is no concrete task, ask what the operator needs and stop.
 4. Handle explanations, reviews of supplied material, repository inspection,
    and small bounded reversible changes directly in `Main`; inline is the
@@ -149,8 +152,9 @@ its snapshot, lens selection, consolidation, preview, or publication gate.
    applies the original broad scope inline. Choice `3` performs no work. The
    direct invocation `@Team-Harness pipeline <task>` remains available, but
    never make copying or repeating it the only way to continue.
-7. If the live operator already explicitly requested the full pipeline, or
-   selects choice `1` after intake, read `../pipeline/SKILL.md` and follow that
+7. If the live operator already explicitly requested the full pipeline, selects
+   choice `1` on the current three-choice intake, or selects choice `2` on the
+   exact unresolved legacy `1 — inline` / `2 — pipeline` presentation, read `../pipeline/SKILL.md` and follow that
    contract. Do not preload its references before approval. Acknowledge the
    outcome in one short sentence in the operator's language, then perform
    successful activation, agent preflight, workspace setup, commit anchoring,

@@ -749,9 +749,10 @@ technical architecture sections. A missing, malformed, stale, or failing record
 blocks Gate 1; agent prose cannot replace it. Legacy recovery and the documented
 self-authored hotfix/Tier-1 routes record the closed not-applicable reason instead
 of being silently migrated. On failure, Main runs the repair helper
-once. Its only writable case adds a canonical task route already present in the
-Task Index when the corresponding regular, non-symlink shard exists inside the
-workspace. The same closed pass may reorder canonical index columns, normalize
+once. The first writable operation in its closed set adds a canonical task
+route already present in the Task Index when the corresponding regular,
+non-symlink shard exists inside the workspace. The same closed pass may reorder
+canonical index columns, normalize
 required heading levels when the exact heading name already exists uniquely,
 and normalize AC/TC punctuation, checkbox, and Given/When/Then casing without
 changing prose. It never creates missing content. Main persists the full repair result and hash as
@@ -1040,7 +1041,9 @@ repository's consolidated tree, not one dispatch across multiple repositories,
 not one dispatch per task, and not a phase or gate. A cross-repository pipeline
 uses one fresh cleaner per repository and gives each only its canonical repo,
 absolute worktree, local candidate identity, allowlist, baseline, and quality
-manifest; each cleaner runs exactly once. It applies whenever the repository
+manifest; each cleaner runs exactly once. Before the first cleaner transition,
+persist the repository set as the sorted `participating_repositories` identity
+list; later cleaner evidence must cover that exact set. It applies whenever the repository
 quality manifest declares a `test` command and `test_contract.path_rules`.
 `format_check`, `lint`, and `crap` are additive deterministic checks: run every
 one that the manifest declares, but do not make the cleaner inapplicable merely
@@ -1087,6 +1090,11 @@ commits every independent safe allowlisted cleanup before returning any
 `implementer_findings`; each finding carries stable ID, cause, files,
 implicated AC/TC requirements, advisory correction, deterministic closure
 check, and expected result. Main still runs the authoritative post transition.
+A cleaner return of `failed` or `blocked` is persisted with its hashed result as
+`cleaner-failed` or `cleaner-blocked`, never as `pending` or `pass`. The
+authoritative post transition may record the resulting tree and diagnostics but
+cannot convert either state to pass; both block Freeze and require a new
+explicitly activated repository-local pipeline.
 A test, behavior, declared optional check, protected/out-of-scope path,
 threshold/config, or declared-tool failure cannot be waived or returned to the
 cleaner. Infrastructure or unclassifiable failure blocks. A complete failure or
@@ -1137,6 +1145,12 @@ new correctable finding requires a new package, nonce, presentation, and live
 authorization before another fresh implementer, still without incrementing
 `iteration`; infrastructure failure blocks. Scope expansion receives its own
 explicit decision first and never implies implementer authorization.
+
+An implementer `failed` or `blocked` return maps to `handoff-failed` or
+`handoff-blocked` with its hashed terminal result and consumed nonce. Neither
+state may run or pass the common quality checkpoint, hygiene, or Freeze. Further
+work requires a new complete package, fresh nonce, presentation, and live
+authorization; it is never an automatic retry.
 
 With no implementer package, persist the post result and SHA-256, cleaner
 commit, candidate identity, and `cleaner_evidence.status: pass`.

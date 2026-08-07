@@ -521,7 +521,10 @@ Split reason, Cleanup PR/Base PR, Title, Branch, and Notes remain frozen otherwi
   not an AC or a technical design choice.
 - Declare every acceptance-required repository control in `Required quality
   checks`, including applicable build/typecheck, invariant, permission,
-  accessibility, cross-repository contract, integration, or database checks.
+  accessibility, `contract` for cross-repository API/schema compatibility,
+  `integration` for multi-repository behavior, or database checks. Emit only
+  command IDs supported by the quality manifest contract; never emit
+  `cross-repository` as an ID.
   Never treat the commands currently present in `quality.json` as proof that the
   required set is complete.
 - The **union** of task-shard ACs covers the approved request. If an AC spans multiple tasks, reference one canonical AC ID from each affected task rather than copying its prose.

@@ -135,8 +135,11 @@ function normalizeIndex(lines) {
   }
   const output = [...lines];
   let changed = actualHeaders.some((header, index) => header !== INDEX_HEADERS[index]);
-  output[headerPosition] = renderRow(INDEX_HEADERS);
-  output[separatorPosition] = renderRow(INDEX_HEADERS.map(() => "------"));
+  const renderedHeader = renderRow(INDEX_HEADERS);
+  const renderedSeparator = renderRow(INDEX_HEADERS.map(() => "------"));
+  if (renderedHeader !== lines[headerPosition] || renderedSeparator !== lines[separatorPosition]) changed = true;
+  output[headerPosition] = renderedHeader;
+  output[separatorPosition] = renderedSeparator;
   for (let position = separatorPosition + 1; position < bounds.indexEnd; position += 1) {
     const cells = tableCells(lines[position]);
     if (cells.length === 0) continue;
@@ -145,8 +148,9 @@ function normalizeIndex(lines) {
       throw new RepairError("task-index-semantic-or-format-defect");
     }
     const reordered = positions.map((index) => cells[index]);
-    if (reordered.some((cell, index) => cell !== cells[index])) changed = true;
-    output[position] = renderRow(reordered);
+    const rendered = renderRow(reordered);
+    if (reordered.some((cell, index) => cell !== cells[index]) || rendered !== lines[position]) changed = true;
+    output[position] = rendered;
   }
   return { lines: output, operations: changed ? ["task-index-columns"] : [] };
 }
@@ -349,17 +353,18 @@ function result({ verdict, reason, before, after, addedPaths, changes, contract 
 
 export async function repairPlanContract(options) {
   let before = Buffer.alloc(0);
-  let contract = await validatePlanContract(options);
+  let contract = null;
   let changes = [];
   try {
     if (options === null || typeof options !== "object" || Array.isArray(options) ||
       Object.keys(options).length !== 2 || options.plan !== "01-plan.md") {
+      contract = await validatePlanContract(null);
       return result({ verdict: "blocked", reason: "arguments-invalid", before, after: before, addedPaths: [], changes, contract });
     }
+    contract = await validatePlanContract(options);
     const workspace = await resolveWorkspace(options.workspace);
     const plan = await readArtifact(workspace, options.plan);
     before = plan.bytes;
-    contract = await validatePlanContract(options);
     if (contract.verdict === "pass") {
       return result({ verdict: "not-needed", reason: "contract-already-passes", before, after: before, addedPaths: [], changes, contract });
     }
@@ -403,6 +408,7 @@ export async function repairPlanContract(options) {
       before, after: finalPlan, addedPaths: parsed.missing.map((task) => task.path), changes, contract: postContract,
     });
   } catch (error) {
+    contract ??= await validatePlanContract(null);
     if (error instanceof RepairError && error.code === "rollback-failed") {
       const residual = [];
       for (const change of changes) {

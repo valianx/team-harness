@@ -1028,7 +1028,7 @@ function parseCli(argv) {
     candidate: values["--candidate"],
     checkpoint: values["--checkpoint"],
     checks,
-    requiredChecks: values["--required-checks"].split(","),
+    requiredChecks: values["--required-checks"] === "" ? [] : values["--required-checks"].split(","),
     policyMode: values["--policy-mode"] ?? "measure",
     ...(Object.hasOwn(values, "--baseline") ? { baseline: values["--baseline"] } : {}),
     ...(Object.hasOwn(values, "--baseline-sha256") ? { baselineSha256: values["--baseline-sha256"] } : {}),

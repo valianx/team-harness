@@ -116,7 +116,8 @@ regression_test_status: failing|passing|skipped|null
 test_contract_evidence: {status: pending|red|green|not-applicable|mixed, index_path, index_sha256, task_count, status_counts: {pending, red, green, not_applicable}}|null
 plan_contract_evidence: {status: pending|pass|not-applicable, reason, result_path, result_sha256, plan_sha256, artifact_set_sha256}|null
 plan_contract_repair_evidence: {status: not-needed|repaired|blocked, reason, result_path, result_sha256, before_sha256, after_sha256, added_paths, artifact_changes: [{path, before_sha256, after_sha256, operations}], contract_result_sha256}|null
-cleaner_evidence: {status: pending|baseline|pass|handoff-pending|handoff-pass|not-applicable, reason, allowlist_path, allowlist_sha256, baseline_path, baseline_sha256, baseline_commit_sha, baseline_tree_sha, cleaner_commit_sha, post_path, post_sha256, post_commit_sha, post_tree_sha, handoff_closure_path, handoff_closure_sha256, handoff_commit_sha, handoff_post_path, handoff_post_sha256, handoff_post_commit_sha, handoff_post_tree_sha}|null
+participating_repositories: [{repository, repo_root, worktree}]|[]
+cleaner_evidence: {status: pending|baseline|pass|cleaner-failed|cleaner-blocked|handoff-pending|handoff-pass|handoff-failed|handoff-blocked|not-applicable, reason, allowlist_path, allowlist_sha256, baseline_path, baseline_sha256, baseline_commit_sha, baseline_tree_sha, cleaner_commit_sha, post_path, post_sha256, post_commit_sha, post_tree_sha, handoff_closure_path, handoff_closure_sha256, handoff_commit_sha, handoff_post_path, handoff_post_sha256, handoff_post_commit_sha, handoff_post_tree_sha}|null
 cleaner_repo_evidence: [{repository, repo_root, worktree, evidence: cleaner_evidence}]|[]
 plan_review_status: not-requested|requested|pass|concerns|fail|null
 audit_status: pending|done|unavailable|null
@@ -140,6 +141,14 @@ delivery_size_justification: {workspace pointer}|null
 delivery_base_status: {base_ref, validated_base_sha, remote_base_sha: {full SHA}|null, status: current|moved|unknown}|null
 delivery_preview: {pr title, workspace paths, and SHA-256 digests bound to Gate 3}|null
 ```
+
+`cleaner_repo_evidence` is complete only when its canonical identity set equals
+`participating_repositories` exactly, with neither missing, extra, nor duplicate
+identities, and one terminal evidence entry exists for every participating
+repository. Main maps cleaner `failed`/`blocked` returns to
+`cleaner-failed`/`cleaner-blocked` and authorized implementer failures or blocks
+to `handoff-failed`/`handoff-blocked`. These terminal non-pass states never
+alias `pending` or `pass` and block Freeze.
 
 Also keep a short phase checklist and a bounded specialist-results table with
 only the latest result per role. The complete file must stay ≤160 lines and

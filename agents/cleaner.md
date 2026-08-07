@@ -133,3 +133,9 @@ finding must include the repository plus all six coordinates above; never propos
 claim authorization. Do not claim final test passage or
 passage of any configured lint, format, coverage, or CRAP check; Main records
 those machine results after return.
+
+`failed` and `blocked` are terminal cleaner outcomes, not aliases for a pending
+or successful checkpoint. Main persists them as
+`cleaner_evidence.status: cleaner-failed` and `cleaner-blocked` respectively,
+with the returned `failure_kind` and hashed result. The cleaner never selects or
+reports the persisted `pending`, `pass`, or handoff states itself.
