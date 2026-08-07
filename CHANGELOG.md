@@ -22,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   decision and made successful activation/preflight mechanics silent in
   operator-facing chat.
 
+### Fixed
+
+- Added a deterministic pre-Gate-1 repair for omitted task-shard routes in the
+  Plan Manifest. Eligible repairs run once without operator authorization,
+  architect redispatch, or iteration cost; semantic defects and missing shards
+  still fail closed.
+
 ## [3.11.1] - 2026-08-06
 
 ### Added

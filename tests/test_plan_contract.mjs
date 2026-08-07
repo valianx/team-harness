@@ -12,6 +12,10 @@ import {
   isPlanContractResult,
   validatePlanContract,
 } from "../plugins/team-harness/skills/pipeline/scripts/plan-contract.mjs";
+import {
+  isPlanContractRepairResult,
+  repairPlanContract,
+} from "../plugins/team-harness/skills/pipeline/scripts/plan-contract-repair.mjs";
 
 const testsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const runner = path.resolve(testsDirectory, "../plugins/team-harness/skills/pipeline/scripts/plan-contract.mjs");
@@ -313,6 +317,79 @@ await check("every manifest task is represented exactly once in the task index",
     const result = await run(workspace);
     assert.equal(result.verdict, "fail");
     assert(result.findings.some((entry) => entry.code === "TASK_INDEX_INVALID" && entry.section === "Task Index coverage"));
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+await check("missing task routes are repaired once without another architect pass", async () => {
+  const taskRows = [1, 2, 3, 4]
+    .map((id) => `| Task-${id} | checkout | pending | 1 | 1 | \`plan/tasks/Task-${id}.md\` |`)
+    .join("\n");
+  const plan = planText()
+    .replace("| task | Task-1 | `plan/tasks/Task-1.md` | AC-1 |\n", "")
+    .replace("| Task-1 | checkout | pending | 1 | 1 | `plan/tasks/Task-1.md` |", taskRows);
+  const workspace = await fixture({ plan });
+  try {
+    for (const id of [2, 3, 4]) {
+      await writeFile(
+        path.join(workspace, `plan/tasks/Task-${id}.md`),
+        taskText().replaceAll("Task-1", `Task-${id}`),
+      );
+    }
+    const before = await readFile(path.join(workspace, "01-plan.md"));
+    const first = await repairPlanContract({ workspace, plan: "01-plan.md" });
+    assert.equal(first.verdict, "repaired", JSON.stringify(first));
+    assert.equal(isPlanContractRepairResult(first), true);
+    assert.deepEqual(first.added_paths, [
+      "plan/tasks/Task-1.md",
+      "plan/tasks/Task-2.md",
+      "plan/tasks/Task-3.md",
+      "plan/tasks/Task-4.md",
+    ]);
+    assert.equal(first.contract_verdict, "pass", JSON.stringify(first));
+    assert.notEqual(first.before_sha256, first.after_sha256);
+    const repaired = await readFile(path.join(workspace, "01-plan.md"));
+    assert.notDeepEqual(repaired, before);
+    for (const route of first.added_paths) assert(repaired.toString("utf8").includes("`" + route + "`"));
+
+    const second = await repairPlanContract({ workspace, plan: "01-plan.md" });
+    assert.equal(second.verdict, "not-needed", JSON.stringify(second));
+    assert.equal(isPlanContractRepairResult(second), true);
+    assert.deepEqual(second.added_paths, []);
+    assert.deepEqual(await readFile(path.join(workspace, "01-plan.md")), repaired);
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+await check("mechanical repair fails closed for semantic index defects", async () => {
+  const plan = planText()
+    .replace("| task | Task-1 | `plan/tasks/Task-1.md` | AC-1 |\n", "")
+    .replace("| Task-1 | checkout | pending | 1 | 1 |", "| Task-1 | checkout | pending | invalid | 1 |");
+  const workspace = await fixture({ plan });
+  try {
+    const before = await readFile(path.join(workspace, "01-plan.md"));
+    const repair = await repairPlanContract({ workspace, plan: "01-plan.md" });
+    assert.equal(repair.verdict, "blocked", JSON.stringify(repair));
+    assert.equal(isPlanContractRepairResult(repair), true);
+    assert.equal(repair.reason, "task-index-semantic-or-format-defect");
+    assert.deepEqual(await readFile(path.join(workspace, "01-plan.md")), before);
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+await check("mechanical repair never manufactures a missing task shard", async () => {
+  const plan = planText().replace("| task | Task-1 | `plan/tasks/Task-1.md` | AC-1 |\n", "");
+  const workspace = await fixture({ plan });
+  try {
+    await rm(path.join(workspace, "plan/tasks/Task-1.md"));
+    const before = await readFile(path.join(workspace, "01-plan.md"));
+    const repair = await repairPlanContract({ workspace, plan: "01-plan.md" });
+    assert.equal(repair.verdict, "blocked", JSON.stringify(repair));
+    assert.equal(isPlanContractRepairResult(repair), true);
+    assert.deepEqual(await readFile(path.join(workspace, "01-plan.md")), before);
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }

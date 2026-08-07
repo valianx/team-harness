@@ -886,7 +886,11 @@ def check_cleaner_crap_contract() -> None:
             require(marker in cleaner, f"{label}: scope contract misses {marker!r}")
 
     state = read("plugins/team-harness/skills/pipeline/references/state-and-gates.md").lower()
-    recovery = read("plugins/team-harness/skills/pipeline/references/recovery.md").lower()
+    recovery = re.sub(
+        r"\s+",
+        " ",
+        read("plugins/team-harness/skills/pipeline/references/recovery.md").lower(),
+    )
     shared_state = read("agents/_shared/orchestrator-state.md").lower()
     require("cleaner_evidence" in state, "cleaner evidence is not durable state")
     require("cleaner_evidence" in shared_state, "agent state schema misses cleaner evidence")
@@ -982,7 +986,9 @@ def check_functional_first_plan_contract() -> None:
         text = re.sub(r"\s+", " ", read(relative).lower())
         for marker in (
             "plan-contract.mjs",
+            "plan-contract-repair.mjs",
             "plan_contract_evidence",
+            "plan_contract_repair_evidence",
             "artifact-set sha-256",
             "observable delta",
             "representative rule/example",
@@ -994,16 +1000,35 @@ def check_functional_first_plan_contract() -> None:
             "planning dispatches only `architect`" in text or "planning dispatches only architect" in text,
             f"{label}: functional-first planning added a specialist dispatch",
         )
+        repair_markers = (
+            ("without operator authorization", "another architect dispatch", "exceptional architect correction")
+            if label == "Claude"
+            else ("no operator authorization", "architect dispatch", "exceptional architect correction")
+        )
+        for marker in repair_markers:
+            require(marker in text, f"{label}: mechanical plan repair misses {marker!r}")
 
     state_sources = (
         read("agents/_shared/orchestrator-state.md").lower(),
         read("plugins/team-harness/skills/pipeline/references/state-and-gates.md").lower(),
     )
     for text in state_sources:
-        for marker in ("plan_contract_evidence", "result_sha256", "plan_sha256", "artifact_set_sha256"):
+        for marker in ("plan_contract_evidence", "plan_contract_repair_evidence", "result_sha256", "plan_sha256", "artifact_set_sha256"):
             require(marker in text, f"plan evidence state misses {marker!r}")
-    recovery = read("plugins/team-harness/skills/pipeline/references/recovery.md").lower()
-    for marker in ("plan_contract_evidence", "legacy-recovery", "self-authored-minimal-plan", "never infer functional completeness"):
+    recovery = re.sub(
+        r"\s+",
+        " ",
+        read("plugins/team-harness/skills/pipeline/references/recovery.md").lower(),
+    )
+    for marker in (
+        "plan_contract_evidence",
+        "plan_contract_repair_evidence",
+        "plan-contract-repair.mjs",
+        "without asking the operator",
+        "legacy-recovery",
+        "self-authored-minimal-plan",
+        "never infer functional completeness",
+    ):
         require(marker in recovery, f"plan evidence recovery misses {marker!r}")
 
     reviewer = re.sub(r"\s+", " ", read("agents/plan-reviewer.md").lower())
@@ -1012,6 +1037,10 @@ def check_functional_first_plan_contract() -> None:
     require(
         (ROOT / "plugins/team-harness/skills/pipeline/scripts/plan-contract.mjs").is_file(),
         "functional plan validator is missing",
+    )
+    require(
+        (ROOT / "plugins/team-harness/skills/pipeline/scripts/plan-contract-repair.mjs").is_file(),
+        "mechanical plan repair helper is missing",
     )
     require((ROOT / "docs/functional-plan-contract.md").is_file(), "functional plan documentation is missing")
 
@@ -1022,6 +1051,7 @@ def check_cross_runtime_pipeline_runners() -> None:
         "bounded-command.mjs",
         "cleaner-transition.mjs",
         "plan-contract.mjs",
+        "plan-contract-repair.mjs",
         "quality-runner.mjs",
         "test-transition.mjs",
     )

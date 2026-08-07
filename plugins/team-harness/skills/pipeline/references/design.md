@@ -29,8 +29,9 @@ and record `size_reason: required-items`; never omit scope or request a split so
 primary thread does not set `next_action: present Stage Gate 1` until the
 deterministic plan evidence below passes.
 
-Before the gate, resolve `scripts/plan-contract.mjs` relative to the loaded
-pipeline skill and run it with the workspace and `01-plan.md`. Persist the
+Before the gate, resolve `scripts/plan-contract.mjs` and
+`scripts/plan-contract-repair.mjs` relative to the loaded pipeline skill and
+run the validator with the workspace and `01-plan.md`. Persist the
 complete JSON, its SHA-256, the plan SHA-256, and artifact-set SHA-256 as
 `plan_contract_evidence`. It deterministically requires the ordered functional
 surface, manifest/artifact set, path-free summary, AC/TC separation and counts,
@@ -43,9 +44,21 @@ from the generated plan index's `Scope Shape` block. Main records evidence for
 those reads before asserting them. The literal values are
 `request_shape: adaptation | new-capability | fix | refactor` and
 `realized_scope: aligned | expanded`; `expansion_reason` is required only when
-expanded, and an aligned plan must omit it. An invalid or
-contradictory scope-shape block is an invalid artifact. An invalid artifact gets one normal design correction; genuine ambiguity is blocked and
-surfaced to the operator. A missing, stale, or failing evidence record blocks
+expanded, and an aligned plan must omit it. An invalid or contradictory
+scope-shape block is an invalid artifact.
+
+When validation fails, run the mechanical repair helper once before classifying
+the failure. Its closed authority is adding Task Index routes to the Plan
+Manifest only when every indexed route is canonical and its regular,
+non-symlink task shard already exists inside the workspace. Persist its complete
+JSON and hash as `plan_contract_repair_evidence`, then rerun the validator. A
+`repaired` or `not-needed` result needs no operator authorization, architect
+dispatch, correction allowance, or iteration. Do not narrate this internal
+checkpoint when it succeeds; present Gate 1 normally. A `blocked` result writes
+nothing. Remaining semantic, ambiguous, malformed-index, missing-artifact, or
+other structural findings receive the one normal design correction; genuine
+ambiguity is blocked and surfaced to the operator. Never create an exceptional
+architect correction for an eligible mechanical omission. A missing, stale, or failing evidence record blocks
 Gate 1 and cannot be replaced by architect prose. Legacy recovery and documented
 self-authored hotfix/Tier-1 plans use only their closed not-applicable reason;
 never migrate them implicitly. `/th:plan-review` is explicit only. Planning dispatches only architect;

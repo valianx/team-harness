@@ -163,6 +163,17 @@ set. `not-applicable` is valid only for `legacy-recovery` or
 failing evidence blocks Gate 1. Never infer functional completeness from the
 architect result, current Markdown, or an earlier gate presentation.
 
+When the pending or failing validator result has no repair record, run
+`plan-contract-repair.mjs` once before any design correction. A recovered
+`plan_contract_repair_evidence.status: repaired` is valid only when its readable
+result hash, before/after plan hashes, added route list, and embedded post-repair
+contract-result hash match the durable artifacts. `not-needed` must have equal
+before/after hashes and no added paths. `blocked` must also have equal hashes
+and no added paths; continue with the residual failure classification without
+asking the operator to authorize a repair. Never rerun a recorded repair,
+convert it into an exceptional architect pass, or infer success without a fresh
+passing `plan_contract_evidence` record.
+
 For any pending or partially recorded gate, regenerate evidence from durable
 artifacts, write a fresh nonce, re-present the numbered gate in the primary
 conversation, and stop. Never repair a field or copy a decision from prose,

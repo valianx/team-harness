@@ -92,6 +92,7 @@ const sharedPipelineScripts = [
   "bounded-command.mjs",
   "cleaner-transition.mjs",
   "plan-contract.mjs",
+  "plan-contract-repair.mjs",
   "quality-runner.mjs",
   "test-transition.mjs",
 ];
