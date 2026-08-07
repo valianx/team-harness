@@ -154,7 +154,8 @@ renaming, splitting, or suppressing measured functions.
 
 The base must be a full 40- or 64-character commit ID. The candidate may be a
 full commit ID or `HEAD`, but it must resolve to the currently checked-out clean
-commit.
+commit. The raw runner does not infer optional checks from the manifest; this
+minimal pre-cleaner invocation works with the required `test` command alone:
 
 ```bash
 node /absolute/path/to/loaded/pipeline/skill/scripts/quality-runner.mjs \
@@ -163,11 +164,11 @@ node /absolute/path/to/loaded/pipeline/skill/scripts/quality-runner.mjs \
   --base 0123456789abcdef0123456789abcdef01234567 \
   --candidate HEAD \
   --checkpoint pre-cleaner \
-  --checks test,crap \
+  --checks test \
   --policy-mode measure
 ```
 
-After cleanup:
+The corresponding minimal post-cleaner invocation is:
 
 ```bash
 node /absolute/path/to/loaded/pipeline/skill/scripts/quality-runner.mjs \
@@ -176,11 +177,17 @@ node /absolute/path/to/loaded/pipeline/skill/scripts/quality-runner.mjs \
   --base 0123456789abcdef0123456789abcdef01234567 \
   --candidate HEAD \
   --checkpoint post-cleaner \
-  --checks test,format_check,lint,crap \
-  --policy-mode enforce \
-  --baseline /path/to/pre-cleaner-result.json \
-  --baseline-sha256 89abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
+  --checks test \
+  --policy-mode enforce
 ```
+
+Select optional checks only when the manifest declares them. Before cleanup,
+use `--checks test,crap` only when both the `crap` command and CRAP policy are
+present. After cleanup, start with `test` and append each declared
+`format_check`, `lint`, and `crap` in that order. When the post-cleaner list
+includes `crap`, also pass the exact pre-cleaner quality result through
+`--baseline /path/to/pre-cleaner-result.json` and its recorded identity through
+`--baseline-sha256 89abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567`.
 
 Successful command output is counted but not replayed. Failure diagnostics use
 the existing bounded-command envelope: independently counted stdout/stderr,
