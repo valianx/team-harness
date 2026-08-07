@@ -139,10 +139,10 @@ The adapter never supplies the CRAP score. The runner computes it consistently:
 CRAP = complexity² × (1 − coverage)³ + complexity
 ```
 
-Use `--policy-mode measure` before cleanup. Persist the result and record its
-SHA-256 in coordinator-owned state. Use `--policy-mode enforce` after cleanup
-with `--baseline` pointing to that result and `--baseline-sha256` carrying the
-recorded identity. Enforcement rejects a new function over
+When CRAP is configured, use `--policy-mode measure` before cleanup. Persist the
+result and record its SHA-256 in coordinator-owned state. Use
+`--policy-mode enforce` after cleanup with `--baseline` pointing to that result
+and `--baseline-sha256` carrying the recorded identity. Enforcement rejects a new function over
 `new_function_max`, a worsening score when policy
 forbids it, a changed function missing from the baseline, a changed manifest,
 or a baseline candidate that is not an ancestor of the current candidate. It
@@ -154,7 +154,8 @@ renaming, splitting, or suppressing measured functions.
 
 The base must be a full 40- or 64-character commit ID. The candidate may be a
 full commit ID or `HEAD`, but it must resolve to the currently checked-out clean
-commit.
+commit. The raw runner does not infer optional checks from the manifest; this
+minimal pre-cleaner invocation works with the required `test` command alone:
 
 ```bash
 node /absolute/path/to/loaded/pipeline/skill/scripts/quality-runner.mjs \
@@ -163,11 +164,11 @@ node /absolute/path/to/loaded/pipeline/skill/scripts/quality-runner.mjs \
   --base 0123456789abcdef0123456789abcdef01234567 \
   --candidate HEAD \
   --checkpoint pre-cleaner \
-  --checks test,format_check,lint,crap \
+  --checks test \
   --policy-mode measure
 ```
 
-After cleanup:
+The corresponding minimal post-cleaner invocation is:
 
 ```bash
 node /absolute/path/to/loaded/pipeline/skill/scripts/quality-runner.mjs \
@@ -176,11 +177,17 @@ node /absolute/path/to/loaded/pipeline/skill/scripts/quality-runner.mjs \
   --base 0123456789abcdef0123456789abcdef01234567 \
   --candidate HEAD \
   --checkpoint post-cleaner \
-  --checks test,format_check,lint,crap \
-  --policy-mode enforce \
-  --baseline /path/to/pre-cleaner-result.json \
-  --baseline-sha256 89abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
+  --checks test \
+  --policy-mode enforce
 ```
+
+Select optional checks only when the manifest declares them. Before cleanup,
+use `--checks test,crap` only when both the `crap` command and CRAP policy are
+present. After cleanup, start with `test` and append each declared
+`format_check`, `lint`, and `crap` in that order. When the post-cleaner list
+includes `crap`, also pass the exact pre-cleaner quality result through
+`--baseline /path/to/pre-cleaner-result.json` and its recorded identity through
+`--baseline-sha256 89abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567`.
 
 Successful command output is counted but not replayed. Failure diagnostics use
 the existing bounded-command envelope: independently counted stdout/stderr,
@@ -194,8 +201,9 @@ the security boundary.
 ## Cleaner integration
 
 The cleaner companion wraps the raw quality records with a hashed production
-allowlist and verifies the exact pre/post transition. See
-[Cleaner and CRAP Checkpoint](cleaner-crap.md).
+allowlist and verifies the exact pre/post transition. It always requires
+`test`; `format_check`, `lint`, and `crap` are selected when declared by the
+manifest. See [Cleaner Checkpoint with Optional CRAP](cleaner-crap.md).
 
 Both deterministic checkpoints live inside `implementation`; they do not
 change the v3 state machine or either Stage Gate.

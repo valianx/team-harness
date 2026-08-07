@@ -1005,12 +1005,15 @@ Bug-fix flow: resume the regression contract started at the implementation check
 
 **jsdom-only soft gate (non-blocking).** When `frontend_scope: true`, no browser-real type was warranted, and the decision log shows a browser-API AC routed to jsdom, note it and proceed unless the operator asks for a re-route.
 
-### Implementation checkpoint — behavior-preserving cleaner and CRAP
+### Implementation checkpoint — behavior-preserving cleaner and optional CRAP
 
 This is one post-green checkpoint over the consolidated tree, not one dispatch
-per task and not a phase or gate. It applies only when the repository quality
-manifest declares `test`, `format_check`, `lint`, and `crap` commands,
-`test_contract.path_rules`, and the CRAP policy. Otherwise record
+per task and not a phase or gate. It applies whenever the repository quality
+manifest declares a `test` command and `test_contract.path_rules`.
+`format_check`, `lint`, and `crap` are additive deterministic checks: run every
+one that the manifest declares, but do not make the cleaner inapplicable merely
+because one is absent. A declared `crap` command still requires CRAP policy.
+When `test` or `test_contract.path_rules` is absent, record
 `cleaner_evidence.status: not-applicable` with
 `reason: repository-quality-manifest-incomplete`; do not infer metrics or ask an
 agent to substitute for missing deterministic tooling.
@@ -1025,11 +1028,11 @@ empty allowlist is an evidenced no-op.
 
 Main resolves and runs `cleaner-transition.mjs --transition pre` with the
 repository, manifest, `verification_base_ref`, `HEAD`, and allowlist. The helper
-runs the embedded `quality-runner.mjs` `pre_cleaner` checks `test,crap` in
-`measure` mode, validates the allowlist against the immutable changed surface,
-and returns one closed wrapper. Persist that complete result and SHA-256 and
-record its candidate commit/tree. Any failure blocks cleanup: no agent may
-reinterpret it.
+runs the embedded `quality-runner.mjs` `pre_cleaner` `test` check plus `crap` in
+`measure` mode when configured, validates the allowlist against the immutable
+changed surface, and returns one closed wrapper. Persist that complete result
+and SHA-256 and record its candidate commit/tree. Any failure blocks cleanup:
+no agent may reinterpret it.
 On pass, dispatch exactly one fresh `cleaner` at `sonnet/medium` with the
 allowlist, functional AC summary, applicable TCs, manifest, and hashed baseline.
 The cleaner may edit only allowlisted existing production paths, never tests or
@@ -1039,20 +1042,21 @@ Main then runs `cleaner-transition.mjs --transition post` with the exact
 allowlist path/hash and pre-transition path/hash. The helper proves the cleaner
 commit descends from the baseline, rejects additions, deletions, renames, type
 changes, and modifications outside the allowlist, then runs the embedded
-`post_cleaner` checks `test,format_check,lint,crap` in `enforce` mode. Pass
-requires all commands green, no changed or new function over policy, no CRAP
-worsening when forbidden, and every baseline function still present in the
-normalized report. Missing functions fail as
+`post_cleaner` `test` check plus each declared `format_check`, `lint`, and
+`crap` check; CRAP runs in `enforce` mode. Pass requires every selected command
+green. When CRAP is configured, pass additionally requires no changed or new
+function over policy, no forbidden CRAP worsening, and every baseline function
+still present in the normalized report. Missing functions fail as
 `CRAP_REPORT_INCOMPLETE`; they cannot disappear from measurement by renaming,
 splitting, exclusion, or adapter omission.
 
 A post-check failure dispatches a fresh cleaner with only the bounded failure
 coordinates and consumes the normal max-3 implementation budget. Tests or
-behavior failing, any protected/out-of-scope change, threshold/config changes,
-or an unavailable required tool blocks rather than being waived. Persist the
-post result and SHA-256, cleaner commit, candidate identity, and pass status;
-then run the code-hygiene scan and proceed to Freeze. QA remains an independent
-auditor of the frozen result.
+behavior failing, any declared optional check failing, any protected/out-of-scope
+change, threshold/config changes, or an unavailable declared tool blocks rather
+than being waived. Persist the post result and SHA-256, cleaner commit,
+candidate identity, and pass status; then run the code-hygiene scan and proceed
+to Freeze. QA remains an independent auditor of the frozen result.
 
 > **Automatic knowledge capture is removed.** Doctrine and KG capture leave delivery entirely. When the operator asks, use the explicit knowledge/documentation flow outside the automatic pipeline; never add a second `delivery` dispatch.
 
