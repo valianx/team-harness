@@ -2659,13 +2659,13 @@ def check_codex_usage_observability_contract() -> None:
     for source, label in ((docs, "observability docs"), (trace, "trace skill")):
         for marker in (
             "~/.claude/.team-harness.json",
-            "tokens_in",
-            "tokens_out",
             "frontmatter",
             "Static opus-agent fallback",
             "price table not configured",
         ):
             require(marker in source, f"{label}: legacy Claude pricing marker missing {marker!r}")
+        for marker in ("tokens_in", "tokens_out"):
+            require(marker not in source, f"{label}: retired per-direction token field {marker!r} reappeared")
 
     for marker in (
         "price table not configured",

@@ -370,12 +370,15 @@ deterministic Layer-1 scan this section complements: `docs/code-hygiene-gate.md 
 4. **Dead code** — commented-out blocks, unreachable branches, unused exports left behind by the
    change.
 5. **Magic numbers** — unexplained numeric/string literals that should be named constants.
+6. **Over-length rationale comments** — a comment block exceeding two lines that neither
+   documents a public API nor matches a bounded load-bearing category in
+   `docs/code-comments.md § 7`; re-verifies the `agents/implementer.md § Comments` cap.
 
 Write a `## Code Hygiene` section into `reviews/04-validation.md` listing every finding with
 `file:line` evidence, or stating "no findings" when clean.
 
 **Status-block field:** `code_hygiene: pass | fail`. `fail` when **any** unjustified finding
-exists in categories 1-5 above.
+exists in categories 1-6 above.
 
 **On `fail`:** append the hygiene findings to `failure-brief.md` as their own `### Hygiene
 findings` block, separate from `### Failing AC`, with `Blast radius: localized {file:line}` or

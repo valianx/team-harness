@@ -719,7 +719,7 @@ reference material only; they are not emitted, dispatched, or gate-releasing.
 event contains an object whose `usage.kind` is `codex_usage_delta`. A
 `phase.start` checkpoint, route, model, agent, or any other field never
 selects it. When no such `phase.end` exists, retain the complete legacy Claude
-contract below unchanged, including `tokens`, `tokens_in`/`tokens_out`,
+contract below unchanged, including `tokens`,
 `tokens_estimated`, `~/.claude/.team-harness.json` pricing, the
 event/frontmatter/static fallbacks, and the established rendering.
 
@@ -770,10 +770,9 @@ Never invent a price, never fail, never crash.
 
 **Model classification.** Phases whose primary agent runs on `claude-opus-*` use the
 `opus` prices; phases on `claude-sonnet-*` (or any other model) use the `sonnet`
-prices. When `tokens_in` / `tokens_out` are both present in the `phase.end` event,
-compute cost as `(tokens_in × input_rate + tokens_out × output_rate) / 1_000_000`.
-When only the total `tokens` is present, use `tokens × (input_rate + output_rate) / 2`
-as a conservative blended estimate and mark the result with `(~)`.
+prices. Compute cost from the total `tokens` as
+`tokens × (input_rate + output_rate) / 2 / 1_000_000`, a conservative blended
+estimate, and mark the result with `(~)`.
 
 ### `## Cost` section schema for `00-pipeline-summary.md`
 

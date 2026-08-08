@@ -454,9 +454,7 @@ usage is unavailable, not a fallback to legacy pricing.
      — do not edit one without the other.
    - **No "all others → sonnet" default.** When none of the three paths
      resolve, classify as `sonnet` and mark the row with `(?)`.
-   - When `tokens_in` / `tokens_out` are available in the event, use
-     `(tokens_in × input + tokens_out × output) / 1_000_000`.
-   - When only `tokens` total is available, use
+   - Compute cost from the total `tokens` as
      `tokens × (input + output) / 2 / 1_000_000` and mark with `(~)`.
 
 5. Render output:

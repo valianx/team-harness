@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.12.1] - 2026-08-08
+
+### Fixed
+
+- Adversary report contract documents the `correction-N` target path, removing the post-correction re-audit deadlock. Fixes #571
+- Code-hygiene gate catches plan-artifact tags (`AC-N`, `TC-N`, `SEC-N`) in Layer 1 and over-length rationale comments in Layer 2. Fixes #497
+
+### Removed
+
+- Retired the never-produced `tokens_in`/`tokens_out` event fields; cost now derives from total `tokens` at the blended rate. Fixes #541
+
 ## [3.12.0] - 2026-08-07
 
 ### Added

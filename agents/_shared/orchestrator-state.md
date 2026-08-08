@@ -422,7 +422,7 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | `phase`, `stage` | conditional | `stage` required for `stage.gate*` |
 | `agent` | conditional | required for `phase.*` |
 | `status` | conditional | `success`/`failed`/`blocked`/`skipped` |
-| `duration_ms`, `tokens`, `tokens_in`, `tokens_out`, `tokens_estimated` | conditional | per the token-tracking rule (legacy/Claude branch when no native `usage` is selected) |
+| `duration_ms`, `tokens`, `tokens_estimated` | conditional | per the token-tracking rule (legacy/Claude branch when no native `usage` is selected) |
 | `usage_scope`, `usage_checkpoint` | conditional | native Codex branch only: safe root-reachable scope plus a `codex_usage_checkpoint`; never an identifier or path |
 | `usage` | conditional | native Codex branch only: a `codex_usage_delta`, measured or unavailable; no estimate or partial subtotal |
 | `pricing_identity`, `cost` | conditional | native Codex branch only: exact provider/model and complete quote provenance |
