@@ -1,6 +1,6 @@
 {
   "name": "team-harness",
-  "version": "3.11.4",
+  "version": "3.12.0",
   "description": "Run the complete shared Team Harness skill catalog in Codex with native setup, updates, hooks, and gated workflows.",
   "author": {
     "name": "Mario Gutierrez",

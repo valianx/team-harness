@@ -20,7 +20,7 @@ write:
 
 - `scripts/manage_config.py` validates, backs up, and atomically writes native
   settings with mode `0o600`.
-- `scripts/manage_agents.py` installs or refreshes the twelve bundled generated
+- `scripts/manage_agents.py` installs or refreshes the nineteen bundled generated
   agents without overwriting an unmanaged same-name file.
 - `scripts/manage_github_identities.py` validates and atomically manages the
   runtime-neutral GitHub workspace/account routes without reading token bytes.
@@ -102,8 +102,11 @@ migration, and preserve every unrelated value.
    agent sync
    installs a missing fallback and migrates only the known obsolete
    `gpt-5.6-luna` value to `gpt-5.6-terra` / `medium`. It preserves any other
-   explicit operator-selected fallback as `custom-preserved`. Named specialists
-   always retain the generated per-role projection table. For project-document
+   explicit operator-selected fallback as `custom-preserved`. Standard named
+   specialists retain the generated per-role projection table; the seven
+   `pipeline-*` identities intentionally omit model and effort so the pipeline
+   can supply either that standard pair or one live-session pair at dispatch.
+   For project-document
    fallbacks, sync preserves their order and appends `CLAUDE.md` once when it is
    absent.
 
@@ -150,7 +153,7 @@ migration, and preserve every unrelated value.
    directory with `GH_CONFIG_DIR=<dir> gh auth login` remains an operator action;
    never read, print, copy, or store token bytes.
 
-6. Reconcile all twelve bundled specialists in the persisted scope on every full
+6. Reconcile all nineteen bundled specialists in the persisted scope on every full
    setup, and whenever `agents` is targeted:
 
    ```bash
@@ -158,8 +161,11 @@ migration, and preserve every unrelated value.
    python3 scripts/manage_agents.py sync --scope SCOPE
    ```
 
-   The pipeline set is `architect`, `implementer`, `tester`, `cleaner`, `qa`, `security`,
-   and `delivery`; the direct inline review set is `inline-reviewer`; the PR-review
+   The spawn-overridable pipeline set is `pipeline-architect`,
+   `pipeline-implementer`, `pipeline-tester`, `pipeline-cleaner`, `pipeline-qa`,
+   `pipeline-security`, and `pipeline-delivery`; the seven corresponding logical
+   role identities retain their standard projections for other bounded skills.
+   The direct inline review set is `inline-reviewer`; the PR-review
    set is `reviewer`, `pr-review-qa`, `pr-review-security`, and
    `reviewer-consolidator`. Missing files are installed and stale Team Harness-managed
    files are refreshed automatically. A same-name unmanaged file is a blocking
@@ -199,7 +205,7 @@ migration, and preserve every unrelated value.
 
 9. Re-run the applicable helper inspections and `codex mcp list --json`; re-run
     `codex features list` only when step 4 ran. Report one compact result:
-    native config path, workspace/language, agent scope and twelve agent statuses,
+    native config path, workspace/language, agent scope and nineteen agent statuses,
     GitHub route count when configured, feature-flag status when checked, MCP registrations, hook
     verification/trust, and whether a new thread is required. Never print
     imported opaque values, secrets, or environment-variable values.

@@ -71,11 +71,11 @@ async function withMutedStderr(action) {
 
 const first = await render();
 const second = await render();
-assert.equal(first.files.size, 26);
+assert.equal(first.files.size, 40);
 assert.deepEqual([...first.files], [...second.files], "identical inputs must render identical bytes");
 
 const agentOutputs = [...first.files].filter(([path]) => path.includes("/.codex/agents/"));
-assert.equal(agentOutputs.length, 12);
+assert.equal(agentOutputs.length, 19);
 for (const [, content] of agentOutputs) {
   assert.match(content, /^name = /m);
   assert.match(content, /^description = /m);
@@ -87,7 +87,7 @@ for (const [, content] of agentOutputs) {
 
 const packagedAgentOutputs = [...first.files].filter(([path]) =>
   path.includes("/plugins/team-harness/skills/setup/assets/agents/"));
-assert.equal(packagedAgentOutputs.length, 12);
+assert.equal(packagedAgentOutputs.length, 19);
 for (const [path, content] of agentOutputs) {
   const name = path.split("/").at(-1);
   assert.equal(
@@ -151,6 +151,24 @@ assert.match(cleaner, /^model = "gpt-5\.6-terra"$/m);
 assert.match(cleaner, /^model_reasoning_effort = "medium"$/m);
 assert.match(cleaner, /^sandbox_mode = "workspace-write"$/m);
 
+const pipelineRoleMap = {
+  "pipeline-architect": "architect",
+  "pipeline-implementer": "implementer",
+  "pipeline-tester": "tester",
+  "pipeline-cleaner": "cleaner",
+  "pipeline-qa": "qa",
+  "pipeline-security": "security",
+  "pipeline-delivery": "delivery",
+};
+for (const [name, role] of Object.entries(pipelineRoleMap)) {
+  const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
+  assert.doesNotMatch(content, /^model = /m, `${name} must accept an explicit spawn model`);
+  assert.doesNotMatch(content, /^model_reasoning_effort = /m, `${name} must accept an explicit spawn effort`);
+  assert.match(content, new RegExp(`^name = "${name}"$`, "m"));
+  assert.match(content, new RegExp(`^# Instruction source: runtime/codex/instructions/${role}\\.md$`, "m"));
+  assert.match(content, new RegExp(`^# Semantic source: agents/${role}\\.md`, "m"));
+}
+
 const architect = first.files.get(join(root, ".codex/agents/architect.toml"));
 for (const marker of [
   "Plan format:",
@@ -174,7 +192,7 @@ const pipelineIdentityDocs = await Promise.all([
   readFile(join(root, "plugins/team-harness/skills/pipeline/SKILL.md"), "utf8"),
   readFile(join(root, "plugins/team-harness/skills/pipeline/references/activation.md"), "utf8"),
 ]);
-for (const name of ["architect", "implementer", "tester", "cleaner", "qa", "security", "delivery"]) {
+for (const name of Object.keys(pipelineRoleMap)) {
   const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
   const normalized = content.replace(/\r\n?/g, "\n");
   const digest = createHash("sha256").update(normalized).digest("hex");
@@ -233,6 +251,12 @@ try {
 await expectRegistryFailure(registry => {
   registry.agents[0].name = "Bad_Name";
 }, /invalid name/);
+await expectRegistryFailure(registry => {
+  registry.agents.find(agent => agent.name === "pipeline-architect").model_policy = "profile";
+}, /aliased roles must use spawn model policy/);
+await expectRegistryFailure(registry => {
+  registry.agents.find(agent => agent.name === "pipeline-architect").model_policy = "ambient";
+}, /unsupported model policy/);
 await expectRegistryFailure(registry => {
   registry.agents[0].semantic_source = "agents/security.md";
 }, /semantic_source must be/);

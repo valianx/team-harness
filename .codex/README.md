@@ -8,7 +8,9 @@ Start Codex from the repository root. Use `@Team-Harness init <request>` for lig
 
 Author shared role intent in `agents/*.md`. Codex model and effort values are projected from that frontmatter, while Codex-specific execution instructions live in `runtime/codex/instructions/*.md` and workflow adapters live in `plugins/team-harness/skills/`. A semantic prompt change is not translated automatically into those adapters, so review both surfaces when behavior should change in Claude Code and Codex.
 
-After changing any canonical agent's model or effort, one of the twelve installed role contracts, a Codex instruction adapter, or `runtime/schema/codex-agents.json`, run `$sync-codex-agents`. The equivalent repository commands are:
+The seven additional `pipeline-*` custom-agent identities reuse the corresponding logical role adapter but intentionally omit `model` and `model_reasoning_effort`. The pipeline passes both values explicitly on every spawn, using the standard role matrix by default or one ephemeral pair selected in the current live Main session.
+
+After changing any canonical agent's model or effort, an installed role contract, a Codex instruction adapter, or `runtime/schema/codex-agents.json`, run `$sync-codex-agents`. The equivalent repository commands are:
 
 ```bash
 node tools/codex-runtime/generate.mjs
