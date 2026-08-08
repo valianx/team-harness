@@ -32,12 +32,40 @@ func TestCodexManifestsAreValidatedAndComplete(t *testing.T) {
 	if len(modules) != 1 {
 		t.Fatalf("modules=%d", len(modules))
 	}
-	if len(components) != 12 {
-		t.Fatalf("components=%d want 12", len(components))
+	wantComponents := []string{
+		"codex-agent-architect",
+		"codex-agent-implementer",
+		"codex-agent-tester",
+		"codex-agent-cleaner",
+		"codex-agent-qa",
+		"codex-agent-security",
+		"codex-agent-inline-reviewer",
+		"codex-agent-delivery",
+		"codex-agent-pipeline-architect",
+		"codex-agent-pipeline-implementer",
+		"codex-agent-pipeline-tester",
+		"codex-agent-pipeline-cleaner",
+		"codex-agent-pipeline-qa",
+		"codex-agent-pipeline-security",
+		"codex-agent-pipeline-delivery",
+		"codex-agent-reviewer",
+		"codex-agent-pr-review-qa",
+		"codex-agent-pr-review-security",
+		"codex-agent-reviewer-consolidator",
 	}
+	if len(components) != len(wantComponents) {
+		t.Fatalf("components=%d want %d", len(components), len(wantComponents))
+	}
+	seen := make(map[string]bool, len(components))
 	for _, component := range components {
+		seen[component.Component] = true
 		if component.Component == "codex-config" || strings.HasSuffix(component.Emits.Files[0], "/config.toml") {
 			t.Fatalf("installer must not own config.toml: %#v", component)
+		}
+	}
+	for _, component := range wantComponents {
+		if !seen[component] {
+			t.Errorf("missing component %q", component)
 		}
 	}
 }

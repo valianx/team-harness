@@ -87,7 +87,7 @@ func ComputePlan(
 		if selectedSet[compID] {
 			continue // still selected — not a removal candidate
 		}
-		if !isRetirableLedgerComponent(compID, placer) {
+		if !isRetirableLedgerComponent(compID, owned, placer) {
 			diff.LedgerErrors = append(diff.LedgerErrors, ledgerError{Line: 0, Reason: fmt.Sprintf("ledger component %q is neither currently managed nor an explicitly retired plugin component", compID)})
 			continue
 		}
@@ -176,9 +176,21 @@ func ComputePlan(
 	return diff, nil
 }
 
-func isRetirableLedgerComponent(component string, placer Placer) bool {
+func isRetirableLedgerComponent(component string, owned OwnershipTags, placer Placer) bool {
+	if historicalOwnership, explicitlyRetired := explicitlyRetiredPluginComponents[component]; explicitlyRetired {
+		return ownershipTagsEqual(owned, historicalOwnership)
+	}
 	return strings.HasPrefix(component, "hook-plugin-") ||
 		(placer.Runtime() == "codex" && strings.HasPrefix(component, "codex-agent-"))
+}
+
+// explicitlyRetiredPluginComponents is the closed allowlist of historical
+// Team Harness component IDs that a newer snapshot may remove. Keep this list
+// exact: accepting every absent agent/skill/command ID would let a forged
+// ledger entry turn an update into an arbitrary managed-path deletion.
+var explicitlyRetiredPluginComponents = map[string]OwnershipTags{
+	// Renamed to agent-init-project in v3.6.1.
+	"agent-init": {Files: []string{"{config_root}/agents/init.md"}, ConfigKeys: []string{}},
 }
 
 func ownershipTagsEqual(a, b OwnershipTags) bool {
