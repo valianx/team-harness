@@ -1672,7 +1672,7 @@ def main() -> None:
         "pipeline-architect": "e1336e37d35b7793dfd9dd9734a7192295c15aaebe15e3f77241716f330ce48f",
         "pipeline-implementer": "1008b1973aeb8bce3953b6c47482d0e3118f9e67898a3b00508f74a119b31641",
         "pipeline-tester": "be88a33209069e9842dfdc8b440e8e2bd82f10157f16494a5224d3165b1eac10",
-        "pipeline-cleaner": "2c8980e5adf54640be3721e299cc71a32aa31c7573bc130d0d1c682927a3550b",
+        "pipeline-cleaner": "d78dc8da49ef52064932f62286b219bb1b0a2b5d318f4815c074099f4709fa48",
         "pipeline-qa": "3429290f07f105c90bcd0c2db6a82092889f92f87142da89dfc53fd836dad026",
         "pipeline-security": "a4de1ab98d3f60f088af71205939d816a8fc22a715f13f118460286b1315fa99",
         "pipeline-delivery": "5b4de188f2040e1976e19c60ecad9d32e2045a08ddbbe52f4af169b505648087",

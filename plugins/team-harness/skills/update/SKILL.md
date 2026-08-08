@@ -153,7 +153,7 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    succeeds.
 
 8. Verify the installed plugin version, native settings, both multi-agent
-   features, twelve agent files, MCP list, and bridge target. Report old/new
+   features, all nineteen agent files, MCP list, and bridge target. Report old/new
    versions, marketplace result, config migration, V2 feature reconciliation,
    agent reconciliation, hook status, bridge status, and any recovery command.
    When the bridge reports `restartRequired: false`, state

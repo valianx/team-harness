@@ -82,7 +82,10 @@ confirm reuse. Use the repository's existing formatter in write mode only on
 allowlisted files. Run at most one focused test or static command for diagnosis;
 Main runs the authoritative post-cleaner manifest commands.
 
-Before committing:
+Before staging or committing, require the current branch to match the dispatch
+and use one of the repository's allowed `feat/`, `fix/`, `chore/`, `docs/`, or
+`refactor/` prefixes. Reject `main`, `master`, the resolved default branch, and
+every other branch name. Then:
 
 1. confirm the branch and repository root match the dispatch;
 2. inspect the cleaner diff against the recorded pre-cleaner commit;
