@@ -155,6 +155,83 @@
       "output_path": ".codex/agents/delivery.toml"
     },
     {
+      "name": "pipeline-architect",
+      "role": "architect",
+      "model_policy": "spawn",
+      "description": "Runs the architect role with the model explicitly selected for the active pipeline session.",
+      "semantic_source": "agents/architect.md",
+      "sandbox_mode": "workspace-write",
+      "capabilities": ["filesystem-read", "filesystem-write", "external-read"],
+      "instruction_source": "runtime/codex/instructions/architect.md",
+      "output_path": ".codex/agents/pipeline-architect.toml"
+    },
+    {
+      "name": "pipeline-implementer",
+      "role": "implementer",
+      "model_policy": "spawn",
+      "description": "Runs the implementer role with the model explicitly selected for the active pipeline session.",
+      "semantic_source": "agents/implementer.md",
+      "sandbox_mode": "workspace-write",
+      "capabilities": ["filesystem-read", "filesystem-write", "command-exec"],
+      "instruction_source": "runtime/codex/instructions/implementer.md",
+      "output_path": ".codex/agents/pipeline-implementer.toml"
+    },
+    {
+      "name": "pipeline-tester",
+      "role": "tester",
+      "model_policy": "spawn",
+      "description": "Runs the tester role with the model explicitly selected for the active pipeline session.",
+      "semantic_source": "agents/tester.md",
+      "sandbox_mode": "workspace-write",
+      "capabilities": ["filesystem-read", "test-write", "command-exec"],
+      "instruction_source": "runtime/codex/instructions/tester.md",
+      "output_path": ".codex/agents/pipeline-tester.toml"
+    },
+    {
+      "name": "pipeline-cleaner",
+      "role": "cleaner",
+      "model_policy": "spawn",
+      "description": "Runs the cleaner role with the model explicitly selected for the active pipeline session.",
+      "semantic_source": "agents/cleaner.md",
+      "sandbox_mode": "workspace-write",
+      "capabilities": ["filesystem-read", "filesystem-write", "command-exec"],
+      "instruction_source": "runtime/codex/instructions/cleaner.md",
+      "output_path": ".codex/agents/pipeline-cleaner.toml"
+    },
+    {
+      "name": "pipeline-qa",
+      "role": "qa",
+      "model_policy": "spawn",
+      "description": "Runs the QA role with the model explicitly selected for the active pipeline session.",
+      "semantic_source": "agents/qa.md",
+      "sandbox_mode": "read-only",
+      "capabilities": ["filesystem-read", "command-exec"],
+      "instruction_source": "runtime/codex/instructions/qa.md",
+      "output_path": ".codex/agents/pipeline-qa.toml"
+    },
+    {
+      "name": "pipeline-security",
+      "role": "security",
+      "model_policy": "spawn",
+      "description": "Runs the security role with the model explicitly selected for the active pipeline session.",
+      "semantic_source": "agents/security.md",
+      "sandbox_mode": "read-only",
+      "capabilities": ["filesystem-read", "command-exec", "external-read"],
+      "instruction_source": "runtime/codex/instructions/security.md",
+      "output_path": ".codex/agents/pipeline-security.toml"
+    },
+    {
+      "name": "pipeline-delivery",
+      "role": "delivery",
+      "model_policy": "spawn",
+      "description": "Runs the delivery role with the model explicitly selected for the active pipeline session.",
+      "semantic_source": "agents/delivery.md",
+      "sandbox_mode": "workspace-write",
+      "capabilities": ["filesystem-read", "filesystem-write", "command-exec", "external-write"],
+      "instruction_source": "runtime/codex/instructions/delivery.md",
+      "output_path": ".codex/agents/pipeline-delivery.toml"
+    },
+    {
       "name": "reviewer",
       "description": "Reviews an immutable pull-request snapshot for concrete merge blockers and suggestions.",
       "semantic_source": "agents/reviewer.md",

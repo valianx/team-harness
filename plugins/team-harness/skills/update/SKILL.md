@@ -107,7 +107,7 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    ```
 
 5. Read `agent-scope` from the native config (the ensured default is
-   `global`) and reconcile all twelve bundled agents automatically:
+   `global`) and reconcile all nineteen bundled agents automatically:
 
    ```bash
    python3 NEW_PLUGIN/skills/setup/scripts/manage_agents.py inspect --scope SCOPE

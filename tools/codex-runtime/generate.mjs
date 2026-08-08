@@ -209,7 +209,16 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
       }
     }
 
-    const expectedSemanticSource = `agents/${agent.name}.md`;
+    const role = agent.role ?? agent.name;
+    if (!/^[a-z][a-z0-9-]*$/.test(role)) fail(`${agent.name}: invalid role`);
+    const modelPolicy = agent.model_policy ?? "profile";
+    if (!new Set(["profile", "spawn"]).has(modelPolicy)) {
+      fail(`${agent.name}: unsupported model policy ${modelPolicy}`);
+    }
+    if (role !== agent.name && modelPolicy !== "spawn") {
+      fail(`${agent.name}: aliased roles must use spawn model policy`);
+    }
+    const expectedSemanticSource = `agents/${role}.md`;
     if (agent.semantic_source !== expectedSemanticSource) fail(`${agent.name}: semantic_source must be ${expectedSemanticSource}`);
     const semanticPath = repositoryPath(rootDir, agent.semantic_source, `${agent.name}.semantic_source`);
     let semanticFields;
@@ -219,7 +228,7 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
       if (error.message.startsWith("codex-runtime:")) throw error;
       fail(`${agent.name}: cannot read semantic source: ${error.message}`);
     }
-    if (semanticFields.get("name") !== agent.name) fail(`${agent.name}: semantic source name does not match`);
+    if (semanticFields.get("name") !== role) fail(`${agent.name}: semantic source name does not match role`);
     const sourceModel = semanticFields.get("model");
     const sourceEffort = semanticFields.get("effort");
     if (!allowedSourceModels.has(sourceModel)) fail(`${agent.name}: unsupported semantic model ${sourceModel ?? "missing"}`);
@@ -227,7 +236,7 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     const matches = projectionTiers.filter(tier => tier.sourceModels.has(sourceModel) && tier.sourceEfforts.has(sourceEffort));
     if (matches.length !== 1) fail(`${agent.name}: semantic model/effort must map to exactly one projection tier (matched ${matches.length})`);
 
-    const expectedSource = `runtime/codex/instructions/${agent.name}.md`;
+    const expectedSource = `runtime/codex/instructions/${role}.md`;
     if (agent.instruction_source !== expectedSource) fail(`${agent.name}: instruction_source must be ${expectedSource}`);
     repositoryPath(rootDir, agent.instruction_source, `${agent.name}.instruction_source`);
     const expectedOutput = `.codex/agents/${agent.name}.toml`;
@@ -236,7 +245,15 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     if (outputPaths.has(resolvedOutput)) fail(`${agent.name}: duplicate output_path`);
     outputPaths.add(resolvedOutput);
     usedProjectionTiers.add(matches[0].name);
-    validatedAgents.push({ ...agent, capabilityProfile, projectionTier: matches[0].name, sourceModel, sourceEffort });
+    validatedAgents.push({
+      ...agent,
+      role,
+      modelPolicy,
+      capabilityProfile,
+      projectionTier: matches[0].name,
+      sourceModel,
+      sourceEffort
+    });
   }
 
   const semanticRoster = [];
@@ -276,8 +293,10 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     usedProjectionTiers.add(matches[0].name);
     semanticRoster.push({ name: expectedName, projectionTier: matches[0].name, sourceModel, sourceEffort });
   }
-  for (const name of names) {
-    if (!semanticRoster.some(agent => agent.name === name)) fail(`${name}: missing from canonical agent roster`);
+  for (const agent of validatedAgents) {
+    if (!semanticRoster.some(role => role.name === agent.role)) {
+      fail(`${agent.name}: role ${agent.role} is missing from canonical agent roster`);
+    }
   }
 
   const selectedProfileName = profileName ?? contract.default_profile;
@@ -300,7 +319,7 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
       `# Projection tier: ${agent.projectionTier}; profile: ${selectedProfileName}`,
       `name = ${JSON.stringify(agent.name)}`,
       `description = ${JSON.stringify(agent.description)}`,
-      ...(profile.inherit_parent ? [] : [
+      ...(profile.inherit_parent || agent.modelPolicy === "spawn" ? [] : [
         `model = ${JSON.stringify(profile.tiers[agent.projectionTier].model)}`,
         `model_reasoning_effort = ${JSON.stringify(profile.tiers[agent.projectionTier].reasoning_effort)}`
       ]),
@@ -358,7 +377,9 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     "",
     "Author shared role intent in `agents/*.md`. Codex model and effort values are projected from that frontmatter, while Codex-specific execution instructions live in `runtime/codex/instructions/*.md` and workflow adapters live in `plugins/team-harness/skills/`. A semantic prompt change is not translated automatically into those adapters, so review both surfaces when behavior should change in Claude Code and Codex.",
     "",
-    "After changing any canonical agent's model or effort, one of the twelve installed role contracts, a Codex instruction adapter, or `runtime/schema/codex-agents.json`, run `$sync-codex-agents`. The equivalent repository commands are:",
+    "The seven additional `pipeline-*` custom-agent identities reuse the corresponding logical role adapter but intentionally omit `model` and `model_reasoning_effort`. The pipeline passes both values explicitly on every spawn, using the standard role matrix by default or one ephemeral pair selected in the current live Main session.",
+    "",
+    "After changing any canonical agent's model or effort, an installed role contract, a Codex instruction adapter, or `runtime/schema/codex-agents.json`, run `$sync-codex-agents`. The equivalent repository commands are:",
     "",
     "```bash",
     "node tools/codex-runtime/generate.mjs",

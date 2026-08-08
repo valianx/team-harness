@@ -49,20 +49,20 @@ the new direct run creates no workspace or pipeline state.
 
 ## Custom-agent preflight
 
-The Codex plugin bundles the pipeline-specific seven-agent subset of its full
-twelve-agent roster, while setup/update materialize the complete roster into a
-Codex agent scope. Before
+The Codex plugin bundles seven spawn-overridable pipeline identities alongside
+the standard role identities, while setup/update materialize the complete
+roster into a Codex agent scope. Before
 initializing a pipeline workspace or dispatching `architect`, resolve the
 repository root and require all of these regular files in one scope:
 
 ```text
-<repo>/.codex/agents/architect.toml
-<repo>/.codex/agents/implementer.toml
-<repo>/.codex/agents/tester.toml
-<repo>/.codex/agents/cleaner.toml
-<repo>/.codex/agents/qa.toml
-<repo>/.codex/agents/security.toml
-<repo>/.codex/agents/delivery.toml
+<repo>/.codex/agents/pipeline-architect.toml
+<repo>/.codex/agents/pipeline-implementer.toml
+<repo>/.codex/agents/pipeline-tester.toml
+<repo>/.codex/agents/pipeline-cleaner.toml
+<repo>/.codex/agents/pipeline-qa.toml
+<repo>/.codex/agents/pipeline-security.toml
+<repo>/.codex/agents/pipeline-delivery.toml
 ```
 
 If the project scope is incomplete, check the equivalent seven paths under
@@ -80,48 +80,50 @@ and generated markers below; marker comments alone are not an identity check.
 
 ```text
 # Code generated from runtime/schema/codex-agents.json; DO NOT EDIT.
-# Instruction source: runtime/codex/instructions/<role>.md
-name = "<role>"
+# Instruction source: runtime/codex/instructions/<logical-role>.md
+name = "pipeline-<logical-role>"
 ```
 
 The role-specific semantic and profile markers must match this matrix:
 
 | Role | Semantic source | Projection/profile |
 |---|---|---|
-| architect | `agents/architect.md (opus/xhigh)` | `opus; profile: team-harness` |
-| implementer | `agents/implementer.md (sonnet/high)` | `sonnet-high; profile: team-harness` |
-| tester | `agents/tester.md (sonnet/high)` | `sonnet-high; profile: team-harness` |
-| cleaner | `agents/cleaner.md (sonnet/medium)` | `sonnet-medium; profile: team-harness` |
-| qa | `agents/qa.md (opus/xhigh)` | `opus; profile: team-harness` |
-| security | `agents/security.md (opus/xhigh)` | `opus; profile: team-harness` |
-| delivery | `agents/delivery.md (sonnet/medium)` | `sonnet-medium; profile: team-harness` |
+| pipeline-architect | `agents/architect.md (opus/xhigh)` | `opus; profile: team-harness` |
+| pipeline-implementer | `agents/implementer.md (sonnet/high)` | `sonnet-high; profile: team-harness` |
+| pipeline-tester | `agents/tester.md (sonnet/high)` | `sonnet-high; profile: team-harness` |
+| pipeline-cleaner | `agents/cleaner.md (sonnet/medium)` | `sonnet-medium; profile: team-harness` |
+| pipeline-qa | `agents/qa.md (opus/xhigh)` | `opus; profile: team-harness` |
+| pipeline-security | `agents/security.md (opus/xhigh)` | `opus; profile: team-harness` |
+| pipeline-delivery | `agents/delivery.md (sonnet/medium)` | `sonnet-medium; profile: team-harness` |
 
-The effective runtime fields must match this projection exactly:
+The effective runtime fields must match this spawn-overridable projection
+exactly. Both `model` and `model_reasoning_effort` must be absent so the
+explicit dispatch values can take effect:
 
-| Role | `name` | `model` | `model_reasoning_effort` | `sandbox_mode` |
-|---|---|---|---|---|
-| architect | `architect` | `gpt-5.6-sol` | `xhigh` | `workspace-write` |
-| implementer | `implementer` | `gpt-5.6-terra` | `high` | `workspace-write` |
-| tester | `tester` | `gpt-5.6-terra` | `high` | `workspace-write` |
-| cleaner | `cleaner` | `gpt-5.6-terra` | `medium` | `workspace-write` |
-| qa | `qa` | `gpt-5.6-sol` | `xhigh` | `read-only` |
-| security | `security` | `gpt-5.6-sol` | `xhigh` | `read-only` |
-| delivery | `delivery` | `gpt-5.6-terra` | `medium` | `workspace-write` |
+| Role | `name` | forbidden fields | `sandbox_mode` |
+|---|---|---|---|
+| architect | `pipeline-architect` | `model`, `model_reasoning_effort` | `workspace-write` |
+| implementer | `pipeline-implementer` | `model`, `model_reasoning_effort` | `workspace-write` |
+| tester | `pipeline-tester` | `model`, `model_reasoning_effort` | `workspace-write` |
+| cleaner | `pipeline-cleaner` | `model`, `model_reasoning_effort` | `workspace-write` |
+| qa | `pipeline-qa` | `model`, `model_reasoning_effort` | `read-only` |
+| security | `pipeline-security` | `model`, `model_reasoning_effort` | `read-only` |
+| delivery | `pipeline-delivery` | `model`, `model_reasoning_effort` | `workspace-write` |
 
 In the files, these appear as `# Semantic source: ...` and
 `# Projection tier: ...` comments. A missing, edited, or mismatched marker or
-field is an identity failure even when `name = "<role>"` matches. Also compare
+field is an identity failure even when `name = "pipeline-<role>"` matches. Also compare
 the normalized (LF) bytes against these canonical SHA-256 digests:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| architect | `f9f05dafa38564aeb8714e2293d565e78be03f6e11e4775801a5344117c44c18` |
-| implementer | `a9c44f6560aae90a03060bba0e192e4b092c25523279bafbe3e31eeaadc4be13` |
-| tester | `7519e2980d21e6f3116da32169386f0531450cf60b6404d7553985879e966c91` |
-| cleaner | `b2da1e953ad822124830363edf8a3be58aa12935024a0448bec066b587e3fc5e` |
-| qa | `2612528da833bcb5cf2db981ac586320a0ad06ac407d38beb564b64880cc24c8` |
-| security | `06434dd772dfff170529c67e15c91c08311329e66f364eb220298a2d0dd2f997` |
-| delivery | `07a5997769adbb2b3304b7640e2f9a701a38564a4f58d192548390b15ffbf7d5` |
+| pipeline-architect | `e1336e37d35b7793dfd9dd9734a7192295c15aaebe15e3f77241716f330ce48f` |
+| pipeline-implementer | `1008b1973aeb8bce3953b6c47482d0e3118f9e67898a3b00508f74a119b31641` |
+| pipeline-tester | `be88a33209069e9842dfdc8b440e8e2bd82f10157f16494a5224d3165b1eac10` |
+| pipeline-cleaner | `2c8980e5adf54640be3721e299cc71a32aa31c7573bc130d0d1c682927a3550b` |
+| pipeline-qa | `3429290f07f105c90bcd0c2db6a82092889f92f87142da89dfc53fd836dad026` |
+| pipeline-security | `a4de1ab98d3f60f088af71205939d816a8fc22a715f13f118460286b1315fa99` |
+| pipeline-delivery | `5b4de188f2040e1976e19c60ecad9d32e2045a08ddbbe52f4af169b505648087` |
 
 A digest mismatch is an identity failure; stop before workspace creation or
 delegation. Ask the operator to run `$team-harness:update` to

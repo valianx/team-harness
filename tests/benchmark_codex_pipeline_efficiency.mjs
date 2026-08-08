@@ -24,13 +24,13 @@ import { fileURLToPath } from "node:url";
 export const RECEIPT_SCHEMA_VERSION = 1;
 export const RECEIPT_KIND = "codex_pipeline_efficiency_provenance_receipt";
 export const EXPECTED_PIPELINE_ROSTER = Object.freeze([
-  "architect.toml",
-  "implementer.toml",
-  "tester.toml",
-  "cleaner.toml",
-  "qa.toml",
-  "security.toml",
-  "delivery.toml",
+  "pipeline-architect.toml",
+  "pipeline-implementer.toml",
+  "pipeline-tester.toml",
+  "pipeline-cleaner.toml",
+  "pipeline-qa.toml",
+  "pipeline-security.toml",
+  "pipeline-delivery.toml",
 ]);
 export const MAX_TREE_FILES = 512;
 export const MAX_TREE_BYTES = 512 * 1024 * 1024;

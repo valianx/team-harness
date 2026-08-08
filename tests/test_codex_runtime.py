@@ -311,9 +311,10 @@ def main() -> None:
     agents = contract["agents"]
     expected = {agent["name"] for agent in agents}
     pipeline_roles = {"architect", "implementer", "tester", "cleaner", "qa", "security", "delivery"}
+    session_pipeline_roles = {f"pipeline-{role}" for role in pipeline_roles}
     review_roles = {"reviewer", "pr-review-qa", "pr-review-security", "reviewer-consolidator"}
     inline_roles = {"inline-reviewer"}
-    if expected != pipeline_roles | review_roles | inline_roles:
+    if expected != pipeline_roles | session_pipeline_roles | review_roles | inline_roles:
         fail(f"unexpected Codex installed roles: {sorted(expected)}")
     architect_contract = next(agent for agent in agents if agent["name"] == "architect")
     if architect_contract["sandbox_mode"] != "workspace-write":
@@ -353,19 +354,30 @@ def main() -> None:
 
     generated = set()
     expected_identity = {
-        "architect": ("opus/xhigh", "opus"),
-        "implementer": ("sonnet/high", "sonnet-high"),
-        "tester": ("sonnet/high", "sonnet-high"),
-        "cleaner": ("sonnet/medium", "sonnet-medium"),
-        "qa": ("opus/xhigh", "opus"),
-        "security": ("opus/xhigh", "opus"),
-        "inline-reviewer": ("sonnet/high", "sonnet-high"),
-        "delivery": ("sonnet/medium", "sonnet-medium"),
-        "reviewer": ("sonnet/high", "sonnet-high"),
-        "pr-review-qa": ("sonnet/high", "sonnet-high"),
-        "pr-review-security": ("sonnet/high", "sonnet-high"),
-        "reviewer-consolidator": ("sonnet/medium", "sonnet-medium"),
+        "architect": ("architect", "opus/xhigh", "opus", False),
+        "implementer": ("implementer", "sonnet/high", "sonnet-high", False),
+        "tester": ("tester", "sonnet/high", "sonnet-high", False),
+        "cleaner": ("cleaner", "sonnet/medium", "sonnet-medium", False),
+        "qa": ("qa", "opus/xhigh", "opus", False),
+        "security": ("security", "opus/xhigh", "opus", False),
+        "inline-reviewer": ("inline-reviewer", "sonnet/high", "sonnet-high", False),
+        "delivery": ("delivery", "sonnet/medium", "sonnet-medium", False),
+        "reviewer": ("reviewer", "sonnet/high", "sonnet-high", False),
+        "pr-review-qa": ("pr-review-qa", "sonnet/high", "sonnet-high", False),
+        "pr-review-security": ("pr-review-security", "sonnet/high", "sonnet-high", False),
+        "reviewer-consolidator": ("reviewer-consolidator", "sonnet/medium", "sonnet-medium", False),
     }
+    for role in pipeline_roles:
+        source_marker, tier = {
+            "architect": ("opus/xhigh", "opus"),
+            "implementer": ("sonnet/high", "sonnet-high"),
+            "tester": ("sonnet/high", "sonnet-high"),
+            "cleaner": ("sonnet/medium", "sonnet-medium"),
+            "qa": ("opus/xhigh", "opus"),
+            "security": ("opus/xhigh", "opus"),
+            "delivery": ("sonnet/medium", "sonnet-medium"),
+        }[role]
+        expected_identity[f"pipeline-{role}"] = (role, source_marker, tier, True)
     expected_projection = {
         "opus": ("gpt-5.6-sol", "xhigh"),
         "sonnet-high": ("gpt-5.6-terra", "high"),
@@ -381,23 +393,26 @@ def main() -> None:
                 fail(f"{path}: missing {required}")
         if data["name"] not in expected_identity:
             fail(f"{path}: unexpected generated agent identity {data['name']!r}")
-        source_marker, tier = expected_identity[data["name"]]
-        if (data.get("model"), data.get("model_reasoning_effort")) != expected_projection[tier]:
+        role, source_marker, tier, spawn_overridable = expected_identity[data["name"]]
+        if spawn_overridable:
+            if "model" in data or "model_reasoning_effort" in data:
+                fail(f"{path}: spawn-overridable pipeline identity pins a model or effort")
+        elif (data.get("model"), data.get("model_reasoning_effort")) != expected_projection[tier]:
             fail(f"{path}: model projection does not match {tier}")
         if "capabilities" in data:
             fail(f"{path}: Codex 0.146 role-schema parser rejects capabilities tables")
         content = path.read_text()
         markers = (
             "# Code generated from runtime/schema/codex-agents.json; DO NOT EDIT.",
-            f"# Instruction source: runtime/codex/instructions/{data['name']}.md",
-            f"# Semantic source: agents/{data['name']}.md ({source_marker})",
+            f"# Instruction source: runtime/codex/instructions/{role}.md",
+            f"# Semantic source: agents/{role}.md ({source_marker})",
             f"# Projection tier: {tier}; profile: team-harness",
             f'name = "{data["name"]}"',
         )
         for marker in markers:
             if marker not in content.splitlines():
                 fail(f"{path}: missing deterministic Team Harness marker {marker!r}")
-        if data["sandbox_mode"] == "read-only" and data["name"] in {"architect", "implementer", "tester", "cleaner", "delivery"}:
+        if data["sandbox_mode"] == "read-only" and role in {"architect", "implementer", "tester", "cleaner", "delivery"}:
             fail(f"{path}: write role is unexpectedly read-only")
         if data["name"] in review_roles and data["sandbox_mode"] != "read-only":
             fail(f"{path}: PR-review role must be read-only")
@@ -939,7 +954,7 @@ def main() -> None:
             fail(f"Codex bundled-agent sync failed: {synced.stdout}{synced.stderr}")
         sync_result = json.loads(synced.stdout)
         if set(sync_result.get("changed", [])) != expected:
-            fail("Codex bundled-agent sync did not install all twelve roles")
+            fail("Codex bundled-agent sync did not install the complete role set")
         runtime_config = temp / "codex-home/config.toml"
         runtime_doc = tomllib.loads(runtime_config.read_text())
         if runtime_doc.get("agents", {}).get("default_subagent_model") != "gpt-5.6-terra":
@@ -1442,8 +1457,8 @@ def main() -> None:
             fail(f"{direct_name} direct fallback does not load persistent configuration")
 
     for role in ("architect", "implementer", "tester", "cleaner", "qa", "security", "delivery"):
-        if f"{role}.toml" not in pipeline:
-            fail(f"pipeline preflight does not name {role}.toml")
+        if f"pipeline-{role}.toml" not in pipeline:
+            fail(f"pipeline preflight does not name pipeline-{role}.toml")
     for marker in (
         "$CODEX_HOME/agents/",
         "$team-harness:setup agents",
@@ -1458,7 +1473,13 @@ def main() -> None:
         "@Team-Harness pipeline <task>",
         "`@Team-Harness init` loads only the lightweight intake posture",
         "Do not create or dispatch a separate `orchestrator` agent",
-        "does not change `Main`'s selected model",
+        "cannot itself change `Main`'s selected model",
+        "pipeline_spawn_profile",
+        "Ejecuta /model",
+        "fork_turns: none",
+        "model_reasoning_effort",
+        "pipeline-architect",
+        "pipeline-delivery",
         "intake-bound live numeric choice `1`",
         "keep successful boot mechanics silent",
         "Do not tell the operator that activation was explicit",
@@ -1640,7 +1661,7 @@ def main() -> None:
     def digest_table(text: str) -> dict[str, str]:
         return dict(
             re.findall(
-                r"\|\s+`?(architect|implementer|tester|cleaner|qa|security|delivery)`?\s+\|\s+`([0-9a-f]{64})`\s+\|",
+                r"\|\s+`?(pipeline-(?:architect|implementer|tester|cleaner|qa|security|delivery))`?\s+\|\s+`([0-9a-f]{64})`\s+\|",
                 text,
             )
         )
@@ -1648,15 +1669,15 @@ def main() -> None:
     activation_digests = digest_table(activation)
     pipeline_digests = digest_table(pipeline)
     expected_updated_digests = {
-        "architect": "f9f05dafa38564aeb8714e2293d565e78be03f6e11e4775801a5344117c44c18",
-        "implementer": "a9c44f6560aae90a03060bba0e192e4b092c25523279bafbe3e31eeaadc4be13",
-        "tester": "7519e2980d21e6f3116da32169386f0531450cf60b6404d7553985879e966c91",
-        "cleaner": "b2da1e953ad822124830363edf8a3be58aa12935024a0448bec066b587e3fc5e",
-        "qa": "2612528da833bcb5cf2db981ac586320a0ad06ac407d38beb564b64880cc24c8",
-        "security": "06434dd772dfff170529c67e15c91c08311329e66f364eb220298a2d0dd2f997",
-        "delivery": "07a5997769adbb2b3304b7640e2f9a701a38564a4f58d192548390b15ffbf7d5",
+        "pipeline-architect": "e1336e37d35b7793dfd9dd9734a7192295c15aaebe15e3f77241716f330ce48f",
+        "pipeline-implementer": "1008b1973aeb8bce3953b6c47482d0e3118f9e67898a3b00508f74a119b31641",
+        "pipeline-tester": "be88a33209069e9842dfdc8b440e8e2bd82f10157f16494a5224d3165b1eac10",
+        "pipeline-cleaner": "2c8980e5adf54640be3721e299cc71a32aa31c7573bc130d0d1c682927a3550b",
+        "pipeline-qa": "3429290f07f105c90bcd0c2db6a82092889f92f87142da89dfc53fd836dad026",
+        "pipeline-security": "a4de1ab98d3f60f088af71205939d816a8fc22a715f13f118460286b1315fa99",
+        "pipeline-delivery": "5b4de188f2040e1976e19c60ecad9d32e2045a08ddbbe52f4af169b505648087",
     }
-    if set(activation_digests) != pipeline_roles or activation_digests != pipeline_digests:
+    if set(activation_digests) != session_pipeline_roles or activation_digests != pipeline_digests:
         fail("pipeline and activation skill digest tables are not synchronized")
     if activation_digests != expected_updated_digests:
         fail("pipeline identity digest table does not match the approved projection set")

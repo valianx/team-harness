@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.12.0] - 2026-08-07
+
+### Added
+
+- Added an ephemeral whole-pipeline model override for Codex. Natural requests
+  such as “pipeline en Luna max” now guide Main through the native `/model`
+  selector and apply the same explicit model and reasoning effort to every
+  specialist without writing the preference to configuration or pipeline state.
+
 ## [3.11.3] - 2026-08-07
 
 ### Changed
