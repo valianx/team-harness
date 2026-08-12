@@ -422,6 +422,24 @@ def main() -> None:
     for role in review_roles - {"reviewer"}:
         if review_contracts[role]["capabilities"] != ["filesystem-read"]:
             fail(f"Codex {role} capability allowlist drifted")
+    read_transport_markers = (
+        "Codex filesystem-read transport",
+        "bounded non-mutating `exec_command`",
+        'sandbox_mode = "read-only"',
+        "one read-only executable with literal arguments",
+        "Do not use shell control operators",
+        "never recommend setup, update, or restart for that condition",
+    )
+    for role in review_roles:
+        adapter = (ROOT / review_contracts[role]["instruction_source"]).read_text()
+        for marker in read_transport_markers:
+            if marker not in adapter:
+                fail(f"Codex {role} adapter is missing filesystem-read transport marker {marker!r}")
+        semantic = (ROOT / review_contracts[role]["semantic_source"]).read_text()
+        tools_line = next((line for line in semantic.splitlines() if line.startswith("tools:")), "")
+        semantic_tools = {tool.strip() for tool in tools_line.removeprefix("tools:").split(",")}
+        if "Bash" in semantic_tools:
+            fail(f"Claude {role} semantic agent unexpectedly gained Bash")
     if generated != expected:
         fail(f"generated roles do not match contract: {sorted(generated)}")
 
@@ -1513,6 +1531,21 @@ def main() -> None:
     ):
         if marker not in review_pr:
             fail(f"Codex review-pr preflight is missing {marker!r}")
+    review_pr_adapter = (ROOT / "plugins/team-harness/skills/review-pr/SKILL.md").read_text()
+    for marker in (
+        "bounded non-mutating `exec_command` calls",
+        'sandbox_mode = "read-only"',
+        "override the canonical no-Bash rule only for those reads",
+        "is not a missing or stale agent declaration",
+        "must never trigger setup, update, or restart guidance",
+        "dispatch one fresh replacement against the same immutable snapshot",
+        "do not clean up or rebuild first",
+        "only if that single retry has an actual read failure",
+    ):
+        if marker not in review_pr_adapter:
+            fail(f"Codex review-pr adapter is missing native read recovery marker {marker!r}")
+    if "Agents run no Bash." not in (ROOT / "skills/review-pr/SKILL.md").read_text():
+        fail("Claude review-pr unexpectedly lost its no-Bash boundary")
 
     output_contract = (ROOT / "docs/output-contract-patterns.md").read_text()
     for marker in (

@@ -31,7 +31,7 @@ workflow:
 5. Preserve every canonical safety boundary, read-only default, confirmation
    gate, secret rule, and outward-write approval. Native Codex sandbox and
    permission policy remain authoritative.
-6. Use native GitHub capabilities or `gh`; preserve immutable snapshot capture and require approval before publishing review writes.
+6. Use native GitHub capabilities or `gh`; preserve immutable snapshot capture and require approval before publishing review writes. For Codex PR-review agents, when standalone `Read`/`Glob`/`Grep` tools are absent, bounded non-mutating `exec_command` calls inside `sandbox_mode = "read-only"` are the native transport for their existing filesystem-read capability and override the canonical no-Bash rule only for those reads. The absence of standalone filesystem tools is not a missing or stale agent declaration and must never trigger setup, update, or restart guidance. If a selected reviewer nevertheless blocks solely for that absence, reject the result and dispatch one fresh replacement against the same immutable snapshot with this transport made explicit; do not clean up or rebuild first, and surface an error only if that single retry has an actual read failure.
 
 Execute the requested workflow after applying this adapter. Do not merely
 summarize the canonical instructions.
