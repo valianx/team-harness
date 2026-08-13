@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.12.1] - 2026-08-12
+
+### Fixed
+
+- Allowed Codex PR-review specialists to use bounded, non-mutating shell
+  commands as their native read transport when standalone filesystem tools are
+  unavailable, without weakening Claude's no-Bash reviewer contract.
+
 ## [3.12.0] - 2026-08-07
 
 ### Added
