@@ -429,6 +429,7 @@ def main() -> None:
         "one read-only executable with literal arguments",
         "Do not use shell control operators",
         "never recommend setup, update, or restart for that condition",
+        "If a bounded read actually fails, return the exact read failure to Main.",
     )
     for role in review_roles:
         adapter = (ROOT / review_contracts[role]["instruction_source"]).read_text()
@@ -1540,7 +1541,10 @@ def main() -> None:
         "must never trigger setup, update, or restart guidance",
         "dispatch one fresh replacement against the same immutable snapshot",
         "do not clean up or rebuild first",
-        "only if that single retry has an actual read failure",
+        "same reviewed head SHA and context hash",
+        "replacement also blocks solely for missing standalone filesystem tools",
+        "fail closed without publishing or approving a review",
+        "include the exact read failure when one exists",
     ):
         if marker not in review_pr_adapter:
             fail(f"Codex review-pr adapter is missing native read recovery marker {marker!r}")
