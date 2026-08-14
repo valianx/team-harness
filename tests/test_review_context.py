@@ -75,7 +75,7 @@ class ReviewContextTests(unittest.TestCase):
             git("remote", "add", "origin", str(remote), cwd=source)
             git("push", "--quiet", "origin", "HEAD:refs/heads/main", cwd=source)
 
-            git("clone", "--quiet", str(remote), str(producer))
+            git("clone", "--quiet", "--branch", "main", str(remote), str(producer))
             git("config", "user.name", "Review Test", cwd=producer)
             git("config", "user.email", "review@example.test", cwd=producer)
             (producer / "file.txt").write_text("head\n", encoding="utf-8")
