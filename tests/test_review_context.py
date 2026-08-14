@@ -50,6 +50,7 @@ class ReviewContextTests(unittest.TestCase):
             root = Path(directory)
             remote = root / "remote.git"
             source = root / "source"
+            producer = root / "producer"
             snapshot = root / "artifacts" / "pr-review-snapshot.git"
             worktree = root / "review-worktree"
             snapshot.parent.mkdir()
@@ -74,14 +75,30 @@ class ReviewContextTests(unittest.TestCase):
             git("remote", "add", "origin", str(remote), cwd=source)
             git("push", "--quiet", "origin", "HEAD:refs/heads/main", cwd=source)
 
-            (source / "file.txt").write_text("head\n", encoding="utf-8")
-            git("commit", "--quiet", "-am", "head", cwd=source)
-            head_oid = git("rev-parse", "HEAD", cwd=source)
-            git("push", "--quiet", "origin", "HEAD:refs/pull/1/head", cwd=source)
+            git("clone", "--quiet", str(remote), str(producer))
+            git("config", "user.name", "Review Test", cwd=producer)
+            git("config", "user.email", "review@example.test", cwd=producer)
+            (producer / "file.txt").write_text("head\n", encoding="utf-8")
+            git("commit", "--quiet", "-am", "head", cwd=producer)
+            head_oid = git("rev-parse", "HEAD", cwd=producer)
+            git("push", "--quiet", "origin", "HEAD:refs/pull/1/head", cwd=producer)
 
             source_git = source / ".git"
             original_mode = source_git.stat().st_mode & 0o777
             os.chmod(source_git, 0o555)
+
+            def source_git_snapshot():
+                return [
+                    (
+                        str(path.relative_to(source_git)),
+                        path.lstat().st_mode,
+                        path.lstat().st_size,
+                        path.lstat().st_mtime_ns,
+                    )
+                    for path in sorted(source_git.rglob("*"))
+                ]
+
+            before = source_git_snapshot()
             try:
                 refs = MODULE.git_snapshot(
                     source,
@@ -95,6 +112,7 @@ class ReviewContextTests(unittest.TestCase):
                 self.assertFalse(
                     (source_git / "refs" / "team-harness" / "review-pr" / "1").exists()
                 )
+                self.assertEqual(source_git_snapshot(), before)
             finally:
                 os.chmod(source_git, original_mode)
 
@@ -103,6 +121,7 @@ class ReviewContextTests(unittest.TestCase):
                 git("--git-dir", str(snapshot), "rev-parse", refs["head_ref"]),
                 head_oid,
             )
+            self.assertFalse((snapshot / "objects" / "info" / "alternates").exists())
             git(
                 "--git-dir",
                 str(snapshot),
@@ -114,6 +133,67 @@ class ReviewContextTests(unittest.TestCase):
                 head_oid,
             )
             self.assertEqual(git("rev-parse", "HEAD", cwd=worktree), head_oid)
+
+    def test_invalid_snapshot_parent_is_a_context_error(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifacts = root / "artifacts"
+            artifacts.mkdir()
+            output = artifacts / "context.json"
+            args = SimpleNamespace(
+                output=output,
+                snapshot_dir=artifacts / "missing" / "snapshot.git",
+                deadline_epoch=None,
+                repo="owner/repo",
+                pr=1,
+                git_dir=root,
+                remote="origin",
+            )
+            with self.assertRaisesRegex(
+                MODULE.ContextError,
+                "snapshot repository parent does not exist",
+            ):
+                MODULE.command_capture(args)
+
+    def test_materialize_uses_one_deadline_for_diff_checks_and_worktree(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifacts = root / "artifacts"
+            artifacts.mkdir()
+            snapshot = artifacts / "pr-review-snapshot.git"
+            snapshot.mkdir()
+            context_path = artifacts / "context.json"
+            value = context(
+                git_refs={"base": "refs/review/base", "head": "refs/review/head"}
+            )
+            context_path.write_text(json.dumps(value), encoding="utf-8")
+            for name in ("tmp-diff", "tmp-files", "tmp-checks"):
+                (artifacts / name).write_text("", encoding="utf-8")
+            args = SimpleNamespace(
+                artifact_root=artifacts,
+                snapshot_dir=snapshot,
+                context=context_path,
+                worktree=root / "worktree",
+                deadline_epoch=MODULE.time.time() + 60,
+                diff_name="tmp-diff",
+                files_name="tmp-files",
+                checks_name="tmp-checks",
+                repo="owner/repo",
+                pr=1,
+            )
+            writes = []
+            commands = []
+            with (
+                patch.object(MODULE, "run_to_leaf", side_effect=lambda *a, **k: writes.append((a, k)) or 0),
+                patch.object(MODULE, "run_text", side_effect=lambda command, **kwargs: commands.append(command) or ""),
+                redirect_stdout(io.StringIO()),
+            ):
+                MODULE.command_materialize(args)
+
+            self.assertEqual([entry[0][1] for entry in writes], ["tmp-diff", "tmp-files", "tmp-checks"])
+            self.assertEqual(writes[-1][1], {"combine_stderr": True, "allow_failure": True})
+            self.assertIn("worktree", commands[-1])
+            self.assertIsNone(MODULE._capture_deadline)
 
     def test_external_commands_are_noninteractive_and_bounded(self):
         with patch.object(
