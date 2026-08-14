@@ -1192,10 +1192,23 @@ def command_materialize(args: argparse.Namespace) -> int:
                 head_oid,
             ]
         )
-    except Exception:
-        if args.worktree.exists() and not args.worktree.is_symlink():
+    except Exception as error:
+        cleanup_error: str | None = None
+        try:
+            cleanup_timeout = command_timeout()
+        except ContextError:
+            cleanup_timeout = None
+            cleanup_error = (
+                "shared deadline exhausted before partial worktree cleanup; "
+                f"inspect {args.worktree} and {snapshot_dir}"
+            )
+        if (
+            cleanup_timeout is not None
+            and args.worktree.exists()
+            and not args.worktree.is_symlink()
+        ):
             try:
-                subprocess.run(
+                cleanup = subprocess.run(
                     [
                         "git",
                         "--git-dir",
@@ -1206,11 +1219,21 @@ def command_materialize(args: argparse.Namespace) -> int:
                     ],
                     check=False,
                     capture_output=True,
-                    timeout=5,
+                    timeout=cleanup_timeout,
                     env=command_environment(),
                 )
+                if cleanup.returncode != 0:
+                    cleanup_error = (
+                        "partial worktree cleanup failed within the shared deadline; "
+                        f"inspect {args.worktree} and {snapshot_dir}"
+                    )
             except (OSError, subprocess.TimeoutExpired):
-                pass
+                cleanup_error = (
+                    "partial worktree cleanup did not complete within the shared "
+                    f"deadline; inspect {args.worktree} and {snapshot_dir}"
+                )
+        if cleanup_error is not None:
+            raise ContextError(f"{error}; {cleanup_error}") from error
         raise
     finally:
         _capture_deadline = None

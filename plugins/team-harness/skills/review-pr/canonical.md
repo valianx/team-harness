@@ -229,8 +229,10 @@ body, and labels once into `$ARTIFACTS/pr-review-issue.json`. Treat failure as
 
 ### 4. Create the frozen worktree and cleanup trap
 
-`materialize` creates the detached worktree within the shared deadline and removes a partially
-created worktree if it fails. Register an EXIT trap immediately after `materialize` succeeds. It
+`materialize` creates the detached worktree within the shared deadline and attempts to remove a
+partially created worktree using only the remaining budget if it fails. If no time remains or
+cleanup cannot finish in that budget, it fails closed and reports the exact residual paths for
+operator cleanup. Register an EXIT trap immediately after `materialize` succeeds. It
 removes the worktree, all
 artifacts inside the exact `$ARTIFACTS` directory (including the private bare repository and its
 temporary refs), and that now-empty directory. Remove the worktree through `$SNAPSHOT_GIT` before

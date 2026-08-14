@@ -195,6 +195,52 @@ class ReviewContextTests(unittest.TestCase):
             self.assertIn("worktree", commands[-1])
             self.assertIsNone(MODULE._capture_deadline)
 
+    def test_materialize_does_not_start_cleanup_after_shared_deadline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifacts = root / "artifacts"
+            artifacts.mkdir()
+            snapshot = artifacts / "pr-review-snapshot.git"
+            snapshot.mkdir()
+            context_path = artifacts / "context.json"
+            value = context(
+                git_refs={"base": "refs/review/base", "head": "refs/review/head"}
+            )
+            context_path.write_text(json.dumps(value), encoding="utf-8")
+            for name in ("tmp-diff", "tmp-files", "tmp-checks"):
+                (artifacts / name).write_text("", encoding="utf-8")
+            worktree = root / "worktree"
+            args = SimpleNamespace(
+                artifact_root=artifacts,
+                snapshot_dir=snapshot,
+                context=context_path,
+                worktree=worktree,
+                deadline_epoch=MODULE.time.time() - 1,
+                diff_name="tmp-diff",
+                files_name="tmp-files",
+                checks_name="tmp-checks",
+                repo="owner/repo",
+                pr=1,
+            )
+
+            def fail_worktree(*_args, **_kwargs):
+                worktree.mkdir()
+                raise MODULE.ContextError("worktree timed out")
+
+            with (
+                patch.object(MODULE, "run_to_leaf", return_value=0),
+                patch.object(MODULE, "run_text", side_effect=fail_worktree),
+                patch.object(MODULE.subprocess, "run") as cleanup,
+            ):
+                with self.assertRaisesRegex(
+                    MODULE.ContextError,
+                    "shared deadline exhausted before partial worktree cleanup",
+                ):
+                    MODULE.command_materialize(args)
+
+            cleanup.assert_not_called()
+            self.assertIsNone(MODULE._capture_deadline)
+
     def test_external_commands_are_noninteractive_and_bounded(self):
         with patch.object(
             MODULE.subprocess,
