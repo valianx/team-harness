@@ -143,6 +143,7 @@ if ! git -C "$REVIEW_ROOT" check-ignore -q -- "$ARTIFACTS"; then
 fi
 CONTEXT="$ARTIFACTS/pr-review-context.json"
 CONVERSATION="$ARTIFACTS/pr-review-conversation.md"
+SNAPSHOT_GIT="$ARTIFACTS/pr-review-snapshot.git"
 
 if [ "${RESUME_FROM_DRAFT:-false}" = "true" ]; then
   for leaf in "$CONTEXT" "$ARTIFACTS/pr-review-final.md" "$ARTIFACTS/pr-review-inline.json"; do
@@ -157,6 +158,7 @@ CONTEXT_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-context.XXXXXX")"
 CONVERSATION_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-conversation.XXXXXX")"
 python3 "$REVIEW_CONTEXT_HELPER" capture \
   --repo "{owner}/{repo}" --pr {number} --git-dir "$REVIEW_ROOT" \
+  --snapshot-dir "$SNAPSHOT_GIT" \
   --output "$CONTEXT_TMP"
 python3 "$REVIEW_CONTEXT_HELPER" render \
   --context "$CONTEXT_TMP" --output "$CONVERSATION_TMP"
@@ -179,6 +181,14 @@ Read metadata and immutable refs from `$CONTEXT`. Store `head_oid`, `base_oid`,
 `merge_base_oid`, `context_hash`, `fetched_at`, `is_cross_repository`, and the classified and raw
 mergeability values.
 
+The helper resolves the configured source remote from `$REVIEW_ROOT`, initializes without user Git
+templates or validates a private bare repository at `$SNAPSHOT_GIT`, and fetches the exact base SHA
+and PR head ref only there. It must never fetch, update refs, create worktree administration, or
+otherwise write inside the operator checkout's `.git`. Every freshness recapture reuses
+`$SNAPSHOT_GIT` and passes the same `--snapshot-dir`; every external `gh` and `git` subprocess is
+non-interactive and the complete capture is bounded to 60 seconds. A timeout or snapshot
+validation failure fails closed without sandbox escalation.
+
 ### 3. Materialize review artifacts
 
 Write data once and pass paths to agents. Do not duplicate the diff, policy, or conversation
@@ -192,8 +202,8 @@ DIFF_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-diff.XXXXXX")"
 FILES_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-files.XXXXXX")"
 CHECKS_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-checks.XXXXXX")"
 
-git diff "{frozen_base_ref}...{frozen_head_ref}" > "$DIFF_TMP"
-git diff --name-only "{frozen_base_ref}...{frozen_head_ref}" > "$FILES_TMP"
+git --git-dir "$SNAPSHOT_GIT" diff "{frozen_base_ref}...{frozen_head_ref}" > "$DIFF_TMP"
+git --git-dir "$SNAPSHOT_GIT" diff --name-only "{frozen_base_ref}...{frozen_head_ref}" > "$FILES_TMP"
 gh pr checks {number} --repo "{owner}/{repo}" > "$CHECKS_TMP" 2>&1 || true
 python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
   --temporary-name "${DIFF_TMP##*/}" --final-name "${DIFF##*/}"
@@ -214,13 +224,14 @@ body, and labels once into `$ARTIFACTS/pr-review-issue.json`. Treat failure as
 
 ```bash
 WORKTREE="${TMPDIR:-/tmp}/team-harness-pr-review-{number}"
-git worktree add --detach "$WORKTREE" "$head_oid"
+git --git-dir "$SNAPSHOT_GIT" worktree add --detach "$WORKTREE" "$head_oid"
 ```
 
 Register an EXIT trap immediately. It removes the worktree, all
-artifacts inside the exact `$ARTIFACTS` directory, that now-empty directory, and
-`refs/team-harness/review-pr/{number}/{base,head}`. Never remove any sibling workspace or force-remove an
-unexpected dirty worktree; surface it.
+artifacts inside the exact `$ARTIFACTS` directory (including the private bare repository and its
+temporary refs), and that now-empty directory. Remove the worktree through `$SNAPSHOT_GIT` before
+removing the snapshot repository. Never remove any sibling workspace or force-remove an unexpected
+dirty worktree; surface it.
 
 Capture `git status --untracked-files=all` and `git diff HEAD` for both the frozen worktree and
 review-artifact root before dispatch. Repeat after all agents finish. The snapshots must be

@@ -13,11 +13,14 @@ import secrets
 import stat
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any, Iterable
 
 
 SCHEMA_VERSION = 2
+COMMAND_TIMEOUT_SECONDS = 60
+_capture_deadline: float | None = None
 BOT_BODY_LIMIT = 500
 HUMAN_BODY_LIMIT = 2_000
 DETAILS_RE = re.compile(r"<details\b[^>]*>.*?</details>", re.IGNORECASE | re.DOTALL)
@@ -217,13 +220,25 @@ def ensure_workspaces_ignored(repo_root: Path) -> None:
 
 
 def run_json(command: list[str], *, cwd: Path | None = None) -> Any:
-    result = subprocess.run(
-        command,
-        cwd=cwd,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    timeout = command_timeout()
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env={
+                **os.environ,
+                "GH_PROMPT_DISABLED": "1",
+                "GIT_TERMINAL_PROMPT": "0",
+            },
+        )
+    except subprocess.TimeoutExpired as error:
+        raise ContextError(
+            f"{' '.join(command[:3])} timed out within the {COMMAND_TIMEOUT_SECONDS}s capture limit"
+        ) from error
     if result.returncode != 0:
         detail = result.stderr.strip() or result.stdout.strip() or "unknown error"
         raise ContextError(f"{' '.join(command[:3])} failed: {detail}")
@@ -234,17 +249,40 @@ def run_json(command: list[str], *, cwd: Path | None = None) -> Any:
 
 
 def run_text(command: list[str], *, cwd: Path | None = None) -> str:
-    result = subprocess.run(
-        command,
-        cwd=cwd,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    timeout = command_timeout()
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env={
+                **os.environ,
+                "GH_PROMPT_DISABLED": "1",
+                "GIT_TERMINAL_PROMPT": "0",
+            },
+        )
+    except subprocess.TimeoutExpired as error:
+        raise ContextError(
+            f"{' '.join(command[:3])} timed out within the {COMMAND_TIMEOUT_SECONDS}s capture limit"
+        ) from error
     if result.returncode != 0:
         detail = result.stderr.strip() or result.stdout.strip() or "unknown error"
         raise ContextError(f"{' '.join(command[:3])} failed: {detail}")
     return result.stdout.strip()
+
+
+def command_timeout() -> float:
+    if _capture_deadline is None:
+        return float(COMMAND_TIMEOUT_SECONDS)
+    remaining = _capture_deadline - time.monotonic()
+    if remaining <= 0:
+        raise ContextError(
+            f"capture timed out within the {COMMAND_TIMEOUT_SECONDS}s capture limit"
+        )
+    return min(float(COMMAND_TIMEOUT_SECONDS), remaining)
 
 
 def is_bot(login: str) -> bool:
@@ -523,36 +561,63 @@ def capture_commits(repo: str, number: int) -> list[dict[str, Any]]:
 
 
 def git_snapshot(
-    git_dir: Path,
+    source_repo: Path,
+    snapshot_dir: Path,
     remote: str,
     number: int,
     base_oid: str,
     head_oid: str,
 ) -> dict[str, str]:
+    if snapshot_dir.is_symlink():
+        raise ContextError("snapshot repository must not be a symlink")
+    if snapshot_dir.exists():
+        if not snapshot_dir.is_dir():
+            raise ContextError("snapshot repository must be a real directory")
+        is_bare = run_text(
+            ["git", "--git-dir", str(snapshot_dir), "rev-parse", "--is-bare-repository"]
+        )
+        if is_bare != "true":
+            raise ContextError("snapshot repository is not a bare Git repository")
+    else:
+        run_text(
+            ["git", "init", "--bare", "--quiet", "--template=", str(snapshot_dir)]
+        )
+
+    fetch_source = run_text(
+        ["git", "remote", "get-url", remote],
+        cwd=source_repo,
+    )
     prefix = f"refs/team-harness/review-pr/{number}"
     base_ref = f"{prefix}/base"
     head_ref = f"{prefix}/head"
     run_text(
         [
             "git",
+            "--git-dir",
+            str(snapshot_dir),
             "fetch",
             "--no-tags",
             "--force",
-            remote,
+            fetch_source,
             f"+{base_oid}:{base_ref}",
             f"+refs/pull/{number}/head:{head_ref}",
-        ],
-        cwd=git_dir,
+        ]
     )
-    fetched_base = run_text(["git", "rev-parse", base_ref], cwd=git_dir)
-    fetched_head = run_text(["git", "rev-parse", head_ref], cwd=git_dir)
+    fetched_base = run_text(
+        ["git", "--git-dir", str(snapshot_dir), "rev-parse", base_ref]
+    )
+    fetched_head = run_text(
+        ["git", "--git-dir", str(snapshot_dir), "rev-parse", head_ref]
+    )
     if fetched_base != base_oid or fetched_head != head_oid:
         raise ContextError(
             "PR changed while context was captured; retry before reviewing "
             f"(expected {base_oid[:12]}..{head_oid[:12]}, "
             f"fetched {fetched_base[:12]}..{fetched_head[:12]})"
         )
-    merge_base = run_text(["git", "merge-base", base_ref, head_ref], cwd=git_dir)
+    merge_base = run_text(
+        ["git", "--git-dir", str(snapshot_dir), "merge-base", base_ref, head_ref]
+    )
     return {
         "base_ref": base_ref,
         "head_ref": head_ref,
@@ -668,14 +733,27 @@ def capture_metadata(repo: str, number: int) -> dict[str, Any]:
     )
 
 
-def capture(repo: str, number: int, git_dir: Path, remote: str) -> dict[str, Any]:
+def capture(
+    repo: str,
+    number: int,
+    source_repo: Path,
+    remote: str,
+    snapshot_dir: Path,
+) -> dict[str, Any]:
     metadata = capture_metadata(repo, number)
     base_oid = metadata.get("baseRefOid")
     head_oid = metadata.get("headRefOid")
     if not base_oid or not head_oid:
         raise ContextError("GitHub did not return baseRefOid and headRefOid")
 
-    refs = git_snapshot(git_dir, remote, number, base_oid, head_oid)
+    refs = git_snapshot(
+        source_repo,
+        snapshot_dir,
+        remote,
+        number,
+        base_oid,
+        head_oid,
+    )
     context: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "fetched_at": dt.datetime.now(dt.timezone.utc).isoformat(),
@@ -918,7 +996,25 @@ def write_json(path: Path, value: Any) -> None:
 
 
 def command_capture(args: argparse.Namespace) -> int:
-    context = capture(args.repo, args.pr, args.git_dir.resolve(), args.remote)
+    global _capture_deadline
+    artifact_root, artifact_fd = _open_directory(args.output.parent)
+    os.close(artifact_fd)
+    requested_snapshot = args.snapshot_dir or artifact_root / "pr-review-snapshot.git"
+    if requested_snapshot.parent.resolve(strict=True) != artifact_root:
+        raise ContextError("snapshot repository must be a direct child of the artifact root")
+    _safe_leaf(requested_snapshot.name)
+    snapshot_dir = artifact_root / requested_snapshot.name
+    _capture_deadline = time.monotonic() + COMMAND_TIMEOUT_SECONDS
+    try:
+        context = capture(
+            args.repo,
+            args.pr,
+            args.git_dir.resolve(),
+            args.remote,
+            snapshot_dir,
+        )
+    finally:
+        _capture_deadline = None
     write_json(args.output, context)
     print(
         json.dumps(
@@ -1002,6 +1098,7 @@ def build_parser() -> argparse.ArgumentParser:
     capture_parser.add_argument("--pr", required=True, type=int)
     capture_parser.add_argument("--output", required=True, type=Path)
     capture_parser.add_argument("--git-dir", default=Path("."), type=Path)
+    capture_parser.add_argument("--snapshot-dir", type=Path)
     capture_parser.add_argument("--remote", default="origin")
     capture_parser.set_defaults(func=command_capture)
 
