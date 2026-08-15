@@ -6,6 +6,38 @@ Enter only from `phase: implementation` with a valid dual-record
 half is absent, malformed, or inconsistent, load `recovery.md`, prepare the
 gate with a fresh nonce, and stop.
 
+## Working topology and protected Git metadata
+
+Before any task dispatch, establish the approved working topology. A planned
+worktree must already have an absolute `worktree`, exact `worktree_branch`, and
+immutable full-SHA `worktree_base` in state; those fields declare intent and do
+not prove the branch or worktree exists. Gate 1 authorizes the implementation
+scope but never grants technical sandbox access to `.git`.
+
+Run read-only `git worktree list --porcelain`, `git branch --list
+<worktree_branch>`, and base-object verification first. When both targets are
+absent, issue only `git worktree add -b <worktree_branch> <worktree>
+<worktree_base>`. If protected Git metadata rejects the normal call, request
+native escalation for that same exact command. Do not add `.git` to writable
+roots, install a blanket Git allow rule, use a clone/copy bypass, or dispatch
+against the dirty checkout.
+
+A native approval-review timeout is neither denial nor a functional pipeline
+failure. Do not automatically retry, recap, replace the command, create another
+gate, change `phase: implementation`, or dispatch a specialist. Persist
+`status: paused` and the exact pending command in `next_action`, then emit one
+instruction to approve the technical action. A later live operator approval
+authorizes one resubmission of the identical escalation; it does not itself
+make `.git` writable. After success, verify the registered absolute path,
+branch, and `HEAD == worktree_base`, then set `working_branch` and continue.
+All matching on recovery means verify and resume; all absent means resume the
+same approval step; partial or mismatched topology stops for operator direction
+without destructive repair.
+
+For branch-in-place, perform the same dirty-tree and ownership checks before
+`git checkout -b`; Gate 1 likewise cannot supply that command's native Git
+metadata permission.
+
 Read `plan/delivery.md` to form dependency rounds. Before every task dispatch,
 preflight its exact `plan/tasks/Task-N.md` and fail closed unless its
 `required_invariants`, `required_evidence_anchors`, and

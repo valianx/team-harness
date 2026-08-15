@@ -50,6 +50,42 @@ the local `main` may lag origin by one or more commits, re-introducing a collisi
 worktree add ... origin/main` form bases the new checkout from the named remote-tracking ref, which
 is always the freshly fetched state.
 
+### Codex protected-`.git` boundary
+
+Gate 1 is functional authority for the approved implementation. It is never a
+technical sandbox grant. In Codex `workspace-write`, the repository worktree
+may be writable while the shared `.git` metadata remains protected; `git
+worktree add` writes both a branch ref and `.git/worktrees`, so Main must obtain
+native approval for that exact local command independently of
+`approved-autonomous`.
+
+The plan records the absolute worktree path, branch, and an immutable base
+commit before Gate 1. Physical creation happens only after a valid Gate-1
+dual-record and before any implementation dispatch. Main first performs the
+read-only Rule-2 collision checks and verifies the base object, then runs the
+single exact argv-equivalent command:
+
+```bash
+git worktree add -b <branch> <absolute-path> <immutable-base-sha>
+```
+
+If the sandbox rejects protected Git metadata, retry that same narrowly scoped
+command through the native escalation surface. Never widen a writable root to
+include `.git`, pre-authorize a blanket Git rule, substitute a clone/copy, or
+implement in the dirty checkout. A native approval-review timeout is neither a
+denial nor a functional pipeline failure: it does not revoke Gate 1, create a
+replacement attempt, or authorize another automatic escalation. Keep
+`phase: implementation`, set `status: paused`, and make `next_action` identify
+the one exact pending worktree command. Report one instruction to approve that
+technical action. A later live operator approval authorizes one resubmission of
+the same escalation; it does not itself make `.git` writable.
+
+On success, verify the registered path, exact branch, and `HEAD ==
+<immutable-base-sha>` before setting `working_branch` or dispatching. On
+recovery, all absent means resume the same technical approval; all matching
+means verify and continue; any partial or mismatched branch/worktree state is a
+collision that stops for operator direction without destructive repair.
+
 > **U1 boundary statement (canonical):** A human's own-terminal `git checkout -b` cannot be
 > intercepted by any hook. Git has no client-side pre-checkout hook. The `worktree-guard.sh`
 > advisory hook fires only on agent-issued Bash tool calls and explicitly cannot cover operations
@@ -178,7 +214,7 @@ lookup rather than a search:
 # in 00-state.md ## Current State
 - worktree: {absolute path | null}
 - worktree_branch: {branch name | null}
-- worktree_base: {origin/main | <dep-branch> | null}
+- worktree_base: {immutable commit SHA | null}
 ```
 
 ```markdown
@@ -187,7 +223,9 @@ lookup rather than a search:
 ```
 
 `null` values are valid for single-session tasks that run branch-in-place. When the worktree
-field is populated, the coordinator and later preflight sweep use it as the durable coordinate.
+field is populated before creation, it is the declared target rather than proof that the
+filesystem entry already exists; `working_branch` stays `null` until the verified creation.
+The coordinator and later preflight sweep use the recorded topology as the durable coordinate.
 No filesystem search is needed.
 
 ---

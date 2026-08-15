@@ -47,7 +47,11 @@ or migrate artifacts between Obsidian and local roots.
 
 **First state write — at the Intake → Design boundary, not at boot.** Write `{docs_root}/00-state.md` with `pipeline_version: 3`, `status: in_progress`, `phase: design`, `stage: 1`, the resolved config, and the classification block Intake produced. Write the canonical named-state checklist with every row unchecked. Append `{"event":"pipeline.start"}` to `{events_file}`. You are the sole writer of this file from here on.
 
-`worktree`, `worktree_branch` and `working_branch` are established here when the work runs in a worktree — the field contract and its two legitimate producer paths are in `agents/_shared/orchestrator-state.md § Current State`.
+When design selects a worktree, its absolute `worktree`, `worktree_branch`, and
+immutable `worktree_base` are declared before Gate 1. They are intent, not
+proof of creation; `working_branch` remains null until implementation entry
+creates and verifies the worktree. The field contract and its two legitimate
+producer paths are in `agents/_shared/orchestrator-state.md § Current State`.
 
 ## No capability-check fallback
 
@@ -900,7 +904,28 @@ points remain traceable events inside the single `implementation` state.
 
 ### Branch guarantee, `working_branch` assertion, `base_sha` registration — at entry, before any dispatch
 
-Guarantee a working branch distinct from the default branch exists. Worktree topology: already true from boot. **Branch-in-place: create it here** (`git checkout -b`, naming per `CLAUDE.md § 6.2`) — this is where that branch comes into existence, never deferred to delivery.
+Guarantee a working branch distinct from the default branch exists.
+
+**Worktree topology.** The declaration exists from design, but physical Git
+topology is established here, after a valid Gate-1 dual record and before any
+specialist dispatch. Apply the "Codex protected-`.git` boundary" section in
+`docs/worktree-discipline.md` by reference. Gate 1 is functional authority, never
+a native sandbox grant. Run the Rule-2 read-only collision checks, verify the
+recorded immutable `worktree_base`, and issue only the exact `git worktree add
+-b <worktree_branch> <worktree> <worktree_base>` command. If protected `.git`
+requires elevation, retry that same command through native escalation.
+
+An approval-review timeout is not denial or functional pipeline failure. Do not loop,
+replace the command, dispatch an implementer, invalidate Gate 1, or change
+phase. Persist `status: paused` and the exact pending command in `next_action`,
+then give one technical-approval instruction. A later live approval permits one
+resubmission of the identical escalation but does not itself widen the
+sandbox. Success requires the path, exact branch, and HEAD equal to the
+recorded base before copying `worktree_branch` into `working_branch`. Partial or
+mismatched topology stops without clone/copy, dirty-checkout work, or
+destructive repair.
+
+**Branch-in-place:** create it here (`git checkout -b`, naming per `CLAUDE.md § 6.2`) — this is where that branch comes into existence, never deferred to delivery. Its Git-metadata write likewise remains subject to the runtime's native technical approval and cannot be inferred from Gate 1.
 
 Immediately before branch-in-place creation, run `git status --short` and `git worktree list
 --porcelain`. Stop on unfamiliar work or unexpected worktree ownership; never create the branch

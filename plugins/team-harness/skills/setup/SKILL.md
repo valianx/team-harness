@@ -123,6 +123,15 @@ migration, and preserve every unrelated value.
      the external workspace ready. The pipeline's non-escalated live write
      probe remains authoritative; never enter an escalation loop or weaken the
      sandbox because persistent config looks correct.
+   - Worktree creation is intentionally not pre-authorized by setup. Keep
+     `approval_policy = "on-request"`; never add a repository `.git` directory
+     to `sandbox_workspace_write.writable_roots` and never install a blanket
+     `git` or `git worktree add` command rule. A pipeline that needs an isolated
+     checkout requests native escalation for its one exact `git worktree add -b
+     <branch> <absolute-path> <immutable-base-sha>` command after Gate 1. If the
+     native approval reviewer times out, setup state is not rewritten and the
+     pipeline remains technically paused; the operator may approve one
+     resubmission through the live native permission flow.
    - Language is a two-letter lowercase code or absent for automatic detection.
    - English learning, Obsidian Tasks, and flow telemetry are booleans;
      telemetry defaults off.
@@ -214,7 +223,9 @@ migration, and preserve every unrelated value.
     native config path, workspace/language, agent scope and nineteen agent statuses,
     GitHub route count when configured, feature-flag status when checked, MCP registrations, hook
     verification/trust, whether a new thread is required, and for Obsidian
-    whether the writable-root grant still requires that restart. Never print
+    whether the writable-root grant still requires that restart. Also report
+    that protected Git worktree creation remains exact-command, on-request, and
+    independent of Gate 1. Never print
     imported opaque values, secrets, or environment-variable values.
 
 The flow is idempotent. Blank input preserves current values; unrelated native

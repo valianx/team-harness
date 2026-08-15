@@ -2374,6 +2374,157 @@ def check_obsidian_workspace_preflight_contract() -> None:
     require((ROOT / "tests/test_workspace_preflight.mjs").is_file(), "workspace preflight regression suite is missing")
 
 
+def check_codex_worktree_permission_contract() -> None:
+    """Gate authority never aliases Codex permission or timeout semantics."""
+    semantic = re.sub(r"\s+", " ", read("agents/ref-pipeline.md").lower())
+    shared_state = re.sub(
+        r"\s+", " ", read("agents/_shared/orchestrator-state.md").lower()
+    )
+    discipline = re.sub(
+        r"\s+", " ", read("docs/worktree-discipline.md").lower()
+    )
+    implementation = re.sub(
+        r"\s+",
+        " ",
+        read(
+            "plugins/team-harness/skills/pipeline/references/implementation.md"
+        ).lower(),
+    )
+    recovery = re.sub(
+        r"\s+",
+        " ",
+        read("plugins/team-harness/skills/pipeline/references/recovery.md").lower(),
+    )
+    state = re.sub(
+        r"\s+",
+        " ",
+        read(
+            "plugins/team-harness/skills/pipeline/references/state-and-gates.md"
+        ).lower(),
+    )
+    setup = re.sub(
+        r"\s+", " ", read("plugins/team-harness/skills/setup/SKILL.md").lower()
+    )
+    runtime_readme = re.sub(
+        r"\s+", " ", read("runtime/codex/README.md").lower()
+    )
+    design = re.sub(
+        r"\s+",
+        " ",
+        read("plugins/team-harness/skills/pipeline/references/design.md").lower(),
+    )
+    architect = re.sub(r"\s+", " ", read("agents/architect.md").lower())
+    architect_adapter = re.sub(
+        r"\s+", " ", read("runtime/codex/instructions/architect.md").lower()
+    )
+
+    for label, text in (
+        ("canonical discipline", discipline),
+        ("semantic pipeline", semantic),
+        ("distributed implementation", implementation),
+    ):
+        for marker in (
+            "gate 1",
+            "functional",
+            "sandbox",
+            "git worktree add",
+            "exact",
+            "approval-review timeout",
+            "denial",
+            "functional pipeline failure",
+            "status: paused",
+            "next_action",
+            "one resubmission",
+        ):
+            require(marker in text, f"{label}: worktree permission marker missing {marker!r}")
+
+    for marker in (
+        "do not automatically retry",
+        "do not automatically retry, recap, replace the command",
+        "dispatch a specialist",
+        "clone/copy bypass",
+        "dirty checkout",
+        "head == worktree_base",
+    ):
+        require(
+            marker in implementation,
+            f"implementation: worktree timeout safety marker missing {marker!r}",
+        )
+
+    for marker in (
+        "protected git topology recovery",
+        "both branch and registered worktree are absent",
+        "all match",
+        "only one target exists",
+        "never delete, force-repair, silently reuse, clone/copy",
+        "never changes phase",
+        "dispatches or replaces an implementer",
+        "interrupt_agent",
+    ):
+        require(marker in recovery, f"recovery: worktree marker missing {marker!r}")
+
+    for label, text in (("semantic state", shared_state), ("distributed state", state)):
+        for marker in (
+            "worktree: {absolute path",
+            "worktree_branch: {branch",
+            "worktree_base: {immutable full commit sha",
+            "working_branch",
+            "declare",
+            "proof",
+        ):
+            require(marker in text, f"{label}: topology marker missing {marker!r}")
+
+    for label, text in (
+        ("distributed design", design),
+        ("semantic architect", architect),
+        ("Codex architect adapter", architect_adapter),
+    ):
+        for marker in ("worktree", "immutable full commit sha"):
+            require(marker in text, f"{label}: immutable worktree base missing {marker!r}")
+    for marker in (
+        "before presenting gate 1",
+        "worktree_branch",
+        "worktree_base",
+        "do not create the branch/worktree",
+        "implementation entry",
+    ):
+        require(marker in design, f"design: planned topology marker missing {marker!r}")
+
+    for marker in (
+        'approval_policy = "on-request"',
+        "never add a repository `.git` directory",
+        "never install a blanket",
+        "one exact `git worktree add -b",
+        "after gate 1",
+        "technically paused",
+    ):
+        require(marker in setup, f"setup: protected Git marker missing {marker!r}")
+
+    for marker in (
+        "does not grant filesystem authority",
+        "native on-request escalation",
+        "neither adds `.git` to writable roots nor installs a blanket",
+        "not a functional failure or denial",
+    ):
+        require(marker in runtime_readme, f"runtime docs: protected Git marker missing {marker!r}")
+
+    combined = " ".join((semantic, discipline, implementation, recovery))
+    for forbidden in (
+        "timeout means failure",
+        "timeout proves failure",
+        "timeout is a denial",
+        "on timeout, interrupt",
+        "after timeout, interrupt",
+        "on timeout, replace",
+        "after timeout, replace",
+        "timeout authorizes another automatic escalation",
+    ):
+        require(
+            forbidden not in combined,
+            f"worktree contract permits timeout-based action: {forbidden!r}",
+        )
+
+
 def check_execution_efficiency_contract() -> None:
     """Codex execution stays interruptible, bounded, and diagnostically useful."""
     pipeline = re.sub(
@@ -2981,6 +3132,7 @@ def main() -> None:
         ("Claude/Codex parity", check_claude_codex_parity),
         ("wait heartbeat and phase SLA", check_wait_heartbeat_sla_contract),
         ("Obsidian workspace preflight", check_obsidian_workspace_preflight_contract),
+        ("Codex worktree technical approval", check_codex_worktree_permission_contract),
         ("execution efficiency", check_execution_efficiency_contract),
         ("context isolation and rotation", check_context_isolation_rotation_contract),
         ("Codex usage observability", check_codex_usage_observability_contract),

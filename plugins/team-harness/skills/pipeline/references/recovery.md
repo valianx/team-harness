@@ -149,6 +149,33 @@ nonces; never synthesize a release or repair a malformed one. If the coupled
 write or required evidence is impossible, route to `blocked` without writing a
 v3 migration.
 
+## Protected Git topology recovery
+
+For `phase: implementation` with a non-null planned worktree and null
+`working_branch`, validate the Gate-1 dual record first, then treat
+`worktree`, `worktree_branch`, and immutable full-SHA `worktree_base` as the
+complete declared target. Run only read-only collision and identity checks
+before resuming its creation:
+
+- If both branch and registered worktree are absent and `next_action` names the
+  exact matching `git worktree add -b <branch> <path> <base>` command, preserve
+  `status: paused` and resume that one native technical-approval step. Do not
+  replay an escalation automatically merely because its approval reviewer
+  timed out.
+- If branch, registered path, exact branch, and `HEAD == worktree_base` all
+  match, verify the worktree is suitable, write `working_branch`, clear the
+  technical pause, and continue implementation.
+- If only one target exists, or any path, branch, or commit differs, stop for
+  operator direction. Never delete, force-repair, silently reuse, clone/copy,
+  or fall back to the dirty checkout.
+
+Gate 1 remains valid throughout this technical pause. A native
+approval-review timeout is neither a denial, a terminal result, nor a
+functional pipeline failure; it never changes phase, creates a new Gate 1,
+dispatches or replaces an implementer, or justifies an `interrupt_agent` call.
+A current live operator approval permits one resubmission of the identical
+escalation, while the sandbox still decides whether the command executes.
+
 ## Gate and resume safety
 
 Before resuming `next_action`, require the structural dual-record:

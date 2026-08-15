@@ -48,6 +48,12 @@ directories or broad write access to the user home. Codex still
 protects `.git` directories in this mode, so tests that construct temporary Git
 repositories require a narrowly approved command or an equivalent external CI
 sandbox; the project config does not weaken that boundary.
+In particular, an approved Team Harness Gate 1 does not grant filesystem
+authority: `git worktree add` must use Codex's native on-request escalation for
+the exact command because it writes refs and shared `.git/worktrees` metadata.
+Team Harness setup neither adds `.git` to writable roots nor installs a blanket
+Git command rule. An approval-review timeout leaves the pipeline technically
+paused and recoverable; it is not a functional failure or denial.
 An additional writable root for an Obsidian Team Harness workspace changes only
 that external subtree. It takes effect for newly started Codex sessions and
 does not make the repository's `.git` writable; `.git` remains protected by

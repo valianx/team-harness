@@ -308,11 +308,11 @@ gate_nonce: {token}|null                    # fresh per presentation, consumed o
 ```
 worktree: {absolute path}|null               # null when running branch-in-place
 worktree_branch: {branch}|null
-worktree_base: origin/main|{dep-branch}|null
+worktree_base: {immutable full commit SHA}|null
 working_branch: {branch}|null
 ```
 
-`working_branch` has two legitimate producer paths and only the orchestrator writes either. **Worktree topology:** copied from `worktree_branch` at branch establishment. **Branch-in-place:** `null` until implementation entry, which creates the branch and writes the field. Delivery only validates it; a null or mismatched value is an upstream failure, never permission to create a late branch around reviewed commits.
+`worktree`, `worktree_branch`, and `worktree_base` declare the planned topology before Gate 1; they are not proof that Git metadata exists. `working_branch` has two legitimate producer paths and only the orchestrator writes either. **Worktree topology:** keep it `null` until implementation entry verifies the newly created or already matching worktree, then copy `worktree_branch`. **Branch-in-place:** keep it `null` until implementation entry creates the branch and writes the field. Delivery only validates it; a null or mismatched value is an upstream failure, never permission to create a late branch around reviewed commits.
 
 `verification_base_source_ref` and `verification_base_ref` have one producer site: implementation entry. The source field preserves the selected branch or commit so Freeze can detect movement; the base field is the full commit SHA resolved from that source and is never rewritten. Implementation checkpoints, Freeze, the frozen diff, and the verification packet all consume the immutable SHA. The packet mirrors it; it never produces it.
 

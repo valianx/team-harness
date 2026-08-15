@@ -77,6 +77,14 @@ self-authored hotfix/Tier-1 plans use only their closed not-applicable reason;
 never migrate them implicitly. `/th:plan-review` is explicit only. Planning dispatches only architect;
 a sensitive plan carries its security assessment and security-relevant TCs to final validation.
 
+Before presenting Gate 1, when the validated plan requires an isolated
+worktree, Main copies its absolute path, exact branch, and immutable full commit
+SHA into `worktree`, `worktree_branch`, and `worktree_base`. Reject a moving
+ref, missing SHA, or incomplete topology. These fields declare the approved
+target only: do not create the branch/worktree or set `working_branch` during
+design. Physical creation and any protected-`.git` native approval happen at
+implementation entry.
+
 ## STAGE-GATE-1
 
 Present the gate from the validated functional contract rather than copying
