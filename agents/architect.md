@@ -442,7 +442,7 @@ Stacked PRs within the SAME repository (a group's Base = a sibling group's branc
 - **Service:** {service-name — must appear in Services Touched}
 - **Title:** `{conventional-commit-style PR title, e.g., feat(reports): add GET /reports/daily endpoint}`
 - **Branch (suggested):** `feat/{kebab-case-name}`
-- **Worktree:** `{absolute worktree path | null}` — branch `{branch name | null}`, base `{origin/main | <dep-branch> | null}`
+- **Worktree:** `{absolute worktree path | null}` — branch `{branch name | null}`, base `{immutable full commit SHA | null}`
 - **Files:**
   - `{path}` (new|modify)
   - `{path}` (new|modify)

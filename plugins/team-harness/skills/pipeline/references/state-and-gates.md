@@ -39,6 +39,12 @@ report artifacts; they never write state, releases, nonces, or gate events and
 never speak for the operator. Write `next_action` before every dispatch and
 record its result before advancing. Preserve unrelated changes.
 
+The absolute `workspace` and effective `logs_mode` become immutable identity at
+the first state write. Every artifact and event for that run stays below that
+one canonical root. A permission failure, restart, recovery, or configured-root
+change never migrates or splits an existing pipeline; only an explicit abort
+followed by a separate activation may choose another root.
+
 Keep a replaceable snapshot with these stable fields (narrative belongs in the
 events file):
 
@@ -131,6 +137,8 @@ validated_commit_sha: {full commit object ID or null}
 validated_tree_sha: {full tree object ID or null}
 open_findings: [{id, disposition}]|[]
 worktree: {absolute path or null}
+worktree_branch: {branch or null}
+worktree_base: {immutable full commit SHA or null}
 working_branch: {branch or null}
 delivery_version: {committed version}|not-bumped|null
 delivery_version_axis: patch|minor|none|null
@@ -165,6 +173,13 @@ with `task_id`, status, `not_applicable_reason`, `contract_path`,
 `green_evidence_sha256`. Main atomically replaces the artifact and recomputes
 the digest, task count, overall status, and four status counts after every task
 transition. This keeps the snapshot below 16 KB even at the maximum task count.
+
+`worktree`, `worktree_branch`, and `worktree_base` are declared topology, not
+proof of creation. A worktree plan records all three before Gate 1 and keeps
+`working_branch: null` until implementation entry verifies the registered path,
+exact branch, and immutable base. A protected-`.git` approval timeout uses
+`status: paused` plus the exact pending command in `next_action`; it does not
+change `phase`, invalidate Gate 1, or create another gate.
 
 `usage_*`, `total_tokens`, and `cost_*` are the current aggregate rendered from
 `phase.end.usage` records under [observability.md](observability.md). They

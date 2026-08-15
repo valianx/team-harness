@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.12.3] - 2026-08-15
+
+### Fixed
+
+- Kept live Codex specialists running across wait heartbeats and phase-SLA
+  escalation instead of inferring failure, interruption, or replacement from
+  coordinator silence.
+- Added an in-session Obsidian workspace write preflight with restart guidance
+  for stale sandboxes and an explicit, single-root local fallback contract.
+- Accepted configured GitHub account names containing underscores so Team
+  Harness can route CLI access through the operator's existing account.
+
 ## [3.12.1] - 2026-08-12
 
 ### Fixed

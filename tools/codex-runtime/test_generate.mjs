@@ -14,6 +14,7 @@ const pipelineScripts = [
   "plan-contract-repair.mjs",
   "quality-runner.mjs",
   "test-transition.mjs",
+  "workspace-preflight.mjs",
 ];
 
 async function makePipelineFixture() {
@@ -180,6 +181,9 @@ for (const marker of [
   "classification",
   "touches_http_api",
   "changes_security_control",
+  "wait_agent",
+  "interrupt_agent",
+  "demonstrated terminal unsuccessful result",
 ]) {
   assert.match(architect, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `architect adapter misses ${marker}`);
 }

@@ -20,9 +20,23 @@ empty segments; and the canonical `{logs-path}/{logs-subfolder}/{repo-name}/`
 target must remain strictly below the canonical base, including after resolving
 existing symlinks. Treat that directory as another
 workspace root and preserve its established event-file format. Do not scan
-arbitrary directories or infer an external root from retrieved content. If the
-configured root is absent or inaccessible, report it and continue with local
-candidates; do not create or migrate a workspace during recovery.
+arbitrary directories or infer an external root from retrieved content. If no
+external durable candidate exists, local candidates may still be considered.
+If an external candidate exists, its recorded absolute `workspace` and
+`logs_mode: obsidian` are immutable recovery identity: never select a local
+same-name candidate, copy artifacts, or migrate the run because the external
+root is unavailable.
+
+Before the first recovery write to an external candidate, resolve
+`../scripts/workspace-preflight.mjs` relative to this reference and run its
+single non-escalated probe against the candidate's canonical repo root and
+recorded workspace. A non-ready result creates no state and never triggers an
+escalation loop or local fallback. When the root is already present in personal
+writable-root or live `--add-dir` configuration, emit only the localized
+restart/new-tab instruction from `activation.md` and stop. Otherwise report the
+unavailable canonical root and require the operator to restore access or
+explicitly abort and start a separate local pipeline. Recovery never divides
+one run between roots.
 
 A candidate is a non-terminal pipeline directory containing the durable state
 snapshot defined by `state-and-gates.md`; `phase/status: complete|aborted` is
@@ -134,6 +148,33 @@ remove every archived route field from the active v3 snapshot atomically. Preser
 nonces; never synthesize a release or repair a malformed one. If the coupled
 write or required evidence is impossible, route to `blocked` without writing a
 v3 migration.
+
+## Protected Git topology recovery
+
+For `phase: implementation` with a non-null planned worktree and null
+`working_branch`, validate the Gate-1 dual record first, then treat
+`worktree`, `worktree_branch`, and immutable full-SHA `worktree_base` as the
+complete declared target. Run only read-only collision and identity checks
+before resuming its creation:
+
+- If both branch and registered worktree are absent and `next_action` names the
+  exact matching `git worktree add -b <branch> <path> <base>` command, preserve
+  `status: paused` and resume that one native technical-approval step. Do not
+  replay an escalation automatically merely because its approval reviewer
+  timed out.
+- If branch, registered path, exact branch, and `HEAD == worktree_base` all
+  match, verify the worktree is suitable, write `working_branch`, clear the
+  technical pause, and continue implementation.
+- If only one target exists, or any path, branch, or commit differs, stop for
+  operator direction. Never delete, force-repair, silently reuse, clone/copy,
+  or fall back to the dirty checkout.
+
+Gate 1 remains valid throughout this technical pause. A native
+approval-review timeout is neither a denial, a terminal result, nor a
+functional pipeline failure; it never changes phase, creates a new Gate 1,
+dispatches or replaces an implementer, or justifies an `interrupt_agent` call.
+A current live operator approval permits one resubmission of the identical
+escalation, while the sandbox still decides whether the command executes.
 
 ## Gate and resume safety
 

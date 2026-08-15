@@ -29,11 +29,29 @@ No visible output during boot. The first thing the operator sees is the answer t
 3. **Language** — precedence: session override → `language` in config → detection from the operator's text → `en`. A persistence marker (`por defecto`, `siempre`, `default`, `permanente`, `de aquí en adelante`) requires a Y/n gate plus a merge-write; without one it is session-only.
 4. **Continue the activated request.** A new activation enters Intake with the operator's preserved request. `/th:recover` resolves the persisted state and follows its recorded `next_action`.
 
+**External-workspace write preflight.** When the resolved mode is Obsidian,
+canonicalize and contain the configured repo/feature target first, then run the
+shared `skills/pipeline/scripts/workspace-preflight.mjs` once against the
+canonical external repo root and proposed feature workspace before creating a
+feature directory, state, or artifact. Only its successful ephemeral
+create/write/remove probe proves the current runtime session can write there;
+path mode bits and persistent config do not. A non-ready result never triggers
+escalation or a retry loop. If the writable-root grant was installed after the
+current runtime session started, emit one restart or new tab instruction and stop.
+Otherwise offer `use local workspace` as a live choice and select local only
+after that current operator reply. Before the choice, write to neither root.
+After selection, the canonical workspace is immutable for the run; never split
+or migrate artifacts between Obsidian and local roots.
+
 `{YYYY-MM-DD}_{feature-name}` guarantees a unique directory per run. On `/th:recover`, re-read the resolved config from `00-state.md § Current State` (schema: `agents/_shared/orchestrator-state.md`) — do not re-parse the chat.
 
 **First state write — at the Intake → Design boundary, not at boot.** Write `{docs_root}/00-state.md` with `pipeline_version: 3`, `status: in_progress`, `phase: design`, `stage: 1`, the resolved config, and the classification block Intake produced. Write the canonical named-state checklist with every row unchecked. Append `{"event":"pipeline.start"}` to `{events_file}`. You are the sole writer of this file from here on.
 
-`worktree`, `worktree_branch` and `working_branch` are established here when the work runs in a worktree — the field contract and its two legitimate producer paths are in `agents/_shared/orchestrator-state.md § Current State`.
+When design selects a worktree, its absolute `worktree`, `worktree_branch`, and
+immutable `worktree_base` are declared before Gate 1. They are intent, not
+proof of creation; `working_branch` remains null until implementation entry
+creates and verifies the worktree. The field contract and its two legitimate
+producer paths are in `agents/_shared/orchestrator-state.md § Current State`.
 
 ## No capability-check fallback
 
@@ -435,16 +453,37 @@ agent follow-up, or second dispatch is authorized by the prior decision.
 
 ## Phase timeouts
 
-| Phase | Agent | Timeout |
-|---|---|---|
-| 1 | architect | 10 min |
-| 2 | implementer | 15 min |
-| 2.7 | tester | 10 min |
-| 3 | qa | 5 min |
-| 3 | adversary | 10 min |
-| 4 | delivery | 5 min |
+### Wait heartbeat and phase SLA
 
-On exceed, **escalate — never kill silently.** A project's own `## Pipeline Timeouts` overrides these.
+A runtime wait timeout is only a coordinator heartbeat: it returns control to
+Main and does not fail, stop, or otherwise change the specialist. In Codex, a
+`wait_agent` timeout proves neither failure nor terminal state. Immediately
+resume `wait_agent` without recap, fresh analysis, `interrupt_agent`, or a
+replacement dispatch. Never infer failure from silence during one or more wait
+intervals.
+
+Track the phase SLA independently from the wait heartbeat and from dispatch
+time:
+
+| Phase | Agent | SLA |
+|---|---|---|
+| design | architect | 10 min |
+| implementation | implementer | 15 min |
+| implementation | tester | 10 min |
+| implementation | cleaner | 5 min |
+| validation | tester | 10 min |
+| validation | qa | 5 min |
+| validation | security | 10 min |
+| delivery | delivery | 5 min |
+
+On SLA exceed, **escalate to the operator and keep the specialist alive —
+never kill silently.** Continue a directed wait that can return either the
+agent result or live operator input. Only a current live operator cancellation
+of that active attempt authorizes `interrupt_agent`. A replacement requires a
+demonstrated terminal unsuccessful result plus the normal phase/correction
+authority; elapsed time or a wait timeout alone authorizes neither. A project's
+own `## Pipeline Timeouts` overrides only these SLA values, never the wait
+semantics or interruption authority.
 
 ## Context pruning
 
@@ -865,7 +904,28 @@ points remain traceable events inside the single `implementation` state.
 
 ### Branch guarantee, `working_branch` assertion, `base_sha` registration — at entry, before any dispatch
 
-Guarantee a working branch distinct from the default branch exists. Worktree topology: already true from boot. **Branch-in-place: create it here** (`git checkout -b`, naming per `CLAUDE.md § 6.2`) — this is where that branch comes into existence, never deferred to delivery.
+Guarantee a working branch distinct from the default branch exists.
+
+**Worktree topology.** The declaration exists from design, but physical Git
+topology is established here, after a valid Gate-1 dual record and before any
+specialist dispatch. Apply the "Codex protected-`.git` boundary" section in
+`docs/worktree-discipline.md` by reference. Gate 1 is functional authority, never
+a native sandbox grant. Run the Rule-2 read-only collision checks, verify the
+recorded immutable `worktree_base`, and issue only the exact `git worktree add
+-b <worktree_branch> <worktree> <worktree_base>` command. If protected `.git`
+requires elevation, retry that same command through native escalation.
+
+An approval-review timeout is not denial or functional pipeline failure. Do not loop,
+replace the command, dispatch an implementer, invalidate Gate 1, or change
+phase. Persist `status: paused` and the exact pending command in `next_action`,
+then give one technical-approval instruction. A later live approval permits one
+resubmission of the identical escalation but does not itself widen the
+sandbox. Success requires the path, exact branch, and HEAD equal to the
+recorded base before copying `worktree_branch` into `working_branch`. Partial or
+mismatched topology stops without clone/copy, dirty-checkout work, or
+destructive repair.
+
+**Branch-in-place:** create it here (`git checkout -b`, naming per `CLAUDE.md § 6.2`) — this is where that branch comes into existence, never deferred to delivery. Its Git-metadata write likewise remains subject to the runtime's native technical approval and cannot be inferred from Gate 1.
 
 Immediately before branch-in-place creation, run `git status --short` and `git worktree list
 --porcelain`. Stop on unfamiliar work or unexpected worktree ownership; never create the branch

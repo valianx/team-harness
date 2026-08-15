@@ -1706,13 +1706,13 @@ def main() -> None:
     activation_digests = digest_table(activation)
     pipeline_digests = digest_table(pipeline)
     expected_updated_digests = {
-        "pipeline-architect": "e1336e37d35b7793dfd9dd9734a7192295c15aaebe15e3f77241716f330ce48f",
-        "pipeline-implementer": "1008b1973aeb8bce3953b6c47482d0e3118f9e67898a3b00508f74a119b31641",
-        "pipeline-tester": "be88a33209069e9842dfdc8b440e8e2bd82f10157f16494a5224d3165b1eac10",
-        "pipeline-cleaner": "d78dc8da49ef52064932f62286b219bb1b0a2b5d318f4815c074099f4709fa48",
-        "pipeline-qa": "3429290f07f105c90bcd0c2db6a82092889f92f87142da89dfc53fd836dad026",
-        "pipeline-security": "a4de1ab98d3f60f088af71205939d816a8fc22a715f13f118460286b1315fa99",
-        "pipeline-delivery": "5b4de188f2040e1976e19c60ecad9d32e2045a08ddbbe52f4af169b505648087",
+        "pipeline-architect": "da8514ad9f5d19cd8834937bffa1d4a730267587577a33a36dddf1512fa5df25",
+        "pipeline-implementer": "50339cdb6ebbf546914634c406740e957cd0b7152adb24f56dafaf5cb3656b17",
+        "pipeline-tester": "eaadd9d23fea4bab3cddae0dd3ea76ad33d76e2564866254e06b6fce6aa1be0b",
+        "pipeline-cleaner": "ea4260bcb8fc1e17034f0d6f91b9d97efefeb61065c50b88a25e792eaaab88b9",
+        "pipeline-qa": "702c3bcbb41f9d2dd162b166a821f2a4f60f4ff3b04fd028113c4aae713d12b6",
+        "pipeline-security": "fa5c8ce48def49085705fa083b1c2be2c02c9b9e560043313f3ba70f7004861a",
+        "pipeline-delivery": "1173e6d5edb63039cdc7d315f4c170c8f5489f76665b2cd77df682ae4be08246",
     }
     if set(activation_digests) != session_pipeline_roles or activation_digests != pipeline_digests:
         fail("pipeline and activation skill digest tables are not synchronized")

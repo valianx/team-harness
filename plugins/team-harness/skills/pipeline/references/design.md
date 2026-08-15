@@ -16,6 +16,15 @@ workspace path, repository root, constraints, required acceptance criteria, and 
 The specialist returns a file-scoped `sharded-v1` manifest plus plan shards and classification;
 it never edits coordination state.
 
+Wait for that same architect attempt to complete. A `wait_agent` timeout is
+only the wait heartbeat and immediately resumes the directed wait without
+recap, replacement, or `interrupt_agent`; it is not the architect's 10-minute
+SLA and proves no failure. Track the SLA from dispatch. On SLA exceed, escalate
+once to the operator while leaving the architect alive and continue waiting for
+either its result or live operator input. Only a live cancellation of that
+active attempt authorizes interruption; replacement requires a demonstrated
+terminal unsuccessful result and the normal design authority.
+
 The plan must lead with problem/outcome, actors/flows, business rules/examples,
 alternate/error behavior, unchanged behavior, non-goals, and human decisions.
 It also identifies dependencies, risks, verification, independent file
@@ -67,6 +76,14 @@ Gate 1 and cannot be replaced by architect prose. Legacy recovery and documented
 self-authored hotfix/Tier-1 plans use only their closed not-applicable reason;
 never migrate them implicitly. `/th:plan-review` is explicit only. Planning dispatches only architect;
 a sensitive plan carries its security assessment and security-relevant TCs to final validation.
+
+Before presenting Gate 1, when the validated plan requires an isolated
+worktree, Main copies its absolute path, exact branch, and immutable full commit
+SHA into `worktree`, `worktree_branch`, and `worktree_base`. Reject a moving
+ref, missing SHA, or incomplete topology. These fields declare the approved
+target only: do not create the branch/worktree or set `working_branch` during
+design. Physical creation and any protected-`.git` native approval happen at
+implementation entry.
 
 ## STAGE-GATE-1
 
