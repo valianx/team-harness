@@ -16,6 +16,15 @@ workspace path, repository root, constraints, required acceptance criteria, and 
 The specialist returns a file-scoped `sharded-v1` manifest plus plan shards and classification;
 it never edits coordination state.
 
+Wait for that same architect attempt to complete. A `wait_agent` timeout is
+only the wait heartbeat and immediately resumes the directed wait without
+recap, replacement, or `interrupt_agent`; it is not the architect's 10-minute
+SLA and proves no failure. Track the SLA from dispatch. On SLA exceed, escalate
+once to the operator while leaving the architect alive and continue waiting for
+either its result or live operator input. Only a live cancellation of that
+active attempt authorizes interruption; replacement requires a demonstrated
+terminal unsuccessful result and the normal design authority.
+
 The plan must lead with problem/outcome, actors/flows, business rules/examples,
 alternate/error behavior, unchanged behavior, non-goals, and human decisions.
 It also identifies dependencies, risks, verification, independent file

@@ -117,13 +117,13 @@ the normalized (LF) bytes against these canonical SHA-256 digests:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| pipeline-architect | `e1336e37d35b7793dfd9dd9734a7192295c15aaebe15e3f77241716f330ce48f` |
-| pipeline-implementer | `1008b1973aeb8bce3953b6c47482d0e3118f9e67898a3b00508f74a119b31641` |
-| pipeline-tester | `be88a33209069e9842dfdc8b440e8e2bd82f10157f16494a5224d3165b1eac10` |
-| pipeline-cleaner | `d78dc8da49ef52064932f62286b219bb1b0a2b5d318f4815c074099f4709fa48` |
-| pipeline-qa | `3429290f07f105c90bcd0c2db6a82092889f92f87142da89dfc53fd836dad026` |
-| pipeline-security | `a4de1ab98d3f60f088af71205939d816a8fc22a715f13f118460286b1315fa99` |
-| pipeline-delivery | `5b4de188f2040e1976e19c60ecad9d32e2045a08ddbbe52f4af169b505648087` |
+| pipeline-architect | `fd6db2a4ac06a33a904810ddcc50ed78d790c322cc31376d5d0cf2c2fd496544` |
+| pipeline-implementer | `50339cdb6ebbf546914634c406740e957cd0b7152adb24f56dafaf5cb3656b17` |
+| pipeline-tester | `eaadd9d23fea4bab3cddae0dd3ea76ad33d76e2564866254e06b6fce6aa1be0b` |
+| pipeline-cleaner | `ea4260bcb8fc1e17034f0d6f91b9d97efefeb61065c50b88a25e792eaaab88b9` |
+| pipeline-qa | `702c3bcbb41f9d2dd162b166a821f2a4f60f4ff3b04fd028113c4aae713d12b6` |
+| pipeline-security | `fa5c8ce48def49085705fa083b1c2be2c02c9b9e560043313f3ba70f7004861a` |
+| pipeline-delivery | `1173e6d5edb63039cdc7d315f4c170c8f5489f76665b2cd77df682ae4be08246` |
 
 A digest mismatch is an identity failure; stop before workspace creation or
 delegation. Ask the operator to run `$team-harness:update` to
@@ -151,9 +151,42 @@ non-root, and different from the user home; require the subfolder to be
 normalized and relative without `.`, `..`, glob, or empty segments;
 canonicalize the combined target; and require that target to remain strictly
 contained below the validated base. Reject symlink escapes. Never require
-Obsidian, invent an external path, or modify another runtime's settings. If the
-external path is unavailable or not writable, report that and fall back to
-local only with the operator's consent. Resolve `operator_language` from the
+Obsidian, invent an external path, or modify another runtime's settings.
+
+Before creating the feature directory, `00-state.md`, or any other artifact,
+resolve `../scripts/workspace-preflight.mjs` relative to this reference and run
+it exactly once without sandbox escalation:
+
+```text
+node <workspace-preflight> --root <canonical external repo root> --workspace <canonical feature workspace>
+```
+
+Only `status: ready` proves that the current Codex session can create and remove
+content under that root. Filesystem mode bits, persistent config, a successful
+setup write, or a path appearing in `sandbox_workspace_write.writable_roots`
+are not substitutes for the live write probe. The helper creates and removes
+only its private random probe below the repo root and never creates the feature
+workspace or state.
+
+On `status: not-writable|invalid`, do not create state, request escalation,
+retry the probe, or start a permission loop. If the candidate root is already
+declared in the personal Codex writable roots or live `--add-dir` launch
+configuration, treat the mismatch as a session born before the sandbox change
+and emit exactly one localized instruction equivalent to:
+
+```text
+Obsidian is configured, but this Codex session does not have that writable root. Restart Codex or open a new tab, then start the pipeline again.
+```
+
+Stop after that instruction. Otherwise report the unavailable external root
+once and offer the single live fallback phrase `use local workspace` (`usar
+workspace local`). Only that current operator reply authorizes selection of
+`{repo-root}/workspaces/{feature}/`; persistent `logs-mode: obsidian`, prior
+chat, a timeout, or failed escalation never does. After fallback authority,
+create every artifact only under the local root and record `logs_mode: local`.
+Before authority, create nothing in either root. Never split one pipeline's
+artifacts across local and Obsidian paths or silently change the canonical
+workspace after state exists. Resolve `operator_language` from the
 native document's `language` key before conversational detection;
 `english_learning` remains an independent boolean. `$team-harness:setup` owns
 persistent changes.

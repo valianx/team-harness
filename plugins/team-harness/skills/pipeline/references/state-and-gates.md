@@ -39,6 +39,12 @@ report artifacts; they never write state, releases, nonces, or gate events and
 never speak for the operator. Write `next_action` before every dispatch and
 record its result before advancing. Preserve unrelated changes.
 
+The absolute `workspace` and effective `logs_mode` become immutable identity at
+the first state write. Every artifact and event for that run stays below that
+one canonical root. A permission failure, restart, recovery, or configured-root
+change never migrates or splits an existing pipeline; only an explicit abort
+followed by a separate activation may choose another root.
+
 Keep a replaceable snapshot with these stable fields (narrative belongs in the
 events file):
 

@@ -1074,6 +1074,7 @@ def check_cross_runtime_pipeline_runners() -> None:
         "plan-contract-repair.mjs",
         "quality-runner.mjs",
         "test-transition.mjs",
+        "workspace-preflight.mjs",
     )
     for name in names:
         canonical_path = ROOT / "skills/pipeline/scripts" / name
@@ -2244,6 +2245,135 @@ def check_claude_codex_parity() -> None:
         require(not re.search(r"(?m)^profile:\s*", text), f"{relative}: retired profile field remains active")
 
 
+def check_wait_heartbeat_sla_contract() -> None:
+    """A wait heartbeat never becomes failure, interruption, or replacement authority."""
+    semantic = re.sub(r"\s+", " ", read("agents/ref-pipeline.md").lower())
+    pipeline = re.sub(r"\s+", " ", read("plugins/team-harness/skills/pipeline/SKILL.md").lower())
+    design = re.sub(r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/design.md").lower())
+    implementation = re.sub(r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/implementation.md").lower())
+    validation = re.sub(r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/validation.md").lower())
+
+    for label, text in (("semantic", semantic), ("pipeline", pipeline)):
+        for marker in (
+            "wait_agent` timeout",
+            "proves neither failure nor terminal",
+            "interrupt_agent",
+            "replacement",
+            "sla",
+            "from dispatch",
+            "keep the specialist alive",
+            "live operator cancellation",
+            "demonstrated terminal unsuccessful result",
+        ):
+            require(marker in text, f"{label}: wait/SLA contract missing {marker!r}")
+        require(
+            "elapsed time" in text and "authorizes neither" in text,
+            f"{label}: elapsed time can authorize interruption/replacement",
+        )
+
+    for label, text, keep_marker in (
+        ("design", design, "leaving"),
+        ("implementation", implementation, "keep"),
+        ("validation", validation, "keep"),
+    ):
+        for marker in (
+            "wait_agent` timeout",
+            "without recap",
+            "interrupt_agent",
+            "replacement",
+            "sla",
+            keep_marker,
+            "live cancellation",
+            "demonstrated terminal unsuccessful result",
+        ):
+            require(marker in text, f"{label}: phase wait contract missing {marker!r}")
+
+    for role in ("architect", "implementer", "tester", "cleaner", "qa", "security", "delivery"):
+        adapter = re.sub(r"\s+", " ", read(f"runtime/codex/instructions/{role}.md").lower())
+        for marker in (
+            "wait_agent` timeout",
+            "proves neither failure nor terminal state",
+            "interrupt_agent",
+            "replacement",
+            "sla is tracked separately from dispatch",
+            "escalates to the operator",
+            "keeping this attempt alive",
+            "current live cancellation",
+            "demonstrated terminal unsuccessful result",
+        ):
+            require(marker in adapter, f"{role}: runtime wait contract missing {marker!r}")
+
+
+def check_obsidian_workspace_preflight_contract() -> None:
+    """Obsidian selection is proven in-session and never silently falls back or splits."""
+    semantic = re.sub(r"\s+", " ", read("agents/ref-pipeline.md").lower())
+    activation = re.sub(r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/activation.md").lower())
+    recovery = re.sub(r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/recovery.md").lower())
+    state = re.sub(r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/state-and-gates.md").lower())
+    setup = re.sub(r"\s+", " ", read("plugins/team-harness/skills/setup/SKILL.md").lower())
+    runtime_readme = re.sub(r"\s+", " ", read("runtime/codex/README.md").lower())
+
+    for label, text in (("semantic", semantic), ("activation", activation)):
+        for marker in (
+            "workspace-preflight.mjs",
+            "before creating",
+            "persistent config",
+            "restart",
+            "new tab",
+            "use local workspace",
+            "current operator reply",
+            "never split",
+        ):
+            require(marker in text, f"{label}: Obsidian preflight marker missing {marker!r}")
+
+    for marker in (
+        "exactly once without sandbox escalation",
+        "only `status: ready` proves",
+        "never creates the feature workspace or state",
+        "do not create state, request escalation, retry the probe",
+        "session born before the sandbox change",
+        "restart codex or open a new tab",
+        "stop after that instruction",
+        "`usar workspace local`",
+        "only that current operator reply authorizes",
+        "before authority, create nothing in either root",
+        "record `logs_mode: local`",
+    ):
+        require(marker in activation, f"activation: Obsidian fallback/session marker missing {marker!r}")
+
+    for marker in (
+        "immutable recovery identity",
+        "never select a local same-name candidate",
+        "single non-escalated probe",
+        "never triggers an escalation loop or local fallback",
+        "restart/new-tab instruction",
+        "explicitly abort and start a separate local pipeline",
+        "never divides one run between roots",
+    ):
+        require(marker in recovery, f"recovery: Obsidian identity marker missing {marker!r}")
+
+    for marker in (
+        "immutable identity at the first state write",
+        "one canonical root",
+        "never migrates or splits an existing pipeline",
+    ):
+        require(marker in state, f"state: canonical workspace marker missing {marker!r}")
+
+    for marker in (
+        "sandbox_workspace_write.writable_roots",
+        "`--add-dir`",
+        "does not update a running session's sandbox",
+        "codex restart or new tab",
+        "non-escalated live write probe",
+    ):
+        require(marker in setup, f"setup: installed Obsidian config marker missing {marker!r}")
+
+    require("obsidian" in runtime_readme and "newly started codex sessions" in runtime_readme, "runtime docs omit Obsidian session freshness")
+    require("`.git` remains protected by design" in runtime_readme, "runtime docs imply Obsidian write access makes .git writable")
+    require((ROOT / "skills/pipeline/scripts/workspace-preflight.mjs").is_file(), "workspace preflight helper is missing")
+    require((ROOT / "tests/test_workspace_preflight.mjs").is_file(), "workspace preflight regression suite is missing")
+
+
 def check_execution_efficiency_contract() -> None:
     """Codex execution stays interruptible, bounded, and diagnostically useful."""
     pipeline = re.sub(
@@ -2849,6 +2979,8 @@ def main() -> None:
         ("PR review workspace isolation", check_pr_review_workspace_isolation),
         ("PR review operator visibility", check_pr_review_operator_visibility),
         ("Claude/Codex parity", check_claude_codex_parity),
+        ("wait heartbeat and phase SLA", check_wait_heartbeat_sla_contract),
+        ("Obsidian workspace preflight", check_obsidian_workspace_preflight_contract),
         ("execution efficiency", check_execution_efficiency_contract),
         ("context isolation and rotation", check_context_isolation_rotation_contract),
         ("Codex usage observability", check_codex_usage_observability_contract),

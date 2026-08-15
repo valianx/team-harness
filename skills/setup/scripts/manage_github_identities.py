@@ -17,7 +17,7 @@ from typing import Any
 
 
 TOKEN_RE = re.compile(r"(?:gh[pousr]_|github_pat_|sk-[A-Za-z0-9_-]{20,})")
-ACCOUNT_RE = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}\Z")
+ACCOUNT_RE = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9]|[-_](?=[A-Za-z0-9])){0,38}\Z")
 HOST_RE = re.compile(
     r"(?=.{1,253}\Z)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(?:\.(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*\Z"
 )

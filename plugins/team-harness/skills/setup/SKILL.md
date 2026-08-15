@@ -115,8 +115,14 @@ migration, and preserve every unrelated value.
 
    - Workspace defaults to `local`. For `obsidian`, require an existing
      absolute vault path plus a safe relative subfolder. Reject filesystem
-     roots, the user home, traversal, globs, and symlink escapes. Codex native
-     sandbox approval remains authoritative; never weaken it.
+     roots, the user home, traversal, globs, and symlink escapes. Report the
+     exact Team Harness subtree that must be present in
+     `sandbox_workspace_write.writable_roots` or supplied with `--add-dir` at
+     Codex launch. A settings write does not update a running session's sandbox:
+     after adding that root, require a Codex restart or new tab before reporting
+     the external workspace ready. The pipeline's non-escalated live write
+     probe remains authoritative; never enter an escalation loop or weaken the
+     sandbox because persistent config looks correct.
    - Language is a two-letter lowercase code or absent for automatic detection.
    - English learning, Obsidian Tasks, and flow telemetry are booleans;
      telemetry defaults off.
@@ -207,7 +213,8 @@ migration, and preserve every unrelated value.
     `codex features list` only when step 4 ran. Report one compact result:
     native config path, workspace/language, agent scope and nineteen agent statuses,
     GitHub route count when configured, feature-flag status when checked, MCP registrations, hook
-    verification/trust, and whether a new thread is required. Never print
+    verification/trust, whether a new thread is required, and for Obsidian
+    whether the writable-root grant still requires that restart. Never print
     imported opaque values, secrets, or environment-variable values.
 
 The flow is idempotent. Blank input preserves current values; unrelated native

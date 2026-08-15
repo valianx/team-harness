@@ -29,6 +29,20 @@ No visible output during boot. The first thing the operator sees is the answer t
 3. **Language** — precedence: session override → `language` in config → detection from the operator's text → `en`. A persistence marker (`por defecto`, `siempre`, `default`, `permanente`, `de aquí en adelante`) requires a Y/n gate plus a merge-write; without one it is session-only.
 4. **Continue the activated request.** A new activation enters Intake with the operator's preserved request. `/th:recover` resolves the persisted state and follows its recorded `next_action`.
 
+**External-workspace write preflight.** When the resolved mode is Obsidian,
+canonicalize and contain the configured repo/feature target first, then run the
+shared `skills/pipeline/scripts/workspace-preflight.mjs` once against the
+canonical external repo root and proposed feature workspace before creating a
+feature directory, state, or artifact. Only its successful ephemeral
+create/write/remove probe proves the current runtime session can write there;
+path mode bits and persistent config do not. A non-ready result never triggers
+escalation or a retry loop. If the writable-root grant was installed after the
+current runtime session started, emit one restart or new tab instruction and stop.
+Otherwise offer `use local workspace` as a live choice and select local only
+after that current operator reply. Before the choice, write to neither root.
+After selection, the canonical workspace is immutable for the run; never split
+or migrate artifacts between Obsidian and local roots.
+
 `{YYYY-MM-DD}_{feature-name}` guarantees a unique directory per run. On `/th:recover`, re-read the resolved config from `00-state.md § Current State` (schema: `agents/_shared/orchestrator-state.md`) — do not re-parse the chat.
 
 **First state write — at the Intake → Design boundary, not at boot.** Write `{docs_root}/00-state.md` with `pipeline_version: 3`, `status: in_progress`, `phase: design`, `stage: 1`, the resolved config, and the classification block Intake produced. Write the canonical named-state checklist with every row unchecked. Append `{"event":"pipeline.start"}` to `{events_file}`. You are the sole writer of this file from here on.
@@ -435,16 +449,37 @@ agent follow-up, or second dispatch is authorized by the prior decision.
 
 ## Phase timeouts
 
-| Phase | Agent | Timeout |
-|---|---|---|
-| 1 | architect | 10 min |
-| 2 | implementer | 15 min |
-| 2.7 | tester | 10 min |
-| 3 | qa | 5 min |
-| 3 | adversary | 10 min |
-| 4 | delivery | 5 min |
+### Wait heartbeat and phase SLA
 
-On exceed, **escalate — never kill silently.** A project's own `## Pipeline Timeouts` overrides these.
+A runtime wait timeout is only a coordinator heartbeat: it returns control to
+Main and does not fail, stop, or otherwise change the specialist. In Codex, a
+`wait_agent` timeout proves neither failure nor terminal state. Immediately
+resume `wait_agent` without recap, fresh analysis, `interrupt_agent`, or a
+replacement dispatch. Never infer failure from silence during one or more wait
+intervals.
+
+Track the phase SLA independently from the wait heartbeat and from dispatch
+time:
+
+| Phase | Agent | SLA |
+|---|---|---|
+| design | architect | 10 min |
+| implementation | implementer | 15 min |
+| implementation | tester | 10 min |
+| implementation | cleaner | 5 min |
+| validation | tester | 10 min |
+| validation | qa | 5 min |
+| validation | security | 10 min |
+| delivery | delivery | 5 min |
+
+On SLA exceed, **escalate to the operator and keep the specialist alive —
+never kill silently.** Continue a directed wait that can return either the
+agent result or live operator input. Only a current live operator cancellation
+of that active attempt authorizes `interrupt_agent`. A replacement requires a
+demonstrated terminal unsuccessful result plus the normal phase/correction
+authority; elapsed time or a wait timeout alone authorizes neither. A project's
+own `## Pipeline Timeouts` overrides only these SLA values, never the wait
+semantics or interruption authority.
 
 ## Context pruning
 

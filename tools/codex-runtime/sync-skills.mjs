@@ -95,6 +95,7 @@ const sharedPipelineScripts = [
   "plan-contract-repair.mjs",
   "quality-runner.mjs",
   "test-transition.mjs",
+  "workspace-preflight.mjs",
 ];
 
 function yamlString(value) {

@@ -314,6 +314,8 @@ echo "# Requires: node. Skipped when absent (NOT a pass — see output)."
 echo "############################################################"
 run_node_suite "bounded-command" "test_bounded_command.mjs" "node not found — install Node.js to run this suite"
 
+run_node_suite "workspace-preflight" "test_workspace_preflight.mjs" "node not found — install Node.js to run this suite"
+
 echo
 echo "############################################################"
 echo "# Suite 164: deterministic repository quality runner"

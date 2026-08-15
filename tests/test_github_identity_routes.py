@@ -73,7 +73,7 @@ def main() -> int:
             {
                 "workspace": str(workspace),
                 "host": "github.com",
-                "account": "account-a",
+                "account": "account_a",
             },
             {
                 "workspace": str(nested_workspace),
@@ -119,7 +119,7 @@ def main() -> int:
             )
             require(parent_match.returncode == 0, parent_match.stderr)
             parent_result = json.loads(parent_match.stdout)
-            require(parent_result["account"] == "account-a", "parent route selected wrong account")
+            require(parent_result["account"] == "account_a", "parent route selected wrong account")
             require(parent_result["strategy"] == "account-switch", "parent route selected wrong strategy")
 
             nested_match = run(

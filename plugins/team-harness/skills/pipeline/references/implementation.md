@@ -61,8 +61,15 @@ checkpoint.
 
 Wait for a specialist completion or live operator input rather than polling. A
 heartbeat may run at most once every 60 seconds; call `list_agents` only for a
-live status request, an actual timeout, or recovery. A normal timeout only
-continues the directed wait without recap, new analysis, or a new dispatch. The normalized benchmark counts only waits and queries that are
+live status request, an actual phase-SLA timeout, or recovery. A normal
+`wait_agent` timeout only returns control and immediately continues the directed
+wait without recap, new analysis, `interrupt_agent`, or a new/replacement
+dispatch; it proves neither failure nor terminal state. Track each role's phase
+SLA independently from dispatch time. On SLA exceed, escalate once to the
+operator, keep the specialist alive, and continue waiting for its result or
+live operator input. Only live cancellation of that attempt authorizes
+interruption; replacement requires a demonstrated terminal unsuccessful result
+and the normal correction authority. The normalized benchmark counts only waits and queries that are
 not caused by completion, input, a real timeout, or recovery; the current
 policy must keep that count at no more than 30% of the normalized baseline
 (at least a 70% reduction) while retaining immediate operator interruption.

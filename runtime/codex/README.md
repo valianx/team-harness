@@ -48,6 +48,10 @@ directories or broad write access to the user home. Codex still
 protects `.git` directories in this mode, so tests that construct temporary Git
 repositories require a narrowly approved command or an equivalent external CI
 sandbox; the project config does not weaken that boundary.
+An additional writable root for an Obsidian Team Harness workspace changes only
+that external subtree. It takes effect for newly started Codex sessions and
+does not make the repository's `.git` writable; `.git` remains protected by
+design in `workspace-write` mode.
 
 The distributable package lives under `plugins/team-harness/`; the repo-scoped
 catalog at `.agents/plugins/marketplace.json` exposes it to Codex. The root

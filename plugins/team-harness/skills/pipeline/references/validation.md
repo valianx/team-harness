@@ -27,9 +27,16 @@ or delivery record and cannot release or infer one.
 ## Efficient verification evidence
 
 Wait for completion or live operator input, with a heartbeat no more frequent
-than 60 seconds. `list_agents` is permitted only for a live status request, a
-real timeout, or recovery; a normal timeout resumes the directed wait without
-recap, fresh analysis, or another dispatch. The normalized verification
+than 60 seconds. `list_agents` is permitted only for a live status request, an
+actual phase-SLA timeout, or recovery; a normal `wait_agent` timeout only
+returns control and immediately resumes the directed wait without recap, fresh
+analysis, `interrupt_agent`, or another/replacement dispatch. It proves neither
+failure nor terminal state. Track the role SLA independently from dispatch
+time. On SLA exceed, escalate once to the operator, keep the verifier alive,
+and continue waiting for its result or live operator input. Only live
+cancellation of that attempt authorizes interruption; replacement requires a
+demonstrated terminal unsuccessful result and the normal correction authority.
+The normalized verification
 benchmark counts waits and queries unrelated to completion, input, a real
 timeout, or recovery, and must remain at or below 30% of its normalized
 baseline (a 70% reduction) without losing operator interruption.
