@@ -9,7 +9,6 @@ multi_agent_v2 = true
 
 [sandbox_workspace_write]
 network_access = true
-writable_roots = ["~/.cache/go-build", "~/.cache/uv", "~/.npm", "~/go/pkg/mod"]
 
 [agents]
 enabled = true

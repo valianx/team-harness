@@ -5,13 +5,7 @@
   "project_execution": {
     "sandbox_mode": "workspace-write",
     "approval_policy": "on-request",
-    "network_access": true,
-    "writable_roots": [
-      "~/.cache/go-build",
-      "~/.cache/uv",
-      "~/.npm",
-      "~/go/pkg/mod"
-    ]
+    "network_access": true
   },
   "project_defaults": {
     "default_subagent_model": "gpt-5.6-terra",

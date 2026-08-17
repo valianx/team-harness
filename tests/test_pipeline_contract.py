@@ -2310,7 +2310,8 @@ def check_obsidian_workspace_preflight_contract() -> None:
     activation = re.sub(r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/activation.md").lower())
     recovery = re.sub(r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/recovery.md").lower())
     state = re.sub(r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/state-and-gates.md").lower())
-    setup = re.sub(r"\s+", " ", read("plugins/team-harness/skills/setup/SKILL.md").lower())
+    setup_source = read("plugins/team-harness/skills/setup/SKILL.md").lower()
+    setup = re.sub(r"\s+", " ", setup_source)
     runtime_readme = re.sub(r"\s+", " ", read("runtime/codex/README.md").lower())
 
     for label, text in (("semantic", semantic), ("activation", activation)):
@@ -2359,9 +2360,26 @@ def check_obsidian_workspace_preflight_contract() -> None:
     ):
         require(marker in state, f"state: canonical workspace marker missing {marker!r}")
 
+    setup_commands = []
+    in_command_fence = False
+    for raw_line in setup_source.splitlines():
+        line = raw_line.strip()
+        if line.startswith("```"):
+            in_command_fence = not in_command_fence
+            continue
+        if in_command_fence and line.startswith("python3 "):
+            setup_commands.append(line)
+    runtime_inspect = "python3 scripts/manage_runtime.py inspect"
+    runtime_ensure = "python3 scripts/manage_runtime.py ensure"
+    require(runtime_inspect in setup_commands, "setup: runtime inspect command is missing")
+    require(runtime_ensure in setup_commands, "setup: runtime ensure command is missing")
+    require(
+        setup_commands.index(runtime_inspect) < setup_commands.index(runtime_ensure),
+        "setup: runtime inspect must precede runtime ensure",
+    )
+
     for marker in (
         "sandbox_workspace_write.writable_roots",
-        "`--add-dir`",
         "does not update a running session's sandbox",
         "codex restart or new tab",
         "non-escalated live write probe",

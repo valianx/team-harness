@@ -41,10 +41,15 @@ The generated project config uses `gpt-5.6-terra` at `medium` as its generic
 subagent fallback without overriding Main's selected model, adds `CLAUDE.md` as
 an ordered project-instruction fallback when `AGENTS.md` is absent, enables both
 `multi_agent` and `multi_agent_v2`, and uses
-`workspace-write` with `on-request` approvals. It enables dependency network access and grants narrowly scoped write
-access to the current user's standard Go, uv, npm, and Go module cache paths.
-This keeps routine builds inside the sandbox without shared predictable `/tmp`
-directories or broad write access to the user home. Codex still
+`workspace-write` with `on-request` approvals. It enables dependency network
+access without shadowing the user-level writable roots reconciled by the
+packaged setup/update helper. That global helper preserves operator-owned roots
+and adds the standard Go, uv, npm, and Go module caches, Codex's private temp
+directory, and the configured Obsidian Team Harness subtree. It also selects
+Codex's `auto_review` approval reviewer, so ordinary Git metadata, push, and PR
+creation escalations do not stop for a human prompt. This keeps routine builds
+inside the sandbox without shared predictable `/tmp` directories or broad write
+access to the user home. Codex still
 protects `.git` directories in this mode, so tests that construct temporary Git
 repositories require a narrowly approved command or an equivalent external CI
 sandbox; the project config does not weaken that boundary.
@@ -52,8 +57,11 @@ In particular, an approved Team Harness Gate 1 does not grant filesystem
 authority: `git worktree add` must use Codex's native on-request escalation for
 the exact command because it writes refs and shared `.git/worktrees` metadata.
 Team Harness setup neither adds `.git` to writable roots nor installs a blanket
-Git command rule. An approval-review timeout leaves the pipeline technically
-paused and recoverable; it is not a functional failure or denial.
+Git command rule, because such a rule could outrank deterministic force-push
+denial. `approval_policy` remains `on-request`; the automatic reviewer handles
+the native on-request escalation for the exact worktree command while
+`gate-guard` retains the deny floor. A reviewer timeout leaves the pipeline
+technically paused and recoverable; it is not a functional failure or denial.
 An additional writable root for an Obsidian Team Harness workspace changes only
 that external subtree. It takes effect for newly started Codex sessions and
 does not make the repository's `.git` writable; `.git` remains protected by

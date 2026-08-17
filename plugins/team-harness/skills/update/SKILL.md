@@ -97,6 +97,23 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    writes Claude Code or opencode configuration. Cross-runtime copying belongs
    only to an explicit `$team-harness:setup` import.
 
+   Reconcile the global Codex execution profile after native settings so an
+   Obsidian workspace selection is reflected in the sandbox:
+
+   ```bash
+   python3 NEW_PLUGIN/skills/setup/scripts/manage_runtime.py inspect
+   python3 NEW_PLUGIN/skills/setup/scripts/manage_runtime.py ensure
+   ```
+
+   Preserve the runtime helper's full result, including `changed` and
+   `restartRequired`, for the final report and restart decision.
+   This preserves unrelated configuration and operator-owned writable roots
+   while ensuring `workspace-write`, `on-request`, `auto_review`, sandbox
+   network access, standard tool caches, the Codex runtime temp directory, and
+   the configured Obsidian Team Harness subtree. It never adds `.git` or a
+   blanket Git/GitHub command rule; deterministic force-push denial remains in
+   `gate-guard`. A changed global runtime config requires a new Codex session.
+
    Reconcile the native multi-agent backend on every update, including an
    equal-version repair. These commands are idempotent and make the V2 runtime
    requirement explicit instead of relying on a prior setup:
@@ -140,8 +157,9 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    trust remains an operator action through `/hooks`; never bypass it.
 
    Steps 4–7 are one retryable convergence sequence. The bridge helper is
-   idempotent; config ensure and agent sync are idempotent and repair partial
-   prior writes; MCP inspection and hook verification are read-only. If any
+   idempotent; config ensure, runtime ensure, and agent sync are idempotent and
+   repair partial prior writes; MCP inspection and hook verification are
+   read-only. If any
    step fails, stop before the success report and return
    `partial-convergence` with the failed step, `OLD_PLUGIN`/`OLD_VERSION`,
    `NEW_PLUGIN`/`NEW_VERSION`, and `$team-harness:update` as the exact retry.
@@ -149,23 +167,27 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    restore a config backup, or undo synchronized agents: the prior snapshot
    remains available, and rerunning update safely recomputes the version state
    and resumes every idempotent step. A retry that reaches the same bridge,
-   config, or agent state is a no-op; step 8 is emitted only after every step
-   succeeds.
+   config, runtime, or agent state is a no-op; step 8 is emitted only after
+   every step succeeds.
 
-8. Verify the installed plugin version, native settings, both multi-agent
+8. Verify the installed plugin version, native settings, global execution
+   defaults, both multi-agent
    features, all nineteen agent files, MCP list, and bridge target. Report old/new
-   versions, marketplace result, config migration, V2 feature reconciliation,
-   agent reconciliation, hook status, bridge status, and any recovery command.
-   When the bridge reports `restartRequired: false`, state
-   that the current thread can continue with its already-known skill and hook
-   paths; do not require a restart merely because the cache version changed.
+   versions, marketplace result, config migration, runtime reconciliation, V2
+   feature reconciliation, agent reconciliation, hook status, bridge status,
+   and any recovery command.
+   When the bridge, runtime helper, and agent sync all report
+   `restartRequired: false`, state that the current thread can continue with its
+   already-known skill and hook paths; do not require a restart merely because
+   the cache version changed.
 
-   Ask the operator to restart Codex or open a new thread only when the bridge
-   requires it or when the release changes capabilities Codex indexes at thread
-   creation, such as added or renamed skills, agent declarations, MCP server
-   declarations, or hook registrations. Never claim that discovery metadata or
-   an already-running MCP process was hot-reloaded. If a new thread is required,
-   stop normal work in the current thread after explicitly requesting it.
+   Ask the operator to restart Codex or open a new thread only when the bridge,
+   runtime helper, or agent sync reports `restartRequired: true`, or when the
+   release changes capabilities Codex indexes at thread creation, such as added
+   or renamed skills, agent declarations, MCP server declarations, or hook
+   registrations. Never claim that discovery metadata or an already-running MCP
+   process was hot-reloaded. If a new thread is required, stop normal work in
+   the current thread after explicitly requesting it.
 
 Even when plugin versions compare equal, steps 4–7 still run. Update is also a
 repair/convergence command, not only a version downloader.

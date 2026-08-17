@@ -80,10 +80,14 @@ from the same Codex cache, and fail closed without a shell-level `127` when no
 plugin runtime can be resolved.
 
 For contributors, the generated project `.codex/config.toml` keeps
-`workspace-write` plus `on-request` approvals, enables dependency network
-access, and grants write access only to the current user's standard Go, uv,
-npm, and Go module cache directories. This avoids shared predictable `/tmp`
-paths and broad write access to `$HOME`. Temporary `.git`
+`workspace-write` plus `on-request` approvals and enables dependency network
+access. It deliberately omits `writable_roots`, allowing the global
+setup/update reconciliation to supply the standard Go, uv, npm, and Go module
+caches, Codex's private temp directory, preserved operator roots, and the
+configured Obsidian Team Harness subtree. The same global profile selects
+`approvals_reviewer = "auto_review"` so eligible CLI and Git escalations are
+reviewed without stopping for a human prompt. This avoids shared predictable
+`/tmp` paths and broad write access to `$HOME`. Temporary `.git`
 directories remain protected by Codex and any test that constructs them still
 requires a narrowly scoped live approval.
 
