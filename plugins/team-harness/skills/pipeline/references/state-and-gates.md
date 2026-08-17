@@ -30,6 +30,12 @@ phase ends with the measured or unavailable `phase.end` shape in
 [observability.md](observability.md). A phase name, gate, or successful result
 never supplies a token value by implication.
 
+For an OpenSpec-bound Design, Main must run the packaged
+`openspec-events.mjs` against the complete configured events file and bound
+feature after both architect attempts close and before writing
+`phase: waiting_gate1`. Only `verdict: pass` permits Gate 1; do not repair or
+normalize invalid lifecycle records while presenting the gate.
+
 ## Ownership and snapshot
 
 The primary Codex thread exclusively owns `00-state.md`, execution events, gate

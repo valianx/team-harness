@@ -182,8 +182,30 @@ change that rule. Track the separate role SLA from dispatch time: architect 10
 minutes, implementer 15, tester 10, cleaner 5, QA 5, security 10, and delivery
 5, unless the project's `## Pipeline Timeouts` changes those SLA values.
 
+An `openspec-overlay` architect packet also carries a coordinator-generated
+`dispatch_id`, exact `progress_recipient`, and
+`progress_interval_seconds: 120`. Require transient native `send_message`
+progress with the exact prefix `TH_PROGRESS ` and JSON keys
+`schema_version`, `dispatch_id`, `role`, `mode`, `milestone`,
+`completed_units`, `total_units`, `artifact_pointers`, and `blocked_code`.
+Allowed milestones are `started`, `inputs-validated`, `mappings-built`,
+`artifacts-writing`, and `validation-ready`; a timed heartbeat repeats the
+current milestone. Validate the known dispatch identity, exact role/mode,
+non-negative integer counters, workspace-contained relative artifact pointers,
+and closed blocked code before using a message. Progress is transient evidence,
+never state or completion authority, and it never resets the SLA clock.
+
 When the role SLA expires, give the operator one concise escalation with role,
-elapsed time, and live status, then keep the specialist alive and continue a directed
+elapsed time, and live status. Before that diagnostic, call `list_agents` once,
+send one non-interrupting `TH_PROGRESS_REQUEST` with native `send_message`, and
+probe only the expected artifact paths with `lstat`/metadata reads—never partial
+content. Emit one `TH_SLA` JSON block containing the dispatch identity, role,
+mode, elapsed seconds, live status, `terminal_result: false`, last valid
+milestone or `none`, heartbeat age or `null`, `artifact_state:
+none|partial|complete`, and `action: continue-waiting`. Append one coordinator-
+owned `agent.sla` event for that attempt with the same closed summary. No
+heartbeat and no artifact is `no-material-progress-observed`; it is not proof
+of failure or blockage. Then keep the specialist alive and continue a directed
 wait that can return either agent completion or live operator input. Only a
 current live operator cancellation of that active attempt authorizes
 `interrupt_agent`. Dispatch a replacement only after a demonstrated terminal
@@ -200,6 +222,12 @@ or current directory; fail closed if it cannot be resolved. Include the helper
 in each role packet only as `bounded_command_path` with that absolute path. It
 is transient: never persist `bounded_command_path` in state, events, reports,
 summaries, or workspace artifacts.
+
+At implementation entry, resolve `scripts/commit-integrity.mjs` by the same
+packaged-relative rule as `commit_integrity_path`; fail closed if it is absent.
+It is coordinator-only and transient: never pass it to a specialist or persist
+the helper path. The implementation reference owns its exact atomic evidence
+invocation and transport-truncation recovery.
 
 Classify expected output volume before execution. Routine commands whose result
 is expected to be small and bounded execute directly; this includes targeted
@@ -323,9 +351,9 @@ the role fields cannot see. The current digests are:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| `pipeline-architect` | `377186f3c4dafb6fd128f8e798779315794cd56fa594630e0a97dd7971892f02` |
-| `pipeline-implementer` | `384f612dfe7cfbfe588be65c6c60071e0d27ab8d7f792447bb66b30c691d5dbc` |
-| `pipeline-tester` | `b919c206695e30fa2ba529523611cffc171a7b06d9b35fd37bc19f5186b79c93` |
+| `pipeline-architect` | `14b51f37d0d455cd964bd4b9ec67dd8855195e5abbb8585935b1655c054c7bbd` |
+| `pipeline-implementer` | `07a93913fb6995d38323506729d277fb4bb7bc3088af96a234153bcf2cbb999a` |
+| `pipeline-tester` | `d26ca31b6314eedc6a9ccad87820e4dc86c70dcbbfce083337eface11d1bc5db` |
 | `pipeline-cleaner` | `ea4260bcb8fc1e17034f0d6f91b9d97efefeb61065c50b88a25e792eaaab88b9` |
 | `pipeline-qa` | `e63a6649de345ffcab03b5a83b5a0c8a1124b9c451be3fa271204b597f9ab5ac` |
 | `pipeline-security` | `fa5c8ce48def49085705fa083b1c2be2c02c9b9e560043313f3ba70f7004861a` |
@@ -474,6 +502,9 @@ the recorded `phase`/`next_action`:
 Before every `phase.start`, `phase.end`, state aggregate, summary rewrite, or
 trace cost render, apply [observability.md](references/observability.md). It
 does not authorize a state write by a specialist or relax any gate rule.
+For OpenSpec Design, validate the complete events file with the packaged
+`openspec-events.mjs` before presenting Gate 1; a schema or lifecycle failure
+blocks the gate rather than triggering a best-effort JSONL repair.
 
 `complete` and `aborted` are terminal. Report their recorded outcome and return
 to ordinary direct behavior; never route either one back through recovery.

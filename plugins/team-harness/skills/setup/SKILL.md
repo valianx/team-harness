@@ -22,8 +22,10 @@ write:
   settings with mode `0o600`.
 - `scripts/manage_runtime.py` converges the global Codex sandbox, automatic
   approval reviewer, network access, tool caches, runtime temp directory, and
-  configured Obsidian workspace root without removing operator-owned writable
-  roots.
+  configured shared Obsidian root `{logs-path}/{logs-subfolder}` without
+  removing operator-owned writable roots. The grant is deliberately above the
+  per-repository directory because pipelines resolve
+  `{logs-path}/{logs-subfolder}/{repo-name}/{feature}` from their own cwd.
 - `scripts/manage_agents.py` installs or refreshes the nineteen bundled generated
   agents without overwriting an unmanaged same-name file.
 - `scripts/manage_github_identities.py` validates and atomically manages the
@@ -120,8 +122,11 @@ migration, and preserve every unrelated value.
    - Workspace defaults to `local`. For `obsidian`, require an existing
      absolute vault path plus a safe relative subfolder. Reject filesystem
      roots, the user home, traversal, globs, and symlink escapes. Runtime
-     reconciliation creates the configured Team Harness subtree when needed and
-     appends its canonical path to `sandbox_workspace_write.writable_roots`.
+     reconciliation creates the shared `{logs-path}/{logs-subfolder}` subtree
+     when needed and appends that canonical path to
+     `sandbox_workspace_write.writable_roots`; never append only the current
+     `{repo-name}` child, which would make the configuration unusable from other
+     repositories.
      A settings write does not update a running session's sandbox: require a
      Codex restart or new tab before reporting the external workspace ready.
      The pipeline's non-escalated live write probe remains authoritative.

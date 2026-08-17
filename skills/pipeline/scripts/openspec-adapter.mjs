@@ -42,6 +42,7 @@ const ERROR_CODES = new Set([
   "APPROVAL_REQUIRED",
   "INSTALL_FAILED",
   "INIT_FAILED",
+  "INIT_SANDBOX_DENIED",
   "UPDATE_FAILED",
   "VERIFICATION_FAILED",
   "OUTPUT_LIMIT",
@@ -317,8 +318,76 @@ function validApproval(approval) {
 
 async function runMutation(runner, argv, cwd) {
   const command = await runner({ argv, cwd });
-  if (command?.stdout?.truncated || command?.stderr?.truncated) return { ok: false, limit: true };
-  return { ok: !commandFailed(command), limit: false };
+  if (command?.stdout?.truncated || command?.stderr?.truncated) return { ok: false, limit: true, command };
+  return { ok: !commandFailed(command), limit: false, command };
+}
+
+function initFailure(command) {
+  const output = `${command?.stderr?.tail ?? ""}\n${command?.stdout?.tail ?? ""}`;
+  const protectedTarget = /(?:^|[\\/])\.(?:agents|codex)(?:[\\/]|$)/im.test(output);
+  const writeDenied = /\b(?:EACCES|EPERM|EROFS|ENOENT)\b|permission denied|read-only file system|operation not permitted/im.test(output);
+  if (protectedTarget && writeDenied) {
+    return {
+      errorCode: "INIT_SANDBOX_DENIED",
+      diagnostic: "OpenSpec init could not write protected .agents/.codex paths; retry the exact init command once with sandbox escalation and login:false.",
+    };
+  }
+  return {
+    errorCode: "INIT_FAILED",
+    diagnostic: "OpenSpec init failed; inspect the bounded command output before retrying.",
+  };
+}
+
+async function initializeFromPreflight({ before, runner, executables, operation, policy }) {
+  const base = {
+    node_version: before.evidence.node_version,
+    npm_version: before.evidence.npm_version,
+    openspec_version: before.evidence.openspec_version,
+    executable: before.evidence.executable,
+    runtime: before.evidence.runtime,
+    project_root: before.evidence.project_root,
+    targets: before.evidence.targets,
+  };
+  const initialized = await runMutation(runner, [
+    executables.openspec, "init", "--tools", before.evidence.runtime,
+    "--no-animation", "--no-copilot-cloud", before.evidence.project_root,
+  ], before.evidence.project_root);
+  if (!initialized.ok) {
+    if (initialized.limit) return result(operation, "failed", "OUTPUT_LIMIT", base);
+    const failure = initFailure(initialized.command);
+    return result(operation, "failed", failure.errorCode, { ...base, diagnostic: failure.diagnostic });
+  }
+  const verified = await preflight({
+    projectRoot: before.evidence.project_root,
+    runtime: before.evidence.runtime,
+    policy,
+    commandRunner: runner,
+    executables,
+  });
+  if (verified.outcome !== "ready") {
+    return result(operation, "failed", "VERIFICATION_FAILED", {
+      ...base,
+      targets: verified.evidence.targets,
+      diagnostic: "OpenSpec init completed but the generated integration did not pass preflight verification.",
+    });
+  }
+  return result(operation, "ready", null, verified.evidence);
+}
+
+/** Initialize a compatible but uninitialized repository without an install/upgrade approval. */
+export async function initializeProject({
+  projectRoot,
+  runtime,
+  policy,
+  commandRunner,
+  executables = { node: "node", npm: "npm", openspec: "openspec" },
+} = {}) {
+  let activePolicy;
+  try { activePolicy = policy ?? await loadOpenSpecPolicy(); } catch { return result("initialize", "invalid-project", "ARGUMENT_INVALID"); }
+  const runner = commandRunnerOrDefault(commandRunner);
+  const before = await preflight({ projectRoot, runtime, policy: activePolicy, commandRunner: runner, executables });
+  if (before.error_code !== "PROJECT_UNINITIALIZED") return { ...before, operation: "initialize" };
+  return initializeFromPreflight({ before, runner, executables, operation: "initialize", policy: activePolicy });
 }
 
 /**
@@ -360,10 +429,10 @@ export async function provision({
     return result("provision", "failed", "VERIFICATION_FAILED", base);
   }
   if (["PROJECT_UNINITIALIZED", "TARGET_MISSING"].includes(afterInstall.error_code)) {
-    const initialized = await runMutation(runner, [
-      executables.openspec, "init", "--tools", runtime, "--no-animation", "--no-copilot-cloud", afterInstall.evidence.project_root,
-    ], afterInstall.evidence.project_root);
-    if (!initialized.ok) return result("provision", "failed", initialized.limit ? "OUTPUT_LIMIT" : "INIT_FAILED", base);
+    const initialized = await initializeFromPreflight({
+      before: afterInstall, runner, executables, operation: "provision", policy: activePolicy,
+    });
+    if (initialized.outcome !== "ready") return initialized;
   } else if (afterInstall.error_code === "TARGET_STALE") {
     const updated = await runMutation(runner, [executables.openspec, "update", afterInstall.evidence.project_root], afterInstall.evidence.project_root);
     if (!updated.ok) return result("provision", "failed", updated.limit ? "OUTPUT_LIMIT" : "UPDATE_FAILED", base);
@@ -381,11 +450,12 @@ function cliError(operation) { return result(operation, "invalid-project", "ARGU
 
 async function runCli() {
   const [operation, raw] = process.argv.slice(2);
-  if (!new Set(["preflight", "provision", "integration"]).has(operation)) return cliError(operation ?? "unknown");
+  if (!new Set(["preflight", "initialize", "provision", "integration"]).has(operation)) return cliError(operation ?? "unknown");
   let options;
   try { options = raw ? JSON.parse(raw) : {}; } catch { return cliError(operation); }
   if (options === null || typeof options !== "object" || Array.isArray(options)) return cliError(operation);
   if (operation === "preflight") return preflight(options);
+  if (operation === "initialize") return initializeProject(options);
   if (operation === "provision") return provision(options);
   return inspectRuntimeIntegration(options);
 }

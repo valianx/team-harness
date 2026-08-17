@@ -214,10 +214,33 @@ result whose SHA-256 and exact
 the traceability overlay, and the bound change. Re-run that entry point with
 `--workspace`, `--plan 01-plan.md`,
 `--snapshot inputs/openspec-snapshot.json`, and
-`--traceability plan/openspec-traceability.json`; never fall through to the
+`--traceability plan/openspec-traceability.json`, plus the current exact
+`--writable-root` values; never fall through to the
 legacy validator or repair route. Snapshot drift resumes explicit OpenSpec
 reconciliation, while a mapping or execution-control failure resumes the one
 normal overlay design correction.
+
+Before re-presenting Gate 1, also rerun `openspec-events.mjs` against the
+complete configured events path and bound feature. An invalid or open
+lifecycle trace remains fail-closed and is never repaired during recovery.
+
+During implementation, use packaged `openspec-overlay.mjs verify-and-rebind`
+instead of separate snapshot verification and overlay mutation. If interrupted
+after the snapshot write, the same operation may recover only when the latest
+progress event's `previous_sha256` equals the overlay binding, its task IDs
+equal the requested authorized set, and ordinary validation has no finding
+except `SNAPSHOT_STALE`; then rerun `plan-contract`. Any missing link, multiple
+unrebound transitions, intent change, or additional finding remains a real
+stale-plan block. Never edit the binding hash manually or make `plan-contract`
+tolerate stale identity.
+
+An implementation/tester return blocked only because an exact scoped Git write
+hit protected `.git/worktrees/.../index.lock` is a technical
+`git-metadata-permission` pause. Preserve the existing commit and unstaged test
+diff, verify `git_metadata_write_mode`, and resume the identical `git add` or
+eligible same-owner `git commit --amend` through native escalation with
+`login:false`. Do not redispatch, reset, restage broadly, widen `.git`, or treat
+the permission failure as failed test evidence.
 
 For a legacy run, `pass` requires a readable `plan-contract.mjs` result whose
 SHA-256, exact `kind: team_harness_functional_plan_contract`, embedded plan

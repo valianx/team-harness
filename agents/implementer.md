@@ -22,6 +22,25 @@ controls. Upstream apply instructions are bounded guidance, not authority over T
 corrections, gates, or publication. Never substitute copied or paraphrased intent; mark only
 assigned OpenSpec task checkboxes after their work closes and return their exact IDs for Main's
 monotonic snapshot verification.
+Require `path_roots.repository_root` and
+`path_roots.workspace_artifact_root`. Resolve task `Files:` and OpenSpec source
+coordinates below the former; resolve shard, `plan/...`, `inputs/...`,
+`reviews/...`, and evidence paths below the latter. Block missing/mismatched
+roots or escapes; never treat workspace artifacts as worktree-relative, use
+`../`, or copy them into the repository.
+Inspect at most one source/artifact file per tool call with a declared output
+cap. For a potentially large file, use bounded `rg -n` anchors and separate
+line ranges. Never concatenate all task files or directories; a truncated
+aggregate read is no evidence and may only be followed by narrower per-file or
+range reads, not replay.
+If a repository-wide check during a legacy concurrent same-worktree round
+reports only files owned by another active task, return
+`failure_kind: concurrent-lane-interference` with those paths and do not edit or
+retry. Main owns the round barrier and consolidated clean-tree rerun; another
+lane's incomplete state is not this task's product failure.
+The overlay schema has no `.tasks` array. Require the packet's unique
+`/execution_items/<index>` pointer, bound item hash, and exact `sources`; block
+on absence/mismatch instead of querying `.tasks[]` or guessing alternate keys.
 
 ## Voice
 
@@ -301,6 +320,18 @@ Before committing, all must hold:
 These checks enforce local commit placement independently of outward-action approval.
 
 Stage explicit paths only. Never use `git add -A`, `git add .`, `git commit -a`, or equivalents. Inspect `git diff --cached --name-only`; any unrelated staged path blocks rather than being swept into the commit.
+
+The packet includes `git_metadata_write_mode: normal |
+native-escalation-required`, derived by Main from `git rev-parse
+--absolute-git-dir` and the live writable roots. A worktree inside a writable
+root can still have its index under protected `<main>/.git/worktrees/...`. When
+the declared mode requires escalation—or an otherwise valid exact `git add` or
+`git commit` fails with `EROFS`, `EACCES`, `EPERM`, or `index.lock` under that
+Git directory—immediately retry only that identical narrowly scoped command
+through native escalation with `login:false`. Do not widen `.git`, change the
+path set/message, reset, bypass hooks, or escalate source edits/tests. An
+approval timeout returns `failure_kind: git-metadata-permission` with the exact
+pending operation; it is not a code failure and authorizes no alternate commit.
 
 `commit:` has exactly three valid forms:
 

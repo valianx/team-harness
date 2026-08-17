@@ -9,6 +9,7 @@ import { syncSharedPipelineAssets } from "./sync-skills.mjs";
 const root = new URL("../..", import.meta.url).pathname;
 const pipelineScripts = [
   "bounded-command.mjs",
+  "commit-integrity.mjs",
   "cleaner-transition.mjs",
   "plan-contract.mjs",
   "plan-contract-repair.mjs",
@@ -19,6 +20,7 @@ const pipelineScripts = [
   "openspec-snapshot.mjs",
   "openspec-overlay.mjs",
   "openspec-recovery.mjs",
+  "openspec-events.mjs",
 ];
 
 async function makePipelineFixture() {

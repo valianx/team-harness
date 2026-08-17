@@ -69,6 +69,7 @@ only correlation mechanism. Its value grammar is
 | Event | Required lifecycle fields | Coordinator rule |
 |---|---|---|
 | `agent.spawn` | `agent_role`, `task`, `attempt_ordinal`, `context_strategy`, `follow_up_count` | `context_strategy: fresh` starts the next ordinal with `follow_up_count: 0`. `context_strategy: continued` reuses the one still-open declared ordinal and increments its count by one. |
+| `agent.sla` | `agent_role`, `task`, `attempt_ordinal`, `elapsed_ms`, `live_status`, `terminal_result`, `last_progress_milestone`, `heartbeat_age_ms`, `artifact_state`, `observation`, `action` | Append at most once for an open attempt after its configured SLA. This observes but never closes, fails, interrupts, or replaces the attempt. |
 | `agent.close` | The same identity fields, final `follow_up_count`, `status`, `quality_verdict`, and `attempt_metrics` | Exactly one closes an open ordinal. A terminal close cannot later receive a continued dispatch. |
 | `agent.correction.spawn` | The spawn fields plus `correction_cause: verification` | Starts a new, strictly larger ordinal with `context_strategy: fresh` and `follow_up_count: 0`, only after the prior related attempt is closed. The bounded correction packet is prompt-only and never becomes an artifact. |
 
@@ -78,6 +79,16 @@ deliberate continuation: every spawn uses `context_strategy: fresh` and
 backward-compatible metrics only. A correction never revives a terminal
 attempt. This is the durable form of the fresh-session rule, not a claim that a
 native alias has been observed.
+
+`agent.sla` uses only closed, non-sensitive values. `live_status` is
+`working|idle|unknown`; `terminal_result` is always `false` for this event;
+`last_progress_milestone` is the last validated closed milestone or `none`;
+`heartbeat_age_ms` is a non-negative integer or `null`; `artifact_state` is
+`none|partial|complete`; `observation` is
+`progress-observed|no-material-progress-observed`; and `action` is always
+`continue-waiting`. Never persist progress-message prose, artifact paths,
+partial content, native agent/session identifiers, or a guessed failure cause.
+The event does not reset elapsed time and is not an `operation.failed` alias.
 
 `quality_verdict` on `agent.close` is one of
 `pass|concerns|fail|n-a`. Use `n-a` unless an already-bounded specialist result
@@ -161,16 +172,26 @@ partial subtotal, and reusing a prior phase's delta are prohibited.
    that trace. `$team-harness:trace` reads the same records; it never rescans
    rollouts or replaces an unavailable result.
 
-The canonical event fragments are:
+The canonical OpenSpec Design sequence below is complete, not a fragment.
+`openspec-planning` and `openspec-overlay` are transient dispatch modes; they
+are never serialized into lifecycle `task`. Both architect attempts use the
+closed pair `agent_role: architect`, `task: design` and distinct local
+ordinals. Replace only the example timestamp and feature with current values:
 
 ```json
-{"event":"phase.start","phase":"implementation","agent":"implementer","usage_scope":"codex-root-reachable","usage_checkpoint":{"schema_version":1,"kind":"codex_usage_checkpoint","usage_status":"available","reason_code":null,"components":{"input_tokens":0,"cached_input_tokens":0,"uncached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":0,"reasoning_output_tokens":0,"total_tokens":0}}}
-{"event":"phase.end","phase":"implementation","agent":"implementer","usage":{"schema_version":1,"kind":"codex_usage_delta","usage_status":"unavailable","reason_code":"CHECKPOINT_UNAVAILABLE","components":null},"usage_checkpoint":{"schema_version":1,"kind":"codex_usage_checkpoint","usage_status":"unavailable","reason_code":"CHECKPOINT_UNAVAILABLE","components":null}}
+{"ts":"2026-01-01T00:00:00Z","event":"phase.start","feature":"example-feature","phase":"design","agent":"architect","usage_scope":"codex-root-reachable","usage_checkpoint":{"schema_version":1,"kind":"codex_usage_checkpoint","usage_status":"unavailable","reason_code":"CHECKPOINT_UNAVAILABLE","components":null}}
+{"ts":"2026-01-01T00:00:01Z","event":"agent.spawn","feature":"example-feature","agent_role":"architect","task":"design","attempt_ordinal":1,"context_strategy":"fresh","follow_up_count":0}
+{"ts":"2026-01-01T00:01:00Z","event":"agent.close","feature":"example-feature","agent_role":"architect","task":"design","attempt_ordinal":1,"context_strategy":"fresh","follow_up_count":0,"status":"success","quality_verdict":"n-a","attempt_metrics":{"schema_version":1,"kind":"codex_agent_attempt_metrics","metrics_status":"unavailable","reason_code":"PER_ATTEMPT_METRICS_UNAVAILABLE","components":null}}
+{"ts":"2026-01-01T00:01:01Z","event":"agent.spawn","feature":"example-feature","agent_role":"architect","task":"design","attempt_ordinal":2,"context_strategy":"fresh","follow_up_count":0}
+{"ts":"2026-01-01T00:02:00Z","event":"agent.close","feature":"example-feature","agent_role":"architect","task":"design","attempt_ordinal":2,"context_strategy":"fresh","follow_up_count":0,"status":"success","quality_verdict":"n-a","attempt_metrics":{"schema_version":1,"kind":"codex_agent_attempt_metrics","metrics_status":"unavailable","reason_code":"PER_ATTEMPT_METRICS_UNAVAILABLE","components":null}}
+{"ts":"2026-01-01T00:02:01Z","event":"phase.end","feature":"example-feature","phase":"design","agent":"architect","status":"success","usage":{"schema_version":1,"kind":"codex_usage_delta","usage_status":"unavailable","reason_code":"CHECKPOINT_UNAVAILABLE","components":null},"usage_checkpoint":{"schema_version":1,"kind":"codex_usage_checkpoint","usage_status":"unavailable","reason_code":"CHECKPOINT_UNAVAILABLE","components":null}}
 ```
 
-The examples show shape only. They do not authorize zero tokens for a completed
-measured phase. `usage_scope` records the root-reachable measurement boundary,
-not a root identifier.
+The unavailable objects are valid examples, not permission to replace measured
+usage. `usage_scope` records the root-reachable measurement boundary, not a
+root identifier. Before OpenSpec Gate 1, `openspec-events.mjs` validates this
+durable sequence against the bound feature and fails closed on any invalid or
+open record.
 
 On resume, do not reconstruct a root identifier from events, state, aliases,
 paths, or rollout filenames. If the active runtime cannot supply it, emit the

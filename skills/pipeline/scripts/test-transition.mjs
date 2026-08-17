@@ -9,7 +9,7 @@
 
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { lstat, readFile, realpath } from "node:fs/promises";
+import { lstat, open, readFile, realpath, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
@@ -23,7 +23,9 @@ import {
 const execFileAsync = promisify(execFile);
 
 export const TEST_CONTRACT_SCHEMA_VERSION = 1;
-export const TEST_TRANSITION_SCHEMA_VERSION = 1;
+export const TEST_TRANSITION_SCHEMA_VERSION = 2;
+export const TEST_CONTRACT_VALIDATION_SCHEMA_VERSION = 1;
+export const TEST_TRANSITION_RECEIPT_SCHEMA_VERSION = 2;
 
 const MAX_JSON_BYTES = 1024 * 1024;
 const MAX_ITEMS = 256;
@@ -50,9 +52,25 @@ const RESULT_KEYS = [
   "verdict",
   "error_code",
   "duration_ms",
+  "diagnostic",
   "contract",
   "red_evidence",
   "quality",
+];
+const DIAGNOSTIC_KEYS = [
+  "stage",
+  "quality_error_code",
+  "command_id",
+  "command_verdict",
+  "execution_outcome",
+  "exit_code",
+  "signal",
+  "stdout_bytes",
+  "stdout_truncated",
+  "stdout_tail_available",
+  "stderr_bytes",
+  "stderr_truncated",
+  "stderr_tail_available",
 ];
 
 class TransitionError extends Error {
@@ -74,6 +92,52 @@ function hasExactlyKeys(value, keys) {
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+async function persistResult(outputPath, result) {
+  if (typeof outputPath !== "string" || !path.isAbsolute(outputPath) || outputPath.includes("\u0000")) {
+    throw new TransitionError("ARGUMENT_INVALID");
+  }
+  const target = path.resolve(outputPath);
+  const parent = path.dirname(target);
+  const parentStat = await lstat(parent);
+  if (!parentStat.isDirectory() || parentStat.isSymbolicLink() || await realpath(parent) !== parent) {
+    throw new TransitionError("ARGUMENT_INVALID");
+  }
+  try {
+    const targetStat = await lstat(target);
+    if (!targetStat.isFile() || targetStat.isSymbolicLink()) throw new TransitionError("ARGUMENT_INVALID");
+  } catch (error) {
+    if (error instanceof TransitionError) throw error;
+    if (error?.code !== "ENOENT") throw error;
+  }
+  const bytes = Buffer.from(`${JSON.stringify(result)}\n`);
+  const temporary = path.join(parent, `.${path.basename(target)}.tmp-${process.pid}-${Date.now()}`);
+  let handle;
+  try {
+    handle = await open(temporary, "wx", 0o600);
+    await handle.writeFile(bytes);
+    await handle.sync();
+    await handle.close();
+    handle = null;
+    await rename(temporary, target);
+  } catch (error) {
+    if (handle) await handle.close().catch(() => {});
+    await unlink(temporary).catch(() => {});
+    if (error instanceof TransitionError) throw error;
+    throw new TransitionError("OUTPUT_WRITE_FAILED");
+  }
+  return {
+    schema_version: TEST_TRANSITION_RECEIPT_SCHEMA_VERSION,
+    kind: "team_harness_test_transition_receipt",
+    verdict: result.verdict,
+    error_code: result.error_code,
+    transition: result.transition,
+    diagnostic: result.diagnostic,
+    result_path: target,
+    result_sha256: sha256(bytes),
+    result_bytes: bytes.length,
+  };
 }
 
 function isSafeRelativePath(value) {
@@ -130,6 +194,32 @@ function validateContract(value) {
     requirements: value.requirements.slice(),
     test_identifiers: value.test_identifiers.slice(),
     test_paths: value.test_paths.slice().sort(),
+  };
+}
+
+/** Validate one tester-authored contract with the transition's exact schema. */
+export async function validateTestContractFile(contractPath) {
+  const startedAt = process.hrtime.bigint();
+  let errorCode = null;
+  let contractSha256 = null;
+  try {
+    if (typeof contractPath !== "string" || contractPath.length === 0) throw new TransitionError("ARGUMENT_INVALID");
+    const file = await realpath(path.resolve(contractPath));
+    const loaded = await readBoundedJson(file, "CONTRACT_INVALID");
+    validateContract(loaded.value);
+    contractSha256 = sha256(loaded.bytes);
+  } catch (error) {
+    errorCode = error instanceof TransitionError && ["ARGUMENT_INVALID", "CONTRACT_INVALID"].includes(error.code)
+      ? error.code
+      : "INTERNAL_ERROR";
+  }
+  return {
+    schema_version: TEST_CONTRACT_VALIDATION_SCHEMA_VERSION,
+    kind: "team_harness_test_contract_validation",
+    verdict: errorCode === null ? "pass" : "fail",
+    error_code: errorCode,
+    duration_ms: Number((process.hrtime.bigint() - startedAt) / 1_000_000n),
+    contract_sha256: contractSha256,
   };
 }
 
@@ -275,14 +365,18 @@ function assertRedQuality(quality) {
 }
 
 function assertGreenQuality(quality) {
-  if (
-    !isQualityResult(quality) ||
-    quality.verdict !== "pass" ||
-    quality.commands.length !== 1 ||
-    quality.commands[0]?.id !== "test" ||
-    quality.commands[0]?.verdict !== "pass"
-  ) {
-    throw new TransitionError("GREEN_NOT_OBSERVED");
+  if (!isQualityResult(quality)) throw new TransitionError("QUALITY_RUNNER_FAILED");
+  const testCommand = quality.commands.length === 1 && quality.commands[0]?.id === "test"
+    ? quality.commands[0]
+    : null;
+  if (quality.verdict === "fail") {
+    if (quality.error_code === "COMMAND_FAILED" && testCommand?.verdict === "fail") {
+      throw new TransitionError("GREEN_NOT_OBSERVED");
+    }
+    throw new TransitionError("QUALITY_RUNNER_FAILED");
+  }
+  if (quality.verdict !== "pass" || testCommand?.verdict !== "pass") {
+    throw new TransitionError("QUALITY_RUNNER_FAILED");
   }
 }
 
@@ -352,6 +446,53 @@ function isRedEvidence(value) {
   );
 }
 
+function isTransitionDiagnostic(value) {
+  if (value === null) return true;
+  if (!hasExactlyKeys(value, DIAGNOSTIC_KEYS)) return false;
+  if (!["transition-input", "quality-precondition", "test-command", "quality-postcondition", "transition-proof"].includes(value.stage)) return false;
+  if (value.quality_error_code !== null && typeof value.quality_error_code !== "string") return false;
+  if (value.command_id !== null && typeof value.command_id !== "string") return false;
+  if (value.command_verdict !== null && !["pass", "fail"].includes(value.command_verdict)) return false;
+  if (value.execution_outcome !== null && !["completed", "spawn_error", "argument_invalid", "internal_error"].includes(value.execution_outcome)) return false;
+  if (value.exit_code !== null && !Number.isSafeInteger(value.exit_code)) return false;
+  if (value.signal !== null && !/^SIG[A-Z0-9]+$/.test(value.signal)) return false;
+  for (const key of ["stdout_bytes", "stderr_bytes"]) {
+    if (value[key] !== null && (!Number.isSafeInteger(value[key]) || value[key] < 0)) return false;
+  }
+  for (const key of ["stdout_truncated", "stdout_tail_available", "stderr_truncated", "stderr_tail_available"]) {
+    if (value[key] !== null && typeof value[key] !== "boolean") return false;
+  }
+  return true;
+}
+
+function transitionDiagnostic(state) {
+  if (state.error_code === null) return null;
+  const quality = isQualityResult(state.quality) ? state.quality : null;
+  const command = quality?.commands.find((entry) => entry.id === "test") ?? quality?.commands[0] ?? null;
+  const execution = command?.execution ?? null;
+  let stage = "transition-input";
+  if (quality !== null) {
+    if (command?.verdict === "fail") stage = "test-command";
+    else if (quality.verdict === "fail") stage = command === null ? "quality-precondition" : "quality-postcondition";
+    else stage = "transition-proof";
+  }
+  return {
+    stage,
+    quality_error_code: quality?.error_code ?? null,
+    command_id: command?.id ?? null,
+    command_verdict: command?.verdict ?? null,
+    execution_outcome: execution?.outcome ?? null,
+    exit_code: execution?.exit_code ?? null,
+    signal: execution?.signal ?? null,
+    stdout_bytes: execution?.stdout?.bytes ?? null,
+    stdout_truncated: execution?.stdout?.truncated ?? null,
+    stdout_tail_available: execution?.stdout ? execution.stdout.tail !== null : null,
+    stderr_bytes: execution?.stderr?.bytes ?? null,
+    stderr_truncated: execution?.stderr?.truncated ?? null,
+    stderr_tail_available: execution?.stderr ? execution.stderr.tail !== null : null,
+  };
+}
+
 export function isTestTransitionResult(value) {
   if (!hasExactlyKeys(value, RESULT_KEYS)) return false;
   if (value.schema_version !== TEST_TRANSITION_SCHEMA_VERSION || value.kind !== "team_harness_test_transition") {
@@ -359,10 +500,12 @@ export function isTestTransitionResult(value) {
   }
   if (![null, "red", "green"].includes(value.transition) || !["pass", "fail"].includes(value.verdict)) return false;
   if (!ERROR_CODES.has(value.error_code) || !Number.isSafeInteger(value.duration_ms) || value.duration_ms < 0) return false;
+  if (!isTransitionDiagnostic(value.diagnostic)) return false;
   if (value.contract !== null && !isContractEvidence(value.contract)) return false;
   if (!isRedEvidence(value.red_evidence) || (value.quality !== null && !isQualityResult(value.quality))) return false;
   if (value.verdict === "pass" && (value.error_code !== null || value.transition === null || value.contract === null)) return false;
   if (value.verdict === "fail" && value.error_code === null) return false;
+  if ((value.verdict === "pass") !== (value.diagnostic === null)) return false;
   if (value.transition === "red" && value.red_evidence !== null) return false;
   if (value.transition === "green" && value.verdict === "pass" && value.red_evidence === null) return false;
   if (
@@ -403,6 +546,7 @@ function safeResult(state, startedAt) {
     verdict: state.error_code === null ? "pass" : "fail",
     error_code: state.error_code,
     duration_ms: elapsedMs(startedAt),
+    diagnostic: transitionDiagnostic(state),
     contract: state.contract,
     red_evidence: state.red_evidence,
     quality: state.quality,
@@ -415,6 +559,21 @@ function safeResult(state, startedAt) {
     verdict: "fail",
     error_code: "INTERNAL_ERROR",
     duration_ms: 0,
+    diagnostic: {
+      stage: "transition-input",
+      quality_error_code: null,
+      command_id: null,
+      command_verdict: null,
+      execution_outcome: null,
+      exit_code: null,
+      signal: null,
+      stdout_bytes: null,
+      stdout_truncated: null,
+      stdout_tail_available: null,
+      stderr_bytes: null,
+      stderr_truncated: null,
+      stderr_tail_available: null,
+    },
     contract: null,
     red_evidence: null,
     quality: null,
@@ -505,7 +664,9 @@ async function assertCompatibleGreen(options, state, contract, red) {
     priorQuality.manifest.sha256 !== currentQuality.manifest.sha256 ||
     priorQuality.repository.base_commit !== currentQuality.repository.base_commit ||
     priorQuality.repository.base_tree !== currentQuality.repository.base_tree ||
-    priorQuality.commands[0].command_sha256 !== currentQuality.commands[0].command_sha256
+    priorQuality.commands[0].command_sha256 !== currentQuality.commands[0].command_sha256 ||
+    priorQuality.commands[0].execution_argv_sha256 !== currentQuality.commands[0].execution_argv_sha256 ||
+    priorQuality.commands[0].execution_resolution !== currentQuality.commands[0].execution_resolution
   ) {
     throw new TransitionError("TEST_INPUT_CHANGED");
   }
@@ -570,7 +731,21 @@ function parseCli(argv) {
     ["--contract-sha256", "contractSha256"],
     ["--red-evidence", "redEvidence"],
     ["--red-evidence-sha256", "redEvidenceSha256"],
+    ["--output", "output"],
   ]);
+  if (argv.length === 1 || (argv.length === 2 && ["red", "green"].includes(argv[0]))) {
+    const raw = argv.length === 1 ? argv[0] : argv[1];
+    if (typeof raw !== "string" || Buffer.byteLength(raw, "utf8") > 64 * 1024) return null;
+    try {
+      const value = JSON.parse(raw);
+      if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+      if (argv.length === 2) {
+        if (Object.hasOwn(value, "transition")) return null;
+        value.transition = argv[0];
+      }
+      return value;
+    } catch { return null; }
+  }
   const values = {};
   if (argv.length % 2 !== 0) return null;
   for (let index = 0; index < argv.length; index += 2) {
@@ -582,7 +757,33 @@ function parseCli(argv) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const result = await runTestTransition(parseCli(process.argv.slice(2)));
+  const argv = process.argv.slice(2);
+  let result;
+  if (argv.length === 2 && argv[0] === "--validate-contract") {
+    result = await validateTestContractFile(argv[1]);
+  } else {
+    const parsed = parseCli(argv);
+    const output = parsed?.output;
+    if (parsed && Object.hasOwn(parsed, "output")) delete parsed.output;
+    const transition = await runTestTransition(parsed);
+    if (output === undefined) result = transition;
+    else {
+      try { result = await persistResult(output, transition); }
+      catch (error) {
+        result = {
+          schema_version: TEST_TRANSITION_RECEIPT_SCHEMA_VERSION,
+          kind: "team_harness_test_transition_receipt",
+          verdict: "fail",
+          error_code: error instanceof TransitionError ? error.code : "OUTPUT_WRITE_FAILED",
+          transition: transition.transition,
+          diagnostic: transition.diagnostic,
+          result_path: null,
+          result_sha256: null,
+          result_bytes: null,
+        };
+      }
+    }
+  }
   process.stdout.write(`${JSON.stringify(result)}\n`);
   if (result.verdict !== "pass") process.exitCode = 1;
 }

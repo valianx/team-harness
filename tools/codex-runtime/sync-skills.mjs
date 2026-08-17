@@ -90,6 +90,7 @@ const opencodeSpecialMappings = new Map([
 
 const sharedPipelineScripts = [
   "bounded-command.mjs",
+  "commit-integrity.mjs",
   "cleaner-transition.mjs",
   "plan-contract.mjs",
   "plan-contract-repair.mjs",
@@ -100,6 +101,7 @@ const sharedPipelineScripts = [
   "openspec-snapshot.mjs",
   "openspec-overlay.mjs",
   "openspec-recovery.mjs",
+  "openspec-events.mjs",
 ];
 
 const sharedPipelinePolicies = ["openspec-policy.json"];

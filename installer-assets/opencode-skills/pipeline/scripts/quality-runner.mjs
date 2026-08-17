@@ -21,7 +21,7 @@ import { isBoundedCommandEnvelope, runBoundedCommand } from "./bounded-command.m
 const execFileAsync = promisify(execFile);
 
 export const QUALITY_MANIFEST_SCHEMA_VERSION = 1;
-export const QUALITY_RESULT_SCHEMA_VERSION = 1;
+export const QUALITY_RESULT_SCHEMA_VERSION = 2;
 export const CRAP_REPORT_SCHEMA_VERSION = 1;
 export const CRAP_REPORT_TOKEN = "${TH_QUALITY_REPORT}";
 
@@ -58,6 +58,7 @@ const ERROR_CODES = new Set([
   "BASELINE_INVALID",
   "REQUIRED_CHECKS_MISSING",
   "PREREQUISITE_UNAVAILABLE",
+  "NON_HERMETIC_COMMAND",
   "INTERNAL_ERROR",
 ]);
 const RESULT_KEYS = [
@@ -213,7 +214,7 @@ function isSafeRelativePath(value) {
   return Buffer.byteLength(value, "utf8") <= 512;
 }
 
-function validateArgv(argv, { requireReportToken = false } = {}) {
+function validateArgv(argv, { requireReportToken = false, allowLocalPnpmExec = false } = {}) {
   if (!Array.isArray(argv) || argv.length === 0 || argv.length > MAX_ARGV_ITEMS) throw new QualityError("MANIFEST_INVALID");
   let bytes = 0;
   let reportTokens = 0;
@@ -229,6 +230,23 @@ function validateArgv(argv, { requireReportToken = false } = {}) {
     if (argument === CRAP_REPORT_TOKEN) reportTokens += 1;
   }
   if (requireReportToken ? reportTokens !== 1 : reportTokens !== 0) throw new QualityError("MANIFEST_INVALID");
+  const executable = path.basename(argv[0]).toLowerCase().replace(/\.(?:cmd|exe)$/u, "");
+  const operation = argv[1]?.toLowerCase();
+  const wrappedExecutable = executable === "corepack" ? argv[1]?.toLowerCase() : null;
+  const wrappedOperation = executable === "corepack" ? argv[2]?.toLowerCase() : null;
+  const localPnpmExec = (executable === "pnpm" && operation === "exec")
+    || (executable === "corepack" && wrappedExecutable === "pnpm" && wrappedOperation === "exec");
+  const nonHermetic = ["npx", "pnpx", "bunx"].includes(executable)
+    || (executable === "npm" && ["exec", "x"].includes(operation))
+    || (executable === "pnpm" && operation === "dlx")
+    || (executable === "yarn" && ["exec", "dlx"].includes(operation))
+    || (executable === "bun" && operation === "x")
+    || (wrappedExecutable === "npm" && ["exec", "x"].includes(wrappedOperation))
+    || (wrappedExecutable === "pnpm" && wrappedOperation === "dlx")
+    || (wrappedExecutable === "yarn" && ["exec", "dlx"].includes(wrappedOperation))
+    || ["npx", "pnpx", "bunx"].includes(wrappedExecutable)
+    || (localPnpmExec && !allowLocalPnpmExec);
+  if (nonHermetic) throw new QualityError("NON_HERMETIC_COMMAND");
   return argv.slice();
 }
 
@@ -243,7 +261,7 @@ function validateCommand(command, id) {
     throw new QualityError("MANIFEST_INVALID");
   }
   const normalized = {
-    argv: validateArgv(command.argv, { requireReportToken: id === "crap" }),
+    argv: validateArgv(command.argv, { requireReportToken: id === "crap", allowLocalPnpmExec: true }),
     working_directory: workingDirectory,
     timeout_ms: timeoutMs,
     version_argv: null,
@@ -487,7 +505,50 @@ async function commandWorkingDirectory(repo, relative) {
   return resolved;
 }
 
-function commandEvidence(id, command, version, execution) {
+function pnpmExecParts(argv) {
+  const executable = path.basename(argv[0]).toLowerCase().replace(/\.(?:cmd|exe)$/u, "");
+  let offset;
+  if (executable === "pnpm" && argv[1]?.toLowerCase() === "exec") offset = 2;
+  else if (executable === "corepack" && argv[1]?.toLowerCase() === "pnpm" && argv[2]?.toLowerCase() === "exec") offset = 3;
+  else return null;
+  if (argv[offset] === "--") offset += 1;
+  const tool = argv[offset];
+  if (typeof tool !== "string" || !/^[A-Za-z0-9._-]+$/.test(tool)) throw new QualityError("NON_HERMETIC_COMMAND");
+  return { tool, args: argv.slice(offset + 1) };
+}
+
+async function resolveExecutionArgv(argv, cwd, repository) {
+  const parts = pnpmExecParts(argv);
+  if (parts === null) return { argv, identity: argv, resolution: "manifest" };
+  let directory = cwd;
+  while (isContained(repository, directory)) {
+    const candidates = [
+      path.join(directory, "node_modules", ".bin", parts.tool),
+      path.join(directory, "node_modules", ".bin", `${parts.tool}.exe`),
+    ];
+    for (const candidate of candidates) {
+      try {
+        const stat = await lstat(candidate);
+        if (!stat.isFile() && !stat.isSymbolicLink()) continue;
+        const target = await realpath(candidate);
+        const targetStat = await lstat(target);
+        if (!targetStat.isFile()) continue;
+        return {
+          argv: [candidate, ...parts.args],
+          identity: [`${"${TH_LOCAL_BIN}"}/${parts.tool}`, ...parts.args],
+          resolution: "linked-local-bin",
+        };
+      } catch { /* try the next candidate/ancestor */ }
+    }
+    if (directory === repository) break;
+    const parent = path.dirname(directory);
+    if (parent === directory || !isContained(repository, parent)) break;
+    directory = parent;
+  }
+  throw new QualityError("PREREQUISITE_UNAVAILABLE");
+}
+
+function commandEvidence(id, command, version, execution, executionIdentity, executionResolution) {
   const versionFingerprint =
     version === null
       ? null
@@ -502,6 +563,8 @@ function commandEvidence(id, command, version, execution) {
   return {
     id,
     command_sha256: canonicalHash(command),
+    execution_argv_sha256: canonicalHash(executionIdentity),
+    execution_resolution: executionResolution,
     version_sha256: command.version_argv === null ? null : canonicalHash(command.version_argv),
     version_fingerprint: versionFingerprint,
     version_result:
@@ -612,6 +675,8 @@ function isCommandEvidence(value) {
   const keys = [
     "id",
     "command_sha256",
+    "execution_argv_sha256",
+    "execution_resolution",
     "version_sha256",
     "version_fingerprint",
     "version_result",
@@ -619,7 +684,9 @@ function isCommandEvidence(value) {
     "verdict",
   ];
   if (!hasExactlyKeys(value, keys)) return false;
-  if (!SAFE_COMMAND_ID.test(value.id) || !/^[0-9a-f]{64}$/.test(value.command_sha256)) return false;
+  if (!SAFE_COMMAND_ID.test(value.id) || !/^[0-9a-f]{64}$/.test(value.command_sha256)
+    || !/^[0-9a-f]{64}$/.test(value.execution_argv_sha256)
+    || !["manifest", "linked-local-bin"].includes(value.execution_resolution)) return false;
   const hasVersion = value.version_result !== null;
   if (hasVersion !== (typeof value.version_sha256 === "string" && /^[0-9a-f]{64}$/.test(value.version_sha256))) return false;
   if (hasVersion !== (typeof value.version_fingerprint === "string" && /^[0-9a-f]{64}$/.test(value.version_fingerprint))) return false;
@@ -871,7 +938,7 @@ async function prepareBaseline(context) {
   context.baselineResult = loaded.result;
 }
 
-async function runVersionCheck(context, id, command, cwd) {
+async function runVersionCheck(context, id, command, cwd, resolved) {
   if (command.version_argv === null) return null;
   const version = await runBoundedCommand({
     argv: command.version_argv,
@@ -881,7 +948,7 @@ async function runVersionCheck(context, id, command, cwd) {
   });
   await assertClean(context.repository.root, "WORKTREE_MUTATED");
   if (version.outcome !== "completed" || version.exit_code !== 0 || version.signal !== null) {
-    context.state.commands.push(commandEvidence(id, command, version, version));
+    context.state.commands.push(commandEvidence(id, command, version, version, resolved.identity, resolved.resolution));
     throw new QualityError("COMMAND_FAILED");
   }
   return version;
@@ -893,11 +960,19 @@ async function runManifestCommand(context, id) {
     throw new QualityError("PREREQUISITE_UNAVAILABLE");
   }
   const cwd = await commandWorkingDirectory(context.repository.root, command.working_directory);
-  const version = await runVersionCheck(context, id, command, cwd);
+  const resolved = await resolveExecutionArgv(command.argv, cwd, context.repository.root);
+  const version = await runVersionCheck(context, id, command, cwd, resolved);
   const reportPath = id === "crap" ? path.join(context.reportRoot, "crap-report.json") : null;
-  const argv = command.argv.map((argument) => (argument === CRAP_REPORT_TOKEN ? reportPath : argument));
-  const execution = await runBoundedCommand({ argv, cwd, timeoutMs: command.timeout_ms });
-  const evidence = commandEvidence(id, command, version, execution);
+  const argv = resolved.argv.map((argument) => (argument === CRAP_REPORT_TOKEN ? reportPath : argument));
+  const identity = resolved.identity.map((argument) => (argument === CRAP_REPORT_TOKEN ? "${TH_QUALITY_REPORT}" : argument));
+  const retainTransitionDiagnostic = id === "test" && /^test_contract_(?:red|green)$/.test(context.options.checkpoint);
+  const execution = await runBoundedCommand({
+    argv,
+    cwd,
+    timeoutMs: command.timeout_ms,
+    includeSuccessDiagnostic: retainTransitionDiagnostic,
+  });
+  const evidence = commandEvidence(id, command, version, execution, identity, resolved.resolution);
   context.state.commands.push(evidence);
   await assertClean(context.repository.root, "WORKTREE_MUTATED");
   if (evidence.verdict !== "pass") throw new QualityError("COMMAND_FAILED");

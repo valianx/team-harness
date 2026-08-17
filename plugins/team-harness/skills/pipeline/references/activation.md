@@ -117,9 +117,9 @@ the normalized (LF) bytes against these canonical SHA-256 digests:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| pipeline-architect | `377186f3c4dafb6fd128f8e798779315794cd56fa594630e0a97dd7971892f02` |
-| pipeline-implementer | `384f612dfe7cfbfe588be65c6c60071e0d27ab8d7f792447bb66b30c691d5dbc` |
-| pipeline-tester | `b919c206695e30fa2ba529523611cffc171a7b06d9b35fd37bc19f5186b79c93` |
+| pipeline-architect | `14b51f37d0d455cd964bd4b9ec67dd8855195e5abbb8585935b1655c054c7bbd` |
+| pipeline-implementer | `07a93913fb6995d38323506729d277fb4bb7bc3088af96a234153bcf2cbb999a` |
+| pipeline-tester | `d26ca31b6314eedc6a9ccad87820e4dc86c70dcbbfce083337eface11d1bc5db` |
 | pipeline-cleaner | `ea4260bcb8fc1e17034f0d6f91b9d97efefeb61065c50b88a25e792eaaab88b9` |
 | pipeline-qa | `e63a6649de345ffcab03b5a83b5a0c8a1124b9c451be3fa271204b597f9ab5ac` |
 | pipeline-security | `fa5c8ce48def49085705fa083b1c2be2c02c9b9e560043313f3ba70f7004861a` |
