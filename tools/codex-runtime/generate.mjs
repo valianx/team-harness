@@ -162,21 +162,6 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
       || Object.keys(projectDefaults.features).length !== 2) {
     fail("project_defaults must enable exactly multi_agent and multi_agent_v2");
   }
-  const writableRoots = assertUniqueStringArray(
-    projectExecution.writable_roots,
-    "project_execution.writable_roots",
-    { nonEmpty: true }
-  );
-  const expectedWritableRoots = new Set([
-    "~/.cache/go-build",
-    "~/.cache/uv",
-    "~/.npm",
-    "~/go/pkg/mod"
-  ]);
-  if (writableRoots.size !== expectedWritableRoots.size
-      || [...writableRoots].some(root => !expectedWritableRoots.has(root))) {
-    fail("project_execution.writable_roots must declare exactly the supported user-scoped cache paths");
-  }
   const allowedSourceModels = assertUniqueStringArray(contract.allowed_source_models, "allowed_source_models", { nonEmpty: true });
   const allowedSourceEfforts = assertUniqueStringArray(contract.allowed_source_efforts, "allowed_source_efforts", { nonEmpty: true });
   const allowedRuntimeReasoningEfforts = assertUniqueStringArray(contract.allowed_runtime_reasoning_efforts, "allowed_runtime_reasoning_efforts", { nonEmpty: true });
@@ -343,7 +328,6 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     "",
     "[sandbox_workspace_write]",
     `network_access = ${projectExecution.network_access}`,
-    `writable_roots = [${[...writableRoots].map(root => JSON.stringify(root)).join(", ")}]`,
     "",
     "[agents]",
     "enabled = true",

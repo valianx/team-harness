@@ -2361,7 +2361,7 @@ def check_obsidian_workspace_preflight_contract() -> None:
 
     for marker in (
         "sandbox_workspace_write.writable_roots",
-        "`--add-dir`",
+        "manage_runtime.py ensure",
         "does not update a running session's sandbox",
         "codex restart or new tab",
         "non-escalated live write probe",

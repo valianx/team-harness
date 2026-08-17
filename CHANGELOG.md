@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.13.0] - 2026-08-17
+
+### Added
+
+- Made Codex setup and update reconcile a global developer execution profile
+  with workspace-write sandboxing, automatic approval review, dependency
+  network access, standard tool caches, and a private Codex temp directory.
+- Granted the configured Obsidian Team Harness workspace subtree automatically
+  while preserving every operator-owned writable root and keeping `.git`
+  protected by the native sandbox.
+
+### Changed
+
+- Stopped the generated project config from shadowing global writable roots, so
+  setup/update changes apply consistently across Team Harness workspaces.
+
 ## [3.12.3] - 2026-08-15
 
 ### Fixed

@@ -20,6 +20,10 @@ write:
 
 - `scripts/manage_config.py` validates, backs up, and atomically writes native
   settings with mode `0o600`.
+- `scripts/manage_runtime.py` converges the global Codex sandbox, automatic
+  approval reviewer, network access, tool caches, runtime temp directory, and
+  configured Obsidian workspace root without removing operator-owned writable
+  roots.
 - `scripts/manage_agents.py` installs or refreshes the nineteen bundled generated
   agents without overwriting an unmanaged same-name file.
 - `scripts/manage_github_identities.py` validates and atomically manages the
@@ -115,23 +119,27 @@ migration, and preserve every unrelated value.
 
    - Workspace defaults to `local`. For `obsidian`, require an existing
      absolute vault path plus a safe relative subfolder. Reject filesystem
-     roots, the user home, traversal, globs, and symlink escapes. Report the
-     exact Team Harness subtree that must be present in
-     `sandbox_workspace_write.writable_roots` or supplied with `--add-dir` at
-     Codex launch. A settings write does not update a running session's sandbox:
-     after adding that root, require a Codex restart or new tab before reporting
-     the external workspace ready. The pipeline's non-escalated live write
-     probe remains authoritative; never enter an escalation loop or weaken the
-     sandbox because persistent config looks correct.
-   - Worktree creation is intentionally not pre-authorized by setup. Keep
-     `approval_policy = "on-request"`; never add a repository `.git` directory
-     to `sandbox_workspace_write.writable_roots` and never install a blanket
-     `git` or `git worktree add` command rule. A pipeline that needs an isolated
-     checkout requests native escalation for its one exact `git worktree add -b
-     <branch> <absolute-path> <immutable-base-sha>` command after Gate 1. If the
-     native approval reviewer times out, setup state is not rewritten and the
-     pipeline remains technically paused; the operator may approve one
-     resubmission through the live native permission flow.
+     roots, the user home, traversal, globs, and symlink escapes. Runtime
+     reconciliation creates the configured Team Harness subtree when needed and
+     appends its canonical path to `sandbox_workspace_write.writable_roots`.
+     A settings write does not update a running session's sandbox: require a
+     Codex restart or new tab before reporting the external workspace ready.
+     The pipeline's non-escalated live write probe remains authoritative.
+   - Keep `approval_policy = "on-request"` and set
+     `approvals_reviewer = "auto_review"`. This is Codex's automatic review
+     path for sandbox escalations, including ordinary local Git metadata writes,
+     benign pushes, and PR creation; it is not a blanket command allow rule.
+     Never add a repository `.git` directory to writable roots and never install
+     a blanket `git`, `git push`, `gh pr create`, or `git worktree add` rule,
+     because an allow rule could outrank a deterministic deny hook. Force-push
+     remains denied by `gate-guard`, while server-side GitHub branch protection
+     remains authoritative for the default branch.
+     A pipeline still submits one exact `git worktree add -b <branch>
+     <absolute-path> <immutable-base-sha>` native escalation after Gate 1;
+     `auto_review` evaluates it without a human prompt. If that reviewer times
+     out or denies the command, the pipeline remains technically paused and may
+     make the contract's single bounded resubmission; setup never rewrites
+     permission state or treats that technical boundary as a functional failure.
    - Language is a two-letter lowercase code or absent for automatic detection.
    - English learning, Obsidian Tasks, and flow telemetry are booleans;
      telemetry defaults off.
@@ -168,7 +176,22 @@ migration, and preserve every unrelated value.
    directory with `GH_CONFIG_DIR=<dir> gh auth login` remains an operator action;
    never read, print, copy, or store token bytes.
 
-6. Reconcile all nineteen bundled specialists in the persisted scope on every full
+6. Reconcile global Codex execution defaults on every setup, including a
+   targeted setup, after applying any selected workspace values:
+
+   ```bash
+   python3 scripts/manage_runtime.py inspect
+   python3 scripts/manage_runtime.py ensure
+   ```
+
+   The helper atomically updates `${CODEX_HOME:-$HOME/.codex}/config.toml`,
+   preserves unrelated keys and all existing writable roots, and ensures
+   `workspace-write`, `on-request`, `auto_review`, sandbox network access, the
+   standard Go/uv/npm caches, `${CODEX_HOME:-$HOME/.codex}/tmp`, and the active
+   Obsidian Team Harness subtree. It never adds `.git` or a command rule. A
+   changed runtime config requires a new Codex session before it is effective.
+
+7. Reconcile all nineteen bundled specialists in the persisted scope on every full
    setup, and whenever `agents` is targeted:
 
    ```bash
@@ -193,7 +216,7 @@ migration, and preserve every unrelated value.
    ready; Codex loads its agent registry and project instruction chain only at
    session start.
 
-7. Configure selected MCP servers after `codex mcp list --json`. Preserve an
+8. Configure selected MCP servers after `codex mcp list --json`. Preserve an
    existing registration unless the operator explicitly requests replacement.
 
    - Memory: register a streamable HTTP URL, optionally with the name (not the
@@ -203,7 +226,7 @@ migration, and preserve every unrelated value.
      printing it, then run
      `codex mcp add context7 --env DEFAULT_MINIMUM_TOKENS=10000 -- npx -y @upstash/context7-mcp@3.2.5`.
 
-8. Verify the installed plugin's `hooks/hooks.json`. Codex supports the
+9. Verify the installed plugin's `hooks/hooks.json`. Codex supports the
    deterministic deny hooks only: `policy-block`, the catastrophic-deny
    portion of `gcp-guard`, and `gate-guard`'s force-push floor. `gate-guard`
    denies direct force flags, `--force-with-lease`, `+refspec` forms, and the
@@ -218,14 +241,14 @@ migration, and preserve every unrelated value.
    Explain that the operator must review and trust hooks through `/hooks`;
    never approve or bypass trust.
 
-9. Re-run the applicable helper inspections and `codex mcp list --json`; re-run
+10. Re-run the applicable helper inspections and `codex mcp list --json`; re-run
     `codex features list` only when step 4 ran. Report one compact result:
     native config path, workspace/language, agent scope and nineteen agent statuses,
     GitHub route count when configured, feature-flag status when checked, MCP registrations, hook
-    verification/trust, whether a new thread is required, and for Obsidian
-    whether the writable-root grant still requires that restart. Also report
-    that protected Git worktree creation remains exact-command, on-request, and
-    independent of Gate 1. Never print
+    verification/trust, global execution-default status, whether a new thread is
+    required, and for Obsidian whether the writable-root grant still requires
+    that restart. Also report that ordinary Git/push/PR approval requests route
+    through automatic review, while force-push remains denied. Never print
     imported opaque values, secrets, or environment-variable values.
 
 The flow is idempotent. Blank input preserves current values; unrelated native

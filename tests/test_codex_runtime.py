@@ -341,14 +341,8 @@ def main() -> None:
         fail("Codex project must preserve scoped approval requests")
     if config.get("sandbox_workspace_write", {}).get("network_access") is not True:
         fail("Codex project sandbox must allow dependency network access")
-    expected_cache_roots = [
-        "~/.cache/go-build",
-        "~/.cache/uv",
-        "~/.npm",
-        "~/go/pkg/mod",
-    ]
-    if config.get("sandbox_workspace_write", {}).get("writable_roots") != expected_cache_roots:
-        fail("Codex project must allow only user-scoped tool cache paths")
+    if "writable_roots" in config.get("sandbox_workspace_write", {}):
+        fail("Codex project must not shadow globally reconciled writable roots")
     if "shell_environment_policy" in config:
         fail("Codex project must not override tool caches with shared paths")
 
@@ -584,6 +578,7 @@ def main() -> None:
     for marker in (
         "${CODEX_HOME:-$HOME/.codex}/.team-harness.json",
         "scripts/manage_config.py",
+        "scripts/manage_runtime.py",
         "scripts/manage_agents.py",
         "manage_config.py ensure --version 3.6.5",
         "codex mcp add memory",
@@ -702,6 +697,7 @@ def main() -> None:
         "skills/update/scripts/bridge_snapshot.py",
         "--old-plugin OLD_PLUGIN --new-plugin NEW_PLUGIN",
         "manage_config.py ensure --version NEW_VERSION",
+        "manage_runtime.py ensure",
         "manage_agents.py sync --scope SCOPE",
         "project_doc_fallback_filenames",
         "appends `CLAUDE.md` once",
@@ -842,7 +838,10 @@ def main() -> None:
             fail("Codex snapshot bridge replaced a real cached directory")
 
     config_script = ROOT / "plugins/team-harness/skills/setup/scripts/manage_config.py"
+    runtime_script = ROOT / "plugins/team-harness/skills/setup/scripts/manage_runtime.py"
     agents_script = ROOT / "plugins/team-harness/skills/setup/scripts/manage_agents.py"
+    if stat.S_IMODE(runtime_script.stat().st_mode) != 0o755:
+        fail("Codex runtime helper must be executable at mode 0755")
     with tempfile.TemporaryDirectory() as temp_root:
         env = {**os.environ, "CODEX_HOME": temp_root}
         first = subprocess.run(
@@ -930,6 +929,149 @@ def main() -> None:
         )
         if secret_like.returncode == 0:
             fail("Codex setup config helper accepted a realistic sk- secret")
+        created_runtime = subprocess.run(
+            [sys.executable, str(runtime_script), "ensure"],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if created_runtime.returncode != 0:
+            fail(f"Codex runtime helper could not create a missing config: {created_runtime.stderr}")
+        created_doc = tomllib.loads((pathlib.Path(temp_root) / "config.toml").read_text())
+        if created_doc.get("approvals_reviewer") != "auto_review":
+            fail("Codex runtime helper omitted auto_review from a new config")
+        if str(pathlib.Path(temp_root) / "tmp") not in created_doc.get("sandbox_workspace_write", {}).get("writable_roots", []):
+            fail("Codex runtime helper omitted its private temp root from a new config")
+
+    with tempfile.TemporaryDirectory() as temp_root:
+        temp = pathlib.Path(temp_root)
+        home = temp / "home"
+        codex_home = home / ".codex"
+        vault = home / "vault"
+        home.mkdir()
+        vault.mkdir()
+        env = {**os.environ, "HOME": str(home), "CODEX_HOME": str(codex_home)}
+        configured = subprocess.run(
+            [
+                sys.executable,
+                str(config_script),
+                "set",
+                "--set",
+                'logs-mode="obsidian"',
+                "--set",
+                f'logs-path={json.dumps(str(vault))}',
+                "--set",
+                'logs-subfolder="work-logs"',
+            ],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if configured.returncode != 0:
+            fail(f"Codex Obsidian setup fixture failed: {configured.stdout}{configured.stderr}")
+        runtime_config = codex_home / "config.toml"
+        runtime_config.write_text(
+            'model = "operator-main"\n'
+            'sandbox_mode = "read-only"\n'
+            'approval_policy = "untrusted" # reconcile this\n'
+            'approvals_reviewer = "user"\n\n'
+            '[sandbox_workspace_write]\n'
+            'network_access = false\n'
+            'writable_roots = [\n'
+            '  "/operator/cache", # preserve operator root\n'
+            ']\n\n'
+            '[projects."/tmp/example"]\n'
+            'trust_level = "trusted"\n',
+            encoding="utf-8",
+        )
+        inspected = subprocess.run(
+            [sys.executable, str(runtime_script), "inspect"],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        inspected_result = json.loads(inspected.stdout) if inspected.returncode == 0 else {}
+        if inspected.returncode != 0 or inspected_result.get("status") != "stale":
+            fail(f"Codex runtime helper did not detect stale defaults: {inspected.stdout}{inspected.stderr}")
+        reconciled = subprocess.run(
+            [sys.executable, str(runtime_script), "ensure"],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if reconciled.returncode != 0:
+            fail(f"Codex runtime reconciliation failed: {reconciled.stdout}{reconciled.stderr}")
+        result = json.loads(reconciled.stdout)
+        runtime_text = runtime_config.read_text(encoding="utf-8")
+        runtime_doc = tomllib.loads(runtime_text)
+        if runtime_doc.get("sandbox_mode") != "workspace-write":
+            fail("Codex runtime helper did not enable workspace-write")
+        if runtime_doc.get("approval_policy") != "on-request":
+            fail("Codex runtime helper did not preserve the on-request sandbox boundary")
+        if runtime_doc.get("approvals_reviewer") != "auto_review":
+            fail("Codex runtime helper did not enable automatic approval review")
+        sandbox = runtime_doc.get("sandbox_workspace_write", {})
+        if sandbox.get("network_access") is not True:
+            fail("Codex runtime helper did not enable sandbox network access")
+        workspace = (vault / "work-logs").resolve()
+        expected_roots = [
+            "/operator/cache",
+            "~/.cache/go-build",
+            "~/.cache/uv",
+            "~/.npm",
+            "~/go/pkg/mod",
+            str(codex_home / "tmp"),
+            str(workspace),
+        ]
+        if sandbox.get("writable_roots") != expected_roots:
+            fail("Codex runtime helper did not preserve and append writable roots")
+        if not workspace.is_dir() or not (codex_home / "tmp").is_dir():
+            fail("Codex runtime helper did not create managed writable roots")
+        for marker in ('model = "operator-main"', '[projects."/tmp/example"]', 'trust_level = "trusted"'):
+            if marker not in runtime_text:
+                fail(f"Codex runtime helper dropped operator config {marker!r}")
+        if result.get("changed") is not True or result.get("restartRequired") is not True:
+            fail("Codex runtime helper did not report a changed profile restart")
+        if stat.S_IMODE(runtime_config.stat().st_mode) != 0o600:
+            fail("Codex runtime helper must write config.toml at mode 0600")
+        if not runtime_config.with_name("config.toml.bak").is_file():
+            fail("Codex runtime helper did not create its rolling backup")
+        runtime_mtime = runtime_config.stat().st_mtime_ns
+        backup_bytes = runtime_config.with_name("config.toml.bak").read_bytes()
+        repeated = subprocess.run(
+            [sys.executable, str(runtime_script), "ensure"],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        repeated_result = json.loads(repeated.stdout) if repeated.returncode == 0 else {}
+        if repeated.returncode != 0 or repeated_result.get("changed") is not False:
+            fail(f"Codex runtime reconciliation is not idempotent: {repeated.stdout}{repeated.stderr}")
+        if runtime_config.stat().st_mtime_ns != runtime_mtime:
+            fail("Codex runtime helper rewrote current config")
+        if runtime_config.with_name("config.toml.bak").read_bytes() != backup_bytes:
+            fail("Codex runtime helper replaced its backup during a no-op")
+        outside = home / "outside"
+        outside.mkdir()
+        escaped = vault / "escape"
+        escaped.symlink_to(outside, target_is_directory=True)
+        settings = json.loads((codex_home / ".team-harness.json").read_text())
+        settings["logs-subfolder"] = "escape"
+        (codex_home / ".team-harness.json").write_text(json.dumps(settings))
+        rejected = subprocess.run(
+            [sys.executable, str(runtime_script), "ensure"],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+        if rejected.returncode == 0 or "outside logs-path" not in rejected.stderr:
+            fail("Codex runtime helper accepted an Obsidian symlink escape")
 
     with tempfile.TemporaryDirectory() as temp_root:
         temp = pathlib.Path(temp_root)
