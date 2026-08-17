@@ -10,11 +10,53 @@ Every activated run uses this full v3 machine. There is no alternate depth profi
 route, or lane selector; direct inline work remains outside the machine and creates no pipeline
 workspace, state, events, gates, validation, or delivery record.
 
-Read `plan-shards.md` before dispatching the architect. Read the live operator request, repository
-evidence, `00-spec-seed.md`, and current state. Give `architect` a bounded prompt containing the
-workspace path, repository root, constraints, required acceptance criteria, and file ownership.
-The specialist returns a file-scoped `sharded-v1` manifest plus plan shards and classification;
-it never edits coordination state.
+## Canonical OpenSpec Design transaction
+
+Every newly activated workspace binds one kebab-case OpenSpec change in the target repository;
+existing approved or frozen legacy workspaces continue their recorded contract and are never
+silently migrated. Resolve `scripts/openspec-adapter.mjs` and
+`scripts/openspec-snapshot.mjs` relative to this loaded pipeline skill. They are the only
+deterministic OpenSpec helpers; OpenSpec's installed generated skills remain the planning
+workflow authority.
+
+Run the transaction continuously:
+
+1. Invoke adapter `preflight` for the repository and active runtime. `ready` continues without
+   operator interaction. `provisionable` presents one exact install/update-or-abort decision;
+   `blocked-prerequisite` gives exact Node/npm guidance; `invalid-project` blocks. Never fall
+   back to legacy planning.
+2. Persist the repository planning root and change binding. Dispatch a fresh architect in
+   `openspec-planning` mode with the approved request and the exact installed
+   `openspec-propose` skill for a new change or `openspec-update-change` for a bound existing
+   change. The architect follows the upstream skill and writes only proposal/specs/design/tasks
+   under that change root; it writes no TH plan or coordination state.
+3. Run CLI-reported status and strict validation through `openspec-snapshot.mjs capture`; it
+   writes the sole `inputs/openspec-snapshot.json`. A binding, path, coordinate, validation, or
+   hash failure remains recoverably in Design.
+4. Dispatch a fresh architect in `openspec-overlay` mode with the snapshot and pinned OpenSpec
+   coordinates. It writes only the compact Gate-1 index, operational execution shards, and
+   bidirectional traceability. It must not paraphrase or replace OpenSpec intent.
+5. Validate snapshot freshness, overlay traceability, and applicable operational plan fields,
+   then present the unchanged Stage Gate 1.
+
+Success at any internal step advances automatically. Commentary is informational and never asks
+the operator to invoke another TH or OpenSpec command. Pause only for the mandatory gate, the
+explicit provisioning choice, a material unresolved decision, separate external-write authority,
+or a real blocker that cannot be resolved safely within scope.
+
+OpenSpec proposal, specs, design, and tasks always remain under the bound repository planning
+root. The snapshot, overlay, decisions, reviews, and evidence always remain under the configured
+TH workspace root. For `logs_mode: obsidian`, snapshot metadata records `workspace.mode:
+obsidian`, the vault workspace root, and `navigation_kind: repository-relative-coordinates`;
+artifact paths, line coordinates, and captured hashes navigate to the repository originals. Never
+copy canonical OpenSpec Markdown into the vault or create an editable second source root there.
+
+Read `plan-shards.md` before the overlay dispatch. Read the live operator request, repository
+evidence, `00-spec-seed.md`, current state, and canonical OpenSpec snapshot. Give the overlay
+architect a bounded prompt containing the workspace path, repository root, pinned source
+coordinates, constraints, and TH-only ownership fields. The specialist returns a file-scoped
+execution overlay plus classification; it never edits coordination state or duplicates canonical
+requirements, scenarios, decisions, or task prose.
 
 Wait for that same architect attempt to complete. A `wait_agent` timeout is
 only the wait heartbeat and immediately resumes the directed wait without

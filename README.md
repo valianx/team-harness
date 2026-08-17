@@ -9,6 +9,10 @@
 
 > Team Harness runs under **Claude Code**, **Codex** (POSIX-only beta), and **opencode**. See [`docs/lifecycle.md`](./docs/lifecycle.md) and the [Codex runtime guide](./docs/codex-runtime.md).
 
+New pipeline Designs use [OpenSpec as the canonical intent source](./docs/openspec-integration.md)
+inside the existing TH lifecycle. TH keeps specialist execution, evidence, both gates, and
+delivery; OpenSpec owns repository-local proposal/spec/design/task artifacts.
+
 ---
 
 ## Install

@@ -6,6 +6,8 @@ import { lstat, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { validateOpenSpecOverlay } from "./openspec-overlay.mjs";
+
 export const PLAN_CONTRACT_SCHEMA_VERSION = 1;
 
 const MAX_ARTIFACT_BYTES = 1024 * 1024;
@@ -406,6 +408,9 @@ function result(state, started) {
 }
 
 export async function validatePlanContract(options) {
+  if (exactlyKeys(options, ["workspace", "plan", "snapshot", "traceability"]) && options.plan === "01-plan.md") {
+    return validateOpenSpecOverlay({ workspace: options.workspace, snapshot: options.snapshot, traceability: options.traceability });
+  }
   const started = process.hrtime.bigint();
   const state = { error_code: null, plan: null, artifact_set_sha256: null, artifacts: [], functional: null, tasks: [], findings: [] };
   try {
@@ -454,10 +459,10 @@ export async function validatePlanContract(options) {
 }
 
 function parseCli(argv) {
-  if (argv.length !== 4) return null;
+  if (![4, 8].includes(argv.length)) return null;
   const values = {};
   for (let index = 0; index < argv.length; index += 2) {
-    const key = argv[index] === "--workspace" ? "workspace" : argv[index] === "--plan" ? "plan" : null;
+    const key = ({ "--workspace": "workspace", "--plan": "plan", "--snapshot": "snapshot", "--traceability": "traceability" })[argv[index]] ?? null;
     if (key === null || Object.hasOwn(values, key)) return null;
     values[key] = argv[index + 1];
   }

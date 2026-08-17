@@ -1,0 +1,73 @@
+// hooks/ts/bodies/worktree-guard.ts
+// Canonical body — verbatim port of hooks/worktree-guard.sh decision logic.
+// Runtime-pure: imports no runtime symbol; reads only NormalizedInput;
+// returns only NormalizedDecision. Never branches on `input.runtime`.
+//
+// PURPOSE: advisory start-gate reminder for agent-issued branch/worktree operations.
+// CONTRACT: FAIL-OPEN. On any error → none (no gate action).
+// Trigger: git checkout -b / git switch -c / git worktree add.
+//
+// This hook fires ONLY on commands the agent's Bash tool is about to run.
+// It CANNOT intercept human terminal commands.
+//
+// NEVER imports hook-profile helper (enforcement floor — even though it is
+// advisory, it is wired as an enforcement gate and must not import profile).
+
+import type { NormalizedInput, NormalizedDecision } from "../shim/normalized-v1.js";
+
+// ---------------------------------------------------------------------------
+// Decision helpers
+// ---------------------------------------------------------------------------
+
+function ask(reason: string): NormalizedDecision {
+  return { decision: "ask", reason, mutations: null };
+}
+
+function none(): NormalizedDecision {
+  return { decision: "none", reason: "", mutations: null };
+}
+
+// ---------------------------------------------------------------------------
+// Trigger pattern — mirrors worktree-guard.sh Step 4
+// ---------------------------------------------------------------------------
+
+const TRIGGER_RE = /git\s+(checkout\s+-b|switch\s+-c|worktree\s+add)/;
+
+// ---------------------------------------------------------------------------
+// Public evaluate() — the single entry point every runtime calls.
+//
+// `rawPayload` (optional) is the ORIGINAL, unparsed stdin text. It backs the
+// Bash oracle's Step 4 fail-safe fallback: when tool_input's shape is
+// malformed (e.g. an array instead of an object) the shim coerces it to an
+// empty object, and the structured `command` extraction above yields "" —
+// exactly like the Bash oracle's own `ti.get('command', '')` failing on a
+// non-dict `tool_input`. The Bash oracle never drops the reminder in that
+// case; it falls back to scanning the RAW, unparsed payload bytes for the
+// trigger token. Passing rawPayload is optional (opencode has no equivalent
+// contract) — when absent, only the structured `cmd` is evaluated.
+// ---------------------------------------------------------------------------
+
+export function evaluate(input: NormalizedInput, rawPayload?: string): NormalizedDecision {
+  const toolName = input.tool?.name ?? "";
+  if (toolName !== "Bash") return none();
+
+  const rawCommand = input.tool?.input?.["command"];
+  const commandExtracted = typeof rawCommand === "string";
+
+  // The raw-payload fallback exists only to cover a missing/malformed
+  // `command` field (see contract note above). When structured extraction
+  // succeeds, decide on that value alone — scanning the raw payload too
+  // would false-positive on a trigger token sitting in an unrelated field
+  // of a safe, non-triggering command.
+  const triggered = commandExtracted
+    ? TRIGGER_RE.test(rawCommand)
+    : (rawPayload !== undefined && TRIGGER_RE.test(rawPayload));
+  if (!triggered) {
+    return none();
+  }
+
+  // Emit advisory ask with start-gate reminder.
+  return ask(
+    "worktree-guard: agent-issued branch/worktree operation detected. Before proceeding, confirm the start-gate decision (docs/worktree-discipline.md): (1) run `git status` and `git worktree list`; (2) `git fetch origin main` then `git rev-list --count origin/main..HEAD` — if the tree is clean AND at/behind origin/main (count=0) → branch in place is permitted; if uncommitted changes OR ahead of origin/main (count>0, incl. on a non-main branch) → create a worktree instead; (3) always cut from fresh origin/main (`git worktree add -b feat/<name> <path> origin/main`). NOTE: this hook only sees agent-issued commands — it cannot cover a human's own-terminal git operations (worktree-guard.ts; see docs/worktree-discipline.md)"
+  );
+}

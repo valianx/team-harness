@@ -195,6 +195,16 @@ terminal run. For corrupt, incomplete, oversized, or unmappable state, report
 only the path and failed structural checks; never echo raw snapshot or event
 content.
 
+For an OpenSpec-bound Design, resolve `scripts/openspec-recovery.mjs` relative to the loaded
+pipeline skill and derive the next action from the bounded OpenSpec state fields. Resume
+`preflight`, an already approved `provisioning`, upstream `planning`, strict `snapshot`, or
+`overlay` at its recorded boundary without asking the operator to re-enter a command. Before
+overlay or Gate 1, require the recorded snapshot bytes/hash and live pre-Gate-1 freshness; source
+drift routes to explicit OpenSpec reconciliation. Before Gate 1 also require the recorded overlay
+bytes/hash and its deterministic validation. A local and an Obsidian workspace use the same rules;
+all paths are resolved below the recorded workspace while canonical source remains below
+`openspec_repository_root`.
+
 Before resuming `design` or presenting Gate 1, validate
 `plan_contract_evidence`. `pending` resumes at deterministic plan validation;
 `pass` requires a readable `plan-contract.mjs` result whose SHA-256, embedded

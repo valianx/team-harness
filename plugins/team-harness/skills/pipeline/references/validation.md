@@ -20,6 +20,18 @@ advisory `Suggested correction`, and deterministic closure evidence with its exp
 result; Main owns canonical plan fields, disposition,
 phase, and routing.
 
+For an OpenSpec-bound workspace, Main verifies snapshot freshness and overlay
+traceability before every tester or QA dispatch. Each packet carries the pinned
+snapshot path and SHA-256, its TH evidence/operational item, and only the exact
+OpenSpec requirement/scenario coordinates it validates, including repository
+artifact path, line, and captured content hash. Tester and QA read the canonical
+source directly; no TH copy, paraphrase, prior verdict, or implementer narrative
+may substitute for it. Tester owns executable evidence and dependency hashes;
+QA remains the criterion-by-criterion final acceptance owner on the current
+Freeze. OpenSpec validation or generated workflow guidance is supplemental and
+cannot produce an AC verdict, lower the security floor, release either gate, or
+write TH state.
+
 A live operator-requested tester, QA, or security review while Main is inline is an ad-hoc report,
 not pipeline validation. It runs without a pipeline workspace, state, events, gates, Stage Gate,
 or delivery record and cannot release or infer one.

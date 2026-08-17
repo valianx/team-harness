@@ -1,0 +1,13 @@
+{
+  "name": "th",
+  "displayName": "Team Harness",
+  "version": "3.13.0",
+  "description": "Orchestrated multi-agent development system for Claude Code, Codex, and opencode.",
+  "author": {
+    "name": "Mario Gutierrez"
+  },
+  "repository": "https://github.com/valianx/team-harness",
+  "license": "MIT",
+  "keywords": ["orchestration", "agents", "workflow", "development"],
+  "hooks": "./.claude-plugin/hooks.json"
+}

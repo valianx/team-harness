@@ -318,6 +318,24 @@ run_node_suite "workspace-preflight" "test_workspace_preflight.mjs" "node not fo
 
 echo
 echo "############################################################"
+echo "# Suite 164: OpenSpec runtime policy and adapter"
+echo "# Requires: node. Missing runtime follows CI-required semantics."
+echo "############################################################"
+run_node_suite "openspec-adapter" "test_openspec_adapter.mjs" "node not found — install Node.js to run this suite"
+
+echo
+echo "############################################################"
+echo "# Suite 165: OpenSpec canonical planning snapshot"
+echo "# Requires: node. Missing runtime follows CI-required semantics."
+echo "############################################################"
+run_node_suite "openspec-snapshot" "test_openspec_snapshot.mjs" "node not found — install Node.js to run this suite"
+run_node_suite "openspec-overlay" "test_openspec_overlay.mjs" "node not found — install Node.js to run this suite"
+run_node_suite "openspec-distribution" "test_openspec_distribution.mjs" "node not found — install Node.js to run this suite"
+run_node_suite "openspec-recovery" "test_openspec_recovery.mjs" "node not found — install Node.js to run this suite"
+run_node_suite "openspec-design-e2e" "test_openspec_design_e2e.mjs" "node not found — install Node.js to run this suite"
+
+echo
+echo "############################################################"
 echo "# Suite 164: deterministic repository quality runner"
 echo "# Requires: node and git. Missing runtimes follow CI-required semantics."
 echo "############################################################"

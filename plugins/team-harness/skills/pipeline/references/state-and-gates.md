@@ -51,6 +51,14 @@ events file):
 ```text
 pipeline_version: 3
 plan_format: sharded-v1
+openspec_change: {kebab-case change|null}
+openspec_repository_root: {absolute repository root|null}
+openspec_preflight: pending|ready|provisionable|blocked-prerequisite|invalid-project|null
+openspec_design_pass: preflight|provisioning|planning|snapshot|overlay|gate1-ready|null
+openspec_snapshot_path: inputs/openspec-snapshot.json|null
+openspec_snapshot_sha256: {SHA-256|null}
+openspec_overlay_path: plan/openspec-traceability.json|null
+openspec_overlay_sha256: {SHA-256|null}
 activation: explicit
 type: feature|fix|refactor|hotfix|enhancement
 feature: {kebab-case slug}

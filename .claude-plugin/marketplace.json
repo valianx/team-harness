@@ -9,7 +9,7 @@
     {
       "name": "th",
       "displayName": "Team Harness",
-      "source": {"source": "github", "repo": "valianx/team-harness"},
+      "source": "./plugins/team-harness",
       "description": "Complete shared Team Harness skill catalog and gated multi-agent workflows for Claude Code, Codex, and opencode",
       "version": "3.13.0",
       "category": "development",
