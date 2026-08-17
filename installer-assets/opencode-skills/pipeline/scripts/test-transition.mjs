@@ -198,7 +198,7 @@ function validateContract(value) {
 }
 
 /** Validate one tester-authored contract with the transition's exact schema. */
-export async function validateTestContractFile(contractPath) {
+export async function validateTestContractFile(contractPath, context = null) {
   const startedAt = process.hrtime.bigint();
   let errorCode = null;
   let contractSha256 = null;
@@ -206,10 +206,42 @@ export async function validateTestContractFile(contractPath) {
     if (typeof contractPath !== "string" || contractPath.length === 0) throw new TransitionError("ARGUMENT_INVALID");
     const file = await realpath(path.resolve(contractPath));
     const loaded = await readBoundedJson(file, "CONTRACT_INVALID");
-    validateContract(loaded.value);
+    const contract = validateContract(loaded.value);
     contractSha256 = sha256(loaded.bytes);
+    if (context !== null) {
+      if (
+        context === null || typeof context !== "object" || Array.isArray(context) ||
+        !hasExactlyKeys(context, ["repo", "manifest", "base", "candidate"]) ||
+        Object.values(context).some((entry) => typeof entry !== "string" || entry.length === 0)
+      ) {
+        throw new TransitionError("ARGUMENT_INVALID");
+      }
+      let repo;
+      try {
+        repo = await realpath(path.resolve(context.repo));
+        const stat = await lstat(repo);
+        if (!stat.isDirectory()) throw new Error("not a repository");
+      } catch {
+        throw new TransitionError("ARGUMENT_INVALID");
+      }
+      const manifest = await loadManifest(repo, context.manifest);
+      const baseCommit = await gitText(repo, ["rev-parse", "--verify", `${context.base}^{commit}`], "TEST_SCOPE_INVALID");
+      const candidateCommit = await gitText(repo, ["rev-parse", "--verify", `${context.candidate}^{commit}`], "TEST_SCOPE_INVALID");
+      const mergeBase = await gitText(repo, ["merge-base", baseCommit, candidateCommit], "TEST_SCOPE_INVALID");
+      if (mergeBase !== baseCommit) throw new TransitionError("TEST_SCOPE_INVALID");
+      const changed = await gitBytes(
+        repo,
+        ["diff", "--name-only", "-z", baseCommit, candidateCommit, "--"],
+        "TEST_SCOPE_INVALID",
+      );
+      const changedPaths = changed.toString("utf8").split("\u0000").filter(Boolean).sort();
+      if (!changedPaths.every(isSafeRelativePath) || new Set(changedPaths).size !== changedPaths.length) {
+        throw new TransitionError("TEST_SCOPE_INVALID");
+      }
+      assertTestOnlyScope(contract, { repository: { changed_paths: changedPaths } }, manifest.value);
+    }
   } catch (error) {
-    errorCode = error instanceof TransitionError && ["ARGUMENT_INVALID", "CONTRACT_INVALID"].includes(error.code)
+    errorCode = error instanceof TransitionError && ["ARGUMENT_INVALID", "MANIFEST_INVALID", "CONTRACT_INVALID", "TEST_SCOPE_INVALID"].includes(error.code)
       ? error.code
       : "INTERNAL_ERROR";
   }
@@ -759,8 +791,30 @@ function parseCli(argv) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const argv = process.argv.slice(2);
   let result;
-  if (argv.length === 2 && argv[0] === "--validate-contract") {
-    result = await validateTestContractFile(argv[1]);
+  if (argv[0] === "--validate-contract") {
+    if (argv.length === 2) {
+      result = await validateTestContractFile(argv[1]);
+    } else {
+      const flags = new Map([
+        ["--repo", "repo"],
+        ["--manifest", "manifest"],
+        ["--base", "base"],
+        ["--candidate", "candidate"],
+      ]);
+      const context = {};
+      if (argv.length !== 10) result = await validateTestContractFile("", null);
+      else {
+        for (let index = 2; index < argv.length; index += 2) {
+          const key = flags.get(argv[index]);
+          if (key === undefined || Object.hasOwn(context, key)) {
+            result = await validateTestContractFile("", null);
+            break;
+          }
+          context[key] = argv[index + 1];
+        }
+        if (result === undefined) result = await validateTestContractFile(argv[1], context);
+      }
+    }
   } else {
     const parsed = parseCli(argv);
     const output = parsed?.output;

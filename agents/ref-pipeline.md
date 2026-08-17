@@ -1046,9 +1046,12 @@ coordinator-owned workspace contract path plus the exact packaged
 `test_transition_path`. Tester reads functional ACs first,
 authors the smallest behavior test expected to fail, commits only the declared
 test paths, writes `requirements` only as closed SAFE_REQUIREMENT strings, and
-runs `--validate-contract` through that exact helper before it may return
-success. An object-valued requirement or other schema mismatch returns
-`contract-invalid`; the tester never runs the red transition. It then returns
+runs `--validate-contract` with repository, manifest, immutable task baseline,
+and candidate through that exact helper before it may return success. This
+checks schema, ancestry, exact candidate diff, and manifest path rules without
+running tests. An object-valued requirement, unchanged preservation path,
+non-test fixture, or other scope mismatch returns `contract-invalid`; the
+tester never runs the red transition. It then returns
 `failure_matches_contract: true|false`. Main verifies commit integrity and no
 production changes, runs `test-transition.mjs --transition red --output
 <coordinator-evidence-path>`, verifies the receipt-bound complete JSON and

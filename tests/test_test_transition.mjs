@@ -183,6 +183,66 @@ await check("tester contract self-validation uses the transition's exact closed 
   }
 });
 
+await check("tester contract self-validation checks the candidate diff and manifest path rules", async () => {
+  await repository(async (context) => {
+    const validationContext = {
+      repo: context.repo,
+      manifest: ".team-harness/quality.json",
+      base: context.base,
+      candidate: "HEAD",
+    };
+    const valid = await validateTestContractFile(context.contractPath, validationContext);
+    assert.equal(valid.verdict, "pass");
+
+    await writeJson(context.contractPath, contract([
+      "tests/feature.test.js",
+      "tests/unchanged.test.js",
+    ]));
+    const unchanged = await validateTestContractFile(context.contractPath, validationContext);
+    assert.equal(unchanged.verdict, "fail");
+    assert.equal(unchanged.error_code, "TEST_SCOPE_INVALID");
+
+    const cli = spawnSync(
+      node,
+      [
+        runnerPath,
+        "--validate-contract",
+        context.contractPath,
+        "--repo",
+        context.repo,
+        "--manifest",
+        ".team-harness/quality.json",
+        "--base",
+        context.base,
+        "--candidate",
+        "HEAD",
+      ],
+      { encoding: "utf8", windowsHide: true },
+    );
+    assert.equal(cli.status, 1);
+    assert.equal(JSON.parse(cli.stdout).error_code, "TEST_SCOPE_INVALID");
+  });
+
+  await repository(
+    async (context) => {
+      const invalidFixture = await validateTestContractFile(context.contractPath, {
+        repo: context.repo,
+        manifest: ".team-harness/quality.json",
+        base: context.base,
+        candidate: "HEAD",
+      });
+      assert.equal(invalidFixture.verdict, "fail");
+      assert.equal(invalidFixture.error_code, "TEST_SCOPE_INVALID");
+    },
+    {
+      redFiles: {
+        "tests/feature.test.js": "feature contract\n",
+        "scripts/feature/__fixtures__/feature.js": "fixture\n",
+      },
+    },
+  );
+});
+
 await check("a test-only failing commit becomes green with identical test blobs and command", async () => {
   await repository(async (context) => {
     const red = await runTestTransition(redOptions(context.repo, context.base, context.contractPath));

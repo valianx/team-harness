@@ -151,7 +151,14 @@ native-escalation-required`, derived by Main from `git rev-parse
 store its index under protected `<main>/.git/worktrees/...`. When escalation is
 declared—or exact scoped `git add`, `git commit`, or an eligible amend fails
 with `EROFS`, `EACCES`, `EPERM`, or `index.lock` there—retry only that identical
-command through native escalation with `login:false`. Amend only the tester's
+command through native escalation with `login:false`. Run scoped `git add` and
+`git commit`/eligible amend as separate escalated operations; never join them
+with a shell operator. After `git add`, verify the staged path set before the
+commit. Give each Git write a declared bounded timeout. If commit reaches that
+timeout without a result, do not retry and do not add `--no-verify`: preserve
+the staged index, inspect status plus the configured hook path read-only, and
+return `failure_kind: git-hook-or-lock-timeout` with the pending command and
+known staged paths. Amend only the tester's
 own current HEAD for the same active task before returning, with no intervening
 commit; otherwise create a new scoped test commit. Never widen `.git`, reset,
 bypass hooks, mutate source, or escalate tests. An approval timeout returns
@@ -178,13 +185,19 @@ path must be a test file changed by this dispatch and satisfy a manifest
 not this role, runs the deterministic red checkpoint and owns its JSON evidence.
 
 Before returning `status: success`, run exactly
-`node <test_transition_path> --validate-contract <contract_path>` using the
-helper path supplied by Main. This invokes the same `validateContract` schema
-used by the authoritative red/green transition. Require
+`node <test_transition_path> --validate-contract <contract_path> --repo
+<repository_root> --manifest <manifest_path> --base <task_test_baseline>
+--candidate HEAD` using the helper path supplied by Main. This invokes the same
+closed schema, exact candidate-diff equality, ancestry, and manifest path-rule checks
+used by the authoritative red/green transition, without executing the test
+command. Require
 `kind: team_harness_test_contract_validation`, `verdict: pass`, and a non-null
 `contract_sha256`; otherwise return `status: blocked` with
-`failure_kind: contract-invalid`. Do not normalize an invalid shape after
-returning, and do not run the red transition yourself.
+`failure_kind: contract-invalid`. `TEST_SCOPE_INVALID` means `test_paths` is
+not the exact changed test-only set or at least one path violates the manifest;
+unchanged preservation tests and non-test fixtures never belong in that array.
+Do not normalize an invalid shape after returning, and do not run the red
+transition yourself.
 
 For Main's later transition call, the helper accepts both the existing closed
 flag pairs and the OpenSpec-style `red|green '<JSON object>'` form using the

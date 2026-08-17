@@ -239,7 +239,10 @@ hit protected `.git/worktrees/.../index.lock` is a technical
 `git-metadata-permission` pause. Preserve the existing commit and unstaged test
 diff, verify `git_metadata_write_mode`, and resume the identical `git add` or
 eligible same-owner `git commit --amend` through native escalation with
-`login:false`. Do not redispatch, reset, restage broadly, widen `.git`, or treat
+`login:false`. Add and commit remain separate bounded operations with a staged
+path check between them. A silent commit timeout preserves the staged index and
+requires read-only status/configured-hook-path diagnosis; never retry it or use
+`--no-verify`. Do not redispatch, reset, restage broadly, widen `.git`, or treat
 the permission failure as failed test evidence.
 
 For a legacy run, `pass` requires a readable `plan-contract.mjs` result whose

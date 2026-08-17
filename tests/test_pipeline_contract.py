@@ -2738,6 +2738,9 @@ def check_execution_efficiency_contract() -> None:
         "login:false",
         "git-metadata-permission",
         ".git/worktrees",
+        "separate native operations",
+        "git-hook-or-lock-timeout",
+        "--no-verify",
     ):
         require(marker in implementation_flat, f"implementation: protected commit metadata misses {marker!r}")
 
@@ -2762,11 +2765,16 @@ def check_execution_efficiency_contract() -> None:
         "packet-artifact-invalid",
         "discovery_scope",
         "required_seams",
+        "verification registry",
+        "exemption manifest",
         "packet-scope-insufficient",
         "never interpret a workspace artifact path relative to the repository",
         "at most one file per tool call",
         "bounded `rg -n`",
         "never replay the aggregate command",
+        "never run repository-wide `rg --files`",
+        "one exact supplied `-g` glob",
+        "exact json pointer",
     ):
         require(marker in implementation_flat, f"implementation: rooted bounded reads miss {marker!r}")
 
@@ -2807,7 +2815,7 @@ def check_execution_efficiency_contract() -> None:
     for role in ("implementer", "tester"):
         semantic = re.sub(r"\s+", " ", read(f"agents/{role}.md").lower())
         adapter = re.sub(r"\s+", " ", read(f"runtime/codex/instructions/{role}.md").lower())
-        for marker in ("git_metadata_write_mode", "native-escalation-required", "login:false", "git-metadata-permission"):
+        for marker in ("git_metadata_write_mode", "native-escalation-required", "login:false", "git-metadata-permission", "git-hook-or-lock-timeout", "--no-verify"):
             require(marker in semantic, f"{role}: protected commit metadata misses {marker!r}")
             require(marker in adapter, f"{role}: Codex protected commit metadata misses {marker!r}")
         for marker in (
@@ -3113,6 +3121,9 @@ def check_context_isolation_rotation_contract() -> None:
         "team_harness_test_contract_validation",
         "contract_sha256",
         "contract-invalid",
+        "--repo <repository_root>",
+        "exact candidate-diff equality",
+        "non-test fixtures",
     ):
         require(marker in tester_flat, f"tester contract self-validation misses {marker!r}")
     for marker in (
@@ -3120,6 +3131,8 @@ def check_context_isolation_rotation_contract() -> None:
         "requirements` must be safe_requirement strings",
         "--validate-contract",
         "team_harness_test_contract_validation",
+        "exact candidate-diff equality",
+        "non-test fixtures",
         "--output <coordinator evidence path>",
         "team_harness_test_transition_receipt",
         "result path",

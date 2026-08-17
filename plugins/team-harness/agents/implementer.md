@@ -35,7 +35,8 @@ array. The task shard must preserve the exact case-sensitive indexed
 `packet-artifact-invalid` on a missing, stale, case-mismatched, escaped,
 duplicate, or hash/anchor mismatch; do not search for a replacement. Require
 `discovery_scope.directories` and `.globs` and search only there. Require every
-TC `required_seams` provider to be owned by this task or an already-closed
+TC `required_seams` provider—including changed callsites, verification
+registries, allowlists, and exemption manifests—to be owned by this task or an already-closed
 dependency; otherwise return `packet-scope-insufficient` without widening
 `Files:`. A specialist cannot authorize its own scope expansion.
 Require a non-null absolute canonical regular non-symlink
@@ -343,7 +344,12 @@ the declared mode requires escalation—or an otherwise valid exact `git add` or
 `git commit` fails with `EROFS`, `EACCES`, `EPERM`, or `index.lock` under that
 Git directory—immediately retry only that identical narrowly scoped command
 through native escalation with `login:false`. Do not widen `.git`, change the
-path set/message, reset, bypass hooks, or escalate source edits/tests. An
+path set/message, reset, bypass hooks, or escalate source edits/tests. Run
+scoped `git add` and `git commit`/eligible amend as separate escalated
+operations, verify the staged path set between them, and give each a declared
+bounded timeout. A silent commit timeout preserves the staged index and returns
+`failure_kind: git-hook-or-lock-timeout` after read-only status/hook-path
+diagnosis; it never authorizes a retry or `--no-verify`. An
 approval timeout returns `failure_kind: git-metadata-permission` with the exact
 pending operation; it is not a code failure and authorizes no alternate commit.
 

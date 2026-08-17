@@ -70,7 +70,12 @@ writable roots. Add `git_metadata_write_mode: normal` only when it is contained;
 otherwise add `native-escalation-required`. This field grants no extra scope.
 For the latter, the specialist retries only exact path-scoped `git add` and
 `git commit`/eligible same-owner amend through native escalation with
-`login:false`. Protected `.git/worktrees/.../index.lock` `EROFS|EACCES|EPERM`
+`login:false`. Run add and commit as separate native operations, never one
+combined shell command; verify the staged path set between them and assign each
+a bounded timeout. A commit timeout preserves the staged index, triggers only
+read-only status plus configured-hook-path diagnosis, and returns
+`git-hook-or-lock-timeout`; it never authorizes an automatic retry or
+`--no-verify`. Protected `.git/worktrees/.../index.lock` `EROFS|EACCES|EPERM`
 is a technical permission boundary, not a test/code failure. Never add `.git`
 to writable roots or authorize reset, hook bypass, broad staging, source edits,
 or tests under escalation. Approval timeout pauses on the exact pending Git
@@ -104,9 +109,10 @@ replacement path.
 
 The packet declares `discovery_scope: {directories: [...], globs: [...]}` with
 only repository-relative task-owned search roots. Before dispatch, Main checks
-`required_seams`: every API, export, mutation adapter, or public entry point
-required by a TC names its provider path, and that path is owned by this task
-or supplied by an already-closed dependency. An unresolved seam or provider
+`required_seams`: every API, export, mutation adapter, public entry point,
+callsite, verification registry, allowlist, or exemption manifest whose
+validity a TC changes names its provider path, and that path is owned by this
+task or supplied by an already-closed dependency. An unresolved seam or provider
 outside both sets is `packet-scope-insufficient`; return the shard for an
 authorized plan correction rather than dispatching it or allowing a specialist
 to widen ownership.
@@ -119,7 +125,13 @@ task-relevant symbols/anchors with bounded `rg -n` and read
 separate bounded ranges. Never combine all task files, a whole directory, or
 workspace artifacts into one inspection command. Tool-level truncation yields
 no read evidence: continue with narrower per-file/range reads and never replay
-the aggregate command.
+the aggregate command. Never run repository-wide `rg --files` and filter its
+output afterward. Enumerate one supplied `discovery_scope.directory` with one
+exact supplied `-g` glob per call; if that pair can still be large, route it
+through `bounded_command_path` before execution. Resolve traceability through
+the packet's exact JSON Pointer and `sources`, and resolve Markdown through its
+supplied unique anchor plus bounded line ranges; broad context searches across
+architecture, traceability, and OpenSpec are packet defects, not discovery.
 
 For an OpenSpec-bound workspace, first verify `inputs/openspec-snapshot.json`
 against the repository and validate `plan/openspec-traceability.json`. The role
@@ -191,10 +203,14 @@ manifest path, worktree/branch, a coordinator-owned workspace contract path,
 and the exact packaged `test_transition_path` resolved by Main.
 The tester may commit only the declared test files and writes the closed contract
 JSON outside the source commit. Before it may return success, it invokes that
-helper with `--validate-contract` and requires the closed
+helper with `--validate-contract <contract_path> --repo <repository_root>
+--manifest <manifest_path> --base <task_test_baseline> --candidate HEAD` and
+requires the closed
 `team_harness_test_contract_validation` pass result. `requirements` must be
-SAFE_REQUIREMENT strings, never objects; a failed self-validation returns
-`contract-invalid` and Main does not begin the red transition. Verify commit
+SAFE_REQUIREMENT strings, never objects. This validation checks schema,
+ancestry, exact candidate-diff equality, and manifest path rules without
+running tests; unchanged preservation tests and non-test fixtures are invalid
+`test_paths`. A failed self-validation returns `contract-invalid` and Main does not begin the red transition. Verify commit
 integrity and that no production path changed.
 
 Main then invokes `node <test-transition-path> --transition red` against that

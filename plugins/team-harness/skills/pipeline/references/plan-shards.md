@@ -95,8 +95,10 @@ regular non-symlink identity, SHA-256, unique anchor occurrence, and equality
 with the overlay `shard_path` before dispatch. A specialist never repairs or
 searches for an invalid coordinate.
 
-Each shard's technical constraints also declare `required_seams` with the API,
-export, mutation adapter, or public entry point and its provider path. Every
+Each shard's technical constraints also declare `required_seams` with every
+API, export, mutation adapter, public entry point, callsite, verification
+registry, allowlist, or exemption manifest whose validity the task changes,
+plus its provider path. Every
 provider must occur in the task's `Files:` or in an already-closed dependency;
 otherwise the shard is not dispatchable. The packet carries only that verified
 set plus `discovery_scope: {directories, globs}` bounded to task-owned source.

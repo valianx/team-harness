@@ -33,12 +33,18 @@
   only exact scoped Git writes through native `login:false` escalation.
 - Rejected package-manager exec/download shims before quality execution so test
   evidence cannot silently bootstrap dependencies or touch a global store.
+- Resolved `pnpm exec` and simple `pnpm` package scripts through an existing
+  repository-local `node_modules/.bin` link, without starting pnpm or touching
+  its external SQLite store.
 - Made the overlay's `execution_items` pointer explicit in specialist packets;
   consumers no longer infer a nonexistent top-level `tasks` array.
 - Added explicit repository and workspace-artifact roots to specialist packets,
   preventing plan/evidence paths from being resolved against the worktree.
 - Required initial implementation inspection to use capped one-file or anchored
   range reads instead of aggregate output that can be transport-truncated.
+- Required every specialist packet to carry the verified bounded-command helper
+  and closed discovery roots/globs, avoiding repository-wide path dumps and
+  broad cross-artifact searches.
 - Made the canonical worktree the committing-concurrency boundary, preventing
   repository-wide checks and Git metadata from observing incomplete sibling tasks.
 - Made failed red/green transitions report a fixed quality-stage diagnostic,
@@ -49,3 +55,9 @@
   rejection in `plan-contract`.
 - Made alternate shard invariant declarations part of the effective dispatch
   anchor set so an overlay cannot silently omit a stricter approved invariant.
+- Extended tester contract self-validation to prove candidate ancestry, exact
+  changed test paths, and manifest path rules before a tester can report a
+  closed RED contract.
+- Split escalated Git staging and commit into bounded operations with an
+  intervening staged-path check and explicit hook/lock timeout diagnosis;
+  hook bypass remains prohibited.
