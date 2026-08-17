@@ -2829,6 +2829,15 @@ def check_execution_efficiency_contract() -> None:
         ):
             require(marker in semantic, f"{role}: packet preflight misses {marker!r}")
             require(marker in adapter, f"{role}: Codex packet preflight misses {marker!r}")
+        for marker in (
+            "bounded_result_path",
+            "--output",
+            "validates and hashes",
+            "without replay",
+            "never invent an evidence coordinate",
+        ):
+            require(marker in semantic, f"{role}: bounded receipt packet misses {marker!r}")
+            require(marker in adapter, f"{role}: Codex bounded receipt packet misses {marker!r}")
 
     for marker in (
         "pipeline preflight resolves",
@@ -2841,6 +2850,15 @@ def check_execution_efficiency_contract() -> None:
         "outside pipeline mode",
     ):
         require(marker in pipeline, f"pipeline: AC12 helper-route marker missing {marker!r}")
+
+    for marker in (
+        "--output <absolute_result_path>",
+        "team_harness_bounded_command_receipt",
+        "sha-256",
+        "functions.wait",
+        "without rerunning the command",
+    ):
+        require(marker in pipeline, f"pipeline: bounded receipt recovery misses {marker!r}")
 
     for marker in (
         "classify expected output volume before execution",
@@ -2929,6 +2947,15 @@ def check_execution_efficiency_contract() -> None:
         ):
             require(marker in text, f"{label}: AC12 helper-route marker missing {marker!r}")
 
+        for marker in (
+            "--output <absolute_result_path>",
+            "team_harness_bounded_command_receipt",
+            "sha-256",
+            "functions.wait",
+            "without replay",
+        ):
+            require(marker in text, f"{label}: bounded receipt recovery misses {marker!r}")
+
     for marker in (
         "before execution",
         "expected output volume",
@@ -2992,6 +3019,10 @@ def check_execution_efficiency_contract() -> None:
             "`bounded_command_path`",
             "node <bounded_command_path> -- <argv...>",
             "`--success-diagnostic` before `--`",
+            "`bounded_result_path`",
+            "--output <bounded_result_path>",
+            "sha-256",
+            "without replay",
             "narrow follow-up through the helper",
             "outside pipeline mode",
         ):
@@ -3012,6 +3043,14 @@ def check_execution_efficiency_contract() -> None:
             require(marker in adapter, f"{role}: AC20 routing marker missing {marker!r}")
 
     bounded_helper = read("plugins/team-harness/skills/pipeline/scripts/bounded-command.mjs")
+    for marker in (
+        "BOUNDED_COMMAND_RECEIPT_SCHEMA_VERSION",
+        "team_harness_bounded_command_receipt",
+        "OUTPUT_WRITE_FAILED",
+        "resolveOutputTarget",
+        "persistEnvelope",
+    ):
+        require(marker in bounded_helper, f"bounded helper: atomic receipt contract misses {marker!r}")
     for forbidden in (
         "DIRECT_COMMAND_MANIFEST",
         "classifyCommandOutputRoute",

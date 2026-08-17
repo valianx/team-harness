@@ -340,6 +340,19 @@ For a command assigned to the bounded route, use
 before execution; never probe a command and never reactively retry it through
 a different route after its output has entered the transcript.
 
+For an authoritative check or a deferred execution whose terminal response may
+be lost to context truncation, Main predeclares an absolute evidence coordinate
+and uses `node <bounded_command_path> --output <absolute_result_path> --
+<argv...>`. The helper fails before child execution when the coordinate is
+unsafe, writes the complete envelope atomically, and renders only a fixed
+`team_harness_bounded_command_receipt` with outcome, counters, path, bytes, and
+SHA-256; it never renders argv or diagnostic tails in that receipt. If
+`functions.wait` loses the receipt, inspect the exact predeclared artifact,
+validate it as a bounded-command envelope, compute and record its SHA-256, and
+continue without replay. A missing, invalid, or hash-mismatched artifact blocks
+fail closed. Specialists use output mode only when Main supplied that exact
+coordinate in the packet; they never invent an evidence path.
+
 The helper captures stdout and stderr independently to a 64 KiB maximum buffer
 per stream while separately counting all received bytes. Render its envelope
 with exit code, duration, per-stream bytes, and `truncated`; render no more than

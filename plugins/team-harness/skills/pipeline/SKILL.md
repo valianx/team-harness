@@ -247,6 +247,20 @@ through the helper; never replay raw/full output. Direct execution remains the
 normal route for small, bounded results. Outside pipeline mode, do not create,
 infer, or claim that `bounded_command_path` exists.
 
+When a bounded command supplies authoritative evidence or runs through a
+deferred tool call whose final response can be lost to context truncation,
+predeclare an absolute result path under the workspace evidence root and invoke
+`node <bounded_command_path> --output <absolute_result_path> -- <argv...>`.
+The helper validates that coordinate before child execution, atomically writes
+the complete bounded envelope, and emits only a fixed
+`team_harness_bounded_command_receipt` containing outcome, stream counters,
+path, byte size, and SHA-256—never argv or tails. `--success-diagnostic` may
+precede `--output`. Treat either the receipt or the hash-verified persisted
+envelope as the terminal result. If `functions.wait` or another transport loses
+the receipt, inspect that exact predeclared artifact, compute and record its
+hash, and continue from it without rerunning the command. Missing, unsafe,
+invalid, or hash-mismatched output blocks fail closed.
+
 The helper is a development-output control, not a process-containment sandbox.
 The operator remains responsible for launched commands. Deadline cleanup
 covers the managed POSIX process group or the tree confirmed by Windows
@@ -352,11 +366,11 @@ the role fields cannot see. The current digests are:
 | Role | SHA-256 of normalized TOML |
 |---|---|
 | `pipeline-architect` | `14b51f37d0d455cd964bd4b9ec67dd8855195e5abbb8585935b1655c054c7bbd` |
-| `pipeline-implementer` | `6c8a326ddb77b2a07d0acb820d76aff032298deca1167892d1b152a64b6cd896` |
-| `pipeline-tester` | `89e7eb4453c7f7c41baa0ce9aa54ff57969e23a0b18fc04d9066dd2ec33b091d` |
+| `pipeline-implementer` | `b6daafc26d9ec0647763f13f4d9fe873a85574ec59dc59fc48d506f45454b009` |
+| `pipeline-tester` | `8eabaaa34e09a23989388db88f0e895cbe4d21612a9bc32bdd3919f8e1f4f888` |
 | `pipeline-cleaner` | `ea4260bcb8fc1e17034f0d6f91b9d97efefeb61065c50b88a25e792eaaab88b9` |
-| `pipeline-qa` | `e63a6649de345ffcab03b5a83b5a0c8a1124b9c451be3fa271204b597f9ab5ac` |
-| `pipeline-security` | `fa5c8ce48def49085705fa083b1c2be2c02c9b9e560043313f3ba70f7004861a` |
+| `pipeline-qa` | `44fe6c12d25fae4c9cd4583dd3f70b2cc5e67310d9d0b5522c50a9d8a983583d` |
+| `pipeline-security` | `5a047d998a2c96919f23feb149eb40305a39b7f4093bc1695b26fdea8f581eee` |
 | `pipeline-delivery` | `1173e6d5edb63039cdc7d315f4c170c8f5489f76665b2cd77df682ae4be08246` |
 
 Do not accept a file solely because its comments or `name` field match. A

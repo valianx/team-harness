@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserved deferred bounded-command results atomically behind a compact,
+  hash-verifiable receipt, allowing pipeline agents to recover from tool-context
+  truncation without rerunning authoritative tests or builds.
+
 ## [3.13.0] - 2026-08-17
 
 ### Added

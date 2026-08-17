@@ -221,6 +221,13 @@ The red/green test-transition checkpoints retain the same bounded diagnostic
 for the `test` command even when it exits successfully. This keeps a later
 quality postcondition failure distinguishable from a test failure; unbounded
 streams are never embedded.
+When the enclosing bounded execution is deferred or its terminal response may
+exceed the remaining tool context, add `--output <absolute-result-path>` to
+`bounded-command.mjs`. It atomically preserves the closed envelope and emits a
+small `team_harness_bounded_command_receipt` containing its path, byte size,
+SHA-256, outcome, and stream counters. A lost transport response is recovered
+by validating and hashing that predeclared artifact, never by rerunning the
+quality transition.
 The result contains command and manifest hashes instead of raw argument arrays.
 Ignored caches and build artifacts are outside Git identity and may still be
 written by repository tools. The runner is an evidence and output-control

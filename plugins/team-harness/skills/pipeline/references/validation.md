@@ -119,6 +119,18 @@ For a command assigned to the bounded route, use
 `node <bounded_command_path> -- <argv...>`. Add `--success-diagnostic` before
 `--` only when the bounded result text is required.
 
+For authoritative validation or a deferred execution whose terminal response
+may be lost to context truncation, Main predeclares an absolute evidence
+coordinate and invokes `node <bounded_command_path> --output
+<absolute_result_path> -- <argv...>`. The helper rejects an unsafe coordinate
+before child execution, persists the complete envelope atomically, and emits
+only a fixed `team_harness_bounded_command_receipt` with outcome, counters,
+path, bytes, and SHA-256—not argv or diagnostic tails. If `functions.wait`
+loses that receipt, validate the exact predeclared artifact as a bounded-command
+envelope, compute and record its SHA-256, and continue without rerunning the
+command. Missing, invalid, or hash-mismatched evidence blocks fail closed.
+Specialists use output mode only for an exact coordinate supplied by Main.
+
 The helper captures each command's stdout and stderr separately with a maximum
 64 KiB buffer per stream, total byte counters, and a `truncated` flag. Render
 exit code, duration, bytes, `truncated`, and only a sanitized tail of at most 8
