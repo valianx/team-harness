@@ -317,6 +317,47 @@ await check("pnpm exec resolves only an existing linked local binary without lau
   });
 });
 
+await check("pnpm package scripts resolve to existing local binaries without launching pnpm", async () => {
+  for (const argv of [
+    ["pnpm", "test", "--", "--runInBand"],
+    ["pnpm", "run", "storybook", "--", "--no-open"],
+  ]) {
+    const script = argv.includes("storybook") ? "storybook" : "test";
+    const tool = script === "storybook" ? "storybook" : "vitest";
+    const expected = script === "storybook" ? "dev --no-open" : "run --runInBand";
+    const manifest = baseManifest({ test: { argv } });
+    await temporaryRepository({
+      manifest,
+      candidateFiles: {
+        ".gitignore": "node_modules/\n",
+        "package.json": { scripts: { test: "vitest run", storybook: "storybook dev" } },
+        "src/calc.go": "package calc\n",
+      },
+    }, async ({ repo, base }) => {
+      const binary = path.join(repo, "node_modules", ".bin", tool);
+      await mkdir(path.dirname(binary), { recursive: true });
+      await writeFile(binary, `#!/usr/bin/env node\nprocess.exit(process.argv.slice(2).join(' ') === ${JSON.stringify(expected)} ? 0 : 9);\n`);
+      await chmod(binary, 0o755);
+      const result = await runQualityChecks(options(repo, base, ["test"]));
+      assert.equal(result.verdict, "pass", JSON.stringify(result));
+      assert.equal(result.commands[0].execution_resolution, "linked-local-script");
+    });
+  }
+
+  for (const script of ["vitest run && echo unsafe", "vitest run | tee result.log"]) {
+    const manifest = baseManifest({ test: { argv: ["pnpm", "test"] } });
+    await temporaryRepository({
+      manifest,
+      candidateFiles: { "package.json": { scripts: { test: script } } },
+    }, async ({ repo, base }) => {
+      const result = await runQualityChecks(options(repo, base, ["test"]));
+      assert.equal(result.verdict, "fail");
+      assert.equal(result.error_code, "NON_HERMETIC_COMMAND");
+      assert.deepEqual(result.commands, []);
+    });
+  }
+});
+
 await check("required quality coverage cannot pass with omitted controls", async () => {
   const manifest = baseManifest({ test: command(), build: command(), accessibility: command() });
   await temporaryRepository({ manifest }, async ({ repo, base }) => {

@@ -2756,12 +2756,39 @@ def check_execution_efficiency_contract() -> None:
         "path_roots",
         "repository_root",
         "workspace_artifact_root",
+        "artifact_coordinates",
+        "plan/tasks/task-3.md",
+        "plan/invariants.md",
+        "packet-artifact-invalid",
+        "discovery_scope",
+        "required_seams",
+        "packet-scope-insufficient",
         "never interpret a workspace artifact path relative to the repository",
         "at most one file per tool call",
         "bounded `rg -n`",
         "never replay the aggregate command",
     ):
         require(marker in implementation_flat, f"implementation: rooted bounded reads miss {marker!r}")
+
+    for marker in (
+        "every initial or correction",
+        "non-null absolute value",
+        "regular non-symlink",
+        "packet-contract-invalid",
+        "before any packet-derived read",
+        "later diagnostics can be volume-unknown",
+    ):
+        require(marker in implementation_flat, f"implementation: mandatory bounded helper misses {marker!r}")
+
+    for marker in (
+        "pnpm <script>",
+        "pnpm run <script>",
+        "pnpm test",
+        "pnpm storybook",
+        "linked-local-script",
+        "compound shell scripts",
+    ):
+        require(marker in implementation_flat, f"implementation: local package script resolution misses {marker!r}")
 
     for marker in (
         "disjoint `files:` are necessary but not sufficient",
@@ -2783,6 +2810,17 @@ def check_execution_efficiency_contract() -> None:
         for marker in ("git_metadata_write_mode", "native-escalation-required", "login:false", "git-metadata-permission"):
             require(marker in semantic, f"{role}: protected commit metadata misses {marker!r}")
             require(marker in adapter, f"{role}: Codex protected commit metadata misses {marker!r}")
+        for marker in (
+            "artifact_coordinates",
+            "plan/tasks/task-n.md",
+            "plan/invariants.md",
+            "packet-artifact-invalid",
+            "discovery_scope",
+            "packet-contract-invalid",
+            "before any packet-derived read",
+        ):
+            require(marker in semantic, f"{role}: packet preflight misses {marker!r}")
+            require(marker in adapter, f"{role}: Codex packet preflight misses {marker!r}")
 
     for marker in (
         "pipeline preflight resolves",

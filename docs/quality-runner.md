@@ -102,6 +102,15 @@ directly, never pnpm. Evidence retains the manifest command hash and separately
 records `execution_resolution: linked-local-bin` plus a stable effective-argv
 hash; a missing link is `PREREQUISITE_UNAVAILABLE`. This avoids pnpm store
 SQLite/install/purge behavior without changing test selection or arguments.
+The runner applies the same non-installing resolution to `pnpm <script>` and
+`pnpm run <script>` (including common `pnpm test` and `pnpm storybook`
+shorthands). It reads the exact `package.json` in the command working directory,
+accepts only a single simple argv-like script with no shell syntax, resolves its
+first token through an existing repository-local `node_modules/.bin` link, and
+executes the link directly without pnpm. Evidence records
+`execution_resolution: linked-local-script`. Compound scripts, lifecycle or
+dependency-management operations, missing scripts, and missing links fail
+closed before pnpm can consult a global store, bootstrap, install, or purge.
 
 `test_contract.path_rules` opts the repository into deterministic
 pre-implementation testing. Every declared test path must match at least one

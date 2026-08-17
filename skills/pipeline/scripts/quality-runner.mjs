@@ -517,14 +517,45 @@ function pnpmExecParts(argv) {
   return { tool, args: argv.slice(offset + 1) };
 }
 
-async function resolveExecutionArgv(argv, cwd, repository) {
-  const parts = pnpmExecParts(argv);
-  if (parts === null) return { argv, identity: argv, resolution: "manifest" };
+function pnpmScriptParts(argv) {
+  const executable = path.basename(argv[0]).toLowerCase().replace(/\.(?:cmd|exe)$/u, "");
+  let offset;
+  if (executable === "pnpm") offset = 1;
+  else if (executable === "corepack" && argv[1]?.toLowerCase() === "pnpm") offset = 2;
+  else return null;
+  if (["exec", "dlx"].includes(argv[offset]?.toLowerCase())) return null;
+  if (argv[offset]?.toLowerCase() === "run") offset += 1;
+  const script = argv[offset];
+  if (typeof script !== "string" || !/^[A-Za-z0-9:_-]+$/.test(script)) {
+    throw new QualityError("NON_HERMETIC_COMMAND");
+  }
+  if (["add", "approve-builds", "audit", "import", "install", "i", "link", "rebuild", "remove", "rm", "uninstall", "update", "up"].includes(script.toLowerCase())) {
+    throw new QualityError("NON_HERMETIC_COMMAND");
+  }
+  const args = argv.slice(offset + 1);
+  if (args[0] === "--") args.shift();
+  return { script, args };
+}
+
+function parseSimplePackageScript(value) {
+  if (typeof value !== "string" || value.length === 0 || Buffer.byteLength(value, "utf8") > MAX_ARGV_BYTES) {
+    throw new QualityError("NON_HERMETIC_COMMAND");
+  }
+  const parts = value.split(" ");
+  if (parts.some((part) => part.length === 0 || !/^[A-Za-z0-9_./:@%+=,-]+$/.test(part))) {
+    throw new QualityError("NON_HERMETIC_COMMAND");
+  }
+  const tool = parts[0];
+  if (!/^[A-Za-z0-9._-]+$/.test(tool)) throw new QualityError("NON_HERMETIC_COMMAND");
+  return { tool, args: parts.slice(1) };
+}
+
+async function resolveLinkedLocalBinary(tool, args, cwd, repository, resolution) {
   let directory = cwd;
   while (isContained(repository, directory)) {
     const candidates = [
-      path.join(directory, "node_modules", ".bin", parts.tool),
-      path.join(directory, "node_modules", ".bin", `${parts.tool}.exe`),
+      path.join(directory, "node_modules", ".bin", tool),
+      path.join(directory, "node_modules", ".bin", `${tool}.exe`),
     ];
     for (const candidate of candidates) {
       try {
@@ -532,11 +563,11 @@ async function resolveExecutionArgv(argv, cwd, repository) {
         if (!stat.isFile() && !stat.isSymbolicLink()) continue;
         const target = await realpath(candidate);
         const targetStat = await lstat(target);
-        if (!targetStat.isFile()) continue;
+        if (!targetStat.isFile() || !isContained(repository, target)) continue;
         return {
-          argv: [candidate, ...parts.args],
-          identity: [`${"${TH_LOCAL_BIN}"}/${parts.tool}`, ...parts.args],
-          resolution: "linked-local-bin",
+          argv: [candidate, ...args],
+          identity: [`${"${TH_LOCAL_BIN}"}/${tool}`, ...args],
+          resolution,
         };
       } catch { /* try the next candidate/ancestor */ }
     }
@@ -546,6 +577,36 @@ async function resolveExecutionArgv(argv, cwd, repository) {
     directory = parent;
   }
   throw new QualityError("PREREQUISITE_UNAVAILABLE");
+}
+
+async function resolveExecutionArgv(argv, cwd, repository) {
+  const parts = pnpmExecParts(argv);
+  if (parts !== null) {
+    return resolveLinkedLocalBinary(parts.tool, parts.args, cwd, repository, "linked-local-bin");
+  }
+  const scriptParts = pnpmScriptParts(argv);
+  if (scriptParts === null) return { argv, identity: argv, resolution: "manifest" };
+  const packagePath = path.join(cwd, "package.json");
+  let packageJson;
+  try {
+    const stat = await lstat(packagePath);
+    if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("invalid package.json");
+    const canonical = await realpath(packagePath);
+    if (!isContained(repository, canonical)) throw new Error("escaped package.json");
+    packageJson = (await readBoundedJson(canonical, "PREREQUISITE_UNAVAILABLE")).value;
+  } catch (error) {
+    if (error instanceof QualityError) throw error;
+    throw new QualityError("PREREQUISITE_UNAVAILABLE");
+  }
+  const scriptValue = packageJson?.scripts?.[scriptParts.script];
+  const simple = parseSimplePackageScript(scriptValue);
+  return resolveLinkedLocalBinary(
+    simple.tool,
+    [...simple.args, ...scriptParts.args],
+    cwd,
+    repository,
+    "linked-local-script",
+  );
 }
 
 function commandEvidence(id, command, version, execution, executionIdentity, executionResolution) {
@@ -686,7 +747,7 @@ function isCommandEvidence(value) {
   if (!hasExactlyKeys(value, keys)) return false;
   if (!SAFE_COMMAND_ID.test(value.id) || !/^[0-9a-f]{64}$/.test(value.command_sha256)
     || !/^[0-9a-f]{64}$/.test(value.execution_argv_sha256)
-    || !["manifest", "linked-local-bin"].includes(value.execution_resolution)) return false;
+    || !["manifest", "linked-local-bin", "linked-local-script"].includes(value.execution_resolution)) return false;
   const hasVersion = value.version_result !== null;
   if (hasVersion !== (typeof value.version_sha256 === "string" && /^[0-9a-f]{64}$/.test(value.version_sha256))) return false;
   if (hasVersion !== (typeof value.version_fingerprint === "string" && /^[0-9a-f]{64}$/.test(value.version_fingerprint))) return false;

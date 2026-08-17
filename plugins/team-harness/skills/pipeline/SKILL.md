@@ -352,8 +352,8 @@ the role fields cannot see. The current digests are:
 | Role | SHA-256 of normalized TOML |
 |---|---|
 | `pipeline-architect` | `14b51f37d0d455cd964bd4b9ec67dd8855195e5abbb8585935b1655c054c7bbd` |
-| `pipeline-implementer` | `07a93913fb6995d38323506729d277fb4bb7bc3088af96a234153bcf2cbb999a` |
-| `pipeline-tester` | `d26ca31b6314eedc6a9ccad87820e4dc86c70dcbbfce083337eface11d1bc5db` |
+| `pipeline-implementer` | `5c97e1c43c80786346cb8dd693970e20ab953ae46de060b734c58af0f1a6590d` |
+| `pipeline-tester` | `f43dc35e429403e6452925a1c3f99d49cbc7f085b990f22a59a0e9cab240d140` |
 | `pipeline-cleaner` | `ea4260bcb8fc1e17034f0d6f91b9d97efefeb61065c50b88a25e792eaaab88b9` |
 | `pipeline-qa` | `e63a6649de345ffcab03b5a83b5a0c8a1124b9c451be3fa271204b597f9ab5ac` |
 | `pipeline-security` | `fa5c8ce48def49085705fa083b1c2be2c02c9b9e560043313f3ba70f7004861a` |

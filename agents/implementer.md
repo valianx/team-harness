@@ -28,6 +28,20 @@ coordinates below the former; resolve shard, `plan/...`, `inputs/...`,
 `reviews/...`, and evidence paths below the latter. Block missing/mismatched
 roots or escapes; never treat workspace artifacts as worktree-relative, use
 `../`, or copy them into the repository.
+Before any packet-derived read, require the non-empty `artifact_coordinates`
+array. The task shard must preserve the exact case-sensitive indexed
+`plan/tasks/Task-N.md` path and an invariant must be an `INV-N` anchor inside
+`plan/invariants.md`, never an invented `INV-N.md` file. Block as
+`packet-artifact-invalid` on a missing, stale, case-mismatched, escaped,
+duplicate, or hash/anchor mismatch; do not search for a replacement. Require
+`discovery_scope.directories` and `.globs` and search only there. Require every
+TC `required_seams` provider to be owned by this task or an already-closed
+dependency; otherwise return `packet-scope-insufficient` without widening
+`Files:`. A specialist cannot authorize its own scope expansion.
+Require a non-null absolute canonical regular non-symlink
+`bounded_command_path` before this first read. If it is missing, relative,
+unavailable, or a symlink, return `packet-contract-invalid`; never continue on
+the assumption that commands will remain small.
 Inspect at most one source/artifact file per tool call with a declared output
 cap. For a potentially large file, use bounded `rg -n` anchors and separate
 line ranges. Never concatenate all task files or directories; a truncated

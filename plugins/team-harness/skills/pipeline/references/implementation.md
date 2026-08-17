@@ -87,8 +87,32 @@ interpret a workspace artifact path relative to the repository, invent `../`
 traversal, or copy artifacts into the worktree. Missing root/domain or a path
 that escapes its declared root blocks the dispatch packet.
 
-The packet provides paths, root domains, and the narrowest expected discovery
-directory/glob, never concatenated file contents. For initial source
+Every V2 implementer/tester packet also carries `artifact_coordinates`, a
+non-empty closed array of `{kind, root, path, anchor, sha256}` records. A task
+shard uses `kind: task-shard`, `root: workspace_artifact_root`, its exact
+case-sensitive Task Index path such as `plan/tasks/Task-3.md`, and `anchor:
+null`. An invariant uses `kind: invariant-anchor`, the canonical
+`plan/invariants.md` path, and an identifier such as `anchor: INV-2`; an
+invariant identifier is never converted into an `INV-2.md` filename. Before
+dispatch, Main resolves each record below its declared root, rejects symlinks,
+proves exact component spelling and regular-file SHA-256, and requires each
+non-null anchor to occur exactly once. It also proves the task coordinate
+equals the Task Index and overlay `shard_path`. Missing, duplicate, stale,
+case-mismatched, escaped, or invented coordinates are
+`packet-artifact-invalid`; do not dispatch or ask a specialist to discover a
+replacement path.
+
+The packet declares `discovery_scope: {directories: [...], globs: [...]}` with
+only repository-relative task-owned search roots. Before dispatch, Main checks
+`required_seams`: every API, export, mutation adapter, or public entry point
+required by a TC names its provider path, and that path is owned by this task
+or supplied by an already-closed dependency. An unresolved seam or provider
+outside both sets is `packet-scope-insufficient`; return the shard for an
+authorized plan correction rather than dispatching it or allowing a specialist
+to widen ownership.
+
+The packet provides paths, root domains, and the closed `discovery_scope`,
+never concatenated file contents. For initial source
 inspection, first inspect metadata, then read at most one file per tool call
 under a predeclared output cap. When a file is not known to fit, locate only
 task-relevant symbols/anchors with bounded `rg -n` and read
@@ -150,7 +174,15 @@ evidence. For the sole `pnpm exec <tool>` exception, the quality runner must
 prove an existing repository-local `node_modules/.bin/<tool>`, execute that
 link directly without launching pnpm, and record `linked-local-bin` plus the
 effective argv hash. Missing linkage is `PREREQUISITE_UNAVAILABLE`; never retry
-pnpm with broader store access or allow its install/purge prompt.
+pnpm with broader store access or allow its install/purge prompt. The same
+non-installing rule applies to `pnpm <script>` and `pnpm run <script>`, including
+`pnpm test` and `pnpm storybook`: the runner may execute them only after reading
+the repository-local `package.json`, accepting a single simple script command,
+resolving its executable through an existing repository-local
+`node_modules/.bin` link, and recording `linked-local-script`. Compound shell
+scripts or missing links fail closed before pnpm launches. Specialist packets
+name quality check IDs and the resolved runner/transition helper; they never
+prescribe a raw package-manager fallback as authoritative evidence.
 
 Immediately before the task's tester dispatch, record the current full commit
 as that task's test baseline. Dispatch a fresh `tester` in
@@ -267,9 +299,13 @@ conjunct unevaluated and blocks rather than silently passing.
 
 Only in this explicitly activated pipeline, preflight resolves the helper's
 absolute path relative to the loaded pipeline skill/reference and fails closed
-if unavailable; include it in the implementer role packet only as
-`bounded_command_path`. Never persist that value in state, events, reports,
-summaries, or workspace artifacts. Before executing a command, Main and the
+if unavailable. It must be a canonical regular non-symlink file. Every initial
+or correction V2 implementer/tester packet must contain this non-null absolute value as
+`bounded_command_path`; omission, relative form, symlink, or an unavailable
+helper is `packet-contract-invalid` and blocks before any packet-derived read
+or command. This is mandatory even when the first anticipated commands are
+small because later diagnostics can be volume-unknown. Never persist that value
+in state, events, reports, summaries, or workspace artifacts. Before executing a command, Main and the
 implementer classify its expected output volume from the known command scope
 and output mode. Routine commands with an expected small, bounded result run
 directly, including targeted file reads and searches, concise status checks,

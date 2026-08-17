@@ -86,6 +86,21 @@ values in `path_roots.repository_root` and
 `path_roots.workspace_artifact_root`. No consumer may resolve every relative
 path against cwd/worktree or use `../` to cross between these domains.
 
+Specialist packets bind these inputs through a non-empty
+`artifact_coordinates` array of `{kind, root, path, anchor, sha256}`. Preserve
+the exact case-sensitive Task Index path (`plan/tasks/Task-N.md`); bind an
+invariant ID as an anchor inside `plan/invariants.md`, never as a synthesized
+`INV-N.md` path. Main proves root containment, exact component spelling,
+regular non-symlink identity, SHA-256, unique anchor occurrence, and equality
+with the overlay `shard_path` before dispatch. A specialist never repairs or
+searches for an invalid coordinate.
+
+Each shard's technical constraints also declare `required_seams` with the API,
+export, mutation adapter, or public entry point and its provider path. Every
+provider must occur in the task's `Files:` or in an already-closed dependency;
+otherwise the shard is not dispatchable. The packet carries only that verified
+set plus `discovery_scope: {directories, globs}` bounded to task-owned source.
+
 Resolve paths from the index once. Implementer reads its task plus named design
 anchors. Tester reads task ACs and TCs plus the verification packet; QA grades
 the task ACs and consumes only relevant TC evidence. Security
