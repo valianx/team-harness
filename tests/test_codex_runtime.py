@@ -704,6 +704,9 @@ def main() -> None:
         "Even when plugin versions compare equal",
         "NEW_PLUGIN` and `NEW_VERSION` are the only",
         "without exiting `127`",
+        "Preserve the runtime helper's full result",
+        "bridge, runtime helper, and agent sync all report `restartRequired: false`",
+        "runtime helper, or agent sync reports `restartRequired: true`",
         "do not require a restart merely because the cache version changed",
         "Ask the operator to restart Codex or open a new thread only when",
     ):
@@ -941,7 +944,7 @@ def main() -> None:
         created_doc = tomllib.loads((pathlib.Path(temp_root) / "config.toml").read_text())
         if created_doc.get("approvals_reviewer") != "auto_review":
             fail("Codex runtime helper omitted auto_review from a new config")
-        if str(pathlib.Path(temp_root) / "tmp") not in created_doc.get("sandbox_workspace_write", {}).get("writable_roots", []):
+        if str(pathlib.Path(temp_root).resolve() / "tmp") not in created_doc.get("sandbox_workspace_write", {}).get("writable_roots", []):
             fail("Codex runtime helper omitted its private temp root from a new config")
 
     with tempfile.TemporaryDirectory() as temp_root:
@@ -980,7 +983,7 @@ def main() -> None:
             '[sandbox_workspace_write]\n'
             'network_access = false\n'
             'writable_roots = [\n'
-            '  "/operator/cache", # preserve operator root\n'
+            '  "/operator/cache" # preserve operator root\n'
             ']\n\n'
             '[projects."/tmp/example"]\n'
             'trust_level = "trusted"\n',
@@ -1024,11 +1027,13 @@ def main() -> None:
             "~/.cache/uv",
             "~/.npm",
             "~/go/pkg/mod",
-            str(codex_home / "tmp"),
+            str(codex_home.resolve() / "tmp"),
             str(workspace),
         ]
         if sandbox.get("writable_roots") != expected_roots:
             fail("Codex runtime helper did not preserve and append writable roots")
+        if "# preserve operator root" not in runtime_text:
+            fail("Codex runtime helper discarded an operator comment inside writable_roots")
         if not workspace.is_dir() or not (codex_home / "tmp").is_dir():
             fail("Codex runtime helper did not create managed writable roots")
         for marker in ('model = "operator-main"', '[projects."/tmp/example"]', 'trust_level = "trusted"'):

@@ -288,11 +288,66 @@ def find_array_end(candidate: str, open_bracket: int) -> int:
     raise ValueError("unsupported writable_roots layout")
 
 
+def array_tail_state(
+    candidate: str,
+    open_bracket: int,
+    close_bracket: int,
+) -> tuple[bool, int | None]:
+    """Return whether an array ends in a comma and its last string end."""
+    quote = None
+    triple_quoted = False
+    escaped = False
+    in_comment = False
+    last_token = None
+    last_value_end = None
+    index = open_bracket + 1
+    while index < close_bracket:
+        char = candidate[index]
+        if in_comment:
+            if char in "\r\n":
+                in_comment = False
+            index += 1
+            continue
+        if quote is not None:
+            if triple_quoted and candidate.startswith(quote * 3, index):
+                quote = None
+                triple_quoted = False
+                last_token = "value"
+                last_value_end = index + 3
+                index += 3
+                continue
+            if escaped:
+                escaped = False
+            elif quote == '"' and char == "\\":
+                escaped = True
+            elif not triple_quoted and char == quote:
+                quote = None
+                last_token = "value"
+                last_value_end = index + 1
+            index += 1
+            continue
+        if char == "#":
+            in_comment = True
+        elif char in {'"', "'"}:
+            quote = char
+            triple_quoted = candidate.startswith(char * 3, index)
+            if triple_quoted:
+                index += 3
+                continue
+        elif char == ",":
+            last_token = "comma"
+        elif not char.isspace():
+            raise ValueError("unsupported writable_roots array value")
+        index += 1
+    return last_token == "comma", last_value_end
+
+
 def render_section_array(
     text: str,
     section: str,
     key: str,
     values: list[str],
+    existing_values: list[str],
     newline: str,
 ) -> str:
     rendered = json.dumps(values, ensure_ascii=False)
@@ -319,19 +374,56 @@ def render_section_array(
     if open_bracket < 0:
         raise ValueError("unsupported writable_roots layout")
     close_bracket = find_array_end(candidate, open_bracket)
-    suffix = candidate[close_bracket + 1:]
-    indentation = re.match(r"^\s*", candidate).group(0)
-    replacement = f"{indentation}{key} = {rendered}"
-    return prefix + replacement + suffix + "".join(lines[end:])
+    missing_values = [value for value in values if value not in existing_values]
+    if not missing_values:
+        return text
+    has_trailing_comma, last_value_end = array_tail_state(
+        candidate,
+        open_bracket,
+        close_bracket,
+    )
+    if existing_values and not has_trailing_comma:
+        if last_value_end is None:
+            raise ValueError("unsupported writable_roots array layout")
+        candidate = candidate[:last_value_end] + "," + candidate[last_value_end:]
+        close_bracket += 1
+    rendered_missing = [json.dumps(value, ensure_ascii=False) for value in missing_values]
+    array_body = candidate[open_bracket + 1:close_bracket]
+    if "\n" not in array_body:
+        separator = " " if existing_values else ""
+        insertion = separator + ", ".join(rendered_missing)
+        candidate = candidate[:close_bracket] + insertion + candidate[close_bracket:]
+    else:
+        close_line_start = candidate.rfind("\n", open_bracket, close_bracket) + 1
+        closing_prefix = candidate[close_line_start:close_bracket]
+        if closing_prefix.strip():
+            insertion = " " + ", ".join(rendered_missing)
+            candidate = candidate[:close_bracket] + insertion + candidate[close_bracket:]
+        else:
+            indentation = re.match(r"^\s*", candidate).group(0) + "  "
+            insertion = "".join(
+                f"{indentation}{value},{newline}" for value in rendered_missing
+            )
+            candidate = candidate[:close_line_start] + insertion + candidate[close_line_start:]
+    return prefix + candidate + "".join(lines[end:])
 
 
 def render_runtime_config(raw: bytes | None, writable_roots: list[str]) -> bytes:
     text = raw.decode("utf-8") if raw is not None else ""
     newline = "\r\n" if "\r\n" in text else "\n"
+    parsed = tomllib.loads(text) if text else {}
+    _, existing_roots = current_runtime_state(parsed)
     for key, value in TOP_LEVEL_DEFAULTS.items():
         text = render_top_level_scalar(text, key, value, newline)
     text = render_section_scalar(text, SECTION, "network_access", True, newline)
-    text = render_section_array(text, SECTION, "writable_roots", writable_roots, newline)
+    text = render_section_array(
+        text,
+        SECTION,
+        "writable_roots",
+        writable_roots,
+        existing_roots,
+        newline,
+    )
     return text.encode("utf-8")
 
 
@@ -426,4 +518,4 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except (OSError, ValueError, json.JSONDecodeError) as error:
         print(f"manage_runtime: {error}", file=sys.stderr)
-        raise SystemExit(1)
+        raise SystemExit(1) from error

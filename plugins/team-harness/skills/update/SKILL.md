@@ -105,6 +105,8 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    python3 NEW_PLUGIN/skills/setup/scripts/manage_runtime.py ensure
    ```
 
+   Preserve the runtime helper's full result, including `changed` and
+   `restartRequired`, for the final report and restart decision.
    This preserves unrelated configuration and operator-owned writable roots
    while ensuring `workspace-write`, `on-request`, `auto_review`, sandbox
    network access, standard tool caches, the Codex runtime temp directory, and
@@ -174,16 +176,18 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    versions, marketplace result, config migration, runtime reconciliation, V2
    feature reconciliation, agent reconciliation, hook status, bridge status,
    and any recovery command.
-   When the bridge reports `restartRequired: false`, state
-   that the current thread can continue with its already-known skill and hook
-   paths; do not require a restart merely because the cache version changed.
+   When the bridge, runtime helper, and agent sync all report
+   `restartRequired: false`, state that the current thread can continue with its
+   already-known skill and hook paths; do not require a restart merely because
+   the cache version changed.
 
-   Ask the operator to restart Codex or open a new thread only when the bridge
-   requires it or when the release changes capabilities Codex indexes at thread
-   creation, such as added or renamed skills, agent declarations, MCP server
-   declarations, or hook registrations. Never claim that discovery metadata or
-   an already-running MCP process was hot-reloaded. If a new thread is required,
-   stop normal work in the current thread after explicitly requesting it.
+   Ask the operator to restart Codex or open a new thread only when the bridge,
+   runtime helper, or agent sync reports `restartRequired: true`, or when the
+   release changes capabilities Codex indexes at thread creation, such as added
+   or renamed skills, agent declarations, MCP server declarations, or hook
+   registrations. Never claim that discovery metadata or an already-running MCP
+   process was hot-reloaded. If a new thread is required, stop normal work in
+   the current thread after explicitly requesting it.
 
 Even when plugin versions compare equal, steps 4–7 still run. Update is also a
 repair/convergence command, not only a version downloader.
