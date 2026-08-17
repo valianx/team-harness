@@ -7,6 +7,7 @@ import path from "node:path";
 
 import {
   MAX_FILE_BYTES,
+  initializeProject,
   inspectRuntimeIntegration,
   isOpenSpecAdapterResult,
   isOpenSpecPolicy,
@@ -161,6 +162,80 @@ await check("requires the complete live-decision envelope before mutation", asyn
   assert.equal(value.outcome, "declined");
   assert.equal(value.error_code, "APPROVAL_REQUIRED");
   assert.equal(calls, 0);
+}));
+
+await check("initializes a compatible repository without a provisioning approval", async () => fixture(async directory => {
+  const calls = [];
+  const runner = async ({ argv }) => {
+    calls.push(argv);
+    if (argv[0] === "node") return envelope({ stdout: "v20.19.0" });
+    if (argv[0] === "npm") return envelope({ stdout: "10.8.2" });
+    if (argv[0] === "openspec" && argv[1] === "--version") return envelope({ stdout: "1.9.0" });
+    if (argv[0] === "openspec" && argv[1] === "init") { await writeCodexIntegration(directory); return envelope(); }
+    throw new Error(`unexpected command: ${argv.join(" ")}`);
+  };
+  const value = await initializeProject({ projectRoot: directory, runtime: "codex", policy, commandRunner: runner });
+  assertClosed(value);
+  assert.equal(value.operation, "initialize");
+  assert.equal(value.outcome, "ready");
+  assert.deepEqual(calls.find(argv => argv[1] === "init"), [
+    "openspec", "init", "--tools", "codex", "--no-animation", "--no-copilot-cloud", directory,
+  ]);
+}));
+
+await check("classifies protected Codex integration writes without exposing raw output", async () => fixture(async directory => {
+  const secret = "NPM_TOKEN=never-persist-this";
+  const runner = async ({ argv }) => {
+    if (argv[0] === "node") return envelope({ stdout: "v20.19.0" });
+    if (argv[0] === "npm") return envelope({ stdout: "10.8.2" });
+    if (argv[0] === "openspec" && argv[1] === "--version") return envelope({ stdout: "1.9.0" });
+    if (argv[0] === "openspec" && argv[1] === "init") {
+      return envelope({
+        exitCode: 1,
+        stderr: `ENOENT: mkdir '${directory}/.agents/skills' ${secret}`,
+      });
+    }
+    throw new Error(`unexpected command: ${argv.join(" ")}`);
+  };
+  const value = await initializeProject({ projectRoot: directory, runtime: "codex", policy, commandRunner: runner });
+  assertClosed(value);
+  assert.equal(value.outcome, "failed");
+  assert.equal(value.error_code, "INIT_SANDBOX_DENIED");
+  assert.match(value.evidence.diagnostic, /exact init command once.*sandbox escalation.*login:false/i);
+  assert.equal(JSON.stringify(value).includes(secret), false);
+}));
+
+await check("preserves the sandbox-denied signal through the approved provision route", async () => fixture(async directory => {
+  const runner = async ({ argv }) => {
+    if (argv[0] === "node") return envelope({ stdout: "v20.19.0" });
+    if (argv[0] === "npm") return envelope({ stdout: "10.8.2" });
+    if (argv[0] === "openspec" && argv[1] === "--version") return envelope({ stdout: "1.9.0" });
+    if (argv[0] === "openspec" && argv[1] === "init") {
+      return envelope({ exitCode: 1, stderr: `ENOENT: mkdir '${directory}/.agents/skills'` });
+    }
+    throw new Error(`unexpected command: ${argv.join(" ")}`);
+  };
+  const value = await provision({ approval: approval(), projectRoot: directory, runtime: "codex", policy, commandRunner: runner });
+  assertClosed(value);
+  assert.equal(value.operation, "provision");
+  assert.equal(value.error_code, "INIT_SANDBOX_DENIED");
+  assert.notEqual(value.evidence.diagnostic, null);
+}));
+
+await check("keeps generic init failures closed with a sanitized diagnostic", async () => fixture(async directory => {
+  const secret = "NPM_TOKEN=never-persist-this";
+  const runner = async ({ argv }) => {
+    if (argv[0] === "node") return envelope({ stdout: "v20.19.0" });
+    if (argv[0] === "npm") return envelope({ stdout: "10.8.2" });
+    if (argv[0] === "openspec" && argv[1] === "--version") return envelope({ stdout: "1.9.0" });
+    if (argv[0] === "openspec" && argv[1] === "init") return envelope({ exitCode: 1, stderr: `unexpected failure ${secret}` });
+    throw new Error(`unexpected command: ${argv.join(" ")}`);
+  };
+  const value = await initializeProject({ projectRoot: directory, runtime: "codex", policy, commandRunner: runner });
+  assertClosed(value);
+  assert.equal(value.error_code, "INIT_FAILED");
+  assert.match(value.evidence.diagnostic, /inspect the bounded command output/i);
+  assert.equal(JSON.stringify(value).includes(secret), false);
 }));
 
 await check("installs the pinned CLI then runs the real upstream init argv", async () => fixture(async directory => {

@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,6 +15,7 @@ import {
   QUALITY_RESULT_SCHEMA_VERSION,
   isQualityResult,
   runQualityChecks,
+  validateQualityManifest,
 } from "../plugins/team-harness/skills/pipeline/scripts/quality-runner.mjs";
 
 const failures = [];
@@ -262,6 +263,57 @@ await check("invalid manifests and missing selected commands fail closed", async
     const result = await runQualityChecks(options(repo, base, ["test"]));
     assert.equal(result.verdict, "fail");
     assert.equal(result.error_code, "MANIFEST_INVALID");
+  });
+});
+
+await check("package-manager exec and download shims are rejected before launch", async () => {
+  const forbidden = [
+    ["npx", "vitest"], ["pnpx", "vitest"], ["bunx", "vitest"],
+    ["npm", "exec", "vitest"], ["npm", "x", "vitest"],
+    ["pnpm", "dlx", "vitest"],
+    ["yarn", "exec", "vitest"], ["yarn", "dlx", "vitest"],
+    ["bun", "x", "vitest"], ["corepack", "pnpm", "dlx", "vitest"],
+  ];
+  for (const argv of forbidden) {
+    assert.throws(
+      () => validateQualityManifest(baseManifest({ test: { argv } })),
+      error => error?.message === "NON_HERMETIC_COMMAND",
+      argv.join(" "),
+    );
+  }
+  assert.doesNotThrow(() => validateQualityManifest(baseManifest({ test: { argv: ["pnpm", "run", "test"] } })));
+  assert.doesNotThrow(() => validateQualityManifest(baseManifest({ test: { argv: ["node_modules/.bin/vitest", "run"] } })));
+
+  const manifest = baseManifest({ test: { argv: ["pnpm", "dlx", "vitest"] } });
+  await temporaryRepository({ manifest }, async ({ repo, base }) => {
+    const result = await runQualityChecks(options(repo, base, ["test"]));
+    assert.equal(result.verdict, "fail");
+    assert.equal(result.error_code, "NON_HERMETIC_COMMAND");
+    assert.deepEqual(result.commands, []);
+  });
+});
+
+await check("pnpm exec resolves only an existing linked local binary without launching pnpm", async () => {
+  const manifest = baseManifest({ test: { argv: ["pnpm", "exec", "vitest", "run", "focused"] } });
+  await temporaryRepository({
+    manifest,
+    candidateFiles: { ".gitignore": "node_modules/\n", "src/calc.go": "package calc\n" },
+  }, async ({ repo, base }) => {
+    const binary = path.join(repo, "node_modules", ".bin", "vitest");
+    await mkdir(path.dirname(binary), { recursive: true });
+    await writeFile(binary, "#!/usr/bin/env node\nprocess.exit(process.argv.slice(2).join(' ') === 'run focused' ? 0 : 9);\n");
+    await chmod(binary, 0o755);
+    const result = await runQualityChecks(options(repo, base, ["test"]));
+    assert.equal(result.verdict, "pass");
+    assert.equal(result.commands[0].execution_resolution, "linked-local-bin");
+    assert.match(result.commands[0].execution_argv_sha256, /^[a-f0-9]{64}$/);
+  });
+
+  await temporaryRepository({ manifest }, async ({ repo, base }) => {
+    const result = await runQualityChecks(options(repo, base, ["test"]));
+    assert.equal(result.verdict, "fail");
+    assert.equal(result.error_code, "PREREQUISITE_UNAVAILABLE");
+    assert.deepEqual(result.commands, []);
   });
 });
 

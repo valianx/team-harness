@@ -22,9 +22,16 @@ workflow authority.
 Run the transaction continuously:
 
 1. Invoke adapter `preflight` for the repository and active runtime. `ready` continues without
-   operator interaction. `provisionable` presents one exact install/update-or-abort decision;
-   `blocked-prerequisite` gives exact Node/npm guidance; `invalid-project` blocks. Never fall
-   back to legacy planning.
+   operator interaction. `PROJECT_UNINITIALIZED` invokes adapter `initialize` automatically;
+   repository initialization is an in-scope pipeline operation, not an operator gate. When that
+   operation returns `INIT_SANDBOX_DENIED`, retry the exact fixed `openspec init --tools
+   <runtime> --no-animation --no-copilot-cloud <repository>` command exactly once through native
+   sandbox escalation with `login:false`, then rerun `preflight`. Do not ask the operator to
+   initialize the repository or to run the command manually. The retry is allowed only for that
+   structured code and exact fixed argv; a generic `INIT_FAILED` remains blocked and its sanitized
+   diagnostic must be surfaced. Other `provisionable` states present one exact pinned CLI
+   install/update-or-abort decision; `blocked-prerequisite` gives exact Node/npm guidance;
+   `invalid-project` blocks. Never fall back to legacy planning.
 2. Persist the repository planning root and change binding. Dispatch a fresh architect in
    `openspec-planning` mode with the approved request and the exact installed
    `openspec-propose` skill for a new change or `openspec-update-change` for a bound existing
@@ -35,11 +42,18 @@ Run the transaction continuously:
    hash failure remains recoverably in Design.
 4. Dispatch a fresh architect in `openspec-overlay` mode with the snapshot and pinned OpenSpec
    coordinates. It writes only the compact Gate-1 index, operational execution shards, and
-   bidirectional traceability. It must not paraphrase or replace OpenSpec intent.
+   bidirectional traceability. It must not paraphrase or replace OpenSpec intent. Include the
+   pipeline skill's exact `dispatch_id`, `progress_recipient`, and
+   `progress_interval_seconds: 120` contract in this packet. Include the effective absolute
+   `writable_roots`; require every planned worktree to be contained by one. Also require each
+   task shard's literal `required_invariants`, `required_evidence_anchors`, and
+   `cross_runtime_preservation` declarations and mirror their exact values into the matching
+   traceability execution item.
 5. Validate snapshot freshness, overlay traceability, and applicable operational plan fields,
    then present the unchanged Stage Gate 1.
 
-Success at any internal step advances automatically. Commentary is informational and never asks
+Success at any internal step, including initialization and its single protected-path retry,
+advances automatically. Commentary is informational and never asks
 the operator to invoke another TH or OpenSpec command. Pause only for the mandatory gate, the
 explicit provisioning choice, a material unresolved decision, separate external-write authority,
 or a real blocker that cannot be resolved safely within scope.
@@ -61,11 +75,18 @@ requirements, scenarios, decisions, or task prose.
 Wait for that same architect attempt to complete. A `wait_agent` timeout is
 only the wait heartbeat and immediately resumes the directed wait without
 recap, replacement, or `interrupt_agent`; it is not the architect's 10-minute
-SLA and proves no failure. Track the SLA from dispatch. On SLA exceed, escalate
-once to the operator while leaving the architect alive and continue waiting for
-either its result or live operator input. Only a live cancellation of that
-active attempt authorizes interruption; replacement requires a demonstrated
-terminal unsuccessful result and the normal design authority.
+SLA and proves no failure. Accept only valid `TH_PROGRESS` messages for this
+dispatch. The architect emits `started`, `inputs-validated`, `mappings-built`,
+`artifacts-writing`, and `validation-ready` milestones plus a heartbeat at most
+120 seconds apart; none is terminal authority or resets the SLA. Track the SLA
+from dispatch. On SLA exceed, inspect live status, request one non-interrupting
+`TH_PROGRESS_REQUEST`, and probe only metadata for `01-plan.md` and `plan/`.
+Emit the pipeline skill's `TH_SLA` diagnostic and append one `agent.sla` event.
+When both are absent, report `no-material-progress-observed`, not a failure or
+blocker. Continue waiting for either its result or live operator input while
+leaving the architect alive. Only a live cancellation of that active attempt
+authorizes interruption; replacement requires a demonstrated terminal
+unsuccessful result and the normal design authority.
 
 The plan must lead with problem/outcome, actors/flows, business rules/examples,
 alternate/error behavior, unchanged behavior, non-goals, and human decisions.
@@ -80,17 +101,28 @@ and record `size_reason: required-items`; never omit scope or request a split so
 primary thread does not set `next_action: present Stage Gate 1` until the
 deterministic plan evidence below passes.
 
-Before the gate, resolve `scripts/plan-contract.mjs` relative to the loaded
+Before the gate, resolve `scripts/plan-contract.mjs` and
+`scripts/openspec-events.mjs` relative to the loaded
 pipeline skill. For an OpenSpec-bound run invoke it with `--workspace`,
 `--plan 01-plan.md`, `--snapshot inputs/openspec-snapshot.json`, and
-`--traceability plan/openspec-traceability.json`. Persist the complete JSON, its
+`--traceability plan/openspec-traceability.json`, plus one exact
+`--writable-root` argument per effective sandbox root. Persist the complete JSON, its
 SHA-256, and the returned `kind: team_harness_openspec_overlay_validation`,
 `snapshot_sha256`, `overlay_sha256`, and `change_name` as
 `plan_contract_evidence`. A pass is valid only when those hashes and the change
 name match the current pinned artifacts and bound change. This route validates
-the compact execution overlay against canonical OpenSpec coordinates; it never
+the compact execution overlay, each task shard's dispatch anchors, and the
+planned execution path against canonical OpenSpec coordinates and live writable
+roots; it never
 falls through to the legacy functional-plan contract or invokes
 `scripts/plan-contract-repair.mjs`.
+
+Then invoke `openspec-events.mjs` with `--workspace`, the state's exact
+`--events` path, and `--feature`. It must return
+`kind: team_harness_openspec_execution_events_validation` and `verdict: pass`
+before Gate 1. Any malformed event, missing `ts`/`feature`, non-canonical
+architect `task`, non-`success|failed|blocked|skipped` status, missing
+`attempt_metrics`, open attempt, or incomplete two-pass design fails closed.
 
 For a legacy `sharded-v1` run, also resolve
 `scripts/plan-contract-repair.mjs`, invoke `plan-contract.mjs` with only the
@@ -140,7 +172,11 @@ repair route and never infer overlay completeness from the Markdown index.
 Before presenting Gate 1, when the validated plan requires an isolated
 worktree, Main copies its absolute path, exact branch, and immutable full commit
 SHA into `worktree`, `worktree_branch`, and `worktree_base`. Reject a moving
-ref, missing SHA, or incomplete topology. These fields declare the approved
+ref, missing SHA, incomplete topology, or a path outside every effective
+`writable_root`. Escalated `git worktree add` authority proves only that one
+command can run and never substitutes for ordinary edit access. Prefer an
+ignored worktree below the repository root when that is the only writable
+location. These fields declare the approved
 target only: do not create the branch/worktree or set `working_branch` during
 design. Physical creation and any protected-`.git` native approval happen at
 implementation entry.

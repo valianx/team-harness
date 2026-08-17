@@ -61,14 +61,13 @@ async function scenario(workspaceMode) {
     const scenarioId = coordinates.find(item => item.kind === "scenario").id;
     const decision = coordinates.find(item => item.kind === "design-decision").id;
     const task = coordinates.find(item => item.kind === "task").id;
-    await writeFile(path.join(workspace, "plan/tasks/Task-1.md"), "# Task-1\n");
-    await writeFile(path.join(workspace, "plan/tasks/Task-2.md"), "# Task-2\n");
     const acceptance = (id, source) => ({ id, sources: [source], classification: "direct", rationale: null, evidence_anchor: "reviews/04-validation.md" });
     const execution = (id, source) => ({
       id, sources: [source], classification: "direct", rationale: null, owner: "implementer", specialist: "implementer",
-      shard_path: `plan/tasks/${id}.md`, files: [`src/${id}.mjs`], dependencies: [], invariants: ["Preserve TH gates."],
+      shard_path: `plan/tasks/${id}.md`, files: [`src/${id}.mjs`], dependencies: [], required_invariants: ["I-gate-authority"],
       technical_constraints: [], quality_command_ids: ["unit"], pre_implementation_test: "required",
-      evidence_anchors: ["02-implementation.md"], rollback: "Revert the task commit.", delivery_group: "default",
+      required_evidence_anchors: ["02-implementation.md"], cross_runtime_preservation: "Preserve equivalent behavior in every supported runtime.",
+      rollback: "Revert the task commit.", delivery_group: "default",
     });
     const pairs = [["AC-1", requirement], ["AC-2", scenarioId], ["Task-1", decision], ["Task-2", task]];
     const overlay = {
@@ -81,12 +80,16 @@ async function scenario(workspaceMode) {
       source_dispositions: pairs.map(([id, source]) => ({ source_id: source, item_ids: [id], classification: "direct", rationale: null })),
       operator_disclosures: [],
     };
+    for (const item of overlay.execution_items) {
+      await writeFile(path.join(workspace, item.shard_path), `# ${item.id}\n\n- **Worktree:** null — branch null, base null\n\n## Dispatch anchors\n\nrequired_invariants: [${item.required_invariants.join(", ")}]\nrequired_evidence_anchors: [${item.required_evidence_anchors.join(", ")}]\ncross_runtime_preservation: ${item.cross_runtime_preservation}\n`);
+    }
     await writeFile(path.join(workspace, "plan/openspec-traceability.json"), `${JSON.stringify(overlay)}\n`);
     const gateOneEvidence = await validatePlanContract({
       workspace,
       plan: "01-plan.md",
       snapshot: "inputs/openspec-snapshot.json",
       traceability: "plan/openspec-traceability.json",
+      writableRoots: [repository],
     });
     assert.equal(gateOneEvidence.verdict, "pass");
     assert.equal(gateOneEvidence.kind, "team_harness_openspec_overlay_validation");

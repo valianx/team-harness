@@ -51,6 +51,52 @@ must be preserved. Parallelize only tasks with disjoint ownership. The primary
 thread records dispatches and results, waits for all tasks in a round, and
 consolidates their evidence.
 
+Disjoint `Files:` are necessary but not sufficient for concurrency. Never run
+two committing implementer/tester lanes concurrently against the same canonical
+worktree: they share Git index/ref metadata and repository-wide checks can
+observe the other lane's incomplete state. Within one worktree dispatch tasks
+sequentially, including their commit-integrity close. Parallel rounds are
+allowed only across distinct canonical worktrees/repositories with disjoint
+ownership. If a legacy/in-flight same-worktree lane's global command reports
+only paths owned by another active task, classify it as
+`concurrent-lane-interference`; do not edit, retry, or fail the current task.
+Main waits for the existing round barrier and reruns the global check once on
+the consolidated clean tree, assigning any persistent failure to its owning
+task.
+
+Before each committing specialist dispatch, resolve `git rev-parse
+--absolute-git-dir` read-only and compare that exact directory with the live
+writable roots. Add `git_metadata_write_mode: normal` only when it is contained;
+otherwise add `native-escalation-required`. This field grants no extra scope.
+For the latter, the specialist retries only exact path-scoped `git add` and
+`git commit`/eligible same-owner amend through native escalation with
+`login:false`. Protected `.git/worktrees/.../index.lock` `EROFS|EACCES|EPERM`
+is a technical permission boundary, not a test/code failure. Never add `.git`
+to writable roots or authorize reset, hook bypass, broad staging, source edits,
+or tests under escalation. Approval timeout pauses on the exact pending Git
+operation; it does not discard an already-created task/test commit or diff.
+Record that pause as `git-metadata-permission`.
+
+Every specialist packet carries the closed root map `path_roots: {
+repository_root: <absolute canonical worktree>, workspace_artifact_root:
+<absolute canonical workspace> }`. Resolve task `files` and OpenSpec source
+coordinates only below `repository_root`; resolve `plan/...`, `inputs/...`,
+`reviews/...`, task shards, contracts, and `required_evidence_anchors` only
+below `workspace_artifact_root`. Validate containment before reading. Never
+interpret a workspace artifact path relative to the repository, invent `../`
+traversal, or copy artifacts into the worktree. Missing root/domain or a path
+that escapes its declared root blocks the dispatch packet.
+
+The packet provides paths, root domains, and the narrowest expected discovery
+directory/glob, never concatenated file contents. For initial source
+inspection, first inspect metadata, then read at most one file per tool call
+under a predeclared output cap. When a file is not known to fit, locate only
+task-relevant symbols/anchors with bounded `rg -n` and read
+separate bounded ranges. Never combine all task files, a whole directory, or
+workspace artifacts into one inspection command. Tool-level truncation yields
+no read evidence: continue with narrower per-file/range reads and never replay
+the aggregate command.
+
 For an OpenSpec-bound workspace, first verify `inputs/openspec-snapshot.json`
 against the repository and validate `plan/openspec-traceability.json`. The role
 packet carries the snapshot path and SHA-256, the assigned TH execution item and
@@ -60,9 +106,31 @@ path, line, and content hash. Obtain `openspec instructions apply --change
 it never selects the phase, task, correction authority, state transition, or
 gate. The implementer reads canonical intent at those exact repository-local
 coordinates and must not rely on copied or paraphrased intent in a TH artifact.
+
+The overlay schema has no top-level `tasks` array. Main resolves the assigned
+item from exactly `.execution_items[] | select(.id == "Task-N")`, requires one
+match, and puts its JSON Pointer (`/execution_items/<zero-based-index>`), full
+item hash, and exact `sources` array in the role packet. The specialist consumes
+that packet binding and never probes `.tasks[]` or guesses another structure.
+For manual diagnosis only, the fail-closed source query is:
+`jq -er --arg id 'Task-N' '[.execution_items[] | select(.id == $id)] |
+if length == 1 then .[0].sources[] else error("execution item cardinality")
+end' plan/openspec-traceability.json`. Zero or multiple matches block.
 After a successful assigned task, permit and record only its exact monotonic
-OpenSpec task-checkbox transition through the snapshot verifier. Any other
-source drift blocks the next dispatch and requires reconciliation.
+OpenSpec task-checkbox transition through `openspec-overlay.mjs
+verify-and-rebind`, passing the same workspace, snapshot, traceability,
+complete live `--writable-root` set, and every exact `--authorized-task` ID.
+This single recoverable operation verifies source intent and progress, updates
+the snapshot, and mechanically rebinds only
+`overlay.snapshot.{sha256,artifact_set_sha256}` before returning. Require its
+closed `team_harness_openspec_progress_transition` pass result and then rerun
+`plan-contract`. On rebind failure it restores the prior snapshot when its
+identity is unchanged; after interruption it resumes only when the latest
+progress event's predecessor and task IDs exactly match the requested
+transition. Any other source drift, missing predecessor, additional overlay
+finding, or concurrent artifact change fails closed. Never invoke standalone
+`verify` followed by manual rebind, repair the JSON by hand, tolerate
+`SNAPSHOT_STALE`, or redispatch an architect for checkbox-only progress.
 
 ## Pre-implementation behavioral test contract
 
@@ -72,23 +140,51 @@ the repository's `.team-harness/quality.json`, the `quality-runner.mjs` and
 `test-transition.mjs` helpers relative to this loaded skill, and a clean current
 commit. Missing `commands.test`, `test_contract.path_rules`, or either helper
 blocks; never downgrade a required task to not-applicable during implementation.
+The manifest must also reject with `NON_HERMETIC_COMMAND` any package-manager
+exec/download shim (`npx`, `pnpx`, `bunx`, `npm exec|x`, `pnpm dlx`,
+`yarn exec|dlx`, `bun x`, including Corepack-wrapped forms). Use only a
+repository-owned package script or an exact already-installed local executable.
+An SQLite/global-store/bootstrap failure is `test-environment`; never authorize
+an install, mutate `node_modules`, or substitute a different argv as machine
+evidence. For the sole `pnpm exec <tool>` exception, the quality runner must
+prove an existing repository-local `node_modules/.bin/<tool>`, execute that
+link directly without launching pnpm, and record `linked-local-bin` plus the
+effective argv hash. Missing linkage is `PREREQUISITE_UNAVAILABLE`; never retry
+pnpm with broader store access or allow its install/purge prompt.
 
 Immediately before the task's tester dispatch, record the current full commit
 as that task's test baseline. Dispatch a fresh `tester` in
 `mode: pre-implementation-contract` with only its task shard, named anchors,
-manifest path, worktree/branch, and a coordinator-owned workspace contract path.
+manifest path, worktree/branch, a coordinator-owned workspace contract path,
+and the exact packaged `test_transition_path` resolved by Main.
 The tester may commit only the declared test files and writes the closed contract
-JSON outside the source commit. Verify commit integrity and that no production
-path changed.
+JSON outside the source commit. Before it may return success, it invokes that
+helper with `--validate-contract` and requires the closed
+`team_harness_test_contract_validation` pass result. `requirements` must be
+SAFE_REQUIREMENT strings, never objects; a failed self-validation returns
+`contract-invalid` and Main does not begin the red transition. Verify commit
+integrity and that no production path changed.
 
 Main then invokes `node <test-transition-path> --transition red` against that
-task baseline and current `HEAD`, persists the complete JSON result plus its
-SHA-256, and requires both machine `verdict: pass` and tester
+task baseline and current `HEAD` with `--output <coordinator evidence path>`.
+The helper atomically persists the complete JSON result and prints only the
+closed `team_harness_test_transition_receipt` containing verdict, result path,
+SHA-256, byte count, and a fixed diagnostic summary. On failure the summary
+identifies the transition stage, quality error, command outcome, and stream
+availability without replaying raw output. Main verifies that receipt against the exact file and
+requires both the persisted machine `verdict: pass` and tester
 `failure_matches_contract: true`. Machine pass here means the exact manifest
 test command completed nonzero, every changed path is a declared test path that
 matches manifest rules, and test blob identities were recorded. Syntax,
 fixture, dependency, infrastructure, unrelated-suite, already-green, or
 semantic mismatch blocks before any implementer runs.
+
+The equivalent `red '<JSON object>'` CLI form is supported for parity with the
+OpenSpec helpers. Main chooses one form before invocation and never retries the
+other after `ARGUMENT_INVALID`; malformed input executes no quality command.
+Because `--output` keeps stdout bounded, invoke the helper directly with a
+small output cap rather than through `bounded-command.mjs`. Never replay the
+full result after truncation; the receipt-bound artifact is the sole evidence.
 
 Only after every required task in the dispatch has valid red evidence may the
 fresh implementer receive its assigned shards plus the corresponding contract
@@ -97,7 +193,7 @@ implementer never edits or deletes them. After its implementation commit, Main
 runs `--transition green` once per required task with the same contract hash and
 hashed red-evidence file. Green requires the same manifest, exact test command,
 task baseline, and test blobs, with the red candidate ancestral to current
-`HEAD`; any mismatch or nonzero result returns to bounded implementation
+`HEAD`; the green call uses its own `--output` path, and any mismatch or nonzero result returns to bounded implementation
 correction and consumes the normal max-3 budget. A task explicitly marked
 `not-applicable` records that state and its plan-time reason without running the
 checkpoint.
@@ -143,6 +239,32 @@ or 20 M cumulative processed tokens. When that boundary is near, prefer a
 completed implementation → validation handoff. This rotation does not create a
 nested orchestrator or automatically replace native Main.
 
+## Atomic commit-integrity evidence
+
+After every successful `implementer`/`tester` return and again at implementation
+evidence close, resolve packaged `commit-integrity.mjs` and invoke it directly
+with `--repository`, the reported `--commit` (or literal `none`), registered
+`--base-sha`, exact `--branch`, declared `--worktree`, repeated task
+`--allowed-path`, any matching annotated `--scope-drift-path`, and
+`--output <coordinator evidence path>`. The helper performs the six Git-backed
+conjuncts without a shell: tree cleanliness, ancestry, baseline movement,
+branch, worktree, and commit staging scope. It atomically persists the complete
+fixed-shape result and prints only a bounded
+`team_harness_commit_integrity_receipt` with path, SHA-256, and byte count.
+Verify the receipt and persisted result before separately applying the seventh,
+coordinator-owned lane-coverage conjunct. Only both passes satisfy commit
+integrity.
+
+Do not concatenate the HEAD, tree, status, changed paths, test paths, branch,
+worktree, or merge-base probes into one shell/tool call. A native tool message
+such as `Output exceeded available model context` is transport failure, not Git
+evidence and not an integrity failure. When the helper already wrote its
+artifact, inspect only that exact artifact/receipt without rerunning Git. If no
+artifact exists, execute the documented individual Git conjunct commands as
+separate capped calls; this decomposition is the fail-closed recovery, never a
+replay of the failed composite command. An individual truncation leaves that
+conjunct unevaluated and blocks rather than silently passing.
+
 Only in this explicitly activated pipeline, preflight resolves the helper's
 absolute path relative to the loaded pipeline skill/reference and fails closed
 if unavailable; include it in the implementer role packet only as
@@ -174,7 +296,11 @@ binary/control data safely before display. A successful command normally needs
 only the envelope; a failing command may use its sanitized failure tail for
 diagnosis. If either stream truncates, make a narrow follow-up as a narrower
 query through the helper and never replay the original raw/full output or command
-just to obtain it. Outside pipeline mode, do not create, infer, or claim that
+just to obtain it. For a test suite, diagnostic partitioning by explicit test
+file is allowed after the single authoritative global failure, including when
+application logs dominate reporter output. Those per-file runs diagnose only;
+after a fix, the exact manifest command must run once to produce authoritative
+green evidence. Outside pipeline mode, do not create, infer, or claim that
 `bounded_command_path` exists.
 
 The helper is a development-output control, not a process-containment sandbox.

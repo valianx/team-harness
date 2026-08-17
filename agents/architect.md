@@ -150,6 +150,34 @@ normative requirement, scenario, decision, or task prose. Classify every mapping
 `split`, `merged`, `th-extension`, `excluded`, or `ambiguous`; report ambiguity instead of
 inventing intent.
 
+Every OpenSpec execution shard must contain one `## Dispatch anchors` block
+with literal `required_invariants: [...]`, `required_evidence_anchors: [...]`,
+and a non-empty `cross_runtime_preservation: ...` line. Mirror those exact
+values into its `execution_items` entry in `plan/openspec-traceability.json`.
+Use `[]` only when no invariant or evidence anchor applies; never omit a field.
+The packet supplies the effective absolute `writable_roots`. A proposed
+worktree must be equal to or strictly below one of them; escalation used to run
+`git worktree add` does not make an outside path writable for later edits.
+
+**Codex progress transport.** When this packet includes `dispatch_id`,
+`progress_recipient`, and `progress_interval_seconds: 120`, use native
+`send_message` to that exact recipient. Send one line beginning `TH_PROGRESS `
+followed by JSON with exactly these keys: `schema_version`, `dispatch_id`,
+`role`, `mode`, `milestone`, `completed_units`, `total_units`,
+`artifact_pointers`, and `blocked_code`. Use `schema_version: 1`,
+`role: architect`, `mode: openspec-overlay`, and only milestones `started`,
+`inputs-validated`, `mappings-built`, `artifacts-writing`, or
+`validation-ready`. Send `started` before lengthy reasoning, each milestone as
+it occurs, and repeat the current truthful milestone whenever 120 seconds pass
+while you retain execution. `artifact_pointers` lists only workspace-relative
+regular outputs already written; `blocked_code` is `null`, `AMBIGUITY`,
+`INPUT_MISSING`, or `WRITE_FAILED`. Never put prose, paths outside the
+workspace, source content, command output, or secrets in progress. A heartbeat
+does not replace the final status, prove completion, or authorize a phase/gate.
+Never write progress into `00-state.md`, events, or a new artifact; Main owns
+durable coordination. On `TH_PROGRESS_REQUEST`, send the current snapshot at
+the next message boundary without restarting analysis.
+
 ### Design Mode (default)
 
 Used when the team needs an architecture proposal for a feature, fix, or refactor.
@@ -472,6 +500,12 @@ Stacked PRs within the SAME repository (a group's Base = a sibling group's branc
   - seams: {seam-1: [files], seam-2: [files], ...}          # omit when no
   - frozen-contracts: [files/symbols every seam may read, none may modify]  # omit when no
 - **Notes:** {anything the implementer should know — same-commit OAS bump, flag names, etc.}
+
+## Dispatch anchors
+
+required_invariants: [{I-N identifiers} | ]
+required_evidence_anchors: [{workspace-relative paths} | ]
+cross_runtime_preservation: {non-empty statement of behavior preserved across supported runtimes}
 
 #### Acceptance Criteria
 
@@ -823,7 +857,7 @@ Each task must be **small enough to complete in one agent pipeline run** (specif
   - Migration with rollback risk (DB schema, public API breaking change) → **×1.5**
   - Spike-style task where the goal is "find out if this works" → **×2.0** (research is open-ended)
   - More than 1 multiplier triggers? Pick the largest, do NOT stack them.
-- **Parallel dispatch** changes total batch time, not per-task time. With 5 worktrees in parallel, batch wall-clock ≈ longest round, not sum of all tasks.
+- **Parallel dispatch** changes total batch time only across distinct canonical worktrees/repositories. Committing tasks in the same worktree are always sequential because they share Git metadata and repository-wide checks. With 5 distinct worktrees in parallel, batch wall-clock ≈ longest round; within one worktree it is the sum.
 - **Calibration check:** a project a human team estimates at **weeks** typically completes in **3-8 hours** of agent batch execution with Opus 4.7. If your batch estimate is much higher than that, you are probably padding.
 
 **Self-correction:** if you produce an estimate and your gut says "feels generous", you ARE padding. Cut it 30% and check again. The pipeline-metrics.json `estimation_accuracy` field will tell you over time whether you are over-estimating; if `delta_pct` is consistently positive, recalibrate your defaults.
@@ -864,7 +898,7 @@ Every task MUST have exactly one dispatch label. The coordinator uses these to b
 | Label | Meaning | How the coordinator treats it |
 |-------|---------|-------------------------------|
 | `BLOCKER` | Blocks other tasks — must complete first | Scheduled in the earliest possible round. Other tasks wait for it. |
-| `PARALLEL` | Independent — can run alongside any task in the same round | Grouped with other PARALLEL tasks in the same round. |
+| `PARALLEL` | Independent and assigned to a distinct canonical worktree/repository | Grouped only with tasks on other worktrees; same-worktree tasks remain sequential. |
 | `CONVERGENCE` | Sync point — needs 2+ upstream tasks to complete first | Scheduled only after ALL its dependencies are done. |
 | `SEQUENTIAL` | Ordered within its stream — depends on exactly 1 prior task | Runs after its single dependency, can parallelize with other streams. |
 
@@ -873,7 +907,7 @@ Every task MUST have exactly one dispatch label. The coordinator uses these to b
 - If a task has no dependencies AND blocks 0-1 tasks → `PARALLEL`
 - If a task depends on 2+ tasks from different streams → `CONVERGENCE`
 - If a task depends on exactly 1 task → `SEQUENTIAL`
-- When in doubt between PARALLEL and SEQUENTIAL → prefer PARALLEL (enables more parallelism)
+- When in doubt between PARALLEL and SEQUENTIAL, or when tasks share one canonical worktree → use SEQUENTIAL. PARALLEL requires distinct worktrees/repositories as well as disjoint ownership.
 
 #### Planning Output Template
 

@@ -52,6 +52,9 @@ immutable `worktree_base` are declared before Gate 1. They are intent, not
 proof of creation; `working_branch` remains null until implementation entry
 creates and verifies the worktree. The field contract and its two legitimate
 producer paths are in `agents/_shared/orchestrator-state.md § Current State`.
+The proposed worktree must be equal to or below an effective native
+`writable_root`; escalation for `git worktree add` proves only that command can
+run and never makes an outside directory writable for implementation.
 
 ## No capability-check fallback
 
@@ -476,8 +479,24 @@ time:
 | validation | security | 10 min |
 | delivery | delivery | 5 min |
 
+For a Codex `openspec-overlay` architect, the dispatch packet carries a
+coordinator-generated `dispatch_id`, exact `progress_recipient`, and
+`progress_interval_seconds: 120`. The specialist uses native `send_message` to
+emit transient `TH_PROGRESS` JSON at `started`, `inputs-validated`,
+`mappings-built`, `artifacts-writing`, and `validation-ready`, repeating the
+current milestone when 120 seconds pass. Main validates the known dispatch,
+role/mode, counters, workspace-contained artifact pointers, and closed blocked
+code. These messages are progress evidence only: they never write coordination
+state, prove correctness or terminality, or reset the SLA.
+
 On SLA exceed, **escalate to the operator and keep the specialist alive —
-never kill silently.** Continue a directed wait that can return either the
+never kill silently.** First inspect `list_agents` once, send one
+non-interrupting `TH_PROGRESS_REQUEST`, and probe only metadata for expected
+artifacts. Emit one structured `TH_SLA` diagnostic and one coordinator-owned
+`agent.sla` event with elapsed time, live status, last milestone/heartbeat age,
+`terminal_result: false`, `artifact_state: none|partial|complete`, and
+`action: continue-waiting`. No valid heartbeat plus no artifact means only
+`no-material-progress-observed`, never failure or blockage. Continue a directed wait that can return either the
 agent result or live operator input. Only a current live operator cancellation
 of that active attempt authorizes `interrupt_agent`. A replacement requires a
 demonstrated terminal unsuccessful result plus the normal phase/correction
@@ -750,8 +769,14 @@ ask only for genuine ambiguity.
 `openspec-adapter.mjs` and `openspec-snapshot.mjs` relative to the installed pipeline
 skill. Bind one kebab-case repository-local OpenSpec change. Preflight Node, npm, the pinned CLI,
 project initialization, and active-runtime generated skills. A ready result continues silently;
-provisionable presents one exact install/update-or-abort decision; missing Node/npm or an unsafe
-project blocks without legacy fallback.
+`PROJECT_UNINITIALIZED` runs adapter `initialize` automatically because repository initialization
+is in-scope pipeline setup, not a gate. If it returns `INIT_SANDBOX_DENIED`, retry the exact fixed
+`openspec init --tools <runtime> --no-animation --no-copilot-cloud <repository>` argv once through
+native sandbox escalation with `login:false`, then rerun preflight. Never ask the operator to run
+that command manually. Only that structured protected-path result authorizes the retry; generic
+`INIT_FAILED` surfaces its sanitized diagnostic and blocks. Other provisionable states present one
+exact pinned CLI install/update-or-abort decision; missing Node/npm or an unsafe project blocks
+without legacy fallback.
 
 Dispatch a fresh `architect` in `openspec-planning` mode with the installed upstream
 `openspec-propose` skill for a new change or `openspec-update-change` for the already bound
@@ -760,10 +785,19 @@ CLI-reported status plus strict validation and captures the sole
 `inputs/openspec-snapshot.json`. Dispatch a second fresh `architect` in
 `openspec-overlay` mode; it writes only the compact Gate-1 index, operational execution shards,
 and bidirectional traceability against pinned coordinates. It never rewrites canonical source
-intent. Main validates freshness and overlay structure before Gate 1.
+intent. Its packet includes the structured progress contract above so Main can
+observe input validation, mapping, and artifact-writing milestones without
+reading partial output. It also includes the effective absolute
+`writable_roots`; each shard declares literal `required_invariants`,
+`required_evidence_anchors`, and `cross_runtime_preservation`, mirrors those
+values into its traceability execution item, and proposes only a branch-in-place
+target or worktree contained by one of those roots. Main validates freshness,
+dispatch-anchor agreement, writable execution topology, and overlay structure
+before Gate 1.
 
 These are consecutive actions in one Design transaction, not operator checkpoints. Main advances
-automatically after successful internal actions and uses commentary only for progress. It pauses
+automatically after successful internal actions, including repository initialization and its one
+protected-path retry, and uses commentary only for progress. It pauses
 only for mandatory gates, provisioning authority, a material unresolved decision, separately
 authorized external writes, or a real blocker. Generated OpenSpec workflow boundaries never
 require the operator to re-enter a command. Existing approved or frozen legacy workspaces retain
@@ -804,16 +838,27 @@ Planning dispatches only `architect`. For every OpenSpec-bound `sharded-v1`
 plan, Main resolves `plan-contract.mjs` from the pipeline skill and invokes it
 with `--workspace`, `--plan 01-plan.md`,
 `--snapshot inputs/openspec-snapshot.json`, and
-`--traceability plan/openspec-traceability.json`. Main persists the complete
+`--traceability plan/openspec-traceability.json`, plus one exact
+`--writable-root` per effective native sandbox root. Main persists the complete
 JSON result, result SHA-256, and the returned
 `kind: team_harness_openspec_overlay_validation`, `snapshot_sha256`,
 `overlay_sha256`, and `change_name` in `plan_contract_evidence`. A pass is valid
 only when the hashes and change name match the current pinned artifacts and
-bound change. This is the Gate-1 evidence for the compact execution overlay;
+bound change. This is the Gate-1 evidence for the compact execution overlay,
+task dispatch anchors, and writable execution target;
 the OpenSpec path never falls through to the legacy functional-plan validator
 or invokes `plan-contract-repair.mjs`. Snapshot drift returns to explicit
 OpenSpec reconciliation. Mapping or execution-control findings receive the one
 normal overlay design correction.
+
+Before presenting Gate 1, Main also runs the packaged `openspec-events.mjs`
+with the complete configured events path and bound feature. Only
+`kind: team_harness_openspec_execution_events_validation`, `verdict: pass`
+permits the gate. The validator rejects missing universal `ts`/`feature`, a
+dispatch mode serialized as lifecycle `task` instead of the closed `design`
+value, non-canonical status, missing `attempt_metrics`, open attempts, or an
+incomplete two-pass Design. The append-only trace is never repaired during gate
+presentation.
 
 For every new legacy `sharded-v1` plan, Main resolves `plan-contract.mjs` and
 `plan-contract-repair.mjs` from the pipeline skill, runs the validator with only
@@ -952,6 +997,10 @@ a native sandbox grant. Run the Rule-2 read-only collision checks, verify the
 recorded immutable `worktree_base`, and issue only the exact `git worktree add
 -b <worktree_branch> <worktree> <worktree_base>` command. If protected `.git`
 requires elevation, retry that same command through native escalation.
+Immediately after creation, re-check that the worktree remains within the
+effective writable-root set recorded at design validation. Escalated creation
+does not authorize `ln`, patching, or ordinary file edits outside that set; a
+mismatch blocks before any specialist dispatch.
 
 An approval-review timeout is not denial or functional pipeline failure. Do not loop,
 replace the command, dispatch an implementer, invalidate Gate 1, or change
@@ -993,11 +1042,17 @@ skill/reference and fails closed if the manifest or either helper is absent.
 Immediately before each applicable task, record current `HEAD` as its test
 baseline and dispatch one fresh `tester`, `mode: pre-implementation-contract`,
 with only that task shard, named anchors, manifest path, branch/worktree, and a
-coordinator-owned workspace contract path. Tester reads functional ACs first,
+coordinator-owned workspace contract path plus the exact packaged
+`test_transition_path`. Tester reads functional ACs first,
 authors the smallest behavior test expected to fail, commits only the declared
-test paths, and returns `failure_matches_contract: true|false`. Main verifies
-commit integrity and no production changes, runs `test-transition.mjs
---transition red`, persists its complete JSON and SHA-256, and advances only on
+test paths, writes `requirements` only as closed SAFE_REQUIREMENT strings, and
+runs `--validate-contract` through that exact helper before it may return
+success. An object-valued requirement or other schema mismatch returns
+`contract-invalid`; the tester never runs the red transition. It then returns
+`failure_matches_contract: true|false`. Main verifies commit integrity and no
+production changes, runs `test-transition.mjs --transition red --output
+<coordinator-evidence-path>`, verifies the receipt-bound complete JSON and
+SHA-256, and advances only on
 machine `verdict: pass` plus semantic `failure_matches_contract: true`. A syntax,
 fixture, dependency, infrastructure, unrelated-suite, or already-green failure
 blocks; agent prose cannot override the machine result.
@@ -1020,7 +1075,18 @@ the implementer without granting it lifecycle authority. The packet includes sna
 the assigned TH execution item/shard, and only its pinned task/design coordinates with source path,
 line, and captured content hash. The specialist reads canonical intent there rather than from TH
 prose. After success, only the assigned pending-to-complete task coordinate may advance, and Main
-records it with the snapshot verifier before another dispatch.
+records it through the packaged atomic `verify-and-rebind` progress transition before another
+dispatch; `plan-contract` never tolerates an intermediate stale binding.
+
+**Test-transition transport.** Every red and green
+`test-transition.mjs` call supplies a coordinator-owned absolute `--output`
+path. The helper atomically writes the complete transition JSON and emits only
+the closed receipt containing verdict, result path, SHA-256, and byte count.
+Main verifies that receipt against the artifact and never routes this call
+through `bounded-command.mjs`, replays a truncated result, or substitutes an
+8-KiB tail for the complete evidence. The helper also accepts the equivalent
+`red|green '<JSON object>'` form; Main selects one CLI shape before execution
+and does not retry another after `ARGUMENT_INVALID`.
 
 **Register `base_sha` before EVERY `implementer`/`tester` dispatch.** `git rev-parse HEAD`, recorded as an attribute of that dispatch's `phase.start`. This is the external baseline the commit-integrity check anchors against — without it a dispatch that produced nothing could report a stale-but-ancestor sha and pass a bare ancestry check trivially.
 
@@ -1374,6 +1440,24 @@ Runs after every `implementer`/`tester` dispatch returns `success`, and **again 
 **Why 3 exists:** 1 and 2 pass trivially on a dispatch that produced nothing — a clean tree is trivial when nothing changed, and any ancestor of HEAD satisfies 2. Conjunct 3 anchors against a record the dispatched agent never wrote.
 
 **No conjunct has a repair path.** A failure means the commit is wrong — wrong branch, wrong worktree, incomplete, out of scope, or vacuous — and the only remedy is a correct re-commit by the original committer.
+
+**Atomic evidence transport.** Resolve packaged `commit-integrity.mjs` and run
+it directly with the repository, reported commit (or `none`), registered
+`base_sha`, working branch, declared worktree, repeated allowed paths, matching
+annotated scope-drift paths, and an explicit coordinator-owned `--output`.
+The helper executes conjuncts 1–3 and 5–7 without a shell, persists one closed
+fixed-shape result atomically, and emits only a bounded
+`team_harness_commit_integrity_receipt` containing path, SHA-256, and bytes.
+Verify that artifact, then evaluate conjunct 4 separately; the helper marks
+lane coverage `external` and never claims the full seven-conjunct pass.
+
+Never combine HEAD/tree/status/path/test/branch/worktree/merge-base probes in
+one tool call. `Output exceeded available model context` is a transport failure
+and proves neither Git success nor integrity failure. If the helper artifact
+exists, inspect only its receipt-bound result without rerunning Git. If it was
+not written, recover by running the individual table commands as separate
+pre-capped calls; do not replay the failed composite command. Any individually
+truncated conjunct stays unevaluated and blocks.
 
 ### Implementation checkpoint — Freeze
 

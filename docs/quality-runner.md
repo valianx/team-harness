@@ -87,6 +87,22 @@ Node repositories can declare npm commands instead:
 The runner itself needs Node.js because it is distributed as an `.mjs` script.
 The repository does not need npm unless its manifest declares an npm command.
 
+Quality commands must be non-installing. The manifest rejects package-manager
+execution/download shims (`npx`, `pnpx`, `bunx`, `npm exec|x`,
+`pnpm dlx`, `yarn exec|dlx`, `bun x`, including `corepack`-wrapped forms)
+with `NON_HERMETIC_COMMAND` before launching a process. These frontends can
+consult or mutate global stores and may bootstrap a missing tool. Declare a
+repository-owned package script (`npm|pnpm|yarn|bun run ...`) or an exact
+already-installed local executable such as `node_modules/.bin/vitest` instead.
+Team Harness never installs dependencies or accepts a diagnostic substitute as
+authoritative evidence. The sole mechanical exception is `pnpm exec <tool>`:
+before launch, the runner requires an already-linked matching executable under
+an ancestor `node_modules/.bin` inside the repository and executes that link
+directly, never pnpm. Evidence retains the manifest command hash and separately
+records `execution_resolution: linked-local-bin` plus a stable effective-argv
+hash; a missing link is `PREREQUISITE_UNAVAILABLE`. This avoids pnpm store
+SQLite/install/purge behavior without changing test selection or arguments.
+
 `test_contract.path_rules` opts the repository into deterministic
 pre-implementation testing. Every declared test path must match at least one
 `prefix`, `suffix`, or directory-`segment` rule. The transition runner also
@@ -192,6 +208,10 @@ includes `crap`, also pass the exact pre-cleaner quality result through
 Successful command output is counted but not replayed. Failure diagnostics use
 the existing bounded-command envelope: independently counted stdout/stderr,
 sanitized printable tails, truncation flags, exit code, signal, and duration.
+The red/green test-transition checkpoints retain the same bounded diagnostic
+for the `test` command even when it exits successfully. This keeps a later
+quality postcondition failure distinguishable from a test failure; unbounded
+streams are never embedded.
 The result contains command and manifest hashes instead of raw argument arrays.
 Ignored caches and build artifacts are outside Git identity and may still be
 written by repository tools. The runner is an evidence and output-control

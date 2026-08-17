@@ -425,7 +425,7 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | Field | Required | Notes |
 |---|---|---|
 | `ts` | yes | ISO-8601 with timezone |
-| `event` | yes | `phase.start`, `phase.end`, `agent.spawn`, `agent.close`, `agent.correction.spawn`, `correction.decision`, `gate`, `gate.pass`, `gate.fail`, `iteration.start`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`, `stage2.hygiene`, `stage2.lane.*`, `plan_structure`, `plan_review.deferred`, `plan_review.offered`, `plan_review.offer_declined`, `plan_review_integrity`, `kg_write`, `artifact.missing`, `operation.started/success/failed`, `pipeline.start`, `pipeline.complete`, `pipeline.incomplete`, `pipeline.end`, `checkpoint.confirmed`, `compaction.trigger` |
+| `event` | yes | `phase.start`, `phase.end`, `agent.spawn`, `agent.sla`, `agent.close`, `agent.correction.spawn`, `correction.decision`, `gate`, `gate.pass`, `gate.fail`, `iteration.start`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`, `stage2.hygiene`, `stage2.lane.*`, `plan_structure`, `plan_review.deferred`, `plan_review.offered`, `plan_review.offer_declined`, `plan_review_integrity`, `kg_write`, `artifact.missing`, `operation.started/success/failed`, `pipeline.start`, `pipeline.complete`, `pipeline.incomplete`, `pipeline.end`, `checkpoint.confirmed`, `compaction.trigger` |
 | `feature` | yes | kebab-case, matches the workspace folder |
 | `phase`, `stage` | conditional | `stage` required for `stage.gate*` |
 | `agent` | conditional | required for `phase.*` |
@@ -501,6 +501,13 @@ Sections: `## TL;DR`, `## Phase Timeline`, `## Dispatch Issues`, `## Tool Effect
 `references/observability.md`; unavailable usage or exact USD provenance then
 renders `Cost: unavailable`. A summary with no such object retains the legacy
 token and price rendering unchanged.
+
+**OpenSpec Gate-1 trace preflight.** After the two Design architect attempts
+close and before presenting Gate 1, validate the complete configured events
+file and bound feature with the packaged `openspec-events.mjs`. Missing `ts` or
+`feature`, a dispatch mode serialized as lifecycle `task`, a non-canonical
+status, missing `attempt_metrics`, or any open attempt fails closed. Do not
+repair the append-only trace as part of gate presentation.
 
 **Declared lifecycle summary branch.** Only when an `agent.*` lifecycle event
 exists, render `## Lifecycle Efficiency` from the conditional lifecycle

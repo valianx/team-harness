@@ -313,6 +313,7 @@ echo "# Suite 161: bounded argv command output (AC12)"
 echo "# Requires: node. Skipped when absent (NOT a pass — see output)."
 echo "############################################################"
 run_node_suite "bounded-command" "test_bounded_command.mjs" "node not found — install Node.js to run this suite"
+run_node_suite "commit-integrity" "test_commit_integrity.mjs" "node or git not found — install Node.js and Git to run this suite"
 
 run_node_suite "workspace-preflight" "test_workspace_preflight.mjs" "node not found — install Node.js to run this suite"
 
@@ -388,6 +389,12 @@ echo "# Suite 167: deterministic functional-first plan contract"
 echo "# Requires: node. Missing runtime follows CI-required semantics."
 echo "############################################################"
 run_node_suite "functional-plan-contract" "test_plan_contract.mjs" "node not found — install Node.js to run this suite"
+
+echo
+echo "############################################################"
+echo "# Suite 168: OpenSpec Gate-1 execution-event validation"
+echo "############################################################"
+run_node_suite "openspec-execution-events" "test_openspec_events.mjs" "node not found — install Node.js to run this suite"
 
 echo
 echo "############################################################"

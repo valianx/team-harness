@@ -1059,6 +1059,12 @@ def check_functional_first_plan_contract() -> None:
         for marker in (
             "--snapshot inputs/openspec-snapshot.json",
             "--traceability plan/openspec-traceability.json",
+            "--writable-root",
+            "required_invariants",
+            "required_evidence_anchors",
+            "cross_runtime_preservation",
+            "openspec-events.mjs",
+            "team_harness_openspec_execution_events_validation",
             "team_harness_openspec_overlay_validation",
             "snapshot_sha256",
             "overlay_sha256",
@@ -1069,6 +1075,18 @@ def check_functional_first_plan_contract() -> None:
         require(
             "openspec" in text and "never" in text and "plan-contract-repair.mjs" in text,
             f"{label}: OpenSpec Gate 1 route does not prohibit legacy repair",
+        )
+        for marker in (
+            "`project_uninitialized`",
+            "`init_sandbox_denied`",
+            "sandbox escalation",
+            "`login:false`",
+            "`init_failed`",
+        ):
+            require(marker in text, f"{label}: OpenSpec automatic initialization misses {marker!r}")
+        require(
+            "never ask the operator" in text or "do not ask the operator" in text,
+            f"{label}: OpenSpec initialization still creates an operator checkpoint",
         )
 
     for text in state_sources:
@@ -1084,10 +1102,37 @@ def check_functional_first_plan_contract() -> None:
     for marker in (
         "--snapshot inputs/openspec-snapshot.json",
         "--traceability plan/openspec-traceability.json",
+        "--writable-root",
+        "openspec-events.mjs",
         "team_harness_openspec_overlay_validation",
         "never fall through to the legacy validator or repair route",
     ):
         require(marker in recovery, f"OpenSpec Gate 1 recovery misses {marker!r}")
+
+    implementation = re.sub(
+        r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/implementation.md").lower()
+    )
+    for marker in (
+        "verify-and-rebind",
+        "--authorized-task",
+        "team_harness_openspec_progress_transition",
+        "latest progress event's predecessor and task ids",
+        "overlay.snapshot.{sha256,artifact_set_sha256}",
+        "never invoke standalone",
+        "tolerate `snapshot_stale`",
+    ):
+        require(marker in implementation, f"OpenSpec implementation rebind misses {marker!r}")
+    for marker in (
+        ".execution_items[]",
+        "/execution_items/<zero-based-index>",
+        "full item hash",
+        "exact `sources`",
+        "no top-level `tasks` array",
+        "zero or multiple matches block",
+    ):
+        require(marker in implementation, f"OpenSpec execution-item packet misses {marker!r}")
+    for marker in ("openspec-overlay.mjs verify-and-rebind", "multiple unrebound transitions", "never edit the binding hash manually", "never edit the binding hash manually or make `plan-contract` tolerate stale identity"):
+        require(marker in recovery, f"OpenSpec recovery rebind misses {marker!r}")
 
     openspec_e2e = read("tests/test_openspec_design_e2e.mjs")
     for marker in (
@@ -1114,6 +1159,10 @@ def check_functional_first_plan_contract() -> None:
         (ROOT / "plugins/team-harness/skills/pipeline/scripts/plan-contract-repair.mjs").is_file(),
         "mechanical plan repair helper is missing",
     )
+    require(
+        (ROOT / "plugins/team-harness/skills/pipeline/scripts/openspec-events.mjs").is_file(),
+        "OpenSpec execution-event validator is missing",
+    )
     require((ROOT / "docs/functional-plan-contract.md").is_file(), "functional plan documentation is missing")
 
 
@@ -1121,12 +1170,14 @@ def check_cross_runtime_pipeline_runners() -> None:
     """Every runtime receives the same deterministic pipeline runner bytes."""
     names = (
         "bounded-command.mjs",
+        "commit-integrity.mjs",
         "cleaner-transition.mjs",
         "plan-contract.mjs",
         "plan-contract-repair.mjs",
         "quality-runner.mjs",
         "test-transition.mjs",
         "workspace-preflight.mjs",
+        "openspec-events.mjs",
     )
     for name in names:
         canonical_path = ROOT / "skills/pipeline/scripts" / name
@@ -2304,6 +2355,9 @@ def check_wait_heartbeat_sla_contract() -> None:
     design = re.sub(r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/design.md").lower())
     implementation = re.sub(r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/implementation.md").lower())
     validation = re.sub(r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/validation.md").lower())
+    architect = re.sub(r"\s+", " ", read("agents/architect.md").lower())
+    observability = re.sub(r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/observability.md").lower())
+    shared_state = re.sub(r"\s+", " ", read("agents/_shared/orchestrator-state.md").lower())
 
     for label, text in (("semantic", semantic), ("pipeline", pipeline)):
         for marker in (
@@ -2322,6 +2376,17 @@ def check_wait_heartbeat_sla_contract() -> None:
             "elapsed time" in text and "authorizes neither" in text,
             f"{label}: elapsed time can authorize interruption/replacement",
         )
+        for marker in (
+            "th_progress",
+            "progress_interval_seconds: 120",
+            "send_message",
+            "th_progress_request",
+            "th_sla",
+            "agent.sla",
+            "no-material-progress-observed",
+            "continue-waiting",
+        ):
+            require(marker in text, f"{label}: structured specialist progress misses {marker!r}")
 
     for label, text, keep_marker in (
         ("design", design, "leaving"),
@@ -2340,6 +2405,38 @@ def check_wait_heartbeat_sla_contract() -> None:
         ):
             require(marker in text, f"{label}: phase wait contract missing {marker!r}")
 
+    for marker in (
+        "th_progress",
+        "started",
+        "inputs-validated",
+        "mappings-built",
+        "artifacts-writing",
+        "validation-ready",
+        "120 seconds",
+        "th_progress_request",
+        "required_invariants",
+        "required_evidence_anchors",
+        "cross_runtime_preservation",
+        "writable_roots",
+    ):
+        require(marker in architect, f"architect: structured progress transport misses {marker!r}")
+
+    for marker in (
+        "`agent.sla`",
+        "working|idle|unknown",
+        "none|partial|complete",
+        "progress-observed|no-material-progress-observed",
+        "continue-waiting",
+        "never persist",
+        '"ts":"2026-01-01t00:00:00z"',
+        '"feature":"example-feature"',
+        '"task":"design"',
+        '"status":"success"',
+        '"attempt_metrics"',
+    ):
+        require(marker in observability, f"observability: SLA diagnostic misses {marker!r}")
+    require("`agent.sla`" in shared_state, "shared state event vocabulary omits agent.sla")
+
     for role in ("architect", "implementer", "tester", "cleaner", "qa", "security", "delivery"):
         adapter = re.sub(r"\s+", " ", read(f"runtime/codex/instructions/{role}.md").lower())
         for marker in (
@@ -2354,6 +2451,18 @@ def check_wait_heartbeat_sla_contract() -> None:
             "demonstrated terminal unsuccessful result",
         ):
             require(marker in adapter, f"{role}: runtime wait contract missing {marker!r}")
+        if role == "architect":
+            for marker in (
+                "th_progress",
+                "progress_recipient",
+                "send_message",
+                "completed_units",
+                "artifact_pointers",
+                "blocked_code",
+                "th_progress_request",
+                "resets the sla",
+            ):
+                require(marker in adapter, f"architect: Codex progress adapter misses {marker!r}")
 
 
 def check_obsidian_workspace_preflight_contract() -> None:
@@ -2607,6 +2716,74 @@ def check_execution_efficiency_contract() -> None:
         "validation": re.sub(r"\s+", " ", validation.lower()),
     }
 
+    implementation_flat = contracts["implementation"]
+    for marker in (
+        "atomic commit-integrity evidence",
+        "commit-integrity.mjs",
+        "team_harness_commit_integrity_receipt",
+        "lane-coverage conjunct",
+        "output exceeded available model context",
+        "separate capped calls",
+        "leaves that conjunct unevaluated and blocks",
+    ):
+        require(marker in implementation_flat, f"implementation: commit-integrity transport misses {marker!r}")
+    require("commit_integrity_path" in pipeline, "pipeline: commit-integrity helper is not preflighted")
+
+    for marker in (
+        "git_metadata_write_mode",
+        "git rev-parse --absolute-git-dir",
+        "native-escalation-required",
+        "git add",
+        "git commit",
+        "login:false",
+        "git-metadata-permission",
+        ".git/worktrees",
+    ):
+        require(marker in implementation_flat, f"implementation: protected commit metadata misses {marker!r}")
+
+    quality = re.sub(r"\s+", " ", read("docs/quality-runner.md").lower())
+    for marker in (
+        "non_hermetic_command",
+        "pnpm dlx",
+        "already-installed local executable",
+        "sole mechanical exception",
+        "execution_resolution: linked-local-bin",
+        "never pnpm",
+    ):
+        require(marker in quality, f"quality runner: non-installing command contract misses {marker!r}")
+
+    for marker in (
+        "path_roots",
+        "repository_root",
+        "workspace_artifact_root",
+        "never interpret a workspace artifact path relative to the repository",
+        "at most one file per tool call",
+        "bounded `rg -n`",
+        "never replay the aggregate command",
+    ):
+        require(marker in implementation_flat, f"implementation: rooted bounded reads miss {marker!r}")
+
+    for marker in (
+        "disjoint `files:` are necessary but not sufficient",
+        "never run two committing implementer/tester lanes concurrently against the same canonical worktree",
+        "parallel rounds are allowed only across distinct canonical worktrees/repositories",
+        "concurrent-lane-interference",
+        "consolidated clean tree",
+    ):
+        require(marker in implementation_flat, f"implementation: worktree concurrency boundary misses {marker!r}")
+    architect = re.sub(r"\s+", " ", read("agents/architect.md").lower())
+    architect_adapter = re.sub(r"\s+", " ", read("runtime/codex/instructions/architect.md").lower())
+    for marker in ("distinct canonical worktrees/repositories", "same worktree", "sequential"):
+        require(marker in architect, f"architect: worktree concurrency boundary misses {marker!r}")
+        require(marker in architect_adapter, f"architect: Codex worktree concurrency boundary misses {marker!r}")
+
+    for role in ("implementer", "tester"):
+        semantic = re.sub(r"\s+", " ", read(f"agents/{role}.md").lower())
+        adapter = re.sub(r"\s+", " ", read(f"runtime/codex/instructions/{role}.md").lower())
+        for marker in ("git_metadata_write_mode", "native-escalation-required", "login:false", "git-metadata-permission"):
+            require(marker in semantic, f"{role}: protected commit metadata misses {marker!r}")
+            require(marker in adapter, f"{role}: Codex protected commit metadata misses {marker!r}")
+
     for marker in (
         "pipeline preflight resolves",
         "absolute path relative to the loaded pipeline skill/reference",
@@ -2806,6 +2983,7 @@ def check_context_isolation_rotation_contract() -> None:
     pipeline = read("plugins/team-harness/skills/pipeline/SKILL.md")
     implementation = read("plugins/team-harness/skills/pipeline/references/implementation.md")
     validation = read("plugins/team-harness/skills/pipeline/references/validation.md")
+    tester = read("agents/tester.md")
     shards = read("docs/plan-shards.md")
     pipeline_flat = re.sub(r"\s+", " ", pipeline.lower())
     validation_flat = re.sub(r"\s+", " ", validation.lower())
@@ -2887,6 +3065,32 @@ def check_context_isolation_rotation_contract() -> None:
         ):
             require(marker in flat, f"{label}: Task 3 routing marker missing {marker!r}")
         require("150 tool calls" not in flat and "25 m tokens" not in flat, f"{label}: superseded rotation limit remains")
+
+    tester_flat = re.sub(r"\s+", " ", tester.lower())
+    implementation_flat = re.sub(r"\s+", " ", implementation.lower())
+    for marker in (
+        "safe_requirement",
+        "never serialize an object",
+        "--validate-contract",
+        "team_harness_test_contract_validation",
+        "contract_sha256",
+        "contract-invalid",
+    ):
+        require(marker in tester_flat, f"tester contract self-validation misses {marker!r}")
+    for marker in (
+        "test_transition_path",
+        "requirements` must be safe_requirement strings",
+        "--validate-contract",
+        "team_harness_test_contract_validation",
+        "--output <coordinator evidence path>",
+        "team_harness_test_transition_receipt",
+        "result path",
+        "sha-256",
+        "byte count",
+        "red '<json object>'",
+        "executes no quality command",
+    ):
+        require(marker in implementation_flat, f"implementation test-transition contract misses {marker!r}")
     implementation_flat = re.sub(r"\s+", " ", implementation.lower())
     require("feedback, scope expansion, and every correction require a fresh agent" in implementation_flat, "implementation: automatic continuation remains")
     require("follow_up_count: 0" in implementation_flat, "implementation: new follow-up counts are not fixed at zero")
