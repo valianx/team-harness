@@ -50,12 +50,13 @@ manifest completeness, architecture section ownership, task-index consistency,
 Given/When/Then ACs, separate TCs, and pre-implementation-test routing. The
 record includes the plan hash, every artifact hash, and one artifact-set hash.
 
-Main persists the result and hashes as `plan_contract_evidence`. Missing,
+For a legacy plan, Main persists the result and hashes as
+`plan_contract_evidence`. Missing,
 failing, stale, or mismatched evidence blocks Gate 1. The tool owns structure,
 counts, paths, and identity; Architect and the operator own whether the stated
 behavior is the right behavior.
 
-When validation fails, Main runs `plan-contract-repair.mjs` once. Its closed
+When legacy validation fails, Main runs `plan-contract-repair.mjs` once. Its closed
 write scope covers canonical reordering of a recognizable Task Index, adding
 existing indexed task-shard routes to the manifest, normalizing uniquely named
 required heading levels, and converting recognizable AC/TC punctuation,

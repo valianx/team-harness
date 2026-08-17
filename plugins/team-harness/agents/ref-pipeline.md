@@ -136,7 +136,7 @@ design → waiting_gate1 → implementation → validation → waiting_gate3 →
    └─ invalid artifact → closed mechanical repair → normal design correction only for residual findings; real ambiguity → blocked
 ```
 
-Before Gate 1, a failing plan contract first runs the closed
+Before Gate 1, a failing legacy functional plan contract first runs the closed
 `plan-contract-repair.mjs` helper exactly once. It may add only canonical Task
 Index routes whose regular task shards already exist inside the workspace to the
 Plan Manifest; reorder a uniquely recognizable Task Index; normalize uniquely
@@ -800,16 +800,32 @@ dispatch with the controlled `TH-STATE-REF` first line, and clear the boundary a
 return. A missing live reply may be recorded as `provenance: inferred`; it keeps the checkpoint
 open and blocks the architect dispatch. It never releases Gate 1 or becomes operator approval.
 
-Planning dispatches only `architect`. For every new `sharded-v1` plan, Main
-resolves `plan-contract.mjs` and `plan-contract-repair.mjs` from the pipeline
-skill, runs the validator with the workspace and `01-plan.md`, and persists the complete JSON result, result SHA-256, plan
-SHA-256, and artifact-set SHA-256 in `plan_contract_evidence`. The tool requires
+Planning dispatches only `architect`. For every OpenSpec-bound `sharded-v1`
+plan, Main resolves `plan-contract.mjs` from the pipeline skill and invokes it
+with `--workspace`, `--plan 01-plan.md`,
+`--snapshot inputs/openspec-snapshot.json`, and
+`--traceability plan/openspec-traceability.json`. Main persists the complete
+JSON result, result SHA-256, and the returned
+`kind: team_harness_openspec_overlay_validation`, `snapshot_sha256`,
+`overlay_sha256`, and `change_name` in `plan_contract_evidence`. A pass is valid
+only when the hashes and change name match the current pinned artifacts and
+bound change. This is the Gate-1 evidence for the compact execution overlay;
+the OpenSpec path never falls through to the legacy functional-plan validator
+or invokes `plan-contract-repair.mjs`. Snapshot drift returns to explicit
+OpenSpec reconciliation. Mapping or execution-control findings receive the one
+normal overlay design correction.
+
+For every new legacy `sharded-v1` plan, Main resolves `plan-contract.mjs` and
+`plan-contract-repair.mjs` from the pipeline skill, runs the validator with only
+the workspace and `01-plan.md`, and persists the complete JSON result, result
+SHA-256, returned `kind: team_harness_functional_plan_contract`, plan SHA-256,
+and artifact-set SHA-256 in `plan_contract_evidence`. The tool requires
 the ordered functional surface, path-free operator summary, manifest and task
 coherence, AC/TC separation and counts, pre-implementation routing, and the
 technical architecture sections. A missing, malformed, stale, or failing record
 blocks Gate 1; agent prose cannot replace it. Legacy recovery and the documented
 self-authored hotfix/Tier-1 routes record the closed not-applicable reason instead
-of being silently migrated. On failure, Main runs the repair helper
+of being silently migrated. On legacy failure, Main runs the repair helper
 once. The first writable operation in its closed set adds a canonical task
 route already present in the Task Index when the corresponding regular,
 non-symlink shard exists inside the workspace. The same closed pass may reorder

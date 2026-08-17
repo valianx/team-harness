@@ -9,7 +9,7 @@ import path from "node:path";
 
 import { preflight } from "../plugins/team-harness/skills/pipeline/scripts/openspec-adapter.mjs";
 import { captureSnapshot } from "../plugins/team-harness/skills/pipeline/scripts/openspec-snapshot.mjs";
-import { validateOpenSpecOverlay } from "../plugins/team-harness/skills/pipeline/scripts/openspec-overlay.mjs";
+import { validatePlanContract } from "../plugins/team-harness/skills/pipeline/scripts/plan-contract.mjs";
 
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
 function run(argv, cwd) { return execFileSync(argv[0], argv.slice(1), { cwd, encoding: "utf8", timeout: 30_000, maxBuffer: 1024 * 1024 }); }
@@ -82,7 +82,14 @@ async function scenario(workspaceMode) {
       operator_disclosures: [],
     };
     await writeFile(path.join(workspace, "plan/openspec-traceability.json"), `${JSON.stringify(overlay)}\n`);
-    assert.equal((await validateOpenSpecOverlay({ workspace })).verdict, "pass");
+    const gateOneEvidence = await validatePlanContract({
+      workspace,
+      plan: "01-plan.md",
+      snapshot: "inputs/openspec-snapshot.json",
+      traceability: "plan/openspec-traceability.json",
+    });
+    assert.equal(gateOneEvidence.verdict, "pass");
+    assert.equal(gateOneEvidence.kind, "team_harness_openspec_overlay_validation");
     assert.equal(await readFile(path.join(workspace, "inputs/openspec-snapshot.json"), "utf8").then(Boolean), true);
     return { generatedSkill: await readFile(path.join(repository, ".agents/skills/openspec-propose/SKILL.md"), "utf8") };
   } finally {

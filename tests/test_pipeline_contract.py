@@ -1051,6 +1051,58 @@ def check_functional_first_plan_contract() -> None:
     ):
         require(marker in recovery, f"plan evidence recovery misses {marker!r}")
 
+    for label, relative in (
+        ("Claude", "agents/ref-pipeline.md"),
+        ("Codex", "plugins/team-harness/skills/pipeline/references/design.md"),
+    ):
+        text = re.sub(r"\s+", " ", read(relative).lower())
+        for marker in (
+            "--snapshot inputs/openspec-snapshot.json",
+            "--traceability plan/openspec-traceability.json",
+            "team_harness_openspec_overlay_validation",
+            "snapshot_sha256",
+            "overlay_sha256",
+            "change_name",
+            "never falls through to the legacy",
+        ):
+            require(marker in text, f"{label}: OpenSpec Gate 1 route misses {marker!r}")
+        require(
+            "openspec" in text and "never" in text and "plan-contract-repair.mjs" in text,
+            f"{label}: OpenSpec Gate 1 route does not prohibit legacy repair",
+        )
+
+    for text in state_sources:
+        for marker in (
+            "team_harness_functional_plan_contract",
+            "team_harness_openspec_overlay_validation",
+            "snapshot_sha256",
+            "overlay_sha256",
+            "change_name",
+        ):
+            require(marker in text, f"plan evidence state misses OpenSpec discriminator {marker!r}")
+
+    for marker in (
+        "--snapshot inputs/openspec-snapshot.json",
+        "--traceability plan/openspec-traceability.json",
+        "team_harness_openspec_overlay_validation",
+        "never fall through to the legacy validator or repair route",
+    ):
+        require(marker in recovery, f"OpenSpec Gate 1 recovery misses {marker!r}")
+
+    openspec_e2e = read("tests/test_openspec_design_e2e.mjs")
+    for marker in (
+        "validatePlanContract",
+        'plan: "01-plan.md"',
+        'snapshot: "inputs/openspec-snapshot.json"',
+        'traceability: "plan/openspec-traceability.json"',
+        'team_harness_openspec_overlay_validation',
+    ):
+        require(marker in openspec_e2e, f"OpenSpec Design E2E bypasses Gate 1 entry point: {marker!r}")
+    require(
+        "import { validateOpenSpecOverlay }" not in openspec_e2e,
+        "OpenSpec Design E2E still calls the overlay helper directly",
+    )
+
     reviewer = re.sub(r"\s+", " ", read("agents/plan-reviewer.md").lower())
     require("functional-first readability" in reviewer, "explicit plan review still prioritizes technical layout")
     require("functional contract contains implementation detail" in reviewer, "plan reviewer cannot reject functional/technical leakage")

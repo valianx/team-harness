@@ -80,14 +80,27 @@ and record `size_reason: required-items`; never omit scope or request a split so
 primary thread does not set `next_action: present Stage Gate 1` until the
 deterministic plan evidence below passes.
 
-Before the gate, resolve `scripts/plan-contract.mjs` and
-`scripts/plan-contract-repair.mjs` relative to the loaded pipeline skill and
-run the validator with the workspace and `01-plan.md`. Persist the
-complete JSON, its SHA-256, the plan SHA-256, and artifact-set SHA-256 as
-`plan_contract_evidence`. It deterministically requires the ordered functional
-surface, manifest/artifact set, path-free summary, AC/TC separation and counts,
-pre-implementation test field, and technical architecture sections. Its result
-envelope does not carry the following coordinator checks: Main derives
+Before the gate, resolve `scripts/plan-contract.mjs` relative to the loaded
+pipeline skill. For an OpenSpec-bound run invoke it with `--workspace`,
+`--plan 01-plan.md`, `--snapshot inputs/openspec-snapshot.json`, and
+`--traceability plan/openspec-traceability.json`. Persist the complete JSON, its
+SHA-256, and the returned `kind: team_harness_openspec_overlay_validation`,
+`snapshot_sha256`, `overlay_sha256`, and `change_name` as
+`plan_contract_evidence`. A pass is valid only when those hashes and the change
+name match the current pinned artifacts and bound change. This route validates
+the compact execution overlay against canonical OpenSpec coordinates; it never
+falls through to the legacy functional-plan contract or invokes
+`scripts/plan-contract-repair.mjs`.
+
+For a legacy `sharded-v1` run, also resolve
+`scripts/plan-contract-repair.mjs`, invoke `plan-contract.mjs` with only the
+workspace and `01-plan.md`, and persist the complete JSON, its SHA-256, the
+returned `kind: team_harness_functional_plan_contract`, plan SHA-256, and
+artifact-set SHA-256 as `plan_contract_evidence`. It deterministically requires
+the ordered functional surface, manifest/artifact set, path-free summary,
+AC/TC separation and counts, pre-implementation test field, and technical
+architecture sections. Its result envelope does not carry the following
+coordinator checks: Main derives
 `implementation_references_in_ac: 0` by inspecting AC prose in the indexed task
 shards, checks unresolved clarification markers across the generated plan set,
 and reads `request_shape`, `realized_scope`, and conditional `expansion_reason`
@@ -98,7 +111,7 @@ those reads before asserting them. The literal values are
 expanded, and an aligned plan must omit it. An invalid or contradictory
 scope-shape block is an invalid artifact.
 
-When validation fails, run the mechanical repair helper once before classifying
+When legacy validation fails, run the mechanical repair helper once before classifying
 the failure. Its closed authority is reordering a recognizable Task Index by
 its canonical headers; adding canonical Task Index routes whose regular,
 non-symlink shards already exist to the Plan Manifest; normalizing the levels
@@ -118,6 +131,11 @@ Gate 1 and cannot be replaced by architect prose. Legacy recovery and documented
 self-authored hotfix/Tier-1 plans use only their closed not-applicable reason;
 never migrate them implicitly. `/th:plan-review` is explicit only. Planning dispatches only architect;
 a sensitive plan carries its security assessment and security-relevant TCs to final validation.
+
+An OpenSpec overlay failure instead returns to snapshot reconciliation when the
+snapshot is stale, or to the one normal overlay design correction for mapping or
+execution-control findings. Never send OpenSpec artifacts through the legacy
+repair route and never infer overlay completeness from the Markdown index.
 
 Before presenting Gate 1, when the validated plan requires an isolated
 worktree, Main copies its absolute path, exact branch, and immutable full commit
