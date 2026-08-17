@@ -96,7 +96,13 @@ const sharedPipelineScripts = [
   "quality-runner.mjs",
   "test-transition.mjs",
   "workspace-preflight.mjs",
+  "openspec-adapter.mjs",
+  "openspec-snapshot.mjs",
+  "openspec-overlay.mjs",
+  "openspec-recovery.mjs",
 ];
+
+const sharedPipelinePolicies = ["openspec-policy.json"];
 
 function yamlString(value) {
   return JSON.stringify(value);
@@ -356,6 +362,42 @@ async function syncSharedSetupAssets({ check, rootDir }) {
   if (check && stale) throw new Error("shared setup assets are stale");
 }
 
+async function syncClaudePackageAssets({ check, rootDir }) {
+  const projections = [
+    [join(rootDir, ".claude-plugin"), join(rootDir, "plugins/team-harness/.claude-plugin"), new Set(["plugin.json", "hooks.json"])],
+    [join(rootDir, "agents"), join(rootDir, "plugins/team-harness/agents"), null],
+    [join(rootDir, "hooks"), join(rootDir, "plugins/team-harness/hooks"), null],
+  ];
+  let stale = false;
+  for (const [sourceRoot, targetRoot, allowlist] of projections) {
+    const files = await walkFiles(sourceRoot);
+    for (const [relativePath, expected] of files) {
+      if (allowlist !== null && !allowlist.has(relativePath)) continue;
+      const source = join(sourceRoot, relativePath);
+      const target = join(targetRoot, relativePath);
+      const sourceMode = (await lstat(source)).mode & 0o777;
+      let current;
+      let currentMode;
+      try {
+        current = await readFile(target);
+        currentMode = (await lstat(target)).mode & 0o777;
+      } catch (error) {
+        if (error?.code !== "ENOENT") throw error;
+      }
+      if (current?.equals(expected) && currentMode === sourceMode) continue;
+      stale = true;
+      if (check) {
+        process.stderr.write(`stale Claude package asset: ${relative(rootDir, target)}\n`);
+        continue;
+      }
+      await mkdir(dirname(target), { recursive: true });
+      await writeFile(target, expected, { mode: sourceMode });
+      await chmod(target, sourceMode);
+    }
+  }
+  if (check && stale) throw new Error("Claude package assets are stale");
+}
+
 async function assertSafeDestinationPath(rootDir, target, leafKind) {
   const relativeTarget = relative(rootDir, target);
   if (relativeTarget === ".." || relativeTarget.startsWith(`..${sep}`)) {
@@ -388,30 +430,59 @@ async function assertSafeDestinationPath(rootDir, target, leafKind) {
 
 export async function syncSharedPipelineAssets({ check, rootDir }) {
   const sourceRoot = join(rootDir, "skills/pipeline/scripts");
-  const targetRoot = join(rootDir, "plugins/team-harness/skills/pipeline/scripts");
-  await assertSafeDestinationPath(rootDir, targetRoot, "directory");
+  const targetRoots = [
+    join(rootDir, "plugins/team-harness/skills/pipeline/scripts"),
+    join(rootDir, "installer-assets/opencode-skills/pipeline/scripts"),
+  ];
   let stale = false;
   for (const name of sharedPipelineScripts) {
     const source = join(sourceRoot, name);
-    const target = join(targetRoot, name);
     const expected = await readFile(source);
-    let current;
-    try {
+    for (const targetRoot of targetRoots) {
+      const target = join(targetRoot, name);
+      let current;
+      try {
+        await assertSafeDestinationPath(rootDir, target, "file");
+        current = await readFile(target);
+      } catch (error) {
+        if (error?.code !== "ENOENT") throw error;
+      }
+      if (current?.equals(expected)) continue;
+      stale = true;
+      if (check) {
+        process.stderr.write(`stale shared pipeline asset: ${relative(rootDir, target)}\n`);
+        continue;
+      }
+      await assertSafeDestinationPath(rootDir, targetRoot, "directory");
+      await mkdir(dirname(target), { recursive: true });
       await assertSafeDestinationPath(rootDir, target, "file");
-      current = await readFile(target);
-    } catch (error) {
-      if (error?.code !== "ENOENT") throw error;
+      await writeFile(target, expected);
     }
-    if (current?.equals(expected)) continue;
-    stale = true;
-    if (check) {
-      process.stderr.write(`stale shared pipeline asset: ${relative(rootDir, target)}\n`);
-      continue;
+  }
+  for (const name of sharedPipelinePolicies) {
+    const source = join(rootDir, "skills/pipeline", name);
+    const expected = await readFile(source);
+    for (const target of [
+      join(rootDir, "plugins/team-harness/skills/pipeline", name),
+      join(rootDir, "installer-assets/opencode-skills/pipeline", name),
+    ]) {
+      let current;
+      try {
+        await assertSafeDestinationPath(rootDir, target, "file");
+        current = await readFile(target);
+      } catch (error) {
+        if (error?.code !== "ENOENT") throw error;
+      }
+      if (current?.equals(expected)) continue;
+      stale = true;
+      if (check) {
+        process.stderr.write(`stale shared pipeline asset: ${relative(rootDir, target)}\n`);
+        continue;
+      }
+      await mkdir(dirname(target), { recursive: true });
+      await assertSafeDestinationPath(rootDir, target, "file");
+      await writeFile(target, expected);
     }
-    await assertSafeDestinationPath(rootDir, targetRoot, "directory");
-    await mkdir(dirname(target), { recursive: true });
-    await assertSafeDestinationPath(rootDir, target, "file");
-    await writeFile(target, expected);
   }
   if (check && stale) throw new Error("shared pipeline assets are stale");
 }
@@ -437,6 +508,7 @@ export async function syncSkills({ check = false, rootDir = defaultRoot } = {}) 
   });
   await syncSharedSetupAssets({ check, rootDir });
   await syncSharedPipelineAssets({ check, rootDir });
+  await syncClaudePackageAssets({ check, rootDir });
   return { names, codexGenerated, opencodeGenerated };
 }
 

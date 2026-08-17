@@ -155,6 +155,39 @@ func TestApplyPlan_Idempotent(t *testing.T) {
 	_ = dataDir
 }
 
+func TestApplyPlan_PreservesProjectOwnedOpenSpecIntegration(t *testing.T) {
+	_, cleanup := ledgerTestEnv(t)
+	defer cleanup()
+
+	configRoot := t.TempDir()
+	external := filepath.Join(configRoot, "skills", "openspec-propose", "SKILL.md")
+	if err := os.MkdirAll(filepath.Dir(external), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const externalBytes = "metadata:\n  author: openspec\n  generatedBy: 1.9.0\n"
+	if err := os.WriteFile(external, []byte(externalBytes), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	mockFS := fstest.MapFS{"agents/test.md": &fstest.MapFile{Data: []byte("# TH agent\n")}}
+	m, c := buildTestManifestPair("agents/test.md", "agent-test", "{config_root}/agents/test.md")
+	placer := newClaudeCodePlacerAt(configRoot)
+	diff, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{"agent-test"}, placer, mockFS, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ApplyPlan(diff, placer); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(external)
+	if err != nil {
+		t.Fatalf("OpenSpec integration was removed: %v", err)
+	}
+	if string(got) != externalBytes {
+		t.Fatalf("OpenSpec integration was modified: %q", got)
+	}
+}
+
 // TestApplyPlan_RemoveAppendsClosure verifies that ToRemove items cause a
 // remove ledger entry to be appended via appendLedger.
 func TestApplyPlan_RemoveAppendsClosure(t *testing.T) {

@@ -51,6 +51,19 @@ must be preserved. Parallelize only tasks with disjoint ownership. The primary
 thread records dispatches and results, waits for all tasks in a round, and
 consolidates their evidence.
 
+For an OpenSpec-bound workspace, first verify `inputs/openspec-snapshot.json`
+against the repository and validate `plan/openspec-traceability.json`. The role
+packet carries the snapshot path and SHA-256, the assigned TH execution item and
+shard, and only its pinned OpenSpec task/design coordinates with source artifact
+path, line, and content hash. Obtain `openspec instructions apply --change
+<bound-change> --json` as implementation guidance and include its bounded result;
+it never selects the phase, task, correction authority, state transition, or
+gate. The implementer reads canonical intent at those exact repository-local
+coordinates and must not rely on copied or paraphrased intent in a TH artifact.
+After a successful assigned task, permit and record only its exact monotonic
+OpenSpec task-checkbox transition through the snapshot verifier. Any other
+source drift blocks the next dispatch and requires reconciliation.
+
 ## Pre-implementation behavioral test contract
 
 This is an implementation checkpoint, not a phase or gate. For every task whose

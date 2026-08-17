@@ -1,0 +1,23 @@
+schemaVersion: "1"
+body: hooks/ts/bodies/language-user-prompt.ts
+kind: hook
+runtime: claude-code
+emit:
+  path: hooks/ts/entry/language-user-prompt.cc.ts
+  frontmatterDialect: none
+events:
+  UserPromptSubmit: UserPromptSubmit
+ioContract: normalized-v1
+capabilities:
+  requires:
+    - node
+  degradeIfMissing: []
+# Event: UserPromptSubmit (per-turn reminder).
+# Timeout: 5s.
+# Output format: { "additionalContext": "<string>" } on stdout.
+# NEVER blocks. FAIL-OPEN.
+# Security: SEC-DR-A (^[a-z]{2}$ validation); SEC-DR-B (fixed template).
+# DOES NOT import hook-profile (enforcement floor).
+notes: >
+  Per-turn language reminder. Emits additionalContext only when a language is
+  configured and passes SEC-DR-A validation. Empty stdout when no language configured.

@@ -195,16 +195,39 @@ terminal run. For corrupt, incomplete, oversized, or unmappable state, report
 only the path and failed structural checks; never echo raw snapshot or event
 content.
 
+For an OpenSpec-bound Design, resolve `scripts/openspec-recovery.mjs` relative to the loaded
+pipeline skill and derive the next action from the bounded OpenSpec state fields. Resume
+`preflight`, an already approved `provisioning`, upstream `planning`, strict `snapshot`, or
+`overlay` at its recorded boundary without asking the operator to re-enter a command. Before
+overlay or Gate 1, require the recorded snapshot bytes/hash and live pre-Gate-1 freshness; source
+drift routes to explicit OpenSpec reconciliation. Before Gate 1 also require the recorded overlay
+bytes/hash and its deterministic validation. A local and an Obsidian workspace use the same rules;
+all paths are resolved below the recorded workspace while canonical source remains below
+`openspec_repository_root`.
+
 Before resuming `design` or presenting Gate 1, validate
 `plan_contract_evidence`. `pending` resumes at deterministic plan validation;
-`pass` requires a readable `plan-contract.mjs` result whose SHA-256, embedded
-plan SHA-256, and artifact-set SHA-256 match state and the current complete plan
-set. `not-applicable` is valid only for `legacy-recovery` or
+for an OpenSpec-bound run, `pass` requires a readable `plan-contract.mjs`
+result whose SHA-256 and exact
+`kind: team_harness_openspec_overlay_validation`, `snapshot_sha256`,
+`overlay_sha256`, and `change_name` match state, the current pinned snapshot,
+the traceability overlay, and the bound change. Re-run that entry point with
+`--workspace`, `--plan 01-plan.md`,
+`--snapshot inputs/openspec-snapshot.json`, and
+`--traceability plan/openspec-traceability.json`; never fall through to the
+legacy validator or repair route. Snapshot drift resumes explicit OpenSpec
+reconciliation, while a mapping or execution-control failure resumes the one
+normal overlay design correction.
+
+For a legacy run, `pass` requires a readable `plan-contract.mjs` result whose
+SHA-256, exact `kind: team_harness_functional_plan_contract`, embedded plan
+SHA-256, and artifact-set SHA-256 match state and the current complete plan set.
+`not-applicable` is valid only for `legacy-recovery` or
 `self-authored-minimal-plan`. Missing, stale, partially populated, mismatched, or
 failing evidence blocks Gate 1. Never infer functional completeness from the
 architect result, current Markdown, or an earlier gate presentation.
 
-When the pending or failing validator result has no repair record, run
+When a pending or failing legacy validator result has no repair record, run
 `plan-contract-repair.mjs` once before any design correction. A recovered
 `plan_contract_repair_evidence.status: repaired` is valid only when its readable
 result hash, before/after plan hashes, added route list, per-artifact

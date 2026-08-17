@@ -1,0 +1,21 @@
+schemaVersion: "1"
+body: hooks/ts/bodies/worktree-guard.ts
+kind: hook
+runtime: claude-code
+emit:
+  path: hooks/ts/entry/worktree-guard.cc.ts
+  frontmatterDialect: none
+events:
+  PreToolUse: PreToolUse
+ioContract: normalized-v1
+capabilities:
+  requires:
+    - node
+  degradeIfMissing: []
+# Matcher: Bash (trigger: git checkout -b / git switch -c / git worktree add).
+# Timeout: 5s.
+# Fail mode: FAIL-OPEN. Any error → none (no gate action). Advisory ask only.
+notes: >
+  worktree-guard is an ADVISORY hook — it issues an ask advisory reminding the agent
+  of the start-gate decision, but never issues a hard deny. Fail-open: any error → none.
+  Human own-terminal git operations are invisible to this hook (U1 discipline rule).

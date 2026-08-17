@@ -15,6 +15,10 @@ const pipelineScripts = [
   "quality-runner.mjs",
   "test-transition.mjs",
   "workspace-preflight.mjs",
+  "openspec-adapter.mjs",
+  "openspec-snapshot.mjs",
+  "openspec-overlay.mjs",
+  "openspec-recovery.mjs",
 ];
 
 async function makePipelineFixture() {
@@ -23,6 +27,7 @@ async function makePipelineFixture() {
   for (const name of pipelineScripts) {
     await writeFile(join(fixture, "skills/pipeline/scripts", name), `source:${name}\n`);
   }
+  await writeFile(join(fixture, "skills/pipeline/openspec-policy.json"), '{"fixture":true}\n');
   return fixture;
 }
 
@@ -349,6 +354,29 @@ try {
 } finally {
   await rm(pipelineSyncFixture, { recursive: true, force: true });
   await rm(pipelineSyncOutside, { recursive: true, force: true });
+}
+
+const pipelineProjectionFixture = await makePipelineFixture();
+try {
+  await syncSharedPipelineAssets({ check: false, rootDir: pipelineProjectionFixture });
+  await syncSharedPipelineAssets({ check: true, rootDir: pipelineProjectionFixture });
+  for (const targetRoot of [
+    "plugins/team-harness/skills/pipeline",
+    "installer-assets/opencode-skills/pipeline",
+  ]) {
+    assert.equal(
+      await readFile(join(pipelineProjectionFixture, targetRoot, "openspec-policy.json"), "utf8"),
+      '{"fixture":true}\n',
+    );
+    for (const name of pipelineScripts) {
+      assert.equal(
+        await readFile(join(pipelineProjectionFixture, targetRoot, "scripts", name), "utf8"),
+        `source:${name}\n`,
+      );
+    }
+  }
+} finally {
+  await rm(pipelineProjectionFixture, { recursive: true, force: true });
 }
 
 console.log("codex runtime generator: PASS");

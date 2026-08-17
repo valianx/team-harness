@@ -1,0 +1,23 @@
+schemaVersion: "1"
+body: hooks/ts/bodies/policy-block.ts
+kind: hook
+runtime: claude-code
+emit:
+  path: hooks/ts/entry/policy-block.cc.ts
+  frontmatterDialect: none
+events:
+  PreToolUse: PreToolUse
+ioContract: normalized-v1
+capabilities:
+  requires:
+    - node
+  degradeIfMissing: []
+# Matcher: Bash|Write|Edit|NotebookEdit (all mutation tools).
+# Timeout: 5s (same as Bash original).
+# Fail mode: fail-closed-for-covered. ShimRejectError → ask (unknown payload may be covered write).
+# Python dependency: DROPPED — entropy fold is inline TS arithmetic (AC-9).
+notes: >
+  policy-block is the broadest security gate: destructive commands, sensitive paths,
+  config-weakening patterns, and secret scanning (10 HIGH_CONFIDENCE_SECRETS classes +
+  Shannon-entropy MEDIUM_CONFIDENCE scan). The entropy fold is ported inline (no python3).
+  The no-leak contract: reason names the secret CLASS, never the captured value (CWE-200).

@@ -1,0 +1,25 @@
+schemaVersion: "1"
+body: hooks/ts/bodies/precompact-snapshot.ts
+kind: hook
+runtime: claude-code
+emit:
+  path: hooks/ts/entry/precompact-snapshot.cc.ts
+  frontmatterDialect: none
+events:
+  PreCompact: PreCompact
+ioContract: normalized-v1
+capabilities:
+  requires:
+    - node
+  degradeIfMissing: []
+# Matcher: manual|auto
+# Timeout: 5s
+# Output: NONE (writes files; never emits stdout)
+# Fail mode: FAIL-OPEN. Profile gate: pipeline-observability class.
+# Symlink guard: realpath must stay under workspace base.
+# IMPORTS hook-profile (observability body — allowed).
+notes: >
+  PreCompact snapshot writer. NEVER blocks. NEVER emits stdout.
+  Profile gate: suppressed under TH_HOOK_PROFILE=minimal.
+  Copies 00-state.md → 00-state.precompact-snapshot.md (rolling overwrite).
+  Symlink guard prevents path traversal on the snapshot destination.

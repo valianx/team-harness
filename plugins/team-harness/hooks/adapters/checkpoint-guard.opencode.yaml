@@ -1,0 +1,23 @@
+schemaVersion: "1"
+body: hooks/ts/bodies/checkpoint-guard.ts
+kind: hook
+runtime: opencode
+emit:
+  path: hooks/ts/entry/checkpoint-guard.opencode.ts
+  frontmatterDialect: none
+events:
+  # Task → opencode tool:before filtered on input.tool === "task" (inside the body).
+  PreToolUse: "tool:before"
+ioContract: normalized-v1
+capabilities:
+  requires:
+    - bun
+  degradeIfMissing: []
+# Fail mode: FAIL-OPEN. ShimRejectError → return (no block; parity with checkpoint-guard.sh).
+# Intentional gate-denial from the body → re-throw (the deny reason propagates to opencode).
+# Other unexpected errors → return (fail-open).
+notes: >
+  FAIL-OPEN utility gate. On opencode, deliberate deny (from B1/B2/B3) is re-thrown so
+  opencode surfaces the boundary message. All other errors are swallowed (fail-open).
+  ask has no interactive equivalent on opencode; if the body emits ask, it maps to throw
+  (a gate-level advisory for this utility gate).

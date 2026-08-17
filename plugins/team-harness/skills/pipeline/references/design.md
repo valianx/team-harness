@@ -10,11 +10,53 @@ Every activated run uses this full v3 machine. There is no alternate depth profi
 route, or lane selector; direct inline work remains outside the machine and creates no pipeline
 workspace, state, events, gates, validation, or delivery record.
 
-Read `plan-shards.md` before dispatching the architect. Read the live operator request, repository
-evidence, `00-spec-seed.md`, and current state. Give `architect` a bounded prompt containing the
-workspace path, repository root, constraints, required acceptance criteria, and file ownership.
-The specialist returns a file-scoped `sharded-v1` manifest plus plan shards and classification;
-it never edits coordination state.
+## Canonical OpenSpec Design transaction
+
+Every newly activated workspace binds one kebab-case OpenSpec change in the target repository;
+existing approved or frozen legacy workspaces continue their recorded contract and are never
+silently migrated. Resolve `scripts/openspec-adapter.mjs` and
+`scripts/openspec-snapshot.mjs` relative to this loaded pipeline skill. They are the only
+deterministic OpenSpec helpers; OpenSpec's installed generated skills remain the planning
+workflow authority.
+
+Run the transaction continuously:
+
+1. Invoke adapter `preflight` for the repository and active runtime. `ready` continues without
+   operator interaction. `provisionable` presents one exact install/update-or-abort decision;
+   `blocked-prerequisite` gives exact Node/npm guidance; `invalid-project` blocks. Never fall
+   back to legacy planning.
+2. Persist the repository planning root and change binding. Dispatch a fresh architect in
+   `openspec-planning` mode with the approved request and the exact installed
+   `openspec-propose` skill for a new change or `openspec-update-change` for a bound existing
+   change. The architect follows the upstream skill and writes only proposal/specs/design/tasks
+   under that change root; it writes no TH plan or coordination state.
+3. Run CLI-reported status and strict validation through `openspec-snapshot.mjs capture`; it
+   writes the sole `inputs/openspec-snapshot.json`. A binding, path, coordinate, validation, or
+   hash failure remains recoverably in Design.
+4. Dispatch a fresh architect in `openspec-overlay` mode with the snapshot and pinned OpenSpec
+   coordinates. It writes only the compact Gate-1 index, operational execution shards, and
+   bidirectional traceability. It must not paraphrase or replace OpenSpec intent.
+5. Validate snapshot freshness, overlay traceability, and applicable operational plan fields,
+   then present the unchanged Stage Gate 1.
+
+Success at any internal step advances automatically. Commentary is informational and never asks
+the operator to invoke another TH or OpenSpec command. Pause only for the mandatory gate, the
+explicit provisioning choice, a material unresolved decision, separate external-write authority,
+or a real blocker that cannot be resolved safely within scope.
+
+OpenSpec proposal, specs, design, and tasks always remain under the bound repository planning
+root. The snapshot, overlay, decisions, reviews, and evidence always remain under the configured
+TH workspace root. For `logs_mode: obsidian`, snapshot metadata records `workspace.mode:
+obsidian`, the vault workspace root, and `navigation_kind: repository-relative-coordinates`;
+artifact paths, line coordinates, and captured hashes navigate to the repository originals. Never
+copy canonical OpenSpec Markdown into the vault or create an editable second source root there.
+
+Read `plan-shards.md` before the overlay dispatch. Read the live operator request, repository
+evidence, `00-spec-seed.md`, current state, and canonical OpenSpec snapshot. Give the overlay
+architect a bounded prompt containing the workspace path, repository root, pinned source
+coordinates, constraints, and TH-only ownership fields. The specialist returns a file-scoped
+execution overlay plus classification; it never edits coordination state or duplicates canonical
+requirements, scenarios, decisions, or task prose.
 
 Wait for that same architect attempt to complete. A `wait_agent` timeout is
 only the wait heartbeat and immediately resumes the directed wait without
@@ -38,14 +80,27 @@ and record `size_reason: required-items`; never omit scope or request a split so
 primary thread does not set `next_action: present Stage Gate 1` until the
 deterministic plan evidence below passes.
 
-Before the gate, resolve `scripts/plan-contract.mjs` and
-`scripts/plan-contract-repair.mjs` relative to the loaded pipeline skill and
-run the validator with the workspace and `01-plan.md`. Persist the
-complete JSON, its SHA-256, the plan SHA-256, and artifact-set SHA-256 as
-`plan_contract_evidence`. It deterministically requires the ordered functional
-surface, manifest/artifact set, path-free summary, AC/TC separation and counts,
-pre-implementation test field, and technical architecture sections. Its result
-envelope does not carry the following coordinator checks: Main derives
+Before the gate, resolve `scripts/plan-contract.mjs` relative to the loaded
+pipeline skill. For an OpenSpec-bound run invoke it with `--workspace`,
+`--plan 01-plan.md`, `--snapshot inputs/openspec-snapshot.json`, and
+`--traceability plan/openspec-traceability.json`. Persist the complete JSON, its
+SHA-256, and the returned `kind: team_harness_openspec_overlay_validation`,
+`snapshot_sha256`, `overlay_sha256`, and `change_name` as
+`plan_contract_evidence`. A pass is valid only when those hashes and the change
+name match the current pinned artifacts and bound change. This route validates
+the compact execution overlay against canonical OpenSpec coordinates; it never
+falls through to the legacy functional-plan contract or invokes
+`scripts/plan-contract-repair.mjs`.
+
+For a legacy `sharded-v1` run, also resolve
+`scripts/plan-contract-repair.mjs`, invoke `plan-contract.mjs` with only the
+workspace and `01-plan.md`, and persist the complete JSON, its SHA-256, the
+returned `kind: team_harness_functional_plan_contract`, plan SHA-256, and
+artifact-set SHA-256 as `plan_contract_evidence`. It deterministically requires
+the ordered functional surface, manifest/artifact set, path-free summary,
+AC/TC separation and counts, pre-implementation test field, and technical
+architecture sections. Its result envelope does not carry the following
+coordinator checks: Main derives
 `implementation_references_in_ac: 0` by inspecting AC prose in the indexed task
 shards, checks unresolved clarification markers across the generated plan set,
 and reads `request_shape`, `realized_scope`, and conditional `expansion_reason`
@@ -56,7 +111,7 @@ those reads before asserting them. The literal values are
 expanded, and an aligned plan must omit it. An invalid or contradictory
 scope-shape block is an invalid artifact.
 
-When validation fails, run the mechanical repair helper once before classifying
+When legacy validation fails, run the mechanical repair helper once before classifying
 the failure. Its closed authority is reordering a recognizable Task Index by
 its canonical headers; adding canonical Task Index routes whose regular,
 non-symlink shards already exist to the Plan Manifest; normalizing the levels
@@ -76,6 +131,11 @@ Gate 1 and cannot be replaced by architect prose. Legacy recovery and documented
 self-authored hotfix/Tier-1 plans use only their closed not-applicable reason;
 never migrate them implicitly. `/th:plan-review` is explicit only. Planning dispatches only architect;
 a sensitive plan carries its security assessment and security-relevant TCs to final validation.
+
+An OpenSpec overlay failure instead returns to snapshot reconciliation when the
+snapshot is stale, or to the one normal overlay design correction for mapping or
+execution-control findings. Never send OpenSpec artifacts through the legacy
+repair route and never infer overlay completeness from the Markdown index.
 
 Before presenting Gate 1, when the validated plan requires an isolated
 worktree, Main copies its absolute path, exact branch, and immutable full commit

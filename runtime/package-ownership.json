@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "kind": "team_harness_package_ownership",
+  "packages": {
+    "claude": [
+      "plugins/team-harness/.claude-plugin",
+      "plugins/team-harness/agents",
+      "plugins/team-harness/hooks",
+      "plugins/team-harness/skills"
+    ],
+    "codex": [
+      "plugins/team-harness/.codex-plugin",
+      "plugins/team-harness/hooks",
+      "plugins/team-harness/skills"
+    ],
+    "go-installer": [
+      ".codex/agents",
+      "agents",
+      "hooks",
+      "installer-assets",
+      "skills"
+    ],
+    "opencode": [
+      "installer-assets/opencode-agents",
+      "installer-assets/opencode-commands",
+      "installer-assets/opencode-hooks",
+      "installer-assets/opencode-skills"
+    ]
+  },
+  "external_project_patterns": [
+    ".agents/skills/openspec-*",
+    ".claude/commands/opsx/**",
+    ".cursor/commands/opsx/**",
+    ".opencode/commands/opsx/**",
+    ".windsurf/workflows/opsx/**",
+    "openspec/**"
+  ]
+}

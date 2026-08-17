@@ -51,6 +51,14 @@ events file):
 ```text
 pipeline_version: 3
 plan_format: sharded-v1
+openspec_change: {kebab-case change|null}
+openspec_repository_root: {absolute repository root|null}
+openspec_preflight: pending|ready|provisionable|blocked-prerequisite|invalid-project|null
+openspec_design_pass: preflight|provisioning|planning|snapshot|overlay|gate1-ready|null
+openspec_snapshot_path: inputs/openspec-snapshot.json|null
+openspec_snapshot_sha256: {SHA-256|null}
+openspec_overlay_path: plan/openspec-traceability.json|null
+openspec_overlay_sha256: {SHA-256|null}
 activation: explicit
 type: feature|fix|refactor|hotfix|enhancement
 feature: {kebab-case slug}
@@ -120,7 +128,7 @@ gate3_release: ship|amend|abort|null
 regression_test_path: {path}|null
 regression_test_status: failing|passing|skipped|null
 test_contract_evidence: {status: pending|red|green|not-applicable|mixed, index_path, index_sha256, task_count, status_counts: {pending, red, green, not_applicable}}|null
-plan_contract_evidence: {status: pending|pass|not-applicable, reason, result_path, result_sha256, plan_sha256, artifact_set_sha256}|null
+plan_contract_evidence: {status: not-applicable, reason, result_path: null, result_sha256: null}|{status: pending|pass, reason, result_path, result_sha256, kind: team_harness_functional_plan_contract, plan_sha256, artifact_set_sha256}|{status: pending|pass, reason, result_path, result_sha256, kind: team_harness_openspec_overlay_validation, snapshot_sha256, overlay_sha256, change_name}|null
 plan_contract_repair_evidence: {status: not-needed|repaired|blocked, reason, result_path, result_sha256, before_sha256, after_sha256, added_paths, artifact_changes: [{path, before_sha256, after_sha256, operations}], contract_result_sha256}|null
 participating_repositories: [{repository, repo_root, worktree}]|[]
 cleaner_evidence: {status: pending|baseline|pass|cleaner-failed|cleaner-blocked|handoff-pending|handoff-pass|handoff-failed|handoff-blocked|not-applicable, reason, allowlist_path, allowlist_sha256, baseline_path, baseline_sha256, baseline_commit_sha, baseline_tree_sha, cleaner_commit_sha, post_path, post_sha256, post_commit_sha, post_tree_sha, handoff_closure_path, handoff_closure_sha256, handoff_commit_sha, handoff_post_path, handoff_post_sha256, handoff_post_commit_sha, handoff_post_tree_sha}|null

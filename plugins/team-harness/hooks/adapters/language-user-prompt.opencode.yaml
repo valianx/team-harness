@@ -1,0 +1,19 @@
+schemaVersion: "1"
+body: hooks/ts/bodies/language-user-prompt.ts
+kind: hook
+runtime: opencode
+emit:
+  path: hooks/ts/entry/language-user-prompt.cc.ts
+  frontmatterDialect: none
+events:
+  # UserPromptSubmit → opencode message:before (if/when opencode exposes this event).
+  UserPromptSubmit: "message:before"
+ioContract: normalized-v1
+capabilities:
+  requires:
+    - bun
+  degradeIfMissing:
+    - message:before  # opencode may not expose UserPromptSubmit; fail-open (no block)
+notes: >
+  Per-turn language reminder on opencode. NEVER blocks. If opencode does not expose
+  a per-turn message event, the language reminder is simply not injected — safe.
