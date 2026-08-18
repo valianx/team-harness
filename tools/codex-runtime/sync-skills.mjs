@@ -107,6 +107,21 @@ const sharedPipelineScripts = [
 
 const sharedPipelinePolicies = ["openspec-policy.json"];
 
+// docs/ files the packaged agent bodies instruct reading at runtime; the
+// Codex package must carry them so those reads resolve on an installed tree.
+export const claudePackageDocs = [
+  "agent-authoring.md",
+  "code-comments.md",
+  "code-hygiene-gate.md",
+  "context7-usage.md",
+  "gcp-infra.md",
+  "permission-provisioning.md",
+  "pipeline-lanes.md",
+  "plan-shards.md",
+  "verification-packet.md",
+  "worktree-discipline.md",
+];
+
 function yamlString(value) {
   return JSON.stringify(value);
 }
@@ -370,6 +385,7 @@ async function syncClaudePackageAssets({ check, rootDir }) {
     [join(rootDir, ".claude-plugin"), join(rootDir, "plugins/team-harness/.claude-plugin"), new Set(["plugin.json", "hooks.json"])],
     [join(rootDir, "agents"), join(rootDir, "plugins/team-harness/agents"), null],
     [join(rootDir, "hooks"), join(rootDir, "plugins/team-harness/hooks"), null],
+    [join(rootDir, "docs"), join(rootDir, "plugins/team-harness/docs"), new Set(claudePackageDocs)],
   ];
   let stale = false;
   for (const [sourceRoot, targetRoot, allowlist] of projections) {

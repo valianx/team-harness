@@ -194,9 +194,11 @@ func validateComponentManifest(c ComponentManifest, moduleByName map[string]Modu
 	}
 
 	// S-7: command kind added so future command components validate.
-	validKind := map[string]bool{"agent": true, "skill": true, "hook": true, "command": true}
+	// reference: runtime-read agent documents placed outside every
+	// registration-scanned directory (identity transform, never dispatchable).
+	validKind := map[string]bool{"agent": true, "skill": true, "hook": true, "command": true, "reference": true}
 	if !validKind[c.Kind] {
-		return fmt.Errorf("component %q: invalid kind %q (want agent|skill|hook|command)", c.Component, c.Kind)
+		return fmt.Errorf("component %q: invalid kind %q (want agent|skill|hook|command|reference)", c.Component, c.Kind)
 	}
 
 	validCost := map[string]bool{"low": true, "medium": true, "high": true}

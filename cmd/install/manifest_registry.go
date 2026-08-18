@@ -269,11 +269,18 @@ func buildOpencodeManifests() ([]ModuleManifest, []ComponentManifest, error) {
 		return nil, nil, fmt.Errorf("build command components: %w", err)
 	}
 
+	// Collect agent reference documents (runtime-read, non-dispatchable).
+	referenceComponents, err := buildReferenceComponents(embeddedFS)
+	if err != nil {
+		return nil, nil, fmt.Errorf("build reference components: %w", err)
+	}
+
 	allComponents := make([]ComponentManifest, 0,
-		len(agentComponents)+len(skillComponents)+len(commandComponents))
+		len(agentComponents)+len(skillComponents)+len(commandComponents)+len(referenceComponents))
 	allComponents = append(allComponents, agentComponents...)
 	allComponents = append(allComponents, skillComponents...)
 	allComponents = append(allComponents, commandComponents...)
+	allComponents = append(allComponents, referenceComponents...)
 
 	// Build the module manifest listing all component IDs AFTER assembling the
 	// full component slice (keeps orphan-check safe).
@@ -336,6 +343,88 @@ func buildAgentComponents(embeddedFS fs.FS) ([]ComponentManifest, error) {
 				ConfigKeys: configKeys,
 			},
 		})
+	}
+
+	return components, nil
+}
+
+// isCopyableReferencePath is the fail-closed copy predicate for agent
+// reference documents (the complement of the invocable set): top-level
+// ref-*.md plus every .md under the agents/ subdirectories (_shared/,
+// testing-refs/, review-lenses/, gcp-infra-refs/). Underscore-prefixed
+// segments are legitimate here (_shared/, _index.md); only dot-segments and
+// non-.md extensions are rejected. The rel argument is relative to "agents/".
+func isCopyableReferencePath(rel string) bool {
+	segments := strings.Split(rel, "/")
+	for _, seg := range segments {
+		if seg == "" || strings.HasPrefix(seg, ".") {
+			return false
+		}
+	}
+	if !strings.HasSuffix(rel, ".md") {
+		return false
+	}
+	if len(segments) == 1 {
+		// Top level: only the non-invocable ref-*.md documents; invocable
+		// agents are emitted by buildAgentComponents and README.md stays
+		// a contributor document.
+		return strings.HasPrefix(rel, "ref-")
+	}
+	return path.Base(rel) != "README.md"
+}
+
+// buildReferenceComponents returns one ComponentManifest per agent reference
+// document. Agent bodies instruct reading these at runtime (the orchestrator
+// loads agents/ref-pipeline.md on activation, the architect loads its design
+// references, shared contracts live under agents/_shared/), so an opencode
+// install must carry them.
+//
+// They are emitted OUTSIDE {config_root}/agents/: opencode auto-registers
+// every .md in its agents directory as a dispatchable agent by filename, so
+// placing ref-pipeline.md there would create a bogus live agent. The
+// th-references/ prefix keeps them inert while preserving the agents/<rel>
+// shape the bodies reference.
+//
+// Source: agents/<rel>
+// Emit:   {config_root}/th-references/agents/<rel>
+func buildReferenceComponents(embeddedFS fs.FS) ([]ComponentManifest, error) {
+	var components []ComponentManifest
+
+	err := fs.WalkDir(embeddedFS, "agents", func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel := strings.TrimPrefix(p, "agents/")
+		if !isCopyableReferencePath(rel) {
+			return nil
+		}
+		compIDBase := strings.NewReplacer(
+			"/", "-",
+			".", "-",
+			"_", "-",
+		).Replace(rel)
+		compIDBase = strings.Trim(compIDBase, "-")
+		components = append(components, ComponentManifest{
+			SchemaVersion:  1,
+			Component:      "reference-" + compIDBase,
+			Module:         "opencode-harness",
+			Kind:           "reference",
+			Source:         p,
+			Cost:           "low",
+			Stability:      "stable",
+			DefaultInstall: true,
+			Emits: OwnershipTags{
+				Files:      []string{"{config_root}/th-references/agents/" + rel},
+				ConfigKeys: []string{},
+			},
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("walk agent references: %w", err)
 	}
 
 	return components, nil

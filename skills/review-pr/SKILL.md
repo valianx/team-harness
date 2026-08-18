@@ -83,7 +83,13 @@ and the bundled helper. Resolve it in this order:
 
 1. latest `~/.claude/plugins/cache/team-harness-marketplace/th/*/skills/review-pr/scripts/review_context.py`
 2. `~/.claude/skills/review-pr/scripts/review_context.py`
-3. `./skills/review-pr/scripts/review_context.py`
+3. the opencode skill install:
+   `${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/skills/review-pr/scripts/review_context.py`
+   (Windows: `%APPDATA%\opencode\skills\review-pr\scripts\review_context.py`; a project-scope
+   install uses `<repo>/.opencode/skills/review-pr/scripts/review_context.py`)
+4. `scripts/review_context.py` resolved against this skill's own directory (the directory
+   containing this document) — the packaged copy on Codex and opencode installs
+5. `./skills/review-pr/scripts/review_context.py`
 
 If any prerequisite is unavailable, stop with:
 

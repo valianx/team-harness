@@ -616,6 +616,27 @@ def main() -> None:
     ):
         if not (ROOT / cc_surface).is_file():
             fail(f"CC-shipped surface missing from the repository tree: {cc_surface}")
+    # Packaged agent bodies instruct runtime reads of these docs/ files; the
+    # Codex package carries a synced subset so those reads resolve on an
+    # installed tree (sync-skills.mjs claudePackageDocs projection).
+    for doc_name in (
+        "agent-authoring.md",
+        "code-comments.md",
+        "code-hygiene-gate.md",
+        "context7-usage.md",
+        "gcp-infra.md",
+        "permission-provisioning.md",
+        "pipeline-lanes.md",
+        "plan-shards.md",
+        "verification-packet.md",
+        "worktree-discipline.md",
+    ):
+        source_doc = ROOT / "docs" / doc_name
+        packaged_doc = ROOT / "plugins/team-harness/docs" / doc_name
+        if not packaged_doc.is_file():
+            fail(f"Codex package must ship docs/{doc_name}")
+        elif source_doc.read_bytes() != packaged_doc.read_bytes():
+            fail(f"packaged docs/{doc_name} diverges from the canonical docs/ copy")
     versions = {
         claude_plugin["version"],
         market_entries[0]["version"],

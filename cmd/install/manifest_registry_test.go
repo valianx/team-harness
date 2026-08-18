@@ -205,6 +205,83 @@ func TestBuildOpencodeManifests_PresentationTemplateComplete(t *testing.T) {
 	}
 }
 
+// TestBuildOpencodeManifests_ReferenceDocsComplete asserts every agent
+// reference document (top-level ref-*.md plus the _shared/, testing-refs/,
+// review-lenses/, and gcp-infra-refs/ trees) is emitted for opencode: the
+// installed agent bodies instruct reading these at runtime, so a dropped
+// reference silently degrades the coordinator and every specialist.
+func TestBuildOpencodeManifests_ReferenceDocsComplete(t *testing.T) {
+	expected := map[string]bool{}
+	err := fs.WalkDir(EmbeddedAssets(), "agents", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel := strings.TrimPrefix(path, "agents/")
+		if isCopyableReferencePath(rel) {
+			expected["{config_root}/th-references/agents/"+rel] = false
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk embedded agents: %v", err)
+	}
+	for _, representative := range []string{
+		"{config_root}/th-references/agents/ref-pipeline.md",
+		"{config_root}/th-references/agents/ref-architect-design.md",
+		"{config_root}/th-references/agents/_shared/gh-fallback.md",
+		"{config_root}/th-references/agents/testing-refs/_index.md",
+	} {
+		if _, ok := expected[representative]; !ok {
+			t.Fatalf("embedded agents tree is missing expected reference %s", representative)
+		}
+	}
+
+	_, components, err := buildOpencodeManifests()
+	if err != nil {
+		t.Fatalf("buildOpencodeManifests: %v", err)
+	}
+	for _, component := range components {
+		for _, emitted := range component.Emits.Files {
+			if _, ok := expected[emitted]; ok {
+				if component.Kind != "reference" {
+					t.Errorf("reference document %s emitted with kind %q, want reference", emitted, component.Kind)
+				}
+				expected[emitted] = true
+			}
+		}
+	}
+	for name, found := range expected {
+		if !found {
+			t.Errorf("agent reference document not emitted for opencode: %s", name)
+		}
+	}
+}
+
+// TestBuildOpencodeManifests_NoReferenceInAgentDir is the bogus-agent
+// regression guard: opencode auto-registers every .md in its agents directory
+// as a dispatchable agent by filename, so reference documents must never be
+// emitted under {config_root}/agents/.
+func TestBuildOpencodeManifests_NoReferenceInAgentDir(t *testing.T) {
+	_, components, err := buildOpencodeManifests()
+	if err != nil {
+		t.Fatalf("buildOpencodeManifests: %v", err)
+	}
+	for _, component := range components {
+		for _, emitted := range component.Emits.Files {
+			rel, ok := strings.CutPrefix(emitted, "{config_root}/agents/")
+			if !ok {
+				continue
+			}
+			if strings.HasPrefix(rel, "ref-") || strings.Contains(rel, "/") {
+				t.Errorf("component %s emits %s into opencode's auto-registering agents dir", component.Component, emitted)
+			}
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // AC-3: dot/underscore paths (.venv etc.) never emitted
 // ---------------------------------------------------------------------------
