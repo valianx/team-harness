@@ -11,7 +11,7 @@
       "displayName": "Team Harness",
       "source": "./plugins/team-harness",
       "description": "Complete shared Team Harness skill catalog and gated multi-agent workflows for Claude Code, Codex, and opencode",
-      "version": "3.14.1",
+      "version": "3.14.2",
       "category": "development",
       "tags": ["orchestration", "agents", "workflow", "diagrams", "gcp"],
       "author": {
