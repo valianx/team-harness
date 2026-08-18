@@ -87,7 +87,7 @@ cleaner_handoff_pending: true|false
 cleaner_handoff_nonce: {fresh token or null}
 cleaner_handoff_repository: {canonical repository identity or null}
 cleaner_handoff_worktree: {absolute path or null}
-cleaner_handoff_anchor: {cleaner-post commit/tree or null}
+cleaner_handoff_anchor: {cleanup commit/tree or null}
 cleaner_handoff_findings: [{id, repository, cause, files, requirements, suggested_correction, closure_check, expected}]|[]
 cleaner_handoff_eligibility: eligible|ineligible|null
 cleaner_handoff_ineligible_reasons: [{closed-predicate conjunct}]|[]
@@ -270,7 +270,7 @@ decision; that requirement never authorizes or aborts anything.
 For a non-empty complete package, atomically set `phase: implementation`,
 `status: paused`, `cleaner_evidence.status: handoff-pending`, a fresh
 `cleaner_handoff_nonce`, `cleaner_handoff_pending: true`, eligibility,
-repository, absolute worktree, the exact cleaner-post anchor and finding
+repository, absolute worktree, the exact cleanup-commit anchor and finding
 objects, with both decision fields null. While pending, do
 not mutate repository/evidence artifacts, dispatch a specialist, run another
 cleaner, or open Freeze. Present exactly:

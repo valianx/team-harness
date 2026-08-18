@@ -379,22 +379,6 @@ fi
 
 echo
 echo "############################################################"
-echo "# Suite 166: deterministic cleaner and CRAP transition"
-echo "# Requires: node and git. Missing runtimes follow CI-required semantics."
-echo "############################################################"
-if ! command -v node >/dev/null 2>&1; then
-    report_skip_or_fail "cleaner-transition" "node not found — install Node.js to run this suite"
-elif ! command -v git >/dev/null 2>&1; then
-    report_skip_or_fail "cleaner-transition" "git not found — install Git to run this suite"
-elif node "$TESTS_DIR/test_cleaner_transition.mjs"; then
-    echo "cleaner-transition: PASS"
-else
-    echo "cleaner-transition: FAIL"
-    FAILED=$((FAILED + 1))
-fi
-
-echo
-echo "############################################################"
 echo "# Suite 167: deterministic functional-first plan contract"
 echo "# Requires: node. Missing runtime follows CI-required semantics."
 echo "############################################################"

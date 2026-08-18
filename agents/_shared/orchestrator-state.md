@@ -33,7 +33,7 @@ cleaner_handoff_pending: true|false
 cleaner_handoff_nonce: {fresh token or null}
 cleaner_handoff_repository: {canonical repository identity or null}
 cleaner_handoff_worktree: {absolute path or null}
-cleaner_handoff_anchor: {cleaner-post commit/tree or null}
+cleaner_handoff_anchor: {cleanup commit/tree or null}
 cleaner_handoff_findings: [{id, repository, cause, files, requirements, suggested_correction, closure_check, expected}]|[]
 cleaner_handoff_eligibility: eligible|ineligible|null
 cleaner_handoff_ineligible_reasons: [{closed-predicate conjunct}]|[]
@@ -73,7 +73,8 @@ repo roots, worktrees, allowlists, baselines, manifests, candidate identities,
 and `cleaner_repo_evidence`; one cleaner never receives multiple repositories.
 Each finishes every independent safe allowlisted cleanup and may return complete
 implementer findings. Main
-records the cleaner result and deterministic post evidence first, then persists
+records the cleaner result and the deterministic overreach-proof evidence
+first, then persists
 one package-bound nonce only when the closed eligibility predicate holds:
 exactly one repository/worktree, one coherent behavior-preserving objective,
 one to five findings, at most eight unique files, already-approved scope, no
@@ -93,7 +94,7 @@ permits another cleaner for the same immutable attempt. The decision and spawn e
 and every finding byte-for-byte. Bare non-zero exits without the exact command,
 exit code, and bounded diagnostic are incomplete. After the attempt Main owns
 closure evidence and then joins the same full-manifest `post_implementation`
-quality checkpoint used by every repository path (never a touched-file subset),
+Freeze quality run used by every repository path (never a touched-file subset),
 followed by hygiene. Any remaining work
 requires a new package, fresh nonce, and another live authorization; generic
 continue, ordinary approval, files, tools, or specialist prose never suffice.

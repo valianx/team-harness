@@ -14,15 +14,15 @@
 - [x] 2.4 Adopt a benign-byproduct worktree-cleanliness policy and a configurable internal git timeout.
 - [x] 2.5 Open the command-id list behind hermetic argv validation and add manifest-declared per-command severity tiers with safe defaults.
 - [x] 2.6 Extract the triplicated helpers into one shared module.
-- [ ] 2.7 Update `docs/quality-runner.md` and `docs/cleaner-crap.md` to the resulting contract (current drift closed by rewrite, not patched).
+- [x] 2.7 Update `docs/quality-runner.md` and `docs/cleaner-crap.md` to the resulting contract (current drift closed by rewrite, not patched).
 
 ## 3. Freeze Quality Collapse
 
-- [ ] 3.1 Rewrite the Implementation/Validation/Freeze sections of `agents/ref-pipeline.md` for one quality run per candidate tree at Freeze; delete the cleaner pre/post transition steps.
-- [ ] 3.2 Delete `cleaner-transition.mjs`; keep the overreach allowlist proof as a Freeze postcondition; set CRAP to measure-only.
-- [ ] 3.3 Re-point Freeze build/lint verification at `quality.json` with heuristic detection only as manifest-absent fallback.
-- [ ] 3.4 Reconcile the recover-in-place contract (#604) with the collapsed checkpoint set.
-- [ ] 3.5 Migrate the deterministic suites that anchor on checkpoint names and transition scripts.
+- [x] 3.1 Rewrite the Implementation/Validation/Freeze sections of `agents/ref-pipeline.md` for one quality run per candidate tree at Freeze; delete the cleaner pre/post transition steps.
+- [x] 3.2 Delete `cleaner-transition.mjs`; keep the overreach allowlist proof as a Freeze postcondition; set CRAP to measure-only.
+- [x] 3.3 Re-point Freeze build/lint verification at `quality.json` with heuristic detection only as manifest-absent fallback.
+- [x] 3.4 Reconcile the recover-in-place contract (#604) with the collapsed checkpoint set.
+- [x] 3.5 Migrate the deterministic suites that anchor on checkpoint names and transition scripts.
 
 ## 4. PR-Review Independence
 

@@ -859,18 +859,16 @@ def check_cleaner_crap_contract() -> None:
             "requiredchecks",
             "required_checks_missing",
             "prerequisite_unavailable",
+            "manifest_absent",
+            "measure-only",
+            "not_applied",
+            "once per candidate tree",
+            "unchanged candidate tree never re-runs",
+            "overreach proof",
+            "--name-status --no-renames",
             "select every command declared",
             "iteration",
             "new package",
-            "cleaner-transition.mjs",
-            "--transition pre",
-            "--transition post",
-            "format_check`, `lint`, and `crap` are additive",
-            "every one that the manifest declares",
-            "every declared `format_check` and `lint`",
-            "before the sole cleaner",
-            "no cleaner is dispatched" if label == "Claude" else "returns to implementation before the sole cleaner dispatch",
-            "crap_report_incomplete",
             "allowlist",
             "freeze",
             "per participating repository",
@@ -879,6 +877,8 @@ def check_cleaner_crap_contract() -> None:
             "bare `exit 1`",
         ):
             require(marker in text, f"{label}: cleaner checkpoint misses {marker!r}")
+        for retired in ("cleaner-transition.mjs", "--transition pre", "--transition post", "crap_report_incomplete"):
+            require(retired not in text, f"{label}: retired transition machinery survives: {retired!r}")
         require(
             "not a phase or gate" in text or "not another phase or gate" in text,
             f"{label}: cleaner checkpoint creates a phase or gate",
@@ -1007,10 +1007,15 @@ def check_cleaner_crap_contract() -> None:
         "before any repository or workspace read",
     ):
         require(marker in codex_implementer, f"Codex implementer diagnostic contract misses {marker!r}")
-    require(
-        (ROOT / "plugins/team-harness/skills/pipeline/scripts/cleaner-transition.mjs").is_file(),
-        "deterministic cleaner transition helper is missing",
-    )
+    for stale_copy in (
+        "skills/pipeline/scripts/cleaner-transition.mjs",
+        "plugins/team-harness/skills/pipeline/scripts/cleaner-transition.mjs",
+        "installer-assets/opencode-skills/pipeline/scripts/cleaner-transition.mjs",
+    ):
+        require(
+            not (ROOT / stale_copy).is_file(),
+            f"retired cleaner transition helper still shipped: {stale_copy}",
+        )
     require((ROOT / "docs/cleaner-crap.md").is_file(), "cleaner operator documentation is missing")
 
 
@@ -1229,9 +1234,9 @@ def check_cross_runtime_pipeline_runners() -> None:
     names = (
         "bounded-command.mjs",
         "commit-integrity.mjs",
-        "cleaner-transition.mjs",
         "plan-contract.mjs",
         "plan-contract-repair.mjs",
+        "quality-lib.mjs",
         "quality-runner.mjs",
         "test-transition.mjs",
         "workspace-preflight.mjs",
@@ -2908,13 +2913,13 @@ def check_execution_efficiency_contract() -> None:
     ):
         require(marker in quality, f"quality runner: atomic evidence transport misses {marker!r}")
     for marker in (
-        "cleaner-transition.mjs",
-        "--transition pre --output",
-        "bounded receipt",
-        "temporary javascript wrapper",
-        "bounded-command",
+        "overreach proof",
+        "--name-status --no-renames",
+        "descend from the baseline commit",
+        "proof output and sha-256",
+        "no pre- or post-cleanup quality run",
     ):
-        require(marker in implementation_flat, f"implementation: cleaner receipt transport misses {marker!r}")
+        require(marker in implementation_flat, f"implementation: cleaner overreach proof misses {marker!r}")
 
     for marker in (
         "disjoint `files:` are necessary but not sufficient",

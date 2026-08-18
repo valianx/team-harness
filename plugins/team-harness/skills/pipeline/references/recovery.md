@@ -321,15 +321,19 @@ repositories block. Validate every entry separately and require a unique
 canonical repository, absolute worktree, manifest, allowlist, baseline,
 candidate identity, and at most one terminal cleaner result per repository; a
 single cleaner result spanning repositories blocks. `pending`
-resumes at allowlist construction; `baseline` requires readable allowlist and
-pre-cleaner result files whose SHA-256 values and candidate commit/tree match
-state before dispatching the one allowed fresh cleaner; `pass` additionally
-requires the hashed post-cleaner result and matching current commit/tree.
-`handoff-pending` requires the same valid cleaner post evidence plus a complete
-pending handoff package anchored to its commit/tree. `handoff-pass` requires
-that ancestry, the package-identical consumed decision and single implementer
-spawn, readable hashed closure and the common `post_implementation` quality
-result, and matching current commit/tree. `not-applicable` requires the closed
+resumes at allowlist construction; `baseline` requires a readable allowlist
+whose SHA-256 and pre-cleanup candidate commit/tree anchor match state before
+dispatching the one allowed fresh cleaner; `pass` additionally requires the
+recorded cleanup commit descending from the baseline commit (or an evidenced
+no-op) and, when the overreach proof has run, a readable hashed `post` record
+matching the current commit/tree — never a pre- or post-cleanup quality
+result, which no longer exists. `handoff-pending` requires that cleanup-commit
+anchor plus a complete pending handoff package anchored to it. `handoff-pass`
+requires that ancestry, the package-identical consumed decision and single
+implementer spawn, readable hashed closure evidence, and matching current
+commit/tree; the single `post_implementation` quality run stays bound to the
+final candidate tree and is validated at Freeze, never reconstructed here.
+`not-applicable` requires the closed
 `repository-quality-manifest-incomplete` reason. Missing, stale, partially
 populated, out-of-scope, or mismatched cleaner or handoff evidence blocks.
 `cleaner-failed`, `cleaner-blocked`, `handoff-failed`, and `handoff-blocked`
@@ -354,7 +358,7 @@ current worktree.
 ## Cleaner-handoff recovery
 
 When `cleaner_handoff_pending: true`, recover only the durable canonical
-repository, absolute worktree, cleaner-post anchor, eligibility record, and
+repository, absolute worktree, cleanup-commit anchor, eligibility record, and
 complete findings, each with repository, stable ID, cause, files, implicated
 requirements, advisory correction, deterministic closure check, and expected
 result. Re-evaluate the closed eligibility predicate: exactly one repository
