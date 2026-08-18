@@ -69,7 +69,8 @@ def find_item(items, key):
 
 A comment that contradicts the code is worse than no comment — it actively misleads the reader.
 When the code is correct and the comment is stale, the fix is to update or remove the comment.
-When both the code and the comment are wrong, classify as CRITICAL.
+When both the code and the comment are wrong, the code defect is its own finding under the
+reviewer's evidence standard; the comment correction rides along with its fix.
 
 ### Commented-out code
 
@@ -129,9 +130,6 @@ this lens. Raise findings only for comments the diff introduced or modified.
 | `HACK` marker with no explanation of why the hack is necessary | NITPICK |
 | Stale `// Returns X` comment where the return type changed but the behavior is correct | NITPICK |
 
-## Scope discipline
+## Scope, channel, and severity mapping
 
-Raise findings only for comments the diff **introduced or modified** (see `## Scope Discipline` in
-`reviewer.md`). Pre-existing stale comments in untouched code go in `## Fuera de alcance` at most
-once — they do not affect the verdict. Do not duplicate a finding already raised under
-`### SOLID / Clean Code` in the main review.
+Governed by `agents/review-lenses/_index.md § "Shared lens contract"`.

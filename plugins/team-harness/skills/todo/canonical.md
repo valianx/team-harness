@@ -80,6 +80,11 @@ Field semantics:
   task. Default `""`.
 - `default_on_completion` — `keep` (default) or `delete`. Applied when the operator does
   not specify per-task.
+- `enabled` — optional boolean toggle written by `/th:setup obsidian-tasks`; absent means
+  enabled. When `false`, every operation stops with `Obsidian Tasks disabled — run /th:setup
+  obsidian-tasks to enable.` A legacy bare-boolean `obsidian_tasks` value is read as
+  `{"enabled": <bool>}` with no folder config (operations stop with the setup pointer);
+  writes always persist the object shape.
 
 **Read/write rule — preserve the rest of the file.** `~/.claude/.team-harness.json` holds
 keys this skill must never overwrite: `format_version`, `installed_version`, `updated_at`,

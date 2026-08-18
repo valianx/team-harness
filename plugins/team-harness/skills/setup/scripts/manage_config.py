@@ -29,7 +29,6 @@ DEFAULTS = {
     "logs-mode": "local",
     "english_learning": False,
     "flow_telemetry.enabled": False,
-    "obsidian_tasks": False,
     "agent-scope": "global",
 }
 LEGACY_SELECTOR_KEYS = frozenset({
@@ -266,6 +265,11 @@ def import_missing(
         target_value = target[key]
         if isinstance(target_value, dict) and isinstance(source_value, dict):
             imported.extend(import_missing(target_value, source_value, dotted, legacy))
+        elif dotted == "obsidian_tasks" and isinstance(target_value, bool) and isinstance(source_value, dict):
+            upgraded = json.loads(json.dumps(source_value))
+            upgraded.setdefault("enabled", target_value)
+            target[key] = upgraded
+            imported.append(dotted)
     return imported
 
 
@@ -290,6 +294,8 @@ def classify_import(target: dict[str, Any], source: dict[str, Any], prefix: str 
             nested_importable, nested_conflicts = classify_import(target_value, source_value, dotted)
             importable.extend(nested_importable)
             conflicts.extend(nested_conflicts)
+        elif dotted == "obsidian_tasks" and isinstance(target_value, bool) and isinstance(source_value, dict):
+            importable.append(dotted)
         else:
             conflicts.append(dotted)
     return importable, conflicts
@@ -321,8 +327,14 @@ def validate(key: str, value: Any) -> None:
         not isinstance(value, str) or re.fullmatch(r"[a-z]{2}", value) is None
     ):
         raise ValueError("language must be a two-letter lowercase code")
-    if key in {"english_learning", "flow_telemetry.enabled", "obsidian_tasks"} and not isinstance(value, bool):
+    if key in {"english_learning", "flow_telemetry.enabled"} and not isinstance(value, bool):
         raise ValueError(f"{key} must be a JSON boolean")
+    if key == "obsidian_tasks":
+        if isinstance(value, dict):
+            if "enabled" in value and not isinstance(value["enabled"], bool):
+                raise ValueError("obsidian_tasks.enabled must be a JSON boolean")
+        elif not isinstance(value, bool):
+            raise ValueError("obsidian_tasks must be a JSON boolean toggle or a config object")
     if key == "clickup.workspace_id" and not isinstance(value, str):
         raise ValueError("clickup.workspace_id must be a string")
     if key == "agent-scope" and value not in {"project", "global"}:
@@ -400,6 +412,12 @@ def set_values(assignments: list[str], removals: list[str], version: str | None)
     after = json.loads(json.dumps(before))
     for raw in assignments:
         key, value = parse_assignment(raw)
+        if key == "obsidian_tasks" and isinstance(value, bool):
+            existing = get_nested(after, key)
+            if isinstance(existing, dict):
+                existing["enabled"] = value
+                continue
+            value = {"enabled": value}
         set_nested(after, key, value)
     for key in removals:
         if key not in ALLOWED_KEYS and key not in LEGACY_SELECTOR_KEYS:

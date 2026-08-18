@@ -590,18 +590,25 @@ Configure the ClickUp workspace ID used by th:orchestrator (intake and delivery)
 
 This sub-step is reached ONLY via the argument router when the target concern is `obsidian-tasks`. It is NOT part of the full no-argument flow.
 
-Configure the Obsidian Tasks integration setting. This key controls whether the pipeline writes task items compatible with the Obsidian Tasks plugin.
+Toggle the Obsidian Tasks integration. The canonical `obsidian_tasks` value is the config
+OBJECT owned by `/th:todo setup` (`vault_root`, `tasks_folder`, `task_format`, …) with an
+optional `enabled` boolean (absent means enabled); this sub-step only flips `enabled` and never
+replaces the object.
 
-1. Read `~/.claude/.team-harness.json`. Show the current `obsidian_tasks` value (if present, e.g. `true` or `false`) as the default hint.
-2. Prompt: `Enable Obsidian Tasks integration? [y/N]` (default: current value, or N if not set)
-3. Accept `y` (enable) or `n`/Enter (disable / keep current).
-4. Persist via **merge-write-whole-document**: read the full JSON, replace or add only the `obsidian_tasks` key (set to the JSON boolean `true` or `false`), write the whole document back. All other keys are preserved.
-5. Print a one-line targeted summary:
+1. Read `~/.claude/.team-harness.json`. Show the current state as the default hint:
+   `enabled`/`disabled` when the object exists (absent `enabled` field means enabled),
+   `not configured` when the key is absent, and treat a legacy bare boolean as
+   `{"enabled": <bool>}` pending folder configuration.
+2. Prompt: `Enable Obsidian Tasks integration? [y/N]` (default: current state, or N if not set)
+3. Persist via **merge-write-whole-document**: read the full JSON and set only
+   `obsidian_tasks.enabled`, preserving every other field of the object and every other key.
+   Never write a bare boolean over an existing object.
+4. Print a one-line targeted summary:
    ```
-   th setup — obsidian-tasks configured
-     obsidian_tasks  <true|false>
+   th setup — obsidian-tasks <enabled|disabled>
    ```
-   Then stop.
+   When enabling without a configured `vault_root`, append: `folders not configured — run
+   /th:todo setup`. Then stop.
 
 ---
 

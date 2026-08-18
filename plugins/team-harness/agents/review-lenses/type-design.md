@@ -105,9 +105,6 @@ type ApiResponse =
 | Primitive obsession on a non-critical domain value (cosmetic label, search term) | SUGGESTION |
 | Boolean parameter flag on an internal helper used in one place | NITPICK |
 
-## Scope discipline
+## Scope, channel, and severity mapping
 
-Raise findings only for types the diff **introduced or modified** (see `## Scope Discipline` in
-`reviewer.md`). Pre-existing primitive obsession in untouched interfaces goes in `## Fuera de
-alcance` at most once — it does not affect the verdict. Do not duplicate a finding already raised
-under `### SOLID / Clean Code` in the main review.
+Governed by `agents/review-lenses/_index.md § "Shared lens contract"`.

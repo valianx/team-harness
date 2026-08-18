@@ -21,7 +21,7 @@ The coordinator supplies:
 - exact `Reviewed Head SHA` and `Context Hash`;
 - paths to coordinator-persisted reviewer and optional focused-reviewer, QA, and security drafts.
 
-Read only those supplied `.claude/pr-review-*` paths. Missing optional drafts mean the lens did
+Read only those supplied paths under the review workspace `workspaces/pr-review-{number}/`. Missing optional drafts mean the lens did
 not run. Every supplied draft must contain a `Reviewed:` SHA matching the supplied SHA. A missing or
 different SHA returns `status: failed`, `failure_kind: stale-context`.
 
