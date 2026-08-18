@@ -445,7 +445,8 @@ implicated requirement, closure check, proposed `resolve|design-consistent|decis
 disposition, rationale, and consequence. The proposal is advisory. Under normal
 approval only the live operator confirms dispositions. Under a valid
 `approved-autonomous` Gate-1 dual record, Main may confirm only unambiguous
-`resolve` findings inside approved scope while `iteration < 3`; all other
+`resolve` findings inside approved scope while
+`autonomous_correction_count < 3`; all other
 findings pause. `design-consistent` is legal only when no AC or security floor
 is violated. Calling a violating finding “part of the
 design” opens an explicit intent/scope/AC/TC decision first and never waives it.
@@ -475,18 +476,20 @@ authorizes exactly one bounded round over the complete package, followed by the
 closure gate, stale-row tester refresh, one new Freeze, fresh QA, and impact-required
 security. The decision and its one
 `iteration.start`/`agent.correction.spawn` pair carry the identical
-`correction_exceptional` boolean. Choice `2` performs no repository
+`correction_authority` and authority Gate nonce. Choice `2` performs no repository
 or evidence mutation and a later presentation uses a fresh nonce. Choice `3`
 aborts without correction. Under normal approval a second failure always pauses
 with a fresh decision. Autonomous approval may start another fresh complete
-round only after another complete required validation set and eligible triage, while `iteration < 3`;
+round only after another complete required validation set and eligible triage,
+while `autonomous_correction_count < 3`;
 there is no verifier-to-implementer bounce or agent follow-up.
-At `iteration: 3/3`, choice `1` exists only while
-`exceptional_correction_count: 0`; the presentation sets
-`correction_exceptional: true` and labels that choice exceptional. Its matching
-authorize decision sets the counter to `1`; every later failure offers only
-pause or abort. `iteration` remains `3/3`, a second exceptional decision is
-invalid, and `3/3+exception` is never serialized.
+The max-3 counter limits only `gate1-autonomous` authority. At
+`iteration: 3/3`, `autonomous_correction_count: 3`, or after any number of prior
+operator rounds, the same live choice `1` remains available. Its matching
+decision increments the deliberately unbounded `operator_correction_count` and
+authorizes one fresh full-package round. It is not an exception or waiver and
+still requires closure, tester refresh, a new Freeze, fresh QA, and
+impact-required security.
 
 An authorized correctable sensitive finding requires a fresh security audit in
 the new full fan. Decision-bearing concerns, including

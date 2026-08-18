@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added automatic frozen-lockfile dependency provisioning for isolated
   worktrees before first dispatch, replacing only untracked cross-checkout
   `node_modules` links and returning an exact recovery action on failure.
+- Limited the max-three correction budget to autonomous decisions while
+  allowing any fresh package-bound operator-live decision to authorize another
+  fully frozen and revalidated round, including recovery from 3.14.3 state.
 - Made blocked cleaner and handoff attempts recoverable in the same workspace
   and branch, preserving failed evidence append-only while allowing a corrected
   candidate to proceed without repeating Gate 1 or discarding valid work.
