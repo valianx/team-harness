@@ -120,6 +120,20 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 3e: Codex hook launcher and manifest floor"
+echo "# Requires: node. Skipped when node is absent."
+echo "############################################################"
+if ! command -v node >/dev/null 2>&1; then
+    report_skip_or_fail "codex-hooks" "node not found"
+elif bash "$TESTS_DIR/test_codex_hooks.sh"; then
+    echo "codex-hooks: PASS"
+else
+    echo "codex-hooks: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 echo "# Suite 3b: review context snapshot helper — behavioral tests"
 echo "############################################################"
 if [ -n "$PY" ] && $PY "$TESTS_DIR/test_review_context.py"; then
