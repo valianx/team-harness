@@ -545,6 +545,79 @@ await check("malformed task rows retain TASK_INDEX_INVALID diagnostics", async (
   }
 });
 
+await check("plan-declared required checks are validated against the repository manifest", async () => {
+  const manifestFor = (ids) => ({
+    schema_version: 1,
+    commands: Object.fromEntries(ids.map((id) => [id, { argv: ["node", "-e", "process.exit(0)"] }])),
+  });
+  async function repoWithManifest(manifest) {
+    const repo = await mkdtemp(path.join(tmpdir(), "th-plan-repo-"));
+    if (manifest !== null) {
+      await mkdir(path.join(repo, ".team-harness"), { recursive: true });
+      const body = typeof manifest === "string" ? manifest : JSON.stringify(manifest);
+      await writeFile(path.join(repo, ".team-harness", "quality.json"), body, "utf8");
+    }
+    return repo;
+  }
+
+  const workspace = await fixture();
+  const narrowRepo = await repoWithManifest(manifestFor(["test", "lint"]));
+  const fullRepo = await repoWithManifest(manifestFor(["test", "build", "typecheck", "format_check", "lint"]));
+  const emptyRepo = await repoWithManifest(null);
+  const invalidRepo = await repoWithManifest("{ not json");
+  try {
+    const unknown = await validatePlanContract({ workspace, plan: "01-plan.md", repo: narrowRepo });
+    assert.equal(unknown.verdict, "fail", JSON.stringify(unknown));
+    assert.equal(unknown.error_code, "REQUIRED_CHECKS_UNKNOWN");
+    const entry = unknown.findings.find((item) => item.code === "REQUIRED_CHECKS_UNKNOWN");
+    assert.equal(entry.artifact, "plan/tasks/Task-1.md");
+    assert.match(entry.section, /unknown \[build, typecheck, format_check\]/);
+    assert.match(entry.section, /declared \[lint, test\]/);
+    assert.equal(isPlanContractResult(unknown), true);
+
+    const known = await validatePlanContract({ workspace, plan: "01-plan.md", repo: fullRepo });
+    assert.equal(known.verdict, "pass", JSON.stringify(known));
+
+    const absent = await validatePlanContract({ workspace, plan: "01-plan.md", repo: emptyRepo });
+    assert.equal(absent.verdict, "pass", JSON.stringify(absent));
+
+    const invalid = await validatePlanContract({ workspace, plan: "01-plan.md", repo: invalidRepo });
+    assert.equal(invalid.verdict, "pass", JSON.stringify(invalid));
+
+    const cli = spawnSync(
+      process.execPath,
+      [runner, "--workspace", workspace, "--plan", "01-plan.md", "--repo", narrowRepo],
+      { encoding: "utf8", windowsHide: true },
+    );
+    assert.equal(cli.status, 1);
+    assert.equal(JSON.parse(cli.stdout).error_code, "REQUIRED_CHECKS_UNKNOWN");
+  } finally {
+    for (const target of [workspace, narrowRepo, fullRepo, emptyRepo, invalidRepo]) {
+      await rm(target, { recursive: true, force: true });
+    }
+  }
+});
+
+await check("a none-declared quality line never cross-checks the manifest", async () => {
+  const workspace = await fixture({
+    task: taskText({ quality: "- **Required quality checks:** none — documentation-only change" }),
+  });
+  const repo = await mkdtemp(path.join(tmpdir(), "th-plan-repo-none-"));
+  await mkdir(path.join(repo, ".team-harness"), { recursive: true });
+  await writeFile(
+    path.join(repo, ".team-harness", "quality.json"),
+    JSON.stringify({ schema_version: 1, commands: { test: { argv: ["node", "-e", "process.exit(0)"] } } }),
+    "utf8",
+  );
+  try {
+    const result = await validatePlanContract({ workspace, plan: "01-plan.md", repo });
+    assert.equal(result.verdict, "pass", JSON.stringify(result));
+  } finally {
+    await rm(repo, { recursive: true, force: true });
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
 await check("manifest traversal, missing artifacts, and symlinks fail closed", async () => {
   const workspace = await fixture();
   const externalRoot = await mkdtemp(path.join(tmpdir(), "th-plan-external-"));

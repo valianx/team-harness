@@ -56,7 +56,7 @@ const RESULT_KEYS = [
   "error_code",
 ];
 const STREAM_KEYS = ["bytes", "truncated", "tail"];
-const ERROR_CODES = new Set([null, "ARGUMENT_INVALID", "SPAWN_FAILED", "INTERNAL_ERROR"]);
+const ERROR_CODES = new Set([null, "ARGUMENT_INVALID", "SPAWN_FAILED", "TIMEOUT", "INTERNAL_ERROR"]);
 const RECEIPT_ERROR_CODES = new Set([...ERROR_CODES, "OUTPUT_WRITE_FAILED"]);
 const RECEIPT_KEYS = [
   "schema_version", "kind", "outcome", "exit_code", "signal", "error_code",
@@ -90,13 +90,13 @@ export const BOUNDED_COMMAND_ENVELOPE_SCHEMA = {
   properties: {
     schema_version: { const: BOUNDED_COMMAND_SCHEMA_VERSION },
     kind: { const: "bounded_command" },
-    outcome: { enum: ["completed", "spawn_error", "argument_invalid", "internal_error"] },
+    outcome: { enum: ["completed", "timed_out", "spawn_error", "argument_invalid", "internal_error"] },
     exit_code: { anyOf: [{ type: "integer" }, { type: "null" }] },
     signal: { anyOf: [{ type: "string", pattern: "^SIG[A-Z0-9]+$" }, { type: "null" }] },
     duration_ms: { type: "integer", minimum: 0 },
     stdout: streamSchema,
     stderr: streamSchema,
-    error_code: { anyOf: [{ type: "null" }, { enum: ["ARGUMENT_INVALID", "SPAWN_FAILED", "INTERNAL_ERROR"] }] },
+    error_code: { anyOf: [{ type: "null" }, { enum: ["ARGUMENT_INVALID", "SPAWN_FAILED", "TIMEOUT", "INTERNAL_ERROR"] }] },
   },
 };
 
@@ -132,13 +132,16 @@ function isStreamEnvelope(value) {
 export function isBoundedCommandEnvelope(value) {
   if (!hasExactlyKeys(value, RESULT_KEYS)) return false;
   if (value.schema_version !== BOUNDED_COMMAND_SCHEMA_VERSION || value.kind !== "bounded_command") return false;
-  if (!["completed", "spawn_error", "argument_invalid", "internal_error"].includes(value.outcome)) return false;
+  if (!["completed", "timed_out", "spawn_error", "argument_invalid", "internal_error"].includes(value.outcome)) return false;
   if (value.exit_code !== null && !Number.isSafeInteger(value.exit_code)) return false;
   if (value.signal !== null && (typeof value.signal !== "string" || !SAFE_SIGNAL.test(value.signal))) return false;
   if (!isSafeInteger(value.duration_ms) || !isStreamEnvelope(value.stdout) || !isStreamEnvelope(value.stderr)) return false;
   if (!ERROR_CODES.has(value.error_code)) return false;
 
   if (value.outcome === "completed") return value.error_code === null;
+  if (value.outcome === "timed_out") {
+    return value.error_code === "TIMEOUT" && value.exit_code === null && value.signal === null;
+  }
   if (value.outcome === "spawn_error") {
     return value.error_code === "SPAWN_FAILED" && value.exit_code === null && value.signal === null;
   }
@@ -152,7 +155,7 @@ export function isBoundedCommandEnvelope(value) {
 export function isBoundedCommandReceipt(value) {
   if (!hasExactlyKeys(value, RECEIPT_KEYS)) return false;
   if (value.schema_version !== BOUNDED_COMMAND_RECEIPT_SCHEMA_VERSION || value.kind !== "team_harness_bounded_command_receipt") return false;
-  if (!["completed", "spawn_error", "argument_invalid", "internal_error", "output_error"].includes(value.outcome)) return false;
+  if (!["completed", "timed_out", "spawn_error", "argument_invalid", "internal_error", "output_error"].includes(value.outcome)) return false;
   if (value.exit_code !== null && !Number.isSafeInteger(value.exit_code)) return false;
   if (value.signal !== null && (typeof value.signal !== "string" || !SAFE_SIGNAL.test(value.signal))) return false;
   if (!RECEIPT_ERROR_CODES.has(value.error_code)) return false;
@@ -168,6 +171,9 @@ export function isBoundedCommandReceipt(value) {
     || value.result_path.includes("\u0000") || Buffer.byteLength(value.result_path, "utf8") > MAX_OUTPUT_PATH_BYTES
     || !SAFE_SHA256.test(value.result_sha256) || !isSafeInteger(value.result_bytes)) return false;
   if (value.outcome === "completed") return value.error_code === null;
+  if (value.outcome === "timed_out") {
+    return value.error_code === "TIMEOUT" && value.exit_code === null && value.signal === null;
+  }
   if (value.outcome === "spawn_error") {
     return value.error_code === "SPAWN_FAILED" && value.exit_code === null && value.signal === null;
   }
@@ -551,7 +557,7 @@ export async function runBoundedCommand(options) {
     const settleDeadlineIfReady = () => {
       if (!deadlineExpired || treeTerminationConfirmed === null || !deadlineClosed) return;
       if (treeTerminationConfirmed) {
-        settle("completed", null, "SIGKILL", null);
+        settle("timed_out", null, null, "TIMEOUT");
       } else {
         settle("internal_error", null, null, "INTERNAL_ERROR");
       }

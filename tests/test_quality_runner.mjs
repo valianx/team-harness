@@ -18,6 +18,7 @@ import {
   runQualityChecks,
   validateQualityManifest,
 } from "../plugins/team-harness/skills/pipeline/scripts/quality-runner.mjs";
+import { resolveGitTimeoutMs } from "../plugins/team-harness/skills/pipeline/scripts/quality-lib.mjs";
 
 const failures = [];
 const node = process.execPath;
@@ -140,6 +141,7 @@ function assertClosedResult(result) {
     "checkpoint",
     "commands",
     "crap",
+    "detail",
     "duration_ms",
     "error_code",
     "error_context",
@@ -149,9 +151,23 @@ function assertClosedResult(result) {
     "schema_version",
     "verdict",
   ]);
+  if (result.verdict === "fail" && result.detail !== null) {
+    assert.equal(typeof result.detail, "string");
+    assert.ok(result.detail.length <= 200);
+    assert.doesNotMatch(result.detail, /[\r\n]/);
+  }
 }
 
 console.log("=== Deterministic quality runner ===");
+
+await check("the internal git timeout is env-configurable within a clamped range", async () => {
+  assert.equal(resolveGitTimeoutMs({}), 30_000);
+  assert.equal(resolveGitTimeoutMs({ TH_GIT_TIMEOUT_MS: "not-a-number" }), 30_000);
+  assert.equal(resolveGitTimeoutMs({ TH_GIT_TIMEOUT_MS: "-1" }), 30_000);
+  assert.equal(resolveGitTimeoutMs({ TH_GIT_TIMEOUT_MS: "1" }), 5_000);
+  assert.equal(resolveGitTimeoutMs({ TH_GIT_TIMEOUT_MS: "45000" }), 45_000);
+  assert.equal(resolveGitTimeoutMs({ TH_GIT_TIMEOUT_MS: "9999999" }), 600_000);
+});
 
 await check("a clean immutable candidate runs exact argv commands and emits bounded evidence", async () => {
   const secret = "ARGV-SECRET-MUST-NOT-APPEAR";
@@ -242,12 +258,13 @@ await check("the CLI returns the same closed JSON contract and a useful process 
 });
 
 await check("invalid manifests and missing selected commands fail closed", async () => {
-  const invalid = { schema_version: 1, commands: { arbitrary: command() } };
+  const invalid = { schema_version: 1, commands: { "Not-A-Valid-Id": command() } };
   await temporaryRepository({ manifest: invalid }, async ({ repo, base }) => {
     const result = await runQualityChecks(options(repo, base, ["test"]));
     assertClosedResult(result);
     assert.equal(result.verdict, "fail");
     assert.equal(result.error_code, "MANIFEST_INVALID");
+    assert.match(result.detail, /command id/);
   });
 
   const manifest = baseManifest({ lint: command() });
@@ -537,7 +554,7 @@ await check("missing external prerequisites are unavailable rather than pass", a
 await check("dirty candidates and quality commands that mutate tracked files fail closed", async () => {
   const manifest = baseManifest({ test: command() });
   await temporaryRepository({ manifest }, async ({ repo, base }) => {
-    await writeFile(path.join(repo, "untracked.txt"), "dirty\n", "utf8");
+    await writeFile(path.join(repo, "README.md"), "modified tracked content\n", "utf8");
     const result = await runQualityChecks(options(repo, base, ["test"]));
     assert.equal(result.error_code, "WORKTREE_DIRTY");
   });
@@ -552,7 +569,20 @@ await check("dirty candidates and quality commands that mutate tracked files fai
   });
 });
 
-await check("tool failures and missing executables remain bounded and fail closed", async () => {
+await check("untracked command byproducts are not worktree evidence", async () => {
+  const manifest = baseManifest({
+    test: command("require('node:fs').mkdirSync('.test-cache', { recursive: true }); require('node:fs').writeFileSync('.test-cache/state.json', '{}')"),
+  });
+  await temporaryRepository({ manifest }, async ({ repo, base }) => {
+    await writeFile(path.join(repo, "preexisting-untracked.log"), "scratch\n", "utf8");
+    const result = await runQualityChecks(options(repo, base, ["test"]));
+    assertClosedResult(result);
+    assert.equal(result.verdict, "pass", JSON.stringify(result));
+    assert.equal(result.error_code, null);
+  });
+});
+
+await check("tool failures, spawn failures, and timeouts carry distinct causes", async () => {
   const failing = baseManifest({ test: command("process.stderr.write('expected failure'); process.exit(7)") });
   await temporaryRepository({ manifest: failing }, async ({ repo, base }) => {
     const result = await runQualityChecks(options(repo, base, ["test"]));
@@ -564,10 +594,87 @@ await check("tool failures and missing executables remain bounded and fail close
   const missing = baseManifest({ test: { argv: ["missing-quality-tool-do-not-leak"] } });
   await temporaryRepository({ manifest: missing }, async ({ repo, base }) => {
     const result = await runQualityChecks(options(repo, base, ["test"]));
-    assert.equal(result.error_code, "COMMAND_FAILED");
+    assertClosedResult(result);
+    assert.equal(result.error_code, "SPAWN_FAILED");
     assert.equal(result.commands[0].execution.outcome, "spawn_error");
     assert.equal(JSON.stringify(result).includes("missing-quality-tool"), false);
   });
+
+  const hanging = baseManifest({
+    test: { argv: [node, "-e", "setInterval(() => {}, 1000);"], timeout_ms: 250 },
+  });
+  await temporaryRepository({ manifest: hanging }, async ({ repo, base }) => {
+    const result = await runQualityChecks(options(repo, base, ["test"]));
+    assertClosedResult(result);
+    assert.equal(result.verdict, "fail");
+    assert.equal(result.error_code, "TIMEOUT");
+    assert.equal(result.commands[0].execution.outcome, "timed_out");
+    assert.match(result.detail, /timed out after 250ms/);
+  });
+});
+
+await check("a missing manifest is absent rather than invalid", async () => {
+  const manifest = baseManifest({ test: command() });
+  await temporaryRepository({ manifest }, async ({ repo, base }) => {
+    const absent = await runQualityChecks({
+      ...options(repo, base, ["test"]),
+      manifest: ".team-harness/no-such-manifest.json",
+    });
+    assertClosedResult(absent);
+    assert.equal(absent.verdict, "fail");
+    assert.equal(absent.error_code, "MANIFEST_ABSENT");
+    assert.match(absent.detail, /manifest not found/);
+
+    const malformed = path.join(repo, ".git", "malformed.json");
+    await writeFile(malformed, "{ not json", "utf8");
+    const invalid = await runQualityChecks({
+      ...options(repo, base, ["test"]),
+      manifest: path.relative(repo, malformed),
+    });
+    assert.equal(invalid.error_code, "MANIFEST_INVALID");
+  });
+});
+
+await check("open command ids are accepted and severity tiers gate the verdict", async () => {
+  const manifest = baseManifest({
+    test: command(),
+    e2e: command(),
+    style_scan: { ...command("process.exit(4)"), severity: "advisory" },
+  });
+  await temporaryRepository({ manifest }, async ({ repo, base }) => {
+    const result = await runQualityChecks(options(repo, base, ["test", "e2e", "style_scan"]));
+    assertClosedResult(result);
+    assert.equal(result.verdict, "pass", JSON.stringify(result));
+    assert.equal(result.error_code, null);
+    const advisory = result.commands.find((entry) => entry.id === "style_scan");
+    assert.equal(advisory.severity, "advisory");
+    assert.equal(advisory.verdict, "fail");
+    assert.ok(result.commands.filter((entry) => entry.severity === "blocking").every((entry) => entry.verdict === "pass"));
+  });
+
+  const blockingFailure = baseManifest({
+    test: command(),
+    style_scan: command("process.exit(4)"),
+  });
+  await temporaryRepository({ manifest: blockingFailure }, async ({ repo, base }) => {
+    const result = await runQualityChecks(options(repo, base, ["test", "style_scan"]));
+    assert.equal(result.verdict, "fail");
+    assert.equal(result.error_code, "COMMAND_FAILED");
+  });
+
+  for (const id of ["test", "crap"]) {
+    const declaration = id === "crap"
+      ? { ...crapCommand(), severity: "advisory" }
+      : { ...command(), severity: "advisory" };
+    const commands = id === "crap" ? { test: command(), crap: declaration } : { [id]: declaration };
+    const floor = baseManifest(commands, id === "crap" ? { new_function_max: 12, changed_function_may_worsen: false } : undefined);
+    await temporaryRepository({ manifest: floor }, async ({ repo, base }) => {
+      const result = await runQualityChecks(options(repo, base, ["test"]));
+      assert.equal(result.verdict, "fail");
+      assert.equal(result.error_code, "MANIFEST_INVALID");
+      assert.match(result.detail, /acceptance-critical/);
+    });
+  }
 });
 
 await check("CRAP is computed from complexity and coverage and improves against an immutable baseline", async () => {
@@ -615,6 +722,59 @@ await check("CRAP is computed from complexity and coverage and improves against 
       assert.equal(enforced.crap.functions[0].baseline_crap, 22.5);
       assert.equal(enforced.crap.functions[0].delta, -14.436);
       assert.deepEqual(enforced.crap.functions[0].violations, []);
+    },
+  );
+});
+
+await check("a reformatted manifest and a pipeline amend keep baseline evidence valid", async () => {
+  const manifest = baseManifest(
+    { crap: crapCommand() },
+    { new_function_max: 200, changed_function_may_worsen: false },
+  );
+  await temporaryRepository(
+    {
+      manifest,
+      candidateFiles: {
+        "src/calc.go": "package calc\nfunc Calculate() {}\n",
+        "metrics.json": crapReport({ complexity: 10, coverage: 50 }),
+      },
+    },
+    async ({ repo, base }) => {
+      const measured = await runQualityChecks(options(repo, base, ["crap"]));
+      assert.equal(measured.verdict, "pass", JSON.stringify(measured));
+      const baselinePath = path.join(repo, ".git", "quality-baseline.json");
+      await writeFile(baselinePath, `${JSON.stringify(measured)}\n`, "utf8");
+      const baselineSha256 = await fileSha256(baselinePath);
+
+      const parsed = JSON.parse(await readFile(path.join(repo, ".team-harness", "quality.json"), "utf8"));
+      const reordered = Object.fromEntries(Object.keys(parsed).sort().reverse().map((key) => [key, parsed[key]]));
+      await writeFile(path.join(repo, ".team-harness", "quality.json"), JSON.stringify(reordered), "utf8");
+      git(repo, "add", ".team-harness/quality.json");
+      git(repo, "commit", "-q", "-m", "reformat manifest only");
+
+      const reformatted = await runQualityChecks(
+        options(repo, base, ["crap"], { policyMode: "enforce", baseline: baselinePath, baselineSha256 }),
+      );
+      assertClosedResult(reformatted);
+      assert.equal(reformatted.verdict, "pass", JSON.stringify(reformatted));
+      assert.notEqual(reformatted.manifest.sha256, measured.manifest.sha256);
+      assert.equal(reformatted.manifest.canonical_sha256, measured.manifest.canonical_sha256);
+
+      const amendBaselinePath = path.join(repo, ".git", "quality-baseline-amend.json");
+      await writeFile(amendBaselinePath, `${JSON.stringify(reformatted)}\n`, "utf8");
+      const amendBaselineSha256 = await fileSha256(amendBaselinePath);
+      git(repo, "commit", "-q", "--amend", "-m", "re-anchored by assembly");
+      const afterAmend = await runQualityChecks(
+        options(repo, base, ["crap"], {
+          policyMode: "enforce",
+          baseline: amendBaselinePath,
+          baselineSha256: amendBaselineSha256,
+        }),
+      );
+      assertClosedResult(afterAmend);
+      assert.equal(afterAmend.verdict, "pass", JSON.stringify(afterAmend));
+      assert.notEqual(afterAmend.repository.candidate_commit, reformatted.repository.candidate_commit);
+      assert.equal(afterAmend.repository.candidate_tree, reformatted.repository.candidate_tree);
     },
   );
 });

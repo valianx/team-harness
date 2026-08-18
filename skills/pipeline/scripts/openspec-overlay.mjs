@@ -7,7 +7,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { isOpenSpecSnapshot, normalizeOpenSpecTaskIds, verifySnapshot } from "./openspec-snapshot.mjs";
-import { KNOWN_COMMANDS } from "./quality-runner.mjs";
+import { isQualityCommandId } from "./quality-runner.mjs";
 
 export const OPENSPEC_OVERLAY_SCHEMA_VERSION = 1;
 export const OPENSPEC_OVERLAY_REBIND_SCHEMA_VERSION = 1;
@@ -16,7 +16,6 @@ const MAX_BYTES = 1024 * 1024;
 const MAX_ITEMS = 4096;
 const SHA256 = /^[a-f0-9]{64}$/;
 const ITEM_ID = /^(?:AC|Task)-[1-9][0-9]*$/;
-const QUALITY_ID = /^[a-z][a-z0-9_]*$/;
 const ANCHOR_ID = /^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$/;
 const CLASSIFICATIONS = new Set(["direct", "split", "merged", "th-extension", "excluded", "ambiguous"]);
 const SOURCE_KINDS = new Set(["requirement", "scenario", "design-decision", "task"]);
@@ -176,8 +175,7 @@ function validateShape(overlay, snapshot, snapshotBytes, findings) {
     findings.push(finding("OWNERSHIP_INVALID", "repository"));
   }
   if (!Array.isArray(overlay.quality_commands) || overlay.quality_commands.length === 0
-    || overlay.quality_commands.some(entry => !exact(entry, ["id"]) || !QUALITY_ID.test(entry.id))
-    || overlay.quality_commands.some(entry => !KNOWN_COMMANDS.includes(entry.id))
+    || overlay.quality_commands.some(entry => !exact(entry, ["id"]) || !isQualityCommandId(entry.id))
     || new Set(overlay.quality_commands.map(entry => entry.id)).size !== overlay.quality_commands.length) {
     findings.push(finding("QUALITY_COMMAND_INVALID", "quality_commands"));
   }

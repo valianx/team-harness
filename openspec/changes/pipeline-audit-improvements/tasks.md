@@ -8,12 +8,12 @@
 
 ## 2. Quality-Runner Diagnostics
 
-- [ ] 2.1 Split the failure taxonomy: `MANIFEST_ABSENT`, `TIMEOUT`, `SPAWN_FAILED`, bounded `detail` on every validation failure; environment causes distinguishable from candidate defects.
-- [ ] 2.2 Validate plan-declared required checks against the manifest at Gate-1 preparation.
-- [ ] 2.3 Move cross-checkpoint identity to canonical hashing; tolerate the pipeline's own squash/amend in ancestry checks.
-- [ ] 2.4 Adopt a benign-byproduct worktree-cleanliness policy and a configurable internal git timeout.
-- [ ] 2.5 Open the command-id list behind hermetic argv validation and add manifest-declared per-command severity tiers with safe defaults.
-- [ ] 2.6 Extract the triplicated helpers into one shared module.
+- [x] 2.1 Split the failure taxonomy: `MANIFEST_ABSENT`, `TIMEOUT`, `SPAWN_FAILED`, bounded `detail` on every validation failure; environment causes distinguishable from candidate defects.
+- [x] 2.2 Validate plan-declared required checks against the manifest at Gate-1 preparation.
+- [x] 2.3 Move cross-checkpoint identity to canonical hashing; tolerate the pipeline's own squash/amend in ancestry checks.
+- [x] 2.4 Adopt a benign-byproduct worktree-cleanliness policy and a configurable internal git timeout.
+- [x] 2.5 Open the command-id list behind hermetic argv validation and add manifest-declared per-command severity tiers with safe defaults.
+- [x] 2.6 Extract the triplicated helpers into one shared module.
 - [ ] 2.7 Update `docs/quality-runner.md` and `docs/cleaner-crap.md` to the resulting contract (current drift closed by rewrite, not patched).
 
 ## 3. Freeze Quality Collapse

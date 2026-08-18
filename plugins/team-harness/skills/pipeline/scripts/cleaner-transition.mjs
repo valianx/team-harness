@@ -1,12 +1,10 @@
 #!/usr/bin/env node
 /** Prove one bounded cleaner transition without trusting agent prose. */
 
-import { execFile } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
-import { lstat, mkdtemp, open, readFile, realpath, rename, rm, unlink, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { lstat, mkdtemp, open, realpath, rename, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
 
 import {
@@ -14,14 +12,22 @@ import {
   runQualityChecks,
   validateQualityManifest,
 } from "./quality-runner.mjs";
-
-const execFileAsync = promisify(execFile);
+import {
+  createBlobResolver,
+  createBoundedJsonReader,
+  createGitRunners,
+  hasExactlyKeys,
+  hasOnlyKeys,
+  isContained,
+  isSafeRelativePath,
+  pathMatchesRule,
+  sha256,
+} from "./quality-lib.mjs";
 
 export const CLEANER_ALLOWLIST_SCHEMA_VERSION = 1;
 export const CLEANER_TRANSITION_SCHEMA_VERSION = 1;
 export const CLEANER_TRANSITION_RECEIPT_SCHEMA_VERSION = 1;
 
-const MAX_JSON_BYTES = 1024 * 1024;
 const MAX_PATHS = 512;
 const SAFE_SHA256 = /^[0-9a-f]{64}$/;
 const SAFE_GIT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
@@ -55,48 +61,10 @@ class CleanerError extends Error {
   }
 }
 
-function hasOnlyKeys(value, allowed, required = []) {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-  const keys = Object.keys(value);
-  return keys.every((key) => allowed.includes(key)) && required.every((key) => Object.hasOwn(value, key));
-}
-
-function hasExactlyKeys(value, keys) {
-  return hasOnlyKeys(value, keys, keys) && Object.keys(value).length === keys.length;
-}
-
-function sha256(value) {
-  return createHash("sha256").update(value).digest("hex");
-}
-
-function isSafeRelativePath(value) {
-  if (typeof value !== "string" || value.length === 0 || value.includes("\u0000") || path.isAbsolute(value)) {
-    return false;
-  }
-  const normalized = value.replaceAll("\\", "/");
-  return (
-    !normalized.startsWith("/") &&
-    !normalized.split("/").includes("..") &&
-    Buffer.byteLength(value, "utf8") <= 512
-  );
-}
-
-function isContained(root, target) {
-  const relative = path.relative(root, target);
-  return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
-}
-
-async function readBoundedJson(filePath, code) {
-  try {
-    const stat = await lstat(filePath);
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_JSON_BYTES) throw new Error("invalid file");
-    const bytes = await readFile(filePath);
-    if (bytes.length > MAX_JSON_BYTES) throw new Error("file too large");
-    return { value: JSON.parse(bytes.toString("utf8")), bytes };
-  } catch {
-    throw new CleanerError(code);
-  }
-}
+const cleanerError = (code) => new CleanerError(code);
+const readBoundedJson = createBoundedJsonReader(cleanerError);
+const { gitText, gitBytes } = createGitRunners(cleanerError);
+const resolveBlobsAtCommit = createBlobResolver(gitBytes, cleanerError);
 
 async function resolveRepository(repoInput) {
   if (typeof repoInput !== "string" || repoInput.length === 0) throw new CleanerError("ARGUMENT_INVALID");
@@ -175,64 +143,6 @@ async function resolveExternalJson(fileInput, code) {
 async function loadAllowlist(fileInput) {
   const loaded = await resolveExternalJson(fileInput, "ALLOWLIST_INVALID");
   return { value: validateAllowlist(loaded.value), sha256: sha256(loaded.bytes) };
-}
-
-async function gitText(repo, args, code) {
-  try {
-    const result = await execFileAsync("git", args, {
-      cwd: repo,
-      encoding: "utf8",
-      maxBuffer: MAX_JSON_BYTES,
-      timeout: 30_000,
-      windowsHide: true,
-    });
-    return result.stdout.trim();
-  } catch {
-    throw new CleanerError(code);
-  }
-}
-
-async function gitBytes(repo, args, code) {
-  try {
-    const result = await execFileAsync("git", args, {
-      cwd: repo,
-      encoding: null,
-      maxBuffer: MAX_JSON_BYTES,
-      timeout: 30_000,
-      windowsHide: true,
-    });
-    return result.stdout;
-  } catch {
-    throw new CleanerError(code);
-  }
-}
-
-function pathMatchesRule(candidate, rule) {
-  const normalized = candidate.replaceAll("\\", "/");
-  if (rule.type === "prefix") return normalized.startsWith(rule.value.replaceAll("\\", "/"));
-  if (rule.type === "suffix") return normalized.endsWith(rule.value);
-  return normalized.split("/").includes(rule.value);
-}
-
-async function resolveBlobsAtCommit(repo, commit, paths, code) {
-  if (paths.length === 0) return new Map();
-  const bytes = await gitBytes(repo, ["ls-tree", "-z", "--full-tree", commit, "--", ...paths], code);
-  const requested = new Set(paths);
-  const blobs = new Map();
-  for (const record of bytes.toString("utf8").split("\u0000").filter(Boolean)) {
-    const separator = record.indexOf("\t");
-    const [mode, type, object, ...extra] = record.slice(0, separator).split(" ");
-    const candidate = record.slice(separator + 1);
-    if (
-      separator < 0 || extra.length !== 0 || !/^[0-7]{6}$/.test(mode) || type !== "blob" ||
-      !SAFE_GIT_ID.test(object) || !requested.has(candidate) || blobs.has(candidate)
-    ) {
-      throw new CleanerError(code);
-    }
-    blobs.set(candidate, object);
-  }
-  if (blobs.size !== requested.size) throw new CleanerError(code);
-  return blobs;
 }
 
 async function assertBaselineAllowlist(repo, allowlist, quality, manifest) {
