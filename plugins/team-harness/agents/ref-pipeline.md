@@ -1723,7 +1723,7 @@ concern. It is never silently treated as a clean audit.
 condition is an explicit fail-closed exception to the QA severity floor: a changed control
 that was broken or not substantively covered cannot proceed as a concern.
 
-**Advance requires both conjuncts:** `phase3_combined ∈ {pass, concerns}` AND `qa.code_hygiene == pass`, **with no correctable security finding**. Preserve only non-correctable `concerns` for STAGE-GATE-3 — their presence is an exception pause, never an auto-ship. Any failing condition completes the required validation set and mandatory triage. An eligible package records one new bounded correction decision; an ineligible one pauses.
+**Advance requires both conjuncts:** `phase3_combined ∈ {pass, concerns}` AND `qa.code_hygiene == pass`, **with no correctable security finding** (the fenced fail-closed conditions above are excluded from `concerns` by construction and never satisfy this clause). A `concerns` outcome the ratchet below records as a `reviews/findings-ledger.md` residual auto-ships citing the Gate-1 record; every other `concerns` outcome — a non-correctable structural contradiction, or a round the ratchet has not yet evaluated — remains an exception pause, never an auto-ship. Any failing condition completes the required validation set and mandatory triage. An eligible package records one new bounded correction decision; an ineligible one pauses.
 
 Validation advance → `waiting_gate3`. Fail on either conjunct → read all required bounded
 result artifacts and consolidate once; then either record the eligible autonomous decision or
@@ -1738,6 +1738,35 @@ rebuild the verification packet before fresh QA and any impact-required security
 
 **Read `failure-brief.md` only**, never the full workspace docs. The failing agent appends its actionable summary there. When the brief does not exist — an `execution-failed` that fired before the agent wrote anything — read the status block's `summary`, `issues` and literal error instead, and do not treat the absent file as a second failure.
 
+### The ratchet
+
+Extends the `fail` predicate and `phase3_combined` above by citation, never a second copy of
+either: the correction loop terminates on severity, not on patience or an exhausted round budget
+alone.
+
+After a correction round's fresh QA and any required security pass return, before deciding
+whether another round opens:
+
+1. **Coverage-defect reclassification.** A finding on surface unchanged since the round that
+   opened this correction, in a class the first fan's Coverage Declaration already flagged an
+   instance of, is a first-pass coverage defect, not genuinely new evidence — cite that
+   declaration instead of treating the finding as freshly discovered.
+2. **Convergence check.** When every remaining open finding is sub-floor (`phase3_combined`
+   evaluates to `concerns`, never `fail`) on surface unchanged since the prior pass, validation is
+   convergence-complete: no further correction round opens. Record each remaining finding as a
+   `reviews/findings-ledger.md` residual (`agents/_shared/orchestrator-state.md § Findings
+   ledger`, disposition `accepted-residual`) and carry it into the pull-request body as a
+   concern.
+3. **New evidence always reopens.** An open `critical` finding classified `new_in_delta` opens a
+   correction round exactly as today, regardless of any convergence this ratchet reached.
+
+The residual set excludes both fenced fail-closed conditions above by construction: a correctable
+`broke-it` and `incomplete_on_changed_control: true` on a sensitive pipeline are never sub-floor,
+never converge, and can never become a ledger residual at any severity label or classification.
+The ratchet never weakens the `fail` predicate, the Gate-3 closed exception list
+(`agents/_shared/gate-contract.md`), or the `code_hygiene` re-assertion below, which stays a gate
+conjunction on its own terms.
+
 ### Validation acceptance check
 
 After validation succeeds and before `waiting_gate3`, re-verify traceability directly from
@@ -1750,7 +1779,7 @@ the artifacts. The combined verdict never replaces Gate 3.
 5. **UX gate (`frontend_scope` only):** any `critical` (WCAG A) finding in `reviews/04-ux-validation.md` fails the gate → Case A. `high`/`medium`/`suggestion` never block.
 6. **Regression still passing (`fix`/`hotfix`, Tier 2–4):** confirm `regression_test_path` shows PASS, not `skip`/`xfail` — then **read the actual assertion body** and confirm it matches the authored pattern. A weakened or replaced assertion fails the gate even with the test name and PASS status intact.
 7. **Test-change integrity:** when tests changed or were deleted, require the exact reason and surviving behavioral evidence. A deletion or weakened assertion whose purpose is to hide a failure joins the consolidated correction-decision package; test counts never gate acceptance.
-8. **`code_hygiene` re-assertion.** Re-read the value `qa` recorded. `fail` closes this check regardless of AC, security or build outcome. This is a re-check, not a new evaluation — it exists so a hygiene fail cannot slip through if validation wording is ever loosened.
+8. **`code_hygiene` re-assertion.** Re-read the value `qa` recorded. `fail` closes this check regardless of AC, security, build, or ratchet-convergence outcome. This is a re-check, not a new evaluation — it exists so a hygiene fail cannot slip through if validation wording is ever loosened.
 
 Security findings are checked here: a correctable `broke-it` or incomplete sensitive-coverage
 finding is a validation failure and, after explicit authorization, must have passed through
