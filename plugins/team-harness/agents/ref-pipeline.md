@@ -311,10 +311,10 @@ One taxonomy for everything that can go wrong, so the budget question is answere
 | `stale-context` | A snapshot-bound result names a missing or different reviewed head/context identity than its dispatch | review coordinator | no retry against the old snapshot; recapture and re-dispatch under the owning freshness barrier | STOP without publishing if a fresh snapshot cannot be established |
 | `artifact-missing` | A required output **file** is absent, empty, or unparseable while the dispatch reported success | the owning specialist | re-dispatch once | STOP; never author the missing artifact yourself |
 | `execution-failed` | The specialist ran, hit an internal error it cannot classify further, and says so | the specialist | re-dispatch once, carrying the literal error plus its `summary` and `issues` | STOP with those surfaced verbatim |
-| `verification-negative` | A verifying lens returned `fail`/`concerns` over real work — the pipeline produced a defect | operator correction decision | counts against the **max-3** limit only after authorization | pause with the consolidated failure; at `3/3`, only an explicitly labelled exceptional decision may authorize one more round |
-| `correction-incomplete` | An authorized correction returned without every package closure check passing | implementer | no Freeze and no validation fan; the consumed correction round remains consumed | consolidate the failed closure evidence as the next correction package; normal approval pauses, eligible autonomy may authorize another round within max-3 |
+| `verification-negative` | A verifying lens returned `fail`/`concerns` over real work — the pipeline produced a defect | operator correction decision | only `gate1-autonomous` authority consumes the **max-3 autonomous** budget; explicit operator-live rounds are unbounded | pause with the consolidated failure and always retain live choice `1`; autonomous exhaustion never removes operator authority |
+| `correction-incomplete` | An authorized correction returned without every package closure check passing | implementer | no Freeze and no validation fan; the consumed single-use authorization remains consumed | consolidate the failed closure evidence as the next correction package; eligible autonomy may continue within max-3, while a fresh operator-live decision remains available without a maximum |
 | `build-or-lint` | A build or lint command exited non-zero at the implementation Freeze checkpoint | implementer | **max 2** attempts, a budget separate from max-3 | `status: blocked` with the full output |
-| `hygiene-fail` | `qa` returned `code_hygiene: fail` | operator correction decision | shares the **max-3** limit only after authorization | as `verification-negative` |
+| `hygiene-fail` | `qa` returned `code_hygiene: fail` | operator correction decision | shares the **max-3 autonomous** limit only under `gate1-autonomous`; operator-live remains unbounded | as `verification-negative` |
 | `contradiction` | The finding cannot be resolved without a decision that is not yours | **operator** | no budget — never becomes a correction round | escalate in the same presentation as any fixable items |
 | `reclassification-needed` | The task is not the type or tier it was dispatched as | **operator** | no budget | STOP with `recommended_type`/`recommended_tier` and the evidence; never auto-route |
 
@@ -324,7 +324,7 @@ One taxonomy for everything that can go wrong, so the budget question is answere
 
 **Scope expansion, and which half of it reaches this table.** `scope_expansion: new-information` is a *successful* classification of something genuinely unknowable at freeze time: the work continues at a re-frozen boundary, it carries its own max-2 bound (§ Scope-freeze convergence gate), and it never appears here — nothing went wrong. `scope_expansion: known-at-freeze` is different: `architect` returns it as `status: blocked` with `failure_kind: contradiction` and a `proposed_scope`, **without having written the revised plan**, because the omission has to reach the operator before it is absorbed into an artifact. That is a real table row — the blocker is a decision that is not the coordinator's — and like every `contradiction` it carries **no budget**. "Budget-neutral" is what "not a failure" means for it; do not read it as "do not block".
 
-**Three invariants across the table.** (a) A correction budget is a limit, never authority: `iteration < 3` and generic continuation text cannot dispatch work. Only a valid `approved-autonomous` Gate-1 dual record plus the closed eligibility predicate may supply bounded autonomous authority. (b) Decision-bearing kinds have no retry budget because additional attempts cannot produce the missing decision. (c) A correction round begins only after one fresh package-bound decision and consumes exactly that one authorization.
+**Three invariants across the table.** (a) The max-3 budget limits only `gate1-autonomous` decisions; it is never authority and never caps a fresh `operator-live` choice. Generic continuation text still cannot dispatch work. (b) Decision-bearing kinds have no automatic retry budget because additional attempts cannot produce the missing decision. (c) Every correction round, automatic or operator-live, begins only after one fresh package-bound decision and consumes exactly that one authorization.
 
 **Every specialist reports its kind.** A status block with `status: failed` or `status: blocked` carries `failure_kind: <one of the above>`. A returned failure with no kind is `invalid-return` — the missing thing is a field, not a file. Re-dispatch once naming the field, and never guess the kind on the specialist's behalf: the whole point is that the agent that hit the failure is the one that knows which it was.
 
@@ -352,17 +352,17 @@ selected by the initial or impact-derived validation set,
 then consolidates and triages the complete finding package. Under normal approval it
 pauses at `phase: validation` until the operator authorizes exactly one round. Under a
 valid `approved-autonomous` dual record, Main may authorize one fresh round only when
-every closed eligibility conjunct passes and `iteration < 3`. Plan repairs and decisions
+every closed eligibility conjunct passes and `autonomous_correction_count < 3`. Plan repairs and decisions
 never create an automatic design-perfection loop.
 
-**Max 3 is a limit, never permission.** At `3/3`, the standard path is pause or abort. An
-exceptional round exists only while `exceptional_correction_count: 0` and when option `1` is explicitly labelled exceptional in the
-post-failure presentation and selected by the live operator. Set
-`correction_exceptional: true` on that presentation, its decision, and the one authorized
-`iteration.start`/`agent.correction.spawn` pair; ordinary decisions use `false`. Increment
-the separate exceptional counter to `1` only for that matching authorize record. Every later
-failure offers only pause or abort; never allow a second exception or serialize
-`3/3+exception`.
+**Max 3 limits autonomy, never the operator.** `autonomous_correction_count`
+is bounded to `0..3` and mirrored by legacy `iteration: N/3`.
+`operator_correction_count` is monotonic and deliberately unbounded. At `3/3`,
+or after any number of operator rounds, Main still pauses with the ordinary
+three choices and a fresh nonce. Each current live choice `1` authorizes one
+complete bounded round, increments only the operator counter, and requires
+closure, a new Freeze, tester refresh, fresh QA, and impact-required security.
+There is no exceptional label, waiver, or one-time overflow allowance.
 
 ### `cause` and the severity floor
 
@@ -407,7 +407,7 @@ intent/scope/AC contradiction to resolve first—never as a silent waiver.
 
 Under a valid `approved-autonomous` dual record, when every finding is an unambiguous in-scope
 `resolve`, the package is complete, no decision-bearing or ambiguous item remains, and
-`iteration < 3`, Main instead records one package-bound `gate1-autonomous` authorization without
+`autonomous_correction_count < 3`, Main instead records one package-bound `gate1-autonomous` authorization without
 a live presentation. It then consumes that single decision through the same correction route.
 
 ### Remediation prefers removal or replacement over addition
@@ -453,8 +453,8 @@ work after Gate 1.
 Live choice `1`, or one eligible autonomous decision, records both the state decision and
 one `correction.decision` event before dispatch. The correction packet contains every authorized finding ID and only the union
 scope; the decision and its one authorized event pair carry the same
-`correction_exceptional` boolean and authority. Autonomous authority also carries the
-exact consumed Gate-1 nonce. It may not narrow to one finding, widen scope, or reuse an old nonce. After the
+`correction_authority` and authority Gate nonce. Autonomous authority carries the
+exact consumed Gate-1 nonce; operator-live carries null. It may not narrow to one finding, widen scope, or reuse an old nonce. After the
 bounded implementation/evidence work, require a recorded PASS for every package closure check
 before any tester refresh or Freeze. Missing or failed closure evidence is `correction-incomplete`:
 do not dispatch tester, create a Freeze, or spend a final validation fan. After successful closure,
@@ -1307,8 +1307,8 @@ candidate/manifest identity. Update the current state pointer only after the
 prior terminal attempt is durably bound in events; never overwrite or relabel
 its artifacts. Use fresh attempt-qualified evidence paths for every recovered
 pre/post transition so no atomic output target can replace an earlier result.
-This recovery consumes the normal max-3 implementation
-correction budget. It needs no new Gate 1 while intent and approved scope are
+This live recovery increments the separate unbounded operator correction
+counter and does not consume the max-3 autonomous budget. It needs no new Gate 1 while intent and approved scope are
 unchanged; scope expansion still requires its explicit decision.
 A test, behavior, declared optional check, protected/out-of-scope path,
 threshold/config, or declared-tool failure cannot be waived or returned to the
@@ -1347,7 +1347,7 @@ exactly one fresh implementer bound byte-for-byte to the package. Gate-1
 autonomy, ordinary approval, generic `continue`, agent prose, files, and tools
 never authorize it. Record `cleaner.handoff.decision` and
 `agent.cleaner-handoff.spawn`, never `iteration.start` or
-`agent.correction.spawn`; `iteration` stays unchanged and max-3 remains wholly
+`agent.correction.spawn`; `iteration` stays unchanged and the autonomous max-3 remains wholly
 available for post-Freeze validation corrections. The implementer gets one
 terminal attempt, runs every closure check, and stops—no feedback or automatic
 re-dispatch. A non-zero closure result includes the exact command, exit code,
@@ -1580,7 +1580,9 @@ After an authorized correction passes every closure check, apply this closed, fa
    classification never weakens the security floor.
 
 This routing changes validation cost, not correction authority: every correction still consumes
-one authorized round, creates one new Freeze only after closure, and remains bounded by max-3.
+one single-use authorization and creates one new Freeze only after closure.
+Gate1-autonomous rounds remain bounded by max-3; operator-live rounds remain
+separately counted and unbounded.
 
 **Staleness invariant: nothing ships from unreviewed relevant evidence.** `adversary` reads the consolidated `inputs/00-frozen.diff` generated from `verification_base_ref...HEAD` — the same range `qa` validates, frozen at the implementation Freeze checkpoint. The only exception is an impact-derived security carry-forward whose record proves that every previously audited attack-surface blob is unchanged and the correction touched no security finding, TC, anchor, or classified attack-surface path.
 
@@ -1874,7 +1876,8 @@ The autonomous eligibility predicate is closed: every blocking finding must be a
 unambiguous `resolve` inside approved scope that preserves intent, behavior, and AC meaning.
 Any scope expansion, conflicting finding, design-consistent/decision-required disposition,
 security ambiguity or waiver, unavailable coverage, infrastructure failure, doubt, budget
-exhaustion, or exceptional round pauses for the operator. Autonomous correction decisions
+exhaustion, or any other failed conjunct pauses for the operator. That pause always retains the
+fresh unbounded operator-live correction choice. Autonomous correction decisions
 record `correction_authority: gate1-autonomous` and the exact consumed Gate-1 release nonce.
 
 **Activation only via an explicit operator declaration at STAGE-GATE-1** — `approve autonomous`. Never via a flag, a skill, an environment variable, or skill metadata.

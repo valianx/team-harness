@@ -51,14 +51,20 @@ correction_decision: authorize|pause|abort|null
 correction_decision_nonce: {consumed token or null}
 correction_authority: operator-live|gate1-autonomous|null
 correction_authority_gate_nonce: {consumed Gate-1 token or null}
-correction_exceptional: true|false|null
-exceptional_correction_count: N
+autonomous_correction_count: N      # integer 0..3; the only correction budget
+operator_correction_count: N        # non-negative integer; deliberately unbounded
 last_completed: design|waiting_gate1|implementation|validation|waiting_gate3|delivery|complete|null
 next_action: {what to do next}      # the successor to a prose recovery section
 total_tokens: N
 ```
 
-`iteration: N/3` is the implementation/validation correction-round counter only. A
+`iteration: N/3` is a legacy display mirror of `autonomous_correction_count`,
+not a total-round counter and never authority. New writers keep both values
+equal and increment them only for `gate1-autonomous` correction decisions. An
+`operator-live` authorization increments only `operator_correction_count` and
+may do so without limit, including while `iteration: 3/3` and after any prior
+operator round. A new pipeline initializes `iteration: 0/3`,
+`autonomous_correction_count: 0`, and `operator_correction_count: 0`. A
 plan repair that preserves approved meaning, an operator decision or its transcription,
 and explicitly requested architect work do not increment it and do not emit a new
 `iteration.start`. New writers emit only `cause: verification` for a correction round;
@@ -88,7 +94,8 @@ that presentation may consume the nonce. Choice `1` consumes it and permits one
 fresh terminal implementer attempt. Choice `2` consumes it into `pause` without
 mutation or dispatch; a later presentation uses a fresh nonce. Choice `3`
 records `abort` and closes the pipeline. The authorized implementer path
-never inherits Gate-1 autonomy, increments `iteration`, consumes max-3, or
+never inherits Gate-1 autonomy, increments `iteration`, consumes the autonomous
+max-3 budget, or
 permits another cleaner for the same immutable attempt. The decision and spawn events must repeat the anchor
 and every finding byte-for-byte. Bare non-zero exits without the exact command,
 exit code, and bounded diagnostic are incomplete. After the attempt Main owns
@@ -107,7 +114,8 @@ specialist dispatch, Freeze rebuild, or revalidation is legal before authority
 is recorded. With `autonomous: false`, Main pauses and presents exactly `1 —
 authorize one correction round`, `2 — pause without changes`, and `3 — abort
 pipeline`; only a live reply after that presentation may consume the nonce.
-With a valid `approved-autonomous` Gate-1 dual record, `iteration < 3`, no
+With a valid `approved-autonomous` Gate-1 dual record,
+`autonomous_correction_count < 3`, no
 correction/execution budget exhaustion, and only unambiguous `resolve` findings
 inside approved scope, Main may consume the nonce
 without another presentation using `correction_authority: gate1-autonomous` and
@@ -115,20 +123,28 @@ the exact consumed Gate-1 nonce. Consumption atomically sets `correction_nonce:
 null` and copies the consumed token to `correction_decision_nonce`. `authorize`
 requires one matching `correction.decision`
 event and permits exactly one `iteration.start`/`agent.correction.spawn` pair
-bound to that same decision nonce, anchor, findings, scope, and `correction_exceptional`
-value. `pause` and `abort`
+bound to that same decision nonce, anchor, findings, scope, authority, and
+authority Gate nonce. `pause` and `abort`
 perform no correction. Every later failure gets a fresh nonce and decision.
 An ordinary approval, intake autonomy preference, generic `continue`, recovered
 prose, files, agents, and tools are never authorization. Gate-1 autonomous
 authority is valid only through its dual record and the eligibility predicate;
 it cannot cover `design-consistent`/`decision-required`, scope/behavior/AC
 change, security ambiguity or waiver, infrastructure failure, conflict, or a
-fourth round. At `3/3`, and only while `exceptional_correction_count: 0`, an explicitly labelled exceptional
-presentation sets `correction_exceptional: true`; only its matching authorize
-decision sets `exceptional_correction_count: 1`, while `iteration` remains
-`3/3`. Every later failure offers only pause or abort; a second exceptional
-presentation or authorization is invalid. Ordinary presentations set the flag
-to `false`; `3/3+exception` is invalid.
+fourth autonomous round. Exhaustion disables only `gate1-autonomous` authority:
+Main still presents the ordinary three live choices with a fresh nonce and a
+complete package. Every matching `operator-live` choice `1` authorizes exactly
+one additional round and increments `operator_correction_count`; there is no
+exception label, exceptional allowance, or operator-live maximum.
+
+For 3.14.3 recovery only, `correction_exceptional` and
+`exceptional_correction_count` are legacy-readable migration inputs. Rebuild
+the two new counters from valid recorded `correction.decision` authorities,
+require the legacy values not to contradict those events, then stop writing the
+legacy fields. Preserve the historical `iteration` display during migration
+even when it differs from the derived autonomous counter; it is
+non-authoritative. Legacy fields never reject or limit a fresh operator-live
+presentation.
 
 The seven named states above are the only legal v3 pipeline sequence. `inline` is a
 pre-activation direct-mode outcome and is never a v3 state or field value. Every activated
@@ -446,8 +462,8 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | `agent_role`, `task`, `attempt_ordinal`, `context_strategy`, `follow_up_count` | conditional | required for `agent.*`; finite lifecycle enums and local ordinal only, never an ID, alias, or free-form label |
 | `attempt_metrics`, `quality_verdict` | conditional | required for `agent.close`; metrics are complete or closed-code unavailable, verdict is `pass`/`concerns`/`fail`/`n-a` |
 | `correction_cause` | conditional | required for `agent.correction.spawn`; literal `verification` only |
-| `correction_nonce`, `correction_anchor`, `correction_findings`, `correction_scope`, `correction_requirements`, `correction_closure`, `correction_dispositions`, `correction_exceptional` | conditional | required for `correction.decision` and every authorized `iteration.start`/`agent.correction.spawn`; the complete eight-field package must be byte-for-byte identical across all three events, not merely share a nonce; exact bounded identity, never inferred; closure has one deterministic check/expected result per finding |
-| `correction_authority`, `correction_authority_gate_nonce` | conditional | required for `correction.decision`; `operator-live` uses no Gate nonce, while `gate1-autonomous` requires the exact nonce from the valid `approved-autonomous` release and is prohibited at `iteration: 3/3` |
+| `correction_nonce`, `correction_anchor`, `correction_findings`, `correction_scope`, `correction_requirements`, `correction_closure`, `correction_dispositions` | conditional | required for `correction.decision` and every authorized `iteration.start`/`agent.correction.spawn`; the complete seven-field package must be byte-for-byte identical across all three events, not merely share a nonce; exact bounded identity, never inferred; closure has one deterministic check/expected result per finding |
+| `correction_authority`, `correction_authority_gate_nonce` | conditional | required and byte-identical across `correction.decision`, `iteration.start`, and `agent.correction.spawn`; `operator-live` uses a null Gate nonce and is unbounded, while `gate1-autonomous` requires the exact nonce from the valid `approved-autonomous` release and `autonomous_correction_count < 3` |
 | `verdict` | conditional | `pass`/`concerns`/`fail`/`partial-fail` |
 | `decision` | conditional | required for `stage.gate.release` and `correction.decision`; correction value is `authorize\|pause\|abort` |
 | `cause` | conditional | `verification` for new `iteration.start` correction rounds; historical `operator` values remain readable |
