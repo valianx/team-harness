@@ -52,6 +52,57 @@ It also declares exactly one
 these values per repository and binds the final quality run to that exact set;
 a missing manifest command or unselected required check fails closed.
 
+Every task shard must also declare all three fields in one `## Dispatch
+anchors` block:
+
+```text
+required_invariants: [I...]
+required_evidence_anchors: [workspace-relative/path...]
+cross_runtime_preservation: <non-empty preservation statement>
+```
+
+The OpenSpec overlay mirrors these exact values into the matching
+`execution_items` entry. `[]` is valid only when no applicable invariant or
+evidence anchor exists; `cross_runtime_preservation` is always non-empty.
+Missing, malformed, or mismatched values fail the deterministic plan contract
+before Gate 1. Attaching Main's transcript, a sibling task shard, or the full
+plan set is never a substitute.
+
+If a shard also contains a legacy `**Required invariants:** ...` field, every
+identifier there joins the effective invariant set and must appear in the
+overlay entry. The validator never ignores a stricter shard declaration or
+silently chooses the less restrictive duplicate.
+
+The overlay schema deliberately names this array `execution_items`; there is no
+top-level `tasks`. Main must select exactly one matching `.execution_items[]`
+entry by `id`, record its `/execution_items/<index>` JSON Pointer and hash in
+the specialist packet, and pass its exact `sources`. Zero/multiple matches or a
+packet that assumes `.tasks[]` fails closed rather than probing alternate keys.
+
+Shard paths and `required_evidence_anchors` are relative to the pipeline
+workspace artifact root; task `Files:` and OpenSpec source coordinates are
+relative to the repository/worktree root. Main passes both absolute canonical
+values in `path_roots.repository_root` and
+`path_roots.workspace_artifact_root`. No consumer may resolve every relative
+path against cwd/worktree or use `../` to cross between these domains.
+
+Specialist packets bind these inputs through a non-empty
+`artifact_coordinates` array of `{kind, root, path, anchor, sha256}`. Preserve
+the exact case-sensitive Task Index path (`plan/tasks/Task-N.md`); bind an
+invariant ID as an anchor inside `plan/invariants.md`, never as a synthesized
+`INV-N.md` path. Main proves root containment, exact component spelling,
+regular non-symlink identity, SHA-256, unique anchor occurrence, and equality
+with the overlay `shard_path` before dispatch. A specialist never repairs or
+searches for an invalid coordinate.
+
+Each shard's technical constraints also declare `required_seams` with every
+API, export, mutation adapter, public entry point, callsite, verification
+registry, allowlist, or exemption manifest whose validity the task changes,
+plus its provider path. Every
+provider must occur in the task's `Files:` or in an already-closed dependency;
+otherwise the shard is not dispatchable. The packet carries only that verified
+set plus `discovery_scope: {directories, globs}` bounded to task-owned source.
+
 Resolve paths from the index once. Implementer reads its task plus named design
 anchors. Tester reads task ACs and TCs plus the verification packet; QA grades
 the task ACs and consumes only relevant TC evidence. Security

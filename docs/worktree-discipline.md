@@ -62,7 +62,12 @@ native approval for that exact local command independently of
 The plan records the absolute worktree path, branch, and an immutable base
 commit before Gate 1. Physical creation happens only after a valid Gate-1
 dual-record and before any implementation dispatch. Main first performs the
-read-only Rule-2 collision checks and verifies the base object, then runs the
+read-only Rule-2 collision checks, verifies the base object, and proves the
+planned path is equal to or below one of the current native `writable_roots`.
+An escalated `git worktree add` can create a path that ordinary patch/edit
+operations still cannot write; command approval is therefore not evidence of
+implementation access. When only the repository root is writable, use an
+ignored contained worktree path or branch in place. Main then runs the
 single exact argv-equivalent command:
 
 ```bash
@@ -79,6 +84,24 @@ replacement attempt, or authorize another automatic escalation. Keep
 the one exact pending worktree command. Report one instruction to approve that
 technical action. A later live operator approval authorizes one resubmission of
 the same escalation; it does not itself make `.git` writable.
+
+The same separation applies after creation. Before a committing specialist is
+dispatched, Main resolves `git rev-parse --absolute-git-dir`. If that directory
+is outside the live writable roots—normally
+`<main>/.git/worktrees/<name>`—the packet declares
+`git_metadata_write_mode: native-escalation-required`. Source edits and tests
+remain sandboxed normally; only exact path-scoped `git add` and `git commit`
+(or a same-owner, no-intervening-commit amend) retry through native escalation
+with `login:false` when protected index/ref writes fail. This never authorizes a
+blanket `.git` root, broad staging, reset, or hook bypass.
+
+A canonical worktree is also the concurrency boundary. Even disjoint source
+paths share its index/ref metadata and repository-wide checks. Team Harness
+therefore dispatches committing tester/implementer tasks sequentially within
+one worktree and parallelizes only across distinct canonical worktrees or
+repositories. A global diagnostic caused solely by another legacy active lane
+is recorded as `concurrent-lane-interference` and rerun once by Main after the
+round barrier on the consolidated clean tree.
 
 On success, verify the registered path, exact branch, and `HEAD ==
 <immutable-base-sha>` before setting `working_branch` or dispatching. On

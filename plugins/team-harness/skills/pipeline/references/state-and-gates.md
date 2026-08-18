@@ -30,6 +30,12 @@ phase ends with the measured or unavailable `phase.end` shape in
 [observability.md](observability.md). A phase name, gate, or successful result
 never supplies a token value by implication.
 
+For an OpenSpec-bound Design, Main must run the packaged
+`openspec-events.mjs` against the complete configured events file and bound
+feature after both architect attempts close and before writing
+`phase: waiting_gate1`. Only `verdict: pass` permits Gate 1; do not repair or
+normalize invalid lifecycle records while presenting the gate.
+
 ## Ownership and snapshot
 
 The primary Codex thread exclusively owns `00-state.md`, execution events, gate
@@ -141,8 +147,6 @@ verification_base_ref: {immutable commit or null}
 freeze_anchor: {immutable tree anchor or null}
 freeze_commit_sha: {full commit object ID or null}
 freeze_tree_sha: {full tree object ID or null}
-validated_commit_sha: {full commit object ID or null}
-validated_tree_sha: {full tree object ID or null}
 open_findings: [{id, disposition}]|[]
 worktree: {absolute path or null}
 worktree_branch: {branch or null}
@@ -154,7 +158,7 @@ delivery_version_rationale: {one sentence naming supported-contract impact}|null
 delivery_diff_composition: {total_lines, total_files, mechanical_files, substantive_files}|null
 delivery_size_result: within-bounds|flagged|null
 delivery_size_justification: {workspace pointer}|null
-delivery_base_status: {base_ref, validated_base_sha, remote_base_sha: {full SHA}|null, status: current|moved|unknown}|null
+delivery_base_status: {base_ref, freeze_base_sha, remote_base_sha: {full SHA}|null, status: current|moved|unknown}|null
 delivery_preview: {pr title, workspace paths, and SHA-256 digests bound to Gate 3}|null
 ```
 
@@ -514,7 +518,7 @@ Record a release atomically in both places:
 Consume the nonce and clear `gate_pending`. A field without its event, or an
 event without its field, is not a release. Never repair a malformed field;
 re-present with a fresh nonce. `Gate 3: ship` is the operator's single approval
-to push the exact validated commit and create/update its draft PR; version,
+to push the exact accepted Freeze commit and create/update its draft PR; version,
 changelog, tests, and commit creation already completed before Freeze. Do not ask
 again between push and PR. Native
 Codex tool approval may still be required to execute a command, but it is a

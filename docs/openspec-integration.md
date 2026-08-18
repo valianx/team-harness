@@ -19,19 +19,49 @@ explicit exclusion. Non-direct mappings are disclosed as `split`, `merged`, `th-
 `excluded` with a rationale. `ambiguous`, missing reverse coverage, stale hashes, dangling
 coordinates, or copied normative text block Gate 1.
 
+The overlay v1 arrays are `acceptance_items` and `execution_items`; it has no
+top-level `tasks`. Task `Task-N` sources live at the unique matching
+`.execution_items[]` entry, and specialist packets bind that entry by JSON
+Pointer plus content hash.
+
+Execution packets use two explicit roots. Repository files and canonical
+OpenSpec source coordinates are relative to `path_roots.repository_root`;
+Team Harness plan, input, review, contract, and evidence artifacts are relative
+to `path_roots.workspace_artifact_root`. Bare relative paths never inherit cwd,
+and `../` is not a valid bridge between the two domains.
+
 ## Continuous two-pass Design
 
 Main advances through these actions without requiring another operator command after each success:
 
 1. Preflight Node.js `>=20.19.0`, npm, OpenSpec `1.9.0`, project initialization, and the generated
-   integration for the active runtime.
+   integration for the active runtime. A compatible but uninitialized repository is initialized
+   automatically; this is not an operator checkpoint.
 2. Dispatch a fresh architect in `openspec-planning` mode. It follows the installed upstream
    `openspec-propose` or `openspec-update-change` skill and writes only the bound OpenSpec change.
 3. Run OpenSpec status and strict validation, extract stable coordinates, and capture the snapshot.
 4. Dispatch a fresh architect in `openspec-overlay` mode. It adds only repository ownership,
    specialist routing, file scope, constraints, quality IDs, Freeze/evidence controls, rollback,
-   and delivery grouping.
-5. Validate snapshot freshness and bidirectional traceability, then present the existing Gate 1.
+   delivery grouping, and each shard's explicit dispatch anchors. The packet includes the live
+   writable roots, and every proposed worktree must remain inside one.
+5. Validate snapshot freshness, bidirectional traceability, exact agreement between every
+   shard's `required_invariants`, `required_evidence_anchors`, and
+   `cross_runtime_preservation` declarations and its execution item, writable execution
+   topology, and the canonical event trace; then present Gate 1.
+6. During implementation, `openspec-overlay.mjs verify-and-rebind` performs
+   every authorized monotonic task-checkbox transition and mechanical overlay
+   binding update as one idempotent recoverable operation. It restores the old
+   snapshot on a safe rebind failure and resumes an interrupted transition only
+   from the exact predecessor/task event; every other stale condition remains
+   fail-closed.
+
+The overlay dispatch includes a 120-second structured `TH_PROGRESS` transport.
+Main observes input validation, mapping, and artifact-writing milestones without
+reading partial output. Crossing the 10-minute architect SLA produces one
+`TH_SLA` diagnostic with live status, last heartbeat, and `artifact_state`, plus
+one `agent.sla` event. An empty heartbeat/artifact observation is reported as
+`no-material-progress-observed`; it never stops or replaces the still-live
+architect.
 
 Progress commentary is informational. Main pauses only for a mandatory TH gate, a material choice
 not resolved by canonical artifacts, separately authorized external mutation, or a real blocker.
@@ -39,10 +69,16 @@ not resolved by canonical artifacts, separately authorized external mutation, or
 ## Dependency and generated-skill ownership
 
 If Node.js or npm is absent or incompatible, TH reports the exact prerequisite and does not install
-Node. If the pinned OpenSpec CLI or generated runtime integration is absent or stale, TH presents
-one live install/update-or-abort decision. An approval installs exactly
-`@fission-ai/openspec@1.9.0` without `sudo`, then runs upstream `openspec init` or `openspec update`
-and verifies the result.
+Node. If the pinned OpenSpec CLI is absent/incompatible or an existing generated integration is
+stale, TH presents one live install/update-or-abort decision. An approval installs exactly
+`@fission-ai/openspec@1.9.0` without `sudo` or runs the required update.
+
+When the compatible CLI reports an uninitialized repository, TH runs the exact upstream
+`openspec init` command automatically. Codex protects `.agents` and `.codex`; if the bounded attempt reports
+`INIT_SANDBOX_DENIED`, TH retries that exact argv once through native sandbox escalation with
+`login:false` and verifies the resulting generated integration. No other failure code authorizes
+that escalation. Generic initialization failures retain a sanitized diagnostic, expose no raw
+stdout/stderr or secret-bearing values, and remain fail-closed.
 
 OpenSpec remains the writer and owner of generated `openspec-*` skills and `opsx` commands. TH uses
 the installed planning skills during Design and bounded apply instructions during authorized
@@ -59,9 +95,10 @@ OpenSpec integrations are preserved unchanged.
 - Cleaner, security/adversary, delivery, state/events, nonces, corrections, Gate 1, Gate 3, and
   publication remain unchanged TH responsibilities.
 
-After implementation begins, the snapshot verifier accepts only authorized monotonic task checkbox
-changes from pending to complete. Task text, structure, added/removed coordinates, rollbacks, or any
-other canonical change block the next dispatch and require reconciliation.
+After implementation begins, the combined progress transition accepts only authorized monotonic
+task checkbox changes from pending to complete and immediately rebinds the overlay. Task text,
+structure, added/removed coordinates, rollbacks, or any other canonical change block the next
+dispatch and require reconciliation.
 
 ## Repository, local workspace, and Obsidian
 

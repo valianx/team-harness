@@ -988,7 +988,7 @@ def main() -> None:
             '[sandbox_workspace_write]\n'
             'network_access = false\n'
             'writable_roots = [\n'
-            '  "/operator/cache" # preserve operator root\n'
+            f'  {json.dumps(str((vault / "work-logs/team-harness").resolve()))} # preserve legacy narrow root\n'
             ']\n\n'
             '[projects."/tmp/example"]\n'
             'trust_level = "trusted"\n',
@@ -1027,7 +1027,7 @@ def main() -> None:
             fail("Codex runtime helper did not enable sandbox network access")
         workspace = (vault / "work-logs").resolve()
         expected_roots = [
-            "/operator/cache",
+            str(workspace / "team-harness"),
             "~/.cache/go-build",
             "~/.cache/uv",
             "~/.npm",
@@ -1037,8 +1037,10 @@ def main() -> None:
         ]
         if sandbox.get("writable_roots") != expected_roots:
             fail("Codex runtime helper did not preserve and append writable roots")
-        if "# preserve operator root" not in runtime_text:
-            fail("Codex runtime helper discarded an operator comment inside writable_roots")
+        if "# preserve legacy narrow root" not in runtime_text:
+            fail("Codex runtime helper discarded the legacy repo-scoped root or its comment")
+        if str(workspace) not in sandbox.get("writable_roots", []):
+            fail("Codex runtime helper did not expand a legacy repo-scoped Obsidian grant to the shared logs root")
         if not workspace.is_dir() or not (codex_home / "tmp").is_dir():
             fail("Codex runtime helper did not create managed writable roots")
         for marker in ('model = "operator-main"', '[projects."/tmp/example"]', 'trust_level = "trusted"'):
@@ -1551,13 +1553,20 @@ def main() -> None:
         fail("Codex sensitive inline path lacks live explicit selection")
 
     deliver_skill = (ROOT / "plugins/team-harness/skills/deliver/SKILL.md").read_text()
+    delivery_adapter = (ROOT / "runtime/codex/instructions/delivery.md").read_text().lower()
     delivery_reference = (
         ROOT / "plugins/team-harness/skills/pipeline/references/delivery.md"
     ).read_text()
     ship_contract = "\n".join((pipeline, current_state, deliver_skill, delivery_reference)).lower()
-    for marker in ("single", "validated commit", "validated_commit_sha", "validated_tree_sha", "push", "draft pr"):
+    for marker in ("single", "accepted freeze commit", "freeze_commit_sha", "freeze_tree_sha", "push", "draft pr"):
         if marker not in ship_contract:
             fail(f"Codex Gate 3 ship contract is missing {marker!r}")
+    for marker in ("single accepted", "freeze_commit_sha", "freeze_tree_sha"):
+        if marker not in delivery_adapter:
+            fail(f"Codex delivery adapter is missing simplified Freeze identity {marker!r}")
+    for retired in ("validated_commit_sha", "validated_tree_sha", "validated_base_sha"):
+        if retired in delivery_adapter:
+            fail(f"Codex delivery adapter retains retired identity {retired!r}")
     delivery_lower = delivery_reference.lower()
     for forbidden in ("run tests", "edit version/changelog", "stage", "commit", "fetch or reconcile"):
         if forbidden not in delivery_lower:
@@ -1732,9 +1741,24 @@ def main() -> None:
             "Each fact has one canonical home",
             "coordinator-assigned plan artifacts",
             "`status`, `artifact_pointers`",
+            "TH_PROGRESS",
+            "progress_recipient",
+            "send_message",
+            "TH_PROGRESS_REQUEST",
+            "required_invariants",
+            "required_evidence_anchors",
+            "cross_runtime_preservation",
+            "writable_roots",
         ),
         "implementer": ("assigned role packet", "never preload sibling tasks"),
-        "tester": ("assigned task shard", "fixed testing prose within 40 lines"),
+        "tester": (
+            "assigned task shard",
+            "fixed testing prose within 40 lines",
+            "--validate-contract",
+            "team_harness_test_contract_validation",
+            "contract-invalid",
+            "never an object",
+        ),
         "qa": ("assigned task shard", "fixed report prose within 30 lines"),
         "security": ("security-relevant task shards", "fixed prose within 20 lines"),
         "delivery": ("plan/delivery.md", "within 60 lines and 12 KB"),
@@ -1858,13 +1882,13 @@ def main() -> None:
     activation_digests = digest_table(activation)
     pipeline_digests = digest_table(pipeline)
     expected_updated_digests = {
-        "pipeline-architect": "377186f3c4dafb6fd128f8e798779315794cd56fa594630e0a97dd7971892f02",
-        "pipeline-implementer": "384f612dfe7cfbfe588be65c6c60071e0d27ab8d7f792447bb66b30c691d5dbc",
-        "pipeline-tester": "b919c206695e30fa2ba529523611cffc171a7b06d9b35fd37bc19f5186b79c93",
+        "pipeline-architect": "4fb84a1cf9cd51d80401c9a9e3a31bc0b66c98f209893b994d89f8a0bc28ed61",
+        "pipeline-implementer": "84afd23ff6adcf3fe7ab6b5ec85f30cac6313d1b0cfe09a96f6eb0d346d698ae",
+        "pipeline-tester": "32ee4a4832c1bc489ce89a578be9e0ef7b33dd91f50a210e9a34dbd74b1db844",
         "pipeline-cleaner": "ea4260bcb8fc1e17034f0d6f91b9d97efefeb61065c50b88a25e792eaaab88b9",
-        "pipeline-qa": "e63a6649de345ffcab03b5a83b5a0c8a1124b9c451be3fa271204b597f9ab5ac",
-        "pipeline-security": "fa5c8ce48def49085705fa083b1c2be2c02c9b9e560043313f3ba70f7004861a",
-        "pipeline-delivery": "1173e6d5edb63039cdc7d315f4c170c8f5489f76665b2cd77df682ae4be08246",
+        "pipeline-qa": "d13a07e234c8c95b91e31920a1c6bbb961ca0e3b96f03b7b93a7dee27472cbd1",
+        "pipeline-security": "11e9632e553eb98374b93b61901679800992edc284ea75d52d280c62fc4f5a14",
+        "pipeline-delivery": "c9a8a42ca62798cca1a57b65b89fbd044356433ac11fe7eff24ba3685f91aafa",
     }
     if set(activation_digests) != session_pipeline_roles or activation_digests != pipeline_digests:
         fail("pipeline and activation skill digest tables are not synchronized")

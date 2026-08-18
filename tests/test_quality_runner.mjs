@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,7 +14,9 @@ import {
   QUALITY_MANIFEST_SCHEMA_VERSION,
   QUALITY_RESULT_SCHEMA_VERSION,
   isQualityResult,
+  resolveLinkedLocalBinary,
   runQualityChecks,
+  validateQualityManifest,
 } from "../plugins/team-harness/skills/pipeline/scripts/quality-runner.mjs";
 
 const failures = [];
@@ -263,6 +265,197 @@ await check("invalid manifests and missing selected commands fail closed", async
     assert.equal(result.verdict, "fail");
     assert.equal(result.error_code, "MANIFEST_INVALID");
   });
+});
+
+await check("package-manager exec and download shims are rejected before launch", async () => {
+  const forbidden = [
+    ["npx", "vitest"], ["pnpx", "vitest"], ["bunx", "vitest"],
+    ["npx.bat", "vitest"], ["pnpx.ps1", "vitest"],
+    ["npm", "exec", "vitest"], ["npm", "x", "vitest"],
+    ["npm", "--prefix", ".", "exec", "vitest"],
+    ["pnpm", "dlx", "vitest"],
+    ["pnpm.ps1", "--config.verify-deps-before-run=false", "dlx", "vitest"],
+    ["yarn", "exec", "vitest"], ["yarn", "dlx", "vitest"],
+    ["bun", "x", "vitest"], ["corepack", "pnpm", "dlx", "vitest"],
+    ["corepack", "--install-directory", ".", "pnpm.cmd", "--offline", "dlx", "vitest"],
+  ];
+  for (const argv of forbidden) {
+    assert.throws(
+      () => validateQualityManifest(baseManifest({ test: { argv } })),
+      error => error?.message === "NON_HERMETIC_COMMAND",
+      argv.join(" "),
+    );
+  }
+  assert.doesNotThrow(() => validateQualityManifest(baseManifest({ test: { argv: ["pnpm", "run", "test"] } })));
+  assert.doesNotThrow(() => validateQualityManifest(baseManifest({ test: { argv: ["node_modules/.bin/vitest", "run"] } })));
+
+  const manifest = baseManifest({ test: { argv: ["pnpm", "dlx", "vitest"] } });
+  await temporaryRepository({ manifest }, async ({ repo, base }) => {
+    const result = await runQualityChecks(options(repo, base, ["test"]));
+    assert.equal(result.verdict, "fail");
+    assert.equal(result.error_code, "NON_HERMETIC_COMMAND");
+    assert.deepEqual(result.commands, []);
+  });
+});
+
+await check("pnpm exec resolves only an existing linked local binary without launching pnpm", async () => {
+  const manifest = baseManifest({ test: { argv: ["pnpm", "exec", "vitest", "run", "focused"] } });
+  await temporaryRepository({
+    manifest,
+    candidateFiles: { ".gitignore": "node_modules\n", "src/calc.go": "package calc\n" },
+  }, async ({ repo, base }) => {
+    const binary = path.join(repo, "node_modules", ".bin", "vitest");
+    await mkdir(path.dirname(binary), { recursive: true });
+    await writeFile(binary, "#!/usr/bin/env node\nprocess.exit(process.argv.slice(2).join(' ') === 'run focused' ? 0 : 9);\n");
+    await chmod(binary, 0o755);
+    const result = await runQualityChecks(options(repo, base, ["test"]));
+    assert.equal(result.verdict, "pass");
+    assert.equal(result.commands[0].execution_resolution, "linked-local-bin");
+    assert.match(result.commands[0].execution_argv_sha256, /^[a-f0-9]{64}$/);
+  });
+
+  await temporaryRepository({ manifest }, async ({ repo, base }) => {
+    const result = await runQualityChecks(options(repo, base, ["test"]));
+    assert.equal(result.verdict, "fail");
+    assert.equal(result.error_code, "PREREQUISITE_UNAVAILABLE");
+    assert.deepEqual(result.commands, []);
+  });
+});
+
+await check("direct node_modules binaries must resolve inside the current repository", async () => {
+  const manifest = baseManifest({ test: { argv: ["./node_modules/.bin/storybook", "build"] } });
+  await temporaryRepository({
+    manifest,
+    candidateFiles: { ".gitignore": "node_modules/\n", "src/calc.go": "package calc\n" },
+  }, async ({ repo, base }) => {
+    const binary = path.join(repo, "node_modules", ".bin", "storybook");
+    await mkdir(path.dirname(binary), { recursive: true });
+    await writeFile(binary, "#!/usr/bin/env node\nprocess.exit(process.argv[2] === 'build' ? 0 : 9);\n");
+    await chmod(binary, 0o755);
+    const result = await runQualityChecks(options(repo, base, ["test"]));
+    assert.equal(result.verdict, "pass", JSON.stringify(result));
+    assert.equal(result.commands[0].execution_resolution, "repository-local-bin");
+  });
+
+  const sharedDependencies = await mkdtemp(path.join(tmpdir(), "th-quality-shared-deps-"));
+  try {
+    const externalBinary = path.join(sharedDependencies, ".bin", "storybook");
+    await mkdir(path.dirname(externalBinary), { recursive: true });
+    await writeFile(externalBinary, "#!/usr/bin/env node\nprocess.exit(0);\n");
+    await chmod(externalBinary, 0o755);
+    await temporaryRepository({
+      manifest,
+      candidateFiles: { ".gitignore": "node_modules\n", "src/calc.go": "package calc\n" },
+    }, async ({ repo, base }) => {
+      await symlink(sharedDependencies, path.join(repo, "node_modules"), "dir");
+      const result = await runQualityChecks(options(repo, base, ["test"]));
+      assert.equal(result.verdict, "fail");
+      assert.equal(result.error_code, "PREREQUISITE_UNAVAILABLE");
+      assert.deepEqual(result.commands, []);
+    });
+  } finally {
+    await rm(sharedDependencies, { recursive: true, force: true });
+  }
+});
+
+await check("pnpm package scripts resolve to existing local binaries without launching pnpm", async () => {
+  for (const argv of [
+    ["pnpm", "test", "--", "--runInBand"],
+    ["pnpm", "run", "storybook", "--", "--no-open"],
+  ]) {
+    const script = argv.includes("storybook") ? "storybook" : "test";
+    const tool = script === "storybook" ? "storybook" : "vitest";
+    const expected = script === "storybook" ? "dev --no-open" : "run --runInBand";
+    const manifest = baseManifest({ test: { argv } });
+    await temporaryRepository({
+      manifest,
+      candidateFiles: {
+        ".gitignore": "node_modules/\n",
+        "package.json": { scripts: { test: "vitest run", storybook: "storybook dev" } },
+        "src/calc.go": "package calc\n",
+      },
+    }, async ({ repo, base }) => {
+      const binary = path.join(repo, "node_modules", ".bin", tool);
+      await mkdir(path.dirname(binary), { recursive: true });
+      await writeFile(binary, `#!/usr/bin/env node\nprocess.exit(process.argv.slice(2).join(' ') === ${JSON.stringify(expected)} ? 0 : 9);\n`);
+      await chmod(binary, 0o755);
+      const result = await runQualityChecks(options(repo, base, ["test"]));
+      assert.equal(result.verdict, "pass", JSON.stringify(result));
+      assert.equal(result.commands[0].execution_resolution, "linked-local-script");
+    });
+  }
+
+  for (const script of ["vitest run && echo unsafe", "vitest run | tee result.log"]) {
+    const manifest = baseManifest({ test: { argv: ["pnpm", "test"] } });
+    await temporaryRepository({
+      manifest,
+      candidateFiles: { "package.json": { scripts: { test: script } } },
+    }, async ({ repo, base }) => {
+      const result = await runQualityChecks(options(repo, base, ["test"]));
+      assert.equal(result.verdict, "fail");
+      assert.equal(result.error_code, "NON_HERMETIC_COMMAND");
+      assert.deepEqual(result.commands, []);
+    });
+  }
+
+  const missingManifest = baseManifest({ test: { argv: ["pnpm", "missing-script"] } });
+  await temporaryRepository({
+    manifest: missingManifest,
+    candidateFiles: { "package.json": { scripts: {} } },
+  }, async ({ repo, base }) => {
+    const result = await runQualityChecks(options(repo, base, ["test"]));
+    assert.equal(result.verdict, "fail");
+    assert.equal(result.error_code, "PREREQUISITE_UNAVAILABLE");
+  });
+});
+
+await check("pnpm package scripts unwrap repository-local node scripts without touching the package-manager store", async () => {
+  const manifest = baseManifest({ permissions: { argv: ["pnpm", "--config.verify-deps-before-run=false", "permissions:matrix"] } });
+  await temporaryRepository({
+    manifest,
+    candidateFiles: {
+      "package.json": { scripts: { "permissions:matrix": "node scripts/generate-permissions-matrix.mjs --check" } },
+      "scripts/generate-permissions-matrix.mjs": "process.exit(process.argv[2] === '--check' ? 0 : 9);\n",
+    },
+  }, async ({ repo, base }) => {
+    const result = await runQualityChecks(options(repo, base, ["permissions"]));
+    assert.equal(result.verdict, "pass", JSON.stringify(result));
+    assert.equal(result.commands[0].execution_resolution, "repository-local-node-script");
+    assert.match(result.commands[0].execution_argv_sha256, /^[a-f0-9]{64}$/);
+  });
+
+  for (const scriptValue of [
+    "node ../outside.mjs --check",
+    "node --eval process.exit(0)",
+    "node scripts/check.mjs && echo unsafe",
+  ]) {
+    const invalidManifest = baseManifest({ permissions: { argv: ["pnpm", "permissions:matrix"] } });
+    await temporaryRepository({
+      manifest: invalidManifest,
+      candidateFiles: { "package.json": { scripts: { "permissions:matrix": scriptValue } } },
+    }, async ({ repo, base }) => {
+      const result = await runQualityChecks(options(repo, base, ["permissions"]));
+      assert.equal(result.verdict, "fail");
+      assert.equal(result.error_code, "NON_HERMETIC_COMMAND");
+    });
+  }
+});
+
+await check("Windows linked-local shims use an explicit PowerShell interpreter without shell mode", async () => {
+  const repo = await mkdtemp(path.join(tmpdir(), "th-quality-windows-shim-"));
+  try {
+    const shim = path.join(repo, "node_modules", ".bin", "vitest.ps1");
+    await mkdir(path.dirname(shim), { recursive: true });
+    await writeFile(shim, "exit 0\n", "utf8");
+    const resolved = await resolveLinkedLocalBinary("vitest.cmd", ["run"], repo, repo, "linked-local-bin", "win32");
+    assert.deepEqual(resolved.argv.slice(0, 7), [
+      "powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+    ]);
+    assert.equal(resolved.argv[7], shim);
+    assert.equal(resolved.argv[8], "run");
+  } finally {
+    await rm(repo, { recursive: true, force: true });
+  }
 });
 
 await check("required quality coverage cannot pass with omitted controls", async () => {
@@ -555,6 +748,35 @@ await check("CRAP reports cannot claim unchanged or out-of-scope functions", asy
       assert.equal(result.error_code, "CRAP_REPORT_INVALID");
     },
   );
+});
+
+await check("CLI output persists complete quality evidence and emits only a bounded receipt", async () => {
+  const manifest = baseManifest({ test: command("process.stdout.write('ok')") });
+  await temporaryRepository({ manifest }, async ({ repo, base }) => {
+    const output = path.join(repo, ".git", "quality-result.json");
+    const processResult = spawnSync(node, [
+      runnerPath,
+      "--repo", repo,
+      "--manifest", ".team-harness/quality.json",
+      "--base", base,
+      "--candidate", "HEAD",
+      "--checkpoint", "quality-test",
+      "--checks", "test",
+      "--required-checks", "test",
+      "--output", output,
+    ], { cwd: repo, encoding: "utf8", windowsHide: true });
+    assert.equal(processResult.status, 0, processResult.stderr || processResult.stdout);
+    const receipt = JSON.parse(processResult.stdout);
+    const resultBytes = await readFile(output);
+    const result = JSON.parse(resultBytes);
+    assert.equal(receipt.kind, "team_harness_quality_receipt");
+    assert.equal(receipt.verdict, "pass");
+    assert.equal(receipt.result_path, output);
+    assert.equal(receipt.result_bytes, resultBytes.length);
+    assert.equal(receipt.result_sha256, createHash("sha256").update(resultBytes).digest("hex"));
+    assert.equal(isQualityResult(result), true);
+    assert.equal(result.verdict, "pass");
+  });
 });
 
 if (failures.length > 0) {

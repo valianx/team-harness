@@ -87,6 +87,61 @@ Node repositories can declare npm commands instead:
 The runner itself needs Node.js because it is distributed as an `.mjs` script.
 The repository does not need npm unless its manifest declares an npm command.
 
+Quality commands must be non-installing. The manifest rejects package-manager
+execution/download shims (`npx`, `pnpx`, `bunx`, `npm exec|x`,
+`pnpm dlx`, `yarn exec|dlx`, `bun x`, including `corepack`-wrapped forms)
+with `NON_HERMETIC_COMMAND` before launching a process. These frontends can
+consult or mutate global stores and may bootstrap a missing tool. Declare a
+repository-owned package script (`npm|pnpm|yarn|bun run ...`) or an exact
+already-installed local executable such as `node_modules/.bin/vitest` instead.
+Team Harness never installs dependencies or accepts a diagnostic substitute as
+authoritative evidence. The sole mechanical exception is `pnpm exec <tool>`:
+before launch, the runner requires an already-linked matching executable under
+an ancestor `node_modules/.bin` inside the repository and executes that link
+directly, never pnpm. Evidence retains the manifest command hash and separately
+records `execution_resolution: linked-local-bin` plus a stable effective-argv
+hash; a missing link is `PREREQUISITE_UNAVAILABLE`. This avoids pnpm store
+SQLite/install/purge behavior without changing test selection or arguments.
+The runner applies the same non-installing resolution to `pnpm <script>` and
+`pnpm run <script>` (including common `pnpm test` and `pnpm storybook`
+shorthands). It reads the exact `package.json` in the command working directory,
+accepts only a single simple argv-like script with no shell syntax, resolves its
+first token through an existing repository-local `node_modules/.bin` link, and
+executes the link directly without pnpm. Evidence records
+`execution_resolution: linked-local-script`. Compound scripts, lifecycle or
+dependency-management operations, missing scripts, and missing links fail
+closed before pnpm can consult a global store, bootstrap, install, or purge.
+When that simple package script is exactly `node <repository-relative
+.js|.mjs|.cjs> ...`, the runner verifies the regular non-symlink script below
+the repository and invokes it through the current Node executable. Evidence
+records `execution_resolution: repository-local-node-script`. This is the
+preferred route for repository-owned checks that do not need dependencies:
+pnpm's `verify-deps-before-run` and cross-OS StoreIndex are never opened.
+
+A manifest coordinate such as `./node_modules/.bin/vitest` or
+`./node_modules/.bin/storybook` is also resolved before execution. The runner
+requires the named file and its canonical target to remain inside the current
+repository and records `execution_resolution: repository-local-bin`. A
+worktree whose whole `node_modules` directory points at another checkout is
+therefore `PREREQUISITE_UNAVAILABLE`; it is not treated as a usable local
+installation and its wrapper cannot fall through to `npx` or an external npm
+cache.
+
+For coordinator evidence, pass an absolute `--output <path>`. The runner writes
+the complete result atomically and prints only a bounded
+`team_harness_quality_receipt` containing the result path, SHA-256, and byte
+count. Coordinators verify that receipt against the file. They do not generate
+temporary JavaScript wrappers, interpolate allowlists into source, or depend on
+a truncated stdout tail.
+
+Quality-result schema v2 adds execution identity fields. Persisted schema-v1
+quality baselines are intentionally rejected as `BASELINE_INVALID`; regenerate
+them by rerunning the repository's documented quality-runner baseline command
+on the current clean base. Schema-v1 red-transition artifacts are intentionally
+rejected as `RED_EVIDENCE_INVALID`; regenerate them with the documented
+`test-transition.mjs red` command before attempting green. Never edit or
+relabel old evidence in place.
+
 `test_contract.path_rules` opts the repository into deterministic
 pre-implementation testing. Every declared test path must match at least one
 `prefix`, `suffix`, or directory-`segment` rule. The transition runner also
@@ -94,8 +149,11 @@ requires the red commit's complete diff to equal the contract's test paths, so
 a permissive suffix cannot hide a production change. See
 [Pre-implementation Test Contract](test-contract-runner.md).
 
-Supported command identifiers are `test`, `format_check`, `lint`, `coverage`,
-and `crap`. Every command is an argument array. Shell expansion, redirection,
+Supported command identifiers are `test`, `build`, `typecheck`,
+`format_check`, `lint`, `coverage`, `crap`, `invariants`, `permissions`,
+`accessibility`, `contract`, `integration`, and `database`. Tool-specific
+aliases such as `storybook_build`, `i18n`, or `openspec` are not manifest IDs;
+fold those commands under the matching canonical control. Every command is an argument array. Shell expansion, redirection,
 pipes, substitutions, and arbitrary interpolated paths are forbidden. The sole
 substitution is the complete-argument `${TH_QUALITY_REPORT}` placeholder in the
 `crap` command, replaced by the runner as described below; partial-string
@@ -132,6 +190,20 @@ The literal argument `${TH_QUALITY_REPORT}` must appear exactly once in the
 `crap` command. The runner replaces that complete argument with a private
 temporary path; there is no partial string interpolation. The adapter writes
 the normalized JSON there. Reported files must belong to the Git change surface.
+The report is closed: its only top-level keys are `schema_version` and
+`functions`, with at most 512 function entries. Every entry has exactly
+`path`, `symbol`, `status`, `complexity`, and `coverage_percent`; `path` is a
+safe repository-relative member of the base-to-candidate changed-path set,
+`symbol` is non-empty and at most 256 UTF-8 bytes, `status` is `new|changed`,
+`complexity` is an integer of at least 1, and coverage is a finite number from
+0 through 100. `(path, symbol)` pairs are unique.
+
+`CRAP_REPORT_INVALID` means one of those input/schema/scope rules failed.
+`CRAP_REPORT_INCOMPLETE` is different: during post-cleaner enforcement, a
+function present in the accepted baseline is absent from the new report. These
+two definitions are the diagnostic contract; agents inspect the bounded report
+artifact and manifest adapter, not the implementation body of
+`quality-runner.mjs`.
 
 The adapter never supplies the CRAP score. The runner computes it consistently:
 
@@ -192,6 +264,17 @@ includes `crap`, also pass the exact pre-cleaner quality result through
 Successful command output is counted but not replayed. Failure diagnostics use
 the existing bounded-command envelope: independently counted stdout/stderr,
 sanitized printable tails, truncation flags, exit code, signal, and duration.
+The red/green test-transition checkpoints retain the same bounded diagnostic
+for the `test` command even when it exits successfully. This keeps a later
+quality postcondition failure distinguishable from a test failure; unbounded
+streams are never embedded.
+When the enclosing bounded execution is deferred or its terminal response may
+exceed the remaining tool context, add `--output <absolute-result-path>` to
+`bounded-command.mjs`. It atomically preserves the closed envelope and emits a
+small `team_harness_bounded_command_receipt` containing its path, byte size,
+SHA-256, outcome, and stream counters. A lost transport response is recovered
+by validating and hashing that predeclared artifact, never by rerunning the
+quality transition.
 The result contains command and manifest hashes instead of raw argument arrays.
 Ignored caches and build artifacts are outside Git identity and may still be
 written by repository tools. The runner is an evidence and output-control

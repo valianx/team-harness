@@ -1,9 +1,9 @@
-# Delivery mechanics: publish the validated commit
+# Delivery mechanics: publish the accepted Freeze commit
 
 This file is the coordinator's complete deterministic delivery contract.
 Delivery starts with accepted evidence over a committed branch and performs no
 implementation, release assembly, tests, commits, merges, or rebases. Its only
-mutation sequence is push the validated commit and create or update its draft
+mutation sequence is push the accepted Freeze commit and create or update its draft
 PR using the Gate-3-bound prose.
 
 `delivery` the specialist runs once before Gate 3 and owns only the workspace
@@ -24,21 +24,21 @@ create/update, re-read title/body and compare the body SHA-256 again. Missing or
 changed prose blocks and requires a fresh Gate 3; never regenerate it after
 `ship` and never recompose approved prose.
 
-## 2. Verify exact validated identity
+## 2. Verify exact accepted Freeze identity
 
 Delivery accepts only the branch state validation approved. Require all of:
 
 ```bash
 git status --porcelain                  # empty
 git branch --show-current               # equals working_branch
-git rev-parse HEAD                      # equals validated_commit_sha
-git rev-parse 'HEAD^{tree}'             # equals validated_tree_sha
+git rev-parse HEAD                      # equals freeze_commit_sha
+git rev-parse 'HEAD^{tree}'             # equals freeze_tree_sha
 ```
 
 Comparisons use full object IDs, never prefixes. `working_branch` must be a
 non-default branch with an allowed project prefix and must match the active
-checkout. `validated_commit_sha` and `validated_tree_sha` must equal the
-accepted Freeze packet values.
+checkout. `freeze_commit_sha` and `freeze_tree_sha` are the accepted packet
+values; delivery does not create another identity.
 
 Any mismatch blocks delivery and returns to implementation/Freeze/validation.
 Delivery does not run tests. It does not classify an allowlist, stage files,
@@ -105,7 +105,7 @@ Compare the returned full SHA with `verification_base_ref` and report
 `current`, `moved`, or `unknown` together with both SHAs. This repeats the signal presented at
 Gate 3 so movement after the operator's decision remains visible immediately before push. A
 moved or unavailable base never authorizes delivery to fetch, merge, rebase, rebuild, or change
-the validated commit; it is a merge-readiness signal for the operator and later PR review.
+the accepted Freeze commit; it is a merge-readiness signal for the operator and later PR review.
 
 Then publish exactly the current plain branch:
 
@@ -172,11 +172,11 @@ snapshot_error: {sanitized one-line error}
 ```
 
 The failed read does not wait, poll, reopen delivery, or prevent terminal
-completion when the validated commit is published and the PR already exists.
+completion when the accepted Freeze commit is published and the PR already exists.
 
 ## Terminal boundary
 
-Success requires the validated commit to be published and a draft PR to exist
+Success requires the accepted Freeze commit to be published and a draft PR to exist
 or an operator-confirmed ready-for-review PR to own the exact head/base pair.
 Then write terminal artifacts/events and set `phase/status: complete` immediately
 after the one snapshot attempt, including a terminal `query-failed` attempt. The pipeline stops; a later merge is external state and
@@ -195,7 +195,7 @@ not a second Team Harness decision.
 |---|---|
 | Valid Gate 3 dual record | block; never repair |
 | Exact preview digest | block; re-present Gate 3 |
-| Clean worktree + exact validated commit/tree | block; return to implementation |
+| Clean worktree + exact accepted Freeze commit/tree | block; return to implementation |
 | Plain non-default working branch | block; never create a late branch |
 | Non-force push | stop on rejection |
 | Draft-only mutation | surface an existing ready PR |

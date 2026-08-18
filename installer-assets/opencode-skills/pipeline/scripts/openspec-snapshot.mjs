@@ -11,7 +11,8 @@ import { fileURLToPath } from "node:url";
 import { runBoundedCommand } from "./bounded-command.mjs";
 import { isOpenSpecAdapterResult } from "./openspec-adapter.mjs";
 
-export const OPENSPEC_SNAPSHOT_SCHEMA_VERSION = 2;
+export const OPENSPEC_SNAPSHOT_SCHEMA_VERSION = 3;
+export const OPENSPEC_PROGRESS_SCHEMA_VERSION = 1;
 export const MAX_JSON_BYTES = 1024 * 1024;
 export const MAX_ARTIFACT_BYTES = 1024 * 1024;
 export const MAX_ARTIFACTS = 128;
@@ -23,8 +24,11 @@ const SHA256 = /^[a-f0-9]{64}$/;
 const ACTION_ERRORS = new Set([
   null, "ARGUMENT_INVALID", "TOOLCHAIN_NOT_READY", "STATUS_FAILED", "VALIDATION_FAILED",
   "BINDING_INVALID", "ARTIFACT_INVALID", "COORDINATE_INVALID", "SNAPSHOT_INVALID",
-  "SOURCE_CHANGED", "TASK_INTENT_CHANGED", "TASK_PROGRESS_INVALID", "INTERNAL_ERROR",
+  "SOURCE_CHANGED", "TASK_INTENT_CHANGED", "TASK_PROGRESS_INVALID", "PROGRESS_INVALID", "ATOMIC_TRANSITION_REQUIRED",
+  "INTERNAL_ERROR",
 ]);
+const CANONICAL_TASK_ID = /^task:\d+\.\d+$/;
+const VISIBLE_TASK_ID = /^\d+\.\d+$/;
 
 function hash(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 
@@ -42,6 +46,17 @@ function safeRelative(value) {
   if (!safeString(value, 1024) || path.isAbsolute(value)) return false;
   const normalized = value.replaceAll("\\", "/");
   return !normalized.startsWith("/") && !normalized.split("/").includes("..");
+}
+
+/** Accept OpenSpec's visible `N.N` IDs and the snapshot's canonical `task:N.N` IDs. */
+export function normalizeOpenSpecTaskIds(values) {
+  if (!Array.isArray(values)) return null;
+  const normalized = values.map(value => {
+    if (typeof value !== "string") return null;
+    if (CANONICAL_TASK_ID.test(value)) return value;
+    return VISIBLE_TASK_ID.test(value) ? `task:${value}` : null;
+  });
+  return normalized.includes(null) || new Set(normalized).size !== normalized.length ? null : normalized;
 }
 
 function contained(root, target) {
@@ -149,6 +164,24 @@ function taskState(coordinates) {
 }
 
 function snapshotBytes(snapshot) { return Buffer.from(`${JSON.stringify(snapshot, null, 2)}\n`, "utf8"); }
+function progressBytes(progress) { return Buffer.from(`${JSON.stringify(progress, null, 2)}\n`, "utf8"); }
+function progressPath(snapshotPath) { return path.join(path.dirname(snapshotPath), "openspec-progress.json"); }
+
+export function isOpenSpecProgress(value, snapshot) {
+  if (!exactlyKeys(value, ["schema_version", "kind", "change_name", "task_intent_sha256", "completed", "events"])
+    || value.schema_version !== OPENSPEC_PROGRESS_SCHEMA_VERSION || value.kind !== "team_harness_openspec_progress"
+    || value.change_name !== snapshot?.change?.name) return false;
+  const taskArtifact = snapshot.artifacts?.find(item => item.artifact_id === "tasks");
+  if (!taskArtifact || value.task_intent_sha256 !== taskArtifact.intent_sha256
+    || !Array.isArray(value.completed) || new Set(value.completed).size !== value.completed.length
+    || !Array.isArray(value.events) || value.events.length > MAX_PROGRESS_EVENTS) return false;
+  const taskIds = new Set(taskArtifact.coordinates.filter(item => item.kind === "task").map(item => item.id));
+  return value.completed.every(id => taskIds.has(id))
+    && value.events.every(event => exactlyKeys(event, ["recorded_at", "task_ids", "previous_progress_sha256", "task_content_sha256"])
+      && !Number.isNaN(Date.parse(event.recorded_at)) && Array.isArray(event.task_ids) && event.task_ids.length > 0
+      && event.task_ids.every(id => taskIds.has(id)) && SHA256.test(event.previous_progress_sha256)
+      && SHA256.test(event.task_content_sha256));
+}
 
 async function atomicWrite(target, bytes) {
   await mkdir(path.dirname(target), { recursive: true });
@@ -232,7 +265,7 @@ async function gitHead(projectRoot, commandRunner) {
 }
 
 export function isOpenSpecSnapshot(value) {
-  if (!exactlyKeys(value, ["schema_version", "kind", "captured_at", "repository", "workspace", "toolchain", "change", "artifacts", "artifact_set_sha256", "task_progress"])) return false;
+  if (!exactlyKeys(value, ["schema_version", "kind", "captured_at", "repository", "workspace", "toolchain", "change", "artifacts", "artifact_set_sha256"])) return false;
   if (value.schema_version !== OPENSPEC_SNAPSHOT_SCHEMA_VERSION || value.kind !== "team_harness_openspec_snapshot"
     || Number.isNaN(Date.parse(value.captured_at))) return false;
   if (!exactlyKeys(value.repository, ["root", "head_sha"]) || !safeString(value.repository.root)
@@ -266,16 +299,7 @@ export function isOpenSpecSnapshot(value) {
     || value.artifacts.some(item => item.artifact_id === "tasks" ? item.intent_sha256 === null : item.intent_sha256 !== null)) return false;
   const expectedSetHash = hash(Buffer.from(value.artifacts.map(item => `${item.path}\0${item.content_sha256}`).join("\n")));
   if (!SHA256.test(value.artifact_set_sha256) || value.artifact_set_sha256 !== expectedSetHash) return false;
-  if (!exactlyKeys(value.task_progress, ["completed", "events"])
-    || !Array.isArray(value.task_progress.completed)
-    || new Set(value.task_progress.completed).size !== value.task_progress.completed.length
-    || !Array.isArray(value.task_progress.events)
-    || value.task_progress.events.length > MAX_PROGRESS_EVENTS) return false;
-  const taskIds = new Set(value.artifacts.flatMap(item => item.coordinates).filter(item => item.kind === "task").map(item => item.id));
-  return value.task_progress.completed.every(id => taskIds.has(id))
-    && value.task_progress.events.every(event => exactlyKeys(event, ["recorded_at", "task_ids", "previous_sha256", "task_content_sha256"])
-      && !Number.isNaN(Date.parse(event.recorded_at)) && Array.isArray(event.task_ids) && event.task_ids.length > 0
-      && event.task_ids.every(id => taskIds.has(id)) && SHA256.test(event.previous_sha256) && SHA256.test(event.task_content_sha256));
+  return true;
 }
 
 export async function captureSnapshot({
@@ -340,33 +364,52 @@ export async function captureSnapshot({
     change: { name: changeName, schema: binding.schema, root: binding.changeRoot },
     artifacts,
     artifact_set_sha256: hash(Buffer.from(artifacts.map(item => `${item.path}\0${item.content_sha256}`).join("\n"))),
-    task_progress: {
-      completed: taskArtifact ? taskState(taskArtifact.coordinates).filter(item => item.complete).map(item => item.id) : [],
-      events: [],
-    },
   };
   if (!isOpenSpecSnapshot(snapshot)) return action("capture", "fail", "SNAPSHOT_INVALID");
   const target = path.join(workspace, "inputs/openspec-snapshot.json");
+  const progressTarget = progressPath(target);
+  const progress = {
+    schema_version: OPENSPEC_PROGRESS_SCHEMA_VERSION,
+    kind: "team_harness_openspec_progress",
+    change_name: changeName,
+    task_intent_sha256: taskArtifact?.intent_sha256 ?? null,
+    completed: taskArtifact ? taskState(taskArtifact.coordinates).filter(item => item.complete).map(item => item.id) : [],
+    events: [],
+  };
+  if (!isOpenSpecProgress(progress, snapshot)) return action("capture", "fail", "SNAPSHOT_INVALID");
   const bytes = snapshotBytes(snapshot);
-  try { await atomicWrite(target, bytes); } catch { return action("capture", "fail", "SNAPSHOT_INVALID"); }
+  try {
+    await atomicWrite(progressTarget, progressBytes(progress));
+    await atomicWrite(target, bytes);
+  } catch { return action("capture", "fail", "SNAPSHOT_INVALID"); }
   return action("capture", "pass", null, { snapshot_path: target, snapshot_sha256: hash(bytes) });
 }
 
 export async function verifySnapshot({ snapshotPath, phase = "pre-gate1", authorizedTaskIds = [] } = {}) {
+  const normalizedAuthorizedTaskIds = normalizeOpenSpecTaskIds(authorizedTaskIds);
   if (!safeString(snapshotPath) || !["pre-gate1", "implementation"].includes(phase)
-    || !Array.isArray(authorizedTaskIds) || new Set(authorizedTaskIds).size !== authorizedTaskIds.length) {
+    || normalizedAuthorizedTaskIds === null) {
     return action("verify", "fail", "ARGUMENT_INVALID");
   }
   let snapshot;
   let originalBytes;
+  let progress;
+  let originalProgressBytes;
   try {
     const stat = await lstat(snapshotPath);
     if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_JSON_BYTES) throw new Error("unsafe snapshot");
     originalBytes = await readFile(snapshotPath);
     snapshot = JSON.parse(originalBytes.toString("utf8"));
+    const progressStat = await lstat(progressPath(snapshotPath));
+    if (!progressStat.isFile() || progressStat.isSymbolicLink() || progressStat.size > MAX_JSON_BYTES) {
+      throw new Error("unsafe progress");
+    }
+    originalProgressBytes = await readFile(progressPath(snapshotPath));
+    progress = JSON.parse(originalProgressBytes.toString("utf8"));
   }
   catch { return action("verify", "fail", "SNAPSHOT_INVALID"); }
   if (!isOpenSpecSnapshot(snapshot)) return action("verify", "fail", "SNAPSHOT_INVALID");
+  if (!isOpenSpecProgress(progress, snapshot)) return action("verify", "fail", "PROGRESS_INVALID");
   const changed = [];
   let currentTask = null;
   try {
@@ -383,36 +426,54 @@ export async function verifySnapshot({ snapshotPath, phase = "pre-gate1", author
       currentTask = { artifact, currentHash, coordinates };
     }
   } catch { return action("verify", "fail", "ARTIFACT_INVALID", { snapshot_path: snapshotPath, changed }); }
-  if (changed.length === 0) return action("verify", "pass", null, { snapshot_path: snapshotPath, snapshot_sha256: hash(originalBytes) });
+  if (changed.length === 0) {
+    if (phase !== "implementation") {
+      return action("verify", "pass", null, { snapshot_path: snapshotPath, snapshot_sha256: hash(originalBytes) });
+    }
+    const latest = progress.events.at(-1);
+    const repeated = latest && JSON.stringify(latest.task_ids.slice().sort())
+      === JSON.stringify(normalizedAuthorizedTaskIds.slice().sort());
+    return repeated
+      ? action("verify", "pass", null, { snapshot_path: snapshotPath, snapshot_sha256: hash(originalBytes) })
+      : action("verify", "fail", "TASK_PROGRESS_INVALID", { snapshot_path: snapshotPath });
+  }
   if (phase !== "implementation" || !currentTask) return action("verify", "fail", "SOURCE_CHANGED", { snapshot_path: snapshotPath, changed });
-  const previous = new Set(snapshot.task_progress.completed);
+  const previous = new Set(progress.completed);
   const current = new Set(taskState(currentTask.coordinates).filter(item => item.complete).map(item => item.id));
   if ([...previous].some(id => !current.has(id))) return action("verify", "fail", "TASK_PROGRESS_INVALID", { snapshot_path: snapshotPath, changed });
   const advanced = [...current].filter(id => !previous.has(id));
-  const authorized = new Set(authorizedTaskIds);
-  if (advanced.length === 0 || advanced.some(id => !authorized.has(id)) || authorizedTaskIds.some(id => !advanced.includes(id))) {
+  const authorized = new Set(normalizedAuthorizedTaskIds);
+  if (advanced.length === 0) {
+    const latest = progress.events.at(-1);
+    const repeated = latest && JSON.stringify(latest.task_ids.slice().sort())
+      === JSON.stringify(normalizedAuthorizedTaskIds.slice().sort());
+    return repeated
+      ? action("verify", "pass", null, { snapshot_path: snapshotPath, snapshot_sha256: hash(originalBytes), changed })
+      : action("verify", "fail", "TASK_PROGRESS_INVALID", { snapshot_path: snapshotPath, changed });
+  }
+  if (advanced.some(id => !authorized.has(id)) || normalizedAuthorizedTaskIds.some(id => !advanced.includes(id))) {
     return action("verify", "fail", "TASK_PROGRESS_INVALID", { snapshot_path: snapshotPath, changed });
   }
-  currentTask.artifact.content_sha256 = currentTask.currentHash;
-  currentTask.artifact.coordinates = currentTask.coordinates;
-  snapshot.task_progress.completed = [...current].sort();
-  snapshot.task_progress.events.push({
+  progress.completed = [...current].sort();
+  progress.events.push({
     recorded_at: new Date().toISOString(),
     task_ids: advanced.sort(),
-    previous_sha256: hash(originalBytes),
+    previous_progress_sha256: hash(originalProgressBytes),
     task_content_sha256: currentTask.currentHash,
   });
-  snapshot.artifact_set_sha256 = hash(Buffer.from(snapshot.artifacts.map(item => `${item.path}\0${item.content_sha256}`).join("\n")));
-  if (!isOpenSpecSnapshot(snapshot)) return action("verify", "fail", "SNAPSHOT_INVALID", { snapshot_path: snapshotPath, changed });
-  const updatedBytes = snapshotBytes(snapshot);
-  try { await atomicWrite(snapshotPath, updatedBytes); } catch { return action("verify", "fail", "SNAPSHOT_INVALID", { snapshot_path: snapshotPath, changed }); }
-  return action("verify", "pass", null, { snapshot_path: snapshotPath, snapshot_sha256: hash(updatedBytes), changed });
+  if (!isOpenSpecProgress(progress, snapshot)) return action("verify", "fail", "PROGRESS_INVALID", { snapshot_path: snapshotPath, changed });
+  try { await atomicWrite(progressPath(snapshotPath), progressBytes(progress)); }
+  catch { return action("verify", "fail", "PROGRESS_INVALID", { snapshot_path: snapshotPath, changed }); }
+  return action("verify", "pass", null, { snapshot_path: snapshotPath, snapshot_sha256: hash(originalBytes), changed });
 }
 
 async function runCli() {
   const [operation, raw] = process.argv.slice(2);
   let options;
   try { options = raw ? JSON.parse(raw) : {}; } catch { return action(operation === "verify" ? "verify" : "capture", "fail", "ARGUMENT_INVALID"); }
+  if (operation === "verify" && options.phase === "implementation") {
+    return action("verify", "fail", "ATOMIC_TRANSITION_REQUIRED");
+  }
   return operation === "verify" ? verifySnapshot(options) : captureSnapshot(options);
 }
 

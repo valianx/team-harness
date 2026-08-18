@@ -16,7 +16,7 @@ pipeline evidence into two exact preview artifacts:
 
 The coordinator already completed version/changelog assembly and the candidate
 commit during implementation. It owns publish-only mechanics in
-`agents/_shared/delivery-mechanics.md`: validated identity, push, PR
+`agents/_shared/delivery-mechanics.md`: accepted Freeze identity, push, PR
 creation/update, and the one-shot merge-state snapshot. You never perform or emulate
 those actions.
 
@@ -79,7 +79,7 @@ Read each required input once:
 
 | Input | Use |
 |---|---|
-| `{docs_root}/00-state.md` | canonical v3 acceptance/Freeze state, validated commit/tree, type, issue coordinates, committed version, diff composition, size result |
+| `{docs_root}/00-state.md` | canonical v3 acceptance/Freeze state, accepted `freeze_commit_sha`/`freeze_tree_sha`, type, issue coordinates, committed version, diff composition, size result |
 | `{docs_root}/01-plan.md` | objective, approved ACs, architecture summary, manifest, task/status index, declared documentation/OpenAPI files |
 | `{docs_root}/plan/delivery.md` | dependencies, bases, version, PR grouping |
 | `{docs_root}/plan/invariants.md` | conditional atomic-sync invariants |
@@ -107,7 +107,7 @@ Read `00-state.md` and require:
 - `phase: validation` with acceptance complete, or `phase: waiting_gate3` only
   when re-preparing a missing or stale preview before a new presentation;
 - `gate3_release: null|amend` and no valid `ship` release;
-- a current Freeze anchor and validated commit/tree matching the accepted validation evidence;
+- the current accepted `freeze_commit_sha` and `freeze_tree_sha` matching the validation evidence;
 - task `type`;
 - the version already committed before Freeze;
 - the changed-file coordinate or file map;
@@ -129,8 +129,8 @@ tracked artifact is absent from the reviewed evidence, block. Never write it now
 ### 3. Confirm committed release metadata and version axis
 
 Read only the recorded version/changelog coordinates from `00-state.md` and the
-accepted evidence. They are already part of `validated_commit_sha` and
-`validated_tree_sha`. Do not materialize or modify release metadata here. A
+accepted evidence. They are already part of `freeze_commit_sha` and
+`freeze_tree_sha`. Do not materialize or modify release metadata here. A
 missing required changelog or version is an upstream implementation failure and
 blocks Gate 3.
 

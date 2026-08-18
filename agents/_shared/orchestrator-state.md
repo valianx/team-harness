@@ -291,8 +291,6 @@ verification_base_source_ref: origin/main|{dep-branch}|{commit}  # selected base
 verification_base_ref: {full commit object ID}             # immutable Phase-2 baseline; copied into the verification packet
 freeze_commit_sha: {full commit object ID}|null             # complete clean candidate before validation
 freeze_tree_sha: {full tree object ID}|null
-validated_commit_sha: {full commit object ID}|null          # copied from Freeze only after acceptance passes
-validated_tree_sha: {full tree object ID}|null
 open_findings: [{id, disposition}]|[]       # dispositions live in 00-decision-ledger.md
 ```
 
@@ -336,7 +334,7 @@ delivery_changed_files: [{path}, ...]|[]
 delivery_diff_composition: {total_lines, total_files, mechanical_files, substantive_files}|null
 delivery_size_result: within-bounds|flagged|null
 delivery_size_justification: {workspace pointer}|null
-delivery_base_status: {base_ref, validated_base_sha, remote_base_sha: {full SHA}|null, status: current|moved|unknown}|null
+delivery_base_status: {base_ref, freeze_base_sha, remote_base_sha: {full SHA}|null, status: current|moved|unknown}|null
 delivery_suite_evidence: {00-suite-evidence.md row coordinate}|null
 delivery_preview: {pr_title, pr_body_path, pr_body_sha256, acceptance_matrix_path, acceptance_matrix_sha256}|null
 ```
@@ -425,7 +423,7 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | Field | Required | Notes |
 |---|---|---|
 | `ts` | yes | ISO-8601 with timezone |
-| `event` | yes | `phase.start`, `phase.end`, `agent.spawn`, `agent.close`, `agent.correction.spawn`, `correction.decision`, `gate`, `gate.pass`, `gate.fail`, `iteration.start`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`, `stage2.hygiene`, `stage2.lane.*`, `plan_structure`, `plan_review.deferred`, `plan_review.offered`, `plan_review.offer_declined`, `plan_review_integrity`, `kg_write`, `artifact.missing`, `operation.started/success/failed`, `pipeline.start`, `pipeline.complete`, `pipeline.incomplete`, `pipeline.end`, `checkpoint.confirmed`, `compaction.trigger` |
+| `event` | yes | `phase.start`, `phase.end`, `agent.spawn`, `agent.sla`, `agent.close`, `agent.correction.spawn`, `correction.decision`, `gate`, `gate.pass`, `gate.fail`, `iteration.start`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`, `stage2.hygiene`, `stage2.lane.*`, `plan_structure`, `plan_review.deferred`, `plan_review.offered`, `plan_review.offer_declined`, `plan_review_integrity`, `kg_write`, `artifact.missing`, `operation.started/success/failed`, `pipeline.start`, `pipeline.complete`, `pipeline.incomplete`, `pipeline.end`, `checkpoint.confirmed`, `compaction.trigger` |
 | `feature` | yes | kebab-case, matches the workspace folder |
 | `phase`, `stage` | conditional | `stage` required for `stage.gate*` |
 | `agent` | conditional | required for `phase.*` |
@@ -501,6 +499,13 @@ Sections: `## TL;DR`, `## Phase Timeline`, `## Dispatch Issues`, `## Tool Effect
 `references/observability.md`; unavailable usage or exact USD provenance then
 renders `Cost: unavailable`. A summary with no such object retains the legacy
 token and price rendering unchanged.
+
+**OpenSpec Gate-1 trace preflight.** After the two Design architect attempts
+close and before presenting Gate 1, validate the complete configured events
+file and bound feature with the packaged `openspec-events.mjs`. Missing `ts` or
+`feature`, a dispatch mode serialized as lifecycle `task`, a non-canonical
+status, missing `attempt_metrics`, or any open attempt fails closed. Do not
+repair the append-only trace as part of gate presentation.
 
 **Declared lifecycle summary branch.** Only when an `agent.*` lifecycle event
 exists, render `## Lifecycle Efficiency` from the conditional lifecycle

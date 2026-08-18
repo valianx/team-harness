@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   captureSnapshot,
@@ -15,6 +17,9 @@ import {
 const failures = [];
 const changeName = "snapshot-fixture";
 const headSha = "a".repeat(40);
+const snapshotScript = fileURLToPath(
+  new URL("../plugins/team-harness/skills/pipeline/scripts/openspec-snapshot.mjs", import.meta.url),
+);
 
 async function check(name, callback) {
   try { await callback(); process.stdout.write(`  [PASS] ${name}\n`); }
@@ -123,7 +128,9 @@ await check("captures strict CLI-reported artifacts and stable coordinates", asy
   assert.equal(snapshot.repository.head_sha, headSha);
   assert.deepEqual(snapshot.workspace, { root: fixture.workspace, mode: "local", navigation_kind: "repository-relative-coordinates" });
   assert.equal(snapshot.artifacts.length, 5);
-  assert.deepEqual(snapshot.task_progress.completed, ["task:1.1"]);
+  assert.equal(Object.hasOwn(snapshot, "task_progress"), false);
+  const progress = JSON.parse(await readFile(path.join(fixture.workspace, "inputs/openspec-progress.json"), "utf8"));
+  assert.deepEqual(progress.completed, ["task:1.1"]);
   assert.ok(snapshot.artifacts.flatMap(item => item.coordinates).some(item => item.id === "scenario:example:example-behavior:successful-behavior"));
   const tasks = snapshot.artifacts.find(item => item.artifact_id === "tasks");
   assert.match(tasks.content_sha256, /^[a-f0-9]{64}$/);
@@ -168,6 +175,8 @@ await check("blocks every raw source change before Gate 1", async () => withFixt
 
 await check("records only an authorized monotonic checkbox transition", async () => withFixture(async fixture => {
   const captured = await capture(fixture);
+  const absent = await verifySnapshot({ snapshotPath: captured.snapshot_path, phase: "implementation", authorizedTaskIds: ["task:1.2"] });
+  assert.equal(absent.error_code, "TASK_PROGRESS_INVALID");
   await writeFile(fixture.files.tasks, "## 1. Work\n\n- [x] 1.1 Existing work\n- [x] 1.2 Pending work\n");
   const beforeGate = await verifySnapshot({ snapshotPath: captured.snapshot_path, phase: "pre-gate1" });
   assert.equal(beforeGate.error_code, "SOURCE_CHANGED");
@@ -176,8 +185,44 @@ await check("records only an authorized monotonic checkbox transition", async ()
   const advanced = await verifySnapshot({ snapshotPath: captured.snapshot_path, phase: "implementation", authorizedTaskIds: ["task:1.2"] });
   assert.equal(advanced.verdict, "pass");
   const snapshot = JSON.parse(await readFile(captured.snapshot_path, "utf8"));
-  assert.deepEqual(snapshot.task_progress.completed, ["task:1.1", "task:1.2"]);
-  assert.equal(snapshot.task_progress.events.length, 1);
+  const progress = JSON.parse(await readFile(path.join(fixture.workspace, "inputs/openspec-progress.json"), "utf8"));
+  assert.equal(snapshot.schema_version, 3);
+  assert.deepEqual(progress.completed, ["task:1.1", "task:1.2"]);
+  assert.equal(progress.events.length, 1);
+}));
+
+await check("normalizes visible OpenSpec task IDs while preserving canonical snapshot IDs", async () => withFixture(async fixture => {
+  const captured = await capture(fixture);
+  await writeFile(fixture.files.tasks, "## 1. Work\n\n- [x] 1.1 Existing work\n- [x] 1.2 Pending work\n");
+  const advanced = await verifySnapshot({
+    snapshotPath: captured.snapshot_path,
+    phase: "implementation",
+    authorizedTaskIds: ["1.2"],
+  });
+  assert.equal(advanced.verdict, "pass");
+  const progress = JSON.parse(await readFile(path.join(fixture.workspace, "inputs/openspec-progress.json"), "utf8"));
+  assert.deepEqual(progress.completed, ["task:1.1", "task:1.2"]);
+  assert.deepEqual(progress.events[0].task_ids, ["task:1.2"]);
+}));
+
+await check("standalone CLI blocks implementation progress before mutating the snapshot", async () => withFixture(async fixture => {
+  const captured = await capture(fixture);
+  const before = await readFile(captured.snapshot_path);
+  const progressPath = path.join(fixture.workspace, "inputs/openspec-progress.json");
+  const progressBefore = await readFile(progressPath);
+  await writeFile(fixture.files.tasks, "## 1. Work\n\n- [x] 1.1 Existing work\n- [x] 1.2 Pending work\n");
+  const child = spawnSync(process.execPath, [
+    snapshotScript,
+    "verify",
+    JSON.stringify({ snapshotPath: captured.snapshot_path, phase: "implementation", authorizedTaskIds: ["1.2"] }),
+  ], { encoding: "utf8" });
+  assert.equal(child.status, 1);
+  assert.equal(child.stderr, "");
+  const result = JSON.parse(child.stdout);
+  assert.equal(isSnapshotAction(result), true);
+  assert.equal(result.error_code, "ATOMIC_TRANSITION_REQUIRED");
+  assert.deepEqual(await readFile(captured.snapshot_path), before);
+  assert.deepEqual(await readFile(progressPath), progressBefore);
 }));
 
 await check("blocks task intent edits and completion rollback", async () => withFixture(async fixture => {

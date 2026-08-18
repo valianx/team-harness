@@ -117,13 +117,13 @@ the normalized (LF) bytes against these canonical SHA-256 digests:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| pipeline-architect | `377186f3c4dafb6fd128f8e798779315794cd56fa594630e0a97dd7971892f02` |
-| pipeline-implementer | `384f612dfe7cfbfe588be65c6c60071e0d27ab8d7f792447bb66b30c691d5dbc` |
-| pipeline-tester | `b919c206695e30fa2ba529523611cffc171a7b06d9b35fd37bc19f5186b79c93` |
+| pipeline-architect | `4fb84a1cf9cd51d80401c9a9e3a31bc0b66c98f209893b994d89f8a0bc28ed61` |
+| pipeline-implementer | `84afd23ff6adcf3fe7ab6b5ec85f30cac6313d1b0cfe09a96f6eb0d346d698ae` |
+| pipeline-tester | `32ee4a4832c1bc489ce89a578be9e0ef7b33dd91f50a210e9a34dbd74b1db844` |
 | pipeline-cleaner | `ea4260bcb8fc1e17034f0d6f91b9d97efefeb61065c50b88a25e792eaaab88b9` |
-| pipeline-qa | `e63a6649de345ffcab03b5a83b5a0c8a1124b9c451be3fa271204b597f9ab5ac` |
-| pipeline-security | `fa5c8ce48def49085705fa083b1c2be2c02c9b9e560043313f3ba70f7004861a` |
-| pipeline-delivery | `1173e6d5edb63039cdc7d315f4c170c8f5489f76665b2cd77df682ae4be08246` |
+| pipeline-qa | `d13a07e234c8c95b91e31920a1c6bbb961ca0e3b96f03b7b93a7dee27472cbd1` |
+| pipeline-security | `11e9632e553eb98374b93b61901679800992edc284ea75d52d280c62fc4f5a14` |
+| pipeline-delivery | `c9a8a42ca62798cca1a57b65b89fbd044356433ac11fe7eff24ba3685f91aafa` |
 
 A digest mismatch is an identity failure; stop before workspace creation or
 delegation. Ask the operator to run `$team-harness:update` to

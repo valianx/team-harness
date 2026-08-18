@@ -102,7 +102,7 @@ async function repository(callback, { allowlistPaths = ["src/feature.js"], candi
     git(repo, "commit", "-q", "-m", "baseline");
     const base = git(repo, "rev-parse", "HEAD");
     await commitFiles(repo, "implementation and tests", {
-      "src/feature.js": "behavior-ok needs-format complex\n",
+      "src/feature.js": "behavior-ok complex\n",
       "tests/feature.test.js": "frozen behavior test\n",
       ...candidateFiles,
     });
@@ -194,7 +194,7 @@ await check("configured format and lint checks run without CRAP", async () => {
     const pre = await runCleanerTransition(preOptions(context));
     assertClosedResult(pre);
     assert.equal(pre.verdict, "pass");
-    assert.deepEqual(pre.quality.commands.map((entry) => entry.id), ["test"]);
+    assert.deepEqual(pre.quality.commands.map((entry) => entry.id), ["test", "format_check", "lint"]);
     assert.equal(pre.quality.crap, null);
     const evidence = await persistBaseline(context, pre);
     await commitFiles(context.repo, "clean changed source", {
@@ -206,6 +206,20 @@ await check("configured format and lint checks run without CRAP", async () => {
     assert.deepEqual(post.quality.commands.map((entry) => entry.id), ["test", "format_check", "lint"]);
     assert.equal(post.quality.crap, null);
   });
+});
+
+await check("pre-check catches repository quality debt before cleaner dispatch", async () => {
+  await repository(
+    async (context) => {
+      const pre = await runCleanerTransition(preOptions(context));
+      assertClosedResult(pre);
+      assert.equal(pre.verdict, "fail");
+      assert.equal(pre.error_code, "QUALITY_FAILED");
+      assert.equal(pre.quality.error_code, "COMMAND_FAILED");
+      assert.deepEqual(pre.quality.commands.map((entry) => entry.id), ["test", "format_check"]);
+    },
+    { candidateFiles: { "src/feature.js": "behavior-ok needs-format complex\n" } },
+  );
 });
 
 await check("a declared format check still blocks without CRAP", async () => {
@@ -273,6 +287,37 @@ await check("the CLI returns closed pre-cleaner evidence", async () => {
     );
     assert.equal(cli.status, 0, cli.stderr);
     assertClosedResult(JSON.parse(cli.stdout));
+  });
+});
+
+await check("the CLI atomically persists pre-cleaner evidence and emits a bounded receipt", async () => {
+  await repository(async (context) => {
+    const output = path.join(context.repo, ".git", "cleaner-pre.json");
+    const cli = spawnSync(
+      node,
+      [
+        runnerPath,
+        "--transition", "pre",
+        "--repo", context.repo,
+        "--manifest", ".team-harness/quality.json",
+        "--base", context.base,
+        "--candidate", "HEAD",
+        "--allowlist", context.allowlist,
+        "--output", output,
+      ],
+      { encoding: "utf8", windowsHide: true },
+    );
+    assert.equal(cli.status, 0, cli.stderr || cli.stdout);
+    const receipt = JSON.parse(cli.stdout);
+    const resultBytes = await readFile(output);
+    const result = JSON.parse(resultBytes);
+    assert.equal(receipt.kind, "team_harness_cleaner_transition_receipt");
+    assert.equal(receipt.transition, "pre");
+    assert.equal(receipt.verdict, "pass");
+    assert.equal(receipt.result_path, output);
+    assert.equal(receipt.result_bytes, resultBytes.length);
+    assert.equal(receipt.result_sha256, createHash("sha256").update(resultBytes).digest("hex"));
+    assertClosedResult(result);
   });
 });
 

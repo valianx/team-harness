@@ -110,7 +110,10 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    This preserves unrelated configuration and operator-owned writable roots
    while ensuring `workspace-write`, `on-request`, `auto_review`, sandbox
    network access, standard tool caches, the Codex runtime temp directory, and
-   the configured Obsidian Team Harness subtree. It never adds `.git` or a
+   the shared `{logs-path}/{logs-subfolder}` Obsidian subtree. It must add this
+   common parent even when a legacy config already contains only
+   `{logs-path}/{logs-subfolder}/{repo-name}`; preserving that narrower entry
+   never substitutes for the shared grant. It never adds `.git` or a
    blanket Git/GitHub command rule; deterministic force-push denial remains in
    `gate-guard`. A changed global runtime config requires a new Codex session.
 

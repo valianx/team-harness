@@ -118,8 +118,8 @@ where they appear beside `audit_coverage`.
 ## 5. Freeze handoff
 
 Freeze records the candidate commit/tree in `00-state.md` and
-`00-verify-packet.md`. When acceptance passes without a tree change, copy the
-same full values to `validated_commit_sha` and `validated_tree_sha`.
+`00-verify-packet.md`. Acceptance binds its pass directly to those same full
+Freeze values; no duplicate validated SHA fields are created.
 
 The selected verification base may be refreshed and reconciled only before
 Freeze. Movement after validation is a PR merge-readiness concern, not a reason

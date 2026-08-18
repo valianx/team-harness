@@ -3,17 +3,20 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  BOUNDED_COMMAND_RECEIPT_SCHEMA_VERSION,
   BOUNDED_COMMAND_SCHEMA_VERSION,
   DEFAULT_EXECUTION_TIMEOUT_MS,
   MAX_CAPTURE_BYTES_PER_STREAM,
   MAX_RENDERED_TAIL_BYTES_PER_STREAM,
   isBoundedCommandEnvelope,
+  isBoundedCommandReceipt,
   runBoundedCommand,
 } from "../plugins/team-harness/skills/pipeline/scripts/bounded-command.mjs";
 
@@ -111,6 +114,27 @@ function assertDeadlineEnvelope(result) {
   assert.equal(result.error_code, null);
 }
 
+function assertClosedReceipt(result) {
+  assert.equal(isBoundedCommandReceipt(result), true);
+  assert.equal(result.schema_version, BOUNDED_COMMAND_RECEIPT_SCHEMA_VERSION);
+  assert.deepEqual(Object.keys(result).sort(), [
+    "error_code",
+    "exit_code",
+    "kind",
+    "outcome",
+    "result_bytes",
+    "result_path",
+    "result_sha256",
+    "schema_version",
+    "signal",
+    "stderr",
+    "stdout",
+  ]);
+  for (const stream of [result.stdout, result.stderr]) {
+    assert.deepEqual(Object.keys(stream).sort(), ["bytes", "tail_available", "truncated"]);
+  }
+}
+
 console.log("=== Bounded command output (AC12) ===");
 
 await check("the helper remains a bounded executor rather than an exact-command route manifest", async () => {
@@ -202,6 +226,8 @@ await check("the success-diagnostic CLI flag must appear before the separator", 
   for (const invalidArgs of [
     ["--success-diagnostic", node, "-e", `process.stdout.write(${JSON.stringify(secret)});`],
     ["--", "--success-diagnostic", secret],
+    ["--output", "--", node, "-e", `process.stdout.write(${JSON.stringify(secret)});`],
+    ["--", "--output", secret],
     ["--unexpected", "--", node, "-e", `process.stdout.write(${JSON.stringify(secret)});`],
   ]) {
     const invalid = runCli(...invalidArgs);
@@ -210,6 +236,76 @@ await check("the success-diagnostic CLI flag must appear before the separator", 
     assert.equal(invalid.error_code, "ARGUMENT_INVALID");
     assert.equal(JSON.stringify(invalid).includes(secret), false);
   }
+});
+
+await check("output mode atomically preserves the full envelope and emits only a small verifiable receipt", async () => {
+  await temporaryRoot(async (root) => {
+    const output = path.join(root, "bounded-result.json");
+    const secretTail = "PERSISTED-DIAGNOSTIC-NOT-IN-RECEIPT";
+    const receipt = runCli(
+      "--output",
+      output,
+      "--success-diagnostic",
+      "--",
+      node,
+      "-e",
+      `process.stdout.write('X'.repeat(200000)); process.stderr.write(${JSON.stringify(secretTail)});`,
+    );
+
+    assertClosedReceipt(receipt);
+    assert.equal(receipt.outcome, "completed");
+    assert.equal(receipt.exit_code, 0);
+    assert.equal(receipt.error_code, null);
+    assert.equal(receipt.result_path, output);
+    assert.equal(receipt.stdout.bytes, 200000);
+    assert.equal(receipt.stdout.truncated, true);
+    assert.equal(receipt.stdout.tail_available, true);
+    assert.equal(receipt.stderr.tail_available, true);
+    assert.equal(JSON.stringify(receipt).includes(secretTail), false);
+    assert.ok(Buffer.byteLength(JSON.stringify(receipt), "utf8") < 2 * 1024);
+
+    const bytes = await readFile(output);
+    assert.equal(receipt.result_bytes, bytes.length);
+    assert.equal(receipt.result_sha256, createHash("sha256").update(bytes).digest("hex"));
+    const envelope = JSON.parse(bytes.toString("utf8"));
+    assertClosedEnvelope(envelope);
+    assert.equal(envelope.stderr.tail, secretTail);
+  });
+});
+
+await check("an unsafe output coordinate fails before executing the child", async () => {
+  await temporaryRoot(async (root) => {
+    const marker = path.join(root, "must-not-exist");
+    const invalid = runCli(
+      "--output",
+      "relative-result.json",
+      "--",
+      node,
+      "-e",
+      "require('node:fs').writeFileSync(process.argv[1], 'executed');",
+      marker,
+    );
+    assertClosedEnvelope(invalid);
+    assert.equal(invalid.outcome, "argument_invalid");
+    await assert.rejects(readFile(marker), { code: "ENOENT" });
+
+    if (process.platform !== "win32") {
+      const linkedParent = path.join(root, "linked-parent");
+      await symlink(root, linkedParent, "dir");
+      const symlinkInvalid = runCli(
+        "--output",
+        path.join(linkedParent, "result.json"),
+        "--",
+        node,
+        "-e",
+        "require('node:fs').writeFileSync(process.argv[1], 'executed');",
+        marker,
+      );
+      assertClosedEnvelope(symlinkInvalid);
+      assert.equal(symlinkInvalid.outcome, "argument_invalid");
+      await assert.rejects(readFile(marker), { code: "ENOENT" });
+    }
+  });
 });
 
 await check("failure tails strip ANSI and safely render binary/control bytes per stream", async () => {

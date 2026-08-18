@@ -12,6 +12,9 @@ security the same frozen identity plus the changed attack surface and named inva
 architecture anchors when required. Every dispatched tester, QA, and security attempt uses a fresh
 V2 `fork_turns: none` agent. Never attach the full plan set or the implementer's success narrative.
 None may edit coordination state, gate fields, releases, or task-shard AC checkbox mirrors.
+When Main supplies `bounded_result_path` to read-only QA or security, it first
+materializes the parent evidence directory in that dispatch's `writable_roots`;
+otherwise the packet is invalid and no command runs.
 QA's read-only review returns an explicit `AC-N: PASS` verdict for every verified satisfied
 criterion (and its evidence row); Main, as the only writer, verifies those PASS results and
 updates the assigned task-shard AC checkbox mirror. For failed or concern
@@ -21,8 +24,8 @@ result; Main owns canonical plan fields, disposition,
 phase, and routing.
 
 For an OpenSpec-bound workspace, Main verifies snapshot freshness and overlay
-traceability before every tester or QA dispatch. Each packet carries the pinned
-snapshot path and SHA-256, its TH evidence/operational item, and only the exact
+traceability before every tester or QA dispatch. Each packet carries one pinned
+`openspec_snapshot: {path, sha256}` binding, its TH evidence/operational item, and only the exact
 OpenSpec requirement/scenario coordinates it validates, including repository
 artifact path, line, and captured content hash. Tester and QA read the canonical
 source directly; no TH copy, paraphrase, prior verdict, or implementer narrative
@@ -115,9 +118,32 @@ broad logs, diffs, or searches. Unknown volume selects the helper; it does not
 make the wrapper the default for known-small results. Never probe a command or
 reactively retry it through another route after output enters the transcript.
 
+Validation reads that support a verdict execute sequentially, never as parallel
+tool calls (`Promise.all`, multiple nested tools in one orchestration response,
+or equivalent), because those results share one response/context budget. Give
+each call one file, one exact JSON Pointer/unique anchor/bounded line range, and
+one independent predeclared output cap. The already-verified whole-file SHA-256
+proves complete artifact identity, so do not render an entire reference or
+OpenSpec JSON merely to prove it was read. If the selected value is still too
+large, descend sequentially to narrower child pointers or line ranges. Any
+truncated selection is no evidence and the parallel/aggregate call is never
+replayed.
+
 For a command assigned to the bounded route, use
 `node <bounded_command_path> -- <argv...>`. Add `--success-diagnostic` before
 `--` only when the bounded result text is required.
+
+For authoritative validation or a deferred execution whose terminal response
+may be lost to context truncation, Main predeclares an absolute evidence
+coordinate and invokes `node <bounded_command_path> --output
+<absolute_result_path> -- <argv...>`. The helper rejects an unsafe coordinate
+before child execution, persists the complete envelope atomically, and emits
+only a fixed `team_harness_bounded_command_receipt` with outcome, counters,
+path, bytes, and SHA-256—not argv or diagnostic tails. If `functions.wait`
+loses that receipt, validate the exact predeclared artifact as a bounded-command
+envelope, compute and record its SHA-256, and continue without rerunning the
+command. Missing, invalid, or hash-mismatched evidence blocks fail closed.
+Specialists use output mode only for an exact coordinate supplied by Main.
 
 The helper captures each command's stdout and stderr separately with a maximum
 64 KiB buffer per stream, total byte counters, and a `truncated` flag. Render
@@ -237,8 +263,8 @@ explicitly authorized implementation/validation correction consumes the
 `0`–`3` correction budget.
 
 When all required evidence and reviews pass and the Freeze anchor plus committed
-identity are still current, copy `freeze_commit_sha`/`freeze_tree_sha` to
-`validated_commit_sha`/`validated_tree_sha`, then delegate `delivery` once in
+identity are still current, mark acceptance pass against that same immutable
+`freeze_commit_sha`/`freeze_tree_sha`, then delegate `delivery` once in
 pre-gate preparation mode. It may write only the workspace PR-body and standalone
 acceptance-matrix drafts. Version and changelog were committed before Freeze. The
 coordinator validates those paths, computes SHA-256 for every exact

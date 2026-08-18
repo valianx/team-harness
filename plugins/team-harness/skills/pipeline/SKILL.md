@@ -182,8 +182,30 @@ change that rule. Track the separate role SLA from dispatch time: architect 10
 minutes, implementer 15, tester 10, cleaner 5, QA 5, security 10, and delivery
 5, unless the project's `## Pipeline Timeouts` changes those SLA values.
 
+An `openspec-overlay` architect packet also carries a coordinator-generated
+`dispatch_id`, exact `progress_recipient`, and
+`progress_interval_seconds: 120`. Require transient native `send_message`
+progress with the exact prefix `TH_PROGRESS`, followed by one space and JSON keys
+`schema_version`, `dispatch_id`, `role`, `mode`, `milestone`,
+`completed_units`, `total_units`, `artifact_pointers`, and `blocked_code`.
+Allowed milestones are `started`, `inputs-validated`, `mappings-built`,
+`artifacts-writing`, and `validation-ready`; a timed heartbeat repeats the
+current milestone. Validate the known dispatch identity, exact role/mode,
+non-negative integer counters, workspace-contained relative artifact pointers,
+and closed blocked code before using a message. Progress is transient evidence,
+never state or completion authority, and it never resets the SLA clock.
+
 When the role SLA expires, give the operator one concise escalation with role,
-elapsed time, and live status, then keep the specialist alive and continue a directed
+elapsed time, and live status. Before that diagnostic, call `list_agents` once,
+send one non-interrupting `TH_PROGRESS_REQUEST` with native `send_message`, and
+probe only the expected artifact paths with `lstat`/metadata reads—never partial
+content. Emit one `TH_SLA` JSON block containing the dispatch identity, role,
+mode, elapsed seconds, live status, `terminal_result: false`, last valid
+milestone or `none`, heartbeat age or `null`, `artifact_state:
+none|partial|complete`, and `action: continue-waiting`. Append one coordinator-
+owned `agent.sla` event for that attempt with the same closed summary. No
+heartbeat and no artifact is `no-material-progress-observed`; it is not proof
+of failure or blockage. Then keep the specialist alive and continue a directed
 wait that can return either agent completion or live operator input. Only a
 current live operator cancellation of that active attempt authorizes
 `interrupt_agent`. Dispatch a replacement only after a demonstrated terminal
@@ -200,6 +222,24 @@ or current directory; fail closed if it cannot be resolved. Include the helper
 in each role packet only as `bounded_command_path` with that absolute path. It
 is transient: never persist `bounded_command_path` in state, events, reports,
 summaries, or workspace artifacts.
+
+Evidence-bearing reads are sequential transport operations even when their
+files are independent. Never batch, fan out, or issue multiple reads/searches/
+extracts through parallel tool calls (`Promise.all`, multiple nested tools in
+one orchestration response, or equivalent): those results share one response
+and context budget, so per-command caps do not protect the combined payload.
+Use one call for one file and one selector—an exact JSON Pointer, unique anchor,
+or bounded line range—with its own predeclared output cap. The verified
+artifact SHA-256 proves whole-file identity; never print the whole file merely
+to demonstrate a complete read. If one selected value still exceeds its cap,
+descend sequentially to narrower child pointers or line ranges. A truncated
+selection is no evidence and never authorizes replay of the aggregate read.
+
+At implementation entry, resolve `scripts/commit-integrity.mjs` by the same
+packaged-relative rule as `commit_integrity_path`; fail closed if it is absent.
+It is coordinator-only and transient: never pass it to a specialist or persist
+the helper path. The implementation reference owns its exact atomic evidence
+invocation and transport-truncation recovery.
 
 Classify expected output volume before execution. Routine commands whose result
 is expected to be small and bounded execute directly; this includes targeted
@@ -218,6 +258,20 @@ tails can be rendered on success. On `truncated: true`, issue a narrower query
 through the helper; never replay raw/full output. Direct execution remains the
 normal route for small, bounded results. Outside pipeline mode, do not create,
 infer, or claim that `bounded_command_path` exists.
+
+When a bounded command supplies authoritative evidence or runs through a
+deferred tool call whose final response can be lost to context truncation,
+predeclare an absolute result path under the workspace evidence root and invoke
+`node <bounded_command_path> --output <absolute_result_path> -- <argv...>`.
+The helper validates that coordinate before child execution, atomically writes
+the complete bounded envelope, and emits only a fixed
+`team_harness_bounded_command_receipt` containing outcome, stream counters,
+path, byte size, and SHA-256—never argv or tails. `--success-diagnostic` may
+precede `--output`. Treat either the receipt or the hash-verified persisted
+envelope as the terminal result. If `functions.wait` or another transport loses
+the receipt, inspect that exact predeclared artifact, compute and record its
+hash, and continue from it without rerunning the command. Missing, unsafe,
+invalid, or hash-mismatched output blocks fail closed.
 
 The helper is a development-output control, not a process-containment sandbox.
 The operator remains responsible for launched commands. Deadline cleanup
@@ -323,13 +377,13 @@ the role fields cannot see. The current digests are:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| `pipeline-architect` | `377186f3c4dafb6fd128f8e798779315794cd56fa594630e0a97dd7971892f02` |
-| `pipeline-implementer` | `384f612dfe7cfbfe588be65c6c60071e0d27ab8d7f792447bb66b30c691d5dbc` |
-| `pipeline-tester` | `b919c206695e30fa2ba529523611cffc171a7b06d9b35fd37bc19f5186b79c93` |
+| `pipeline-architect` | `4fb84a1cf9cd51d80401c9a9e3a31bc0b66c98f209893b994d89f8a0bc28ed61` |
+| `pipeline-implementer` | `84afd23ff6adcf3fe7ab6b5ec85f30cac6313d1b0cfe09a96f6eb0d346d698ae` |
+| `pipeline-tester` | `32ee4a4832c1bc489ce89a578be9e0ef7b33dd91f50a210e9a34dbd74b1db844` |
 | `pipeline-cleaner` | `ea4260bcb8fc1e17034f0d6f91b9d97efefeb61065c50b88a25e792eaaab88b9` |
-| `pipeline-qa` | `e63a6649de345ffcab03b5a83b5a0c8a1124b9c451be3fa271204b597f9ab5ac` |
-| `pipeline-security` | `fa5c8ce48def49085705fa083b1c2be2c02c9b9e560043313f3ba70f7004861a` |
-| `pipeline-delivery` | `1173e6d5edb63039cdc7d315f4c170c8f5489f76665b2cd77df682ae4be08246` |
+| `pipeline-qa` | `d13a07e234c8c95b91e31920a1c6bbb961ca0e3b96f03b7b93a7dee27472cbd1` |
+| `pipeline-security` | `11e9632e553eb98374b93b61901679800992edc284ea75d52d280c62fc4f5a14` |
+| `pipeline-delivery` | `c9a8a42ca62798cca1a57b65b89fbd044356433ac11fe7eff24ba3685f91aafa` |
 
 Do not accept a file solely because its comments or `name` field match. A
 digest mismatch is a stale or unrelated shadow; stop before workspace
@@ -474,6 +528,9 @@ the recorded `phase`/`next_action`:
 Before every `phase.start`, `phase.end`, state aggregate, summary rewrite, or
 trace cost render, apply [observability.md](references/observability.md). It
 does not authorize a state write by a specialist or relax any gate rule.
+For OpenSpec Design, validate the complete events file with the packaged
+`openspec-events.mjs` before presenting Gate 1; a schema or lifecycle failure
+blocks the gate rather than triggering a best-effort JSONL repair.
 
 `complete` and `aborted` are terminal. Report their recorded outcome and return
 to ordinary direct behavior; never route either one back through recovery.
@@ -489,7 +546,7 @@ present a gate or write coordination state. Pipeline activation alone does not
 authorize delivery. A later valid `Gate 3: ship` reply is the operator's single
 delivery decision for the frozen tree: implementation has already assembled
 version/changelog and committed the complete candidate. `ship` authorizes the
-coordinator to push that exact validated commit and create or update its
+coordinator to push that exact accepted Freeze commit and create or update its
 draft PR without another conversational confirmation. It never
 authorizes merge, tag, release, publication, force-push, or broader scope.
 

@@ -6,14 +6,18 @@ import { lstat, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { isOpenSpecSnapshot } from "./openspec-snapshot.mjs";
+import { isOpenSpecSnapshot, normalizeOpenSpecTaskIds, verifySnapshot } from "./openspec-snapshot.mjs";
+import { KNOWN_COMMANDS } from "./quality-runner.mjs";
 
 export const OPENSPEC_OVERLAY_SCHEMA_VERSION = 1;
+export const OPENSPEC_OVERLAY_REBIND_SCHEMA_VERSION = 1;
+export const OPENSPEC_PROGRESS_TRANSITION_SCHEMA_VERSION = 2;
 const MAX_BYTES = 1024 * 1024;
 const MAX_ITEMS = 4096;
 const SHA256 = /^[a-f0-9]{64}$/;
 const ITEM_ID = /^(?:AC|Task)-[1-9][0-9]*$/;
 const QUALITY_ID = /^[a-z][a-z0-9_]*$/;
+const ANCHOR_ID = /^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$/;
 const CLASSIFICATIONS = new Set(["direct", "split", "merged", "th-extension", "excluded", "ambiguous"]);
 const SOURCE_KINDS = new Set(["requirement", "scenario", "design-decision", "task"]);
 const FORBIDDEN_NORMATIVE_KEYS = new Set([
@@ -38,9 +42,65 @@ function contained(root, target) {
   const relative = path.relative(root, target);
   return relative === "" || (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
 }
+function normalizeWritableRoots(values) {
+  if (!Array.isArray(values) || values.length === 0) return null;
+  const roots = values.map(value => typeof value === "string" && path.isAbsolute(value) ? path.resolve(value) : null);
+  if (roots.some(value => value === null || value === path.parse(value).root) || new Set(roots).size !== roots.length) return null;
+  return roots;
+}
+function taskExecutionTarget(text, repositoryRoot) {
+  const matches = text.replaceAll("\r\n", "\n").split("\n")
+    .map(line => /^- \*\*Worktree:\*\*\s+(.+)$/.exec(line))
+    .filter(Boolean);
+  if (matches.length !== 1) return null;
+  const value = matches[0][1].split(" — ", 1)[0].trim();
+  if (value === "null") return path.resolve(repositoryRoot);
+  return path.isAbsolute(value) && !value.includes("\u0000") ? path.resolve(value) : null;
+}
 function finding(code, target) { return { code, target }; }
 function rationaleValid(classification, rationale) {
   return classification === "direct" ? rationale === null : safeString(rationale, 2048);
+}
+function parseAnchorList(value, validator) {
+  if (typeof value !== "string" || !value.startsWith("[") || !value.endsWith("]")) return null;
+  const body = value.slice(1, -1).trim();
+  if (body === "") return [];
+  const items = body.split(",").map(item => item.trim());
+  return items.length <= MAX_ITEMS && new Set(items).size === items.length && items.every(validator) ? items : null;
+}
+function dispatchAnchors(text) {
+  const lines = text.replaceAll("\r\n", "\n").split("\n");
+  const headings = lines.map((line, index) => line === "## Dispatch anchors" ? index : -1).filter(index => index >= 0);
+  if (headings.length !== 1) return null;
+  const start = headings[0] + 1;
+  let end = lines.length;
+  for (let index = start; index < lines.length; index += 1) {
+    if (/^##\s/.test(lines[index])) { end = index; break; }
+  }
+  const fields = new Map();
+  for (const line of lines.slice(start, end)) {
+    const match = /^(required_invariants|required_evidence_anchors|cross_runtime_preservation):\s*(.*)$/.exec(line);
+    if (match) {
+      if (fields.has(match[1])) return null;
+      fields.set(match[1], match[2]);
+    }
+  }
+  if (fields.size !== 3) return null;
+  const requiredInvariants = parseAnchorList(fields.get("required_invariants"), value => ANCHOR_ID.test(value));
+  const requiredEvidenceAnchors = parseAnchorList(fields.get("required_evidence_anchors"), safeRelative);
+  const preservation = fields.get("cross_runtime_preservation");
+  if (requiredInvariants === null || requiredEvidenceAnchors === null || !safeString(preservation, 1024)) return null;
+  const effectiveInvariants = requiredInvariants.slice();
+  for (const line of lines) {
+    const match = /^\s*(?:-\s*)?\*\*Required invariants(?::\*\*|\*\*:)\s*(.+)\s*$/.exec(line);
+    if (!match) continue;
+    const parsed = match[1].startsWith("[")
+      ? parseAnchorList(match[1], value => ANCHOR_ID.test(value))
+      : match[1].split(",").map(value => value.trim()).filter(Boolean);
+    if (parsed === null || parsed.length === 0 || !parsed.every(value => ANCHOR_ID.test(value))) return null;
+    for (const value of parsed) if (!effectiveInvariants.includes(value)) effectiveInvariants.push(value);
+  }
+  return { required_invariants: effectiveInvariants, required_evidence_anchors: requiredEvidenceAnchors, cross_runtime_preservation: preservation };
 }
 function hasForbiddenKeys(value) {
   if (Array.isArray(value)) return value.some(hasForbiddenKeys);
@@ -64,7 +124,7 @@ async function readRegular(root, relative) {
 function validMapping(item, expectedPrefix, sourceIds, qualityIds, findings) {
   const baseKeys = expectedPrefix === "AC"
     ? ["id", "sources", "classification", "rationale", "evidence_anchor"]
-    : ["id", "sources", "classification", "rationale", "owner", "specialist", "shard_path", "files", "dependencies", "invariants", "technical_constraints", "quality_command_ids", "pre_implementation_test", "evidence_anchors", "rollback", "delivery_group"];
+    : ["id", "sources", "classification", "rationale", "owner", "specialist", "shard_path", "files", "dependencies", "required_invariants", "technical_constraints", "quality_command_ids", "pre_implementation_test", "required_evidence_anchors", "cross_runtime_preservation", "rollback", "delivery_group"];
   if (!exact(item, baseKeys) || !ITEM_ID.test(item.id ?? "") || !item.id.startsWith(`${expectedPrefix}-`)) {
     findings.push(finding("ITEM_SCHEMA_INVALID", item?.id ?? expectedPrefix));
     return;
@@ -87,12 +147,13 @@ function validMapping(item, expectedPrefix, sourceIds, qualityIds, findings) {
     || !safeRelative(item.shard_path) || !/^plan\/tasks\/Task-[1-9][0-9]*\.md$/.test(item.shard_path)
     || !Array.isArray(item.files) || item.files.length === 0 || new Set(item.files).size !== item.files.length || !item.files.every(safeRelative)
     || !Array.isArray(item.dependencies) || new Set(item.dependencies).size !== item.dependencies.length || !item.dependencies.every(id => ITEM_ID.test(id) && id.startsWith("Task-"))
-    || !Array.isArray(item.invariants) || item.invariants.length === 0 || !item.invariants.every(value => safeString(value, 1024))
+    || !Array.isArray(item.required_invariants) || new Set(item.required_invariants).size !== item.required_invariants.length || !item.required_invariants.every(value => ANCHOR_ID.test(value))
     || !Array.isArray(item.technical_constraints) || !item.technical_constraints.every(value => safeString(value, 1024))
     || !Array.isArray(item.quality_command_ids) || new Set(item.quality_command_ids).size !== item.quality_command_ids.length
     || !item.quality_command_ids.every(id => qualityIds.has(id))
     || !["required", "not-applicable"].includes(item.pre_implementation_test)
-    || !Array.isArray(item.evidence_anchors) || item.evidence_anchors.length === 0 || !item.evidence_anchors.every(safeRelative)) {
+    || !Array.isArray(item.required_evidence_anchors) || new Set(item.required_evidence_anchors).size !== item.required_evidence_anchors.length || !item.required_evidence_anchors.every(safeRelative)
+    || !safeString(item.cross_runtime_preservation, 1024)) {
     findings.push(finding("EXECUTION_CONTROL_INVALID", item.id));
   }
 }
@@ -116,6 +177,7 @@ function validateShape(overlay, snapshot, snapshotBytes, findings) {
   }
   if (!Array.isArray(overlay.quality_commands) || overlay.quality_commands.length === 0
     || overlay.quality_commands.some(entry => !exact(entry, ["id"]) || !QUALITY_ID.test(entry.id))
+    || overlay.quality_commands.some(entry => !KNOWN_COMMANDS.includes(entry.id))
     || new Set(overlay.quality_commands.map(entry => entry.id)).size !== overlay.quality_commands.length) {
     findings.push(finding("QUALITY_COMMAND_INVALID", "quality_commands"));
   }
@@ -125,7 +187,7 @@ function validateShape(overlay, snapshot, snapshotBytes, findings) {
   }
 }
 
-export async function validateOpenSpecOverlay({ workspace, snapshot = "inputs/openspec-snapshot.json", traceability = "plan/openspec-traceability.json" } = {}) {
+export async function validateOpenSpecOverlay({ workspace, snapshot = "inputs/openspec-snapshot.json", traceability = "plan/openspec-traceability.json", writableRoots } = {}) {
   const started = process.hrtime.bigint();
   const findings = [];
   let snapshotValue = null;
@@ -134,6 +196,8 @@ export async function validateOpenSpecOverlay({ workspace, snapshot = "inputs/op
   let overlayDigest = null;
   try {
     if (!safeString(workspace) || snapshot !== "inputs/openspec-snapshot.json" || traceability !== "plan/openspec-traceability.json") throw new Error("arguments");
+    const roots = normalizeWritableRoots(writableRoots);
+    if (roots === null) throw new Error("arguments");
     const root = await realpath(path.resolve(workspace));
     const rootStat = await lstat(root);
     if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) throw new Error("arguments");
@@ -199,8 +263,21 @@ export async function validateOpenSpecOverlay({ workspace, snapshot = "inputs/op
           findings.push(finding("DISCLOSURE_INCOMPLETE", "operator_disclosures"));
         }
         for (const item of execution) {
-          try { await readRegular(root, item.shard_path); }
-          catch { findings.push(finding("SHARD_INVALID", item.id ?? "Task")); }
+          try {
+            const shard = await readRegular(root, item.shard_path);
+            const shardText = shard.bytes.toString("utf8");
+            const anchors = dispatchAnchors(shardText);
+            if (anchors === null) findings.push(finding("DISPATCH_ANCHOR_INVALID", item.id ?? "Task"));
+            else if (JSON.stringify(anchors.required_invariants) !== JSON.stringify(item.required_invariants)
+              || JSON.stringify(anchors.required_evidence_anchors) !== JSON.stringify(item.required_evidence_anchors)
+              || anchors.cross_runtime_preservation !== item.cross_runtime_preservation) {
+              findings.push(finding("DISPATCH_ANCHOR_MISMATCH", item.id ?? "Task"));
+            }
+            const target = taskExecutionTarget(shardText, snapshotValue.repository.root);
+            if (target === null || !roots.some(writableRoot => contained(writableRoot, target))) {
+              findings.push(finding("EXECUTION_ROOT_NOT_WRITABLE", item.id ?? "Task"));
+            }
+          } catch { findings.push(finding("SHARD_INVALID", item.id ?? "Task")); }
         }
       }
     }
@@ -221,19 +298,141 @@ export async function validateOpenSpecOverlay({ workspace, snapshot = "inputs/op
   };
 }
 
-function parseCli(argv) {
-  if (argv.length !== 6) return null;
-  const result = {};
+function rebindResult(verdict, errorCode, details = {}) {
+  return {
+    schema_version: OPENSPEC_OVERLAY_REBIND_SCHEMA_VERSION,
+    kind: "team_harness_openspec_overlay_rebind",
+    verdict,
+    error_code: errorCode,
+    changed: details.changed ?? false,
+    previous_snapshot_sha256: details.previous_snapshot_sha256 ?? null,
+    snapshot_sha256: details.snapshot_sha256 ?? null,
+    overlay_sha256: details.overlay_sha256 ?? null,
+  };
+}
+
+export async function rebindOpenSpecOverlay({ workspace, snapshot = "inputs/openspec-snapshot.json", traceability = "plan/openspec-traceability.json", writableRoots } = {}) {
+  const validation = await validateOpenSpecOverlay({ workspace, snapshot, traceability, writableRoots });
+  if (validation.verdict === "pass") {
+    return rebindResult("pass", null, {
+      snapshot_sha256: validation.snapshot_sha256,
+      overlay_sha256: validation.overlay_sha256,
+    });
+  }
+  // Gate-1 snapshot identity is immutable in schema v3. Task completion lives
+  // in inputs/openspec-progress.json, so a stale snapshot binding represents
+  // semantic drift and is never mechanically rewritten.
+  return rebindResult("fail", "REBIND_NOT_MECHANICAL", {
+    snapshot_sha256: validation.snapshot_sha256,
+    overlay_sha256: validation.overlay_sha256,
+  });
+}
+
+function progressResult(verdict, errorCode, details = {}) {
+  return {
+    schema_version: OPENSPEC_PROGRESS_TRANSITION_SCHEMA_VERSION,
+    kind: "team_harness_openspec_progress_transition",
+    verdict,
+    error_code: errorCode,
+    changed: details.changed ?? false,
+    snapshot_sha256: details.snapshot_sha256 ?? null,
+    progress_sha256: details.progress_sha256 ?? null,
+    overlay_sha256: details.overlay_sha256 ?? null,
+  };
+}
+
+/** Verify one authorized monotonic OpenSpec task transition without mutating its immutable Gate-1 binding. */
+export async function verifyOpenSpecProgress({
+  workspace,
+  snapshot = "inputs/openspec-snapshot.json",
+  traceability = "plan/openspec-traceability.json",
+  writableRoots,
+  authorizedTaskIds,
+} = {}) {
+  const normalizedAuthorizedTaskIds = normalizeOpenSpecTaskIds(authorizedTaskIds);
+  if (normalizedAuthorizedTaskIds === null || normalizedAuthorizedTaskIds.length === 0) {
+    return progressResult("fail", "ARGUMENT_INVALID");
+  }
+  const validation = await validateOpenSpecOverlay({ workspace, snapshot, traceability, writableRoots });
+  if (validation.verdict !== "pass") {
+    return progressResult("fail", "PRECONDITION_INVALID", {
+      snapshot_sha256: validation.snapshot_sha256,
+      overlay_sha256: validation.overlay_sha256,
+    });
+  }
+  try {
+    const root = await realpath(path.resolve(workspace));
+    const snapshotFile = await readRegular(root, snapshot);
+    const overlayFile = await readRegular(root, traceability);
+    const progressFile = await readRegular(root, "inputs/openspec-progress.json");
+    const verified = await verifySnapshot({
+      snapshotPath: snapshotFile.canonical,
+      phase: "implementation",
+      authorizedTaskIds: normalizedAuthorizedTaskIds,
+    });
+    if (verified.verdict !== "pass") {
+      return progressResult("fail", verified.error_code, {
+        snapshot_sha256: verified.snapshot_sha256,
+        progress_sha256: hash(progressFile.bytes),
+        overlay_sha256: hash(overlayFile.bytes),
+      });
+    }
+    const updatedProgress = await readRegular(root, "inputs/openspec-progress.json");
+    const postValidation = await validateOpenSpecOverlay({ workspace, snapshot, traceability, writableRoots });
+    if (postValidation.verdict !== "pass" || verified.snapshot_sha256 !== hash(snapshotFile.bytes)) {
+      return progressResult("fail", "PRECONDITION_INVALID", {
+        snapshot_sha256: postValidation.snapshot_sha256,
+        progress_sha256: hash(updatedProgress.bytes),
+        overlay_sha256: postValidation.overlay_sha256,
+      });
+    }
+    return progressResult("pass", null, {
+      changed: hash(progressFile.bytes) !== hash(updatedProgress.bytes),
+      snapshot_sha256: verified.snapshot_sha256,
+      progress_sha256: hash(updatedProgress.bytes),
+      overlay_sha256: postValidation.overlay_sha256,
+    });
+  } catch {
+    return progressResult("fail", "ARTIFACT_INVALID", {
+      snapshot_sha256: validation.snapshot_sha256,
+      overlay_sha256: validation.overlay_sha256,
+    });
+  }
+}
+
+// Compatibility export for callers from 3.14.0; schema v2 never rebinds.
+export const verifyAndRebindOpenSpecProgress = verifyOpenSpecProgress;
+
+function parseCli(argv, progress = false) {
+  if (argv.length < 4 || argv.length % 2 !== 0) return null;
+  const result = { writableRoots: [], ...(progress ? { authorizedTaskIds: [] } : {}) };
   for (let index = 0; index < argv.length; index += 2) {
+    if (argv[index] === "--writable-root") {
+      result.writableRoots.push(argv[index + 1]);
+      continue;
+    }
+    if (progress && argv[index] === "--authorized-task") {
+      result.authorizedTaskIds.push(argv[index + 1]);
+      continue;
+    }
     const key = ({ "--workspace": "workspace", "--snapshot": "snapshot", "--traceability": "traceability" })[argv[index]];
     if (!key || own(result, key)) return null;
     result[key] = argv[index + 1];
   }
-  return result;
+  return own(result, "workspace") && result.writableRoots.length > 0
+    && (!progress || result.authorizedTaskIds.length > 0) ? result : null;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const result = await validateOpenSpecOverlay(parseCli(process.argv.slice(2)) ?? {});
+  const argv = process.argv.slice(2);
+  const operation = ["rebind", "verify-progress", "verify-and-rebind"].includes(argv[0]) ? argv[0] : "validate";
+  const progressOperation = ["verify-progress", "verify-and-rebind"].includes(operation);
+  const parsed = parseCli(operation === "validate" ? argv : argv.slice(1), progressOperation) ?? {};
+  const result = operation === "rebind"
+    ? await rebindOpenSpecOverlay(parsed)
+    : progressOperation
+      ? await verifyOpenSpecProgress(parsed)
+      : await validateOpenSpecOverlay(parsed);
   process.stdout.write(`${JSON.stringify(result)}\n`);
   if (result.verdict !== "pass") process.exitCode = 1;
 }

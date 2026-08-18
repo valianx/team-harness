@@ -408,8 +408,8 @@ function result(state, started) {
 }
 
 export async function validatePlanContract(options) {
-  if (exactlyKeys(options, ["workspace", "plan", "snapshot", "traceability"]) && options.plan === "01-plan.md") {
-    return validateOpenSpecOverlay({ workspace: options.workspace, snapshot: options.snapshot, traceability: options.traceability });
+  if (exactlyKeys(options, ["workspace", "plan", "snapshot", "traceability", "writableRoots"]) && options.plan === "01-plan.md") {
+    return validateOpenSpecOverlay({ workspace: options.workspace, snapshot: options.snapshot, traceability: options.traceability, writableRoots: options.writableRoots });
   }
   const started = process.hrtime.bigint();
   const state = { error_code: null, plan: null, artifact_set_sha256: null, artifacts: [], functional: null, tasks: [], findings: [] };
@@ -459,13 +459,20 @@ export async function validatePlanContract(options) {
 }
 
 function parseCli(argv) {
-  if (![4, 8].includes(argv.length)) return null;
-  const values = {};
+  if (argv.length < 4 || argv.length % 2 !== 0) return null;
+  const values = { writableRoots: [] };
   for (let index = 0; index < argv.length; index += 2) {
+    if (argv[index] === "--writable-root") {
+      values.writableRoots.push(argv[index + 1]);
+      continue;
+    }
     const key = ({ "--workspace": "workspace", "--plan": "plan", "--snapshot": "snapshot", "--traceability": "traceability" })[argv[index]] ?? null;
     if (key === null || Object.hasOwn(values, key)) return null;
     values[key] = argv[index + 1];
   }
+  if (!Object.hasOwn(values, "snapshot") && !Object.hasOwn(values, "traceability") && values.writableRoots.length > 0) return null;
+  if ((Object.hasOwn(values, "snapshot") || Object.hasOwn(values, "traceability")) && values.writableRoots.length === 0) return null;
+  if (!Object.hasOwn(values, "snapshot") && !Object.hasOwn(values, "traceability")) delete values.writableRoots;
   return values;
 }
 

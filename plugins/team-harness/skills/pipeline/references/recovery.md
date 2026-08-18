@@ -214,10 +214,38 @@ result whose SHA-256 and exact
 the traceability overlay, and the bound change. Re-run that entry point with
 `--workspace`, `--plan 01-plan.md`,
 `--snapshot inputs/openspec-snapshot.json`, and
-`--traceability plan/openspec-traceability.json`; never fall through to the
+`--traceability plan/openspec-traceability.json`, plus the current exact
+`--writable-root` values; never fall through to the
 legacy validator or repair route. Snapshot drift resumes explicit OpenSpec
 reconciliation, while a mapping or execution-control failure resumes the one
 normal overlay design correction.
+
+Before re-presenting Gate 1, also rerun `openspec-events.mjs` against the
+complete configured events path and bound feature. An invalid or open
+lifecycle trace remains fail-closed and is never repaired during recovery.
+
+During implementation, use packaged `openspec-overlay.mjs verify-progress`
+instead of standalone snapshot verification or overlay mutation. Gate-1 intent
+remains bound to the immutable `inputs/openspec-snapshot.json`; checkbox-only
+state advances atomically in `inputs/openspec-progress.json`. If interrupted,
+the same exact authorized task set is idempotent only when it matches the latest
+progress event and its predecessor hash. A missing/malformed progress chain,
+rollback, unauthorized task, non-checkbox task change, other intent drift, or
+concurrent mutation remains fail-closed. Checkbox progress never changes the
+snapshot or overlay binding and therefore never requires `SNAPSHOT_STALE`
+tolerance, rebinding, or manual hash edits. Rerun `plan-contract` after every
+successful progress transition.
+
+An implementation/tester return blocked only because an exact scoped Git write
+hit protected `.git/worktrees/.../index.lock` is a technical
+`git-metadata-permission` pause. Preserve the existing commit and unstaged test
+diff, verify `git_metadata_write_mode`, and resume the identical `git add` or
+eligible same-owner `git commit --amend` through native escalation with
+`login:false`. Add and commit remain separate bounded operations with a staged
+path check between them. A silent commit timeout preserves the staged index and
+requires read-only status/configured-hook-path diagnosis; never retry it or use
+`--no-verify`. Do not redispatch, reset, restage broadly, widen `.git`, or treat
+the permission failure as failed test evidence.
 
 For a legacy run, `pass` requires a readable `plan-contract.mjs` result whose
 SHA-256, exact `kind: team_harness_functional_plan_contract`, embedded plan

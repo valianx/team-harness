@@ -21,21 +21,28 @@
  */
 
 import { spawn } from "node:child_process";
+import { createHash, randomUUID } from "node:crypto";
+import { lstat, open, realpath, rename, unlink } from "node:fs/promises";
+import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 export const BOUNDED_COMMAND_SCHEMA_VERSION = 1;
+export const BOUNDED_COMMAND_RECEIPT_SCHEMA_VERSION = 1;
 export const MAX_CAPTURE_BYTES_PER_STREAM = 64 * 1024;
 export const MAX_RENDERED_TAIL_BYTES_PER_STREAM = 8 * 1024;
 export const SUCCESS_DIAGNOSTIC_FLAG = "--success-diagnostic";
+export const OUTPUT_FLAG = "--output";
 export const DEFAULT_EXECUTION_TIMEOUT_MS = 5 * 60 * 1000;
 
 const MAX_ARGV_ITEMS = 128;
 const MAX_ARGV_ITEM_BYTES = 8 * 1024;
 const MAX_ARGV_BYTES = 64 * 1024;
 const MAX_CWD_BYTES = 32 * 1024;
+const MAX_OUTPUT_PATH_BYTES = 4 * 1024;
 const MAX_EXECUTION_TIMEOUT_MS = 60 * 60 * 1000;
 const TERMINATION_SETTLEMENT_GRACE_MS = 1_000;
 const SAFE_SIGNAL = /^SIG[A-Z0-9]+$/;
+const SAFE_SHA256 = /^[0-9a-f]{64}$/;
 const SAFE_TAIL = /^[\x20-\x7E]*$/;
 const RESULT_KEYS = [
   "schema_version",
@@ -50,6 +57,12 @@ const RESULT_KEYS = [
 ];
 const STREAM_KEYS = ["bytes", "truncated", "tail"];
 const ERROR_CODES = new Set([null, "ARGUMENT_INVALID", "SPAWN_FAILED", "INTERNAL_ERROR"]);
+const RECEIPT_ERROR_CODES = new Set([...ERROR_CODES, "OUTPUT_WRITE_FAILED"]);
+const RECEIPT_KEYS = [
+  "schema_version", "kind", "outcome", "exit_code", "signal", "error_code",
+  "result_path", "result_sha256", "result_bytes", "stdout", "stderr",
+];
+const RECEIPT_STREAM_KEYS = ["bytes", "truncated", "tail_available"];
 
 const streamSchema = {
   type: "object",
@@ -125,6 +138,35 @@ export function isBoundedCommandEnvelope(value) {
   if (!isSafeInteger(value.duration_ms) || !isStreamEnvelope(value.stdout) || !isStreamEnvelope(value.stderr)) return false;
   if (!ERROR_CODES.has(value.error_code)) return false;
 
+  if (value.outcome === "completed") return value.error_code === null;
+  if (value.outcome === "spawn_error") {
+    return value.error_code === "SPAWN_FAILED" && value.exit_code === null && value.signal === null;
+  }
+  if (value.outcome === "argument_invalid") {
+    return value.error_code === "ARGUMENT_INVALID" && value.exit_code === null && value.signal === null;
+  }
+  return value.error_code === "INTERNAL_ERROR" && value.exit_code === null && value.signal === null;
+}
+
+/** Validate the fixed small receipt emitted when `--output` persists an envelope. */
+export function isBoundedCommandReceipt(value) {
+  if (!hasExactlyKeys(value, RECEIPT_KEYS)) return false;
+  if (value.schema_version !== BOUNDED_COMMAND_RECEIPT_SCHEMA_VERSION || value.kind !== "team_harness_bounded_command_receipt") return false;
+  if (!["completed", "spawn_error", "argument_invalid", "internal_error", "output_error"].includes(value.outcome)) return false;
+  if (value.exit_code !== null && !Number.isSafeInteger(value.exit_code)) return false;
+  if (value.signal !== null && (typeof value.signal !== "string" || !SAFE_SIGNAL.test(value.signal))) return false;
+  if (!RECEIPT_ERROR_CODES.has(value.error_code)) return false;
+  for (const stream of [value.stdout, value.stderr]) {
+    if (!hasExactlyKeys(stream, RECEIPT_STREAM_KEYS) || !isSafeInteger(stream.bytes)
+      || typeof stream.truncated !== "boolean" || typeof stream.tail_available !== "boolean") return false;
+  }
+  if (value.outcome === "output_error") {
+    return value.error_code === "OUTPUT_WRITE_FAILED" && value.result_path === null
+      && value.result_sha256 === null && value.result_bytes === null;
+  }
+  if (typeof value.result_path !== "string" || !path.isAbsolute(value.result_path)
+    || value.result_path.includes("\u0000") || Buffer.byteLength(value.result_path, "utf8") > MAX_OUTPUT_PATH_BYTES
+    || !SAFE_SHA256.test(value.result_sha256) || !isSafeInteger(value.result_bytes)) return false;
   if (value.outcome === "completed") return value.error_code === null;
   if (value.outcome === "spawn_error") {
     return value.error_code === "SPAWN_FAILED" && value.exit_code === null && value.signal === null;
@@ -607,24 +649,127 @@ export async function runBoundedCommand(options) {
   });
 }
 
-function parseCli(argv) {
-  let separatorIndex = 0;
-  let includeSuccessDiagnostic = false;
-  if (argv[0] === SUCCESS_DIAGNOSTIC_FLAG) {
-    includeSuccessDiagnostic = true;
-    separatorIndex = 1;
-  }
+function receiptStream(stream) {
+  return {
+    bytes: stream.bytes,
+    truncated: stream.truncated,
+    tail_available: stream.tail !== null,
+  };
+}
 
-  if (argv.length <= separatorIndex + 1 || argv[separatorIndex] !== "--") return null;
+function outputErrorReceipt(envelope) {
+  return {
+    schema_version: BOUNDED_COMMAND_RECEIPT_SCHEMA_VERSION,
+    kind: "team_harness_bounded_command_receipt",
+    outcome: "output_error",
+    exit_code: envelope.exit_code,
+    signal: envelope.signal,
+    error_code: "OUTPUT_WRITE_FAILED",
+    result_path: null,
+    result_sha256: null,
+    result_bytes: null,
+    stdout: receiptStream(envelope.stdout),
+    stderr: receiptStream(envelope.stderr),
+  };
+}
+
+async function resolveOutputTarget(outputPath) {
+  if (typeof outputPath !== "string" || !path.isAbsolute(outputPath) || outputPath.includes("\u0000")
+    || Buffer.byteLength(outputPath, "utf8") > MAX_OUTPUT_PATH_BYTES) {
+    return null;
+  }
+  const target = path.resolve(outputPath);
+  const parent = path.dirname(target);
+  try {
+    const parentStat = await lstat(parent);
+    if (!parentStat.isDirectory() || parentStat.isSymbolicLink() || await realpath(parent) !== parent) {
+      return null;
+    }
+    try {
+      const targetStat = await lstat(target);
+      if (!targetStat.isFile() || targetStat.isSymbolicLink()) return null;
+    } catch (error) {
+      if (error?.code !== "ENOENT") return null;
+    }
+    return target;
+  } catch {
+    return null;
+  }
+}
+
+async function persistEnvelope(outputPath, envelope) {
+  const target = await resolveOutputTarget(outputPath);
+  if (target === null) return outputErrorReceipt(envelope);
+  const parent = path.dirname(target);
+  let temporary;
+  let handle;
+  try {
+    const bytes = Buffer.from(`${JSON.stringify(envelope)}\n`);
+    temporary = path.join(parent, `.${path.basename(target)}.tmp-${process.pid}-${randomUUID()}`);
+    handle = await open(temporary, "wx", 0o600);
+    await handle.writeFile(bytes);
+    await handle.sync();
+    await handle.close();
+    handle = null;
+    // Revalidate immediately before replacement so a target swapped for a
+    // symlink after preflight is never followed or overwritten.
+    if (await resolveOutputTarget(target) === null) throw new Error("unsafe output target");
+    await rename(temporary, target);
+    const receipt = {
+      schema_version: BOUNDED_COMMAND_RECEIPT_SCHEMA_VERSION,
+      kind: "team_harness_bounded_command_receipt",
+      outcome: envelope.outcome,
+      exit_code: envelope.exit_code,
+      signal: envelope.signal,
+      error_code: envelope.error_code,
+      result_path: target,
+      result_sha256: createHash("sha256").update(bytes).digest("hex"),
+      result_bytes: bytes.length,
+      stdout: receiptStream(envelope.stdout),
+      stderr: receiptStream(envelope.stderr),
+    };
+    return isBoundedCommandReceipt(receipt) ? receipt : outputErrorReceipt(envelope);
+  } catch {
+    if (handle) await handle.close().catch(() => {});
+    if (temporary) await unlink(temporary).catch(() => {});
+    return outputErrorReceipt(envelope);
+  }
+}
+
+function parseCli(argv) {
+  const separatorIndex = argv.indexOf("--");
+  if (separatorIndex < 0 || separatorIndex === argv.length - 1) return null;
+  let includeSuccessDiagnostic = false;
+  let output;
+  for (let index = 0; index < separatorIndex;) {
+    if (argv[index] === SUCCESS_DIAGNOSTIC_FLAG && !includeSuccessDiagnostic) {
+      includeSuccessDiagnostic = true;
+      index += 1;
+      continue;
+    }
+    if (argv[index] === OUTPUT_FLAG && output === undefined && index + 1 < separatorIndex) {
+      output = argv[index + 1];
+      index += 2;
+      continue;
+    }
+    return null;
+  }
   // The helper flag is meaningful only before its separator. Treat a misplaced
   // leading flag as invalid instead of trying to execute it as an argv command.
-  if (!includeSuccessDiagnostic && argv[separatorIndex + 1] === SUCCESS_DIAGNOSTIC_FLAG) return null;
-  return { argv: argv.slice(separatorIndex + 1), includeSuccessDiagnostic };
+  if ([SUCCESS_DIAGNOSTIC_FLAG, OUTPUT_FLAG].includes(argv[separatorIndex + 1])) return null;
+  return { argv: argv.slice(separatorIndex + 1), includeSuccessDiagnostic, output };
 }
 
 async function main(argv) {
   const options = parseCli(argv);
-  return options === null ? invalidArgumentsEnvelope() : runBoundedCommand(options);
+  if (options === null) return invalidArgumentsEnvelope();
+  const { output, ...command } = options;
+  // Invalid evidence coordinates fail before child execution. This makes a
+  // malformed or sandbox-incompatible packet recoverable without replaying a
+  // possibly mutating command.
+  if (output !== undefined && await resolveOutputTarget(output) === null) return invalidArgumentsEnvelope();
+  const envelope = await runBoundedCommand(command);
+  return output === undefined ? envelope : persistEnvelope(output, envelope);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
