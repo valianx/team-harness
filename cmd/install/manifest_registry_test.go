@@ -142,11 +142,11 @@ func TestBuildOpencodeManifests_PipelineRunnersPresent(t *testing.T) {
 	}
 
 	required := map[string]bool{
-		"bounded-command.mjs":    false,
-		"cleaner-transition.mjs": false,
-		"plan-contract.mjs":      false,
-		"quality-runner.mjs":     false,
-		"test-transition.mjs":    false,
+		"bounded-command.mjs": false,
+		"quality-lib.mjs":     false,
+		"plan-contract.mjs":   false,
+		"quality-runner.mjs":  false,
+		"test-transition.mjs": false,
 	}
 	for _, component := range components {
 		for _, emitted := range component.Emits.Files {
