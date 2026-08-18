@@ -287,6 +287,88 @@ def _check_qa_post_gate1_route(validation: str) -> None:
             fail(f"{context} must keep QA read-only")
 
 
+SEMANTIC_ADAPTER_PARITY = {
+    # role: [(rule label, semantic-source token, adapter token)]
+    # Tokens are lowercased and whitespace-flattened. A rule reworded in one
+    # file without updating the other side (or this table) fails the suite.
+    "architect": [
+        ("acceptance form", "given/when/then", "given/when/then"),
+        ("no implementation", "never", "do not implement"),
+    ],
+    "implementer": [
+        ("bounded diff", "smallest approved production diff", "exactly one approved task"),
+        ("planned scope", "does not design architecture", "respect declared files"),
+    ],
+    "tester": [
+        ("warranted tests only", "warranted", "warranted"),
+        ("no quotas", "test-count quotas", "only warranted"),
+    ],
+    "cleaner": [
+        ("behavior preserving", "behavior", "behavior"),
+        ("allowlist bounded", "allowlist", "allowlist"),
+    ],
+    "qa": [
+        ("verdict producer", "verdict", "verdict"),
+        ("checkbox mirror", "checkbox", "checkbox"),
+    ],
+    "security": [
+        ("read-only audit", "read-only", "read-only"),
+        ("audit not fix", "audit", "audit"),
+    ],
+    "inline-reviewer": [
+        ("read-only", "read-only", "read-only"),
+        ("single lens", "lens", "lens"),
+    ],
+    "delivery": [
+        ("acceptance matrix", "acceptance matrix", "acceptance matrix"),
+        ("draft only", "draft", "draft"),
+    ],
+    "reviewer": [
+        ("untrusted input", "untrusted", "untrusted"),
+        ("frozen snapshot", "snapshot", "snapshot"),
+    ],
+    "pr-review-qa": [
+        ("ac validation", "acceptance criteria", "acceptance"),
+        ("no mutation", "without modifying files", "read-only"),
+    ],
+    "pr-review-security": [
+        ("regressions only", "regressions", "concrete"),
+        ("no mutation", "without modifying files", "read-only"),
+    ],
+    "reviewer-consolidator": [
+        ("de-duplication", "de-dup", "de-dup"),
+        ("no republication", "never", "never"),
+    ],
+}
+
+
+def _check_semantic_adapter_rule_parity(agents: list) -> None:
+    """A rule in a semantic contract must survive into every projection."""
+    roles = {agent.get("role", agent["name"]): agent for agent in agents}
+    for role, anchors in SEMANTIC_ADAPTER_PARITY.items():
+        if role not in roles:
+            fail(f"parity table names unknown role {role}")
+        semantic = re.sub(r"\s+", " ", (ROOT / f"agents/{role}.md").read_text().lower())
+        adapter = re.sub(
+            r"\s+", " ",
+            (ROOT / f"runtime/codex/instructions/{role}.md").read_text().lower(),
+        )
+        for label, semantic_token, adapter_token in anchors:
+            if semantic_token not in semantic:
+                fail(f"{role}: semantic rule {label!r} lost its anchor {semantic_token!r} — update the rule or the parity table")
+            if adapter_token not in adapter:
+                fail(f"{role}: rule {label!r} is not propagated to the Codex adapter ({adapter_token!r} missing)")
+    for agent in agents:
+        role = agent.get("role", agent["name"])
+        if agent["sandbox_mode"] != "read-only" or role not in SEMANTIC_ADAPTER_PARITY:
+            continue
+        adapter = (ROOT / f"runtime/codex/instructions/{role}.md").read_text().lower()
+        if "read-only" not in adapter:
+            fail(f"{role}: read-only role's adapter does not state its read-only boundary")
+        if 'sandbox_mode = "workspace-write"' in adapter:
+            fail(f"{role}: read-only role's adapter contradicts its sandbox mode")
+
+
 def _check_review_transport_fixture_read(review_contracts: dict) -> None:
     """Each review role must read a real fixture through its declared transport.
 
@@ -459,6 +541,7 @@ def main() -> None:
         if "Bash" in semantic_tools:
             fail(f"Claude {role} semantic agent unexpectedly gained Bash")
     _check_review_transport_fixture_read(review_contracts)
+    _check_semantic_adapter_rule_parity(agents)
     if generated != expected:
         fail(f"generated roles do not match contract: {sorted(generated)}")
 

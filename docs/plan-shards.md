@@ -1,6 +1,8 @@
 # Sharded plan contract
 
-New Tier 2-4 workspaces use `plan_format: sharded-v1`. The plan is a set of
+New Tier 2-4 workspaces use `plan_format: sharded-v1`. The canonical fenced
+schema the architect emits ships with the agents:
+`agents/ref-architect-design.md § "Canonical schema"`. The plan is a set of
 small canonical artifacts, not a monolith copied between roles:
 
 | Artifact | Canonical content | Normal readers |

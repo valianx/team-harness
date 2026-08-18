@@ -174,6 +174,7 @@ All commands run from the repo root.
 - **`/th:research-code` hybrid codebase-research flow.** `code-researcher` fans out per-file/module lanes; consolidator surfaces docs-vs-code conflicts. `agents/code-researcher.md`.
 - **Gated local permission provisioning.** Adds `additionalDirectories` via a gated Y/n; never touches outward-action rules. `docs/permission-provisioning.md`.
 - **Canonical dispatch contract.** One home for what a dispatch prompt may/must not carry and the two-halves scope rule (review scope never bounded by the dispatcher; write scope always bounded by the recipient's own contract). `agents/_shared/dispatch-contract.md`.
+- **Agent authoring standard.** Every agent/contract file follows the canonical skeleton, size budgets (specialist ≤2,000 words, shared contract ≤1,500, references one level deep with TOC), and ten authoring rules; `/th:lint` Check 12 enforces structure and the projection suite enforces semantic↔adapter parity. `docs/agent-authoring.md`.
 
 **Architectural changes must be reviewed by the `architect` subagent before implementation.** Applies especially to: adding an agent, changing the pipeline flow, modifying the installer's contract with `~/.claude/` or `~/.claude.json`, introducing a new memory layer.
 

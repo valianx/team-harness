@@ -50,11 +50,11 @@
 
 ## 7. Agent Authoring Standard
 
-- [ ] 7.1 Write `docs/agent-authoring.md` (skeleton, budgets, rules, PR checklist) and bind it from CLAUDE.md and `agent-builder`.
-- [ ] 7.2 Add the `/th:lint` structure checks: budgets, description format, tools allowlist, reference depth, dangling anchors, TOC.
-- [ ] 7.3 Add the semantic↔adapter parity check to the projection verification suite.
-- [ ] 7.4 Rewrite `agents/architect.md` to budget; validate with the behavioral suite plus a trial pipeline run.
-- [ ] 7.5 Rewrite `agents/plan-reviewer.md`, `agents/security.md`, `agents/qa.md`, then `agents/_shared/orchestrator-state.md` and `agents/_shared/gh-fallback.md`, same validation per file.
+- [x] 7.1 Write `docs/agent-authoring.md` (skeleton, budgets, rules, PR checklist) and bind it from CLAUDE.md and `agent-builder`.
+- [x] 7.2 Add the `/th:lint` structure checks: budgets, description format, tools allowlist, reference depth, dangling anchors, TOC.
+- [x] 7.3 Add the semantic↔adapter parity check to the projection verification suite.
+- [x] 7.4 Rewrite `agents/architect.md` to budget; validated with the deterministic behavioral and contract suites (no headless trial pipeline run is executable in this environment; the contract suites cover the preserved anchors).
+- [x] 7.5 Rewrite `agents/plan-reviewer.md`, `agents/security.md`, `agents/qa.md`, then `agents/_shared/orchestrator-state.md` and `agents/_shared/gh-fallback.md`, same validation per file (orchestrator-state.md is schema-bound: prose compressed, field schemas preserved verbatim).
 
 ## 8. Verification and Release
 

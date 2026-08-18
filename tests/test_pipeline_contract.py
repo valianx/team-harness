@@ -796,7 +796,8 @@ def check_preimplementation_test_contract() -> None:
 
     architect = read("agents/architect.md")
     require("Emit this block for every plan" in architect, "direct plans may omit Scope Shape")
-    task_template = architect.split("<!-- file: plan/tasks/Task-1.md -->", 1)[1].split("<!-- file: plan/tasks/Task-2.md -->", 1)[0]
+    design_reference = read("agents/ref-architect-design.md")
+    task_template = design_reference.split("<!-- file: plan/tasks/Task-1.md -->", 1)[1].split("<!-- file: plan/tasks/Task-2.md -->", 1)[0]
     require("#### Verification" in task_template, "task template misses Verification")
 
     vocabulary_pattern = re.compile(r"`SECURITY_CONTROL_VOCABULARY: ([^`\n]+)`")
