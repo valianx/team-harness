@@ -75,9 +75,10 @@ the current thread already knows, but newly added or renamed skills, agent or
 MCP declarations, and hook registrations still require a new Codex thread.
 Hook commands prefer Codex's native
 `PLUGIN_ROOT`, accept the `CLAUDE_PLUGIN_ROOT` compatibility alias that Codex
-itself provides without requiring Claude Code, recover a replacement snapshot
-from the same Codex cache, and fail closed without a shell-level `127` when no
-plugin runtime can be resolved.
+itself provides without requiring Claude Code, and recover a replacement
+snapshot from the same Codex cache. When no plugin runtime can be resolved,
+the launcher reports the broken cache as a system message and leaves the
+decision to native Codex permissions instead of denying every tool call.
 
 For contributors, the generated project `.codex/config.toml` keeps
 `workspace-write` plus `on-request` approvals and enables dependency network
@@ -250,6 +251,19 @@ metadata or adapters, run `$sync-codex-agents`; do not hand-edit generated TOML.
 Codex's native sandbox and permission path remain authoritative. Only
 deterministic deny floors emit a hook decision; hook-level `ask` and classifier
 `allow` are never translated into authorization.
+
+**Accepted risk — fail-open launcher fallback.** When the hook launcher cannot
+resolve a valid plugin root (stale or replaced cache, unmounted path, invalid
+`PLUGIN_ROOT`), it surfaces one `systemMessage` (`plugin runtime missing`) and
+makes no permission decision: the deny floor (`policy-block`, `gcp-guard`) is
+inactive until the plugin is reinstalled, and native Codex permissions are the
+only boundary. This is deliberate, not an oversight: the floor is a narrow
+backstop against destructive actions under the honest-developer threat model
+(`docs/dev-mode.md § "Threat model — honest-developer disposition"`), and a
+broken cache denying every Bash call would convert a packaging failure into a
+development outage. `tests/test_codex_hooks.sh` proves the safety half that is
+non-negotiable either way: an unresolvable or unsafe root never executes a
+fallback runner.
 
 ## Controlled pipeline-efficiency A/B benchmark
 

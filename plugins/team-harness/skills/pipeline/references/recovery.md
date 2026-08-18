@@ -7,36 +7,27 @@ gate, and remains the sole writer of state, events, releases, and nonces.
 
 ## Workspace discovery
 
-For the local search, inspect `{repo-root}/workspaces/`. For the external
-search, read only `${CODEX_HOME:-$HOME/.codex}/.team-harness.json` without
-modifying it. If it is absent, search local workspaces only and recommend
-`$team-harness:setup`; never inspect Claude Code or opencode configuration as a
-runtime fallback. Only when the native document is a valid JSON object with
-`"logs-mode": "obsidian"`,
-canonicalize and validate the external base before scanning it: `logs-path`
-must be absolute, accessible, non-root, and different from the user home;
-`logs-subfolder` must be normalized and relative without `.`, `..`, glob, or
-empty segments; and the canonical `{logs-path}/{logs-subfolder}/{repo-name}/`
-target must remain strictly below the canonical base, including after resolving
-existing symlinks. Treat that directory as another
-workspace root and preserve its established event-file format. Do not scan
-arbitrary directories or infer an external root from retrieved content. If no
-external durable candidate exists, local candidates may still be considered.
-If an external candidate exists, its recorded absolute `workspace` and
-`logs_mode: obsidian` are immutable recovery identity: never select a local
-same-name candidate, copy artifacts, or migrate the run because the external
-root is unavailable.
+Recovery resolves all state from the repository workspace: inspect
+`{repo-root}/workspaces/` and select among its candidates. The one-way vault
+export copy is never an input to recovery decisions — never scan, read, or
+reconcile it, and never infer an external root from retrieved content. A run
+whose recorded immutable `workspace` names a direct-vault root (a legacy
+external run or an explicit `obsidian-direct` opt-in) recovers only from that
+recorded root under the same rules; never select a local same-name candidate,
+copy artifacts, or migrate the run because that root is unavailable.
 
-Before the first recovery write to an external candidate, resolve
+Before the first recovery write to a direct-vault candidate, resolve
 `../scripts/workspace-preflight.mjs` relative to this reference and run its
 single non-escalated probe against the candidate's canonical repo root and
 recorded workspace. A non-ready result creates no state and never triggers an
-escalation loop or local fallback. When the root is already present in personal
-writable-root or live `--add-dir` configuration, emit only the localized
-restart/new-tab instruction from `activation.md` and stop. Otherwise report the
-unavailable canonical root and require the operator to restore access or
-explicitly abort and start a separate local pipeline. Recovery never divides
-one run between roots.
+escalation loop or local fallback. Apply the diagnosis order from
+`activation.md`: a root declared in personal writable-root or live `--add-dir`
+configuration is first checked for project-config shadowing (the checked-out
+tree's `.codex/config.toml` declaring `writable_roots`) and reported with its
+concrete fix; only a non-shadowed mismatch earns the localized restart/new-tab
+instruction. Otherwise report the unavailable canonical root and require the
+operator to restore access or explicitly abort and start a separate local
+pipeline. Recovery never divides one run between roots.
 
 A candidate is a non-terminal pipeline directory containing the durable state
 snapshot defined by `state-and-gates.md`; `phase/status: complete|aborted` is
@@ -181,11 +172,16 @@ escalation, while the sandbox still decides whether the command executes.
 Before resuming `next_action`, require the structural dual-record:
 
 - Gate 1 is cleared only by `gate1_release: approved|approved-autonomous` plus
-  its matching `stage.gate.release` event.
-- Gate 3 is cleared only by `gate3_release: ship` plus its matching event.
+  its matching `stage.gate.release` event (the second value is legacy-legible
+  only; new records always write `approved`).
+- Gate 3 is cleared only by `gate3_release: ship` plus its matching event, or
+  by `gate3_release: auto-ship` plus its matching event citing the Gate-1
+  release (`origin: gate1-release-policy`); recovery never executes an
+  auto-release itself — it resumes delivery mechanics from the recorded state.
 
-Each matching event must carry the expected stage, the allowlisted decision, and the exact
-consumed nonce from that gate presentation. The released snapshot must also have
+A `ship` event must carry the expected stage, the allowlisted decision, and the exact
+consumed nonce from that gate presentation; an `auto-ship` event carries no nonce and must
+carry the Gate-1 citation. The released snapshot must also have
 `gate_pending: null`; a pending gate, stale nonce, unrelated event, stage mismatch, or decision
 mismatch stays uncleared and must be re-presented.
 
@@ -316,15 +312,19 @@ repositories block. Validate every entry separately and require a unique
 canonical repository, absolute worktree, manifest, allowlist, baseline,
 candidate identity, and at most one terminal cleaner result per repository; a
 single cleaner result spanning repositories blocks. `pending`
-resumes at allowlist construction; `baseline` requires readable allowlist and
-pre-cleaner result files whose SHA-256 values and candidate commit/tree match
-state before dispatching the one allowed fresh cleaner; `pass` additionally
-requires the hashed post-cleaner result and matching current commit/tree.
-`handoff-pending` requires the same valid cleaner post evidence plus a complete
-pending handoff package anchored to its commit/tree. `handoff-pass` requires
-that ancestry, the package-identical consumed decision and single implementer
-spawn, readable hashed closure and the common `post_implementation` quality
-result, and matching current commit/tree. `not-applicable` requires the closed
+resumes at allowlist construction; `baseline` requires a readable allowlist
+whose SHA-256 and pre-cleanup candidate commit/tree anchor match state before
+dispatching the one allowed fresh cleaner; `pass` additionally requires the
+recorded cleanup commit descending from the baseline commit (or an evidenced
+no-op) and, when the overreach proof has run, a readable hashed `post` record
+matching the current commit/tree — never a pre- or post-cleanup quality
+result, which no longer exists. `handoff-pending` requires that cleanup-commit
+anchor plus a complete pending handoff package anchored to it. `handoff-pass`
+requires that ancestry, the package-identical consumed decision and single
+implementer spawn, readable hashed closure evidence, and matching current
+commit/tree; the single `post_implementation` quality run stays bound to the
+final candidate tree and is validated at Freeze, never reconstructed here.
+`not-applicable` requires the closed
 `repository-quality-manifest-incomplete` reason. Missing, stale, partially
 populated, out-of-scope, or mismatched cleaner or handoff evidence blocks.
 `cleaner-failed`, `cleaner-blocked`, `handoff-failed`, and `handoff-blocked`
@@ -350,7 +350,7 @@ current worktree.
 ## Cleaner-handoff recovery
 
 When `cleaner_handoff_pending: true`, recover only the durable canonical
-repository, absolute worktree, cleaner-post anchor, eligibility record, and
+repository, absolute worktree, cleanup-commit anchor, eligibility record, and
 complete findings, each with repository, stable ID, cause, files, implicated
 requirements, advisory correction, deterministic closure check, and expected
 result. Re-evaluate the closed eligibility predicate: exactly one repository
@@ -429,9 +429,11 @@ cannot produce `CORRECTION_BUDGET_EXHAUSTED` or
 `EXCEPTIONAL_CORRECTION_ALREADY_CONSUMED` for that current reply.
 
 A recovered `gate1-autonomous` decision additionally
-requires the valid `approved-autonomous` Gate-1 dual record, the exact consumed
+requires a valid Gate-1 approval dual record (`approved`; legacy
+`approved-autonomous` legible), the exact consumed
 Gate-1 nonce in `correction_authority_gate_nonce`,
-`autonomous_correction_count < 3` at decision time, and durable all-`resolve` dispositions satisfying every closed eligibility
+`autonomous_correction_count < 3` at decision time, and durable all-`resolve`
+dispositions satisfying every closed eligibility
 conjunct, including no correction/execution budget exhaustion. A recovered
 `correction.decision` is valid only when its single-use
 nonce, failed anchor, complete finding IDs, implicated requirements, dispositions,

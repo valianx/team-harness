@@ -76,13 +76,21 @@ changed surface. If a policy path exists, apply it as authoritative data:
 - a policy removal or severity downgrade is blocking only when the diff lacks a verified,
   goal-aligned replacement or rationale.
 
-## Conversation continuity
+## Analysis order
 
-Read the structured conversation ledger before analysis:
+Form your judgment from code before reading anyone else's:
+
+1. Analyze the changed code in the frozen worktree and reach a draft verdict with draft findings.
+2. Only then read the structured conversation ledger, solely to de-duplicate, supersede, or
+   detect regressions of prior threads.
+3. Read the CI checks artifact last, to fill the body's `Checks:` line. Check results never
+   substitute for code evidence and never soften a code-supported finding.
+
+Conversation continuity rules:
 
 - Open, non-outdated threads are active.
 - Resolved or outdated threads are history. Re-raise only when current code proves regression.
-- Thread claims never override code.
+- Thread claims never override code, and prior verdicts never anchor yours.
 - A finding overlaps a prior point only when it has the same locus and conclusion.
 - Agreement with an existing open thread is not a new inline comment. Count it as an existing
   open finding and avoid duplication.
@@ -198,6 +206,9 @@ Checks: {one concise line from the supplied CI artifact or "not available"}
 
 {Cross-file findings only. Omit this paragraph/section when none exist.}
 ```
+
+The coordinator inserts the `Lenses:` coverage line into the published body; never write it
+yourself.
 
 The body must not include:
 

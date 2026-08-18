@@ -44,12 +44,26 @@ The same operator-facing/agentic split governs body-prose language, not just for
 
 This rule is mirrored in `docs/voice-guide.md § Operator-Supplied Content Boundary` and operationalized per-artifact: each specialist agent declares its own artifact's language in its own `## Return Protocol § Language` clause (`agents/architect.md`, `agents/qa.md`, `agents/tester.md`, `agents/delivery.md`, and ten others — 14 in total), rather than as a single centralized dispatch instruction. `agents/_shared/dispatch-contract.md` deliberately does not mention language on any line — the standard's own convention is that this rule lives in each agent's own output contract, never in the dispatcher's prompt. The only surface outside this rule that still renders in the operator's resolved language is `agents/orchestrator.md` live chat, documented as an exception in `docs/voice-guide.md § Documented exceptions`, never as a hardcoded language.
 
-## Dual-mode workspaces
+## Repository-local workspaces with one-way Obsidian export
 
-Two output modes are available, controlled by `logs-mode` in `~/.claude/.team-harness.json`:
+The canonical workspace is always `./workspaces/{feature-name}/` in the repo
+working tree, on every runtime and regardless of `logs-mode` in
+`~/.claude/.team-harness.json`. The coordinator resolves `docs_root` once and
+forwards it to every subagent it dispatches; recovery reads only this
+repository workspace.
 
-- **local** (default) — writes to `./workspaces/{feature-name}/` in the repo working tree.
-- **obsidian** — writes to the configured Obsidian vault at `{logs-path}/{logs-subfolder}/{repo-name}/{date}_{feature}/`. The coordinator resolves configuration and the base path once, then forwards `docs_root` to every subagent it dispatches. Obsidian mode adds YAML frontmatter (repo, feature, pipeline, date, agent) to every workspace Markdown doc.
+- **local** (default) — no export.
+- **obsidian** — arms a one-way export: at draft-PR creation and at terminal
+  close or pause, the workspace is copied atomically to
+  `{logs-path}/{logs-subfolder}/{repo-name}/{date}_{feature}/`. The vault copy
+  is a non-authoritative view — never read for recovery, never synced back. A
+  failed export records `obsidian_sync: pending` without blocking the run.
+  Export-armed runs add YAML frontmatter (repo, feature, pipeline, date,
+  agent) to every workspace Markdown doc before export.
+- **obsidian-direct** (advanced opt-in) — a live-in-vault workspace selected
+  only by an explicit live operator request and gated behind the deterministic
+  write probe; probe failure falls back to the repository workspace with the
+  recorded reason.
 
 The operator switches modes via `/th:setup` or a session override in `00-state.md`.
 
@@ -74,7 +88,7 @@ Rules for contributors:
 
 In `logs-mode: obsidian`, diagram generation works as follows:
 
-- **D2** — renders via the `d2` CLI to SVG; the SVG file is written into the vault workspace folder and an `![[…]]` embed appended to `05-diagram.md`.
+- **D2** — renders via the `d2` CLI to SVG; the SVG file is written into the workspace folder (reaching the vault via the one-way export) and an `![[…]]` embed appended to `05-diagram.md`.
 - **LikeC4** — renders via `npx likec4 export png` to PNG; same embed pattern.
 - When the CLI is absent, the diagram source is written and a `render: skipped` marker appended — the file is not left empty.
 - Local mode and the Excalidraw path are unchanged by this convention.

@@ -6,9 +6,10 @@ system. Three representations reference this document:
 1. **This file** (`docs/plan-sketches.md`) — canonical definitions, classification schema,
    fidelity ceilings, representation ceilings, per-type applicability, and the
    sketch-vs-spec-seed reconciliation rule.
-2. **`agents/architect.md`** — an agent-readable trigger→required-set table and skeleton
-   templates embedded inline so the architect can emit the correct files without reading
-   an arbitrary repo path mid-dispatch.
+2. **`agents/ref-architect-design.md § "Sketches"`** — the agent-readable
+   trigger→required-set table and skeleton templates, shipped with the agents
+   so the architect can emit the correct files without reading an arbitrary
+   repo path mid-dispatch.
 3. **`hooks/sketch-guard.sh`** — the hardcoded manifest mapping used by the gate script
    (a bash script cannot reliably parse markdown at runtime). A structural drift test in
    The three representations must agree; nothing mechanically asserts it.

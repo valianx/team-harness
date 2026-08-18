@@ -6,8 +6,8 @@ candidate and emits a closed JSON evidence record. It does not select tools,
 install dependencies, edit source, or decide whether a test expresses the
 approved behavior.
 
-The base runner is used by both the pre-implementation test-transition and the
-pre-Freeze cleaner checkpoints.
+The base runner is used by the pre-implementation test-transition checkpoints
+and by the single Freeze quality run (`post_implementation`).
 
 ## Functional contract
 
@@ -19,7 +19,9 @@ candidate, a checkpoint name, and a selected set of checks, the runner:
 3. resolves the changed file surface from Git;
 4. executes only manifest-declared `argv` arrays, never a shell command string;
 5. bounds stdout, stderr, duration, argument size, changed paths, and metric records;
-6. rejects commands that mutate Git-visible tracked or untracked repository state;
+6. rejects commands that mutate tracked repository state; untracked content —
+   pre-existing or a command byproduct — is intentionally outside this check
+   and never counts as worktree evidence;
 7. calculates CRAP itself from normalized complexity and coverage input; and
 8. returns one schema-versioned JSON result and a nonzero process status on failure.
 
@@ -219,10 +221,10 @@ safe repository-relative member of the base-to-candidate changed-path set,
 0 through 100. `(path, symbol)` pairs are unique.
 
 `CRAP_REPORT_INVALID` means one of those input/schema/scope rules failed.
-`CRAP_REPORT_INCOMPLETE` is different: during post-cleaner enforcement, a
-function present in the accepted baseline is absent from the new report. These
-two definitions are the diagnostic contract; agents inspect the bounded report
-artifact and manifest adapter, not the implementation body of
+`CRAP_REPORT_INCOMPLETE` is different: under `--policy-mode enforce` with a
+baseline, a function present in the accepted baseline is absent from the new
+report. These two definitions are the diagnostic contract; agents inspect the
+bounded report artifact and manifest adapter, not the implementation body of
 `quality-runner.mjs`.
 
 The adapter never supplies the CRAP score. The runner computes it consistently:
@@ -231,23 +233,24 @@ The adapter never supplies the CRAP score. The runner computes it consistently:
 CRAP = complexity² × (1 − coverage)³ + complexity
 ```
 
-When CRAP is configured, use `--policy-mode measure` before cleanup. Persist the
-result and record its SHA-256 in coordinator-owned state. Use
-`--policy-mode enforce` after cleanup with `--baseline` pointing to that result
-and `--baseline-sha256` carrying the recorded identity. Enforcement rejects a new function over
-`new_function_max`, a worsening score when policy
-forbids it, a changed function missing from the baseline, a changed manifest,
-or a baseline candidate that is not an ancestor of the current candidate. It
-also rejects a post-cleaner report that omits any function present in the
-baseline (`CRAP_REPORT_INCOMPLETE`); cleanup cannot improve the metric by
-renaming, splitting, or suppressing measured functions.
+The pipeline runs CRAP measure-only: the default `--policy-mode measure`
+records per-function values as informational diagnostics with verdict
+`not_applied`, and no baseline comparison gates the run. `--policy-mode
+enforce` remains a standalone runner capability for repositories that want a
+hard threshold outside the pipeline; with `--baseline` and
+`--baseline-sha256` it rejects a new function over `new_function_max`, a
+worsening score when policy forbids it, a changed function missing from the
+baseline (`CRAP_REPORT_INCOMPLETE`), a changed manifest, or a baseline
+candidate that is not an ancestor of the current candidate. The pipeline never
+selects enforce mode.
 
 ## Invocation
 
 The base must be a full 40- or 64-character commit ID. The candidate may be a
 full commit ID or `HEAD`, but it must resolve to the currently checked-out clean
-commit. The raw runner does not infer optional checks from the manifest; this
-minimal pre-cleaner invocation works with the required `test` command alone:
+commit. The raw runner does not infer optional checks from the manifest. The
+pipeline's single Freeze invocation selects every command declared by the
+manifest plus the per-repository union of task-declared required checks:
 
 ```bash
 node /absolute/path/to/loaded/pipeline/skill/scripts/quality-runner.mjs \
@@ -255,31 +258,13 @@ node /absolute/path/to/loaded/pipeline/skill/scripts/quality-runner.mjs \
   --manifest .team-harness/quality.json \
   --base 0123456789abcdef0123456789abcdef01234567 \
   --candidate HEAD \
-  --checkpoint pre-cleaner \
-  --checks test \
+  --checkpoint post_implementation \
+  --checks test,format_check,lint,crap \
   --policy-mode measure
 ```
 
-The corresponding minimal post-cleaner invocation is:
-
-```bash
-node /absolute/path/to/loaded/pipeline/skill/scripts/quality-runner.mjs \
-  --repo /absolute/path/to/repository \
-  --manifest .team-harness/quality.json \
-  --base 0123456789abcdef0123456789abcdef01234567 \
-  --candidate HEAD \
-  --checkpoint post-cleaner \
-  --checks test \
-  --policy-mode enforce
-```
-
-Select optional checks only when the manifest declares them. Before cleanup,
-use `--checks test,crap` only when both the `crap` command and CRAP policy are
-present. After cleanup, start with `test` and append each declared
-`format_check`, `lint`, and `crap` in that order. When the post-cleaner list
-includes `crap`, also pass the exact pre-cleaner quality result through
-`--baseline /path/to/pre-cleaner-result.json` and its recorded identity through
-`--baseline-sha256 89abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567`.
+Select optional checks only when the manifest declares them; `test` leads and
+each declared `format_check`, `lint`, and `crap` follows in that order.
 
 Successful command output is counted but not replayed. Failure diagnostics use
 the existing bounded-command envelope: independently counted stdout/stderr,
@@ -303,10 +288,12 @@ the security boundary.
 
 ## Cleaner integration
 
-The cleaner companion wraps the raw quality records with a hashed production
-allowlist and verifies the exact pre/post transition. It always requires
-`test`; `format_check`, `lint`, and `crap` are selected when declared by the
-manifest. See [Cleaner Checkpoint with Optional CRAP](cleaner-crap.md).
+The cleaner checkpoint records a hashed production allowlist and a pre-cleanup
+baseline anchor, then dispatches one bounded cleanup pass. There is no pre- or
+post-cleanup quality run: quality executes exactly once per candidate tree at
+the Freeze `post_implementation` checkpoint, and cleanup containment is proven
+by a git-native overreach diff at Freeze. See
+[Cleaner Checkpoint](cleaner-crap.md).
 
 Both deterministic checkpoints live inside `implementation`; they do not
 change the v3 state machine or either Stage Gate.

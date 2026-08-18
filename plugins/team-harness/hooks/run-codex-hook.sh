@@ -8,7 +8,7 @@ HOOK_NAMES=()
 
 for hook_name in "$@"; do
   case "$hook_name" in
-    policy-block|gcp-guard|gate-guard) HOOK_NAMES+=("$hook_name") ;;
+    policy-block|gcp-guard) HOOK_NAMES+=("$hook_name") ;;
     *) ;;
   esac
 done

@@ -75,12 +75,13 @@ every deletion.
 
 ## Severity guidance
 
-Severity is governed by the **existing rules** in `reviewer.md §
-"Severity Classification"`. This lens is additive — it provides the consumer
-trace and the non-execution-as-safety-property check; it does NOT override
-existing severity levels and NEVER replaces the deterministic bright-line
-(the `review-policy.md` rule-removal-equals-critical rule at
-`reviewer.md § "Policy-aware review"`).
+Severity mapping and precedence are governed by
+`agents/review-lenses/_index.md § "Shared lens contract"`. This lens is additive — it provides
+the consumer trace and the non-execution-as-safety-property check. For policy-declared rules,
+the reviewer's policy handling (`reviewer.md § "Input"`) governs: a policy removal or severity
+downgrade is blocking only when the diff lacks a verified, goal-aligned replacement or
+rationale — the consumer trace this lens produces is exactly the evidence that answers that
+question.
 
 Indicative guidance (NOT an automatic override):
 
@@ -95,13 +96,6 @@ Indicative guidance (NOT an automatic override):
 
 Apply existing reviewer judgement; do not escalate solely because the lens fired.
 
-## Scope discipline
+## Scope, channel, and severity mapping
 
-Raise findings only for deletions or loosenings the diff introduced (see
-`reviewer.md § "Scope Discipline"`). Pre-existing unguarded code in untouched
-files goes in `## Fuera de alcance` at most once — it does not affect the
-verdict. Do not duplicate a finding already raised under `### Error Handling`
-or `### Security` in the main review.
-
-Fold findings into the existing `### Error Handling` or `### Security` sections
-of `review_body`; do not add new top-level sections for this lens.
+Governed by `agents/review-lenses/_index.md § "Shared lens contract"`.

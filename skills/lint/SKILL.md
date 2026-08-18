@@ -4,7 +4,7 @@ description: Validate health of agents, skills, and hooks in the system.
 ---
 name: lint
 
-Validate the health of agents and skills in this dev-team system. Run all 4 checks below **in sequence**, then show the consolidated report.
+Validate the health of agents and skills in this dev-team system. Run all 12 checks below **in sequence**, then show the consolidated report.
 
 **IMPORTANT:** This skill runs directly — do NOT invoke the `th:orchestrator` agent or any other agent. Execute all checks yourself using the tools available to you (Bash, Glob, Read, Grep).
 
@@ -311,6 +311,46 @@ Result:
 ---
 name: lint
 
+## Check 12 — Authoring standard structure
+
+Enforce the structural half of `docs/agent-authoring.md` deterministically.
+File classes and budgets:
+
+| Class | Files | Word budget | Hard cap |
+|---|---|---|---|
+| specialist | `agents/*.md` (excluding `README.md`, `ref-*.md`, `orchestrator.md`) | 2,000 | 500 lines |
+| shared contract | `agents/_shared/*.md` | 1,500 | 500 lines |
+| reference | `agents/ref-*.md`, `agents/*/` reference folders | — | TOC required over 100 lines |
+
+For each file in scope:
+
+1. **Budgets:** count words (`wc -w`) and lines (`wc -l`). Over 80% of the
+   word budget → WARN naming the file, its count, and the budget. Over the
+   hard line cap → FAIL. A reference file has no word budget; over 100 lines
+   it must contain a table-of-contents block (a list of its own `##`
+   headings) near the top — absence → FAIL.
+2. **Description format:** frontmatter `description` present, one line,
+   third-person, ≤ 240 characters → otherwise FAIL.
+3. **Tools allowlist:** frontmatter `tools:` present and explicit on every
+   specialist agent → absence FAIL. (`ref-*.md` and `README.md` carry no
+   frontmatter and are exempt.)
+4. **Reference depth:** collect `agents/ref-*.md` and `references/` paths
+   cited in each reference file's body; a reference citing another reference
+   that the reader must open to act (depth two) → WARN naming both files.
+5. **Dangling section anchors:** for every cite of the form
+   `` `file § "Heading"` `` or `file § Heading`, resolve the file and grep
+   its headings for the quoted heading text. A cite whose file or heading
+   does not exist → FAIL naming the citing file and the anchor.
+
+Result:
+- **PASS** if every file fits budgets and formats and every anchor resolves.
+- **WARN** for 80%-budget crossings and depth-two references.
+- **FAIL** for a hard-cap breach, missing description/tools, missing TOC, or
+  a dangling anchor.
+
+---
+name: lint
+
 ## Arguments
 
 | Argument | Applies to | Description |
@@ -419,8 +459,14 @@ Status: {PASS|WARN}
 {for each agent with an unused grant: "  [WARN] <agent>: unused <mcp-tool> — remove from tools:/mcpServers: or add the invoking body text"}
 {if PASS: "All agents' MCP grants are matched by a body invocation"}
 
+--- Check 12: Authoring standard structure ---
+Status: {PASS|WARN|FAIL}
+Budgets: {N within} / {N checked} | {for each breach: "  [WARN|FAIL] <file>: NNNN words / NNN lines (budget WWWW / cap CCC)"}
+Anchors: {N resolved} / {N cited} | {for each dangling: "  [FAIL] <file>: unresolved anchor <file § heading>"}
+{if PASS: "All files fit the authoring standard (docs/agent-authoring.md)"}
+
 ====================================
-  Result: {X} / 11 checks passed
+  Result: {X} / 12 checks passed
 ====================================
 {if --fix applied: "\n--- Auto-fix applied ---\n{list of fixes}"}
 ```

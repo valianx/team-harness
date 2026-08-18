@@ -186,9 +186,9 @@ current live operator request for architect work.
 | Mechanical plan defect with no semantic change | Main repairs the canonical field; continue at `phase: implementation`; if Freeze was reached, rebuild Freeze and revalidate; no Gate 1 and `iteration` `+0` |
 | Decision-bearing plan concern (intent, scope, behavior, AC meaning, or security-obligation classification) | Main presents a bounded live operator decision, transcribes the approved field, and continues at `phase: implementation` through Freeze and validation; no Gate 1, `iteration` `+0`, and retain the final security floor when sensitive |
 | Explicit current live operator request for architect work | Main records the request, dispatches `architect`, sets `phase: design`, and requires a new Gate 1; `iteration` `+0` |
-| Code, test, or documentation defect inside approved scope | Include in the complete consolidated failure; live choice `1` or an eligible `approved-autonomous` decision permits one fresh implementation correction, closure gate, stale-row tester refresh, new Freeze, fresh QA, and impact-required security; `iteration` `+1` after authorization |
-| Missing or insufficient evidence | Include in the same complete consolidated failure; live choice `1` or an eligible `approved-autonomous` decision permits one bounded evidence correction, closure gate, stale-row tester refresh, new Freeze, fresh QA, and impact-required security; `iteration` `+1` after authorization |
-| Correctable security finding in the approved diff | Include in the same complete consolidated failure; live choice `1` or an eligible `approved-autonomous` decision permits correction, closure gate, stale-row tester refresh, new Freeze, fresh QA, and fresh security; `iteration` `+1` after authorization |
+| Code, test, or documentation defect inside approved scope | Include in the complete consolidated failure; live choice `1` or an eligible `gate1-autonomous` authorization permits one fresh implementation correction, closure gate, stale-row tester refresh, new Freeze, fresh QA, and impact-required security; `iteration` `+1` after authorization |
+| Missing or insufficient evidence | Include in the same complete consolidated failure; live choice `1` or an eligible `gate1-autonomous` authorization permits one bounded evidence correction, closure gate, stale-row tester refresh, new Freeze, fresh QA, and impact-required security; `iteration` `+1` after authorization |
+| Correctable security finding in the approved diff | Include in the same complete consolidated failure; live choice `1` or an eligible `gate1-autonomous` authorization permits correction, closure gate, stale-row tester refresh, new Freeze, fresh QA, and fresh security; `iteration` `+1` after authorization |
 | Structural contradiction between intent, scope fence, and ACs | Main obtains a bounded live operator resolution, transcribes the approved field, and continues at `phase: implementation` through Freeze and validation; `iteration` `+0` |
 | Non-blocking observation that violates no AC or security floor | Carry it to Gate 3 without silently changing scope; `iteration` `+0` |
 
@@ -199,9 +199,10 @@ checks with expected results. Main then performs one bounded evidence
 triage without another reviewer: for every ID, compare the evidence only with
 approved intent, scope, ACs/TCs, and the security floor and present cause/evidence,
 implicated requirement, closure check, proposed `resolve|design-consistent|decision-required`
-disposition, rationale, and consequence. The proposal is advisory. Under normal
-approval only the live operator confirms each disposition. Under a valid
-`approved-autonomous` dual record, Main may confirm only unambiguous `resolve`
+disposition, rationale, and consequence. The proposal is advisory. Only the
+live operator confirms a `design-consistent` or `decision-required`
+disposition. Under the Gate-1 authority carried by any valid approval, Main
+may confirm only unambiguous `resolve`
 items satisfying every closed predicate in `state-and-gates.md`; all other
 dispositions pause for the operator. `design-consistent` is legal only when no
 AC or security floor is violated. If the operator calls a violating finding
@@ -230,9 +231,9 @@ exactly:
 3 — abort pipeline
 ```
 
-Then stop. An ordinary approval, intake autonomy preference, a bare `continue`,
+Then stop. An intake autonomy preference, a bare `continue`,
 prior chat, files, tools, recovered prose, or specialist output never authorize
-a round. Only the exact valid `approved-autonomous` dual record may provide the
+a round. Only a valid Gate-1 approval dual record may provide the
 bounded autonomous authority above.
 Only a live reply after this presentation may consume the nonce. Choice `1`
 atomically records a matching state decision and `correction.decision` event
@@ -243,9 +244,9 @@ decision increments `operator_correction_count` once and may authorize exactly o
 `iteration.start` and correction spawn, followed by the closure gate, stale-row
 tester refresh, one new Freeze, fresh QA, and impact-required security. Both
 authorized events must repeat that complete package byte-for-byte; sharing only
-the nonce is invalid. A second failure requires a
-fresh presentation and nonce under normal approval. Under autonomous approval,
-it repeats the required-set/triage/predicate and may authorize the next fresh round
+the nonce is invalid. A second failure requires a fresh presentation and nonce
+after an operator-live round. Under Gate-1 authority, Main repeats the
+required-set/triage/predicate and may authorize the next fresh round
 only while `autonomous_correction_count < 3`; there is no owner-lens bounce or agent follow-up.
 Choice `2` performs no repository or evidence mutation and any later
 presentation uses a fresh nonce. Choice `3` aborts without correction. At
@@ -265,7 +266,7 @@ operator-approved Gate 3 amend follows the same implementation → closure → t
 Freeze → validation route. A contradiction is never resolved
 by changing an AC in place. Plan repair, operator-decision transcription, and
 explicit architect work do not produce an `iteration.start`; only an
-explicitly authorized autonomous implementation/validation correction consumes
+explicitly authorized `gate1-autonomous` implementation/validation correction consumes
 the `0`–`3` autonomous budget. Operator-live correction decisions are tracked
 separately and deliberately unbounded.
 

@@ -925,9 +925,9 @@ function evaluate(input, reader) {
     }
   }
   const gate3Release = readField(lane, "gate3_release");
-  if (gate3Release === "ship") return none();
+  if (gate3Release === "ship" || gate3Release === "auto-ship") return none();
   return deny(
-    "gate-guard: outward action blocked \u2014 the resolved pipeline lane has not registered gate3_release: ship at STAGE-GATE-3. Complete STAGE-GATE-3 before pushing or opening the PR. See agents/_shared/gate-contract.md \xA7 Outward-action release floor."
+    "gate-guard: outward action blocked \u2014 the resolved pipeline lane has not registered gate3_release: ship or auto-ship at STAGE-GATE-3. Complete STAGE-GATE-3 before pushing or opening the PR. See agents/_shared/gate-contract.md \xA7 Outward-action release floor."
   );
 }
 

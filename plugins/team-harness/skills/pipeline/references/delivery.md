@@ -12,8 +12,12 @@ committed MAJOR candidate blocks as `major-release-required` and requires a sepa
 operator-led release-planning task; this classification takes precedence over `version-overbump` and
 `version-underbump`, and delivery never selects, recommends, or validates MAJOR. Otherwise, an unsupported over- or
 under-bump returns to implementation → Freeze → full validation; delivery never repairs it. Validate canonical non-symlink paths
-and SHA-256 digests, bind them to `delivery_preview`, present the committed
-version plus accepted Freeze commit/tree, and stop for:
+and SHA-256 digests, bind them to `delivery_preview`, and record the committed
+version plus accepted Freeze commit/tree. On total green with no closed-list
+exception, record the mechanical dual record `gate3_release: auto-ship` citing
+the Gate-1 release event and continue — no STOP. On a closed-list exception
+(design changed, security obligation changed or surviving broke-it,
+infrastructure failure), present the exception and stop for:
 
 ```text
 1 — ship    (ship)
@@ -21,7 +25,7 @@ version plus accepted Freeze commit/tree, and stop for:
 3 — abort   (abort)
 ```
 
-After a valid dual-record `gate3_release: ship`, do not ask again and do not regenerate prose.
+After a valid dual-record `gate3_release ∈ {ship, auto-ship}`, do not ask again and do not regenerate prose.
 Re-read the exact recorded PR title/body/digests. Before the first GitHub remote
 query, resolve the operator-owned identity route with the helper relative to the
 loaded setup skill:
@@ -86,3 +90,12 @@ that terminal state transition, close delivery with the measured or unavailable
 usage/cost aggregate as every other phase, and rewrite the summary from the
 trace. A missing native root identifier yields an unavailable result; it never
 authorizes an estimate, a reused subtotal, or a price inference.
+
+When `obsidian_sync: armed`, export the workspace after draft-PR creation and
+again at terminal close or pause: copy the complete workspace atomically into
+a fresh directory under the recorded `obsidian_export_target` and set
+`obsidian_sync: exported`. The vault copy is a non-authoritative view — never
+read for recovery, never synced back. An export failure (sandbox denial,
+unmounted path, latency timeout) records `obsidian_sync: pending` with one
+sanitized reason line and never blocks, delays, or reopens delivery; a later
+explicit operator request may retry the export.

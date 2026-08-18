@@ -52,9 +52,10 @@ func TestEmbeddedAssets_SharedSnippets(t *testing.T) {
 // added to the repo but the embed directive is still pointing at the old directory.
 func TestEmbeddedAssets_AllExpectedAgents(t *testing.T) {
 	roster := []string{
-		"adversary", "agent-builder", "architect", "code-researcher",
+		"adversary", "agent-builder", "architect", "cleaner", "code-researcher",
 		"d2-diagrammer", "delivery", "diagrammer", "documenter", "gcp-cost-analyzer",
-		"gcp-infra", "implementer", "init-project", "likec4-diagrammer", "mentor",
+		"gcp-infra", "implementer", "init-project", "inline-reviewer",
+		"likec4-diagrammer", "mentor",
 		"orchestrator", "plan-reviewer", "qa", "qa-plan", "research-consolidator",
 		"pr-review-qa", "pr-review-security", "researcher", "reviewer",
 		"reviewer-consolidator", "security", "tester",

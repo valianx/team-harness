@@ -146,6 +146,7 @@ function assertClosedResult(result) {
   assert.equal(result.schema_version, TEST_TRANSITION_SCHEMA_VERSION);
   assert.deepEqual(Object.keys(result).sort(), [
     "contract",
+    "detail",
     "diagnostic",
     "duration_ms",
     "error_code",

@@ -33,7 +33,7 @@ cleaner_handoff_pending: true|false
 cleaner_handoff_nonce: {fresh token or null}
 cleaner_handoff_repository: {canonical repository identity or null}
 cleaner_handoff_worktree: {absolute path or null}
-cleaner_handoff_anchor: {cleaner-post commit/tree or null}
+cleaner_handoff_anchor: {cleanup commit/tree or null}
 cleaner_handoff_findings: [{id, repository, cause, files, requirements, suggested_correction, closure_check, expected}]|[]
 cleaner_handoff_eligibility: eligible|ineligible|null
 cleaner_handoff_ineligible_reasons: [{closed-predicate conjunct}]|[]
@@ -73,53 +73,50 @@ runs. A cleaner-to-implementer handoff is also excluded: it emits only
 `cleaner.handoff.decision` and `agent.cleaner-handoff.spawn`.
 
 **Cleaner handoff decisions.** The cleaner runs once per participating
-repository and immutable candidate/manifest identity. Cross-repository work
-uses separate fresh cleaners with separate
-repo roots, worktrees, allowlists, baselines, manifests, candidate identities,
-and `cleaner_repo_evidence`; one cleaner never receives multiple repositories.
-Each finishes every independent safe allowlisted cleanup and may return complete
-implementer findings. Main
-records the cleaner result and deterministic post evidence first, then persists
-one package-bound nonce only when the closed eligibility predicate holds:
-exactly one repository/worktree, one coherent behavior-preserving objective,
-one to five findings, at most eight unique files, already-approved scope, no
-DDL/migration, public-schema, security-control, external-environment, or new
-decision dependency, local closure checks, and a complete quality manifest.
-Otherwise it preserves commits/evidence, dispatches nobody, and pauses the same
-pipeline for an in-place repository-decomposed recovery package or applicable
-live scope decision. An eligible package pauses with
-exactly `1 — authorize one implementer pass`,
-`2 — pause without changes`, and `3 — abort pipeline`. Only a live reply after
+repository and immutable candidate/manifest identity; cross-repository work
+uses separate fresh cleaners with separate roots, worktrees, allowlists,
+baselines, manifests, and `cleaner_repo_evidence` — one cleaner never receives
+multiple repositories. Main records the cleaner result and the deterministic
+overreach-proof evidence first, then persists one package-bound nonce only
+when the closed eligibility predicate holds: exactly one repository/worktree,
+one coherent behavior-preserving objective, one to five findings, at most
+eight unique files, already-approved scope, no DDL/migration, public-schema,
+security-control, external-environment, or new decision dependency, local
+closure checks, and a complete quality manifest. Otherwise it preserves
+commits/evidence, dispatches nobody, and pauses the same pipeline for an
+in-place repository-decomposed recovery package or live scope decision. An
+eligible package pauses with exactly `1 — authorize one implementer pass`,
+`2 — pause without changes`, and `3 — abort pipeline`; only a live reply after
 that presentation may consume the nonce. Choice `1` consumes it and permits one
 fresh terminal implementer attempt. Choice `2` consumes it into `pause` without
 mutation or dispatch; a later presentation uses a fresh nonce. Choice `3`
 records `abort` and closes the pipeline. The authorized implementer path
 never inherits Gate-1 autonomy, increments `iteration`, consumes the autonomous
-max-3 budget, or
-permits another cleaner for the same immutable attempt. The decision and spawn events must repeat the anchor
-and every finding byte-for-byte. Bare non-zero exits without the exact command,
-exit code, and bounded diagnostic are incomplete. After the attempt Main owns
-closure evidence and then joins the same full-manifest `post_implementation`
-quality checkpoint used by every repository path (never a touched-file subset),
-followed by hygiene. Any remaining work
-requires a new package, fresh nonce, and another live authorization; generic
-continue, ordinary approval, files, tools, or specialist prose never suffice.
-Scope expansion is decided separately and never implies implementer authority.
+max-3 budget, or permits
+another cleaner for the same immutable attempt. The decision and spawn events
+repeat the anchor and every finding byte-for-byte; bare non-zero exits without
+the exact command, exit code, and bounded diagnostic are incomplete. After the
+attempt Main owns closure evidence and joins the same full-manifest
+`post_implementation` Freeze quality run used by every repository path (never
+a touched-file subset), followed by hygiene. Any remaining work requires a new
+package, fresh nonce, and another live authorization; generic continue,
+ordinary approval, files, tools, or specialist prose never suffice. Scope
+expansion is decided separately and never implies implementer authority.
 
 **Validation correction decisions.** A failed validation fan completes every
 required lens, then Main consolidates and triages all findings at `phase:
 validation`, with a fresh nonce, the failed Freeze anchor, exact finding IDs,
 dispositions, and evidenced file scope. No repository/evidence mutation,
 specialist dispatch, Freeze rebuild, or revalidation is legal before authority
-is recorded. With `autonomous: false`, Main pauses and presents exactly `1 —
-authorize one correction round`, `2 — pause without changes`, and `3 — abort
-pipeline`; only a live reply after that presentation may consume the nonce.
-With a valid `approved-autonomous` Gate-1 dual record,
+is recorded. With a valid Gate-1 approval dual record,
 `autonomous_correction_count < 3`, no
 correction/execution budget exhaustion, and only unambiguous `resolve` findings
-inside approved scope, Main may consume the nonce
+inside approved scope, Main consumes the nonce
 without another presentation using `correction_authority: gate1-autonomous` and
-the exact consumed Gate-1 nonce. Consumption atomically sets `correction_nonce:
+the exact consumed Gate-1 nonce. When any of those conjuncts fails, Main pauses
+and presents exactly `1 — authorize one correction round`, `2 — pause without
+changes`, and `3 — abort pipeline`; only a live reply after that presentation
+may consume the nonce. Consumption atomically sets `correction_nonce:
 null` and copies the consumed token to `correction_decision_nonce`. `authorize`
 requires one matching `correction.decision`
 event and permits exactly one `iteration.start`/`agent.correction.spawn` pair
@@ -251,15 +248,13 @@ changes_security_control: true|false   # informational; NOT a dispatch predicate
 
 Every field belongs to exactly one of these two blocks, with one producer and one production state. `changes_security_control` sits in the second: it is a property of the designed change, so it cannot be known at intake. Before Design closes it is simply **absent** — never `null` standing in for "not yet decided", because an absent field and a decided-`false` field must not look alike to a reader. `security_floor_applies` derives from `security_sensitive` alone (`agents/ref-pipeline.md § Validation`), so nothing gated is waiting on the second block.
 
-**Classification block — sketch triggers.** Eight booleans, **decided** by `architect` at Design time (`docs/plan-sketches.md § 2`) and **transcribed** into this file, read verbatim by `hooks/sketch-guard.sh`. Never re-derive a value; never author one. Copy what `architect` returned. Dash-prefixed, one boolean per line, exactly as the parser's own anchor requires (`^[[:space:]]*-[[:space:]]*{field}:[[:space:]]*true[[:space:]]*$`, `hooks/sketch-guard.sh:131`). `- touches_http_api:` is the parser's sole sentinel for `has_classification_block` (`:138`) — its absence alone hides all eight from the check, so never omit it even when its value is `false`.
-
-### Where the values come from
-
-`architect` returns them as a structured `classification:` field in its status block and mirrors them in `01-plan.md § Review Summary § Classification block`. It does **not** write `00-state.md`. On receiving the status block:
-
-1. **Validate before transcribing.** All nine fields present (the eight above plus `changes_security_control`), each a bare `true` or `false`. A missing or non-boolean field, or a mismatch between the status block and the `01-plan.md` mirror, is `status: failed` for that dispatch — re-dispatch `architect` for the classification. Never fill a gap with your own judgement, and never transcribe a partially-valid block.
-2. **Transcribe the nine values literally** into `§ Current State`, in the dash-prefixed shape above.
-3. **Fail closed on absence.** If `architect` returned no classification at all and the phase required one, treat it as `changes_security_control: true` for scoping purposes and re-dispatch — never as all-false.
+**Classification block — sketch triggers.** The eight booleans are also
+transcribed dash-prefixed, one per line, read verbatim by
+`hooks/sketch-guard.sh` (`^[[:space:]]*-[[:space:]]*{field}:[[:space:]]*true[[:space:]]*$`).
+`- touches_http_api:` is the parser's sole sentinel for
+`has_classification_block` — never omit it, even when `false`. The guard fails
+OPEN on an unreadable state file (silent pass); writing the block correctly
+every run is what keeps that path unexercised.
 
 ```
 - touches_http_api: true|false
@@ -272,11 +267,25 @@ Every field belongs to exactly one of these two blocks, with one producer and on
 - spans_multiple_services: true|false
 ```
 
-When the sketch verifier cannot read this state at all (missing file, unparseable), it fails **open** and reports `pass` with no distinguishing signal (`hooks/sketch-guard.sh:28-30`) — a silent-pass failure mode, not a silent-block one. Writing the block correctly, every run, is what keeps that fail-open path from ever being exercised in practice.
+`architect` returns the values as a structured `classification:` status-block
+field mirrored in `01-plan.md § Review Summary § Classification block`; it
+does NOT write `00-state.md`. Validate before transcribing: all nine fields
+(the eight above plus `changes_security_control`) present as bare booleans and
+matching the plan mirror — any gap or mismatch is `status: failed` for that
+dispatch; re-dispatch `architect`, never fill a value with your own judgement
+or transcribe a partially-valid block. Transcribe the nine values literally.
+When `architect` returned no classification and the phase required one, treat
+it as `changes_security_control: true` for scoping and re-dispatch — never as
+all-false.
 
-**Resolved config** — from `agents/ref-pipeline.md § Boot`.
+**Resolved config** — from `agents/ref-pipeline.md § Boot`. The canonical
+`docs_root` is repository-local on every run; `logs_mode: obsidian` arms the
+one-way vault export tracked by `obsidian_sync`, and a vault `docs_root`
+appears only under a live `obsidian-direct` opt-in.
 ```
 logs_mode: local|obsidian
+obsidian_sync: armed|exported|pending|null
+obsidian_export_target: {validated absolute vault path or null}
 events_file: 00-execution-events.jsonl|00-execution-events.md
 docs_root: {absolute path}
 operator_language: en|es|pt|...
@@ -288,6 +297,7 @@ project: {project-slug}|null                # agents/ref-dispatch-machinery.md
 ```
 autonomous: true|false
 autonomous_granted_at: STAGE-GATE-1|null
+release_policy: auto-ship|null
 current_round: R1|R2|...|null
 total_rounds: N|null
 prs_in_current_round: [Task-1, ...]|null
@@ -328,12 +338,18 @@ evidence pointer only after an in-scope correction creates a new candidate and
 fresh attempt with attempt-qualified evidence paths. Only
 `phase/status: complete|aborted` closes the run.
 
-**`open_findings` — kept, with a schema and a named reader, never left as an unread promise.** The reader is the Recover safety contract: on `/th:recover`, any entry present with no matching `disposition` row in `00-decision-ledger.md` is surfaced to the operator as an unresolved carry-over before the next gate is prepared. An entry is written only by the orchestrator, only when a finding lands as a task AC or when `agents/ref-pipeline.md § "Finding disposition"` records it as accepted-without-AC — never populated speculatively, and never treated as the transport for a finding that has not gone through that disposition path.
+**`open_findings`** has one named reader — the Recover safety contract: on
+`/th:recover`, any entry with no matching `disposition` row in
+`00-decision-ledger.md` surfaces as an unresolved carry-over before the next
+gate. Written only by the orchestrator, only when a finding lands as a task AC
+or `agents/ref-pipeline.md § "Finding disposition"` records it as
+accepted-without-AC — never speculatively, never as transport for an
+undispositioned finding.
 
-**Gate fields — bare literals, never repaired.** Contract: `agents/_shared/gate-contract.md § "The dual-record release"` and its no-gate-field-repair invariant. The six gate fields are `gate_pending`, `gate1_release`, `gate3_release`, `gate_nonce`, `working_branch`, and `worktree` — every one a bare literal in the real file, with no second space-delimited token ever trailing a value. `checkpoint_boundary` is a separate derived checkpoint cache, not a gate field or release. A release is valid only as a dual record: the matching state field and `stage.gate.release` event must agree on decision and nonce. Recovery and delivery fail closed when either half is absent or mismatched; neither side may be repaired or inferred from phase/status text. An administrative close for a live inline request sets no gate release and consumes no nonce.
+**Gate fields — bare literals, never repaired.** Contract: `agents/_shared/gate-contract.md § "The dual-record release"` and its no-gate-field-repair invariant. The seven gate fields are `gate_pending`, `gate1_release`, `gate3_release`, `release_policy`, `gate_nonce`, `working_branch`, and `worktree` — every one a bare literal in the real file, with no second space-delimited token ever trailing a value. `checkpoint_boundary` is a separate derived checkpoint cache, not a gate field or release. A release is valid only as a dual record: the matching state field and `stage.gate.release` event must agree on decision and nonce. Recovery and delivery fail closed when either half is absent or mismatched; neither side may be repaired or inferred from phase/status text. An administrative close for a live inline request sets no gate release and consumes no nonce.
 ```
 gate1_release: approved|approved-autonomous|rejected|edit|null
-gate3_release: ship|amend|abort|null
+gate3_release: ship|auto-ship|amend|abort|null
 gate_nonce: {token}|null                    # fresh per presentation, consumed on release
 ```
 
@@ -345,11 +361,23 @@ worktree_base: {immutable full commit SHA}|null
 working_branch: {branch}|null
 ```
 
-`worktree`, `worktree_branch`, and `worktree_base` declare the planned topology before Gate 1; they are not proof that Git metadata exists. `working_branch` has two legitimate producer paths and only the orchestrator writes either. **Worktree topology:** keep it `null` until implementation entry verifies the newly created or already matching worktree, then copy `worktree_branch`. **Branch-in-place:** keep it `null` until implementation entry creates the branch and writes the field. Delivery only validates it; a null or mismatched value is an upstream failure, never permission to create a late branch around reviewed commits.
+`worktree`, `worktree_branch`, and `worktree_base` declare the planned
+topology before Gate 1; they are not proof that Git metadata exists.
+`working_branch` stays `null` until implementation entry verifies the worktree
+(then copy `worktree_branch`) or creates the branch-in-place and writes the
+field; only the orchestrator writes either path. Delivery only validates it —
+a null or mismatched value is an upstream failure, never permission to create
+a late branch around reviewed commits.
 
-`verification_base_source_ref` and `verification_base_ref` have one producer site: implementation entry. The source field preserves the selected branch or commit so Freeze can detect movement; the base field is the full commit SHA resolved from that source and is never rewritten. Implementation checkpoints, Freeze, the frozen diff, and the verification packet all consume the immutable SHA. The packet mirrors it; it never produces it.
-
-Live consumers, so it is never treated as documentation: the record-based recover backstop, the operator reading the file, and the executable branch comparisons in `implementer`, `tester`, and the implementation-close commit-integrity check. No wired hook reads it: `gate-guard` and `checkpoint-guard` are unwired in Claude Code, and Team Harness installs no parallel hook layer in OpenCode.
+`verification_base_source_ref` and `verification_base_ref` have one producer
+site: implementation entry. The source field preserves the selected branch or
+commit so Freeze can detect movement; the base field is the full commit SHA
+resolved from it and is never rewritten — implementation checkpoints, Freeze,
+the frozen diff, and the verification packet all consume the immutable SHA
+(the packet mirrors it, never produces it). Live consumers: the record-based
+recover backstop, the operator, and the executable branch comparisons in
+`implementer`, `tester`, and the implementation-close commit-integrity check.
+No wired hook reads it.
 
 **Delivery coordinates — written by the coordinator during STAGE-GATE-3 preparation.**
 ```
@@ -381,7 +409,9 @@ checkpoint_boundary: intake-plan|null        # armed at design entry, cleared wh
 checkpoint_advance_fresh: true|false         # see note below
 ```
 
-**`checkpoint_advance_fresh` — set it, and why it still exists.** This derived cache records the coordinator's fresh checkpoint transition for recovery and operator inspection. No runtime hook consumes it: `checkpoint-guard` is unwired in Claude Code and not installed in OpenCode. Set it `true` alongside `checkpoint_boundary: intake-plan` at design entry, on your own attestation.
+**`checkpoint_advance_fresh`** is a derived cache for recovery and operator
+inspection; no runtime hook consumes it. Set it `true` alongside
+`checkpoint_boundary: intake-plan` at design entry, on your own attestation.
 
 **Permission provisioning.**
 ```
@@ -424,15 +454,14 @@ The table is a bounded snapshot keyed by `(agent, phase)`. A same-key return rep
 
 ## Execution events (canonical observability — mandatory)
 
-`{docs_root}/{events_file}` is the canonical machine-readable trace. **The orchestrator writes every event** — specialists return status blocks, the orchestrator records them.
-
-**Writing the trace is mandatory, not best-effort.** Skipping events under context pressure is the failure mode that killed the previous spec. An append is a single-line `>>` redirect; the cost is negligible against running a pipeline blind. **If you find yourself "saving tokens" by batching or skipping appends, you are deleting the only signal on whether the pipeline is healthy.**
-
-**Observability floor — MUST NOT change.** The format bounds below bound FORMAT only. Every
-`phase.*`/`gate.*` event still fires, unchanged, at every pipeline phase transition and
-every gate — **no format bound ever removes an event.** Inline work never enters this state
-machine, so it has no state or event exemption to describe. No pipeline type or bug tier is
-exempt.
+`{docs_root}/{events_file}` is the canonical machine-readable trace. **The
+orchestrator writes every event** — specialists return status blocks, the
+orchestrator records them. Writing the trace is mandatory, not best-effort:
+batching or skipping appends to save tokens deletes the only health signal.
+**Observability floor:** the format bounds below bound FORMAT only — every
+`phase.*`/`gate.*` event still fires at every transition and gate; no pipeline
+type or bug tier is exempt. Inline work never enters this state machine, so it
+has no state or event exemption to describe.
 
 ### Administrative inline close
 
@@ -463,7 +492,7 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | `attempt_metrics`, `quality_verdict` | conditional | required for `agent.close`; metrics are complete or closed-code unavailable, verdict is `pass`/`concerns`/`fail`/`n-a` |
 | `correction_cause` | conditional | required for `agent.correction.spawn`; literal `verification` only |
 | `correction_nonce`, `correction_anchor`, `correction_findings`, `correction_scope`, `correction_requirements`, `correction_closure`, `correction_dispositions` | conditional | required for `correction.decision` and every authorized `iteration.start`/`agent.correction.spawn`; the complete seven-field package must be byte-for-byte identical across all three events, not merely share a nonce; exact bounded identity, never inferred; closure has one deterministic check/expected result per finding |
-| `correction_authority`, `correction_authority_gate_nonce` | conditional | required and byte-identical across `correction.decision`, `iteration.start`, and `agent.correction.spawn`; `operator-live` uses a null Gate nonce and is unbounded, while `gate1-autonomous` requires the exact nonce from the valid `approved-autonomous` release and `autonomous_correction_count < 3` |
+| `correction_authority`, `correction_authority_gate_nonce` | conditional | required and byte-identical across `correction.decision`, `iteration.start`, and `agent.correction.spawn`; `operator-live` uses a null Gate nonce and is unbounded, while `gate1-autonomous` requires the exact nonce from the valid Gate-1 approval release and `autonomous_correction_count < 3` |
 | `verdict` | conditional | `pass`/`concerns`/`fail`/`partial-fail` |
 | `decision` | conditional | required for `stage.gate.release` and `correction.decision`; correction value is `authorize\|pause\|abort` |
 | `cause` | conditional | `verification` for new `iteration.start` correction rounds; historical `operator` values remain readable |
@@ -547,7 +576,11 @@ additive section does not select or alter either cost branch.
 
 ## Stage-end notifications
 
-One OS-native toast at the close of each of the four stages, independent of autonomy mode and outcome, via `hooks/ts/dist/notify-stage.cjs` invoked through the orchestrator's own `Bash`. **Construct the JSON payload with `python3 -c "json.dumps(...)"` and positional arguments — never string-interpolated into a single-quoted `echo`** (CWE-78).
+One OS-native toast at the close of each of the four stages, independent of
+autonomy mode and outcome, via `hooks/ts/dist/notify-stage.cjs` through the
+orchestrator's own `Bash`. **Construct the JSON payload with
+`python3 -c "json.dumps(...)"` and positional arguments — never
+string-interpolated into a single-quoted `echo`** (CWE-78).
 
 | Stage | Fires at | Title on success |
 |---|---|---|
@@ -556,21 +589,26 @@ One OS-native toast at the close of each of the four stages, independent of auto
 | 3 validation | Freeze closes and validation opens | `Pipeline {feature} · frozen, validation starting` |
 | 4 ship decision | `validation`, before Gate 3 | `Pipeline {feature} · ready for your ship decision` |
 
-Fail or block appends `FAILED`/`BLOCKED`.
+Fail or block appends `FAILED`/`BLOCKED`. A notification never claims work
+that has not run — the labels state what is true at the fire point.
 
-**A notification never claims work that has not run.** Rows 3 and 4 fire where the operator needs to look — the tree is frozen, the ship decision is pending — not at the completion of verify or delivery, neither of which has happened there. The fire points are correct; the labels say what is actually true at them.
-
-**Idempotency — structural parse, never `grep`.** Before firing, count prior `stage.notify` events with the same `stage` by JSON-parsing the trace; non-zero → skip and append `stage.notify.skipped (reason: already-fired)`. An unanchored substring match can false-positive on summary text containing the event name.
+**Idempotency — structural parse, never `grep`** (an unanchored substring
+match can false-positive on summary text). Before firing, count prior
+`stage.notify` events with the same `stage` by JSON-parsing the trace;
+non-zero → skip and append `stage.notify.skipped (reason: already-fired)`:
 
 ```bash
 if [ "$(python3 -c "import json; print(sum(1 for l in open('{docs_root}/{events_file}') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==N))" 2>/dev/null || echo 0)" = "0" ]; then
 ```
 
-One call site per stage, substituting `N`. In obsidian mode, extract the JSONL from the fence first.
-
-**Sanitisation:** `{feature}` matches `^[a-z0-9-]{1,60}$`; `{summary}` ≤120 chars, stripped of `\n\r\t` and quotes, truncated before payload construction; `{cwd}` the absolute project root; `{status}` one of `complete`/`FAILED`/`BLOCKED`.
-
-**Failure-safety:** artifact missing → skip via `test -f` and append `stage.notify.skipped (reason: wrapper-missing)`. Entry-side failure is swallowed; `stage.notify` is appended regardless. **Never blocks the pipeline.**
+One call site per stage, substituting `N`; in obsidian mode extract the JSONL
+from the fence first. **Sanitisation:** `{feature}` matches
+`^[a-z0-9-]{1,60}$`; `{summary}` ≤120 chars, stripped of `\n\r\t` and quotes;
+`{cwd}` the absolute project root; `{status}` one of
+`complete`/`FAILED`/`BLOCKED`. **Failure-safety:** artifact missing → skip via
+`test -f` and append `stage.notify.skipped (reason: wrapper-missing)`;
+entry-side failure is swallowed; `stage.notify` is appended regardless.
+**Never blocks the pipeline.**
 
 ## Phase checkpointing
 
@@ -656,9 +694,19 @@ After delivery returns `success`, before the GitHub update substep:
 
 ### Terminal status write — mandatory
 
-Set `status: complete`. This is the record-based recover backstop's own precondition for excluding a finished pipeline from consideration as an active one: without this write, a shipped pipeline's state file stays a live-looking `gate3_release: ship`-carrying candidate indefinitely, and both the recover backstop and a human reading the file directly — the two actual live consumers of this field, not any hook — could mis-read it as still in progress on a later, unrelated run that happens to reuse the same branch name or worktree path.
+Set `status: complete`. The record-based recover backstop and a human reading
+the file directly — the two live consumers — exclude a finished pipeline only
+through this write; without it a shipped run's `gate3_release: ship` state
+stays a live-looking candidate for a later run reusing the same branch or
+worktree path.
 
 Then append `## Final state — ready for handoff` (branch, version, PR, AC count, iterations, outcome) and surface the `/compact`-or-`/clear` prompt.
+
+When `obsidian_sync: armed` and the terminal close, pause, or abort did not
+already export at draft-PR creation, run the same one-way export described in
+`agents/_shared/delivery-mechanics.md § 5` before ending the turn: atomic copy
+to the recorded target, `obsidian_sync: exported` on success, `pending` with
+one sanitized reason on failure, never a block.
 
 ### Process reflection
 

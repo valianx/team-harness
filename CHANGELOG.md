@@ -7,7 +7,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.15.2] - 2026-08-18
+
 ### Fixed
+
+- Limited the max-three correction budget to autonomous decisions while
+  allowing any fresh package-bound operator-live decision to authorize another
+  fully frozen and revalidated round, including recovery from 3.14.3 state.
+
+## [3.15.1] - 2026-08-18
+
+### Fixed
+
+- Claude Code marketplace source reverted to the whole-repository GitHub
+  tree (`{"source": "github", "repo": "valianx/team-harness"}`), fixing the
+  v3.14.0 regression that shipped the Codex projection subtree
+  (`./plugins/team-harness`) to Claude Code users — the installed cache
+  lacked `skills/setup/managed-blocks/`, `output-styles/`, the CC hook
+  wiring, and the CC skill procedure texts, breaking `/th:update`'s
+  managed-block sync.
+- opencode installer: the fail-closed skill-asset extension allowlist now
+  admits `.ts`, `.tsx`, `.css`, `.js`, and `.lock`, so the
+  interactive-presentation scaffold templates are emitted completely
+  instead of dropping 12 of 15 files.
+
+### Added
+
+- Regression pins in `tests/test_codex_runtime.py`: the CC marketplace
+  entry must use the whole-repo GitHub source, the Codex marketplace entry
+  must keep the `./plugins/team-harness` path, and five CC-only surfaces
+  (managed blocks, output style, hooks wiring, hook launcher) must exist in
+  the shipped tree.
+- Go test coverage: opencode manifest emission of the complete
+  interactive-presentation template set, and the embedded-agent roster
+  check now includes `cleaner` and `inline-reviewer`.
+
+## [3.15.0] - 2026-08-18
+
+### Added
+
+- Single autonomous-approve Gate 1: one approval records
+  `release_policy: auto-ship` and carries the run to the draft PR with zero
+  further human intervention; bounded `gate1-autonomous` correction rounds
+  replace per-round prompts, and `gate-guard` accepts the recorded
+  `auto-ship` release.
+- Agent authoring standard (`docs/agent-authoring.md`): binding skeleton,
+  word/line budgets, ten authoring rules, a `/th:lint` structure audit
+  (Check 12), and a semantic↔adapter parity suite that fails when a rule is
+  reworded on one side only.
+- Repository-local canonical workspaces on every run, with `logs-mode:
+  obsidian` arming a one-way, non-authoritative vault export
+  (`obsidian_sync` state) at draft-PR creation and terminal close; recovery
+  reads only the repository workspace, and project-config shadowing is
+  diagnosed instead of prescribing runtime restarts.
+
+### Changed
+
+- Quality collapsed to one authoritative run per candidate tree at the
+  Freeze `post_implementation` checkpoint; CRAP is measure-only, cleaner
+  overreach is proven with a deterministic
+  `git diff --name-status --no-renames` allowlist/ancestry proof, and
+  `cleaner-transition.mjs` is retired.
+- Codex runtime parity: PR-review roles declare their real `command-exec`
+  read transport, the Codex hook chain is reduced to the deny-only floor
+  (`policy-block`, `gcp-guard`), and a broken plugin cache degrades to a
+  system message instead of a blanket deny.
+- Five oversized agents rewritten to the authoring budgets (architect, qa,
+  security, plan-reviewer, gh-fallback; orchestrator-state prose-compressed
+  with schemas intact), with design-mode reference material moved to shipped
+  `agents/ref-architect-design.md`/`ref-architect-modes.md`.
+
+### Fixed
+
+- Quality-runner failures now return a closed diagnostic taxonomy with safe
+  command/field coordinates instead of opaque non-zero exits.
+- PR-review independence: reviews resolve the real PR head from GitHub and
+  fail closed with "cannot reach PR" instead of ever reviewing the
+  checked-out branch, and review-context sensitivity classification no
+  longer biases lens selection.
 
 - Made Codex update classify only the exact non-fatal PATH-alias warning,
   retry protected mutations with narrow non-login escalation, require informed
@@ -19,9 +96,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added automatic frozen-lockfile dependency provisioning for isolated
   worktrees before first dispatch, replacing only untracked cross-checkout
   `node_modules` links and returning an exact recovery action on failure.
-- Limited the max-three correction budget to autonomous decisions while
-  allowing any fresh package-bound operator-live decision to authorize another
-  fully frozen and revalidated round, including recovery from 3.14.3 state.
 - Made blocked cleaner and handoff attempts recoverable in the same workspace
   and branch, preserving failed evidence append-only while allowing a corrected
   candidate to proceed without repeating Gate 1 or discarding valid work.

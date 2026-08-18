@@ -106,12 +106,10 @@ function assertClosedEnvelope(result) {
 
 function assertDeadlineEnvelope(result) {
   assertClosedEnvelope(result);
-  assert.equal(result.outcome, "completed");
+  assert.equal(result.outcome, "timed_out");
   assert.equal(result.exit_code, null);
-  // taskkill reports a Windows exit status rather than a libuv signal. After
-  // confirmed tree termination, the helper normalizes the deadline intent.
-  assert.equal(result.signal, "SIGKILL");
-  assert.equal(result.error_code, null);
+  assert.equal(result.signal, null);
+  assert.equal(result.error_code, "TIMEOUT");
 }
 
 function assertClosedReceipt(result) {

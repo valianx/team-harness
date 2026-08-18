@@ -72,8 +72,10 @@ plan carries the architect's security assessment and security TCs to the final a
 validation; planning itself dispatches no security reviewer.
 
 At **STAGE-GATE-1**, the operator sees a short summary and an artifact pointer. The stable
-options are `1 approve`, `2 approve autonomous`, `3 edit`, `4 reject`; a number alone is enough
-for the decision, while `3: detail` and `4: reason` carry edits or rejection context.
+options are `1 approve`, `3 edit`, `4 reject`; a number alone is enough for the decision, while
+`3: detail` and `4: reason` carry edits or rejection context. Every approval preauthorizes the
+run through the draft PR (`release_policy: auto-ship`) — Gate 3 pauses again only on a
+closed-list exception; a green run releases mechanically, citing the Gate-1 event.
 
 ### `implementation` and `validation`
 
@@ -201,7 +203,7 @@ Each row is a real failure mode encountered and patched. See [`docs/knowledge.md
 
 **The top-level Claude Code agent IS `th:orchestrator`** — the coordination agent, not a specialist. No filesystem marker, no mode flag, and no special invocation is required — when Claude Code runs at the top level, it operates with the full `th:orchestrator` role: it handles intake/discover/specify directly and runs the gated pipeline itself, dispatching every specialist subagent (architect, implementer, tester, qa, etc.) via `Task`. It never dispatches another coordinator, including another copy of itself; there is no split to verify and no monolith fallback, because there is no second coordinator for the pipeline to fall back from.
 
-**Outward-action gate.** All outward actions (`git push`, `gh pr create`, `gh pr merge`, GitHub API writes, ClickUp MCP writes) are evaluated via `hooks/dev-guard.sh`. The hook fires unconditionally and gates by destination — the agent cannot auto-approve regardless of autonomy grants. A `git push` whose single recognized refspec targets a non-default branch on `origin` resolves to `allow` (no prompt); a push to the default branch, a tag push, a force push, `gh pr create`/`merge`, GitHub API writes, and ClickUp MCP writes still resolve to `ask`, requiring explicit operator approval.
+**Outward-action gate.** The deterministic dev-guard hook covers only the minimal floor and fires unconditionally, gating by destination — the agent cannot auto-approve regardless of autonomy grants. A `git push` whose single recognized refspec targets a non-default branch on `origin` resolves to `allow` (no prompt); a push to the default branch, a tag push, a force push, and a PR merge (`gh pr merge` or a `gh api` merge endpoint) resolve to `ask`, requiring explicit operator approval. Every other outward write (`gh pr create/review/comment`, issue writes, MCP writes) is uncovered by the hook and governed by the host runtime's permission model.
 
 **Every specialist dispatch goes through `Task`.** All specialist subagents (architect, implementer, tester, qa, etc.) are dispatched via `Task`, and none of them is itself a coordinator — there is no nested-dispatch takeover protocol to fall back to, because no coordinator is ever dispatched as a subagent. See `docs/subagent-orchestration.md`.
 

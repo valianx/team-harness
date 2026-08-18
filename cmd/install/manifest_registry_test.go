@@ -142,11 +142,11 @@ func TestBuildOpencodeManifests_PipelineRunnersPresent(t *testing.T) {
 	}
 
 	required := map[string]bool{
-		"bounded-command.mjs":    false,
-		"cleaner-transition.mjs": false,
-		"plan-contract.mjs":      false,
-		"quality-runner.mjs":     false,
-		"test-transition.mjs":    false,
+		"bounded-command.mjs": false,
+		"quality-lib.mjs":     false,
+		"plan-contract.mjs":   false,
+		"quality-runner.mjs":  false,
+		"test-transition.mjs": false,
 	}
 	for _, component := range components {
 		for _, emitted := range component.Emits.Files {
@@ -160,6 +160,47 @@ func TestBuildOpencodeManifests_PipelineRunnersPresent(t *testing.T) {
 	for name, found := range required {
 		if !found {
 			t.Errorf("opencode pipeline runner %q is not emitted", name)
+		}
+	}
+}
+
+// TestBuildOpencodeManifests_PresentationTemplateComplete asserts the
+// interactive-presentation scaffold tree survives the extension allowlist in
+// full: canonical.md instructs copying the entire references/templates/ tree,
+// so a silently dropped source file breaks the scaffold on every target.
+func TestBuildOpencodeManifests_PresentationTemplateComplete(t *testing.T) {
+	const prefix = "installer-assets/opencode-skills/interactive-presentation/references/templates/"
+	expected := map[string]bool{}
+	err := fs.WalkDir(EmbeddedAssets(), strings.TrimSuffix(prefix, "/"), func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			expected["{config_root}/skills/interactive-presentation/references/templates/"+strings.TrimPrefix(path, prefix)] = false
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk embedded templates: %v", err)
+	}
+	if len(expected) < 10 {
+		t.Fatalf("embedded template tree suspiciously small: %d files", len(expected))
+	}
+
+	_, components, err := buildOpencodeManifests()
+	if err != nil {
+		t.Fatalf("buildOpencodeManifests: %v", err)
+	}
+	for _, component := range components {
+		for _, emitted := range component.Emits.Files {
+			if _, ok := expected[emitted]; ok {
+				expected[emitted] = true
+			}
+		}
+	}
+	for name, found := range expected {
+		if !found {
+			t.Errorf("presentation template file dropped by the extension allowlist: %s", name)
 		}
 	}
 }

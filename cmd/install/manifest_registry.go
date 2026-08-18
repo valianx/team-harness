@@ -47,7 +47,9 @@ var opencodeSkillOverrides = map[string]bool{
 //
 // The list is derived from the real skills/**/references/ trees:
 // .md, .txt, .toml, .html, .py (render_excalidraw.py), .json, .yaml/.yml,
-// .svg, .png, and .mjs (deterministic pipeline runners).
+// .svg, .png, .mjs (deterministic pipeline runners), and the
+// interactive-presentation scaffold sources (.ts/.tsx/.css/.js plus .lock for
+// the uv/npm lockfiles that pin the scaffold's dependency versions).
 //
 // Note: .py is on the allowlist because render_excalidraw.py is a legitimate
 // first-party skill asset. .venv Python files share the .py extension but are
@@ -64,6 +66,11 @@ var opencodeCopyableSkillExt = map[string]bool{
 	".svg":  true,
 	".png":  true,
 	".mjs":  true,
+	".ts":   true,
+	".tsx":  true,
+	".css":  true,
+	".js":   true,
+	".lock": true,
 }
 
 // isCopyableSkillPath is the fail-closed copy predicate for skill files.

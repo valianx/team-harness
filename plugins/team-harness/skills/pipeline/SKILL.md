@@ -433,8 +433,8 @@ following matrix is exhaustive:
 | Mechanical plan repair (references, identifiers, paths, counts, format, or field coherence with no semantic change) | Main repairs the canonical field and records the repair | `phase: implementation`; no new Gate 1; if Freeze was reached, rebuild Freeze and revalidate | prohibited | `0` |
 | Decision-bearing plan resolution, including a structural intent/scope/AC contradiction, security-obligation classification, or a change to intent, scope, behavior, or AC meaning | Main pauses for a bounded live operator decision and transcribes the approved resolution without reinterpretation | `phase: implementation`; `next_action` continues through implementation → Freeze → validation; no new Gate 1 and retain the final security floor when the classification is sensitive | prohibited unless the separate explicit current live operator request for architect work applies | `0` |
 | Explicit, current live operator request for architect work | Main records the request and dispatches `architect` | `phase: design`; the resulting plan requires a new Gate 1 | allowed only for that request | `0` |
-| Correctable code, test, documentation, hygiene, or security finding inside approved scope | Main includes it in the complete consolidated validation failure | `phase: validation`; live choice `1` or an eligible `approved-autonomous` decision authorizes one bounded implementation round → closure gate → stale-row tester refresh → new Freeze → fresh QA plus impact-required security; no new Gate 1 | prohibited | `+1` |
-| Missing or insufficient evidence | Main includes it in the same complete consolidated validation failure | `phase: validation`; live choice `1` or an eligible `approved-autonomous` decision authorizes one bounded evidence/correction round → closure gate → stale-row tester refresh → new Freeze when applicable → fresh QA plus impact-required security; no new Gate 1 | prohibited | `+1` |
+| Correctable code, test, documentation, hygiene, or security finding inside approved scope | Main includes it in the complete consolidated validation failure | `phase: validation`; live choice `1` or an eligible `gate1-autonomous` authorization authorizes one bounded implementation round → closure gate → stale-row tester refresh → new Freeze → fresh QA plus impact-required security; no new Gate 1 | prohibited | `+1` |
+| Missing or insufficient evidence | Main includes it in the same complete consolidated validation failure | `phase: validation`; live choice `1` or an eligible `gate1-autonomous` authorization authorizes one bounded evidence/correction round → closure gate → stale-row tester refresh → new Freeze when applicable → fresh QA plus impact-required security; no new Gate 1 | prohibited | `+1` |
 
 After every required validation lens terminates, Main consolidates all blocking
 findings under stable IDs, the current frozen anchor, and the union file scope.
@@ -442,9 +442,10 @@ Before creating a correction nonce, Main performs one bounded evidence triage
 against the approved intent, scope, ACs/TCs, and security floor, without dispatching
 another reviewer. For every finding it presents the ID, cause/evidence,
 implicated requirement, closure check, proposed `resolve|design-consistent|decision-required`
-disposition, rationale, and consequence. The proposal is advisory. Under normal
-approval only the live operator confirms dispositions. Under a valid
-`approved-autonomous` Gate-1 dual record, Main may confirm only unambiguous
+disposition, rationale, and consequence. The proposal is advisory. Only the
+live operator confirms a `design-consistent` or `decision-required`
+disposition. Under the Gate-1 authority carried by any valid approval, Main
+may confirm only unambiguous
 `resolve` findings inside approved scope while
 `autonomous_correction_count < 3`; all other
 findings pause. `design-consistent` is legal only when no AC or security floor
@@ -461,7 +462,7 @@ autonomous corrections. Scope/behavior/AC/TC change, design or security ambiguit
 conflict, unavailable coverage, infrastructure failure, or budget exhaustion
 always pauses.
 
-For normal approval or any ineligible autonomous result, Main persists
+For any ineligible autonomous result, Main persists
 `correction_pending: true`, a fresh `correction_nonce`, the anchor,
 finding IDs, implicated AC/TC requirements, one closure check/expected result per
 finding, and scope; keeps `phase: validation`; presents exactly `1 —
@@ -478,9 +479,9 @@ security. The decision and its one
 `iteration.start`/`agent.correction.spawn` pair carry the identical
 `correction_authority` and authority Gate nonce. Choice `2` performs no repository
 or evidence mutation and a later presentation uses a fresh nonce. Choice `3`
-aborts without correction. Under normal approval a second failure always pauses
-with a fresh decision. Autonomous approval may start another fresh complete
-round only after another complete required validation set and eligible triage,
+aborts without correction. Under operator-live authority a second failure
+always pauses with a fresh decision. Gate-1 authority may start another fresh
+complete round only after another complete required validation set and eligible triage,
 while `autonomous_correction_count < 3`;
 there is no verifier-to-implementer bounce or agent follow-up.
 The max-3 counter limits only `gate1-autonomous` authority. At
@@ -540,17 +541,20 @@ to ordinary direct behavior; never route either one back through recovery.
 
 `waiting_gate1` and `waiting_gate3` use the numbered options and dual-record
 rules in `state-and-gates.md`; a specialist result or green suite never releases
-either gate. Gate 1 offers `1 — approve`, `2 — approve autonomous`, `3: detail —
-edit`, and `4: reason — reject`; Gate 3 offers `1 — ship`, `2 — amend`, and
-`3 — abort`.
+either gate presentation. Gate 1 offers `1 — approve` (preauthorizing through
+the draft PR, `release_policy: auto-ship`), `3: detail — edit`, and
+`4: reason — reject`; a legacy `2` reply is accepted as approve. Gate 3 STOPs
+only on a closed-list exception, offering `1 — ship`, `2 — amend`, and
+`3 — abort`; on total green Main records the mechanical `auto-ship` dual record
+citing the Gate-1 release event instead of presenting anything.
 
 Never treat a specialist result as a gate decision. Never let a specialist
 present a gate or write coordination state. Pipeline activation alone does not
-authorize delivery. A later valid `Gate 3: ship` reply is the operator's single
-delivery decision for the frozen tree: implementation has already assembled
-version/changelog and committed the complete candidate. `ship` authorizes the
-coordinator to push that exact accepted Freeze commit and create or update its
-draft PR without another conversational confirmation. It never
+authorize delivery — the Gate-1 approval to the disclosed policy does. Either
+Gate 3 release covers the frozen tree: implementation has already assembled
+version/changelog and committed the complete candidate. The release authorizes
+the coordinator to push that exact accepted Freeze commit and create or update
+its draft PR without another conversational confirmation. It never
 authorizes merge, tag, release, publication, force-push, or broader scope.
 
 ## Workspace I/O budget

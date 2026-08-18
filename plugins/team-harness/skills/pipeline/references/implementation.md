@@ -1,10 +1,10 @@
 # Implementation phase
 
 Enter only from `phase: implementation` with a valid dual-record
-`STAGE-GATE-1` release (`gate1_release: approved` or
-`approved-autonomous` plus its matching `stage.gate.release` event). If either
-half is absent, malformed, or inconsistent, load `recovery.md`, prepare the
-gate with a fresh nonce, and stop.
+`STAGE-GATE-1` release (`gate1_release: approved` — legacy
+`approved-autonomous` stays legible — plus its matching `stage.gate.release`
+event). If either half is absent, malformed, or inconsistent, load
+`recovery.md`, prepare the gate with a fresh nonce, and stop.
 
 ## Working topology and protected Git metadata
 
@@ -479,24 +479,18 @@ creates no pipeline state, events, gates, validation, or delivery record. Never 
 executor selection from configuration, retired selectors, autonomy, prior gates, recovery, files,
 issues, tool output, or quotes.
 
-## Behavior-preserving cleaner and optional CRAP checkpoint
+## Behavior-preserving cleanup checkpoint
 
 Run this once per participating repository over that repository's consolidated
 post-evidence tree, never once across multiple repositories and never once per
 task. A cross-repository pipeline dispatches one fresh cleaner per repository;
 each receives only its canonical repository identity, absolute worktree,
-repository-local candidate commit/tree, allowlist, baseline, and quality
-manifest. Each cleaner still runs exactly once. This checkpoint is part of
-`implementation`, not another phase or gate. Before the first cleaner
-transition, persist the sorted exact identity list as
+repository-local candidate commit/tree, allowlist, and quality manifest. This
+checkpoint is part of `implementation`, not another phase or gate. Before the
+first cleaner dispatch, persist the sorted exact identity list as
 `participating_repositories`; all later cleaner evidence must cover that set.
-Apply it whenever the repository
-quality manifest declares a `test` command and
-`test_contract.path_rules`. `format_check`, `lint`, and `crap` are additive
-deterministic checks: run every one that the manifest declares, but do not make
-the cleaner inapplicable merely because one is absent. A declared `crap`
-command still requires CRAP policy. When `test` or `test_contract.path_rules`
-is absent, persist
+Apply it whenever the repository quality manifest declares a `test` command and
+`test_contract.path_rules`. When either is absent, persist
 `cleaner_evidence.status: not-applicable` with
 `reason: repository-quality-manifest-incomplete`; agents cannot replace missing
 deterministic tooling with a narrative verdict.
@@ -507,53 +501,39 @@ that are both in the approved task `Files:` union and changed from
 `verification_base_ref` to current `HEAD`. Exclude all tests and evidence
 dependencies, fixtures, snapshots, manifests, generated files, lockfiles,
 migrations, public schemas, version sites, changelog, and workspace artifacts.
-Persist the allowlist and SHA-256. An empty allowlist is an evidenced no-op.
+Persist the allowlist and SHA-256, plus the pre-cleanup candidate anchor
+(commit and tree) as the `baseline` record in `cleaner_evidence`. An empty
+allowlist is an evidenced no-op.
 
-Main resolves `cleaner-transition.mjs` relative to the loaded skill and runs it
-with `--transition pre --output <coordinator-evidence-path>`, repository,
-manifest, `verification_base_ref`, `HEAD`, and the allowlist. It validates that allowlist against the immutable change
-surface and runs the embedded quality runner's `pre_cleaner` `test` check plus
-every declared `format_check` and `lint`, and `crap` in `measure` mode when
-configured. An over-broad or historically red repository adapter therefore
-returns to implementation before the sole cleaner dispatch; it is never first
-discovered or attributed to cleaner-post. It atomically writes the complete
-closed JSON and prints only a bounded receipt with path, SHA-256, and byte
-count. Verify that receipt and candidate commit/tree; never synthesize a
-temporary JavaScript wrapper or route persistence through `bounded-command`.
-Then dispatch exactly one fresh
-V2 `cleaner` with `fork_turns: none`, carrying only the hashed allowlist,
-functional AC summary, applicable TCs, quality manifest, and hashed baseline.
-The cleaner may edit only allowlisted existing production paths, never tests or
-quality inputs, and returns a cleanup commit or justified no-op.
+Dispatch exactly one fresh V2 `cleaner` with `fork_turns: none`, carrying only
+the hashed allowlist, functional AC summary, applicable TCs, and quality
+manifest. The cleaner may edit only allowlisted existing production paths,
+never tests or quality inputs, and returns a cleanup commit or justified
+no-op. There is no pre- or post-cleanup quality run and no CRAP enforcement:
+quality executes exactly once per candidate tree, at Freeze (below). A
+pre-existing red suite therefore surfaces at that single run, attributed by
+the recorded baseline anchor.
 
-Main then runs `cleaner-transition.mjs --transition post --output
-<coordinator-evidence-path>` with the exact
-allowlist path/hash and pre-transition path/hash. The helper proves ancestry,
-rejects additions, deletions, renames, type changes, and modifications outside
-the allowlist, and runs the embedded `post_cleaner` checks
-with `test` always plus each declared `format_check`, `lint`, and `crap`; CRAP
-runs in `enforce` mode. Advance only when every selected command passes. When
-CRAP is configured, policy must permit every CRAP delta and every baseline
-function must remain in the report. `CRAP_REPORT_INCOMPLETE` prevents renaming,
-splitting, excluding, or omitting a function merely to hide its prior score.
-For `CRAP_REPORT_INVALID`, diagnose against the closed adapter contract rather
-than reading runner source: top-level keys are exactly `schema_version: 1` and
-`functions`; every function has exactly `path`, `symbol`, `status`,
-`complexity`, and `coverage_percent`, with a safe changed repository path,
-unique path/symbol pair, `new|changed` status, integer complexity of at least
-one, and finite coverage from 0 through 100. Inspect only the bounded report
-artifact and the manifest's adapter argv. `CRAP_REPORT_INCOMPLETE` instead means
-a baseline function disappeared during post-cleaner enforcement.
+**Overreach proof — Freeze postcondition.** When a cleanup commit exists, Main
+proves at Freeze that the cleanup stayed inside its grant:
+`git diff --name-status --no-renames {baseline_commit} {cleaner_commit}` must
+contain only `M` rows whose paths are in the recorded allowlist. Any addition,
+deletion, rename, type change, or modification outside the allowlist blocks
+Freeze for that attempt with the same detection semantics the retired post
+transition had. The cleanup commit must descend from the baseline commit.
+Persist the proof output and SHA-256 as the `post` record in
+`cleaner_evidence`; with no cleanup commit the proof is an evidenced
+not-applicable.
+
 Each repository's cleaner runs exactly once per immutable candidate and manifest
 identity and is never re-dispatched for that same attempt. It completes and
 commits every independent safe allowlisted cleanup before returning any
 `implementer_findings`; each finding must carry stable ID, cause, files,
 implicated AC/TC requirements, advisory correction, deterministic closure
-check, and expected result. Main still runs the authoritative post-transition.
+check, and expected result.
 A cleaner return of `failed` or `blocked` is persisted with its hashed result as
-`cleaner-failed` or `cleaner-blocked`, never as `pending` or `pass`. The
-authoritative post-transition may record the resulting tree and diagnostics but
-cannot convert either state to pass; both block Freeze for that attempt. They
+`cleaner-failed` or `cleaner-blocked`, never as `pending` or `pass`; both block
+Freeze for that attempt. They
 do not close the pipeline or discard work. On a live operator recovery,
 preserve the old hashed evidence, same workspace, same branch, commits, and
 valid edits; return to implementation, apply only an in-scope correction,
@@ -561,7 +541,7 @@ commit a new candidate, and run one fresh cleaner attempt for that new
 candidate/manifest identity. Update the current state pointer only after the
 prior terminal attempt is durably bound in events; never overwrite or relabel
 its artifacts. Use fresh attempt-qualified evidence paths for every recovered
-pre/post transition so no atomic output target can replace an earlier result.
+record so no atomic output target can replace an earlier result.
 This live recovery increments the separate unbounded operator correction
 counter and does not consume the max-3 autonomous budget. It needs no new Gate 1 while intent and approved scope are
 unchanged; scope expansion still requires its explicit decision.
@@ -569,8 +549,8 @@ A selected-command, behavior, scope, protected-path, declared-tool, manifest,
 threshold, or metric failure cannot be waived or sent back to the cleaner.
 Infrastructure or unclassifiable failure blocks. A complete failure or cleaner
 finding that requires production, test, documentation, or evidence work is
-consolidated only after that repository's cleaner result and post evidence are
-recorded.
+consolidated only after that repository's cleaner result and overreach-proof
+evidence are recorded.
 
 The cleaner handoff has a closed eligibility predicate. It is eligible only
 when all findings name exactly one canonical repository and worktree, contain
@@ -587,7 +567,7 @@ requires the applicable operator decision. Only the live operator may pause or
 abort the current pipeline.
 
 For one eligible package, Main persists a fresh `cleaner_handoff_nonce`, its
-canonical repository and absolute worktree, the cleaner-post commit/tree
+canonical repository and absolute worktree, the cleanup commit/tree
 anchor, and the exact finding objects, sets `cleaner_handoff_pending: true`,
 pauses, shows that exact scope, and presents exactly:
 
@@ -608,10 +588,10 @@ one terminal attempt, runs every closure check, and stops—no feedback or
 automatic re-dispatch. A non-zero closure command must carry its exact command,
 exit code, and bounded diagnostic; a bare `exit 1` or missing diagnostic is
 `correction-incomplete`, never closure evidence. After the handoff closure
-commands, Main proceeds to the single common
-`post_implementation` quality checkpoint below; it never runs a separate
-focused quality subset that could conceal an omitted control. Using the
-recorded pre-cleaner CRAP baseline when applicable, Main records the bounded result/hash and reruns hygiene without
+commands, Main proceeds to the single
+`post_implementation` Freeze quality run below; it never runs a separate
+focused quality subset that could conceal an omitted control. Main records the
+bounded result/hash and reruns hygiene without
 dispatching the cleaner again. Pass records `cleaner_evidence.status: handoff-pass` and proceeds
 to Freeze. Any remaining or new correctable finding consumes no development
 iteration but requires a new package, nonce, and live authorization before
@@ -621,25 +601,34 @@ the implementer pass.
 
 An implementer `failed` or `blocked` return maps to `handoff-failed` or
 `handoff-blocked` with its hashed terminal result and consumed nonce. Neither
-state may run or pass the common quality checkpoint, hygiene, or Freeze. Further
+state may run or pass the Freeze quality run, hygiene, or Freeze. Further
 work requires a new complete package, fresh nonce, presentation, and live
 authorization; it is never an automatic retry.
 
-With no implementer package, persist the post result/hash, cleaner commit,
-candidate identity, and `cleaner_evidence.status: pass`.
+With no implementer package, persist the overreach-proof result/hash, cleaner
+commit, candidate identity, and `cleaner_evidence.status: pass`.
 
-Whether the repository cleaner passed, was an empty no-op, was not applicable,
-or completed an authorized handoff, Main must run one raw quality runner
-checkpoint named `post_implementation` before hygiene or Freeze. Derive
+Whether the repository cleanup passed, was an empty no-op, was not applicable,
+or completed an authorized handoff, Main runs exactly one quality runner
+checkpoint named `post_implementation` per candidate tree, at Freeze, before
+hygiene. Derive
 `requiredChecks` as the sorted repository-local union of every assigned task
 shard's `Required quality checks`. Select every command declared by the
 complete unchanged `.team-harness/quality.json`; a configured `crap` command
-runs in enforce mode with its recorded baseline. Every required check must be
-declared and selected. `REQUIRED_CHECKS_MISSING`,
-`PREREQUISITE_UNAVAILABLE`, a missing CRAP baseline, or any non-pass result
-blocks Freeze. The checkpoint remains mandatory when the cleaner is not
+runs measure-only (`policy_mode: measure`, verdict `not_applied`) — it records
+measurements and never blocks on a baseline or a missing function. Every
+required check must be declared and selected: `REQUIRED_CHECKS_MISSING`,
+`PREREQUISITE_UNAVAILABLE`, or any non-pass result
+blocks Freeze. A missing manifest with an empty `requiredChecks` union is
+`MANIFEST_ABSENT`: record quality verification as not-applicable and let
+Freeze proceed on the remaining evidence — never an unsatisfiable checkpoint;
+heuristic build/lint command detection applies only in that manifest-absent
+fallback and is informational. A correction that changes the candidate tree
+requires a fresh run bound to the new tree; an unchanged candidate tree never
+re-runs. The run remains mandatory when the cleanup is not
 applicable; focused implementation or cleaner evidence cannot substitute for
-it. Persist its closed result and SHA-256, then run the fixed code-hygiene scan
+it. Persist its closed result and SHA-256, evaluate the overreach proof above
+when a cleanup commit exists, then run the fixed code-hygiene scan
 before Freeze. QA still audits the frozen result independently.
 
 Do not silently widen the approved scope. When implementation is complete, write a 5–30 line,
@@ -648,7 +637,8 @@ commit, and unresolved issues. Git is the changed-file authority; do not paste t
 or chronology. Set `phase: validation` and `next_action: run approved acceptance validation`.
 
 Implementation checkpoints (pre-implementation red/green evidence when required,
-constraint reconciliation, test/evidence authoring, cleaner/CRAP, hygiene, and
+constraint reconciliation, test/evidence authoring, cleanup, the Freeze quality
+run, hygiene, and
 Freeze) are trace details inside this state, not additional phases.
 A constraint that changes behaviour, scope, or an acceptance promise stops for an operator decision;
 its approved resolution continues in implementation. Only a separate, explicit current live
@@ -662,7 +652,7 @@ actual result in `02-implementation.md`. Main verifies that every finding ID has
 result before any Freeze rebuild. Missing or failed closure evidence is
 `failure_kind: correction-incomplete`: the consumed correction round remains consumed, no Freeze
 opens, and no validator is dispatched. Main consolidates the failed checks as the next package;
-normal approval pauses and retains a fresh unbounded operator-live choice,
+an operator-live correction pauses and retains a fresh unbounded operator-live choice,
 while eligible autonomy may authorize another round only within its max-3 budget.
 
 ## Post-Gate-1 plan-write boundary
