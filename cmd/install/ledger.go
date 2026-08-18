@@ -226,6 +226,9 @@ func validateLedgerOwnership(entry LedgerEntry) error {
 		case strings.HasPrefix(entry.Component, "skill-"):
 			derived := strings.NewReplacer("/", "-", ".", "-", "_", "-").Replace(strings.TrimPrefix(clean, "skills/"))
 			valid = strings.HasPrefix(clean, "skills/") && entry.Component == "skill-"+strings.Trim(derived, "-")
+		case strings.HasPrefix(entry.Component, "reference-"):
+			derived := strings.NewReplacer("/", "-", ".", "-", "_", "-").Replace(strings.TrimPrefix(clean, "th-references/agents/"))
+			valid = strings.HasPrefix(clean, "th-references/agents/") && entry.Component == "reference-"+strings.Trim(derived, "-")
 		case strings.HasPrefix(entry.Component, "hook-plugin-"):
 			valid = historicalPluginOwnershipMatches(entry.Component, clean)
 		}

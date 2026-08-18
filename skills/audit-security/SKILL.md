@@ -68,7 +68,15 @@ REPORT-only: no --fix, no write, no auto-remediation.
 
 ### Scan path (no `--help`)
 
-1. Run: `python3 tests/test_security_scan.py`
+1. Resolve the scanner in this order and run it with `python3`:
+   1. `scripts/security_scan.py` resolved against this skill's own directory
+      (the directory containing this document) — the packaged copy on every
+      installed runtime
+   2. `tests/test_security_scan.py` — the repo wrapper, when the working
+      directory is a team-harness checkout
+
+   The scanner scans the asset tree it lives in by default; pass
+   `--root <asset-root>` to target a different tree.
 2. Capture and present the full stdout verbatim — do not truncate or reformat.
 3. After the output, state the exit code: `Exit code: {N}`
 4. If exit code is 0: state "All FAIL-severity checks passed."

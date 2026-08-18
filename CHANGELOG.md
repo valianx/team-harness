@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.15.3] - 2026-08-18
+
+### Fixed
+
+- Codex package now ships the ten `docs/*.md` files its agent bodies
+  instruct reading at runtime (agent-authoring, code-comments,
+  code-hygiene-gate, context7-usage, gcp-infra, permission-provisioning,
+  pipeline-lanes, plan-shards, verification-packet, worktree-discipline)
+  via a synced `plugins/team-harness/docs/` projection, with a
+  byte-identity regression pin.
+- opencode installs now receive the agent reference documents
+  (`agents/ref-*.md`, `agents/_shared/`, `agents/testing-refs/`,
+  `agents/review-lenses/`, `agents/gcp-infra-refs/`) as a new `reference`
+  component class emitted to `{config_root}/th-references/agents/` —
+  deliberately outside the auto-registering agents directory so no
+  reference document becomes a dispatchable agent.
+- The security self-scan ships with the `audit-security` skill
+  (`skills/audit-security/scripts/security_scan.py`) so installed Codex
+  and opencode runtimes can run it without a repo checkout; the scanner
+  resolves its asset root from its own location (or `--root`), skips the
+  exact tools-allowlist check for opencode-projected agents, and
+  `tests/test_security_scan.py` remains as a forwarding wrapper.
+- `review-pr` helper resolution chain gains deterministic opencode and
+  package-relative tiers, so installed Codex and opencode runtimes locate
+  `review_context.py` without relying on adapter inference; the
+  fail-closed epilogue is unchanged.
+
 ## [3.15.2] - 2026-08-18
 
 ### Fixed

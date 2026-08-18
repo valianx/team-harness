@@ -46,6 +46,7 @@ The following table shows where each converted asset type lands after migration:
 | Asset type | Target location |
 |---|---|
 | Agents | `.opencode/agents/` (or registered as entries in `opencode.json`) |
+| Agent reference documents (`agents/ref-*.md`, `agents/_shared/`, `agents/testing-refs/`, `agents/review-lenses/`, `agents/gcp-infra-refs/`) | `.opencode/th-references/agents/` — deliberately OUTSIDE `.opencode/agents/`, which auto-registers every `.md` as a dispatchable agent by filename |
 | Commands | `.opencode/commands/` |
 | Skills | `.opencode/skills/` — or reuse `.claude/skills/` directly (the target harness reads CC skill directories; no placement step may be needed) |
 | Rules | `AGENTS.md` (cross-tool standard), with `CLAUDE.md` as fallback |
