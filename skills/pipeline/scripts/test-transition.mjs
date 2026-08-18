@@ -212,7 +212,7 @@ export async function validateTestContractFile(contractPath, context = null) {
     if (context !== null) {
       if (
         typeof context !== "object" || Array.isArray(context) ||
-        !hasExactlyKeys(context, ["repo", "manifest", "base", "candidate"]) ||
+        !hasExactlyKeys(context, ["repo", "workspace", "manifest", "base", "candidate"]) ||
         Object.values(context).some((entry) => typeof entry !== "string" || entry.length === 0)
       ) {
         throw new TransitionError("ARGUMENT_INVALID");
@@ -228,7 +228,7 @@ export async function validateTestContractFile(contractPath, context = null) {
       } catch {
         throw new TransitionError("ARGUMENT_INVALID");
       }
-      const manifest = await loadManifest(repo, context.manifest);
+      const manifest = await loadManifest(repo, context.workspace, context.manifest);
       const baseCommit = await gitText(repo, ["rev-parse", "--verify", `${context.base}^{commit}`], "TEST_SCOPE_INVALID");
       const candidateCommit = await gitText(repo, ["rev-parse", "--verify", `${context.candidate}^{commit}`], "TEST_SCOPE_INVALID");
       const mergeBase = await gitText(repo, ["merge-base", baseCommit, candidateCommit], "TEST_SCOPE_INVALID");
@@ -259,23 +259,51 @@ export async function validateTestContractFile(contractPath, context = null) {
   };
 }
 
-async function resolveContainedFile(repoInput, fileInput, code) {
-  if (typeof repoInput !== "string" || typeof fileInput !== "string" || fileInput.length === 0) {
+async function resolveWorkspaceManifest(repoInput, workspaceInput, manifestInput) {
+  if (
+    typeof repoInput !== "string" ||
+    typeof workspaceInput !== "string" ||
+    typeof manifestInput !== "string" ||
+    workspaceInput.length === 0 ||
+    manifestInput.length === 0 ||
+    workspaceInput.includes("\u0000") ||
+    manifestInput.includes("\u0000") ||
+    !path.isAbsolute(workspaceInput) ||
+    !path.isAbsolute(manifestInput)
+  ) {
     throw new TransitionError("ARGUMENT_INVALID");
   }
   let repo;
-  let file;
+  let workspace;
+  let manifest;
   try {
+    const repoStat = await lstat(repoInput);
+    if (!repoStat.isDirectory() || repoStat.isSymbolicLink()) throw new Error("invalid repository");
     repo = await realpath(path.resolve(repoInput));
-    const requested = path.resolve(repo, fileInput);
-    const stat = await lstat(requested);
-    if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("invalid file");
-    file = await realpath(requested);
+    const workspaceStat = await lstat(workspaceInput);
+    if (!workspaceStat.isDirectory() || workspaceStat.isSymbolicLink()) throw new Error("invalid workspace");
+    workspace = await realpath(workspaceInput);
+    const manifestStat = await lstat(manifestInput);
+    if (!manifestStat.isFile() || manifestStat.isSymbolicLink()) throw new Error("invalid manifest");
+    manifest = await realpath(manifestInput);
   } catch {
-    throw new TransitionError(code);
+    throw new TransitionError("MANIFEST_INVALID");
   }
-  if (!isContained(repo, file)) throw new TransitionError(code);
-  return { repo, file };
+  if (
+    workspace === repo ||
+    !isContained(workspace, manifest)
+  ) {
+    throw new TransitionError("MANIFEST_INVALID");
+  }
+  if (isContained(repo, manifest)) {
+    const repositoryRelative = path.relative(repo, manifest).split(path.sep).join("/");
+    try {
+      await gitBytes(repo, ["check-ignore", "-q", "--", repositoryRelative], "MANIFEST_INVALID");
+    } catch {
+      throw new TransitionError("MANIFEST_INVALID");
+    }
+  }
+  return manifest;
 }
 
 async function loadContract(repo, contractPath) {
@@ -283,7 +311,7 @@ async function loadContract(repo, contractPath) {
     throw new TransitionError("ARGUMENT_INVALID");
   }
   // Coordinator-owned contract evidence may live outside the repository;
-  // unlike the manifest, this path is deliberately resolved independently.
+  // it is deliberately resolved independently from the workspace-bound manifest.
   let file;
   try {
     file = await realpath(path.resolve(contractPath));
@@ -298,9 +326,9 @@ async function loadContract(repo, contractPath) {
   };
 }
 
-async function loadManifest(repo, manifestPath) {
-  const resolved = await resolveContainedFile(repo, manifestPath, "MANIFEST_INVALID");
-  const loaded = await readBoundedJson(resolved.file, "MANIFEST_INVALID");
+async function loadManifest(repo, workspace, manifestPath) {
+  const resolved = await resolveWorkspaceManifest(repo, workspace, manifestPath);
+  const loaded = await readBoundedJson(resolved, "MANIFEST_INVALID");
   let value;
   try {
     value = validateQualityManifest(loaded.value, { selectedChecks: ["test"] });
@@ -596,6 +624,7 @@ function safeResult(state, startedAt) {
 const OPTION_KEYS = [
   "transition",
   "repo",
+  "workspace",
   "manifest",
   "base",
   "candidate",
@@ -606,11 +635,11 @@ const OPTION_KEYS = [
 ];
 
 function normalizeOptions(options) {
-  const required = ["transition", "repo", "manifest", "base", "candidate", "contract"];
+  const required = ["transition", "repo", "workspace", "manifest", "base", "candidate", "contract"];
   if (!hasOnlyKeys(options, OPTION_KEYS, required) || !["red", "green"].includes(options.transition)) {
     throw new TransitionError("ARGUMENT_INVALID");
   }
-  const strings = ["repo", "manifest", "base", "candidate", "contract"];
+  const strings = ["repo", "workspace", "manifest", "base", "candidate", "contract"];
   if (strings.some((key) => typeof options[key] !== "string" || options[key].length === 0)) {
     throw new TransitionError("ARGUMENT_INVALID");
   }
@@ -629,6 +658,7 @@ function normalizeOptions(options) {
 async function runQuality(options) {
   return runQualityChecks({
     repo: options.repo,
+    workspace: options.workspace,
     manifest: options.manifest,
     base: options.base,
     candidate: options.candidate,
@@ -639,7 +669,7 @@ async function runQuality(options) {
 }
 
 async function executeRed(options, state, contract) {
-  const manifest = await loadManifest(options.repo, options.manifest);
+  const manifest = await loadManifest(options.repo, options.workspace, options.manifest);
   state.quality = await runQuality(options);
   if (state.quality.repository === null || state.quality.manifest === null) {
     throw new TransitionError("QUALITY_RUNNER_FAILED");
@@ -713,7 +743,7 @@ async function assertCompatibleGreen(options, state, contract, red, manifest) {
 }
 
 async function executeGreen(options, state, contract) {
-  const manifest = await loadManifest(options.repo, options.manifest);
+  const manifest = await loadManifest(options.repo, options.workspace, options.manifest);
   const red = await loadRedEvidence(options);
   state.quality = await runQuality(options);
   if (state.quality.repository === null || state.quality.manifest === null) {
@@ -745,6 +775,7 @@ function parseCli(argv) {
   const flags = new Map([
     ["--transition", "transition"],
     ["--repo", "repo"],
+    ["--workspace", "workspace"],
     ["--manifest", "manifest"],
     ["--base", "base"],
     ["--candidate", "candidate"],
@@ -786,12 +817,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     } else {
       const flags = new Map([
         ["--repo", "repo"],
+        ["--workspace", "workspace"],
         ["--manifest", "manifest"],
         ["--base", "base"],
         ["--candidate", "candidate"],
       ]);
       const context = {};
-      if (argv.length !== 10) result = await validateTestContractFile("", null);
+      if (argv.length !== 12) result = await validateTestContractFile("", null);
       else {
         for (let index = 2; index < argv.length; index += 2) {
           const key = flags.get(argv[index]);

@@ -31,6 +31,11 @@ coordinates resolve below `repository_root`; shards, `plan/...`, `inputs/...`,
 `reviews/...`, contracts, and evidence resolve below
 `workspace_artifact_root`. Block missing roots or escapes rather than treating
 every path as worktree-relative or adding `../`.
+Require the quality manifest at the absolute
+`<workspace_artifact_root>/.team-harness/quality.json` path and pass both root
+arguments to its helper. If the workspace is nested below `repository_root`,
+the manifest must be ignored and untracked. Never stage, force-add, or copy
+that operational file into a product path.
 Before any packet-derived read, require non-empty `artifact_coordinates`. The
 task shard preserves exact case-sensitive indexed `plan/tasks/Task-N.md`;
 invariant IDs remain unique anchors in `plan/invariants.md`, never synthesized
@@ -181,7 +186,7 @@ failure or permission to abandon the test diff.
 ## Mode: `pre-implementation-contract`
 
 Use this mode only when the task shard says `Pre-implementation test: required`
-and the repository quality manifest declares both `commands.test` and
+and the workspace-local quality manifest declares both `commands.test` and
 `test_contract.path_rules`. Read the assigned
 task's functional ACs before its technical constraints. Author the smallest
 observable-behavior test set that is expected to fail before implementation;
@@ -199,8 +204,9 @@ not this role, runs the deterministic red checkpoint and owns its JSON evidence.
 
 Before returning `status: success`, run exactly
 `node <test_transition_path> --validate-contract <contract_path> --repo
-<repository_root> --manifest <manifest_path> --base <task_test_baseline>
---candidate HEAD` using the helper path supplied by Main. This invokes the same
+<repository_root> --workspace <workspace_artifact_root> --manifest
+<absolute_manifest_path> --base <task_test_baseline> --candidate HEAD` using
+the helper path supplied by Main. This invokes the same
 closed schema, exact candidate-diff equality, ancestry, and manifest path-rule checks
 used by the authoritative red/green transition, without executing the test
 command. Require
@@ -365,7 +371,8 @@ Corepack-wrapped forms in pipeline evidence. If one falls through to an install,
 global store, or SQLite database, return `failure_kind: test-environment`
 without retrying it or mutating `node_modules`. An already-linked local binary
 may be used only for bounded diagnosis unless that exact argv is committed in
-`.team-harness/quality.json`; diagnostic success never replaces the manifest
+`<workspace_artifact_root>/.team-harness/quality.json`; diagnostic success
+never replaces the workspace manifest
 command or a machine transition. Do not launch `pnpm exec` directly: when the
 manifest declares it, the quality runner must resolve the already-linked
 repository-local `.bin` executable and record `execution_resolution:

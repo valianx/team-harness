@@ -95,22 +95,25 @@ async function commitFiles(repo, message, files) {
 }
 
 async function repository(callback, { initialFeature = "missing\n", redFiles, manifest = qualityManifest() } = {}) {
-  const repo = await mkdtemp(path.join(tmpdir(), "th-test-transition-"));
+  const workspace = await mkdtemp(path.join(tmpdir(), "th-test-transition-"));
+  const repo = path.join(workspace, "repository");
+  const manifestPath = path.join(workspace, ".team-harness", "quality.json");
   try {
+    await mkdir(repo);
     git(repo, "init", "-q");
     git(repo, "config", "user.email", "test-transition@example.invalid");
     git(repo, "config", "user.name", "Test Transition");
-    await writeJson(path.join(repo, ".team-harness", "quality.json"), manifest);
+    await writeJson(manifestPath, manifest);
     await writeFile(path.join(repo, "feature.txt"), initialFeature, "utf8");
     git(repo, "add", ".");
     git(repo, "commit", "-q", "-m", "baseline");
     const base = git(repo, "rev-parse", "HEAD");
     await commitFiles(repo, "tests first", redFiles ?? { "tests/feature.test.js": "feature contract\n" });
-    const contractPath = path.join(repo, ".git", "th-test-contract.json");
+    const contractPath = path.join(workspace, "evidence", "th-test-contract.json");
     await writeJson(contractPath, contract(Object.keys(redFiles ?? { "tests/feature.test.js": "" })));
-    await callback({ repo, base, contractPath });
+    await callback({ workspace, repo, manifestPath, base, contractPath });
   } finally {
-    await rm(repo, { recursive: true, force: true });
+    await rm(workspace, { recursive: true, force: true });
   }
 }
 
@@ -118,7 +121,8 @@ function redOptions(repo, base, contractPath) {
   return {
     transition: "red",
     repo,
-    manifest: ".team-harness/quality.json",
+    workspace: path.dirname(repo),
+    manifest: path.join(path.dirname(repo), ".team-harness", "quality.json"),
     base,
     candidate: "HEAD",
     contract: contractPath,
@@ -126,7 +130,7 @@ function redOptions(repo, base, contractPath) {
 }
 
 async function persistRed(repo, result) {
-  const redEvidence = path.join(repo, ".git", "th-test-red.json");
+  const redEvidence = path.join(path.dirname(repo), "evidence", "th-test-red.json");
   await writeFile(redEvidence, `${JSON.stringify(result)}\n`, "utf8");
   return { redEvidence, redEvidenceSha256: await fileSha256(redEvidence) };
 }
@@ -189,7 +193,8 @@ await check("tester contract self-validation checks the candidate diff and manif
   await repository(async (context) => {
     const validationContext = {
       repo: context.repo,
-      manifest: ".team-harness/quality.json",
+      workspace: context.workspace,
+      manifest: context.manifestPath,
       base: context.base,
       candidate: "HEAD",
     };
@@ -220,8 +225,10 @@ await check("tester contract self-validation checks the candidate diff and manif
         context.contractPath,
         "--repo",
         context.repo,
+        "--workspace",
+        context.workspace,
         "--manifest",
-        ".team-harness/quality.json",
+        context.manifestPath,
         "--base",
         context.base,
         "--candidate",
@@ -237,7 +244,8 @@ await check("tester contract self-validation checks the candidate diff and manif
     async (context) => {
       const invalidFixture = await validateTestContractFile(context.contractPath, {
         repo: context.repo,
-        manifest: ".team-harness/quality.json",
+        workspace: context.workspace,
+        manifest: context.manifestPath,
         base: context.base,
         candidate: "HEAD",
       });
@@ -300,6 +308,44 @@ await check("test transition does not execute failing probes from unselected com
   );
 });
 
+await check("test transition accepts disjoint workspaces and rejects unsafe quality manifests", async () => {
+  await repository(async (context) => {
+    const repoLocalManifest = path.join(context.repo, ".team-harness", "quality.json");
+    await writeJson(repoLocalManifest, qualityManifest());
+
+    const repoLocal = await runTestTransition({
+      ...redOptions(context.repo, context.base, context.contractPath),
+      manifest: repoLocalManifest,
+    });
+    assertClosedResult(repoLocal);
+    assert.equal(repoLocal.verdict, "fail");
+    assert.equal(repoLocal.error_code, "MANIFEST_INVALID");
+
+    const disjointWorkspace = await mkdtemp(path.join(tmpdir(), "th-transition-disjoint-"));
+    try {
+      const disjointManifest = path.join(disjointWorkspace, ".team-harness", "quality.json");
+      await writeJson(disjointManifest, qualityManifest());
+      const disjoint = await runTestTransition({
+        ...redOptions(context.repo, context.base, context.contractPath),
+        workspace: disjointWorkspace,
+        manifest: disjointManifest,
+      });
+      assertClosedResult(disjoint);
+      assert.equal(disjoint.verdict, "pass", JSON.stringify(disjoint));
+    } finally {
+      await rm(disjointWorkspace, { recursive: true, force: true });
+    }
+
+    const relative = await runTestTransition({
+      ...redOptions(context.repo, context.base, context.contractPath),
+      manifest: ".team-harness/quality.json",
+    });
+    assertClosedResult(relative);
+    assert.equal(relative.verdict, "fail");
+    assert.equal(relative.error_code, "ARGUMENT_INVALID");
+  });
+});
+
 await check("the CLI emits the same closed evidence contract and process status", async () => {
   await repository(async (context) => {
     const cli = spawnSync(
@@ -310,8 +356,10 @@ await check("the CLI emits the same closed evidence contract and process status"
         "red",
         "--repo",
         context.repo,
+        "--workspace",
+        context.workspace,
         "--manifest",
-        ".team-harness/quality.json",
+        context.manifestPath,
         "--base",
         context.base,
         "--candidate",
@@ -330,14 +378,15 @@ await check("the CLI emits the same closed evidence contract and process status"
 
 await check("the CLI persists full evidence atomically and emits a bounded receipt", async () => {
   await repository(async (context) => {
-    const output = path.join(context.repo, ".git", "th-red-result.json");
+    const output = path.join(context.workspace, "evidence", "th-red-result.json");
     const cli = spawnSync(
       node,
       [
         runnerPath,
         "--transition", "red",
         "--repo", context.repo,
-        "--manifest", ".team-harness/quality.json",
+        "--workspace", context.workspace,
+        "--manifest", context.manifestPath,
         "--base", context.base,
         "--candidate", "HEAD",
         "--contract", context.contractPath,
@@ -366,7 +415,8 @@ await check("persisted transition output rejects relative and symlinked coordina
       runnerPath,
       "--transition", "red",
       "--repo", context.repo,
-      "--manifest", ".team-harness/quality.json",
+      "--workspace", context.workspace,
+      "--manifest", context.manifestPath,
       "--base", context.base,
       "--candidate", "HEAD",
       "--contract", context.contractPath,
@@ -519,7 +569,7 @@ await check("green preserves red evidence when only non-test manifest controls c
         version_argv: [node, "--version"],
       };
     }
-    await writeJson(path.join(context.repo, ".team-harness", "quality.json"), changedManifest);
+    await writeJson(context.manifestPath, changedManifest);
     await writeFile(path.join(context.repo, "feature.txt"), "implemented\n", "utf8");
     git(context.repo, "add", ".");
     git(context.repo, "commit", "-q", "-m", "add non-test controls and implement");
@@ -539,7 +589,7 @@ await check("green fails closed when the test-contract manifest fragment changes
     const contractSha256 = await fileSha256(context.contractPath);
     const changedManifest = qualityManifest();
     changedManifest.test_contract.path_rules.push({ type: "segment", value: "test" });
-    await writeJson(path.join(context.repo, ".team-harness", "quality.json"), changedManifest);
+    await writeJson(context.manifestPath, changedManifest);
     await writeFile(path.join(context.repo, "feature.txt"), "implemented\n", "utf8");
     git(context.repo, "add", ".");
     git(context.repo, "commit", "-q", "-m", "change manifest and implement");
@@ -562,7 +612,7 @@ await check("green fails closed when the exact test command changes", async () =
       "-e",
       "const fs=require('node:fs');process.exit(fs.readFileSync('feature.txt','utf8').trim()==='implemented'?0:1);",
     ];
-    await writeJson(path.join(context.repo, ".team-harness", "quality.json"), changedManifest);
+    await writeJson(context.manifestPath, changedManifest);
     await writeFile(path.join(context.repo, "feature.txt"), "implemented\n", "utf8");
     git(context.repo, "add", ".");
     git(context.repo, "commit", "-q", "-m", "change test command and implement");

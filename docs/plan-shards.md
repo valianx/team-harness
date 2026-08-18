@@ -66,7 +66,7 @@ verification. `VERIFY:` is accepted only when recovering an older workspace;
 new plans never emit it inside `## Acceptance Criteria`.
 
 `Pre-implementation test` is a required routing field, not a requirement. It is
-`required` when the repository quality manifest declares both `commands.test`
+`required` when the workspace-local quality manifest declares both `commands.test`
 and `test_contract.path_rules` and the task changes observable runtime behavior.
 It is `not-applicable` for docs,
 assets, comments, or other no-behavior work, and when the repository has not

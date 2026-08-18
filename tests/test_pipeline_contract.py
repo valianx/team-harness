@@ -907,7 +907,7 @@ def check_cleaner_crap_contract() -> None:
             "freeze",
             "per participating repository",
             "at most five",
-            "complete `.team-harness/quality.json`",
+            "complete workspace-local `.team-harness/quality.json`",
             "bare `exit 1`",
         ):
             require(marker in text, f"{label}: cleaner checkpoint misses {marker!r}")
@@ -1126,6 +1126,8 @@ def check_functional_first_plan_contract() -> None:
     for text in state_sources:
         for marker in ("plan_contract_evidence", "plan_contract_repair_evidence", "result_sha256", "plan_sha256", "artifact_set_sha256"):
             require(marker in text, f"plan evidence state misses {marker!r}")
+        for marker in ("quality_manifest_path", "quality_manifest_sha256", "ignored and untracked"):
+            require(marker in text, f"quality manifest state misses {marker!r}")
     recovery = re.sub(
         r"\s+",
         " ",
@@ -1223,6 +1225,26 @@ def check_functional_first_plan_contract() -> None:
         "zero or multiple matches block",
     ):
         require(marker in implementation, f"OpenSpec execution-item packet misses {marker!r}")
+    for marker in (
+        "<workspace_artifact_root>/.team-harness/quality.json",
+        "ignored and untracked",
+        "never copy it into a product path",
+        "`git add -f`",
+        "final base-to-candidate diff",
+        "canonical proposal, design, specs, and tasks are product artifacts",
+        "must exclude `.team-harness/quality.json`",
+    ):
+        require(marker in implementation, f"artifact-domain contract misses {marker!r}")
+
+    openspec_docs = re.sub(r"\s+", " ", read("docs/openspec-integration.md").lower())
+    for marker in (
+        "canonical openspec markdown always stays in the target repository",
+        "workspace/.team-harness/quality.json",
+        "tracked by git",
+        "included in the final base-to-candidate diff",
+        "workspace quality manifest is absent from that product diff",
+    ):
+        require(marker in openspec_docs, f"OpenSpec artifact-boundary docs miss {marker!r}")
     for marker in (
         "openspec-overlay.mjs verify-progress",
         "inputs/openspec-progress.json",

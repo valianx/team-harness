@@ -73,6 +73,8 @@ type: feature|fix|refactor|hotfix|enhancement
 feature: {kebab-case slug}
 repo_root: {absolute path}
 workspace: {absolute path}
+quality_manifest_path: {absolute workspace-local path|null}
+quality_manifest_sha256: {SHA-256|null}
 logs_mode: local|obsidian
 obsidian_sync: armed|exported|pending|null
 obsidian_export_target: {validated absolute vault path or null}
@@ -167,6 +169,13 @@ delivery_size_justification: {workspace pointer}|null
 delivery_base_status: {base_ref, freeze_base_sha, remote_base_sha: {full SHA}|null, status: current|moved|unknown}|null
 delivery_preview: {pr title, workspace paths, and SHA-256 digests bound to Gate 3}|null
 ```
+
+When non-null, `quality_manifest_path` must be a regular non-symlink below
+`workspace`. If that workspace is below a participating repository, the
+manifest must also be ignored and untracked. It is operational state, never a
+product diff entry. Persist the exact file hash in
+`quality_manifest_sha256` after each authorized change and verify both fields
+during recovery before running quality.
 
 `autonomous_correction_count` is an integer from `0` through `3` and is the
 only correction budget. `operator_correction_count` is a non-negative,
@@ -273,7 +282,7 @@ repository/worktree, one dependency-coherent behavior-preserving objective,
 one to five findings, no more than eight unique files, already-approved scope,
 no DDL/migration, public-schema, security-control, external-environment, or new
 decision dependency, locally executable closure checks, and a complete
-repository `.team-harness/quality.json`. Persist `ineligible` plus every failed
+workspace-local `.team-harness/quality.json`. Persist `ineligible` plus every failed
 conjunct when it does not hold, issue no nonce, and dispatch nobody. Preserve
 the existing commits/evidence and pause the same pipeline for an in-place
 recovery package decomposed by repository or the applicable live scope

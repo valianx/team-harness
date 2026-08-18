@@ -39,11 +39,19 @@ candidate, a checkpoint name, and a selected set of checks, the runner:
 Agents may diagnose a failed command or justify a policy exception. They cannot
 change a failing machine verdict into a pass.
 
-## Repository manifest
+## Workspace manifest
 
-The proposed conventional location is `.team-harness/quality.json`. The file is
-committed with the repository so command and policy changes alter its SHA-256
-identity and invalidate older full-manifest readiness and Freeze evidence.
+The conventional location is `<workspace>/.team-harness/quality.json`. This is
+coordinator-owned operational state: it must be an absolute, regular,
+non-symlink file below the execution workspace. A workspace may be disjoint
+from the checkout, contain its isolated worktree, or be an ignored child of the
+checkout; in the last case the runner also proves the manifest is ignored and
+untracked. It is never staged, force-added, copied to a product path, or
+included in the pull request. The runner requires absolute workspace and
+manifest paths and fails closed when either boundary is ambiguous or crossed.
+
+Command and policy changes still alter the manifest's SHA-256 identity and
+invalidate older full-manifest readiness and Freeze evidence.
 Test-transition schema v3 additionally records a narrower
 `test_binding_sha256`, calculated from the normalized manifest schema version,
 `commands.test`, and `test_contract`. RED/GREEN compatibility uses that binding
@@ -277,7 +285,8 @@ manifest plus the per-repository union of task-declared required checks:
 ```bash
 node /absolute/path/to/loaded/pipeline/skill/scripts/quality-runner.mjs \
   --repo /absolute/path/to/repository \
-  --manifest .team-harness/quality.json \
+  --workspace /absolute/path/to/workspace \
+  --manifest /absolute/path/to/workspace/.team-harness/quality.json \
   --base 0123456789abcdef0123456789abcdef01234567 \
   --candidate HEAD \
   --checkpoint post_implementation \

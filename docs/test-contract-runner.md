@@ -9,7 +9,7 @@ approved functional behavior. Neither may substitute for the other.
 
 The checkpoint is opt-in per repository and explicit per task:
 
-- `.team-harness/quality.json` declares `commands.test` and
+- the workspace-local `.team-harness/quality.json` declares `commands.test` and
   `test_contract.path_rules`;
 - a task that changes observable runtime behavior declares
   `Pre-implementation test: required`; and
@@ -45,7 +45,8 @@ commit must be current clean `HEAD`.
 node /absolute/path/to/loaded/pipeline/skill/scripts/test-transition.mjs \
   --transition red \
   --repo /absolute/path/to/repository \
-  --manifest .team-harness/quality.json \
+  --workspace /absolute/path/to/workspace \
+  --manifest /absolute/path/to/workspace/.team-harness/quality.json \
   --base 0123456789abcdef0123456789abcdef01234567 \
   --candidate HEAD \
   --contract /absolute/workspace/Task-1-test-contract.json
@@ -68,7 +69,8 @@ After implementation, run the same test command with both persisted hashes:
 node /absolute/path/to/loaded/pipeline/skill/scripts/test-transition.mjs \
   --transition green \
   --repo /absolute/path/to/repository \
-  --manifest .team-harness/quality.json \
+  --workspace /absolute/path/to/workspace \
+  --manifest /absolute/path/to/workspace/.team-harness/quality.json \
   --base 0123456789abcdef0123456789abcdef01234567 \
   --candidate HEAD \
   --contract /absolute/workspace/Task-1-test-contract.json \

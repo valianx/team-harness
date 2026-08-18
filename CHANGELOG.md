@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   diagnostic, group symptoms by root cause, and dispatch one comprehensive
   package instead of fixing the first surfaced failure in a sequence of
   avoidable rounds.
+- Canonical OpenSpec artifacts remain tracked below repository `openspec/` and
+  are verified into the final product diff, while generated quality policy now
+  lives only at `<workspace>/.team-harness/quality.json`; runners reject
+  relative, symlinked, workspace-escaping, tracked, or non-ignored nested
+  manifests.
 
 ## [3.15.3] - 2026-08-18
 

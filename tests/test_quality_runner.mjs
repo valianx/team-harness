@@ -92,14 +92,17 @@ function crapReport({ complexity, coverage, status = "new", file = "src/calc.go"
 }
 
 async function temporaryRepository({ manifest, candidateFiles = { "src/calc.go": "package calc\n" } }, callback) {
-  const repo = await mkdtemp(path.join(tmpdir(), "th-quality-runner-"));
+  const workspace = await mkdtemp(path.join(tmpdir(), "th-quality-runner-"));
+  const repo = path.join(workspace, "repository");
+  const manifestPath = path.join(workspace, ".team-harness", "quality.json");
   try {
+    await mkdir(repo);
     git(repo, "init", "-q");
     git(repo, "config", "user.email", "quality-runner@example.invalid");
     git(repo, "config", "user.name", "Quality Runner Test");
     await writeFile(path.join(repo, "README.md"), "baseline\n", "utf8");
-    await writeJson(path.join(repo, ".team-harness", "quality.json"), manifest);
-    git(repo, "add", "README.md", ".team-harness/quality.json");
+    await writeJson(manifestPath, manifest);
+    git(repo, "add", "README.md");
     git(repo, "commit", "-q", "-m", "baseline");
     const base = git(repo, "rev-parse", "HEAD");
 
@@ -114,16 +117,17 @@ async function temporaryRepository({ manifest, candidateFiles = { "src/calc.go":
     }
     git(repo, "add", ".");
     git(repo, "commit", "-q", "-m", "candidate");
-    await callback({ repo, base, candidate: git(repo, "rev-parse", "HEAD") });
+    await callback({ workspace, repo, manifestPath, base, candidate: git(repo, "rev-parse", "HEAD") });
   } finally {
-    await rm(repo, { recursive: true, force: true });
+    await rm(workspace, { recursive: true, force: true });
   }
 }
 
 function options(repo, base, checks, extra = {}) {
   return {
     repo,
-    manifest: ".team-harness/quality.json",
+    workspace: path.dirname(repo),
+    manifest: path.join(path.dirname(repo), ".team-harness", "quality.json"),
     base,
     candidate: "HEAD",
     checkpoint: "quality-test",
@@ -183,6 +187,7 @@ await check("a clean immutable candidate runs exact argv commands and emits boun
     assert.equal(result.repository.base_commit, base);
     assert.equal(result.repository.candidate_commit, candidate);
     assert.deepEqual(result.repository.changed_paths, ["src/calc.go"]);
+    assert.equal(result.manifest.path, ".team-harness/quality.json");
     assert.deepEqual(result.commands.map((entry) => entry.id), ["test", "lint"]);
     assert.ok(result.commands.every((entry) => entry.verdict === "pass"));
     assert.ok(result.commands.every((entry) => /^[0-9a-f]{64}$/.test(entry.command_sha256)));
@@ -201,15 +206,17 @@ await check("a clean immutable candidate runs exact argv commands and emits boun
 
 await check("the CLI returns the same closed JSON contract and a useful process status", async () => {
   const manifest = baseManifest({ test: command() });
-  await temporaryRepository({ manifest }, async ({ repo, base }) => {
+  await temporaryRepository({ manifest }, async ({ workspace, repo, manifestPath, base }) => {
     const child = spawnSync(
       node,
       [
         runnerPath,
         "--repo",
         repo,
+        "--workspace",
+        workspace,
         "--manifest",
-        ".team-harness/quality.json",
+        manifestPath,
         "--base",
         base,
         "--candidate",
@@ -235,8 +242,10 @@ await check("the CLI returns the same closed JSON contract and a useful process 
         runnerPath,
         "--repo",
         repo,
+        "--workspace",
+        workspace,
         "--manifest",
-        ".team-harness/quality.json",
+        manifestPath,
         "--base",
         base,
         "--candidate",
@@ -615,23 +624,99 @@ await check("tool failures, spawn failures, and timeouts carry distinct causes",
 
 await check("a missing manifest is absent rather than invalid", async () => {
   const manifest = baseManifest({ test: command() });
-  await temporaryRepository({ manifest }, async ({ repo, base }) => {
+  await temporaryRepository({ manifest }, async ({ workspace, repo, base }) => {
     const absent = await runQualityChecks({
       ...options(repo, base, ["test"]),
-      manifest: ".team-harness/no-such-manifest.json",
+      manifest: path.join(workspace, ".team-harness", "no-such-manifest.json"),
     });
     assertClosedResult(absent);
     assert.equal(absent.verdict, "fail");
     assert.equal(absent.error_code, "MANIFEST_ABSENT");
     assert.match(absent.detail, /manifest not found/);
 
-    const malformed = path.join(repo, ".git", "malformed.json");
+    const malformed = path.join(workspace, ".team-harness", "malformed.json");
     await writeFile(malformed, "{ not json", "utf8");
     const invalid = await runQualityChecks({
       ...options(repo, base, ["test"]),
-      manifest: path.relative(repo, malformed),
+      manifest: malformed,
     });
     assert.equal(invalid.error_code, "MANIFEST_INVALID");
+  });
+});
+
+await check("quality manifests stay workspace-bound and outside the product diff", async () => {
+  const manifest = baseManifest({ test: command() });
+  await temporaryRepository({ manifest }, async ({ workspace, repo, base }) => {
+    const repoLocalManifest = path.join(repo, ".team-harness", "quality.json");
+    await writeJson(repoLocalManifest, manifest);
+
+    const repoLocal = await runQualityChecks({
+      ...options(repo, base, ["test"]),
+      manifest: repoLocalManifest,
+    });
+    assert.equal(repoLocal.error_code, "MANIFEST_INVALID");
+
+    const nestedWorkspace = path.join(repo, "workspaces", "feature");
+    const nestedManifest = path.join(nestedWorkspace, ".team-harness", "quality.json");
+    await writeFile(path.join(repo, ".git", "info", "exclude"), "/workspaces/\n", "utf8");
+    await writeJson(nestedManifest, manifest);
+    const ignoredNested = await runQualityChecks({
+      ...options(repo, base, ["test"]),
+      workspace: nestedWorkspace,
+      manifest: nestedManifest,
+    });
+    assert.equal(ignoredNested.verdict, "pass", JSON.stringify(ignoredNested));
+    assert.equal(git(repo, "ls-files", "--", "workspaces/feature/.team-harness/quality.json"), "");
+
+    const relative = await runQualityChecks({
+      ...options(repo, base, ["test"]),
+      manifest: ".team-harness/quality.json",
+    });
+    assert.equal(relative.error_code, "ARGUMENT_INVALID");
+
+    const repositoryAsWorkspace = await runQualityChecks({
+      ...options(repo, base, ["test"]),
+      workspace: repo,
+      manifest: repoLocalManifest,
+    });
+    assert.equal(repositoryAsWorkspace.error_code, "ARGUMENT_INVALID");
+
+    const disjointWorkspace = await mkdtemp(path.join(tmpdir(), "th-quality-disjoint-"));
+    try {
+      const disjointManifest = path.join(disjointWorkspace, ".team-harness", "quality.json");
+      await writeJson(disjointManifest, manifest);
+      const disjoint = await runQualityChecks({
+        ...options(repo, base, ["test"]),
+        workspace: disjointWorkspace,
+        manifest: disjointManifest,
+      });
+      assert.equal(disjoint.verdict, "pass", JSON.stringify(disjoint));
+    } finally {
+      await rm(disjointWorkspace, { recursive: true, force: true });
+    }
+
+    const outsideWorkspace = await mkdtemp(path.join(tmpdir(), "th-quality-outside-"));
+    try {
+      const outsideManifest = path.join(outsideWorkspace, "quality.json");
+      await writeJson(outsideManifest, manifest);
+      const escaped = await runQualityChecks({
+        ...options(repo, base, ["test"]),
+        manifest: outsideManifest,
+      });
+      assert.equal(escaped.error_code, "MANIFEST_INVALID");
+    } finally {
+      await rm(outsideWorkspace, { recursive: true, force: true });
+    }
+
+    if (process.platform !== "win32") {
+      const linkedManifest = path.join(workspace, ".team-harness", "linked-quality.json");
+      await symlink(path.join(workspace, ".team-harness", "quality.json"), linkedManifest);
+      const symlinked = await runQualityChecks({
+        ...options(repo, base, ["test"]),
+        manifest: linkedManifest,
+      });
+      assert.equal(symlinked.error_code, "MANIFEST_INVALID");
+    }
   });
 });
 
@@ -739,18 +824,16 @@ await check("a reformatted manifest and a pipeline amend keep baseline evidence 
         "metrics.json": crapReport({ complexity: 10, coverage: 50 }),
       },
     },
-    async ({ repo, base }) => {
+    async ({ repo, manifestPath, base }) => {
       const measured = await runQualityChecks(options(repo, base, ["crap"]));
       assert.equal(measured.verdict, "pass", JSON.stringify(measured));
       const baselinePath = path.join(repo, ".git", "quality-baseline.json");
       await writeFile(baselinePath, `${JSON.stringify(measured)}\n`, "utf8");
       const baselineSha256 = await fileSha256(baselinePath);
 
-      const parsed = JSON.parse(await readFile(path.join(repo, ".team-harness", "quality.json"), "utf8"));
+      const parsed = JSON.parse(await readFile(manifestPath, "utf8"));
       const reordered = Object.fromEntries(Object.keys(parsed).sort().reverse().map((key) => [key, parsed[key]]));
-      await writeFile(path.join(repo, ".team-harness", "quality.json"), JSON.stringify(reordered), "utf8");
-      git(repo, "add", ".team-harness/quality.json");
-      git(repo, "commit", "-q", "-m", "reformat manifest only");
+      await writeFile(manifestPath, JSON.stringify(reordered), "utf8");
 
       const reformatted = await runQualityChecks(
         options(repo, base, ["crap"], { policyMode: "enforce", baseline: baselinePath, baselineSha256 }),
@@ -792,7 +875,7 @@ await check("CRAP derives from the same rounded coverage stored in evidence", as
         "metrics.json": crapReport({ complexity: 5, coverage: 33.333333 }),
       },
     },
-    async ({ repo, base }) => {
+    async ({ repo, manifestPath, base }) => {
       const result = await runQualityChecks(options(repo, base, ["crap"]));
       assertClosedResult(result);
       assert.equal(result.verdict, "pass", JSON.stringify(result));
@@ -832,7 +915,7 @@ await check("CRAP thresholds and stale baseline manifests cannot be converted in
         "metrics.json": crapReport({ complexity: 6, coverage: 100 }),
       },
     },
-    async ({ repo, base }) => {
+    async ({ repo, manifestPath, base }) => {
       const measured = await runQualityChecks(options(repo, base, ["crap"]));
       const baselinePath = path.join(repo, ".git", "quality-baseline.json");
       await writeFile(baselinePath, JSON.stringify(measured), "utf8");
@@ -853,11 +936,9 @@ await check("CRAP thresholds and stale baseline manifests cannot be converted in
       assert.equal(failed.error_code, "CRAP_POLICY_FAILED");
       assert.deepEqual(failed.crap.functions[0].violations, ["new_function_max", "crap_worsened"]);
 
-      const currentManifest = JSON.parse(await readFile(path.join(repo, ".team-harness", "quality.json"), "utf8"));
+      const currentManifest = JSON.parse(await readFile(manifestPath, "utf8"));
       currentManifest.crap.new_function_max = 200;
-      await writeJson(path.join(repo, ".team-harness", "quality.json"), currentManifest);
-      git(repo, "add", ".team-harness/quality.json");
-      git(repo, "commit", "-q", "-m", "change quality policy");
+      await writeJson(manifestPath, currentManifest);
       const stale = await runQualityChecks(
         options(repo, base, ["crap"], {
           policyMode: "enforce",
@@ -943,12 +1024,13 @@ await check("CRAP reports cannot claim unchanged or out-of-scope functions", asy
 
 await check("CLI output persists complete quality evidence and emits only a bounded receipt", async () => {
   const manifest = baseManifest({ test: command("process.stdout.write('ok')") });
-  await temporaryRepository({ manifest }, async ({ repo, base }) => {
+  await temporaryRepository({ manifest }, async ({ workspace, repo, manifestPath, base }) => {
     const output = path.join(repo, ".git", "quality-result.json");
     const processResult = spawnSync(node, [
       runnerPath,
       "--repo", repo,
-      "--manifest", ".team-harness/quality.json",
+      "--workspace", workspace,
+      "--manifest", manifestPath,
       "--base", base,
       "--candidate", "HEAD",
       "--checkpoint", "quality-test",

@@ -107,6 +107,7 @@ decisions, reviews, and evidence stay in the configured TH workspace:
 
 ```text
 repository/openspec/changes/<change>/...       canonical source
+workspace/.team-harness/quality.json           operational quality policy
 workspace/inputs/openspec-snapshot.json        pinned identity and navigation
 workspace/plan/openspec-traceability.json      TH execution overlay
 workspace/reviews/...                          TH validation evidence
@@ -115,6 +116,15 @@ workspace/reviews/...                          TH validation evidence
 When `logs_mode: obsidian`, `workspace` is the configured vault path. Snapshot metadata records the
 vault root, `mode: obsidian`, repository-relative artifact paths, coordinates, line numbers, and
 content hashes. Obsidian is therefore the audit/navigation surface, not a second OpenSpec source.
+
+Before Freeze, TH verifies that the snapshot-bound OpenSpec source set is
+present byte-for-byte below the implementation checkout, tracked by Git, and
+included in the final base-to-candidate diff when created or changed by this
+pipeline. It also verifies that the workspace quality manifest is absent from
+that product diff. When the workspace is nested below a checkout, the manifest
+must also be ignored and untracked. A worktree boundary never moves canonical
+OpenSpec artifacts into the workspace or operational quality state into a
+product path.
 
 ## Recovery and finalization
 

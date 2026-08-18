@@ -23,6 +23,8 @@ openspec_snapshot_path: inputs/openspec-snapshot.json|null
 openspec_snapshot_sha256: {SHA-256|null}
 openspec_overlay_path: plan/openspec-traceability.json|null
 openspec_overlay_sha256: {SHA-256|null}
+quality_manifest_path: {absolute workspace-local path|null}
+quality_manifest_sha256: {SHA-256|null}
 type: feature|fix|refactor|hotfix|enhancement
 phase: design|waiting_gate1|implementation|validation|waiting_gate3|delivery|complete|blocked|aborted
 stage: 1|2|3|4                 # telemetry grouping; `phase` is the machine authority
@@ -58,6 +60,13 @@ next_action: {what to do next}      # the successor to a prose recovery section
 total_tokens: N
 ```
 
+`quality_manifest_path`, when non-null, must resolve to a regular non-symlink
+below the recorded workspace. If that workspace is below a participating
+repository, the manifest must also be ignored and untracked. It is
+coordinator-owned operational state and never a product diff entry. Persist its
+exact file SHA-256 after each authorized manifest change; recovery revalidates
+both fields before any quality invocation.
+
 `iteration: N/3` is a legacy display mirror of `autonomous_correction_count`,
 not a total-round counter and never authority. New writers keep both values
 equal and increment them only for `gate1-autonomous` correction decisions. An
@@ -82,7 +91,7 @@ when the closed eligibility predicate holds: exactly one repository/worktree,
 one coherent behavior-preserving objective, one to five findings, at most
 eight unique files, already-approved scope, no DDL/migration, public-schema,
 security-control, external-environment, or new decision dependency, local
-closure checks, and a complete quality manifest. Otherwise it preserves
+closure checks, and a complete workspace-local quality manifest. Otherwise it preserves
 commits/evidence, dispatches nobody, and pauses the same pipeline for an
 in-place repository-decomposed recovery package or live scope decision. An
 eligible package pauses with exactly `1 — authorize one implementer pass`,
