@@ -259,9 +259,14 @@ Every field belongs to exactly one of these two blocks, with one producer and on
 
 When the sketch verifier cannot read this state at all (missing file, unparseable), it fails **open** and reports `pass` with no distinguishing signal (`hooks/sketch-guard.sh:28-30`) — a silent-pass failure mode, not a silent-block one. Writing the block correctly, every run, is what keeps that fail-open path from ever being exercised in practice.
 
-**Resolved config** — from `agents/ref-pipeline.md § Boot`.
+**Resolved config** — from `agents/ref-pipeline.md § Boot`. The canonical
+`docs_root` is repository-local on every run; `logs_mode: obsidian` arms the
+one-way vault export tracked by `obsidian_sync`, and a vault `docs_root`
+appears only under a live `obsidian-direct` opt-in.
 ```
 logs_mode: local|obsidian
+obsidian_sync: armed|exported|pending|null
+obsidian_export_target: {validated absolute vault path or null}
 events_file: 00-execution-events.jsonl|00-execution-events.md
 docs_root: {absolute path}
 operator_language: en|es|pt|...
@@ -645,6 +650,12 @@ After delivery returns `success`, before the GitHub update substep:
 Set `status: complete`. This is the record-based recover backstop's own precondition for excluding a finished pipeline from consideration as an active one: without this write, a shipped pipeline's state file stays a live-looking `gate3_release: ship`-carrying candidate indefinitely, and both the recover backstop and a human reading the file directly — the two actual live consumers of this field, not any hook — could mis-read it as still in progress on a later, unrelated run that happens to reuse the same branch name or worktree path.
 
 Then append `## Final state — ready for handoff` (branch, version, PR, AC count, iterations, outcome) and surface the `/compact`-or-`/clear` prompt.
+
+When `obsidian_sync: armed` and the terminal close, pause, or abort did not
+already export at draft-PR creation, run the same one-way export described in
+`agents/_shared/delivery-mechanics.md § 5` before ending the turn: atomic copy
+to the recorded target, `obsidian_sync: exported` on success, `pending` with
+one sanitized reason on failure, never a block.
 
 ### Process reflection
 

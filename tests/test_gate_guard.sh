@@ -182,6 +182,13 @@ assert_nodecision "AC-1: ship + branch correlation -> none (gh pr create)" \
     "$TMP" "$(push_payload 'gh pr create --title x --body y')"
 rm -rf "$TMP"
 
+TMP=$(mktemp -d)
+make_branch_in_place_repo "$TMP" "feat/deterministic-gate-release-enforcement"
+make_lane_state "$TMP" "$(lane_fields auto-ship feat/deterministic-gate-release-enforcement null)"
+assert_nodecision "AC-1: auto-ship + branch correlation -> none (git push)" \
+    "$TMP" "$(push_payload 'git push origin feat/deterministic-gate-release-enforcement')"
+rm -rf "$TMP"
+
 # ---------------------------------------------------------------------------
 # AC-2 — lane resolved, gate3_release not in {ship} -> deny (fail-closed)
 # ---------------------------------------------------------------------------

@@ -75,9 +75,10 @@ the current thread already knows, but newly added or renamed skills, agent or
 MCP declarations, and hook registrations still require a new Codex thread.
 Hook commands prefer Codex's native
 `PLUGIN_ROOT`, accept the `CLAUDE_PLUGIN_ROOT` compatibility alias that Codex
-itself provides without requiring Claude Code, recover a replacement snapshot
-from the same Codex cache, and fail closed without a shell-level `127` when no
-plugin runtime can be resolved.
+itself provides without requiring Claude Code, and recover a replacement
+snapshot from the same Codex cache. When no plugin runtime can be resolved,
+the launcher reports the broken cache as a system message and leaves the
+decision to native Codex permissions instead of denying every tool call.
 
 For contributors, the generated project `.codex/config.toml` keeps
 `workspace-write` plus `on-request` approvals and enables dependency network

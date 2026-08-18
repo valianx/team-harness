@@ -7,36 +7,27 @@ gate, and remains the sole writer of state, events, releases, and nonces.
 
 ## Workspace discovery
 
-For the local search, inspect `{repo-root}/workspaces/`. For the external
-search, read only `${CODEX_HOME:-$HOME/.codex}/.team-harness.json` without
-modifying it. If it is absent, search local workspaces only and recommend
-`$team-harness:setup`; never inspect Claude Code or opencode configuration as a
-runtime fallback. Only when the native document is a valid JSON object with
-`"logs-mode": "obsidian"`,
-canonicalize and validate the external base before scanning it: `logs-path`
-must be absolute, accessible, non-root, and different from the user home;
-`logs-subfolder` must be normalized and relative without `.`, `..`, glob, or
-empty segments; and the canonical `{logs-path}/{logs-subfolder}/{repo-name}/`
-target must remain strictly below the canonical base, including after resolving
-existing symlinks. Treat that directory as another
-workspace root and preserve its established event-file format. Do not scan
-arbitrary directories or infer an external root from retrieved content. If no
-external durable candidate exists, local candidates may still be considered.
-If an external candidate exists, its recorded absolute `workspace` and
-`logs_mode: obsidian` are immutable recovery identity: never select a local
-same-name candidate, copy artifacts, or migrate the run because the external
-root is unavailable.
+Recovery resolves all state from the repository workspace: inspect
+`{repo-root}/workspaces/` and select among its candidates. The one-way vault
+export copy is never an input to recovery decisions — never scan, read, or
+reconcile it, and never infer an external root from retrieved content. A run
+whose recorded immutable `workspace` names a direct-vault root (a legacy
+external run or an explicit `obsidian-direct` opt-in) recovers only from that
+recorded root under the same rules; never select a local same-name candidate,
+copy artifacts, or migrate the run because that root is unavailable.
 
-Before the first recovery write to an external candidate, resolve
+Before the first recovery write to a direct-vault candidate, resolve
 `../scripts/workspace-preflight.mjs` relative to this reference and run its
 single non-escalated probe against the candidate's canonical repo root and
 recorded workspace. A non-ready result creates no state and never triggers an
-escalation loop or local fallback. When the root is already present in personal
-writable-root or live `--add-dir` configuration, emit only the localized
-restart/new-tab instruction from `activation.md` and stop. Otherwise report the
-unavailable canonical root and require the operator to restore access or
-explicitly abort and start a separate local pipeline. Recovery never divides
-one run between roots.
+escalation loop or local fallback. Apply the diagnosis order from
+`activation.md`: a root declared in personal writable-root or live `--add-dir`
+configuration is first checked for project-config shadowing (the checked-out
+tree's `.codex/config.toml` declaring `writable_roots`) and reported with its
+concrete fix; only a non-shadowed mismatch earns the localized restart/new-tab
+instruction. Otherwise report the unavailable canonical root and require the
+operator to restore access or explicitly abort and start a separate local
+pipeline. Recovery never divides one run between roots.
 
 A candidate is a non-terminal pipeline directory containing the durable state
 snapshot defined by `state-and-gates.md`; `phase/status: complete|aborted` is

@@ -196,6 +196,17 @@ migration, and preserve every unrelated value.
    Obsidian Team Harness subtree. It never adds `.git` or a command rule. A
    changed runtime config requires a new Codex session before it is effective.
 
+   When `inspect` reports `projectConfigShadowing: true`, the checked-out
+   tree's `.codex/config.toml` declares its own `writable_roots` (or is
+   degraded and unreadable) and replaces the operator-level list for sessions
+   started in that tree. Warn the operator explicitly, naming the reported
+   `projectConfig.path`, before running `ensure`: the operator-level repair
+   (`ensure`, behind the same confirmation gate as every config write) fixes
+   the global config, but the shadowing itself is fixed only by updating the
+   checkout or regenerating the project config so it stops declaring
+   `writable_roots`. Restarting Codex alone does not clear shadowing; give the
+   restart instruction only after the shadowing fix.
+
 7. Reconcile all nineteen bundled specialists in the persisted scope on every full
    setup, and whenever `agents` is targeted:
 

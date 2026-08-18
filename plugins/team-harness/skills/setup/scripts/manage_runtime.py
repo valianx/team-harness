@@ -134,6 +134,19 @@ def current_runtime_state(parsed: dict[str, Any]) -> tuple[dict[str, object], li
     return values, writable_roots
 
 
+def project_config_shadowing() -> dict[str, object] | None:
+    path = Path.cwd() / ".codex" / "config.toml"
+    if path.is_symlink() or not path.is_file():
+        return None
+    try:
+        parsed = tomllib.loads(path.read_bytes().decode("utf-8"))
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
+        return {"path": str(path), "declaresWritableRoots": None}
+    sandbox = parsed.get(SECTION)
+    declares = isinstance(sandbox, dict) and "writable_roots" in sandbox
+    return {"path": str(path), "declaresWritableRoots": declares}
+
+
 def classify() -> dict[str, object]:
     raw, parsed = read_runtime_config()
     values, writable_roots = current_runtime_state(parsed)
@@ -149,6 +162,7 @@ def classify() -> dict[str, object]:
     if workspace is not None:
         managed_directories.append(workspace)
     missing_directories = [str(path) for path in managed_directories if not path.is_dir()]
+    shadowing = project_config_shadowing()
     return {
         "path": str(runtime_config_path()),
         "exists": raw is not None,
@@ -160,6 +174,8 @@ def classify() -> dict[str, object]:
         "missingDirectories": missing_directories,
         "mismatchedSettings": mismatched,
         "obsidianWorkspaceRoot": str(workspace) if workspace is not None else None,
+        "projectConfig": shadowing,
+        "projectConfigShadowing": bool(shadowing and shadowing.get("declaresWritableRoots") is not False),
         "restartRequired": bool(mismatched or missing_roots or missing_directories),
     }
 

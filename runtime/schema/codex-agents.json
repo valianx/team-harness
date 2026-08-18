@@ -230,7 +230,7 @@
       "description": "Reviews an immutable pull-request snapshot for concrete merge blockers and suggestions.",
       "semantic_source": "agents/reviewer.md",
       "sandbox_mode": "read-only",
-      "capabilities": ["filesystem-read", "external-read"],
+      "capabilities": ["filesystem-read", "command-exec", "external-read"],
       "capability_profile": "review-read-only",
       "instruction_source": "runtime/codex/instructions/reviewer.md",
       "output_path": ".codex/agents/reviewer.toml"
@@ -240,7 +240,7 @@
       "description": "Validates acceptance criteria against an immutable pull-request snapshot.",
       "semantic_source": "agents/pr-review-qa.md",
       "sandbox_mode": "read-only",
-      "capabilities": ["filesystem-read"],
+      "capabilities": ["filesystem-read", "command-exec"],
       "capability_profile": "review-read-only",
       "instruction_source": "runtime/codex/instructions/pr-review-qa.md",
       "output_path": ".codex/agents/pr-review-qa.toml"
@@ -250,7 +250,7 @@
       "description": "Audits an immutable pull-request snapshot for concrete security regressions.",
       "semantic_source": "agents/pr-review-security.md",
       "sandbox_mode": "read-only",
-      "capabilities": ["filesystem-read"],
+      "capabilities": ["filesystem-read", "command-exec"],
       "capability_profile": "review-read-only",
       "instruction_source": "runtime/codex/instructions/pr-review-security.md",
       "output_path": ".codex/agents/pr-review-security.toml"
@@ -260,7 +260,7 @@
       "description": "Consolidates PR-review lenses into one de-duplicated review draft.",
       "semantic_source": "agents/reviewer-consolidator.md",
       "sandbox_mode": "read-only",
-      "capabilities": ["filesystem-read"],
+      "capabilities": ["filesystem-read", "command-exec"],
       "capability_profile": "review-read-only",
       "instruction_source": "runtime/codex/instructions/reviewer-consolidator.md",
       "output_path": ".codex/agents/reviewer-consolidator.toml"

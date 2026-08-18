@@ -23,25 +23,24 @@ Once activated, you run one named state machine — `design → waiting_gate1 �
 
 No visible output during boot. The first thing the operator sees is the answer to their request.
 
-1. **Config** — read `~/.claude/.team-harness.json`. `logs-mode` `obsidian` → `base_path = {logs-path}/{logs-subfolder}/{repo_name}`, `events_file = 00-execution-events.md`; missing, `local`, or empty `logs-path` → `base_path = workspaces`, `events_file = 00-execution-events.jsonl`. No posture/profile selector is read from config.
+1. **Config** — read `~/.claude/.team-harness.json`. `base_path = workspaces` and `events_file = 00-execution-events.jsonl` always: the canonical workspace is repository-local regardless of `logs-mode`. `logs-mode: obsidian` only arms the one-way vault export — validate `{logs-path}/{logs-subfolder}/{repo_name}` (absolute, accessible, non-root, not the user home; subfolder normalized-relative without `.`/`..`/glob/empty segments; combined target strictly below the base after symlink resolution), record it as `obsidian_export_target` with `obsidian_sync: armed`, and on validation failure disarm with a one-line report — never block. No posture/profile selector is read from config.
    **Initiative in play** — a supported, current mode: path composition, `overview.md` placement and per-project `docs_root` all differ. Read `agents/ref-dispatch-machinery.md`. Off the hot path because it is infrequent, not because it is deprecated — never resolve it from memory.
 2. **Session override** — The load-bearing order is exact: parse override intent from the operator's message BEFORE resolving paths, read persistent config from `~/.claude/.team-harness.json`, apply precedence `override > persistent > default` evaluated against the whitelist in `CLAUDE.md §5`, then resolve — compute `base_path`/`logs_mode`/`events_file`/`docs_root` from the merged result. Never write the config file from this flow. A non-whitelisted key is ignored with a one-line WARN naming the key, never the value. No-override case: when the operator's message carries no override, this step falls through to the persistent config and stays silent — no extra output, indistinguishable from a boot with no override logic at all.
 3. **Language** — precedence: session override → `language` in config → detection from the operator's text → `en`. A persistence marker (`por defecto`, `siempre`, `default`, `permanente`, `de aquí en adelante`) requires a Y/n gate plus a merge-write; without one it is session-only.
 4. **Continue the activated request.** A new activation enters Intake with the operator's preserved request. `/th:recover` resolves the persisted state and follows its recorded `next_action`.
 
-**External-workspace write preflight.** When the resolved mode is Obsidian,
-canonicalize and contain the configured repo/feature target first, then run the
-shared `skills/pipeline/scripts/workspace-preflight.mjs` once against the
-canonical external repo root and proposed feature workspace before creating a
-feature directory, state, or artifact. Only its successful ephemeral
-create/write/remove probe proves the current runtime session can write there;
-path mode bits and persistent config do not. A non-ready result never triggers
-escalation or a retry loop. If the writable-root grant was installed after the
-current runtime session started, emit one restart or new tab instruction and stop.
-Otherwise offer `use local workspace` as a live choice and select local only
-after that current operator reply. Before the choice, write to neither root.
-After selection, the canonical workspace is immutable for the run; never split
-or migrate artifacts between Obsidian and local roots.
+**Direct-vault opt-in (`obsidian-direct`).** Only an explicit live operator
+request in the current turn may make the vault the canonical workspace;
+`logs-mode: obsidian`, prior chat, or persisted markers never do. Activation
+requires the validated export target plus one run of the shared
+`skills/pipeline/scripts/workspace-preflight.mjs` against the canonical
+external root and proposed feature workspace before creating anything. Only
+its successful ephemeral create/write/remove probe proves the current runtime
+session can write there; path mode bits and persistent config do not. On any
+non-ready result, fall back to the repository workspace, record the probe
+reason, and continue — never an escalation or retry loop, never a blocked
+pipeline. After the first state write the canonical workspace is immutable for
+the run; never split or migrate artifacts between vault and local roots.
 
 `{YYYY-MM-DD}_{feature-name}` guarantees a unique directory per run. On `/th:recover`, re-read the resolved config from `00-state.md § Current State` (schema: `agents/_shared/orchestrator-state.md`) — do not re-parse the chat.
 
@@ -584,7 +583,7 @@ You create the folder and own its structure and every coordination file in it. E
 
 `reviews/` and `sketches/` are created implicitly on first write — no `mkdir` step.
 
-**Frontmatter injection, obsidian mode only.** After a specialist returns, read the file it wrote; if it does not start with `---`, prepend the standard block (`repo`, `repo_path`, `feature`, `pipeline_type`, `date`, `agent`, `tags`), deriving `file_role` from the basename. **Excluded:** the events file, `*.excalidraw`, `*.html`, and `session.json`.
+**Frontmatter injection, only when the vault export is armed or the run is `obsidian-direct`.** After a specialist returns, read the file it wrote; if it does not start with `---`, prepend the standard block (`repo`, `repo_path`, `feature`, `pipeline_type`, `date`, `agent`, `tags`), deriving `file_role` from the basename. **Excluded:** the events file, `*.excalidraw`, `*.html`, and `session.json`.
 
 **No specialist you dispatch writes outside `{docs_root}`** except the code and tests the implementer and tester produce in the work tree.
 

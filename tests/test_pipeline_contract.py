@@ -2555,34 +2555,35 @@ def check_obsidian_workspace_preflight_contract() -> None:
             "workspace-preflight.mjs",
             "before creating",
             "persistent config",
-            "restart",
-            "new tab",
-            "use local workspace",
-            "current operator reply",
+            "obsidian-direct",
+            "explicit live operator request",
+            "fall back",
             "never split",
         ):
-            require(marker in text, f"{label}: Obsidian preflight marker missing {marker!r}")
+            require(marker in text, f"{label}: workspace-model marker missing {marker!r}")
 
     for marker in (
         "exactly once without sandbox escalation",
         "only `status: ready` proves",
         "never creates the feature workspace or state",
         "do not create state, request escalation, retry the probe",
+        "shadowed, not stale",
+        "regenerate the project config",
+        "never advise a restart for this case",
         "session born before the sandbox change",
         "restart codex or open a new tab",
-        "stop after that instruction",
-        "`usar workspace local`",
-        "only that current operator reply authorizes",
-        "before authority, create nothing in either root",
-        "record `logs_mode: local`",
+        "stop after the diagnosis",
+        "record the probe reason",
+        "never blocks the pipeline",
     ):
         require(marker in activation, f"activation: Obsidian fallback/session marker missing {marker!r}")
 
     for marker in (
-        "immutable recovery identity",
+        "never an input to recovery decisions",
         "never select a local same-name candidate",
         "single non-escalated probe",
         "never triggers an escalation loop or local fallback",
+        "project-config shadowing",
         "restart/new-tab instruction",
         "explicitly abort and start a separate local pipeline",
         "never divides one run between roots",
@@ -2593,8 +2594,25 @@ def check_obsidian_workspace_preflight_contract() -> None:
         "immutable identity at the first state write",
         "one canonical root",
         "never migrates or splits an existing pipeline",
+        "arms the one-way vault export",
+        "obsidian_sync",
     ):
         require(marker in state, f"state: canonical workspace marker missing {marker!r}")
+
+    delivery = re.sub(
+        r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/delivery.md").lower()
+    )
+    mechanics = re.sub(r"\s+", " ", read("agents/_shared/delivery-mechanics.md").lower())
+    for label, text in (("codex delivery", delivery), ("delivery mechanics", mechanics)):
+        for marker in (
+            "obsidian_sync: armed",
+            "after draft-pr creation",
+            "non-authoritative view",
+            "never synced back",
+            "obsidian_sync: pending",
+            "never blocks",
+        ):
+            require(marker in text, f"{label}: one-way export marker missing {marker!r}")
 
     setup_commands = []
     in_command_fence = False
@@ -2619,6 +2637,7 @@ def check_obsidian_workspace_preflight_contract() -> None:
         "does not update a running session's sandbox",
         "codex restart or new tab",
         "non-escalated live write probe",
+        "projectconfigshadowing",
     ):
         require(marker in setup, f"setup: installed Obsidian config marker missing {marker!r}")
 

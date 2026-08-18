@@ -41,12 +41,12 @@
 
 ## 6. Codex Parity and Workspace Model
 
-- [ ] 6.1 Extend Codex preflight to diagnose project-config shadowing distinctly from stale-session, with the concrete fix message.
-- [ ] 6.2 Teach Codex `setup`/`update` to detect shadowing drift and offer the gated operator-level `writable_roots` repair.
-- [ ] 6.3 Reconcile the capability contract: registry `command-exec` for review roles, enforced-or-unclaimed allowlists, real-transport fixture-read integration test.
-- [ ] 6.4 Move frozen review worktrees under `workspaces/` and prune at flow close.
-- [ ] 6.5 Reduce Codex PreToolUse wiring to the deny floor; `gate-guard` unwired or opt-in with only the `auto-ship` literal update.
-- [ ] 6.6 Implement the repository-local canonical workspace with one-way Obsidian export (`obsidian_sync` states, recovery reads repo only, `obsidian-direct` opt-in behind the probe).
+- [x] 6.1 Extend Codex preflight to diagnose project-config shadowing distinctly from stale-session, with the concrete fix message.
+- [x] 6.2 Teach Codex `setup`/`update` to detect shadowing drift and offer the gated operator-level `writable_roots` repair.
+- [x] 6.3 Reconcile the capability contract: registry `command-exec` for review roles, enforced-or-unclaimed allowlists, real-transport fixture-read integration test.
+- [x] 6.4 Move frozen review worktrees under `workspaces/` and prune at flow close.
+- [x] 6.5 Reduce Codex PreToolUse wiring to the deny floor; `gate-guard` unwired or opt-in with only the `auto-ship` literal update.
+- [x] 6.6 Implement the repository-local canonical workspace with one-way Obsidian export (`obsidian_sync` states, recovery reads repo only, `obsidian-direct` opt-in behind the probe).
 
 ## 7. Agent Authoring Standard
 

@@ -137,28 +137,36 @@ agents.
 Resolve the repository root first. Derive a short kebab-case feature slug that
 does not collide with an unrelated active workspace.
 
-Use `{repo-root}/workspaces/{feature}/` by default. This local path requires no
-setup and is the beta's portable first-use mode.
+The canonical workspace is `{repo-root}/workspaces/{feature}/` on every run,
+regardless of runtime and of the configured `logs-mode`. All coordination
+state — `00-state.md`, events, plan artifacts, evidence, the delivery
+preview — lives under that root; artifacts are never split across roots, and
+recovery reads only this repository workspace.
 
 Read only `${CODEX_HOME:-$HOME/.codex}/.team-harness.json`. If it is absent,
 use local safe defaults and recommend `$team-harness:setup`; never inspect
 Claude Code or opencode configuration as a runtime fallback. When the native
-document parses as a JSON object and declares `"logs-mode":
-"obsidian"`, the operator may reuse
-`{logs-path}/{logs-subfolder}/{repo-name}/{feature}/` only after all of these
-checks pass: canonicalize the base; require it to be absolute, accessible,
-non-root, and different from the user home; require the subfolder to be
-normalized and relative without `.`, `..`, glob, or empty segments;
-canonicalize the combined target; and require that target to remain strictly
-contained below the validated base. Reject symlink escapes. Never require
-Obsidian, invent an external path, or modify another runtime's settings.
+document parses as a JSON object and declares `"logs-mode": "obsidian"`, that
+setting arms the one-way vault export (`state-and-gates.md` `obsidian_sync`),
+not a different live workspace. Validate the export target
+`{logs-path}/{logs-subfolder}/{repo-name}/{feature}/` before recording it:
+canonicalize the base; require it to be absolute, accessible, non-root, and
+different from the user home; require the subfolder to be normalized and
+relative without `.`, `..`, glob, or empty segments; canonicalize the combined
+target; and require that target to remain strictly contained below the
+validated base. Reject symlink escapes. A target that fails validation
+disarms the export with a one-line report; it never blocks the pipeline.
+Never require Obsidian, invent an external path, or modify another runtime's
+settings. Resolve `operator_language` from the native document's `language`
+key before conversational detection; `english_learning` remains an
+independent boolean. `$team-harness:setup` owns persistent changes.
 
 Before creating the feature directory, `00-state.md`, or any other artifact,
 resolve `../scripts/workspace-preflight.mjs` relative to this reference and run
 it exactly once without sandbox escalation:
 
 ```text
-node <workspace-preflight> --root <canonical external repo root> --workspace <canonical feature workspace>
+node <workspace-preflight> --root <canonical repo root> --workspace <canonical feature workspace>
 ```
 
 Only `status: ready` proves that the current Codex session can create and remove
@@ -169,27 +177,34 @@ only its private random probe below the repo root and never creates the feature
 workspace or state.
 
 On `status: not-writable|invalid`, do not create state, request escalation,
-retry the probe, or start a permission loop. If the candidate root is already
-declared in the personal Codex writable roots or live `--add-dir` launch
-configuration, treat the mismatch as a session born before the sandbox change
-and emit exactly one localized instruction equivalent to:
+retry the probe, or start a permission loop. Diagnose the real cause before
+advising anything. When the failed root is already declared in the personal
+Codex writable roots or live `--add-dir` launch configuration, first check
+whether the checked-out tree's project `.codex/config.toml` declares its own
+`writable_roots`: a project-level declaration replaces the operator-level list
+for sessions started in that tree, so the session is shadowed, not stale.
+Report the shadowing with its concrete fix — update the checkout or regenerate
+the project config via `$team-harness:update` so it stops declaring
+`writable_roots` — and never advise a restart for this case; restarting
+reproduces the same sandbox and loops forever. Only when the project config
+declares no `writable_roots` is the mismatch a session born before the sandbox
+change; then emit exactly one localized instruction equivalent to:
 
 ```text
-Obsidian is configured, but this Codex session does not have that writable root. Restart Codex or open a new tab, then start the pipeline again.
+This Codex session does not have that writable root. Restart Codex or open a new tab, then start the pipeline again.
 ```
 
-Stop after that instruction. Otherwise report the unavailable external root
-once and offer the single live fallback phrase `use local workspace` (`usar
-workspace local`). Only that current operator reply authorizes selection of
-`{repo-root}/workspaces/{feature}/`; persistent `logs-mode: obsidian`, prior
-chat, a timeout, or failed escalation never does. After fallback authority,
-create every artifact only under the local root and record `logs_mode: local`.
-Before authority, create nothing in either root. Never split one pipeline's
-artifacts across local and Obsidian paths or silently change the canonical
-workspace after state exists. Resolve `operator_language` from the
-native document's `language` key before conversational detection;
-`english_learning` remains an independent boolean. `$team-harness:setup` owns
-persistent changes.
+Stop after the diagnosis in either case.
+
+**Direct-vault mode (`obsidian-direct`) is an advanced opt-in.** Only an
+explicit live operator request in the current turn may select a live-in-vault
+workspace; `logs-mode: obsidian`, prior chat, or persisted markers never do.
+Activation requires the validated export target above plus one
+workspace-preflight run against the vault root. On `status: ready`, that
+target becomes the canonical workspace for the run. On any other status, fall
+back to `{repo-root}/workspaces/{feature}/`, record the probe reason, and
+continue — the failed opt-in never blocks the pipeline. Never silently change
+the canonical workspace after state exists.
 
 ## Initial artifacts
 
@@ -202,12 +217,13 @@ Create:
   `pipeline_version: 3`, `activation: explicit`,
   `phase: design`, `status: in_progress`, and
   `next_action: delegate architect`.
-- `00-execution-events.jsonl`: append-only trace in local mode. For a new
-  Obsidian workspace use `00-execution-events.md`; preserve an established
-  workspace's existing format. Both formats append one minified JSON object per
-  durability-bearing event and are never rewritten. The Markdown variant adds
-  its wrapper once; it does not justify narrative events. Do not emit routine
-  tool-call start/success pairs or content already recoverable from state.
+- `00-execution-events.jsonl`: append-only trace; every new workspace uses this
+  format. An established workspace that already uses the legacy
+  `00-execution-events.md` variant keeps its existing format. Both append one
+  minified JSON object per durability-bearing event and are never rewritten.
+  The Markdown variant adds its wrapper once; it does not justify narrative
+  events. Do not emit routine tool-call start/success pairs or content already
+  recoverable from state.
 
 Initialize state before dispatch so an interrupted design is recoverable.
 The primary thread remains the only writer of this state and of gate releases;

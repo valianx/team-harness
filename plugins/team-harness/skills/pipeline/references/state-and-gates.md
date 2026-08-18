@@ -45,11 +45,14 @@ report artifacts; they never write state, releases, nonces, or gate events and
 never speak for the operator. Write `next_action` before every dispatch and
 record its result before advancing. Preserve unrelated changes.
 
-The absolute `workspace` and effective `logs_mode` become immutable identity at
-the first state write. Every artifact and event for that run stays below that
-one canonical root. A permission failure, restart, recovery, or configured-root
-change never migrates or splits an existing pipeline; only an explicit abort
-followed by a separate activation may choose another root.
+The absolute `workspace` — repository-local by default, a vault root only
+under an explicit live `obsidian-direct` opt-in — and the effective
+`logs_mode` become immutable identity at the first state write. Every
+artifact and event for that run stays below that one canonical root. A
+permission failure, restart, recovery, or configured-root change never
+migrates or splits an existing pipeline; only an explicit abort followed by a
+separate activation may choose another root. `logs_mode: obsidian` arms the
+one-way vault export (`obsidian_sync`); it never selects the live workspace.
 
 Keep a replaceable snapshot with these stable fields (narrative belongs in the
 events file):
@@ -71,6 +74,8 @@ feature: {kebab-case slug}
 repo_root: {absolute path}
 workspace: {absolute path}
 logs_mode: local|obsidian
+obsidian_sync: armed|exported|pending|null
+obsidian_export_target: {validated absolute vault path or null}
 events_file: 00-execution-events.jsonl|00-execution-events.md
 operator_language: {resolved language code}
 phase: design|waiting_gate1|implementation|validation|waiting_gate3|delivery|complete|blocked|aborted

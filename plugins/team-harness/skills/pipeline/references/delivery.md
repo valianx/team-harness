@@ -90,3 +90,12 @@ that terminal state transition, close delivery with the measured or unavailable
 usage/cost aggregate as every other phase, and rewrite the summary from the
 trace. A missing native root identifier yields an unavailable result; it never
 authorizes an estimate, a reused subtotal, or a price inference.
+
+When `obsidian_sync: armed`, export the workspace after draft-PR creation and
+again at terminal close or pause: copy the complete workspace atomically into
+a fresh directory under the recorded `obsidian_export_target` and set
+`obsidian_sync: exported`. The vault copy is a non-authoritative view — never
+read for recovery, never synced back. An export failure (sandbox denial,
+unmounted path, latency timeout) records `obsidian_sync: pending` with one
+sanitized reason line and never blocks, delays, or reopens delivery; a later
+explicit operator request may retry the export.
