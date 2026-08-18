@@ -668,7 +668,11 @@ async function loadRedEvidence(options) {
 }
 
 async function assertCompatibleGreen(options, state, contract, red, manifest) {
-  if (contract.sha256 !== options.contractSha256 || contract.canonical_sha256 !== red.result.contract.canonical_sha256) {
+  if (
+    contract.sha256 !== options.contractSha256 ||
+    contract.sha256 !== red.result.contract.sha256 ||
+    contract.canonical_sha256 !== red.result.contract.canonical_sha256
+  ) {
     throw new TransitionError("TEST_INPUT_CHANGED", "the test contract differs from the red-checkpoint contract");
   }
   const priorQuality = red.result.quality;
@@ -684,16 +688,13 @@ async function assertCompatibleGreen(options, state, contract, red, manifest) {
   ) {
     throw new TransitionError("TEST_INPUT_CHANGED", "the test binding, base, or effective test runtime changed after red");
   }
-  if (priorQuality.repository.candidate_tree !== currentQuality.repository.candidate_tree) {
-    const mergeBase = await gitText(
-      options.repo,
-      ["merge-base", priorQuality.repository.candidate_commit, currentQuality.repository.candidate_commit],
-      "REPOSITORY_INVALID",
-    );
-    if (mergeBase !== priorQuality.repository.candidate_commit) {
-      throw new TransitionError("RED_EVIDENCE_INVALID",
-        "the red candidate is neither tree-identical to nor an ancestor of the green candidate");
-    }
+  const mergeBase = await gitText(
+    options.repo,
+    ["merge-base", priorQuality.repository.candidate_commit, currentQuality.repository.candidate_commit],
+    "REPOSITORY_INVALID",
+  );
+  if (mergeBase !== priorQuality.repository.candidate_commit) {
+    throw new TransitionError("RED_EVIDENCE_INVALID", "the red candidate is not an ancestor of the green candidate");
   }
   const inputs = await resolveTestInputs(
     options.repo,

@@ -462,6 +462,48 @@ await check("green fails closed when test content changes after red", async () =
   });
 });
 
+await check("green fails closed when only the contract JSON formatting changes after red", async () => {
+  await repository(async (context) => {
+    const red = await runTestTransition(redOptions(context.repo, context.base, context.contractPath));
+    assert.equal(red.verdict, "pass");
+    const evidence = await persistRed(context.repo, red);
+    await writeFile(context.contractPath, JSON.stringify(contract()), "utf8");
+    const reformattedContractSha256 = await fileSha256(context.contractPath);
+    await commitFiles(context.repo, "implement feature", { "feature.txt": "implemented\n" });
+    const green = await runTestTransition(greenOptions(context, evidence, reformattedContractSha256));
+    assertClosedResult(green);
+    assert.equal(green.verdict, "fail");
+    assert.equal(green.error_code, "TEST_INPUT_CHANGED");
+  });
+});
+
+await check("green rejects same-tree evidence from a non-ancestor red candidate", async () => {
+  const manifest = qualityManifest(
+    "process.exit(require('node:fs').existsSync('.git/implemented.flag') ? 0 : 1);",
+  );
+  await repository(async (context) => {
+    const red = await runTestTransition(redOptions(context.repo, context.base, context.contractPath));
+    assert.equal(red.verdict, "pass");
+    const redCandidate = git(context.repo, "rev-parse", "HEAD");
+    const redTree = git(context.repo, "rev-parse", "HEAD^{tree}");
+    const evidence = await persistRed(context.repo, red);
+    const contractSha256 = await fileSha256(context.contractPath);
+
+    git(context.repo, "checkout", "-q", "--detach", context.base);
+    const siblingCandidate = await commitFiles(context.repo, "independent tests first", {
+      "tests/feature.test.js": "feature contract\n",
+    });
+    assert.notEqual(siblingCandidate, redCandidate);
+    assert.equal(git(context.repo, "rev-parse", "HEAD^{tree}"), redTree);
+    await writeFile(path.join(context.repo, ".git", "implemented.flag"), "ready\n", "utf8");
+
+    const green = await runTestTransition(greenOptions(context, evidence, contractSha256));
+    assertClosedResult(green);
+    assert.equal(green.verdict, "fail");
+    assert.equal(green.error_code, "RED_EVIDENCE_INVALID");
+  }, { manifest });
+});
+
 await check("green preserves red evidence when only non-test manifest controls change", async () => {
   await repository(async (context) => {
     const red = await runTestTransition(redOptions(context.repo, context.base, context.contractPath));
