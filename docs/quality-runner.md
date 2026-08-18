@@ -9,6 +9,17 @@ approved behavior.
 The base runner is used by the pre-implementation test-transition checkpoints
 and by the single Freeze quality run (`post_implementation`).
 
+Before the first implementation dispatch, the pipeline runs a fan-complete
+readiness pass: each required non-test control is invoked separately so a
+failure cannot suppress the remaining diagnostics, and the required RED
+transitions also complete. These runs are diagnostic rather than Freeze
+acceptance evidence. The coordinator persists every terminal result, groups
+the complete finding set by root cause, and supplies one comprehensive initial
+implementation package. The same rule applies before a later correction:
+never dispatch from the first visible failure while another selected check is
+pending. Cleaner runs only after that consolidated set is closed, followed by
+one authoritative full-manifest quality run at Freeze.
+
 ## Functional contract
 
 Given a versioned repository manifest, an immutable base commit, the checked-out
@@ -32,7 +43,15 @@ change a failing machine verdict into a pass.
 
 The proposed conventional location is `.team-harness/quality.json`. The file is
 committed with the repository so command and policy changes alter its SHA-256
-identity and invalidate older evidence.
+identity and invalidate older full-manifest readiness and Freeze evidence.
+Test-transition schema v3 additionally records a narrower
+`test_binding_sha256`, calculated from the normalized manifest schema version,
+`commands.test`, and `test_contract`. RED/GREEN compatibility uses that binding
+plus the exact contract, test blobs, base, effective argv/resolution, and runtime
+version fingerprint. A coverage, lint, format, build, or database-only manifest
+change therefore reruns the affected diagnostics and final quality without
+discarding otherwise identical RED/GREEN evidence. Any change to the test
+binding or its other frozen inputs still fails closed and requires a new RED.
 
 ```json
 {
@@ -142,11 +161,14 @@ count. Coordinators verify that receipt against the file. They do not generate
 temporary JavaScript wrappers, interpolate allowlists into source, or depend on
 a truncated stdout tail.
 
-Quality-result schema v2 adds execution identity fields. Persisted schema-v1
+Quality-result schema v2 adds execution identity fields. Test-transition result
+and receipt schema v3 add the independent canonical test binding described
+above. Persisted schema-v1
 quality baselines are intentionally rejected as `BASELINE_INVALID`; regenerate
 them by rerunning the repository's documented quality-runner baseline command
-on the current clean base. Schema-v1 red-transition artifacts are intentionally
-rejected as `RED_EVIDENCE_INVALID`; regenerate them with the documented
+on the current clean base. Pre-v3 red-transition artifacts are intentionally
+rejected as `RED_EVIDENCE_INVALID` because they lack the independent test
+binding; regenerate them with the documented
 `test-transition.mjs red` command before attempting green. Never edit or
 relabel old evidence in place.
 

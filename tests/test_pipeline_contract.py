@@ -752,6 +752,16 @@ def check_preimplementation_test_contract() -> None:
         ):
             require(marker in text, f"{label}: deterministic transition marker missing: {marker}")
         for marker in (
+            "non-authoritative readiness diagnostic",
+            "terminal result",
+            "root cause",
+            "pending",
+            "test binding",
+            "version fingerprint",
+            "non-test",
+        ):
+            require(marker in text, f"{label}: consolidated readiness marker missing: {marker}")
+        for marker in (
             "immutable only",
             "active red-to-green transition",
             "fresh tester",
@@ -790,6 +800,16 @@ def check_preimplementation_test_contract() -> None:
         (ROOT / "docs/test-contract-runner.md").is_file(),
         "test transition operator documentation is missing",
     )
+    transition_docs = read("docs/test-contract-runner.md").lower()
+    for marker in (
+        "test_binding_sha256",
+        "commands.test",
+        "test_contract",
+        "runtime version fingerprint",
+        "non-test manifest commands are",
+        "final full-manifest freeze quality evidence",
+    ):
+        require(marker in transition_docs, f"test transition docs miss independent binding marker {marker!r}")
 
     dispatch = read("agents/_shared/dispatch-contract.md").lower()
     require("security assessment anchors" in dispatch, "adversary dispatch lost security anchors")

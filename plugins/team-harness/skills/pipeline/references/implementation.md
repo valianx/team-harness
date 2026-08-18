@@ -296,6 +296,23 @@ running tests; unchanged preservation tests and non-test fixtures are invalid
 the test-only diff directly and require that no production path changed; no
 intermediate commit-integrity gate is created.
 
+Before creating RED or dispatching an implementer, Main completes one
+fan-complete readiness pass over the frozen task scope and quality manifest.
+It invokes every declared non-test check required by the task set as a separate
+non-authoritative readiness diagnostic through the quality runner so one failure cannot hide later
+failures, and it also completes the RED command. Every invocation uses an
+atomic output path and reaches a terminal result; stopping after the first
+coverage, lint, format, build, environment, or dependency error is prohibited.
+Main deduplicates the complete result set by root cause and prepares one
+implementation package containing all observable failures, implicated
+requirements and files, and deterministic closure checks. Missing dependencies,
+non-hermetic commands, unavailable required environment, or invalid manifest
+coordinates block before implementation. Expected not-yet-implemented behavior
+failures remain in the same package. Main may repair the manifest from this
+complete diagnostic set, reruns only diagnostics made stale by that repair, and
+does not dispatch while any declared readiness diagnostic is absent or partial.
+This readiness evidence is diagnostic, not the final Freeze quality verdict.
+
 Main then invokes `node <test-transition-path> --transition red` against that
 task baseline and current `HEAD` with `--output <coordinator evidence path>`.
 The helper atomically persists the complete JSON result and prints only the
@@ -322,13 +339,26 @@ fresh implementer receive its assigned shards plus the corresponding contract
 and red-evidence pointers/hashes. Contract test paths are frozen inputs: the
 implementer never edits or deletes them. After its implementation commit, Main
 runs `--transition green` once per required task with the same contract hash and
-hashed red-evidence file. Green requires the same manifest, exact test command,
-task baseline, and test blobs, with the red candidate ancestral to current
+hashed red-evidence file. Transition schema v3 binds RED/GREEN to the canonical
+test fragment—manifest schema version, `commands.test`, and `test_contract`—not
+to unrelated coverage, lint, format, build, or database commands. Green requires
+that same test binding, contract bytes, effective test command/runtime and
+version fingerprint, task baseline, and test blobs, with the red candidate ancestral to current
 `HEAD`; the green call uses its own `--output` path, and any mismatch or nonzero result returns to bounded implementation
 correction. Eligible `gate1-autonomous` authority consumes the max-3 autonomous
 budget; a fresh operator-live authorization remains available without a maximum. A task explicitly marked
 `not-applicable` records that state and its plan-time reason without running the
 checkpoint.
+
+A change limited to non-test manifest controls preserves valid RED/GREEN when
+the computed test binding is identical, but invalidates the affected readiness
+diagnostics and the final full-manifest quality evidence. A change to
+`commands.test`, `test_contract`, contract bytes, test blobs, baseline, effective
+test resolution, or version fingerprint starts a new RED/GREEN transition.
+Before any later correction dispatch, Main likewise completes every selected
+closure/readiness diagnostic, groups all terminal findings by root cause, and
+creates one comprehensive correction package. A single surfaced symptom never
+authorizes an immediate dispatch while another selected diagnostic is pending.
 
 Test blobs are immutable only during their own active red-to-green transition.
 After that task closes and before final Freeze, a fresh tester may make

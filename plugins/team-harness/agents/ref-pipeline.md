@@ -385,12 +385,14 @@ increment `iteration`; historical `cause: operator` remains readable but is not 
 
 ### Pre-decision consolidation over a failed validation fan
 
-**Run this after every required lens terminates and before presenting any correction
-decision.** Deduplicate all findings by stable ID and compute one package containing the
+**Run this after every required lens and selected closure/readiness diagnostic
+terminates and before presenting any correction decision.** Deduplicate all
+symptoms by stable ID and root cause, then compute one package containing the
 failed Freeze anchor, exact IDs, implicated `AC-N|TC-N` requirements, union of evidenced
 paths, and one deterministic closure check plus expected result for every finding. The reviewing lenses'
 `Suggested correction` fields are advisory data, never routes. Reading `verdict: fail`
-and dispatching anything is forbidden.
+and dispatching anything is forbidden. A later round addresses genuinely new
+evidence; it must not reveal a declared diagnostic that the prior fan skipped.
 
 Main then performs one bounded evidence triage without dispatching another reviewer. For
 each finding, compare only its evidence against approved intent, scope, ACs/TCs, and the
@@ -1074,16 +1076,32 @@ machine `verdict: pass` plus semantic `failure_matches_contract: true`. A syntax
 fixture, dependency, infrastructure, unrelated-suite, or already-green failure
 blocks; agent prose cannot override the machine result.
 
+Before RED and the first implementer dispatch, Main runs every task-required
+non-test quality control separately as a non-authoritative readiness diagnostic
+and lets every selected invocation reach a terminal result after failures. It
+persists all results, clusters duplicate symptoms by root cause, and creates one
+complete initial package with closure checks. Missing infrastructure blocks;
+expected not-yet-implemented behavior stays in that package. No dispatch is
+legal from the first visible failure or while a declared diagnostic is pending.
+
 The implementer receives the contract/red evidence pointers and hashes and may
 not edit or delete their test paths. After implementation, Main runs the same
-helper with `--transition green`. It requires the identical contract, manifest,
-test command, task baseline, and test blob identities, plus red-candidate
+helper with `--transition green`. Transition schema v3 binds compatibility to
+the normalized manifest schema version, `commands.test`, and `test_contract`,
+plus the identical contract, effective test command/runtime and version
+fingerprint, task baseline, and test blob identities, plus red-candidate
 ancestry and an exit-zero test result. A mismatch or remaining red result is an
 implementation bounce under max-3. Record one entry per task in the bounded,
 hashed `evidence/test-contracts.json` index and keep only its digest, counts,
 and aggregate status in `test_contract_evidence` state. `not-applicable` is
 valid only when the task shard already carries its plan-time reason;
 implementation never infers or rewrites that decision.
+
+A manifest change limited to non-test controls preserves an identical RED/GREEN
+test binding but invalidates the affected readiness and final full-manifest
+quality evidence. A test-binding or other frozen-input change requires a new
+RED. Before any later correction, complete every selected closure/readiness
+diagnostic and consolidate all newly observed findings into one package.
 
 **OpenSpec-bound dispatch.** Before every implementer or tester dispatch, verify the immutable
 Gate-1 `inputs/openspec-snapshot.json`, `plan/openspec-traceability.json`, and separate

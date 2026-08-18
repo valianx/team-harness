@@ -33,9 +33,9 @@ import {
 } from "./quality-lib.mjs";
 
 export const TEST_CONTRACT_SCHEMA_VERSION = 1;
-export const TEST_TRANSITION_SCHEMA_VERSION = 2;
+export const TEST_TRANSITION_SCHEMA_VERSION = 3;
 export const TEST_CONTRACT_VALIDATION_SCHEMA_VERSION = 1;
-export const TEST_TRANSITION_RECEIPT_SCHEMA_VERSION = 2;
+export const TEST_TRANSITION_RECEIPT_SCHEMA_VERSION = 3;
 
 const MAX_ITEMS = 256;
 const SAFE_COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
@@ -376,10 +376,19 @@ async function resolveTestInputs(repo, candidateCommit, testPaths) {
   return testPaths.map((testPath) => ({ path: testPath, blob_sha: blobs.get(testPath) }));
 }
 
-function contractEvidence(contract, testInputs) {
+function manifestTestBinding(manifest) {
+  return canonicalHash({
+    schema_version: manifest.schema_version,
+    test_command: manifest.commands.test,
+    test_contract: manifest.test_contract,
+  });
+}
+
+function contractEvidence(contract, testInputs, testBindingSha256) {
   return {
     sha256: contract.sha256,
     canonical_sha256: contract.canonical_sha256,
+    test_binding_sha256: testBindingSha256,
     requirements: contract.value.requirements,
     test_identifiers: contract.value.test_identifiers,
     test_inputs: testInputs,
@@ -392,9 +401,10 @@ function isTestInput(value) {
 
 function isContractEvidence(value) {
   return (
-    hasExactlyKeys(value, ["sha256", "canonical_sha256", "requirements", "test_identifiers", "test_inputs"]) &&
+    hasExactlyKeys(value, ["sha256", "canonical_sha256", "test_binding_sha256", "requirements", "test_identifiers", "test_inputs"]) &&
     SAFE_SHA256.test(value.sha256) &&
     SAFE_SHA256.test(value.canonical_sha256) &&
+    SAFE_SHA256.test(value.test_binding_sha256) &&
     uniqueStrings(value.requirements, (entry) => typeof entry === "string" && SAFE_REQUIREMENT.test(entry)) &&
     uniqueStrings(
       value.test_identifiers,
@@ -642,7 +652,7 @@ async function executeRed(options, state, contract) {
     state.quality.repository.candidate_commit,
     contract.value.test_paths,
   );
-  state.contract = contractEvidence(contract, inputs);
+  state.contract = contractEvidence(contract, inputs, manifestTestBinding(manifest.value));
 }
 
 async function loadRedEvidence(options) {
@@ -657,21 +667,22 @@ async function loadRedEvidence(options) {
   return { result, sha256: sha256(loaded.bytes) };
 }
 
-async function assertCompatibleGreen(options, state, contract, red) {
+async function assertCompatibleGreen(options, state, contract, red, manifest) {
   if (contract.sha256 !== options.contractSha256 || contract.canonical_sha256 !== red.result.contract.canonical_sha256) {
     throw new TransitionError("TEST_INPUT_CHANGED", "the test contract differs from the red-checkpoint contract");
   }
   const priorQuality = red.result.quality;
   const currentQuality = state.quality;
   if (
-    priorQuality.manifest.canonical_sha256 !== currentQuality.manifest.canonical_sha256 ||
+    red.result.contract.test_binding_sha256 !== manifestTestBinding(manifest.value) ||
     priorQuality.repository.base_commit !== currentQuality.repository.base_commit ||
     priorQuality.repository.base_tree !== currentQuality.repository.base_tree ||
     priorQuality.commands[0].command_sha256 !== currentQuality.commands[0].command_sha256 ||
     priorQuality.commands[0].execution_argv_sha256 !== currentQuality.commands[0].execution_argv_sha256 ||
-    priorQuality.commands[0].execution_resolution !== currentQuality.commands[0].execution_resolution
+    priorQuality.commands[0].execution_resolution !== currentQuality.commands[0].execution_resolution ||
+    priorQuality.commands[0].version_fingerprint !== currentQuality.commands[0].version_fingerprint
   ) {
-    throw new TransitionError("TEST_INPUT_CHANGED", "the manifest, base, or exact test command changed after red");
+    throw new TransitionError("TEST_INPUT_CHANGED", "the test binding, base, or effective test runtime changed after red");
   }
   if (priorQuality.repository.candidate_tree !== currentQuality.repository.candidate_tree) {
     const mergeBase = await gitText(
@@ -692,7 +703,7 @@ async function assertCompatibleGreen(options, state, contract, red) {
   if (JSON.stringify(inputs) !== JSON.stringify(red.result.contract.test_inputs)) {
     throw new TransitionError("TEST_INPUT_CHANGED", "test file blobs changed between red and green");
   }
-  state.contract = contractEvidence(contract, inputs);
+  state.contract = contractEvidence(contract, inputs, manifestTestBinding(manifest.value));
   state.red_evidence = {
     sha256: red.sha256,
     candidate_commit: priorQuality.repository.candidate_commit,
@@ -709,7 +720,7 @@ async function executeGreen(options, state, contract) {
   }
   if (manifest.sha256 !== state.quality.manifest.sha256) throw new TransitionError("MANIFEST_INVALID");
   assertGreenQuality(state.quality);
-  await assertCompatibleGreen(options, state, contract, red);
+  await assertCompatibleGreen(options, state, contract, red, manifest);
 }
 
 /** Run one red or green transition checkpoint and return closed JSON evidence. */

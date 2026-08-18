@@ -25,6 +25,13 @@ evidenced no-op.
 
 ## Flow
 
+The coordinator must first finish every selected readiness and correction
+closure diagnostic, deduplicate the terminal findings by root cause, and close
+the resulting comprehensive package. A partial pass or a fix dispatched from
+only the first surfaced symptom is not cleaner-ready. Manifest corrections are
+complete before cleaner dispatch; changing the manifest afterward creates a
+new candidate identity and invalidates the affected readiness evidence.
+
 1. Commit the consolidated implementation candidate and require a clean tree.
 2. Persist the allowlist, its SHA-256, and the pre-cleanup candidate anchor
    (commit and tree) as the `baseline` record in `cleaner_evidence`.

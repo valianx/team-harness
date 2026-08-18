@@ -268,6 +268,8 @@ await check("a test-only failing commit becomes green with identical test blobs 
     assert.equal(green.verdict, "pass");
     assert.equal(green.transition, "green");
     assert.equal(green.quality.verdict, "pass");
+    assert.match(red.contract.test_binding_sha256, /^[0-9a-f]{64}$/);
+    assert.equal(green.contract.test_binding_sha256, red.contract.test_binding_sha256);
     assert.equal(green.contract.test_inputs[0].blob_sha, red.contract.test_inputs[0].blob_sha);
 
     const forgedRed = {
@@ -460,7 +462,34 @@ await check("green fails closed when test content changes after red", async () =
   });
 });
 
-await check("green fails closed when the manifest or exact test command changes", async () => {
+await check("green preserves red evidence when only non-test manifest controls change", async () => {
+  await repository(async (context) => {
+    const red = await runTestTransition(redOptions(context.repo, context.base, context.contractPath));
+    assert.equal(red.verdict, "pass");
+    const evidence = await persistRed(context.repo, red);
+    const contractSha256 = await fileSha256(context.contractPath);
+    const changedManifest = qualityManifest();
+    for (const id of ["coverage", "format_check", "lint", "database"]) {
+      changedManifest.commands[id] = {
+        argv: [node, "-e", "process.exit(0);"],
+        working_directory: ".",
+        timeout_ms: 10_000,
+        version_argv: [node, "--version"],
+      };
+    }
+    await writeJson(path.join(context.repo, ".team-harness", "quality.json"), changedManifest);
+    await writeFile(path.join(context.repo, "feature.txt"), "implemented\n", "utf8");
+    git(context.repo, "add", ".");
+    git(context.repo, "commit", "-q", "-m", "add non-test controls and implement");
+    const green = await runTestTransition(greenOptions(context, evidence, contractSha256));
+    assertClosedResult(green);
+    assert.equal(green.verdict, "pass");
+    assert.notEqual(green.quality.manifest.canonical_sha256, red.quality.manifest.canonical_sha256);
+    assert.equal(green.contract.test_binding_sha256, red.contract.test_binding_sha256);
+  });
+});
+
+await check("green fails closed when the test-contract manifest fragment changes", async () => {
   await repository(async (context) => {
     const red = await runTestTransition(redOptions(context.repo, context.base, context.contractPath));
     assert.equal(red.verdict, "pass");
@@ -477,6 +506,52 @@ await check("green fails closed when the manifest or exact test command changes"
     assert.equal(green.verdict, "fail");
     assert.equal(green.error_code, "TEST_INPUT_CHANGED");
   });
+});
+
+await check("green fails closed when the exact test command changes", async () => {
+  await repository(async (context) => {
+    const red = await runTestTransition(redOptions(context.repo, context.base, context.contractPath));
+    assert.equal(red.verdict, "pass");
+    const evidence = await persistRed(context.repo, red);
+    const contractSha256 = await fileSha256(context.contractPath);
+    const changedManifest = qualityManifest();
+    changedManifest.commands.test.argv = [
+      node,
+      "-e",
+      "const fs=require('node:fs');process.exit(fs.readFileSync('feature.txt','utf8').trim()==='implemented'?0:1);",
+    ];
+    await writeJson(path.join(context.repo, ".team-harness", "quality.json"), changedManifest);
+    await writeFile(path.join(context.repo, "feature.txt"), "implemented\n", "utf8");
+    git(context.repo, "add", ".");
+    git(context.repo, "commit", "-q", "-m", "change test command and implement");
+    const green = await runTestTransition(greenOptions(context, evidence, contractSha256));
+    assertClosedResult(green);
+    assert.equal(green.verdict, "fail");
+    assert.equal(green.error_code, "TEST_INPUT_CHANGED");
+  });
+});
+
+await check("green fails closed when the effective test runtime version changes", async () => {
+  const manifest = qualityManifest();
+  manifest.commands.test.version_argv = [
+    node,
+    "-e",
+    "process.stdout.write(require('node:fs').readFileSync('.git/runtime-version.txt','utf8'));",
+  ];
+  await repository(async (context) => {
+    const runtimeVersion = path.join(context.repo, ".git", "runtime-version.txt");
+    await writeFile(runtimeVersion, "runtime-v1\n", "utf8");
+    const red = await runTestTransition(redOptions(context.repo, context.base, context.contractPath));
+    assert.equal(red.verdict, "pass");
+    const evidence = await persistRed(context.repo, red);
+    const contractSha256 = await fileSha256(context.contractPath);
+    await commitFiles(context.repo, "implement feature", { "feature.txt": "implemented\n" });
+    await writeFile(runtimeVersion, "runtime-v2\n", "utf8");
+    const green = await runTestTransition(greenOptions(context, evidence, contractSha256));
+    assertClosedResult(green);
+    assert.equal(green.verdict, "fail");
+    assert.equal(green.error_code, "TEST_INPUT_CHANGED");
+  }, { manifest });
 });
 
 await check("green requires hashed red evidence and a green test result", async () => {

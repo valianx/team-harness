@@ -1,7 +1,7 @@
 {
   "name": "th",
   "displayName": "Team Harness",
-  "version": "3.15.3",
+  "version": "3.15.4",
   "description": "Orchestrated multi-agent development system for Claude Code, Codex, and opencode.",
   "author": {
     "name": "Mario Gutierrez"

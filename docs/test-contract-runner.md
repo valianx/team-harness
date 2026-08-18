@@ -77,10 +77,20 @@ node /absolute/path/to/loaded/pipeline/skill/scripts/test-transition.mjs \
   --red-evidence-sha256 fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
 ```
 
-Green requires exit zero plus the same contract bytes, manifest, exact test
-command, task baseline, and test blobs. The red candidate must be an ancestor of
-the green candidate. Changing, deleting, or weakening a frozen contract test
-fails mechanically even if the suite is green.
+Green requires exit zero plus the same contract bytes, canonical test binding,
+task baseline, and test blobs. Transition schema v3
+records `test_binding_sha256` over the normalized manifest schema version,
+`commands.test`, and `test_contract`; unrelated non-test manifest commands are
+not part of RED/GREEN identity. Green also requires the same effective argv,
+execution resolution, and runtime version fingerprint. The red candidate must
+be an ancestor of the green candidate. Changing, deleting, or weakening a
+frozen contract test fails mechanically even if the suite is green.
+
+Changing only coverage, lint, format, build, or database controls preserves an
+otherwise identical RED/GREEN transition. It still invalidates the affected
+readiness diagnostics and the final full-manifest Freeze quality evidence. A
+test-binding, contract, test-blob, base, or effective-runtime change requires a
+new RED checkpoint.
 
 The helper invokes exact argv without a shell, uses bounded output evidence,
 requires a clean checked-out candidate, and never installs tools. It is not a

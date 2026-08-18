@@ -291,6 +291,13 @@ receives a bounded correction packet containing the matching nonce, failed
 anchor, complete finding IDs, union scope, `Cause`, `Files`, implicated
 `AC-N|TC-N`, advisory `Suggested correction`, and deterministic closure evidence
 with its expected result.
+Before the initial implementation dispatch and before every correction
+decision, Main also completes every selected readiness/closure diagnostic to a
+terminal result, even after one has failed. It persists each bounded result,
+groups symptoms by root cause, and forms one comprehensive package. Dispatching
+from the first visible failure, or while another declared diagnostic is pending,
+is prohibited; a later round is for genuinely new evidence, not a finding that
+the prior fan omitted.
 
 Initial tester, QA, and security attempts start fresh with V2 `fork_turns: none`
 on their assigned current identity. Their packets contain executable ACs/TCs or
@@ -436,8 +443,11 @@ following matrix is exhaustive:
 | Correctable code, test, documentation, hygiene, or security finding inside approved scope | Main includes it in the complete consolidated validation failure | `phase: validation`; live choice `1` or an eligible `gate1-autonomous` authorization authorizes one bounded implementation round → closure gate → stale-row tester refresh → new Freeze → fresh QA plus impact-required security; no new Gate 1 | prohibited | `+1` |
 | Missing or insufficient evidence | Main includes it in the same complete consolidated validation failure | `phase: validation`; live choice `1` or an eligible `gate1-autonomous` authorization authorizes one bounded evidence/correction round → closure gate → stale-row tester refresh → new Freeze when applicable → fresh QA plus impact-required security; no new Gate 1 | prohibited | `+1` |
 
-After every required validation lens terminates, Main consolidates all blocking
-findings under stable IDs, the current frozen anchor, and the union file scope.
+After every required validation lens and selected closure/readiness diagnostic
+terminates, Main consolidates all blocking findings under stable IDs, the
+current frozen anchor, and the union file scope. It groups duplicate symptoms
+under their shared root cause and never creates a correction nonce from a
+partial result set.
 Before creating a correction nonce, Main performs one bounded evidence triage
 against the approved intent, scope, ACs/TCs, and security floor, without dispatching
 another reviewer. For every finding it presents the ID, cause/evidence,

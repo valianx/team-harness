@@ -104,11 +104,15 @@ ordinary approval, files, tools, or specialist prose never suffice. Scope
 expansion is decided separately and never implies implementer authority.
 
 **Validation correction decisions.** A failed validation fan completes every
-required lens, then Main consolidates and triages all findings at `phase:
+required lens and every selected closure/readiness diagnostic, even after an
+earlier failure. Main persists each terminal result, groups symptoms by root
+cause, and only then consolidates and triages all findings at `phase:
 validation`, with a fresh nonce, the failed Freeze anchor, exact finding IDs,
 dispositions, and evidenced file scope. No repository/evidence mutation,
 specialist dispatch, Freeze rebuild, or revalidation is legal before authority
-is recorded. With a valid Gate-1 approval dual record,
+is recorded. A correction package built from a partial diagnostic set is
+invalid; later rounds are for genuinely new evidence, never a declared check
+that the previous fan omitted. With a valid Gate-1 approval dual record,
 `autonomous_correction_count < 3`, no
 correction/execution budget exhaustion, and only unambiguous `resolve` findings
 inside approved scope, Main consumes the nonce
