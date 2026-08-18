@@ -328,9 +328,10 @@ function derivationResult(verdict, errorCode, details = {}) {
  * call, no operator input, and no write outside the overlay and the shard scaffolds it emits. The
  * planning pass that follows authors judgment content (routing, scope decomposition, invariants,
  * ownership) on top of this scaffold; the result already satisfies `validateOpenSpecOverlay` by
- * construction.
+ * construction. All-or-nothing: refuses and writes nothing when the traceability file or any
+ * target shard path already exists, unless `overwrite: true` is passed explicitly.
  */
-export async function deriveOpenSpecOverlay({ workspace, snapshot = "inputs/openspec-snapshot.json", traceability = "plan/openspec-traceability.json", writableRoots } = {}) {
+export async function deriveOpenSpecOverlay({ workspace, snapshot = "inputs/openspec-snapshot.json", traceability = "plan/openspec-traceability.json", writableRoots, overwrite = false } = {}) {
   try {
     if (!safeString(workspace) || snapshot !== "inputs/openspec-snapshot.json" || traceability !== "plan/openspec-traceability.json") {
       return derivationResult("fail", "ARGUMENT_INVALID");
@@ -381,10 +382,27 @@ export async function deriveOpenSpecOverlay({ workspace, snapshot = "inputs/open
       source_dispositions: sourceDispositions, operator_disclosures: operatorDisclosures,
     };
 
+    const targets = [traceability, ...executionItems.map(item => item.shard_path)];
+    const targetPaths = [];
+    for (const target of targets) {
+      if (!safeRelative(target)) return derivationResult("fail", "ARGUMENT_INVALID");
+      const targetPath = path.resolve(root, target);
+      if (!contained(root, targetPath)) return derivationResult("fail", "ARGUMENT_INVALID");
+      targetPaths.push(targetPath);
+    }
+    if (overwrite !== true) {
+      for (const targetPath of targetPaths) {
+        try {
+          await lstat(targetPath);
+          return derivationResult("fail", "DERIVATION_TARGET_EXISTS");
+        } catch (error) {
+          if (error.code !== "ENOENT") return derivationResult("fail", "ARTIFACT_INVALID");
+        }
+      }
+    }
+
     for (const item of executionItems) {
-      if (!safeRelative(item.shard_path)) return derivationResult("fail", "ARGUMENT_INVALID");
       const shardPath = path.resolve(root, item.shard_path);
-      if (!contained(root, shardPath)) return derivationResult("fail", "ARGUMENT_INVALID");
       await mkdir(path.dirname(shardPath), { recursive: true });
       await writeFile(shardPath, shardScaffold(item));
     }
@@ -518,6 +536,11 @@ function parseCli(argv, progress = false) {
     }
     if (progress && argv[index] === "--authorized-task") {
       result.authorizedTaskIds.push(argv[index + 1]);
+      continue;
+    }
+    if (argv[index] === "--overwrite") {
+      if (own(result, "overwrite")) return null;
+      result.overwrite = argv[index + 1] === "true";
       continue;
     }
     const key = ({ "--workspace": "workspace", "--snapshot": "snapshot", "--traceability": "traceability" })[argv[index]];

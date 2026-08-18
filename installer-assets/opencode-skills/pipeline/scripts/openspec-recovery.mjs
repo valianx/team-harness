@@ -71,13 +71,21 @@ export async function recoverOpenSpecDesign({ state, workspace, snapshotVerifier
   const freshness = await snapshotVerifier({ snapshotPath: path.join(root, snapshotPath), phase: "pre-gate1" });
   if (freshness?.verdict !== "pass") return result("blocked", "reconcile changed OpenSpec source", "CANONICAL_SOURCE_CHANGED");
 
-  if (state.openspec_design_pass === "overlay") return result("resume", "resume OpenSpec execution-overlay generation");
+  if (state.openspec_design_pass === "overlay") {
+    return result("resume", "rerun the mechanical OpenSpec overlay derivation — no architect dispatch");
+  }
   if (state.openspec_overlay_path !== "plan/openspec-traceability.json" || !SHA256.test(state.openspec_overlay_sha256 ?? "")) {
     return result("blocked", null, "OVERLAY_STATE_INVALID");
   }
   let overlayBytes;
   try { overlayBytes = await readWorkspaceFile(root, state.openspec_overlay_path); }
-  catch { return result("resume", "resume OpenSpec execution-overlay generation", "OVERLAY_MISSING"); }
+  catch {
+    return result(
+      "resume",
+      "rerun the mechanical OpenSpec overlay derivation — no architect dispatch",
+      "OVERLAY_MISSING",
+    );
+  }
   if (hash(overlayBytes) !== state.openspec_overlay_sha256) return result("blocked", "revalidate OpenSpec execution overlay", "OVERLAY_STALE");
   return result("resume", "present STAGE-GATE-1");
 }
