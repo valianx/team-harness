@@ -292,20 +292,23 @@ matrix):
 **Standards:** OWASP Top 10 {year}, CWE Top 25 {year}
 
 ### Critical
-- `{file}:{line}` — [CWE-{N}] {impact ≤1 sentence} — Fix: {pointer ≤1 line}
+- **{id}** `{file}:{line}` — [CWE-{N}] {class} {impact ≤1 sentence} — Fix: {pointer ≤1 line} {classification, re-review only}
 
 ### High
-- `{file}:{line}` — [CWE-{N}] {impact ≤1 sentence} — Fix: {pointer ≤1 line}
+- **{id}** `{file}:{line}` — [CWE-{N}] {class} {impact ≤1 sentence} — Fix: {pointer ≤1 line} {classification, re-review only}
 
 ### Medium / Low / Info
-- `{file}:{line}` — [CWE-{N}] {brief description}
+- **{id}** `{file}:{line}` — [CWE-{N}] {class} {brief description} {classification, re-review only}
+
+### Coverage Declaration
+{Files/areas read, areas not examined, known-unswept vulnerability classes.}
 
 ### Summary
 {1-2 sentences: counts and overall risk for this feature.}
 ```
 
 No findings → header + `**qa_status:** clean` + "No security findings in the
-scanned changed files."
+scanned changed files." + the Coverage Declaration.
 
 **Audit/focused mode — audit-grade template** (English, full verbosity —
 fenced from the pipeline budget): header with date/project type/standards;
@@ -319,6 +322,22 @@ code + concrete steps), grouped Critical → Info; Dependency Analysis tables
 tables (headers with current vs recommended values, CORS, authentication);
 Prioritized Remediation Plan in four phases (immediate/next release/next
 sprint/backlog); Audit Coverage table; Analysis Limitations.
+
+### Exhaustive sweep and finding identity
+
+Finding one instance of a vulnerability class in the checklists above obliges
+scanning every same-class instance within the scanned scope in the same pass
+— one root-cause finding covering all sites. This is a floor, never a
+ceiling: a finding outside every checklist class is still reported. Every
+report ends with the Coverage Declaration above (pipeline mode) or the
+existing Audit Coverage table (audit/focused mode).
+
+Every finding carries a stable `id`, a `severity` from the closed vocabulary
+`critical | high | medium | low | info` (the existing Critical/High/Medium/
+Low/Info scale, reconciled to this lowercase structural form — no second
+vocabulary), and its `class` — structural status-block fields, never inferred
+from report prose — plus `classification` (`new_in_delta | pre_existing_missed
+| reopened`) on a re-review dispatched against the findings ledger.
 
 ### Final-result finding contract
 
@@ -389,7 +408,7 @@ packet_integrity: ok | stale | mismatch | n-a
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 blast_radius: localized {IDs} | structural   # when status: failed
 issues: {critical and high finding titles, or "none"}
-finding_summary: [{cause, files, requirement, suggested_correction, closure_evidence}] | none
+finding_summary: [{id, severity, class, classification, cause, files, requirement, suggested_correction, closure_evidence}] | none
 ```
 
 The orchestrator gates phases on this block without re-reading your output;

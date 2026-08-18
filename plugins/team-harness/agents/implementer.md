@@ -117,7 +117,10 @@ test, and report paths with `file:line` evidence; implicated AC or TC; concrete
 correction with owner; and deterministic closure evidence with its expected
 result. Read that complete finding before editing; if any of
 those coordinates is missing, return `status: blocked` with
-`failure_kind: artifact-missing` rather than guessing.
+`failure_kind: artifact-missing` rather than guessing. Every returned
+`finding_resolutions.finding_id` is the exact `id` the lens (qa, adversary, or
+security) reported — the same identity, never a second vocabulary — so the
+coordinator can append the resolution to the same ledger row.
 
 A cleaner-handoff correction additionally names exactly one canonical
 repository and matching absolute worktree. Every file is repo-relative to that

@@ -203,11 +203,21 @@ in the report with `file:line` per finding or "no findings". Any unjustified
 finding → `code_hygiene: fail`, which sets `status: failed` even when every AC
 passes, and appends its own `### Hygiene findings` block to the failure brief.
 
-## Final-result finding contract
+## Exhaustive sweep and finding identity
+
+Forming any finding obliges enumerating every same-class instance within your
+declared scope in the same pass — one finding per root cause covering all
+sites. This is a floor, never a ceiling: a finding outside every known class
+is still reported. Every report ends with a mandatory Coverage Declaration:
+files/areas read, areas not examined, and known-unswept classes.
 
 Every failed AC, hygiene finding, TC evidence gap, or security-relevant
-evidence gap is reported with the same five coordinates — evidence, not
-authority; QA never selects `design`, edits the plan, changes phase, or
+evidence gap is reported with the same five coordinates plus a stable `id`, a
+`severity` from the closed vocabulary `critical | high | medium | low | info`,
+and its `class` — structural status-block fields, never inferred from report
+prose — plus `classification` (`new_in_delta | pre_existing_missed |
+reopened`) on a re-review dispatched against the findings ledger. Evidence,
+not authority; QA never selects `design`, edits the plan, changes phase, or
 dispatches the next agent:
 
 - **Cause:** the observed defect or missing evidence.
@@ -229,8 +239,10 @@ Write `reviews/04-validation.md` (agentic-tier, English throughout): header
 (`Passed | Failed | Warnings | Status`), `## Acceptance Criteria Results`
 listing `AC-N: PASS/FAIL — {evidence kind} — file:line` without re-quoting
 requirement text (the task shard is the single canonical AC statement), a
-Warnings list, a Security/Accessibility check table, recommendations, and a
-readiness conclusion. Iteration narratives live only in `failure-brief.md`;
+Warnings list, a Security/Accessibility check table, recommendations, a
+mandatory `## Coverage Declaration` (files/areas read, areas not examined,
+known-unswept classes), and a readiness conclusion. Iteration narratives live
+only in `failure-brief.md`;
 reference prior rounds by `Iteration {N}`, never retell them.
 
 ## Execution Log Protocol
@@ -273,7 +285,7 @@ regression_test_referenced: true | false | null  # fix/hotfix only; null when bu
 reproduction_steps_validated: true | false      # fix/hotfix only
 blast_radius: localized {IDs} | structural       # when status: failed
 issues: {list of failed criteria, or "none"}
-finding_summary: [{cause, files, requirement, suggested_correction, closure_evidence}] | none
+finding_summary: [{id, severity, class, classification, cause, files, requirement, suggested_correction, closure_evidence}] | none
 ```
 
 `regression_test_referenced: null` is accepted by the gate only when the
