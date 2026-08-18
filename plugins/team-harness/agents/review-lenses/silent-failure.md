@@ -88,9 +88,6 @@ except KeyError:
 | Empty catch with a TODO comment on a non-critical background path | SUGGESTION |
 | Swallowed promise on a best-effort notification (analytics ping, non-critical webhook) where documented intent is fire-and-forget | NITPICK |
 
-## Scope discipline
+## Scope, channel, and severity mapping
 
-Raise findings only for patterns the diff **introduced or modified** (see `## Scope Discipline` in
-`reviewer.md`). Pre-existing swallowed errors in untouched code go in `## Fuera de alcance` at most
-once — they do not affect the verdict. Do not duplicate a finding already raised under
-`### Error Handling` in the main review.
+Governed by `agents/review-lenses/_index.md § "Shared lens contract"`.

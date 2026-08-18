@@ -182,6 +182,13 @@ assert_nodecision "AC-1: ship + branch correlation -> none (gh pr create)" \
     "$TMP" "$(push_payload 'gh pr create --title x --body y')"
 rm -rf "$TMP"
 
+TMP=$(mktemp -d)
+make_branch_in_place_repo "$TMP" "feat/deterministic-gate-release-enforcement"
+make_lane_state "$TMP" "$(lane_fields auto-ship feat/deterministic-gate-release-enforcement null)"
+assert_nodecision "AC-1: auto-ship + branch correlation -> none (git push)" \
+    "$TMP" "$(push_payload 'git push origin feat/deterministic-gate-release-enforcement')"
+rm -rf "$TMP"
+
 # ---------------------------------------------------------------------------
 # AC-2 — lane resolved, gate3_release not in {ship} -> deny (fail-closed)
 # ---------------------------------------------------------------------------
@@ -583,13 +590,6 @@ _r3_case="grep -rnE ${_t8_dq}${_t8_lit_gh_pr_create}|${_t8_lit_git_push}${_t8_dq
 assert_nodecision "round 3 (no regression): inert quoted covered-verb in a read-only grep -> still none" \
     "$TMP" "$(push_payload "$_r3_case")"
 rm -rf "$TMP"
-
-# ---------------------------------------------------------------------------
-# dev-guard's `gh pr create` autogate opt-in predates gate-guard and is
-# preserved unchanged; its regression coverage already lives in
-# tests/test_dev_guard.sh (assert_allow "gh pr create with
-# autogate.pr_create=true -> ALLOW"). Not duplicated here.
-# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 # Routing sanity — non-push/non-pr-create commands and a non-git directory

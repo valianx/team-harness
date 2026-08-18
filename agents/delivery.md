@@ -106,7 +106,7 @@ Read `00-state.md` and require:
 - `pipeline_version: 3`;
 - `phase: validation` with acceptance complete, or `phase: waiting_gate3` only
   when re-preparing a missing or stale preview before a new presentation;
-- `gate3_release: null|amend` and no valid `ship` release;
+- `gate3_release: null|amend` and no valid `ship`/`auto-ship` release;
 - the current accepted `freeze_commit_sha` and `freeze_tree_sha` matching the validation evidence;
 - task `type`;
 - the version already committed before Freeze;

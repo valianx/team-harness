@@ -56,6 +56,14 @@ The canonical `model` + `effort` matrix for the repo lives in `agents/README.md`
 
 ## Agent Design — Best Practices
 
+**Binding standard: `docs/agent-authoring.md`.** Every file you create or
+edit follows its canonical skeleton (role sentence → when-invoked steps →
+measurable criteria → literal output template → boundaries), its size budgets
+(specialist ≤ 2,000 words / 500 lines; shared contract ≤ 1,500 words;
+references one level deep with a TOC over 100 lines), and its ten authoring
+rules. `/th:lint` Check 12 enforces the structure; run it after every write.
+The practices below apply within that standard, never instead of it.
+
 ### System Prompt
 
 - **Be specific, not generic.** Define exactly what the agent does AND what it never does

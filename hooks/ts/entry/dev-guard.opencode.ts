@@ -17,8 +17,6 @@
 // runtime: `allow` proceeds silently with no human in the loop.
 
 import * as fs from "node:fs";
-import * as path from "node:path";
-import * as os from "node:os";
 import { execFileSync } from "node:child_process";
 import { inboundOpencode, outboundOpencode, ShimRejectError } from "../shim/shim.js";
 import { evaluate, type DevGuardReader } from "../bodies/dev-guard.js";
@@ -100,16 +98,6 @@ function makeReader(): DevGuardReader {
         return null;
       }
     },
-
-    readConfig(): Record<string, unknown> | null {
-      try {
-        const configPath = path.join(os.homedir(), ".claude", ".team-harness.json");
-        const raw = fs.readFileSync(configPath, "utf8");
-        return JSON.parse(raw) as Record<string, unknown>;
-      } catch {
-        return null;
-      }
-    },
   };
 }
 
@@ -160,8 +148,8 @@ function resolveWorktreeCwd(input: unknown): void {
 
 /** opencode plugin factory for dev-guard.
  *  Registers the body on 'tool:before' (maps to tool.execute.before in the
- *  opencode plugin model). Both Bash matcher and ClickUp MCP matcher are
- *  handled inside the body (evaluate() gates on toolName for ClickUp). */
+ *  opencode plugin model). Only Bash commands carry floor actions; every
+ *  other tool call produces no decision inside the body. */
 export default function devGuardPlugin(): DevGuardPlugin {
   return {
     hooks: {

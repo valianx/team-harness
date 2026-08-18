@@ -6,8 +6,11 @@ import { fileURLToPath } from "node:url";
 import process from "node:process";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+// Capability profiles are declaration-consistency contracts between the
+// registry and each instruction adapter; the runtime-enforced boundary is
+// sandbox_mode. No profile is emitted into the TOML as an enforced allowlist.
 const capabilityProfiles = new Map([
-  ["review-read-only", { default: "deny", allow: ["read", "glob", "grep"] }],
+  ["review-read-only", { default: "deny", allow: ["read", "glob", "grep", "command-exec"] }],
   ["inline-review-read-only", { default: "deny", allow: ["read", "glob", "grep", "command-exec"] }]
 ]);
 
@@ -191,6 +194,9 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
       if (!capabilityProfile) fail(`${agent.name}: unsupported capability profile ${agent.capability_profile}`);
       if (agent.sandbox_mode !== "read-only") {
         fail(`${agent.name}: capability profile ${agent.capability_profile} requires read-only sandbox mode`);
+      }
+      if (capabilityProfile.allow.includes("command-exec") && !capabilities.has("command-exec")) {
+        fail(`${agent.name}: profile ${agent.capability_profile} reads via bounded exec_command but the registry does not declare command-exec`);
       }
     }
 

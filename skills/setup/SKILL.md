@@ -381,7 +381,7 @@ key. Runtime/native, destructive-action, and outward-action approvals remain unc
 
 **English-learning mode propagation.** The `english_learning` boolean in `~/.claude/.team-harness.json` is set the same way as `language`: via `/th:setup` Step 3.6, or via a chat toggle with a persistence marker (`por defecto`, `siempre`, `default`, `permanente`, `de aquí en adelante`) routed through the orchestrator's Y/n confirmation gate. A chat toggle WITHOUT a persistence marker applies as a session-only override recorded in `00-state.md` only — the config file is never written without an explicit persistence signal. This key is NOT in the session-override whitelist; it requires the persistence-marker + Y/n gate to become permanent. `english_learning` and `language` are independent settings — enabling english-learning arms corrections for messages the operator writes in English regardless of the configured response language; English as the response language is a separate, explicitly offered opt-in.
 
-**Outward-action gate.** Outward actions (git push, gh pr merge/review/comment, gh api mutating PR endpoints, ClickUp MCP writes) are evaluated by the deterministic dev-guard hook (compiled TS, launched via `hooks/run-ts-hook.sh dev-guard`), which fires UNCONDITIONALLY and gates by destination: a push to a non-default branch on `origin` resolves to `allow` without a prompt; a push to the default branch, a tag push, a force push, `gh pr merge/review/comment`, `gh api` mutating PR endpoints, and ClickUp MCP writes still require explicit operator approval (`ask`). The agent cannot auto-approve an `ask`. Security floors are non-waivable. Full contract: `docs/dev-mode.md § Outward-Action Gate`.
+**Outward-action gate.** The deterministic dev-guard hook (compiled TS, launched via `hooks/run-ts-hook.sh dev-guard`) fires UNCONDITIONALLY and covers only the minimal floor, gating by destination: a push to a non-default branch on `origin` resolves to `allow` without a prompt; a push to the default branch, a tag push, a force push, and a PR merge (`gh pr merge` or a `gh api` merge endpoint) require explicit operator approval (`ask`). Every other outward write (`gh pr create/review/comment`, issue writes, MCP writes) is uncovered by the hook and governed by the host runtime's permission model plus TH's prompt-level preview contracts. The agent cannot auto-approve an `ask`. Security floors are non-waivable. Full contract: `docs/dev-mode.md § Outward-Action Gate`.
 
 **GitHub channel rule — git and gh only.** Never call the GitHub API directly (curl, wget, or any HTTP client against `api.github.com` or GraphQL): `git` and `gh` are the only sanctioned GitHub channels. This is a prompt-level rule, not a deterministic gate — the raw-HTTP gate was retired to eliminate false positives. Sole exception: the documented gh-fallback path (`agents/_shared/gh-fallback.md`) when `gh` is absent or unauthenticated.
 
@@ -400,7 +400,7 @@ After the copy, tell the operator:
 
 ```
 Orchestrator disposition configured.
-  Gate:    fires unconditionally, gates by destination — non-default branch push to origin: allow; default/tag/force push, gh pr merge/review/comment, API/ClickUp writes: ask
+  Gate:    fires unconditionally, minimal floor by destination — non-default branch push to origin: allow; default/tag/force push, PR merge: ask; other outward writes: host permission model
   Style:   /config -> Output style -> developer-mode  (optional — replaces coding instructions with orchestrator contract)
 ```
 
@@ -590,18 +590,25 @@ Configure the ClickUp workspace ID used by th:orchestrator (intake and delivery)
 
 This sub-step is reached ONLY via the argument router when the target concern is `obsidian-tasks`. It is NOT part of the full no-argument flow.
 
-Configure the Obsidian Tasks integration setting. This key controls whether the pipeline writes task items compatible with the Obsidian Tasks plugin.
+Toggle the Obsidian Tasks integration. The canonical `obsidian_tasks` value is the config
+OBJECT owned by `/th:todo setup` (`vault_root`, `tasks_folder`, `task_format`, …) with an
+optional `enabled` boolean (absent means enabled); this sub-step only flips `enabled` and never
+replaces the object.
 
-1. Read `~/.claude/.team-harness.json`. Show the current `obsidian_tasks` value (if present, e.g. `true` or `false`) as the default hint.
-2. Prompt: `Enable Obsidian Tasks integration? [y/N]` (default: current value, or N if not set)
-3. Accept `y` (enable) or `n`/Enter (disable / keep current).
-4. Persist via **merge-write-whole-document**: read the full JSON, replace or add only the `obsidian_tasks` key (set to the JSON boolean `true` or `false`), write the whole document back. All other keys are preserved.
-5. Print a one-line targeted summary:
+1. Read `~/.claude/.team-harness.json`. Show the current state as the default hint:
+   `enabled`/`disabled` when the object exists (absent `enabled` field means enabled),
+   `not configured` when the key is absent, and treat a legacy bare boolean as
+   `{"enabled": <bool>}` pending folder configuration.
+2. Prompt: `Enable Obsidian Tasks integration? [y/N]` (default: current state, or N if not set)
+3. Persist via **merge-write-whole-document**: read the full JSON and set only
+   `obsidian_tasks.enabled`, preserving every other field of the object and every other key.
+   Never write a bare boolean over an existing object.
+4. Print a one-line targeted summary:
    ```
-   th setup — obsidian-tasks configured
-     obsidian_tasks  <true|false>
+   th setup — obsidian-tasks <enabled|disabled>
    ```
-   Then stop.
+   When enabling without a configured `vault_root`, append: `folders not configured — run
+   /th:todo setup`. Then stop.
 
 ---
 

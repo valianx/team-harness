@@ -56,8 +56,8 @@ Gate 1 is functional authority for the approved implementation. It is never a
 technical sandbox grant. In Codex `workspace-write`, the repository worktree
 may be writable while the shared `.git` metadata remains protected; `git
 worktree add` writes both a branch ref and `.git/worktrees`, so Main must obtain
-native approval for that exact local command independently of
-`approved-autonomous`.
+native approval for that exact local command independently of the Gate-1
+release and its auto-ship policy.
 
 The plan records the absolute worktree path, branch, and an immutable base
 commit before Gate 1. Physical creation happens only after a valid Gate-1

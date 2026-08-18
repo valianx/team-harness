@@ -10,9 +10,9 @@ const root = new URL("../..", import.meta.url).pathname;
 const pipelineScripts = [
   "bounded-command.mjs",
   "commit-integrity.mjs",
-  "cleaner-transition.mjs",
   "plan-contract.mjs",
   "plan-contract-repair.mjs",
+  "quality-lib.mjs",
   "quality-runner.mjs",
   "test-transition.mjs",
   "worktree-dependencies.mjs",

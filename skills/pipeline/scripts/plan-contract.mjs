@@ -7,6 +7,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { validateOpenSpecOverlay } from "./openspec-overlay.mjs";
+import { validateQualityManifest } from "./quality-runner.mjs";
 
 export const PLAN_CONTRACT_SCHEMA_VERSION = 1;
 
@@ -34,6 +35,7 @@ const ERROR_CODES = new Set([
   "MANIFEST_INVALID",
   "TASK_INDEX_INVALID",
   "TASK_INVALID",
+  "REQUIRED_CHECKS_UNKNOWN",
   "INTERNAL_ERROR",
 ]);
 const FINDING_CODES = new Set([
@@ -51,6 +53,7 @@ const FINDING_CODES = new Set([
   "TASK_TECHNICAL_CONSTRAINT_INVALID",
   "TASK_VERIFICATION_INVALID",
   "TASK_COUNT_MISMATCH",
+  "REQUIRED_CHECKS_UNKNOWN",
   "ARCHITECTURE_SECTION_MISSING",
 ]);
 const FUNCTIONAL_SECTIONS = [
@@ -89,6 +92,44 @@ function safeRelative(value) {
 function contained(root, target) {
   const relative = path.relative(root, target);
   return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
+}
+
+async function loadManifestCommandIds(repoInput) {
+  if (repoInput === undefined) return null;
+  if (typeof repoInput !== "string" || repoInput.length === 0) throw new ContractError("ARGUMENT_INVALID");
+  let manifestPath;
+  try {
+    const repo = await realpath(path.resolve(repoInput));
+    manifestPath = path.join(repo, ".team-harness", "quality.json");
+  } catch {
+    throw new ContractError("ARGUMENT_INVALID");
+  }
+  let bytes;
+  try {
+    const stat = await lstat(manifestPath);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_ARTIFACT_BYTES) return null;
+    bytes = await readFile(manifestPath);
+    if (bytes.length > MAX_ARTIFACT_BYTES) return null;
+  } catch {
+    return null;
+  }
+  try {
+    const manifest = validateQualityManifest(JSON.parse(bytes.toString("utf8")), { selectedChecks: [] });
+    return Object.keys(manifest.commands).sort();
+  } catch {
+    return null;
+  }
+}
+
+function inspectRequiredChecks(tasks, manifestCommandIds, findings) {
+  if (manifestCommandIds === null) return;
+  for (const task of tasks) {
+    const unknown = task.required_quality_checks.filter((id) => !manifestCommandIds.includes(id));
+    if (unknown.length > 0) {
+      const section = `${task.id}: unknown [${unknown.join(", ")}]; declared [${manifestCommandIds.join(", ")}]`;
+      findings.push(finding("REQUIRED_CHECKS_UNKNOWN", task.path, section.slice(0, 200)));
+    }
+  }
 }
 
 async function resolveWorkspace(input) {
@@ -414,7 +455,10 @@ export async function validatePlanContract(options) {
   const started = process.hrtime.bigint();
   const state = { error_code: null, plan: null, artifact_set_sha256: null, artifacts: [], functional: null, tasks: [], findings: [] };
   try {
-    if (!exactlyKeys(options, ["workspace", "plan"]) || options.plan !== "01-plan.md") throw new ContractError("ARGUMENT_INVALID");
+    const withRepo = exactlyKeys(options, ["workspace", "plan", "repo"]);
+    if ((!exactlyKeys(options, ["workspace", "plan"]) && !withRepo) || options.plan !== "01-plan.md") {
+      throw new ContractError("ARGUMENT_INVALID");
+    }
     const workspace = await resolveWorkspace(options.workspace);
     const plan = await readArtifact(workspace, options.plan);
     state.plan = { sha256: sha256(plan.bytes), bytes: plan.bytes.length };
@@ -441,6 +485,7 @@ export async function validatePlanContract(options) {
       }
       return inspectTask(task, artifact.text, state.findings);
     });
+    inspectRequiredChecks(state.tasks, await loadManifestCommandIds(options.repo), state.findings);
     state.artifacts = [plan, ...loaded.values()]
       .map((artifact) => ({ path: artifact.path, sha256: sha256(artifact.bytes), bytes: artifact.bytes.length }))
       .sort((left, right) => left.path.localeCompare(right.path));
@@ -450,7 +495,8 @@ export async function validatePlanContract(options) {
       state.error_code = [...codes].some((code) => code.startsWith("FUNCTIONAL_") || code === "DECISION_INVALID")
         ? "FUNCTIONAL_CONTRACT_INVALID"
         : codes.has("TASK_INDEX_INVALID") ? "TASK_INDEX_INVALID"
-        : [...codes].some((code) => code.startsWith("TASK_")) ? "TASK_INVALID" : "MANIFEST_INVALID";
+        : [...codes].some((code) => code.startsWith("TASK_")) ? "TASK_INVALID"
+        : codes.has("REQUIRED_CHECKS_UNKNOWN") ? "REQUIRED_CHECKS_UNKNOWN" : "MANIFEST_INVALID";
     }
   } catch (error) {
     state.error_code = error instanceof ContractError && ERROR_CODES.has(error.code) ? error.code : "INTERNAL_ERROR";
@@ -466,7 +512,7 @@ function parseCli(argv) {
       values.writableRoots.push(argv[index + 1]);
       continue;
     }
-    const key = ({ "--workspace": "workspace", "--plan": "plan", "--snapshot": "snapshot", "--traceability": "traceability" })[argv[index]] ?? null;
+    const key = ({ "--workspace": "workspace", "--plan": "plan", "--repo": "repo", "--snapshot": "snapshot", "--traceability": "traceability" })[argv[index]] ?? null;
     if (key === null || Object.hasOwn(values, key)) return null;
     values[key] = argv[index + 1];
   }

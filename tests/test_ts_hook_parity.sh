@@ -21,7 +21,7 @@
 #   - Fail-closed inversion guard (AC-7): exception on covered action → ask not empty.
 #   - Non-mutation proof (AC-14, SEC-DR-F): output.args byte-identical before/after gate.
 #   - Reason-no-leak (AC-15, CWE-200): reason names CLASS not value.
-#   - ClickUp no-command boundary (AC-16, SEC-DR-B): tool.name match, absent command → ask.
+#   - ClickUp uncovered (AC-16, minimal floor): any ClickUp tool payload → none.
 #   - Cold-start latency (AC-17): Node entry < 5s gate timeout.
 #   - Dual-runtime parity (AC-8): Node AND Bun (or recorded bun-not-present)
 #     produce the SAME decision — this is TS-vs-TS (cross-runtime), not
@@ -364,8 +364,8 @@ rm -rf "$_parity_throwaway"
 assert_parity "gh pr merge (ASK)" "$(make_bash_payload 'gh pr merge 123 --squash')" "ask"
 assert_parity_in_dir "git push to non-default branch on origin (ALLOW, th-friction-redesign branch-aware recognizer)" "$PARITY_NORMAL_REPO" \
     "$(make_bash_payload 'git push origin feat/my-branch')" "allow"
-assert_parity "gh pr review (ASK)" "$(make_bash_payload 'gh pr review 42 --approve')" "ask"
-assert_parity "gh pr comment (ASK)" "$(make_bash_payload 'gh pr comment 42 --body "LGTM"')" "ask"
+assert_parity "gh pr review (NONE, uncovered)" "$(make_bash_payload 'gh pr review 42 --approve')" "none"
+assert_parity "gh pr comment (NONE, uncovered)" "$(make_bash_payload 'gh pr comment 42 --body "LGTM"')" "none"
 assert_parity "gh api -X PUT /pulls/merge (ASK)" "$(make_bash_payload 'gh api -X PUT /repos/owner/repo/pulls/42/merge')" "ask"
 assert_parity "curl -X POST api.github.com/reviews (retired gate -> NONE)" "$(make_bash_payload 'curl -X POST https://api.github.com/repos/owner/repo/pulls/42/reviews -d "{}"')" "none"
 assert_parity "git -C /path push (ASK)" "$(make_bash_payload 'git -C /tmp/myrepo push origin main')" "ask"
@@ -383,15 +383,16 @@ assert_parity "Write payload no command (NODECISION)" "$(make_write_payload)" "n
 # AC-2 regression cases from test_dev_guard.sh
 assert_parity "#298 AC-2 gh pr merge no config (ASK)" "$(make_bash_payload 'gh pr merge 123 --squash')" "ask"
 assert_parity "#298 AC-2 git push no config (ASK)" "$(make_bash_payload 'git push origin main')" "ask"
-assert_parity "#298 AC-2 gh pr review no config (ASK)" "$(make_bash_payload 'gh pr review 42 --approve')" "ask"
+assert_parity "#298 AC-2 gh pr review no config (NONE, uncovered)" "$(make_bash_payload 'gh pr review 42 --approve')" "none"
 assert_parity "#298 AC-2 curl api.github.com POST (retired gate -> NONE)" "$(make_bash_payload 'curl -X POST https://api.github.com/repos/o/r/pulls/1/reviews -d "{}"')" "none"
 assert_parity "#298 AC-3 git status (NODECISION)" "$(make_bash_payload 'git status')" "none"
 assert_parity "#298 AC-3 git log (NODECISION)" "$(make_bash_payload 'git log --oneline -5')" "none"
 assert_parity "#298 AC-3 ls (NODECISION)" "$(make_bash_payload 'ls -la /tmp')" "none"
 
-# GraphQL cases (SEC-001 gate)
-assert_parity "graphql resolveReviewThread (ASK)" "$(make_bash_payload "gh api graphql -f query='mutation(\$threadId: ID!) { resolveReviewThread(input: { threadId: \$threadId }) { thread { id isResolved } } }' -F threadId=PRRT_x")" "ask"
-assert_parity "graphql addPRReviewThreadReply (ASK)" "$(make_bash_payload "gh api graphql -f query='mutation(\$t: ID!, \$b: String!) { addPullRequestReviewThreadReply(input: {pullRequestReviewThreadId: \$t, body: \$b}) { comment { id } } }' -F t=PRRT_x -f b=hi")" "ask"
+# GraphQL cases — only mergePullRequest is floor-covered
+assert_parity "graphql mergePullRequest (ASK)" "$(make_bash_payload "gh api graphql -f query='mutation(\$id: ID!) { mergePullRequest(input: { pullRequestId: \$id }) { pullRequest { merged } } }' -F id=PR_x")" "ask"
+assert_parity "graphql resolveReviewThread (NONE, uncovered)" "$(make_bash_payload "gh api graphql -f query='mutation(\$threadId: ID!) { resolveReviewThread(input: { threadId: \$threadId }) { thread { id isResolved } } }' -F threadId=PRRT_x")" "none"
+assert_parity "graphql addPRReviewThreadReply (NONE, uncovered)" "$(make_bash_payload "gh api graphql -f query='mutation(\$t: ID!, \$b: String!) { addPullRequestReviewThreadReply(input: {pullRequestReviewThreadId: \$t, body: \$b}) { comment { id } } }' -F t=PRRT_x -f b=hi")" "none"
 assert_parity "graphql reviewThreads read-only (NODECISION)" "$(make_bash_payload "gh api graphql -f query='query { repository(owner:\"o\", name:\"r\") { pullRequest(number:1) { reviewThreads(first:100) { nodes { id isResolved } } } } }'")" "none"
 
 # ---------------------------------------------------------------------------
@@ -505,12 +506,12 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Section 5 — ClickUp no-command boundary (AC-16, SEC-DR-B)
-# tool.name matches ClickUp write pattern; NO command field. Must produce ask,
-# never none/allow.
+# Section 5 — ClickUp no-command boundary (AC-16, recalibrated for the
+# minimal floor): ClickUp MCP tools are uncovered by dev-guard. Every ClickUp
+# tool payload must produce NO decision.
 # ---------------------------------------------------------------------------
 echo ""
-echo "--- Section 5: ClickUp no-command boundary (AC-16) ---"
+echo "--- Section 5: ClickUp uncovered (AC-16, minimal floor) ---"
 
 CLICKUP_TOOL="mcp__my_clickup_server__clickup_update_task"
 CLICKUP_PAYLOAD="$(make_clickup_payload "$CLICKUP_TOOL")"
@@ -519,27 +520,27 @@ TS_CLICKUP=$(run_ts_node "$CLICKUP_PAYLOAD")
 TS_CLICKUP_DEC=$(extract_decision "$TS_CLICKUP")
 
 echo "  TS Node: $TS_CLICKUP_DEC"
-if [ "$TS_CLICKUP_DEC" = "ask" ]; then
+if [ "$TS_CLICKUP_DEC" = "none" ]; then
     PASS=$((PASS + 1))
-    echo "  [PASS] AC-16: ClickUp no-command → ask"
+    echo "  [PASS] AC-16: ClickUp no-command → none (uncovered)"
 else
     FAIL=$((FAIL + 1))
-    FAILURES+=("AC-16: ClickUp no-command boundary failed [ts-node-got: $TS_CLICKUP_DEC]")
-    echo "  [FAIL] AC-16: ClickUp no-command failed [ts-node-got: $TS_CLICKUP_DEC]"
+    FAILURES+=("AC-16: ClickUp uncovered boundary failed [ts-node-got: $TS_CLICKUP_DEC]")
+    echo "  [FAIL] AC-16: ClickUp uncovered failed [ts-node-got: $TS_CLICKUP_DEC]"
 fi
 
-# Test other ClickUp write verbs
+# Other ClickUp write verbs — equally uncovered
 for verb in "create_task" "create_task_comment" "attach_task_file"; do
     TOOL="mcp__clickup_server__clickup_${verb}"
     PAYLOAD="$(make_clickup_payload "$TOOL")"
     TS_DEC=$(extract_decision "$(run_ts_node "$PAYLOAD")")
-    if [ "$TS_DEC" = "ask" ]; then
+    if [ "$TS_DEC" = "none" ]; then
         PASS=$((PASS + 1))
-        echo "  [PASS] AC-16: ClickUp ${verb} → ask"
+        echo "  [PASS] AC-16: ClickUp ${verb} → none (uncovered)"
     else
         FAIL=$((FAIL + 1))
-        FAILURES+=("AC-16: ClickUp ${verb} → expected ask, got $TS_DEC")
-        echo "  [FAIL] AC-16: ClickUp ${verb} → expected ask, got $TS_DEC"
+        FAILURES+=("AC-16: ClickUp ${verb} → expected none, got $TS_DEC")
+        echo "  [FAIL] AC-16: ClickUp ${verb} → expected none, got $TS_DEC"
     fi
 done
 
@@ -547,13 +548,13 @@ done
 if [ -n "$BUN_BIN" ]; then
     BUN_CLICKUP=$(run_ts_bun_cc "$CLICKUP_PAYLOAD")
     BUN_CLICKUP_DEC=$(extract_decision "$BUN_CLICKUP")
-    if [ "$BUN_CLICKUP_DEC" = "ask" ]; then
+    if [ "$BUN_CLICKUP_DEC" = "none" ]; then
         PASS=$((PASS + 1))
-        echo "  [PASS] AC-16 (Bun): ClickUp no-command → ask"
+        echo "  [PASS] AC-16 (Bun): ClickUp no-command → none (uncovered)"
     else
         FAIL=$((FAIL + 1))
-        FAILURES+=("AC-16 (Bun): ClickUp no-command → expected ask, got $BUN_CLICKUP_DEC")
-        echo "  [FAIL] AC-16 (Bun): expected ask, got $BUN_CLICKUP_DEC"
+        FAILURES+=("AC-16 (Bun): ClickUp no-command → expected none, got $BUN_CLICKUP_DEC")
+        echo "  [FAIL] AC-16 (Bun): expected none, got $BUN_CLICKUP_DEC"
     fi
 else
     echo "  [SKIP] AC-16 (Bun): bun-not-present"

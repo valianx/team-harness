@@ -73,8 +73,8 @@ append, repair, or normalize the trace.
 
 When the operator asks for details for one pipeline, show the pending gate's stable choices:
 
-- Gate 1: `1 approve`, `2 approve autonomous`, `3 edit`, `4 reject`.
-- Gate 3: `1 ship`, `2 amend`, `3 abort`.
+- Gate 1: `1 approve`, `3 edit`, `4 reject`.
+- Gate 3 (exception pause only): `1 ship`, `2 amend`, `3 abort`.
 
 These are display shortcuts only. The coordinator verifies the live reply, current nonce, and
 dual-record release. This renderer never accepts or records a gate decision.

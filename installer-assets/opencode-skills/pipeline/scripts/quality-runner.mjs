@@ -8,17 +8,26 @@
  * decides whether a behavioral assertion expresses the approved intent.
  */
 
-import { execFile } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
-import { lstat, mkdtemp, open, readFile, realpath, rename, rm, unlink } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { lstat, mkdtemp, open, realpath, rename, rm, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
 
 import { isBoundedCommandEnvelope, runBoundedCommand } from "./bounded-command.mjs";
-
-const execFileAsync = promisify(execFile);
+import {
+  MAX_DETAIL_CHARS,
+  boundedDetail,
+  canonicalHash,
+  createBoundedJsonReader,
+  createGitRunners,
+  hasExactlyKeys,
+  hasOnlyKeys,
+  isBoundedDetail,
+  isContained,
+  isSafeRelativePath,
+  sha256,
+} from "./quality-lib.mjs";
 
 export const QUALITY_MANIFEST_SCHEMA_VERSION = 1;
 export const QUALITY_RESULT_SCHEMA_VERSION = 3;
@@ -28,22 +37,20 @@ export const CRAP_REPORT_TOKEN = "${TH_QUALITY_REPORT}";
 
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_TIMEOUT_MS = 60 * 60 * 1000;
-const MAX_JSON_BYTES = 1024 * 1024;
 const MAX_CHANGED_PATHS = 512;
 const MAX_FUNCTIONS = 512;
 const MAX_ARGV_ITEMS = 128;
 const MAX_ARGV_ITEM_BYTES = 8 * 1024;
 const MAX_ARGV_BYTES = 64 * 1024;
 const SAFE_CHECKPOINT = /^[a-z][a-z0-9_-]{0,63}$/;
-const SAFE_COMMAND_ID = /^[a-z][a-z0-9_]{0,63}$/;
+const SAFE_COMMAND_ID = /^[a-z][a-z0-9_]{0,31}$/;
 const SAFE_COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
-export const KNOWN_COMMANDS = [
-  "test", "build", "typecheck", "format_check", "lint", "coverage", "crap",
-  "invariants", "permissions", "accessibility", "contract", "integration", "database",
-];
+const ACCEPTANCE_CRITICAL_COMMANDS = new Set(["test", "crap"]);
+const COMMAND_FIELDS = ["command", "argv", "version_argv", "working_directory", "timeout_ms", "required_environment", "severity", "commands"];
 const ERROR_CODES = new Set([
   null,
   "ARGUMENT_INVALID",
+  "MANIFEST_ABSENT",
   "MANIFEST_INVALID",
   "REPOSITORY_INVALID",
   "REF_INVALID",
@@ -53,6 +60,8 @@ const ERROR_CODES = new Set([
   "WORKTREE_MUTATED",
   "SCOPE_TOO_LARGE",
   "COMMAND_FAILED",
+  "TIMEOUT",
+  "SPAWN_FAILED",
   "CRAP_REPORT_INVALID",
   "CRAP_REPORT_INCOMPLETE",
   "CRAP_POLICY_FAILED",
@@ -70,6 +79,7 @@ const RESULT_KEYS = [
   "verdict",
   "error_code",
   "error_context",
+  "detail",
   "duration_ms",
   "repository",
   "manifest",
@@ -77,6 +87,31 @@ const RESULT_KEYS = [
   "commands",
   "crap",
 ];
+const REQUIRED_RESULT_KEYS = RESULT_KEYS.filter((key) => key !== "detail");
+
+const COMMAND_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["argv"],
+  properties: {
+    argv: { type: "array", minItems: 1, maxItems: MAX_ARGV_ITEMS, items: { type: "string" } },
+    working_directory: { type: "string" },
+    timeout_ms: { type: "integer", minimum: 1, maximum: MAX_TIMEOUT_MS },
+    version_argv: {
+      type: "array",
+      minItems: 1,
+      maxItems: MAX_ARGV_ITEMS,
+      items: { type: "string" },
+    },
+    required_environment: {
+      type: "array",
+      maxItems: 32,
+      uniqueItems: true,
+      items: { type: "string", pattern: "^[A-Z][A-Z0-9_]{0,127}$" },
+    },
+    severity: { enum: ["blocking", "advisory"] },
+  },
+};
 
 export const QUALITY_MANIFEST_SCHEMA = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
@@ -90,33 +125,7 @@ export const QUALITY_MANIFEST_SCHEMA = {
       type: "object",
       minProperties: 1,
       additionalProperties: false,
-      properties: Object.fromEntries(
-        KNOWN_COMMANDS.map((id) => [
-          id,
-          {
-            type: "object",
-            additionalProperties: false,
-            required: ["argv"],
-            properties: {
-              argv: { type: "array", minItems: 1, maxItems: MAX_ARGV_ITEMS, items: { type: "string" } },
-              working_directory: { type: "string" },
-              timeout_ms: { type: "integer", minimum: 1, maximum: MAX_TIMEOUT_MS },
-              version_argv: {
-                type: "array",
-                minItems: 1,
-                maxItems: MAX_ARGV_ITEMS,
-                items: { type: "string" },
-              },
-              required_environment: {
-                type: "array",
-                maxItems: 32,
-                uniqueItems: true,
-                items: { type: "string", pattern: "^[A-Z][A-Z0-9_]{0,127}$" },
-              },
-            },
-          },
-        ]),
-      ),
+      patternProperties: { "^[a-z][a-z0-9_]{0,31}$": COMMAND_SCHEMA },
     },
     crap: {
       type: "object",
@@ -156,7 +165,7 @@ export const QUALITY_RESULT_SCHEMA = {
   $id: "team-harness/quality-result/v3",
   type: "object",
   additionalProperties: false,
-  required: RESULT_KEYS,
+  required: REQUIRED_RESULT_KEYS,
   properties: {
     schema_version: { const: QUALITY_RESULT_SCHEMA_VERSION },
     kind: { const: "team_harness_quality" },
@@ -171,12 +180,13 @@ export const QUALITY_RESULT_SCHEMA = {
           additionalProperties: false,
           required: ["command_id", "field"],
           properties: {
-            command_id: { type: "string", pattern: "^[a-z][a-z0-9_]{0,63}$" },
-            field: { enum: ["command", "argv", "version_argv", "working_directory", "timeout_ms", "required_environment", "commands"] },
+            command_id: { type: "string", pattern: "^[a-z][a-z0-9_]{0,31}$" },
+            field: { enum: COMMAND_FIELDS },
           },
         },
       ],
     },
+    detail: { anyOf: [{ type: "null" }, { type: "string", minLength: 1, maxLength: MAX_DETAIL_CHARS }] },
     duration_ms: { type: "integer", minimum: 0 },
     repository: { anyOf: [{ type: "null" }, { type: "object" }] },
     manifest: { anyOf: [{ type: "null" }, { type: "object" }] },
@@ -186,57 +196,44 @@ export const QUALITY_RESULT_SCHEMA = {
   },
 };
 
+function boundedToken(value) {
+  const text = typeof value === "string" ? value : String(value);
+  return boundedDetail(text.slice(0, 64)) ?? "(unprintable)";
+}
+
 class QualityError extends Error {
-  constructor(code, context = null) {
+  constructor(code, { detail = null, context = null } = {}) {
     super(code);
     this.code = code;
+    this.detail = boundedDetail(detail);
     this.context = isErrorContext(context) ? context : null;
   }
+}
+
+function qualityError(code, detail = null) {
+  return new QualityError(code, { detail });
+}
+
+const readBoundedJson = createBoundedJsonReader(qualityError);
+const { gitText: gitTextWithCode, gitBytes: gitBytesWithCode } = createGitRunners(qualityError);
+
+async function git(repo, args) {
+  return gitBytesWithCode(repo, args, "REPOSITORY_INVALID");
+}
+
+async function gitText(repo, args) {
+  return gitTextWithCode(repo, args, "REPOSITORY_INVALID");
 }
 
 function isErrorContext(value) {
   return hasExactlyKeys(value, ["command_id", "field"])
     && typeof value.command_id === "string"
     && SAFE_COMMAND_ID.test(value.command_id)
-    && ["command", "argv", "version_argv", "working_directory", "timeout_ms", "required_environment", "commands"].includes(value.field);
+    && COMMAND_FIELDS.includes(value.field);
 }
 
-function hasOnlyKeys(value, allowed, required = []) {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-  const actual = Object.keys(value);
-  return actual.every((key) => allowed.includes(key)) && required.every((key) => Object.hasOwn(value, key));
-}
-
-function hasExactlyKeys(value, keys) {
-  return hasOnlyKeys(value, keys, keys) && Object.keys(value).length === keys.length;
-}
-
-function sha256(value) {
-  return createHash("sha256").update(value).digest("hex");
-}
-
-function canonicalize(value) {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (value !== null && typeof value === "object") {
-    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));
-  }
-  return value;
-}
-
-function canonicalHash(value) {
-  return sha256(JSON.stringify(canonicalize(value)));
-}
-
-function isContained(root, target) {
-  const relative = path.relative(root, target);
-  return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
-}
-
-function isSafeRelativePath(value) {
-  if (typeof value !== "string" || value.length === 0 || value.includes("\u0000") || path.isAbsolute(value)) return false;
-  const normalized = value.replaceAll("\\", "/");
-  if (normalized.startsWith("/") || normalized.split("/").includes("..")) return false;
-  return Buffer.byteLength(value, "utf8") <= 512;
+export function isQualityCommandId(value) {
+  return typeof value === "string" && SAFE_COMMAND_ID.test(value);
 }
 
 const PACKAGE_MANAGERS = new Set(["npm", "pnpm", "yarn", "bun"]);
@@ -264,7 +261,7 @@ function skipLeadingOptions(argv, offset) {
       offset += 2;
       continue;
     }
-    throw new QualityError("NON_HERMETIC_COMMAND");
+    throw qualityError("NON_HERMETIC_COMMAND", "unsupported package-manager leading option");
   }
   return offset;
 }
@@ -275,7 +272,9 @@ function packageManagerInvocation(argv) {
   if (executable === "corepack") {
     offset = skipLeadingOptions(argv, offset);
     executable = normalizeExecutable(argv[offset] ?? "");
-    if (!PACKAGE_MANAGERS.has(executable)) throw new QualityError("NON_HERMETIC_COMMAND");
+    if (!PACKAGE_MANAGERS.has(executable)) {
+      throw qualityError("NON_HERMETIC_COMMAND", "corepack may only wrap a known package manager");
+    }
     offset += 1;
   }
   if (!PACKAGE_MANAGERS.has(executable)) return null;
@@ -284,21 +283,27 @@ function packageManagerInvocation(argv) {
 }
 
 function validateArgv(argv, { requireReportToken = false, allowLocalPnpmExec = false, enforceHermetic = true } = {}) {
-  if (!Array.isArray(argv) || argv.length === 0 || argv.length > MAX_ARGV_ITEMS) throw new QualityError("MANIFEST_INVALID");
+  if (!Array.isArray(argv) || argv.length === 0 || argv.length > MAX_ARGV_ITEMS) {
+    throw qualityError("MANIFEST_INVALID", "argv must be a non-empty string array with at most 128 items");
+  }
   let bytes = 0;
   let reportTokens = 0;
   for (const argument of argv) {
     if (typeof argument !== "string" || argument.length === 0 || argument.includes("\u0000")) {
-      throw new QualityError("MANIFEST_INVALID");
+      throw qualityError("MANIFEST_INVALID", "argv items must be non-empty strings without NUL bytes");
     }
     const itemBytes = Buffer.byteLength(argument, "utf8");
     if (itemBytes > MAX_ARGV_ITEM_BYTES || bytes > MAX_ARGV_BYTES - itemBytes) {
-      throw new QualityError("MANIFEST_INVALID");
+      throw qualityError("MANIFEST_INVALID", "argv exceeds the per-item or total byte bound");
     }
     bytes += itemBytes;
     if (argument === CRAP_REPORT_TOKEN) reportTokens += 1;
   }
-  if (requireReportToken ? reportTokens !== 1 : reportTokens !== 0) throw new QualityError("MANIFEST_INVALID");
+  if (requireReportToken ? reportTokens !== 1 : reportTokens !== 0) {
+    throw qualityError("MANIFEST_INVALID", requireReportToken
+      ? "crap argv must contain the report token exactly once"
+      : "only the crap argv may contain the report token");
+  }
   if (!enforceHermetic) return argv.slice();
   const executable = normalizeExecutable(argv[0]);
   const invocation = packageManagerInvocation(argv);
@@ -311,25 +316,33 @@ function validateArgv(argv, { requireReportToken = false, allowLocalPnpmExec = f
     || (manager === "yarn" && ["exec", "dlx"].includes(operation))
     || (manager === "bun" && operation === "x")
     || (localPnpmExec && !allowLocalPnpmExec);
-  if (nonHermetic) throw new QualityError("NON_HERMETIC_COMMAND");
+  if (nonHermetic) throw qualityError("NON_HERMETIC_COMMAND", "package-manager exec/download shims are not hermetic");
   return argv.slice();
 }
 
-function commandError(code, id, field) {
-  return new QualityError(code, { command_id: id, field });
+function commandError(code, id, field, detail = null) {
+  return new QualityError(code, { detail, context: { command_id: id, field } });
 }
 
 function validateCommand(command, id, { enforceHermetic = true } = {}) {
-  if (!hasOnlyKeys(command, ["argv", "working_directory", "timeout_ms", "version_argv", "required_environment"], ["argv"])) {
-    throw commandError("MANIFEST_INVALID", id, "command");
+  if (!hasOnlyKeys(command, ["argv", "working_directory", "timeout_ms", "version_argv", "required_environment", "severity"], ["argv"])) {
+    throw commandError("MANIFEST_INVALID", id, "command",
+      `command '${id}' must declare argv and only working_directory/timeout_ms/version_argv/required_environment/severity`);
   }
   const workingDirectory = Object.hasOwn(command, "working_directory") ? command.working_directory : ".";
   if (!isSafeRelativePath(workingDirectory) && workingDirectory !== ".") {
-    throw commandError("MANIFEST_INVALID", id, "working_directory");
+    throw commandError("MANIFEST_INVALID", id, "working_directory", `command '${id}' working_directory must be a safe relative path`);
   }
   const timeoutMs = Object.hasOwn(command, "timeout_ms") ? command.timeout_ms : DEFAULT_TIMEOUT_MS;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > MAX_TIMEOUT_MS) {
-    throw commandError("MANIFEST_INVALID", id, "timeout_ms");
+    throw commandError("MANIFEST_INVALID", id, "timeout_ms", `command '${id}' timeout_ms must be an integer between 1 and ${MAX_TIMEOUT_MS}`);
+  }
+  const severity = Object.hasOwn(command, "severity") ? command.severity : "blocking";
+  if (!["blocking", "advisory"].includes(severity)) {
+    throw commandError("MANIFEST_INVALID", id, "severity", `command '${id}' severity must be "blocking" or "advisory"`);
+  }
+  if (severity === "advisory" && ACCEPTANCE_CRITICAL_COMMANDS.has(id)) {
+    throw commandError("MANIFEST_INVALID", id, "severity", `command '${id}' is acceptance-critical and may not be declared advisory`);
   }
   let argv;
   try {
@@ -339,13 +352,14 @@ function validateCommand(command, id, { enforceHermetic = true } = {}) {
       enforceHermetic,
     });
   } catch (error) {
-    if (error instanceof QualityError) throw commandError(error.code, id, "argv");
+    if (error instanceof QualityError) throw commandError(error.code, id, "argv", error.detail);
     throw error;
   }
   const normalized = {
     argv,
     working_directory: workingDirectory,
     timeout_ms: timeoutMs,
+    severity,
     version_argv: null,
     required_environment: [],
   };
@@ -353,7 +367,7 @@ function validateCommand(command, id, { enforceHermetic = true } = {}) {
     try {
       normalized.version_argv = validateArgv(command.version_argv, { enforceHermetic });
     } catch (error) {
-      if (error instanceof QualityError) throw commandError(error.code, id, "version_argv");
+      if (error instanceof QualityError) throw commandError(error.code, id, "version_argv", error.detail);
       throw error;
     }
   }
@@ -361,7 +375,8 @@ function validateCommand(command, id, { enforceHermetic = true } = {}) {
     if (!Array.isArray(command.required_environment) || command.required_environment.length > 32 ||
       new Set(command.required_environment).size !== command.required_environment.length ||
       command.required_environment.some((name) => typeof name !== "string" || !/^[A-Z][A-Z0-9_]{0,127}$/.test(name))) {
-      throw commandError("MANIFEST_INVALID", id, "required_environment");
+      throw commandError("MANIFEST_INVALID", id, "required_environment",
+        `command '${id}' required_environment must be at most 32 unique UPPER_SNAKE names`);
     }
     normalized.required_environment = command.required_environment.slice().sort();
   }
@@ -370,19 +385,23 @@ function validateCommand(command, id, { enforceHermetic = true } = {}) {
 
 function validateTestPathRule(rule) {
   if (!hasExactlyKeys(rule, ["type", "value"]) || !["prefix", "suffix", "segment"].includes(rule.type)) {
-    throw new QualityError("MANIFEST_INVALID");
+    throw qualityError("MANIFEST_INVALID", "test_contract path rules must declare type prefix/suffix/segment and value");
   }
   if (typeof rule.value !== "string" || rule.value.length === 0 || rule.value.includes("\u0000")) {
-    throw new QualityError("MANIFEST_INVALID");
+    throw qualityError("MANIFEST_INVALID", "test_contract path-rule value must be a non-empty string without NUL bytes");
   }
-  if (rule.type === "prefix" && !isSafeRelativePath(rule.value)) throw new QualityError("MANIFEST_INVALID");
+  if (rule.type === "prefix" && !isSafeRelativePath(rule.value)) {
+    throw qualityError("MANIFEST_INVALID", "test_contract prefix rule value must be a safe relative path");
+  }
   if (
     rule.type !== "prefix" &&
     (rule.value.includes("/") || rule.value.includes("\\") || rule.value === "." || rule.value === "..")
   ) {
-    throw new QualityError("MANIFEST_INVALID");
+    throw qualityError("MANIFEST_INVALID", "test_contract suffix/segment rule value may not contain path separators");
   }
-  if (Buffer.byteLength(rule.value, "utf8") > 128) throw new QualityError("MANIFEST_INVALID");
+  if (Buffer.byteLength(rule.value, "utf8") > 128) {
+    throw qualityError("MANIFEST_INVALID", "test_contract path-rule value exceeds 128 bytes");
+  }
   return { type: rule.type, value: rule.value };
 }
 
@@ -393,29 +412,33 @@ function validateTestContractConfig(value) {
     value.path_rules.length === 0 ||
     value.path_rules.length > 32
   ) {
-    throw new QualityError("MANIFEST_INVALID");
+    throw qualityError("MANIFEST_INVALID", "test_contract must declare between 1 and 32 path_rules");
   }
   return { path_rules: value.path_rules.map(validateTestPathRule) };
 }
 
 export function validateQualityManifest(value, { selectedChecks = null } = {}) {
   if (!hasOnlyKeys(value, ["schema_version", "commands", "crap", "test_contract"], ["schema_version", "commands"])) {
-    throw new QualityError("MANIFEST_INVALID");
+    throw qualityError("MANIFEST_INVALID", "manifest must declare schema_version and commands, plus only crap/test_contract");
   }
-  if (value.schema_version !== QUALITY_MANIFEST_SCHEMA_VERSION) throw new QualityError("MANIFEST_INVALID");
+  if (value.schema_version !== QUALITY_MANIFEST_SCHEMA_VERSION) {
+    throw qualityError("MANIFEST_INVALID", `manifest schema_version must be ${QUALITY_MANIFEST_SCHEMA_VERSION}`);
+  }
   if (value.commands === null || typeof value.commands !== "object" || Array.isArray(value.commands)) {
-    throw new QualityError("MANIFEST_INVALID");
+    throw qualityError("MANIFEST_INVALID", "manifest commands must be an object of command declarations");
   }
   const commandIds = Object.keys(value.commands);
-  if (commandIds.length === 0 || commandIds.some((id) => !SAFE_COMMAND_ID.test(id) || !KNOWN_COMMANDS.includes(id))) {
-    throw new QualityError("MANIFEST_INVALID");
+  if (commandIds.length === 0) throw qualityError("MANIFEST_INVALID", "manifest must declare at least one command");
+  const invalidId = commandIds.find((id) => !SAFE_COMMAND_ID.test(id));
+  if (invalidId !== undefined) {
+    throw qualityError("MANIFEST_INVALID", `command id '${boundedToken(invalidId)}' must match ^[a-z][a-z0-9_]{0,31}$`);
   }
   if (
     selectedChecks !== null &&
     (!Array.isArray(selectedChecks) || new Set(selectedChecks).size !== selectedChecks.length ||
-      selectedChecks.some((id) => typeof id !== "string" || !SAFE_COMMAND_ID.test(id) || !KNOWN_COMMANDS.includes(id)))
+      selectedChecks.some((id) => !isQualityCommandId(id)))
   ) {
-    throw new QualityError("MANIFEST_INVALID");
+    throw qualityError("MANIFEST_INVALID", "selected checks must be unique command ids matching ^[a-z][a-z0-9_]{0,31}$");
   }
   const hermeticChecks = new Set(selectedChecks === null ? commandIds : selectedChecks);
   const commands = Object.fromEntries(commandIds.sort().map((id) => [
@@ -433,14 +456,15 @@ export function validateQualityManifest(value, { selectedChecks = null } = {}) {
       typeof value.crap.changed_function_may_worsen !== "boolean" ||
       !Object.hasOwn(commands, "crap")
     ) {
-      throw new QualityError("MANIFEST_INVALID");
+      throw qualityError("MANIFEST_INVALID",
+        "crap policy requires new_function_max >= 0, boolean changed_function_may_worsen, and a declared crap command");
     }
     crap = {
       new_function_max: value.crap.new_function_max,
       changed_function_may_worsen: value.crap.changed_function_may_worsen,
     };
   } else if (Object.hasOwn(commands, "crap")) {
-    throw new QualityError("MANIFEST_INVALID");
+    throw qualityError("MANIFEST_INVALID", "a declared crap command requires a crap policy block");
   }
   const testContract = Object.hasOwn(value, "test_contract")
     ? validateTestContractConfig(value.test_contract)
@@ -448,46 +472,9 @@ export function validateQualityManifest(value, { selectedChecks = null } = {}) {
   return { schema_version: QUALITY_MANIFEST_SCHEMA_VERSION, commands, crap, test_contract: testContract };
 }
 
-async function readBoundedJson(filePath, errorCode) {
-  let stat;
-  let bytes;
-  try {
-    stat = await lstat(filePath);
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_JSON_BYTES) throw new Error("invalid file");
-    bytes = await readFile(filePath);
-  } catch {
-    throw new QualityError(errorCode);
-  }
-  if (bytes.length > MAX_JSON_BYTES) throw new QualityError(errorCode);
-  try {
-    return { value: JSON.parse(bytes.toString("utf8")), bytes };
-  } catch {
-    throw new QualityError(errorCode);
-  }
-}
-
-async function git(repo, args) {
-  try {
-    const result = await execFileAsync("git", args, {
-      cwd: repo,
-      encoding: null,
-      maxBuffer: MAX_JSON_BYTES,
-      timeout: 30_000,
-      windowsHide: true,
-    });
-    return result.stdout;
-  } catch {
-    throw new QualityError("REPOSITORY_INVALID");
-  }
-}
-
-async function gitText(repo, args) {
-  return (await git(repo, args)).toString("utf8").trim();
-}
-
-async function assertClean(repo, code) {
-  const status = await git(repo, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]);
-  if (status.length !== 0) throw new QualityError(code);
+async function assertClean(repo, code, detail) {
+  const status = await git(repo, ["status", "--porcelain=v1", "-z", "--untracked-files=no"]);
+  if (status.length !== 0) throw qualityError(code, detail);
 }
 
 function validateRepositoryInputs(repoInput, baseInput, candidateInput) {
@@ -497,7 +484,7 @@ function validateRepositoryInputs(repoInput, baseInput, candidateInput) {
     !SAFE_COMMIT.test(baseInput ?? "") ||
     !(candidateInput === "HEAD" || SAFE_COMMIT.test(candidateInput ?? ""))
   ) {
-    throw new QualityError("ARGUMENT_INVALID");
+    throw qualityError("ARGUMENT_INVALID", "repo must be a path and base/candidate full commit hashes (candidate may be HEAD)");
   }
 }
 
@@ -506,17 +493,17 @@ async function resolveRepositoryRoot(repoInput) {
   try {
     repo = await realpath(path.resolve(repoInput));
   } catch {
-    throw new QualityError("REPOSITORY_INVALID");
+    throw qualityError("REPOSITORY_INVALID", "repository path does not resolve");
   }
   const top = await gitText(repo, ["rev-parse", "--show-toplevel"]);
   let canonicalTop;
   try {
     canonicalTop = await realpath(top);
   } catch {
-    throw new QualityError("REPOSITORY_INVALID");
+    throw qualityError("REPOSITORY_INVALID", "repository top-level does not resolve");
   }
-  if (canonicalTop !== repo) throw new QualityError("REPOSITORY_INVALID");
-  await assertClean(repo, "WORKTREE_DIRTY");
+  if (canonicalTop !== repo) throw qualityError("REPOSITORY_INVALID", "repo must be the repository root");
+  await assertClean(repo, "WORKTREE_DIRTY", "tracked files are modified or staged before execution");
   return repo;
 }
 
@@ -529,11 +516,11 @@ async function resolveCommitIdentity(repo, baseInput, candidateInput) {
     candidateCommit = await gitText(repo, ["rev-parse", "--verify", `${candidateInput}^{commit}`]);
     headCommit = await gitText(repo, ["rev-parse", "--verify", "HEAD^{commit}"]);
   } catch {
-    throw new QualityError("REF_INVALID");
+    throw qualityError("REF_INVALID", "base or candidate does not resolve to a commit");
   }
-  if (candidateCommit !== headCommit) throw new QualityError("CANDIDATE_NOT_HEAD");
+  if (candidateCommit !== headCommit) throw qualityError("CANDIDATE_NOT_HEAD", "candidate must be the current HEAD commit");
   const mergeBase = await gitText(repo, ["merge-base", baseCommit, candidateCommit]);
-  if (mergeBase !== baseCommit) throw new QualityError("BASE_NOT_ANCESTOR");
+  if (mergeBase !== baseCommit) throw qualityError("BASE_NOT_ANCESTOR", "base must be an ancestor of the candidate");
   const baseTree = await gitText(repo, ["rev-parse", "--verify", `${baseCommit}^{tree}`]);
   const candidateTree = await gitText(repo, ["rev-parse", "--verify", `${candidateCommit}^{tree}`]);
   return { baseCommit, candidateCommit, baseTree, candidateTree };
@@ -546,8 +533,12 @@ async function resolveChangedPaths(repo, identity) {
     .toString("utf8")
     .split("\u0000")
     .filter(Boolean);
-  if (changedPaths.length > MAX_CHANGED_PATHS) throw new QualityError("SCOPE_TOO_LARGE");
-  if (changedPaths.some((entry) => !isSafeRelativePath(entry))) throw new QualityError("REPOSITORY_INVALID");
+  if (changedPaths.length > MAX_CHANGED_PATHS) {
+    throw qualityError("SCOPE_TOO_LARGE", `diff exceeds ${MAX_CHANGED_PATHS} changed paths`);
+  }
+  if (changedPaths.some((entry) => !isSafeRelativePath(entry))) {
+    throw qualityError("REPOSITORY_INVALID", "diff contains an unsafe changed path");
+  }
   return changedPaths;
 }
 
@@ -568,25 +559,34 @@ async function resolveRepository(repoInput, baseInput, candidateInput) {
 
 async function resolveManifest(repo, manifestInput, selectedChecks) {
   if (typeof manifestInput !== "string" || manifestInput.length === 0 || manifestInput.includes("\u0000")) {
-    throw new QualityError("ARGUMENT_INVALID");
+    throw qualityError("ARGUMENT_INVALID", "manifest path must be a non-empty string without NUL bytes");
   }
   const requested = path.resolve(repo, manifestInput);
+  let requestedStat;
+  try {
+    requestedStat = await lstat(requested);
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      throw qualityError("MANIFEST_ABSENT", `manifest not found: ${boundedToken(manifestInput)}`);
+    }
+    throw qualityError("MANIFEST_INVALID", `manifest is unreadable: ${boundedToken(manifestInput)}`);
+  }
   let filePath;
   try {
-    const requestedStat = await lstat(requested);
     if (!requestedStat.isFile() || requestedStat.isSymbolicLink()) throw new Error("invalid manifest");
     filePath = await realpath(requested);
   } catch {
-    throw new QualityError("MANIFEST_INVALID");
+    throw qualityError("MANIFEST_INVALID", `manifest must be a regular non-symlink file: ${boundedToken(manifestInput)}`);
   }
-  if (!isContained(repo, filePath)) throw new QualityError("MANIFEST_INVALID");
-  const loaded = await readBoundedJson(filePath, "MANIFEST_INVALID");
+  if (!isContained(repo, filePath)) throw qualityError("MANIFEST_INVALID", "manifest escapes the repository root");
+  const loaded = await readBoundedJson(filePath, "MANIFEST_INVALID", "manifest is oversized or not valid JSON");
   const manifest = validateQualityManifest(loaded.value, { selectedChecks });
   return {
     value: manifest,
     evidence: {
       path: path.relative(repo, filePath).split(path.sep).join("/"),
       sha256: sha256(loaded.bytes),
+      canonical_sha256: canonicalHash(loaded.value),
     },
   };
 }
@@ -599,9 +599,11 @@ async function commandWorkingDirectory(repo, relative) {
     const stat = await lstat(resolved);
     if (!stat.isDirectory()) throw new Error("not a directory");
   } catch {
-    throw new QualityError("MANIFEST_INVALID");
+    throw qualityError("MANIFEST_INVALID", `working_directory does not resolve to a directory: ${boundedToken(relative)}`);
   }
-  if (!isContained(repo, resolved)) throw new QualityError("MANIFEST_INVALID");
+  if (!isContained(repo, resolved)) {
+    throw qualityError("MANIFEST_INVALID", "working_directory escapes the repository root");
+  }
   return resolved;
 }
 
@@ -611,7 +613,9 @@ function pnpmExecParts(argv) {
   let offset = invocation.operationOffset + 1;
   if (argv[offset] === "--") offset += 1;
   const tool = argv[offset];
-  if (typeof tool !== "string" || !/^[A-Za-z0-9._-]+$/.test(tool)) throw new QualityError("NON_HERMETIC_COMMAND");
+  if (typeof tool !== "string" || !/^[A-Za-z0-9._-]+$/.test(tool)) {
+    throw qualityError("NON_HERMETIC_COMMAND", "pnpm exec tool name is not a plain binary name");
+  }
   return { tool, args: argv.slice(offset + 1) };
 }
 
@@ -623,10 +627,10 @@ function pnpmScriptParts(argv) {
   if (argv[offset]?.toLowerCase() === "run") offset += 1;
   const script = argv[offset];
   if (typeof script !== "string" || !/^[A-Za-z0-9:_-]+$/.test(script)) {
-    throw new QualityError("NON_HERMETIC_COMMAND");
+    throw qualityError("NON_HERMETIC_COMMAND", "pnpm script name is not a plain script identifier");
   }
   if (["add", "approve-builds", "audit", "import", "install", "i", "link", "rebuild", "remove", "rm", "uninstall", "update", "up"].includes(script.toLowerCase())) {
-    throw new QualityError("NON_HERMETIC_COMMAND");
+    throw qualityError("NON_HERMETIC_COMMAND", "pnpm store-mutating operations are not hermetic");
   }
   const args = argv.slice(offset + 1);
   if (args[0] === "--") args.shift();
@@ -635,14 +639,16 @@ function pnpmScriptParts(argv) {
 
 function parseSimplePackageScript(value) {
   if (typeof value !== "string" || value.length === 0 || Buffer.byteLength(value, "utf8") > MAX_ARGV_BYTES) {
-    throw new QualityError("NON_HERMETIC_COMMAND");
+    throw qualityError("NON_HERMETIC_COMMAND", "package script is empty or oversized");
   }
   const parts = value.split(" ");
   if (parts.some((part) => part.length === 0 || !/^[A-Za-z0-9_./:@%+=,-]+$/.test(part))) {
-    throw new QualityError("NON_HERMETIC_COMMAND");
+    throw qualityError("NON_HERMETIC_COMMAND", "package script uses shell syntax");
   }
   const tool = parts[0];
-  if (!/^[A-Za-z0-9._-]+$/.test(tool)) throw new QualityError("NON_HERMETIC_COMMAND");
+  if (!/^[A-Za-z0-9._-]+$/.test(tool)) {
+    throw qualityError("NON_HERMETIC_COMMAND", "package script tool is not a plain binary name");
+  }
   return { tool, args: parts.slice(1) };
 }
 
@@ -683,16 +689,18 @@ export async function resolveLinkedLocalBinary(tool, args, cwd, repository, reso
     if (parent === directory || !isContained(repository, parent)) break;
     directory = parent;
   }
-  throw new QualityError("PREREQUISITE_UNAVAILABLE");
+  throw qualityError("PREREQUISITE_UNAVAILABLE", "no linked repository-local binary satisfies the command");
 }
 
 async function resolveDeclaredLocalBinary(argv, cwd, repository, platform = process.platform) {
   const coordinate = argv[0].replaceAll("\\", "/");
   const match = /^(?:\.\/)?node_modules\/\.bin\/([A-Za-z0-9._-]+)$/u.exec(coordinate);
   if (match === null) return null;
-  if (!isSafeRelativePath(coordinate)) throw new QualityError("NON_HERMETIC_COMMAND");
+  if (!isSafeRelativePath(coordinate)) throw qualityError("NON_HERMETIC_COMMAND", "declared local binary path is unsafe");
   const requested = path.resolve(cwd, coordinate);
-  if (!isContained(repository, requested)) throw new QualityError("NON_HERMETIC_COMMAND");
+  if (!isContained(repository, requested)) {
+    throw qualityError("NON_HERMETIC_COMMAND", "declared local binary escapes the repository");
+  }
   try {
     const stat = await lstat(requested);
     if (!stat.isFile() && !stat.isSymbolicLink()) throw new Error("invalid local binary");
@@ -712,14 +720,14 @@ async function resolveDeclaredLocalBinary(argv, cwd, repository, platform = proc
     };
   } catch (error) {
     if (error instanceof QualityError) throw error;
-    throw new QualityError("PREREQUISITE_UNAVAILABLE");
+    throw qualityError("PREREQUISITE_UNAVAILABLE", "declared local binary does not resolve inside the repository");
   }
 }
 
 async function resolveRepositoryNodeScript(args, cwd, repository, resolution) {
   const [script, ...scriptArgs] = args;
   if (!isSafeRelativePath(script) || !/\.(?:cjs|js|mjs)$/iu.test(script)) {
-    throw new QualityError("NON_HERMETIC_COMMAND");
+    throw qualityError("NON_HERMETIC_COMMAND", "node package script must target a repository script file");
   }
   const requested = path.resolve(cwd, script);
   try {
@@ -735,7 +743,7 @@ async function resolveRepositoryNodeScript(args, cwd, repository, resolution) {
     };
   } catch (error) {
     if (error instanceof QualityError) throw error;
-    throw new QualityError("PREREQUISITE_UNAVAILABLE");
+    throw qualityError("PREREQUISITE_UNAVAILABLE", "node package script does not resolve inside the repository");
   }
 }
 
@@ -755,13 +763,13 @@ async function resolveExecutionArgv(argv, cwd, repository) {
     if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("invalid package.json");
     const canonical = await realpath(packagePath);
     if (!isContained(repository, canonical)) throw new Error("escaped package.json");
-    packageJson = (await readBoundedJson(canonical, "PREREQUISITE_UNAVAILABLE")).value;
+    packageJson = (await readBoundedJson(canonical, "PREREQUISITE_UNAVAILABLE", "package.json is unreadable or not valid JSON")).value;
   } catch (error) {
     if (error instanceof QualityError) throw error;
-    throw new QualityError("PREREQUISITE_UNAVAILABLE");
+    throw qualityError("PREREQUISITE_UNAVAILABLE", "package.json does not resolve inside the repository");
   }
   const scriptValue = packageJson?.scripts?.[scriptParts.script];
-  if (scriptValue === undefined) throw new QualityError("PREREQUISITE_UNAVAILABLE");
+  if (scriptValue === undefined) throw qualityError("PREREQUISITE_UNAVAILABLE", "package script is not declared in package.json");
   const simple = parseSimplePackageScript(scriptValue);
   if (normalizeExecutable(simple.tool) === "node") {
     return resolveRepositoryNodeScript(
@@ -794,6 +802,7 @@ function commandEvidence(id, command, version, execution, executionIdentity, exe
         );
   return {
     id,
+    severity: command.severity,
     command_sha256: canonicalHash(command),
     execution_argv_sha256: canonicalHash(executionIdentity),
     execution_resolution: executionResolution,
@@ -826,7 +835,7 @@ function computeCrap(complexity, coveragePercent) {
 
 function validateCrapReport(value, changedPaths) {
   if (!hasExactlyKeys(value, ["schema_version", "functions"]) || value.schema_version !== CRAP_REPORT_SCHEMA_VERSION || !Array.isArray(value.functions) || value.functions.length > MAX_FUNCTIONS) {
-    throw new QualityError("CRAP_REPORT_INVALID");
+    throw qualityError("CRAP_REPORT_INVALID", "crap report must declare schema_version 1 and at most 512 functions");
   }
   const changed = new Set(changedPaths);
   const seen = new Set();
@@ -846,10 +855,10 @@ function validateCrapReport(value, changedPaths) {
       entry.coverage_percent < 0 ||
       entry.coverage_percent > 100
     ) {
-      throw new QualityError("CRAP_REPORT_INVALID");
+      throw qualityError("CRAP_REPORT_INVALID", "crap report function entry is malformed or outside the changed paths");
     }
     const key = `${entry.path}\u0000${entry.symbol}`;
-    if (seen.has(key)) throw new QualityError("CRAP_REPORT_INVALID");
+    if (seen.has(key)) throw qualityError("CRAP_REPORT_INVALID", "crap report repeats a path/symbol pair");
     seen.add(key);
     const coveragePercent = roundMetric(entry.coverage_percent);
     return {
@@ -878,7 +887,12 @@ function isRepositoryEvidence(value) {
 }
 
 function isManifestEvidence(value) {
-  return hasExactlyKeys(value, ["path", "sha256"]) && isSafeRelativePath(value.path) && /^[0-9a-f]{64}$/.test(value.sha256);
+  return (
+    hasExactlyKeys(value, ["path", "sha256", "canonical_sha256"]) &&
+    isSafeRelativePath(value.path) &&
+    /^[0-9a-f]{64}$/.test(value.sha256) &&
+    /^[0-9a-f]{64}$/.test(value.canonical_sha256)
+  );
 }
 
 function isBaselineEvidence(value) {
@@ -894,18 +908,19 @@ function isVersionResult(value) {
   return (
     value === null ||
     (hasExactlyKeys(value, ["outcome", "exit_code", "signal", "duration_ms", "error_code"]) &&
-      ["completed", "spawn_error", "argument_invalid", "internal_error"].includes(value.outcome) &&
+      ["completed", "timed_out", "spawn_error", "argument_invalid", "internal_error"].includes(value.outcome) &&
       (value.exit_code === null || Number.isSafeInteger(value.exit_code)) &&
       (value.signal === null || /^SIG[A-Z0-9]+$/.test(value.signal)) &&
       Number.isSafeInteger(value.duration_ms) &&
       value.duration_ms >= 0 &&
-      [null, "ARGUMENT_INVALID", "SPAWN_FAILED", "INTERNAL_ERROR"].includes(value.error_code))
+      [null, "ARGUMENT_INVALID", "TIMEOUT", "SPAWN_FAILED", "INTERNAL_ERROR"].includes(value.error_code))
   );
 }
 
 function isCommandEvidence(value) {
   const keys = [
     "id",
+    "severity",
     "command_sha256",
     "execution_argv_sha256",
     "execution_resolution",
@@ -916,7 +931,8 @@ function isCommandEvidence(value) {
     "verdict",
   ];
   if (!hasExactlyKeys(value, keys)) return false;
-  if (!SAFE_COMMAND_ID.test(value.id) || !/^[0-9a-f]{64}$/.test(value.command_sha256)
+  if (!SAFE_COMMAND_ID.test(value.id) || !["blocking", "advisory"].includes(value.severity)
+    || !/^[0-9a-f]{64}$/.test(value.command_sha256)
     || !/^[0-9a-f]{64}$/.test(value.execution_argv_sha256)
     || !["manifest", "linked-local-bin", "linked-local-script", "repository-local-bin", "repository-local-node-script"].includes(value.execution_resolution)) return false;
   const hasVersion = value.version_result !== null;
@@ -988,11 +1004,13 @@ function isCrapEvidence(value) {
 }
 
 export function isQualityResult(value) {
-  if (!hasExactlyKeys(value, RESULT_KEYS)) return false;
+  if (!hasOnlyKeys(value, RESULT_KEYS, REQUIRED_RESULT_KEYS)) return false;
   if (value.schema_version !== QUALITY_RESULT_SCHEMA_VERSION || value.kind !== "team_harness_quality") return false;
   if (value.checkpoint !== null && (typeof value.checkpoint !== "string" || !SAFE_CHECKPOINT.test(value.checkpoint))) return false;
   if (!["pass", "fail"].includes(value.verdict) || !ERROR_CODES.has(value.error_code)) return false;
   if (value.error_context !== null && !isErrorContext(value.error_context)) return false;
+  const detail = Object.hasOwn(value, "detail") ? value.detail : null;
+  if (!isBoundedDetail(detail)) return false;
   if (!Number.isSafeInteger(value.duration_ms) || value.duration_ms < 0) return false;
   if (value.repository !== null && !isRepositoryEvidence(value.repository)) return false;
   if (value.manifest !== null && !isManifestEvidence(value.manifest)) return false;
@@ -1002,7 +1020,8 @@ export function isQualityResult(value) {
   if (value.crap !== null && !isCrapEvidence(value.crap)) return false;
   if (value.verdict === "pass" && value.error_code !== null) return false;
   if (value.verdict === "pass" && value.error_context !== null) return false;
-  if (value.verdict === "pass" && value.commands.some((entry) => entry.verdict !== "pass")) return false;
+  if (value.verdict === "pass" && detail !== null) return false;
+  if (value.verdict === "pass" && value.commands.some((entry) => entry.severity !== "advisory" && entry.verdict !== "pass")) return false;
   if (value.verdict === "pass" && value.crap?.verdict === "fail") return false;
   if (value.verdict === "fail" && value.error_code === null) return false;
   return true;
@@ -1020,6 +1039,7 @@ function safeResult(state, startedAt) {
     verdict: state.error_code === null ? "pass" : "fail",
     error_code: state.error_code,
     error_context: state.error_context,
+    detail: state.detail,
     duration_ms: elapsedMs(startedAt),
     repository: state.repository,
     manifest: state.manifest,
@@ -1035,6 +1055,7 @@ function safeResult(state, startedAt) {
     verdict: "fail",
     error_code: "INTERNAL_ERROR",
     error_context: null,
+    detail: null,
     duration_ms: 0,
     repository: null,
     manifest: null,
@@ -1054,24 +1075,32 @@ function isCompatibleBaseline(result, context, bytes) {
     result.repository !== null &&
     result.manifest !== null &&
     result.crap !== null &&
-    result.manifest.sha256 === context.manifestEvidence.sha256 &&
+    result.manifest.canonical_sha256 === context.manifestEvidence.canonical_sha256 &&
     result.repository.base_commit === context.repository.base_commit &&
     result.repository.base_tree === context.repository.base_tree
   );
 }
 
 async function loadBaseline(context) {
-  const loaded = await readBoundedJson(context.filePath, "BASELINE_INVALID");
+  const loaded = await readBoundedJson(context.filePath, "BASELINE_INVALID", "baseline evidence is unreadable or not valid JSON");
   const result = loaded.value;
-  if (!isCompatibleBaseline(result, context, loaded.bytes)) throw new QualityError("BASELINE_INVALID");
+  if (!isCompatibleBaseline(result, context, loaded.bytes)) {
+    throw qualityError("BASELINE_INVALID", "baseline is not a passing quality result for this base and manifest");
+  }
   const priorCrapCommand = result.commands.find((entry) => entry?.id === "crap");
-  if (priorCrapCommand?.command_sha256 !== context.currentCrapCommandHash) throw new QualityError("BASELINE_INVALID");
-  const mergeBase = await gitText(context.repo, [
-    "merge-base",
-    result.repository.candidate_commit,
-    context.repository.candidate_commit,
-  ]);
-  if (mergeBase !== result.repository.candidate_commit) throw new QualityError("BASELINE_INVALID");
+  if (priorCrapCommand?.command_sha256 !== context.currentCrapCommandHash) {
+    throw qualityError("BASELINE_INVALID", "baseline crap command differs from the current manifest");
+  }
+  if (result.repository.candidate_tree !== context.repository.candidate_tree) {
+    const mergeBase = await gitText(context.repo, [
+      "merge-base",
+      result.repository.candidate_commit,
+      context.repository.candidate_commit,
+    ]);
+    if (mergeBase !== result.repository.candidate_commit) {
+      throw qualityError("BASELINE_INVALID", "baseline candidate is neither tree-identical to nor an ancestor of the current candidate");
+    }
+  }
   return {
     evidence: {
       sha256: sha256(loaded.bytes),
@@ -1102,25 +1131,27 @@ function normalizeRunOptions(options) {
     Array.isArray(options) ||
     !hasOnlyKeys(options, RUN_OPTION_KEYS, ["repo", "manifest", "base", "candidate", "checkpoint", "checks", "requiredChecks"])
   ) {
-    throw new QualityError("ARGUMENT_INVALID");
+    throw qualityError("ARGUMENT_INVALID", "options must declare repo/manifest/base/candidate/checkpoint/checks/requiredChecks");
   }
   if (typeof options.checkpoint !== "string" || !SAFE_CHECKPOINT.test(options.checkpoint)) {
-    throw new QualityError("ARGUMENT_INVALID");
+    throw qualityError("ARGUMENT_INVALID", "checkpoint must match ^[a-z][a-z0-9_-]{0,63}$");
   }
   if (
     !Array.isArray(options.checks) ||
     options.checks.length === 0 ||
     new Set(options.checks).size !== options.checks.length ||
-    options.checks.some((id) => typeof id !== "string" || !SAFE_COMMAND_ID.test(id) || !KNOWN_COMMANDS.includes(id))
+    options.checks.some((id) => !isQualityCommandId(id))
   ) {
-    throw new QualityError("ARGUMENT_INVALID");
+    throw qualityError("ARGUMENT_INVALID", "checks must be unique command ids matching ^[a-z][a-z0-9_]{0,31}$");
   }
   const policyMode = Object.hasOwn(options, "policyMode") ? options.policyMode : "measure";
-  if (!["measure", "enforce"].includes(policyMode)) throw new QualityError("ARGUMENT_INVALID");
+  if (!["measure", "enforce"].includes(policyMode)) {
+    throw qualityError("ARGUMENT_INVALID", "policyMode must be measure or enforce");
+  }
   const requiredChecks = options.requiredChecks;
   if (!Array.isArray(requiredChecks) || new Set(requiredChecks).size !== requiredChecks.length ||
-    requiredChecks.some((id) => typeof id !== "string" || !KNOWN_COMMANDS.includes(id))) {
-    throw new QualityError("ARGUMENT_INVALID");
+    requiredChecks.some((id) => !isQualityCommandId(id))) {
+    throw qualityError("ARGUMENT_INVALID", "requiredChecks must be unique command ids matching ^[a-z][a-z0-9_]{0,31}$");
   }
   return { ...options, policyMode, requiredChecks };
 }
@@ -1143,20 +1174,28 @@ async function prepareRun(options, state) {
   const missingRequired = options.requiredChecks.find((id) =>
     !Object.hasOwn(manifest.value.commands, id) || !options.checks.includes(id));
   if (missingRequired !== undefined) {
-    throw new QualityError("REQUIRED_CHECKS_MISSING", { command_id: missingRequired, field: "commands" });
+    throw new QualityError("REQUIRED_CHECKS_MISSING", {
+      detail: `required check '${missingRequired}' is not declared and selected`,
+      context: { command_id: missingRequired, field: "commands" },
+    });
   }
   const missingSelected = options.checks.find((id) => !Object.hasOwn(manifest.value.commands, id));
   if (missingSelected !== undefined) {
-    throw new QualityError("MANIFEST_INVALID", { command_id: missingSelected, field: "commands" });
+    throw new QualityError("MANIFEST_INVALID", {
+      detail: `selected check '${missingSelected}' is not declared in the manifest`,
+      context: { command_id: missingSelected, field: "commands" },
+    });
   }
   const usesCrap = options.checks.includes("crap");
-  if (usesCrap && manifest.value.crap === null) throw new QualityError("MANIFEST_INVALID");
+  if (usesCrap && manifest.value.crap === null) {
+    throw qualityError("MANIFEST_INVALID", "the crap check requires a crap policy block in the manifest");
+  }
   if (
     usesCrap &&
     options.policyMode === "enforce" &&
     (typeof options.baseline !== "string" || typeof options.baselineSha256 !== "string")
   ) {
-    throw new QualityError("BASELINE_INVALID");
+    throw qualityError("BASELINE_INVALID", "enforce mode requires baseline and baselineSha256");
   }
   return { options, state, repository, manifest, baselineResult: null, reportRoot: null };
 }
@@ -1176,31 +1215,39 @@ async function prepareBaseline(context) {
   context.baselineResult = loaded.result;
 }
 
-async function runVersionCheck(context, id, command, cwd, resolved) {
-  if (command.version_argv === null) return null;
-  const versionResolved = await resolveExecutionArgv(command.version_argv, cwd, context.repository.root);
-  const version = await runBoundedCommand({
-    argv: versionResolved.argv,
-    cwd,
-    timeoutMs: command.timeout_ms,
-    includeSuccessDiagnostic: true,
-  });
-  await assertClean(context.repository.root, "WORKTREE_MUTATED");
-  if (version.outcome !== "completed" || version.exit_code !== 0 || version.signal !== null) {
-    context.state.commands.push(commandEvidence(id, command, version, version, resolved.identity, resolved.resolution));
-    throw new QualityError("COMMAND_FAILED");
+function executionFailure(id, command, execution) {
+  if (execution.outcome === "timed_out") {
+    return qualityError("TIMEOUT", `command '${id}' timed out after ${command.timeout_ms}ms`);
   }
-  return version;
+  if (execution.outcome === "spawn_error") {
+    return qualityError("SPAWN_FAILED", `command '${id}' failed to spawn`);
+  }
+  return qualityError("COMMAND_FAILED", `command '${id}' failed`);
 }
 
 async function runManifestCommand(context, id) {
   const command = context.manifest.value.commands[id];
   if (command.required_environment.some((name) => !Object.hasOwn(process.env, name) || process.env[name] === "")) {
-    throw new QualityError("PREREQUISITE_UNAVAILABLE");
+    throw qualityError("PREREQUISITE_UNAVAILABLE", `command '${id}' is missing a required environment variable`);
   }
   const cwd = await commandWorkingDirectory(context.repository.root, command.working_directory);
   const resolved = await resolveExecutionArgv(command.argv, cwd, context.repository.root);
-  const version = await runVersionCheck(context, id, command, cwd, resolved);
+  let version = null;
+  if (command.version_argv !== null) {
+    const versionResolved = await resolveExecutionArgv(command.version_argv, cwd, context.repository.root);
+    version = await runBoundedCommand({
+      argv: versionResolved.argv,
+      cwd,
+      timeoutMs: command.timeout_ms,
+      includeSuccessDiagnostic: true,
+    });
+    await assertClean(context.repository.root, "WORKTREE_MUTATED", `command '${id}' version probe mutated tracked files`);
+    if (version.outcome !== "completed" || version.exit_code !== 0 || version.signal !== null) {
+      context.state.commands.push(commandEvidence(id, command, version, version, resolved.identity, resolved.resolution));
+      if (command.severity === "advisory") return null;
+      throw executionFailure(id, command, version);
+    }
+  }
   const reportPath = id === "crap" ? path.join(context.reportRoot, "crap-report.json") : null;
   const argv = resolved.argv.map((argument) => (argument === CRAP_REPORT_TOKEN ? reportPath : argument));
   const identity = resolved.identity.map((argument) => (argument === CRAP_REPORT_TOKEN ? "${TH_QUALITY_REPORT}" : argument));
@@ -1213,10 +1260,13 @@ async function runManifestCommand(context, id) {
   });
   const evidence = commandEvidence(id, command, version, execution, identity, resolved.resolution);
   context.state.commands.push(evidence);
-  await assertClean(context.repository.root, "WORKTREE_MUTATED");
-  if (evidence.verdict !== "pass") throw new QualityError("COMMAND_FAILED");
+  await assertClean(context.repository.root, "WORKTREE_MUTATED", `command '${id}' mutated tracked files`);
+  if (evidence.verdict !== "pass") {
+    if (command.severity === "advisory") return null;
+    throw executionFailure(id, command, execution);
+  }
   if (id !== "crap") return null;
-  const report = await readBoundedJson(reportPath, "CRAP_REPORT_INVALID");
+  const report = await readBoundedJson(reportPath, "CRAP_REPORT_INVALID", "crap report is unreadable or not valid JSON");
   return {
     functions: validateCrapReport(report.value, context.repository.changed_paths),
     reportSha256: sha256(report.bytes),
@@ -1248,7 +1298,7 @@ function recordCrapEvidence(context, crapData) {
     verdict: policy.verdict,
     functions: policy.functions,
   };
-  if (policy.verdict === "fail") throw new QualityError("CRAP_POLICY_FAILED");
+  if (policy.verdict === "fail") throw qualityError("CRAP_POLICY_FAILED", "a changed or new function violates the crap policy");
 }
 
 function applyCrapPolicy(functions, config, policyMode, baselineResult) {
@@ -1259,7 +1309,7 @@ function applyCrapPolicy(functions, config, policyMode, baselineResult) {
   const evaluated = functions.map((entry) => {
     const prior = baselineFunctions.get(`${entry.path}\u0000${entry.symbol}`);
     if (policyMode === "enforce" && entry.status === "changed" && prior === undefined) {
-      throw new QualityError("CRAP_REPORT_INCOMPLETE");
+      throw qualityError("CRAP_REPORT_INCOMPLETE", "a changed function has no baseline measurement");
     }
     const baselineCrap = prior?.crap ?? null;
     const delta = baselineCrap === null ? null : roundMetric(entry.crap - baselineCrap);
@@ -1274,7 +1324,7 @@ function applyCrapPolicy(functions, config, policyMode, baselineResult) {
   if (policyMode === "enforce") {
     const currentKeys = new Set(functions.map((entry) => `${entry.path}\u0000${entry.symbol}`));
     if ([...baselineFunctions.keys()].some((key) => !currentKeys.has(key))) {
-      throw new QualityError("CRAP_REPORT_INCOMPLETE");
+      throw qualityError("CRAP_REPORT_INCOMPLETE", "a baseline function is missing from the current crap report");
     }
   }
   return { functions: evaluated, verdict: policyMode === "measure" ? "not_applied" : failed ? "fail" : "pass" };
@@ -1287,6 +1337,7 @@ export async function runQualityChecks(options) {
     checkpoint: null,
     error_code: null,
     error_context: null,
+    detail: null,
     repository: null,
     manifest: null,
     baseline: null,
@@ -1303,10 +1354,11 @@ export async function runQualityChecks(options) {
       context.reportRoot = await mkdtemp(path.join(tmpdir(), "th-quality-report-"));
     }
     recordCrapEvidence(context, await executeSelectedCommands(context));
-    await assertClean(context.repository.root, "WORKTREE_MUTATED");
+    await assertClean(context.repository.root, "WORKTREE_MUTATED", "a quality command mutated tracked files");
   } catch (error) {
     state.error_code = error instanceof QualityError && ERROR_CODES.has(error.code) ? error.code : "INTERNAL_ERROR";
     state.error_context = error instanceof QualityError ? error.context : null;
+    state.detail = error instanceof QualityError ? error.detail : null;
   } finally {
     if (context?.reportRoot !== null && context?.reportRoot !== undefined) {
       try {
@@ -1321,18 +1373,20 @@ export async function runQualityChecks(options) {
 
 export async function persistQualityResult(outputPath, result) {
   if (typeof outputPath !== "string" || !path.isAbsolute(outputPath) || outputPath.includes("\u0000")) {
-    throw new QualityError("ARGUMENT_INVALID");
+    throw qualityError("ARGUMENT_INVALID", "output path must be absolute and free of NUL bytes");
   }
   const target = path.resolve(outputPath);
   const parent = path.dirname(target);
   try {
     const parentStat = await lstat(parent);
     if (!parentStat.isDirectory() || parentStat.isSymbolicLink() || await realpath(parent) !== parent) {
-      throw new QualityError("ARGUMENT_INVALID");
+      throw qualityError("ARGUMENT_INVALID", "output parent must be a real non-symlink directory");
     }
     try {
       const targetStat = await lstat(target);
-      if (!targetStat.isFile() || targetStat.isSymbolicLink()) throw new QualityError("ARGUMENT_INVALID");
+      if (!targetStat.isFile() || targetStat.isSymbolicLink()) {
+        throw qualityError("ARGUMENT_INVALID", "output target must be a regular non-symlink file");
+      }
     } catch (error) {
       if (error instanceof QualityError) throw error;
       if (error?.code !== "ENOENT") throw error;
@@ -1348,10 +1402,14 @@ export async function persistQualityResult(outputPath, result) {
       await handle.sync();
       await handle.close();
       handle = null;
-      if (await realpath(parent) !== parent) throw new QualityError("ARGUMENT_INVALID");
+      if (await realpath(parent) !== parent) {
+        throw qualityError("ARGUMENT_INVALID", "output parent changed during the write");
+      }
       try {
         const targetStat = await lstat(target);
-        if (!targetStat.isFile() || targetStat.isSymbolicLink()) throw new QualityError("ARGUMENT_INVALID");
+        if (!targetStat.isFile() || targetStat.isSymbolicLink()) {
+          throw qualityError("ARGUMENT_INVALID", "output target must be a regular non-symlink file");
+        }
       } catch (error) {
         if (error instanceof QualityError) throw error;
         if (error?.code !== "ENOENT") throw error;
@@ -1362,7 +1420,7 @@ export async function persistQualityResult(outputPath, result) {
       if (handle) await handle.close().catch(() => {});
       if (ownsTemporary) await unlink(temporary).catch(() => {});
       if (error instanceof QualityError) throw error;
-      throw new QualityError("OUTPUT_WRITE_FAILED");
+      throw qualityError("OUTPUT_WRITE_FAILED", "quality evidence could not be persisted");
     }
     return {
       schema_version: QUALITY_RECEIPT_SCHEMA_VERSION,
@@ -1376,7 +1434,7 @@ export async function persistQualityResult(outputPath, result) {
     };
   } catch (error) {
     if (error instanceof QualityError) throw error;
-    throw new QualityError("OUTPUT_WRITE_FAILED");
+    throw qualityError("OUTPUT_WRITE_FAILED", "quality evidence could not be persisted");
   }
 }
 

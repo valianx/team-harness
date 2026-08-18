@@ -19,11 +19,13 @@ The coordinator supplies:
 
 - PR coordinates;
 - exact `Reviewed Head SHA` and `Context Hash`;
+- the read-only frozen `Worktree` coordinate;
 - paths to coordinator-persisted reviewer and optional focused-reviewer, QA, and security drafts.
 
-Read only those supplied `.claude/pr-review-*` paths. Missing optional drafts mean the lens did
-not run. Every supplied draft must contain a `Reviewed:` SHA matching the supplied SHA. A missing or
-different SHA returns `status: failed`, `failure_kind: stale-context`.
+Read only those supplied paths under the review workspace `workspaces/pr-review-{number}/` and
+the frozen worktree. Missing optional drafts mean the lens did not run. Every supplied draft
+must contain a `Reviewed:` SHA matching the supplied SHA. A missing or different SHA — or a
+missing worktree coordinate — returns `status: failed`, `failure_kind: stale-context`.
 
 ## Language contract
 
@@ -55,8 +57,9 @@ Fingerprint a finding by normalized path, line/range, category, and claim.
 
 - Same fingerprint: keep one finding, merge only evidence or fix details that add substance.
 - Same defect at nearby lines: keep the best anchor.
-- Same locus with different severity: inspect the supplied evidence and keep the supported
-  severity; never choose severity by agent rank.
+- Same locus with different severity: inspect the cited code in the frozen worktree and keep
+  the severity the code supports; never choose severity by agent rank, and never demote a
+  specialist finding on prose alone — a demotion cites the worktree evidence that decides it.
 - Same locus with contradictory fixes: choose the fix supported by code/contracts. If the
   evidence cannot decide, keep a short cross-file contradiction note; do not fabricate
   consensus.
@@ -66,6 +69,11 @@ Fingerprint a finding by normalized path, line/range, category, and claim.
 
 Preserve all supported blockers. Keep at most five suggestions globally, ordered by concrete
 impact and confidence. Omit nitpicks.
+
+Account for every source finding: each one ends `preserved`, `demoted`, or `dropped`, and the
+return's `disposition_ledger` records the non-preserved ones with a one-line reason. The
+coordinator reconciles source counts against this ledger before preview; an unaccounted
+blocking finding fails the consolidation.
 
 ## One-channel rule
 
@@ -116,6 +124,7 @@ Checks: {single concise CI line or "not available"}
 ```
 
 Preserve the general reviewer's CI line; do not manufacture stronger claims.
+The coordinator inserts the `Lenses:` coverage line; never write it yourself.
 Never describe the captured mergeability as current external readiness.
 
 Do not include focus summaries, clean-lens confirmations, reviewability/time estimates, file
@@ -135,6 +144,12 @@ output: inline
 reviewed_head_sha: exact supplied SHA
 context_hash: exact supplied hash
 consolidated_sources: [reviewer, qa, security]
+source_blocking_counts: {reviewer: N, qa: N, security: N}
+disposition_ledger:
+  - source: reviewer | qa | security
+    finding: short claim
+    disposition: demoted | dropped
+    reason: one line citing the deciding evidence
 blocking_count: N
 suggestion_count: N
 event: APPROVE | REQUEST_CHANGES | COMMENT

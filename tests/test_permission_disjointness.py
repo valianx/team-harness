@@ -154,7 +154,7 @@ OUTWARD_SAMPLES: dict[str, list[str]] = {
     "GH_GRAPHQL_RE": [
         "gh api graphql -f query='mutation{mergePullRequest(input:{pullRequestId:\"x\"}){clientMutationId}}'"
     ],
-    "GRAPHQL_PR_MUTATIONS_RE": [
+    "GRAPHQL_PR_MERGE_RE": [
         "gh api graphql -f query='mutation{mergePullRequest(input:{pullRequestId:\"x\"}){clientMutationId}}'"
     ],
     "GH_ISSUE_WRITE_RE": [

@@ -207,7 +207,7 @@ CHECKS="$ARTIFACTS/pr-review-checks.txt"
 DIFF_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-diff.XXXXXX")"
 FILES_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-files.XXXXXX")"
 CHECKS_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-checks.XXXXXX")"
-WORKTREE="${TMPDIR:-/tmp}/team-harness-pr-review-{number}"
+WORKTREE="$ARTIFACTS/pr-review-worktree"
 
 python3 "$REVIEW_CONTEXT_HELPER" materialize \
   --repo "{owner}/{repo}" --pr {number} --context "$CONTEXT" \
@@ -245,8 +245,9 @@ dirty worktree; surface it.
 
 Capture `git status --untracked-files=all` and `git diff HEAD` for the frozen worktree. Separately
 capture the regular review-artifact leaves under `$ARTIFACTS`, excluding the exact
-`$SNAPSHOT_GIT` directory and its contents because Git legitimately updates administrative data
-there during freshness checks and worktree cleanup. Repeat both snapshots after all agents finish.
+`$SNAPSHOT_GIT` and `$WORKTREE` directories and their contents — Git legitimately updates
+administrative data in the snapshot during freshness checks and cleanup, and the worktree's
+integrity is verified by its own status/diff snapshot above. Repeat both snapshots after all agents finish.
 The compared surfaces must be byte-identical; surface any other mutation as a defect before
 trusting a returned draft. Only after this check may the coordinator persist inline returns to the
 fixed `$ARTIFACTS/pr-review-*` paths.
@@ -342,8 +343,6 @@ Direct Mode Task:
 - Focus: general
 - PR: #{number}
 - Repository: {owner}/{repo}
-- Title: {title}
-- Author: {author}
 - Base: {base_ref}
 - Head: {head_ref}
 - Reviewed Head SHA: {head_oid}
@@ -394,13 +393,28 @@ returns using this fixed mapping: reviewer body → `$ARTIFACTS/pr-review-draft.
 findings → `$ARTIFACTS/pr-review-inline.json`. Ignore any output path proposed by an agent.
 
 If only the general reviewer ran, its body and inline JSON are canonical. If any additional
-draft exists, dispatch `review-consolidate` once with the source file paths, `head_oid`, and
-`context_hash`. The consolidator produces:
+draft exists, dispatch `review-consolidate` once with the source file paths, `head_oid`,
+`context_hash`, and the read-only `Worktree` coordinate so adjudication cites code, not prose.
+The consolidator produces:
 
 - `$ARTIFACTS/pr-review-final.md`
 - `$ARTIFACTS/pr-review-inline.json`
 
 There is no automatic convergence loop.
+
+**Reconcile the consolidation.** The consolidator's status block enumerates, per source lens,
+findings received and their disposition (`preserved`, `demoted`, `dropped`) with a one-line
+reason each. Before preview, verify every blocking finding present in a source draft appears
+either in the consolidated output or in that ledger; on a mismatch, retry the consolidator once
+with the discrepancy named, then stop and surface it. A missing or count-inconsistent ledger is
+a failed consolidation, never a silent pass-through.
+
+**Lens coverage line.** After the canonical body is chosen (either path), insert one line under
+`Checks:` naming each selected lens and its outcome — `ran`, `limited ({reason})`, or
+`absent after retry` — for example `Lenses: reviewer ran, qa limited (no operator oracle),
+security ran`. This line is coordinator-owned mechanical metadata; agents never write it. An
+absent selected lens must appear here, so a published APPROVE can never hide a lens that did not
+run.
 
 While agents run, keep raw dispatch coordinates and identity validation silent. If a progress
 update is warranted, name the active agents and summarize their distinct review responsibilities
@@ -420,6 +434,7 @@ Use a compact index:
 Verdict: **APPROVE | REQUEST CHANGES | COMMENT**
 Findings: **{N} blocking**, **{M} suggestions**
 Checks: {concise CI summary or "not available"}
+Lenses: {coordinator-inserted coverage line}
 
 {Only cross-file findings that cannot be anchored to one changed line. Omit when empty.}
 ```
@@ -467,21 +482,25 @@ Never dismiss prior reviews automatically.
 Require a non-empty body and valid inline JSON. Retry the producing agent once for a missing or
 invalid artifact; then stop.
 
-Unless `--auto-publish` was supplied, show:
+Unless `--auto-publish` was supplied, show the evidence before the recommendation:
 
 1. `PR #{number} review ready — nothing has been published.`;
-2. a leading `Recommendation:` with the event in plain language and one concise rationale grounded
-   in the supported findings and available checks;
-3. the exact body;
-4. every inline comment with path, line, and side;
-5. a superseded-review note when applicable, without exposing snapshot identity unless needed to
+2. the exact body;
+3. every inline comment with path, line, and side;
+4. a superseded-review note when applicable, without exposing snapshot identity unless needed to
    disambiguate it;
+5. a closing `Recommendation:` with the event in plain language and one concise rationale grounded
+   in the supported findings and available checks;
 6. five numeric choices with the recommended publish event first and marked `**(recommended)**`.
 
 Build the rationale without adding new findings: for `REQUEST_CHANGES`, state the blocking count
 and concrete consequence category; for `APPROVE`, state that no supported blockers remain and
 qualify the available check evidence; for `COMMENT`, state why the draft is informational rather
 than an approval or change request.
+
+**Approval anchor.** When the operator approves, record the SHA-256 of the exact canonical body
+artifact and inline JSON shown in the preview. The approval applies to those bytes and the
+displayed `context_hash` only.
 
 Use exactly one of these menus, matching the recommendation:
 
@@ -517,6 +536,12 @@ JSON, and context for `--resume-from-draft`, removes the worktree/nonessential a
 disables the EXIT trap before returning. `cancel` removes all artifacts. Operator edits require
 another complete preview.
 
+**`--auto-publish` path.** No menu is shown and no approval exists: the published event is
+exactly the recommendation's event, the anchor is taken from the canonical draft at validation
+time, and the pre-publish freshness comparison runs against the pre-dispatch capture. Any drift,
+capture failure, or anchor mismatch stops without publishing — the auto path never retries past
+a failed check and never publishes an event other than the recommendation.
+
 ## Pre-publish freshness
 
 After approval and immediately before the GitHub write, capture and compare again. Require exact
@@ -528,7 +553,10 @@ head, base, merge-base, and mergeability equality with the approved capture.
 - Capture or comparison failure: invalidate approval and restart Gather with
   `freshness could not be verified — review not published`.
 
-Approval applies only to the displayed `context_hash`.
+Approval applies only to the displayed `context_hash` and the recorded draft hashes: recompute
+the SHA-256 of the canonical body and inline JSON immediately before the write and require
+equality with the approval anchor. A mismatch means the draft changed after approval — fail
+closed and re-preview; never publish unanchored bytes.
 Never describe `conflicting` or `indeterminate` mergeability as merge-ready.
 `clean` describes only the displayed captured head/base/time; it never asserts current external
 readiness. State that the external system can change after Team Harness's final local check.
@@ -536,7 +564,10 @@ readiness. State that the external system can change after Team Harness's final 
 ## Publish
 
 Map the operator's numeric or textual choice to `APPROVE`, `REQUEST_CHANGES`, or `COMMENT`.
-Submit exactly once:
+When the chosen event differs from the recommendation, rewrite the body's `Verdict:` line to the
+chosen event through the leaf-safe artifact rule, refresh the approval anchor to the rewritten
+bytes, and show the operator the updated verdict line before the write — the published body and
+event must never disagree. Submit exactly once:
 
 ```bash
 jq -n \

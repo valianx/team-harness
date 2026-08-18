@@ -7,11 +7,9 @@
  * command succeeding after implementation.
  */
 
-import { execFile } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
-import { lstat, open, readFile, realpath, rename, unlink } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { lstat, open, realpath, rename, unlink } from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
 
 import {
@@ -19,15 +17,26 @@ import {
   runQualityChecks,
   validateQualityManifest,
 } from "./quality-runner.mjs";
-
-const execFileAsync = promisify(execFile);
+import {
+  boundedDetail,
+  canonicalHash,
+  createBlobResolver,
+  createBoundedJsonReader,
+  createGitRunners,
+  hasExactlyKeys,
+  hasOnlyKeys,
+  isBoundedDetail,
+  isContained,
+  isSafeRelativePath,
+  pathMatchesRule,
+  sha256,
+} from "./quality-lib.mjs";
 
 export const TEST_CONTRACT_SCHEMA_VERSION = 1;
 export const TEST_TRANSITION_SCHEMA_VERSION = 2;
 export const TEST_CONTRACT_VALIDATION_SCHEMA_VERSION = 1;
 export const TEST_TRANSITION_RECEIPT_SCHEMA_VERSION = 2;
 
-const MAX_JSON_BYTES = 1024 * 1024;
 const MAX_ITEMS = 256;
 const SAFE_COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
 const SAFE_SHA256 = /^[0-9a-f]{64}$/;
@@ -42,6 +51,7 @@ const ERROR_CODES = new Set([
   "GREEN_NOT_OBSERVED",
   "RED_EVIDENCE_INVALID",
   "TEST_INPUT_CHANGED",
+  "REPOSITORY_INVALID",
   "QUALITY_RUNNER_FAILED",
   "OUTPUT_WRITE_FAILED",
   "INTERNAL_ERROR",
@@ -53,12 +63,14 @@ const RESULT_KEYS = [
   "transition",
   "verdict",
   "error_code",
+  "detail",
   "duration_ms",
   "diagnostic",
   "contract",
   "red_evidence",
   "quality",
 ];
+const REQUIRED_RESULT_KEYS = RESULT_KEYS.filter((key) => key !== "detail");
 const DIAGNOSTIC_KEYS = [
   "stage",
   "quality_error_code",
@@ -76,25 +88,17 @@ const DIAGNOSTIC_KEYS = [
 ];
 
 class TransitionError extends Error {
-  constructor(code) {
+  constructor(code, detail = null) {
     super(code);
     this.code = code;
+    this.detail = boundedDetail(detail);
   }
 }
 
-function hasOnlyKeys(value, allowed, required = []) {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-  const actual = Object.keys(value);
-  return actual.every((key) => allowed.includes(key)) && required.every((key) => Object.hasOwn(value, key));
-}
-
-function hasExactlyKeys(value, keys) {
-  return hasOnlyKeys(value, keys, keys) && Object.keys(value).length === keys.length;
-}
-
-function sha256(value) {
-  return createHash("sha256").update(value).digest("hex");
-}
+const transitionError = (code, detail = null) => new TransitionError(code, detail);
+const readBoundedJson = createBoundedJsonReader(transitionError);
+const { gitText, gitBytes } = createGitRunners(transitionError);
+const resolveBlobsAtCommit = createBlobResolver(gitBytes, transitionError);
 
 async function persistResult(outputPath, result) {
   if (typeof outputPath !== "string" || !path.isAbsolute(outputPath) || outputPath.includes("\u0000")) {
@@ -152,23 +156,6 @@ async function persistResult(outputPath, result) {
     result_sha256: sha256(bytes),
     result_bytes: bytes.length,
   };
-}
-
-function isSafeRelativePath(value) {
-  if (typeof value !== "string" || value.length === 0 || value.includes("\u0000") || path.isAbsolute(value)) {
-    return false;
-  }
-  const normalized = value.replaceAll("\\", "/");
-  return (
-    !normalized.startsWith("/") &&
-    !normalized.split("/").includes("..") &&
-    Buffer.byteLength(value, "utf8") <= 512
-  );
-}
-
-function isContained(root, target) {
-  const relative = path.relative(root, target);
-  return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
 }
 
 function uniqueStrings(values, validator) {
@@ -272,19 +259,6 @@ export async function validateTestContractFile(contractPath, context = null) {
   };
 }
 
-async function readBoundedJson(filePath, code) {
-  try {
-    const stat = await lstat(filePath);
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_JSON_BYTES) throw new Error("invalid file");
-    const bytes = await readFile(filePath);
-    if (bytes.length > MAX_JSON_BYTES) throw new Error("file too large");
-    return { value: JSON.parse(bytes.toString("utf8")), bytes };
-  } catch (error) {
-    if (error instanceof TransitionError) throw error;
-    throw new TransitionError(code);
-  }
-}
-
 async function resolveContainedFile(repoInput, fileInput, code) {
   if (typeof repoInput !== "string" || typeof fileInput !== "string" || fileInput.length === 0) {
     throw new TransitionError("ARGUMENT_INVALID");
@@ -317,7 +291,11 @@ async function loadContract(repo, contractPath) {
     throw new TransitionError("CONTRACT_INVALID");
   }
   const loaded = await readBoundedJson(file, "CONTRACT_INVALID");
-  return { value: validateContract(loaded.value), sha256: sha256(loaded.bytes) };
+  return {
+    value: validateContract(loaded.value),
+    sha256: sha256(loaded.bytes),
+    canonical_sha256: canonicalHash(loaded.value),
+  };
 }
 
 async function loadManifest(repo, manifestPath) {
@@ -333,43 +311,6 @@ async function loadManifest(repo, manifestPath) {
     throw new TransitionError("MANIFEST_INVALID");
   }
   return { value, sha256: sha256(loaded.bytes) };
-}
-
-async function gitText(repo, args, code) {
-  try {
-    const result = await execFileAsync("git", args, {
-      cwd: repo,
-      encoding: "utf8",
-      maxBuffer: MAX_JSON_BYTES,
-      timeout: 30_000,
-      windowsHide: true,
-    });
-    return result.stdout.trim();
-  } catch {
-    throw new TransitionError(code);
-  }
-}
-
-async function gitBytes(repo, args, code) {
-  try {
-    const result = await execFileAsync("git", args, {
-      cwd: repo,
-      encoding: null,
-      maxBuffer: MAX_JSON_BYTES,
-      timeout: 30_000,
-      windowsHide: true,
-    });
-    return result.stdout;
-  } catch {
-    throw new TransitionError(code);
-  }
-}
-
-function pathMatchesRule(testPath, rule) {
-  const normalized = testPath.replaceAll("\\", "/");
-  if (rule.type === "prefix") return normalized.startsWith(rule.value.replaceAll("\\", "/"));
-  if (rule.type === "suffix") return normalized.endsWith(rule.value);
-  return normalized.split("/").includes(rule.value);
 }
 
 function assertTestOnlyScope(contract, quality, manifest) {
@@ -431,30 +372,16 @@ function assertGreenQuality(quality) {
 
 async function resolveTestInputs(repo, candidateCommit, testPaths) {
   if (testPaths.length === 0) return [];
-  const bytes = await gitBytes(repo, ["ls-tree", "-z", "--full-tree", candidateCommit, "--", ...testPaths], "TEST_SCOPE_INVALID");
-  const requested = new Set(testPaths);
-  const blobs = new Map();
-  for (const record of bytes.toString("utf8").split("\u0000").filter(Boolean)) {
-    const separator = record.indexOf("\t");
-    const [mode, type, object, ...extra] = record.slice(0, separator).split(" ");
-    const testPath = record.slice(separator + 1);
-    if (
-      separator < 0 || extra.length !== 0 || !/^[0-7]{6}$/.test(mode) || type !== "blob" ||
-      !SAFE_COMMIT.test(object) || !requested.has(testPath) || blobs.has(testPath)
-    ) {
-      throw new TransitionError("TEST_SCOPE_INVALID");
-    }
-    blobs.set(testPath, object);
-  }
-  if (blobs.size !== requested.size) throw new TransitionError("TEST_SCOPE_INVALID");
+  const blobs = await resolveBlobsAtCommit(repo, candidateCommit, testPaths, "TEST_SCOPE_INVALID");
   return testPaths.map((testPath) => ({ path: testPath, blob_sha: blobs.get(testPath) }));
 }
 
-function contractEvidence(contract, contractSha256, testInputs) {
+function contractEvidence(contract, testInputs) {
   return {
-    sha256: contractSha256,
-    requirements: contract.requirements,
-    test_identifiers: contract.test_identifiers,
+    sha256: contract.sha256,
+    canonical_sha256: contract.canonical_sha256,
+    requirements: contract.value.requirements,
+    test_identifiers: contract.value.test_identifiers,
     test_inputs: testInputs,
   };
 }
@@ -465,8 +392,9 @@ function isTestInput(value) {
 
 function isContractEvidence(value) {
   return (
-    hasExactlyKeys(value, ["sha256", "requirements", "test_identifiers", "test_inputs"]) &&
+    hasExactlyKeys(value, ["sha256", "canonical_sha256", "requirements", "test_identifiers", "test_inputs"]) &&
     SAFE_SHA256.test(value.sha256) &&
+    SAFE_SHA256.test(value.canonical_sha256) &&
     uniqueStrings(value.requirements, (entry) => typeof entry === "string" && SAFE_REQUIREMENT.test(entry)) &&
     uniqueStrings(
       value.test_identifiers,
@@ -502,7 +430,7 @@ function isTransitionDiagnostic(value) {
   if (value.quality_error_code !== null && typeof value.quality_error_code !== "string") return false;
   if (value.command_id !== null && typeof value.command_id !== "string") return false;
   if (value.command_verdict !== null && !["pass", "fail"].includes(value.command_verdict)) return false;
-  if (value.execution_outcome !== null && !["completed", "spawn_error", "argument_invalid", "internal_error"].includes(value.execution_outcome)) return false;
+  if (value.execution_outcome !== null && !["completed", "timed_out", "spawn_error", "argument_invalid", "internal_error"].includes(value.execution_outcome)) return false;
   if (value.exit_code !== null && !Number.isSafeInteger(value.exit_code)) return false;
   if (value.signal !== null && !/^SIG[A-Z0-9]+$/.test(value.signal)) return false;
   for (const key of ["stdout_bytes", "stderr_bytes"]) {
@@ -543,12 +471,15 @@ function transitionDiagnostic(state) {
 }
 
 export function isTestTransitionResult(value) {
-  if (!hasExactlyKeys(value, RESULT_KEYS)) return false;
+  if (!hasOnlyKeys(value, RESULT_KEYS, REQUIRED_RESULT_KEYS)) return false;
   if (value.schema_version !== TEST_TRANSITION_SCHEMA_VERSION || value.kind !== "team_harness_test_transition") {
     return false;
   }
   if (![null, "red", "green"].includes(value.transition) || !["pass", "fail"].includes(value.verdict)) return false;
   if (!ERROR_CODES.has(value.error_code) || !Number.isSafeInteger(value.duration_ms) || value.duration_ms < 0) return false;
+  const detail = Object.hasOwn(value, "detail") ? value.detail : null;
+  if (!isBoundedDetail(detail)) return false;
+  if (value.verdict === "pass" && detail !== null) return false;
   if (!isTransitionDiagnostic(value.diagnostic)) return false;
   if (value.contract !== null && !isContractEvidence(value.contract)) return false;
   if (!isRedEvidence(value.red_evidence) || (value.quality !== null && !isQualityResult(value.quality))) return false;
@@ -615,6 +546,7 @@ function safeResult(state, startedAt) {
     transition: state.transition,
     verdict: state.error_code === null ? "pass" : "fail",
     error_code: state.error_code,
+    detail: state.detail,
     duration_ms: elapsedMs(startedAt),
     diagnostic: transitionDiagnostic(state),
     contract: state.contract,
@@ -628,6 +560,7 @@ function safeResult(state, startedAt) {
     transition: null,
     verdict: "fail",
     error_code: "INTERNAL_ERROR",
+    detail: null,
     duration_ms: 0,
     diagnostic: {
       stage: "transition-input",
@@ -709,7 +642,7 @@ async function executeRed(options, state, contract) {
     state.quality.repository.candidate_commit,
     contract.value.test_paths,
   );
-  state.contract = contractEvidence(contract.value, contract.sha256, inputs);
+  state.contract = contractEvidence(contract, inputs);
 }
 
 async function loadRedEvidence(options) {
@@ -725,36 +658,41 @@ async function loadRedEvidence(options) {
 }
 
 async function assertCompatibleGreen(options, state, contract, red) {
-  if (contract.sha256 !== options.contractSha256 || contract.sha256 !== red.result.contract.sha256) {
-    throw new TransitionError("TEST_INPUT_CHANGED");
+  if (contract.sha256 !== options.contractSha256 || contract.canonical_sha256 !== red.result.contract.canonical_sha256) {
+    throw new TransitionError("TEST_INPUT_CHANGED", "the test contract differs from the red-checkpoint contract");
   }
   const priorQuality = red.result.quality;
   const currentQuality = state.quality;
   if (
-    priorQuality.manifest.sha256 !== currentQuality.manifest.sha256 ||
+    priorQuality.manifest.canonical_sha256 !== currentQuality.manifest.canonical_sha256 ||
     priorQuality.repository.base_commit !== currentQuality.repository.base_commit ||
     priorQuality.repository.base_tree !== currentQuality.repository.base_tree ||
     priorQuality.commands[0].command_sha256 !== currentQuality.commands[0].command_sha256 ||
     priorQuality.commands[0].execution_argv_sha256 !== currentQuality.commands[0].execution_argv_sha256 ||
     priorQuality.commands[0].execution_resolution !== currentQuality.commands[0].execution_resolution
   ) {
-    throw new TransitionError("TEST_INPUT_CHANGED");
+    throw new TransitionError("TEST_INPUT_CHANGED", "the manifest, base, or exact test command changed after red");
   }
-  const mergeBase = await gitText(
-    options.repo,
-    ["merge-base", priorQuality.repository.candidate_commit, currentQuality.repository.candidate_commit],
-    "RED_EVIDENCE_INVALID",
-  );
-  if (mergeBase !== priorQuality.repository.candidate_commit) throw new TransitionError("RED_EVIDENCE_INVALID");
+  if (priorQuality.repository.candidate_tree !== currentQuality.repository.candidate_tree) {
+    const mergeBase = await gitText(
+      options.repo,
+      ["merge-base", priorQuality.repository.candidate_commit, currentQuality.repository.candidate_commit],
+      "REPOSITORY_INVALID",
+    );
+    if (mergeBase !== priorQuality.repository.candidate_commit) {
+      throw new TransitionError("RED_EVIDENCE_INVALID",
+        "the red candidate is neither tree-identical to nor an ancestor of the green candidate");
+    }
+  }
   const inputs = await resolveTestInputs(
     options.repo,
     currentQuality.repository.candidate_commit,
     contract.value.test_paths,
   );
   if (JSON.stringify(inputs) !== JSON.stringify(red.result.contract.test_inputs)) {
-    throw new TransitionError("TEST_INPUT_CHANGED");
+    throw new TransitionError("TEST_INPUT_CHANGED", "test file blobs changed between red and green");
   }
-  state.contract = contractEvidence(contract.value, contract.sha256, inputs);
+  state.contract = contractEvidence(contract, inputs);
   state.red_evidence = {
     sha256: red.sha256,
     candidate_commit: priorQuality.repository.candidate_commit,
@@ -777,7 +715,7 @@ async function executeGreen(options, state, contract) {
 /** Run one red or green transition checkpoint and return closed JSON evidence. */
 export async function runTestTransition(options) {
   const startedAt = process.hrtime.bigint();
-  const state = { transition: null, error_code: null, contract: null, red_evidence: null, quality: null };
+  const state = { transition: null, error_code: null, detail: null, contract: null, red_evidence: null, quality: null };
   try {
     const normalized = normalizeOptions(options);
     state.transition = normalized.transition;
@@ -786,6 +724,7 @@ export async function runTestTransition(options) {
     else await executeGreen(normalized, state, contract);
   } catch (error) {
     state.error_code = error instanceof TransitionError && ERROR_CODES.has(error.code) ? error.code : "INTERNAL_ERROR";
+    state.detail = error instanceof TransitionError ? error.detail : null;
   }
   return safeResult(state, startedAt);
 }

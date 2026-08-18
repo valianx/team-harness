@@ -33,18 +33,21 @@ separate presentation duty.
 ## Outward-action release floor
 
 No pipeline outward action — including `git push`, `gh pr create`, or `gh pr merge` —
-proceeds without `gate3_release ∈ {ship}` registered in the governing pipeline's
+proceeds without `gate3_release ∈ {ship, auto-ship}` registered in the governing pipeline's
 `00-state.md` (see § "The dual-record release" below). The orchestrator enforces this
 ordering by refusing to invoke the action before the release exists.
 
-`Gate 3: ship` is the operator's single delivery approval for the previewed frozen tree and the
-exact workspace prose paths/digests presented with it. It authorizes the coordinator's standard
-sequence through feature-branch push of the exact accepted Freeze commit and draft PR creation/update;
-it never authorizes mutating an existing ready-for-review PR. No second conversational
-confirmation is allowed between those steps. Native runtime tool approval may still be required
-to execute a command, but that is
-a technical permission boundary—not another Team Harness decision and never a substitute for the
-recorded release. Merge, tag, release, publication, force-push, and broader scope remain excluded.
+Both release values carry the same human origin and the same scope. `ship` is the operator's
+live reply to a presented Gate-3 STOP block (rendered only on an exception pause — see
+§ "STAGE-GATE-3 — mechanical release"). `auto-ship` is the mechanical execution of the release
+policy the operator approved at STAGE-GATE-1: it is recorded only when validation is totally
+green and it cites the Gate-1 release that authorized it. Either value authorizes the
+coordinator's standard sequence through feature-branch push of the exact accepted Freeze commit
+and draft PR creation/update; neither authorizes mutating an existing ready-for-review PR. No
+second conversational confirmation is allowed between those steps. Native runtime tool approval
+may still be required to execute a command, but that is a technical permission boundary — not
+another Team Harness decision and never a substitute for the recorded release. Merge, tag,
+release, publication, force-push, and broader scope remain excluded.
 
 **Force-push clause (Invariant E, operator-mandated).** The pipeline never force-pushes —
 not with `-f`, `--force`, `--force-with-lease`, or a `+`-prefixed refspec. A `ship`
@@ -107,7 +110,13 @@ recover backstop"):
 | Gate | Field | Cleared when | Not cleared (any of) |
 |---|---|---|---|
 | STAGE-GATE-1 | `gate1_release` | `∈ {approved, approved-autonomous}` | `rejected`, `edit`, `null`/missing |
-| STAGE-GATE-3 | `gate3_release` | `= ship` | `amend`, `abort`, `null`/missing |
+| STAGE-GATE-3 | `gate3_release` | `∈ {ship, auto-ship}` | `amend`, `abort`, `null`/missing |
+
+`approved-autonomous` is legacy-legible only: recover treats a persisted historical value as
+cleared, but no new record ever writes it — the single `approved` release always carries the
+autonomous authority. An `auto-ship` release additionally requires the citation of the Gate-1
+release event that authorized it (see § "STAGE-GATE-3 — mechanical release"); recovery never
+executes an auto-release itself — it resumes delivery mechanics from the recorded state.
 
 Clearing a gate against this table is necessary but not sufficient on its own: the reply
 must also be attributable to the presentation whose `gate_nonce` is currently pending
@@ -128,7 +137,7 @@ presentation*, which the coordinator observes directly and the operator cannot f
 omitting a string.
 
 **Bare-literal field values.** Each of the gate-state fields —
-`gate_pending`, `gate1_release`, `gate3_release`, `gate_nonce`,
+`gate_pending`, `gate1_release`, `gate3_release`, `release_policy`, `gate_nonce`,
 `working_branch`, and `worktree` — is written to `00-state.md § Current State`
 as a bare literal: the value carries no second token delimited by a space on
 the same line, no trailing nonce, attribution, justification, or condition
@@ -139,9 +148,10 @@ backstop above, `agents/_shared/orchestrator-state.md § Current State`, and the
 equality, so a value carrying any annotation stops matching the instant one
 is appended.
 
-For the three `*_release` fields, the per-gate allowlist table above is the
-closed, citable set of literal values the field may hold — no value outside
-that set, and no annotated variant of an allowlisted value, is ever written.
+For the `*_release` fields, the per-gate allowlist table above is the closed, citable set of
+literal values the field may hold — no value outside that set, and no annotated variant of an
+allowlisted value, is ever written. `release_policy` admits the single literal `auto-ship`,
+written only in the same transition as a Gate-1 approval.
 `gate_nonce`, `working_branch`, and `worktree` are open-ended by
 construction — a token, a branch name, a filesystem path — and admit no
 allowlist; they are subject to the bare-literal requirement alone, never to
@@ -153,7 +163,7 @@ gate decision belongs in `00-decision-ledger` (`operator-approval`,
 
 **The "No gate-field repair" invariant.** No agent converts a malformed
 gate-field value into a well-formed one. No agent other than the
-orchestrator writes any of the six fields above, under any circumstance —
+orchestrator writes any of the seven fields above, under any circumstance —
 including one it finds already malformed. Recovery from a malformed field is
 re-presenting the affected gate with a fresh `gate_nonce` (see above); the
 write that eventually lands is the product of a new operator reply, never a
@@ -198,7 +208,10 @@ richer — is a contract violation, not a formatting choice: the template below 
 shape of a STOP block, it never overrides what a specific gate's own section says its
 options are.
 
-**STAGE-GATE-1** — end of `design` (mandatory, never skippable):
+**STAGE-GATE-1** — end of `design` (mandatory, never skippable). The presentation always
+discloses the release policy the approval carries: bounded autonomous correction (max-3 on the
+frozen result) and automatic draft-PR publication on totally green validation. The operator's
+`approve` to that disclosure is the human origin of the eventual release.
 
 ```
 ========================================
@@ -207,31 +220,46 @@ options are.
  {intent + scope fence + functional AC summary + task/file map + required risks
   + security-design result when the security floor applies; full plan at artifact}
 
+ Approval authorizes autonomous execution: bounded correction (max-3) and
+ draft-PR publication when validation is totally green. Pauses occur only for
+ design-change, security, or infrastructure exceptions. Merge stays manual.
+
  Reply with:
-   - "1 — approve"            → proceed to `implementation`
-   - "2 — approve autonomous" → proceed to `implementation` with preference retained
-   - "3: detail — edit"        → return to `design` after the requested edit
-   - "4: reason — reject"      → return to `design` after the operator's decision
+   - "1 — approve"        → proceed autonomously through draft PR
+   - "3: detail — edit"    → return to `design` after the requested edit
+   - "4: reason — reject"  → return to `design` after the operator's decision
 ========================================
 ```
 
-Numbers are stable input aliases for the exact textual values. A bare `3` or `4` is
-ambiguous because edit/reject require detail; use `3: detail` or `4: reason`. The alias
-never changes nonce, dual-record or live-reply requirements.
+Numbers are stable input aliases for the exact textual values (`2` is retired with the
+approve/approve-autonomous duality; `3`/`4` keep their historical meaning). A bare `3` or `4`
+is ambiguous because edit/reject require detail; use `3: detail` or `4: reason`. The alias
+never changes nonce, dual-record or live-reply requirements. Recording the approval writes
+`gate1_release: approved` and `release_policy: auto-ship` in the same transition; the release
+event carries both.
 
-**STAGE-GATE-3** — end of `validation` (mandatory, never skippable, regardless of
-`autonomous`):
+**STAGE-GATE-3 — mechanical release.** Gate 3 is the execution point of the release decision
+recorded at Gate 1, not a second human approval:
+
+- **Totally green validation** (no open blocking findings, all floors satisfied): the
+  coordinator records `gate3_release: auto-ship` with a `stage.gate.release` event citing the
+  Gate-1 release event and its consumed nonce (`origin: gate1-release-policy`). No STOP block
+  is rendered, no new nonce is issued, and delivery proceeds immediately through push and
+  draft-PR creation.
+- **Exception pause** (closed list — see § "Closed exception list"): the coordinator renders
+  the STOP block below with a fresh `gate_nonce` and waits. The exception list always takes
+  precedence over auto-ship.
 
 ```
 ====================================
- STAGE-GATE-3 — Delivery ready for human approval
+ STAGE-GATE-3 — Delivery paused: {exception}
 ====================================
- {delivery summary + committed version + accepted Freeze commit/tree + exact PR title/body and
-  acceptance-matrix paths with SHA-256 digests + Pre-Delivery Security Audit findings,
-  or a stated absence when no audit lens ran (security_floor_applies: false)}
+ {exception statement + delivery summary + committed version + accepted Freeze commit/tree
+  + exact PR title/body and acceptance-matrix paths with SHA-256 digests
+  + Pre-Delivery Security Audit findings, or a stated absence when no audit lens ran}
 
  Reply with:
-   - "1 — ship"   → proceed to `delivery`
+   - "1 — ship"   → proceed to `delivery` despite the stated exception
    - "2 — amend"  → return to `implementation`, then validate again
    - "3 — abort"  → record terminal `phase/status: aborted` and halt without pushing
 ====================================
@@ -240,10 +268,29 @@ never changes nonce, dual-record or live-reply requirements.
 The Gate 3 numeric aliases are exact textual equivalents; a modified or combined reply
 is ambiguous and releases nothing.
 
-Each allowlist above (Gate 1: `1`/`approve`, `2`/`approve autonomous`, `3: detail`/`edit`,
-`4: reason`/`reject {reason}`; Gate 3: `1`/`ship`, `2`/`amend`, `3`/`abort`) is
-closed — see § "Ambiguous-gate-reply rule" for what happens when a reply does not map to
-exactly one of these values.
+Each allowlist above (Gate 1: `1`/`approve`, `3: detail`/`edit`, `4: reason`/`reject {reason}`;
+Gate 3 when presented: `1`/`ship`, `2`/`amend`, `3`/`abort`) is closed — see
+§ "Ambiguous-gate-reply rule" for what happens when a reply does not map to exactly one of
+these values.
+
+## Closed exception list
+
+Between Gate-1 approval and draft-PR creation, the pipeline pauses only for these classes;
+nothing else interrupts autonomous execution, and no flow may add a pause outside them:
+
+- **A — the design changed:** a structural contradiction between the plan and the code found
+  during implementation; a scope expansion beyond the approved fence; an acceptance criterion
+  discovered to be unimplementable as approved.
+- **B — security:** a security obligation changed (new floor triggered by the diff); a
+  surviving `broke-it` from adversarial validation; a non-correctable blocking security
+  finding.
+- **C — infrastructure:** the correction budget (max-3) is exhausted with findings still open;
+  a required runtime capability is unavailable (sandbox, credentials, network); a verification
+  command cannot produce a trustworthy result; a MAJOR version bump becomes required.
+
+An exception pause renders the Gate-3 STOP block above, names its class and concrete trigger,
+and is loud: it uses the runtime's notification channel when available. A totally green run
+encounters none of these and ships without pausing.
 
 ## Record-based recover backstop
 
@@ -297,12 +344,12 @@ interior file write. This residual is pre-existing and platform-bounded; the fus
 adds nor removes it.
 
 **2. The contractual order floor.** The orchestrator does not invoke a pipeline outward
-action unless `gate3_release ∈ {ship}` for that pipeline (§ "Outward-action release floor").
-This rule closes the ordering gap only; it does not verify writer identity because the
-release field remains intra-privilege-forgeable.
+action unless `gate3_release ∈ {ship, auto-ship}` for that pipeline (§ "Outward-action
+release floor"). This rule closes the ordering gap only; it does not verify writer identity
+because the release field remains intra-privilege-forgeable.
 
 The order floor also does not close the **approval→push content-drift** residual:
-`gate3_release: ship` binds ORDER (that the release preceded the push), not CONTENT (a
+the Gate 3 release binds ORDER (that the release preceded the push), not CONTENT (a
 tree hash) — HEAD can move between recording `ship` and the push actually running (an
 `amend`, a concurrent mutation), and the pushed tree can differ from the one the
 operator saw at the gate. This is the same failure shape the KG pattern
@@ -369,8 +416,11 @@ The per-gate allowlists this rule enforces:
 
 | Gate | Allowlist (text and numeric aliases) |
 |---|---|
-| STAGE-GATE-1 | `1`/`approve`, `2`/`approve autonomous`, `3: {detail}`/`edit`, `4: {reason}`/`reject {reason}` |
-| STAGE-GATE-3 | `1`/`ship`, `2`/`amend`, `3`/`abort` |
+| STAGE-GATE-1 | `1`/`approve`, `3: {detail}`/`edit`, `4: {reason}`/`reject {reason}` |
+| STAGE-GATE-3 (when presented) | `1`/`ship`, `2`/`amend`, `3`/`abort` |
+
+A reply of `2`/`approve autonomous` to STAGE-GATE-1 is accepted as `approve` for operator
+convenience during the transition; it records `approved`, never the retired value.
 
 This turns the one residual place where model capability could matter at the gate seam —
 interpreting an ambiguous human reply — into a closed-form contract rule that holds

@@ -287,6 +287,111 @@ def _check_qa_post_gate1_route(validation: str) -> None:
             fail(f"{context} must keep QA read-only")
 
 
+SEMANTIC_ADAPTER_PARITY = {
+    # role: [(rule label, semantic-source token, adapter token)]
+    # Tokens are lowercased and whitespace-flattened. A rule reworded in one
+    # file without updating the other side (or this table) fails the suite.
+    "architect": [
+        ("acceptance form", "given/when/then", "given/when/then"),
+        ("no implementation", "never", "do not implement"),
+    ],
+    "implementer": [
+        ("bounded diff", "smallest approved production diff", "exactly one approved task"),
+        ("planned scope", "does not design architecture", "respect declared files"),
+    ],
+    "tester": [
+        ("warranted tests only", "warranted", "warranted"),
+        ("no quotas", "test-count quotas", "only warranted"),
+    ],
+    "cleaner": [
+        ("behavior preserving", "behavior", "behavior"),
+        ("allowlist bounded", "allowlist", "allowlist"),
+    ],
+    "qa": [
+        ("verdict producer", "verdict", "verdict"),
+        ("checkbox mirror", "checkbox", "checkbox"),
+    ],
+    "security": [
+        ("read-only audit", "read-only", "read-only"),
+        ("audit not fix", "audit", "audit"),
+    ],
+    "inline-reviewer": [
+        ("read-only", "read-only", "read-only"),
+        ("single lens", "lens", "lens"),
+    ],
+    "delivery": [
+        ("acceptance matrix", "acceptance matrix", "acceptance matrix"),
+        ("draft only", "draft", "draft"),
+    ],
+    "reviewer": [
+        ("untrusted input", "untrusted", "untrusted"),
+        ("frozen snapshot", "snapshot", "snapshot"),
+    ],
+    "pr-review-qa": [
+        ("ac validation", "acceptance criteria", "acceptance"),
+        ("no mutation", "without modifying files", "read-only"),
+    ],
+    "pr-review-security": [
+        ("regressions only", "regressions", "concrete"),
+        ("no mutation", "without modifying files", "read-only"),
+    ],
+    "reviewer-consolidator": [
+        ("de-duplication", "de-dup", "de-dup"),
+        ("no republication", "never", "never"),
+    ],
+}
+
+
+def _check_semantic_adapter_rule_parity(agents: list) -> None:
+    """A rule in a semantic contract must survive into every projection."""
+    roles = {agent.get("role", agent["name"]): agent for agent in agents}
+    for role, anchors in SEMANTIC_ADAPTER_PARITY.items():
+        if role not in roles:
+            fail(f"parity table names unknown role {role}")
+        semantic = re.sub(r"\s+", " ", (ROOT / f"agents/{role}.md").read_text().lower())
+        adapter = re.sub(
+            r"\s+", " ",
+            (ROOT / f"runtime/codex/instructions/{role}.md").read_text().lower(),
+        )
+        for label, semantic_token, adapter_token in anchors:
+            if semantic_token not in semantic:
+                fail(f"{role}: semantic rule {label!r} lost its anchor {semantic_token!r} — update the rule or the parity table")
+            if adapter_token not in adapter:
+                fail(f"{role}: rule {label!r} is not propagated to the Codex adapter ({adapter_token!r} missing)")
+    for agent in agents:
+        role = agent.get("role", agent["name"])
+        if agent["sandbox_mode"] != "read-only" or role not in SEMANTIC_ADAPTER_PARITY:
+            continue
+        adapter = (ROOT / f"runtime/codex/instructions/{role}.md").read_text().lower()
+        if "read-only" not in adapter:
+            fail(f"{role}: read-only role's adapter does not state its read-only boundary")
+        if 'sandbox_mode = "workspace-write"' in adapter:
+            fail(f"{role}: read-only role's adapter contradicts its sandbox mode")
+
+
+def _check_review_transport_fixture_read(review_contracts: dict) -> None:
+    """Each review role must read a real fixture through its declared transport.
+
+    The registry declares `command-exec` because the adapters read via bounded
+    non-mutating `exec_command`. This executes that exact transport shape —
+    one read-only executable with literal arguments against a supplied path —
+    and fails when declaration and effect diverge.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        fixture = pathlib.Path(tmp) / "fixture.txt"
+        sentinel = "team-harness-transport-fixture"
+        fixture.write_text(f"first line\n{sentinel}\nlast line\n")
+        for role, contract in sorted(review_contracts.items()):
+            if "command-exec" not in contract["capabilities"]:
+                fail(f"Codex {role} reads via exec_command but does not declare command-exec")
+            result = subprocess.run(
+                ["sed", "-n", "2p", str(fixture)],
+                capture_output=True, text=True, timeout=30,
+            )
+            if result.returncode != 0 or result.stdout.strip() != sentinel:
+                fail(f"Codex {role} bounded fixture read failed through its declared transport")
+
+
 def check_post_gate1_projection() -> None:
     """Parse the Codex routing rows and prove generated adapters preserve them."""
     pipeline = (ROOT / "plugins/team-harness/skills/pipeline/SKILL.md").read_text()
@@ -411,10 +516,10 @@ def main() -> None:
         if data["name"] in review_roles and data["sandbox_mode"] != "read-only":
             fail(f"{path}: PR-review role must be read-only")
     review_contracts = {agent["name"]: agent for agent in agents if agent["name"] in review_roles}
-    if review_contracts["reviewer"]["capabilities"] != ["filesystem-read", "external-read"]:
+    if review_contracts["reviewer"]["capabilities"] != ["filesystem-read", "command-exec", "external-read"]:
         fail("Codex reviewer capability allowlist drifted")
     for role in review_roles - {"reviewer"}:
-        if review_contracts[role]["capabilities"] != ["filesystem-read"]:
+        if review_contracts[role]["capabilities"] != ["filesystem-read", "command-exec"]:
             fail(f"Codex {role} capability allowlist drifted")
     read_transport_markers = (
         "Codex filesystem-read transport",
@@ -435,6 +540,8 @@ def main() -> None:
         semantic_tools = {tool.strip() for tool in tools_line.removeprefix("tools:").split(",")}
         if "Bash" in semantic_tools:
             fail(f"Claude {role} semantic agent unexpectedly gained Bash")
+    _check_review_transport_fixture_read(review_contracts)
+    _check_semantic_adapter_rule_parity(agents)
     if generated != expected:
         fail(f"generated roles do not match contract: {sorted(generated)}")
 
@@ -511,7 +618,7 @@ def main() -> None:
     ]
     if len(hook_commands) != 2 or not all(
         any(name in command for command in hook_commands)
-        for name in ("policy-block", "gcp-guard", "gate-guard")
+        for name in ("policy-block", "gcp-guard")
     ):
         fail("Codex plugin must wire the deterministic-deny hook floors")
     if not all(
@@ -522,9 +629,16 @@ def main() -> None:
     if any(
         retired in command
         for command in hook_commands
-        for retired in ("dev-guard", "prepublish-guard", "worktree-guard")
+        for retired in ("dev-guard", "prepublish-guard", "worktree-guard", "gate-guard")
     ):
-        fail("Codex plugin still wires an approval-classifying hook")
+        fail("Codex plugin wires a hook beyond the deny floor")
+    for command in hook_commands:
+        if "plugin runtime missing" not in command:
+            fail("Codex launcher fallback must report a missing plugin runtime")
+        if "permissionDecision" in command:
+            fail("Codex launcher fallback still denies every tool on a broken plugin cache")
+        if "systemMessage" not in command:
+            fail("Codex launcher fallback must surface the broken cache as a system message")
 
     shared_skill_names = {
         path.parent.name for path in (ROOT / "skills").glob("*/SKILL.md")

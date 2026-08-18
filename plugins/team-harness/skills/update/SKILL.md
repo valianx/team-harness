@@ -129,10 +129,15 @@ because it changes the persistent execution profile.
    python3 NEW_PLUGIN/skills/setup/scripts/manage_runtime.py inspect
    ```
 
-   When inspect reports `status: current`, record the result and do not run
-   ensure. When it reports `status: stale`, render only its bounded
-   `mismatchedSettings`, `missingWritableRoots`, and `missingDirectories`, then
-   present exactly:
+   When inspect reports `projectConfigShadowing: true`, warn first — before
+   any reconciliation offer — that the checked-out tree's `.codex/config.toml`
+   (the reported `projectConfig.path`) declares its own `writable_roots` and
+   shadows the operator-level list for sessions started in that tree; the fix
+   is updating the checkout or regenerating the project config, and a restart
+   alone does not clear it. When inspect reports `status: current`, record the
+   result and do not run ensure. When it reports `status: stale`, render only
+   its bounded `mismatchedSettings`, `missingWritableRoots`, and
+   `missingDirectories`, then present exactly:
 
    ```text
    Runtime profile reconciliation requires persistent configuration changes:

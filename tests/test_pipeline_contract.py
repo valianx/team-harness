@@ -796,7 +796,8 @@ def check_preimplementation_test_contract() -> None:
 
     architect = read("agents/architect.md")
     require("Emit this block for every plan" in architect, "direct plans may omit Scope Shape")
-    task_template = architect.split("<!-- file: plan/tasks/Task-1.md -->", 1)[1].split("<!-- file: plan/tasks/Task-2.md -->", 1)[0]
+    design_reference = read("agents/ref-architect-design.md")
+    task_template = design_reference.split("<!-- file: plan/tasks/Task-1.md -->", 1)[1].split("<!-- file: plan/tasks/Task-2.md -->", 1)[0]
     require("#### Verification" in task_template, "task template misses Verification")
 
     vocabulary_pattern = re.compile(r"`SECURITY_CONTROL_VOCABULARY: ([^`\n]+)`")
@@ -859,18 +860,16 @@ def check_cleaner_crap_contract() -> None:
             "requiredchecks",
             "required_checks_missing",
             "prerequisite_unavailable",
+            "manifest_absent",
+            "measure-only",
+            "not_applied",
+            "once per candidate tree",
+            "unchanged candidate tree never re-runs",
+            "overreach proof",
+            "--name-status --no-renames",
             "select every command declared",
             "iteration",
             "new package",
-            "cleaner-transition.mjs",
-            "--transition pre",
-            "--transition post",
-            "format_check`, `lint`, and `crap` are additive",
-            "every one that the manifest declares",
-            "every declared `format_check` and `lint`",
-            "before the sole cleaner",
-            "no cleaner is dispatched" if label == "Claude" else "returns to implementation before the sole cleaner dispatch",
-            "crap_report_incomplete",
             "allowlist",
             "freeze",
             "per participating repository",
@@ -879,6 +878,8 @@ def check_cleaner_crap_contract() -> None:
             "bare `exit 1`",
         ):
             require(marker in text, f"{label}: cleaner checkpoint misses {marker!r}")
+        for retired in ("cleaner-transition.mjs", "--transition pre", "--transition post", "crap_report_incomplete"):
+            require(retired not in text, f"{label}: retired transition machinery survives: {retired!r}")
         require(
             "not a phase or gate" in text or "not another phase or gate" in text,
             f"{label}: cleaner checkpoint creates a phase or gate",
@@ -1007,10 +1008,15 @@ def check_cleaner_crap_contract() -> None:
         "before any repository or workspace read",
     ):
         require(marker in codex_implementer, f"Codex implementer diagnostic contract misses {marker!r}")
-    require(
-        (ROOT / "plugins/team-harness/skills/pipeline/scripts/cleaner-transition.mjs").is_file(),
-        "deterministic cleaner transition helper is missing",
-    )
+    for stale_copy in (
+        "skills/pipeline/scripts/cleaner-transition.mjs",
+        "plugins/team-harness/skills/pipeline/scripts/cleaner-transition.mjs",
+        "installer-assets/opencode-skills/pipeline/scripts/cleaner-transition.mjs",
+    ):
+        require(
+            not (ROOT / stale_copy).is_file(),
+            f"retired cleaner transition helper still shipped: {stale_copy}",
+        )
     require((ROOT / "docs/cleaner-crap.md").is_file(), "cleaner operator documentation is missing")
 
 
@@ -1229,9 +1235,9 @@ def check_cross_runtime_pipeline_runners() -> None:
     names = (
         "bounded-command.mjs",
         "commit-integrity.mjs",
-        "cleaner-transition.mjs",
         "plan-contract.mjs",
         "plan-contract-repair.mjs",
+        "quality-lib.mjs",
         "quality-runner.mjs",
         "test-transition.mjs",
         "workspace-preflight.mjs",
@@ -1618,7 +1624,7 @@ def check_residual_corrections() -> None:
     require("validation-checkpoint" in readme, "README: adversary/QA phase label drifted")
 
     gate = read("agents/_shared/gate-contract.md")
-    require("six fields above" in gate and "five fields above" not in gate, "Gate contract: stale field count")
+    require("seven fields above" in gate and "six fields above" not in gate, "Gate contract: stale field count")
     state_contract = read("agents/_shared/orchestrator-state.md")
     require("checkpoint_boundary` is a separate derived checkpoint cache" in state_contract, "State: checkpoint boundary is conflated with gate fields")
 
@@ -2203,8 +2209,9 @@ def check_terminal_and_transition_mapping() -> None:
     claude_pipeline = read("agents/ref-pipeline.md").lower()
 
     for marker in (
-        "gate 1 `approve autonomous`",
+        "release_policy: auto-ship",
         "autonomous_granted_at: stage-gate-1",
+        "gate 3 `auto-ship`",
         "gate 3 `ship`",
         "phase: delivery",
         "gate 3 `abort`",
@@ -2289,7 +2296,8 @@ def check_pr_review_workspace_isolation() -> None:
     require(canonical.count('--deadline-epoch "$GATHER_DEADLINE"') == 2, "PR review capture and materialization do not share one deadline")
     require("materialize" in canonical, "PR review does not materialize through the bounded helper")
     require("borrows the operator checkout's existing object database" in flattened and "self-contained" in flattened, "PR review snapshot does not safely reuse local objects")
-    require("excluding the exact `$snapshot_git` directory" in flattened, "PR review artifact identity check includes mutable Git administration")
+    require("excluding the exact `$snapshot_git` and `$worktree` directories" in flattened, "PR review artifact identity check includes mutable Git administration")
+    require('worktree="$artifacts/pr-review-worktree"' in flattened, "PR review worktree lives outside the review workspace")
     require("gh pr checks" not in canonical, "PR review checks can bypass the bounded helper")
     require("must never fetch, update refs, create worktree administration" in flattened, "PR review can still mutate the operator checkout's .git")
     require("one 60-second budget" in flattened, "PR review gather phase is not explicitly bounded")
@@ -2548,34 +2556,35 @@ def check_obsidian_workspace_preflight_contract() -> None:
             "workspace-preflight.mjs",
             "before creating",
             "persistent config",
-            "restart",
-            "new tab",
-            "use local workspace",
-            "current operator reply",
+            "obsidian-direct",
+            "explicit live operator request",
+            "fall back",
             "never split",
         ):
-            require(marker in text, f"{label}: Obsidian preflight marker missing {marker!r}")
+            require(marker in text, f"{label}: workspace-model marker missing {marker!r}")
 
     for marker in (
         "exactly once without sandbox escalation",
         "only `status: ready` proves",
         "never creates the feature workspace or state",
         "do not create state, request escalation, retry the probe",
+        "shadowed, not stale",
+        "regenerate the project config",
+        "never advise a restart for this case",
         "session born before the sandbox change",
         "restart codex or open a new tab",
-        "stop after that instruction",
-        "`usar workspace local`",
-        "only that current operator reply authorizes",
-        "before authority, create nothing in either root",
-        "record `logs_mode: local`",
+        "stop after the diagnosis",
+        "record the probe reason",
+        "never blocks the pipeline",
     ):
         require(marker in activation, f"activation: Obsidian fallback/session marker missing {marker!r}")
 
     for marker in (
-        "immutable recovery identity",
+        "never an input to recovery decisions",
         "never select a local same-name candidate",
         "single non-escalated probe",
         "never triggers an escalation loop or local fallback",
+        "project-config shadowing",
         "restart/new-tab instruction",
         "explicitly abort and start a separate local pipeline",
         "never divides one run between roots",
@@ -2586,8 +2595,25 @@ def check_obsidian_workspace_preflight_contract() -> None:
         "immutable identity at the first state write",
         "one canonical root",
         "never migrates or splits an existing pipeline",
+        "arms the one-way vault export",
+        "obsidian_sync",
     ):
         require(marker in state, f"state: canonical workspace marker missing {marker!r}")
+
+    delivery = re.sub(
+        r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/delivery.md").lower()
+    )
+    mechanics = re.sub(r"\s+", " ", read("agents/_shared/delivery-mechanics.md").lower())
+    for label, text in (("codex delivery", delivery), ("delivery mechanics", mechanics)):
+        for marker in (
+            "obsidian_sync: armed",
+            "after draft-pr creation",
+            "non-authoritative view",
+            "never synced back",
+            "obsidian_sync: pending",
+            "never blocks",
+        ):
+            require(marker in text, f"{label}: one-way export marker missing {marker!r}")
 
     setup_commands = []
     in_command_fence = False
@@ -2612,6 +2638,7 @@ def check_obsidian_workspace_preflight_contract() -> None:
         "does not update a running session's sandbox",
         "codex restart or new tab",
         "non-escalated live write probe",
+        "projectconfigshadowing",
     ):
         require(marker in setup, f"setup: installed Obsidian config marker missing {marker!r}")
 
@@ -2906,13 +2933,13 @@ def check_execution_efficiency_contract() -> None:
     ):
         require(marker in quality, f"quality runner: atomic evidence transport misses {marker!r}")
     for marker in (
-        "cleaner-transition.mjs",
-        "--transition pre --output",
-        "bounded receipt",
-        "temporary javascript wrapper",
-        "bounded-command",
+        "overreach proof",
+        "--name-status --no-renames",
+        "descend from the baseline commit",
+        "proof output and sha-256",
+        "no pre- or post-cleanup quality run",
     ):
-        require(marker in implementation_flat, f"implementation: cleaner receipt transport misses {marker!r}")
+        require(marker in implementation_flat, f"implementation: cleaner overreach proof misses {marker!r}")
 
     for marker in (
         "disjoint `files:` are necessary but not sufficient",
