@@ -2576,17 +2576,13 @@ def check_wait_heartbeat_sla_contract() -> None:
         "th_progress",
         "started",
         "inputs-validated",
-        "mappings-built",
         "artifacts-writing",
         "validation-ready",
         "120 seconds",
         "th_progress_request",
-        "required_invariants",
-        "required_evidence_anchors",
-        "cross_runtime_preservation",
-        "writable_roots",
     ):
         require(marker in architect, f"architect: structured progress transport misses {marker!r}")
+    require("mappings-built" not in architect, "architect: retired overlay-mapping milestone survived retirement")
 
     for marker in (
         "`agent.sla`",
@@ -2630,6 +2626,24 @@ def check_wait_heartbeat_sla_contract() -> None:
                 "resets the sla",
             ):
                 require(marker in adapter, f"architect: Codex progress adapter misses {marker!r}")
+
+
+def check_openspec_single_pass_design() -> None:
+    """The standing openspec-overlay dispatch mode is retired everywhere it was named."""
+    carriers = {
+        "architect": read("agents/architect.md").lower(),
+        "ref-pipeline": read("agents/ref-pipeline.md").lower(),
+        "openspec-integration": read("docs/openspec-integration.md").lower(),
+        "codex architect adapter": read("runtime/codex/instructions/architect.md").lower(),
+        "pipeline design reference": read("plugins/team-harness/skills/pipeline/references/design.md").lower(),
+    }
+    for label, text in carriers.items():
+        require("openspec-overlay` mode" not in text, f"{label}: still describes a standing openspec-overlay dispatch mode")
+        require("second architect dispatch" not in text or "never a second architect dispatch" in text or "no second architect dispatch" in text or "not a second architect dispatch" in text,
+                f"{label}: a second architect dispatch is described as legal")
+        require("mechanical" in text and "derivation" in text, f"{label}: mechanical derivation replacement missing")
+    require("no standing second dispatch mode" in carriers["ref-pipeline"] or "no second dispatch mode" in carriers["ref-pipeline"],
+            "ref-pipeline: retirement of the standing second dispatch mode is not stated")
 
 
 def check_obsidian_workspace_preflight_contract() -> None:
@@ -3784,6 +3798,7 @@ def main() -> None:
         ("PR review operator visibility", check_pr_review_operator_visibility),
         ("Claude/Codex parity", check_claude_codex_parity),
         ("wait heartbeat and phase SLA", check_wait_heartbeat_sla_contract),
+        ("OpenSpec single-pass Design", check_openspec_single_pass_design),
         ("Obsidian workspace preflight", check_obsidian_workspace_preflight_contract),
         ("Codex worktree technical approval", check_codex_worktree_permission_contract),
         ("execution efficiency", check_execution_efficiency_contract),

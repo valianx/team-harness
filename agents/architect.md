@@ -114,7 +114,7 @@ Detect the mode from the dispatch. Secondary-mode processes and templates:
 | Mode | Output | Deep reference |
 |---|---|---|
 | design (default) | `01-plan.md` + `plan/**` (+ rubric, sketches) | `ref-architect-design.md` |
-| openspec-planning / openspec-overlay | OpenSpec artifacts / overlay shards | this file |
+| openspec-planning | OpenSpec artifacts (overlay shards are a mechanical derivation, not a dispatch) | this file |
 | root-cause | `01-root-cause.md` + `01-plan.md` | `ref-architect-modes.md § Root-cause templates` |
 | research / audit / planning / consolidation | `research/00-research.md` / `research/00-audit.md` / `01-planning.md` / `00-consolidated.md` | `ref-architect-modes.md` |
 
@@ -203,21 +203,11 @@ no TH planning indexes, shards, traceability, or coordinator state. Return
 artifact pointers plus unresolved contradictions; OpenSpec readiness never
 releases Gate 1.
 
-**openspec-overlay** — only with a verified `inputs/openspec-snapshot.json`.
-Read the pinned OpenSpec coordinates as canonical source; write only the
-compact Gate-1 index, operational execution shards, and
-`plan/openspec-traceability.json`, adding what OpenSpec does not own
-(ownership, routing, dependencies, invariants, TCs, verification, evidence,
-rollback, Freeze, delivery metadata). Never copy or paraphrase normative
-prose. Classify every mapping as `direct`, `split`, `merged`, `th-extension`,
-`excluded`, or `ambiguous`; report ambiguity instead of inventing intent.
-Every execution shard carries one `## Dispatch anchors` block with literal
-`required_invariants: [...]`, `required_evidence_anchors: [...]`, and a
-non-empty `cross_runtime_preservation: ...` line, mirrored exactly into its
-`execution_items` entry; `[]` only when nothing applies. The packet supplies
-the effective absolute `writable_roots`; a proposed worktree must be equal to
-or strictly below one — escalation used for `git worktree add` does not make
-an outside path writable later.
+Once your proposal, specs, design, and tasks validate, Main derives the compact Gate-1 index,
+operational execution shards, and `plan/openspec-traceability.json` mechanically from the pinned
+coordinates — a script projection, never a second architect dispatch. A validator failure on
+that assembled plan re-enters this same `openspec-planning` mode with the failure; there is no
+standing `openspec-overlay` dispatch mode to repair a mapping.
 
 **Codex progress transport.** When the packet includes `dispatch_id`,
 `progress_recipient`, and `progress_interval_seconds: 120`, use native
@@ -226,7 +216,7 @@ space, then JSON with exactly `schema_version` (1), `dispatch_id`, `role`,
 `mode`, `milestone`, `completed_units`, `total_units`, `artifact_pointers`
 (workspace-relative regular outputs already written), and `blocked_code`
 (`null`, `AMBIGUITY`, `INPUT_MISSING`, or `WRITE_FAILED`). Milestones:
-`started` (before lengthy reasoning), `inputs-validated`, `mappings-built`,
+`started` (before lengthy reasoning), `inputs-validated`,
 `artifacts-writing`, `validation-ready`; repeat the current truthful milestone
 whenever 120 seconds pass while you retain execution. Never put prose,
 outside paths, source content, or secrets in progress; a heartbeat proves

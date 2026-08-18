@@ -494,11 +494,11 @@ time:
 | validation | security | 10 min |
 | delivery | delivery | 5 min |
 
-For a Codex `openspec-overlay` architect, the dispatch packet carries a
+For a Codex `openspec-planning` architect, the dispatch packet carries a
 coordinator-generated `dispatch_id`, exact `progress_recipient`, and
 `progress_interval_seconds: 120`. The specialist uses native `send_message` to
 emit transient `TH_PROGRESS` JSON at `started`, `inputs-validated`,
-`mappings-built`, `artifacts-writing`, and `validation-ready`, repeating the
+`artifacts-writing`, and `validation-ready`, repeating the
 current milestone when 120 seconds pass. Main validates the known dispatch,
 role/mode, counters, workspace-contained artifact pointers, and closed blocked
 code. These messages are progress evidence only: they never write coordination
@@ -795,20 +795,19 @@ without legacy fallback.
 
 Dispatch a fresh `architect` in `openspec-planning` mode with the installed upstream
 `openspec-propose` skill for a new change or `openspec-update-change` for the already bound
-change. This pass writes only the OpenSpec proposal, specs, design, and tasks. Main then runs
-CLI-reported status plus strict validation and captures the sole
-`inputs/openspec-snapshot.json`. Dispatch a second fresh `architect` in
-`openspec-overlay` mode; it writes only the compact Gate-1 index, operational execution shards,
-and bidirectional traceability against pinned coordinates. It never rewrites canonical source
-intent. Its packet includes the structured progress contract above so Main can
-observe input validation, mapping, and artifact-writing milestones without
-reading partial output. It also includes the effective absolute
-`writable_roots`; each shard declares literal `required_invariants`,
-`required_evidence_anchors`, and `cross_runtime_preservation`, mirrors those
-values into its traceability execution item, and proposes only a branch-in-place
-target or worktree contained by one of those roots. Main validates freshness,
-dispatch-anchor agreement, writable execution topology, and overlay structure
-before Gate 1.
+change. This is the single reasoning pass: it writes the OpenSpec proposal, specs, design, and
+tasks, carrying every judgment call — routing, scope decomposition, invariants — into that one
+change. Main then runs CLI-reported status plus strict validation and captures the sole
+`inputs/openspec-snapshot.json`. Main then runs `openspec-overlay.mjs derive` directly over the
+validated snapshot and the effective absolute `writable_roots` — a mechanical projection, never a
+second agent dispatch. It writes only the compact Gate-1 index, operational execution shard
+scaffolds, and bidirectional traceability against pinned coordinates, and never rewrites
+canonical source intent. Each shard's literal `required_invariants`, `required_evidence_anchors`,
+and `cross_runtime_preservation` declarations mirror exactly into its traceability
+`execution_items` entry by construction. A validator failure on the assembled plan re-enters the same
+`openspec-planning` flow with the failure and Main reruns the derivation over the corrected
+snapshot; no standing second dispatch mode exists to repair a mapping. Main validates freshness,
+dispatch-anchor agreement, writable execution topology, and overlay structure before Gate 1.
 
 These are consecutive actions in one Design transaction, not operator checkpoints. Main advances
 automatically after successful internal actions, including repository initialization and its one
@@ -819,8 +818,9 @@ require the operator to re-enter a command. Existing approved or frozen legacy w
 their recorded plan contract and are not implicitly migrated.
 
 **Agent:** `architect`, with the documented self-authored hotfix/Tier-1 exception. In an
-OpenSpec-bound run Design uses the two bounded passes above. A legacy run uses the historical
-single bounded pass. The architect never writes coordination state.
+OpenSpec-bound run Design dispatches the architect exactly once, in `openspec-planning` mode; the
+overlay is a mechanical derivation, not a second dispatch. A legacy run uses the historical single
+bounded pass. The architect never writes coordination state.
 
 | `type` | `bug_tier` | Mode | Output |
 |---|---|---|---|
@@ -864,7 +864,7 @@ task dispatch anchors, and writable execution target;
 the OpenSpec path never falls through to the legacy functional-plan validator
 or invokes `plan-contract-repair.mjs`. Snapshot drift returns to explicit
 OpenSpec reconciliation. Mapping or execution-control findings receive the one
-normal overlay design correction.
+normal design correction described above — no second dispatch mode.
 
 Before presenting Gate 1, Main also runs the packaged `openspec-events.mjs`
 with the complete configured events path and bound feature. Only
@@ -872,7 +872,8 @@ with the complete configured events path and bound feature. Only
 permits the gate. The validator rejects missing universal `ts`/`feature`, a
 dispatch mode serialized as lifecycle `task` instead of the closed `design`
 value, non-canonical status, missing `attempt_metrics`, open attempts, or an
-incomplete two-pass Design. The append-only trace is never repaired during gate
+incomplete Design transaction (a missing planning dispatch or a missing
+derivation result). The append-only trace is never repaired during gate
 presentation.
 
 For every new legacy `sharded-v1` plan, Main resolves `plan-contract.mjs` and
