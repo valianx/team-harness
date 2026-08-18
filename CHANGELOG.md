@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   retry protected mutations with narrow non-login escalation, require informed
   approval before persistent runtime-profile changes, and emit a structured
   protected-cache retry signal from snapshot bridging.
+- Isolated quality hermeticity and runtime resolution to selected checks while
+  keeping manifest structure globally fail-closed, and added safe command/field
+  coordinates to schema-v3 failure evidence.
 - Made blocked cleaner and handoff attempts recoverable in the same workspace
   and branch, preserving failed evidence append-only while allowing a corrected
   candidate to proceed without repeating Gate 1 or discarding valid work.

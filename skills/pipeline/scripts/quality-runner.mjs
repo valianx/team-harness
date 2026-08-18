@@ -21,7 +21,7 @@ import { isBoundedCommandEnvelope, runBoundedCommand } from "./bounded-command.m
 const execFileAsync = promisify(execFile);
 
 export const QUALITY_MANIFEST_SCHEMA_VERSION = 1;
-export const QUALITY_RESULT_SCHEMA_VERSION = 2;
+export const QUALITY_RESULT_SCHEMA_VERSION = 3;
 export const QUALITY_RECEIPT_SCHEMA_VERSION = 1;
 export const CRAP_REPORT_SCHEMA_VERSION = 1;
 export const CRAP_REPORT_TOKEN = "${TH_QUALITY_REPORT}";
@@ -69,6 +69,7 @@ const RESULT_KEYS = [
   "checkpoint",
   "verdict",
   "error_code",
+  "error_context",
   "duration_ms",
   "repository",
   "manifest",
@@ -152,7 +153,7 @@ export const QUALITY_MANIFEST_SCHEMA = {
 
 export const QUALITY_RESULT_SCHEMA = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
-  $id: "team-harness/quality-result/v2",
+  $id: "team-harness/quality-result/v3",
   type: "object",
   additionalProperties: false,
   required: RESULT_KEYS,
@@ -162,6 +163,20 @@ export const QUALITY_RESULT_SCHEMA = {
     checkpoint: { anyOf: [{ type: "null" }, { type: "string", pattern: "^[a-z][a-z0-9_-]{0,63}$" }] },
     verdict: { enum: ["pass", "fail"] },
     error_code: { anyOf: [{ type: "null" }, { enum: [...ERROR_CODES].filter((value) => value !== null) }] },
+    error_context: {
+      anyOf: [
+        { type: "null" },
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["command_id", "field"],
+          properties: {
+            command_id: { type: "string", pattern: "^[a-z][a-z0-9_]{0,63}$" },
+            field: { enum: ["command", "argv", "version_argv", "working_directory", "timeout_ms", "required_environment", "commands"] },
+          },
+        },
+      ],
+    },
     duration_ms: { type: "integer", minimum: 0 },
     repository: { anyOf: [{ type: "null" }, { type: "object" }] },
     manifest: { anyOf: [{ type: "null" }, { type: "object" }] },
@@ -172,10 +187,18 @@ export const QUALITY_RESULT_SCHEMA = {
 };
 
 class QualityError extends Error {
-  constructor(code) {
+  constructor(code, context = null) {
     super(code);
     this.code = code;
+    this.context = isErrorContext(context) ? context : null;
   }
+}
+
+function isErrorContext(value) {
+  return hasExactlyKeys(value, ["command_id", "field"])
+    && typeof value.command_id === "string"
+    && SAFE_COMMAND_ID.test(value.command_id)
+    && ["command", "argv", "version_argv", "working_directory", "timeout_ms", "required_environment", "commands"].includes(value.field);
 }
 
 function hasOnlyKeys(value, allowed, required = []) {
@@ -260,7 +283,7 @@ function packageManagerInvocation(argv) {
   return { executable, operation: argv[offset]?.toLowerCase() ?? null, operationOffset: offset };
 }
 
-function validateArgv(argv, { requireReportToken = false, allowLocalPnpmExec = false } = {}) {
+function validateArgv(argv, { requireReportToken = false, allowLocalPnpmExec = false, enforceHermetic = true } = {}) {
   if (!Array.isArray(argv) || argv.length === 0 || argv.length > MAX_ARGV_ITEMS) throw new QualityError("MANIFEST_INVALID");
   let bytes = 0;
   let reportTokens = 0;
@@ -276,6 +299,7 @@ function validateArgv(argv, { requireReportToken = false, allowLocalPnpmExec = f
     if (argument === CRAP_REPORT_TOKEN) reportTokens += 1;
   }
   if (requireReportToken ? reportTokens !== 1 : reportTokens !== 0) throw new QualityError("MANIFEST_INVALID");
+  if (!enforceHermetic) return argv.slice();
   const executable = normalizeExecutable(argv[0]);
   const invocation = packageManagerInvocation(argv);
   const operation = invocation?.operation ?? null;
@@ -291,29 +315,53 @@ function validateArgv(argv, { requireReportToken = false, allowLocalPnpmExec = f
   return argv.slice();
 }
 
-function validateCommand(command, id) {
+function commandError(code, id, field) {
+  return new QualityError(code, { command_id: id, field });
+}
+
+function validateCommand(command, id, { enforceHermetic = true } = {}) {
   if (!hasOnlyKeys(command, ["argv", "working_directory", "timeout_ms", "version_argv", "required_environment"], ["argv"])) {
-    throw new QualityError("MANIFEST_INVALID");
+    throw commandError("MANIFEST_INVALID", id, "command");
   }
   const workingDirectory = Object.hasOwn(command, "working_directory") ? command.working_directory : ".";
-  if (!isSafeRelativePath(workingDirectory) && workingDirectory !== ".") throw new QualityError("MANIFEST_INVALID");
+  if (!isSafeRelativePath(workingDirectory) && workingDirectory !== ".") {
+    throw commandError("MANIFEST_INVALID", id, "working_directory");
+  }
   const timeoutMs = Object.hasOwn(command, "timeout_ms") ? command.timeout_ms : DEFAULT_TIMEOUT_MS;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > MAX_TIMEOUT_MS) {
-    throw new QualityError("MANIFEST_INVALID");
+    throw commandError("MANIFEST_INVALID", id, "timeout_ms");
+  }
+  let argv;
+  try {
+    argv = validateArgv(command.argv, {
+      requireReportToken: id === "crap",
+      allowLocalPnpmExec: true,
+      enforceHermetic,
+    });
+  } catch (error) {
+    if (error instanceof QualityError) throw commandError(error.code, id, "argv");
+    throw error;
   }
   const normalized = {
-    argv: validateArgv(command.argv, { requireReportToken: id === "crap", allowLocalPnpmExec: true }),
+    argv,
     working_directory: workingDirectory,
     timeout_ms: timeoutMs,
     version_argv: null,
     required_environment: [],
   };
-  if (Object.hasOwn(command, "version_argv")) normalized.version_argv = validateArgv(command.version_argv);
+  if (Object.hasOwn(command, "version_argv")) {
+    try {
+      normalized.version_argv = validateArgv(command.version_argv, { enforceHermetic });
+    } catch (error) {
+      if (error instanceof QualityError) throw commandError(error.code, id, "version_argv");
+      throw error;
+    }
+  }
   if (Object.hasOwn(command, "required_environment")) {
     if (!Array.isArray(command.required_environment) || command.required_environment.length > 32 ||
       new Set(command.required_environment).size !== command.required_environment.length ||
       command.required_environment.some((name) => typeof name !== "string" || !/^[A-Z][A-Z0-9_]{0,127}$/.test(name))) {
-      throw new QualityError("MANIFEST_INVALID");
+      throw commandError("MANIFEST_INVALID", id, "required_environment");
     }
     normalized.required_environment = command.required_environment.slice().sort();
   }
@@ -350,7 +398,7 @@ function validateTestContractConfig(value) {
   return { path_rules: value.path_rules.map(validateTestPathRule) };
 }
 
-export function validateQualityManifest(value) {
+export function validateQualityManifest(value, { selectedChecks = null } = {}) {
   if (!hasOnlyKeys(value, ["schema_version", "commands", "crap", "test_contract"], ["schema_version", "commands"])) {
     throw new QualityError("MANIFEST_INVALID");
   }
@@ -362,7 +410,18 @@ export function validateQualityManifest(value) {
   if (commandIds.length === 0 || commandIds.some((id) => !SAFE_COMMAND_ID.test(id) || !KNOWN_COMMANDS.includes(id))) {
     throw new QualityError("MANIFEST_INVALID");
   }
-  const commands = Object.fromEntries(commandIds.sort().map((id) => [id, validateCommand(value.commands[id], id)]));
+  if (
+    selectedChecks !== null &&
+    (!Array.isArray(selectedChecks) || new Set(selectedChecks).size !== selectedChecks.length ||
+      selectedChecks.some((id) => typeof id !== "string" || !SAFE_COMMAND_ID.test(id) || !KNOWN_COMMANDS.includes(id)))
+  ) {
+    throw new QualityError("MANIFEST_INVALID");
+  }
+  const hermeticChecks = new Set(selectedChecks === null ? commandIds : selectedChecks);
+  const commands = Object.fromEntries(commandIds.sort().map((id) => [
+    id,
+    validateCommand(value.commands[id], id, { enforceHermetic: hermeticChecks.has(id) }),
+  ]));
 
   let crap = null;
   if (Object.hasOwn(value, "crap")) {
@@ -507,7 +566,7 @@ async function resolveRepository(repoInput, baseInput, candidateInput) {
   };
 }
 
-async function resolveManifest(repo, manifestInput) {
+async function resolveManifest(repo, manifestInput, selectedChecks) {
   if (typeof manifestInput !== "string" || manifestInput.length === 0 || manifestInput.includes("\u0000")) {
     throw new QualityError("ARGUMENT_INVALID");
   }
@@ -522,7 +581,7 @@ async function resolveManifest(repo, manifestInput) {
   }
   if (!isContained(repo, filePath)) throw new QualityError("MANIFEST_INVALID");
   const loaded = await readBoundedJson(filePath, "MANIFEST_INVALID");
-  const manifest = validateQualityManifest(loaded.value);
+  const manifest = validateQualityManifest(loaded.value, { selectedChecks });
   return {
     value: manifest,
     evidence: {
@@ -933,6 +992,7 @@ export function isQualityResult(value) {
   if (value.schema_version !== QUALITY_RESULT_SCHEMA_VERSION || value.kind !== "team_harness_quality") return false;
   if (value.checkpoint !== null && (typeof value.checkpoint !== "string" || !SAFE_CHECKPOINT.test(value.checkpoint))) return false;
   if (!["pass", "fail"].includes(value.verdict) || !ERROR_CODES.has(value.error_code)) return false;
+  if (value.error_context !== null && !isErrorContext(value.error_context)) return false;
   if (!Number.isSafeInteger(value.duration_ms) || value.duration_ms < 0) return false;
   if (value.repository !== null && !isRepositoryEvidence(value.repository)) return false;
   if (value.manifest !== null && !isManifestEvidence(value.manifest)) return false;
@@ -941,6 +1001,7 @@ export function isQualityResult(value) {
   if (new Set(value.commands.map((entry) => entry.id)).size !== value.commands.length) return false;
   if (value.crap !== null && !isCrapEvidence(value.crap)) return false;
   if (value.verdict === "pass" && value.error_code !== null) return false;
+  if (value.verdict === "pass" && value.error_context !== null) return false;
   if (value.verdict === "pass" && value.commands.some((entry) => entry.verdict !== "pass")) return false;
   if (value.verdict === "pass" && value.crap?.verdict === "fail") return false;
   if (value.verdict === "fail" && value.error_code === null) return false;
@@ -958,6 +1019,7 @@ function safeResult(state, startedAt) {
     checkpoint: state.checkpoint,
     verdict: state.error_code === null ? "pass" : "fail",
     error_code: state.error_code,
+    error_context: state.error_context,
     duration_ms: elapsedMs(startedAt),
     repository: state.repository,
     manifest: state.manifest,
@@ -972,6 +1034,7 @@ function safeResult(state, startedAt) {
     checkpoint: null,
     verdict: "fail",
     error_code: "INTERNAL_ERROR",
+    error_context: null,
     duration_ms: 0,
     repository: null,
     manifest: null,
@@ -1075,14 +1138,16 @@ function repositoryEvidence(repository) {
 async function prepareRun(options, state) {
   const repository = await resolveRepository(options.repo, options.base, options.candidate);
   state.repository = repositoryEvidence(repository);
-  const manifest = await resolveManifest(repository.root, options.manifest);
+  const manifest = await resolveManifest(repository.root, options.manifest, options.checks);
   state.manifest = manifest.evidence;
-  if (options.requiredChecks.some((id) =>
-    !Object.hasOwn(manifest.value.commands, id) || !options.checks.includes(id))) {
-    throw new QualityError("REQUIRED_CHECKS_MISSING");
+  const missingRequired = options.requiredChecks.find((id) =>
+    !Object.hasOwn(manifest.value.commands, id) || !options.checks.includes(id));
+  if (missingRequired !== undefined) {
+    throw new QualityError("REQUIRED_CHECKS_MISSING", { command_id: missingRequired, field: "commands" });
   }
-  if (options.checks.some((id) => !Object.hasOwn(manifest.value.commands, id))) {
-    throw new QualityError("MANIFEST_INVALID");
+  const missingSelected = options.checks.find((id) => !Object.hasOwn(manifest.value.commands, id));
+  if (missingSelected !== undefined) {
+    throw new QualityError("MANIFEST_INVALID", { command_id: missingSelected, field: "commands" });
   }
   const usesCrap = options.checks.includes("crap");
   if (usesCrap && manifest.value.crap === null) throw new QualityError("MANIFEST_INVALID");
@@ -1221,6 +1286,7 @@ export async function runQualityChecks(options) {
   const state = {
     checkpoint: null,
     error_code: null,
+    error_context: null,
     repository: null,
     manifest: null,
     baseline: null,
@@ -1240,6 +1306,7 @@ export async function runQualityChecks(options) {
     await assertClean(context.repository.root, "WORKTREE_MUTATED");
   } catch (error) {
     state.error_code = error instanceof QualityError && ERROR_CODES.has(error.code) ? error.code : "INTERNAL_ERROR";
+    state.error_context = error instanceof QualityError ? error.context : null;
   } finally {
     if (context?.reportRoot !== null && context?.reportRoot !== undefined) {
       try {

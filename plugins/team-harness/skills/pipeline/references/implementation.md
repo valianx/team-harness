@@ -232,7 +232,16 @@ resolving its executable through an existing repository-local
 to the current Node executable and records `repository-local-node-script`;
 pnpm is never launched, so worktree dependency verification cannot touch a
 global or cross-OS store. Compound shell scripts, unsafe Node coordinates, or
-missing links/files fail closed before pnpm launches. Specialist packets
+missing links/files fail closed before pnpm launches.
+The runner validates manifest structure globally but applies hermetic runtime
+classification and executable resolution only to the selected checks. A bad
+runtime probe on an unselected independent command cannot block the current
+checkpoint. When a selected manifest field fails, quality result schema v3
+names only its safe `error_context.command_id` and `error_context.field`; use
+those coordinates instead of dumping the manifest or runner source. A
+`version_argv` must probe the effective resolved runtime, such as `node` when a
+package script unwraps to a repository-local Node script.
+Specialist packets
 name quality check IDs and the resolved runner/transition helper; they never
 prescribe a raw package-manager fallback as authoritative evidence.
 The same containment preflight applies when the manifest names

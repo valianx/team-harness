@@ -208,6 +208,22 @@ await check("configured format and lint checks run without CRAP", async () => {
   });
 });
 
+await check("cleaner checks ignore non-hermetic probes from unselected commands", async () => {
+  await repository(async (context) => {
+    const quality = manifest({ crap: false });
+    quality.commands.database = command("process.exit(0);");
+    quality.commands.database.version_argv = ["pnpm", "--version"];
+    await writeJson(path.join(context.repo, ".team-harness", "quality.json"), quality);
+    git(context.repo, "add", ".team-harness/quality.json");
+    git(context.repo, "commit", "-q", "-m", "add unrelated database check");
+
+    const pre = await runCleanerTransition(preOptions(context));
+    assertClosedResult(pre);
+    assert.equal(pre.verdict, "pass");
+    assert.deepEqual(pre.quality.commands.map((entry) => entry.id), ["test", "format_check", "lint"]);
+  });
+});
+
 await check("pre-check catches repository quality debt before cleaner dispatch", async () => {
   await repository(
     async (context) => {

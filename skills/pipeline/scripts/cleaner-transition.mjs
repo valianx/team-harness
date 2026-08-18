@@ -127,7 +127,8 @@ async function resolveManifest(repo, manifestInput) {
   const loaded = await readBoundedJson(file, "MANIFEST_INVALID");
   let value;
   try {
-    value = validateQualityManifest(loaded.value);
+    const structural = validateQualityManifest(loaded.value, { selectedChecks: [] });
+    value = validateQualityManifest(loaded.value, { selectedChecks: cleanerChecks({ value: structural }) });
   } catch {
     throw new CleanerError("MANIFEST_INVALID");
   }

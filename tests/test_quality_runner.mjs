@@ -142,6 +142,7 @@ function assertClosedResult(result) {
     "crap",
     "duration_ms",
     "error_code",
+    "error_context",
     "kind",
     "manifest",
     "repository",
@@ -264,6 +265,36 @@ await check("invalid manifests and missing selected commands fail closed", async
     const result = await runQualityChecks(options(repo, base, ["test"]));
     assert.equal(result.verdict, "fail");
     assert.equal(result.error_code, "MANIFEST_INVALID");
+  });
+});
+
+await check("unselected command runtimes stay isolated while selected failures name their field", async () => {
+  const manifest = baseManifest({
+    format_check: command(),
+    database: {
+      argv: ["pnpm", "permissions:check"],
+      version_argv: ["pnpm", "--version"],
+    },
+  });
+  assert.throws(
+    () => validateQualityManifest(manifest),
+    error => error?.message === "NON_HERMETIC_COMMAND",
+  );
+  assert.doesNotThrow(() => validateQualityManifest(manifest, { selectedChecks: ["format_check"] }));
+
+  await temporaryRepository({ manifest }, async ({ repo, base }) => {
+    const isolated = await runQualityChecks(options(repo, base, ["format_check"]));
+    assertClosedResult(isolated);
+    assert.equal(isolated.verdict, "pass", JSON.stringify(isolated));
+    assert.equal(isolated.error_context, null);
+    assert.deepEqual(isolated.commands.map((entry) => entry.id), ["format_check"]);
+
+    const selected = await runQualityChecks(options(repo, base, ["database"]));
+    assertClosedResult(selected);
+    assert.equal(selected.verdict, "fail");
+    assert.equal(selected.error_code, "NON_HERMETIC_COMMAND");
+    assert.deepEqual(selected.error_context, { command_id: "database", field: "version_argv" });
+    assert.deepEqual(selected.commands, []);
   });
 });
 

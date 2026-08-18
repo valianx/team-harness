@@ -163,7 +163,21 @@ five minutes and cannot exceed one hour.
 
 `version_argv` is optional. When present, it must succeed before the quality
 command. The runner stores a version-output fingerprint rather than replaying
-the tool's text into the evidence record.
+the tool's text into the evidence record. It must probe the runtime that the
+runner actually executes after hermetic resolution: for example, a package
+script unwrapped to `node scripts/check.mjs` uses `node --version`, not
+`pnpm --version`.
+
+Manifest structure is validated globally: schema version, command IDs, closed
+fields, argv bounds, paths, timeouts, environments, and CRAP/test-contract
+shape must remain valid. Hermetic runtime classification and executable
+resolution apply only to the explicitly selected checks. An unselected
+command's package manager or version probe cannot block an independent
+format/lint checkpoint and is never executed; selecting that command applies
+the complete fail-closed validation before launch. Quality result schema v3
+records a bounded `error_context` with exactly `command_id` and `field` when a
+manifest or hermeticity failure can be attributed safely. It never includes
+argv, paths, environment values, or child output.
 
 ## CRAP adapter contract
 

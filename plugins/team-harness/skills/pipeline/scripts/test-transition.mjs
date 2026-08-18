@@ -325,7 +325,7 @@ async function loadManifest(repo, manifestPath) {
   const loaded = await readBoundedJson(resolved.file, "MANIFEST_INVALID");
   let value;
   try {
-    value = validateQualityManifest(loaded.value);
+    value = validateQualityManifest(loaded.value, { selectedChecks: ["test"] });
   } catch {
     throw new TransitionError("MANIFEST_INVALID");
   }
