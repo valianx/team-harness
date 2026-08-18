@@ -1284,7 +1284,8 @@ dumping runner source. Its closed input has exactly top-level
 path, unique path/symbol pair, `new|changed` status, integer complexity of at
 least one, and finite coverage from 0 through 100.
 
-Each repository's cleaner runs exactly once and is never re-dispatched. It completes and
+Each repository's cleaner runs exactly once per immutable candidate and manifest
+identity and is never re-dispatched for that same attempt. It completes and
 commits every independent safe allowlisted cleanup before returning any
 `implementer_findings`; each finding carries stable ID, cause, files,
 implicated AC/TC requirements, advisory correction, deterministic closure
@@ -1292,8 +1293,18 @@ check, and expected result. Main still runs the authoritative post transition.
 A cleaner return of `failed` or `blocked` is persisted with its hashed result as
 `cleaner-failed` or `cleaner-blocked`, never as `pending` or `pass`. The
 authoritative post transition may record the resulting tree and diagnostics but
-cannot convert either state to pass; both block Freeze and require a new
-explicitly activated repository-local pipeline.
+cannot convert either state to pass; both block Freeze for that attempt. They
+do not close the pipeline or discard work. On a live operator recovery,
+preserve the old hashed evidence, same workspace, same branch, commits, and
+valid edits; return to implementation, apply only an in-scope correction,
+commit a new candidate, and run one fresh cleaner attempt for that new
+candidate/manifest identity. Update the current state pointer only after the
+prior terminal attempt is durably bound in events; never overwrite or relabel
+its artifacts. Use fresh attempt-qualified evidence paths for every recovered
+pre/post transition so no atomic output target can replace an earlier result.
+This recovery consumes the normal max-3 implementation
+correction budget. It needs no new Gate 1 while intent and approved scope are
+unchanged; scope expansion still requires its explicit decision.
 A test, behavior, declared optional check, protected/out-of-scope path,
 threshold/config, or declared-tool failure cannot be waived or returned to the
 cleaner. Infrastructure or unclassifiable failure blocks. A complete failure or
@@ -1309,9 +1320,11 @@ DDL/migration, public-schema, security-control, external-environment, or new
 operator decision, and every closure check is locally executable against a
 complete `.team-harness/quality.json`. This is a closed predicate. On any false
 conjunct, preserve commits and evidence, issue no nonce, dispatch no
-implementer, report the exact failed conjuncts, and recommend a new explicitly
-activated pipeline split into repository-local packages. Never infer pause or
-abort from that recommendation.
+implementer, report the exact failed conjuncts, and pause the current pipeline
+for an in-place recovery plan split into repository-local packages. Preserve
+the same workspace and branch; only a real change of intent or approved scope
+requires the applicable operator decision. Never infer abort or replace the
+pipeline from that recovery requirement.
 
 For one eligible implementer package, persist a fresh
 `cleaner_handoff_nonce`, canonical repository and absolute worktree, the

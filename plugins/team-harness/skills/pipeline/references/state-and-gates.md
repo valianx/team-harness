@@ -168,7 +168,12 @@ identities, and one terminal evidence entry exists for every participating
 repository. Main maps cleaner `failed`/`blocked` returns to
 `cleaner-failed`/`cleaner-blocked` and authorized implementer failures or blocks
 to `handoff-failed`/`handoff-blocked`. These terminal non-pass states never
-alias `pending` or `pass` and block Freeze.
+alias `pending` or `pass` and block Freeze for their immutable attempt. They do
+not close the pipeline or invalidate its branch and commits. Recovery preserves
+their hashed artifacts and events append-only, then may replace only the
+current-state pointer after an in-scope correction creates a new candidate and
+fresh attempt with attempt-qualified evidence paths. Only
+`phase/status: complete|aborted` is terminal for the run.
 
 Also keep a short phase checklist and a bounded specialist-results table with
 only the latest result per role. The complete file must stay ≤160 lines and
@@ -257,8 +262,9 @@ no DDL/migration, public-schema, security-control, external-environment, or new
 decision dependency, locally executable closure checks, and a complete
 repository `.team-harness/quality.json`. Persist `ineligible` plus every failed
 conjunct when it does not hold, issue no nonce, and dispatch nobody. Preserve
-the existing commits/evidence and recommend a new explicit pipeline decomposed
-by repository; recommendation never authorizes or aborts anything.
+the existing commits/evidence and pause the same pipeline for an in-place
+recovery package decomposed by repository or the applicable live scope
+decision; that requirement never authorizes or aborts anything.
 
 For a non-empty complete package, atomically set `phase: implementation`,
 `status: paused`, `cleaner_evidence.status: handoff-pending`, a fresh

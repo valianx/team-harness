@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Made blocked cleaner and handoff attempts recoverable in the same workspace
+  and branch, preserving failed evidence append-only while allowing a corrected
+  candidate to proceed without repeating Gate 1 or discarding valid work.
 - Preserved deferred bounded-command results atomically behind a compact,
   hash-verifiable receipt, allowing pipeline agents to recover from tool-context
   truncation without rerunning authoritative tests or builds.

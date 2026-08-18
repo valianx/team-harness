@@ -67,7 +67,8 @@ runs. A cleaner-to-implementer handoff is also excluded: it emits only
 `cleaner.handoff.decision` and `agent.cleaner-handoff.spawn`.
 
 **Cleaner handoff decisions.** The cleaner runs once per participating
-repository. Cross-repository work uses separate fresh cleaners with separate
+repository and immutable candidate/manifest identity. Cross-repository work
+uses separate fresh cleaners with separate
 repo roots, worktrees, allowlists, baselines, manifests, candidate identities,
 and `cleaner_repo_evidence`; one cleaner never receives multiple repositories.
 Each finishes every independent safe allowlisted cleanup and may return complete
@@ -78,13 +79,14 @@ exactly one repository/worktree, one coherent behavior-preserving objective,
 one to five findings, at most eight unique files, already-approved scope, no
 DDL/migration, public-schema, security-control, external-environment, or new
 decision dependency, local closure checks, and a complete quality manifest.
-Otherwise it preserves commits/evidence, dispatches nobody, and recommends a
-new explicit repository-decomposed pipeline. An eligible package pauses with
+Otherwise it preserves commits/evidence, dispatches nobody, and pauses the same
+pipeline for an in-place repository-decomposed recovery package or applicable
+live scope decision. An eligible package pauses with
 exactly `1 — authorize one implementer pass`,
 `2 — pause without changes`, and `3 — abort pipeline`. Only live choice
 `1` consumes the nonce and permits one fresh terminal implementer attempt. It
 never inherits Gate-1 autonomy, increments `iteration`, consumes max-3, or
-permits another cleaner. The decision and spawn events must repeat the anchor
+permits another cleaner for the same immutable attempt. The decision and spawn events must repeat the anchor
 and every finding byte-for-byte. Bare non-zero exits without the exact command,
 exit code, and bounded diagnostic are incomplete. After the attempt Main owns
 closure evidence and then joins the same full-manifest `post_implementation`
@@ -300,6 +302,12 @@ per repository. Main maps a cleaner return of `failed` to `cleaner-failed` and
 `blocked` to `cleaner-blocked`; an authorized implementer return that fails or
 blocks maps to `handoff-failed` or `handoff-blocked`. These terminal non-pass
 states never alias `pending` or `pass` and block Freeze.
+They are terminal for that immutable attempt, not for the pipeline: a live
+recovery preserves their hashed artifacts and events append-only, retains the
+same workspace, branch, commits, and valid edits, and may update the current
+evidence pointer only after an in-scope correction creates a new candidate and
+fresh attempt with attempt-qualified evidence paths. Only
+`phase/status: complete|aborted` closes the run.
 
 **`open_findings` — kept, with a schema and a named reader, never left as an unread promise.** The reader is the Recover safety contract: on `/th:recover`, any entry present with no matching `disposition` row in `00-decision-ledger.md` is surfaced to the operator as an unresolved carry-over before the next gate is prepared. An entry is written only by the orchestrator, only when a finding lands as a task AC or when `agents/ref-pipeline.md § "Finding disposition"` records it as accepted-without-AC — never populated speculatively, and never treated as the transport for a finding that has not gone through that disposition path.
 
