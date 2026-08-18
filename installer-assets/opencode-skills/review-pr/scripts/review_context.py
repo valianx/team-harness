@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 COMMAND_TIMEOUT_SECONDS = 60
 _capture_deadline: float | None = None
 BOT_BODY_LIMIT = 500
@@ -754,8 +754,9 @@ SENSITIVE_FILENAMES = {
     "requirements.txt", "yarn.lock",
 }
 NON_EXECUTABLE_SUFFIXES = {
-    ".adoc", ".avif", ".bmp", ".gif", ".ico", ".jpeg", ".jpg", ".md",
-    ".pdf", ".png", ".rst", ".svg", ".txt", ".webp",
+    ".adoc", ".avif", ".bmp", ".cfg", ".gif", ".ico", ".ini", ".jpeg", ".jpg",
+    ".json", ".md", ".pdf", ".png", ".properties", ".rst", ".svg", ".toml",
+    ".txt", ".webp", ".yaml", ".yml",
 }
 SENSITIVE_DIFF_TOKENS = re.compile(
     r"\b(auth(?:entication|orization)?|crypt(?:o|ography)|eval|exec|password|"
@@ -796,7 +797,6 @@ def finalize_hashes(context: dict[str, Any]) -> None:
             "code_hash": context["code_hash"],
             "conversation_hash": context["conversation_hash"],
             "commits": context.get("commits", []),
-            "mergeability": context.get("mergeability", {}),
         }
     )
 
@@ -899,6 +899,8 @@ def load_context(path: Path) -> dict[str, Any]:
 
 
 def compare_contexts(expected: dict[str, Any], actual: dict[str, Any]) -> dict[str, Any]:
+    # Invalidation keys on head_oid/commits/code_hash only; mergeability drift is
+    # reported for the operator but never forces a restart (TC-1).
     code_changed = expected.get("code_hash") != actual.get("code_hash")
     conversation_changed = (
         expected.get("conversation_hash") != actual.get("conversation_hash")
@@ -913,12 +915,12 @@ def compare_contexts(expected: dict[str, Any], actual: dict[str, Any]) -> dict[s
     return {
         "status": (
             "code-changed"
-            if code_changed or commits_changed or mergeability_changed
+            if code_changed or commits_changed
             else "conversation-changed"
             if conversation_changed
             else "current"
         ),
-        "code_changed": code_changed or commits_changed or mergeability_changed,
+        "code_changed": code_changed or commits_changed,
         "conversation_changed": conversation_changed,
         "mergeability_changed": mergeability_changed,
         "changed_fields": changed_fields,
@@ -1263,6 +1265,19 @@ def command_same_author(args: argparse.Namespace) -> int:
     return 0
 
 
+REASONS_REQUIRING_SECURITY = {"known-sensitive", "unmatched-executable"}
+
+
+def resolve_security_required(reason: str, triggers: list[str]) -> bool:
+    """Pure function of the resolved reason and trigger list (TC-4).
+
+    An explicit or tier-4 trigger always forces the lens; otherwise only a
+    known-sensitive or unmatched-executable reason does. `indeterminate` no
+    longer defaults to required.
+    """
+    return bool(triggers) or reason in REASONS_REQUIRING_SECURITY
+
+
 def command_select_security(args: argparse.Namespace) -> int:
     try:
         changed_files = args.changed_files.read_text(encoding="utf-8")
@@ -1277,7 +1292,7 @@ def command_select_security(args: argparse.Namespace) -> int:
         triggers.append("tier-4")
     print(json.dumps({
         "reason": reason,
-        "security_required": reason != "known-non-executable" or bool(triggers),
+        "security_required": resolve_security_required(reason, triggers),
         "triggers": triggers,
     }))
     return 0
