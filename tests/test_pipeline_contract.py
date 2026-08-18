@@ -853,7 +853,7 @@ def check_cleaner_crap_contract() -> None:
         for marker in (
             "repository-quality-manifest-incomplete",
             "exactly one fresh",
-            "repository's cleaner runs exactly once",
+            "repository's cleaner runs exactly once per immutable candidate and manifest",
             "authorize one implementer pass",
             "post_implementation",
             "requiredchecks",
@@ -882,6 +882,21 @@ def check_cleaner_crap_contract() -> None:
         require(
             "not a phase or gate" in text or "not another phase or gate" in text,
             f"{label}: cleaner checkpoint creates a phase or gate",
+        )
+        for marker in (
+            "they do not close the pipeline",
+            "same workspace",
+            "same branch",
+            "new candidate",
+            "old hashed evidence",
+            "fresh attempt-qualified evidence paths",
+            "normal max-3 implementation correction budget",
+            "no new gate 1",
+        ):
+            require(marker in text, f"{label}: cleaner recovery misses {marker!r}")
+        require(
+            "require a new explicitly activated repository-local pipeline" not in text,
+            f"{label}: cleaner failure still discards the active pipeline",
         )
 
     for label, relative in (
@@ -921,6 +936,17 @@ def check_cleaner_crap_contract() -> None:
         and "sha-256" in recovery,
         "recovery can trust inferred or unhashed cleaner evidence",
     )
+    for marker in (
+        "`blocked` is recoverable",
+        "same workspace",
+        "same branch",
+        "old result remains immutable",
+        "fresh attempt-qualified evidence path",
+        "no new gate 1",
+        "not a replacement pipeline",
+        "only `phase/status: complete|aborted` closes the run",
+    ):
+        require(marker in recovery, f"cleaner recovery misses {marker!r}")
     for marker in (
         "cleaner_handoff_pending",
         "cleaner_handoff_nonce",
