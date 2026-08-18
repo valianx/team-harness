@@ -7,7 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.15.0] - 2026-08-18
+
+### Added
+
+- Single autonomous-approve Gate 1: one approval records
+  `release_policy: auto-ship` and carries the run to the draft PR with zero
+  further human intervention; bounded `gate1-autonomous` correction rounds
+  replace per-round prompts, and `gate-guard` accepts the recorded
+  `auto-ship` release.
+- Agent authoring standard (`docs/agent-authoring.md`): binding skeleton,
+  word/line budgets, ten authoring rules, a `/th:lint` structure audit
+  (Check 12), and a semantic↔adapter parity suite that fails when a rule is
+  reworded on one side only.
+- Repository-local canonical workspaces on every run, with `logs-mode:
+  obsidian` arming a one-way, non-authoritative vault export
+  (`obsidian_sync` state) at draft-PR creation and terminal close; recovery
+  reads only the repository workspace, and project-config shadowing is
+  diagnosed instead of prescribing runtime restarts.
+
+### Changed
+
+- Quality collapsed to one authoritative run per candidate tree at the
+  Freeze `post_implementation` checkpoint; CRAP is measure-only, cleaner
+  overreach is proven with a deterministic
+  `git diff --name-status --no-renames` allowlist/ancestry proof, and
+  `cleaner-transition.mjs` is retired.
+- Codex runtime parity: PR-review roles declare their real `command-exec`
+  read transport, the Codex hook chain is reduced to the deny-only floor
+  (`policy-block`, `gcp-guard`), and a broken plugin cache degrades to a
+  system message instead of a blanket deny.
+- Five oversized agents rewritten to the authoring budgets (architect, qa,
+  security, plan-reviewer, gh-fallback; orchestrator-state prose-compressed
+  with schemas intact), with design-mode reference material moved to shipped
+  `agents/ref-architect-design.md`/`ref-architect-modes.md`.
+
 ### Fixed
+
+- Quality-runner failures now return a closed diagnostic taxonomy with safe
+  command/field coordinates instead of opaque non-zero exits.
+- PR-review independence: reviews resolve the real PR head from GitHub and
+  fail closed with "cannot reach PR" instead of ever reviewing the
+  checked-out branch, and review-context sensitivity classification no
+  longer biases lens selection.
 
 - Made Codex update classify only the exact non-fatal PATH-alias warning,
   retry protected mutations with narrow non-login escalation, require informed

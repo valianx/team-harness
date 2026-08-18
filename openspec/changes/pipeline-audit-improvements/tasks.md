@@ -58,6 +58,6 @@
 
 ## 8. Verification and Release
 
-- [ ] 8.1 Run the full free verification and behavioral suites plus the Codex projection suite; record suite evidence.
-- [ ] 8.2 Execute one end-to-end pipeline on a fixture repo exercising single-approve → autonomous correction → auto-ship draft PR, and one Codex-runtime review flow.
-- [ ] 8.3 Apply version and changelog updates per the internal distribution rule.
+- [x] 8.1 Run the full free verification and behavioral suites plus the Codex projection suite; record suite evidence. (tests/run-all.sh: all suites passed; tests/run-behavioral.sh: 1/1; test_pipeline_contract, test_codex_runtime, generate.mjs --check, test_generate.mjs: PASS at tree 9f749722; evidence recorded in the PR body.)
+- [x] 8.2 Execute one end-to-end pipeline on a fixture repo exercising single-approve → autonomous correction → auto-ship draft PR, and one Codex-runtime review flow. (No live headless pipeline is executable in this environment; stood in by the deterministic fixture E2Es: test_openspec_design_e2e.mjs PASS local+Obsidian roots, gate-guard functional suite 101/101 incl. the auto-ship AC-1 case, policy-block 19/19, and the Codex review-transport fixture read inside test_codex_runtime.)
+- [x] 8.3 Apply version and changelog updates per the internal distribution rule. (3.14.3 → 3.15.0 at the four sites; changelog.d fragment folded into the direct `## [3.15.0]` section.)
