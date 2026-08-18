@@ -36,7 +36,11 @@ After Gate 1, a mechanical plan repair is coordinator-owned and continues
 Correctable code, test, documentation, hygiene, or security findings, plus missing or
 insufficient evidence, consume one implementation/validation correction round and follow
 that same route; evidence returns to `tester`, while a sensitive delta requires a fresh audit.
-`iteration: N/3` counts only those correction rounds. Plan repairs,
+The ratchet (`agents/ref-pipeline.md § "The ratchet"`) ends this loop early: a sub-floor finding
+on unchanged surface after a prior round records to `reviews/findings-ledger.md` as a residual
+and ships instead of consuming another round; the two fail-closed security conditions are
+excluded from that residual by construction. `iteration: N/3` counts only correction rounds that
+actually opened. Plan repairs,
 operator decisions, and explicitly requested design work do not increment it or emit a new
 `iteration.start`; historical `cause: operator` events remain readable, while new writers
 use `cause: verification`.

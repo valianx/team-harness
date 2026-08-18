@@ -484,9 +484,12 @@ approvals remain independent.
 2. Validation dispatches the conditional adversarial audit against the current Freeze anchor.
 3. Every correctable `broke-it` result or incomplete changed-control coverage blocks delivery,
    returns to implementation, rebuilds Freeze, and receives a fresh delta audit.
-4. A genuinely structural contradiction is surfaced for an explicit operator design decision;
+4. A non-security correctable finding remains governed by the ratchet (`agents/ref-pipeline.md §
+   "The ratchet"`): a sub-floor residual on unchanged surface after a prior correction round
+   records to the findings ledger instead of reopening implementation again.
+5. A genuinely structural contradiction is surfaced for an explicit operator design decision;
    it is never silently downgraded to a warning.
-5. If a required finding remains unresolved when the iteration limit is exhausted, set the run
+6. If a required finding remains unresolved when the iteration limit is exhausted, set the run
    to `blocked` and stop before Gate 3 or delivery. No iteration cap waives a security finding.
 
 ---

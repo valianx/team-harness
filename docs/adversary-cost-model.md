@@ -72,8 +72,9 @@ Cost reduction is acceptable only while all of these remain true:
 4. `security` and `adversary` retain different methods and verdict vocabularies.
 5. Untestable material coverage is declared through `incomplete_on_changed_control`.
 6. A correctable `broke-it` or incomplete sensitive-coverage finding fails validation and
-   returns to implementation → Freeze → a fresh audit; only non-correctable structural
-   concerns remain operator-disposed at Gate 3.
+   returns to implementation → Freeze → a fresh audit; only a non-correctable structural
+   concern or a ratchet-recorded findings-ledger residual (`agents/ref-pipeline.md § "The
+   ratchet"`) reaches Gate 3, and only the residual auto-ships.
 
 `could-not-break` is neutral and non-certifying. It maps to `concerns` only when material evidence or coverage was unavailable, rather than automatically penalizing every completed negative attempt.
 

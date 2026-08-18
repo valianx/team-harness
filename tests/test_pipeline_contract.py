@@ -1667,7 +1667,8 @@ def check_residual_corrections() -> None:
 
     cost = read("docs/adversary-cost-model.md").lower()
     require("correctable `broke-it`" in cost and "fresh audit" in cost, "Adversary cost: correction route missing")
-    require("only non-correctable structural" in cost, "Adversary cost: all findings remain operator-disposed")
+    require("findings-ledger residual" in cost, "Adversary cost: ratchet residual route missing")
+    require("concerns remain operator-disposed" not in cost, "Adversary cost: unconditional correctable-must-correct wording survived")
 
     how = read("docs/how-it-works.md")
     require("inline" in how.lower() and "pipeline" in how.lower(), "How-it-works: direct/pipeline explanation drifted")

@@ -376,9 +376,12 @@ presented. The renderer reads these fields and events but never edits them.
 
 Validation findings are classified and routed as follows:
 
-- in-scope code, test, or documentation defect → implementation executor;
+- in-scope code, test, or documentation defect → implementation executor, unless the ratchet
+  (`agents/ref-pipeline.md § "The ratchet"`) records it as a sub-floor findings-ledger residual on
+  unchanged surface after a prior correction round;
 - missing evidence → tester;
 - correctable security finding → implementation plus delta audit;
+- ratchet-recorded findings-ledger residual → auto-ship citing the Gate-1 record, no further round;
 - structural contradiction → operator decision, then optional design re-open and new Gate 1.
 
 Mechanical plan defects are repaired by the coordinator; bounded operator decisions are

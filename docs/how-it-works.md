@@ -87,7 +87,10 @@ manifest record a plan-time not-applicable reason. This is an implementation che
 phase or gate. The coordinator then dispatches the approved implementation work and evidence pass.
 Tester, QA, and the applicable security lens inspect the resulting tree. A code, test, or
 documentation defect inside scope returns to the implementation executor and the affected
-validation delta is rerun. Missing evidence returns to tester. A correctable security
+validation delta is rerun, unless the ratchet (`agents/ref-pipeline.md § "The ratchet"`) records a
+sub-floor finding on unchanged surface as a findings-ledger residual instead — that residual ships
+as a pull-request concern rather than consuming another round. Missing evidence returns to
+tester. A correctable security
 `broke-it` finding or incomplete sensitive coverage fails validation, reopens Freeze, and
 requires a fresh audit before Gate 3; it cannot be carried as a concern to ship. A finding that
 would change the approved intention, scope fence, or acceptance criteria is a structural
