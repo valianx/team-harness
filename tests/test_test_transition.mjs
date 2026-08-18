@@ -278,13 +278,13 @@ await check("a test-only failing commit becomes green with identical test blobs 
   });
 });
 
-await check("test transition ignores non-hermetic probes from unselected commands", async () => {
+await check("test transition does not execute failing probes from unselected commands", async () => {
   const manifest = qualityManifest();
   manifest.commands.database = {
     argv: [node, "-e", "process.exit(0);"],
     working_directory: ".",
     timeout_ms: 10_000,
-    version_argv: ["pnpm", "--version"],
+    version_argv: [node, "-e", "process.exit(23);"],
   };
   await repository(
     async (context) => {

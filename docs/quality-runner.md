@@ -125,7 +125,13 @@ repository and records `execution_resolution: repository-local-bin`. A
 worktree whose whole `node_modules` directory points at another checkout is
 therefore `PREREQUISITE_UNAVAILABLE`; it is not treated as a usable local
 installation and its wrapper cannot fall through to `npx` or an external npm
-cache.
+cache. The quality runner remains non-mutating. Before the first pipeline
+specialist dispatch, Main uses the packaged
+`worktree-dependencies.mjs provision --repository <absolute-worktree>` helper
+as a normal Gate-1 prerequisite. It derives the frozen install command from one
+root lockfile, replaces only an untracked top-level symlink, and verifies a real
+worktree-local directory. Failure returns the exact closed `required_action`
+instead of asking a specialist to install dependencies or use a shared cache.
 
 For coordinator evidence, pass an absolute `--output <path>`. The runner writes
 the complete result atomically and prints only a bounded

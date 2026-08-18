@@ -40,9 +40,33 @@ a regular local executable whose canonical target remains inside this checkout.
 Reject a whole `node_modules` symlink to another checkout as
 `PREREQUISITE_UNAVAILABLE`: it can trigger package-manager verification,
 cross-OS stores, `npx`, or external caches and is not a self-contained worktree.
-Use the branch-in-place topology approved at Gate 1 or the plan's explicit
-lockfile-native local provisioning step; never improvise an `ln -s`, change
+Quality-runner stays read-only and never repairs this condition.
+
+Before the first specialist dispatch, when selected quality commands need Node
+dependencies, resolve the packaged `scripts/worktree-dependencies.mjs` beside
+the loaded pipeline skill and run exactly:
+
+```text
+node <worktree-dependencies-path> provision --repository <absolute-worktree>
+```
+
+This is an idempotent Gate-1 implementation prerequisite, not another Team
+Harness gate, plan task, or conversational approval. It derives exactly one
+supported root lockfile and permits only `pnpm install --frozen-lockfile`,
+`npm ci`, `yarn install --immutable`, or `bun install --frozen-lockfile`. When
+the top-level `node_modules` is an untracked symlink, the helper removes only
+that link, never its target, then requires the install to produce a real local
+directory. It never accepts multiple/missing lockfiles, mutable resolution,
+`npx`, a shared checkout, or a tracked `node_modules` entry. An ordinary native
+sandbox/network authorization may still be required to execute the exact
+provisioning command, but it does not create or repeat a pipeline decision.
+
+Require `outcome: ready|provisioned` before dispatch. Otherwise surface the
+helper's exact `error_code`, `diagnostic`, and closed
+`required_action: {cwd, argv}`. Retry only that same action after its stated
+environment prerequisite is repaired; never improvise an `ln -s`, change
 topology after Gate 1, or present a shared wrapper as installed dependencies.
+Recovery reruns the same idempotent helper instead of discarding the worktree.
 
 For branch-in-place, perform the same dirty-tree and ownership checks before
 `git checkout -b`; Gate 1 likewise cannot supply that command's native Git

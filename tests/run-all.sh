@@ -323,6 +323,12 @@ run_node_suite "workspace-preflight" "test_workspace_preflight.mjs" "node not fo
 
 echo
 echo "############################################################"
+echo "# Suite 14e: worktree dependency provisioning"
+echo "############################################################"
+run_node_suite "worktree-dependencies" "test_worktree_dependencies.mjs" "node not found — install Node.js to run this suite"
+
+echo
+echo "############################################################"
 echo "# Suite 164: OpenSpec runtime policy and adapter"
 echo "# Requires: node. Missing runtime follows CI-required semantics."
 echo "############################################################"

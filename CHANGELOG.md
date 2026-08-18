@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Isolated quality hermeticity and runtime resolution to selected checks while
   keeping manifest structure globally fail-closed, and added safe command/field
   coordinates to schema-v3 failure evidence.
+- Added automatic frozen-lockfile dependency provisioning for isolated
+  worktrees before first dispatch, replacing only untracked cross-checkout
+  `node_modules` links and returning an exact recovery action on failure.
 - Made blocked cleaner and handoff attempts recoverable in the same workspace
   and branch, preserving failed evidence append-only while allowing a corrected
   candidate to proceed without repeating Gate 1 or discarding valid work.

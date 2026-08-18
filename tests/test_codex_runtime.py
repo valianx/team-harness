@@ -731,6 +731,9 @@ def main() -> None:
         "reject it above 64 KiB",
         "one bounded verdict containing status and adapter count",
         "Never use recursive",
+        "WARNING: proceeding, even though we could not create PATH aliases: Read-only file system (os error 30)",
+        "Do not retry or escalate a read solely for that warning",
+        "Verify both commands in the parsed object",
     ):
         if marker not in update_flat:
             fail(f"Codex update skill is missing {marker!r}")

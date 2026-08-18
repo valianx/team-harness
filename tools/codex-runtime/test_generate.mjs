@@ -15,6 +15,7 @@ const pipelineScripts = [
   "plan-contract-repair.mjs",
   "quality-runner.mjs",
   "test-transition.mjs",
+  "worktree-dependencies.mjs",
   "workspace-preflight.mjs",
   "openspec-adapter.mjs",
   "openspec-snapshot.mjs",

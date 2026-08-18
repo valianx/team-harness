@@ -58,8 +58,13 @@ run and never makes an outside directory writable for implementation.
 Prefer branch-in-place when the current checkout is clean, writable, and
 already owns the dependencies required by its quality manifest. Select an
 isolated worktree only for a recorded isolation need, and require its Node
-dependency installation to be self-contained below that worktree. A whole
-`node_modules` symlink to another checkout is not dependency readiness.
+dependency installation to be self-contained below that worktree. Before the
+first specialist dispatch, Main automatically runs the pipeline's
+lockfile-native worktree dependency provisioner when selected quality commands
+need Node dependencies; this is a normal Gate-1 implementation prerequisite,
+not another pipeline choice or approval. A whole `node_modules` symlink to
+another checkout is not dependency readiness and is replaced only through that
+provisioner.
 
 ## No capability-check fallback
 
