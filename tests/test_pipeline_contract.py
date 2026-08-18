@@ -483,9 +483,9 @@ def check_explicit_validation_correction_decision() -> None:
             "2 — pause without changes",
             "3 — abort pipeline",
             "generic `continue`",
-            "3/3+exception",
-            "correction_exceptional",
-            "exceptional_correction_count",
+            "autonomous_correction_count",
+            "operator_correction_count",
+            "operator-live",
         ):
             require(marker in flat, f"{label}: correction-decision marker missing: {marker}")
         require("every required" in flat and "lens" in flat, f"{label}: validation can short-circuit before the full fan")
@@ -504,7 +504,7 @@ def check_explicit_validation_correction_decision() -> None:
             "approved-autonomous",
             "correction_authority: gate1-autonomous",
             "correction_authority_gate_nonce",
-            "iteration < 3",
+            "autonomous_correction_count < 3",
             "fresh implementer",
             "scope expansion",
             "security ambiguity",
@@ -512,7 +512,10 @@ def check_explicit_validation_correction_decision() -> None:
             require(marker in flat, f"{label}: bounded autonomous-loop marker missing: {marker}")
         require("correction-incomplete" in flat, f"{label}: incomplete correction can reach Freeze")
         require("impact-derived validation" in flat, f"{label}: autonomous correction lacks impact-derived validation")
-        require("normal approval" in flat and "paus" in flat, f"{label}: ordinary approve can loop automatically")
+        require(
+            ("ineligible" in flat or "failed conjunct" in flat) and "paus" in flat,
+            f"{label}: an ineligible autonomous correction can loop automatically",
+        )
 
     for relative in (
         "agents/qa.md",
@@ -596,23 +599,22 @@ def check_explicit_validation_correction_decision() -> None:
         "without the matching decision",
         "recovery never synthesizes",
         "historical `3/3+exception`",
-        "missing or mismatched `correction_exceptional` boolean",
-        "authorize decision carrying `correction_exceptional: true`",
+        "mechanically derive `autonomous_correction_count`",
+        "`operator_correction_count`",
+        "preserve historical `iteration: n/3` as a non-authoritative display",
         "at most three `gate1-autonomous` correction decisions",
         "a fourth",
         "exact consumed gate-1 nonce",
         "no correction/execution budget exhaustion",
         "disposition and deterministic closure check/expected result for every finding",
         "before issuing a fresh nonce",
-        "missing, extra, duplicated, or mismatched findings, requirements, dispositions, or closure records",
-        "for `iteration < 3`, require `correction_exceptional: false`",
-        "at `iteration: 3/3`, require `exceptional_correction_count: 0`",
-        "`correction_exceptional: true`",
-        "authorize one exceptional correction round",
-        "ordinary recovered choice text can never authorize an exceptional round",
-        "require `exceptional_correction_count: 0`",
-        "may offer only pause or abort",
-        "any second exceptional presentation",
+        "missing, extra, duplicated, or mismatched findings, requirements, dispositions, closure records, or counters",
+        "regardless of `iteration`",
+        "deliberately unbounded",
+        "cannot produce `correction_budget_exhausted`",
+        "`exceptional_correction_already_consumed`",
+        "increments `operator_correction_count` exactly once",
+        "autonomous_correction_count < 3",
         "`correction_nonce: null`",
         "exact token in `correction_decision_nonce`",
         "mismatched decision nonce",
@@ -630,11 +632,22 @@ def check_explicit_validation_correction_decision() -> None:
         "Codex autonomous correction does not persist exact nonce consumption",
     )
     require(
-        "only while `exceptional_correction_count: 0`" in state_gate
-        and "sets `exceptional_correction_count: 1`" in state_gate
-        and "only pause or abort" in state_gate,
-        "Codex permits repeated exceptional correction rounds",
+        "same three choices are always available" in state_gate
+        and "deliberately unbounded" in state_gate
+        and "budget exhaustion disables only" in state_gate,
+        "Codex caps explicit operator-live correction rounds",
     )
+    require(
+        "initialize new runs with `iteration: 0/3` and both counters at `0`" in state_gate
+        and "leaves `autonomous_correction_count` and `iteration` unchanged" in state_gate,
+        "Codex does not maintain independent automatic/operator correction counters",
+    )
+    for forbidden in (
+        "only while `exceptional_correction_count: 0`",
+        "every further failure offers only pause or abort",
+        "a second exceptional decision is invalid",
+    ):
+        require(forbidden not in state_gate, f"Codex retains the retired operator correction cap: {forbidden}")
 
     planning = re.sub(
         r"\s+",
@@ -891,7 +904,7 @@ def check_cleaner_crap_contract() -> None:
             "new candidate",
             "old hashed evidence",
             "fresh attempt-qualified evidence paths",
-            "normal max-3 implementation correction budget",
+            "does not consume the max-3 autonomous budget",
             "no new gate 1",
         ):
             require(marker in text, f"{label}: cleaner recovery misses {marker!r}")

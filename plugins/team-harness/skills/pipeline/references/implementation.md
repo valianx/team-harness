@@ -325,7 +325,8 @@ runs `--transition green` once per required task with the same contract hash and
 hashed red-evidence file. Green requires the same manifest, exact test command,
 task baseline, and test blobs, with the red candidate ancestral to current
 `HEAD`; the green call uses its own `--output` path, and any mismatch or nonzero result returns to bounded implementation
-correction and consumes the normal max-3 budget. A task explicitly marked
+correction. Eligible `gate1-autonomous` authority consumes the max-3 autonomous
+budget; a fresh operator-live authorization remains available without a maximum. A task explicitly marked
 `not-applicable` records that state and its plan-time reason without running the
 checkpoint.
 
@@ -541,8 +542,8 @@ candidate/manifest identity. Update the current state pointer only after the
 prior terminal attempt is durably bound in events; never overwrite or relabel
 its artifacts. Use fresh attempt-qualified evidence paths for every recovered
 record so no atomic output target can replace an earlier result.
-This recovery consumes the normal max-3 implementation
-correction budget. It needs no new Gate 1 while intent and approved scope are
+This live recovery increments the separate unbounded operator correction
+counter and does not consume the max-3 autonomous budget. It needs no new Gate 1 while intent and approved scope are
 unchanged; scope expansion still requires its explicit decision.
 A selected-command, behavior, scope, protected-path, declared-tool, manifest,
 threshold, or metric failure cannot be waived or sent back to the cleaner.
@@ -582,7 +583,7 @@ Gate-1 autonomy, ordinary approval, a generic `continue`, agent prose, files,
 or tools never authorize this handoff. It emits
 `cleaner.handoff.decision` and `agent.cleaner-handoff.spawn`, never
 `iteration.start` or `agent.correction.spawn`; `iteration` is unchanged and the
-normal max-3 validation-correction budget is untouched. The implementer gets
+max-3 autonomous validation-correction budget is untouched. The implementer gets
 one terminal attempt, runs every closure check, and stops—no feedback or
 automatic re-dispatch. A non-zero closure command must carry its exact command,
 exit code, and bounded diagnostic; a bare `exit 1` or missing diagnostic is
@@ -651,7 +652,8 @@ actual result in `02-implementation.md`. Main verifies that every finding ID has
 result before any Freeze rebuild. Missing or failed closure evidence is
 `failure_kind: correction-incomplete`: the consumed correction round remains consumed, no Freeze
 opens, and no validator is dispatched. Main consolidates the failed checks as the next package;
-normal approval pauses, while eligible autonomy may authorize another round only within max-3.
+an operator-live correction pauses and retains a fresh unbounded operator-live choice,
+while eligible autonomy may authorize another round only within its max-3 budget.
 
 ## Post-Gate-1 plan-write boundary
 

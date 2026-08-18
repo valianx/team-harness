@@ -110,8 +110,8 @@ correction_decision: authorize|pause|abort|null
 correction_decision_nonce: {consumed token or null}
 correction_authority: operator-live|gate1-autonomous|null
 correction_authority_gate_nonce: {consumed Gate-1 token or null}
-correction_exceptional: true|false|null
-exceptional_correction_count: N
+autonomous_correction_count: N
+operator_correction_count: N
 usage_schema_version: 1|null
 usage_status: available|unavailable
 usage_reason_code: {collector code}|null
@@ -167,6 +167,13 @@ delivery_size_justification: {workspace pointer}|null
 delivery_base_status: {base_ref, freeze_base_sha, remote_base_sha: {full SHA}|null, status: current|moved|unknown}|null
 delivery_preview: {pr title, workspace paths, and SHA-256 digests bound to Gate 3}|null
 ```
+
+`autonomous_correction_count` is an integer from `0` through `3` and is the
+only correction budget. `operator_correction_count` is a non-negative,
+monotonic, deliberately unbounded integer. `iteration: N/3` is retained as a
+legacy display mirror of the autonomous counter; it never limits or authorizes
+an `operator-live` round. Initialize new runs with `iteration: 0/3` and both
+counters at `0`.
 
 `cleaner_repo_evidence` is complete only when its canonical identity set equals
 `participating_repositories` exactly, with neither missing, extra, nor duplicate
@@ -293,7 +300,7 @@ and one package-identical `cleaner.handoff.decision` event, and authorizes one
 fresh V2 implementer plus one package-identical
 `agent.cleaner-handoff.spawn`. Gate-1 autonomous approval never applies. The
 nonce may appear on one decision and one spawn only. This path never increments
-`iteration`, consumes max-3, emits `iteration.start`, or emits
+`iteration`, consumes the autonomous max-3 budget, emits `iteration.start`, or emits
 `agent.correction.spawn`.
 
 The implementer receives one terminal attempt and every closure check. No
@@ -331,11 +338,11 @@ final `resolve` IDs and file scope.
 
 The closed autonomous predicate requires every conjunct: a valid Gate-1
 approval dual record (`approved`; legacy `approved-autonomous` stays legible);
-`iteration < 3`; every blocking finding is `resolve`; every correction is
+`autonomous_correction_count < 3`; every blocking finding is `resolve`; every correction is
 inside approved scope and preserves intent, behavior, and AC meaning; no scope
 expansion, conflicting finding, `design-consistent` or `decision-required`
 disposition, security ambiguity/waiver, unavailable coverage, infrastructure
-failure, correction/execution budget exhaustion, or exceptional round exists.
+failure or correction/execution budget exhaustion exists.
 If any conjunct is false or doubtful,
 the autonomous path is prohibited and Main uses the live path below.
 
@@ -344,18 +351,21 @@ When every conjunct is true, Main creates and immediately consumes a fresh
 consumed token in `correction_decision_nonce`, `correction_pending: false`,
 `correction_decision: authorize`, `correction_authority: gate1-autonomous`, the
 exact consumed Gate-1 release nonce in `correction_authority_gate_nonce`, and
-`correction_exceptional: false`, plus one matching `correction.decision` event
+the incremented `autonomous_correction_count` plus matching incremented
+`iteration: N/3`, plus one matching
+`correction.decision` event
 bound to that same consumed correction nonce, complete dispositions, resolve
 IDs, anchor, scope, implicated requirements, and one deterministic closure
 check/expected result per finding. The one subsequent `iteration.start` and
 `agent.correction.spawn` must carry the byte-for-byte identical nonce, anchor,
-findings, scope, requirements, closure, dispositions, and exceptional value.
+findings, scope, requirements, closure, dispositions,
+`correction_authority: gate1-autonomous`, and the exact authority Gate nonce.
 Matching the nonce alone never authorizes either event. This single record
 authorizes exactly one fresh implementer, a mandatory correction-closure gate,
 stale-row tester refresh, new Freeze, fresh QA, and impact-required security. Each later failed set repeats the triage and predicate; the
 third authorized correction exhausts autonomy and any later failure pauses.
 
-For normal approval or any ineligible autonomous result, atomically set:
+For any ineligible autonomous result, atomically set:
 
 ```text
 phase: validation
@@ -373,7 +383,8 @@ correction_decision: null
 correction_decision_nonce: null
 correction_authority: null
 correction_authority_gate_nonce: null
-correction_exceptional: true|false
+autonomous_correction_count: {integer 0..3}
+operator_correction_count: {non-negative integer, no maximum}
 ```
 
 While `correction_pending: true`, Main must not dispatch `implementer`,
@@ -396,10 +407,12 @@ atomically records `correction_decision: authorize`, the consumed nonce in
 `correction_authority_gate_nonce: null`, `correction_pending: false`, and one matching
 `correction.decision` event bound to the anchor, all finding IDs, and file
 scope, implicated requirements, one deterministic closure check/expected result
-per finding, and dispositions, including the identical `correction_exceptional`
-boolean. It authorizes exactly one bounded correction over that complete package;
+per finding, and dispositions. It increments `operator_correction_count`
+exactly once, leaves `autonomous_correction_count` and `iteration` unchanged,
+and authorizes exactly one bounded correction over that complete package;
 the subsequent `iteration.start` and `agent.correction.spawn` must repeat every
-package field byte-for-byte, and a nonce-only match is invalid. Its authorization includes the
+package field plus `correction_authority: operator-live` and the null authority
+Gate nonce byte-for-byte, and a nonce-only match is invalid. Its authorization includes the
 closure gate, stale-row tester refresh, one new Freeze, fresh QA, and impact-required
 security; its nonce may appear on exactly
 one subsequent `iteration.start` and `agent.correction.spawn`. A second failure
@@ -411,14 +424,18 @@ mutation or dispatch, and leaves `next_action: await operator request to
 re-present correction decision`; any later presentation uses a fresh nonce.
 Choice `3` records `abort` with `correction_authority: operator-live`, closes
 the pipeline, and performs no correction.
-At `iteration: 3/3`, choice `1` may be presented only while
-`exceptional_correction_count: 0`; that presentation sets
-`correction_exceptional: true` and labels choice `1` as an exceptional single
-round. Only its matching authorize decision sets `exceptional_correction_count:
-1` and leaves `iteration: 3/3`; after that round, every further failure offers
-only pause or abort and can never present or accept another authorize choice.
-Never serialize `3/3+exception`; autonomous authority can never authorize an
-exception.
+The same three choices are always available for a live operator, including at
+`iteration: 3/3`, `autonomous_correction_count: 3`, or after any number of prior
+operator-live rounds. Budget exhaustion disables only a new
+`gate1-autonomous` decision. It never removes choice `1`, changes its label,
+requires a waiver, or produces `CORRECTION_BUDGET_EXHAUSTED` for a current live
+reply. Every later failure still requires a fresh nonce, full package, one
+bounded correction, closure, new Freeze, and complete revalidation.
+
+Legacy 3.14.3 `correction_exceptional` and `exceptional_correction_count`
+values are recovery inputs only. Validate them against historical decision
+events, derive the new counters, and never use them to suppress an
+operator-live presentation or authorization.
 
 ## Post-Gate-1 coordinator routing
 

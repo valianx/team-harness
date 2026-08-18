@@ -89,7 +89,7 @@ An eligible implementer package pauses with a fresh nonce and asks the
 operator to authorize one implementer pass. Neither normal nor autonomous
 Gate-1 approval authorizes that pass. The authorized implementer gets one
 terminal attempt; the handoff does not increment the pipeline `iteration`
-counter or consume its max-3 validation-correction budget. A non-zero closure
+counter or consume its max-3 autonomous validation-correction budget. A non-zero closure
 result must include the exact command, exit code, and bounded diagnostic —
 `exit 1` alone is not evidence. Remaining work requires a new package and
 another live authorization; the cleaner still does not run again.

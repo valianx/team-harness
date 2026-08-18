@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.15.2] - 2026-08-18
+
+### Fixed
+
+- Limited the max-three correction budget to autonomous decisions while
+  allowing any fresh package-bound operator-live decision to authorize another
+  fully frozen and revalidated round, including recovery from 3.14.3 state.
+
 ## [3.15.1] - 2026-08-18
 
 ### Fixed

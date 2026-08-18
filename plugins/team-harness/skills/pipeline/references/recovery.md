@@ -333,8 +333,9 @@ commit/tree. They remain non-pass and block Freeze. A cleaner terminal failure
 is terminal only for that immutable candidate/manifest attempt, not for the
 pipeline. `blocked` is recoverable: on a live operator recovery, retain the same
 workspace, same branch, commits, valid edits, and all old evidence; return to
-implementation and use the normal max-3 correction budget to produce a new
-candidate. The old result remains immutable and event-bound while state may
+implementation under a fresh operator-live authorization to produce a new
+candidate. That live authority is not capped by the autonomous max-3 budget.
+The old result remains immutable and event-bound while state may
 point to one fresh cleaner attempt for the new identity. Never overwrite,
 relabel, or infer success for the old attempt; every recovered transition uses
 a fresh attempt-qualified evidence path. No new Gate 1 is required while
@@ -398,16 +399,17 @@ single dispatch only when no terminal cleaner result exists.
 When `correction_pending: true`, recover only the durable failed Freeze anchor,
 complete finding-ID set, implicated AC/TC requirement set, exact one-to-one
 disposition and deterministic closure check/expected result for every finding,
-evidenced file scope, and `correction_exceptional` boolean. Before issuing a
-fresh nonce, require every field to be present, structurally valid, and mutually
-consistent; missing, extra, duplicated, or mismatched findings, requirements,
-dispositions, or closure records, or a missing/non-boolean exceptional flag,
-blocks recovery. Do not infer or repair
-them, dispatch an agent, mutate repository or evidence files, rebuild Freeze,
-or revalidate.
+evidenced file scope, `autonomous_correction_count`, and
+`operator_correction_count`. Before issuing a fresh nonce, require every field
+to be present, structurally valid, and mutually consistent; missing, extra,
+duplicated, or mismatched findings, requirements, dispositions, closure
+records, or counters blocks recovery. Do not infer or repair the correction
+package, dispatch an agent, mutate repository or evidence files, rebuild
+Freeze, or revalidate.
 
-For `iteration < 3`, require `correction_exceptional: false` and re-present the
-complete consolidated failure with a fresh `correction_nonce` and exactly:
+Re-present the complete consolidated failure with a fresh `correction_nonce`
+and exactly these choices regardless of `iteration`, autonomous-budget
+exhaustion, or prior operator-live count:
 
 ```text
 1 — authorize one correction round
@@ -415,51 +417,56 @@ complete consolidated failure with a fresh `correction_nonce` and exactly:
 3 — abort pipeline
 ```
 
-At `iteration: 3/3`, require `exceptional_correction_count: 0` and
-`correction_exceptional: true`, then replace only choice `1` with `1 —
-authorize one exceptional correction round`. A different
-iteration/exceptional combination is invalid and blocks. The exceptional label
-must be present in the live presentation that produces the authorize decision;
-ordinary recovered choice text can never authorize an exceptional round.
-When `exceptional_correction_count: 1`, recovery must never re-present or accept
-an authorize option; a later failure may offer only pause or abort. Any second
-exceptional presentation, decision, `iteration.start`, or
-`agent.correction.spawn` blocks recovery.
+Recovery never synthesizes an authorization from an ordinary approval, intake
+autonomy preference, generic `continue`, chat history, state prose, files,
+tools, or specialist output. A current live choice `1` records
+`correction_authority: operator-live`, a null authority Gate nonce, increments
+`operator_correction_count` exactly once, and authorizes only one
+package-identical `iteration.start`/`agent.correction.spawn` pair. This path is
+deliberately unbounded; `iteration: 3/3`,
+`autonomous_correction_count: 3`, and any prior number of operator-live rounds
+cannot produce `CORRECTION_BUDGET_EXHAUSTED` or
+`EXCEPTIONAL_CORRECTION_ALREADY_CONSUMED` for that current reply.
 
-Recovery never synthesizes an authorization from an intake autonomy
-preference, generic `continue`, chat history, state prose, files,
-tools, or specialist output. A recovered `gate1-autonomous` decision additionally
+A recovered `gate1-autonomous` decision additionally
 requires a valid Gate-1 approval dual record (`approved`; legacy
 `approved-autonomous` legible), the exact consumed
-Gate-1 nonce in `correction_authority_gate_nonce`, `iteration < 3` at decision
-time, and durable all-`resolve` dispositions satisfying every closed eligibility
+Gate-1 nonce in `correction_authority_gate_nonce`,
+`autonomous_correction_count < 3` at decision time, and durable all-`resolve`
+dispositions satisfying every closed eligibility
 conjunct, including no correction/execution budget exhaustion. A recovered
 `correction.decision` is valid only when its single-use
 nonce, failed anchor, complete finding IDs, implicated requirements, dispositions,
 closure checks, scope,
-`correction_authority`, and `correction_exceptional` boolean exactly match
+`correction_authority`, and authority Gate nonce exactly match
 the state record. An authorized consumed decision additionally requires
 `correction_nonce: null`, its exact token in `correction_decision_nonce`, and
 that the complete anchor, findings, requirements, closure, scope, dispositions,
-and exceptional-value package is byte-for-byte identical on the matching
+authority, and authority-Gate-nonce package is byte-for-byte identical on the matching
 `correction.decision`, one `iteration.start`, and one `agent.correction.spawn`.
 A shared nonce never substitutes for this full-package comparison. A stale or consumed nonce,
-mismatched decision nonce, mismatched anchor/findings/requirements/closure/scope/dispositions/exceptional value,
+mismatched decision nonce, mismatched anchor/findings/requirements/closure/scope/dispositions/authority,
 or reuse of one authorization for more than one `iteration.start` or
 `agent.correction.spawn` is invalid and blocks dispatch. An implementation or
 correction event after a failed validation without the matching decision also
 blocks; recovery never repairs or infers the missing authority.
 
 At most three `gate1-autonomous` correction decisions may descend from one Gate-1
-release. A fourth, an exceptional autonomous decision, or any autonomous event
+release. A fourth or any autonomous event
 whose eligibility evidence is missing or doubtful blocks and must be presented
 to the operator; recovery never completes the predicate optimistically.
 
 A recorded `pause` performs no mutation or dispatch. A later request merely
 causes the decision to be re-presented with a fresh nonce. A recorded `abort`
-is terminal. Historical `3/3+exception`, a missing or mismatched
-`correction_exceptional` boolean, or an exceptional round without an authorize
-decision carrying `correction_exceptional: true` on the decision and its one
-`iteration.start`/`agent.correction.spawn` pair is invalid and blocks; recovery
-never synthesizes the exception. A valid exceptional authorization increments the separate
-`exceptional_correction_count` from `0` to `1` while `iteration` remains `3/3`.
+is terminal.
+
+For a 3.14.3 workspace containing `correction_exceptional`,
+`exceptional_correction_count`, or historical `3/3+exception`, preserve the
+append-only events and mechanically derive `autonomous_correction_count` from
+valid `gate1-autonomous` authorize decisions and `operator_correction_count`
+from valid `operator-live` authorize decisions. Require the legacy values not
+to contradict those decisions, atomically write the two new counters, and stop
+producing the legacy fields. Preserve historical `iteration: N/3` as a
+non-authoritative display even when it differs from the derived autonomous
+counter. This migration is not a waiver and never consumes or denies a new
+operator-live authorization.

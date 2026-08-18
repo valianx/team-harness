@@ -98,7 +98,9 @@ After closure passes, apply this order:
    tester-produced paths fail closed to tester refresh plus QA and the applicable security lens.
 
 Carry-forward reuses evidence only; it never reuses an agent or its narrative. The correction
-still consumes one authorized round and remains bounded by max-3.
+still consumes one single-use authorization. Only a `gate1-autonomous` decision
+consumes the max-3 autonomous budget; an `operator-live` decision increments
+the separate unbounded operator counter.
 
 Only in this explicitly activated pipeline, preflight resolves the helper's
 absolute path relative to the loaded pipeline skill/reference and fails closed
@@ -213,13 +215,14 @@ the closed autonomous predicate passes, record the autonomous authority and
 dispatch exactly one fresh correction as defined in `state-and-gates.md`,
 without presenting an intermediate choice. Every later failure repeats the complete required
 validation set and triage, and no more than three autonomous correction rounds are legal.
+Explicit `operator-live` rounds are outside that budget and have no maximum.
 
 Any unresolved or ineligible item blocks autonomous continuation. Then set
 `correction_pending: true`, a
 fresh `correction_nonce`, `correction_anchor`, `correction_findings`, and
 `correction_scope`; keep `phase: validation`; set `next_action` to await the
-live decision; set `correction_exceptional: true` only when this is the
-explicitly labelled `iteration: 3/3` presentation (otherwise `false`); present
+live decision; preserve the current `autonomous_correction_count` and
+`operator_correction_count`; present
 exactly:
 
 ```text
@@ -235,21 +238,24 @@ bounded autonomous authority above.
 Only a live reply after this presentation may consume the nonce. Choice `1`
 atomically records a matching state decision and `correction.decision` event
 bound to the same nonce, anchor, finding IDs, implicated requirements, scope,
-one deterministic closure check/expected result per finding, dispositions, and
-`correction_exceptional` boolean. That decision may authorize exactly one
+one deterministic closure check/expected result per finding, dispositions,
+`correction_authority: operator-live`, and a null authority Gate nonce. That
+decision increments `operator_correction_count` once and may authorize exactly one
 `iteration.start` and correction spawn, followed by the closure gate, stale-row
 tester refresh, one new Freeze, fresh QA, and impact-required security. Both
 authorized events must repeat that complete package byte-for-byte; sharing only
-the nonce is invalid. A second failure requires a
-fresh presentation and nonce under normal approval. Under autonomous approval,
-it repeats the required-set/triage/predicate and may authorize the next fresh round
-only while `iteration < 3`; there is no owner-lens bounce or agent follow-up.
+the nonce is invalid. A second failure requires a fresh presentation and nonce
+after an operator-live round. Under Gate-1 authority, Main repeats the
+required-set/triage/predicate and may authorize the next fresh round
+only while `autonomous_correction_count < 3`; there is no owner-lens bounce or agent follow-up.
 Choice `2` performs no repository or evidence mutation and any later
 presentation uses a fresh nonce. Choice `3` aborts without correction. At
-`iteration: 3/3`, choice `1` is an explicitly labelled exceptional single
-round; only an authorize decision with `correction_exceptional: true` increments
-`exceptional_correction_count` and leaves `iteration: 3/3`;
-never write `3/3+exception`.
+`iteration: 3/3` or `autonomous_correction_count: 3`, the live presentation and
+choice `1` remain unchanged. A matching current reply may authorize another
+round regardless of prior `operator-live` count; budget exhaustion blocks only
+`gate1-autonomous`. Every such round still uses a fresh nonce and full package,
+then closure, tester refresh, a new Freeze, fresh QA, and impact-required
+security.
 
 Every authorized implementation correction invalidates the old Freeze and its QA verdict.
 After closure, refresh stale tester rows, rebuild Freeze, run fresh QA and impact-required
@@ -260,8 +266,9 @@ operator-approved Gate 3 amend follows the same implementation → closure → t
 Freeze → validation route. A contradiction is never resolved
 by changing an AC in place. Plan repair, operator-decision transcription, and
 explicit architect work do not produce an `iteration.start`; only an
-explicitly authorized implementation/validation correction consumes the
-`0`–`3` correction budget.
+explicitly authorized `gate1-autonomous` implementation/validation correction consumes
+the `0`–`3` autonomous budget. Operator-live correction decisions are tracked
+separately and deliberately unbounded.
 
 When all required evidence and reviews pass and the Freeze anchor plus committed
 identity are still current, mark acceptance pass against that same immutable
