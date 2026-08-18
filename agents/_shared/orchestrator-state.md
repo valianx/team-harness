@@ -83,8 +83,11 @@ Otherwise it preserves commits/evidence, dispatches nobody, and pauses the same
 pipeline for an in-place repository-decomposed recovery package or applicable
 live scope decision. An eligible package pauses with
 exactly `1 — authorize one implementer pass`,
-`2 — pause without changes`, and `3 — abort pipeline`. Only live choice
-`1` consumes the nonce and permits one fresh terminal implementer attempt. It
+`2 — pause without changes`, and `3 — abort pipeline`. Only a live reply after
+that presentation may consume the nonce. Choice `1` consumes it and permits one
+fresh terminal implementer attempt. Choice `2` consumes it into `pause` without
+mutation or dispatch; a later presentation uses a fresh nonce. Choice `3`
+records `abort` and closes the pipeline. The authorized implementer path
 never inherits Gate-1 autonomy, increments `iteration`, consumes max-3, or
 permits another cleaner for the same immutable attempt. The decision and spawn events must repeat the anchor
 and every finding byte-for-byte. Bare non-zero exits without the exact command,

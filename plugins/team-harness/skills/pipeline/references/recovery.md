@@ -199,9 +199,14 @@ Any other `status: blocked` is a recoverable stop, not a terminal close. Resume
 in the same workspace and branch after validating their identities and every
 previous evidence hash. Preserve all commits and artifacts append-only, then
 continue from the recorded phase with a new attempt or candidate as its local
-contract requires. Do not demand a new pipeline or repeat Gate 1 merely because
-an earlier attempt is terminal; only `phase/status: complete|aborted` closes the
-run, and a real scope or intent change follows the existing decision contract.
+contract requires. The no-repeat-Gate-1 path is legal only after validating the
+prior Gate 1 dual record and its approved scope binding. A blocked pre-Gate-1
+state, or one with a missing or invalid release/event/scope binding, remains
+blocked and routes through the existing Gate 1 recovery or migration contract;
+it never borrows a later implementation recovery. With those prerequisites
+valid, do not demand a new pipeline or repeat Gate 1 merely because an earlier
+attempt is terminal. Only `phase/status: complete|aborted` closes the run, and a
+real scope or intent change follows the existing decision contract.
 
 For an OpenSpec-bound Design, resolve `scripts/openspec-recovery.mjs` relative to the loaded
 pipeline skill and derive the next action from the bounded OpenSpec state fields. Resume

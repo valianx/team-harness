@@ -898,6 +898,10 @@ def check_cleaner_crap_contract() -> None:
             "require a new explicitly activated repository-local pipeline" not in text,
             f"{label}: cleaner failure still discards the active pipeline",
         )
+        require(
+            "authoritative post transition" not in text,
+            f"{label}: authoritative cleaner post-transition remains unhyphenated",
+        )
 
     for label, relative in (
         ("Claude cleaner", "agents/cleaner.md"),
@@ -926,6 +930,7 @@ def check_cleaner_crap_contract() -> None:
         read("plugins/team-harness/skills/pipeline/references/recovery.md").lower(),
     )
     shared_state = read("agents/_shared/orchestrator-state.md").lower()
+    shared_state_flat = re.sub(r"\s+", " ", shared_state)
     require("cleaner_evidence" in state, "cleaner evidence is not durable state")
     require("cleaner_evidence" in shared_state, "agent state schema misses cleaner evidence")
     for marker in ("allowlist_sha256", "baseline_sha256", "post_sha256"):
@@ -965,6 +970,12 @@ def check_cleaner_crap_contract() -> None:
     ):
         require(marker in state, f"cleaner handoff state misses {marker!r}")
         require(marker in shared_state, f"shared cleaner handoff state misses {marker!r}")
+    for marker in (
+        "choice `1` consumes it and permits one",
+        "choice `2` consumes it into `pause` without mutation or dispatch",
+        "choice `3` records `abort` and closes the pipeline",
+    ):
+        require(marker in shared_state_flat, f"shared cleaner handoff choice misses {marker!r}")
     for marker in (
         "cleaner-handoff recovery",
         "agent.cleaner-handoff.spawn",
@@ -2187,6 +2198,7 @@ def check_terminal_and_transition_mapping() -> None:
     codex_state = read("plugins/team-harness/skills/pipeline/references/state-and-gates.md").lower()
     codex_pipeline = read("plugins/team-harness/skills/pipeline/SKILL.md").lower()
     recovery = read("plugins/team-harness/skills/pipeline/references/recovery.md").lower()
+    recovery_flat = re.sub(r"\s+", " ", recovery)
     claude_recovery = read("skills/recover/SKILL.md").lower()
     claude_pipeline = read("agents/ref-pipeline.md").lower()
 
@@ -2205,6 +2217,15 @@ def check_terminal_and_transition_mapping() -> None:
         require("valid `amend` decision record" in text, f"{label}: Gate 3 amend migration is missing")
     require("autonomous: true" in claude_pipeline and "autonomous_granted_at: stage-gate-1" in claude_pipeline, "Claude autonomous grant is not persisted")
     require("pipeline administratively closed" in claude_pipeline, "Claude administrative close does not clear next_action safely")
+
+    for marker in (
+        "no-repeat-gate-1 path is legal only after validating the prior gate 1 dual record",
+        "approved scope binding",
+        "a blocked pre-gate-1 state",
+        "remains blocked and routes through the existing gate 1 recovery or migration contract",
+        "never borrows a later implementation recovery",
+    ):
+        require(marker in recovery_flat, f"Codex blocked pre-Gate-1 recovery misses {marker!r}")
 
 
 def check_review_comment_regressions() -> None:

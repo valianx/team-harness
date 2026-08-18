@@ -1289,10 +1289,10 @@ identity and is never re-dispatched for that same attempt. It completes and
 commits every independent safe allowlisted cleanup before returning any
 `implementer_findings`; each finding carries stable ID, cause, files,
 implicated AC/TC requirements, advisory correction, deterministic closure
-check, and expected result. Main still runs the authoritative post transition.
+check, and expected result. Main still runs the authoritative post-transition.
 A cleaner return of `failed` or `blocked` is persisted with its hashed result as
 `cleaner-failed` or `cleaner-blocked`, never as `pending` or `pass`. The
-authoritative post transition may record the resulting tree and diagnostics but
+authoritative post-transition may record the resulting tree and diagnostics but
 cannot convert either state to pass; both block Freeze for that attempt. They
 do not close the pipeline or discard work. On a live operator recovery,
 preserve the old hashed evidence, same workspace, same branch, commits, and
