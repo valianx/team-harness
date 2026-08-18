@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { preflight } from "../plugins/team-harness/skills/pipeline/scripts/openspec-adapter.mjs";
+import { deriveOpenSpecOverlay, validateOpenSpecOverlay } from "../plugins/team-harness/skills/pipeline/scripts/openspec-overlay.mjs";
 import { captureSnapshot } from "../plugins/team-harness/skills/pipeline/scripts/openspec-snapshot.mjs";
 import { validatePlanContract } from "../plugins/team-harness/skills/pipeline/scripts/plan-contract.mjs";
 
@@ -55,6 +56,11 @@ async function scenario(workspaceMode) {
     assert.equal(snapshot.workspace.root, workspace);
     assert.equal(snapshot.artifacts.every(artifact => artifact.path.startsWith("openspec/changes/canonical-e2e/")), true);
     assert.equal(await readFile(path.join(repository, "openspec/changes/canonical-e2e/proposal.md"), "utf8").then(Boolean), true);
+
+    const derived = await deriveOpenSpecOverlay({ workspace, writableRoots: [repository] });
+    assert.equal(derived.verdict, "pass");
+    assert.equal(derived.kind, "team_harness_openspec_overlay_derivation");
+    assert.equal((await validateOpenSpecOverlay({ workspace, writableRoots: [repository] })).verdict, "pass");
 
     const coordinates = snapshot.artifacts.flatMap(artifact => artifact.coordinates);
     const requirement = coordinates.find(item => item.kind === "requirement").id;

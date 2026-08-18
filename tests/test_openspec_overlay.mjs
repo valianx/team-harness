@@ -6,7 +6,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { rebindOpenSpecOverlay, validateOpenSpecOverlay, verifyOpenSpecProgress } from "../plugins/team-harness/skills/pipeline/scripts/openspec-overlay.mjs";
+import { deriveOpenSpecOverlay, rebindOpenSpecOverlay, validateOpenSpecOverlay, verifyOpenSpecProgress } from "../plugins/team-harness/skills/pipeline/scripts/openspec-overlay.mjs";
 import { verifySnapshot } from "../plugins/team-harness/skills/pipeline/scripts/openspec-snapshot.mjs";
 import { validatePlanContract } from "../plugins/team-harness/skills/pipeline/scripts/plan-contract.mjs";
 
@@ -296,6 +296,27 @@ await check("requires the live writable-root set for OpenSpec Gate-1 validation"
   await value.writeOverlay(value.overlay);
   const result = await validateOpenSpecOverlay({ workspace: value.workspace });
   assert.equal(result.error_code, "ARGUMENT_INVALID");
+}));
+
+await check("derives an overlay skeleton that validates without manual repair", async () => withFixture(async value => {
+  const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository] });
+  assert.equal(derived.verdict, "pass");
+  assert.equal(derived.kind, "team_harness_openspec_overlay_derivation");
+  assert.equal(derived.acceptance_item_count, 1);
+  assert.equal(derived.execution_item_count, 1);
+  const result = await validateOverlay(value);
+  assert.equal(result.verdict, "pass");
+  assert.deepEqual(result.findings, []);
+}));
+
+await check("fails closed when the change has no scenario or task coordinates", async () => withFixture(async value => {
+  const snapshotPath = path.join(value.workspace, "inputs/openspec-snapshot.json");
+  const snapshot = JSON.parse(await readFile(snapshotPath, "utf8"));
+  for (const artifact of snapshot.artifacts) artifact.coordinates = artifact.coordinates.filter(coordinate => coordinate.kind !== "scenario" && coordinate.kind !== "task");
+  await writeFile(snapshotPath, `${JSON.stringify(snapshot)}\n`);
+  const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository] });
+  assert.equal(derived.verdict, "fail");
+  assert.equal(derived.error_code, "SOURCE_COVERAGE_INCOMPLETE");
 }));
 
 if (failures.length) {
