@@ -24,8 +24,6 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 
 // entry/dev-guard.cc.ts
 var fs = __toESM(require("node:fs"), 1);
-var path = __toESM(require("node:path"), 1);
-var os = __toESM(require("node:os"), 1);
 var import_node_child_process = require("node:child_process");
 
 // shim/normalized-v1.ts
@@ -1222,9 +1220,8 @@ function none() {
   return { decision: "none", reason: "", mutations: null };
 }
 var GATE_DOC_POINTER = "see docs/dev-mode.md \xA7 Outward-Action Gate";
-var CLICKUP_WRITE_RE = /^mcp__.+__clickup_(update_task|create_task|create_task_comment|attach_task_file|delete_task)$/;
-var RAW_OUTWARD_SCAN_RE = /(git\s+push|gh\s+pr\s+(create|merge|review|comment)|gh\s+issue\s+(create|edit|comment)|gh\s+api.*pulls)/i;
-var GRAPHQL_PR_MUTATIONS_RE = /(resolveReviewThread|unresolveReviewThread|addPullRequestReviewThreadReply|addPullRequestReviewComment|addPullRequestReview|submitPullRequestReview|mergePullRequest)/;
+var RAW_OUTWARD_SCAN_RE = /(git\s+push|gh\s+pr\s+merge|gh\s+api.*pulls.*merge)/i;
+var GRAPHQL_PR_MERGE_RE = /mergePullRequest/;
 var DEFAULT_BRANCH_FLOOR = /* @__PURE__ */ new Set(["main", "master"]);
 function evaluateDestinationBranch(dst, reader, allowContext, dir) {
   const targetNote = dir !== void 0 ? ` (target '-C ${dir}')` : "";
@@ -1366,8 +1363,7 @@ function evaluateGitClassified(classified, reader) {
   return evaluateGitPushArgs(classified.args, reader, classified.cDir ?? void 0);
 }
 var REPO_FLAG_NAMES = /* @__PURE__ */ new Set(["--repo", "-R"]);
-var GH_MUTATING_PR_VERBS = /* @__PURE__ */ new Set(["create", "merge", "review", "comment"]);
-var GH_MUTATING_ISSUE_VERBS = /* @__PURE__ */ new Set(["create", "edit", "comment"]);
+var GH_FLOOR_PR_VERBS = /* @__PURE__ */ new Set(["merge"]);
 function resolveGhVerb(args) {
   const cleanArgs = [];
   let repoTarget = null;
@@ -1398,10 +1394,7 @@ function matchesVerbPrefix(verbLower, knownVerbs) {
   }
   return null;
 }
-function isGraphqlPrMutation(cleanArgs) {
-  return cleanArgs.some((t) => GRAPHQL_PR_MUTATIONS_RE.test(t.value));
-}
-function isRestMutatingPrEndpoint(cleanArgs) {
+function isRestPrMergeEndpoint(cleanArgs) {
   const hasMutatingMethod = cleanArgs.some((t, i) => {
     if (t.value === "-X" || t.value === "--method") {
       const next = cleanArgs[i + 1];
@@ -1409,67 +1402,40 @@ function isRestMutatingPrEndpoint(cleanArgs) {
     }
     return /^(--method=|-X)(PUT|POST|PATCH|DELETE)$/i.test(t.value);
   });
-  return hasMutatingMethod && cleanArgs.some((t) => /pulls/i.test(t.value));
+  return hasMutatingMethod && cleanArgs.some((t) => /pulls\/[^/]+\/merge/i.test(t.value));
 }
 function classifyGhAction(args) {
   const { subcommand, verb, repoTarget, cleanArgs } = resolveGhVerb(args);
   if (subcommand === "pr") {
-    const matched = verb !== null ? matchesVerbPrefix(verb, GH_MUTATING_PR_VERBS) : null;
-    if (matched === "create") return { kind: "pr-create", verb: matched, repoTarget, cleanArgs };
-    if (matched !== null) return { kind: "pr-mutating", verb: matched, repoTarget, cleanArgs };
-    return null;
-  }
-  if (subcommand === "issue") {
-    const matched = verb !== null ? matchesVerbPrefix(verb, GH_MUTATING_ISSUE_VERBS) : null;
-    return matched !== null ? { kind: "issue-mutating", verb: matched, repoTarget, cleanArgs } : null;
+    const matched = verb !== null ? matchesVerbPrefix(verb, GH_FLOOR_PR_VERBS) : null;
+    return matched !== null ? { kind: "pr-merge", repoTarget, cleanArgs } : null;
   }
   if (subcommand === "api") {
     const verbToken = cleanArgs[1]?.value.toLowerCase() ?? null;
     if (verbToken === "graphql") {
-      return isGraphqlPrMutation(cleanArgs) ? { kind: "api-graphql-pr", verb: null, repoTarget, cleanArgs } : null;
+      return cleanArgs.some((t) => GRAPHQL_PR_MERGE_RE.test(t.value)) ? { kind: "api-graphql-merge", repoTarget, cleanArgs } : null;
     }
-    return isRestMutatingPrEndpoint(cleanArgs) ? { kind: "api-rest-pr", verb: null, repoTarget, cleanArgs } : null;
+    return isRestPrMergeEndpoint(cleanArgs) ? { kind: "api-rest-merge", repoTarget, cleanArgs } : null;
   }
   return null;
 }
-function isCleanGhPrCreate(classified, action) {
-  return classified.binary === "gh" && classified.binaryCaseExact && !classified.requiresFailClosed && action.cleanArgs[0]?.value === "pr" && action.cleanArgs[1]?.value === "create" && classified.args.every((t) => !t.tainted);
-}
-function isPrCreateAutogateEnabled(reader) {
-  const config = reader.readConfig();
-  if (!config) return false;
-  const autogate = config["autogate"];
-  if (!autogate || typeof autogate !== "object") return false;
-  return autogate["pr_create"] === true;
-}
-function evaluateGhClassified(classified, reader) {
+function evaluateGhClassified(classified) {
   const action = classifyGhAction(classified.args);
   if (!action) return null;
   const ghTargetNote = action.repoTarget ? ` (target repo: '${action.repoTarget}')` : "";
-  if (action.kind === "pr-create") {
-    if (isCleanGhPrCreate(classified, action) && isPrCreateAutogateEnabled(reader)) {
-      return allow(
-        `outward action 'gh pr create'${ghTargetNote} auto-allowed by opt-in config autogate.pr_create=true (dev-guard.ts); the prepublish-guard tests-before-PR floor still applies independently (deny > allow); ${GATE_DOC_POINTER}`
-      );
-    }
+  if (action.kind === "pr-merge") {
     return ask(
-      `outward action 'gh pr create'${ghTargetNote} requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
+      `outward action 'gh pr merge'${ghTargetNote} \u2014 merging a pull request always requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
     );
   }
-  if (action.kind === "pr-mutating") {
+  if (action.kind === "api-graphql-merge") {
     return ask(
-      `outward action 'gh pr ${action.verb}'${ghTargetNote} requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
+      `outward action 'gh api graphql' mergePullRequest mutation requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
     );
   }
-  if (action.kind === "issue-mutating") {
-    return ask(
-      `outward action 'gh issue write'${ghTargetNote} requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
-    );
-  }
-  if (action.kind === "api-graphql-pr") {
-    return ask(`outward action 'gh api graphql' PR-mutating operation requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`);
-  }
-  return ask(`outward action 'gh api' mutating PR endpoint requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`);
+  return ask(
+    `outward action 'gh api' PR-merge endpoint requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
+  );
 }
 function isCoveredEffectiveCommand(cmd) {
   const classified = classifyCoveredAction(cmd);
@@ -1485,18 +1451,13 @@ function evaluateSingleCommand(cmd, reader) {
   const binaryLower = classified.binary.toLowerCase();
   if (binaryLower === "git") return evaluateGitClassified(classified, reader);
   if (binaryLower === "gh") {
-    const decision = evaluateGhClassified(classified, reader);
+    const decision = evaluateGhClassified(classified);
     if (decision) return decision;
   }
   return none();
 }
 function evaluate(input, reader) {
   const toolName = input.tool?.name ?? "";
-  if (toolName && CLICKUP_WRITE_RE.test(toolName)) {
-    return ask(
-      `outward action \u2014 ClickUp MCP outward write (${toolName}) requires explicit operator approval; preview the change before confirming (dev-guard.ts; see docs/dev-mode.md)`
-    );
-  }
   const cmd = input.tool?.input?.["command"];
   const cmdStr = typeof cmd === "string" ? cmd : null;
   if (cmdStr === null && toolName === "Bash") {
@@ -1571,45 +1532,6 @@ function makeReader() {
       } catch {
         return null;
       }
-    },
-    readConfig() {
-      const legacyPath = path.join(os.homedir(), ".claude", ".team-harness.json");
-      const codexRoot = process.env.CODEX_HOME?.trim() || path.join(os.homedir(), ".codex");
-      const candidates = process.env.TEAM_HARNESS_CODEX_HOOK === "1" ? [path.join(codexRoot, ".team-harness.json"), legacyPath] : [legacyPath];
-      for (const configPath of candidates) {
-        let raw;
-        try {
-          raw = fs.readFileSync(configPath, "utf8");
-        } catch (err) {
-          if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") {
-            continue;
-          }
-          process.stderr.write(`dev-guard: cannot read Team Harness config at ${configPath}; using safe defaults
-`);
-          return null;
-        }
-        let config;
-        try {
-          const parsed = JSON.parse(raw);
-          if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-            throw new TypeError("config root must be an object");
-          }
-          config = parsed;
-        } catch {
-          process.stderr.write(`dev-guard: malformed Team Harness config at ${configPath}; using safe defaults
-`);
-          return null;
-        }
-        if (process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
-          const codexConfig = /* @__PURE__ */ Object.create(null);
-          for (const key of Object.keys(config)) {
-            if (key !== "autogate") codexConfig[key] = config[key];
-          }
-          return codexConfig;
-        }
-        return config;
-      }
-      return null;
     }
   };
 }

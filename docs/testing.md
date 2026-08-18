@@ -40,7 +40,7 @@ Everything below has inputs, outputs, and exit codes.
 | Suite | Covers |
 |---|---|
 | `test_policy_block.sh` | Secret-scanning and destructive-command denial: `rm` on `/`/`~`/`$HOME`/wildcards, `git --force`/`--no-verify`/`reset --hard`/`clean -f`, SQL `DROP`/`TRUNCATE`, sensitive paths (`.env`, `.pem`, `.ssh/`, `.aws/credentials`), the `.env.example`-class allowlist, malformed payloads (fail-open) |
-| `test_dev_guard.sh` | Outward-action gating by destination — a non-default-branch push allows; default-branch, tag and force pushes, `gh pr merge/review/comment`, `gh api` mutating PR endpoints and ClickUp MCP writes ask |
+| `test_dev_guard.sh` | Minimal outward floor by destination — a non-default-branch push allows; default-branch, tag and force pushes and PR merges (`gh pr merge`, `gh api` merge endpoints) ask; uncovered outward writes (pr create/review/comment, issue, ClickUp) produce no decision |
 | `test_gcp_guard.sh` | Destructive `gcloud` verb gating |
 | `test_session_start.sh` | SessionStart config read and language-directive injection |
 | `test_language_user_prompt.sh` | UserPromptSubmit language handling |

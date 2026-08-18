@@ -104,14 +104,14 @@ required lens, then Main consolidates and triages all findings at `phase:
 validation`, with a fresh nonce, the failed Freeze anchor, exact finding IDs,
 dispositions, and evidenced file scope. No repository/evidence mutation,
 specialist dispatch, Freeze rebuild, or revalidation is legal before authority
-is recorded. With `autonomous: false`, Main pauses and presents exactly `1 —
-authorize one correction round`, `2 — pause without changes`, and `3 — abort
-pipeline`; only a live reply after that presentation may consume the nonce.
-With a valid `approved-autonomous` Gate-1 dual record, `iteration < 3`, no
+is recorded. With a valid Gate-1 approval dual record, `iteration < 3`, no
 correction/execution budget exhaustion, and only unambiguous `resolve` findings
-inside approved scope, Main may consume the nonce
+inside approved scope, Main consumes the nonce
 without another presentation using `correction_authority: gate1-autonomous` and
-the exact consumed Gate-1 nonce. Consumption atomically sets `correction_nonce:
+the exact consumed Gate-1 nonce. When any of those conjuncts fails, Main pauses
+and presents exactly `1 — authorize one correction round`, `2 — pause without
+changes`, and `3 — abort pipeline`; only a live reply after that presentation
+may consume the nonce. Consumption atomically sets `correction_nonce:
 null` and copies the consumed token to `correction_decision_nonce`. `authorize`
 requires one matching `correction.decision`
 event and permits exactly one `iteration.start`/`agent.correction.spawn` pair
@@ -272,6 +272,7 @@ project: {project-slug}|null                # agents/ref-dispatch-machinery.md
 ```
 autonomous: true|false
 autonomous_granted_at: STAGE-GATE-1|null
+release_policy: auto-ship|null
 current_round: R1|R2|...|null
 total_rounds: N|null
 prs_in_current_round: [Task-1, ...]|null
@@ -314,10 +315,10 @@ fresh attempt with attempt-qualified evidence paths. Only
 
 **`open_findings` — kept, with a schema and a named reader, never left as an unread promise.** The reader is the Recover safety contract: on `/th:recover`, any entry present with no matching `disposition` row in `00-decision-ledger.md` is surfaced to the operator as an unresolved carry-over before the next gate is prepared. An entry is written only by the orchestrator, only when a finding lands as a task AC or when `agents/ref-pipeline.md § "Finding disposition"` records it as accepted-without-AC — never populated speculatively, and never treated as the transport for a finding that has not gone through that disposition path.
 
-**Gate fields — bare literals, never repaired.** Contract: `agents/_shared/gate-contract.md § "The dual-record release"` and its no-gate-field-repair invariant. The six gate fields are `gate_pending`, `gate1_release`, `gate3_release`, `gate_nonce`, `working_branch`, and `worktree` — every one a bare literal in the real file, with no second space-delimited token ever trailing a value. `checkpoint_boundary` is a separate derived checkpoint cache, not a gate field or release. A release is valid only as a dual record: the matching state field and `stage.gate.release` event must agree on decision and nonce. Recovery and delivery fail closed when either half is absent or mismatched; neither side may be repaired or inferred from phase/status text. An administrative close for a live inline request sets no gate release and consumes no nonce.
+**Gate fields — bare literals, never repaired.** Contract: `agents/_shared/gate-contract.md § "The dual-record release"` and its no-gate-field-repair invariant. The seven gate fields are `gate_pending`, `gate1_release`, `gate3_release`, `release_policy`, `gate_nonce`, `working_branch`, and `worktree` — every one a bare literal in the real file, with no second space-delimited token ever trailing a value. `checkpoint_boundary` is a separate derived checkpoint cache, not a gate field or release. A release is valid only as a dual record: the matching state field and `stage.gate.release` event must agree on decision and nonce. Recovery and delivery fail closed when either half is absent or mismatched; neither side may be repaired or inferred from phase/status text. An administrative close for a live inline request sets no gate release and consumes no nonce.
 ```
 gate1_release: approved|approved-autonomous|rejected|edit|null
-gate3_release: ship|amend|abort|null
+gate3_release: ship|auto-ship|amend|abort|null
 gate_nonce: {token}|null                    # fresh per presentation, consumed on release
 ```
 
@@ -447,7 +448,7 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | `attempt_metrics`, `quality_verdict` | conditional | required for `agent.close`; metrics are complete or closed-code unavailable, verdict is `pass`/`concerns`/`fail`/`n-a` |
 | `correction_cause` | conditional | required for `agent.correction.spawn`; literal `verification` only |
 | `correction_nonce`, `correction_anchor`, `correction_findings`, `correction_scope`, `correction_requirements`, `correction_closure`, `correction_dispositions`, `correction_exceptional` | conditional | required for `correction.decision` and every authorized `iteration.start`/`agent.correction.spawn`; the complete eight-field package must be byte-for-byte identical across all three events, not merely share a nonce; exact bounded identity, never inferred; closure has one deterministic check/expected result per finding |
-| `correction_authority`, `correction_authority_gate_nonce` | conditional | required for `correction.decision`; `operator-live` uses no Gate nonce, while `gate1-autonomous` requires the exact nonce from the valid `approved-autonomous` release and is prohibited at `iteration: 3/3` |
+| `correction_authority`, `correction_authority_gate_nonce` | conditional | required for `correction.decision`; `operator-live` uses no Gate nonce, while `gate1-autonomous` requires the exact nonce from the valid Gate-1 approval release and is prohibited at `iteration: 3/3` |
 | `verdict` | conditional | `pass`/`concerns`/`fail`/`partial-fail` |
 | `decision` | conditional | required for `stage.gate.release` and `correction.decision`; correction value is `authorize\|pause\|abort` |
 | `cause` | conditional | `verification` for new `iteration.start` correction rounds; historical `operator` values remain readable |

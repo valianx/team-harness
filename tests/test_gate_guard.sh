@@ -585,13 +585,6 @@ assert_nodecision "round 3 (no regression): inert quoted covered-verb in a read-
 rm -rf "$TMP"
 
 # ---------------------------------------------------------------------------
-# dev-guard's `gh pr create` autogate opt-in predates gate-guard and is
-# preserved unchanged; its regression coverage already lives in
-# tests/test_dev_guard.sh (assert_allow "gh pr create with
-# autogate.pr_create=true -> ALLOW"). Not duplicated here.
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
 # Routing sanity — non-push/non-pr-create commands and a non-git directory
 # never trip the hook (mirrors test_prepublish_guard.sh's routing suite).
 # ---------------------------------------------------------------------------

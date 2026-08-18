@@ -130,7 +130,8 @@ autonomous_granted_at: STAGE-GATE-1|null
 gate_pending: gate1|gate3|null
 gate_nonce: {fresh token or null}
 gate1_release: approved|approved-autonomous|rejected|edit|null
-gate3_release: ship|amend|abort|null
+release_policy: auto-ship|null
+gate3_release: ship|auto-ship|amend|abort|null
 regression_test_path: {path}|null
 regression_test_status: failing|passing|skipped|null
 test_contract_evidence: {status: pending|red|green|not-applicable|mixed, index_path, index_sha256, task_count, status_counts: {pending, red, green, not_applicable}}|null
@@ -313,17 +314,18 @@ or replace the handoff authorization.
 
 Wait for every required validation lens to finish even after one fails. Main
 deduplicates the complete finding set by stable ID and performs the bounded
-evidence triage defined by `validation.md`. Under normal `approve`, the live
-operator must explicitly confirm every `resolve|design-consistent` disposition
-and resolve every `decision-required` item. Under a valid `approve autonomous`
-dual record, Main may confirm only unambiguous `resolve` findings that satisfy
-the closed autonomous predicate below. Main's recommendation otherwise is never
-a decision; `design-consistent` cannot cover an AC or security-floor violation.
-Only after dispositions are durable does Main record the exact failed Freeze
-anchor, final `resolve` IDs and file scope.
+evidence triage defined by `validation.md`. The live operator must explicitly
+confirm every `design-consistent` disposition and resolve every
+`decision-required` item — only the live operator decides those. Under the
+Gate-1 authority carried by any valid approval, Main may confirm only
+unambiguous `resolve` findings that satisfy the closed autonomous predicate
+below. Main's recommendation otherwise is never a decision;
+`design-consistent` cannot cover an AC or security-floor violation. Only after
+dispositions are durable does Main record the exact failed Freeze anchor,
+final `resolve` IDs and file scope.
 
-The closed autonomous predicate requires every conjunct: a valid
-`gate1_release: approved-autonomous` dual record; `autonomous: true`;
+The closed autonomous predicate requires every conjunct: a valid Gate-1
+approval dual record (`approved`; legacy `approved-autonomous` stays legible);
 `iteration < 3`; every blocking finding is `resolve`; every correction is
 inside approved scope and preserves intent, behavior, and AC meaning; no scope
 expansion, conflicting finding, `design-consistent` or `decision-required`
@@ -523,16 +525,25 @@ Record a release atomically in both places:
 
 Consume the nonce and clear `gate_pending`. A field without its event, or an
 event without its field, is not a release. Never repair a malformed field;
-re-present with a fresh nonce. `Gate 3: ship` is the operator's single approval
-to push the exact accepted Freeze commit and create/update its draft PR; version,
-changelog, tests, and commit creation already completed before Freeze. Do not ask
-again between push and PR. Native
+re-present with a fresh nonce.
+
+Gate 3 has two release routes. On total green with no closed-list exception,
+Main records the mechanical dual record `gate3_release: auto-ship` plus a
+`stage.gate.release` event citing the Gate-1 release event
+(`origin: gate1-release-policy`) — no STOP, no nonce, because nothing is
+presented; the release-record write itself is never skippable. On a closed-list
+exception (design changed, security obligation changed or surviving broke-it,
+infrastructure failure including correction-budget exhaustion), Main STOPs with
+a fresh nonce and the operator's `ship` reply is the single approval. Either
+release authorizes only pushing the exact accepted Freeze commit and
+creating/updating its draft PR; version, changelog, tests, and commit creation
+already completed before Freeze. Do not ask again between push and PR. Native
 Codex tool approval may still be required to execute a command, but it is a
 technical runtime boundary rather than another Team Harness decision. The
-pipeline never force-pushes, and `ship` excludes merge, tag, release, and
-publication. An administrative close for a live inline request is not a gate
-decision: it does not set `gate1_release` or `gate3_release`, consume a nonce,
-or pretend that a gate reply occurred.
+pipeline never force-pushes, and a Gate 3 release excludes merge, tag, release,
+and publication. An administrative close for a live inline request is not a
+gate decision: it does not set `gate1_release` or `gate3_release`, consume a
+nonce, or pretend that a gate reply occurred.
 
 ## Decision transitions
 
@@ -542,29 +553,32 @@ mapping is exact:
 
 | Decision | Required snapshot after recording |
 |---|---|
-| Gate 1 `approve` | `phase: implementation`; `stage: 2`; `status: in_progress`; `last_completed: waiting_gate1`; `next_action: start approved implementation`; `autonomous: false`; `autonomous_granted_at: null` |
-| Gate 1 `approve autonomous` | same implementation transition, plus `autonomous: true`; `autonomous_granted_at: STAGE-GATE-1` |
+| Gate 1 `approve` | `phase: implementation`; `stage: 2`; `status: in_progress`; `last_completed: waiting_gate1`; `next_action: start approved implementation`; `release_policy: auto-ship`; `autonomous: true`; `autonomous_granted_at: STAGE-GATE-1` |
 | Gate 1 `edit` | `phase: design`; `stage: 1`; `status: iterating`; `last_completed: waiting_gate1`; `next_action: apply operator-requested Gate 1 edit` |
 | Gate 1 `reject` | `phase: design`; `stage: 1`; `status: paused`; `last_completed: waiting_gate1`; `next_action: await operator-directed design decision` |
-| Gate 3 `ship` | `phase: delivery`; `stage: 4`; `status: in_progress`; `last_completed: waiting_gate3`; `next_action: execute the exact previewed delivery package` |
+| Gate 3 `auto-ship` (mechanical, no presentation) | `phase: delivery`; `stage: 4`; `status: in_progress`; `last_completed: waiting_gate3`; `next_action: execute the exact previewed delivery package` |
+| Gate 3 `ship` (exception presentation) | same delivery transition as `auto-ship` |
 | Gate 3 `amend` | `phase: implementation`; `stage: 2`; `status: paused_for_amend`; `last_completed: waiting_gate3`; `next_action: apply operator-requested amendment, then re-Freeze and revalidate` |
 | Gate 3 `abort` | `phase: aborted`; `stage: 4`; `status: aborted`; `last_completed: waiting_gate3`; `next_action: none — pipeline administratively closed` |
 
-Every row clears `gate_pending` and consumes `gate_nonce`. An invalid or stale
-reply changes none of these fields and is re-presented with a fresh nonce.
+Every presented row clears `gate_pending` and consumes `gate_nonce`; the
+mechanical `auto-ship` row clears `gate_pending` without a nonce. An invalid
+or stale reply changes none of these fields and is re-presented with a fresh
+nonce. A legacy `2`/`approve autonomous` reply is accepted as `approve` and
+recorded as `approved`; legacy persisted `approved-autonomous` values stay
+legible without being re-emitted.
 
 ## Numbered decisions
 
 Gate 1 always shows:
 
 ```text
-1 — approve                 (approve)
-2 — approve autonomous      (approve autonomous)
+1 — approve                 (approve; preauthorizes through the draft PR)
 3: detail — edit            (edit; detail required)
 4: reason — reject          (reject {reason}; detail required)
 ```
 
-Gate 3 always shows:
+Gate 3, only on an exception presentation, shows:
 
 ```text
 1 — ship                    (ship)
@@ -572,9 +586,10 @@ Gate 3 always shows:
 3 — abort                   (abort)
 ```
 
-`1`/`2` are accepted alone for Gate 1; Gate 3 accepts `1`, `2`, or `3` alone.
+`1` is accepted alone for Gate 1; Gate 3 accepts `1`, `2`, or `3` alone.
 Gate 1 edit/reject require `3: detail` or `4: reason`; a bare `3`/`4`, an
 unknown number, or a modified/ambiguous reply releases nothing and causes a
 fresh presentation. Textual equivalents remain compatible input. Gate 1 is
-cleared only by `approved` or `approved-autonomous` plus its matching event;
-Gate 3 only by `ship` plus its matching event.
+cleared only by `approved` (or legacy `approved-autonomous`) plus its matching
+event; Gate 3 by `ship` plus its matching event, or by `auto-ship` plus its
+matching Gate-1-citing event.

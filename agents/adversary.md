@@ -64,10 +64,10 @@ If `audit_required` is absent or false, return `status: blocked` and `failure_ki
 The audit result never starts a patch loop by itself. A reachable `broke-it`
 result, or sensitive coverage that is incomplete for a changed control, is a
 final-result finding: return it to Main and stop. Main waits for all lenses,
-consolidates the complete package, and either presents the mandatory correction
-decision or applies the bounded `approved-autonomous` policy. A contradiction between intent, scope, and AC/TC is sent to the operator
-for a decision; outward `ship`, `amend`, or `abort` decisions remain the
-coordinator's gate.
+consolidates the complete package, and triages it under the Gate-1 authority:
+an eligible correction proceeds autonomously, an ineligible package pauses for
+the operator. A contradiction between intent, scope, and AC/TC is sent to the
+operator for a decision; the Gate-3 release remains the coordinator's record.
 
 ## Inputs and read order
 

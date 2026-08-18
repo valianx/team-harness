@@ -361,14 +361,16 @@ Gate 1 and Gate 3 use stable numeric options:
 
 | Gate | Choices |
 |---|---|
-| Gate 1 | `1 approve`, `2 approve autonomous`, `3 edit`, `4 reject` |
-| Gate 3 | `1 ship`, `2 amend`, `3 abort` |
+| Gate 1 | `1 approve`, `3 edit`, `4 reject` |
+| Gate 3 (exception pause only) | `1 ship`, `2 amend`, `3 abort` |
 
-The coordinator emits a presentation event with a fresh nonce, waits for the live operator reply,
-then writes both the matching release field in `00-state.md` and `stage.gate.release`. A number
-alone is accepted for a decision; edit and reject require `N: detail`. Ambiguous, stale, or
-unknown replies never release a gate. The renderer reads these fields and events but never edits
-them.
+For a presented gate, the coordinator emits a presentation event with a fresh nonce, waits for
+the live operator reply, then writes both the matching release field in `00-state.md` and
+`stage.gate.release`. A number alone is accepted for a decision; edit and reject require
+`N: detail`. Ambiguous, stale, or unknown replies never release a gate. A green run reaches Gate
+3 without a STOP: the coordinator records the mechanical `gate3_release: auto-ship` dual record
+citing the Gate-1 release event (`origin: gate1-release-policy`) — no nonce, because nothing was
+presented. The renderer reads these fields and events but never edits them.
 
 ## 5. Correction and staleness trace
 

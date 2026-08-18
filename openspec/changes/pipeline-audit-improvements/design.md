@@ -36,9 +36,9 @@ During a pipeline run, all coordination state lives under `{repo}/workspaces/{fe
 
 Every role has a semantic contract (`agents/*.md`) and, per runtime, a compact adapter. The standard governs both: canonical skeleton (role → when-invoked steps → criteria → output template → boundaries), size budgets (specialist ≤ 2,000 words, shared contract ≤ 1,500, references one level deep with TOC), and ten authoring rules (deletion test, one motivated rule over enumerations, one term per concept, no time-sensitive statements, scarce emphasis). Lint enforces structure deterministically: budget warnings, description format, dangling section anchors, reference depth. Parity checks detect rules present in the semantic source but absent or contradicted in a projection. Staged rewrites target the oversized files by per-dispatch cost (`architect.md` first at ~9× budget); `ref-pipeline.md` shrinks through this change's own phases, not a separate rewrite.
 
-## D7. What does not change
+## D7. Guard floors: minimal by decision, merge stays human
 
-`policy-block`/`dev-guard`/`gcp-guard` floors; `base_sha` + Freeze anchoring; the security-review floor and adversary dispatch; the red→green contract; human merge authority; the OpenSpec design integration (#602). No new guards, no new gates, no new approval currencies.
+`dev-guard` shrinks to the minimal outward floor (operator directive 2026-08-18): `ask` only for default-branch/force/tag pushes and PR merge (`gh pr merge`, `gh api` merge endpoints); `allow` for the clean non-default push; everything else — `gh pr create/review/comment`, issue writes, non-merge API mutations, ClickUp MCP writes — is uncovered and owned by the host runtime's permission model. The `autogate` config mechanism disappears with the `gh pr create` coverage that consumed it. Unchanged: `policy-block`/`gcp-guard` floors; `base_sha` + Freeze anchoring; the security-review floor and adversary dispatch; the red→green contract; human merge authority; the OpenSpec design integration (#602). No new guards, no new gates, no new approval currencies.
 
 ## D8. Editing mandate
 

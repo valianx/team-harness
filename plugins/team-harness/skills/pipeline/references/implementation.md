@@ -1,10 +1,10 @@
 # Implementation phase
 
 Enter only from `phase: implementation` with a valid dual-record
-`STAGE-GATE-1` release (`gate1_release: approved` or
-`approved-autonomous` plus its matching `stage.gate.release` event). If either
-half is absent, malformed, or inconsistent, load `recovery.md`, prepare the
-gate with a fresh nonce, and stop.
+`STAGE-GATE-1` release (`gate1_release: approved` — legacy
+`approved-autonomous` stays legible — plus its matching `stage.gate.release`
+event). If either half is absent, malformed, or inconsistent, load
+`recovery.md`, prepare the gate with a fresh nonce, and stop.
 
 ## Working topology and protected Git metadata
 

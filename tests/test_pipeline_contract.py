@@ -1618,7 +1618,7 @@ def check_residual_corrections() -> None:
     require("validation-checkpoint" in readme, "README: adversary/QA phase label drifted")
 
     gate = read("agents/_shared/gate-contract.md")
-    require("six fields above" in gate and "five fields above" not in gate, "Gate contract: stale field count")
+    require("seven fields above" in gate and "six fields above" not in gate, "Gate contract: stale field count")
     state_contract = read("agents/_shared/orchestrator-state.md")
     require("checkpoint_boundary` is a separate derived checkpoint cache" in state_contract, "State: checkpoint boundary is conflated with gate fields")
 
@@ -2203,8 +2203,9 @@ def check_terminal_and_transition_mapping() -> None:
     claude_pipeline = read("agents/ref-pipeline.md").lower()
 
     for marker in (
-        "gate 1 `approve autonomous`",
+        "release_policy: auto-ship",
         "autonomous_granted_at: stage-gate-1",
+        "gate 3 `auto-ship`",
         "gate 3 `ship`",
         "phase: delivery",
         "gate 3 `abort`",

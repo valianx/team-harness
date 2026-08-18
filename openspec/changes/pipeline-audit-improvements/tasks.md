@@ -2,9 +2,9 @@
 
 ## 1. Quick Fixes
 
-- [ ] 1.1 Replace the consolidator's `.claude/pr-review-*` draft-path pattern with the `workspaces/pr-review-{number}/` invariant across source agent and adapters, with a source↔adapter parity assertion.
-- [ ] 1.2 Reconcile the review lens library with the reviewer contract: declared severity mapping, live anchors only, explicit precedence, corrected body folding.
-- [ ] 1.3 Fix Codex config migration so `obsidian_tasks` keeps its object shape, and make the Codex todo path fail with a setup pointer when the folder is unresolvable.
+- [x] 1.1 Replace the consolidator's `.claude/pr-review-*` draft-path pattern with the `workspaces/pr-review-{number}/` invariant across source agent and adapters, with a source↔adapter parity assertion.
+- [x] 1.2 Reconcile the review lens library with the reviewer contract: declared severity mapping, live anchors only, explicit precedence, corrected body folding.
+- [x] 1.3 Fix Codex config migration so `obsidian_tasks` keeps its object shape, and make the Codex todo path fail with a setup pointer when the folder is unresolvable.
 
 ## 2. Quality-Runner Diagnostics
 
@@ -26,18 +26,18 @@
 
 ## 4. PR-Review Independence
 
-- [ ] 4.1 Add the QA-lens coverage schema (`acs_evaluated`, non-verifiables, `lens_status`), oracle-provenance handling, severity rule, and missing-coordinate blocking.
-- [ ] 4.2 Give the consolidator the frozen worktree coordinate (read-only), the disposition ledger, coordinator count reconciliation, and the published lens-coverage line.
-- [ ] 4.3 Rewrite the reviewer contract order (code → draft verdict → thread for dedup), strip Title/Author from the dispatch, move CI status post-verdict.
-- [ ] 4.4 Implement preview→publish integrity: verdict-line/event reconciliation, draft hash anchor, `--auto-publish` event and freshness, evidence-first preview.
+- [x] 4.1 Add the QA-lens coverage schema (`acs_evaluated`, non-verifiables, `lens_status`), oracle-provenance handling, severity rule, and missing-coordinate blocking.
+- [x] 4.2 Give the consolidator the frozen worktree coordinate (read-only), the disposition ledger, coordinator count reconciliation, and the published lens-coverage line.
+- [x] 4.3 Rewrite the reviewer contract order (code → draft verdict → thread for dedup), strip Title/Author from the dispatch, move CI status post-verdict.
+- [x] 4.4 Implement preview→publish integrity: verdict-line/event reconciliation, draft hash anchor, `--auto-publish` event and freshness, evidence-first preview.
 
 ## 5. Gate Autonomy
 
-- [ ] 5.1 Rewrite `agents/_shared/gate-contract.md`: single approve carrying `release_policy: auto-ship` in the Gate-1 dual record; mechanical Gate 3 citing that record; `approved-autonomous` legacy-legible only.
-- [ ] 5.2 Rewrite the Validation→Gate 3→Delivery flow in `agents/ref-pipeline.md` for autonomous correction (max-3) plus auto-ship on total green, with the closed exception list as the only pause source.
-- [ ] 5.3 Update `agents/_shared/orchestrator-state.md` and recovery: `{ship, auto-ship}` cleared values; recovery never auto-releases.
-- [ ] 5.4 Update `dev-guard` so the recorded ship policy covers the benign push and `gh pr create` only; fix the env-assignment-prefix false positive; all other outward actions unchanged.
-- [ ] 5.5 Update `recover`/`deliver`/`pipelines` skills and gate-literal test anchors; regenerate all runtime projections.
+- [x] 5.1 Rewrite `agents/_shared/gate-contract.md`: single approve carrying `release_policy: auto-ship` in the Gate-1 dual record; mechanical Gate 3 citing that record; `approved-autonomous` legacy-legible only.
+- [x] 5.2 Rewrite the Validation→Gate 3→Delivery flow in `agents/ref-pipeline.md` for autonomous correction (max-3) plus auto-ship on total green, with the closed exception list as the only pause source.
+- [x] 5.3 Update `agents/_shared/orchestrator-state.md` and recovery: `{ship, auto-ship}` cleared values; recovery never auto-releases.
+- [x] 5.4 Reduce `dev-guard` to the minimal outward floor (operator directive 2026-08-18): keep default-branch/force/tag push and PR merge (`gh pr merge` + `gh api` merge endpoints) as `ask` and the clean non-default push as `allow`; uncover `gh pr create/review/comment`, issue writes, non-merge API mutations, and ClickUp MCP writes (host permission model governs); remove the `autogate` config mechanism and the ClickUp hooks.json matcher; migrate suites and docs.
+- [x] 5.5 Update `recover`/`deliver`/`pipelines` skills and gate-literal test anchors; regenerate all runtime projections.
 
 ## 6. Codex Parity and Workspace Model
 

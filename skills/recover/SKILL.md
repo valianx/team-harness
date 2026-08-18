@@ -37,8 +37,11 @@ both structural conditions hold:
 expected stage, allowlisted decision, and the exact consumed nonce from that presentation; and
 (b) the per-gate field in `00-state.md § Current State` is in the clear allowlist:
 
-- STAGE-GATE-1: `gate1_release ∈ {approved, approved-autonomous}`
-- STAGE-GATE-3: `gate3_release = ship`
+- STAGE-GATE-1: `gate1_release ∈ {approved, approved-autonomous}` (the second value is
+  legacy-legible only; new records always write `approved`)
+- STAGE-GATE-3: `gate3_release ∈ {ship, auto-ship}` (an `auto-ship` record must cite the
+  Gate-1 release event that authorized it; recovery never executes an auto-release itself —
+  it resumes delivery mechanics from the recorded state)
 
 Any other value (`rejected`, `edit`, `stop`, `redo`, `amend`, `abort`), a null field, or a
 missing field means the gate is uncleared. Never infer approval from `next_action`, status

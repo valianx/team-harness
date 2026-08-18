@@ -8,21 +8,24 @@ PR using the Gate-3-bound prose.
 
 `delivery` the specialist runs once before Gate 3 and owns only the workspace
 acceptance matrix and PR-body draft. The coordinator owns this publish-only
-procedure after a valid `gate3_release: ship`.
+procedure after a valid `gate3_release ∈ {ship, auto-ship}`.
 
 ## 1. Revalidate the Gate 3 release and prose
 
 Re-read the exact active `00-state.md`. Require the valid dual record for the
-current Gate 3 presentation: `gate3_release: ship`, cleared `gate_pending`, and
-the matching `stage.gate.release` event carrying the consumed nonce. Never
-repair a gate field.
+current Gate 3 release: `gate3_release ∈ {ship, auto-ship}`, cleared
+`gate_pending`, and the matching `stage.gate.release` event. A `ship` record
+carries the consumed nonce from the exception presentation; an `auto-ship`
+record instead cites the Gate-1 release event that authorized it
+(`origin: gate1-release-policy`) — no nonce, because no STOP was presented.
+Never repair a gate field.
 
 Require the PR title, PR-body path/digest, and acceptance-matrix path/digest to
 equal the recorded `delivery_preview`. Paths must be canonical non-symlink
 files under the active workspace `inputs/` directory. Immediately before a PR
 create/update, re-read title/body and compare the body SHA-256 again. Missing or
 changed prose blocks and requires a fresh Gate 3; never regenerate it after
-`ship` and never recompose approved prose.
+the release and never recompose approved prose.
 
 ## 2. Verify exact accepted Freeze identity
 
@@ -49,7 +52,7 @@ it does not change which commit was validated.
 Before pushing, query existing PRs for the exact head/base pair including
 `state` and `isDraft`. A `MERGED` or `CLOSED` PR is a stale-branch failure. An
 open draft is eligible for exact title/body update. An open ready-for-review PR
-is surfaced and never downgraded or otherwise mutated by `ship`.
+is surfaced and never downgraded or otherwise mutated by the release.
 
 ## 3. Push
 
@@ -182,12 +185,12 @@ Then write terminal artifacts/events and set `phase/status: complete` immediatel
 after the one snapshot attempt, including a terminal `query-failed` attempt. The pipeline stops; a later merge is external state and
 requires a separate live request if the operator wants an update.
 
-Gate 3 `ship` authorizes only this feature-branch push and draft-PR
-create/update. It excludes version/changelog edits, staging, commit creation,
-tests, merge, tag, release, publication, force-push, issue comments, and board
-mutations. Do not ask for another operator decision between the validated push
-and draft PR. Native runtime approval remains a technical permission boundary,
-not a second Team Harness decision.
+A Gate 3 release (`ship` or `auto-ship`) authorizes only this feature-branch
+push and draft-PR create/update. It excludes version/changelog edits, staging,
+commit creation, tests, merge, tag, release, publication, force-push, issue
+comments, and board mutations. Do not ask for another operator decision between
+the validated push and draft PR. Native runtime approval remains a technical
+permission boundary, not a second Team Harness decision.
 
 ## Control rubric
 

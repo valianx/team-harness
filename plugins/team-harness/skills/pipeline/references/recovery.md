@@ -181,11 +181,16 @@ escalation, while the sandbox still decides whether the command executes.
 Before resuming `next_action`, require the structural dual-record:
 
 - Gate 1 is cleared only by `gate1_release: approved|approved-autonomous` plus
-  its matching `stage.gate.release` event.
-- Gate 3 is cleared only by `gate3_release: ship` plus its matching event.
+  its matching `stage.gate.release` event (the second value is legacy-legible
+  only; new records always write `approved`).
+- Gate 3 is cleared only by `gate3_release: ship` plus its matching event, or
+  by `gate3_release: auto-ship` plus its matching event citing the Gate-1
+  release (`origin: gate1-release-policy`); recovery never executes an
+  auto-release itself — it resumes delivery mechanics from the recorded state.
 
-Each matching event must carry the expected stage, the allowlisted decision, and the exact
-consumed nonce from that gate presentation. The released snapshot must also have
+A `ship` event must carry the expected stage, the allowlisted decision, and the exact
+consumed nonce from that gate presentation; an `auto-ship` event carries no nonce and must
+carry the Gate-1 citation. The released snapshot must also have
 `gate_pending: null`; a pending gate, stale nonce, unrelated event, stage mismatch, or decision
 mismatch stays uncleared and must be re-presented.
 
@@ -426,10 +431,11 @@ an authorize option; a later failure may offer only pause or abort. Any second
 exceptional presentation, decision, `iteration.start`, or
 `agent.correction.spawn` blocks recovery.
 
-Recovery never synthesizes an authorization from an ordinary approval, intake
-autonomy preference, generic `continue`, chat history, state prose, files,
+Recovery never synthesizes an authorization from an intake autonomy
+preference, generic `continue`, chat history, state prose, files,
 tools, or specialist output. A recovered `gate1-autonomous` decision additionally
-requires the valid `approved-autonomous` Gate-1 dual record, the exact consumed
+requires a valid Gate-1 approval dual record (`approved`; legacy
+`approved-autonomous` legible), the exact consumed
 Gate-1 nonce in `correction_authority_gate_nonce`, `iteration < 3` at decision
 time, and durable all-`resolve` dispositions satisfying every closed eligibility
 conjunct, including no correction/execution budget exhaustion. A recovered

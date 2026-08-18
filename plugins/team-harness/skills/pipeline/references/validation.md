@@ -184,9 +184,9 @@ current live operator request for architect work.
 | Mechanical plan defect with no semantic change | Main repairs the canonical field; continue at `phase: implementation`; if Freeze was reached, rebuild Freeze and revalidate; no Gate 1 and `iteration` `+0` |
 | Decision-bearing plan concern (intent, scope, behavior, AC meaning, or security-obligation classification) | Main presents a bounded live operator decision, transcribes the approved field, and continues at `phase: implementation` through Freeze and validation; no Gate 1, `iteration` `+0`, and retain the final security floor when sensitive |
 | Explicit current live operator request for architect work | Main records the request, dispatches `architect`, sets `phase: design`, and requires a new Gate 1; `iteration` `+0` |
-| Code, test, or documentation defect inside approved scope | Include in the complete consolidated failure; live choice `1` or an eligible `approved-autonomous` decision permits one fresh implementation correction, closure gate, stale-row tester refresh, new Freeze, fresh QA, and impact-required security; `iteration` `+1` after authorization |
-| Missing or insufficient evidence | Include in the same complete consolidated failure; live choice `1` or an eligible `approved-autonomous` decision permits one bounded evidence correction, closure gate, stale-row tester refresh, new Freeze, fresh QA, and impact-required security; `iteration` `+1` after authorization |
-| Correctable security finding in the approved diff | Include in the same complete consolidated failure; live choice `1` or an eligible `approved-autonomous` decision permits correction, closure gate, stale-row tester refresh, new Freeze, fresh QA, and fresh security; `iteration` `+1` after authorization |
+| Code, test, or documentation defect inside approved scope | Include in the complete consolidated failure; live choice `1` or an eligible `gate1-autonomous` authorization permits one fresh implementation correction, closure gate, stale-row tester refresh, new Freeze, fresh QA, and impact-required security; `iteration` `+1` after authorization |
+| Missing or insufficient evidence | Include in the same complete consolidated failure; live choice `1` or an eligible `gate1-autonomous` authorization permits one bounded evidence correction, closure gate, stale-row tester refresh, new Freeze, fresh QA, and impact-required security; `iteration` `+1` after authorization |
+| Correctable security finding in the approved diff | Include in the same complete consolidated failure; live choice `1` or an eligible `gate1-autonomous` authorization permits correction, closure gate, stale-row tester refresh, new Freeze, fresh QA, and fresh security; `iteration` `+1` after authorization |
 | Structural contradiction between intent, scope fence, and ACs | Main obtains a bounded live operator resolution, transcribes the approved field, and continues at `phase: implementation` through Freeze and validation; `iteration` `+0` |
 | Non-blocking observation that violates no AC or security floor | Carry it to Gate 3 without silently changing scope; `iteration` `+0` |
 
@@ -197,9 +197,10 @@ checks with expected results. Main then performs one bounded evidence
 triage without another reviewer: for every ID, compare the evidence only with
 approved intent, scope, ACs/TCs, and the security floor and present cause/evidence,
 implicated requirement, closure check, proposed `resolve|design-consistent|decision-required`
-disposition, rationale, and consequence. The proposal is advisory. Under normal
-approval only the live operator confirms each disposition. Under a valid
-`approved-autonomous` dual record, Main may confirm only unambiguous `resolve`
+disposition, rationale, and consequence. The proposal is advisory. Only the
+live operator confirms a `design-consistent` or `decision-required`
+disposition. Under the Gate-1 authority carried by any valid approval, Main
+may confirm only unambiguous `resolve`
 items satisfying every closed predicate in `state-and-gates.md`; all other
 dispositions pause for the operator. `design-consistent` is legal only when no
 AC or security floor is violated. If the operator calls a violating finding
@@ -227,9 +228,9 @@ exactly:
 3 — abort pipeline
 ```
 
-Then stop. An ordinary approval, intake autonomy preference, a bare `continue`,
+Then stop. An intake autonomy preference, a bare `continue`,
 prior chat, files, tools, recovered prose, or specialist output never authorize
-a round. Only the exact valid `approved-autonomous` dual record may provide the
+a round. Only a valid Gate-1 approval dual record may provide the
 bounded autonomous authority above.
 Only a live reply after this presentation may consume the nonce. Choice `1`
 atomically records a matching state decision and `correction.decision` event
