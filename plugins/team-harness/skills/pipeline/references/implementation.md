@@ -126,6 +126,18 @@ interpret a workspace artifact path relative to the repository, invent `../`
 traversal, or copy artifacts into the worktree. Missing root/domain or a path
 that escapes its declared root blocks the dispatch packet.
 
+The quality manifest is the one deliberate workspace artifact named by a
+runner invocation: require the absolute
+`<workspace_artifact_root>/.team-harness/quality.json` path, verify it is a
+regular non-symlink below `workspace_artifact_root`, and pass both absolute
+`--workspace` and `--manifest` arguments. The workspace may be disjoint from
+the checkout, contain its isolated worktree, or be an ignored child of the
+checkout. In the last case, also prove the manifest is ignored and untracked.
+It is operational state, never a task or product artifact. Never copy it into a
+product path, `git add -f` it, stage it, or include it in the product diff. A
+relative, symlinked, workspace-escaping, tracked, or non-ignored nested
+manifest fails closed.
+
 Every V2 implementer/tester packet also carries `artifact_coordinates`, a
 non-empty closed array of `{kind, root, path, anchor, sha256}` records. A task
 shard uses `kind: task-shard`, `root: workspace_artifact_root`, its exact
@@ -193,6 +205,15 @@ it never selects the phase, task, correction authority, state transition, or
 gate. The implementer reads canonical intent at those exact repository-local
 coordinates and must not rely on copied or paraphrased intent in a TH artifact.
 
+Before the first implementation dispatch, Main also materializes the exact
+snapshot-bound OpenSpec source set below `repository_root` when Design used a
+different checkout, verifies every source hash, and adds those canonical paths
+to the approved repository scope. Before Freeze, every created or changed
+`openspec/changes/<change>/...` source must be tracked and present in the final
+base-to-candidate diff. Missing or workspace-copied OpenSpec source blocks;
+canonical proposal, design, specs, and tasks are product artifacts that reach
+the pull request.
+
 The overlay schema has no top-level `tasks` array. Main resolves the assigned
 item from exactly `.execution_items[] | select(.id == "Task-N")`, requires one
 match, and puts its JSON Pointer (`/execution_items/<zero-based-index>`), full
@@ -232,7 +253,7 @@ only the in-process verifier owned by `verify-progress` may advance it.
 
 This is an implementation checkpoint, not a phase or gate. For every task whose
 Verification section declares `Pre-implementation test: required`, preflight
-the repository's `.team-harness/quality.json`, the `quality-runner.mjs` and
+the workspace's `.team-harness/quality.json`, the `quality-runner.mjs` and
 `test-transition.mjs` helpers relative to this loaded skill, and a clean current
 commit. Missing `commands.test`, `test_contract.path_rules`, or either helper
 blocks; never downgrade a required task to not-applicable during implementation.
@@ -286,7 +307,8 @@ and the exact packaged `test_transition_path` resolved by Main.
 The tester may commit only the declared test files and writes the closed contract
 JSON outside the source commit. Before it may return success, it invokes that
 helper with `--validate-contract <contract_path> --repo <repository_root>
---manifest <manifest_path> --base <task_test_baseline> --candidate HEAD` and
+--workspace <workspace_artifact_root> --manifest <absolute_manifest_path>
+--base <task_test_baseline> --candidate HEAD` and
 requires the closed
 `team_harness_test_contract_validation` pass result. `requirements` must be
 SAFE_REQUIREMENT strings, never objects. This validation checks schema,
@@ -295,6 +317,23 @@ running tests; unchanged preservation tests and non-test fixtures are invalid
 `test_paths`. A failed self-validation returns `contract-invalid` and Main does not begin the red transition. Verify commit
 the test-only diff directly and require that no production path changed; no
 intermediate commit-integrity gate is created.
+
+Before creating RED or dispatching an implementer, Main completes one
+fan-complete readiness pass over the frozen task scope and quality manifest.
+It invokes every declared non-test check required by the task set as a separate
+non-authoritative readiness diagnostic through the quality runner so one failure cannot hide later
+failures, and it also completes the RED command. Every invocation uses an
+atomic output path and reaches a terminal result; stopping after the first
+coverage, lint, format, build, environment, or dependency error is prohibited.
+Main deduplicates the complete result set by root cause and prepares one
+implementation package containing all observable failures, implicated
+requirements and files, and deterministic closure checks. Missing dependencies,
+non-hermetic commands, unavailable required environment, or invalid manifest
+coordinates block before implementation. Expected not-yet-implemented behavior
+failures remain in the same package. Main may repair the manifest from this
+complete diagnostic set, reruns only diagnostics made stale by that repair, and
+does not dispatch while any declared readiness diagnostic is absent or partial.
+This readiness evidence is diagnostic, not the final Freeze quality verdict.
 
 Main then invokes `node <test-transition-path> --transition red` against that
 task baseline and current `HEAD` with `--output <coordinator evidence path>`.
@@ -322,13 +361,26 @@ fresh implementer receive its assigned shards plus the corresponding contract
 and red-evidence pointers/hashes. Contract test paths are frozen inputs: the
 implementer never edits or deletes them. After its implementation commit, Main
 runs `--transition green` once per required task with the same contract hash and
-hashed red-evidence file. Green requires the same manifest, exact test command,
-task baseline, and test blobs, with the red candidate ancestral to current
+hashed red-evidence file. Transition schema v3 binds RED/GREEN to the canonical
+test fragment—manifest schema version, `commands.test`, and `test_contract`—not
+to unrelated coverage, lint, format, build, or database commands. Green requires
+that same test binding, contract bytes, effective test command/runtime and
+version fingerprint, task baseline, and test blobs, with the red candidate ancestral to current
 `HEAD`; the green call uses its own `--output` path, and any mismatch or nonzero result returns to bounded implementation
 correction. Eligible `gate1-autonomous` authority consumes the max-3 autonomous
 budget; a fresh operator-live authorization remains available without a maximum. A task explicitly marked
 `not-applicable` records that state and its plan-time reason without running the
 checkpoint.
+
+A change limited to non-test manifest controls preserves valid RED/GREEN when
+the computed test binding is identical, but invalidates the affected readiness
+diagnostics and the final full-manifest quality evidence. A change to
+`commands.test`, `test_contract`, contract bytes, test blobs, baseline, effective
+test resolution, or version fingerprint starts a new RED/GREEN transition.
+Before any later correction dispatch, Main likewise completes every selected
+closure/readiness diagnostic, groups all terminal findings by root cause, and
+creates one comprehensive correction package. A single surfaced symptom never
+authorizes an immediate dispatch while another selected diagnostic is pending.
 
 Test blobs are immutable only during their own active red-to-green transition.
 After that task closes and before final Freeze, a fresh tester may make
@@ -485,11 +537,11 @@ Run this once per participating repository over that repository's consolidated
 post-evidence tree, never once across multiple repositories and never once per
 task. A cross-repository pipeline dispatches one fresh cleaner per repository;
 each receives only its canonical repository identity, absolute worktree,
-repository-local candidate commit/tree, allowlist, and quality manifest. This
+repository-local candidate commit/tree, allowlist, and workspace quality manifest. This
 checkpoint is part of `implementation`, not another phase or gate. Before the
 first cleaner dispatch, persist the sorted exact identity list as
 `participating_repositories`; all later cleaner evidence must cover that set.
-Apply it whenever the repository quality manifest declares a `test` command and
+Apply it whenever the workspace-local quality manifest declares a `test` command and
 `test_contract.path_rules`. When either is absent, persist
 `cleaner_evidence.status: not-applicable` with
 `reason: repository-quality-manifest-incomplete`; agents cannot replace missing
@@ -558,7 +610,7 @@ at most five stable IDs and eight unique repo-relative files, form one
 dependency-coherent behavior-preserving correction, stay inside already
 approved scope, require no DDL/migration, public-schema, security-control, or
 external-environment change, and have locally executable closure checks plus a
-complete `.team-harness/quality.json`. If any conjunct fails, do not issue a
+complete workspace-local `.team-harness/quality.json`. If any conjunct fails, do not issue a
 handoff nonce or dispatch an implementer. Preserve every commit and evidence
 artifact, report the failed conjuncts, and pause the current pipeline for an
 in-place recovery plan decomposed into repository-local packages. Preserve the
@@ -614,8 +666,9 @@ checkpoint named `post_implementation` per candidate tree, at Freeze, before
 hygiene. Derive
 `requiredChecks` as the sorted repository-local union of every assigned task
 shard's `Required quality checks`. Select every command declared by the
-complete unchanged `.team-harness/quality.json`; a configured `crap` command
-runs measure-only (`policy_mode: measure`, verdict `not_applied`) — it records
+complete unchanged workspace-local `.team-harness/quality.json`; a configured
+`crap` command runs measure-only (`policy_mode: measure`, verdict
+`not_applied`) — it records
 measurements and never blocks on a baseline or a missing function. Every
 required check must be declared and selected: `REQUIRED_CHECKS_MISSING`,
 `PREREQUISITE_UNAVAILABLE`, or any non-pass result
@@ -628,8 +681,11 @@ requires a fresh run bound to the new tree; an unchanged candidate tree never
 re-runs. The run remains mandatory when the cleanup is not
 applicable; focused implementation or cleaner evidence cannot substitute for
 it. Persist its closed result and SHA-256, evaluate the overreach proof above
-when a cleanup commit exists, then run the fixed code-hygiene scan
-before Freeze. QA still audits the frozen result independently.
+when a cleanup commit exists, then run the fixed code-hygiene scan before
+Freeze. The final base-to-candidate path proof must include every changed
+snapshot-bound `openspec/` source and must exclude
+`.team-harness/quality.json`; either mismatch blocks Freeze. QA still audits
+the frozen result independently.
 
 Do not silently widen the approved scope. When implementation is complete, write a 5–30 line,
 ≤8 KB `02-implementation.md` containing only outcome, deviations, exceptions, one-line checks,

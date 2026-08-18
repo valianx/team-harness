@@ -33,9 +33,9 @@ import {
 } from "./quality-lib.mjs";
 
 export const TEST_CONTRACT_SCHEMA_VERSION = 1;
-export const TEST_TRANSITION_SCHEMA_VERSION = 2;
+export const TEST_TRANSITION_SCHEMA_VERSION = 3;
 export const TEST_CONTRACT_VALIDATION_SCHEMA_VERSION = 1;
-export const TEST_TRANSITION_RECEIPT_SCHEMA_VERSION = 2;
+export const TEST_TRANSITION_RECEIPT_SCHEMA_VERSION = 3;
 
 const MAX_ITEMS = 256;
 const SAFE_COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
@@ -212,7 +212,7 @@ export async function validateTestContractFile(contractPath, context = null) {
     if (context !== null) {
       if (
         typeof context !== "object" || Array.isArray(context) ||
-        !hasExactlyKeys(context, ["repo", "manifest", "base", "candidate"]) ||
+        !hasExactlyKeys(context, ["repo", "workspace", "manifest", "base", "candidate"]) ||
         Object.values(context).some((entry) => typeof entry !== "string" || entry.length === 0)
       ) {
         throw new TransitionError("ARGUMENT_INVALID");
@@ -228,7 +228,7 @@ export async function validateTestContractFile(contractPath, context = null) {
       } catch {
         throw new TransitionError("ARGUMENT_INVALID");
       }
-      const manifest = await loadManifest(repo, context.manifest);
+      const manifest = await loadManifest(repo, context.workspace, context.manifest);
       const baseCommit = await gitText(repo, ["rev-parse", "--verify", `${context.base}^{commit}`], "TEST_SCOPE_INVALID");
       const candidateCommit = await gitText(repo, ["rev-parse", "--verify", `${context.candidate}^{commit}`], "TEST_SCOPE_INVALID");
       const mergeBase = await gitText(repo, ["merge-base", baseCommit, candidateCommit], "TEST_SCOPE_INVALID");
@@ -259,23 +259,51 @@ export async function validateTestContractFile(contractPath, context = null) {
   };
 }
 
-async function resolveContainedFile(repoInput, fileInput, code) {
-  if (typeof repoInput !== "string" || typeof fileInput !== "string" || fileInput.length === 0) {
+async function resolveWorkspaceManifest(repoInput, workspaceInput, manifestInput) {
+  if (
+    typeof repoInput !== "string" ||
+    typeof workspaceInput !== "string" ||
+    typeof manifestInput !== "string" ||
+    workspaceInput.length === 0 ||
+    manifestInput.length === 0 ||
+    workspaceInput.includes("\u0000") ||
+    manifestInput.includes("\u0000") ||
+    !path.isAbsolute(workspaceInput) ||
+    !path.isAbsolute(manifestInput)
+  ) {
     throw new TransitionError("ARGUMENT_INVALID");
   }
   let repo;
-  let file;
+  let workspace;
+  let manifest;
   try {
+    const repoStat = await lstat(repoInput);
+    if (!repoStat.isDirectory() || repoStat.isSymbolicLink()) throw new Error("invalid repository");
     repo = await realpath(path.resolve(repoInput));
-    const requested = path.resolve(repo, fileInput);
-    const stat = await lstat(requested);
-    if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("invalid file");
-    file = await realpath(requested);
+    const workspaceStat = await lstat(workspaceInput);
+    if (!workspaceStat.isDirectory() || workspaceStat.isSymbolicLink()) throw new Error("invalid workspace");
+    workspace = await realpath(workspaceInput);
+    const manifestStat = await lstat(manifestInput);
+    if (!manifestStat.isFile() || manifestStat.isSymbolicLink()) throw new Error("invalid manifest");
+    manifest = await realpath(manifestInput);
   } catch {
-    throw new TransitionError(code);
+    throw new TransitionError("MANIFEST_INVALID");
   }
-  if (!isContained(repo, file)) throw new TransitionError(code);
-  return { repo, file };
+  if (
+    workspace === repo ||
+    !isContained(workspace, manifest)
+  ) {
+    throw new TransitionError("MANIFEST_INVALID");
+  }
+  if (isContained(repo, manifest)) {
+    const repositoryRelative = path.relative(repo, manifest).split(path.sep).join("/");
+    try {
+      await gitBytes(repo, ["check-ignore", "-q", "--", repositoryRelative], "MANIFEST_INVALID");
+    } catch {
+      throw new TransitionError("MANIFEST_INVALID");
+    }
+  }
+  return manifest;
 }
 
 async function loadContract(repo, contractPath) {
@@ -283,7 +311,7 @@ async function loadContract(repo, contractPath) {
     throw new TransitionError("ARGUMENT_INVALID");
   }
   // Coordinator-owned contract evidence may live outside the repository;
-  // unlike the manifest, this path is deliberately resolved independently.
+  // it is deliberately resolved independently from the workspace-bound manifest.
   let file;
   try {
     file = await realpath(path.resolve(contractPath));
@@ -298,9 +326,9 @@ async function loadContract(repo, contractPath) {
   };
 }
 
-async function loadManifest(repo, manifestPath) {
-  const resolved = await resolveContainedFile(repo, manifestPath, "MANIFEST_INVALID");
-  const loaded = await readBoundedJson(resolved.file, "MANIFEST_INVALID");
+async function loadManifest(repo, workspace, manifestPath) {
+  const resolved = await resolveWorkspaceManifest(repo, workspace, manifestPath);
+  const loaded = await readBoundedJson(resolved, "MANIFEST_INVALID");
   let value;
   try {
     value = validateQualityManifest(loaded.value, { selectedChecks: ["test"] });
@@ -376,10 +404,19 @@ async function resolveTestInputs(repo, candidateCommit, testPaths) {
   return testPaths.map((testPath) => ({ path: testPath, blob_sha: blobs.get(testPath) }));
 }
 
-function contractEvidence(contract, testInputs) {
+function manifestTestBinding(manifest) {
+  return canonicalHash({
+    schema_version: manifest.schema_version,
+    test_command: manifest.commands.test,
+    test_contract: manifest.test_contract,
+  });
+}
+
+function contractEvidence(contract, testInputs, testBindingSha256) {
   return {
     sha256: contract.sha256,
     canonical_sha256: contract.canonical_sha256,
+    test_binding_sha256: testBindingSha256,
     requirements: contract.value.requirements,
     test_identifiers: contract.value.test_identifiers,
     test_inputs: testInputs,
@@ -392,9 +429,10 @@ function isTestInput(value) {
 
 function isContractEvidence(value) {
   return (
-    hasExactlyKeys(value, ["sha256", "canonical_sha256", "requirements", "test_identifiers", "test_inputs"]) &&
+    hasExactlyKeys(value, ["sha256", "canonical_sha256", "test_binding_sha256", "requirements", "test_identifiers", "test_inputs"]) &&
     SAFE_SHA256.test(value.sha256) &&
     SAFE_SHA256.test(value.canonical_sha256) &&
+    SAFE_SHA256.test(value.test_binding_sha256) &&
     uniqueStrings(value.requirements, (entry) => typeof entry === "string" && SAFE_REQUIREMENT.test(entry)) &&
     uniqueStrings(
       value.test_identifiers,
@@ -586,6 +624,7 @@ function safeResult(state, startedAt) {
 const OPTION_KEYS = [
   "transition",
   "repo",
+  "workspace",
   "manifest",
   "base",
   "candidate",
@@ -596,11 +635,11 @@ const OPTION_KEYS = [
 ];
 
 function normalizeOptions(options) {
-  const required = ["transition", "repo", "manifest", "base", "candidate", "contract"];
+  const required = ["transition", "repo", "workspace", "manifest", "base", "candidate", "contract"];
   if (!hasOnlyKeys(options, OPTION_KEYS, required) || !["red", "green"].includes(options.transition)) {
     throw new TransitionError("ARGUMENT_INVALID");
   }
-  const strings = ["repo", "manifest", "base", "candidate", "contract"];
+  const strings = ["repo", "workspace", "manifest", "base", "candidate", "contract"];
   if (strings.some((key) => typeof options[key] !== "string" || options[key].length === 0)) {
     throw new TransitionError("ARGUMENT_INVALID");
   }
@@ -619,6 +658,7 @@ function normalizeOptions(options) {
 async function runQuality(options) {
   return runQualityChecks({
     repo: options.repo,
+    workspace: options.workspace,
     manifest: options.manifest,
     base: options.base,
     candidate: options.candidate,
@@ -629,7 +669,7 @@ async function runQuality(options) {
 }
 
 async function executeRed(options, state, contract) {
-  const manifest = await loadManifest(options.repo, options.manifest);
+  const manifest = await loadManifest(options.repo, options.workspace, options.manifest);
   state.quality = await runQuality(options);
   if (state.quality.repository === null || state.quality.manifest === null) {
     throw new TransitionError("QUALITY_RUNNER_FAILED");
@@ -642,7 +682,7 @@ async function executeRed(options, state, contract) {
     state.quality.repository.candidate_commit,
     contract.value.test_paths,
   );
-  state.contract = contractEvidence(contract, inputs);
+  state.contract = contractEvidence(contract, inputs, manifestTestBinding(manifest.value));
 }
 
 async function loadRedEvidence(options) {
@@ -657,32 +697,34 @@ async function loadRedEvidence(options) {
   return { result, sha256: sha256(loaded.bytes) };
 }
 
-async function assertCompatibleGreen(options, state, contract, red) {
-  if (contract.sha256 !== options.contractSha256 || contract.canonical_sha256 !== red.result.contract.canonical_sha256) {
+async function assertCompatibleGreen(options, state, contract, red, manifest) {
+  if (
+    contract.sha256 !== options.contractSha256 ||
+    contract.sha256 !== red.result.contract.sha256 ||
+    contract.canonical_sha256 !== red.result.contract.canonical_sha256
+  ) {
     throw new TransitionError("TEST_INPUT_CHANGED", "the test contract differs from the red-checkpoint contract");
   }
   const priorQuality = red.result.quality;
   const currentQuality = state.quality;
   if (
-    priorQuality.manifest.canonical_sha256 !== currentQuality.manifest.canonical_sha256 ||
+    red.result.contract.test_binding_sha256 !== manifestTestBinding(manifest.value) ||
     priorQuality.repository.base_commit !== currentQuality.repository.base_commit ||
     priorQuality.repository.base_tree !== currentQuality.repository.base_tree ||
     priorQuality.commands[0].command_sha256 !== currentQuality.commands[0].command_sha256 ||
     priorQuality.commands[0].execution_argv_sha256 !== currentQuality.commands[0].execution_argv_sha256 ||
-    priorQuality.commands[0].execution_resolution !== currentQuality.commands[0].execution_resolution
+    priorQuality.commands[0].execution_resolution !== currentQuality.commands[0].execution_resolution ||
+    priorQuality.commands[0].version_fingerprint !== currentQuality.commands[0].version_fingerprint
   ) {
-    throw new TransitionError("TEST_INPUT_CHANGED", "the manifest, base, or exact test command changed after red");
+    throw new TransitionError("TEST_INPUT_CHANGED", "the test binding, base, or effective test runtime changed after red");
   }
-  if (priorQuality.repository.candidate_tree !== currentQuality.repository.candidate_tree) {
-    const mergeBase = await gitText(
-      options.repo,
-      ["merge-base", priorQuality.repository.candidate_commit, currentQuality.repository.candidate_commit],
-      "REPOSITORY_INVALID",
-    );
-    if (mergeBase !== priorQuality.repository.candidate_commit) {
-      throw new TransitionError("RED_EVIDENCE_INVALID",
-        "the red candidate is neither tree-identical to nor an ancestor of the green candidate");
-    }
+  const mergeBase = await gitText(
+    options.repo,
+    ["merge-base", priorQuality.repository.candidate_commit, currentQuality.repository.candidate_commit],
+    "REPOSITORY_INVALID",
+  );
+  if (mergeBase !== priorQuality.repository.candidate_commit) {
+    throw new TransitionError("RED_EVIDENCE_INVALID", "the red candidate is not an ancestor of the green candidate");
   }
   const inputs = await resolveTestInputs(
     options.repo,
@@ -692,7 +734,7 @@ async function assertCompatibleGreen(options, state, contract, red) {
   if (JSON.stringify(inputs) !== JSON.stringify(red.result.contract.test_inputs)) {
     throw new TransitionError("TEST_INPUT_CHANGED", "test file blobs changed between red and green");
   }
-  state.contract = contractEvidence(contract, inputs);
+  state.contract = contractEvidence(contract, inputs, manifestTestBinding(manifest.value));
   state.red_evidence = {
     sha256: red.sha256,
     candidate_commit: priorQuality.repository.candidate_commit,
@@ -701,7 +743,7 @@ async function assertCompatibleGreen(options, state, contract, red) {
 }
 
 async function executeGreen(options, state, contract) {
-  const manifest = await loadManifest(options.repo, options.manifest);
+  const manifest = await loadManifest(options.repo, options.workspace, options.manifest);
   const red = await loadRedEvidence(options);
   state.quality = await runQuality(options);
   if (state.quality.repository === null || state.quality.manifest === null) {
@@ -709,7 +751,7 @@ async function executeGreen(options, state, contract) {
   }
   if (manifest.sha256 !== state.quality.manifest.sha256) throw new TransitionError("MANIFEST_INVALID");
   assertGreenQuality(state.quality);
-  await assertCompatibleGreen(options, state, contract, red);
+  await assertCompatibleGreen(options, state, contract, red, manifest);
 }
 
 /** Run one red or green transition checkpoint and return closed JSON evidence. */
@@ -733,6 +775,7 @@ function parseCli(argv) {
   const flags = new Map([
     ["--transition", "transition"],
     ["--repo", "repo"],
+    ["--workspace", "workspace"],
     ["--manifest", "manifest"],
     ["--base", "base"],
     ["--candidate", "candidate"],
@@ -774,12 +817,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     } else {
       const flags = new Map([
         ["--repo", "repo"],
+        ["--workspace", "workspace"],
         ["--manifest", "manifest"],
         ["--base", "base"],
         ["--candidate", "candidate"],
       ]);
       const context = {};
-      if (argv.length !== 10) result = await validateTestContractFile("", null);
+      if (argv.length !== 12) result = await validateTestContractFile("", null);
       else {
         for (let index = 2; index < argv.length; index += 2) {
           const key = flags.get(argv[index]);

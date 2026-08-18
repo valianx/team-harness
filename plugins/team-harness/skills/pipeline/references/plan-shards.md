@@ -42,7 +42,7 @@ only and are never emitted by a new plan. Gates count ACs and TCs separately.
 The Verification section also declares exactly one literal routing line:
 `- **Pre-implementation test:** required` or
 `- **Pre-implementation test:** not-applicable — {reason}`.
-Use `required` only when the repository quality manifest has both
+Use `required` only when the workspace-local quality manifest has both
 `commands.test` and `test_contract.path_rules` and the task changes observable runtime behavior.
 Otherwise use
 `not-applicable` with the concrete reason; this field is neither an AC nor a TC.

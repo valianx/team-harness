@@ -291,6 +291,13 @@ receives a bounded correction packet containing the matching nonce, failed
 anchor, complete finding IDs, union scope, `Cause`, `Files`, implicated
 `AC-N|TC-N`, advisory `Suggested correction`, and deterministic closure evidence
 with its expected result.
+Before the initial implementation dispatch and before every correction
+decision, Main also completes every selected readiness/closure diagnostic to a
+terminal result, even after one has failed. It persists each bounded result,
+groups symptoms by root cause, and forms one comprehensive package. Dispatching
+from the first visible failure, or while another declared diagnostic is pending,
+is prohibited; a later round is for genuinely new evidence, not a finding that
+the prior fan omitted.
 
 Initial tester, QA, and security attempts start fresh with V2 `fork_turns: none`
 on their assigned current identity. Their packets contain executable ACs/TCs or
@@ -379,7 +386,7 @@ the role fields cannot see. The current digests are:
 |---|---|
 | `pipeline-architect` | `4fb84a1cf9cd51d80401c9a9e3a31bc0b66c98f209893b994d89f8a0bc28ed61` |
 | `pipeline-implementer` | `84afd23ff6adcf3fe7ab6b5ec85f30cac6313d1b0cfe09a96f6eb0d346d698ae` |
-| `pipeline-tester` | `32ee4a4832c1bc489ce89a578be9e0ef7b33dd91f50a210e9a34dbd74b1db844` |
+| `pipeline-tester` | `21bdd93b9d25ffe9158e5657a558f8d457358bc5394ab67cbfdf7c8d924c0e81` |
 | `pipeline-cleaner` | `ea4260bcb8fc1e17034f0d6f91b9d97efefeb61065c50b88a25e792eaaab88b9` |
 | `pipeline-qa` | `d13a07e234c8c95b91e31920a1c6bbb961ca0e3b96f03b7b93a7dee27472cbd1` |
 | `pipeline-security` | `11e9632e553eb98374b93b61901679800992edc284ea75d52d280c62fc4f5a14` |
@@ -436,8 +443,11 @@ following matrix is exhaustive:
 | Correctable code, test, documentation, hygiene, or security finding inside approved scope | Main includes it in the complete consolidated validation failure | `phase: validation`; live choice `1` or an eligible `gate1-autonomous` authorization authorizes one bounded implementation round → closure gate → stale-row tester refresh → new Freeze → fresh QA plus impact-required security; no new Gate 1 | prohibited | `+1` |
 | Missing or insufficient evidence | Main includes it in the same complete consolidated validation failure | `phase: validation`; live choice `1` or an eligible `gate1-autonomous` authorization authorizes one bounded evidence/correction round → closure gate → stale-row tester refresh → new Freeze when applicable → fresh QA plus impact-required security; no new Gate 1 | prohibited | `+1` |
 
-After every required validation lens terminates, Main consolidates all blocking
-findings under stable IDs, the current frozen anchor, and the union file scope.
+After every required validation lens and selected closure/readiness diagnostic
+terminates, Main consolidates all blocking findings under stable IDs, the
+current frozen anchor, and the union file scope. It groups duplicate symptoms
+under their shared root cause and never creates a correction nonce from a
+partial result set.
 Before creating a correction nonce, Main performs one bounded evidence triage
 against the approved intent, scope, ACs/TCs, and security floor, without dispatching
 another reviewer. For every finding it presents the ID, cause/evidence,
@@ -517,6 +527,14 @@ next agent.
    snapshot → execution-overlay transaction with fresh architect dispatches, validate the
    resulting overlay, present `STAGE-GATE-1`, and stop only for that mandatory live reply or a
    real decision/blocker named by the reference.
+
+Keep artifact domains disjoint throughout the run: canonical OpenSpec proposal,
+design, specs, and tasks stay tracked below the repository's `openspec/` tree
+and reach the product PR; generated quality policy stays at the absolute
+workspace `.team-harness/quality.json`, outside the product diff (and ignored,
+untracked when the workspace is nested below a checkout).
+The implementation and recovery references define the fail-closed containment
+and hash checks.
 
 ## Continue
 

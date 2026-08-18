@@ -214,6 +214,18 @@ bytes/hash and its deterministic validation. A local and an Obsidian workspace u
 all paths are resolved below the recorded workspace while canonical source remains below
 `openspec_repository_root`.
 
+Recovery never substitutes one artifact domain for the other. Validate
+`quality_manifest_path` as an absolute regular non-symlink below the recorded
+workspace, then require its bytes to match `quality_manifest_sha256` before any
+quality command. If the workspace is below a participating repository, also
+prove the manifest is ignored and untracked. A relative path, symlink, escape,
+tracked file, or non-ignored nested manifest blocks instead of being staged or
+adopted. Conversely, canonical OpenSpec proposal, design,
+spec, and task files remain below the recorded repository `openspec/` tree; if
+Design and implementation checkouts differ, materialize only the
+snapshot-bound source set into the implementation checkout and verify its
+hashes. Never recover those canonical artifacts from a workspace copy.
+
 Before resuming `design` or presenting Gate 1, validate
 `plan_contract_evidence`. `pending` resumes at deterministic plan validation;
 for an OpenSpec-bound run, `pass` requires a readable `plan-contract.mjs`

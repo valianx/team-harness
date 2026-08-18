@@ -9,7 +9,7 @@ approved functional behavior. Neither may substitute for the other.
 
 The checkpoint is opt-in per repository and explicit per task:
 
-- `.team-harness/quality.json` declares `commands.test` and
+- the workspace-local `.team-harness/quality.json` declares `commands.test` and
   `test_contract.path_rules`;
 - a task that changes observable runtime behavior declares
   `Pre-implementation test: required`; and
@@ -45,7 +45,8 @@ commit must be current clean `HEAD`.
 node /absolute/path/to/loaded/pipeline/skill/scripts/test-transition.mjs \
   --transition red \
   --repo /absolute/path/to/repository \
-  --manifest .team-harness/quality.json \
+  --workspace /absolute/path/to/workspace \
+  --manifest /absolute/path/to/workspace/.team-harness/quality.json \
   --base 0123456789abcdef0123456789abcdef01234567 \
   --candidate HEAD \
   --contract /absolute/workspace/Task-1-test-contract.json
@@ -68,7 +69,8 @@ After implementation, run the same test command with both persisted hashes:
 node /absolute/path/to/loaded/pipeline/skill/scripts/test-transition.mjs \
   --transition green \
   --repo /absolute/path/to/repository \
-  --manifest .team-harness/quality.json \
+  --workspace /absolute/path/to/workspace \
+  --manifest /absolute/path/to/workspace/.team-harness/quality.json \
   --base 0123456789abcdef0123456789abcdef01234567 \
   --candidate HEAD \
   --contract /absolute/workspace/Task-1-test-contract.json \
@@ -77,10 +79,20 @@ node /absolute/path/to/loaded/pipeline/skill/scripts/test-transition.mjs \
   --red-evidence-sha256 fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
 ```
 
-Green requires exit zero plus the same contract bytes, manifest, exact test
-command, task baseline, and test blobs. The red candidate must be an ancestor of
-the green candidate. Changing, deleting, or weakening a frozen contract test
-fails mechanically even if the suite is green.
+Green requires exit zero plus the same contract bytes, canonical test binding,
+task baseline, and test blobs. Transition schema v3
+records `test_binding_sha256` over the normalized manifest schema version,
+`commands.test`, and `test_contract`; unrelated non-test manifest commands are
+not part of RED/GREEN identity. Green also requires the same effective argv,
+execution resolution, and runtime version fingerprint. The red candidate must
+be an ancestor of the green candidate. Changing, deleting, or weakening a
+frozen contract test fails mechanically even if the suite is green.
+
+Changing only coverage, lint, format, build, or database controls preserves an
+otherwise identical RED/GREEN transition. It still invalidates the affected
+readiness diagnostics and the final full-manifest Freeze quality evidence. A
+test-binding, contract, test-blob, base, or effective-runtime change requires a
+new RED checkpoint.
 
 The helper invokes exact argv without a shell, uses bounded output evidence,
 requires a clean checked-out candidate, and never installs tools. It is not a

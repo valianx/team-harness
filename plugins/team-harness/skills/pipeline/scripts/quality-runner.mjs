@@ -557,11 +557,39 @@ async function resolveRepository(repoInput, baseInput, candidateInput) {
   };
 }
 
-async function resolveManifest(repo, manifestInput, selectedChecks) {
-  if (typeof manifestInput !== "string" || manifestInput.length === 0 || manifestInput.includes("\u0000")) {
-    throw qualityError("ARGUMENT_INVALID", "manifest path must be a non-empty string without NUL bytes");
+async function resolveWorkspace(repo, workspaceInput) {
+  if (
+    typeof workspaceInput !== "string" ||
+    workspaceInput.length === 0 ||
+    workspaceInput.includes("\u0000") ||
+    !path.isAbsolute(workspaceInput)
+  ) {
+    throw qualityError("ARGUMENT_INVALID", "workspace must be an absolute path without NUL bytes");
   }
-  const requested = path.resolve(repo, manifestInput);
+  let workspace;
+  try {
+    const stat = await lstat(workspaceInput);
+    if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error("invalid workspace");
+    workspace = await realpath(workspaceInput);
+  } catch {
+    throw qualityError("ARGUMENT_INVALID", "workspace must be a regular non-symlink directory");
+  }
+  if (workspace === repo) {
+    throw qualityError("ARGUMENT_INVALID", "workspace and repository must be distinct roots");
+  }
+  return workspace;
+}
+
+async function resolveManifest(repo, workspace, manifestInput, selectedChecks) {
+  if (
+    typeof manifestInput !== "string" ||
+    manifestInput.length === 0 ||
+    manifestInput.includes("\u0000") ||
+    !path.isAbsolute(manifestInput)
+  ) {
+    throw qualityError("ARGUMENT_INVALID", "manifest path must be an absolute path without NUL bytes");
+  }
+  const requested = path.resolve(manifestInput);
   let requestedStat;
   try {
     requestedStat = await lstat(requested);
@@ -578,13 +606,23 @@ async function resolveManifest(repo, manifestInput, selectedChecks) {
   } catch {
     throw qualityError("MANIFEST_INVALID", `manifest must be a regular non-symlink file: ${boundedToken(manifestInput)}`);
   }
-  if (!isContained(repo, filePath)) throw qualityError("MANIFEST_INVALID", "manifest escapes the repository root");
+  if (!isContained(workspace, filePath)) {
+    throw qualityError("MANIFEST_INVALID", "manifest must stay inside the workspace");
+  }
+  if (isContained(repo, filePath)) {
+    const repositoryRelative = path.relative(repo, filePath).split(path.sep).join("/");
+    try {
+      await git(repo, ["check-ignore", "-q", "--", repositoryRelative]);
+    } catch {
+      throw qualityError("MANIFEST_INVALID", "a workspace manifest below the repository must be ignored and untracked");
+    }
+  }
   const loaded = await readBoundedJson(filePath, "MANIFEST_INVALID", "manifest is oversized or not valid JSON");
   const manifest = validateQualityManifest(loaded.value, { selectedChecks });
   return {
     value: manifest,
     evidence: {
-      path: path.relative(repo, filePath).split(path.sep).join("/"),
+      path: path.relative(workspace, filePath).split(path.sep).join("/"),
       sha256: sha256(loaded.bytes),
       canonical_sha256: canonicalHash(loaded.value),
     },
@@ -1113,6 +1151,7 @@ async function loadBaseline(context) {
 
 const RUN_OPTION_KEYS = [
   "repo",
+  "workspace",
   "manifest",
   "base",
   "candidate",
@@ -1129,9 +1168,9 @@ function normalizeRunOptions(options) {
     options === null ||
     typeof options !== "object" ||
     Array.isArray(options) ||
-    !hasOnlyKeys(options, RUN_OPTION_KEYS, ["repo", "manifest", "base", "candidate", "checkpoint", "checks", "requiredChecks"])
+    !hasOnlyKeys(options, RUN_OPTION_KEYS, ["repo", "workspace", "manifest", "base", "candidate", "checkpoint", "checks", "requiredChecks"])
   ) {
-    throw qualityError("ARGUMENT_INVALID", "options must declare repo/manifest/base/candidate/checkpoint/checks/requiredChecks");
+    throw qualityError("ARGUMENT_INVALID", "options must declare repo/workspace/manifest/base/candidate/checkpoint/checks/requiredChecks");
   }
   if (typeof options.checkpoint !== "string" || !SAFE_CHECKPOINT.test(options.checkpoint)) {
     throw qualityError("ARGUMENT_INVALID", "checkpoint must match ^[a-z][a-z0-9_-]{0,63}$");
@@ -1169,7 +1208,8 @@ function repositoryEvidence(repository) {
 async function prepareRun(options, state) {
   const repository = await resolveRepository(options.repo, options.base, options.candidate);
   state.repository = repositoryEvidence(repository);
-  const manifest = await resolveManifest(repository.root, options.manifest, options.checks);
+  const workspace = await resolveWorkspace(repository.root, options.workspace);
+  const manifest = await resolveManifest(repository.root, workspace, options.manifest, options.checks);
   state.manifest = manifest.evidence;
   const missingRequired = options.requiredChecks.find((id) =>
     !Object.hasOwn(manifest.value.commands, id) || !options.checks.includes(id));
@@ -1445,14 +1485,14 @@ function parseCli(argv) {
     const value = argv[index + 1];
     if (
       value === undefined ||
-      !["--repo", "--manifest", "--base", "--candidate", "--checkpoint", "--checks", "--required-checks", "--policy-mode", "--baseline", "--baseline-sha256", "--output"].includes(flag) ||
+      !["--repo", "--workspace", "--manifest", "--base", "--candidate", "--checkpoint", "--checks", "--required-checks", "--policy-mode", "--baseline", "--baseline-sha256", "--output"].includes(flag) ||
       Object.hasOwn(values, flag)
     ) {
       return null;
     }
     values[flag] = value;
   }
-  for (const required of ["--repo", "--manifest", "--base", "--candidate", "--checkpoint", "--checks", "--required-checks"]) {
+  for (const required of ["--repo", "--workspace", "--manifest", "--base", "--candidate", "--checkpoint", "--checks", "--required-checks"]) {
     if (!Object.hasOwn(values, required)) return null;
   }
   const checks = values["--checks"].split(",");
@@ -1460,6 +1500,7 @@ function parseCli(argv) {
     output: values["--output"] ?? null,
     options: {
       repo: values["--repo"],
+      workspace: values["--workspace"],
       manifest: values["--manifest"],
       base: values["--base"],
       candidate: values["--candidate"],

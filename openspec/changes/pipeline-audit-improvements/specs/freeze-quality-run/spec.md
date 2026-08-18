@@ -1,6 +1,6 @@
 ## Purpose
 
-Exactly one quality run per candidate tree, at Freeze, driven by the `quality.json` manifest. Retires the cleaner pre/post transitions and CRAP enforce as a coupled unit while preserving the checks with real detection value.
+Exactly one quality run per candidate tree, at Freeze, driven by the workspace-local `.team-harness/quality.json` manifest outside the product diff. Retires the cleaner pre/post transitions and CRAP enforce as a coupled unit while preserving the checks with real detection value.
 
 ## ADDED Requirements
 
@@ -30,8 +30,8 @@ The per-task red→green test contract (`test-transition.mjs`) SHALL survive unc
 - **THEN** out-of-allowlist modifications block with the same detection semantics the POST transition had
 
 ### Requirement: Freeze verification reads the manifest
-Freeze build/lint verification SHALL use `quality.json` as its source of truth; heuristic command detection (CLAUDE.md → package.json → Makefile) applies only when no manifest exists, and a missing manifest yields a declared not-applicable result, never an unsatisfiable checkpoint.
+Freeze build/lint verification SHALL use the workspace-local `.team-harness/quality.json` as its source of truth; heuristic command detection (CLAUDE.md → package.json → Makefile) applies only when no manifest exists, and a missing manifest yields a declared not-applicable result, never an unsatisfiable checkpoint.
 
-#### Scenario: Repository has no quality manifest
-- **WHEN** Freeze runs in a repo without `.team-harness/quality.json`
+#### Scenario: Workspace has no quality manifest
+- **WHEN** Freeze runs without an absolute workspace-local `.team-harness/quality.json` that is absent from the product diff and, when nested below the checkout, ignored and untracked
 - **THEN** quality verification records `MANIFEST_ABSENT`/not-applicable and Freeze proceeds on the remaining evidence rather than blocking forever

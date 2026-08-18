@@ -10,8 +10,11 @@ receives several projects. It adds no phase, gate, or architecture review.
 
 ## Applicability
 
-The checkpoint applies when `.team-harness/quality.json` declares `test` and
-`test_contract.path_rules`. If either is absent, the coordinator records
+The checkpoint applies when the workspace-local
+`.team-harness/quality.json` declares `test` and `test_contract.path_rules`.
+The manifest is operational state outside the product diff; a workspace nested
+below a checkout must keep it ignored and untracked. If either field is absent,
+the coordinator records
 `cleaner_evidence.status: not-applicable` with reason
 `repository-quality-manifest-incomplete`; it never invents repository
 commands.
@@ -24,6 +27,14 @@ files remain outside the cleaner's authority. An empty allowlist is an
 evidenced no-op.
 
 ## Flow
+
+The coordinator must first finish every selected readiness and correction
+closure diagnostic, deduplicate the terminal findings by root cause, and close
+the resulting comprehensive package. A partial pass or a fix dispatched from
+only the first surfaced symptom is not cleaner-ready. Manifest corrections are
+complete before cleaner dispatch; changing the workspace manifest afterward
+creates a new manifest identity and invalidates the affected readiness evidence
+without adding it to the candidate tree.
 
 1. Commit the consolidated implementation candidate and require a clean tree.
 2. Persist the allowlist, its SHA-256, and the pre-cleanup candidate anchor
