@@ -19,7 +19,9 @@ candidate, a checkpoint name, and a selected set of checks, the runner:
 3. resolves the changed file surface from Git;
 4. executes only manifest-declared `argv` arrays, never a shell command string;
 5. bounds stdout, stderr, duration, argument size, changed paths, and metric records;
-6. rejects commands that mutate Git-visible tracked or untracked repository state;
+6. rejects commands that mutate tracked repository state; untracked content —
+   pre-existing or a command byproduct — is intentionally outside this check
+   and never counts as worktree evidence;
 7. calculates CRAP itself from normalized complexity and coverage input; and
 8. returns one schema-versioned JSON result and a nonzero process status on failure.
 

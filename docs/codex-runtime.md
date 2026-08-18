@@ -252,6 +252,19 @@ Codex's native sandbox and permission path remain authoritative. Only
 deterministic deny floors emit a hook decision; hook-level `ask` and classifier
 `allow` are never translated into authorization.
 
+**Accepted risk — fail-open launcher fallback.** When the hook launcher cannot
+resolve a valid plugin root (stale or replaced cache, unmounted path, invalid
+`PLUGIN_ROOT`), it surfaces one `systemMessage` (`plugin runtime missing`) and
+makes no permission decision: the deny floor (`policy-block`, `gcp-guard`) is
+inactive until the plugin is reinstalled, and native Codex permissions are the
+only boundary. This is deliberate, not an oversight: the floor is a narrow
+backstop against destructive actions under the honest-developer threat model
+(`docs/dev-mode.md § "Threat model — honest-developer disposition"`), and a
+broken cache denying every Bash call would convert a packaging failure into a
+development outage. `tests/test_codex_hooks.sh` proves the safety half that is
+non-negotiable either way: an unresolvable or unsafe root never executes a
+fallback runner.
+
 ## Controlled pipeline-efficiency A/B benchmark
 
 `tests/evidence/codex-pipeline-efficiency.md` is the reproducible protocol and
