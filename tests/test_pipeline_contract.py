@@ -1673,6 +1673,41 @@ def check_residual_corrections() -> None:
     how = read("docs/how-it-works.md")
     require("inline" in how.lower() and "pipeline" in how.lower(), "How-it-works: direct/pipeline explanation drifted")
 
+
+def check_convergence_counts_contract() -> None:
+    """`convergence_counts` is declared identically by both `iteration.start` carriers."""
+    keys = ("new_in_delta", "pre_existing_missed", "reopened")
+
+    state = read("agents/_shared/orchestrator-state.md")
+    schema = section(state, "### Schema", "### Free-text bound")
+    convergence_row = next(
+        (line for line in schema.splitlines() if "convergence_counts" in line), None
+    )
+    require(convergence_row is not None, "State schema: convergence_counts row missing")
+    require(
+        all(key in convergence_row for key in keys),
+        "State schema: convergence_counts is missing one of its three counted keys",
+    )
+    require(
+        "never omitted" in convergence_row.lower() and "optional" not in convergence_row.lower(),
+        "State schema: convergence_counts documented as optional rather than conditional-with-zeros",
+    )
+
+    observability = read("docs/observability.md")
+    events = section(observability, "Core event names are:", "There is no `plan_structure` event")
+    convergence_line = next(
+        (line for line in events.splitlines() if "iteration.start" in line), None
+    )
+    require(convergence_line is not None, "Observability: iteration.start event row missing")
+    require(
+        "convergence_counts" in convergence_line and all(key in convergence_line for key in keys),
+        "Observability: iteration.start producer contract is missing convergence_counts",
+    )
+    require(
+        "present with zeros" in convergence_line.lower(),
+        "Observability: convergence_counts producer contract does not require zeros over omission",
+    )
+
     readme = read("agents/README.md")
     lint = read("skills/lint/SKILL.md")
     require("init-project.md" in readme and "`init.md`" not in readme, "README: stale init agent reference")
@@ -3736,6 +3771,7 @@ def main() -> None:
         ("profile/document guards", check_profile_and_document_guards),
         ("recovery fail-closed", check_recovery_fail_closed),
         ("residual corrections", check_residual_corrections),
+        ("convergence counts contract", check_convergence_counts_contract),
         ("sensitive inline authorization", check_sensitive_inline_authorization),
         ("ad-hoc review boundary", check_ad_hoc_review_boundary),
         ("inline review contract", check_inline_review_contract),
