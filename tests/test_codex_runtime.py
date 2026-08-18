@@ -589,11 +589,33 @@ def main() -> None:
             "Claude marketplace must declare exactly one entry for "
             f"{claude_plugin_name!r}"
         )
-    if market_entries[0].get("source") != "./plugins/team-harness":
-        fail("Claude marketplace must install from the curated plugins/team-harness root")
+    # The CC plugin ships the WHOLE repo tree: root skills/ carries the Claude
+    # texts, plugins/team-harness/ carries the Codex projections. A relative
+    # subtree source would hand CC users the Codex projection package (missing
+    # managed-blocks, output-styles, and the CC skill procedures) — the
+    # regression shipped in v3.14.0 and is pinned closed here.
+    if market_entries[0].get("source") != {"source": "github", "repo": "valianx/team-harness"}:
+        fail("Claude marketplace must install the whole repository tree (github source)")
+    codex_market = json.loads((ROOT / ".agents/plugins/marketplace.json").read_text())
+    codex_sources = [
+        entry.get("source", {}).get("path")
+        for entry in codex_market["plugins"]
+        if entry.get("name") == "team-harness"
+    ]
+    if codex_sources != ["./plugins/team-harness"]:
+        fail("Codex marketplace must install from the curated plugins/team-harness subtree")
     curated_claude = ROOT / "plugins/team-harness/.claude-plugin"
     if not (curated_claude / "plugin.json").is_file() or not (curated_claude / "hooks.json").is_file():
         fail("curated Claude package root is not self-contained")
+    for cc_surface in (
+        "skills/setup/managed-blocks/orchestrator-dispatch-rule.md",
+        "skills/setup/managed-blocks/voice-rule.md",
+        "output-styles/developer-mode.md",
+        ".claude-plugin/hooks.json",
+        "hooks/run-ts-hook.sh",
+    ):
+        if not (ROOT / cc_surface).is_file():
+            fail(f"CC-shipped surface missing from the repository tree: {cc_surface}")
     versions = {
         claude_plugin["version"],
         market_entries[0]["version"],

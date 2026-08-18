@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.15.1] - 2026-08-18
+
+### Fixed
+
+- Claude Code marketplace source reverted to the whole-repository GitHub
+  tree (`{"source": "github", "repo": "valianx/team-harness"}`), fixing the
+  v3.14.0 regression that shipped the Codex projection subtree
+  (`./plugins/team-harness`) to Claude Code users — the installed cache
+  lacked `skills/setup/managed-blocks/`, `output-styles/`, the CC hook
+  wiring, and the CC skill procedure texts, breaking `/th:update`'s
+  managed-block sync.
+- opencode installer: the fail-closed skill-asset extension allowlist now
+  admits `.ts`, `.tsx`, `.css`, `.js`, and `.lock`, so the
+  interactive-presentation scaffold templates are emitted completely
+  instead of dropping 12 of 15 files.
+
+### Added
+
+- Regression pins in `tests/test_codex_runtime.py`: the CC marketplace
+  entry must use the whole-repo GitHub source, the Codex marketplace entry
+  must keep the `./plugins/team-harness` path, and five CC-only surfaces
+  (managed blocks, output style, hooks wiring, hook launcher) must exist in
+  the shipped tree.
+- Go test coverage: opencode manifest emission of the complete
+  interactive-presentation template set, and the embedded-agent roster
+  check now includes `cleaner` and `inline-reviewer`.
+
 ## [3.15.0] - 2026-08-18
 
 ### Added

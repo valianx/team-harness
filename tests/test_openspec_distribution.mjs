@@ -22,7 +22,7 @@ async function walk(directory, base = directory) {
 assert.equal(ownership.schema_version, 1);
 assert.deepEqual(Object.keys(ownership.packages).sort(), ["claude", "codex", "go-installer", "opencode"]);
 assert.equal(marketplace.plugins.length, 1);
-assert.equal(marketplace.plugins[0].source, "./plugins/team-harness");
+assert.deepEqual(marketplace.plugins[0].source, { source: "github", repo: "valianx/team-harness" });
 
 for (const relative of [
   "plugins/team-harness/.claude-plugin/plugin.json",
