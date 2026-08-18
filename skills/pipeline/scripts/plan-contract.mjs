@@ -470,8 +470,9 @@ function parseCli(argv) {
     if (key === null || Object.hasOwn(values, key)) return null;
     values[key] = argv[index + 1];
   }
+  if (!Object.hasOwn(values, "snapshot") && !Object.hasOwn(values, "traceability") && values.writableRoots.length > 0) return null;
+  if ((Object.hasOwn(values, "snapshot") || Object.hasOwn(values, "traceability")) && values.writableRoots.length === 0) return null;
   if (!Object.hasOwn(values, "snapshot") && !Object.hasOwn(values, "traceability")) delete values.writableRoots;
-  else if (values.writableRoots.length === 0) return null;
   return values;
 }
 

@@ -55,6 +55,11 @@ producer paths are in `agents/_shared/orchestrator-state.md § Current State`.
 The proposed worktree must be equal to or below an effective native
 `writable_root`; escalation for `git worktree add` proves only that command can
 run and never makes an outside directory writable for implementation.
+Prefer branch-in-place when the current checkout is clean, writable, and
+already owns the dependencies required by its quality manifest. Select an
+isolated worktree only for a recorded isolation need, and require its Node
+dependency installation to be self-contained below that worktree. A whole
+`node_modules` symlink to another checkout is not dependency readiness.
 
 ## No capability-check fallback
 
@@ -985,7 +990,7 @@ points remain traceable events inside the single `implementation` state.
 
 **Agent:** `implementer`.
 
-### Branch guarantee, `working_branch` assertion, `base_sha` registration — at entry, before any dispatch
+### Branch guarantee and one `base_commit` — at entry, before any dispatch
 
 Guarantee a working branch distinct from the default branch exists.
 
@@ -1071,15 +1076,18 @@ and aggregate status in `test_contract_evidence` state. `not-applicable` is
 valid only when the task shard already carries its plan-time reason;
 implementation never infers or rewrites that decision.
 
-**OpenSpec-bound dispatch.** Before every implementer or tester dispatch, verify the pinned
-`inputs/openspec-snapshot.json` and `plan/openspec-traceability.json`; any unapproved source drift
-blocks. Resolve bounded `openspec instructions apply --change <bound-change> --json` guidance for
-the implementer without granting it lifecycle authority. The packet includes snapshot identity,
-the assigned TH execution item/shard, and only its pinned task/design coordinates with source path,
-line, and captured content hash. The specialist reads canonical intent there rather than from TH
-prose. After success, only the assigned pending-to-complete task coordinate may advance, and Main
-records it through the packaged atomic `verify-and-rebind` progress transition before another
-dispatch; `plan-contract` never tolerates an intermediate stale binding.
+**OpenSpec-bound dispatch.** Before every implementer or tester dispatch, verify the immutable
+Gate-1 `inputs/openspec-snapshot.json`, `plan/openspec-traceability.json`, and separate
+`inputs/openspec-progress.json`; any unapproved source-intent drift blocks. Resolve bounded
+`openspec instructions apply --change <bound-change> --json` guidance for the implementer without
+granting it lifecycle authority. The packet carries the inseparable absolute
+`openspec_snapshot: {path, sha256}` binding, the assigned TH execution item/shard, and only its
+pinned task/design coordinates with source path, line, and captured content hash. After success,
+only assigned pending-to-complete task coordinates may advance through the packaged atomic
+`verify-progress` operation. That operation changes only `inputs/openspec-progress.json`; snapshot
+bytes, snapshot SHA-256, artifact-set SHA-256, and the approved overlay remain unchanged.
+`plan-contract` accepts this authorized monotonic progress without rebinding. Never edit overlay
+hashes, manually rebind, or dispatch an architect for checkbox-only progress.
 
 **Test-transition transport.** Every red and green
 `test-transition.mjs` call supplies a coordinator-owned absolute `--output`
@@ -1091,7 +1099,9 @@ through `bounded-command.mjs`, replays a truncated result, or substitutes an
 `red|green '<JSON object>'` form; Main selects one CLI shape before execution
 and does not retry another after `ARGUMENT_INVALID`.
 
-**Register `base_sha` before EVERY `implementer`/`tester` dispatch.** `git rev-parse HEAD`, recorded as an attribute of that dispatch's `phase.start`. This is the external baseline the commit-integrity check anchors against — without it a dispatch that produced nothing could report a stale-but-ancestor sha and pass a bare ancestry check trivially.
+**Register `base_commit` once when implementation opens.** It is the only Git
+identity used until Freeze. Per-task or per-dispatch commits are optional
+checkpoints, not pipeline state, and never block the next independent task.
 
 ### Mirroring task progress
 
@@ -1200,11 +1210,11 @@ Shares the max-3 cap for implementation bounces. A clean scan is a trace event o
 
 ### Implementation checkpoint — evidence authoring
 
-**Agent:** `tester`, `mode: authoring`. Runs before Freeze and the validation state, over a tree that is immutable afterward. The tester classifies each AC and TC as `test`, `command`, or `inspection`, records the complete evidence dependency paths, reuses sufficient evidence, authors only warranted missing tests, runs the relevant suite/commands, and writes `03-testing.md`'s evidence map. For tasks with a pre-implementation contract, reuse its frozen test paths and complete only missing evidence rows; never rewrite those tests. For other non-bug tasks this remains the full authoring write point. A correction may dispatch one fresh tester only for rows made stale by changed requirement text, exact command/arguments, or any consumed implementation, test, fixture, configuration, or argument-file dependency blob.
+**Agent:** `tester`, `mode: authoring`. Runs before Freeze and the validation state, over a tree that is immutable afterward. The tester classifies each AC and TC as `test`, `command`, or `inspection`, records the complete evidence dependency paths, reuses sufficient evidence, authors only warranted missing tests, runs the relevant suite/commands, and writes `03-testing.md`'s evidence map. A pre-implementation test is immutable only across its own active red-to-green transition. Before final Freeze, a fresh test-only correction may replace an obsolete expectation when it conflicts with the same canonical intent; production code is not changed to satisfy a stale test. For other non-bug tasks this remains the full authoring write point. A correction may dispatch one fresh tester only for rows made stale by changed requirement text, exact command/arguments, or any consumed implementation, test, fixture, configuration, or argument-file dependency blob.
 
 Bug-fix flow: resume the regression contract started at the implementation checkpoint and complete the remaining evidence-map rows.
 
-**Advance:** `success` requires relevant successful evidence and declared evidence paths for every AC and TC. `tests_authored: 0` and `commit: none — no source change` are valid. Re-run commit integrity only when `commit:` is a SHA. `failed` → back to the appropriate owner (max-3); Freeze does not open until the evidence map is complete.
+**Advance:** `success` requires relevant successful evidence and declared evidence paths for every AC and TC. `tests_authored: 0` is valid. Intermediate tester commits are bookkeeping only; commit integrity runs once on the consolidated Freeze candidate. `failed` → back to the appropriate owner (max-3); Freeze does not open until the evidence map is complete.
 
 **Browser readiness (non-blocking).** When `warranted_types` includes `e2e`/`browser-mode` and tooling is missing, surface the proposed setup commands and wait for confirmation or an explicit decline.
 
@@ -1237,19 +1247,26 @@ manifest, generated file, lockfile, migration, public schema, version site,
 changelog, and workspace artifact. Persist the sorted allowlist and SHA-256; an
 empty allowlist is an evidenced no-op.
 
-Main resolves and runs `cleaner-transition.mjs --transition pre` with the
-repository, manifest, `verification_base_ref`, `HEAD`, and allowlist. The helper
-runs the embedded `quality-runner.mjs` `pre_cleaner` `test` check plus `crap` in
-`measure` mode when configured, validates the allowlist against the immutable
-changed surface, and returns one closed wrapper. Persist that complete result
-and SHA-256 and record its candidate commit/tree. Any failure blocks cleanup:
-no agent may reinterpret it.
+Main resolves and runs `cleaner-transition.mjs --transition pre --output
+<coordinator-evidence-path>` with the repository, manifest,
+`verification_base_ref`, `HEAD`, and allowlist. The helper
+runs the embedded `quality-runner.mjs` `pre_cleaner` `test` check plus every
+declared `format_check` and `lint`, and `crap` in `measure` mode when configured,
+validates the allowlist against the immutable
+changed surface, atomically persists the complete result, and prints only a
+bounded receipt with path, SHA-256, and byte count. Verify the receipt and
+record its candidate commit/tree. Never synthesize a temporary JavaScript
+wrapper or route this persistence through `bounded-command`. Any failure blocks cleanup:
+no agent may reinterpret it, and no cleaner is dispatched. This preflight
+exposes an over-broad or historically red repository adapter before the sole
+cleaner attempt rather than attributing it to post-cleaner changes.
 On pass, dispatch exactly one fresh `cleaner` at `sonnet/medium` with the
 allowlist, functional AC summary, applicable TCs, manifest, and hashed baseline.
 The cleaner may edit only allowlisted existing production paths, never tests or
 quality inputs, and returns a cleanup commit or justified no-op.
 
-Main then runs `cleaner-transition.mjs --transition post` with the exact
+Main then runs `cleaner-transition.mjs --transition post --output
+<coordinator-evidence-path>` with the exact
 allowlist path/hash and pre-transition path/hash. The helper proves the cleaner
 commit descends from the baseline, rejects additions, deletions, renames, type
 changes, and modifications outside the allowlist, then runs the embedded
@@ -1260,6 +1277,12 @@ function over policy, no forbidden CRAP worsening, and every baseline function
 still present in the normalized report. Missing functions fail as
 `CRAP_REPORT_INCOMPLETE`; they cannot disappear from measurement by renaming,
 splitting, exclusion, or adapter omission.
+Diagnose `CRAP_REPORT_INVALID` from the bounded adapter artifact, never by
+dumping runner source. Its closed input has exactly top-level
+`schema_version: 1` and `functions`; each function has exactly `path`, `symbol`,
+`status`, `complexity`, and `coverage_percent`, with a safe changed repository
+path, unique path/symbol pair, `new|changed` status, integer complexity of at
+least one, and finite coverage from 0 through 100.
 
 Each repository's cleaner runs exactly once and is never re-dispatched. It completes and
 commits every independent safe allowlisted cleanup before returning any
@@ -1426,27 +1449,28 @@ On any match, monotonically set `security_sensitive: true` for the remainder of 
 
 ### Commit-integrity check
 
-Runs after every `implementer`/`tester` dispatch returns `success`, and **again when implementation evidence closes**. All seven conjuncts; any failure is `status: blocked` and escalation — never a silent pass, never a corrective write by you.
+Runs once when implementation evidence closes, immediately before Freeze. It
+compares the complete `base_commit..HEAD` delta; intermediate task SHAs are not
+inputs. All final conjuncts must pass.
 
 | # | Conjunct | Command | Fails when |
 |---|---|---|---|
 | 1 | Tree clean | `git status --porcelain` | any line, including untracked |
-| 2 | Ancestry | `git merge-base --is-ancestor {sha} HEAD` | non-zero for any reported sha |
-| 3 | Baseline movement | compare `{sha}` to the registered `base_sha`; `git diff --quiet {base_sha} HEAD` | sha equals `base_sha`, or the diff exits 0 |
-| 4 | Lane coverage | — | a `lane-deferred` report with no consolidation sha |
+| 2 | Ancestry | `git merge-base --is-ancestor {base_commit} HEAD` | non-zero |
+| 3 | Baseline movement | `git diff --quiet {base_commit} HEAD` | no implementation delta when changes were required |
+| 4 | Lane coverage | — | an approved task has no final evidence in the consolidated tree |
 | 5 | Branch | `git rev-parse --abbrev-ref HEAD` | ≠ `working_branch`, or = the default branch |
 | 6 | Worktree | `git rev-parse --show-toplevel` | ≠ the worktree declared for this task |
-| 7 | Staging scope | `git diff-tree --no-commit-id --name-only -r {sha}` | any path outside the task's `Files:` without a matching `[SCOPE-DRIFT]` annotation |
+| 7 | Final scope | `git diff --name-only {base_commit} HEAD --` | any path outside the union of approved `Files:` without a matching `[SCOPE-DRIFT]` annotation |
 
-**Exemption:** a dispatch reporting `commit: none — no source change` is exempt from 2, 3 and 7 — there is no sha. Conjuncts 1, 5 and 6 still apply: that report on a dirty tree, wrong branch or wrong worktree is itself a violation. No other `commit:` value is exempt from anything.
-
-**Why 3 exists:** 1 and 2 pass trivially on a dispatch that produced nothing — a clean tree is trivial when nothing changed, and any ancestor of HEAD satisfies 2. Conjunct 3 anchors against a record the dispatched agent never wrote.
-
-**No conjunct has a repair path.** A failure means the commit is wrong — wrong branch, wrong worktree, incomplete, out of scope, or vacuous — and the only remedy is a correct re-commit by the original committer.
+The final `freeze_commit` is HEAD and must match the helper result. An optional
+`red_commit` exists only inside one active test transition; `delivery_commit`
+exists only when delivery changes the accepted tree. No other SHA advances or
+blocks state.
 
 **Atomic evidence transport.** Resolve packaged `commit-integrity.mjs` and run
-it directly with the repository, reported commit (or `none`), registered
-`base_sha`, working branch, declared worktree, repeated allowed paths, matching
+it directly with the repository, `HEAD`, registered `base_commit`, working
+branch, declared worktree, the union of approved paths, matching
 annotated scope-drift paths, and an explicit coordinator-owned `--output`.
 The helper executes conjuncts 1–3 and 5–7 without a shell, persists one closed
 fixed-shape result atomically, and emits only a bounded
@@ -1469,8 +1493,9 @@ truncated conjunct stays unevaluated and blocks.
 **1 — Release assembly and commit-integrity re-check.** Execute
 `agents/_shared/implementation-assembly.md`: apply version/changelog, commit the
 complete candidate, require a clean worktree, and persist full
-`freeze_commit_sha`/`freeze_tree_sha`. Then re-check the full set of task and
-assembly commits before building the packet.
+`freeze_commit_sha`/`freeze_tree_sha`. Then run the single final
+`base_commit..freeze_commit_sha` integrity check before building the packet;
+do not revalidate a chain of intermediate task commits.
 
 **2 — Build and lint.** Detection order: `CLAUDE.md` Golden Commands → `package.json` scripts → `Makefile` → `go.mod` → `Cargo.toml`; none found → log `skipped` and continue. **Consult `00-suite-evidence.md` first** per `docs/suite-evidence.md § 4` before running a full-suite command — a citable row (matching `tree_anchor`, `result: pass`, `agent` in the closed writer list, no untracked path) may be cited instead of a fresh run; any fail-closed condition there forces execution. **The build and lint commands themselves always run** — the registry never substitutes for them. Run them as separate invocations. Both exit 0 → append a row (`agent: orchestrator`, `phase: implementation-freeze`) unless a row was cited. Either fails → re-dispatch the implementer with the output and retry **once**; a second failure is `status: blocked` with the full output. Max 2 attempts, separate from the validation budget.
 
@@ -1488,9 +1513,8 @@ verifier live-reads only its assigned task shard. Hard cap 120 lines. Overwrite 
 
 **5 — Record the fan-open identity** in the same write: the canonical tree
 anchor plus the full clean `freeze_commit_sha` and `freeze_tree_sha`. Gate
-preparation compares all three. When acceptance passes, copy the same object IDs
-to `validated_commit_sha` and `validated_tree_sha`; delivery publishes only
-that identity.
+preparation compares all three. Acceptance and delivery remain bound to that
+same identity; no duplicate validated object IDs are created.
 
 **6 — Selected-base movement reconcile.** Read `verification_base_source_ref`; never substitute the default branch. When it is an `origin/{branch}` ref, run `git fetch origin {branch}` first so the comparison cannot use a stale remote-tracking ref. Re-resolve the source with `git rev-parse --verify "${verification_base_source_ref}^{commit}"` and compare that full SHA for exact equality with immutable `verification_base_ref`. An unresolvable source or any mismatch **STOPS**: report it and do not proceed until the task is deliberately re-planned from the new base. Never rewrite the baseline, merge, or rebase on your own authority. For a remote source this is the earliest fetch in the pipeline; local dependency branches and commit literals are checked without inventing a remote counterpart.
 
@@ -1774,8 +1798,8 @@ presentation. Any required version, changelog, documentation, or API-contract ch
 the reviewed implementation tree before Freeze.
 
 You execute `agents/_shared/delivery-mechanics.md`: re-read the Gate-3 release and preview,
-require a clean worktree with `HEAD == validated_commit_sha` and
-`HEAD^{tree} == validated_tree_sha`, push that exact branch, create/update its draft PR, and
+require a clean worktree with `HEAD == freeze_commit_sha` and
+`HEAD^{tree} == freeze_tree_sha`, push that exact branch, create/update its draft PR, and
 report merge state once. Delivery runs no tests, fetch, base-advance reconcile, version/changelog
 edit, staging, commit, merge, or rebase. That file is the single source; this is the pointer.
 

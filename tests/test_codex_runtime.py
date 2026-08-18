@@ -1553,13 +1553,20 @@ def main() -> None:
         fail("Codex sensitive inline path lacks live explicit selection")
 
     deliver_skill = (ROOT / "plugins/team-harness/skills/deliver/SKILL.md").read_text()
+    delivery_adapter = (ROOT / "runtime/codex/instructions/delivery.md").read_text().lower()
     delivery_reference = (
         ROOT / "plugins/team-harness/skills/pipeline/references/delivery.md"
     ).read_text()
     ship_contract = "\n".join((pipeline, current_state, deliver_skill, delivery_reference)).lower()
-    for marker in ("single", "validated commit", "validated_commit_sha", "validated_tree_sha", "push", "draft pr"):
+    for marker in ("single", "accepted freeze commit", "freeze_commit_sha", "freeze_tree_sha", "push", "draft pr"):
         if marker not in ship_contract:
             fail(f"Codex Gate 3 ship contract is missing {marker!r}")
+    for marker in ("single accepted", "freeze_commit_sha", "freeze_tree_sha"):
+        if marker not in delivery_adapter:
+            fail(f"Codex delivery adapter is missing simplified Freeze identity {marker!r}")
+    for retired in ("validated_commit_sha", "validated_tree_sha", "validated_base_sha"):
+        if retired in delivery_adapter:
+            fail(f"Codex delivery adapter retains retired identity {retired!r}")
     delivery_lower = delivery_reference.lower()
     for forbidden in ("run tests", "edit version/changelog", "stage", "commit", "fetch or reconcile"):
         if forbidden not in delivery_lower:
@@ -1875,13 +1882,13 @@ def main() -> None:
     activation_digests = digest_table(activation)
     pipeline_digests = digest_table(pipeline)
     expected_updated_digests = {
-        "pipeline-architect": "14b51f37d0d455cd964bd4b9ec67dd8855195e5abbb8585935b1655c054c7bbd",
-        "pipeline-implementer": "b6daafc26d9ec0647763f13f4d9fe873a85574ec59dc59fc48d506f45454b009",
-        "pipeline-tester": "8eabaaa34e09a23989388db88f0e895cbe4d21612a9bc32bdd3919f8e1f4f888",
+        "pipeline-architect": "4fb84a1cf9cd51d80401c9a9e3a31bc0b66c98f209893b994d89f8a0bc28ed61",
+        "pipeline-implementer": "84afd23ff6adcf3fe7ab6b5ec85f30cac6313d1b0cfe09a96f6eb0d346d698ae",
+        "pipeline-tester": "32ee4a4832c1bc489ce89a578be9e0ef7b33dd91f50a210e9a34dbd74b1db844",
         "pipeline-cleaner": "ea4260bcb8fc1e17034f0d6f91b9d97efefeb61065c50b88a25e792eaaab88b9",
-        "pipeline-qa": "44fe6c12d25fae4c9cd4583dd3f70b2cc5e67310d9d0b5522c50a9d8a983583d",
-        "pipeline-security": "5a047d998a2c96919f23feb149eb40305a39b7f4093bc1695b26fdea8f581eee",
-        "pipeline-delivery": "1173e6d5edb63039cdc7d315f4c170c8f5489f76665b2cd77df682ae4be08246",
+        "pipeline-qa": "d13a07e234c8c95b91e31920a1c6bbb961ca0e3b96f03b7b93a7dee27472cbd1",
+        "pipeline-security": "11e9632e553eb98374b93b61901679800992edc284ea75d52d280c62fc4f5a14",
+        "pipeline-delivery": "c9a8a42ca62798cca1a57b65b89fbd044356433ac11fe7eff24ba3685f91aafa",
     }
     if set(activation_digests) != session_pipeline_roles or activation_digests != pipeline_digests:
         fail("pipeline and activation skill digest tables are not synchronized")

@@ -6,7 +6,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { rebindOpenSpecOverlay, validateOpenSpecOverlay, verifyAndRebindOpenSpecProgress } from "../plugins/team-harness/skills/pipeline/scripts/openspec-overlay.mjs";
+import { rebindOpenSpecOverlay, validateOpenSpecOverlay, verifyOpenSpecProgress } from "../plugins/team-harness/skills/pipeline/scripts/openspec-overlay.mjs";
 import { verifySnapshot } from "../plugins/team-harness/skills/pipeline/scripts/openspec-snapshot.mjs";
 import { validatePlanContract } from "../plugins/team-harness/skills/pipeline/scripts/plan-contract.mjs";
 
@@ -47,23 +47,30 @@ async function fixture() {
     { artifact_id: "tasks", path: "openspec/changes/example/tasks.md", content_sha256: digest(sourceBytes.tasks), intent_sha256: digest(sourceBytes.tasks), coordinates: [{ ...coordinate("task", "task:1.1"), complete: false }] },
   ];
   const snapshot = {
-    schema_version: 2, kind: "team_harness_openspec_snapshot", captured_at: "2026-08-17T12:00:00Z",
+    schema_version: 3, kind: "team_harness_openspec_snapshot", captured_at: "2026-08-17T12:00:00Z",
     repository: { root: repository, head_sha: "a".repeat(40) },
     workspace: { root: workspace, mode: "local", navigation_kind: "repository-relative-coordinates" },
     toolchain: { runtime: "codex", node_version: "20.19.0", npm_version: "10.8.2", openspec_version: "1.9.0", generated_targets: [] },
     change: { name: "example", schema: "spec-driven", root: path.join(repository, "openspec/changes/example") },
     artifacts,
     artifact_set_sha256: digest(Buffer.from(artifacts.map(item => `${item.path}\0${item.content_sha256}`).join("\n"))),
-    task_progress: { completed: [], events: [] },
   };
   const snapshotBytes = Buffer.from(`${JSON.stringify(snapshot)}\n`);
   await writeFile(path.join(workspace, "inputs/openspec-snapshot.json"), snapshotBytes);
+  await writeFile(path.join(workspace, "inputs/openspec-progress.json"), `${JSON.stringify({
+    schema_version: 1,
+    kind: "team_harness_openspec_progress",
+    change_name: "example",
+    task_intent_sha256: artifacts.find(item => item.artifact_id === "tasks").intent_sha256,
+    completed: [],
+    events: [],
+  }, null, 2)}\n`);
   await writeFile(path.join(workspace, "01-plan.md"), "**Plan format:** sharded-v1\n");
   const acceptance = id => ({ id, sources: [], classification: "th-extension", rationale: "TH-only acceptance control.", evidence_anchor: "reviews/04-validation.md" });
   const execution = id => ({
     id, sources: [], classification: "th-extension", rationale: "TH-only execution control.", owner: "implementer", specialist: "implementer",
     shard_path: `plan/tasks/${id}.md`, files: [`src/${id}.mjs`], dependencies: [], required_invariants: ["I-gate-authority"],
-    technical_constraints: [], quality_command_ids: ["unit"], pre_implementation_test: "required",
+    technical_constraints: [], quality_command_ids: ["test"], pre_implementation_test: "required",
     required_evidence_anchors: ["02-implementation.md"], cross_runtime_preservation: "Preserve equivalent behavior in every supported runtime.",
     rollback: "Revert the bounded task commit.", delivery_group: "default",
   });
@@ -72,7 +79,7 @@ async function fixture() {
     schema_version: 1, kind: "team_harness_openspec_execution_overlay", plan_format: "sharded-v1",
     snapshot: { path: "inputs/openspec-snapshot.json", sha256: digest(snapshotBytes), artifact_set_sha256: snapshot.artifact_set_sha256, change_name: "example" },
     repository: { root: repository, ownership: [{ path: "src", owner: "implementer" }] },
-    quality_commands: [{ id: "unit" }],
+      quality_commands: [{ id: "test" }],
     freeze: { baseline_sha256: "b".repeat(64), state_anchor: "00-state.json", evidence_root: "reviews" },
     acceptance_items: [acceptance("AC-1"), acceptance("AC-2")],
     execution_items: [execution("Task-1"), execution("Task-2")],
@@ -171,97 +178,65 @@ await check("blocks stale snapshot identity and duplicate items", async () => wi
   assert.ok(result.findings.some(item => item.code === "ITEM_DUPLICATE"));
 }));
 
-await check("mechanically rebinds only the latest verified monotonic task-progress snapshot", async () => withFixture(async value => {
+await check("never mechanically rebinds a stale immutable Gate-1 snapshot", async () => withFixture(async value => {
+  makeDirect(value.overlay);
+  value.overlay.snapshot.sha256 = "0".repeat(64);
+  await value.writeOverlay(value.overlay);
+  const overlayPath = path.join(value.workspace, "plan/openspec-traceability.json");
+  const before = await readFile(overlayPath);
+  assert.equal((await validateOverlay(value)).error_code, "SNAPSHOT_STALE");
+  const rebound = await rebindOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository] });
+  assert.equal(rebound.verdict, "fail");
+  assert.equal(rebound.error_code, "REBIND_NOT_MECHANICAL");
+  assert.deepEqual(await readFile(overlayPath), before);
+}));
+
+await check("verifies authorized task progress without changing snapshot or overlay identity", async () => withFixture(async value => {
   makeDirect(value.overlay);
   await value.writeOverlay(value.overlay);
   const snapshotPath = path.join(value.workspace, "inputs/openspec-snapshot.json");
-  const originalBytes = await readFile(snapshotPath);
-  const snapshot = JSON.parse(originalBytes.toString("utf8"));
-  const tasks = snapshot.artifacts.find(item => item.artifact_id === "tasks");
-  tasks.content_sha256 = "6".repeat(64);
-  tasks.coordinates[0].complete = true;
-  snapshot.task_progress.completed = ["task:1.1"];
-  snapshot.task_progress.events.push({
-    recorded_at: "2026-08-17T12:01:00Z",
-    task_ids: ["task:1.1"],
-    previous_sha256: digest(originalBytes),
-    task_content_sha256: tasks.content_sha256,
-  });
-  snapshot.artifact_set_sha256 = digest(Buffer.from(snapshot.artifacts.map(item => `${item.path}\0${item.content_sha256}`).join("\n")));
-  await writeFile(snapshotPath, `${JSON.stringify(snapshot)}\n`);
-
-  assert.equal((await validateOverlay(value)).error_code, "SNAPSHOT_STALE");
-  const rebound = await rebindOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository] });
-  assert.equal(rebound.verdict, "pass");
-  assert.equal(rebound.changed, true);
-  assert.equal(rebound.previous_snapshot_sha256, digest(originalBytes));
-  assert.equal((await validateOverlay(value)).verdict, "pass");
-  const overlay = JSON.parse(await readFile(path.join(value.workspace, "plan/openspec-traceability.json"), "utf8"));
-  assert.equal(overlay.snapshot.sha256, digest(Buffer.from(`${JSON.stringify(snapshot)}\n`)));
-  assert.equal(overlay.snapshot.artifact_set_sha256, snapshot.artifact_set_sha256);
-  assert.equal((await rebindOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository] })).changed, false);
-}));
-
-await check("verifies and rebinds authorized task progress as one idempotent recoverable operation", async () => withFixture(async value => {
-  makeDirect(value.overlay);
-  await value.writeOverlay(value.overlay);
+  const overlayPath = path.join(value.workspace, "plan/openspec-traceability.json");
+  const snapshotBefore = await readFile(snapshotPath);
+  const overlayBefore = await readFile(overlayPath);
   const tasksPath = path.join(value.repository, "openspec/changes/example/tasks.md");
   await writeFile(tasksPath, "- [x] 1.1 Work\n");
-  const advanced = await verifyAndRebindOpenSpecProgress({
+  const advanced = await verifyOpenSpecProgress({
     workspace: value.workspace,
     writableRoots: [value.repository],
-    authorizedTaskIds: ["task:1.1"],
+    authorizedTaskIds: ["1.1"],
   });
   assert.equal(advanced.verdict, "pass");
+  assert.equal(advanced.schema_version, 2);
   assert.equal(advanced.changed, true);
-  assert.equal(advanced.recovered, false);
+  assert.match(advanced.progress_sha256, /^[a-f0-9]{64}$/);
+  assert.deepEqual(await readFile(snapshotPath), snapshotBefore);
+  assert.deepEqual(await readFile(overlayPath), overlayBefore);
   assert.equal((await validateOverlay(value)).verdict, "pass");
-  const repeated = await verifyAndRebindOpenSpecProgress({
+  const repeated = await verifyOpenSpecProgress({
     workspace: value.workspace,
     writableRoots: [value.repository],
-    authorizedTaskIds: ["task:1.1"],
+    authorizedTaskIds: ["1.1"],
   });
   assert.equal(repeated.verdict, "pass");
   assert.equal(repeated.changed, false);
 }));
 
-await check("recovers an interrupted verified progress write only for the exact authorized event", async () => withFixture(async value => {
+await check("accepts an already-recorded exact progress event without recovery or rebinding", async () => withFixture(async value => {
   makeDirect(value.overlay);
   await value.writeOverlay(value.overlay);
   const snapshotPath = path.join(value.workspace, "inputs/openspec-snapshot.json");
   await writeFile(path.join(value.repository, "openspec/changes/example/tasks.md"), "- [x] 1.1 Work\n");
   const verified = await verifySnapshot({ snapshotPath, phase: "implementation", authorizedTaskIds: ["task:1.1"] });
   assert.equal(verified.verdict, "pass");
-  assert.equal((await validateOverlay(value)).error_code, "SNAPSHOT_STALE");
-  const recovered = await verifyAndRebindOpenSpecProgress({
+  assert.equal((await validateOverlay(value)).verdict, "pass");
+  const repeated = await verifyOpenSpecProgress({
     workspace: value.workspace,
     writableRoots: [value.repository],
-    authorizedTaskIds: ["task:1.1"],
+    authorizedTaskIds: ["1.1"],
   });
-  assert.equal(recovered.verdict, "pass");
-  assert.equal(recovered.recovered, true);
+  assert.equal(repeated.verdict, "pass");
+  assert.equal(repeated.changed, false);
   assert.equal((await validateOverlay(value)).verdict, "pass");
-}));
-
-await check("refuses stale overlays without an immediate verified progress predecessor", async () => withFixture(async value => {
-  makeDirect(value.overlay);
-  await value.writeOverlay(value.overlay);
-  const snapshotPath = path.join(value.workspace, "inputs/openspec-snapshot.json");
-  const snapshot = JSON.parse(await readFile(snapshotPath, "utf8"));
-  const tasks = snapshot.artifacts.find(item => item.artifact_id === "tasks");
-  tasks.content_sha256 = "6".repeat(64);
-  tasks.coordinates[0].complete = true;
-  snapshot.task_progress.completed = ["task:1.1"];
-  snapshot.task_progress.events.push({
-    recorded_at: "2026-08-17T12:01:00Z", task_ids: ["task:1.1"],
-    previous_sha256: "f".repeat(64), task_content_sha256: tasks.content_sha256,
-  });
-  snapshot.artifact_set_sha256 = digest(Buffer.from(snapshot.artifacts.map(item => `${item.path}\0${item.content_sha256}`).join("\n")));
-  await writeFile(snapshotPath, `${JSON.stringify(snapshot)}\n`);
-  const before = await readFile(path.join(value.workspace, "plan/openspec-traceability.json"));
-  const result = await rebindOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository] });
-  assert.equal(result.error_code, "PROGRESS_CHAIN_INVALID");
-  assert.deepEqual(await readFile(path.join(value.workspace, "plan/openspec-traceability.json")), before);
 }));
 
 await check("blocks normative prose fields instead of asserting semantic equivalence", async () => withFixture(async value => {

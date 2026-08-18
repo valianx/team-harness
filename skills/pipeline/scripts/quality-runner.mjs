@@ -9,8 +9,8 @@
  */
 
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
-import { lstat, mkdtemp, readFile, realpath, rm } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { lstat, mkdtemp, open, readFile, realpath, rename, rm, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -22,6 +22,7 @@ const execFileAsync = promisify(execFile);
 
 export const QUALITY_MANIFEST_SCHEMA_VERSION = 1;
 export const QUALITY_RESULT_SCHEMA_VERSION = 2;
+export const QUALITY_RECEIPT_SCHEMA_VERSION = 1;
 export const CRAP_REPORT_SCHEMA_VERSION = 1;
 export const CRAP_REPORT_TOKEN = "${TH_QUALITY_REPORT}";
 
@@ -36,7 +37,7 @@ const MAX_ARGV_BYTES = 64 * 1024;
 const SAFE_CHECKPOINT = /^[a-z][a-z0-9_-]{0,63}$/;
 const SAFE_COMMAND_ID = /^[a-z][a-z0-9_]{0,63}$/;
 const SAFE_COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
-const KNOWN_COMMANDS = [
+export const KNOWN_COMMANDS = [
   "test", "build", "typecheck", "format_check", "lint", "coverage", "crap",
   "invariants", "permissions", "accessibility", "contract", "integration", "database",
 ];
@@ -59,6 +60,7 @@ const ERROR_CODES = new Set([
   "REQUIRED_CHECKS_MISSING",
   "PREREQUISITE_UNAVAILABLE",
   "NON_HERMETIC_COMMAND",
+  "OUTPUT_WRITE_FAILED",
   "INTERNAL_ERROR",
 ]);
 const RESULT_KEYS = [
@@ -150,7 +152,7 @@ export const QUALITY_MANIFEST_SCHEMA = {
 
 export const QUALITY_RESULT_SCHEMA = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
-  $id: "team-harness/quality-result/v1",
+  $id: "team-harness/quality-result/v2",
   type: "object",
   additionalProperties: false,
   required: RESULT_KEYS,
@@ -214,6 +216,50 @@ function isSafeRelativePath(value) {
   return Buffer.byteLength(value, "utf8") <= 512;
 }
 
+const PACKAGE_MANAGERS = new Set(["npm", "pnpm", "yarn", "bun"]);
+const LEADING_OPTIONS_WITH_VALUE = new Set([
+  "--cache", "--config", "--cwd", "--dir", "--global-dir", "--globalconfig",
+  "--install-directory", "--prefix", "--store-dir", "--userconfig",
+]);
+const LEADING_FLAGS = new Set([
+  "--color", "--no-color", "--offline", "--prefer-offline", "--silent", "--verbose",
+]);
+
+function normalizeExecutable(value) {
+  return path.basename(value).toLowerCase().replace(/\.(?:bat|cmd|exe|ps1)$/u, "");
+}
+
+function skipLeadingOptions(argv, offset) {
+  while (offset < argv.length && argv[offset].startsWith("-")) {
+    const option = argv[offset].toLowerCase();
+    if (option === "--") return offset + 1;
+    if (option.includes("=") || LEADING_FLAGS.has(option)) {
+      offset += 1;
+      continue;
+    }
+    if (LEADING_OPTIONS_WITH_VALUE.has(option) && typeof argv[offset + 1] === "string") {
+      offset += 2;
+      continue;
+    }
+    throw new QualityError("NON_HERMETIC_COMMAND");
+  }
+  return offset;
+}
+
+function packageManagerInvocation(argv) {
+  let executable = normalizeExecutable(argv[0]);
+  let offset = 1;
+  if (executable === "corepack") {
+    offset = skipLeadingOptions(argv, offset);
+    executable = normalizeExecutable(argv[offset] ?? "");
+    if (!PACKAGE_MANAGERS.has(executable)) throw new QualityError("NON_HERMETIC_COMMAND");
+    offset += 1;
+  }
+  if (!PACKAGE_MANAGERS.has(executable)) return null;
+  offset = skipLeadingOptions(argv, offset);
+  return { executable, operation: argv[offset]?.toLowerCase() ?? null, operationOffset: offset };
+}
+
 function validateArgv(argv, { requireReportToken = false, allowLocalPnpmExec = false } = {}) {
   if (!Array.isArray(argv) || argv.length === 0 || argv.length > MAX_ARGV_ITEMS) throw new QualityError("MANIFEST_INVALID");
   let bytes = 0;
@@ -230,21 +276,16 @@ function validateArgv(argv, { requireReportToken = false, allowLocalPnpmExec = f
     if (argument === CRAP_REPORT_TOKEN) reportTokens += 1;
   }
   if (requireReportToken ? reportTokens !== 1 : reportTokens !== 0) throw new QualityError("MANIFEST_INVALID");
-  const executable = path.basename(argv[0]).toLowerCase().replace(/\.(?:cmd|exe)$/u, "");
-  const operation = argv[1]?.toLowerCase();
-  const wrappedExecutable = executable === "corepack" ? argv[1]?.toLowerCase() : null;
-  const wrappedOperation = executable === "corepack" ? argv[2]?.toLowerCase() : null;
-  const localPnpmExec = (executable === "pnpm" && operation === "exec")
-    || (executable === "corepack" && wrappedExecutable === "pnpm" && wrappedOperation === "exec");
+  const executable = normalizeExecutable(argv[0]);
+  const invocation = packageManagerInvocation(argv);
+  const operation = invocation?.operation ?? null;
+  const manager = invocation?.executable ?? null;
+  const localPnpmExec = manager === "pnpm" && operation === "exec";
   const nonHermetic = ["npx", "pnpx", "bunx"].includes(executable)
-    || (executable === "npm" && ["exec", "x"].includes(operation))
-    || (executable === "pnpm" && operation === "dlx")
-    || (executable === "yarn" && ["exec", "dlx"].includes(operation))
-    || (executable === "bun" && operation === "x")
-    || (wrappedExecutable === "npm" && ["exec", "x"].includes(wrappedOperation))
-    || (wrappedExecutable === "pnpm" && wrappedOperation === "dlx")
-    || (wrappedExecutable === "yarn" && ["exec", "dlx"].includes(wrappedOperation))
-    || ["npx", "pnpx", "bunx"].includes(wrappedExecutable)
+    || (manager === "npm" && ["exec", "x"].includes(operation))
+    || (manager === "pnpm" && operation === "dlx")
+    || (manager === "yarn" && ["exec", "dlx"].includes(operation))
+    || (manager === "bun" && operation === "x")
     || (localPnpmExec && !allowLocalPnpmExec);
   if (nonHermetic) throw new QualityError("NON_HERMETIC_COMMAND");
   return argv.slice();
@@ -506,11 +547,9 @@ async function commandWorkingDirectory(repo, relative) {
 }
 
 function pnpmExecParts(argv) {
-  const executable = path.basename(argv[0]).toLowerCase().replace(/\.(?:cmd|exe)$/u, "");
-  let offset;
-  if (executable === "pnpm" && argv[1]?.toLowerCase() === "exec") offset = 2;
-  else if (executable === "corepack" && argv[1]?.toLowerCase() === "pnpm" && argv[2]?.toLowerCase() === "exec") offset = 3;
-  else return null;
+  const invocation = packageManagerInvocation(argv);
+  if (invocation?.executable !== "pnpm" || invocation.operation !== "exec") return null;
+  let offset = invocation.operationOffset + 1;
   if (argv[offset] === "--") offset += 1;
   const tool = argv[offset];
   if (typeof tool !== "string" || !/^[A-Za-z0-9._-]+$/.test(tool)) throw new QualityError("NON_HERMETIC_COMMAND");
@@ -518,11 +557,9 @@ function pnpmExecParts(argv) {
 }
 
 function pnpmScriptParts(argv) {
-  const executable = path.basename(argv[0]).toLowerCase().replace(/\.(?:cmd|exe)$/u, "");
-  let offset;
-  if (executable === "pnpm") offset = 1;
-  else if (executable === "corepack" && argv[1]?.toLowerCase() === "pnpm") offset = 2;
-  else return null;
+  const invocation = packageManagerInvocation(argv);
+  if (invocation?.executable !== "pnpm") return null;
+  let offset = invocation.operationOffset;
   if (["exec", "dlx"].includes(argv[offset]?.toLowerCase())) return null;
   if (argv[offset]?.toLowerCase() === "run") offset += 1;
   const script = argv[offset];
@@ -550,12 +587,20 @@ function parseSimplePackageScript(value) {
   return { tool, args: parts.slice(1) };
 }
 
-async function resolveLinkedLocalBinary(tool, args, cwd, repository, resolution) {
+function windowsShimInvocation(candidate, args) {
+  return {
+    argv: ["powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", candidate, ...args],
+  };
+}
+
+export async function resolveLinkedLocalBinary(tool, args, cwd, repository, resolution, platform = process.platform) {
+  const normalizedTool = tool.replace(/\.(?:bat|cmd|exe|ps1)$/iu, "");
   let directory = cwd;
   while (isContained(repository, directory)) {
     const candidates = [
-      path.join(directory, "node_modules", ".bin", tool),
-      path.join(directory, "node_modules", ".bin", `${tool}.exe`),
+      path.join(directory, "node_modules", ".bin", normalizedTool),
+      path.join(directory, "node_modules", ".bin", `${normalizedTool}.exe`),
+      ...(platform === "win32" ? [path.join(directory, "node_modules", ".bin", `${normalizedTool}.ps1`)] : []),
     ];
     for (const candidate of candidates) {
       try {
@@ -564,9 +609,12 @@ async function resolveLinkedLocalBinary(tool, args, cwd, repository, resolution)
         const target = await realpath(candidate);
         const targetStat = await lstat(target);
         if (!targetStat.isFile() || !isContained(repository, target)) continue;
+        const invocation = platform === "win32" && candidate.toLowerCase().endsWith(".ps1")
+          ? windowsShimInvocation(candidate, args)
+          : { argv: [candidate, ...args] };
         return {
-          argv: [candidate, ...args],
-          identity: [`${"${TH_LOCAL_BIN}"}/${tool}`, ...args],
+          argv: invocation.argv,
+          identity: [`${"${TH_LOCAL_BIN}"}/${normalizedTool}`, ...args],
           resolution,
         };
       } catch { /* try the next candidate/ancestor */ }
@@ -579,7 +627,62 @@ async function resolveLinkedLocalBinary(tool, args, cwd, repository, resolution)
   throw new QualityError("PREREQUISITE_UNAVAILABLE");
 }
 
+async function resolveDeclaredLocalBinary(argv, cwd, repository, platform = process.platform) {
+  const coordinate = argv[0].replaceAll("\\", "/");
+  const match = /^(?:\.\/)?node_modules\/\.bin\/([A-Za-z0-9._-]+)$/u.exec(coordinate);
+  if (match === null) return null;
+  if (!isSafeRelativePath(coordinate)) throw new QualityError("NON_HERMETIC_COMMAND");
+  const requested = path.resolve(cwd, coordinate);
+  if (!isContained(repository, requested)) throw new QualityError("NON_HERMETIC_COMMAND");
+  try {
+    const stat = await lstat(requested);
+    if (!stat.isFile() && !stat.isSymbolicLink()) throw new Error("invalid local binary");
+    const target = await realpath(requested);
+    const targetStat = await lstat(target);
+    if (!targetStat.isFile() || !isContained(repository, target)) {
+      throw new Error("local binary escapes repository");
+    }
+    const args = argv.slice(1);
+    const invocation = platform === "win32" && requested.toLowerCase().endsWith(".ps1")
+      ? windowsShimInvocation(requested, args)
+      : { argv: [requested, ...args] };
+    return {
+      argv: invocation.argv,
+      identity: [`${"${TH_LOCAL_BIN}"}/${match[1]}`, ...args],
+      resolution: "repository-local-bin",
+    };
+  } catch (error) {
+    if (error instanceof QualityError) throw error;
+    throw new QualityError("PREREQUISITE_UNAVAILABLE");
+  }
+}
+
+async function resolveRepositoryNodeScript(args, cwd, repository, resolution) {
+  const [script, ...scriptArgs] = args;
+  if (!isSafeRelativePath(script) || !/\.(?:cjs|js|mjs)$/iu.test(script)) {
+    throw new QualityError("NON_HERMETIC_COMMAND");
+  }
+  const requested = path.resolve(cwd, script);
+  try {
+    const stat = await lstat(requested);
+    if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("invalid script");
+    const canonical = await realpath(requested);
+    if (!isContained(repository, canonical)) throw new Error("escaped script");
+    const relative = path.relative(repository, canonical).split(path.sep).join("/");
+    return {
+      argv: [process.execPath, canonical, ...scriptArgs],
+      identity: ["${TH_REPOSITORY_NODE}", relative, ...scriptArgs],
+      resolution,
+    };
+  } catch (error) {
+    if (error instanceof QualityError) throw error;
+    throw new QualityError("PREREQUISITE_UNAVAILABLE");
+  }
+}
+
 async function resolveExecutionArgv(argv, cwd, repository) {
+  const declaredLocalBinary = await resolveDeclaredLocalBinary(argv, cwd, repository);
+  if (declaredLocalBinary !== null) return declaredLocalBinary;
   const parts = pnpmExecParts(argv);
   if (parts !== null) {
     return resolveLinkedLocalBinary(parts.tool, parts.args, cwd, repository, "linked-local-bin");
@@ -599,7 +702,16 @@ async function resolveExecutionArgv(argv, cwd, repository) {
     throw new QualityError("PREREQUISITE_UNAVAILABLE");
   }
   const scriptValue = packageJson?.scripts?.[scriptParts.script];
+  if (scriptValue === undefined) throw new QualityError("PREREQUISITE_UNAVAILABLE");
   const simple = parseSimplePackageScript(scriptValue);
+  if (normalizeExecutable(simple.tool) === "node") {
+    return resolveRepositoryNodeScript(
+      [...simple.args, ...scriptParts.args],
+      cwd,
+      repository,
+      "repository-local-node-script",
+    );
+  }
   return resolveLinkedLocalBinary(
     simple.tool,
     [...simple.args, ...scriptParts.args],
@@ -747,7 +859,7 @@ function isCommandEvidence(value) {
   if (!hasExactlyKeys(value, keys)) return false;
   if (!SAFE_COMMAND_ID.test(value.id) || !/^[0-9a-f]{64}$/.test(value.command_sha256)
     || !/^[0-9a-f]{64}$/.test(value.execution_argv_sha256)
-    || !["manifest", "linked-local-bin", "linked-local-script"].includes(value.execution_resolution)) return false;
+    || !["manifest", "linked-local-bin", "linked-local-script", "repository-local-bin", "repository-local-node-script"].includes(value.execution_resolution)) return false;
   const hasVersion = value.version_result !== null;
   if (hasVersion !== (typeof value.version_sha256 === "string" && /^[0-9a-f]{64}$/.test(value.version_sha256))) return false;
   if (hasVersion !== (typeof value.version_fingerprint === "string" && /^[0-9a-f]{64}$/.test(value.version_fingerprint))) return false;
@@ -1001,8 +1113,9 @@ async function prepareBaseline(context) {
 
 async function runVersionCheck(context, id, command, cwd, resolved) {
   if (command.version_argv === null) return null;
+  const versionResolved = await resolveExecutionArgv(command.version_argv, cwd, context.repository.root);
   const version = await runBoundedCommand({
-    argv: command.version_argv,
+    argv: versionResolved.argv,
     cwd,
     timeoutMs: command.timeout_ms,
     includeSuccessDiagnostic: true,
@@ -1139,6 +1252,67 @@ export async function runQualityChecks(options) {
   return safeResult(state, startedAt);
 }
 
+export async function persistQualityResult(outputPath, result) {
+  if (typeof outputPath !== "string" || !path.isAbsolute(outputPath) || outputPath.includes("\u0000")) {
+    throw new QualityError("ARGUMENT_INVALID");
+  }
+  const target = path.resolve(outputPath);
+  const parent = path.dirname(target);
+  try {
+    const parentStat = await lstat(parent);
+    if (!parentStat.isDirectory() || parentStat.isSymbolicLink() || await realpath(parent) !== parent) {
+      throw new QualityError("ARGUMENT_INVALID");
+    }
+    try {
+      const targetStat = await lstat(target);
+      if (!targetStat.isFile() || targetStat.isSymbolicLink()) throw new QualityError("ARGUMENT_INVALID");
+    } catch (error) {
+      if (error instanceof QualityError) throw error;
+      if (error?.code !== "ENOENT") throw error;
+    }
+    const bytes = Buffer.from(`${JSON.stringify(result)}\n`);
+    const temporary = path.join(parent, `.${path.basename(target)}.tmp-${process.pid}-${Date.now()}-${randomUUID()}`);
+    let handle;
+    let ownsTemporary = false;
+    try {
+      handle = await open(temporary, "wx", 0o600);
+      ownsTemporary = true;
+      await handle.writeFile(bytes);
+      await handle.sync();
+      await handle.close();
+      handle = null;
+      if (await realpath(parent) !== parent) throw new QualityError("ARGUMENT_INVALID");
+      try {
+        const targetStat = await lstat(target);
+        if (!targetStat.isFile() || targetStat.isSymbolicLink()) throw new QualityError("ARGUMENT_INVALID");
+      } catch (error) {
+        if (error instanceof QualityError) throw error;
+        if (error?.code !== "ENOENT") throw error;
+      }
+      await rename(temporary, target);
+      ownsTemporary = false;
+    } catch (error) {
+      if (handle) await handle.close().catch(() => {});
+      if (ownsTemporary) await unlink(temporary).catch(() => {});
+      if (error instanceof QualityError) throw error;
+      throw new QualityError("OUTPUT_WRITE_FAILED");
+    }
+    return {
+      schema_version: QUALITY_RECEIPT_SCHEMA_VERSION,
+      kind: "team_harness_quality_receipt",
+      verdict: result.verdict,
+      error_code: result.error_code,
+      checkpoint: result.checkpoint,
+      result_path: target,
+      result_sha256: sha256(bytes),
+      result_bytes: bytes.length,
+    };
+  } catch (error) {
+    if (error instanceof QualityError) throw error;
+    throw new QualityError("OUTPUT_WRITE_FAILED");
+  }
+}
+
 function parseCli(argv) {
   const values = {};
   for (let index = 0; index < argv.length; index += 2) {
@@ -1146,7 +1320,7 @@ function parseCli(argv) {
     const value = argv[index + 1];
     if (
       value === undefined ||
-      !["--repo", "--manifest", "--base", "--candidate", "--checkpoint", "--checks", "--required-checks", "--policy-mode", "--baseline", "--baseline-sha256"].includes(flag) ||
+      !["--repo", "--manifest", "--base", "--candidate", "--checkpoint", "--checks", "--required-checks", "--policy-mode", "--baseline", "--baseline-sha256", "--output"].includes(flag) ||
       Object.hasOwn(values, flag)
     ) {
       return null;
@@ -1158,22 +1332,43 @@ function parseCli(argv) {
   }
   const checks = values["--checks"].split(",");
   return {
-    repo: values["--repo"],
-    manifest: values["--manifest"],
-    base: values["--base"],
-    candidate: values["--candidate"],
-    checkpoint: values["--checkpoint"],
-    checks,
-    requiredChecks: values["--required-checks"] === "" ? [] : values["--required-checks"].split(","),
-    policyMode: values["--policy-mode"] ?? "measure",
-    ...(Object.hasOwn(values, "--baseline") ? { baseline: values["--baseline"] } : {}),
-    ...(Object.hasOwn(values, "--baseline-sha256") ? { baselineSha256: values["--baseline-sha256"] } : {}),
+    output: values["--output"] ?? null,
+    options: {
+      repo: values["--repo"],
+      manifest: values["--manifest"],
+      base: values["--base"],
+      candidate: values["--candidate"],
+      checkpoint: values["--checkpoint"],
+      checks,
+      requiredChecks: values["--required-checks"] === "" ? [] : values["--required-checks"].split(","),
+      policyMode: values["--policy-mode"] ?? "measure",
+      ...(Object.hasOwn(values, "--baseline") ? { baseline: values["--baseline"] } : {}),
+      ...(Object.hasOwn(values, "--baseline-sha256") ? { baselineSha256: values["--baseline-sha256"] } : {}),
+    },
   };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const options = parseCli(process.argv.slice(2));
-  const result = await runQualityChecks(options);
-  process.stdout.write(`${JSON.stringify(result)}\n`);
+  const parsed = parseCli(process.argv.slice(2));
+  const result = await runQualityChecks(parsed?.options ?? null);
+  if (parsed?.output === null || parsed?.output === undefined) {
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+  } else {
+    try {
+      process.stdout.write(`${JSON.stringify(await persistQualityResult(parsed.output, result))}\n`);
+    } catch (error) {
+      process.stdout.write(`${JSON.stringify({
+        schema_version: QUALITY_RECEIPT_SCHEMA_VERSION,
+        kind: "team_harness_quality_receipt",
+        verdict: "fail",
+        error_code: error instanceof QualityError && ERROR_CODES.has(error.code) ? error.code : "OUTPUT_WRITE_FAILED",
+        checkpoint: result.checkpoint,
+        result_path: null,
+        result_sha256: null,
+        result_bytes: null,
+      })}\n`);
+      process.exitCode = 1;
+    }
+  }
   if (result.verdict !== "pass") process.exitCode = 1;
 }

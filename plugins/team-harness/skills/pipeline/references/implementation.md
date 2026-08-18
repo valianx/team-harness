@@ -34,6 +34,16 @@ All matching on recovery means verify and resume; all absent means resume the
 same approval step; partial or mismatched topology stops for operator direction
 without destructive repair.
 
+Before dispatch, validate the dependency topology required by the selected
+quality commands. A direct `node_modules/.bin/<tool>` coordinate must resolve to
+a regular local executable whose canonical target remains inside this checkout.
+Reject a whole `node_modules` symlink to another checkout as
+`PREREQUISITE_UNAVAILABLE`: it can trigger package-manager verification,
+cross-OS stores, `npx`, or external caches and is not a self-contained worktree.
+Use the branch-in-place topology approved at Gate 1 or the plan's explicit
+lockfile-native local provisioning step; never improvise an `ln -s`, change
+topology after Gate 1, or present a shared wrapper as installed dependencies.
+
 For branch-in-place, perform the same dirty-tree and ownership checks before
 `git checkout -b`; Gate 1 likewise cannot supply that command's native Git
 metadata permission.
@@ -107,6 +117,15 @@ case-mismatched, escaped, or invented coordinates are
 `packet-artifact-invalid`; do not dispatch or ask a specialist to discover a
 replacement path.
 
+Every OpenSpec-bound initial or correction packet carries one inseparable
+`openspec_snapshot: {path, sha256}` binding. `path` is the absolute canonical
+snapshot file below `workspace_artifact_root`; a standalone digest, standalone
+path, relative path, symlink, missing file, containment failure, or digest
+mismatch is `packet-contract-invalid` and blocks before spawn. Main performs
+that regular-file and SHA-256 preflight immediately before every fresh dispatch;
+specialists never interpret a snapshot digest as a Git object or discover a
+missing coordinate.
+
 The packet declares `discovery_scope: {directories: [...], globs: [...]}` with
 only repository-relative task-owned search roots. Before dispatch, Main checks
 `required_seams`: every API, export, mutation adapter, public entry point,
@@ -123,9 +142,16 @@ inspection, first inspect metadata, then read at most one file per tool call
 under a predeclared output cap. When a file is not known to fit, locate only
 task-relevant symbols/anchors with bounded `rg -n` and read
 separate bounded ranges. Never combine all task files, a whole directory, or
-workspace artifacts into one inspection command. Tool-level truncation yields
-no read evidence: continue with narrower per-file/range reads and never replay
-the aggregate command. Never run repository-wide `rg --files` and filter its
+workspace artifacts into one inspection command. Also never place independent
+reads in a parallel tool batch (`Promise.all`, multiple nested tool calls in one
+orchestration response, or equivalent): their outputs share one response/context
+budget and can truncate each other despite individual caps. One evidence read
+means one file, one exact JSON Pointer/unique anchor/bounded line range, and one
+independent predeclared cap. A verified whole-file SHA-256 establishes complete
+artifact identity; dumping the full file is not proof of reading and is
+prohibited. Tool-level truncation yields no read evidence: continue
+sequentially with narrower child pointers or per-file/range reads and never
+replay the aggregate command. Never run repository-wide `rg --files` and filter its
 output afterward. Enumerate one supplied `discovery_scope.directory` with one
 exact supplied `-g` glob per call; if that pair can still be large, route it
 through `bounded_command_path` before execution. Resolve traceability through
@@ -154,19 +180,29 @@ if length == 1 then .[0].sources[] else error("execution item cardinality")
 end' plan/openspec-traceability.json`. Zero or multiple matches block.
 After a successful assigned task, permit and record only its exact monotonic
 OpenSpec task-checkbox transition through `openspec-overlay.mjs
-verify-and-rebind`, passing the same workspace, snapshot, traceability,
+verify-progress`, passing the same workspace, snapshot, traceability,
 complete live `--writable-root` set, and every exact `--authorized-task` ID.
-This single recoverable operation verifies source intent and progress, updates
-the snapshot, and mechanically rebinds only
-`overlay.snapshot.{sha256,artifact_set_sha256}` before returning. Require its
-closed `team_harness_openspec_progress_transition` pass result and then rerun
-`plan-contract`. On rebind failure it restores the prior snapshot when its
-identity is unchanged; after interruption it resumes only when the latest
-progress event's predecessor and task IDs exactly match the requested
-transition. Any other source drift, missing predecessor, additional overlay
-finding, or concurrent artifact change fails closed. Never invoke standalone
-`verify` followed by manual rebind, repair the JSON by hand, tolerate
-`SNAPSHOT_STALE`, or redispatch an architect for checkbox-only progress.
+The transition accepts OpenSpec's visible IDs (`5.1`) and canonical snapshot
+IDs (`task:5.1`), normalizes both to the canonical form, rejects malformed or
+duplicate-after-normalization input, and records only canonical IDs. Main
+passes the IDs already returned by the specialist; it never reads the snapshot
+to guess a different spelling or retries an alternate form.
+The Gate-1 `inputs/openspec-snapshot.json` is immutable intent: task checkbox
+state is excluded from its identity. This single recoverable operation verifies
+source intent, atomically advances only `inputs/openspec-progress.json`, and
+leaves both the snapshot and overlay bytes unchanged. Require its closed
+`team_harness_openspec_progress_transition` pass result and then rerun
+`plan-contract`; legitimate checkbox progress therefore never produces
+`SNAPSHOT_STALE` and never requires hash rebinding. An exact repeat of the
+latest authorized transition is idempotent. Any non-task drift, task-content
+change beyond checkboxes, rollback, unauthorized ID, malformed progress chain,
+or concurrent artifact change fails closed. Never invoke standalone `verify`
+followed by manual rebind, repair hashes by hand, tolerate `SNAPSHOT_STALE`, or
+redispatch an architect for checkbox-only progress. `verify-and-rebind` remains
+a compatibility alias for `verify-progress` but performs no rebinding.
+The standalone `openspec-snapshot.mjs verify` CLI rejects `phase:
+implementation` with `ATOMIC_TRANSITION_REQUIRED` before mutating progress;
+only the in-process verifier owned by `verify-progress` may advance it.
 
 ## Pre-implementation behavioral test contract
 
@@ -191,10 +227,23 @@ non-installing rule applies to `pnpm <script>` and `pnpm run <script>`, includin
 `pnpm test` and `pnpm storybook`: the runner may execute them only after reading
 the repository-local `package.json`, accepting a single simple script command,
 resolving its executable through an existing repository-local
-`node_modules/.bin` link, and recording `linked-local-script`. Compound shell
-scripts or missing links fail closed before pnpm launches. Specialist packets
+`node_modules/.bin` link, and recording `linked-local-script`. A simple
+`node <repository-relative .js|.mjs|.cjs> ...` script instead resolves directly
+to the current Node executable and records `repository-local-node-script`;
+pnpm is never launched, so worktree dependency verification cannot touch a
+global or cross-OS store. Compound shell scripts, unsafe Node coordinates, or
+missing links/files fail closed before pnpm launches. Specialist packets
 name quality check IDs and the resolved runner/transition helper; they never
 prescribe a raw package-manager fallback as authoritative evidence.
+The same containment preflight applies when the manifest names
+`./node_modules/.bin/<tool>` directly; success records
+`repository-local-bin`, while a target in another checkout is
+`PREREQUISITE_UNAVAILABLE` before either the command or its version probe runs.
+Every coordinator-owned quality invocation supplies an absolute `--output`
+path, verifies the bounded receipt against the atomically written complete JSON,
+and persists that artifact directly. Never synthesize a temporary `.mjs`
+wrapper or interpolate command, allowlist, or path strings into executable
+source merely to capture quality evidence.
 
 Immediately before the task's tester dispatch, record the current full commit
 as that task's test baseline. Dispatch a fresh `tester` in
@@ -211,7 +260,8 @@ SAFE_REQUIREMENT strings, never objects. This validation checks schema,
 ancestry, exact candidate-diff equality, and manifest path rules without
 running tests; unchanged preservation tests and non-test fixtures are invalid
 `test_paths`. A failed self-validation returns `contract-invalid` and Main does not begin the red transition. Verify commit
-integrity and that no production path changed.
+the test-only diff directly and require that no production path changed; no
+intermediate commit-integrity gate is created.
 
 Main then invokes `node <test-transition-path> --transition red` against that
 task baseline and current `HEAD` with `--output <coordinator evidence path>`.
@@ -245,6 +295,14 @@ task baseline, and test blobs, with the red candidate ancestral to current
 correction and consumes the normal max-3 budget. A task explicitly marked
 `not-applicable` records that state and its plan-time reason without running the
 checkpoint.
+
+Test blobs are immutable only during their own active red-to-green transition.
+After that task closes and before final Freeze, a fresh tester may make
+one test-only correction when a previously green expectation contradicts the
+same pinned OpenSpec intent. The correction must name the obsolete expectation,
+change no production path, and produce current focused/global evidence. Never
+change production behavior to satisfy a stale test; final Freeze, not a chain
+of per-task test commits, owns the accepted suite identity.
 
 ## Efficient execution, rotation, and tool diagnostics
 
@@ -289,19 +347,23 @@ nested orchestrator or automatically replace native Main.
 
 ## Atomic commit-integrity evidence
 
-After every successful `implementer`/`tester` return and again at implementation
-evidence close, resolve packaged `commit-integrity.mjs` and invoke it directly
-with `--repository`, the reported `--commit` (or literal `none`), registered
-`--base-sha`, exact `--branch`, declared `--worktree`, repeated task
-`--allowed-path`, any matching annotated `--scope-drift-path`, and
+Record one `base_commit` when implementation opens. Per-task commits are
+optional checkpoints and never become orchestration identity. At Freeze only,
+resolve packaged `commit-integrity.mjs` and invoke it directly with
+`--repository`, the final `--commit HEAD`, that implementation `--base-sha`,
+exact `--branch`, declared `--worktree`, the union of approved
+`--allowed-path` values, any matching annotated `--scope-drift-path`, and
 `--output <coordinator evidence path>`. The helper performs the six Git-backed
-conjuncts without a shell: tree cleanliness, ancestry, baseline movement,
-branch, worktree, and commit staging scope. It atomically persists the complete
+conjuncts against the complete `base_commit..HEAD` delta without a shell: tree
+cleanliness, base ancestry, baseline movement, branch, worktree, and final
+scope. The reported commit must equal HEAD. It atomically persists the complete
 fixed-shape result and prints only a bounded
 `team_harness_commit_integrity_receipt` with path, SHA-256, and byte count.
-Verify the receipt and persisted result before separately applying the seventh,
-coordinator-owned lane-coverage conjunct. Only both passes satisfy commit
-integrity.
+Verify the receipt and persisted result before separately applying the
+coordinator-owned lane-coverage conjunct. Only both passes satisfy Freeze.
+An optional `red_commit` is owned by `test-transition`; delivery records a
+separate `delivery_commit` only when delivery itself changes the tree. No other
+commit SHA blocks or advances pipeline state.
 
 Do not concatenate the HEAD, tree, status, changed paths, test paths, branch,
 worktree, or merge-base probes into one shell/tool call. A native tool message
@@ -414,17 +476,24 @@ migrations, public schemas, version sites, changelog, and workspace artifacts.
 Persist the allowlist and SHA-256. An empty allowlist is an evidenced no-op.
 
 Main resolves `cleaner-transition.mjs` relative to the loaded skill and runs it
-with `--transition pre`, repository, manifest, `verification_base_ref`, `HEAD`,
-and the allowlist. It validates that allowlist against the immutable change
+with `--transition pre --output <coordinator-evidence-path>`, repository,
+manifest, `verification_base_ref`, `HEAD`, and the allowlist. It validates that allowlist against the immutable change
 surface and runs the embedded quality runner's `pre_cleaner` `test` check plus
-`crap` in `measure` mode when configured. Persist the complete closed JSON
-wrapper, SHA-256, and candidate commit/tree. Then dispatch exactly one fresh
+every declared `format_check` and `lint`, and `crap` in `measure` mode when
+configured. An over-broad or historically red repository adapter therefore
+returns to implementation before the sole cleaner dispatch; it is never first
+discovered or attributed to cleaner-post. It atomically writes the complete
+closed JSON and prints only a bounded receipt with path, SHA-256, and byte
+count. Verify that receipt and candidate commit/tree; never synthesize a
+temporary JavaScript wrapper or route persistence through `bounded-command`.
+Then dispatch exactly one fresh
 V2 `cleaner` with `fork_turns: none`, carrying only the hashed allowlist,
 functional AC summary, applicable TCs, quality manifest, and hashed baseline.
 The cleaner may edit only allowlisted existing production paths, never tests or
 quality inputs, and returns a cleanup commit or justified no-op.
 
-Main then runs `cleaner-transition.mjs --transition post` with the exact
+Main then runs `cleaner-transition.mjs --transition post --output
+<coordinator-evidence-path>` with the exact
 allowlist path/hash and pre-transition path/hash. The helper proves ancestry,
 rejects additions, deletions, renames, type changes, and modifications outside
 the allowlist, and runs the embedded `post_cleaner` checks
@@ -433,6 +502,14 @@ runs in `enforce` mode. Advance only when every selected command passes. When
 CRAP is configured, policy must permit every CRAP delta and every baseline
 function must remain in the report. `CRAP_REPORT_INCOMPLETE` prevents renaming,
 splitting, excluding, or omitting a function merely to hide its prior score.
+For `CRAP_REPORT_INVALID`, diagnose against the closed adapter contract rather
+than reading runner source: top-level keys are exactly `schema_version: 1` and
+`functions`; every function has exactly `path`, `symbol`, `status`,
+`complexity`, and `coverage_percent`, with a safe changed repository path,
+unique path/symbol pair, `new|changed` status, integer complexity of at least
+one, and finite coverage from 0 through 100. Inspect only the bounded report
+artifact and the manifest's adapter argv. `CRAP_REPORT_INCOMPLETE` instead means
+a baseline function disappeared during post-cleaner enforcement.
 Each repository's cleaner runs exactly once and is never re-dispatched. It completes and
 commits every independent safe allowlisted cleanup before returning any
 `implementer_findings`; each finding must carry stable ID, cause, files,
@@ -568,7 +645,7 @@ every other path is substantive. The 400-line/8-file caps require a bounded
 unconditional composition, size result, and optional justification, then record full
 `freeze_commit_sha` and `freeze_tree_sha` together with the frozen diff/evidence anchor. Build, tests, QA, and security see that exact identity. Any later tree change
 reopens Freeze and the affected validation; nothing ships from stale findings. When acceptance
-passes, copy the same values to `validated_commit_sha` and `validated_tree_sha`.
+passes, retain that same Freeze identity; do not create duplicate validated SHA fields.
 
 When all approved implementation work and evidence checkpoints are complete, set `phase: validation`,
 `status: in_progress`, and `next_action: run approved acceptance validation`. Record changed files,

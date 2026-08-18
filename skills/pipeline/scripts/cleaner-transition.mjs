@@ -2,8 +2,8 @@
 /** Prove one bounded cleaner transition without trusting agent prose. */
 
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
-import { lstat, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { lstat, mkdtemp, open, readFile, realpath, rename, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -19,6 +19,7 @@ const execFileAsync = promisify(execFile);
 
 export const CLEANER_ALLOWLIST_SCHEMA_VERSION = 1;
 export const CLEANER_TRANSITION_SCHEMA_VERSION = 1;
+export const CLEANER_TRANSITION_RECEIPT_SCHEMA_VERSION = 1;
 
 const MAX_JSON_BYTES = 1024 * 1024;
 const MAX_PATHS = 512;
@@ -32,6 +33,7 @@ const ERROR_CODES = new Set([
   "BASELINE_INVALID",
   "CLEANER_SCOPE_INVALID",
   "QUALITY_FAILED",
+  "OUTPUT_WRITE_FAILED",
   "INTERNAL_ERROR",
 ]);
 const RESULT_KEYS = [
@@ -135,12 +137,10 @@ async function resolveManifest(repo, manifestInput) {
   return { value, sha256: sha256(loaded.bytes) };
 }
 
-function cleanerChecks(manifest, transition) {
+function cleanerChecks(manifest) {
   const checks = ["test"];
-  if (transition === "post") {
-    for (const id of ["format_check", "lint"]) {
-      if (Object.hasOwn(manifest.value.commands, id)) checks.push(id);
-    }
+  for (const id of ["format_check", "lint"]) {
+    if (Object.hasOwn(manifest.value.commands, id)) checks.push(id);
   }
   if (manifest.value.crap !== null) checks.push("crap");
   return checks;
@@ -295,9 +295,7 @@ export function isCleanerTransitionResult(value) {
   ) {
     return false;
   }
-  const allowedCommands = new Set(value.transition === "pre"
-    ? ["test", "crap"]
-    : ["test", "format_check", "lint", "crap"]);
+  const allowedCommands = new Set(["test", "format_check", "lint", "crap"]);
   const actualCommands = value.quality?.commands.map((entry) => entry.id) ?? [];
   const actualCommandSet = new Set(actualCommands);
   const hasCrap = actualCommandSet.has("crap");
@@ -380,7 +378,7 @@ function normalizeOptions(options) {
 }
 
 async function runPreQuality(options, manifest) {
-  const checks = cleanerChecks(manifest, "pre");
+  const checks = cleanerChecks(manifest);
   return runQualityChecks({
     repo: options.repo,
     manifest: options.manifest,
@@ -417,7 +415,7 @@ async function withQualityBaseline(baselineResult, callback) {
 }
 
 async function runPostQuality(options, baseline, manifest) {
-  const checks = cleanerChecks(manifest, "post");
+  const checks = cleanerChecks(manifest);
   return withQualityBaseline(baseline.result, ({ file, sha256: baselineSha256 }) =>
     runQualityChecks({
       repo: options.repo,
@@ -517,6 +515,67 @@ export async function runCleanerTransition(options) {
   return safeResult(state, startedAt);
 }
 
+export async function persistCleanerTransition(outputPath, result) {
+  if (typeof outputPath !== "string" || !path.isAbsolute(outputPath) || outputPath.includes("\u0000")) {
+    throw new CleanerError("ARGUMENT_INVALID");
+  }
+  const target = path.resolve(outputPath);
+  const parent = path.dirname(target);
+  try {
+    const parentStat = await lstat(parent);
+    if (!parentStat.isDirectory() || parentStat.isSymbolicLink() || await realpath(parent) !== parent) {
+      throw new CleanerError("ARGUMENT_INVALID");
+    }
+    try {
+      const targetStat = await lstat(target);
+      if (!targetStat.isFile() || targetStat.isSymbolicLink()) throw new CleanerError("ARGUMENT_INVALID");
+    } catch (error) {
+      if (error instanceof CleanerError) throw error;
+      if (error?.code !== "ENOENT") throw error;
+    }
+    const bytes = Buffer.from(`${JSON.stringify(result)}\n`);
+    const temporary = path.join(parent, `.${path.basename(target)}.tmp-${process.pid}-${Date.now()}-${randomUUID()}`);
+    let handle;
+    let ownsTemporary = false;
+    try {
+      handle = await open(temporary, "wx", 0o600);
+      ownsTemporary = true;
+      await handle.writeFile(bytes);
+      await handle.sync();
+      await handle.close();
+      handle = null;
+      if (await realpath(parent) !== parent) throw new CleanerError("ARGUMENT_INVALID");
+      try {
+        const targetStat = await lstat(target);
+        if (!targetStat.isFile() || targetStat.isSymbolicLink()) throw new CleanerError("ARGUMENT_INVALID");
+      } catch (error) {
+        if (error instanceof CleanerError) throw error;
+        if (error?.code !== "ENOENT") throw error;
+      }
+      await rename(temporary, target);
+      ownsTemporary = false;
+    } catch (error) {
+      if (handle) await handle.close().catch(() => {});
+      if (ownsTemporary) await unlink(temporary).catch(() => {});
+      if (error instanceof CleanerError) throw error;
+      throw new CleanerError("OUTPUT_WRITE_FAILED");
+    }
+    return {
+      schema_version: CLEANER_TRANSITION_RECEIPT_SCHEMA_VERSION,
+      kind: "team_harness_cleaner_transition_receipt",
+      transition: result.transition,
+      verdict: result.verdict,
+      error_code: result.error_code,
+      result_path: target,
+      result_sha256: sha256(bytes),
+      result_bytes: bytes.length,
+    };
+  } catch (error) {
+    if (error instanceof CleanerError) throw error;
+    throw new CleanerError("OUTPUT_WRITE_FAILED");
+  }
+}
+
 function parseCli(argv) {
   const flags = new Map([
     ["--transition", "transition"],
@@ -528,6 +587,7 @@ function parseCli(argv) {
     ["--allowlist-sha256", "allowlistSha256"],
     ["--baseline", "baseline"],
     ["--baseline-sha256", "baselineSha256"],
+    ["--output", "output"],
   ]);
   if (argv.length % 2 !== 0) return null;
   const values = {};
@@ -536,11 +596,31 @@ function parseCli(argv) {
     if (key === undefined || Object.hasOwn(values, key)) return null;
     values[key] = argv[index + 1];
   }
-  return values;
+  const { output = null, ...options } = values;
+  return { options, output };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const result = await runCleanerTransition(parseCli(process.argv.slice(2)));
-  process.stdout.write(`${JSON.stringify(result)}\n`);
+  const parsed = parseCli(process.argv.slice(2));
+  const result = await runCleanerTransition(parsed?.options ?? null);
+  if (parsed?.output === null || parsed?.output === undefined) {
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+  } else {
+    try {
+      process.stdout.write(`${JSON.stringify(await persistCleanerTransition(parsed.output, result))}\n`);
+    } catch (error) {
+      process.stdout.write(`${JSON.stringify({
+        schema_version: CLEANER_TRANSITION_RECEIPT_SCHEMA_VERSION,
+        kind: "team_harness_cleaner_transition_receipt",
+        transition: result.transition,
+        verdict: "fail",
+        error_code: error instanceof CleanerError && ERROR_CODES.has(error.code) ? error.code : "OUTPUT_WRITE_FAILED",
+        result_path: null,
+        result_sha256: null,
+        result_bytes: null,
+      })}\n`);
+      process.exitCode = 1;
+    }
+  }
   if (result.verdict !== "pass") process.exitCode = 1;
 }

@@ -134,7 +134,7 @@ Detect the mode from the task description or the orchestrator's instructions.
 Use only when the role packet explicitly declares `mode: openspec-planning`, the bound change
 root, and the absolute installed upstream skill path. Read that `SKILL.md` completely and follow
 its propose or update workflow. Write only the concrete OpenSpec artifacts reported by the CLI
-inside the bound change root. Do not create `01-plan.md`, task shards, traceability, or TH state in
+inside the bound change root. Do not create Team Harness planning indexes, task shards, traceability, or coordinator state in
 this pass. Return artifact pointers plus unresolved contradictions; OpenSpec readiness never
 releases Gate 1 or selects another role.
 
@@ -161,8 +161,8 @@ worktree must be equal to or strictly below one of them; escalation used to run
 
 **Codex progress transport.** When this packet includes `dispatch_id`,
 `progress_recipient`, and `progress_interval_seconds: 120`, use native
-`send_message` to that exact recipient. Send one line beginning `TH_PROGRESS `
-followed by JSON with exactly these keys: `schema_version`, `dispatch_id`,
+`send_message` to that exact recipient. Send one line beginning with `TH_PROGRESS`,
+followed by one space and JSON with exactly these keys: `schema_version`, `dispatch_id`,
 `role`, `mode`, `milestone`, `completed_units`, `total_units`,
 `artifact_pointers`, and `blocked_code`. Use `schema_version: 1`,
 `role: architect`, `mode: openspec-overlay`, and only milestones `started`,
@@ -174,7 +174,7 @@ regular outputs already written; `blocked_code` is `null`, `AMBIGUITY`,
 `INPUT_MISSING`, or `WRITE_FAILED`. Never put prose, paths outside the
 workspace, source content, command output, or secrets in progress. A heartbeat
 does not replace the final status, prove completion, or authorize a phase/gate.
-Never write progress into `00-state.md`, events, or a new artifact; Main owns
+Never write progress into coordinator-owned state, events, or a new artifact; Main owns
 durable coordination. On `TH_PROGRESS_REQUEST`, send the current snapshot at
 the next message boundary without restarting analysis.
 
@@ -503,8 +503,8 @@ Stacked PRs within the SAME repository (a group's Base = a sibling group's branc
 
 ## Dispatch anchors
 
-required_invariants: [{I-N identifiers} | ]
-required_evidence_anchors: [{workspace-relative paths} | ]
+required_invariants: [{I-N identifiers} | []]
+required_evidence_anchors: [{workspace-relative paths} | []]
 cross_runtime_preservation: {non-empty statement of behavior preserved across supported runtimes}
 
 #### Acceptance Criteria
@@ -904,7 +904,7 @@ Every task MUST have exactly one dispatch label. The coordinator uses these to b
 
 **Classification rules:**
 - If a task has no dependencies AND blocks 2+ other tasks → `BLOCKER`
-- If a task has no dependencies AND blocks 0-1 tasks → `PARALLEL`
+- If a task has no dependencies, blocks 0-1 tasks, uses a distinct canonical worktree/repository, and has disjoint ownership → `PARALLEL`; otherwise → `SEQUENTIAL`
 - If a task depends on 2+ tasks from different streams → `CONVERGENCE`
 - If a task depends on exactly 1 task → `SEQUENTIAL`
 - When in doubt between PARALLEL and SEQUENTIAL, or when tasks share one canonical worktree → use SEQUENTIAL. PARALLEL requires distinct worktrees/repositories as well as disjoint ownership.

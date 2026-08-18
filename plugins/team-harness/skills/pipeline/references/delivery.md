@@ -2,8 +2,7 @@
 
 Delivery publishes the exact commit validation accepted. Implementation already
 assembled version/changelog, committed the complete branch, and recorded
-`freeze_commit_sha`/`freeze_tree_sha`; acceptance copied them to
-`validated_commit_sha`/`validated_tree_sha`.
+`freeze_commit_sha`/`freeze_tree_sha`; acceptance is bound to that same identity.
 
 Before Gate 3, delegate `delivery` once for workspace-only PR prose: exact title,
 PR body, standalone acceptance matrix, and an independent version-axis assessment. PATCH is the default for a
@@ -14,7 +13,7 @@ operator-led release-planning task; this classification takes precedence over `v
 `version-underbump`, and delivery never selects, recommends, or validates MAJOR. Otherwise, an unsupported over- or
 under-bump returns to implementation → Freeze → full validation; delivery never repairs it. Validate canonical non-symlink paths
 and SHA-256 digests, bind them to `delivery_preview`, present the committed
-version plus validated commit/tree, and stop for:
+version plus accepted Freeze commit/tree, and stop for:
 
 ```text
 1 — ship    (ship)
@@ -54,8 +53,8 @@ dispatch token bytes. Then require:
 ```bash
 git status --porcelain                  # empty
 git branch --show-current               # working_branch
-git rev-parse HEAD                      # validated_commit_sha
-git rev-parse 'HEAD^{tree}'             # validated_tree_sha
+git rev-parse HEAD                      # freeze_commit_sha
+git rev-parse 'HEAD^{tree}'             # freeze_tree_sha
 ```
 
 Use full object IDs. A mismatch blocks and returns to implementation → Freeze →

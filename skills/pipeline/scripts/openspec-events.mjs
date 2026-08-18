@@ -16,6 +16,9 @@ const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d
 const STATUS = new Set(["success", "failed", "blocked", "skipped"]);
 const QUALITY = new Set(["pass", "concerns", "fail", "n-a"]);
 const CONTEXT = new Set(["fresh", "continued"]);
+const ERROR_CODES = new Set([
+  "ARGUMENT_INVALID", "EVENTS_FENCE_INVALID", "EVENTS_FILE_INVALID", "EVENT_COUNT_INVALID",
+]);
 const ROLE_TASK = new Map([
   ["architect", "design"],
   ["implementer", "implementation"],
@@ -166,7 +169,10 @@ export async function validateOpenSpecEvents({ workspace, events, feature } = {}
     if (open.size > 0) findings.push(finding("ATTEMPT_UNCLOSED"));
     if (architectAttempts < 2 || successfulArchitectAttempts < 2) findings.push(finding("OPENSPEC_DESIGN_ATTEMPTS_INCOMPLETE"));
   } catch (error) {
-    findings.push(finding(error?.message ?? "INTERNAL_ERROR"));
+    const code = typeof error?.message === "string" && ERROR_CODES.has(error.message)
+      ? error.message
+      : "INTERNAL_ERROR";
+    findings.push(finding(code));
   }
   const bounded = findings.slice(0, MAX_FINDINGS);
   return {

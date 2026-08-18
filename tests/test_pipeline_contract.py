@@ -738,6 +738,18 @@ def check_preimplementation_test_contract() -> None:
             "phase or gate",
         ):
             require(marker in text, f"{label}: deterministic transition marker missing: {marker}")
+        for marker in (
+            "immutable only",
+            "active red-to-green transition",
+            "fresh tester",
+            "obsolete expectation",
+            "same canonical intent" if label == "Claude" else "same pinned openspec intent",
+            "production code is not changed to satisfy a stale test"
+            if label == "Claude"
+            else "never change production behavior to satisfy a stale test",
+            "final freeze",
+        ):
+            require(marker in text, f"{label}: stale-test correction marker missing: {marker}")
 
     state = read(
         "plugins/team-harness/skills/pipeline/references/state-and-gates.md"
@@ -855,6 +867,9 @@ def check_cleaner_crap_contract() -> None:
             "--transition post",
             "format_check`, `lint`, and `crap` are additive",
             "every one that the manifest declares",
+            "every declared `format_check` and `lint`",
+            "before the sole cleaner",
+            "no cleaner is dispatched" if label == "Claude" else "returns to implementation before the sole cleaner dispatch",
             "crap_report_incomplete",
             "allowlist",
             "freeze",
@@ -1113,11 +1128,12 @@ def check_functional_first_plan_contract() -> None:
         r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/implementation.md").lower()
     )
     for marker in (
-        "verify-and-rebind",
+        "verify-progress",
         "--authorized-task",
         "team_harness_openspec_progress_transition",
-        "latest progress event's predecessor and task ids",
-        "overlay.snapshot.{sha256,artifact_set_sha256}",
+        "inputs/openspec-progress.json",
+        "leaves both the snapshot and overlay bytes unchanged",
+        "never requires hash rebinding",
         "never invoke standalone",
         "tolerate `snapshot_stale`",
     ):
@@ -1131,8 +1147,13 @@ def check_functional_first_plan_contract() -> None:
         "zero or multiple matches block",
     ):
         require(marker in implementation, f"OpenSpec execution-item packet misses {marker!r}")
-    for marker in ("openspec-overlay.mjs verify-and-rebind", "multiple unrebound transitions", "never edit the binding hash manually", "never edit the binding hash manually or make `plan-contract` tolerate stale identity"):
-        require(marker in recovery, f"OpenSpec recovery rebind misses {marker!r}")
+    for marker in (
+        "openspec-overlay.mjs verify-progress",
+        "inputs/openspec-progress.json",
+        "checkbox progress never changes the snapshot or overlay binding",
+        "never requires `snapshot_stale` tolerance",
+    ):
+        require(marker in recovery, f"OpenSpec recovery progress misses {marker!r}")
 
     openspec_e2e = read("tests/test_openspec_design_e2e.mjs")
     for marker in (
@@ -1970,8 +1991,8 @@ def _check_publish_contracts(publish_sources: dict[str, str]) -> None:
         for marker in ("push", "draft pr"):
             require(marker in flat, f"{label}: ship delivery omits {marker}")
         require(
-            "validated commit" in flat or "validated_commit_sha" in flat,
-            f"{label}: ship delivery omits validated commit identity",
+            "accepted freeze" in flat or "freeze_commit_sha" in flat,
+            f"{label}: ship delivery omits accepted Freeze identity",
         )
         require(
             "do not ask" in flat
@@ -2009,7 +2030,7 @@ def check_single_ship_delivery() -> None:
     mechanics = publish_sources["Claude mechanics"].lower()
     for forbidden in ("git commit -m", "git add ", "git fetch origin {default-branch}"):
         require(forbidden not in mechanics, f"Claude delivery still executes {forbidden!r}")
-    for marker in ("validated_commit_sha", "validated_tree_sha", "git status --porcelain"):
+    for marker in ("freeze_commit_sha", "freeze_tree_sha", "git status --porcelain"):
         require(marker in mechanics, f"Claude delivery identity check omits {marker!r}")
     for marker in ("git ls-remote", "verification_base_ref", "current", "moved", "unknown"):
         require(marker in mechanics, f"Claude delivery base-status report omits {marker!r}")
@@ -2710,6 +2731,9 @@ def check_execution_efficiency_contract() -> None:
         r"\s+", " ", read("plugins/team-harness/skills/pipeline/SKILL.md").lower()
     )
     implementation = read("plugins/team-harness/skills/pipeline/references/implementation.md")
+    design = re.sub(
+        r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/design.md").lower()
+    )
     validation = read("plugins/team-harness/skills/pipeline/references/validation.md")
     contracts = {
         "implementation": re.sub(r"\s+", " ", implementation.lower()),
@@ -2717,6 +2741,13 @@ def check_execution_efficiency_contract() -> None:
     }
 
     implementation_flat = contracts["implementation"]
+    for marker in (
+        "prefer branch-in-place",
+        "recorded isolation need",
+        "self-contained installation",
+        "node_modules` symlink to another checkout",
+    ):
+        require(marker in design, f"design: dependency topology misses {marker!r}")
     for marker in (
         "atomic commit-integrity evidence",
         "commit-integrity.mjs",
@@ -2752,6 +2783,10 @@ def check_execution_efficiency_contract() -> None:
         "sole mechanical exception",
         "execution_resolution: linked-local-bin",
         "never pnpm",
+        "tool-specific aliases",
+        "crap_report_invalid",
+        "bounded report artifact",
+        "not the implementation body",
     ):
         require(marker in quality, f"quality runner: non-installing command contract misses {marker!r}")
 
@@ -2775,8 +2810,20 @@ def check_execution_efficiency_contract() -> None:
         "never run repository-wide `rg --files`",
         "one exact supplied `-g` glob",
         "exact json pointer",
+        "never place independent reads in a parallel tool batch",
+        "one evidence read means one file",
+        "verified whole-file sha-256",
+        "dumping the full file is not proof",
     ):
         require(marker in implementation_flat, f"implementation: rooted bounded reads miss {marker!r}")
+
+    for marker in (
+        "openspec_snapshot: {path, sha256}",
+        "standalone digest",
+        "blocks before spawn",
+        "never interpret a snapshot digest as a git object",
+    ):
+        require(marker in implementation_flat, f"implementation: snapshot packet binding misses {marker!r}")
 
     for marker in (
         "every initial or correction",
@@ -2794,9 +2841,31 @@ def check_execution_efficiency_contract() -> None:
         "pnpm test",
         "pnpm storybook",
         "linked-local-script",
+        "repository-local-bin",
+        "repository-local-node-script",
+        "worktree dependency verification",
         "compound shell scripts",
+        "node_modules` symlink to another checkout",
+        "temporary `.mjs` wrapper",
     ):
         require(marker in implementation_flat, f"implementation: local package script resolution misses {marker!r}")
+
+    for marker in (
+        "team_harness_quality_receipt",
+        "--output <path>",
+        "atomically",
+        "temporary javascript wrappers",
+        "truncated stdout tail",
+    ):
+        require(marker in quality, f"quality runner: atomic evidence transport misses {marker!r}")
+    for marker in (
+        "cleaner-transition.mjs",
+        "--transition pre --output",
+        "bounded receipt",
+        "temporary javascript wrapper",
+        "bounded-command",
+    ):
+        require(marker in implementation_flat, f"implementation: cleaner receipt transport misses {marker!r}")
 
     for marker in (
         "disjoint `files:` are necessary but not sufficient",
@@ -2829,6 +2898,9 @@ def check_execution_efficiency_contract() -> None:
         ):
             require(marker in semantic, f"{role}: packet preflight misses {marker!r}")
             require(marker in adapter, f"{role}: Codex packet preflight misses {marker!r}")
+        for marker in ("openspec_snapshot: {path, sha256}", "path or digest", "never a git revision"):
+            require(marker in semantic, f"{role}: snapshot binding misses {marker!r}")
+            require(marker in adapter, f"{role}: Codex snapshot binding misses {marker!r}")
         for marker in (
             "bounded_result_path",
             "--output",
@@ -2838,6 +2910,38 @@ def check_execution_efficiency_contract() -> None:
         ):
             require(marker in semantic, f"{role}: bounded receipt packet misses {marker!r}")
             require(marker in adapter, f"{role}: Codex bounded receipt packet misses {marker!r}")
+
+    for role in ("implementer", "tester", "qa", "security"):
+        semantic = re.sub(r"\s+", " ", read(f"agents/{role}.md").lower())
+        adapter = re.sub(r"\s+", " ", read(f"runtime/codex/instructions/{role}.md").lower())
+        for marker in ("openspec_snapshot: {path, sha256}", "path or digest", "never a git revision"):
+            require(marker in semantic, f"{role}: snapshot binding misses {marker!r}")
+            require(marker in adapter, f"{role}: Codex snapshot binding misses {marker!r}")
+        for marker in (
+            "evidence-bearing reads",
+            "exact json pointer",
+            "independent cap",
+            "verified artifact sha-256 proves whole-file identity",
+            "never dump a full reference",
+        ):
+            require(marker in semantic, f"{role}: sequential evidence read contract misses {marker!r}")
+        for marker in (
+            "evidence-bearing reads are sequential transport operations",
+            "parallel tool calls",
+            "one response/context budget",
+            "independent predeclared cap",
+            "verified artifact sha-256 proves whole-file identity",
+            "never dump a complete reference",
+        ):
+            require(marker in adapter, f"{role}: Codex sequential evidence read contract misses {marker!r}")
+
+    validation = re.sub(r"\s+", " ", read("plugins/team-harness/skills/pipeline/references/validation.md").lower())
+    for marker in ("bounded_result_path", "read-only qa or security", "writable_roots", "packet is invalid"):
+        require(marker in validation, f"validation: read-only evidence root contract misses {marker!r}")
+    for role in ("qa", "security"):
+        adapter = re.sub(r"\s+", " ", read(f"runtime/codex/instructions/{role}.md").lower())
+        for marker in ("parent evidence root", "writable_roots", "evidence_root_not_writable"):
+            require(marker in adapter, f"{role}: read-only evidence write grant misses {marker!r}")
 
     for marker in (
         "pipeline preflight resolves",
@@ -2850,6 +2954,15 @@ def check_execution_efficiency_contract() -> None:
         "outside pipeline mode",
     ):
         require(marker in pipeline, f"pipeline: AC12 helper-route marker missing {marker!r}")
+
+    for marker in (
+        "evidence-bearing reads are sequential transport operations",
+        "multiple nested tools in one orchestration response",
+        "per-command caps do not protect the combined payload",
+        "verified artifact sha-256 proves whole-file identity",
+        "never print the whole file",
+    ):
+        require(marker in pipeline, f"pipeline: sequential evidence read contract misses {marker!r}")
 
     for marker in (
         "--output <absolute_result_path>",
@@ -2970,6 +3083,16 @@ def check_execution_efficiency_contract() -> None:
         "reactively retry it through another route",
     ):
         require(marker in contracts["validation"], f"validation: AC20 pre-execution routing marker missing {marker!r}")
+
+    for marker in (
+        "validation reads that support a verdict execute sequentially",
+        "multiple nested tools in one orchestration response",
+        "one independent predeclared output cap",
+        "verified whole-file sha-256",
+        "do not render an entire reference or openspec json",
+        "truncated selection is no evidence",
+    ):
+        require(marker in contracts["validation"], f"validation: sequential evidence read contract misses {marker!r}")
 
     for marker in (
         "before executing a command",

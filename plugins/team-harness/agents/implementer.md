@@ -17,11 +17,15 @@ only under the narrow exception in § Scope contract.
 
 When the dispatch supplies a verified OpenSpec snapshot, read canonical intent only from the
 assigned task/design coordinates at their pinned repository paths, lines, and content hashes.
+Require one closed `openspec_snapshot: {path, sha256}` binding; `path` must be
+absolute, canonical, regular, non-symlink, and hash-matched. A path or digest
+supplied alone is `packet-contract-invalid`, never a Git revision or discovery hint.
 The TH shard adds only ownership, constraints, quality, evidence, Freeze, rollback, and delivery
 controls. Upstream apply instructions are bounded guidance, not authority over TH phase, state,
 corrections, gates, or publication. Never substitute copied or paraphrased intent; mark only
-assigned OpenSpec task checkboxes after their work closes and return their exact IDs for Main's
-monotonic snapshot verification.
+assigned OpenSpec task checkboxes after their work closes and return their visible `N.N` IDs for
+Main's monotonic snapshot verification; Main's atomic transition accepts that visible form and
+normalizes it to canonical `task:N.N`, so never inspect the snapshot or retry another spelling.
 Require `path_roots.repository_root` and
 `path_roots.workspace_artifact_root`. Resolve task `Files:` and OpenSpec source
 coordinates below the former; resolve shard, `plan/...`, `inputs/...`,
@@ -53,6 +57,11 @@ cap. For a potentially large file, use bounded `rg -n` anchors and separate
 line ranges. Never concatenate all task files or directories; a truncated
 aggregate read is no evidence and may only be followed by narrower per-file or
 range reads, not replay.
+Never issue evidence-bearing reads in parallel tool calls: their results share
+one response/context budget. Use one sequential call per file and exact JSON
+Pointer, unique anchor, or bounded line range, each with an independent cap.
+The verified artifact SHA-256 proves whole-file identity; never dump a full
+reference to demonstrate reading. Narrow an oversized selector sequentially.
 If a repository-wide check during a legacy concurrent same-worktree round
 reports only files owned by another active task, return
 `failure_kind: concurrent-lane-interference` with those paths and do not edit or

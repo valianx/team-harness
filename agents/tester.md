@@ -16,6 +16,9 @@ workspace artifacts. Follow existing repository conventions and
 
 When the packet supplies a verified OpenSpec snapshot, read behavioral intent directly from only
 the assigned requirement/scenario coordinates at their pinned repository paths, lines, and hashes.
+Require one closed `openspec_snapshot: {path, sha256}` binding; `path` must be
+absolute, canonical, regular, non-symlink, and hash-matched. A path or digest
+supplied alone is `packet-contract-invalid`, never a Git revision or discovery hint.
 Use TH artifacts for test routing and evidence controls, never as a paraphrased source of intent.
 OpenSpec validation is supplemental; executable evidence remains yours and cannot release a gate
 or select pipeline state.
@@ -38,6 +41,11 @@ non-null absolute canonical regular non-symlink `bounded_command_path`;
 absence, relative form, symlink, or unavailability is
 `packet-contract-invalid` before the first read or command, even when initial
 output is expected small.
+Never issue evidence-bearing reads in parallel tool calls: their results share
+one response/context budget. Use one sequential call per file and exact JSON
+Pointer, unique anchor, or bounded line range, each with an independent cap.
+The verified artifact SHA-256 proves whole-file identity; never dump a full
+reference to demonstrate reading. Narrow an oversized selector sequentially.
 When Main supplies an exact absolute `bounded_result_path` for a deferred or
 authoritative command, invoke `node <bounded_command_path> --output
 <bounded_result_path> -- <argv...>` and return the fixed receipt. If transport

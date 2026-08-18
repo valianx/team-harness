@@ -48,7 +48,12 @@ Run the transaction continuously:
    `writable_roots`; require every planned worktree to be contained by one. Also require each
    task shard's literal `required_invariants`, `required_evidence_anchors`, and
    `cross_runtime_preservation` declarations and mirror their exact values into the matching
-   traceability execution item.
+   traceability execution item. Prefer branch-in-place when the current checkout is clean,
+   writable, and already owns the dependency installation needed by the approved quality
+   commands. Select an isolated worktree only for a recorded isolation need. When its tasks need
+   Node dependencies, the plan must provide a self-contained installation below that worktree;
+   a `node_modules` symlink to another checkout is not dependency readiness and must not be
+   proposed as setup.
 5. Validate snapshot freshness, overlay traceability, and applicable operational plan fields,
    then present the unchanged Stage Gate 1.
 
@@ -103,7 +108,7 @@ deterministic plan evidence below passes.
 
 Before the gate, resolve `scripts/plan-contract.mjs` and
 `scripts/openspec-events.mjs` relative to the loaded
-pipeline skill. For an OpenSpec-bound run invoke it with `--workspace`,
+pipeline skill. For an OpenSpec-bound run invoke `scripts/plan-contract.mjs` with `--workspace`,
 `--plan 01-plan.md`, `--snapshot inputs/openspec-snapshot.json`, and
 `--traceability plan/openspec-traceability.json`, plus one exact
 `--writable-root` argument per effective sandbox root. Persist the complete JSON, its

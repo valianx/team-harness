@@ -12,6 +12,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Preserved deferred bounded-command results atomically behind a compact,
   hash-verifiable receipt, allowing pipeline agents to recover from tool-context
   truncation without rerunning authoritative tests or builds.
+- Made verdict-bearing artifact reads sequential with one independently capped
+  file/selector per tool response, preventing parallel reference and OpenSpec
+  outputs from truncating one another while whole-file hashes prove identity.
+- Normalized visible and canonical OpenSpec task IDs in atomic progress
+  transitions, separated mutable checkbox progress from the immutable Gate-1
+  intent snapshot, and eliminated snapshot/traceability hash rebinding.
+- Resolved safe repository-local Node package scripts directly without pnpm,
+  avoiding worktree `verify-deps-before-run` installs and cross-OS SQLite store
+  failures while preserving fail-closed command classification.
+- Rejected cross-checkout `node_modules` links during quality resolution and
+  added atomic quality/cleaner result receipts, eliminating temporary wrapper
+  scripts, empty bounded-command completions, and external npm-cache fallbacks.
+- Reduced Git orchestration identity to the implementation base and final
+  Freeze commit, with optional red and delivery commits only when those phases
+  actually create changes.
+- Hardened final evidence helpers against package-manager flag bypasses,
+  interactive or unbounded Git probes, unsafe commit arguments, concurrent
+  temporary-file collisions, and unbounded filesystem error disclosure.
 
 ## [3.13.0] - 2026-08-17
 

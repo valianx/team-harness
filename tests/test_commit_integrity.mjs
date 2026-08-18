@@ -69,6 +69,9 @@ await check("passes the six Git-backed conjuncts with fixed bounded evidence", a
 }));
 
 await check("fails closed for dirty trees and out-of-scope commit paths", async () => withRepository(async fixture => {
+  const stale = await runCommitIntegrity({ ...fixture.options, reported_commit: fixture.baseSha });
+  assert.equal(stale.verdict, "fail");
+  assert.equal(stale.checks.ancestry, "fail");
   const scope = await runCommitIntegrity({ ...fixture.options, allowed_paths: ["src/base.mjs"] });
   assert.equal(scope.verdict, "fail");
   assert.equal(scope.error_code, "INTEGRITY_FAILED");
@@ -80,7 +83,14 @@ await check("fails closed for dirty trees and out-of-scope commit paths", async 
 }));
 
 await check("the no-source-change form skips only sha-backed checks", async () => withRepository(async fixture => {
-  const result = await runCommitIntegrity({ ...fixture.options, reported_commit: "none" });
+  const changed = await runCommitIntegrity({ ...fixture.options, reported_commit: "none" });
+  assert.equal(changed.verdict, "fail");
+  assert.equal(changed.checks.ancestry, "fail");
+  const result = await runCommitIntegrity({
+    ...fixture.options,
+    reported_commit: "none",
+    base_sha: fixture.commit,
+  });
   assert.equal(result.verdict, "pass");
   assert.equal(result.checks.ancestry, "skipped");
   assert.equal(result.checks.baseline_movement, "skipped");

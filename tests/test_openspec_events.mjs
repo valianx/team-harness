@@ -80,6 +80,14 @@ await check("rejects complete status, missing attempt metrics, and an open attem
   assert.ok(result.findings.some(item => item.code === "ATTEMPT_UNCLOSED"));
 }));
 
+await check("maps unexpected filesystem failures to a closed non-disclosing error", async () => withFixture(async ({ workspace }) => {
+  const result = await validateOpenSpecEvents({ workspace, events: "missing-events.jsonl", feature });
+  assert.equal(result.verdict, "fail");
+  assert.equal(result.error_code, "INTERNAL_ERROR");
+  assert.deepEqual(result.findings, [{ code: "INTERNAL_ERROR", line: null }]);
+  assert.equal(JSON.stringify(result).includes(workspace), false);
+}));
+
 if (failures.length > 0) {
   console.error(`${failures.length} OpenSpec event checks failed: ${failures.join(", ")}`);
   process.exitCode = 1;

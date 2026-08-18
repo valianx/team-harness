@@ -8,7 +8,7 @@
  */
 
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { lstat, open, readFile, realpath, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -43,8 +43,10 @@ const ERROR_CODES = new Set([
   "RED_EVIDENCE_INVALID",
   "TEST_INPUT_CHANGED",
   "QUALITY_RUNNER_FAILED",
+  "OUTPUT_WRITE_FAILED",
   "INTERNAL_ERROR",
 ]);
+const RECEIPT_ERROR_CODES = new Set(ERROR_CODES);
 const RESULT_KEYS = [
   "schema_version",
   "kind",
@@ -112,18 +114,30 @@ async function persistResult(outputPath, result) {
     if (error?.code !== "ENOENT") throw error;
   }
   const bytes = Buffer.from(`${JSON.stringify(result)}\n`);
-  const temporary = path.join(parent, `.${path.basename(target)}.tmp-${process.pid}-${Date.now()}`);
+  const temporary = path.join(parent, `.${path.basename(target)}.tmp-${process.pid}-${Date.now()}-${randomUUID()}`);
   let handle;
+  let ownsTemporary = false;
   try {
     handle = await open(temporary, "wx", 0o600);
+    ownsTemporary = true;
     await handle.writeFile(bytes);
     await handle.sync();
     await handle.close();
     handle = null;
+    const currentParent = await realpath(parent);
+    if (currentParent !== parent) throw new TransitionError("ARGUMENT_INVALID");
+    try {
+      const targetStat = await lstat(target);
+      if (!targetStat.isFile() || targetStat.isSymbolicLink()) throw new TransitionError("ARGUMENT_INVALID");
+    } catch (error) {
+      if (error instanceof TransitionError) throw error;
+      if (error?.code !== "ENOENT") throw error;
+    }
     await rename(temporary, target);
+    ownsTemporary = false;
   } catch (error) {
     if (handle) await handle.close().catch(() => {});
-    await unlink(temporary).catch(() => {});
+    if (ownsTemporary) await unlink(temporary).catch(() => {});
     if (error instanceof TransitionError) throw error;
     throw new TransitionError("OUTPUT_WRITE_FAILED");
   }
@@ -210,10 +224,13 @@ export async function validateTestContractFile(contractPath, context = null) {
     contractSha256 = sha256(loaded.bytes);
     if (context !== null) {
       if (
-        context === null || typeof context !== "object" || Array.isArray(context) ||
+        typeof context !== "object" || Array.isArray(context) ||
         !hasExactlyKeys(context, ["repo", "manifest", "base", "candidate"]) ||
         Object.values(context).some((entry) => typeof entry !== "string" || entry.length === 0)
       ) {
+        throw new TransitionError("ARGUMENT_INVALID");
+      }
+      if (!SAFE_COMMIT.test(context.base) || !(context.candidate === "HEAD" || SAFE_COMMIT.test(context.candidate))) {
         throw new TransitionError("ARGUMENT_INVALID");
       }
       let repo;
@@ -564,6 +581,27 @@ export function isTestTransitionResult(value) {
     return false;
   }
   return true;
+}
+
+export function isTestTransitionReceipt(value) {
+  const keys = [
+    "schema_version", "kind", "verdict", "error_code", "transition", "diagnostic",
+    "result_path", "result_sha256", "result_bytes",
+  ];
+  if (!hasExactlyKeys(value, keys)) return false;
+  if (value.schema_version !== TEST_TRANSITION_RECEIPT_SCHEMA_VERSION
+    || value.kind !== "team_harness_test_transition_receipt"
+    || !["pass", "fail"].includes(value.verdict)
+    || !RECEIPT_ERROR_CODES.has(value.error_code)
+    || ![null, "red", "green"].includes(value.transition)
+    || !isTransitionDiagnostic(value.diagnostic)) return false;
+  const persisted = typeof value.result_path === "string" && path.isAbsolute(value.result_path)
+    && SAFE_SHA256.test(value.result_sha256)
+    && Number.isSafeInteger(value.result_bytes) && value.result_bytes > 0;
+  const unavailable = value.result_path === null && value.result_sha256 === null && value.result_bytes === null;
+  if (!persisted && !unavailable) return false;
+  if (value.verdict === "pass") return value.error_code === null && persisted && value.diagnostic === null;
+  return value.error_code !== null;
 }
 
 function elapsedMs(startedAt) {

@@ -65,7 +65,7 @@ async function scenario(workspaceMode) {
     const execution = (id, source) => ({
       id, sources: [source], classification: "direct", rationale: null, owner: "implementer", specialist: "implementer",
       shard_path: `plan/tasks/${id}.md`, files: [`src/${id}.mjs`], dependencies: [], required_invariants: ["I-gate-authority"],
-      technical_constraints: [], quality_command_ids: ["unit"], pre_implementation_test: "required",
+      technical_constraints: [], quality_command_ids: ["test"], pre_implementation_test: "required",
       required_evidence_anchors: ["02-implementation.md"], cross_runtime_preservation: "Preserve equivalent behavior in every supported runtime.",
       rollback: "Revert the task commit.", delivery_group: "default",
     });
@@ -73,7 +73,7 @@ async function scenario(workspaceMode) {
     const overlay = {
       schema_version: 1, kind: "team_harness_openspec_execution_overlay", plan_format: "sharded-v1",
       snapshot: { path: "inputs/openspec-snapshot.json", sha256: digest(snapshotBytes), artifact_set_sha256: snapshot.artifact_set_sha256, change_name: "canonical-e2e" },
-      repository: { root: repository, ownership: [{ path: "src", owner: "implementer" }] }, quality_commands: [{ id: "unit" }],
+      repository: { root: repository, ownership: [{ path: "src", owner: "implementer" }] }, quality_commands: [{ id: "test" }],
       freeze: { baseline_sha256: "b".repeat(64), state_anchor: "00-state.md", evidence_root: "reviews" },
       acceptance_items: [acceptance("AC-1", requirement), acceptance("AC-2", scenarioId)],
       execution_items: [execution("Task-1", decision), execution("Task-2", task)],

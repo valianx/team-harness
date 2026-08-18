@@ -224,15 +224,17 @@ Before re-presenting Gate 1, also rerun `openspec-events.mjs` against the
 complete configured events path and bound feature. An invalid or open
 lifecycle trace remains fail-closed and is never repaired during recovery.
 
-During implementation, use packaged `openspec-overlay.mjs verify-and-rebind`
-instead of separate snapshot verification and overlay mutation. If interrupted
-after the snapshot write, the same operation may recover only when the latest
-progress event's `previous_sha256` equals the overlay binding, its task IDs
-equal the requested authorized set, and ordinary validation has no finding
-except `SNAPSHOT_STALE`; then rerun `plan-contract`. Any missing link, multiple
-unrebound transitions, intent change, or additional finding remains a real
-stale-plan block. Never edit the binding hash manually or make `plan-contract`
-tolerate stale identity.
+During implementation, use packaged `openspec-overlay.mjs verify-progress`
+instead of standalone snapshot verification or overlay mutation. Gate-1 intent
+remains bound to the immutable `inputs/openspec-snapshot.json`; checkbox-only
+state advances atomically in `inputs/openspec-progress.json`. If interrupted,
+the same exact authorized task set is idempotent only when it matches the latest
+progress event and its predecessor hash. A missing/malformed progress chain,
+rollback, unauthorized task, non-checkbox task change, other intent drift, or
+concurrent mutation remains fail-closed. Checkbox progress never changes the
+snapshot or overlay binding and therefore never requires `SNAPSHOT_STALE`
+tolerance, rebinding, or manual hash edits. Rerun `plan-contract` after every
+successful progress transition.
 
 An implementation/tester return blocked only because an exact scoped Git write
 hit protected `.git/worktrees/.../index.lock` is a technical

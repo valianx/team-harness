@@ -185,7 +185,7 @@ minutes, implementer 15, tester 10, cleaner 5, QA 5, security 10, and delivery
 An `openspec-overlay` architect packet also carries a coordinator-generated
 `dispatch_id`, exact `progress_recipient`, and
 `progress_interval_seconds: 120`. Require transient native `send_message`
-progress with the exact prefix `TH_PROGRESS ` and JSON keys
+progress with the exact prefix `TH_PROGRESS`, followed by one space and JSON keys
 `schema_version`, `dispatch_id`, `role`, `mode`, `milestone`,
 `completed_units`, `total_units`, `artifact_pointers`, and `blocked_code`.
 Allowed milestones are `started`, `inputs-validated`, `mappings-built`,
@@ -222,6 +222,18 @@ or current directory; fail closed if it cannot be resolved. Include the helper
 in each role packet only as `bounded_command_path` with that absolute path. It
 is transient: never persist `bounded_command_path` in state, events, reports,
 summaries, or workspace artifacts.
+
+Evidence-bearing reads are sequential transport operations even when their
+files are independent. Never batch, fan out, or issue multiple reads/searches/
+extracts through parallel tool calls (`Promise.all`, multiple nested tools in
+one orchestration response, or equivalent): those results share one response
+and context budget, so per-command caps do not protect the combined payload.
+Use one call for one file and one selector—an exact JSON Pointer, unique anchor,
+or bounded line range—with its own predeclared output cap. The verified
+artifact SHA-256 proves whole-file identity; never print the whole file merely
+to demonstrate a complete read. If one selected value still exceeds its cap,
+descend sequentially to narrower child pointers or line ranges. A truncated
+selection is no evidence and never authorizes replay of the aggregate read.
 
 At implementation entry, resolve `scripts/commit-integrity.mjs` by the same
 packaged-relative rule as `commit_integrity_path`; fail closed if it is absent.
@@ -365,13 +377,13 @@ the role fields cannot see. The current digests are:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| `pipeline-architect` | `14b51f37d0d455cd964bd4b9ec67dd8855195e5abbb8585935b1655c054c7bbd` |
-| `pipeline-implementer` | `b6daafc26d9ec0647763f13f4d9fe873a85574ec59dc59fc48d506f45454b009` |
-| `pipeline-tester` | `8eabaaa34e09a23989388db88f0e895cbe4d21612a9bc32bdd3919f8e1f4f888` |
+| `pipeline-architect` | `4fb84a1cf9cd51d80401c9a9e3a31bc0b66c98f209893b994d89f8a0bc28ed61` |
+| `pipeline-implementer` | `84afd23ff6adcf3fe7ab6b5ec85f30cac6313d1b0cfe09a96f6eb0d346d698ae` |
+| `pipeline-tester` | `32ee4a4832c1bc489ce89a578be9e0ef7b33dd91f50a210e9a34dbd74b1db844` |
 | `pipeline-cleaner` | `ea4260bcb8fc1e17034f0d6f91b9d97efefeb61065c50b88a25e792eaaab88b9` |
-| `pipeline-qa` | `44fe6c12d25fae4c9cd4583dd3f70b2cc5e67310d9d0b5522c50a9d8a983583d` |
-| `pipeline-security` | `5a047d998a2c96919f23feb149eb40305a39b7f4093bc1695b26fdea8f581eee` |
-| `pipeline-delivery` | `1173e6d5edb63039cdc7d315f4c170c8f5489f76665b2cd77df682ae4be08246` |
+| `pipeline-qa` | `d13a07e234c8c95b91e31920a1c6bbb961ca0e3b96f03b7b93a7dee27472cbd1` |
+| `pipeline-security` | `11e9632e553eb98374b93b61901679800992edc284ea75d52d280c62fc4f5a14` |
+| `pipeline-delivery` | `c9a8a42ca62798cca1a57b65b89fbd044356433ac11fe7eff24ba3685f91aafa` |
 
 Do not accept a file solely because its comments or `name` field match. A
 digest mismatch is a stale or unrelated shadow; stop before workspace
@@ -534,7 +546,7 @@ present a gate or write coordination state. Pipeline activation alone does not
 authorize delivery. A later valid `Gate 3: ship` reply is the operator's single
 delivery decision for the frozen tree: implementation has already assembled
 version/changelog and committed the complete candidate. `ship` authorizes the
-coordinator to push that exact validated commit and create or update its
+coordinator to push that exact accepted Freeze commit and create or update its
 draft PR without another conversational confirmation. It never
 authorizes merge, tag, release, publication, force-push, or broader scope.
 

@@ -1,23 +1,23 @@
 #!/usr/bin/env node
 /** Validate the minimal Team Harness execution overlay over a pinned OpenSpec snapshot. */
 
-import { createHash, randomUUID } from "node:crypto";
-import { lstat, open, readFile, realpath, rename, unlink } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { lstat, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { isOpenSpecSnapshot, verifySnapshot } from "./openspec-snapshot.mjs";
+import { isOpenSpecSnapshot, normalizeOpenSpecTaskIds, verifySnapshot } from "./openspec-snapshot.mjs";
+import { KNOWN_COMMANDS } from "./quality-runner.mjs";
 
 export const OPENSPEC_OVERLAY_SCHEMA_VERSION = 1;
 export const OPENSPEC_OVERLAY_REBIND_SCHEMA_VERSION = 1;
-export const OPENSPEC_PROGRESS_TRANSITION_SCHEMA_VERSION = 1;
+export const OPENSPEC_PROGRESS_TRANSITION_SCHEMA_VERSION = 2;
 const MAX_BYTES = 1024 * 1024;
 const MAX_ITEMS = 4096;
 const SHA256 = /^[a-f0-9]{64}$/;
 const ITEM_ID = /^(?:AC|Task)-[1-9][0-9]*$/;
 const QUALITY_ID = /^[a-z][a-z0-9_]*$/;
 const ANCHOR_ID = /^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$/;
-const TASK_COORDINATE_ID = /^task:[1-9][0-9]*\.[1-9][0-9]*$/;
 const CLASSIFICATIONS = new Set(["direct", "split", "merged", "th-extension", "excluded", "ambiguous"]);
 const SOURCE_KINDS = new Set(["requirement", "scenario", "design-decision", "task"]);
 const FORBIDDEN_NORMATIVE_KEYS = new Set([
@@ -121,23 +121,6 @@ async function readRegular(root, relative) {
   return { bytes, canonical };
 }
 
-async function atomicWrite(target, bytes) {
-  const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`;
-  let handle;
-  try {
-    handle = await open(temporary, "wx", 0o600);
-    await handle.writeFile(bytes);
-    await handle.sync();
-    await handle.close();
-    handle = undefined;
-    await rename(temporary, target);
-  } catch (error) {
-    await handle?.close().catch(() => {});
-    await unlink(temporary).catch(() => {});
-    throw error;
-  }
-}
-
 function validMapping(item, expectedPrefix, sourceIds, qualityIds, findings) {
   const baseKeys = expectedPrefix === "AC"
     ? ["id", "sources", "classification", "rationale", "evidence_anchor"]
@@ -194,6 +177,7 @@ function validateShape(overlay, snapshot, snapshotBytes, findings) {
   }
   if (!Array.isArray(overlay.quality_commands) || overlay.quality_commands.length === 0
     || overlay.quality_commands.some(entry => !exact(entry, ["id"]) || !QUALITY_ID.test(entry.id))
+    || overlay.quality_commands.some(entry => !KNOWN_COMMANDS.includes(entry.id))
     || new Set(overlay.quality_commands.map(entry => entry.id)).size !== overlay.quality_commands.length) {
     findings.push(finding("QUALITY_COMMAND_INVALID", "quality_commands"));
   }
@@ -335,52 +319,13 @@ export async function rebindOpenSpecOverlay({ workspace, snapshot = "inputs/open
       overlay_sha256: validation.overlay_sha256,
     });
   }
-  if (validation.findings.length !== 1 || validation.findings[0].code !== "SNAPSHOT_STALE") {
-    return rebindResult("fail", "REBIND_NOT_MECHANICAL", {
-      snapshot_sha256: validation.snapshot_sha256,
-      overlay_sha256: validation.overlay_sha256,
-    });
-  }
-  try {
-    const root = await realpath(path.resolve(workspace));
-    const snapshotFile = await readRegular(root, snapshot);
-    const overlayFile = await readRegular(root, traceability);
-    if (hash(snapshotFile.bytes) !== validation.snapshot_sha256 || hash(overlayFile.bytes) !== validation.overlay_sha256) {
-      return rebindResult("fail", "ARTIFACT_CHANGED");
-    }
-    const snapshotValue = JSON.parse(snapshotFile.bytes.toString("utf8"));
-    const overlay = JSON.parse(overlayFile.bytes.toString("utf8"));
-    if (!isOpenSpecSnapshot(snapshotValue) || !object(overlay) || !object(overlay.snapshot)
-      || overlay.snapshot.path !== snapshot || overlay.snapshot.change_name !== snapshotValue.change.name
-      || !SHA256.test(overlay.snapshot.sha256) || !SHA256.test(overlay.snapshot.artifact_set_sha256)) {
-      return rebindResult("fail", "REBIND_NOT_MECHANICAL");
-    }
-    const events = snapshotValue.task_progress.events;
-    const latest = events[events.length - 1];
-    if (!latest || latest.previous_sha256 !== overlay.snapshot.sha256) {
-      return rebindResult("fail", "PROGRESS_CHAIN_INVALID", {
-        previous_snapshot_sha256: overlay.snapshot.sha256,
-        snapshot_sha256: validation.snapshot_sha256,
-        overlay_sha256: validation.overlay_sha256,
-      });
-    }
-    const previous = overlay.snapshot.sha256;
-    overlay.snapshot.sha256 = validation.snapshot_sha256;
-    overlay.snapshot.artifact_set_sha256 = snapshotValue.artifact_set_sha256;
-    const updatedBytes = Buffer.from(`${JSON.stringify(overlay)}\n`, "utf8");
-    await atomicWrite(overlayFile.canonical, updatedBytes);
-    return rebindResult("pass", null, {
-      changed: true,
-      previous_snapshot_sha256: previous,
-      snapshot_sha256: validation.snapshot_sha256,
-      overlay_sha256: hash(updatedBytes),
-    });
-  } catch {
-    return rebindResult("fail", "ARTIFACT_INVALID", {
-      snapshot_sha256: validation.snapshot_sha256,
-      overlay_sha256: validation.overlay_sha256,
-    });
-  }
+  // Gate-1 snapshot identity is immutable in schema v3. Task completion lives
+  // in inputs/openspec-progress.json, so a stale snapshot binding represents
+  // semantic drift and is never mechanically rewritten.
+  return rebindResult("fail", "REBIND_NOT_MECHANICAL", {
+    snapshot_sha256: validation.snapshot_sha256,
+    overlay_sha256: validation.overlay_sha256,
+  });
 }
 
 function progressResult(verdict, errorCode, details = {}) {
@@ -390,39 +335,26 @@ function progressResult(verdict, errorCode, details = {}) {
     verdict,
     error_code: errorCode,
     changed: details.changed ?? false,
-    recovered: details.recovered ?? false,
-    rolled_back: details.rolled_back ?? false,
-    verify_error_code: details.verify_error_code ?? null,
-    rebind_error_code: details.rebind_error_code ?? null,
-    previous_snapshot_sha256: details.previous_snapshot_sha256 ?? null,
     snapshot_sha256: details.snapshot_sha256 ?? null,
+    progress_sha256: details.progress_sha256 ?? null,
     overlay_sha256: details.overlay_sha256 ?? null,
   };
 }
 
-function sameTaskIds(left, right) {
-  return Array.isArray(left) && Array.isArray(right)
-    && JSON.stringify(left.slice().sort()) === JSON.stringify(right.slice().sort());
-}
-
-/** Verify one authorized monotonic OpenSpec task transition and rebind its overlay as one recoverable operation. */
-export async function verifyAndRebindOpenSpecProgress({
+/** Verify one authorized monotonic OpenSpec task transition without mutating its immutable Gate-1 binding. */
+export async function verifyOpenSpecProgress({
   workspace,
   snapshot = "inputs/openspec-snapshot.json",
   traceability = "plan/openspec-traceability.json",
   writableRoots,
   authorizedTaskIds,
 } = {}) {
-  if (!Array.isArray(authorizedTaskIds) || authorizedTaskIds.length === 0
-    || new Set(authorizedTaskIds).size !== authorizedTaskIds.length
-    || !authorizedTaskIds.every(value => typeof value === "string" && TASK_COORDINATE_ID.test(value))) {
+  const normalizedAuthorizedTaskIds = normalizeOpenSpecTaskIds(authorizedTaskIds);
+  if (normalizedAuthorizedTaskIds === null || normalizedAuthorizedTaskIds.length === 0) {
     return progressResult("fail", "ARGUMENT_INVALID");
   }
   const validation = await validateOpenSpecOverlay({ workspace, snapshot, traceability, writableRoots });
-  const staleRecovery = validation.verdict === "fail"
-    && validation.findings.length === 1
-    && validation.findings[0].code === "SNAPSHOT_STALE";
-  if (validation.verdict !== "pass" && !staleRecovery) {
+  if (validation.verdict !== "pass") {
     return progressResult("fail", "PRECONDITION_INVALID", {
       snapshot_sha256: validation.snapshot_sha256,
       overlay_sha256: validation.overlay_sha256,
@@ -432,85 +364,33 @@ export async function verifyAndRebindOpenSpecProgress({
     const root = await realpath(path.resolve(workspace));
     const snapshotFile = await readRegular(root, snapshot);
     const overlayFile = await readRegular(root, traceability);
-    const snapshotValue = JSON.parse(snapshotFile.bytes.toString("utf8"));
-    const overlay = JSON.parse(overlayFile.bytes.toString("utf8"));
-    if (!isOpenSpecSnapshot(snapshotValue) || !object(overlay?.snapshot)) {
-      return progressResult("fail", "PRECONDITION_INVALID");
-    }
-    const latest = snapshotValue.task_progress.events.at(-1);
-    if (staleRecovery) {
-      if (!latest || latest.previous_sha256 !== overlay.snapshot.sha256 || !sameTaskIds(latest.task_ids, authorizedTaskIds)) {
-        return progressResult("fail", "PROGRESS_CHAIN_INVALID", {
-          snapshot_sha256: validation.snapshot_sha256,
-          overlay_sha256: validation.overlay_sha256,
-        });
-      }
-      const rebound = await rebindOpenSpecOverlay({ workspace, snapshot, traceability, writableRoots });
-      return progressResult(rebound.verdict, rebound.verdict === "pass" ? null : "REBIND_FAILED", {
-        changed: rebound.changed,
-        recovered: rebound.verdict === "pass",
-        rebind_error_code: rebound.error_code,
-        previous_snapshot_sha256: rebound.previous_snapshot_sha256,
-        snapshot_sha256: rebound.snapshot_sha256,
-        overlay_sha256: rebound.overlay_sha256,
-      });
-    }
-
-    const originalSnapshotBytes = snapshotFile.bytes;
+    const progressFile = await readRegular(root, "inputs/openspec-progress.json");
     const verified = await verifySnapshot({
       snapshotPath: snapshotFile.canonical,
       phase: "implementation",
-      authorizedTaskIds,
+      authorizedTaskIds: normalizedAuthorizedTaskIds,
     });
     if (verified.verdict !== "pass") {
-      return progressResult("fail", "VERIFY_FAILED", {
-        verify_error_code: verified.error_code,
-        previous_snapshot_sha256: hash(originalSnapshotBytes),
+      return progressResult("fail", verified.error_code, {
         snapshot_sha256: verified.snapshot_sha256,
+        progress_sha256: hash(progressFile.bytes),
         overlay_sha256: hash(overlayFile.bytes),
       });
     }
-    if (verified.changed.length === 0) {
-      if (latest && sameTaskIds(latest.task_ids, authorizedTaskIds)) {
-        return progressResult("pass", null, {
-          snapshot_sha256: verified.snapshot_sha256,
-          overlay_sha256: hash(overlayFile.bytes),
-        });
-      }
-      return progressResult("fail", "VERIFY_FAILED", {
-        verify_error_code: "TASK_PROGRESS_INVALID",
-        previous_snapshot_sha256: hash(originalSnapshotBytes),
-        snapshot_sha256: verified.snapshot_sha256,
-        overlay_sha256: hash(overlayFile.bytes),
+    const updatedProgress = await readRegular(root, "inputs/openspec-progress.json");
+    const postValidation = await validateOpenSpecOverlay({ workspace, snapshot, traceability, writableRoots });
+    if (postValidation.verdict !== "pass" || verified.snapshot_sha256 !== hash(snapshotFile.bytes)) {
+      return progressResult("fail", "PRECONDITION_INVALID", {
+        snapshot_sha256: postValidation.snapshot_sha256,
+        progress_sha256: hash(updatedProgress.bytes),
+        overlay_sha256: postValidation.overlay_sha256,
       });
     }
-    const rebound = await rebindOpenSpecOverlay({ workspace, snapshot, traceability, writableRoots });
-    if (rebound.verdict === "pass") {
-      return progressResult("pass", null, {
-        changed: true,
-        previous_snapshot_sha256: rebound.previous_snapshot_sha256,
-        snapshot_sha256: rebound.snapshot_sha256,
-        overlay_sha256: rebound.overlay_sha256,
-      });
-    }
-    const currentSnapshot = await readRegular(root, snapshot);
-    if (hash(currentSnapshot.bytes) !== verified.snapshot_sha256) {
-      return progressResult("fail", "ROLLBACK_FAILED", {
-        verify_error_code: verified.error_code,
-        rebind_error_code: rebound.error_code,
-        previous_snapshot_sha256: hash(originalSnapshotBytes),
-        snapshot_sha256: hash(currentSnapshot.bytes),
-        overlay_sha256: rebound.overlay_sha256,
-      });
-    }
-    await atomicWrite(snapshotFile.canonical, originalSnapshotBytes);
-    return progressResult("fail", "REBIND_FAILED", {
-      rolled_back: true,
-      verify_error_code: verified.error_code,
-      rebind_error_code: rebound.error_code,
-      previous_snapshot_sha256: hash(originalSnapshotBytes),
-      snapshot_sha256: hash(originalSnapshotBytes),
-      overlay_sha256: rebound.overlay_sha256,
+    return progressResult("pass", null, {
+      changed: hash(progressFile.bytes) !== hash(updatedProgress.bytes),
+      snapshot_sha256: verified.snapshot_sha256,
+      progress_sha256: hash(updatedProgress.bytes),
+      overlay_sha256: postValidation.overlay_sha256,
     });
   } catch {
     return progressResult("fail", "ARTIFACT_INVALID", {
@@ -520,8 +400,11 @@ export async function verifyAndRebindOpenSpecProgress({
   }
 }
 
+// Compatibility export for callers from 3.14.0; schema v2 never rebinds.
+export const verifyAndRebindOpenSpecProgress = verifyOpenSpecProgress;
+
 function parseCli(argv, progress = false) {
-  if (argv.length < 8 || argv.length % 2 !== 0) return null;
+  if (argv.length < 4 || argv.length % 2 !== 0) return null;
   const result = { writableRoots: [], ...(progress ? { authorizedTaskIds: [] } : {}) };
   for (let index = 0; index < argv.length; index += 2) {
     if (argv[index] === "--writable-root") {
@@ -536,17 +419,19 @@ function parseCli(argv, progress = false) {
     if (!key || own(result, key)) return null;
     result[key] = argv[index + 1];
   }
-  return result.writableRoots.length > 0 && (!progress || result.authorizedTaskIds.length > 0) ? result : null;
+  return own(result, "workspace") && result.writableRoots.length > 0
+    && (!progress || result.authorizedTaskIds.length > 0) ? result : null;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const argv = process.argv.slice(2);
-  const operation = ["rebind", "verify-and-rebind"].includes(argv[0]) ? argv[0] : "validate";
-  const parsed = parseCli(operation === "validate" ? argv : argv.slice(1), operation === "verify-and-rebind") ?? {};
+  const operation = ["rebind", "verify-progress", "verify-and-rebind"].includes(argv[0]) ? argv[0] : "validate";
+  const progressOperation = ["verify-progress", "verify-and-rebind"].includes(operation);
+  const parsed = parseCli(operation === "validate" ? argv : argv.slice(1), progressOperation) ?? {};
   const result = operation === "rebind"
     ? await rebindOpenSpecOverlay(parsed)
-    : operation === "verify-and-rebind"
-      ? await verifyAndRebindOpenSpecProgress(parsed)
+    : progressOperation
+      ? await verifyOpenSpecProgress(parsed)
       : await validateOpenSpecOverlay(parsed);
   process.stdout.write(`${JSON.stringify(result)}\n`);
   if (result.verdict !== "pass") process.exitCode = 1;

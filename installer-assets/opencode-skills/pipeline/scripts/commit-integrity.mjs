@@ -15,12 +15,14 @@ const SHA = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const MAX_PATHS = 4096;
 const MAX_PATH_BYTES = 1024;
 const MAX_GIT_OUTPUT_BYTES = 1024 * 1024;
+const GIT_TIMEOUT_MS = 30_000;
 const CHECK_VALUES = new Set(["pass", "fail", "skipped", "external"]);
 const ERROR_CODES = new Set([
   null,
   "ARGUMENT_INVALID",
   "GIT_FAILED",
   "GIT_OUTPUT_LIMIT",
+  "GIT_TIMEOUT",
   "INTEGRITY_FAILED",
   "OUTPUT_WRITE_FAILED",
   "INTERNAL_ERROR",
@@ -100,31 +102,54 @@ function runGit(repository, argv) {
   return new Promise((resolve, reject) => {
     const child = spawn("git", ["-c", "core.pager=cat", "-c", "diff.external=", ...argv], {
       cwd: repository,
-      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0", GIT_TERMINAL_PROMPT: "0", GIT_ASKPASS: "" },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
+      detached: process.platform !== "win32",
     });
     const stdout = [];
     const stderr = [];
     let stdoutBytes = 0;
     let stderrBytes = 0;
     let overflow = false;
+    let timedOut = false;
+    let settled = false;
+    const stop = () => {
+      if (child.pid && process.platform !== "win32") {
+        try { process.kill(-child.pid, "SIGKILL"); return; } catch { /* fall back to the child */ }
+      }
+      child.kill("SIGKILL");
+    };
+    const timer = setTimeout(() => {
+      timedOut = true;
+      stop();
+    }, GIT_TIMEOUT_MS);
+    timer.unref();
     const collect = (target, chunk, stream) => {
       if (overflow) return;
       if (stream === "stdout") stdoutBytes += chunk.length;
       else stderrBytes += chunk.length;
       if (stdoutBytes > MAX_GIT_OUTPUT_BYTES || stderrBytes > MAX_GIT_OUTPUT_BYTES) {
         overflow = true;
-        child.kill("SIGKILL");
+        stop();
         return;
       }
       target.push(chunk);
     };
     child.stdout.on("data", chunk => collect(stdout, chunk, "stdout"));
     child.stderr.on("data", chunk => collect(stderr, chunk, "stderr"));
-    child.once("error", () => reject(new IntegrityError("GIT_FAILED")));
+    child.once("error", () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(new IntegrityError(timedOut ? "GIT_TIMEOUT" : "GIT_FAILED"));
+    });
     child.once("close", (code, signal) => {
-      if (overflow) reject(new IntegrityError("GIT_OUTPUT_LIMIT"));
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (timedOut) reject(new IntegrityError("GIT_TIMEOUT"));
+      else if (overflow) reject(new IntegrityError("GIT_OUTPUT_LIMIT"));
       else resolve({ code, signal, stdout: Buffer.concat(stdout), stderr: Buffer.concat(stderr) });
     });
   });
@@ -152,8 +177,17 @@ function nulRecordCount(result) {
   const bytes = requireGitSuccess(result);
   if (bytes.length === 0) return 0;
   if (bytes[bytes.length - 1] !== 0) throw new IntegrityError("GIT_FAILED");
+  const records = bytes.subarray(0, -1).toString("utf8").split("\0");
   let count = 0;
-  for (const byte of bytes) if (byte === 0) count += 1;
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index];
+    if (record.length < 4 || record[2] !== " ") throw new IntegrityError("GIT_FAILED");
+    count += 1;
+    if (/[RC]/.test(record.slice(0, 2))) {
+      index += 1;
+      if (index >= records.length || records[index].length === 0) throw new IntegrityError("GIT_FAILED");
+    }
+  }
   return count;
 }
 
@@ -214,19 +248,19 @@ export async function runCommitIntegrity(options) {
     result.checks.worktree = actualWorktree === normalized.worktree && actualWorktree === normalized.repository ? "pass" : "fail";
 
     if (normalized.reportedCommit === "none") {
-      result.checks.ancestry = "skipped";
+      result.checks.ancestry = head === normalized.baseSha ? "skipped" : "fail";
       result.checks.baseline_movement = "skipped";
       result.checks.staging_scope = "skipped";
     } else {
-      const ancestry = await runGit(normalized.repository, ["merge-base", "--is-ancestor", normalized.reportedCommit, "HEAD"]);
+      const ancestry = await runGit(normalized.repository, ["merge-base", "--is-ancestor", normalized.baseSha, "HEAD"]);
       if (ancestry.signal !== null || ![0, 1].includes(ancestry.code)) throw new IntegrityError("GIT_FAILED");
-      result.checks.ancestry = ancestry.code === 0 ? "pass" : "fail";
+      result.checks.ancestry = ancestry.code === 0 && normalized.reportedCommit === head ? "pass" : "fail";
 
       const movement = await runGit(normalized.repository, ["diff", "--quiet", normalized.baseSha, "HEAD"]);
       if (movement.signal !== null || ![0, 1].includes(movement.code)) throw new IntegrityError("GIT_FAILED");
       result.checks.baseline_movement = normalized.reportedCommit !== normalized.baseSha && movement.code === 1 ? "pass" : "fail";
 
-      const changed = nulPaths(await runGit(normalized.repository, ["diff-tree", "--root", "--no-commit-id", "--name-only", "--no-renames", "-r", "-z", normalized.reportedCommit]));
+      const changed = nulPaths(await runGit(normalized.repository, ["diff", "--name-only", "--no-renames", "-z", normalized.baseSha, "HEAD", "--"]));
       const allowed = new Set([...normalized.allowedPaths, ...normalized.scopeDriftPaths]);
       const outOfScope = changed.filter(item => !allowed.has(item));
       result.counts.changed_paths = changed.length;

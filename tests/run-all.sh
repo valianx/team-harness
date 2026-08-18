@@ -313,7 +313,11 @@ echo "# Suite 161: bounded argv command output (AC12)"
 echo "# Requires: node. Skipped when absent (NOT a pass — see output)."
 echo "############################################################"
 run_node_suite "bounded-command" "test_bounded_command.mjs" "node not found — install Node.js to run this suite"
-run_node_suite "commit-integrity" "test_commit_integrity.mjs" "node or git not found — install Node.js and Git to run this suite"
+if command -v git >/dev/null 2>&1; then
+    run_node_suite "commit-integrity" "test_commit_integrity.mjs" "node not found — install Node.js to run this suite"
+else
+    report_skip_or_fail "commit-integrity" "git not found — install Git to run this suite"
+fi
 
 run_node_suite "workspace-preflight" "test_workspace_preflight.mjs" "node not found — install Node.js to run this suite"
 

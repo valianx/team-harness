@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +13,7 @@ import {
   TEST_CONTRACT_SCHEMA_VERSION,
   TEST_CONTRACT_VALIDATION_SCHEMA_VERSION,
   TEST_TRANSITION_SCHEMA_VERSION,
+  isTestTransitionReceipt,
   isTestTransitionResult,
   runTestTransition,
   validateTestContractFile,
@@ -193,6 +194,14 @@ await check("tester contract self-validation checks the candidate diff and manif
     };
     const valid = await validateTestContractFile(context.contractPath, validationContext);
     assert.equal(valid.verdict, "pass");
+    for (const unsafe of [
+      { ...validationContext, base: "--help" },
+      { ...validationContext, candidate: "--upload-pack=malicious" },
+    ]) {
+      const rejected = await validateTestContractFile(context.contractPath, unsafe);
+      assert.equal(rejected.verdict, "fail");
+      assert.equal(rejected.error_code, "ARGUMENT_INVALID");
+    }
 
     await writeJson(context.contractPath, contract([
       "tests/feature.test.js",
@@ -316,6 +325,7 @@ await check("the CLI persists full evidence atomically and emits a bounded recei
     );
     assert.equal(cli.status, 0, cli.stderr);
     const receipt = JSON.parse(cli.stdout);
+    assert.equal(isTestTransitionReceipt(receipt), true);
     assert.equal(receipt.kind, "team_harness_test_transition_receipt");
     assert.equal(receipt.verdict, "pass");
     assert.equal(receipt.diagnostic, null);
@@ -325,6 +335,42 @@ await check("the CLI persists full evidence atomically and emits a bounded recei
     assert.equal(receipt.result_sha256, createHash("sha256").update(bytes).digest("hex"));
     assertClosedResult(JSON.parse(bytes.toString("utf8")));
     assert.ok(Buffer.byteLength(cli.stdout) < 1024);
+  });
+});
+
+await check("persisted transition output rejects relative and symlinked coordinates", async () => {
+  await repository(async (context) => {
+    const baseArgs = [
+      runnerPath,
+      "--transition", "red",
+      "--repo", context.repo,
+      "--manifest", ".team-harness/quality.json",
+      "--base", context.base,
+      "--candidate", "HEAD",
+      "--contract", context.contractPath,
+    ];
+    const relative = spawnSync(node, [...baseArgs, "--output", "relative.json"], { encoding: "utf8", windowsHide: true });
+    assert.equal(relative.status, 1);
+    assert.equal(JSON.parse(relative.stdout).error_code, "ARGUMENT_INVALID");
+
+    if (process.platform !== "win32") {
+      const realParent = path.join(context.repo, ".git", "real-evidence");
+      const linkedParent = path.join(context.repo, ".git", "linked-evidence");
+      await mkdir(realParent);
+      await symlink(realParent, linkedParent, "dir");
+      const parentResult = spawnSync(node, [...baseArgs, "--output", path.join(linkedParent, "result.json")], { encoding: "utf8", windowsHide: true });
+      assert.equal(parentResult.status, 1);
+      assert.equal(JSON.parse(parentResult.stdout).error_code, "ARGUMENT_INVALID");
+
+      const protectedTarget = path.join(realParent, "protected.txt");
+      const linkedTarget = path.join(context.repo, ".git", "linked-result.json");
+      await writeFile(protectedTarget, "preserve\n");
+      await symlink(protectedTarget, linkedTarget);
+      const targetResult = spawnSync(node, [...baseArgs, "--output", linkedTarget], { encoding: "utf8", windowsHide: true });
+      assert.equal(targetResult.status, 1);
+      assert.equal(JSON.parse(targetResult.stdout).error_code, "ARGUMENT_INVALID");
+      assert.equal(await readFile(protectedTarget, "utf8"), "preserve\n");
+    }
   });
 });
 
