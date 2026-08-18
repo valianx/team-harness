@@ -195,6 +195,19 @@ terminal run. For corrupt, incomplete, oversized, or unmappable state, report
 only the path and failed structural checks; never echo raw snapshot or event
 content.
 
+Any other `status: blocked` is a recoverable stop, not a terminal close. Resume
+in the same workspace and branch after validating their identities and every
+previous evidence hash. Preserve all commits and artifacts append-only, then
+continue from the recorded phase with a new attempt or candidate as its local
+contract requires. The no-repeat-Gate-1 path is legal only after validating the
+prior Gate 1 dual record and its approved scope binding. A blocked pre-Gate-1
+state, or one with a missing or invalid release/event/scope binding, remains
+blocked and routes through the existing Gate 1 recovery or migration contract;
+it never borrows a later implementation recovery. With those prerequisites
+valid, do not demand a new pipeline or repeat Gate 1 merely because an earlier
+attempt is terminal. Only `phase/status: complete|aborted` closes the run, and a
+real scope or intent change follows the existing decision contract.
+
 For an OpenSpec-bound Design, resolve `scripts/openspec-recovery.mjs` relative to the loaded
 pipeline skill and derive the next action from the bounded OpenSpec state fields. Resume
 `preflight`, an already approved `provisioning`, upstream `planning`, strict `snapshot`, or
@@ -317,9 +330,18 @@ populated, out-of-scope, or mismatched cleaner or handoff evidence blocks.
 `cleaner-failed`, `cleaner-blocked`, `handoff-failed`, and `handoff-blocked`
 require a readable hashed terminal result, exact reason, and matching
 commit/tree. They remain non-pass and block Freeze. A cleaner terminal failure
-requires a new explicitly activated repository-local pipeline; a handoff
-terminal failure requires a new complete package, fresh nonce, presentation,
-and live authorization before any further implementer dispatch.
+is terminal only for that immutable candidate/manifest attempt, not for the
+pipeline. `blocked` is recoverable: on a live operator recovery, retain the same
+workspace, same branch, commits, valid edits, and all old evidence; return to
+implementation and use the normal max-3 correction budget to produce a new
+candidate. The old result remains immutable and event-bound while state may
+point to one fresh cleaner attempt for the new identity. Never overwrite,
+relabel, or infer success for the old attempt; every recovered transition uses
+a fresh attempt-qualified evidence path. No new Gate 1 is required while
+intent and approved scope are unchanged. A handoff terminal failure similarly
+requires a new complete package, fresh nonce, presentation, and live
+authorization before any further implementer dispatch, but not a replacement
+pipeline.
 Never infer a baseline, formatter/lint result, CRAP value, behavior-preserving
 verdict, authorization, or closure from cleaner/implementer prose or the
 current worktree.
@@ -339,8 +361,8 @@ safe paths, one closure per ID, and exact
 agreement with `cleaner_evidence.status: handoff-pending`. Missing, extra,
 duplicated, ineligible, or mismatched coordinates block; never repair or infer
 them or convert them into a multi-repository dispatch. An ineligible recovered
-package preserves commits/evidence and may only recommend a new explicit
-repository-decomposed pipeline.
+package preserves commits/evidence and pauses the same pipeline for an in-place
+repository-decomposed recovery package or the applicable live scope decision.
 
 Issue a fresh nonce and re-present exactly:
 
