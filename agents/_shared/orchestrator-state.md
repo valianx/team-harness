@@ -555,6 +555,24 @@ estimate, use zero, or preserve a partial native subtotal.
 
 **Confidence is not approval.** A high-confidence plan or a green suite never substitutes for the operator's gate decision.
 
+## Findings ledger
+
+`reviews/findings-ledger.md` — append-only, coordinator-sole-writer, distinct from the decision
+ledger and from `open_findings`. One row per finding `id`, carrying `class`, `severity`, and a
+`disposition` from the closed set `fixed | accepted-residual | open | rejected-with-rationale`,
+plus any operator ruling including a waiver rationale — transcribed from a lens's or the
+implementer's status block, never inferred. Verifiers read it and never edit it.
+
+`id` is the exact identity a reasoning lens (`qa`, `adversary`, `security`) reports and the
+implementer echoes in `finding_resolutions.finding_id` (I-4); `correction_findings` and
+`open_findings` above resolve to this same identity, never a second vocabulary. A row suppressed
+as `accepted-residual` or by an operator ruling stays suppressed only for the same root cause —
+evidence of a different root cause opens a fresh row rather than reopening the old one.
+
+Every re-review the coordinator dispatches after a correction includes the current ledger as
+dispatch context, so the lens classifies each reported finding as `new_in_delta`,
+`pre_existing_missed`, or `reopened` against it, rather than against its own memory.
+
 ## Pipeline summary
 
 `{docs_root}/00-pipeline-summary.md` — rewritten **in full, never appended**, at four mandatory checkpoints: the STAGE-GATE-1 emission, Freeze, every `iteration.start`, and pipeline end. Rewriting at other transitions is best-effort.

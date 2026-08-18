@@ -92,6 +92,12 @@ range and size instead of re-reading the whole file. Budgets cap fixed prose and
 not the number of required projects, tasks, ACs, findings, or controls. Compact duplication, but
 never omit required items or split operator-approved scope solely to meet a total-size target.
 
+A per-round report (e.g. `reviews/04-validation.md`, `reviews/04-adversary.md`) may be replaced
+wholesale each round without losing finding history: `reviews/findings-ledger.md`
+(`agents/_shared/orchestrator-state.md § Findings ledger`) is the append-only record of finding
+identity, class, severity, and disposition across rounds. Do not duplicate that content into the
+report to preserve it.
+
 ## Status block — common fields
 
 <!-- Consumed by: every leaf agent's Return Protocol status-block template. -->
