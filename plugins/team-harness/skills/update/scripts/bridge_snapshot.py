@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import json
 import os
 from pathlib import Path
@@ -27,6 +28,17 @@ def lexical_path(value: str) -> Path:
 
 def fail(message: str) -> None:
     emit("error", restart_required=True, error=message)
+    raise SystemExit(2)
+
+
+def fail_write_protected() -> None:
+    emit(
+        "error",
+        restart_required=True,
+        errorCode="CACHE_WRITE_PROTECTED",
+        retryWithEscalation=True,
+        error="Codex plugin cache is protected in the current sandbox",
+    )
     raise SystemExit(2)
 
 
@@ -151,4 +163,6 @@ if __name__ == "__main__":
     try:
         main()
     except OSError as exc:
-        fail(str(exc))
+        if exc.errno in {errno.EACCES, errno.EPERM, errno.EROFS}:
+            fail_write_protected()
+        fail("snapshot bridge filesystem operation failed")

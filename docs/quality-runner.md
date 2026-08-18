@@ -125,7 +125,13 @@ repository and records `execution_resolution: repository-local-bin`. A
 worktree whose whole `node_modules` directory points at another checkout is
 therefore `PREREQUISITE_UNAVAILABLE`; it is not treated as a usable local
 installation and its wrapper cannot fall through to `npx` or an external npm
-cache.
+cache. The quality runner remains non-mutating. Before the first pipeline
+specialist dispatch, Main uses the packaged
+`worktree-dependencies.mjs provision --repository <absolute-worktree>` helper
+as a normal Gate-1 prerequisite. It derives the frozen install command from one
+root lockfile, replaces only an untracked top-level symlink, and verifies a real
+worktree-local directory. Failure returns the exact closed `required_action`
+instead of asking a specialist to install dependencies or use a shared cache.
 
 For coordinator evidence, pass an absolute `--output <path>`. The runner writes
 the complete result atomically and prints only a bounded
@@ -163,7 +169,21 @@ five minutes and cannot exceed one hour.
 
 `version_argv` is optional. When present, it must succeed before the quality
 command. The runner stores a version-output fingerprint rather than replaying
-the tool's text into the evidence record.
+the tool's text into the evidence record. It must probe the runtime that the
+runner actually executes after hermetic resolution: for example, a package
+script unwrapped to `node scripts/check.mjs` uses `node --version`, not
+`pnpm --version`.
+
+Manifest structure is validated globally: schema version, command IDs, closed
+fields, argv bounds, paths, timeouts, environments, and CRAP/test-contract
+shape must remain valid. Hermetic runtime classification and executable
+resolution apply only to the explicitly selected checks. An unselected
+command's package manager or version probe cannot block an independent
+format/lint checkpoint and is never executed; selecting that command applies
+the complete fail-closed validation before launch. Quality result schema v3
+records a bounded `error_context` with exactly `command_id` and `field` when a
+manifest or hermeticity failure can be attributed safely. It never includes
+argv, paths, environment values, or child output.
 
 ## CRAP adapter contract
 

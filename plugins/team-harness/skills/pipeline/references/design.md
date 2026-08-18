@@ -51,9 +51,11 @@ Run the transaction continuously:
    traceability execution item. Prefer branch-in-place when the current checkout is clean,
    writable, and already owns the dependency installation needed by the approved quality
    commands. Select an isolated worktree only for a recorded isolation need. When its tasks need
-   Node dependencies, the plan must provide a self-contained installation below that worktree;
-   a `node_modules` symlink to another checkout is not dependency readiness and must not be
-   proposed as setup.
+   Node dependencies, record that requirement but do not make installation an operator choice or
+   task shard: implementation automatically runs the packaged lockfile-native provisioner before
+   the first dispatch. The resulting self-contained installation must remain below that worktree; a
+   `node_modules` symlink to another checkout is not dependency readiness and must not be proposed
+   as setup.
 5. Validate snapshot freshness, overlay traceability, and applicable operational plan fields,
    then present the unchanged Stage Gate 1.
 

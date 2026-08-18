@@ -278,6 +278,25 @@ await check("a test-only failing commit becomes green with identical test blobs 
   });
 });
 
+await check("test transition does not execute failing probes from unselected commands", async () => {
+  const manifest = qualityManifest();
+  manifest.commands.database = {
+    argv: [node, "-e", "process.exit(0);"],
+    working_directory: ".",
+    timeout_ms: 10_000,
+    version_argv: [node, "-e", "process.exit(23);"],
+  };
+  await repository(
+    async (context) => {
+      const red = await runTestTransition(redOptions(context.repo, context.base, context.contractPath));
+      assertClosedResult(red);
+      assert.equal(red.verdict, "pass");
+      assert.deepEqual(red.quality.commands.map((entry) => entry.id), ["test"]);
+    },
+    { manifest },
+  );
+});
+
 await check("the CLI emits the same closed evidence contract and process status", async () => {
   await repository(async (context) => {
     const cli = spawnSync(
