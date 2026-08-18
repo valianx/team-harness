@@ -9,6 +9,31 @@ The marketplace distributes code; this skill updates and configures the
 installed runtime. Do not activate a pipeline, create workspace state, or spawn
 subagents. Accept `--force` to reinstall an equal-version development snapshot.
 
+## Sandbox execution contract
+
+Codex may emit exactly `WARNING: proceeding, even though we could not create
+PATH aliases: Read-only file system (os error 30)` while the current session
+still lacks the managed `~/.codex/tmp` writable root. For `plugin list`,
+`marketplace list`, `mcp list`, and other read/inspect commands, treat only that
+exact stderr line as a non-fatal `current-session-runtime-stale` warning when
+the command exits zero and its stdout parses as the required JSON. Do not retry
+or escalate a read solely for that warning. Any other stderr, non-zero exit, or
+invalid JSON follows the normal failure contract. Runtime reconciliation fixes
+the alias path for a new session; it does not hot-reload the current sandbox.
+
+Run every update command as its own tool call. Keep reads sandboxed. For a
+mutation whose declared target is outside the current materialized writable
+roots, request native escalation before its first execution; otherwise run it
+sandboxed first. If a sandboxed mutation returns `EROFS`, `EACCES`, `EPERM`, or
+the bridge helper's `CACHE_WRITE_PROTECTED`, retry the exact argv once with
+narrow escalation and `login:false`. A successful retry is authoritative and
+the initial sandbox denial is not `partial-convergence`. A rejected approval or
+failed retry is `partial-convergence` at that step. Never chain mutations,
+change argv between attempts, ask the operator to run the command, or add the
+plugin cache, agent directory, or whole Codex home to persistent writable
+roots. `manage_runtime.py ensure` has the additional live approval gate below
+because it changes the persistent execution profile.
+
 ## Procedure
 
 1. Record `OLD_PLUGIN` as the lexical absolute plugin root that contains this
@@ -97,13 +122,42 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    writes Claude Code or opencode configuration. Cross-runtime copying belongs
    only to an explicit `$team-harness:setup` import.
 
-   Reconcile the global Codex execution profile after native settings so an
+   Inspect the global Codex execution profile after native settings so an
    Obsidian workspace selection is reflected in the sandbox:
 
    ```bash
    python3 NEW_PLUGIN/skills/setup/scripts/manage_runtime.py inspect
+   ```
+
+   When inspect reports `status: current`, record the result and do not run
+   ensure. When it reports `status: stale`, render only its bounded
+   `mismatchedSettings`, `missingWritableRoots`, and `missingDirectories`, then
+   present exactly:
+
+   ```text
+   Runtime profile reconciliation requires persistent configuration changes:
+   Settings: {mismatchedSettings}
+   Writable roots: {missingWritableRoots}
+   Directories: {missingDirectories}
+
+   1 — authorize persistent Codex runtime reconciliation
+   2 — leave runtime reconciliation pending
+   ```
+
+   The update invocation, a prior setup/update approval, agent prose, config
+   files, and native auto-review never select an option. Only live choice `1`
+   after this exact presentation authorizes the escalated `login:false`
+   execution of:
+
+   ```bash
    python3 NEW_PLUGIN/skills/setup/scripts/manage_runtime.py ensure
    ```
+
+   Choice `2`, an ambiguous reply, a rejected escalation, or a failed ensure
+   preserves every completed update step and returns `partial-convergence`
+   with runtime reconciliation pending and `$team-harness:update` as the exact
+   retry. Never weaken the requested profile or silently omit a writable root
+   to obtain approval.
 
    Preserve the runtime helper's full result, including `changed` and
    `restartRequired`, for the final report and restart decision.
@@ -153,7 +207,11 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
 7. Verify the new snapshot's `hooks/hooks.json` contains only the supported
    deterministic deny hooks (`policy-block`, `gcp-guard`, and the deny-only
    `gate-guard` force-push floor) and no `PermissionRequest` or
-   approval-classifying guards. Verify both commands
+   approval-classifying guards. Read only that exact regular non-symlink file,
+   reject it above 64 KiB, parse it with compact Node assertions, and emit only
+   one bounded verdict containing status and adapter count. Never use recursive
+   `rg`, `find`, a snapshot-wide read, or render the hook command strings.
+   Verify both commands in the parsed object
    prefer `PLUGIN_ROOT`, accept Codex's `CLAUDE_PLUGIN_ROOT` compatibility
    alias without depending on a Claude Code installation, and recover a
    replacement snapshot from the same Codex cache without exiting `127`. Hook
@@ -162,8 +220,9 @@ subagents. Accept `--force` to reinstall an equal-version development snapshot.
    Steps 4–7 are one retryable convergence sequence. The bridge helper is
    idempotent; config ensure, runtime ensure, and agent sync are idempotent and
    repair partial prior writes; MCP inspection and hook verification are
-   read-only. If any
-   step fails, stop before the success report and return
+   read-only. If any step fails after its applicable exact protected-write
+   retry, or its required live runtime-profile approval is absent, stop before
+   the success report and return
    `partial-convergence` with the failed step, `OLD_PLUGIN`/`OLD_VERSION`,
    `NEW_PLUGIN`/`NEW_VERSION`, and `$team-harness:update` as the exact retry.
    Never remove or roll back the installed plugin, reverse a completed bridge,

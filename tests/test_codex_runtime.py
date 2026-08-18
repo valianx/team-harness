@@ -714,6 +714,23 @@ def main() -> None:
         "runtime helper, or agent sync reports `restartRequired: true`",
         "do not require a restart merely because the cache version changed",
         "Ask the operator to restart Codex or open a new thread only when",
+        "current-session-runtime-stale",
+        "command exits zero and its stdout parses as the required JSON",
+        "Any other stderr, non-zero exit, or invalid JSON",
+        "retry the exact argv once with narrow escalation and `login:false`",
+        "A rejected approval or failed retry is `partial-convergence`",
+        "Never chain mutations",
+        "whole Codex home",
+        "When inspect reports `status: current`",
+        "`mismatchedSettings`, `missingWritableRoots`, and `missingDirectories`",
+        "1 — authorize persistent Codex runtime reconciliation",
+        "2 — leave runtime reconciliation pending",
+        "Only live choice `1`",
+        "runtime reconciliation pending",
+        "Read only that exact regular non-symlink file",
+        "reject it above 64 KiB",
+        "one bounded verdict containing status and adapter count",
+        "Never use recursive",
     ):
         if marker not in update_flat:
             fail(f"Codex update skill is missing {marker!r}")
@@ -844,6 +861,34 @@ def main() -> None:
             or real_snapshot.is_symlink()
         ):
             fail("Codex snapshot bridge replaced a real cached directory")
+
+        protected_old = cache / "3.6.0"
+        cache.chmod(0o555)
+        try:
+            protected = subprocess.run(
+                [
+                    sys.executable,
+                    str(bridge_script),
+                    "--old-plugin",
+                    str(protected_old),
+                    "--new-plugin",
+                    str(new_snapshot),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        finally:
+            cache.chmod(0o755)
+        protected_result = json.loads(protected.stdout)
+        if (
+            protected.returncode != 2
+            or protected_result.get("status") != "error"
+            or protected_result.get("errorCode") != "CACHE_WRITE_PROTECTED"
+            or protected_result.get("retryWithEscalation") is not True
+            or protected_result.get("restartRequired") is not True
+        ):
+            fail("Codex snapshot bridge does not classify protected-cache retry")
 
     config_script = ROOT / "plugins/team-harness/skills/setup/scripts/manage_config.py"
     runtime_script = ROOT / "plugins/team-harness/skills/setup/scripts/manage_runtime.py"
