@@ -494,11 +494,11 @@ time:
 | validation | security | 10 min |
 | delivery | delivery | 5 min |
 
-For a Codex `openspec-overlay` architect, the dispatch packet carries a
+For a Codex `openspec-planning` architect, the dispatch packet carries a
 coordinator-generated `dispatch_id`, exact `progress_recipient`, and
 `progress_interval_seconds: 120`. The specialist uses native `send_message` to
 emit transient `TH_PROGRESS` JSON at `started`, `inputs-validated`,
-`mappings-built`, `artifacts-writing`, and `validation-ready`, repeating the
+`artifacts-writing`, and `validation-ready`, repeating the
 current milestone when 120 seconds pass. Main validates the known dispatch,
 role/mode, counters, workspace-contained artifact pointers, and closed blocked
 code. These messages are progress evidence only: they never write coordination
@@ -795,20 +795,21 @@ without legacy fallback.
 
 Dispatch a fresh `architect` in `openspec-planning` mode with the installed upstream
 `openspec-propose` skill for a new change or `openspec-update-change` for the already bound
-change. This pass writes only the OpenSpec proposal, specs, design, and tasks. Main then runs
-CLI-reported status plus strict validation and captures the sole
-`inputs/openspec-snapshot.json`. Dispatch a second fresh `architect` in
-`openspec-overlay` mode; it writes only the compact Gate-1 index, operational execution shards,
-and bidirectional traceability against pinned coordinates. It never rewrites canonical source
-intent. Its packet includes the structured progress contract above so Main can
-observe input validation, mapping, and artifact-writing milestones without
-reading partial output. It also includes the effective absolute
-`writable_roots`; each shard declares literal `required_invariants`,
-`required_evidence_anchors`, and `cross_runtime_preservation`, mirrors those
-values into its traceability execution item, and proposes only a branch-in-place
-target or worktree contained by one of those roots. Main validates freshness,
-dispatch-anchor agreement, writable execution topology, and overlay structure
-before Gate 1.
+change. This is the single reasoning pass: it writes the OpenSpec proposal, specs, design, and
+tasks, carrying every judgment call — routing, scope decomposition, invariants — into that one
+change. Main then runs CLI-reported status plus strict validation and captures the sole
+`inputs/openspec-snapshot.json`. Main then runs `openspec-overlay.mjs derive` directly over the
+validated snapshot and the effective absolute `writable_roots` — a mechanical projection, never a
+second agent dispatch. It writes only the compact Gate-1 index, operational execution shard
+scaffolds, and bidirectional traceability against pinned coordinates, and never rewrites
+canonical source intent. Each shard's literal `required_invariants`, `required_evidence_anchors`,
+and `cross_runtime_preservation` declarations mirror exactly into its traceability
+`execution_items` entry by construction. A validator failure on the assembled plan re-enters the same
+`openspec-planning` flow with the failure and Main reruns the derivation over the corrected
+snapshot, invoking it with `overwrite: true` since the prior derivation already wrote the
+traceability file and shards — that authorization is bound to the recorded correction event, not
+a standing default; no standing second dispatch mode exists to repair a mapping. Main validates freshness,
+dispatch-anchor agreement, writable execution topology, and overlay structure before Gate 1.
 
 These are consecutive actions in one Design transaction, not operator checkpoints. Main advances
 automatically after successful internal actions, including repository initialization and its one
@@ -819,8 +820,9 @@ require the operator to re-enter a command. Existing approved or frozen legacy w
 their recorded plan contract and are not implicitly migrated.
 
 **Agent:** `architect`, with the documented self-authored hotfix/Tier-1 exception. In an
-OpenSpec-bound run Design uses the two bounded passes above. A legacy run uses the historical
-single bounded pass. The architect never writes coordination state.
+OpenSpec-bound run Design dispatches the architect exactly once, in `openspec-planning` mode; the
+overlay is a mechanical derivation, not a second dispatch. A legacy run uses the historical single
+bounded pass. The architect never writes coordination state.
 
 | `type` | `bug_tier` | Mode | Output |
 |---|---|---|---|
@@ -864,7 +866,7 @@ task dispatch anchors, and writable execution target;
 the OpenSpec path never falls through to the legacy functional-plan validator
 or invokes `plan-contract-repair.mjs`. Snapshot drift returns to explicit
 OpenSpec reconciliation. Mapping or execution-control findings receive the one
-normal overlay design correction.
+normal design correction described above — no second dispatch mode.
 
 Before presenting Gate 1, Main also runs the packaged `openspec-events.mjs`
 with the complete configured events path and bound feature. Only
@@ -872,7 +874,8 @@ with the complete configured events path and bound feature. Only
 permits the gate. The validator rejects missing universal `ts`/`feature`, a
 dispatch mode serialized as lifecycle `task` instead of the closed `design`
 value, non-canonical status, missing `attempt_metrics`, open attempts, or an
-incomplete two-pass Design. The append-only trace is never repaired during gate
+incomplete Design transaction (a missing planning dispatch or a missing
+derivation result). The append-only trace is never repaired during gate
 presentation.
 
 For every new legacy `sharded-v1` plan, Main resolves `plan-contract.mjs` and
@@ -1723,7 +1726,7 @@ concern. It is never silently treated as a clean audit.
 condition is an explicit fail-closed exception to the QA severity floor: a changed control
 that was broken or not substantively covered cannot proceed as a concern.
 
-**Advance requires both conjuncts:** `phase3_combined ∈ {pass, concerns}` AND `qa.code_hygiene == pass`, **with no correctable security finding**. Preserve only non-correctable `concerns` for STAGE-GATE-3 — their presence is an exception pause, never an auto-ship. Any failing condition completes the required validation set and mandatory triage. An eligible package records one new bounded correction decision; an ineligible one pauses.
+**Advance requires both conjuncts:** `phase3_combined ∈ {pass, concerns}` AND `qa.code_hygiene == pass`, **with no correctable security finding** (the fenced fail-closed conditions above are excluded from `concerns` by construction and never satisfy this clause). A `concerns` outcome the ratchet below records as a `reviews/findings-ledger.md` residual auto-ships citing the Gate-1 record; every other `concerns` outcome — a non-correctable structural contradiction, or a round the ratchet has not yet evaluated — remains an exception pause, never an auto-ship. Any failing condition completes the required validation set and mandatory triage. An eligible package records one new bounded correction decision; an ineligible one pauses.
 
 Validation advance → `waiting_gate3`. Fail on either conjunct → read all required bounded
 result artifacts and consolidate once; then either record the eligible autonomous decision or
@@ -1738,6 +1741,35 @@ rebuild the verification packet before fresh QA and any impact-required security
 
 **Read `failure-brief.md` only**, never the full workspace docs. The failing agent appends its actionable summary there. When the brief does not exist — an `execution-failed` that fired before the agent wrote anything — read the status block's `summary`, `issues` and literal error instead, and do not treat the absent file as a second failure.
 
+### The ratchet
+
+Extends the `fail` predicate and `phase3_combined` above by citation, never a second copy of
+either: the correction loop terminates on severity, not on patience or an exhausted round budget
+alone.
+
+After a correction round's fresh QA and any required security pass return, before deciding
+whether another round opens:
+
+1. **Coverage-defect reclassification.** A finding on surface unchanged since the round that
+   opened this correction, in a class the first fan's Coverage Declaration already flagged an
+   instance of, is a first-pass coverage defect, not genuinely new evidence — cite that
+   declaration instead of treating the finding as freshly discovered.
+2. **Convergence check.** When every remaining open finding is sub-floor (`phase3_combined`
+   evaluates to `concerns`, never `fail`) on surface unchanged since the prior pass, validation is
+   convergence-complete: no further correction round opens. Record each remaining finding as a
+   `reviews/findings-ledger.md` residual (`agents/_shared/orchestrator-state.md § Findings
+   ledger`, disposition `accepted-residual`) and carry it into the pull-request body as a
+   concern.
+3. **New evidence always reopens.** An open `critical` finding classified `new_in_delta` opens a
+   correction round exactly as today, regardless of any convergence this ratchet reached.
+
+The residual set excludes both fenced fail-closed conditions above by construction: a correctable
+`broke-it` and `incomplete_on_changed_control: true` on a sensitive pipeline are never sub-floor,
+never converge, and can never become a ledger residual at any severity label or classification.
+The ratchet never weakens the `fail` predicate, the Gate-3 closed exception list
+(`agents/_shared/gate-contract.md`), or the `code_hygiene` re-assertion below, which stays a gate
+conjunction on its own terms.
+
 ### Validation acceptance check
 
 After validation succeeds and before `waiting_gate3`, re-verify traceability directly from
@@ -1750,7 +1782,7 @@ the artifacts. The combined verdict never replaces Gate 3.
 5. **UX gate (`frontend_scope` only):** any `critical` (WCAG A) finding in `reviews/04-ux-validation.md` fails the gate → Case A. `high`/`medium`/`suggestion` never block.
 6. **Regression still passing (`fix`/`hotfix`, Tier 2–4):** confirm `regression_test_path` shows PASS, not `skip`/`xfail` — then **read the actual assertion body** and confirm it matches the authored pattern. A weakened or replaced assertion fails the gate even with the test name and PASS status intact.
 7. **Test-change integrity:** when tests changed or were deleted, require the exact reason and surviving behavioral evidence. A deletion or weakened assertion whose purpose is to hide a failure joins the consolidated correction-decision package; test counts never gate acceptance.
-8. **`code_hygiene` re-assertion.** Re-read the value `qa` recorded. `fail` closes this check regardless of AC, security or build outcome. This is a re-check, not a new evaluation — it exists so a hygiene fail cannot slip through if validation wording is ever loosened.
+8. **`code_hygiene` re-assertion.** Re-read the value `qa` recorded. `fail` closes this check regardless of AC, security, build, or ratchet-convergence outcome. This is a re-check, not a new evaluation — it exists so a hygiene fail cannot slip through if validation wording is ever loosened.
 
 Security findings are checked here: a correctable `broke-it` or incomplete sensitive-coverage
 finding is a validation failure and, after explicit authorization, must have passed through
@@ -1897,6 +1929,14 @@ Non-iterating: after the separate request, report and continue on failure.
 ## Complete — close the session
 
 **Yours.** `mcp__memory__session_end(session_id, summary)`. Idempotent; on error log and continue. This is mechanical lifecycle — without it the session opened at intake never closes.
+
+**Archive offer.** For an OpenSpec-bound run, terminal close checks the pull request state once and
+offers `openspec archive <change>` behind a one-line Y/n only when the merge is already confirmed
+there — publish-only delivery ends at a draft PR, so an unmerged pull request is the common case
+and records a pending, re-offerable entry instead. Never silent; a declined or deferred offer never
+blocks close. Full mechanics: `agents/_shared/orchestrator-state.md § "Terminal status write —
+mandatory"`. The direct spec lane (`skills/spec/SKILL.md`) offers the same archive at its own
+post-merge step, with identical semantics.
 
 > **Entity save is on request only and is not a Delivery mode.** Extract reusable insights through the explicit knowledge flow when the operator asks. What stays automatic is narrow and content-filtered — the conditional security-finding write inside `validation`, which is the audit's own memory rather than project doctrine. The content policy, pre-write checklist, dedup gate, entity types, save triggers and soft cap live in `agents/_shared/kg-write-policy.md`; read them only for that explicit flow.
 

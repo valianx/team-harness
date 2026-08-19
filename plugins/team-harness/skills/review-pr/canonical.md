@@ -66,8 +66,9 @@ Require `workspaces/pr-review-{number}/pr-review-context.json`, a non-empty body
 `workspaces/pr-review-{number}/pr-review-inline.json` (an empty JSON array is valid). Capture a fresh context and run
 `review_context.py compare`.
 
-- `current`: continue at Preview.
-- Any change: discard the draft and restart at Gather.
+- `current`: continue at Preview. Carry a reported `mergeability_changed` as one informational
+  drift line in the preview; it never blocks resume.
+- `conversation-changed` or `code-changed`: discard the draft and restart at Gather.
 - Capture failure or missing snapshot identity: stop; do not publish a legacy or stale draft.
 
 ## Gather
@@ -290,9 +291,15 @@ python3 "$REVIEW_CONTEXT_HELPER" select-security \
 ```
 
 The selector returns `known-sensitive`, `known-non-executable`, `unmatched-executable`, or
-`indeterminate`. Only `known-non-executable` without an explicit security request or Tier 4 may
-omit the security lens. A missing helper, unreadable input, or invalid result is
-`indeterminate` and requires security.
+`indeterminate`, alongside `security_required` and the trigger list. `known-non-executable` now
+also covers configuration-only diffs (`.json`, `.yaml`, `.yml`, `.toml`, `.ini`, `.cfg`,
+`.properties`); `.env` variants, sensitive filenames such as `package.json`/`go.mod`, and any path
+under `.github/workflows/` are still caught earlier and stay sensitive. Security is required for
+`known-sensitive` or `unmatched-executable`, and for an explicit request or Tier 4 regardless of
+suffix classification; `known-non-executable` and `indeterminate` omit it otherwise. A missing
+selector or an unreadable changed-files/diff artifact fails closed and requires security. State
+the resolved `reason` whenever security is omitted, so a not-required outcome stays visible
+instead of silent.
 
 Add specialist agents only from concrete signals:
 
@@ -315,7 +322,8 @@ Announce the selected specialists using the operator-facing communication contra
 
 Capture a new context immediately before dispatch and compare it with `$CONTEXT`.
 
-- `current`: dispatch.
+- `current`: dispatch. Carry a reported `mergeability_changed` as one informational drift line;
+  it never blocks dispatch.
 - `conversation-changed` or `code-changed`: rebuild artifacts and restart Gather once.
 - A second movement or capture failure: stop without reviewing.
 
@@ -491,9 +499,11 @@ Unless `--auto-publish` was supplied, show the evidence before the recommendatio
 3. every inline comment with path, line, and side;
 4. a superseded-review note when applicable, without exposing snapshot identity unless needed to
    disambiguate it;
-5. a closing `Recommendation:` with the event in plain language and one concise rationale grounded
+5. an informational mergeability-drift line when the latest freshness comparison reported
+   `mergeability_changed`, never phrased as a blocker;
+6. a closing `Recommendation:` with the event in plain language and one concise rationale grounded
    in the supported findings and available checks;
-6. five numeric choices with the recommended publish event first and marked `**(recommended)**`.
+7. five numeric choices with the recommended publish event first and marked `**(recommended)**`.
 
 Build the rationale without adding new findings: for `REQUEST_CHANGES`, state the blocking count
 and concrete consequence category; for `APPROVE`, state that no supported blockers remain and
@@ -546,12 +556,16 @@ a failed check and never publishes an event other than the recommendation.
 
 ## Pre-publish freshness
 
-After approval and immediately before the GitHub write, capture and compare again. Require exact
-head, base, merge-base, and mergeability equality with the approved capture.
+After approval and immediately before the GitHub write, capture and compare again against the
+approved capture.
 
-- `current`: proceed directly to the write.
-- Any mismatch, including conversation or mergeability drift: invalidate approval and restart
-  Gather.
+- `current`: proceed directly to the write. When the comparison reports `mergeability_changed`,
+  add one informational drift line to the publish confirmation; it never blocks the write.
+- First `code-changed` result: invalidate approval, restart Gather once, and return to Preview
+  for renewed approval.
+- `code-changed` again on the capture taken after that restart: stop without restarting further —
+  present the drift to the operator and keep the drafted review for a manual retry.
+- `conversation-changed`: invalidate approval and restart Gather.
 - Capture or comparison failure: invalidate approval and restart Gather with
   `freshness could not be verified — review not published`.
 

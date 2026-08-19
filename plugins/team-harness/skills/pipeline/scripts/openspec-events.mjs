@@ -167,7 +167,7 @@ export async function validateOpenSpecEvents({ workspace, events, feature } = {}
     }
     if (designStarts === 0 || designStarts !== designEnds) findings.push(finding("DESIGN_PHASE_UNBALANCED"));
     if (open.size > 0) findings.push(finding("ATTEMPT_UNCLOSED"));
-    if (architectAttempts < 2 || successfulArchitectAttempts < 2) findings.push(finding("OPENSPEC_DESIGN_ATTEMPTS_INCOMPLETE"));
+    if (architectAttempts < 1 || successfulArchitectAttempts < 1) findings.push(finding("OPENSPEC_DESIGN_ATTEMPTS_INCOMPLETE"));
   } catch (error) {
     const code = typeof error?.message === "string" && ERROR_CODES.has(error.message)
       ? error.message

@@ -2087,12 +2087,12 @@ def main() -> None:
     activation_digests = digest_table(activation)
     pipeline_digests = digest_table(pipeline)
     expected_updated_digests = {
-        "pipeline-architect": "4fb84a1cf9cd51d80401c9a9e3a31bc0b66c98f209893b994d89f8a0bc28ed61",
-        "pipeline-implementer": "84afd23ff6adcf3fe7ab6b5ec85f30cac6313d1b0cfe09a96f6eb0d346d698ae",
+        "pipeline-architect": "a06dcb4656f0d6485acb024f77383e54b3e715dfc4e57e1674edd4932add24f2",
+        "pipeline-implementer": "ec6200d8ba9e5b3f0f1ccb12d3f86ccc12850f22cd36bb425c26ae13e548f0ab",
         "pipeline-tester": "21bdd93b9d25ffe9158e5657a558f8d457358bc5394ab67cbfdf7c8d924c0e81",
         "pipeline-cleaner": "ea4260bcb8fc1e17034f0d6f91b9d97efefeb61065c50b88a25e792eaaab88b9",
-        "pipeline-qa": "d13a07e234c8c95b91e31920a1c6bbb961ca0e3b96f03b7b93a7dee27472cbd1",
-        "pipeline-security": "11e9632e553eb98374b93b61901679800992edc284ea75d52d280c62fc4f5a14",
+        "pipeline-qa": "95320bb295a510e45cf405ac72811bdc2920e2aa03dff4d3f9026c06bb1002aa",
+        "pipeline-security": "9df5adab4075e4e66ec9cf7d45ba798037dd25af4b38a851fac90b13951a6530",
         "pipeline-delivery": "c9a8a42ca62798cca1a57b65b89fbd044356433ac11fe7eff24ba3685f91aafa",
     }
     if set(activation_digests) != session_pipeline_roles or activation_digests != pipeline_digests:

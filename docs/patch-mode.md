@@ -24,7 +24,11 @@ Validation reports one of these outcomes:
 | Observation that does not violate AC or the security floor | preserve for Gate 3 disposition | no |
 | Contradiction between intent, scope fence, and AC | operator decision | only after explicit decision |
 
-Never rewrite an acceptance criterion to manufacture PASS. A structural contradiction is not a
+A row above always routes to its owner except when the ratchet (`agents/ref-pipeline.md § "The
+ratchet"`) converges it: a sub-floor finding on surface unchanged since the round that opened the
+correction records to `reviews/findings-ledger.md` as a residual and ships as a pull-request
+concern instead of consuming another round. The two fail-closed security conditions are excluded
+from that residual by construction. Never rewrite an acceptance criterion to manufacture PASS. A structural contradiction is not a
 bounded patch: the operator decides whether design reopens, the architect produces a revised
 plan, and the coordinator presents a fresh Gate 1. This is the only route back to `design` from
 `validation`.
@@ -50,7 +54,8 @@ finding receives a fresh audit of the changed delta; this is not a waiver or a d
 
 Tester owns evidence gaps. QA owns functional and hygiene findings. Adversary owns adversarial
 findings when the security floor applies, but a correctable finding is still routed to the
-implementation executor. Each correction consumes the shared implementation/validation budget
+implementation executor unless the ratchet records it as a ledger residual (§ 1). Each correction
+consumes the shared implementation/validation budget
 defined in `agents/ref-pipeline.md`; transport, invalid-return, artifact-missing, build/lint,
 contradiction, and reclassification failures use their named budgets instead.
 
@@ -68,8 +73,9 @@ over the new tree. No result from an older tree can release Gate 3.
 
 ## 5. Gate interaction
 
-Patch mode does not add an intermediate operator stop. After a correctable finding is fixed and
-the affected validation passes, the machine advances to `waiting_gate3`. Gate 3 remains the final
+Patch mode does not add an intermediate operator stop. After a correctable finding is fixed, or
+the ratchet converges it to a ledger residual, and the affected validation passes, the machine
+advances to `waiting_gate3`. Gate 3 remains the final
 operator decision with stable numeric options: `1 ship`, `2 amend`, `3 abort`. `amend` returns to
 implementation and repeats the Freeze/validation freshness barrier; `abort` records the decision
 and closes the run. The dual record, fresh nonce, and live approval rules are unchanged.

@@ -97,7 +97,7 @@ Core event names are:
 | `agent.spawn`, `agent.close`, `agent.correction.spawn` | Declared specialist lifecycle; finite role/task, local ordinal, context strategy, final follow-up count, and closed aggregate result only |
 | `stage.gate`, `stage.gate.release` | Gate presentation and dual-record release |
 | `gate`, `gate.pass`, `gate.fail` | Human-checkpoint marker or an internal verdict; never a release by itself |
-| `iteration.start` | Implementation/validation correction round; new producers use `cause: verification` only. Historical `cause: operator` events remain readable but are not emitted for plan repairs, operator decisions, or explicit design work |
+| `iteration.start` | Implementation/validation correction round; new producers use `cause: verification` only and carry `convergence_counts` (`new_in_delta`/`pre_existing_missed`/`reopened` integer counts, present with zeros rather than omitted when the round found nothing). Historical `cause: operator` events remain readable but are not emitted for plan repairs, operator decisions, or explicit design work |
 | `artifact.missing`, `operation.started/success/failed` | Artifact and operation observability |
 | `checkpoint.confirmed` | Discover reasoning checkpoint evidence, not a gate |
 | `stage2.hygiene` | Implementation hygiene scan result |
@@ -376,9 +376,12 @@ presented. The renderer reads these fields and events but never edits them.
 
 Validation findings are classified and routed as follows:
 
-- in-scope code, test, or documentation defect → implementation executor;
+- in-scope code, test, or documentation defect → implementation executor, unless the ratchet
+  (`agents/ref-pipeline.md § "The ratchet"`) records it as a sub-floor findings-ledger residual on
+  unchanged surface after a prior correction round;
 - missing evidence → tester;
 - correctable security finding → implementation plus delta audit;
+- ratchet-recorded findings-ledger residual → auto-ship citing the Gate-1 record, no further round;
 - structural contradiction → operator decision, then optional design re-open and new Gate 1.
 
 Mechanical plan defects are repaired by the coordinator; bounded operator decisions are

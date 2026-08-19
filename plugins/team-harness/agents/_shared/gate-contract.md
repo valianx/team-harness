@@ -241,7 +241,9 @@ event carries both.
 **STAGE-GATE-3 — mechanical release.** Gate 3 is the execution point of the release decision
 recorded at Gate 1, not a second human approval:
 
-- **Totally green validation** (no open blocking findings, all floors satisfied): the
+- **Totally green validation** (no open blocking findings, all floors satisfied — a
+  `reviews/findings-ledger.md` residual the ratchet records, `agents/ref-pipeline.md § "The
+  ratchet"`, is not a blocking finding and does not by itself prevent this bullet): the
   coordinator records `gate3_release: auto-ship` with a `stage.gate.release` event citing the
   Gate-1 release event and its consumed nonce (`origin: gate1-release-policy`). No STOP block
   is rendered, no new nonce is issued, and delivery proceeds immediately through push and

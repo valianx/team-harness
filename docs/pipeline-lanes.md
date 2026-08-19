@@ -1,8 +1,9 @@
 # Pipeline Compatibility and Migration
 
 This document is the compatibility authority for retired route markers. The current runtime has
-exactly two postures: `inline` and `pipeline`. It does not define a third lane, a depth selector,
-or a configuration-selected route.
+exactly two postures: `inline` and `pipeline`; the explicit `/th:spec` lane (§ "The direct spec
+lane" below) runs entirely within inline's floor — no new posture value, workspace, state, events,
+or gate. It does not define a depth selector or a configuration-selected route.
 
 The `pipeline` posture is always the canonical full v3 machine:
 
@@ -71,6 +72,23 @@ Once a pipeline is active, an inline request is handled as an administrative clo
 direct work begins. The close preserves history, clears pending gate presentation, and records no
 synthetic gate release. It is not a downgrade and is not a gate decision.
 
+## The direct spec lane
+
+Plain inline handles mechanical, reversible work with no design decision worth recording.
+`/th:spec` handles tasks that merit written intent and task decomposition — single repo, no
+security floor, no public-contract break. `/th:pipeline` remains the hard router for
+security-sensitive, multi-specialist, multi-task, or irreversible work — these are hard routers
+the lane never absorbs. When an in-flight lane task grows a second specialist need or a security
+dimension, stop before proceeding and offer the pipeline, carrying the authored change over.
+
+The lane is entered only by explicit `/th:spec` invocation; the live escalation guidance
+(`1 — inline` / `2 — pipeline`) MAY additionally offer it as a third option only when this
+predicate passes. It creates no workspace, `00-state.md`, execution events, pipeline summary,
+snapshot, overlay, traceability artifact, or gate ceremony, and dispatches no specialist by
+default; at most one full-scope ad hoc review runs on live operator request and never opens a
+correction or re-audit loop. A lane-authored change uses the same `openspec/changes/` directory,
+schema, naming, and archive path as a pipeline-authored change. Full flow: `skills/spec/SKILL.md`.
+
 ## Legacy route markers (compatibility only)
 
 The former express/full depth-profile model is **superseded**. The marker names below remain only
@@ -117,3 +135,4 @@ gate release.
 | State/event ownership and recovery invariants | [`agents/_shared/orchestrator-state.md`](../agents/_shared/orchestrator-state.md), [`skills/recover/SKILL.md`](../skills/recover/SKILL.md) |
 | Gate dual record and numeric decisions | [`agents/_shared/gate-contract.md`](../agents/_shared/gate-contract.md) |
 | Direct kernel and ad hoc review posture | [`agents/orchestrator.md`](../agents/orchestrator.md), [`agents/ref-direct-modes.md`](../agents/ref-direct-modes.md) |
+| Direct spec lane flow and routing predicate | [`skills/spec/SKILL.md`](../skills/spec/SKILL.md), [`agents/ref-direct-modes.md`](../agents/ref-direct-modes.md) § "Spec Lane Mode" |

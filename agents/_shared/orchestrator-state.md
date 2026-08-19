@@ -506,6 +506,7 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | `correction_cause` | conditional | required for `agent.correction.spawn`; literal `verification` only |
 | `correction_nonce`, `correction_anchor`, `correction_findings`, `correction_scope`, `correction_requirements`, `correction_closure`, `correction_dispositions` | conditional | required for `correction.decision` and every authorized `iteration.start`/`agent.correction.spawn`; the complete seven-field package must be byte-for-byte identical across all three events, not merely share a nonce; exact bounded identity, never inferred; closure has one deterministic check/expected result per finding |
 | `correction_authority`, `correction_authority_gate_nonce` | conditional | required and byte-identical across `correction.decision`, `iteration.start`, and `agent.correction.spawn`; `operator-live` uses a null Gate nonce and is unbounded, while `gate1-autonomous` requires the exact nonce from the valid Gate-1 approval release and `autonomous_correction_count < 3` |
+| `convergence_counts` | conditional | required on every `iteration.start` following a correction fan; one object with exactly the three non-negative integer keys `new_in_delta`, `pre_existing_missed`, `reopened` counting that round's findings by the ratchet's classification vocabulary (`agents/ref-pipeline.md § "The ratchet"`); present with all-zero values when the triggering round produced no reasoning-lens findings — never omitted |
 | `verdict` | conditional | `pass`/`concerns`/`fail`/`partial-fail` |
 | `decision` | conditional | required for `stage.gate.release` and `correction.decision`; correction value is `authorize\|pause\|abort` |
 | `cause` | conditional | `verification` for new `iteration.start` correction rounds; historical `operator` values remain readable |
@@ -555,6 +556,26 @@ estimate, use zero, or preserve a partial native subtotal.
 
 **Confidence is not approval.** A high-confidence plan or a green suite never substitutes for the operator's gate decision.
 
+## Findings ledger
+
+`reviews/findings-ledger.md` — append-only, coordinator-sole-writer, distinct from the decision
+ledger and from `open_findings`. One row per finding `id`, carrying `class`, `severity`, and a
+`disposition` from the closed set `fixed | accepted-residual | open | rejected-with-rationale`,
+plus any operator ruling including a waiver rationale — transcribed from a lens's or the
+implementer's status block, never inferred. Verifiers read it and never edit it. A disposition
+change is recorded by appending the new disposition and round to the finding's existing row —
+never by deleting prior row material and never by opening a second row for the same id.
+
+`id` is the exact identity a reasoning lens (`qa`, `adversary`, `security`) reports and the
+implementer echoes in `finding_resolutions.finding_id` (I-4); `correction_findings` and
+`open_findings` above resolve to this same identity, never a second vocabulary. A row suppressed
+as `accepted-residual` or by an operator ruling stays suppressed only for the same root cause —
+evidence of a different root cause opens a fresh row rather than reopening the old one.
+
+Every re-review the coordinator dispatches after a correction includes the current ledger as
+dispatch context, so the lens classifies each reported finding as `new_in_delta`,
+`pre_existing_missed`, or `reopened` against it, rather than against its own memory.
+
 ## Pipeline summary
 
 `{docs_root}/00-pipeline-summary.md` — rewritten **in full, never appended**, at four mandatory checkpoints: the STAGE-GATE-1 emission, Freeze, every `iteration.start`, and pipeline end. Rewriting at other transitions is best-effort.
@@ -569,8 +590,8 @@ Sections: `## TL;DR`, `## Phase Timeline`, `## Dispatch Issues`, `## Tool Effect
 renders `Cost: unavailable`. A summary with no such object retains the legacy
 token and price rendering unchanged.
 
-**OpenSpec Gate-1 trace preflight.** After the two Design architect attempts
-close and before presenting Gate 1, validate the complete configured events
+**OpenSpec Gate-1 trace preflight.** Before Gate 1, once the Design architect
+attempt closes (one pair required), validate the configured events
 file and bound feature with the packaged `openspec-events.mjs`. Missing `ts` or
 `feature`, a dispatch mode serialized as lifecycle `task`, a non-canonical
 status, missing `attempt_metrics`, or any open attempt fails closed. Do not
@@ -713,7 +734,18 @@ through this write; without it a shipped run's `gate3_release: ship` state
 stays a live-looking candidate for a later run reusing the same branch or
 worktree path.
 
-Then append `## Final state — ready for handoff` (branch, version, PR, AC count, iterations, outcome) and surface the `/compact`-or-`/clear` prompt.
+**Archive offer — OpenSpec-bound runs only, confirmed merge.** Before appending `## Final state`,
+check the run's pull request state once. When it reports merged, present a one-line
+`Archive {change}? [y/N]` and wait for the live reply; on `y`, run `openspec archive <change>` on
+a branch delivered as its own pull request — never the run's own pull request, never a direct
+default-branch push — and record the outcome. Publish-only delivery ends at a draft PR, so an
+unmerged pull request is the common case at close: no archive is offered or executed, and a
+`pending` entry is recorded instead. A declined (`N`/no reply) or deferred (unmerged) offer never
+blocks close; either way, record the archive disposition in `## Final state` below for a later
+explicit request. Archive never runs silently.
+
+Then append `## Final state — ready for handoff` (branch, version, PR, AC count, iterations,
+outcome, archive disposition) and surface the `/compact`-or-`/clear` prompt.
 
 When `obsidian_sync: armed` and the terminal close, pause, or abort did not
 already export at draft-PR creation, run the same one-way export described in

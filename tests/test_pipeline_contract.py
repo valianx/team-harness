@@ -1667,7 +1667,8 @@ def check_residual_corrections() -> None:
 
     cost = read("docs/adversary-cost-model.md").lower()
     require("correctable `broke-it`" in cost and "fresh audit" in cost, "Adversary cost: correction route missing")
-    require("only non-correctable structural" in cost, "Adversary cost: all findings remain operator-disposed")
+    require("findings-ledger residual" in cost, "Adversary cost: ratchet residual route missing")
+    require("concerns remain operator-disposed" not in cost, "Adversary cost: unconditional correctable-must-correct wording survived")
 
     how = read("docs/how-it-works.md")
     require("inline" in how.lower() and "pipeline" in how.lower(), "How-it-works: direct/pipeline explanation drifted")
@@ -1682,6 +1683,41 @@ def check_residual_corrections() -> None:
     require("seven fields above" in gate and "six fields above" not in gate, "Gate contract: stale field count")
     state_contract = read("agents/_shared/orchestrator-state.md")
     require("checkpoint_boundary` is a separate derived checkpoint cache" in state_contract, "State: checkpoint boundary is conflated with gate fields")
+
+
+def check_convergence_counts_contract() -> None:
+    """`convergence_counts` is declared identically by both `iteration.start` carriers."""
+    keys = ("new_in_delta", "pre_existing_missed", "reopened")
+
+    state = read("agents/_shared/orchestrator-state.md")
+    schema = section(state, "### Schema", "### Free-text bound")
+    convergence_row = next(
+        (line for line in schema.splitlines() if "convergence_counts" in line), None
+    )
+    require(convergence_row is not None, "State schema: convergence_counts row missing")
+    require(
+        all(key in convergence_row for key in keys),
+        "State schema: convergence_counts is missing one of its three counted keys",
+    )
+    require(
+        "never omitted" in convergence_row.lower() and "optional" not in convergence_row.lower(),
+        "State schema: convergence_counts documented as optional rather than conditional-with-zeros",
+    )
+
+    observability = read("docs/observability.md")
+    events = section(observability, "Core event names are:", "There is no `plan_structure` event")
+    convergence_line = next(
+        (line for line in events.splitlines() if "iteration.start" in line), None
+    )
+    require(convergence_line is not None, "Observability: iteration.start event row missing")
+    require(
+        "convergence_counts" in convergence_line and all(key in convergence_line for key in keys),
+        "Observability: iteration.start producer contract is missing convergence_counts",
+    )
+    require(
+        "present with zeros" in convergence_line.lower(),
+        "Observability: convergence_counts producer contract does not require zeros over omission",
+    )
 
 
 def check_sensitive_inline_authorization() -> None:
@@ -2540,17 +2576,13 @@ def check_wait_heartbeat_sla_contract() -> None:
         "th_progress",
         "started",
         "inputs-validated",
-        "mappings-built",
         "artifacts-writing",
         "validation-ready",
         "120 seconds",
         "th_progress_request",
-        "required_invariants",
-        "required_evidence_anchors",
-        "cross_runtime_preservation",
-        "writable_roots",
     ):
         require(marker in architect, f"architect: structured progress transport misses {marker!r}")
+    require("mappings-built" not in architect, "architect: retired overlay-mapping milestone survived retirement")
 
     for marker in (
         "`agent.sla`",
@@ -2594,6 +2626,24 @@ def check_wait_heartbeat_sla_contract() -> None:
                 "resets the sla",
             ):
                 require(marker in adapter, f"architect: Codex progress adapter misses {marker!r}")
+
+
+def check_openspec_single_pass_design() -> None:
+    """The standing openspec-overlay dispatch mode is retired everywhere it was named."""
+    carriers = {
+        "architect": read("agents/architect.md").lower(),
+        "ref-pipeline": read("agents/ref-pipeline.md").lower(),
+        "openspec-integration": read("docs/openspec-integration.md").lower(),
+        "codex architect adapter": read("runtime/codex/instructions/architect.md").lower(),
+        "pipeline design reference": read("plugins/team-harness/skills/pipeline/references/design.md").lower(),
+    }
+    for label, text in carriers.items():
+        require("openspec-overlay` mode" not in text, f"{label}: still describes a standing openspec-overlay dispatch mode")
+        require("second architect dispatch" not in text or "never a second architect dispatch" in text or "no second architect dispatch" in text or "not a second architect dispatch" in text,
+                f"{label}: a second architect dispatch is described as legal")
+        require("mechanical" in text and "derivation" in text, f"{label}: mechanical derivation replacement missing")
+    require("no standing second dispatch mode" in carriers["ref-pipeline"] or "no second dispatch mode" in carriers["ref-pipeline"],
+            "ref-pipeline: retirement of the standing second dispatch mode is not stated")
 
 
 def check_obsidian_workspace_preflight_contract() -> None:
@@ -3735,6 +3785,7 @@ def main() -> None:
         ("profile/document guards", check_profile_and_document_guards),
         ("recovery fail-closed", check_recovery_fail_closed),
         ("residual corrections", check_residual_corrections),
+        ("convergence counts contract", check_convergence_counts_contract),
         ("sensitive inline authorization", check_sensitive_inline_authorization),
         ("ad-hoc review boundary", check_ad_hoc_review_boundary),
         ("inline review contract", check_inline_review_contract),
@@ -3747,6 +3798,7 @@ def main() -> None:
         ("PR review operator visibility", check_pr_review_operator_visibility),
         ("Claude/Codex parity", check_claude_codex_parity),
         ("wait heartbeat and phase SLA", check_wait_heartbeat_sla_contract),
+        ("OpenSpec single-pass Design", check_openspec_single_pass_design),
         ("Obsidian workspace preflight", check_obsidian_workspace_preflight_contract),
         ("Codex worktree technical approval", check_codex_worktree_permission_contract),
         ("execution efficiency", check_execution_efficiency_contract),

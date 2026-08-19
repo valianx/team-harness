@@ -33,22 +33,26 @@ Run the transaction continuously:
    install/update-or-abort decision; `blocked-prerequisite` gives exact Node/npm guidance;
    `invalid-project` blocks. Never fall back to legacy planning.
 2. Persist the repository planning root and change binding. Dispatch a fresh architect in
-   `openspec-planning` mode with the approved request and the exact installed
+   `openspec-planning` mode (the single reasoning pass) with the approved request and the exact installed
    `openspec-propose` skill for a new change or `openspec-update-change` for a bound existing
-   change. The architect follows the upstream skill and writes only proposal/specs/design/tasks
-   under that change root; it writes no TH plan or coordination state.
+   change. The architect follows the upstream skill and writes only
+   proposal/specs/design/tasks under that change root, carrying every judgment call (routing,
+   scope decomposition, invariants) into it; it writes no TH plan or coordination state. Include
+   the pipeline skill's exact `dispatch_id`, `progress_recipient`, and
+   `progress_interval_seconds: 120` contract in this packet.
 3. Run CLI-reported status and strict validation through `openspec-snapshot.mjs capture`; it
    writes the sole `inputs/openspec-snapshot.json`. A binding, path, coordinate, validation, or
    hash failure remains recoverably in Design.
-4. Dispatch a fresh architect in `openspec-overlay` mode with the snapshot and pinned OpenSpec
-   coordinates. It writes only the compact Gate-1 index, operational execution shards, and
-   bidirectional traceability. It must not paraphrase or replace OpenSpec intent. Include the
-   pipeline skill's exact `dispatch_id`, `progress_recipient`, and
-   `progress_interval_seconds: 120` contract in this packet. Include the effective absolute
-   `writable_roots`; require every planned worktree to be contained by one. Also require each
-   task shard's literal `required_invariants`, `required_evidence_anchors`, and
-   `cross_runtime_preservation` declarations and mirror their exact values into the matching
-   traceability execution item. Prefer branch-in-place when the current checkout is clean,
+4. Once that snapshot validates, run `scripts/openspec-overlay.mjs derive` directly with the
+   snapshot and pinned OpenSpec coordinates — a mechanical projection, never a second architect
+   dispatch. It writes only the compact Gate-1 index, operational execution shards, and
+   bidirectional traceability. It must not paraphrase or replace OpenSpec intent. Pass the
+   effective absolute `writable_roots`; require every planned worktree to be contained by one.
+   Each task shard's literal `required_invariants`, `required_evidence_anchors`, and
+   `cross_runtime_preservation` declarations mirror into the matching traceability execution
+   item by construction. A validator failure on the assembled plan re-enters step 2 with the
+   failure and reruns this derivation over the corrected snapshot; there is no standing second
+   dispatch mode. Prefer branch-in-place when the current checkout is clean,
    writable, and already owns the dependency installation needed by the approved quality
    commands. Select an isolated worktree only for a recorded isolation need. When its tasks need
    Node dependencies, record that requirement but do not make installation an operator choice or
@@ -72,22 +76,21 @@ obsidian`, the vault workspace root, and `navigation_kind: repository-relative-c
 artifact paths, line coordinates, and captured hashes navigate to the repository originals. Never
 copy canonical OpenSpec Markdown into the vault or create an editable second source root there.
 
-Read `plan-shards.md` before the overlay dispatch. Read the live operator request, repository
-evidence, `00-spec-seed.md`, current state, and canonical OpenSpec snapshot. Give the overlay
-architect a bounded prompt containing the workspace path, repository root, pinned source
-coordinates, constraints, and TH-only ownership fields. The specialist returns a file-scoped
-execution overlay plus classification; it never edits coordination state or duplicates canonical
-requirements, scenarios, decisions, or task prose.
+Read `plan-shards.md` before the planning dispatch. Read the live operator request, repository
+evidence, `00-spec-seed.md`, current state, and canonical OpenSpec snapshot for the derivation
+step that follows. Give the architect a bounded prompt containing the workspace path,
+repository root, and the approved request; it returns the OpenSpec change and never edits
+coordination state or duplicates canonical requirements, scenarios, decisions, or task prose.
 
-Wait for that same architect attempt to complete. A `wait_agent` timeout is
+Wait for that architect attempt to complete. A `wait_agent` timeout is
 only the wait heartbeat and immediately resumes the directed wait without
 recap, replacement, or `interrupt_agent`; it is not the architect's 10-minute
 SLA and proves no failure. Accept only valid `TH_PROGRESS` messages for this
-dispatch. The architect emits `started`, `inputs-validated`, `mappings-built`,
+dispatch. The architect emits `started`, `inputs-validated`,
 `artifacts-writing`, and `validation-ready` milestones plus a heartbeat at most
 120 seconds apart; none is terminal authority or resets the SLA. Track the SLA
 from dispatch. On SLA exceed, inspect live status, request one non-interrupting
-`TH_PROGRESS_REQUEST`, and probe only metadata for `01-plan.md` and `plan/`.
+`TH_PROGRESS_REQUEST`, and probe only metadata for the bound OpenSpec change.
 Emit the pipeline skill's `TH_SLA` diagnostic and append one `agent.sla` event.
 When both are absent, report `no-material-progress-observed`, not a failure or
 blocker. Continue waiting for either its result or live operator input while
@@ -129,7 +132,8 @@ Then invoke `openspec-events.mjs` with `--workspace`, the state's exact
 `kind: team_harness_openspec_execution_events_validation` and `verdict: pass`
 before Gate 1. Any malformed event, missing `ts`/`feature`, non-canonical
 architect `task`, non-`success|failed|blocked|skipped` status, missing
-`attempt_metrics`, open attempt, or incomplete two-pass design fails closed.
+`attempt_metrics`, open attempt, or an incomplete Design transaction (a missing
+planning dispatch or a missing derivation result) fails closed.
 
 For a legacy `sharded-v1` run, also resolve
 `scripts/plan-contract-repair.mjs`, invoke `plan-contract.mjs` with only the

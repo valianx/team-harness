@@ -120,10 +120,24 @@ Every distinct control receives its own result. Brevity never merges controls, c
 
 Overall verdict is `broke-it` if at least one control broke; otherwise `could-not-break`. `break_count` is the number of distinct evidenced breaks.
 
+### Exhaustive sweep and finding identity
+
+Step 1 already enumerates every changed control in scope; a single reachable
+break in a control class does not close the sweep early — the same pass
+attempts every remaining in-scope control of that class. This is a floor,
+never a ceiling: a break outside every named `SECURITY_CONTROL_VOCABULARY`
+entry is still reported. `## Limits` is the mandatory Coverage Declaration:
+controls attempted, controls out of scope and why, and unavailable runtime,
+infrastructure, evidence, or coverage — state "none material" when complete.
+
 ### Final-result finding coordinates
 
 For every `broke-it` result and every incomplete sensitive-coverage result,
-record all five coordinates below in the report and status block:
+record all five coordinates below plus a stable `id`, a `severity` from the
+closed vocabulary `critical | high | medium | low | info`, and its `class` —
+structural status-block fields, never inferred from report prose — plus
+`classification` (`new_in_delta | pre_existing_missed | reopened`) on a
+re-review dispatched against the findings ledger:
 
 - **Cause:** the reachable precondition and observed failure (or unavailable coverage).
 - **Files:** changed source, test, and report paths with `file:line` evidence.
@@ -168,6 +182,9 @@ Use this compact structure:
 ## Control Attempts
 
 ### C-{N}: {control}
+- **Id:** {stable finding id, breaks only}
+- **Severity:** critical | high | medium | low | info {breaks only}
+- **Class:** {control class from SECURITY_CONTROL_VOCABULARY}
 - **Property:** {protected property}
 - **Claim tested:** {claim being falsified}
 - **Worst case:** {consequential failure; one or two sentences}
@@ -178,9 +195,10 @@ Use this compact structure:
 - **Suggested correction:** {smallest advisory fix and likely owner}
 - **Closure evidence:** {check to run and expected result before revalidation}
 - **Verdict:** broke-it | could-not-break {and why incomplete, only when applicable}
+- **Classification:** new_in_delta | pre_existing_missed | reopened {re-review only}
 
 ## Limits
-{Unavailable runtime, infrastructure, evidence, or coverage. State "none material" when complete.}
+{Coverage Declaration: controls attempted, controls out of scope and why, and unavailable runtime, infrastructure, evidence, or coverage. State "none material" when complete.}
 
 ```
 
@@ -213,7 +231,7 @@ packet_escapes: N
 packet_integrity: ok | stale | mismatch | n-a
 tools: read:N write:N edit:N grep:N glob:N
 issues: {break titles, coverage gap, or "none"}
-finding_summary: [{cause, files, requirement, suggested_correction, closure_evidence}] | none
+finding_summary: [{id, severity, class, classification, cause, files, requirement, suggested_correction, closure_evidence}] | none
 ```
 
 On `failed` or `blocked`, omit unsupported verdict fields. `broke-it` and incomplete coverage are successful audit outcomes, not execution failures; never create `failure-brief.md`.

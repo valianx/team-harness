@@ -2,7 +2,7 @@
 /** Validate the minimal Team Harness execution overlay over a pinned OpenSpec snapshot. */
 
 import { createHash } from "node:crypto";
-import { lstat, readFile, realpath } from "node:fs/promises";
+import { lstat, mkdir, readFile, realpath, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -12,6 +12,11 @@ import { isQualityCommandId } from "./quality-runner.mjs";
 export const OPENSPEC_OVERLAY_SCHEMA_VERSION = 1;
 export const OPENSPEC_OVERLAY_REBIND_SCHEMA_VERSION = 1;
 export const OPENSPEC_PROGRESS_TRANSITION_SCHEMA_VERSION = 2;
+export const OPENSPEC_OVERLAY_DERIVATION_SCHEMA_VERSION = 1;
+const DERIVATION_OWNER = "architect";
+const DERIVATION_PRESERVATION = "Derivation scaffold — the planning pass authors the real cross-runtime preservation statement before Gate 1.";
+const DERIVATION_ROLLBACK = "Derivation scaffold — the planning pass authors the real rollback statement before Gate 1.";
+const DERIVATION_EXCLUSION_RATIONALE = "Derivation scaffold: this coordinate has no standalone acceptance or execution shape; its child scenario or task items carry the work. The planning pass reclassifies it if that changes.";
 const MAX_BYTES = 1024 * 1024;
 const MAX_ITEMS = 4096;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -296,6 +301,173 @@ export async function validateOpenSpecOverlay({ workspace, snapshot = "inputs/op
   };
 }
 
+function shardScaffold(item) {
+  return `# ${item.id}\n\n- **Worktree:** null — branch null, base null\n\n## Dispatch anchors\n\nrequired_invariants: [${item.required_invariants.join(", ")}]\nrequired_evidence_anchors: [${item.required_evidence_anchors.join(", ")}]\ncross_runtime_preservation: ${item.cross_runtime_preservation}\n`;
+}
+
+/** Compact Gate-1 index scaffold: mechanical Plan Manifest and Task Index binding the traceability and shard paths this same derivation writes. Judgment content stays in the pinned OpenSpec coordinates each item's traceability entry sources; nothing is authored here. */
+function planScaffold(changeName, traceability, executionItems) {
+  const manifestRows = [
+    `| traceability | shared | \`${traceability}\` | acceptance items, execution items, dispositions |`,
+    ...executionItems.map(item => `| task | ${item.id} | \`${item.shard_path}\` | dispatch anchors |`),
+  ].join("\n");
+  const indexRows = executionItems
+    .map(item => `| ${item.id} | ${DERIVATION_OWNER} | pending | 1 | ${item.technical_constraints.length} | \`${item.shard_path}\` |`)
+    .join("\n");
+  return `# Plan: ${changeName}\n**Plan format:** sharded-v1\n**Reviews:** pending\n\n## Plan Manifest\n\n| Kind | ID | Path | Anchors |\n|------|----|------|---------|\n${manifestRows}\n\n### Task Index\n\n| Task | Service | Status | AC count | TC count | Path |\n|------|---------|--------|----------|----------|------|\n${indexRows}\n`;
+}
+
+function derivationResult(verdict, errorCode, details = {}) {
+  return {
+    schema_version: OPENSPEC_OVERLAY_DERIVATION_SCHEMA_VERSION,
+    kind: "team_harness_openspec_overlay_derivation",
+    verdict,
+    error_code: errorCode,
+    snapshot_sha256: details.snapshot_sha256 ?? null,
+    overlay_sha256: details.overlay_sha256 ?? null,
+    change_name: details.change_name ?? null,
+    acceptance_item_count: details.acceptance_item_count ?? 0,
+    execution_item_count: details.execution_item_count ?? 0,
+  };
+}
+
+function buildDerivationOverlay(snapshotValue, snapshotFile, snapshot) {
+  const coordinates = snapshotValue.artifacts
+    .flatMap(artifact => artifact.coordinates.map(coordinate => ({ ...coordinate, artifactPath: artifact.path })))
+    .filter(coordinate => SOURCE_KINDS.has(coordinate.kind));
+  const scenarioCoordinates = coordinates.filter(coordinate => coordinate.kind === "scenario");
+  const taskCoordinates = coordinates.filter(coordinate => coordinate.kind === "task");
+  const parentCoordinates = coordinates.filter(coordinate => coordinate.kind === "requirement" || coordinate.kind === "design-decision");
+  if (scenarioCoordinates.length === 0 || taskCoordinates.length === 0) return null;
+
+  const acceptanceItems = scenarioCoordinates.map((coordinate, index) => ({
+    id: `AC-${index + 1}`, sources: [coordinate.id], classification: "direct", rationale: null,
+    evidence_anchor: "plan/architecture.md",
+  }));
+  const executionItems = taskCoordinates.map((coordinate, index) => ({
+    id: `Task-${index + 1}`, sources: [coordinate.id], classification: "direct", rationale: null,
+    owner: DERIVATION_OWNER, specialist: DERIVATION_OWNER, shard_path: `plan/tasks/Task-${index + 1}.md`,
+    files: [coordinate.artifactPath], dependencies: [], required_invariants: [], technical_constraints: [],
+    quality_command_ids: [], pre_implementation_test: "not-applicable", required_evidence_anchors: [snapshot],
+    cross_runtime_preservation: DERIVATION_PRESERVATION, rollback: DERIVATION_ROLLBACK, delivery_group: "default",
+  }));
+  const sourceDispositions = [
+    ...scenarioCoordinates.map((coordinate, index) => ({ source_id: coordinate.id, item_ids: [acceptanceItems[index].id], classification: "direct", rationale: null })),
+    ...taskCoordinates.map((coordinate, index) => ({ source_id: coordinate.id, item_ids: [executionItems[index].id], classification: "direct", rationale: null })),
+    ...parentCoordinates.map(coordinate => ({ source_id: coordinate.id, item_ids: [], classification: "excluded", rationale: DERIVATION_EXCLUSION_RATIONALE })),
+  ];
+  const operatorDisclosures = parentCoordinates.map(coordinate => ({
+    mapping_id: coordinate.id, classification: "excluded", rationale: DERIVATION_EXCLUSION_RATIONALE,
+  }));
+  const overlay = {
+    schema_version: OPENSPEC_OVERLAY_SCHEMA_VERSION, kind: "team_harness_openspec_execution_overlay", plan_format: "sharded-v1",
+    snapshot: { path: snapshot, sha256: hash(snapshotFile.bytes), artifact_set_sha256: snapshotValue.artifact_set_sha256, change_name: snapshotValue.change.name },
+    repository: { root: snapshotValue.repository.root, ownership: [{ path: ".", owner: DERIVATION_OWNER }] },
+    quality_commands: [{ id: "verify" }],
+    freeze: { baseline_sha256: hash(snapshotFile.bytes), state_anchor: "00-state.md", evidence_root: "reviews" },
+    acceptance_items: acceptanceItems, execution_items: executionItems,
+    source_dispositions: sourceDispositions, operator_disclosures: operatorDisclosures,
+  };
+  return { overlay, acceptanceItems, executionItems };
+}
+
+/** Write every shard, the Gate-1 index scaffold, and the traceability file; on any write failure, remove every shard and index scaffold already written in this call before rethrowing. */
+async function writeDerivationOutputs(root, traceability, plan, planText, overlay, executionItems) {
+  const written = [];
+  try {
+    for (const item of executionItems) {
+      const shardPath = path.resolve(root, item.shard_path);
+      await mkdir(path.dirname(shardPath), { recursive: true });
+      await writeFile(shardPath, shardScaffold(item));
+      written.push(shardPath);
+    }
+    const planPath = path.resolve(root, plan);
+    await writeFile(planPath, planText);
+    written.push(planPath);
+    const overlayBytes = Buffer.from(`${JSON.stringify(overlay)}\n`);
+    await writeFile(path.resolve(root, traceability), overlayBytes);
+    return overlayBytes;
+  } catch (writeError) {
+    await Promise.allSettled(written.map(target => unlink(target)));
+    throw writeError;
+  }
+}
+
+async function resolveDerivationTargets(root, traceability, plan, executionItems, overwrite) {
+  const targets = [traceability, plan, ...executionItems.map(item => item.shard_path)];
+  const targetPaths = [];
+  for (const target of targets) {
+    if (!safeRelative(target)) return { ok: false, code: "ARGUMENT_INVALID" };
+    const targetPath = path.resolve(root, target);
+    if (!contained(root, targetPath)) return { ok: false, code: "ARGUMENT_INVALID" };
+    targetPaths.push(targetPath);
+  }
+  if (overwrite === true) return { ok: true, targetPaths };
+  for (const targetPath of targetPaths) {
+    try {
+      await lstat(targetPath);
+      return { ok: false, code: "DERIVATION_TARGET_EXISTS" };
+    } catch (error) {
+      if (error.code !== "ENOENT") return { ok: false, code: "ARTIFACT_INVALID" };
+    }
+  }
+  return { ok: true, targetPaths };
+}
+
+/**
+ * Derive the overlay skeleton mechanically from a validated OpenSpec change and its pinned
+ * snapshot: every `scenario` coordinate becomes one acceptance item, every `task` coordinate
+ * becomes one execution item with a written shard scaffold, and every `requirement` or
+ * `design-decision` coordinate — carrying no standalone testable or executable shape — is
+ * dispositioned `excluded` with a disclosed rationale. A pure function of the snapshot: no model
+ * call, no operator input, and no write outside the overlay, its Gate-1 index scaffold, and the
+ * shard scaffolds it emits. The judgment content already authored by the single `openspec-planning`
+ * pass stays in the pinned OpenSpec coordinates each item's traceability entry sources, never
+ * restated here; the result already satisfies `validateOpenSpecOverlay` by construction.
+ * All-or-nothing: refuses and writes nothing unless BOTH the snapshot's own repository root AND
+ * the resolved `workspace` write root are each independently contained by a writable root, and
+ * the traceability file, the Gate-1 index, and every target shard path either do not yet exist or
+ * `overwrite: true` was passed explicitly. If a write fails partway through, every shard and index
+ * scaffold already written in this call is removed before the failure result is returned; the
+ * traceability file is written last, so its presence is the commit record of a successful
+ * derivation.
+ */
+export async function deriveOpenSpecOverlay({ workspace, snapshot = "inputs/openspec-snapshot.json", traceability = "plan/openspec-traceability.json", plan = "01-plan.md", writableRoots, overwrite = false } = {}) {
+  try {
+    if (!safeString(workspace) || snapshot !== "inputs/openspec-snapshot.json" || traceability !== "plan/openspec-traceability.json" || plan !== "01-plan.md") return derivationResult("fail", "ARGUMENT_INVALID");
+    const roots = normalizeWritableRoots(writableRoots);
+    if (roots === null) return derivationResult("fail", "ARGUMENT_INVALID");
+    const root = await realpath(path.resolve(workspace));
+    const rootStat = await lstat(root);
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) return derivationResult("fail", "ARGUMENT_INVALID");
+    const snapshotFile = await readRegular(root, snapshot);
+    const snapshotValue = JSON.parse(snapshotFile.bytes.toString("utf8"));
+    if (!isOpenSpecSnapshot(snapshotValue)) return derivationResult("fail", "SNAPSHOT_INVALID");
+    if (!roots.some(writableRoot => contained(writableRoot, path.resolve(snapshotValue.repository.root)))) return derivationResult("fail", "REPOSITORY_ROOT_NOT_WRITABLE");
+    if (!roots.some(writableRoot => contained(writableRoot, root))) return derivationResult("fail", "WORKSPACE_ROOT_NOT_WRITABLE");
+
+    const built = buildDerivationOverlay(snapshotValue, snapshotFile, snapshot);
+    if (built === null) return derivationResult("fail", "SOURCE_COVERAGE_INCOMPLETE");
+    const { overlay, acceptanceItems, executionItems } = built;
+
+    const resolved = await resolveDerivationTargets(root, traceability, plan, executionItems, overwrite);
+    if (!resolved.ok) return derivationResult("fail", resolved.code);
+
+    const planText = planScaffold(snapshotValue.change.name, traceability, executionItems);
+    const overlayBytes = await writeDerivationOutputs(root, traceability, plan, planText, overlay, executionItems);
+
+    return derivationResult("pass", null, {
+      snapshot_sha256: hash(snapshotFile.bytes),
+      overlay_sha256: hash(overlayBytes),
+      change_name: snapshotValue.change.name,
+      acceptance_item_count: acceptanceItems.length,
+      execution_item_count: executionItems.length,
+    });
+  } catch (error) {
+    return derivationResult("fail", error.message === "arguments" ? "ARGUMENT_INVALID" : "ARTIFACT_INVALID");
+  }
+}
+
 function rebindResult(verdict, errorCode, details = {}) {
   return {
     schema_version: OPENSPEC_OVERLAY_REBIND_SCHEMA_VERSION,
@@ -413,6 +585,11 @@ function parseCli(argv, progress = false) {
       result.authorizedTaskIds.push(argv[index + 1]);
       continue;
     }
+    if (argv[index] === "--overwrite") {
+      if (own(result, "overwrite")) return null;
+      result.overwrite = argv[index + 1] === "true";
+      continue;
+    }
     const key = ({ "--workspace": "workspace", "--snapshot": "snapshot", "--traceability": "traceability" })[argv[index]];
     if (!key || own(result, key)) return null;
     result[key] = argv[index + 1];
@@ -423,14 +600,16 @@ function parseCli(argv, progress = false) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const argv = process.argv.slice(2);
-  const operation = ["rebind", "verify-progress", "verify-and-rebind"].includes(argv[0]) ? argv[0] : "validate";
+  const operation = ["rebind", "verify-progress", "verify-and-rebind", "derive"].includes(argv[0]) ? argv[0] : "validate";
   const progressOperation = ["verify-progress", "verify-and-rebind"].includes(operation);
   const parsed = parseCli(operation === "validate" ? argv : argv.slice(1), progressOperation) ?? {};
   const result = operation === "rebind"
     ? await rebindOpenSpecOverlay(parsed)
-    : progressOperation
-      ? await verifyOpenSpecProgress(parsed)
-      : await validateOpenSpecOverlay(parsed);
+    : operation === "derive"
+      ? await deriveOpenSpecOverlay(parsed)
+      : progressOperation
+        ? await verifyOpenSpecProgress(parsed)
+        : await validateOpenSpecOverlay(parsed);
   process.stdout.write(`${JSON.stringify(result)}\n`);
   if (result.verdict !== "pass") process.exitCode = 1;
 }

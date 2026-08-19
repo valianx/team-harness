@@ -1,9 +1,14 @@
 # OpenSpec Design integration
 
-Team Harness uses OpenSpec as the canonical source of product intent inside the existing Design
-phase. It does not add another pipeline entry point or lifecycle. The normal entry remains
-`@Team-Harness pipeline <task>` and TH retains both gates, state, specialist routing, Freeze,
-validation, correction authority, and delivery.
+Team Harness uses OpenSpec as the canonical source of product intent, reached through two entry
+points that share the identical `openspec/changes/` schema, naming, and archive path. The full
+pipeline's Design phase (`@Team-Harness pipeline <task>`) retains both gates, state, specialist
+routing, Freeze, validation, correction authority, and delivery, exactly as below. The coordinator-
+only `/th:spec` lane (`skills/spec/SKILL.md`, `docs/pipeline-lanes.md § "The direct spec lane"`)
+authors the same `proposal.md`/`tasks.md` (and `design.md`/spec deltas when a specced capability is
+touched) directly, with one conversational approval and no workspace, state, snapshot, overlay, or
+gate ceremony. Neither entry point adds a third OpenSpec lifecycle or a lane-specific artifact
+layout; archive treats a change from either origin identically.
 
 ## Canonical source model
 
@@ -30,20 +35,27 @@ Team Harness plan, input, review, contract, and evidence artifacts are relative
 to `path_roots.workspace_artifact_root`. Bare relative paths never inherit cwd,
 and `../` is not a valid bridge between the two domains.
 
-## Continuous two-pass Design
+## Single-pass Design
 
 Main advances through these actions without requiring another operator command after each success:
 
 1. Preflight Node.js `>=20.19.0`, npm, OpenSpec `1.9.0`, project initialization, and the generated
    integration for the active runtime. A compatible but uninitialized repository is initialized
    automatically; this is not an operator checkpoint.
-2. Dispatch a fresh architect in `openspec-planning` mode. It follows the installed upstream
-   `openspec-propose` or `openspec-update-change` skill and writes only the bound OpenSpec change.
+2. Dispatch a fresh architect in `openspec-planning` mode — the single reasoning pass. It follows
+   the installed upstream `openspec-propose` or `openspec-update-change` skill and writes only the
+   bound OpenSpec change, carrying every judgment call (routing, scope decomposition, invariants)
+   into it.
 3. Run OpenSpec status and strict validation, extract stable coordinates, and capture the snapshot.
-4. Dispatch a fresh architect in `openspec-overlay` mode. It adds only repository ownership,
-   specialist routing, file scope, constraints, quality IDs, Freeze/evidence controls, rollback,
-   delivery grouping, and each shard's explicit dispatch anchors. The packet includes the live
-   writable roots, and every proposed worktree must remain inside one.
+4. Run `openspec-overlay.mjs derive` directly over the validated snapshot and the live writable
+   roots — a mechanical projection, never a second agent dispatch. It writes the compact Gate-1
+   index, repository ownership, specialist routing, file scope, constraints, quality IDs,
+   Freeze/evidence controls, rollback, delivery grouping, and each shard's explicit dispatch
+   anchors. Every proposed worktree must remain inside one of the writable roots. A validator
+   failure re-enters the same `openspec-planning` flow and reruns the derivation over the
+   corrected snapshot, invoking it with `overwrite: true` authorized by that recorded correction
+   event since the prior derivation's targets already exist; there is no standing second dispatch
+   mode.
 5. Validate snapshot freshness, bidirectional traceability, exact agreement between every
    shard's `required_invariants`, `required_evidence_anchors`, and
    `cross_runtime_preservation` declarations and its execution item, writable execution
@@ -55,8 +67,8 @@ Main advances through these actions without requiring another operator command a
    from the exact predecessor/task event; every other stale condition remains
    fail-closed.
 
-The overlay dispatch includes a 120-second structured `TH_PROGRESS` transport.
-Main observes input validation, mapping, and artifact-writing milestones without
+The planning dispatch includes a 120-second structured `TH_PROGRESS` transport.
+Main observes input validation and artifact-writing milestones without
 reading partial output. Crossing the 10-minute architect SLA produces one
 `TH_SLA` diagnostic with live status, last heartbeat, and `artifact_state`, plus
 one `agent.sla` event. An empty heartbeat/artifact observation is reported as

@@ -368,12 +368,13 @@ class ReviewContextTests(unittest.TestCase):
 
             self.assertEqual((root / "review.md").read_text(encoding="utf-8"), "safe")
 
-    def test_security_selection_is_fail_closed_for_every_reason(self):
+    def test_security_selection_maps_reason_and_triggers(self):
         cases = [
             ("agents/security.md\n", "+permission boundary\n", "known-sensitive", True),
             ("docs/guide.md\n", "+clarify review behavior\n", "known-non-executable", False),
+            ("config/app.json\n", '+{"flag": true}\n', "known-non-executable", False),
             ("src/plugin.future\n", "+run new handler\n", "unmatched-executable", True),
-            ("", "", "indeterminate", True),
+            ("", "", "indeterminate", False),
         ]
         for changed_files, diff, reason, required in cases:
             with self.subTest(reason=reason):
@@ -426,6 +427,150 @@ class ReviewContextTests(unittest.TestCase):
                 self.assertEqual(result["reason"], "known-non-executable")
                 self.assertTrue(result["security_required"])
                 self.assertEqual(result["triggers"], [trigger])
+
+    def test_extended_suffix_set_does_not_override_filename_sensitivity(self):
+        self.assertEqual(
+            MODULE.classify_security_change("package.json\n", "+update deps\n"),
+            "known-sensitive",
+        )
+        self.assertEqual(
+            MODULE.classify_security_change("go.mod\n", "+require lib v1\n"),
+            "known-sensitive",
+        )
+        self.assertEqual(
+            MODULE.classify_security_change("config/app.json\n", "+flag: true\n"),
+            "known-non-executable",
+        )
+
+    def test_dotenv_files_stay_outside_non_executable_suffix_set(self):
+        self.assertEqual(
+            MODULE.classify_security_change(".env\n", "+PORT=8080\n"),
+            "unmatched-executable",
+        )
+        self.assertEqual(
+            MODULE.classify_security_change(".env.production\n", "+PORT=8080\n"),
+            "unmatched-executable",
+        )
+
+    def test_github_workflow_path_is_always_security_sensitive(self):
+        changed_files = ".github/workflows/ci.yml\n"
+        diff = (
+            "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\n"
+            "index 1111111..2222222 100644\n"
+            "--- a/.github/workflows/ci.yml\n"
+            "+++ b/.github/workflows/ci.yml\n"
+            "@@ -1,2 +1,3 @@\n"
+            " name: CI\n"
+            "+      - run: echo hello\n"
+            " jobs:\n"
+        )
+        reason = MODULE.classify_security_change(changed_files, diff)
+        self.assertEqual(reason, "known-sensitive")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            changed_path = root / "changed-files.txt"
+            diff_path = root / "review.diff"
+            changed_path.write_text(changed_files, encoding="utf-8")
+            diff_path.write_text(diff, encoding="utf-8")
+            output = io.StringIO()
+            with redirect_stdout(output):
+                MODULE.command_select_security(
+                    SimpleNamespace(
+                        changed_files=changed_path,
+                        diff=diff_path,
+                        explicit_security=False,
+                        tier=None,
+                    )
+                )
+            result = json.loads(output.getvalue())
+        self.assertTrue(result["security_required"])
+
+    def test_non_utf8_diff_in_a_sensitive_path_still_classifies_security_sensitive(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            changed_path = root / "changed-files.txt"
+            diff_path = root / "review.diff"
+            changed_path.write_text("src/auth/login.py\n", encoding="utf-8")
+            diff_path.write_bytes(
+                b"diff --git a/src/auth/login.py b/src/auth/login.py\n"
+                b"index 1111111..2222222 100644\n"
+                b"--- a/src/auth/login.py\n"
+                b"+++ b/src/auth/login.py\n"
+                b"@@ -1,1 +1,2 @@\n"
+                b" existing line\n"
+                b"+# caf\xe9 comment\n"
+            )
+            output = io.StringIO()
+            with redirect_stdout(output):
+                MODULE.command_select_security(
+                    SimpleNamespace(
+                        changed_files=changed_path,
+                        diff=diff_path,
+                        explicit_security=False,
+                        tier=None,
+                    )
+                )
+            result = json.loads(output.getvalue())
+        self.assertEqual(result["reason"], "known-sensitive")
+        self.assertTrue(result["security_required"])
+
+    def test_unreadable_diff_artifact_fails_closed_to_security_required(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            changed_path = root / "changed-files.txt"
+            changed_path.write_text("docs/guide.md\n", encoding="utf-8")
+            missing_diff_path = root / "missing.diff"
+            output = io.StringIO()
+            with redirect_stdout(output):
+                MODULE.command_select_security(
+                    SimpleNamespace(
+                        changed_files=changed_path,
+                        diff=missing_diff_path,
+                        explicit_security=False,
+                        tier=None,
+                    )
+                )
+            result = json.loads(output.getvalue())
+        self.assertEqual(result["reason"], "indeterminate")
+        self.assertTrue(result["security_required"])
+
+    def test_binary_file_does_not_blind_the_scan_to_sensitive_changes(self):
+        changed_files = "assets/logo.png\nagents/security.md\n"
+        diff = (
+            "diff --git a/assets/logo.png b/assets/logo.png\n"
+            "index 1111111..2222222 100644\n"
+            "GIT binary patch\n"
+            "literal 10\n"
+            "Zc$xd0\n"
+            "\n"
+            "diff --git a/agents/security.md b/agents/security.md\n"
+            "index 3333333..4444444 100644\n"
+            "--- a/agents/security.md\n"
+            "+++ b/agents/security.md\n"
+            "@@ -1,1 +1,2 @@\n"
+            " existing line\n"
+            "+password = \"changeme\"\n"
+        )
+        reason = MODULE.classify_security_change(changed_files, diff)
+        self.assertEqual(reason, "known-sensitive")
+        self.assertTrue(MODULE.resolve_security_required(reason, []))
+
+    def test_binary_marker_in_readable_content_does_not_suppress_the_section(self):
+        changed_files = "skills/review-pr/scripts/review_context.py\n"
+        diff = (
+            "diff --git a/skills/review-pr/scripts/review_context.py "
+            "b/skills/review-pr/scripts/review_context.py\n"
+            "index 1111111..2222222 100644\n"
+            "--- a/skills/review-pr/scripts/review_context.py\n"
+            "+++ b/skills/review-pr/scripts/review_context.py\n"
+            "@@ -1,1 +1,2 @@\n"
+            " existing line\n"
+            '+if "GIT binary patch" not in section:\n'
+            '+password = "changeme"\n'
+        )
+        reason = MODULE.classify_security_change(changed_files, diff)
+        self.assertEqual(reason, "known-sensitive")
+        self.assertTrue(MODULE.resolve_security_required(reason, []))
 
     def test_capture_binds_mergeability_and_rejects_mid_capture_drift(self):
         metadata = {
@@ -485,7 +630,7 @@ class ReviewContextTests(unittest.TestCase):
         self.assertEqual(MODULE.classify_mergeability("UNKNOWN", "UNKNOWN"), "indeterminate")
         self.assertEqual(MODULE.classify_mergeability(None, None), "indeterminate")
 
-    def test_mergeability_changes_hash_freshness_and_rendering(self):
+    def test_mergeability_drift_is_informational_and_preserves_identity(self):
         clean = context(
             mergeability={
                 "status": "clean",
@@ -502,13 +647,27 @@ class ReviewContextTests(unittest.TestCase):
         )
 
         comparison = MODULE.compare_contexts(clean, conflicting)
-        self.assertNotEqual(clean["context_hash"], conflicting["context_hash"])
-        self.assertEqual(comparison["status"], "code-changed")
+        self.assertEqual(clean["context_hash"], conflicting["context_hash"])
+        self.assertEqual(comparison["status"], "current")
+        self.assertFalse(comparison["code_changed"])
         self.assertTrue(comparison["mergeability_changed"])
         rendered = MODULE.render_context(conflicting)
         self.assertIn("Mergeability: **conflicting**", rendered)
         self.assertIn("Raw mergeable: `CONFLICTING`", rendered)
         self.assertIn("Raw merge state: `DIRTY`", rendered)
+
+    def test_repeated_head_drift_is_detected_across_a_capped_restart(self):
+        approved = context()
+        first_recapture = context(head_oid="new-head")
+        second_recapture = context(head_oid="new-head")
+
+        first = MODULE.compare_contexts(approved, first_recapture)
+        second = MODULE.compare_contexts(approved, second_recapture)
+
+        self.assertEqual(first["status"], "code-changed")
+        self.assertEqual(second["status"], "code-changed")
+        self.assertEqual(first["expected_head_oid"], second["expected_head_oid"])
+        self.assertEqual(first["actual_head_oid"], second["actual_head_oid"])
 
     def test_compare_distinguishes_code_and_conversation_changes(self):
         original = context()

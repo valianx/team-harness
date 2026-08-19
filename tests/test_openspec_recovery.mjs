@@ -53,15 +53,18 @@ await use(async ({ workspace, state }) => {
 
 await use(async ({ workspace, state }) => {
   state.openspec_design_pass = "overlay";
-  assert.equal((await recoverOpenSpecDesign({ state, workspace, snapshotVerifier: pass })).next_action, "resume OpenSpec execution-overlay generation");
-  console.log("  [PASS] interruption after snapshot");
+  const resumed = await recoverOpenSpecDesign({ state, workspace, snapshotVerifier: pass });
+  assert.equal(resumed.next_action, "rerun the mechanical OpenSpec overlay derivation with overwrite authorized for this recovery event — no architect dispatch");
+  assert.doesNotMatch(resumed.next_action, /resume OpenSpec execution-overlay generation/);
+  console.log("  [PASS] interruption after snapshot reruns the mechanical derivation, not an architect dispatch");
 });
 
 await use(async ({ workspace, state }) => {
   state.openspec_design_pass = "gate1-ready";
   await rm(path.join(workspace, "plan/openspec-traceability.json"));
-  assert.equal((await recoverOpenSpecDesign({ state, workspace, snapshotVerifier: pass })).next_action, "resume OpenSpec execution-overlay generation");
-  console.log("  [PASS] interruption during overlay generation");
+  const resumed = await recoverOpenSpecDesign({ state, workspace, snapshotVerifier: pass });
+  assert.equal(resumed.next_action, "rerun the mechanical OpenSpec overlay derivation with overwrite authorized for this recovery event — no architect dispatch");
+  console.log("  [PASS] interruption during overlay derivation reruns mechanically");
 });
 
 await use(async ({ workspace, state }) => {
