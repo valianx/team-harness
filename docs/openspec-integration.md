@@ -1,9 +1,14 @@
 # OpenSpec Design integration
 
-Team Harness uses OpenSpec as the canonical source of product intent inside the existing Design
-phase. It does not add another pipeline entry point or lifecycle. The normal entry remains
-`@Team-Harness pipeline <task>` and TH retains both gates, state, specialist routing, Freeze,
-validation, correction authority, and delivery.
+Team Harness uses OpenSpec as the canonical source of product intent, reached through two entry
+points that share the identical `openspec/changes/` schema, naming, and archive path. The full
+pipeline's Design phase (`@Team-Harness pipeline <task>`) retains both gates, state, specialist
+routing, Freeze, validation, correction authority, and delivery, exactly as below. The coordinator-
+only `/th:spec` lane (`skills/spec/SKILL.md`, `docs/pipeline-lanes.md § "The direct spec lane"`)
+authors the same `proposal.md`/`tasks.md` (and `design.md`/spec deltas when a specced capability is
+touched) directly, with one conversational approval and no workspace, state, snapshot, overlay, or
+gate ceremony. Neither entry point adds a third OpenSpec lifecycle or a lane-specific artifact
+layout; archive treats a change from either origin identically.
 
 ## Canonical source model
 

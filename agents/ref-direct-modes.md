@@ -164,6 +164,29 @@ Full report: workspaces/{feature-name}/reviews/01-plan-review.md § Plan Review
 
 ---
 
+## Spec Lane Mode
+
+When invoked with `Direct Mode Task: spec`:
+
+Full flow: `skills/spec/SKILL.md`. This section states only the routing predicate and the
+escalation rule shared verbatim with `agents/orchestrator.md`, `docs/pipeline-lanes.md`, and the
+CLAUDE.md two-posture bullet.
+
+**Routing predicate.** Plain inline handles mechanical, reversible work with no design decision
+worth recording. `/th:spec` handles tasks that merit written intent and task decomposition —
+single repo, no security floor, no public-contract break. `/th:pipeline` remains the hard router
+for security-sensitive, multi-specialist, multi-task, or irreversible work — these are hard
+routers the lane never absorbs. When an in-flight lane task grows a second specialist need or a
+security dimension, stop before proceeding and offer the pipeline, carrying the authored change
+over.
+
+**Entry.** The lane is entered only by explicit `/th:spec` invocation. It creates no workspace,
+`00-state.md`, execution events, pipeline summary, snapshot, overlay, traceability artifact, or
+gate ceremony, and dispatches no specialist by default; at most one full-scope ad hoc review runs
+on live operator request, and it never opens a correction or re-audit loop.
+
+---
+
 ## Diagram Mode (Excalidraw)
 
 When invoked with `Direct Mode Task: diagram`:
