@@ -18,9 +18,7 @@ function canonicalEvents() {
     { ts: "2026-01-01T00:00:00Z", event: "phase.start", feature, phase: "design", agent: "architect", usage_scope: "codex-root-reachable", usage_checkpoint: checkpoint },
     { ts: "2026-01-01T00:00:01Z", event: "agent.spawn", feature, agent_role: "architect", task: "design", attempt_ordinal: 1, context_strategy: "fresh", follow_up_count: 0 },
     { ts: "2026-01-01T00:01:00Z", event: "agent.close", feature, agent_role: "architect", task: "design", attempt_ordinal: 1, context_strategy: "fresh", follow_up_count: 0, status: "success", quality_verdict: "n-a", attempt_metrics: metrics },
-    { ts: "2026-01-01T00:01:01Z", event: "agent.spawn", feature, agent_role: "architect", task: "design", attempt_ordinal: 2, context_strategy: "fresh", follow_up_count: 0 },
-    { ts: "2026-01-01T00:02:00Z", event: "agent.close", feature, agent_role: "architect", task: "design", attempt_ordinal: 2, context_strategy: "fresh", follow_up_count: 0, status: "success", quality_verdict: "n-a", attempt_metrics: metrics },
-    { ts: "2026-01-01T00:02:01Z", event: "phase.end", feature, phase: "design", agent: "architect", status: "success", usage, usage_checkpoint: checkpoint },
+    { ts: "2026-01-01T00:01:01Z", event: "phase.end", feature, phase: "design", agent: "architect", status: "success", usage, usage_checkpoint: checkpoint },
   ];
 }
 
@@ -43,11 +41,20 @@ async function check(name, callback) {
 
 console.log("=== OpenSpec execution events ===");
 
-await check("accepts the complete canonical two-pass Design lifecycle", async () => withFixture(async ({ workspace }) => {
+await check("accepts the complete canonical single-pass Design lifecycle", async () => withFixture(async ({ workspace }) => {
   await writeJsonl(workspace, canonicalEvents());
   const result = await validateOpenSpecEvents({ workspace, events: "00-execution-events.jsonl", feature });
   assert.equal(result.verdict, "pass");
-  assert.equal(result.architect_attempt_count, 2);
+  assert.equal(result.architect_attempt_count, 1);
+}));
+
+await check("fails closed on zero architect attempts", async () => withFixture(async ({ workspace }) => {
+  const events = canonicalEvents().filter(event => event.event !== "agent.spawn" && event.event !== "agent.close");
+  await writeJsonl(workspace, events);
+  const result = await validateOpenSpecEvents({ workspace, events: "00-execution-events.jsonl", feature });
+  assert.equal(result.verdict, "fail");
+  assert.ok(result.findings.some(item => item.code === "OPENSPEC_DESIGN_ATTEMPTS_INCOMPLETE"));
+  assert.equal(result.architect_attempt_count, 0);
 }));
 
 await check("accepts one Obsidian jsonl fence", async () => withFixture(async ({ workspace }) => {
@@ -71,8 +78,8 @@ await check("rejects missing universal fields and dispatch modes used as task na
 await check("rejects complete status, missing attempt metrics, and an open attempt", async () => withFixture(async ({ workspace }) => {
   const events = canonicalEvents();
   events[2].status = "complete";
-  delete events[4].attempt_metrics;
-  events.splice(-1, 0, { ts: "2026-01-01T00:02:00Z", event: "agent.spawn", feature, agent_role: "architect", task: "design", attempt_ordinal: 3, context_strategy: "fresh", follow_up_count: 0 });
+  delete events[2].attempt_metrics;
+  events.splice(-1, 0, { ts: "2026-01-01T00:01:02Z", event: "agent.spawn", feature, agent_role: "architect", task: "design", attempt_ordinal: 2, context_strategy: "fresh", follow_up_count: 0 });
   await writeJsonl(workspace, events);
   const result = await validateOpenSpecEvents({ workspace, events: "00-execution-events.jsonl", feature });
   assert.ok(result.findings.some(item => item.code === "STATUS_INVALID"));
