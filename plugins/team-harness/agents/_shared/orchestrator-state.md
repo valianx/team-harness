@@ -588,8 +588,8 @@ Sections: `## TL;DR`, `## Phase Timeline`, `## Dispatch Issues`, `## Tool Effect
 renders `Cost: unavailable`. A summary with no such object retains the legacy
 token and price rendering unchanged.
 
-**OpenSpec Gate-1 trace preflight.** After the two Design architect attempts
-close and before presenting Gate 1, validate the complete configured events
+**OpenSpec Gate-1 trace preflight.** Before Gate 1, once the Design architect
+attempt closes (one pair required), validate the configured events
 file and bound feature with the packaged `openspec-events.mjs`. Missing `ts` or
 `feature`, a dispatch mode serialized as lifecycle `task`, a non-canonical
 status, missing `attempt_metrics`, or any open attempt fails closed. Do not
