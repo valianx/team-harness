@@ -732,7 +732,18 @@ through this write; without it a shipped run's `gate3_release: ship` state
 stays a live-looking candidate for a later run reusing the same branch or
 worktree path.
 
-Then append `## Final state — ready for handoff` (branch, version, PR, AC count, iterations, outcome) and surface the `/compact`-or-`/clear` prompt.
+**Archive offer — OpenSpec-bound runs only, confirmed merge.** Before appending `## Final state`,
+check the run's pull request state once. When it reports merged, present a one-line
+`Archive {change}? [y/N]` and wait for the live reply; on `y`, run `openspec archive <change>` on
+a branch delivered as its own pull request — never the run's own pull request, never a direct
+default-branch push — and record the outcome. Publish-only delivery ends at a draft PR, so an
+unmerged pull request is the common case at close: no archive is offered or executed, and a
+`pending` entry is recorded instead. A declined (`N`/no reply) or deferred (unmerged) offer never
+blocks close; either way, record the archive disposition in `## Final state` below for a later
+explicit request. Archive never runs silently.
+
+Then append `## Final state — ready for handoff` (branch, version, PR, AC count, iterations,
+outcome, archive disposition) and surface the `/compact`-or-`/clear` prompt.
 
 When `obsidian_sync: armed` and the terminal close, pause, or abort did not
 already export at draft-PR creation, run the same one-way export described in

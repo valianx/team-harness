@@ -36,8 +36,13 @@ dispatches no specialist by default.
    rides as a pull-request concern; the lane never opens a correction or re-audit loop.
 6. **Publish.** Open the pull request under the repository's existing conventions (branch naming,
    commit style, outward-action approval).
-7. **Archive.** After the PR merges, offer `openspec archive <change>` with a one-line Y/n exactly
-   as the pipeline's terminal-close step does; a declined or deferred offer never blocks close.
+7. **Archive.** Check the pull request state once. When it reports merged, offer
+   `openspec archive <change>` behind a one-line Y/n; on acceptance, run it on a branch delivered
+   as its own pull request — never this run's own pull request, never a direct default-branch
+   push. When the pull request is not yet merged, record the archive as pending instead. Archive
+   never runs silently, and a declined or deferred offer never blocks close — either way, note the
+   disposition for a later explicit request. Identical semantics to the pipeline's terminal-close
+   step (`agents/_shared/orchestrator-state.md § "Terminal status write — mandatory"`).
 
 ## Escalation
 

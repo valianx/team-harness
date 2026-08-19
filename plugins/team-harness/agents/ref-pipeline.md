@@ -1928,6 +1928,14 @@ Non-iterating: after the separate request, report and continue on failure.
 
 **Yours.** `mcp__memory__session_end(session_id, summary)`. Idempotent; on error log and continue. This is mechanical lifecycle — without it the session opened at intake never closes.
 
+**Archive offer.** For an OpenSpec-bound run, terminal close checks the pull request state once and
+offers `openspec archive <change>` behind a one-line Y/n only when the merge is already confirmed
+there — publish-only delivery ends at a draft PR, so an unmerged pull request is the common case
+and records a pending, re-offerable entry instead. Never silent; a declined or deferred offer never
+blocks close. Full mechanics: `agents/_shared/orchestrator-state.md § "Terminal status write —
+mandatory"`. The direct spec lane (`skills/spec/SKILL.md`) offers the same archive at its own
+post-merge step, with identical semantics.
+
 > **Entity save is on request only and is not a Delivery mode.** Extract reusable insights through the explicit knowledge flow when the operator asks. What stays automatic is narrow and content-filtered — the conditional security-finding write inside `validation`, which is the audit's own memory rather than project doctrine. The content policy, pre-write checklist, dedup gate, entity types, save triggers and soft cap live in `agents/_shared/kg-write-policy.md`; read them only for that explicit flow.
 
 ## Autonomous execution
