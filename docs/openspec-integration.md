@@ -53,7 +53,9 @@ Main advances through these actions without requiring another operator command a
    Freeze/evidence controls, rollback, delivery grouping, and each shard's explicit dispatch
    anchors. Every proposed worktree must remain inside one of the writable roots. A validator
    failure re-enters the same `openspec-planning` flow and reruns the derivation over the
-   corrected snapshot; there is no standing second dispatch mode.
+   corrected snapshot, invoking it with `overwrite: true` authorized by that recorded correction
+   event since the prior derivation's targets already exist; there is no standing second dispatch
+   mode.
 5. Validate snapshot freshness, bidirectional traceability, exact agreement between every
    shard's `required_invariants`, `required_evidence_anchors`, and
    `cross_runtime_preservation` declarations and its execution item, writable execution

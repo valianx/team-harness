@@ -346,6 +346,40 @@ await check("overwrites existing targets only with explicit authorization", asyn
   assert.equal(result.verdict, "pass");
 }));
 
+await check("removes every shard already written before returning fail on a mid-derivation write failure", async () => withFixture(async value => {
+  const snapshotPath = path.join(value.workspace, "inputs/openspec-snapshot.json");
+  const snapshot = JSON.parse(await readFile(snapshotPath, "utf8"));
+  const tasksArtifact = snapshot.artifacts.find(item => item.artifact_id === "tasks");
+  tasksArtifact.coordinates.push({ kind: "task", id: "task:1.2", title: "Second task", line: 2, complete: false });
+  await writeFile(snapshotPath, `${JSON.stringify(snapshot)}\n`);
+  const firstShardPath = path.join(value.workspace, "plan/tasks/Task-1.md");
+  const secondShardPath = path.join(value.workspace, "plan/tasks/Task-2.md");
+  const traceabilityPath = path.join(value.workspace, "plan/openspec-traceability.json");
+  await rm(secondShardPath, { recursive: true, force: true });
+  await mkdir(secondShardPath);
+  const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository, value.root], overwrite: true });
+  assert.equal(derived.verdict, "fail");
+  assert.equal(derived.error_code, "ARTIFACT_INVALID");
+  await assert.rejects(readFile(firstShardPath), { code: "ENOENT" });
+  await assert.rejects(readFile(traceabilityPath), { code: "ENOENT" });
+}));
+
+await check("Design re-entry reruns derivation with overwrite authorized and binds to the corrected snapshot", async () => withFixture(async value => {
+  const first = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository, value.root], overwrite: true });
+  assert.equal(first.verdict, "pass");
+  const snapshotPath = path.join(value.workspace, "inputs/openspec-snapshot.json");
+  const snapshot = JSON.parse(await readFile(snapshotPath, "utf8"));
+  const tasksArtifact = snapshot.artifacts.find(item => item.artifact_id === "tasks");
+  tasksArtifact.coordinates.push({ kind: "task", id: "task:1.2", title: "Second task", line: 2, complete: false });
+  await writeFile(snapshotPath, `${JSON.stringify(snapshot)}\n`);
+  const second = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository, value.root], overwrite: true });
+  assert.equal(second.verdict, "pass");
+  assert.notEqual(second.snapshot_sha256, first.snapshot_sha256);
+  assert.equal(second.execution_item_count, 2);
+  const result = await validateOverlay(value);
+  assert.equal(result.verdict, "pass");
+}));
+
 await check("derives normally on a clean target directory with no explicit overwrite", async () => withFixture(async value => {
   await rm(path.join(value.workspace, "plan/tasks/Task-1.md"));
   await rm(path.join(value.workspace, "plan/tasks/Task-2.md"));

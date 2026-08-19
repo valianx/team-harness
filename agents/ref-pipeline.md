@@ -806,7 +806,9 @@ canonical source intent. Each shard's literal `required_invariants`, `required_e
 and `cross_runtime_preservation` declarations mirror exactly into its traceability
 `execution_items` entry by construction. A validator failure on the assembled plan re-enters the same
 `openspec-planning` flow with the failure and Main reruns the derivation over the corrected
-snapshot; no standing second dispatch mode exists to repair a mapping. Main validates freshness,
+snapshot, invoking it with `overwrite: true` since the prior derivation already wrote the
+traceability file and shards — that authorization is bound to the recorded correction event, not
+a standing default; no standing second dispatch mode exists to repair a mapping. Main validates freshness,
 dispatch-anchor agreement, writable execution topology, and overlay structure before Gate 1.
 
 These are consecutive actions in one Design transaction, not operator checkpoints. Main advances

@@ -72,7 +72,7 @@ export async function recoverOpenSpecDesign({ state, workspace, snapshotVerifier
   if (freshness?.verdict !== "pass") return result("blocked", "reconcile changed OpenSpec source", "CANONICAL_SOURCE_CHANGED");
 
   if (state.openspec_design_pass === "overlay") {
-    return result("resume", "rerun the mechanical OpenSpec overlay derivation — no architect dispatch");
+    return result("resume", "rerun the mechanical OpenSpec overlay derivation with overwrite authorized for this recovery event — no architect dispatch");
   }
   if (state.openspec_overlay_path !== "plan/openspec-traceability.json" || !SHA256.test(state.openspec_overlay_sha256 ?? "")) {
     return result("blocked", null, "OVERLAY_STATE_INVALID");
@@ -82,7 +82,7 @@ export async function recoverOpenSpecDesign({ state, workspace, snapshotVerifier
   catch {
     return result(
       "resume",
-      "rerun the mechanical OpenSpec overlay derivation — no architect dispatch",
+      "rerun the mechanical OpenSpec overlay derivation with overwrite authorized for this recovery event — no architect dispatch",
       "OVERLAY_MISSING",
     );
   }

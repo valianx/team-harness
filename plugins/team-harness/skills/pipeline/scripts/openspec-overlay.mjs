@@ -2,7 +2,7 @@
 /** Validate the minimal Team Harness execution overlay over a pinned OpenSpec snapshot. */
 
 import { createHash } from "node:crypto";
-import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, realpath, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -359,6 +359,25 @@ function buildDerivationOverlay(snapshotValue, snapshotFile, snapshot) {
   return { overlay, acceptanceItems, executionItems };
 }
 
+/** Write every shard and the traceability file; on any write failure, remove every shard already written in this call before rethrowing. */
+async function writeDerivationOutputs(root, traceability, overlay, executionItems) {
+  const written = [];
+  try {
+    for (const item of executionItems) {
+      const shardPath = path.resolve(root, item.shard_path);
+      await mkdir(path.dirname(shardPath), { recursive: true });
+      await writeFile(shardPath, shardScaffold(item));
+      written.push(shardPath);
+    }
+    const overlayBytes = Buffer.from(`${JSON.stringify(overlay)}\n`);
+    await writeFile(path.resolve(root, traceability), overlayBytes);
+    return overlayBytes;
+  } catch (writeError) {
+    await Promise.allSettled(written.map(target => unlink(target)));
+    throw writeError;
+  }
+}
+
 async function resolveDerivationTargets(root, traceability, executionItems, overwrite) {
   const targets = [traceability, ...executionItems.map(item => item.shard_path)];
   const targetPaths = [];
@@ -392,7 +411,9 @@ async function resolveDerivationTargets(root, traceability, executionItems, over
  * construction. All-or-nothing: refuses and writes nothing unless BOTH the snapshot's own
  * repository root AND the resolved `workspace` write root are each independently contained by a
  * writable root, and the traceability file and every target shard path either do not yet exist or
- * `overwrite: true` was passed explicitly — or at any other failure short of the final write.
+ * `overwrite: true` was passed explicitly. If a write fails partway through, every shard already
+ * written in this call is removed before the failure result is returned; the traceability file is
+ * written last, so its presence is the commit record of a successful derivation.
  */
 export async function deriveOpenSpecOverlay({ workspace, snapshot = "inputs/openspec-snapshot.json", traceability = "plan/openspec-traceability.json", writableRoots, overwrite = false } = {}) {
   try {
@@ -415,13 +436,7 @@ export async function deriveOpenSpecOverlay({ workspace, snapshot = "inputs/open
     const resolved = await resolveDerivationTargets(root, traceability, executionItems, overwrite);
     if (!resolved.ok) return derivationResult("fail", resolved.code);
 
-    for (const item of executionItems) {
-      const shardPath = path.resolve(root, item.shard_path);
-      await mkdir(path.dirname(shardPath), { recursive: true });
-      await writeFile(shardPath, shardScaffold(item));
-    }
-    const overlayBytes = Buffer.from(`${JSON.stringify(overlay)}\n`);
-    await writeFile(path.resolve(root, traceability), overlayBytes);
+    const overlayBytes = await writeDerivationOutputs(root, traceability, overlay, executionItems);
 
     return derivationResult("pass", null, {
       snapshot_sha256: hash(snapshotFile.bytes),
