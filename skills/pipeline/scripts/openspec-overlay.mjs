@@ -319,6 +319,67 @@ function derivationResult(verdict, errorCode, details = {}) {
   };
 }
 
+function buildDerivationOverlay(snapshotValue, snapshotFile, snapshot) {
+  const coordinates = snapshotValue.artifacts
+    .flatMap(artifact => artifact.coordinates.map(coordinate => ({ ...coordinate, artifactPath: artifact.path })))
+    .filter(coordinate => SOURCE_KINDS.has(coordinate.kind));
+  const scenarioCoordinates = coordinates.filter(coordinate => coordinate.kind === "scenario");
+  const taskCoordinates = coordinates.filter(coordinate => coordinate.kind === "task");
+  const parentCoordinates = coordinates.filter(coordinate => coordinate.kind === "requirement" || coordinate.kind === "design-decision");
+  if (scenarioCoordinates.length === 0 || taskCoordinates.length === 0) return null;
+
+  const acceptanceItems = scenarioCoordinates.map((coordinate, index) => ({
+    id: `AC-${index + 1}`, sources: [coordinate.id], classification: "direct", rationale: null,
+    evidence_anchor: "plan/architecture.md",
+  }));
+  const executionItems = taskCoordinates.map((coordinate, index) => ({
+    id: `Task-${index + 1}`, sources: [coordinate.id], classification: "direct", rationale: null,
+    owner: DERIVATION_OWNER, specialist: DERIVATION_OWNER, shard_path: `plan/tasks/Task-${index + 1}.md`,
+    files: [coordinate.artifactPath], dependencies: [], required_invariants: [], technical_constraints: [],
+    quality_command_ids: [], pre_implementation_test: "not-applicable", required_evidence_anchors: [snapshot],
+    cross_runtime_preservation: DERIVATION_PRESERVATION, rollback: DERIVATION_ROLLBACK, delivery_group: "default",
+  }));
+  const sourceDispositions = [
+    ...scenarioCoordinates.map((coordinate, index) => ({ source_id: coordinate.id, item_ids: [acceptanceItems[index].id], classification: "direct", rationale: null })),
+    ...taskCoordinates.map((coordinate, index) => ({ source_id: coordinate.id, item_ids: [executionItems[index].id], classification: "direct", rationale: null })),
+    ...parentCoordinates.map(coordinate => ({ source_id: coordinate.id, item_ids: [], classification: "excluded", rationale: DERIVATION_EXCLUSION_RATIONALE })),
+  ];
+  const operatorDisclosures = parentCoordinates.map(coordinate => ({
+    mapping_id: coordinate.id, classification: "excluded", rationale: DERIVATION_EXCLUSION_RATIONALE,
+  }));
+  const overlay = {
+    schema_version: OPENSPEC_OVERLAY_SCHEMA_VERSION, kind: "team_harness_openspec_execution_overlay", plan_format: "sharded-v1",
+    snapshot: { path: snapshot, sha256: hash(snapshotFile.bytes), artifact_set_sha256: snapshotValue.artifact_set_sha256, change_name: snapshotValue.change.name },
+    repository: { root: snapshotValue.repository.root, ownership: [{ path: ".", owner: DERIVATION_OWNER }] },
+    quality_commands: [{ id: "verify" }],
+    freeze: { baseline_sha256: hash(snapshotFile.bytes), state_anchor: "00-state.md", evidence_root: "reviews" },
+    acceptance_items: acceptanceItems, execution_items: executionItems,
+    source_dispositions: sourceDispositions, operator_disclosures: operatorDisclosures,
+  };
+  return { overlay, acceptanceItems, executionItems };
+}
+
+async function resolveDerivationTargets(root, traceability, executionItems, overwrite) {
+  const targets = [traceability, ...executionItems.map(item => item.shard_path)];
+  const targetPaths = [];
+  for (const target of targets) {
+    if (!safeRelative(target)) return { ok: false, code: "ARGUMENT_INVALID" };
+    const targetPath = path.resolve(root, target);
+    if (!contained(root, targetPath)) return { ok: false, code: "ARGUMENT_INVALID" };
+    targetPaths.push(targetPath);
+  }
+  if (overwrite === true) return { ok: true, targetPaths };
+  for (const targetPath of targetPaths) {
+    try {
+      await lstat(targetPath);
+      return { ok: false, code: "DERIVATION_TARGET_EXISTS" };
+    } catch (error) {
+      if (error.code !== "ENOENT") return { ok: false, code: "ARTIFACT_INVALID" };
+    }
+  }
+  return { ok: true, targetPaths };
+}
+
 /**
  * Derive the overlay skeleton mechanically from a validated OpenSpec change and its pinned
  * snapshot: every `scenario` coordinate becomes one acceptance item, every `task` coordinate
@@ -328,14 +389,14 @@ function derivationResult(verdict, errorCode, details = {}) {
  * call, no operator input, and no write outside the overlay and the shard scaffolds it emits. The
  * planning pass that follows authors judgment content (routing, scope decomposition, invariants,
  * ownership) on top of this scaffold; the result already satisfies `validateOpenSpecOverlay` by
- * construction. All-or-nothing: refuses and writes nothing when the traceability file or any
- * target shard path already exists, unless `overwrite: true` is passed explicitly.
+ * construction. All-or-nothing: refuses and writes nothing when the snapshot's own repository root
+ * is not contained by a writable root, when the traceability file or any target shard path already
+ * exists (unless `overwrite: true` is passed explicitly), or at any other failure short of the
+ * final write.
  */
 export async function deriveOpenSpecOverlay({ workspace, snapshot = "inputs/openspec-snapshot.json", traceability = "plan/openspec-traceability.json", writableRoots, overwrite = false } = {}) {
   try {
-    if (!safeString(workspace) || snapshot !== "inputs/openspec-snapshot.json" || traceability !== "plan/openspec-traceability.json") {
-      return derivationResult("fail", "ARGUMENT_INVALID");
-    }
+    if (!safeString(workspace) || snapshot !== "inputs/openspec-snapshot.json" || traceability !== "plan/openspec-traceability.json") return derivationResult("fail", "ARGUMENT_INVALID");
     const roots = normalizeWritableRoots(writableRoots);
     if (roots === null) return derivationResult("fail", "ARGUMENT_INVALID");
     const root = await realpath(path.resolve(workspace));
@@ -344,62 +405,14 @@ export async function deriveOpenSpecOverlay({ workspace, snapshot = "inputs/open
     const snapshotFile = await readRegular(root, snapshot);
     const snapshotValue = JSON.parse(snapshotFile.bytes.toString("utf8"));
     if (!isOpenSpecSnapshot(snapshotValue)) return derivationResult("fail", "SNAPSHOT_INVALID");
+    if (!roots.some(writableRoot => contained(writableRoot, path.resolve(snapshotValue.repository.root)))) return derivationResult("fail", "REPOSITORY_ROOT_NOT_WRITABLE");
 
-    const coordinates = snapshotValue.artifacts
-      .flatMap(artifact => artifact.coordinates.map(coordinate => ({ ...coordinate, artifactPath: artifact.path })))
-      .filter(coordinate => SOURCE_KINDS.has(coordinate.kind));
-    const scenarioCoordinates = coordinates.filter(coordinate => coordinate.kind === "scenario");
-    const taskCoordinates = coordinates.filter(coordinate => coordinate.kind === "task");
-    const parentCoordinates = coordinates.filter(coordinate => coordinate.kind === "requirement" || coordinate.kind === "design-decision");
-    if (scenarioCoordinates.length === 0 || taskCoordinates.length === 0) return derivationResult("fail", "SOURCE_COVERAGE_INCOMPLETE");
+    const built = buildDerivationOverlay(snapshotValue, snapshotFile, snapshot);
+    if (built === null) return derivationResult("fail", "SOURCE_COVERAGE_INCOMPLETE");
+    const { overlay, acceptanceItems, executionItems } = built;
 
-    const acceptanceItems = scenarioCoordinates.map((coordinate, index) => ({
-      id: `AC-${index + 1}`, sources: [coordinate.id], classification: "direct", rationale: null,
-      evidence_anchor: "plan/architecture.md",
-    }));
-    const executionItems = taskCoordinates.map((coordinate, index) => ({
-      id: `Task-${index + 1}`, sources: [coordinate.id], classification: "direct", rationale: null,
-      owner: DERIVATION_OWNER, specialist: DERIVATION_OWNER, shard_path: `plan/tasks/Task-${index + 1}.md`,
-      files: [coordinate.artifactPath], dependencies: [], required_invariants: [], technical_constraints: [],
-      quality_command_ids: [], pre_implementation_test: "not-applicable", required_evidence_anchors: [snapshot],
-      cross_runtime_preservation: DERIVATION_PRESERVATION, rollback: DERIVATION_ROLLBACK, delivery_group: "default",
-    }));
-    const sourceDispositions = [
-      ...scenarioCoordinates.map((coordinate, index) => ({ source_id: coordinate.id, item_ids: [acceptanceItems[index].id], classification: "direct", rationale: null })),
-      ...taskCoordinates.map((coordinate, index) => ({ source_id: coordinate.id, item_ids: [executionItems[index].id], classification: "direct", rationale: null })),
-      ...parentCoordinates.map(coordinate => ({ source_id: coordinate.id, item_ids: [], classification: "excluded", rationale: DERIVATION_EXCLUSION_RATIONALE })),
-    ];
-    const operatorDisclosures = parentCoordinates.map(coordinate => ({
-      mapping_id: coordinate.id, classification: "excluded", rationale: DERIVATION_EXCLUSION_RATIONALE,
-    }));
-    const overlay = {
-      schema_version: OPENSPEC_OVERLAY_SCHEMA_VERSION, kind: "team_harness_openspec_execution_overlay", plan_format: "sharded-v1",
-      snapshot: { path: snapshot, sha256: hash(snapshotFile.bytes), artifact_set_sha256: snapshotValue.artifact_set_sha256, change_name: snapshotValue.change.name },
-      repository: { root: snapshotValue.repository.root, ownership: [{ path: ".", owner: DERIVATION_OWNER }] },
-      quality_commands: [{ id: "verify" }],
-      freeze: { baseline_sha256: hash(snapshotFile.bytes), state_anchor: "00-state.md", evidence_root: "reviews" },
-      acceptance_items: acceptanceItems, execution_items: executionItems,
-      source_dispositions: sourceDispositions, operator_disclosures: operatorDisclosures,
-    };
-
-    const targets = [traceability, ...executionItems.map(item => item.shard_path)];
-    const targetPaths = [];
-    for (const target of targets) {
-      if (!safeRelative(target)) return derivationResult("fail", "ARGUMENT_INVALID");
-      const targetPath = path.resolve(root, target);
-      if (!contained(root, targetPath)) return derivationResult("fail", "ARGUMENT_INVALID");
-      targetPaths.push(targetPath);
-    }
-    if (overwrite !== true) {
-      for (const targetPath of targetPaths) {
-        try {
-          await lstat(targetPath);
-          return derivationResult("fail", "DERIVATION_TARGET_EXISTS");
-        } catch (error) {
-          if (error.code !== "ENOENT") return derivationResult("fail", "ARTIFACT_INVALID");
-        }
-      }
-    }
+    const resolved = await resolveDerivationTargets(root, traceability, executionItems, overwrite);
+    if (!resolved.ok) return derivationResult("fail", resolved.code);
 
     for (const item of executionItems) {
       const shardPath = path.resolve(root, item.shard_path);

@@ -765,9 +765,22 @@ SENSITIVE_DIFF_TOKENS = re.compile(
 )
 
 
+DIFF_FILE_BOUNDARY = re.compile(r"(?=^diff --git )", re.MULTILINE)
+
+
+def _readable_diff_text(diff: str) -> str:
+    """Diff text with each binary file's own section dropped, keeping every readable hunk
+    scannable even when another file in the same PR is binary."""
+    sections = DIFF_FILE_BOUNDARY.split(diff)
+    return "".join(
+        section for section in sections
+        if "GIT binary patch" not in section and "Binary files " not in section
+    )
+
+
 def classify_security_change(changed_files: str, diff: str) -> str:
     paths = [line.strip() for line in changed_files.splitlines() if line.strip()]
-    if not paths or not diff.strip() or "GIT binary patch" in diff or "Binary files " in diff:
+    if not paths or not diff.strip():
         return "indeterminate"
     if any("\x00" in value for value in (changed_files, diff)):
         return "indeterminate"
@@ -777,7 +790,7 @@ def classify_security_change(changed_files: str, diff: str) -> str:
         parts = {part.lower() for part in path.parts}
         if parts & SENSITIVE_PATH_PARTS or path.name.lower() in SENSITIVE_FILENAMES:
             return "known-sensitive"
-    if SENSITIVE_DIFF_TOKENS.search(diff):
+    if SENSITIVE_DIFF_TOKENS.search(_readable_diff_text(diff)):
         return "known-sensitive"
     if all(Path(path).suffix.lower() in NON_EXECUTABLE_SUFFIXES for path in paths):
         return "known-non-executable"
@@ -900,7 +913,7 @@ def load_context(path: Path) -> dict[str, Any]:
 
 def compare_contexts(expected: dict[str, Any], actual: dict[str, Any]) -> dict[str, Any]:
     # Invalidation keys on head_oid/commits/code_hash only; mergeability drift is
-    # reported for the operator but never forces a restart (TC-1).
+    # reported for the operator but never forces a restart.
     code_changed = expected.get("code_hash") != actual.get("code_hash")
     conversation_changed = (
         expected.get("conversation_hash") != actual.get("conversation_hash")
@@ -1269,7 +1282,7 @@ REASONS_REQUIRING_SECURITY = {"known-sensitive", "unmatched-executable"}
 
 
 def resolve_security_required(reason: str, triggers: list[str]) -> bool:
-    """Pure function of the resolved reason and trigger list (TC-4).
+    """Pure function of the resolved reason and trigger list.
 
     An explicit or tier-4 trigger always forces the lens; otherwise only a
     known-sensitive or unmatched-executable reason does. `indeterminate` no

@@ -356,6 +356,18 @@ await check("derives normally on a clean target directory with no explicit overw
   assert.equal(result.verdict, "pass");
 }));
 
+await check("refuses to derive when the snapshot's repository root is not contained by any writable root", async () => withFixture(async value => {
+  await rm(path.join(value.workspace, "plan/tasks/Task-1.md"));
+  await rm(path.join(value.workspace, "plan/tasks/Task-2.md"));
+  await rm(path.join(value.workspace, "plan/tasks/Task-3.md"));
+  const traceabilityPath = path.join(value.workspace, "plan/openspec-traceability.json");
+  const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.workspace] });
+  assert.equal(derived.verdict, "fail");
+  assert.equal(derived.error_code, "REPOSITORY_ROOT_NOT_WRITABLE");
+  await assert.rejects(readFile(traceabilityPath), { code: "ENOENT" });
+  await assert.rejects(readFile(path.join(value.workspace, "plan/tasks/Task-1.md")), { code: "ENOENT" });
+}));
+
 if (failures.length) {
   console.error(`${failures.length} OpenSpec overlay checks failed: ${failures.join(", ")}`);
   process.exitCode = 1;

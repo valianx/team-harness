@@ -452,6 +452,27 @@ class ReviewContextTests(unittest.TestCase):
             "unmatched-executable",
         )
 
+    def test_binary_file_does_not_blind_the_scan_to_sensitive_changes(self):
+        changed_files = "assets/logo.png\nagents/security.md\n"
+        diff = (
+            "diff --git a/assets/logo.png b/assets/logo.png\n"
+            "index 1111111..2222222 100644\n"
+            "GIT binary patch\n"
+            "literal 10\n"
+            "Zc$xd0\n"
+            "\n"
+            "diff --git a/agents/security.md b/agents/security.md\n"
+            "index 3333333..4444444 100644\n"
+            "--- a/agents/security.md\n"
+            "+++ b/agents/security.md\n"
+            "@@ -1,1 +1,2 @@\n"
+            " existing line\n"
+            "+password = \"changeme\"\n"
+        )
+        reason = MODULE.classify_security_change(changed_files, diff)
+        self.assertEqual(reason, "known-sensitive")
+        self.assertTrue(MODULE.resolve_security_required(reason, []))
+
     def test_capture_binds_mergeability_and_rejects_mid_capture_drift(self):
         metadata = {
             "number": 1,
