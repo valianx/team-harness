@@ -562,7 +562,9 @@ estimate, use zero, or preserve a partial native subtotal.
 ledger and from `open_findings`. One row per finding `id`, carrying `class`, `severity`, and a
 `disposition` from the closed set `fixed | accepted-residual | open | rejected-with-rationale`,
 plus any operator ruling including a waiver rationale — transcribed from a lens's or the
-implementer's status block, never inferred. Verifiers read it and never edit it.
+implementer's status block, never inferred. Verifiers read it and never edit it. A disposition
+change is recorded by appending the new disposition and round to the finding's existing row —
+never by deleting prior row material and never by opening a second row for the same id.
 
 `id` is the exact identity a reasoning lens (`qa`, `adversary`, `security`) reports and the
 implementer echoes in `finding_resolutions.finding_id` (I-4); `correction_findings` and

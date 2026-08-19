@@ -293,12 +293,13 @@ python3 "$REVIEW_CONTEXT_HELPER" select-security \
 The selector returns `known-sensitive`, `known-non-executable`, `unmatched-executable`, or
 `indeterminate`, alongside `security_required` and the trigger list. `known-non-executable` now
 also covers configuration-only diffs (`.json`, `.yaml`, `.yml`, `.toml`, `.ini`, `.cfg`,
-`.properties`); `.env` variants and sensitive filenames such as `package.json`/`go.mod` are still
-caught earlier by the filename check and stay sensitive. Security is required for
+`.properties`); `.env` variants, sensitive filenames such as `package.json`/`go.mod`, and any path
+under `.github/workflows/` are still caught earlier and stay sensitive. Security is required for
 `known-sensitive` or `unmatched-executable`, and for an explicit request or Tier 4 regardless of
-suffix classification; `known-non-executable` and `indeterminate` omit it otherwise, including
-when the helper is missing or the input is unreadable. State the resolved `reason` whenever
-security is omitted, so a not-required outcome stays visible instead of silent.
+suffix classification; `known-non-executable` and `indeterminate` omit it otherwise. A missing
+selector or an unreadable changed-files/diff artifact fails closed and requires security. State
+the resolved `reason` whenever security is omitted, so a not-required outcome stays visible
+instead of silent.
 
 Add specialist agents only from concrete signals:
 

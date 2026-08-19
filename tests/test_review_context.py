@@ -452,6 +452,88 @@ class ReviewContextTests(unittest.TestCase):
             "unmatched-executable",
         )
 
+    def test_github_workflow_path_is_always_security_sensitive(self):
+        changed_files = ".github/workflows/ci.yml\n"
+        diff = (
+            "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\n"
+            "index 1111111..2222222 100644\n"
+            "--- a/.github/workflows/ci.yml\n"
+            "+++ b/.github/workflows/ci.yml\n"
+            "@@ -1,2 +1,3 @@\n"
+            " name: CI\n"
+            "+      - run: echo hello\n"
+            " jobs:\n"
+        )
+        reason = MODULE.classify_security_change(changed_files, diff)
+        self.assertEqual(reason, "known-sensitive")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            changed_path = root / "changed-files.txt"
+            diff_path = root / "review.diff"
+            changed_path.write_text(changed_files, encoding="utf-8")
+            diff_path.write_text(diff, encoding="utf-8")
+            output = io.StringIO()
+            with redirect_stdout(output):
+                MODULE.command_select_security(
+                    SimpleNamespace(
+                        changed_files=changed_path,
+                        diff=diff_path,
+                        explicit_security=False,
+                        tier=None,
+                    )
+                )
+            result = json.loads(output.getvalue())
+        self.assertTrue(result["security_required"])
+
+    def test_non_utf8_diff_in_a_sensitive_path_still_classifies_security_sensitive(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            changed_path = root / "changed-files.txt"
+            diff_path = root / "review.diff"
+            changed_path.write_text("src/auth/login.py\n", encoding="utf-8")
+            diff_path.write_bytes(
+                b"diff --git a/src/auth/login.py b/src/auth/login.py\n"
+                b"index 1111111..2222222 100644\n"
+                b"--- a/src/auth/login.py\n"
+                b"+++ b/src/auth/login.py\n"
+                b"@@ -1,1 +1,2 @@\n"
+                b" existing line\n"
+                b"+# caf\xe9 comment\n"
+            )
+            output = io.StringIO()
+            with redirect_stdout(output):
+                MODULE.command_select_security(
+                    SimpleNamespace(
+                        changed_files=changed_path,
+                        diff=diff_path,
+                        explicit_security=False,
+                        tier=None,
+                    )
+                )
+            result = json.loads(output.getvalue())
+        self.assertEqual(result["reason"], "known-sensitive")
+        self.assertTrue(result["security_required"])
+
+    def test_unreadable_diff_artifact_fails_closed_to_security_required(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            changed_path = root / "changed-files.txt"
+            changed_path.write_text("docs/guide.md\n", encoding="utf-8")
+            missing_diff_path = root / "missing.diff"
+            output = io.StringIO()
+            with redirect_stdout(output):
+                MODULE.command_select_security(
+                    SimpleNamespace(
+                        changed_files=changed_path,
+                        diff=missing_diff_path,
+                        explicit_security=False,
+                        tier=None,
+                    )
+                )
+            result = json.loads(output.getvalue())
+        self.assertEqual(result["reason"], "indeterminate")
+        self.assertTrue(result["security_required"])
+
     def test_binary_file_does_not_blind_the_scan_to_sensitive_changes(self):
         changed_files = "assets/logo.png\nagents/security.md\n"
         diff = (

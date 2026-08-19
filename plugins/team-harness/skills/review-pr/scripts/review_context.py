@@ -788,6 +788,11 @@ def _readable_diff_text(diff: str) -> str:
     return "".join(section for section in sections if not _is_binary_section(section))
 
 
+def _is_workflow_path(path: Path) -> bool:
+    parts = [part.lower() for part in path.parts]
+    return any(left == ".github" and right == "workflows" for left, right in zip(parts, parts[1:]))
+
+
 def classify_security_change(changed_files: str, diff: str) -> str:
     paths = [line.strip() for line in changed_files.splitlines() if line.strip()]
     if not paths or not diff.strip():
@@ -798,7 +803,7 @@ def classify_security_change(changed_files: str, diff: str) -> str:
     for raw_path in paths:
         path = Path(raw_path)
         parts = {part.lower() for part in path.parts}
-        if parts & SENSITIVE_PATH_PARTS or path.name.lower() in SENSITIVE_FILENAMES:
+        if parts & SENSITIVE_PATH_PARTS or path.name.lower() in SENSITIVE_FILENAMES or _is_workflow_path(path):
             return "known-sensitive"
     if SENSITIVE_DIFF_TOKENS.search(_readable_diff_text(diff)):
         return "known-sensitive"
@@ -1302,12 +1307,16 @@ def resolve_security_required(reason: str, triggers: list[str]) -> bool:
 
 
 def command_select_security(args: argparse.Namespace) -> int:
+    # Decode with replacement rather than strict UTF-8 so a non-UTF-8 hunk never
+    # skips classification; only a real read failure fails closed below.
     try:
-        changed_files = args.changed_files.read_text(encoding="utf-8")
-        diff = args.diff.read_text(encoding="utf-8")
+        changed_files = args.changed_files.read_bytes().decode("utf-8", errors="replace")
+        diff = args.diff.read_bytes().decode("utf-8", errors="replace")
         reason = classify_security_change(changed_files, diff)
-    except (OSError, UnicodeError):
+        read_failed = False
+    except OSError:
         reason = "indeterminate"
+        read_failed = True
     triggers = []
     if args.explicit_security:
         triggers.append("explicit")
@@ -1315,7 +1324,7 @@ def command_select_security(args: argparse.Namespace) -> int:
         triggers.append("tier-4")
     print(json.dumps({
         "reason": reason,
-        "security_required": resolve_security_required(reason, triggers),
+        "security_required": True if read_failed else resolve_security_required(reason, triggers),
         "triggers": triggers,
     }))
     return 0
