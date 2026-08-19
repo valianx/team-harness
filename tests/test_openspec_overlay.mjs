@@ -299,7 +299,7 @@ await check("requires the live writable-root set for OpenSpec Gate-1 validation"
 }));
 
 await check("derives an overlay skeleton that validates without manual repair", async () => withFixture(async value => {
-  const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository], overwrite: true });
+  const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository, value.root], overwrite: true });
   assert.equal(derived.verdict, "pass");
   assert.equal(derived.kind, "team_harness_openspec_overlay_derivation");
   assert.equal(derived.acceptance_item_count, 1);
@@ -314,14 +314,14 @@ await check("fails closed when the change has no scenario or task coordinates", 
   const snapshot = JSON.parse(await readFile(snapshotPath, "utf8"));
   for (const artifact of snapshot.artifacts) artifact.coordinates = artifact.coordinates.filter(coordinate => coordinate.kind !== "scenario" && coordinate.kind !== "task");
   await writeFile(snapshotPath, `${JSON.stringify(snapshot)}\n`);
-  const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository], overwrite: true });
+  const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository, value.root], overwrite: true });
   assert.equal(derived.verdict, "fail");
   assert.equal(derived.error_code, "SOURCE_COVERAGE_INCOMPLETE");
 }));
 
 await check("refuses all-or-nothing when a target shard already exists", async () => withFixture(async value => {
   const traceabilityPath = path.join(value.workspace, "plan/openspec-traceability.json");
-  const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository] });
+  const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository, value.root] });
   assert.equal(derived.verdict, "fail");
   assert.equal(derived.error_code, "DERIVATION_TARGET_EXISTS");
   await assert.rejects(readFile(traceabilityPath), { code: "ENOENT" });
@@ -332,7 +332,7 @@ await check("refuses when the traceability file already exists even with no shar
   await rm(shardPath);
   await value.writeOverlay(value.overlay);
   const before = await readFile(path.join(value.workspace, "plan/openspec-traceability.json"), "utf8");
-  const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository] });
+  const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository, value.root] });
   assert.equal(derived.verdict, "fail");
   assert.equal(derived.error_code, "DERIVATION_TARGET_EXISTS");
   await assert.rejects(readFile(shardPath), { code: "ENOENT" });
@@ -340,7 +340,7 @@ await check("refuses when the traceability file already exists even with no shar
 }));
 
 await check("overwrites existing targets only with explicit authorization", async () => withFixture(async value => {
-  const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository], overwrite: true });
+  const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository, value.root], overwrite: true });
   assert.equal(derived.verdict, "pass");
   const result = await validateOverlay(value);
   assert.equal(result.verdict, "pass");
@@ -350,7 +350,7 @@ await check("derives normally on a clean target directory with no explicit overw
   await rm(path.join(value.workspace, "plan/tasks/Task-1.md"));
   await rm(path.join(value.workspace, "plan/tasks/Task-2.md"));
   await rm(path.join(value.workspace, "plan/tasks/Task-3.md"));
-  const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository] });
+  const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository, value.root] });
   assert.equal(derived.verdict, "pass");
   const result = await validateOverlay(value);
   assert.equal(result.verdict, "pass");
@@ -364,6 +364,18 @@ await check("refuses to derive when the snapshot's repository root is not contai
   const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.workspace] });
   assert.equal(derived.verdict, "fail");
   assert.equal(derived.error_code, "REPOSITORY_ROOT_NOT_WRITABLE");
+  await assert.rejects(readFile(traceabilityPath), { code: "ENOENT" });
+  await assert.rejects(readFile(path.join(value.workspace, "plan/tasks/Task-1.md")), { code: "ENOENT" });
+}));
+
+await check("refuses to derive when the workspace write root is a sibling of every writable root", async () => withFixture(async value => {
+  await rm(path.join(value.workspace, "plan/tasks/Task-1.md"));
+  await rm(path.join(value.workspace, "plan/tasks/Task-2.md"));
+  await rm(path.join(value.workspace, "plan/tasks/Task-3.md"));
+  const traceabilityPath = path.join(value.workspace, "plan/openspec-traceability.json");
+  const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository] });
+  assert.equal(derived.verdict, "fail");
+  assert.equal(derived.error_code, "WORKSPACE_ROOT_NOT_WRITABLE");
   await assert.rejects(readFile(traceabilityPath), { code: "ENOENT" });
   await assert.rejects(readFile(path.join(value.workspace, "plan/tasks/Task-1.md")), { code: "ENOENT" });
 }));

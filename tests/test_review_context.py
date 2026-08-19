@@ -473,6 +473,23 @@ class ReviewContextTests(unittest.TestCase):
         self.assertEqual(reason, "known-sensitive")
         self.assertTrue(MODULE.resolve_security_required(reason, []))
 
+    def test_binary_marker_in_readable_content_does_not_suppress_the_section(self):
+        changed_files = "skills/review-pr/scripts/review_context.py\n"
+        diff = (
+            "diff --git a/skills/review-pr/scripts/review_context.py "
+            "b/skills/review-pr/scripts/review_context.py\n"
+            "index 1111111..2222222 100644\n"
+            "--- a/skills/review-pr/scripts/review_context.py\n"
+            "+++ b/skills/review-pr/scripts/review_context.py\n"
+            "@@ -1,1 +1,2 @@\n"
+            " existing line\n"
+            '+if "GIT binary patch" not in section:\n'
+            '+password = "changeme"\n'
+        )
+        reason = MODULE.classify_security_change(changed_files, diff)
+        self.assertEqual(reason, "known-sensitive")
+        self.assertTrue(MODULE.resolve_security_required(reason, []))
+
     def test_capture_binds_mergeability_and_rejects_mid_capture_drift(self):
         metadata = {
             "number": 1,

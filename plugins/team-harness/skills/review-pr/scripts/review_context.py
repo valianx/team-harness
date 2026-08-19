@@ -766,16 +766,26 @@ SENSITIVE_DIFF_TOKENS = re.compile(
 
 
 DIFF_FILE_BOUNDARY = re.compile(r"(?=^diff --git )", re.MULTILINE)
+DIFF_HUNK_START = re.compile(r"^(?:--- |\+\+\+ |@@)")
+DIFF_BINARY_MARKER = re.compile(r"^(?:GIT binary patch|Binary files .+ differ)$")
+
+
+def _is_binary_section(section: str) -> bool:
+    # The marker is only authoritative in Git's own header block, before any hunk line —
+    # a hunk's readable content can otherwise contain the literal marker text as data.
+    for line in section.splitlines():
+        if DIFF_HUNK_START.match(line):
+            return False
+        if DIFF_BINARY_MARKER.match(line):
+            return True
+    return False
 
 
 def _readable_diff_text(diff: str) -> str:
     """Diff text with each binary file's own section dropped, keeping every readable hunk
     scannable even when another file in the same PR is binary."""
     sections = DIFF_FILE_BOUNDARY.split(diff)
-    return "".join(
-        section for section in sections
-        if "GIT binary patch" not in section and "Binary files " not in section
-    )
+    return "".join(section for section in sections if not _is_binary_section(section))
 
 
 def classify_security_change(changed_files: str, diff: str) -> str:

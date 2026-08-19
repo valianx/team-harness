@@ -57,7 +57,7 @@ async function scenario(workspaceMode) {
     assert.equal(snapshot.artifacts.every(artifact => artifact.path.startsWith("openspec/changes/canonical-e2e/")), true);
     assert.equal(await readFile(path.join(repository, "openspec/changes/canonical-e2e/proposal.md"), "utf8").then(Boolean), true);
 
-    const derived = await deriveOpenSpecOverlay({ workspace, writableRoots: [repository] });
+    const derived = await deriveOpenSpecOverlay({ workspace, writableRoots: [repository, root] });
     assert.equal(derived.verdict, "pass");
     assert.equal(derived.kind, "team_harness_openspec_overlay_derivation");
     assert.equal((await validateOpenSpecOverlay({ workspace, writableRoots: [repository] })).verdict, "pass");

@@ -389,10 +389,10 @@ async function resolveDerivationTargets(root, traceability, executionItems, over
  * call, no operator input, and no write outside the overlay and the shard scaffolds it emits. The
  * planning pass that follows authors judgment content (routing, scope decomposition, invariants,
  * ownership) on top of this scaffold; the result already satisfies `validateOpenSpecOverlay` by
- * construction. All-or-nothing: refuses and writes nothing when the snapshot's own repository root
- * is not contained by a writable root, when the traceability file or any target shard path already
- * exists (unless `overwrite: true` is passed explicitly), or at any other failure short of the
- * final write.
+ * construction. All-or-nothing: refuses and writes nothing unless BOTH the snapshot's own
+ * repository root AND the resolved `workspace` write root are each independently contained by a
+ * writable root, and the traceability file and every target shard path either do not yet exist or
+ * `overwrite: true` was passed explicitly — or at any other failure short of the final write.
  */
 export async function deriveOpenSpecOverlay({ workspace, snapshot = "inputs/openspec-snapshot.json", traceability = "plan/openspec-traceability.json", writableRoots, overwrite = false } = {}) {
   try {
@@ -406,6 +406,7 @@ export async function deriveOpenSpecOverlay({ workspace, snapshot = "inputs/open
     const snapshotValue = JSON.parse(snapshotFile.bytes.toString("utf8"));
     if (!isOpenSpecSnapshot(snapshotValue)) return derivationResult("fail", "SNAPSHOT_INVALID");
     if (!roots.some(writableRoot => contained(writableRoot, path.resolve(snapshotValue.repository.root)))) return derivationResult("fail", "REPOSITORY_ROOT_NOT_WRITABLE");
+    if (!roots.some(writableRoot => contained(writableRoot, root))) return derivationResult("fail", "WORKSPACE_ROOT_NOT_WRITABLE");
 
     const built = buildDerivationOverlay(snapshotValue, snapshotFile, snapshot);
     if (built === null) return derivationResult("fail", "SOURCE_COVERAGE_INCOMPLETE");
