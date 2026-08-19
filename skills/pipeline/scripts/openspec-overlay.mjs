@@ -305,6 +305,18 @@ function shardScaffold(item) {
   return `# ${item.id}\n\n- **Worktree:** null — branch null, base null\n\n## Dispatch anchors\n\nrequired_invariants: [${item.required_invariants.join(", ")}]\nrequired_evidence_anchors: [${item.required_evidence_anchors.join(", ")}]\ncross_runtime_preservation: ${item.cross_runtime_preservation}\n`;
 }
 
+/** Compact Gate-1 index scaffold: mechanical Plan Manifest and Task Index binding the traceability and shard paths this same derivation writes. Judgment content stays in the pinned OpenSpec coordinates each item's traceability entry sources; nothing is authored here. */
+function planScaffold(changeName, traceability, executionItems) {
+  const manifestRows = [
+    `| traceability | shared | \`${traceability}\` | acceptance items, execution items, dispositions |`,
+    ...executionItems.map(item => `| task | ${item.id} | \`${item.shard_path}\` | dispatch anchors |`),
+  ].join("\n");
+  const indexRows = executionItems
+    .map(item => `| ${item.id} | ${DERIVATION_OWNER} | pending | 1 | ${item.technical_constraints.length} | \`${item.shard_path}\` |`)
+    .join("\n");
+  return `# Plan: ${changeName}\n**Plan format:** sharded-v1\n**Reviews:** pending\n\n## Plan Manifest\n\n| Kind | ID | Path | Anchors |\n|------|----|------|---------|\n${manifestRows}\n\n### Task Index\n\n| Task | Service | Status | AC count | TC count | Path |\n|------|---------|--------|----------|----------|------|\n${indexRows}\n`;
+}
+
 function derivationResult(verdict, errorCode, details = {}) {
   return {
     schema_version: OPENSPEC_OVERLAY_DERIVATION_SCHEMA_VERSION,
@@ -359,8 +371,8 @@ function buildDerivationOverlay(snapshotValue, snapshotFile, snapshot) {
   return { overlay, acceptanceItems, executionItems };
 }
 
-/** Write every shard and the traceability file; on any write failure, remove every shard already written in this call before rethrowing. */
-async function writeDerivationOutputs(root, traceability, overlay, executionItems) {
+/** Write every shard, the Gate-1 index scaffold, and the traceability file; on any write failure, remove every shard and index scaffold already written in this call before rethrowing. */
+async function writeDerivationOutputs(root, traceability, plan, planText, overlay, executionItems) {
   const written = [];
   try {
     for (const item of executionItems) {
@@ -369,6 +381,9 @@ async function writeDerivationOutputs(root, traceability, overlay, executionItem
       await writeFile(shardPath, shardScaffold(item));
       written.push(shardPath);
     }
+    const planPath = path.resolve(root, plan);
+    await writeFile(planPath, planText);
+    written.push(planPath);
     const overlayBytes = Buffer.from(`${JSON.stringify(overlay)}\n`);
     await writeFile(path.resolve(root, traceability), overlayBytes);
     return overlayBytes;
@@ -378,8 +393,8 @@ async function writeDerivationOutputs(root, traceability, overlay, executionItem
   }
 }
 
-async function resolveDerivationTargets(root, traceability, executionItems, overwrite) {
-  const targets = [traceability, ...executionItems.map(item => item.shard_path)];
+async function resolveDerivationTargets(root, traceability, plan, executionItems, overwrite) {
+  const targets = [traceability, plan, ...executionItems.map(item => item.shard_path)];
   const targetPaths = [];
   for (const target of targets) {
     if (!safeRelative(target)) return { ok: false, code: "ARGUMENT_INVALID" };
@@ -405,19 +420,21 @@ async function resolveDerivationTargets(root, traceability, executionItems, over
  * becomes one execution item with a written shard scaffold, and every `requirement` or
  * `design-decision` coordinate — carrying no standalone testable or executable shape — is
  * dispositioned `excluded` with a disclosed rationale. A pure function of the snapshot: no model
- * call, no operator input, and no write outside the overlay and the shard scaffolds it emits. The
- * planning pass that follows authors judgment content (routing, scope decomposition, invariants,
- * ownership) on top of this scaffold; the result already satisfies `validateOpenSpecOverlay` by
- * construction. All-or-nothing: refuses and writes nothing unless BOTH the snapshot's own
- * repository root AND the resolved `workspace` write root are each independently contained by a
- * writable root, and the traceability file and every target shard path either do not yet exist or
- * `overwrite: true` was passed explicitly. If a write fails partway through, every shard already
- * written in this call is removed before the failure result is returned; the traceability file is
- * written last, so its presence is the commit record of a successful derivation.
+ * call, no operator input, and no write outside the overlay, its Gate-1 index scaffold, and the
+ * shard scaffolds it emits. The judgment content already authored by the single `openspec-planning`
+ * pass stays in the pinned OpenSpec coordinates each item's traceability entry sources, never
+ * restated here; the result already satisfies `validateOpenSpecOverlay` by construction.
+ * All-or-nothing: refuses and writes nothing unless BOTH the snapshot's own repository root AND
+ * the resolved `workspace` write root are each independently contained by a writable root, and
+ * the traceability file, the Gate-1 index, and every target shard path either do not yet exist or
+ * `overwrite: true` was passed explicitly. If a write fails partway through, every shard and index
+ * scaffold already written in this call is removed before the failure result is returned; the
+ * traceability file is written last, so its presence is the commit record of a successful
+ * derivation.
  */
-export async function deriveOpenSpecOverlay({ workspace, snapshot = "inputs/openspec-snapshot.json", traceability = "plan/openspec-traceability.json", writableRoots, overwrite = false } = {}) {
+export async function deriveOpenSpecOverlay({ workspace, snapshot = "inputs/openspec-snapshot.json", traceability = "plan/openspec-traceability.json", plan = "01-plan.md", writableRoots, overwrite = false } = {}) {
   try {
-    if (!safeString(workspace) || snapshot !== "inputs/openspec-snapshot.json" || traceability !== "plan/openspec-traceability.json") return derivationResult("fail", "ARGUMENT_INVALID");
+    if (!safeString(workspace) || snapshot !== "inputs/openspec-snapshot.json" || traceability !== "plan/openspec-traceability.json" || plan !== "01-plan.md") return derivationResult("fail", "ARGUMENT_INVALID");
     const roots = normalizeWritableRoots(writableRoots);
     if (roots === null) return derivationResult("fail", "ARGUMENT_INVALID");
     const root = await realpath(path.resolve(workspace));
@@ -433,10 +450,11 @@ export async function deriveOpenSpecOverlay({ workspace, snapshot = "inputs/open
     if (built === null) return derivationResult("fail", "SOURCE_COVERAGE_INCOMPLETE");
     const { overlay, acceptanceItems, executionItems } = built;
 
-    const resolved = await resolveDerivationTargets(root, traceability, executionItems, overwrite);
+    const resolved = await resolveDerivationTargets(root, traceability, plan, executionItems, overwrite);
     if (!resolved.ok) return derivationResult("fail", resolved.code);
 
-    const overlayBytes = await writeDerivationOutputs(root, traceability, overlay, executionItems);
+    const planText = planScaffold(snapshotValue.change.name, traceability, executionItems);
+    const overlayBytes = await writeDerivationOutputs(root, traceability, plan, planText, overlay, executionItems);
 
     return derivationResult("pass", null, {
       snapshot_sha256: hash(snapshotFile.bytes),

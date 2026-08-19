@@ -1673,6 +1673,17 @@ def check_residual_corrections() -> None:
     how = read("docs/how-it-works.md")
     require("inline" in how.lower() and "pipeline" in how.lower(), "How-it-works: direct/pipeline explanation drifted")
 
+    readme = read("agents/README.md")
+    lint = read("skills/lint/SKILL.md")
+    require("init-project.md" in readme and "`init.md`" not in readme, "README: stale init agent reference")
+    require("init-project.md" in lint and "`init.md`" not in lint, "lint skill: stale init skip entry")
+    require("validation-checkpoint" in readme, "README: adversary/QA phase label drifted")
+
+    gate = read("agents/_shared/gate-contract.md")
+    require("seven fields above" in gate and "six fields above" not in gate, "Gate contract: stale field count")
+    state_contract = read("agents/_shared/orchestrator-state.md")
+    require("checkpoint_boundary` is a separate derived checkpoint cache" in state_contract, "State: checkpoint boundary is conflated with gate fields")
+
 
 def check_convergence_counts_contract() -> None:
     """`convergence_counts` is declared identically by both `iteration.start` carriers."""
@@ -1707,17 +1718,6 @@ def check_convergence_counts_contract() -> None:
         "present with zeros" in convergence_line.lower(),
         "Observability: convergence_counts producer contract does not require zeros over omission",
     )
-
-    readme = read("agents/README.md")
-    lint = read("skills/lint/SKILL.md")
-    require("init-project.md" in readme and "`init.md`" not in readme, "README: stale init agent reference")
-    require("init-project.md" in lint and "`init.md`" not in lint, "lint skill: stale init skip entry")
-    require("validation-checkpoint" in readme, "README: adversary/QA phase label drifted")
-
-    gate = read("agents/_shared/gate-contract.md")
-    require("seven fields above" in gate and "six fields above" not in gate, "Gate contract: stale field count")
-    state_contract = read("agents/_shared/orchestrator-state.md")
-    require("checkpoint_boundary` is a separate derived checkpoint cache" in state_contract, "State: checkpoint boundary is conflated with gate fields")
 
 
 def check_sensitive_inline_authorization() -> None:

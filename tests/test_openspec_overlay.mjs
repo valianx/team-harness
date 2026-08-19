@@ -65,7 +65,6 @@ async function fixture() {
     completed: [],
     events: [],
   }, null, 2)}\n`);
-  await writeFile(path.join(workspace, "01-plan.md"), "**Plan format:** sharded-v1\n");
   const acceptance = id => ({ id, sources: [], classification: "th-extension", rationale: "TH-only acceptance control.", evidence_anchor: "reviews/04-validation.md" });
   const execution = id => ({
     id, sources: [], classification: "th-extension", rationale: "TH-only execution control.", owner: "implementer", specialist: "implementer",
@@ -307,6 +306,10 @@ await check("derives an overlay skeleton that validates without manual repair", 
   const result = await validateOverlay(value);
   assert.equal(result.verdict, "pass");
   assert.deepEqual(result.findings, []);
+  const planText = await readFile(path.join(value.workspace, "01-plan.md"), "utf8");
+  assert.ok(planText.includes("**Plan format:** sharded-v1"));
+  assert.ok(planText.includes("## Plan Manifest"));
+  assert.ok(planText.includes("### Task Index"));
 }));
 
 await check("fails closed when the change has no scenario or task coordinates", async () => withFixture(async value => {
@@ -355,12 +358,14 @@ await check("removes every shard already written before returning fail on a mid-
   const firstShardPath = path.join(value.workspace, "plan/tasks/Task-1.md");
   const secondShardPath = path.join(value.workspace, "plan/tasks/Task-2.md");
   const traceabilityPath = path.join(value.workspace, "plan/openspec-traceability.json");
+  const planPath = path.join(value.workspace, "01-plan.md");
   await rm(secondShardPath, { recursive: true, force: true });
   await mkdir(secondShardPath);
   const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository, value.root], overwrite: true });
   assert.equal(derived.verdict, "fail");
   assert.equal(derived.error_code, "ARTIFACT_INVALID");
   await assert.rejects(readFile(firstShardPath), { code: "ENOENT" });
+  await assert.rejects(readFile(planPath), { code: "ENOENT" });
   await assert.rejects(readFile(traceabilityPath), { code: "ENOENT" });
 }));
 
