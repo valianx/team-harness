@@ -21,25 +21,25 @@
 - [x] 2.2 Make `gate` name the missing or blocking lens in its not-ready output, and refuse to resolve ready while any required floor lens is absent or carries a blocker.
 - [x] 2.3 Make `gate` classify a finding whose file set lies outside a delta-scoped package's range as a pull-request concern rather than a blocker, so a closure pass cannot escalate into a new round.
 - [x] 2.4 Extend `tests/test_review_fan.mjs` with gate cases: absent required return, blocking floor lens, out-of-range finding demoted to concern, and the ready case.
-- [ ] 2.5 Rewrite the Review step and the no-re-audit sentence of `skills/spec/SKILL.md` into one consistent statement of the closure loop, documenting the producer's behaviour and pointing at the script rather than restating its rules.
+- [x] 2.5 Rewrite the Review step and the no-re-audit sentence of `skills/spec/SKILL.md` into one consistent statement of the closure loop, documenting the producer's behaviour and pointing at the script rather than restating its rules.
 
 ## 3. Written Intent and Lens Count
 
 - [x] 3.1 Implement criteria binding in `review-fan.mjs package`: read the named `openspec/changes/<change>/specs/**` requirement headers and emit them as criteria with provenance `written-intent`, carried by anchored path.
 - [x] 3.2 Make `package` exit non-zero when the named change does not validate under the pinned OpenSpec CLI, so unvalidated intent cannot become criteria.
-- [ ] 3.3 Add `written-intent` to the `criteria[].provenance` enum in the review package schema in `agents/_shared/inline-review-contract.md`.
-- [ ] 3.4 Add one sentence to `agents/_shared/inline-review-contract.md` stating that lens count never counts toward specialist count, and offset both additions with an equivalent net word reduction in the same file.
-- [ ] 3.5 Update the return schema in `agents/_shared/inline-review-contract.md` and the return section of `agents/inline-reviewer.md` so coverage against written-intent criteria reports separately from coverage against live-operator criteria, without granting the reviewer any new tool.
+- [x] 3.3 Add `written-intent` to the `criteria[].provenance` enum in the review package schema in `agents/_shared/inline-review-contract.md`.
+- [x] 3.4 Add one sentence to `agents/_shared/inline-review-contract.md` stating that lens count never counts toward specialist count, and offset both additions with an equivalent net word reduction in the same file.
+- [x] 3.5 Update the return schema in `agents/_shared/inline-review-contract.md` and the return section of `agents/inline-reviewer.md` so coverage against written-intent criteria reports separately from coverage against live-operator criteria, without granting the reviewer any new tool.
 - [x] 3.6 Extend `tests/test_review_fan.mjs` with criteria-binding cases: bound requirement headers, the unvalidated-change refusal, and provenance separation in the emitted package.
-- [ ] 3.7 Run `node tools/codex-runtime/generate.mjs` and re-verify the pinned reviewer digest expectation in `tests/test_codex_runtime.py`.
+- [x] 3.7 Run `node tools/codex-runtime/generate.mjs` and re-verify the pinned reviewer digest expectation in `tests/test_codex_runtime.py`.
 
 ## 4. Verification Invocation Surface
 
-- [ ] 4.1 Author `skills/verify/SKILL.md` as the invocation surface for `review-fan.mjs`, documenting the two subcommands and pointing at `agents/_shared/inline-review-contract.md` rather than restating it.
-- [ ] 4.2 State in `skills/verify/SKILL.md` that the skill creates no workspace, state, events, gate, branch, or delivery record, and that every refusal comes from the script rather than from operator discipline.
-- [ ] 4.3 Add the `verify` row to the `skills/modes/SKILL.md` catalog table in alphabetical position.
-- [ ] 4.4 Run `node tools/codex-runtime/sync-skills.mjs` and commit the generated `plugins/team-harness/skills/verify/**` and `installer-assets/opencode-skills/verify/**` projections, confirming the script triplicates byte-for-byte.
-- [ ] 4.5 Add a deterministic check to `tests/test_pipeline_contract.py` asserting the three script copies are byte-identical, so the capability cannot degrade in a projection.
+- [x] 4.1 Author `skills/verify/SKILL.md` as the invocation surface for `review-fan.mjs`, documenting the two subcommands and pointing at `agents/_shared/inline-review-contract.md` rather than restating it.
+- [x] 4.2 State in `skills/verify/SKILL.md` that the skill creates no workspace, state, events, gate, branch, or delivery record, and that every refusal comes from the script rather than from operator discipline.
+- [x] 4.3 Add the `verify` row to the `skills/modes/SKILL.md` catalog table in alphabetical position.
+- [x] 4.4 Run `node tools/codex-runtime/sync-skills.mjs` and commit the generated `plugins/team-harness/skills/verify/**` and `installer-assets/opencode-skills/verify/**` projections, confirming the script triplicates byte-for-byte.
+- [x] 4.5 Add a deterministic check to `tests/test_pipeline_contract.py` asserting the three script copies are byte-identical, so the capability cannot degrade in a projection.
 
 ## 5. Review Surface Economy
 

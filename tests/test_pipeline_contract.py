@@ -1311,6 +1311,34 @@ def check_cross_runtime_pipeline_runners() -> None:
     require('".mjs":  true' in opencode_registry, "opencode installer does not emit pipeline runner assets")
 
 
+def check_verification_fan_producer() -> None:
+    """The verification fan's enforcement is executable and reaches every runtime unchanged."""
+    canonical_path = ROOT / "skills/verify/scripts/review-fan.mjs"
+    require(canonical_path.is_file(), "verification fan producer is missing")
+    canonical = canonical_path.read_bytes()
+    for label, relative in (
+        ("Codex", "plugins/team-harness/skills/verify/scripts/review-fan.mjs"),
+        ("opencode", "installer-assets/opencode-skills/verify/scripts/review-fan.mjs"),
+    ):
+        projection = ROOT / relative
+        require(projection.is_file() and projection.read_bytes() == canonical, f"{label} verification fan drifted")
+
+    source = canonical.decode("utf-8")
+    for marker, description in (
+        ("WORKTREE_NOT_CLEAN", "dirty-tree refusal"),
+        ("RANGE_NOT_COMMITTED", "uncommitted-range refusal"),
+        ("SCOPE_FULL_REFUSED", "second-full-scope refusal"),
+        ("written-intent", "written-intent criteria binding"),
+        ("unscannable", "ambiguous-classification handling"),
+    ):
+        require(marker in source, f"verification fan lost its {description}")
+
+    skill = read("skills/verify/SKILL.md")
+    require("review-fan.mjs" in skill, "verify skill does not invoke its producer")
+    require("no workspace" in skill.lower(), "verify skill does not disclaim pipeline artifacts")
+    require("| `verify` |" in read("skills/modes/SKILL.md"), "verify is absent from the modes catalog")
+
+
 def check_direct_predicate() -> None:
     """Direct eligibility and a live `hazlo tú` preference cannot dispatch silently."""
     claude = "\n".join(
@@ -3777,6 +3805,7 @@ def main() -> None:
         ("cleaner and CRAP contract", check_cleaner_crap_contract),
         ("functional-first Stage 1 contract", check_functional_first_plan_contract),
         ("cross-runtime deterministic runners", check_cross_runtime_pipeline_runners),
+        ("verification fan producer", check_verification_fan_producer),
         ("authoritative post-Gate-1 transitions", check_authoritative_post_gate1_transitions),
         ("direct predicate", check_direct_predicate),
         ("single writer", check_single_writer),

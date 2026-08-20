@@ -71,6 +71,7 @@ text. Keep mode names and invocations exact.
 | `translate` | Discover, extract, and translate UI strings for i18n. | Claude Code + opencode + Codex |
 | `update` | Update the installed Team Harness runtime. | Claude Code + opencode + Codex |
 | `validate` | Validate an implementation against its acceptance criteria. | Claude Code + opencode + Codex |
+| `verify` | Run the inline verification fan over a committed range and decide its ship join. | Claude Code + opencode + Codex |
 
 Do not load another skill, create pipeline state, dispatch an agent, or perform
 any listed action while rendering this catalog. A later explicit operator

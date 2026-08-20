@@ -88,8 +88,12 @@ location was available.
 Return exactly one compact YAML/JSON-compatible result with `lens`,
 matching `expected_lens`, exact `dispatch_id`, `lens_status`, `repository_root`,
 `commit_or_range`, `target_id`, `verdict`,
-`output: null`, `findings`, `coverage.checked`, `coverage.limits`, and
-`disagreements` as defined by the shared contract. Use
+`output: null`, `findings`, `coverage.checked`, `coverage.written_intent`,
+`coverage.limits`, and
+`disagreements` as defined by the shared contract. Report one
+`coverage.written_intent` row per criterion whose provenance is `written-intent`,
+keyed by its `source`, so authored-requirement coverage stays separable from
+live-operator coverage. Use
 `lens_status: complete` only when the selected bounded work and meaningful
 coverage finished. Use `incomplete`, `failed`, `unavailable`, or `untrusted`
 with the concrete cause when the target, local-object preflight, or read-only

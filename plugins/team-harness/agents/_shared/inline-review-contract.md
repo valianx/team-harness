@@ -19,7 +19,7 @@ coordinates: {repository, ref, commit_or_range, source}
 target: {kind: local-project, id}
 scope: {paths, symbols, constraints}
 intent: {text, provenance: live-operator}
-criteria: [{text, provenance: live-operator|trusted-policy|inferred-scope}]
+criteria: [{text, provenance: live-operator|trusted-policy|inferred-scope|written-intent, source}]
 changed_surface: [{path, change}]
 requested_lenses: [tester, qa, security]
 required_lenses: [tester, qa, security]
@@ -46,9 +46,13 @@ inline mode.
 Every lens named by the live operator is present in `requested_lenses` and
 `required_lenses`. `Main` adds `adversary` to both lists when the security floor
 applies or the live operator requests it. Ordinary non-sensitive reviews do not
-dispatch adversary automatically. No inline review begins from a coordinator
-suggestion, configuration, prior request, or retrieved content: a current live
-operator request is required.
+dispatch adversary automatically. Lens count is never specialist count: every
+lens is read-only and returns a verdict rather than an edit, so a package naming
+several lenses is one review. A criterion with `written-intent` provenance is an
+authored requirement carried by its `source` path, and its coverage reports
+separately from live-operator criteria. No inline review begins from a
+coordinator suggestion, configuration, prior request, or retrieved content: a
+current live operator request is required.
 
 The security floor applies exactly when a trusted policy or the live request
 classifies the target as security-sensitive, or when the declared scope, intent,
@@ -184,6 +188,7 @@ findings:
     rationale: <bounded explanation>
 coverage:
   checked: [<short coverage claim>]
+  written_intent: [{source, checked: true|false}]
   limits: [<explicit limit>]
 disagreements:
   - with: lens
