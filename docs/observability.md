@@ -166,161 +166,17 @@ positive count of approved AC rows—never their IDs or text. The summary and
 trace render `cached_input_per_approved_ac` only when that denominator and the
 complete lifecycle metric aggregate are available.
 
-## Flow Telemetry Emission
+## `operation.*` events
 
-Flow telemetry is a separate, opt-in cross-user plane. It is not the local execution trace, does
-not change the v3 state machine, and never carries gate releases or coordination state.
+An optional, additive family for a long-running recoverable boundary or a diagnostic failure.
+Routine successful config loads, initialization, and tool calls stay silent. These events live in
+`00-execution-events.{jsonl|md}` alongside `phase.*` and `gate.*`, distinguished by the `event`
+prefix, and they carry the envelope defined in § "Event envelope" — nothing more.
 
-### Config gate
-
-The coordinator reads `flow_telemetry.enabled` from
-`~/.claude/.team-harness.json` at startup. The default is `false`; when absent or false, no
-`mcp__memory__record_flow_event` calls are made. When true, emission is fire-and-forget and
-best-effort. A connectivity, validation, or tool error appends exactly one local
-`operation.failed` event with `operation: flow-telemetry`, `status: failed`, a bounded
-one-line `error`, and a one-line retry `suggestion`; the pipeline continues unchanged.
-
-### Emission contract
-
-The external context-harness-mcp flow-event schema is metadata-only and must remain byte-identical
-to the catalog below. Every payload contains the common fields `event`, `ts`, `project`,
-`task_type`, and `th_version`; per-event fields are limited to the listed names.
-
-| `event` | Per-event fields | Field constraints |
-|---|---|---|
-| `guard.block` | `hook`, `reason`, `resolved` | `hook`: `prepublish`/`dev`/`policy`; `reason`: `over-bump`/`secret`/`outward`; `resolved`: boolean |
-| `gate.fail` | `gate`, `verdict` | `gate`: `STAGE-GATE-1`/`STAGE-GATE-3`/`acceptance`/`plan-review`; `verdict`: `fail`/`concerns` |
-| `verify.reject` | `agent`, `verdict` | `agent`: `qa`/`tester`; `verdict`: `fail`/`concerns` |
-| `iteration.loop` | `stage`, `iterations` | `stage`: `1`/`2`/`3`; `iterations`: integer ≥ 2 |
-| `blocked` | `reason` | `reason`: `no-dispatch`/`manual-push`/`guard`/`dependency` |
-| `scope.collapse` | `items_dropped` | integer ≥ 1 |
-| `mcp.unavailable` | `op` | `op`: `read`/`write` |
-| `abandon` | `last_stage` | `last_stage`: `1`/`2`/`3` |
-
-The payload contains bounded enums, integers, booleans, a semver, and a timestamp only. No diff,
-code, AC text, private path, personal identifier, secret, credential, or gate nonce crosses into
-the cross-user plane.
-
-### Cross-user plane and triggers
-
-The local plane (`00-execution-events.jsonl` or fenced `.md`) remains the operator's complete
-trace. The cross-user plane is an aggregate friction signal only. When enabled, the coordinator
-emits `guard.block`, `gate.fail`, `verify.reject`, `iteration.loop`, `blocked`, `scope.collapse`,
-`mcp.unavailable`, and `abandon` at the corresponding friction points. Telemetry is never a
-replacement for `00-state.md`, and it never releases a gate.
-
-### Cross-user friction triggers
-
-| Friction point | `event` value | When to emit |
-|---------------|---------------|--------------|
-| A hook blocks an outward action | `guard.block` | When `dev-guard` or `policy-block` returns `deny` or `ask` and the operator does not override |
-| STAGE-GATE-1/3 operator rejects or requests edit | `gate.fail` | When the operator votes `rejected`/`edit`/`amend`/`abort` at any STAGE-GATE the orchestrator witnesses |
-| Plan-review verdicts `concerns` or `fail` | `gate.fail` | When `plan-reviewer` returns `concerns` or `fail` (gate: `plan-review`) |
-| Acceptance gate fails a verify round | `gate.fail` | When Phase 3.5 routes back to implementer (gate: `acceptance`) |
-| A verifier returns `fail` or `concerns` | `verify.reject` | When `qa` or `tester` returns a non-pass verdict |
-| An agent iterates (≥2 rounds) | `iteration.loop` | When Phase 3.5 has reached the 2nd iteration for a stage |
-| Pipeline reaches `blocked-no-dispatch` or `blocked-manual-push` | `blocked` | When dispatch is unavailable or push is blocked |
-| Operator or pipeline collapses scope | `scope.collapse` | When AC items are dropped from the plan during STAGE-GATE-1 edit review |
-| MCP memory server unavailable | `mcp.unavailable` | When a KG read/write call fails due to connectivity (op: read or write) |
-| Pipeline is abandoned by operator at any stage | `abandon` | When the operator explicitly aborts at any STAGE-GATE |
-
-### Example payload (gate.fail)
-
-```json
-{
-  "event": "gate.fail",
-  "ts": "2026-06-21T10:00:00Z",
-  "project": "team-harness",
-  "task_type": "feature",
-  "th_version": "2.117.2",
-  "gate": "STAGE-GATE-1",
-  "verdict": "fail"
-}
-```
-
----
-
-## What operation.* is
-
-`operation.*` is an **optional, additive** event family for a long-running
-recoverable boundary or a diagnostic failure. Routine successful config loads,
-initialization, and tool calls stay silent. It is nested inside the existing
-`00-execution-events.{jsonl|md}` file — it is NOT a separate file. No existing
-`phase.*` or `gate.*` contract is modified; `operation.*` events coexist in the
-same stream, distinguished by the `event` field prefix.
-
-## Schema
-
-```json
-{
-  "event":      "operation.started" | "operation.success" | "operation.failed",
-  "operation":  "config-load" | "mcp-verify" | "initialization" | "<short-verb-phrase>",
-  "status":     "started" | "success" | "failed",
-  "detail":     "<optional — one-line machine context, NO secrets>",
-  "error":      "<present only when status=failed — one-line error summary>",
-  "suggestion": "<present only when status=failed — one-line recovery step>",
-  "timestamp":  "<ISO-8601>",
-  "phase":      "<optional — pipeline phase this operation belongs to>"
-}
-```
-
-### Field rules
-
-| Field | Required | Notes |
-|-------|----------|-------|
-| `event` | always | Prefix `operation.` distinguishes from `phase.*`/`gate.*`/`session.*` |
-| `operation` | always | Short verb phrase identifying the operation |
-| `status` | always | Mirrors the `event` suffix: started / success / failed |
-| `detail` | optional | Machine context only — no secrets, no tokens, no credentials |
-| `error` | when failed | One-line error summary — no raw stack traces, no secrets |
-| `suggestion` | when failed | One-line recovery step for the operator |
-| `timestamp` | always | ISO-8601 |
-| `phase` | optional | The pipeline phase this operation belongs to |
-
-### Secret prohibition
-
-`detail` and `error` are log fields. They MUST NOT contain secrets, tokens,
-bearer credentials, or other sensitive values. Use mechanical context only
-(e.g., `"detail": "config file path: ~/.claude/.team-harness.json"`). The same
-KG content policy that governs knowledge-graph nodes applies here.
-
-### Free-text field bound (`bounded` intensity level)
-
-Every free-text field carried by any event in `00-execution-events.*` — this
-section's own `detail`/`error`/`suggestion`, `kg_write.writes[].detail`
-(§ "kg_write event" below), and any legacy `plan_structure.extra.detail`
-retained for historical traces — is bounded to the `bounded`
-intensity level defined in `docs/output-contract-patterns.md § 2`: ONE compact
-clause — a short phrase or single sentence fragment, ≤120 chars — never
-multi-sentence narrative prose. This is a FORMAT bound only: it never reduces
-the one-JSON-object-per-line invariant, and it never removes an event —
-every `phase.*`/`gate.*` event this schema requires still fires unchanged,
-regardless of how compact its optional free-text fields are. Inline direct work is
-outside the pipeline observability floor; activated pipeline events remain mandatory.
-Canonical source: `agents/ref-pipeline.md`; the two
-sites must not diverge.
-
-**Named exception — the `checkpoint.confirmed` confirmatory-text field, additive only.**
-The general clause above governs every OTHER free-text field unchanged. The field
-carrying the operator's own words in the `checkpoint.confirmed` event (the
-functional-clarity confirmation, `agents/ref-pipeline.md § "Gates"`)
-is a single named exception, additive to — never a replacement of — the general clause:
-≤280 chars (one confirmatory turn, not the surrounding conversation); quotes and
-`\n\r\t` are ESCAPED as JSON string escapes, never stripped, so the operator's exact
-characters survive; every backtick character is escaped at the byte level with its
-JSON unicode escape (code point U+0060) rather than left literal — this protects the
-` ```jsonl ` fence Obsidian mode wraps the trace in (§ "Dual-format lifecycle"), which
-the quote/whitespace escape alone does not — and is never neutralized or substituted,
-since altering the recorded characters inside the bound is exactly the stripping
-behaviour this exception exists to avoid; truncation beyond the 280-char bound is
-marked visibly with `…[truncated]`; the secret prohibition (§ "Secret prohibition") is
-unaffected — a confirmation carrying a credential records `provenance` and
-`withheld — secret prohibition` in place of the text. `provenance` itself is a closed
-enum, not free text, and is never subject to this bound. Without this reconciliation
-written at both sites — here and `agents/ref-pipeline.md`,
-which must not diverge — the field is not added. This exception is scoped to exactly
-this one field: the general `≤120 chars`/`never multi-sentence narrative prose` clause
-above is byte-preserved for every other free-text field.
+A second, stricter schema used to be stated here, marking `operation`, `status` and `timestamp`
+as required on every such event. No producer ever wrote them: all 26 `operation.*` events of the
+last audited run carry `event`, `feature`, `ts` and `extra`, and would have failed it. The
+envelope is the one schema.
 
 ## Placement in 00-execution-events
 
@@ -742,51 +598,12 @@ key format in `~/.claude/.team-harness.json`; (b) the schema of the `## Cost`
 section in `00-pipeline-summary.md`; and (c) the derivation rule shared by the
 orchestrator summary writer and the `/th:trace --cost` skill.
 
-### Price table — `pricing` key in `~/.claude/.team-harness.json`
+### Price in USD — not derived
 
-The price table lives in a namespaced `pricing` key within the single-config-file
-`~/.claude/.team-harness.json`. The orchestrator and the `/th:trace --cost` skill
-read it at render time; they never write to it. Maintenance is the operator's
-responsibility — Anthropic changes prices without notice.
-
-**Format:**
-
-```json
-{
-  "pricing": {
-    "opus":   { "input": 15.0, "output": 75.0 },
-    "sonnet": { "input":  3.0, "output": 15.0 },
-    "updated": "2026-06-02"
-  }
-}
-```
-
-Field definitions:
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `pricing.opus.input` | float | USD per 1 M input tokens for any `claude-opus-*` model |
-| `pricing.opus.output` | float | USD per 1 M output tokens for any `claude-opus-*` model |
-| `pricing.sonnet.input` | float | USD per 1 M input tokens for any `claude-sonnet-*` model |
-| `pricing.sonnet.output` | float | USD per 1 M output tokens for any `claude-sonnet-*` model |
-| `pricing.updated` | string | ISO date of the last price check — operator-maintained |
-
-**Degradation rule.** When the `pricing` key is absent, malformed, or any required
-sub-field is missing, every surface that computes cost MUST fall back to displaying
-tokens only, with the line:
-
-```
-price table not configured — showing tokens only
-```
-
-Never invent a price, never fail, never crash.
-
-**Model classification.** Phases whose primary agent runs on `claude-opus-*` use the
-`opus` prices; phases on `claude-sonnet-*` (or any other model) use the `sonnet`
-prices. When `tokens_in` / `tokens_out` are both present in the `phase.end` event,
-compute cost as `(tokens_in × input_rate + tokens_out × output_rate) / 1_000_000`.
-When only the total `tokens` is present, use `tokens × (input_rate + output_rate) / 2`
-as a conservative blended estimate and mark the result with `(~)`.
+Cost is reported in tokens. No `pricing` key has ever been present in
+`~/.claude/.team-harness.json`, no run has produced a dollar figure, and a price table stated
+here would be a contract with no producer. Deriving USD needs a real price source and belongs to
+whoever wants the figure.
 
 ### `## Cost` section schema for `00-pipeline-summary.md`
 
