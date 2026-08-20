@@ -2,7 +2,8 @@
 /** Build the anchored inline review package from repository state, and decide its ship join. */
 
 import { execFile } from "node:child_process";
-import { readdir, readFile, stat } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { promisify } from "node:util";
@@ -32,6 +33,7 @@ export const ERROR_CODES = new Set([
   "CHANGED_SURFACE_TOO_LARGE",
   "CHANGE_NOT_VALIDATED",
   "CHANGE_NOT_FOUND",
+  "CRITERIA_TOO_MANY",
   "SCOPE_FULL_REFUSED",
   "PACKAGE_INVALID",
   "RETURNS_INVALID",
@@ -102,7 +104,7 @@ async function resolveRepositoryRoot(candidate) {
 }
 
 async function assertCleanTree(root) {
-  const status = await git(root, ["status", "--porcelain", "--untracked-files=no"]);
+  const status = await git(root, ["status", "--porcelain=v1", "--untracked-files=all"]);
   if (status.trim().length > 0) fail("WORKTREE_NOT_CLEAN");
 }
 
@@ -253,30 +255,51 @@ function requirementHeaders(text) {
 }
 
 /** Bind each authored requirement header as a criterion carried by its anchored path. */
-export async function readSpecRequirements(specsRoot) {
+export async function readSpecRequirements(specsRoot, reader) {
   const criteria = [];
   let capabilities = [];
   try {
-    capabilities = await readdir(specsRoot, { withFileTypes: true });
+    capabilities = await reader.list(specsRoot);
   } catch {
     return criteria;
   }
-  for (const entry of capabilities) {
-    if (!entry.isDirectory()) continue;
-    const specPath = path.join(specsRoot, entry.name, "spec.md");
-    const text = await readFile(specPath, "utf8").catch(() => null);
+  for (const name of capabilities) {
+    const specPath = `${specsRoot}/${name}/spec.md`;
+    const text = await reader.read(specPath);
     if (text === null) continue;
-    for (const name of requirementHeaders(text)) {
-      criteria.push({ text: name, provenance: "written-intent", source: specPath });
+    for (const heading of requirementHeaders(text)) {
+      criteria.push({ text: heading, provenance: "written-intent", source: specPath });
     }
   }
   return criteria;
 }
 
-async function validateChange(root, change) {
+/**
+ * Criteria are read out of the reviewed head, never the working checkout: a package must not
+ * bind requirements that are absent from its own immutable target.
+ */
+export function headTreeReader(root, head) {
+  return {
+    async list(prefix) {
+      const stdout = await git(root, ["ls-tree", "--name-only", `${head}:${prefix}`]);
+      return stdout.split("\n").map((line) => line.trim().replace(/\/$/, "")).filter(Boolean);
+    },
+    async read(relative) {
+      try {
+        return await git(root, ["show", `${head}:${relative}`]);
+      } catch {
+        return null;
+      }
+    },
+  };
+}
+
+async function validateChange(root, head, change) {
   if (!CHANGE_NAME.test(change)) fail("ARGUMENT_INVALID");
-  const changeRoot = path.join(root, "openspec", "changes", change);
-  const present = await stat(changeRoot).then((entry) => entry.isDirectory()).catch(() => false);
+  const changeRoot = `openspec/changes/${change}`;
+  const present = await git(root, ["ls-tree", "--name-only", `${head}:${changeRoot}`])
+    .then((stdout) => stdout.trim().length > 0)
+    .catch(() => false);
   if (!present) fail("CHANGE_NOT_FOUND");
   try {
     await run("npx", ["--yes", "@fission-ai/openspec@1.9.0", "validate", change, "--strict"], {
@@ -290,11 +313,12 @@ async function validateChange(root, change) {
   return changeRoot;
 }
 
-async function bindWrittenIntent(root, change) {
+async function bindWrittenIntent(root, head, change) {
   if (change === undefined) return [];
-  const changeRoot = await validateChange(root, change);
-  const criteria = await readSpecRequirements(path.join(changeRoot, "specs"));
-  return criteria.slice(0, MAX_CRITERIA);
+  const changeRoot = await validateChange(root, head, change);
+  const criteria = await readSpecRequirements(`${changeRoot}/specs`, headTreeReader(root, head));
+  if (criteria.length > MAX_CRITERIA) fail("CRITERIA_TOO_MANY");
+  return criteria;
 }
 
 function normalizeLenses(value) {
@@ -316,6 +340,20 @@ function resolveScope(priorAnchor, requestedScope) {
   return { kind: "delta", prior_anchor: priorAnchor };
 }
 
+/** Stable identity over everything a return must reproduce; the join binds on this digest. */
+function targetId(draft) {
+  const identity = {
+    repository_root: draft.repository_root,
+    coordinates: draft.coordinates,
+    scope: draft.scope,
+    criteria: draft.criteria,
+    changed_surface: draft.changed_surface,
+    requested_lenses: draft.requested_lenses,
+    required_lenses: draft.required_lenses,
+  };
+  return createHash("sha256").update(JSON.stringify(identity)).digest("hex");
+}
+
 async function buildPackage(input) {
   const root = await resolveRepositoryRoot(input.repoRoot);
   await assertCleanTree(root);
@@ -331,26 +369,42 @@ async function buildPackage(input) {
     await readUnscannablePaths(root, range),
   );
   const requested = normalizeLenses(input.lens);
-  return {
+  const coordinateBlock = { commit_or_range: range, base: coordinates.base, head: coordinates.head, source: "derived" };
+  const required = resolveRequiredLenses(requested, floor.applies);
+  const draft = {
     mode: "inline-review",
     repository_root: root,
-    coordinates: { commit_or_range: range, base: coordinates.base, head: coordinates.head, source: "derived" },
+    coordinates: coordinateBlock,
     scope: { kind: scope.kind, prior_anchor: scope.prior_anchor, paths: changedSurface.map((entry) => entry.path) },
-    criteria: await bindWrittenIntent(root, input.change),
+    criteria: await bindWrittenIntent(root, coordinates.head, input.change),
     changed_surface: changedSurface,
     requested_lenses: requested,
-    required_lenses: resolveRequiredLenses(requested, floor.applies),
+    required_lenses: required,
     security_floor: floor,
     review_surface: verified.surface,
     read_only: true,
   };
+  return {
+    ...draft,
+    target_id: targetId(draft),
+    dispatch_ids: Object.fromEntries(required.map((lens) => [lens, randomUUID()])),
+  };
 }
+
+/** The verdict vocabulary is the shared contract's, not a local one. */
+const VERDICTS = ["pass", "concerns", "fail", "not-run"];
+const LENS_STATUSES = ["complete", "incomplete", "failed", "unavailable", "untrusted"];
 
 function validReturn(value) {
   return object(value) &&
     LENSES.includes(value.lens) &&
-    ["pass", "concerns", "fail", "blocked"].includes(value.verdict) &&
-    (value.findings === undefined || Array.isArray(value.findings));
+    VERDICTS.includes(value.verdict) &&
+    LENS_STATUSES.includes(value.lens_status) &&
+    typeof value.dispatch_id === "string" && value.dispatch_id.length > 0 &&
+    typeof value.target_id === "string" && value.target_id.length > 0 &&
+    typeof value.commit_or_range === "string" && value.commit_or_range.length > 0 &&
+    (value.findings === undefined || Array.isArray(value.findings)) &&
+    (value.disagreements === undefined || Array.isArray(value.disagreements));
 }
 
 function findingFiles(entry) {
@@ -400,16 +454,54 @@ export function classifyCoverage(pkg, finding) {
   return { coverage: "uncovered", criterion: null, source: null };
 }
 
-/** Fail-closed join: an absent required return is never a pass. */
+/** Every identity field a return must reproduce exactly to fill its own slot. */
+function slotIdentity(pkg, lens) {
+  return {
+    lens,
+    dispatch_id: pkg.dispatch_ids?.[lens],
+    target_id: pkg.target_id,
+    commit_or_range: pkg.coordinates?.commit_or_range,
+  };
+}
+
+function identityMatches(slot, entry) {
+  return entry.lens === slot.lens &&
+    entry.dispatch_id === slot.dispatch_id &&
+    entry.target_id === slot.target_id &&
+    entry.commit_or_range === slot.commit_or_range;
+}
+
+function blockingDisagreement(entry) {
+  return (entry.disagreements ?? []).some((item) => item?.blocking === true);
+}
+
+/**
+ * The shared contract's exact keyed join, not a phrase check: one outstanding slot per required
+ * `(lens, dispatch_id, target_id, coordinates)`, exactly one return accepted into its own slot.
+ * A return with no slot, a filled slot, another slot's lens, or a mismatched identity field is
+ * untrusted and can never replace one already accepted — which is what keying by lens alone let
+ * a later duplicate do to an earlier failure.
+ */
 export function gateDecision(pkg, returns) {
   const reasons = [];
-  const byLens = new Map(returns.map((entry) => [entry.lens, entry]));
+  const untrusted = [];
+  const slots = new Map(pkg.required_lenses.map((lens) => [lens, { identity: slotIdentity(pkg, lens), entry: null }]));
+
+  for (const entry of returns) {
+    const slot = slots.get(entry.lens);
+    if (slot === undefined) { untrusted.push({ reason: "no slot", lens: entry.lens }); continue; }
+    if (slot.entry !== null) { untrusted.push({ reason: "duplicate", lens: entry.lens }); continue; }
+    if (!identityMatches(slot.identity, entry)) { untrusted.push({ reason: "identity mismatch", lens: entry.lens }); continue; }
+    slot.entry = entry;
+  }
+  for (const item of untrusted) reasons.push(`untrusted return for ${item.lens}: ${item.reason}`);
+
   const concerns = [];
   const covered = [];
   const specDefects = [];
-  for (const lens of pkg.required_lenses) {
-    const entry = byLens.get(lens);
-    if (entry === undefined) {
+  for (const [lens, slot] of slots) {
+    const entry = slot.entry;
+    if (entry === null) {
       reasons.push(`required lens ${lens} returned nothing`);
       continue;
     }
@@ -419,10 +511,12 @@ export function gateDecision(pkg, returns) {
       const classified = { ...classifyCoverage(pkg, blocker), lens, finding: blocker };
       (classified.coverage === "covered" ? covered : specDefects).push(classified);
     }
+    if (entry.lens_status !== "complete") reasons.push(`required lens ${lens} returned lens_status ${entry.lens_status}`);
     if (entry.verdict !== "pass") reasons.push(`required lens ${lens} returned ${entry.verdict}`);
-    else if (split.blockers.length > 0) reasons.push(`required lens ${lens} returned ${split.blockers.length} blocker(s)`);
+    if (split.blockers.length > 0) reasons.push(`required lens ${lens} returned ${split.blockers.length} blocker(s)`);
+    if (blockingDisagreement(entry)) reasons.push(`required lens ${lens} carries an unresolved blocking disagreement`);
   }
-  return { ready: reasons.length === 0, reasons, concerns, covered, spec_defects: specDefects };
+  return { ready: reasons.length === 0, reasons, concerns, covered, spec_defects: specDefects, untrusted };
 }
 
 async function readJson(target, code) {

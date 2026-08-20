@@ -95,13 +95,13 @@
 
 ## 10. Review Findings — Uncovered
 
-- [ ] 10.1 Emit `target_id` over the resolved root, coordinates, range, scope, criteria, changed surface, and lens lists, and a fresh `dispatch_id` per required lens, in `skills/verify/scripts/review-fan.mjs`.
-- [ ] 10.2 Replace the lens-keyed return map in `gate` with the shared contract's exact keyed join: one slot per required `(lens, dispatch_id, target_id, coordinates)`, exactly one return per slot after exact equality of all four, and replay, duplicate, substitution, and identity mismatch rejected as untrusted.
-- [ ] 10.3 Require `lens_status: complete` on an accepted return before its verdict can count as a pass, and keep every non-terminal status as a non-pass outcome.
-- [ ] 10.4 Read written-intent criteria from the reviewed head tree rather than the working checkout, refusing when the change is absent from that tree instead of falling back.
+- [x] 10.1 Emit `target_id` over the resolved root, coordinates, range, scope, criteria, changed surface, and lens lists, and a fresh `dispatch_id` per required lens, in `skills/verify/scripts/review-fan.mjs`.
+- [x] 10.2 Replace the lens-keyed return map in `gate` with the shared contract's exact keyed join: one slot per required `(lens, dispatch_id, target_id, coordinates)`, exactly one return per slot after exact equality of all four, and replay, duplicate, substitution, and identity mismatch rejected as untrusted.
+- [x] 10.3 Require `lens_status: complete` on an accepted return before its verdict can count as a pass, and keep every non-terminal status as a non-pass outcome.
+- [x] 10.4 Read written-intent criteria from the reviewed head tree rather than the working checkout, refusing when the change is absent from that tree instead of falling back.
 - [ ] 10.5 Derive the exclusion set in `skills/pipeline/scripts/review-surface.mjs` from each checker's own expected paths rather than a hand-maintained mirror table, or record why that is infeasible and narrow the shipped requirement to match the implementation.
 - [ ] 10.6 Reference the packaged script from `skills/verify/SKILL.md` so both generated `canonical.md` projections resolve their own packaged copy rather than a repository-relative path.
-- [ ] 10.7 Extend `tests/test_review_fan.mjs` with slot-join cases: duplicate rejected, substituted lens rejected, mismatched identity rejected, non-complete status non-pass, and the all-slots-complete ready case.
-- [ ] 10.8 Extend `tests/test_review_fan.mjs` with a case proving criteria come from the reviewed head when the checkout carries different change content.
+- [x] 10.7 Extend `tests/test_review_fan.mjs` with slot-join cases: duplicate rejected, substituted lens rejected, mismatched identity rejected, non-complete status non-pass, and the all-slots-complete ready case.
+- [x] 10.8 Extend `tests/test_review_fan.mjs` with a case proving criteria come from the reviewed head when the checkout carries different change content.
 - [ ] 10.9 Run every suite and both parity checkers, and record the results.
 - [x] 10.10 Prove mirror byte-equality against the reviewed head tree rather than the working checkout, and replace the tautological drift test with an oracle that fails against the defect.

@@ -9,8 +9,12 @@ Record the dispatch costs that are deterministically derivable from the coordina
 The executable that validates the execution trace SHALL reject an attempt record that omits a derivable measure this capability requires, and SHALL reject a token component presented as available without its complete frozen component set. Conformance MUST NOT rest on prose describing the expected shape.
 
 #### Scenario: An attempt record omits a derivable measure
-- **WHEN** the trace is validated and an attempt carries neither its derived wall time nor its declared-input budget
+- **WHEN** the trace is validated and an attempt omits either its derived wall time or its declared-input budget
 - **THEN** validation fails and names the attempt and the missing measure
+
+#### Scenario: An attempt reports a wall time it did not derive
+- **WHEN** an attempt's reported wall time does not match the interval between its own spawn and close timestamps
+- **THEN** validation fails, because an unchecked number is one the producer could have invented
 
 #### Scenario: A token component is presented without its full set
 - **WHEN** an attempt reports available token components with any of the frozen set missing

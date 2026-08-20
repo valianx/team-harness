@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { belowFloor, classifyFloor, gateDecision, partitionFindings, readSpecRequirements, runReviewFan } from "../skills/verify/scripts/review-fan.mjs";
+import { belowFloor, classifyFloor, gateDecision, headTreeReader, partitionFindings, readSpecRequirements, runReviewFan } from "../skills/verify/scripts/review-fan.mjs";
 
 const run = promisify(execFile);
 const failures = [];
@@ -44,10 +44,31 @@ async function check(name, callback) {
   catch (error) { failures.push(name); process.stdout.write(`  [FAIL] ${name}: ${error.message}\n`); }
 }
 
+const TARGET = "target-digest";
+const RANGE = "base..head";
+
 function pkg(overrides = {}) {
+  const required = overrides.required_lenses ?? ["qa"];
   return {
-    required_lenses: ["qa"],
+    required_lenses: required,
     scope: { kind: "full", prior_anchor: null, paths: ["src/a.js"] },
+    coordinates: { commit_or_range: RANGE },
+    target_id: TARGET,
+    dispatch_ids: Object.fromEntries(required.map((lens) => [lens, `dispatch-${lens}`])),
+    ...overrides,
+  };
+}
+
+/** A return that fills its own slot; overrides break exactly one identity or status field. */
+function ret(lens, overrides = {}) {
+  return {
+    lens,
+    dispatch_id: `dispatch-${lens}`,
+    target_id: TARGET,
+    commit_or_range: RANGE,
+    lens_status: "complete",
+    verdict: "pass",
+    findings: [],
     ...overrides,
   };
 }
@@ -165,30 +186,39 @@ await check("refuses to bind criteria from a change that is not present", async 
   assert.equal(result.error_code, "CHANGE_NOT_FOUND");
 }));
 
-await check("binds authored requirement headers as written-intent criteria", async () => withRepository(async (root) => {
-  const specs = path.join(root, "openspec", "changes", "demo", "specs");
-  await mkdir(path.join(specs, "alpha"), { recursive: true });
-  await mkdir(path.join(specs, "beta"), { recursive: true });
-  await writeFile(path.join(specs, "alpha", "spec.md"), "## ADDED Requirements\n\n### Requirement: Alpha holds\nBody SHALL hold.\n");
-  await writeFile(path.join(specs, "beta", "spec.md"), "### Requirement: Beta holds\nBody MUST hold.\n\n### Requirement: Beta also holds\nMore.\n");
-  const criteria = await readSpecRequirements(specs);
+await check("binds authored requirement headers from the reviewed head, not the checkout", async () => withRepository(async (root) => {
+  await commit(root, {
+    "openspec/changes/demo/specs/alpha/spec.md": "## ADDED Requirements\n\n### Requirement: Alpha holds\nBody SHALL hold.\n",
+    "openspec/changes/demo/specs/beta/spec.md": "### Requirement: Beta holds\nBody MUST hold.\n\n### Requirement: Beta also holds\nMore.\n",
+  }, "intent");
+  const head = (await run("git", ["-C", root, "rev-parse", "HEAD"])).stdout.trim();
+
+  // The checkout gains a criterion the reviewed head does not carry; it must not be bound.
+  await writeFile(path.join(root, "openspec/changes/demo/specs/alpha/spec.md"),
+    "### Requirement: Alpha holds\nBody SHALL hold.\n\n### Requirement: Checkout only\nMore.\n");
+
+  const criteria = await readSpecRequirements("openspec/changes/demo/specs", headTreeReader(root, head));
   assert.deepEqual(criteria.map((entry) => entry.text).sort(), ["Alpha holds", "Beta also holds", "Beta holds"]);
+  assert.equal(criteria.some((entry) => entry.text === "Checkout only"), false, "a checkout-only criterion was bound");
   assert.equal(criteria.every((entry) => entry.provenance === "written-intent"), true);
   assert.equal(criteria.every((entry) => entry.source.endsWith("spec.md")), true);
 }));
 
-await check("binds nothing when the change carries no spec deltas", async () => withRepository(async (root) => {
-  const specs = path.join(root, "openspec", "changes", "empty", "specs");
-  await mkdir(specs, { recursive: true });
-  assert.deepEqual(await readSpecRequirements(specs), []);
-  assert.deepEqual(await readSpecRequirements(path.join(root, "absent")), []);
+await check("binds nothing when the reviewed head carries no spec deltas", async () => withRepository(async (root) => {
+  const head = (await run("git", ["-C", root, "rev-parse", "HEAD"])).stdout.trim();
+  assert.deepEqual(await readSpecRequirements("openspec/changes/empty/specs", headTreeReader(root, head)), []);
+}));
+
+await check("refuses a package when the tree carries untracked files", async () => withRepository(async (root) => {
+  await commit(root, { "src/a.js": "export const a = 1;\n" }, "add");
+  await writeFile(path.join(root, "stray.txt"), "untracked\n");
+  const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa" });
+  assert.equal(result.error_code, "WORKTREE_NOT_CLEAN");
 }));
 
 await check("reports a finding the authored criteria anticipated as covered", () => {
   const anticipated = pkg({ criteria: [{ text: "Derivation is all-or-nothing", provenance: "written-intent", source: "specs/a/spec.md" }] });
-  const decision = gateDecision(anticipated, [
-    { lens: "qa", verdict: "fail", findings: [{ file: "src/a.js", criterion: "Derivation is all-or-nothing" }] },
-  ]);
+  const decision = gateDecision(anticipated, [ret("qa", { verdict: "fail", findings: [{ file: "src/a.js", criterion: "Derivation is all-or-nothing" }] })]);
   assert.equal(decision.covered.length, 1);
   assert.equal(decision.spec_defects.length, 0);
   assert.equal(decision.covered[0].source, "specs/a/spec.md");
@@ -196,49 +226,91 @@ await check("reports a finding the authored criteria anticipated as covered", ()
 
 await check("reports a finding no criterion anticipated as a spec defect", () => {
   const anticipated = pkg({ criteria: [{ text: "Derivation is all-or-nothing", provenance: "written-intent" }] });
-  const decision = gateDecision(anticipated, [
-    { lens: "qa", verdict: "fail", findings: [{ file: "src/a.js", criterion: "Decoding never fails open" }] },
-  ]);
+  const decision = gateDecision(anticipated, [ret("qa", { verdict: "fail", findings: [{ file: "src/a.js", criterion: "Decoding never fails open" }] })]);
   assert.equal(decision.spec_defects.length, 1);
   assert.equal(decision.spec_defects[0].coverage, "uncovered");
   assert.equal(decision.covered.length, 0);
 });
 
 await check("treats a finding naming no criterion at all as uncovered", () => {
-  const decision = gateDecision(pkg({ criteria: [{ text: "Anything", provenance: "written-intent" }] }), [
-    { lens: "qa", verdict: "fail", findings: [{ file: "src/a.js" }] },
-  ]);
+  const decision = gateDecision(pkg({ criteria: [{ text: "Anything", provenance: "written-intent" }] }), [ret("qa", { verdict: "fail", findings: [{ file: "src/a.js" }] })]);
   assert.equal(decision.spec_defects.length, 1);
 });
 
 await check("classifies nothing when a package bound no written intent", () => {
-  const decision = gateDecision(pkg(), [{ lens: "qa", verdict: "pass", findings: [] }]);
+  const decision = gateDecision(pkg(), [ret("qa")]);
   assert.deepEqual(decision.covered, []);
   assert.deepEqual(decision.spec_defects, []);
   assert.equal(decision.ready, true);
 });
 
 await check("keeps an absent required return from resolving ready", () => {
-  const decision = gateDecision(pkg({ required_lenses: ["qa", "security"] }), [{ lens: "qa", verdict: "pass" }]);
+  const decision = gateDecision(pkg({ required_lenses: ["qa", "security"] }), [ret("qa")]);
   assert.equal(decision.ready, false);
   assert.equal(decision.reasons.some((reason) => reason.includes("security")), true);
 });
 
 await check("keeps a blocking floor lens from resolving ready", () => {
-  const decision = gateDecision(pkg({ required_lenses: ["adversary"] }), [{ lens: "adversary", verdict: "fail" }]);
+  const decision = gateDecision(pkg({ required_lenses: ["adversary"] }), [ret("adversary", { verdict: "fail" })]);
   assert.equal(decision.ready, false);
 });
 
-await check("resolves ready only when every required lens passes without a blocker", () => {
-  const decision = gateDecision(pkg({ required_lenses: ["qa", "tester"] }), [
-    { lens: "qa", verdict: "pass", findings: [] },
-    { lens: "tester", verdict: "pass", findings: [] },
+await check("rejects a duplicate return instead of letting it replace an accepted one", () => {
+  const decision = gateDecision(pkg(), [
+    ret("qa", { verdict: "fail", findings: [{ severity: "blocker", file: "src/a.js" }] }),
+    ret("qa"),
   ]);
-  assert.deepEqual(decision, { ready: true, reasons: [], concerns: [], covered: [], spec_defects: [] });
+  assert.equal(decision.ready, false, "a later duplicate erased an earlier failure");
+  assert.equal(decision.untrusted.some((item) => item.reason === "duplicate"), true);
+});
+
+await check("rejects a return that names another slot's lens", () => {
+  const decision = gateDecision(pkg({ required_lenses: ["qa"] }), [ret("qa"), ret("security")]);
+  assert.equal(decision.untrusted.some((item) => item.reason === "no slot"), true);
+  assert.equal(decision.ready, false);
+});
+
+await check("rejects a return whose identity does not reproduce its slot", () => {
+  for (const broken of [{ dispatch_id: "other" }, { target_id: "other" }, { commit_or_range: "other..range" }]) {
+    const decision = gateDecision(pkg(), [ret("qa", broken)]);
+    assert.equal(decision.ready, false, JSON.stringify(broken));
+    assert.equal(decision.untrusted.some((item) => item.reason === "identity mismatch"), true, JSON.stringify(broken));
+  }
+});
+
+await check("holds a non-terminal lens status short of a pass, whatever its verdict", () => {
+  for (const status of ["incomplete", "failed", "unavailable", "untrusted"]) {
+    const decision = gateDecision(pkg(), [ret("qa", { lens_status: status })]);
+    assert.equal(decision.ready, false, status);
+    assert.equal(decision.reasons.some((reason) => reason.includes(status)), true, status);
+  }
+});
+
+await check("holds the ship on an unresolved blocking disagreement", () => {
+  const decision = gateDecision(pkg(), [ret("qa", { disagreements: [{ with: "security", blocking: true }] })]);
+  assert.equal(decision.ready, false);
+  const informational = gateDecision(pkg(), [ret("qa", { disagreements: [{ with: "security", blocking: false }] })]);
+  assert.equal(informational.ready, true);
+});
+
+await check("gives every dispatch a fresh identifier so an earlier return cannot fill a later slot", async () => withRepository(async (root) => {
+  await commit(root, { "src/a.js": "export const a = 1;\n" }, "add");
+  const first = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa,tester" });
+  const second = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa,tester" });
+  assert.equal(first.package.target_id, second.package.target_id, "identical inputs changed the target identity");
+  assert.notEqual(first.package.dispatch_ids.qa, second.package.dispatch_ids.qa);
+  assert.notEqual(first.package.dispatch_ids.qa, first.package.dispatch_ids.tester);
+}));
+
+await check("resolves ready only when every required lens passes without a blocker", () => {
+  const decision = gateDecision(pkg({ required_lenses: ["qa", "tester"] }), [ret("qa"), ret("tester")]);
+  assert.equal(decision.ready, true);
+  assert.deepEqual(decision.reasons, []);
+  assert.deepEqual(decision.untrusted, []);
 });
 
 await check("treats a pass carrying blockers as not ready", () => {
-  const decision = gateDecision(pkg(), [{ lens: "qa", verdict: "pass", findings: [{ file: "src/a.js" }] }]);
+  const decision = gateDecision(pkg(), [ret("qa", { findings: [{ file: "src/a.js" }] })]);
   assert.equal(decision.ready, false);
 });
 
@@ -247,7 +319,7 @@ await check("demotes a finding outside a delta range to a concern", () => {
   const split = partitionFindings(delta, [{ file: "src/unrelated.js" }, { file: "src/a.js" }]);
   assert.equal(split.concerns.length, 1);
   assert.equal(split.blockers.length, 1);
-  const decision = gateDecision(delta, [{ lens: "qa", verdict: "pass", findings: [{ file: "src/unrelated.js" }] }]);
+  const decision = gateDecision(delta, [{ ...ret("qa"), findings: [{ file: "src/unrelated.js" }] }]);
   assert.equal(decision.ready, true);
   assert.equal(decision.concerns.length, 1);
 });
@@ -276,9 +348,7 @@ await check("holds the ship when a severity is absent or unrecognized", () => {
 
 await check("routes a sub-floor uncovered finding to concerns rather than spec defects", () => {
   const anticipated = pkg({ criteria: [{ text: "Some property", provenance: "written-intent" }] });
-  const decision = gateDecision(anticipated, [
-    { lens: "qa", verdict: "pass", findings: [{ file: "src/a.js", severity: "low", criterion: "Unrelated" }] },
-  ]);
+  const decision = gateDecision(anticipated, [ret("qa", { findings: [{ file: "src/a.js", severity: "low", criterion: "Unrelated" }] })]);
   assert.equal(decision.ready, true);
   assert.equal(decision.concerns.length, 1);
   assert.equal(decision.spec_defects.length, 0);
