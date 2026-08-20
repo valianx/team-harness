@@ -17,7 +17,7 @@ function canonicalEvents() {
   return [
     { ts: "2026-01-01T00:00:00Z", event: "phase.start", feature, phase: "design", agent: "architect", usage_scope: "codex-root-reachable", usage_checkpoint: checkpoint },
     { ts: "2026-01-01T00:00:01Z", event: "agent.spawn", feature, agent_role: "architect", task: "design", attempt_ordinal: 1, context_strategy: "fresh", follow_up_count: 0 },
-    { ts: "2026-01-01T00:01:00Z", event: "agent.close", feature, agent_role: "architect", task: "design", attempt_ordinal: 1, context_strategy: "fresh", follow_up_count: 0, status: "success", quality_verdict: "n-a", attempt_metrics: metrics },
+    { ts: "2026-01-01T00:01:00Z", event: "agent.close", feature, agent_role: "architect", task: "design", attempt_ordinal: 1, context_strategy: "fresh", follow_up_count: 0, status: "success", quality_verdict: "n-a", attempt_metrics: metrics, wall_time_ms: 59000, declared_input_bytes: 16384 },
     { ts: "2026-01-01T00:01:01Z", event: "phase.end", feature, phase: "design", agent: "architect", status: "success", usage, usage_checkpoint: checkpoint },
   ];
 }
@@ -93,6 +93,45 @@ await check("maps unexpected filesystem failures to a closed non-disclosing erro
   assert.equal(result.error_code, "INTERNAL_ERROR");
   assert.deepEqual(result.findings, [{ code: "INTERNAL_ERROR", line: null }]);
   assert.equal(JSON.stringify(result).includes(workspace), false);
+}));
+
+await check("rejects an attempt that discards every derivable measure", async () => withFixture(async ({ workspace }) => {
+  const events = canonicalEvents();
+  const close = events.find(event => event.event === "agent.close");
+  delete close.wall_time_ms;
+  delete close.declared_input_bytes;
+  await writeJsonl(workspace, events);
+  const result = await validateOpenSpecEvents({ workspace, events: "00-execution-events.jsonl", feature });
+  assert.equal(result.verdict, "fail");
+  assert.ok(result.findings.some(item => item.code === "DERIVED_MEASURES_MISSING"));
+}));
+
+await check("accepts wall time alone when no input manifest was declared", async () => withFixture(async ({ workspace }) => {
+  const events = canonicalEvents();
+  const close = events.find(event => event.event === "agent.close");
+  delete close.declared_input_bytes;
+  await writeJsonl(workspace, events);
+  const result = await validateOpenSpecEvents({ workspace, events: "00-execution-events.jsonl", feature });
+  assert.equal(result.verdict, "pass");
+}));
+
+await check("rejects a negative or fractional derivable measure", async () => withFixture(async ({ workspace }) => {
+  const events = canonicalEvents();
+  events.find(event => event.event === "agent.close").wall_time_ms = -1;
+  await writeJsonl(workspace, events);
+  const result = await validateOpenSpecEvents({ workspace, events: "00-execution-events.jsonl", feature });
+  assert.ok(result.findings.some(item => item.code === "DERIVED_MEASURES_MISSING"));
+}));
+
+await check("keeps the unavailable token branch as the only alternative to a complete set", async () => withFixture(async ({ workspace }) => {
+  const events = canonicalEvents();
+  events.find(event => event.event === "agent.close").attempt_metrics = {
+    schema_version: 1, kind: "codex_agent_attempt_metrics", metrics_status: "available", reason_code: null,
+    components: { cached_input_tokens: 1, uncached_input_tokens: 2, output_tokens: 3 },
+  };
+  await writeJsonl(workspace, events);
+  const result = await validateOpenSpecEvents({ workspace, events: "00-execution-events.jsonl", feature });
+  assert.ok(result.findings.some(item => item.code === "ATTEMPT_METRICS_INVALID"));
 }));
 
 if (failures.length > 0) {

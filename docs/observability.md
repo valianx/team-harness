@@ -148,6 +148,15 @@ producers record `PER_ATTEMPT_METRICS_UNAVAILABLE`; they never split a phase
 delta or make an estimate. This is deliberate unavailable reporting, not a
 claim that runtime telemetry exists.
 
+`agent.close` separately carries at least one derived measure — `wall_time_ms`
+from this attempt's own spawn and close timestamps, and `declared_input_bytes`
+from the byte size of its declared input manifest — validated by
+`skills/pipeline/scripts/openspec-events.mjs`. These are derivations over
+artifacts the coordinator already owns, not telemetry and not consumed tokens,
+and their presence never licenses populating the token components. A stalled
+attempt records its consumed wall time and reports returning no result, so time
+spent without output is visible rather than absorbed.
+
 The current snapshot aggregates complete closed attempts only. A duplicate,
 missing, open, malformed, unavailable, or conflicting attempt makes all
 aggregate attempt metrics unavailable, never partial. It separately counts

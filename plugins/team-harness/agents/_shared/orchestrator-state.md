@@ -232,7 +232,12 @@ defined by `references/observability.md`; it does not divide, attribute, or
 copy a root/phase usage delta. A missing, duplicate, open, malformed,
 unavailable, or conflicting attempt makes `agent_lifecycle_metrics_status:
 unavailable`, clears `agent_lifecycle_metrics`, and renders
-`cached_input_per_approved_ac: unavailable`. Count follow-ups from final
+`cached_input_per_approved_ac: unavailable`. The derived measures are separate
+and stay reportable when token components do not: the cost report carries a
+per-role total of `declared_input_bytes`, so a fixed cost paid once per dispatch
+of the same role is visible, and states the difference between the run total and
+the sum of its attributed parts as unattributed coordinator overhead — never
+distributing that difference across attributed items. Count follow-ups from final
 closes, corrections from correction spawns, and quality verdicts from their
 closed enum only. `approved_ac_count` is a current approved-plan count with no
 AC text or identifier. Never write a native ID, alias, rollout path,
@@ -503,6 +508,7 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | `pricing_identity`, `cost` | conditional | native Codex branch only: exact provider/model and complete quote provenance |
 | `agent_role`, `task`, `attempt_ordinal`, `context_strategy`, `follow_up_count` | conditional | required for `agent.*`; finite lifecycle enums and local ordinal only, never an ID, alias, or free-form label |
 | `attempt_metrics`, `quality_verdict` | conditional | required for `agent.close`; metrics are complete or closed-code unavailable, verdict is `pass`/`concerns`/`fail`/`n-a` |
+| `wall_time_ms`, `declared_input_bytes` | conditional | `agent.close` carries at least one, both non-negative integers, enforced by `skills/pipeline/scripts/openspec-events.mjs`. `wall_time_ms` is derived from this attempt's own `agent.spawn` and `agent.close` timestamps — including an attempt closed after a stall, whose consumed time is recorded and marked as returning no result. `declared_input_bytes` is the byte size of the dispatch's declared input manifest. Both are derivations over artifacts the coordinator already owns; neither is a consumed-token measure, and neither may be substituted for one |
 | `correction_cause` | conditional | required for `agent.correction.spawn`; literal `verification` only |
 | `correction_nonce`, `correction_anchor`, `correction_findings`, `correction_scope`, `correction_requirements`, `correction_closure`, `correction_dispositions` | conditional | required for `correction.decision` and every authorized `iteration.start`/`agent.correction.spawn`; the complete seven-field package must be byte-for-byte identical across all three events, not merely share a nonce; exact bounded identity, never inferred; closure has one deterministic check/expected result per finding |
 | `correction_authority`, `correction_authority_gate_nonce` | conditional | required and byte-identical across `correction.decision`, `iteration.start`, and `agent.correction.spawn`; `operator-live` uses a null Gate nonce and is unbounded, while `gate1-autonomous` requires the exact nonce from the valid Gate-1 approval release and `autonomous_correction_count < 3` |

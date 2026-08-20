@@ -65,13 +65,13 @@
 
 ## 7. Dispatch Cost Observability
 
-- [ ] 7.1 Extend `skills/pipeline/scripts/openspec-events.mjs` to require a derived wall time and a declared-input budget on every attempt record, rejecting an attempt that carries neither and naming it.
-- [ ] 7.2 Extend the same validator to keep rejecting an available token branch missing any of its frozen five components, and to reject a component presented without the available branch's full set.
-- [ ] 7.3 Extend `tests/test_openspec_events.mjs` with cases for the two new required measures, the unchanged unavailable branch, and rejection of a partial available set.
-- [ ] 7.4 Document in `agents/_shared/orchestrator-state.md` the attempt record the validator now enforces: wall time derived from the coordinator's own spawn and close timestamps including the stalled-without-result case, and the declared-input budget labelled as a declared-input measure rather than consumed tokens.
-- [ ] 7.5 Specify per-role declared-input totals and the unattributed-coordinator line in the run cost report in `agents/_shared/orchestrator-state.md`, so the difference between the run total and its attributed parts is stated rather than distributed.
-- [ ] 7.6 Restate in the packaged observability reference that per-attempt token components remain unavailable and that splitting, mining, correlation, and estimation stay forbidden, so the two new measures do not read as a relaxation.
-- [ ] 7.7 Mirror `openspec-events.mjs` to its projection copies and confirm byte parity.
+- [x] 7.1 Extend `skills/pipeline/scripts/openspec-events.mjs` to require a derived wall time and a declared-input budget on every attempt record, rejecting an attempt that carries neither and naming it.
+- [x] 7.2 Extend the same validator to keep rejecting an available token branch missing any of its frozen five components, and to reject a component presented without the available branch's full set.
+- [x] 7.3 Extend `tests/test_openspec_events.mjs` with cases for the two new required measures, the unchanged unavailable branch, and rejection of a partial available set.
+- [x] 7.4 Document in `agents/_shared/orchestrator-state.md` the attempt record the validator now enforces: wall time derived from the coordinator's own spawn and close timestamps including the stalled-without-result case, and the declared-input budget labelled as a declared-input measure rather than consumed tokens.
+- [x] 7.5 Specify per-role declared-input totals and the unattributed-coordinator line in the run cost report in `agents/_shared/orchestrator-state.md`, so the difference between the run total and its attributed parts is stated rather than distributed.
+- [x] 7.6 Restate in the packaged observability reference that per-attempt token components remain unavailable and that splitting, mining, correlation, and estimation stay forbidden, so the two new measures do not read as a relaxation.
+- [x] 7.7 Mirror `openspec-events.mjs` to its projection copies and confirm byte parity.
 
 ## 8. Verification and Release
 

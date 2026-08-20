@@ -18,6 +18,7 @@ const QUALITY = new Set(["pass", "concerns", "fail", "n-a"]);
 const CONTEXT = new Set(["fresh", "continued"]);
 const ERROR_CODES = new Set([
   "ARGUMENT_INVALID", "EVENTS_FENCE_INVALID", "EVENTS_FILE_INVALID", "EVENT_COUNT_INVALID",
+  "DERIVED_MEASURES_MISSING",
 ]);
 const ROLE_TASK = new Map([
   ["architect", "design"],
@@ -50,6 +51,22 @@ function finding(code, line = null) {
 
 function validTimestamp(value) {
   return typeof value === "string" && TIMESTAMP.test(value) && !Number.isNaN(Date.parse(value));
+}
+
+function nonNegativeInteger(value) {
+  return Number.isSafeInteger(value) && value >= 0;
+}
+
+/**
+ * Wall time and declared-input budget are derivable from artifacts the coordinator already owns,
+ * so an attempt that carries neither has discarded what was measurable rather than reported it.
+ */
+function validDerivedMeasures(event) {
+  const hasWallTime = Object.hasOwn(event, "wall_time_ms");
+  const hasBudget = Object.hasOwn(event, "declared_input_bytes");
+  if (!hasWallTime && !hasBudget) return false;
+  if (hasWallTime && !nonNegativeInteger(event.wall_time_ms)) return false;
+  return !hasBudget || nonNegativeInteger(event.declared_input_bytes);
 }
 
 function validAttemptMetrics(value) {
@@ -112,6 +129,7 @@ function validateLifecycle(event, line, open, findings) {
   if (!STATUS.has(event.status)) findings.push(finding("STATUS_INVALID", line));
   if (!QUALITY.has(event.quality_verdict)) findings.push(finding("QUALITY_VERDICT_INVALID", line));
   if (!validAttemptMetrics(event.attempt_metrics)) findings.push(finding("ATTEMPT_METRICS_INVALID", line));
+  if (!validDerivedMeasures(event)) findings.push(finding("DERIVED_MEASURES_MISSING", line));
 }
 
 export async function validateOpenSpecEvents({ workspace, events, feature } = {}) {
