@@ -8,29 +8,29 @@
 
 ## 1. Review Package Producer
 
-- [ ] 1.1 Create `skills/verify/scripts/review-fan.mjs` with a `package` subcommand that resolves the repository root, requires a clean index and worktree, resolves a committed range, and exits non-zero naming the failing precondition instead of emitting a package.
-- [ ] 1.2 Derive `changed_surface` and the scan list inside `package` from `git diff --name-status` over the resolved range, so no caller supplies them.
-- [ ] 1.3 Implement floor classification inside `package` over the changed paths and diff content, emitting `security_floor.applies` with the matching category as its reason, defaulting to sensitive when the classification is ambiguous.
-- [ ] 1.4 Implement required-lens resolution inside `package`: operator-named lenses are required, and `security` plus `adversary` are forced into the required set whenever the floor applies.
-- [ ] 1.5 Implement `--prior-anchor` in `package`: supplying it refuses full scope, names the prior anchor, and emits a delta-scoped package bounded to the range since that anchor.
-- [ ] 1.6 Create `tests/test_review_fan.mjs` covering the dirty-tree refusal, the uncommitted-range refusal, derived changed surface, ambiguous-classification-is-sensitive, forced floor lenses, and the second-full-scope refusal.
+- [x] 1.1 Create `skills/verify/scripts/review-fan.mjs` with a `package` subcommand that resolves the repository root, requires a clean index and worktree, resolves a committed range, and exits non-zero naming the failing precondition instead of emitting a package.
+- [x] 1.2 Derive `changed_surface` and the scan list inside `package` from `git diff --name-status` over the resolved range, so no caller supplies them.
+- [x] 1.3 Implement floor classification inside `package` over the changed paths and diff content, emitting `security_floor.applies` with the matching category as its reason, defaulting to sensitive when the classification is ambiguous.
+- [x] 1.4 Implement required-lens resolution inside `package`: operator-named lenses are required, and `security` plus `adversary` are forced into the required set whenever the floor applies.
+- [x] 1.5 Implement `--prior-anchor` in `package`: supplying it refuses full scope, names the prior anchor, and emits a delta-scoped package bounded to the range since that anchor.
+- [x] 1.6 Create `tests/test_review_fan.mjs` covering the dirty-tree refusal, the uncommitted-range refusal, derived changed surface, ambiguous-classification-is-sensitive, forced floor lenses, and the second-full-scope refusal.
 
 ## 2. Ship Decision and Closure Loop
 
-- [ ] 2.1 Add a `gate` subcommand to `skills/verify/scripts/review-fan.mjs` that reads lens returns and resolves ready or not-ready, treating an absent required return as not-ready and never as a pass.
-- [ ] 2.2 Make `gate` name the missing or blocking lens in its not-ready output, and refuse to resolve ready while any required floor lens is absent or carries a blocker.
-- [ ] 2.3 Make `gate` classify a finding whose file set lies outside a delta-scoped package's range as a pull-request concern rather than a blocker, so a closure pass cannot escalate into a new round.
-- [ ] 2.4 Extend `tests/test_review_fan.mjs` with gate cases: absent required return, blocking floor lens, out-of-range finding demoted to concern, and the ready case.
+- [x] 2.1 Add a `gate` subcommand to `skills/verify/scripts/review-fan.mjs` that reads lens returns and resolves ready or not-ready, treating an absent required return as not-ready and never as a pass.
+- [x] 2.2 Make `gate` name the missing or blocking lens in its not-ready output, and refuse to resolve ready while any required floor lens is absent or carries a blocker.
+- [x] 2.3 Make `gate` classify a finding whose file set lies outside a delta-scoped package's range as a pull-request concern rather than a blocker, so a closure pass cannot escalate into a new round.
+- [x] 2.4 Extend `tests/test_review_fan.mjs` with gate cases: absent required return, blocking floor lens, out-of-range finding demoted to concern, and the ready case.
 - [ ] 2.5 Rewrite the Review step and the no-re-audit sentence of `skills/spec/SKILL.md` into one consistent statement of the closure loop, documenting the producer's behaviour and pointing at the script rather than restating its rules.
 
 ## 3. Written Intent and Lens Count
 
-- [ ] 3.1 Implement criteria binding in `review-fan.mjs package`: read the named `openspec/changes/<change>/specs/**` requirement headers and emit them as criteria with provenance `written-intent`, carried by anchored path.
-- [ ] 3.2 Make `package` exit non-zero when the named change does not validate under the pinned OpenSpec CLI, so unvalidated intent cannot become criteria.
+- [x] 3.1 Implement criteria binding in `review-fan.mjs package`: read the named `openspec/changes/<change>/specs/**` requirement headers and emit them as criteria with provenance `written-intent`, carried by anchored path.
+- [x] 3.2 Make `package` exit non-zero when the named change does not validate under the pinned OpenSpec CLI, so unvalidated intent cannot become criteria.
 - [ ] 3.3 Add `written-intent` to the `criteria[].provenance` enum in the review package schema in `agents/_shared/inline-review-contract.md`.
 - [ ] 3.4 Add one sentence to `agents/_shared/inline-review-contract.md` stating that lens count never counts toward specialist count, and offset both additions with an equivalent net word reduction in the same file.
 - [ ] 3.5 Update the return schema in `agents/_shared/inline-review-contract.md` and the return section of `agents/inline-reviewer.md` so coverage against written-intent criteria reports separately from coverage against live-operator criteria, without granting the reviewer any new tool.
-- [ ] 3.6 Extend `tests/test_review_fan.mjs` with criteria-binding cases: bound requirement headers, the unvalidated-change refusal, and provenance separation in the emitted package.
+- [x] 3.6 Extend `tests/test_review_fan.mjs` with criteria-binding cases: bound requirement headers, the unvalidated-change refusal, and provenance separation in the emitted package.
 - [ ] 3.7 Run `node tools/codex-runtime/generate.mjs` and re-verify the pinned reviewer digest expectation in `tests/test_codex_runtime.py`.
 
 ## 4. Verification Invocation Surface
