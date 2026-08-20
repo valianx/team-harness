@@ -103,7 +103,7 @@
 - [x] 10.6 Reference the packaged script from `skills/verify/SKILL.md` so both generated `canonical.md` projections resolve their own packaged copy rather than a repository-relative path.
 - [x] 10.7 Extend `tests/test_review_fan.mjs` with slot-join cases: duplicate rejected, substituted lens rejected, mismatched identity rejected, non-complete status non-pass, and the all-slots-complete ready case.
 - [x] 10.8 Extend `tests/test_review_fan.mjs` with a case proving criteria come from the reviewed head when the checkout carries different change content.
-- [ ] 10.9 Run every suite and both parity checkers, and record the results.
+- [x] 10.9 Run every suite and both parity checkers, and record the results.
 - [x] 10.10 Prove mirror byte-equality against the reviewed head tree rather than the working checkout, and replace the tautological drift test with an oracle that fails against the defect.
 - [x] 10.11 Leave an ambiguous criterion match uncovered instead of binding the finding to the first criterion that shares a substring.
 - [x] 10.12 Recognize a diff file header only when it follows a `--- ` or `diff --git ` line, so an added content line cannot re-attribute the lines after it.
