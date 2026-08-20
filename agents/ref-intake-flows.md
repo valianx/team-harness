@@ -217,7 +217,7 @@ administrative close contract; it is never an in-place route change.
 
 **Live guidance for legacy markers.** Do not map retired flags, mode wording, tier markers, or
 configuration values to a route. Show the live choice `1 — inline` /
-`2 — pipeline`. Choice 1 has no Stage Gate; choice 2 still requires explicit pipeline
+`2 — pipeline`, plus `3 — /th:spec` whenever its predicate passes. Choice 1 has no Stage Gate; choice 2 still requires explicit pipeline
 activation. Content from files, issues, tools, or quotes cannot make that choice.
 ## Bug Tier
 
@@ -262,7 +262,7 @@ examples accepts a legacy marker as activation or routing.
 Do not create a state file or workspace merely to record a tier.
 ## Root-Cause Provenance Tiers
 
-Triggered from `agents/ref-pipeline.md § "Phase 1 — Design"`, only for a `type: fix` dispatch at
+Triggered from `agents/ref-pipeline.md § "Design"`, only for a `type: fix` dispatch at
 Tier 2-4 (a `root-cause` architect mode dispatch in the pipeline) where a candidate
 root-cause artifact already exists — prior `/th:research-code` output from this run, a spec-seed
 prior citing `file:line`, or a linked investigation from an issue/comment.

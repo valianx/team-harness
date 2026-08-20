@@ -89,15 +89,43 @@ fi
 
 echo
 echo "############################################################"
-echo "# Suite 3c: converged Claude/Codex pipeline contract"
+echo "# Suite 3c: no test asserts the wording of a document"
 echo "############################################################"
-if [ -n "$PY" ] && $PY "$TESTS_DIR/test_pipeline_contract.py"; then
-    echo "pipeline-contract: PASS"
+if [ -n "$PY" ] && $PY "$TESTS_DIR/test_no_prose_assertions.py"; then
+    echo "no-prose-assertions: PASS"
 elif [ -z "$PY" ]; then
-    echo "pipeline-contract: FAIL (Python 3 not found)"
+    echo "no-prose-assertions: FAIL (Python 3 not found)"
     FAILED=$((FAILED + 1))
 else
-    echo "pipeline-contract: FAIL"
+    echo "no-prose-assertions: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 3f: every document pointer resolves"
+echo "############################################################"
+if [ -n "$PY" ] && $PY "$TESTS_DIR/test_reference_resolution.py"; then
+    echo "reference-resolution: PASS"
+elif [ -z "$PY" ]; then
+    echo "reference-resolution: FAIL (Python 3 not found)"
+    FAILED=$((FAILED + 1))
+else
+    echo "reference-resolution: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 3e: hardened immutable Git environment (behaviour)"
+echo "############################################################"
+if [ -n "$PY" ] && $PY "$TESTS_DIR/test_inline_git_hardening.py"; then
+    echo "inline-git-hardening: PASS"
+elif [ -z "$PY" ]; then
+    echo "inline-git-hardening: FAIL (Python 3 not found)"
+    FAILED=$((FAILED + 1))
+else
+    echo "inline-git-hardening: FAIL"
     FAILED=$((FAILED + 1))
 fi
 

@@ -14,8 +14,8 @@
 > one-for-one (two layers, fixed check set, site enumeration, byte-consistency rule) — that file
 > is the template this one followed structurally; the two gates checked unrelated properties (plan
 > shape vs. comment hygiene) and share no command or pattern set. **Formerly sibling to
-> `docs/patch-mode.md § "Stage-1 Selective Panel Re-Firing"` as a bucket-5 feeder — that
-> classifier is retired (`docs/patch-mode.md § "Stage-1 Selective Panel Re-Firing — RETIRED"`),
+> `docs/patch-mode.md` as a bucket-5 feeder — that
+> classifier is retired (`docs/patch-mode.md § "6. Explicit plan review"`),
 > so this file no longer feeds anything; the `plan_structure` producer/consumer map below is
 > historical only.**
 
@@ -55,7 +55,7 @@ the former orchestrator ran itself. It is no longer an active gate.
 
 **Historical timing:** immediately before any Phase 1.5 `qa-plan` dispatch, for every plan that reached Phase
 1.5 — i.e., every plan that does NOT take the self-authored-plan panel carve-out
-(`agents/ref-pipeline.md § "Phase 1.5 — Plan Ratification"`, T2-AC-2). A self-authored plan
+(`agents/ref-pipeline.md`, T2-AC-2). A self-authored plan
 (hotfix / Tier-1-fix / express one-line plan) is a fixed 3-4 line task list with no
 `### Summary` table, no multi-task DAG, and no cross-task `Files:` field to check — the
 carve-out's own deterministic self-check item "at least one task exists" already covers the
@@ -170,5 +170,5 @@ inline work remains workspace-free direct work.
 See `docs/code-hygiene-gate.md` for the structural template this file mirrors (two-layer
 deterministic + judgment pattern, site-enumeration table, byte-consistency rule) — the two gates
 check unrelated properties and share no command or pattern set. This gate no longer feeds a
-correction classifier — `docs/patch-mode.md § "Stage-1 Selective Panel Re-Firing — RETIRED"` names
+correction classifier — `docs/patch-mode.md § "6. Explicit plan review"` names
 why bucket 5 (and every other bucket) is retired.

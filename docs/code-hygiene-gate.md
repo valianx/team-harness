@@ -173,7 +173,7 @@ exclusion in § 2 covers committed `.md` files under `docs/`/`agents/`/`skills/`
    change.
 5. **Magic numbers** — unexplained numeric/string literals that should be named constants.
 
-**Status-block field:** `code_hygiene: pass | fail`. `fail` when **any** unjustified finding
+**Reported as findings.** Each unjustified item is a finding with severity, location and grounds; `qa` emits no separate verdict field. Whether one holds the ship is decided by the ordinary severity floor, not by a conjunction of its own. Origin: finding
 exists in categories 1-5 above. On `fail`, `qa` appends the hygiene findings to
 `failure-brief.md` as their own block, separate from failing-AC findings, with a
 `Blast radius: localized {file:line}` or `structural` declaration per the existing failure-brief
@@ -194,7 +194,7 @@ wordings is a defect — both sides must be edited together; nothing pins them.
 ## 7. Site enumeration
 
 Every execution path that dispatches or gates this contract, as a separate site class. A
-consumer of the `code_hygiene` field enumerated without its producer (or vice versa) is a
+consumer of a field enumerated without its producer (or vice versa) is a
 false-green gate by construction — see `docs/knowledge.md` node
 `multi-site-contract-all-execution-paths-must-match`.
 
@@ -203,12 +203,8 @@ false-green gate by construction — see `docs/knowledge.md` node
 | Layer 1 scan — primary dispatch path | scan-site A1 | `agents/ref-pipeline.md` | `## Phase 2.6 — Code-Hygiene Scan` |
 | Layer 1 scan — takeover/inline path | scan-site A2 | `docs/subagent-orchestration.md` | Takeover Pipeline Manifest (inviolable gates list) |
 | Layer 1 scan — special-flow pointers | scan-site A3 | `agents/ref-special-flows.md` | Bug-fix Flow / Milestone-Build Flow (pointer only — never replicates the command) |
-| `code_hygiene` PRODUCER | producer B1 | `agents/qa.md` | `## Code Hygiene` audit + Return Protocol `code_hygiene:` field |
 | Comment-producer contract — implementer | contract-site D1 | `agents/implementer.md` | `§ Comments` |
 | Comment-producer contract — tester | contract-site D2 | `agents/tester.md` | `§ Comments` |
-| `code_hygiene` CONSUMER — Phase 3 gate | consumer C1 | `agents/ref-pipeline.md` | `### Phase 3` worst-of combined verdict (conjunction) |
-| `code_hygiene` CONSUMER — Phase 3.5 gate | consumer C2 | `agents/ref-pipeline.md` | `## Phase 3.5 — Acceptance Gate` (defensive re-assertion) |
-| `code_hygiene` CONSUMER — iteration routing | consumer C3 | `agents/ref-pipeline.md` | `### Iteration` (Case A) |
 | Observability | event | `agents/ref-pipeline.md` (event enum) + `docs/observability.md` | `stage2.hygiene` |
 
 **Rule for any future edit to this contract:** touching one row of this table without touching

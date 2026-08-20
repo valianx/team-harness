@@ -324,7 +324,7 @@ otherwise.
 one plan = one implementation = one approved delivery. If scope looks too
 large, surface it as a `### Decisions for human review` item — splitting is
 the operator's call (canonical:
-`agents/ref-special-flows.md § "Operator-authority invariant"`).
+`agents/ref-special-flows.md § "Milestone-Build Flow (single-repo `type: plan`)"`).
 
 | Situation | Correct delivery shape |
 |---|---|

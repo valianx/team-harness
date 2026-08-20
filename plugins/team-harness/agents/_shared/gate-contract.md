@@ -71,27 +71,8 @@ the same phase-transition:
 
 | Record | Where | What it carries |
 |---|---|---|
-| Field | `00-state.md § Current State` | `gate_pending`, `gate1_release` or `gate3_release` — see the per-gate allowlist table below — plus `gate_nonce`, the token currently pending for that gate |
-| Event | `{events_file}` | a `stage.gate.release` JSON line carrying `stage`, `decision`, `gate_nonce` (the consumed value) |
-
-**The `gate_nonce` field.** Each dual-record carries a third element: a `gate_nonce` — a
-fresh, **single-use** token the orchestrator generates every time it prepares a gate,
-**including every re-presentation** (an ambiguous-reply re-ask, a recover-triggered
-re-presentation). The nonce is written to `00-state.md` alongside the pending gate and
-included in the STOP block the orchestrator presents to the operator inline. Recording a
-release **consumes** the nonce — it becomes invalid the instant the release is written. A
-reply that answers a superseded presentation of the same gate therefore carries a stale
-nonce and is ambiguous, never a valid release: the orchestrator re-presents instead of
-recording (§ "Ambiguous-gate-reply rule").
-
-**The nonce is a freshness/ordering token, not a secret or an authentication factor.** It
-does not prove operator origin — the orchestrator generates it itself and the operator
-sees it the moment the gate is presented, in the same turn. Its only job is to make each
-presentation of a gate distinguishable from every other presentation, so a stale reply
-(one answering a superseded presentation) can never be recorded as if it answered the
-current one. It closes the exact replay vector where a reply arrives after the gate has
-already been re-presented — it is not, and is never meant to be, evidence of who typed
-the reply.
+| Field | `00-state.md § Current State` | `gate_pending`, `gate1_release` or `gate3_release` — see the per-gate allowlist table below |
+| Event | `{events_file}` | a `stage.gate.release` JSON line carrying `stage` and `decision` |
 
 **Atomic write requirement.** Writing the field and appending the event are ONE inseparable
 step, not two independently-skippable writes — the same atomic-coupling discipline that
@@ -100,7 +81,6 @@ update with no matching event, or an event with no matching field, is a contract
 the moment it happens.
 
 While a gate is presented, `gate_pending` is the bare literal `gate1` or `gate3` and
-`gate_nonce` is the fresh token. On a valid release, the coordinator records the matching
 release field and event in the same transition, consumes the nonce and clears
 `gate_pending`. A re-presentation replaces both pending values; it never reuses a nonce.
 
@@ -119,7 +99,6 @@ release event that authorized it (see § "STAGE-GATE-3 — mechanical release");
 executes an auto-release itself — it resumes delivery mechanics from the recorded state.
 
 Clearing a gate against this table is necessary but not sufficient on its own: the reply
-must also be attributable to the presentation whose `gate_nonce` is currently pending
 (§ "The dual-record release" above). **Attribution is the coordinator's job, not the
 operator's typing.** The operator answers with the words the STOP block offers — `approve`,
 `ship`, `reject {reason}` — and the coordinator records the pending nonce alongside the
@@ -137,7 +116,7 @@ presentation*, which the coordinator observes directly and the operator cannot f
 omitting a string.
 
 **Bare-literal field values.** Each of the gate-state fields —
-`gate_pending`, `gate1_release`, `gate3_release`, `release_policy`, `gate_nonce`,
+`gate_pending`, `gate1_release`, `gate3_release`, `release_policy`,
 `working_branch`, and `worktree` — is written to `00-state.md § Current State`
 as a bare literal: the value carries no second token delimited by a space on
 the same line, no trailing nonce, attribution, justification, or condition
@@ -152,7 +131,7 @@ For the `*_release` fields, the per-gate allowlist table above is the closed, ci
 literal values the field may hold — no value outside that set, and no annotated variant of an
 allowlisted value, is ever written. `release_policy` admits the single literal `auto-ship`,
 written only in the same transition as a Gate-1 approval.
-`gate_nonce`, `working_branch`, and `worktree` are open-ended by
+`working_branch` and `worktree` are open-ended by
 construction — a token, a branch name, a filesystem path — and admit no
 allowlist; they are subject to the bare-literal requirement alone, never to
 a closed-set check.
@@ -163,9 +142,9 @@ gate decision belongs in `00-decision-ledger` (`operator-approval`,
 
 **The "No gate-field repair" invariant.** No agent converts a malformed
 gate-field value into a well-formed one. No agent other than the
-orchestrator writes any of the seven fields above, under any circumstance —
+orchestrator writes any of the six fields above, under any circumstance —
 including one it finds already malformed. Recovery from a malformed field is
-re-presenting the affected gate with a fresh `gate_nonce` (see above); the
+re-presenting the affected gate; the
 write that eventually lands is the product of a new operator reply, never a
 repair of the existing value.
 
@@ -175,14 +154,14 @@ Each STAGE-GATE is a single-agent flow. The orchestrator does all three steps it
 the same conversation, with no hand-off:
 
 1. **Prepare** — run the phases, produce the gate's artifacts in the workspace, generate a
-   fresh `gate_nonce` (including on every re-presentation of the same gate), and write it
+   gate record (including on every re-presentation of the same gate), and write it
    to `00-state.md` beside the pending gate.
 2. **Present** — render the gate's STOP block directly to the operator, inline, in the
    operator's own conversation: gate name, summary of what is being approved, workspace
-   path, options, and the `gate_nonce`.
+   path and options.
 3. **Interpret and record** — read the operator's reply against the gate's closed
    allowlist (see § "Ambiguous-gate-reply rule" when the reply does not map cleanly),
-   verify it is attributable to the presentation whose `gate_nonce` is currently pending — the coordinator's own observation, never a token the operator typed, then **record** both halves of
+   verify it answers the presentation currently pending — the coordinator's own observation, never a token the operator typed, then **record** both halves of
    the dual-record atomically — consuming the nonce — and route.
 
 The orchestrator is the single **preparer, presenter and recorder** of every gate, and the
@@ -200,7 +179,7 @@ independent of any gate.
 At each STAGE-GATE the orchestrator renders the STOP block directly to the operator
 inline, pausing for an explicit reply in that same conversation. The shape below is a
 GENERIC template: the orchestrator's own gate-data contract
-(`agents/ref-pipeline.md § "STAGE-GATE-1"`/`"STAGE-GATE-3"`)
+(`agents/ref-pipeline.md § "Design"`/`"STAGE-GATE-3"`)
 supplies the REAL option set of each presentation, including its conditionality.
 Substituting the real option set with this generic placeholder — rendering the bare
 `ship`/`amend`/`abort` shape shown below when the actual presentation's set is narrower or
@@ -249,7 +228,7 @@ recorded at Gate 1, not a second human approval:
   is rendered, no new nonce is issued, and delivery proceeds immediately through push and
   draft-PR creation.
 - **Exception pause** (closed list — see § "Closed exception list"): the coordinator renders
-  the STOP block below with a fresh `gate_nonce` and waits. The exception list always takes
+  the STOP block below and waits. The exception list always takes
   precedence over auto-ship.
 
 ```
@@ -304,7 +283,7 @@ A STAGE-GATE is cleared **only** when BOTH conditions hold:
 
 Any other decision value, or a null/missing field, means the gate is **not** cleared:
 recover re-presents the STOP block — the orchestrator renders it directly to the operator
-inline, with a fresh `gate_nonce` — and halts. **Cleared-status derives exclusively from this
+inline — and halts. **Cleared-status derives exclusively from this
 dual-record check — never from prose inference.** Recover never infers approval from
 `next_action`, Hot Context, a TL;DR line, or any other free-text field. STAGE-GATE-3 (the
 human push/PR gate) must never be bypassed on recovery, regardless of how confident the
@@ -314,36 +293,17 @@ This is a **record-based** backstop, not a structural one — it closes a specif
 fabrication vector by construction, not by preventing writes at the filesystem level. See
 the next section for the precise boundary of what it does and does not close.
 
-## Integrity model — audited relay + runtime approval floor
+## Integrity model — order floor + runtime approval floor
 
 **The dual-record backstop above is record-based, not structural.** Agents share a
 filesystem and the runtime gives no per-agent write-sandbox, so nothing at the filesystem
-level prevents any agent from writing any file the operator's permissions allow. A
-release's integrity rests on three layers, honestly stated:
+level prevents any agent from writing any file the operator's permissions allow.
 
-**1. Audited relay — RETIRED.** The prior two-coordinator design had the operator's
-decision travel through a second agent (`th:leader`), which relayed it to the recorder
-under an explicit `leader-relayed-operator` provenance tag. That gave a release a specific
-auditable property: the record showed both the operator's own words *and* a second agent's
-own attribution that those words were genuinely the operator's, unmodified. With the
-fusion, the operator's reply reaches the sole coordinator directly, in the same
-conversation — there is no second agent, so there is nothing left to relay and nothing left
-to tag with that provenance. **This property is retired, not transferred: no successor
-replicates it.** The live knowledge-graph `constraint` node that made this dual-conjunct
-property mandatory for every gate release is reconciled separately, out of this tree (see
-`docs/knowledge.md` and the coordinator-fusion delivery record) — reconciling the prose
-here does not, by itself, close that node. What remains after this retirement is layers 2
-and 3 below, and the fail-closed disciplines already stated in this file (the nonce, the
-bare-literal fields, the no-repair invariant) — none of which independently proves the
-operator, rather than a prompt-injected coordinator, produced the reply. **Never describe
-this retirement as preserving the audited-relay property under a different name — it does
-not.**
-
-A release's integrity never depended on which agent held the pen — a prompt-injected
-coordinator, monolithic or split, could forge its own release identically by writing both
-dual-record halves directly. Runtime permissions do not establish writer identity for an
-interior file write. This residual is pre-existing and platform-bounded; the fusion neither
-adds nor removes it.
+**Retired: the audited relay.** A prior two-coordinator design routed the operator's decision
+through a second agent, which relayed it under its own provenance tag — the record then showed
+both the operator's words and a second agent's attestation that they were unmodified. The fusion
+removed the second agent, so that property is retired, not transferred: no successor replicates
+it, and nothing below should be described as restoring it under another name. Two layers remain.
 
 **2. The contractual order floor.** The orchestrator does not invoke a pipeline outward
 action unless `gate3_release ∈ {ship, auto-ship}` for that pipeline (§ "Outward-action
@@ -357,7 +317,7 @@ tree hash) — HEAD can move between recording `ship` and the push actually runn
 operator saw at the gate. This is the same failure shape the KG pattern
 `pattern-agent-executed-safety-predicate-no-true-atomicity` describes — a safety
 predicate and the gated action are not truly atomic. That residual is mitigated elsewhere:
-an `amend` re-runs Internal Review and regenerates the `gate_nonce`.
+an `amend` re-runs Internal Review.
 
 **3. The runtime approval floor.** Actions that cannot be undone — `git push`,
 `gh pr create/merge`, and GitHub or ClickUp API writes — require the active runtime's
@@ -409,7 +369,7 @@ any reply that does not map cleanly to exactly one value in the gate's allowlist
 a reply, the orchestrator:
 
 1. Does **not** write either half of the dual-record.
-2. Re-presents the gate's allowlist to the operator inline, with a fresh `gate_nonce`.
+2. Re-presents the gate's allowlist to the operator inline.
    Never guesses which allowlist value the operator "probably meant."
 3. Waits for a reply that maps cleanly to exactly one allowlist value before writing
    anything.

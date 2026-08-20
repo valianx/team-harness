@@ -72,22 +72,53 @@ Once a pipeline is active, an inline request is handled as an administrative clo
 direct work begins. The close preserves history, clears pending gate presentation, and records no
 synthetic gate release. It is not a downgrade and is not a gate decision.
 
+## 2a. What counts as a sensitive path (type-agnostic)
+
+The single sensitivity authority. Every consumer resolves sensitivity here by reference and never
+restates a local list: a divergent copy is how one consumer silently classifies as non-sensitive
+what another classifies as sensitive.
+
+A scope is sensitive when its declared paths, intent, criteria, or changed surface include a
+changed control for any of these categories:
+
+- authentication, authorization, or permissions
+- identity or session handling
+- credentials or secrets
+- cryptography or transport security
+- untrusted-input validation or deserialization
+- file upload
+- data access or export
+- executable-code handling
+- security policy or audit enforcement
+
+**Fail-closed rule: an ambiguous or unresolved classification is sensitive.** Content that cannot
+be scanned — a binary or otherwise undecodable path — leaves the classification unresolved and is
+therefore sensitive; it never resolves as an absence of signal.
+
+The executable form of this list is the floor classifier in
+`skills/verify/scripts/review-fan.mjs`, which derives the categories from changed paths and added
+content and reports the matching category as its reason. The identical category list governs the
+inline review contract's floor (`agents/_shared/inline-review-contract.md`).
+
 ## The direct spec lane
 
 Plain inline handles mechanical, reversible work with no design decision worth recording.
 `/th:spec` handles tasks that merit written intent and task decomposition — single repo, no
-security floor, no public-contract break. `/th:pipeline` remains the hard router for
-security-sensitive, multi-specialist, multi-task, or irreversible work — these are hard routers
-the lane never absorbs. When an in-flight lane task grows a second specialist need or a security
-dimension, stop before proceeding and offer the pipeline, carrying the authored change over.
+public-contract break. `/th:pipeline` remains the hard router for multi-repository,
+multi-specialist, multi-task, irreversible, or operator-absent work — these are hard routers the
+lane never absorbs. A security dimension is not one of them: it stops the lane for a live choice
+whose in-lane option raises the required lens set instead of ejecting the task.
 
-The lane is entered only by explicit `/th:spec` invocation; the live escalation guidance
-(`1 — inline` / `2 — pipeline`) MAY additionally offer it as a third option only when this
-predicate passes. It creates no workspace, `00-state.md`, execution events, pipeline summary,
-snapshot, overlay, traceability artifact, or gate ceremony, and dispatches no specialist by
-default; at most one full-scope ad hoc review runs on live operator request and never opens a
-correction or re-audit loop. A lane-authored change uses the same `openspec/changes/` directory,
-schema, naming, and archive path as a pipeline-authored change. Full flow: `skills/spec/SKILL.md`.
+The lane is entered only by explicit `/th:spec` invocation. Whenever this predicate passes, the
+live posture guidance offers it — a passing predicate is the reason to offer, not a discretionary
+prompt; when the predicate fails, the guidance names the condition that removed it. The lane
+creates no workspace, `00-state.md`, execution events, pipeline summary, snapshot, overlay,
+traceability artifact, or gate ceremony, and dispatches no specialist by default. Verification is
+one full-scope review on live operator request; full scope never runs twice. A fix closes by
+executing the oracle its criterion already carries, not by another review, and a finding no
+criterion anticipated is a defect in the authored change rather than a new round. A
+lane-authored change uses the same `openspec/changes/` directory, schema, naming, and archive path
+as a pipeline-authored change. Full flow: `skills/spec/SKILL.md`.
 
 ## Legacy route markers (compatibility only)
 
@@ -108,10 +139,13 @@ When a live operator needs to choose a posture after encountering legacy wording
 ```text
 1 — inline
 2 — pipeline
+3 — /th:spec   (shown whenever the spec-lane predicate passes)
 ```
 
 Choice `1` keeps the request in direct inline mode and has no Stage Gate. Choice `2` is an explicit
-pipeline activation and starts canonical full v3 intake and Gate 1. A number in an old artifact,
+pipeline activation and starts canonical full v3 intake and Gate 1. Choice `3` is shown whenever
+the spec-lane predicate passes and omitted, with the removing condition named, when it does not.
+A number in an old artifact,
 config value, issue, tool result, or quoted text is not this live choice. If an active pipeline is
 already present, close it administratively before honoring a new inline request; never fabricate a
 gate release.

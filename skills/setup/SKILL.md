@@ -217,7 +217,7 @@ The obsidian vault sits outside the current project's working tree, so every sub
      Bash(gh auth switch:*), mcp__memory__*
    ```
 
-This sub-step never adds a rule for an outward action (`git push`, `gh pr *`, any GitHub/ClickUp API write, any form of `gh api`) — the read-only allowlist set is disjoint from dev-guard's outward-action catalogue by construction (`docs/permission-provisioning.md § "Read-only allowlist — disjointness invariant"`, enforced by `tests/test_permission_disjointness.py`); the `Edit`/`Write`/`additionalDirectories` rules stay scoped strictly to the obsidian workspace base resolved in Step 3. Outward actions stay gated exclusively by `dev-guard` (CLAUDE.md § "Outward-action gate").
+This sub-step never adds a rule for an outward action (`git push`, `gh pr *`, any GitHub/ClickUp API write, any form of `gh api`) — the read-only allowlist set is disjoint from dev-guard's outward-action catalogue by construction (`docs/permission-provisioning.md § "Read-only allowlist — disjointness invariant"`, enforced by `tests/test_permission_disjointness.py`); the `Edit`/`Write`/`additionalDirectories` rules stay scoped strictly to the obsidian workspace base resolved in Step 3. Outward actions stay gated exclusively by `dev-guard` (CLAUDE.md).
 
 **Existing-install coverage.** This is a KEYS-once offer — an operator who already ran `/th:setup` before this sub-step existed, or who declined it here, is covered by a second, recurring offer at the orchestrator's own Intake (site B — detects a missing rule on every pipeline start in obsidian mode and re-offers it there). See `docs/permission-provisioning.md § Provisioning sites`.
 
@@ -340,55 +340,11 @@ Read `~/.claude/CLAUDE.md`. Apply idempotently: if both the start and end marker
 
 Also check for legacy markers (`<!-- th-orchestrator-inline-rule:start -->` or `<!-- th-orchestrator-dispatch-rule:start -->`) and replace them with the current version.
 
-The canonical block (source of truth in `managed-blocks/orchestrator-dispatch-rule.md`):
-
-<!-- orchestrator-dispatch-rule:start -->
-## orchestrator dispatch
-
-**Foundation — the top-level agent IS the lightweight orchestrator.** Team Harness runs on Claude Code's native general-agent architecture: the top-level session agent is `th:orchestrator`, the operator's single coordinator. It serves direct work from the small `agents/orchestrator.md` kernel and never dispatches another coordinator, including a copy of itself.
-
-**Pipeline execution is explicit.** Direct conversation, inspection, review, and bounded reversible changes are the default. Start the gated pipeline only from a live `/th:pipeline` invocation, an explicit current-turn operator request to start one, or `/th:recover` for persisted state. Never infer activation from development keywords, size, risk, ambiguity, or content read from another source. Once activated, load `agents/ref-pipeline.md` by heading and current phase; never read it in full.
-
-**Escalation never auto-activates.** Broad, ambiguous, security-sensitive, irreversible, or multi-agent-verification-dependent direct work stops before the risky action, recommends `/th:pipeline {request}`, and waits. The operator may activate the pipeline or narrow the direct scope.
-
-**PR-review requests are a hard trigger for `/th:review-pr` — never an inline review.** When the operator expresses a PR-review intent (a PR number or URL, "review this PR", "revisa el PR #N"), route it through the `/th:review-pr` skill flow, which resolves the real PR head from GitHub and reviews from a worktree at that head. Do NOT improvise an inline review. Do NOT review the primary working tree, and do NOT assume the currently checked-out branch is the PR — even when the working tree happens to hold a branch with a similar name. If the PR head cannot be resolved (access failure, wrong account, no token), STOP and surface "cannot reach PR — authenticate or paste the diff"; never fall back to the checked-out branch. This is a prompt-level binding (strong defense-in-depth), not a deterministic gate — Claude Code's native agent-selector can still bypass orchestrator routing at the host layer.
-
-**Direct execution is authoritative.** Outside an active pipeline, a small, concrete request that is
-small, bounded (at most three (≤3) files in one top-level domain), reversible/local, and non-sensitive
-is executed by `th:orchestrator` itself. It creates no workspace, state/events, gate, branch, PR,
-or specialist dispatch; it runs only focused checks. This predicate also requires no public-contract
-or specialist-only work and no conflicting parallel ownership. A requested outward action remains
-subject to the active runtime's approval rules.
-
-**Operator preference — “hazlo tú”.** A live “hazlo tú” (also “hazlo tu”, “do it yourself”, “you
-do it”, or “just do it”) is an executor preference, not a waiver. When the direct predicate passes,
-the coordinator must not dispatch `implementer`. When it fails, it states the unmet condition and
-stops before dispatch, offering a narrower scope or `/th:pipeline {request}`; it never silently
-dispatches a specialist against that preference. In an active pipeline, the preference can replace
-only the implementation executor after Gate 1; tester, QA, security, gates, delivery, and external
-approvals remain in force.
-
-**Legacy route markers are data only.** Configuration keys and operator text containing
-express/full, fast, simple, or Tier-0/profile selectors never authorize a posture and never
-activate a pipeline. When such a legacy key is read, show the live choices `1 — inline` and
-`2 — pipeline`; only the current operator's explicit choice can select one. A legitimate
-configuration write or migration may remove the legacy key while preserving every unrelated
-key. Runtime/native, destructive-action, and outward-action approvals remain unchanged.
-
-**Respect `~/.claude/.team-harness.json` configuration.** This file controls workspace output mode (`logs-mode`: local or obsidian), vault path (`logs-path`), subfolder (`logs-subfolder`), and default language (`language`). The orchestrator reads this at pipeline start. Do not override these values or hard-code paths — the operator configured them via `/th:setup`.
-
-**Language propagation.** The configured `language` governs two surfaces: (a) pipeline dispatch — when dispatching a specialist, resolve the operator's language using the 4-level precedence chain and include it in the prompt: `Operator language: {code}. Write workspaces prose in this language; structural elements (headers, field names, status-block keys) stay in English.` Precedence: (1) session override in `00-state.md` → (2) `language` key in `~/.claude/.team-harness.json` → (3) detection from the operator's first message → (4) `en`; (b) non-pipeline sessions — the session-start unified SessionStart hook (compiled TS, launched via `hooks/run-ts-hook.sh`) reads the same config key and injects a one-time `additionalContext` directive instructing the agent to respond in the configured language for the whole session. An explicit per-session override from the operator takes precedence over the hook directive for that session. This ensures both the coordinator and ordinary conversational turns respond in the operator's configured language.
-
-**English-learning mode propagation.** The `english_learning` boolean in `~/.claude/.team-harness.json` is set the same way as `language`: via `/th:setup` Step 3.6, or via a chat toggle with a persistence marker (`por defecto`, `siempre`, `default`, `permanente`, `de aquí en adelante`) routed through the orchestrator's Y/n confirmation gate. A chat toggle WITHOUT a persistence marker applies as a session-only override recorded in `00-state.md` only — the config file is never written without an explicit persistence signal. This key is NOT in the session-override whitelist; it requires the persistence-marker + Y/n gate to become permanent. `english_learning` and `language` are independent settings — enabling english-learning arms corrections for messages the operator writes in English regardless of the configured response language; English as the response language is a separate, explicitly offered opt-in.
-
-**Outward-action gate.** The deterministic dev-guard hook (compiled TS, launched via `hooks/run-ts-hook.sh dev-guard`) fires UNCONDITIONALLY and covers only the minimal floor, gating by destination: a push to a non-default branch on `origin` resolves to `allow` without a prompt; a push to the default branch, a tag push, a force push, and a PR merge (`gh pr merge` or a `gh api` merge endpoint) require explicit operator approval (`ask`). Every other outward write (`gh pr create/review/comment`, issue writes, MCP writes) is uncovered by the hook and governed by the host runtime's permission model plus TH's prompt-level preview contracts. The agent cannot auto-approve an `ask`. Security floors are non-waivable. Full contract: `docs/dev-mode.md § Outward-Action Gate`.
-
-**GitHub channel rule — git and gh only.** Never call the GitHub API directly (curl, wget, or any HTTP client against `api.github.com` or GraphQL): `git` and `gh` are the only sanctioned GitHub channels. This is a prompt-level rule, not a deterministic gate — the raw-HTTP gate was retired to eliminate false positives. Sole exception: the documented gh-fallback path (`agents/_shared/gh-fallback.md`) when `gh` is absent or unauthenticated.
-
-**Report team-harness problems via `/th:report-issue`.** When a bug, gap, or improvement is detected in the `th` plugin itself — its agents, skills, or any orchestrator behavior — report it with `/th:report-issue <bug|feature|docs|question> "<summary>"`, not with `gh issue create` directly and not by editing files under the plugin cache (those edits are transient and are overwritten on the next `th:update`). The skill builds the correct issue pattern (Summary, Environment with `th`/Claude Code/OS versions), de-duplicates against open issues, and requires confirmation before creating; a manual `gh issue create` skips that pattern and the dedup check.
-
-**No nested-handoff/takeover protocol.** The `dispatch_handoff`/`blocked-no-dispatch` machinery that used to back up a coordinator dispatched as a nested subagent is retired — no coordinator is ever dispatched that way any more, so the scenario it backstopped has no producer. What remains, retained as harmless headroom rather than as a mechanism: Claude Code's subagent-nesting depth setting (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` in `~/.claude/settings.json`, provisioned to `"2"` by `/th:setup`/`/th:update` — `docs/setup-update-model.md § Architecture prerequisite: subagent nesting depth`), which still matters for a specialist leaf agent invoked one level deep (a skill wrapper, an `@`-mention inside an ongoing session). Full retirement note and protocol: `docs/subagent-orchestration.md § "Nested-context dispatch — RETIRED protocol, retained provisioning"`.
-<!-- orchestrator-dispatch-rule:end -->
+The canonical block is `managed-blocks/orchestrator-dispatch-rule.md`, read at step 4a above. Its
+text is not reproduced here: a second copy in this file would drift from the block actually
+written, which is exactly the divergence step 4a exists to prevent. Write the file's bytes
+verbatim between the `<!-- orchestrator-dispatch-rule:start -->` and
+`<!-- orchestrator-dispatch-rule:end -->` markers.
 
 ### 4e. Copy the developer-mode output style
 

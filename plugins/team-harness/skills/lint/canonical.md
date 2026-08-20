@@ -166,13 +166,10 @@ Verify that each wired hook script is healthy and that the runtime environment s
    - `./hooks/<script>` (team-harness clone)
    For each script that does not resolve via any chain path:
    - Report `[FAIL] <hook-script> wired but not found on disk — gate is dead`
-3. **Obsidian checkpoint coverage:** read `~/.claude/.team-harness.json`. If `logs-mode: obsidian`:
-   - Report `[INFO] obsidian mode: checkpoint-guard resolves vault state from ${logs-path}/${logs-subfolder} (F-010 fix applied)` if the fix is in place
-   - Report `[WARN] obsidian mode active — checkpoint-guard may not cover vault-resident state (upgrade to fix F-010)` if coverage cannot be confirmed
 
 Result:
 - **PASS** if python3 is available and all wired hook scripts resolve on disk
-- **WARN** if python3 is absent (degraded mode — bash fallback enforces the high-confidence floor; entropy scan unavailable) or obsidian coverage is partial
+- **WARN** if python3 is absent (degraded mode — bash fallback enforces the high-confidence floor; entropy scan unavailable)
 - **FAIL** if any wired hook script does not resolve on disk (gate is dead)
 
 ---
@@ -434,7 +431,6 @@ Agents checked: {N} | {N matched} | {mismatches or "all canonical"}
 Status: {PASS|WARN|FAIL}
 python3:  {available | WARN: absent — policy gate running degraded}
 wired-scripts: {N resolved on disk | FAIL: <script> wired but not found on disk — gate is dead}
-obsidian: {coverage confirmed | WARN: obsidian mode — verify F-010 fix | N/A (local mode)}
 
 --- Check 9: Skill overlap (dedup) ---
 Status: {PASS|WARN}

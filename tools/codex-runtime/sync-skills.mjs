@@ -88,7 +88,7 @@ const opencodeSpecialMappings = new Map([
   ["trace", "Resolve workspace and pricing settings from opencode-native Team Harness configuration and remain read-only."],
 ]);
 
-const sharedPipelineScripts = [
+export const sharedPipelineScripts = [
   "bounded-command.mjs",
   "commit-integrity.mjs",
   "plan-contract.mjs",
@@ -103,6 +103,7 @@ const sharedPipelineScripts = [
   "openspec-overlay.mjs",
   "openspec-recovery.mjs",
   "openspec-events.mjs",
+  "review-surface.mjs",
 ];
 
 const sharedPipelinePolicies = ["openspec-policy.json"];

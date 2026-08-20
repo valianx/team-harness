@@ -110,17 +110,14 @@ Gate 1. No validator rewrites an AC or edits coordination state to manufacture P
 
 ## Write-tool discipline (shared review files)
 
-This section governs `Edit`/`Write` usage on `reviews/01-plan-review.md` — the panel's shared, multi-writer review artifact (`plan-reviewer`, `qa-plan` and `security` write into it; `adversary` does **not** — it owns no section here and writes only its `reviews/04-adversary.md` or `reviews/04-adversary-amend-{N}.md` report). It is a rule of the panel as a whole, not an exception carved out for one agent.
+On a review file that several agents write — today only `/th:plan-review`'s panel, which the
+pipeline no longer dispatches — use `Edit`, never `Write`, once the file exists, and anchor
+`old_string` to your own section. A whole-file `Write` destroys the other writers' sections; an
+unanchored edit corrupts one silently, which is worse because nothing surfaces it.
 
-**The rule.** Every panel agent uses `Edit` on a review file that already exists. `Write` is reserved for the initial creation of the agent's own review file — never for a file that already exists, never for a file owned by another agent, never for a shared file. When `reviews/01-plan-review.md` already exists (created by whichever panel agent ran first this round), every subsequent writer edits it in place with `Edit`; none of them re-`Write`s it whole.
-
-On an existing file, `old_string` is anchored exclusively to the writer's own section or its own labelled line (e.g., `**Substance (qa):**`, `**Security design-review (security):**`, `**Combined verdict:**`) — never a string shared with another agent's section. `replace_all: true` is PROHIBITED on this file: a `true` value applies the substitution everywhere the string matches, including inside a section this agent does not own.
-
-**Why both anchoring rules matter — they separate the noisy failure from the silent one.** A full `Write` over an existing file destroys every heading and sub-verdict label at once — the header-survival check (`agents/ref-pipeline.md § "Header-survival check (panel dispatch integrity)"`) sees the loss and blocks. A broad `old_string` or a `replace_all: true` over a string common to more than one section corrupts another agent's prose while leaving every heading and every sub-verdict label intact — it passes that check by construction. The two restrictions in this section are what closes that second, silent failure mode; the check alone cannot.
-
-**Capacity vs. contract — a declared asymmetry, not a gap.** `Edit` is a CAPACITY: it is declared in an agent's frontmatter `tools:` line, and a structural test can assert its presence. The "`Write` only for the writer's own file's initial creation" rule is a CONTRACT the tool grant cannot impose: a tool grant is not path-scoped — an agent holding `Write` can reach any file its permissions allow, and no frontmatter check distinguishes "creates its own file" from "overwrites someone else's." Stating the restriction as if the grant enforced it would be exactly the kind of unverified assertion this mechanism exists to remove. What actually detects a violation of this contract is the header-subset (header-survival) check the orchestrator runs around every panel dispatch on `reviews/01-plan-review.md` (`agents/ref-pipeline.md § "Header-survival check (panel dispatch integrity)"`) — that check catches the noisy failure (a full-file loss); it does not catch a content corruption that leaves every header and label intact. That blind spot is a residual covered by this write-tool discipline as a CONTRACT the writing agent is trusted to follow, never a CHECK the orchestrator independently verifies — recorded plainly in `01-plan.md § Security Assessment`.
-
-**Why the plan set carries no equivalent check.** `plan-reviewer`'s one sanctioned plan write is the `**Reviews:**` attestation. Structure validation checks the manifest and required shards before the gate. A complete, well-formed rewrite by a reviewer remains a contract risk rather than an independently detected content risk.
+Nothing checks this. `Edit` is granted by the agent's frontmatter `tools:` line, which is the only
+real control here; the anchoring half is self-applied. A prior revision named a coordinator-run
+header-survival check as its enforcer — that check was never defined in any file.
 
 ## How to reference this file
 

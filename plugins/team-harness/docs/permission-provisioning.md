@@ -72,7 +72,7 @@ Permission provisioning is `security_sensitive: true` (it widens local write acc
 Every rule this contract writes is scoped strictly to `{base}/**` for a single, explicitly declared base (the resolved obsidian workspace path, or a declared work-surface repo path), after that base has passed the "Resolved-value validation floor" above. This contract never emits:
 
 - A root-anchor rule without a path suffix (e.g. bare `//**`) — that would grant access far beyond the declared surface.
-- A rule for an outward action (`git push`, `gh pr *`, any GitHub/ClickUp API write). Outward actions remain gated exclusively by `dev-guard` (CLAUDE.md § "Outward-action gate") — this contract only ever touches local `Edit`/`Write`/deny rules and `additionalDirectories`.
+- A rule for an outward action (`git push`, `gh pr *`, any GitHub/ClickUp API write). Outward actions remain gated exclusively by `dev-guard` (CLAUDE.md) — this contract only ever touches local `Edit`/`Write`/deny rules and `additionalDirectories`.
 
 ## Read-only allowlist — disjointness invariant
 

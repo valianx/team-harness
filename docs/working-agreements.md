@@ -50,6 +50,6 @@
   **Trade-off:** concurrent PRs touching distributed assets race on the version line
   (rebase-and-rebump). `changelog.d/{pr-slug}.md` remains the batch/fallback path for grouped
   sessions, not team-harness's own default. Full site list:
-  `docs/cost-and-caching.md § "team-harness's own version sites"`.
+  `docs/cost-and-caching.md § "How Claude Code caches"`.
 - **New hooks must be authored in TypeScript, not Bash** (Decision A = closed). See
   `docs/opencode-distribution-roadmap.md` § Cross-Harness Authoring Mandate.

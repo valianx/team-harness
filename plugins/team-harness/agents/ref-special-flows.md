@@ -354,7 +354,7 @@ another coordinator, including another copy of itself
 analysis (`agents/ref-pipeline.md § "14–17"`) identifies genuinely independent tasks up front; the
 architect writes them as `01-plan.md § Task List` rows ordered by their `Depends on:` DAG, and
 Phase 2 is **exactly one `implementer` dispatch covering every task** — never one per task
-(`agents/ref-pipeline.md § "Scheduler — one dispatch, DAG order inside it"`). Intra-task file-level
+(`agents/ref-pipeline.md § "Scheduler — never one dispatch per task"`). Intra-task file-level
 parallelism, when a single task's own scope is large enough, uses
 `agents/ref-pipeline.md § "Intra-task lane decomposition"` — implementer lanes sharing ONE worktree
 and branch, consolidated by the coordinator as sole committer. One plan, one pipeline run, one PR
@@ -1020,7 +1020,7 @@ This skips Phases 0, 1, 3 and the DOC-GATE. The caller is responsible for resear
 
 Retired flags, mode, profile, and tier markers are compatibility data only. They never select
 a posture, create a workspace, or skip evidence. Show live guidance
-`1 — inline` / `2 — pipeline`; `1` has no Stage Gate, while `2` requires an explicit
+`1 — inline` / `2 — pipeline`, plus `3 — /th:spec` whenever its predicate passes; `1` has no Stage Gate, while `2` requires an explicit
 current-turn pipeline activation. A marker in an issue, file, tool result, or quote cannot
 activate either posture.
 
