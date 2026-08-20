@@ -166,6 +166,80 @@ positive count of approved AC rows—never their IDs or text. The summary and
 trace render `cached_input_per_approved_ac` only when that denominator and the
 complete lifecycle metric aggregate are available.
 
+## Flow Telemetry Emission
+
+Flow telemetry is a separate, opt-in cross-user plane. It is not the local execution trace, does
+not change the v3 state machine, and never carries gate releases or coordination state.
+
+### Config gate
+
+The coordinator reads `flow_telemetry.enabled` from
+`~/.claude/.team-harness.json` at startup. The default is `false`; when absent or false, no
+`mcp__memory__record_flow_event` calls are made. When true, emission is fire-and-forget and
+best-effort. A connectivity, validation, or tool error appends exactly one local
+`operation.failed` event with `operation: flow-telemetry`, `status: failed`, a bounded
+one-line `error`, and a one-line retry `suggestion`; the pipeline continues unchanged.
+
+### Emission contract
+
+The external context-harness-mcp flow-event schema is metadata-only and must remain byte-identical
+to the catalog below. Every payload contains the common fields `event`, `ts`, `project`,
+`task_type`, and `th_version`; per-event fields are limited to the listed names.
+
+| `event` | Per-event fields | Field constraints |
+|---|---|---|
+| `guard.block` | `hook`, `reason`, `resolved` | `hook`: `prepublish`/`dev`/`policy`; `reason`: `over-bump`/`secret`/`outward`; `resolved`: boolean |
+| `gate.fail` | `gate`, `verdict` | `gate`: `STAGE-GATE-1`/`STAGE-GATE-3`/`acceptance`/`plan-review`; `verdict`: `fail`/`concerns` |
+| `verify.reject` | `agent`, `verdict` | `agent`: `qa`/`tester`; `verdict`: `fail`/`concerns` |
+| `iteration.loop` | `stage`, `iterations` | `stage`: `1`/`2`/`3`; `iterations`: integer ≥ 2 |
+| `blocked` | `reason` | `reason`: `no-dispatch`/`manual-push`/`guard`/`dependency` |
+| `scope.collapse` | `items_dropped` | integer ≥ 1 |
+| `mcp.unavailable` | `op` | `op`: `read`/`write` |
+| `abandon` | `last_stage` | `last_stage`: `1`/`2`/`3` |
+
+The payload contains bounded enums, integers, booleans, a semver, and a timestamp only. No diff,
+code, AC text, private path, personal identifier, secret, credential, or gate nonce crosses into
+the cross-user plane.
+
+### Cross-user plane and triggers
+
+The local plane (`00-execution-events.jsonl` or fenced `.md`) remains the operator's complete
+trace. The cross-user plane is an aggregate friction signal only. When enabled, the coordinator
+emits `guard.block`, `gate.fail`, `verify.reject`, `iteration.loop`, `blocked`, `scope.collapse`,
+`mcp.unavailable`, and `abandon` at the corresponding friction points. Telemetry is never a
+replacement for `00-state.md`, and it never releases a gate.
+
+### Cross-user friction triggers
+
+| Friction point | `event` value | When to emit |
+|---------------|---------------|--------------|
+| A hook blocks an outward action | `guard.block` | When `dev-guard` or `policy-block` returns `deny` or `ask` and the operator does not override |
+| STAGE-GATE-1/3 operator rejects or requests edit | `gate.fail` | When the operator votes `rejected`/`edit`/`amend`/`abort` at any STAGE-GATE the orchestrator witnesses |
+| Plan-review verdicts `concerns` or `fail` | `gate.fail` | When `plan-reviewer` returns `concerns` or `fail` (gate: `plan-review`) |
+| Acceptance gate fails a verify round | `gate.fail` | When validation routes a correction back to implementer (gate: `acceptance`) |
+| A verifier returns `fail` or `concerns` | `verify.reject` | When `qa` or `tester` returns a non-pass verdict |
+| An agent iterates (≥2 rounds) | `iteration.loop` | When validation has reached the 2nd correction round |
+| Pipeline reaches `blocked-no-dispatch` or `blocked-manual-push` | `blocked` | When dispatch is unavailable or push is blocked |
+| Operator or pipeline collapses scope | `scope.collapse` | When AC items are dropped from the plan during STAGE-GATE-1 edit review |
+| MCP memory server unavailable | `mcp.unavailable` | When a KG read/write call fails due to connectivity (op: read or write) |
+| Pipeline is abandoned by operator at any stage | `abandon` | When the operator explicitly aborts at any STAGE-GATE |
+
+### Example payload (gate.fail)
+
+```json
+{
+  "event": "gate.fail",
+  "ts": "2026-06-21T10:00:00Z",
+  "project": "team-harness",
+  "task_type": "feature",
+  "th_version": "2.117.2",
+  "gate": "STAGE-GATE-1",
+  "verdict": "fail"
+}
+```
+
+---
+
 ## `operation.*` events
 
 An optional, additive family for a long-running recoverable boundary or a diagnostic failure.
@@ -459,7 +533,7 @@ The following event types appear in `00-execution-events` in addition to the cor
 | `gate` | When a human-checkpoint gate is reached (DOC-GATE, STAGE-GATE approval prompt) | `gate` (name), `action` (`stop`/`approved`) |
 | `research.lane.skipped` | When a research fan-out lane returns no findings (fail-open) | `lane`, `angle`, `reason` |
 | `artifact.missing` | When an expected agent output file is absent after dispatch | `expected_file`, `agent`, `action` (`retry`/`escalate`) |
-| `stage2.hygiene` | When the Phase 2.6 code-hygiene scan completes (deterministic, orchestrator-run — see `docs/code-hygiene-gate.md § Layer 1`) | `verdict` (`pass`/`fail`), `extra.files` (int, on `fail`), `extra.count` (int, on `fail`) |
+| `stage2.hygiene` | When the code-hygiene scan completes (deterministic, orchestrator-run — see `docs/code-hygiene-gate.md § Layer 1`) | `verdict` (`pass`/`fail`), `extra.files` (int, on `fail`), `extra.count` (int, on `fail`) |
 | `checkpoint.confirmed` | When `th:orchestrator` obtains — or fails to obtain — the operator's live confirmation of the functional-clarity artifact at Discover Boundary B1, before dispatching `architect` (`docs/reasoning-checkpoint.md § "Attribution and failure direction"`) | `provenance` (`operator-live`/`inferred`), the confirmatory text (named exception to the Free-text field bound, see below) |
 
 Note: `checkpoint.confirmed` is written exclusively by `th:orchestrator`, on the same file it already initializes at Intake (`agents/ref-pipeline.md § "Intake"`). On a later `/th:recover`, the same agent reads and verifies the event but never repairs it.
@@ -533,7 +607,7 @@ detail (what happened at each phase, over time) lives exclusively in
 iterations (e.g. `implementer` re-run after a Phase-3 iteration) overwrites
 that row in place — it never adds a second row for the same key. A distinct
 `(agent, phase)` key is always a distinct row: `security` and `adversary`
-both dispatch at Phase 3 (`3-verify`) but are different agents, so each keeps
+both dispatch during validation but are different agents, so each keeps
 its own current-verdict row — including `adversary`'s
 `incomplete_on_changed_control` field — never collapsed into a single
 last-writer-wins value. In-place replacement happens **between iterations**
