@@ -413,156 +413,17 @@ missing a human able to notice the difference. Rule 4's own original teardown-pr
 caveat (`## Rule 4` above, used by human-manual teardown flows outside this automated-sweep scope)
 are unchanged by this safeguard.
 
-### Atomicity discipline — minimize the TOCTOU window, do not claim to eliminate it
+### Atomicity — the window is narrowed, never closed
 
-The four-condition predicate above is prose evaluated by an agent through separate, sequential
-Bash tool calls — `git worktree list`, `gh pr view`/`git branch --merged`, `git rev-list`,
-`git status`/`git diff --numstat`, and the final `git worktree remove` are each an independent
-invocation, not one atomic transaction. There is no file-system lock, no PID file, and no
-mutual-exclusion mechanism serializing this sweep against a concurrent writer. This is a genuine
-time-of-check-to-time-of-use (TOCTOU) window: work can land in a candidate worktree after the
-sweep's own safety check and before its `git worktree remove` call.
+The sweep reads a worktree's state and then acts on it, so the state can change in between. Keep
+the gap small: re-check the four conditions immediately before removing, and treat any change as
+a reason to skip rather than to proceed. The window is not eliminated and no claim here should
+say otherwise.
 
-To minimize this window, the sweep MUST follow this discipline for every candidate:
-
-1. **Process one worktree candidate fully before starting the next.** Do not evaluate conditions
-   1–4 across all candidates first and remove them in a second pass. Each candidate goes through
-   check → immediate re-check → remove-or-leave, in that order, before the sweep moves on to the
-   next candidate.
-2. **Re-verify conditions 3 and 4 immediately adjacent to the `git worktree remove` call for that
-   specific worktree.** Once the first full four-condition pass qualifies a candidate for removal,
-   re-run condition 3 (merged AND no commits ahead) and condition 4 (clean beyond the mode-only
-   allow-list) again, right before issuing `git worktree remove <path>` — with no other Bash call,
-   no other worktree's processing, and no unrelated work interleaved between this final re-check
-   and the removal of that same worktree.
-3. **Any re-check failure aborts the removal for that candidate.** If the immediate re-check finds
-   a new commit, an unmerged state, or a dirty tree that the first pass did not see, treat the
-   worktree as if it had failed the predicate on the first pass — leave it and report; do not
-   remove.
-
-**Residual risk, named honestly.** This discipline minimizes the TOCTOU window; it does not close
-it. There is no true file-system-level lock in this agent-instruction-driven protocol — a human
-editing or committing to the same worktree in the window between the final re-check and the
-`git worktree remove` call is still technically possible and would not be caught. That window is
-the width of several sequential tool-call round-trips — the re-check alone spans `git rev-list`,
-`git status`/`git diff --numstat`, then the removal call itself, each a separate agent-issued Bash
-invocation carrying its own inference and dispatch latency — realistically seconds to tens of
-seconds, not sub-second, since this discipline runs as agent-issued commands, not a single atomic
-system call. Any earlier framing of this predicate as one that "cannot cause a false removal" only
-holds for a single atomic evaluation, which this multi-step, agent-executed reality is not. The
-realistic concurrent writer is the human-two-session path (Rule 1's own U1 boundary statement) — a
-human actively working in a worktree the sweep independently determines is merged-and-clean. This
-is a low-frequency, bounded exposure (only uncommitted or committed-but-unmerged work landing in
-that window is at risk; a worktree that is genuinely merged-and-clean at both checks has nothing
-left to lose), not a claim of zero risk.
-
-### Lock protocol — serializing cooperating sweepers (layered atop atomicity discipline)
-
-The atomicity discipline above minimizes the TOCTOU window but cannot close it, because it runs as
-sequential agent-issued Bash calls with no mutual-exclusion primitive. This subsection adds a
-directory lock as an ADDITIONAL, external layer — it does not replace the atomicity discipline
-above, which remains the sweep's only defense against a non-cooperating writer (see "Residual
-closure" at the end of this subsection).
-
-**1. Acquisition primitive — `mkdir "$LOCK"`.** `mkdir` of a not-yet-existing directory is atomic
-creation in a single shell invocation: it fails with a nonzero exit (`EEXIST`) if the directory
-already exists, and that atomicity is an OS-level guarantee (`mkdir(2)`), not a shell option.
-Rejected alternative: `set -C; > file` (`noclobber`) — (a) `set -C` is a shell option, not an OS
-guarantee, and its behavior is not uniform across Git Bash / non-bash shells / PowerShell (this repo
-is cross-platform, per `CLAUDE.md §3`); (b) it persists in the shell's own state and would affect
-every later redirection in that agent session; (c) a lock directory gives a natural place to also
-hold the holder file. Acquisition and metadata write happen in one step:
-`mkdir "$LOCK" 2>/dev/null && printf '...' > "$LOCK/holder"` — the `mkdir` is the atomic gate; the
-`printf` only runs if the race was won.
-
-**2. Location — central, under the common git dir, never inside the worktree.**
-`LOCK_ROOT="$(git -C <path> rev-parse --git-common-dir)/th-worktree-sweep-locks"`;
-`LOCK="$LOCK_ROOT/<key>.lock"`, with `<key>` the worktree's absolute path, sanitized (every run of
-non-alphanumeric characters replaced by a single `-`; the path is already unique, so no collision
-and no hashing tool is needed). Rationale: `git worktree remove <path>` deletes (a) the working
-directory at `<path>` and (b) the per-worktree admin directory at
-`<main>/.git/worktrees/<name>/` — it never touches any other path under the common `.git`. Living in
-a sibling namespace under the common `.git` means: (i) `git worktree remove` (with or without
-`--force`) never sees, rejects, or deletes it; (ii) `git status` of any tree never reports
-`.git/**` as untracked, so the lock never trips condition 4 of the predicate above (a lock placed
-inside the working tree would — that is why it is rejected); (iii) the lock survives the remove, so
-release is deterministic and stale detection is always reachable (the lock always sits at a
-computable path, never "stale-undetectable").
-
-**3. Holder identification.** A `holder` file inside the lock directory, one `key=value` per line:
-`pid=<acquiring shell's PID>`, `host=<hostname>`, `epoch=<acquisition epoch-seconds>`,
-`holder=orchestrator-preflight-sweep`. `pid`/`host` are diagnostic only — for
-the report line when a lock is found already held — not the operative liveness signal: the "holder"
-is an ephemeral LLM-agent process with no reliable heartbeat (the shell that ran `mkdir` exits once
-that command returns, so `kill -0 <pid>` is not reliable). The operative liveness signal is the
-lock's age (next point).
-
-**4. Stale-lock expiry — 15 minutes.** A lock is held only for the duration of one worktree's
-re-check-to-remove sequence (seconds to tens of seconds, per the atomicity discipline above). 15
-minutes is roughly 30-100x that expected hold, so an older lock is overwhelmingly likely orphaned (a
-crashed or abandoned agent session), while still short enough that it does not block the next
-legitimate sweep (the next boot is typically more than 15 minutes later). Single-invocation, portable
-check (GNU/BSD/Git-Bash `find`): `find "$LOCK" -maxdepth 0 -mmin +15` prints the path when the lock
-directory's mtime (set at `mkdir` time) is older than 15 minutes, empty otherwise. Age by mtime is
-the signal — not the holder file's contents, which stay diagnostic-only. If stale: break it
-(`rm -rf "$LOCK"`) and retry acquisition. **Named residual (stale-break race):** breaking a stale
-lock is itself a small race — two processes could both see it as stale, both `rm -rf`, both
-`mkdir`, and the loser's `rm -rf` could delete the winner's fresh lock (both then believe they hold
-it). Accepted, because: (a) it only happens when breaking an ALREADY-stale lock (the prior holder
-already crashed or was abandoned — a rare event, not the steady state); (b) it only affects sweep
-ORDERING, never causes data loss by itself — every sweeper that proceeds after a stale-break still
-runs the full four-condition predicate plus the immediate-adjacency re-check (atomicity discipline,
-retained) before `git worktree remove`; the lock is a serialization optimization, not the safety
-mechanism. Deliberately kept simple (an age check via `find`, not a full health-check protocol).
-
-**5. Fail-safe defaults.** (a) **Acquisition fails** (another process holds a live, non-stale lock):
-skip that worktree this pass, report, retry next boot — the same "never a silent, permanent skip"
-contract Rule 7 already carries; report line
-`worktree_swept: left <path> — sweep lock held (retry next boot)`. (b) **The lock mechanism itself
-errors** (e.g., `rev-parse --git-common-dir` fails, `mkdir` fails for a reason other than `EEXIST`,
-`find` errors, a filesystem permission error): treat as "cannot proceed safely" — leave the
-worktree, report, do NOT remove; report line
-`worktree_swept: left <path> — lock mechanism error, not auto-removed`. **Fail-safe direction:**
-here the safe default is to LEAVE (conservative, no deletion) — not fail-open — unlike the guard
-(whose fail-open permits a push, a recoverable action); here deletion is unrecoverable, so the
-failure direction must be "do not delete". This is fail-safe, consistent with this repo's
-convention for destructive operations.
-
-**Sequence and release.** Acquire the lock → [re-check conditions 3 and 4 (atomicity discipline,
-retained) + `git worktree remove` while holding the lock] → release (`rm -rf "$LOCK"`, best-effort;
-if it fails, the stale-expiry check above cleans it up on a later pass). Release happens on BOTH the
-remove path and the leave path — the lock is acquired for the re-check; it is released once a
-decision is made either way.
-
-**Residual closure — honest, not overclaimed.** Acquiring the lock immediately before the final
-re-check and holding it through `git worktree remove` fully CLOSES the TOCTOU window for
-COOPERATING processes: two orchestrator preflight sweeps that both follow this protocol
-serialize — one acquires, the other's `mkdir` fails (`EEXIST`), so it skips that worktree, reports,
-and retries next boot; the two can never both be inside the re-check-to-remove window for the same
-worktree at the same time. The sweeper-vs-sweeper race that originally motivated the atomicity
-discipline above is now fully closed. **Remaining residual (NOT closed by the lock):** a genuinely
-non-cooperating actor — a human editing files directly in the worktree through their own terminal
-(the human-two-session path) who never runs `mkdir` on the lock — is not coordinated by it (the lock
-coordinates sweepers with each other, not a sweeper with a human's raw `git commit`/edit). Against
-that human writer, the only defense remains the atomicity discipline above (which still catches a
-commit landing before the final re-check); the one truly irreducible sliver is a human edit/commit
-landing in the single-tool-call gap between the final re-check and the `git worktree remove` call
-itself — the residual already named in the atomicity discipline subsection, which the lock does not
-narrow (it was never sweeper-vs-sweeper contention to begin with). Additional bound, corrected: the
-*initial* `git worktree remove` call never uses `--force` at either site, so a tree the human left
-dirty makes that first call REFUSE (a git-level backstop) — and a human commit in that sliver
-survives on the branch ref/reflog after the remove (the remove deletes the working directory and
-per-worktree admin metadata, not the branch or its commits). This backstop is NOT, by itself, the
-end of the story: Rule 4's own repair-on-failure step (invoked when the initial call appears to
-fail) escalates to `git worktree remove --force <path>` unconditionally, without distinguishing this
-refusal from the documented Windows file-lock quirk — a naive reading of "the removal never uses
-`--force`" would miss that the *repair* step does. The Action-and-report table above closes this at
-this rule's automated call sites: the force-repair sequence re-verifies dirtiness before
-force-removing, and aborts (falls through to leave + report) if the tree is genuinely dirty, so the
-git-level refusal is not silently overridden. With that re-check in place, genuinely unrecoverable
-loss is limited to uncommitted work landing in the single-tool-call sliver itself. **The lock does
-not eliminate the risk an out-of-band human edit could cause; it reduces it to that bounded sliver
-and names it explicitly.**
+A prior revision specified a mkdir-based mutex with holder files and sanitized lock keys to
+serialize concurrent sweepers. Nothing has ever implemented it and no incident called for it —
+the sweep runs at boot in one session. Two sessions booting at once remains the case this does
+not cover; a skipped removal is the failure mode, which is the safe direction.
 
 ### Squash-merge detection limit (documented, not a bug)
 
