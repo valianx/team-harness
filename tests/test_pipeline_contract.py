@@ -1311,6 +1311,65 @@ def check_cross_runtime_pipeline_runners() -> None:
     require('".mjs":  true' in opencode_registry, "opencode installer does not emit pipeline runner assets")
 
 
+def check_routing_predicate_carriers() -> None:
+    """Every carrier of the spec-lane predicate states the same routers and the same offer."""
+    carriers = (
+        "agents/orchestrator.md",
+        "agents/ref-direct-modes.md",
+        "docs/pipeline-lanes.md",
+        "skills/spec/SKILL.md",
+        "CLAUDE.md",
+    )
+    hard_routers = "multi-repository, multi-specialist, multi-task, irreversible, or operator-absent"
+    for relative in carriers:
+        text = " ".join(read(relative).split())
+        require(hard_routers in text, f"{relative} does not state the canonical hard-router list")
+        require(
+            "A security dimension is not one of them" in text,
+            f"{relative} does not state that a security dimension is not a hard router",
+        )
+        require(
+            "security-sensitive, multi-specialist" not in text,
+            f"{relative} still carries the superseded hard-router list",
+        )
+
+    for relative in carriers + ("skills/setup/managed-blocks/orchestrator-dispatch-rule.md",):
+        require("MAY additionally offer" not in read(relative), f"{relative} still makes the spec-lane offer discretionary")
+
+    setup = read("skills/setup/SKILL.md")
+    require(
+        "**Foundation — the top-level agent IS the lightweight orchestrator.**" not in setup,
+        "the setup skill inlines a copy of the managed block instead of referencing it",
+    )
+    require("managed-blocks/orchestrator-dispatch-rule.md" in setup, "the setup skill lost its managed-block reference")
+
+    lane = " ".join(read("skills/spec/SKILL.md").split())
+    require("1 — raise the bar in-lane" in lane, "the spec lane does not present the in-lane security option")
+    require("review-fan.mjs gate" in lane, "the spec lane does not bind publication to the ship join")
+    require("never opens a correction or re-audit loop" not in lane, "the spec lane still forbids its own closure loop")
+
+
+def check_section_citations_resolve() -> None:
+    """A cited section anchor resolves, and the recorded pre-existing debt cannot grow."""
+    sys.path.insert(0, str(ROOT / "tests"))
+    from lib_section_citations import scan
+
+    sources = [
+        path
+        for path in sorted(list(ROOT.glob("agents/**/*.md")) + list(ROOT.glob("docs/*.md")) + list(ROOT.glob("skills/**/*.md")))
+        if "plugins/" not in str(path) and "installer-assets/" not in str(path)
+    ]
+    baseline_path = ROOT / "tests/section-citation-baseline.txt"
+    require(baseline_path.is_file(), "section citation baseline is missing")
+    baseline = {line for line in baseline_path.read_text(encoding="utf8").splitlines() if line and not line.startswith("#")}
+    found = set(scan(ROOT, sources))
+
+    introduced = sorted(found - baseline)
+    require(not introduced, f"section citations do not resolve: {'; '.join(introduced[:5])}")
+    repaired = sorted(baseline - found)
+    require(not repaired, f"baseline lists citations that now resolve — delete these lines: {'; '.join(repaired[:5])}")
+
+
 def check_verification_fan_producer() -> None:
     """The verification fan's enforcement is executable and reaches every runtime unchanged."""
     canonical_path = ROOT / "skills/verify/scripts/review-fan.mjs"
@@ -3806,6 +3865,8 @@ def main() -> None:
         ("functional-first Stage 1 contract", check_functional_first_plan_contract),
         ("cross-runtime deterministic runners", check_cross_runtime_pipeline_runners),
         ("verification fan producer", check_verification_fan_producer),
+        ("section citations resolve", check_section_citations_resolve),
+        ("routing predicate carriers", check_routing_predicate_carriers),
         ("authoritative post-Gate-1 transitions", check_authoritative_post_gate1_transitions),
         ("direct predicate", check_direct_predicate),
         ("single writer", check_single_writer),

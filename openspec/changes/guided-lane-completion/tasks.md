@@ -55,13 +55,13 @@
 
 ## 6. Routing Predicate
 
-- [ ] 6.1 Add a deterministic check to `tests/test_pipeline_contract.py` that every `§ "<heading>"` citation in `agents/**`, `skills/**`, and `docs/**` resolves to an existing heading in the cited file, and fix every citation it reports.
-- [ ] 6.2 Add a deterministic check to `tests/test_pipeline_contract.py` asserting the routing predicate and hard-router list are byte-consistent across their declared carriers, and naming every drifting carrier on failure.
-- [ ] 6.3 Restore a sensitivity authority section in `docs/pipeline-lanes.md` defining the sensitive categories and the ambiguous-is-sensitive default, sourced from the same category list the producer classifies against.
-- [ ] 6.4 Repoint every citation of the removed anchor in `agents/orchestrator.md`, `agents/ref-direct-modes.md`, `agents/ref-pipeline.md`, and `docs/knowledge.md` to the restored section, verified by the check from task 6.1.
-- [ ] 6.5 Rewrite the posture guidance in `docs/pipeline-lanes.md` and `agents/orchestrator.md` so the spec lane is rendered whenever its predicate passes and the removing condition is named when it does not.
-- [ ] 6.6 Update the renderings that omit the spec option in `agents/ref-intake-flows.md`, `agents/ref-special-flows.md`, `docs/discover-phase.md`, `docs/reasoning-checkpoint.md`, and `docs/how-it-works.md`, verified by the check from task 6.2.
-- [ ] 6.7 Update `skills/setup/managed-blocks/orchestrator-dispatch-rule.md` and the two-posture bullet in `CLAUDE.md` § 5 to the same wording, and reconcile the stale inlined copy in `skills/setup/SKILL.md` with its declared source of truth.
+- [x] 6.1 Add a deterministic check to `tests/test_pipeline_contract.py` that every `§ "<heading>"` citation in `agents/**`, `skills/**`, and `docs/**` resolves to an existing heading in the cited file, and fix every citation it reports.
+- [x] 6.2 Add a deterministic check to `tests/test_pipeline_contract.py` asserting the routing predicate and hard-router list are byte-consistent across their declared carriers, and naming every drifting carrier on failure.
+- [x] 6.3 Restore a sensitivity authority section in `docs/pipeline-lanes.md` defining the sensitive categories and the ambiguous-is-sensitive default, sourced from the same category list the producer classifies against.
+- [x] 6.4 Repoint every citation of the removed anchor in `agents/orchestrator.md`, `agents/ref-direct-modes.md`, `agents/ref-pipeline.md`, and `docs/knowledge.md` to the restored section, verified by the check from task 6.1.
+- [x] 6.5 Rewrite the posture guidance in `docs/pipeline-lanes.md` and `agents/orchestrator.md` so the spec lane is rendered whenever its predicate passes and the removing condition is named when it does not.
+- [x] 6.6 Update the renderings that omit the spec option in `agents/ref-intake-flows.md`, `agents/ref-special-flows.md`, `docs/discover-phase.md`, `docs/reasoning-checkpoint.md`, and `docs/how-it-works.md`, verified by the check from task 6.2.
+- [x] 6.7 Update `skills/setup/managed-blocks/orchestrator-dispatch-rule.md` and the two-posture bullet in `CLAUDE.md` § 5 to the same wording, and reconcile the stale inlined copy in `skills/setup/SKILL.md` with its declared source of truth.
 
 ## 7. Dispatch Cost Observability
 

@@ -1421,7 +1421,7 @@ Freeze. QA remains an independent auditor of the frozen result.
 
 ### Implementation close — mandatory checks before validation
 
-All three run before `validation`. Two share `docs/pipeline-lanes.md § 2a` as their pattern source but produce different consequences on different scopes; none duplicates another's authority.
+All three run before `validation`. Two share `docs/pipeline-lanes.md` § "2a. What counts as a sensitive path (type-agnostic)" as their pattern source but produce different consequences on different scopes; none duplicates another's authority.
 
 **1. Scope check (`fix`/`hotfix` only).** `git diff --name-only`; every changed non-test file appears in `01-root-cause.md § Scope of Fix` or carries a `[SCOPE-DRIFT]` annotation. Otherwise return to the implementer for a bounded correction (max-3), or present a semantic scope decision to the operator; never auto-dispatch `architect`.
 
@@ -1429,9 +1429,9 @@ All three run before `validation`. Two share `docs/pipeline-lanes.md § 2a` as t
 
 **3. `security_sensitive` backstop — every type.** Deterministic, code-level, and **independent of the upstream classification**: it exists to catch what that classification missed, and neither substitutes for the other.
 
-*Path-pattern check.* `git diff --name-only --no-renames "${verification_base_ref}"...HEAD`, using the state field resolved at Phase-2 entry, matched against the § 2a list — never re-derived here. `--no-renames` keeps a file renamed out of a sensitive path from hiding behind its new name.
+*Path-pattern check.* `git diff --name-only --no-renames "${verification_base_ref}"...HEAD`, using the state field resolved at Phase-2 entry, matched against that sensitivity list — never re-derived here. `--no-renames` keeps a file renamed out of a sensitive path from hiding behind its new name.
 
-*Content-trigger check.* A name-only diff cannot evaluate § 2a's content triggers at a benign-named path. **Scans added AND removed lines** — removing an auth check is exactly as relevant as adding one, and an additions-only scan fails open on control removal.
+*Content-trigger check.* A name-only diff cannot evaluate that section's content triggers at a benign-named path. **Scans added AND removed lines** — removing an auth check is exactly as relevant as adding one, and an additions-only scan fails open on control removal.
 
 *Header exclusion is positional, never content-based.* A removed `--`-style comment and a real `--- a/path` header can be byte-identical in isolation; no single-line regex separates them, and each more-specific pattern only narrows the collision. The `awk` state machine tracks position instead: `--- `/`+++ ` count as headers only between a `diff --git` line and that file's first `@@`. After a `@@`, every `+`/`-` line is unconditionally content. This closes the disguise class structurally — a file's own text becomes hunk lines, never format-control lines, which git generates itself.
 

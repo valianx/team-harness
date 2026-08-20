@@ -158,14 +158,15 @@ All commands run from the repo root.
   selects it, and live tester/QA/security requests remain ad hoc inline reviews with no pipeline
   state, events, gates, or delivery. Pipeline entry requires explicit live activation or recovery
   and always uses canonical full v3. Retired route markers are migration data only: show
-  `1 — inline` / `2 — pipeline` (optionally `3 — /th:spec`) and never infer a route or gate
+  `1 — inline` / `2 — pipeline` (plus `3 — /th:spec` whenever its predicate passes) and never
+  infer a route or gate
   decision. Spec-lane routing predicate: plain inline handles mechanical, reversible work with no
   design decision worth recording. `/th:spec` handles tasks that merit written intent and task
-  decomposition — single repo, no security floor, no public-contract break. `/th:pipeline` remains
-  the hard router for security-sensitive, multi-specialist, multi-task, or irreversible work —
-  these are hard routers the lane never absorbs. When an in-flight lane task grows a second
-  specialist need or a security dimension, stop before proceeding and offer the pipeline, carrying
-  the authored change over. `docs/pipeline-lanes.md`.
+  decomposition — single repo, no public-contract break. `/th:pipeline` remains the hard router
+  for multi-repository, multi-specialist, multi-task, irreversible, or operator-absent work —
+  these are hard routers the lane never absorbs. A security dimension is not one of them: it
+  stops the lane for a live choice whose in-lane option raises the required lens set instead of
+  ejecting the task. `docs/pipeline-lanes.md`.
 - **Plan review is explicit only.** `/th:plan-review` may dispatch `qa-plan`, `security` when relevant, and `plan-reviewer` as a standalone direct mode. No plan-review panel, ratification loop, approach checkpoint, or post-approval offer runs automatically in the pipeline. `skills/plan-review/SKILL.md`; `agents/ref-direct-modes.md`.
 - **Coordination state has one writer.** Only `orchestrator` writes `00-state.md`, the execution trace, the decision ledger, and the pipeline summary. Specialists return status blocks and artifact pointers; they never edit coordination state. `agents/_shared/orchestrator-state.md`.
 - **Gate UX is concise and numeric.** Gate 1 displays `1 approve`, `3 edit`, `4 reject` — every approval preauthorizes through the draft PR (`release_policy: auto-ship`). Gate 3 STOPs only on a closed-list exception, displaying `1 ship`, `2 amend`, `3 abort`; a green run records a mechanical `auto-ship` release citing the Gate-1 event. A number alone is accepted for a decision; edit/reject require `N: detail`. Dual record and live Gate-1 approval remain mandatory. `agents/_shared/gate-contract.md`.

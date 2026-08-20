@@ -1,0 +1,55 @@
+# Pre-existing dangling section citations, recorded so the count cannot grow.
+# Each line is debt: repoint the citation or restore the heading, then delete the line.
+agents/_shared/dispatch-contract.md -> CLAUDE.md § hook gates guard the boundary, not the flow
+agents/_shared/dispatch-contract.md -> agents/_shared/plan-consolidation.md § write-scope on \`01-plan.md\
+agents/_shared/dispatch-contract.md -> agents/ref-pipeline.md § header-survival check
+agents/_shared/gate-contract.md -> agents/ref-pipeline.md § stage-gate-1
+agents/_shared/orchestrator-state.md -> agents/ref-pipeline.md § finding disposition
+agents/_shared/plan-consolidation.md -> agents/ref-pipeline.md § header-survival check (panel dispatch integrity)
+agents/ref-architect-design.md -> agents/ref-special-flows.md § operator-authority invariant
+agents/ref-direct-modes.md -> orchestrator.md § pr comment incorporation — apply-review disposition
+agents/ref-intake-flows.md -> agents/ref-pipeline.md § phase 1 — design
+agents/ref-pipeline.md -> agents/_shared/orchestrator-state.md § delivery coordinates
+agents/ref-special-flows.md -> agents/ref-pipeline.md § scheduler — one dispatch, dag order inside it
+docs/decisions.md -> agents/_shared/plan-consolidation.md § write-scope on \`01-plan.md\
+docs/dev-mode.md -> agents/ref-pipeline.md § phase 3 — verify
+docs/knowledge.md -> agents/architect.md § ### delivery grouping
+docs/knowledge.md -> agents/architect.md § default: delivery grouping
+docs/knowledge.md -> agents/architect.md § phase 2 approach-first contract
+docs/knowledge.md -> agents/leader.md (file)
+docs/knowledge.md -> agents/plan-reviewer.md § consolidated plan review section
+docs/knowledge.md -> agents/plan-reviewer.md § rule 9 — no stacked prs / base must be main
+docs/knowledge.md -> agents/qa.md § docs validation mode
+docs/knowledge.md -> agents/ref-dispatch-machinery.md § consolidated delivery
+docs/knowledge.md -> agents/ref-dispatch-machinery.md § multi-task fan-out
+docs/knowledge.md -> agents/ref-pipeline.md § current state
+docs/knowledge.md -> agents/ref-pipeline.md § flow telemetry emission
+docs/knowledge.md -> agents/ref-pipeline.md § if any agent fails
+docs/knowledge.md -> agents/ref-pipeline.md § kg_write events
+docs/knowledge.md -> agents/ref-pipeline.md § phase 1 gate
+docs/knowledge.md -> agents/ref-pipeline.md § phase 1.6 — plan review — nested-context handoff
+docs/knowledge.md -> agents/ref-pipeline.md § phase 2.5
+docs/knowledge.md -> agents/ref-pipeline.md § phase 2.7
+docs/knowledge.md -> agents/ref-pipeline.md § phase 2.75 (knowledge capture) is removed
+docs/knowledge.md -> agents/ref-pipeline.md § phase 3 — verify (parallel validation block)
+docs/knowledge.md -> agents/ref-pipeline.md § phase 3.8 — pre-delivery security audit
+docs/knowledge.md -> agents/ref-pipeline.md § phase 4a — delivery (prepare)
+docs/knowledge.md -> agents/ref-pipeline.md § phase checklist
+docs/knowledge.md -> agents/ref-pipeline.md § plan-review panel centralization contract
+docs/knowledge.md -> agents/ref-pipeline.md § recovery instructions
+docs/knowledge.md -> agents/ref-pipeline.md § stage 2 scheduler
+docs/knowledge.md -> docs/dev-mode.md § deterministic order floor (gate-guard)
+docs/knowledge.md -> docs/dev-mode.md § outward-action gate / detection mechanism
+docs/knowledge.md -> docs/observability.md § two observability planes
+docs/knowledge.md -> orchestrator.md § plan-review panel centralization contract
+docs/observability.md -> agents/ref-pipeline.md § checkpoint-trust-transfer
+docs/observability.md -> agents/ref-pipeline.md § free-text bound
+docs/observability.md -> agents/ref-pipeline.md § transition protocol — atomic, all three steps, never partial
+docs/permission-provisioning.md -> CLAUDE.md § outward-action gate
+docs/plan-structure-gate.md -> agents/ref-pipeline.md § phase 1.5 — plan ratification
+docs/plan-structure-gate.md -> docs/patch-mode.md § stage-1 selective panel re-firing
+docs/plan-structure-gate.md -> docs/patch-mode.md § stage-1 selective panel re-firing — retired
+docs/verification-packet.md -> agents/ref-pipeline.md § reconciliation backstop
+docs/verification-packet.md -> agents/ref-pipeline.md § tools propagation
+docs/working-agreements.md -> docs/cost-and-caching.md § team-harness's own version sites
+skills/setup/SKILL.md -> CLAUDE.md § outward-action gate
