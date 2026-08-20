@@ -316,84 +316,12 @@ orchestrator noticing a document edit outside the code tree.
 
 ---
 
-## 8. Per-run parity reporting (operator-evaluated)
+## 8. Parity reporting — not produced
 
-**Reporting unit = one run.** Every pipeline run's `00-pipeline-summary.md` reports one
-parity line, computable entirely from that run's own artifacts. There is no run counter, no
-multi-run window, no window-close step, and no automatic trigger of any kind.
-
-**Denominator — verdict-doc-derived, not breadcrumb- or `phase.end`-derived.** The
-verifier-dispatch count is read from the workspace verdict docs — one dispatch per verifier
-per iteration verdict entry: `03-testing.md` authoring result (tester), `reviews/04-validation.md`
-(qa), `reviews/04-adversary.md` /
-`reviews/04-adversary-amend-{N}.md` (adversary, Pre-Delivery Security Audit), `reviews/04-ux-validation.md`
-(ux-reviewer validate). `00-subagent-trace.jsonl` breadcrumbs (`subagent.start`/
-`subagent.stop` pairs filtered by verifier `agent_type`) demote to upward-only enrichment: a
-breadcrumb-evidenced dispatch with no matching verdict entry is **ADDED** to the denominator
-as telemetry-missing — breadcrumb absence can never **shrink** the count. The denominator is
-**never** counted from `phase.end` events, whose emission is the unreliable layer this
-contract's own Task-1 fix is repairing.
-
-**Dispatch floor — exactly one derivation.** The floor is the should-have verifier set
-derived strictly from that run's `00-state.md` scope flags: `tester` authoring unconditionally; +
-`qa` for every pipeline run; +
-`adversary` iff the orchestrator's derived security floor evaluates true; +
-`ux-reviewer` validate iff `frontend_scope: true`.
-The floor is **never** derived from
-`00-state.md § Agent Results` (the did-dispatch record) — a silently-skipped verifier must
-push the run below its floor, not shrink the floor to match the undercount. A run whose
-counted denominator (verdict-doc entries plus any breadcrumb-only telemetry-missing
-additions) falls below its floor, or whose scope flags are unreadable, renders the parity
-line as `UNMEASURABLE` — never as parity. N=0 always reads UNMEASURABLE, never parity.
-
-**Per-dispatch classification — three mutually exclusive buckets:**
-
-- **accepted-with-evidence** — a fresh, non-`backfilled: true` `phase.end` whose
-  `tools.packet` shows `packet_integrity: ok` AND `packet_escapes: 0`.
-- **fallback-with-evidence** — fresh telemetry showing `stale|mismatch`, `escapes > 0`, or
-  `packet_used: absent|false`.
-- **telemetry-missing** — the dispatch's `phase.end` is backfilled, carries no
-  `tools.packet`, or is a breadcrumb-only addition with no matching verdict entry.
-
-**Telemetry-missing ALWAYS counts as fallback-signal, never as acceptance.** A backfilled
-event structurally cannot carry packet telemetry (the reconciliation backstop derives only
-`duration_ms` from breadcrumbs — see `agents/ref-pipeline.md`), so
-counting it any other way would let emission loss impersonate packet acceptance.
-
-**What each run reports** (via the Task-1 `## Cost` checkpoint contract in
-`agents/ref-pipeline.md § Pipeline Summary Protocol` — the `## Verification Packet`
-section of `00-pipeline-summary.md`): the three-bucket breakdown above, and verifier catch
-rates read from the workspace verdict documents, not from `phase.end` telemetry — adversarial
-break count from the report matching the current dispatch/status block's exact `audit_run`
-(`initial` → `reviews/04-adversary.md`; `amend-N` →
-`reviews/04-adversary-amend-{N}.md`), qa AC-fail rate from
-`reviews/04-validation.md § AC Coverage Results`, drift flags from
-`reviews/04-validation.md § Drift Analysis` — each compared against the June 2026 baseline recorded
-in the pipeline-validation research workspace (`02-june-empirical-analysis.md`, referenced
-by pointer — not duplicated here). These artifacts exist deterministically whenever the
-verifier ran.
-
-If that exact adversary report is missing, report its metrics as unavailable.
-Never fall back to an older amend report or select the greatest suffix.
-
-**Ownership and rollback — operator-owned, no automatic trigger.** Parity data accumulates
-in every pipeline summary; the OPERATOR evaluates it against the June 2026 baseline
-whenever desired — there is no cross-run aggregation, window, or scheduled evaluation point
-owned by the contract itself. Rollback is a one-line contract flip shipped as a normal PR:
-the packet-first ladder default in the Phase-3 verifier Session Context Protocols
-(`agents/{qa,adversary,ux-reviewer}.md` — packet-first read protocol) flips back to the full
-input-manifest read as the unconditional default (the §4 Step 3 fail-open fallback becomes
-the primary path), and the orchestrator's packet build (§1) and digest-dispatch (§3) steps
-are suspended until the schema (§2) is enriched. No clause in this contract computes this
-automatically, and no text here claims one does.
-
-**Honest bound (reporting aid, not a gate).** The parity line is rendered by the
-orchestrator at prompt level and consumed by the operator — nothing gates on it. That
-reliability class is acceptable here precisely because the consumer is human: a missing or
-malformed line is itself visible evidence to the reader, and parity is only ever concluded
-by the operator reading the line — silence cannot impersonate parity. The Task-1
-fail-closed step-6 assert still requires the `## Cost` section at the 4 mandatory
-checkpoints (§ Pipeline Summary Protocol).
+A per-run parity line was specified here, to be computed from each run's own verdict documents
+and written into `00-pipeline-summary.md`. No run has produced one, including the most recently
+audited. The measurement it was meant to support — whether packet-first reading degrades verifier
+coverage — is worth having, but it needs a producer before it needs a reporting contract.
 
 ---
 
