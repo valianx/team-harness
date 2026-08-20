@@ -15,6 +15,28 @@ This file is read on-demand by `th:orchestrator` when executing a special flow. 
 
 ---
 
+## Contents
+
+- [Research Flow](#research-flow)
+- [Research-Code Flow](#research-code-flow)
+- [Spike Flow](#spike-flow)
+- [Plan Flow](#plan-flow)
+- [Milestone-Build Flow (single-repo `type: plan`)](#milestone-build-flow-single-repo-type-plan)
+- [Multi-Task Handling (DEFAULT for 2+ tasks in one project)](#multi-task-handling-default-for-2-tasks-in-one-project)
+- [Bug-fix Flow](#bug-fix-flow)
+- [Hotfix sub-flow (type: hotfix)](#hotfix-sub-flow-type-hotfix)
+- [Security-sensitive validation (extended)](#security-sensitive-validation-extended)
+- [Database Changes Flow](#database-changes-flow)
+- [Refactor Flow](#refactor-flow)
+- [Test Pipeline Flow](#test-pipeline-flow)
+- [Documentation Flow](#documentation-flow)
+- [Legacy route markers](#legacy-route-markers)
+- [Artifact Verification in Special Flows](#artifact-verification-in-special-flows)
+- [Plan Sketches — Per-Type Applicability](#plan-sketches-per-type-applicability)
+- [Learn (Teaching) Flow](#learn-teaching-flow)
+
+Locate the needed section by heading; do not read this file in full.
+
 ## Research Flow
 
 When the user asks to investigate, compare technologies, evaluate a migration, or study an approach:

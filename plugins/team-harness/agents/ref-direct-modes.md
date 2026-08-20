@@ -7,6 +7,22 @@ color: cyan
 
 # orchestrator — Direct Mode Reference
 
+## Contents
+
+- [Plan Review Mode (standalone audit of Stage 1 artifacts)](#plan-review-mode-standalone-audit-of-stage-1-artifacts)
+- [Spec Lane Mode](#spec-lane-mode)
+- [Diagram Mode (Excalidraw)](#diagram-mode-excalidraw)
+- [LikeC4 Diagram Mode](#likec4-diagram-mode)
+- [D2 Diagram Mode](#d2-diagram-mode)
+- [Review Mode](#review-mode)
+- [Read-Only Working-Tree Guard](#read-only-working-tree-guard)
+- [Translate Mode](#translate-mode)
+- [Test Mode](#test-mode)
+- [Test-Pipeline Mode](#test-pipeline-mode)
+- [Apply-Review Mode](#apply-review-mode)
+
+Locate the needed section by heading; do not read this file in full.
+
 This file is read on-demand by `th:orchestrator` when executing a direct mode. It is NOT part of its system prompt.
 
 **Role mapping.** Every direct mode in this file is dispatched directly by `th:orchestrator` without activating the gated flow. Cross-references to pipeline mechanics resolve to `agents/ref-pipeline.md`.

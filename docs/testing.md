@@ -64,6 +64,7 @@ Everything below has inputs, outputs, and exit codes.
 | `test_permission_disjointness.py` | The permission-allowlist disjointness invariant (#18312 floor) |
 | `test_flow_event_schema_sync.py` | Cross-repo flow-event schema sync |
 | `test_lane_marker_identity.py` | Lane-marker byte identity |
+| `test_authoring_budgets.py` | The size budgets `docs/agent-authoring.md` declares — word budgets per file class, the 500-line hard cap, and the table-of-contents requirement for reference files over 100 lines. A reference file's contents block is checked against that file's own headings, so a list of invented entries fails. Files already over budget are named in an `EXEMPT` map that the suite forces to shrink: it fails when an exempt file becomes compliant and its entry is left behind |
 
 **Installer, runtime, and tooling.**
 

@@ -13,6 +13,16 @@ Everything in this file applies only when `initiative != null`. On the single-pr
 
 ---
 
+## Contents
+
+- [Initiative path composition](#initiative-path-composition)
+- [Repo-identity verification](#repo-identity-verification)
+- [Multi-project sequencing](#multi-project-sequencing)
+- [overview.md — you are the sole writer](#overviewmd-you-are-the-sole-writer)
+- [What left this file, and where it went](#what-left-this-file-and-where-it-went)
+
+Locate the needed section by heading; do not read this file in full.
+
 ## Initiative path composition
 
 Relocated here from the boot sequence: it is infrequent and does not belong on the hot path.

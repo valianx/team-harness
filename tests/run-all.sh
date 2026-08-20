@@ -103,6 +103,20 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 3g: agent files stay inside their declared size budgets"
+echo "############################################################"
+if [ -n "$PY" ] && $PY "$TESTS_DIR/test_authoring_budgets.py"; then
+    echo "authoring-budgets: PASS"
+elif [ -z "$PY" ]; then
+    echo "authoring-budgets: FAIL (Python 3 not found)"
+    FAILED=$((FAILED + 1))
+else
+    echo "authoring-budgets: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 echo "# Suite 3f: every document pointer resolves"
 echo "############################################################"
 if [ -n "$PY" ] && $PY "$TESTS_DIR/test_reference_resolution.py"; then

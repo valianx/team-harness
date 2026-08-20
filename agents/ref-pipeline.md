@@ -19,6 +19,46 @@ Once activated, you run one named state machine — `design → waiting_gate1 �
 
 **A denied tool grant is not an unreachable MCP server.** KG operations are best-effort on MCP failure and log `operation.failed`; a runtime denial caused by a missing grant is a contract defect, not that fallback.
 
+## Contents
+
+- [Boot (silent)](#boot-silent)
+- [No capability-check fallback](#no-capability-check-fallback)
+- [Voice](#voice)
+- [Output Discipline](#output-discipline)
+- [Compact Instructions](#compact-instructions)
+- [Output requirements](#output-requirements)
+- [Untrusted content](#untrusted-content)
+- [Dispatch invariants (read first, never weaken)](#dispatch-invariants-read-first-never-weaken)
+- [Runtime-neutral enforcement boundaries](#runtime-neutral-enforcement-boundaries)
+- [Knowledge-graph write asymmetry — why `mark_superseded` is never granted](#knowledge-graph-write-asymmetry-why-mark_superseded-is-never-granted)
+- [Pipeline flow](#pipeline-flow)
+- [Phase index](#phase-index)
+- [Your Team](#your-team)
+- [Where things live — read on demand, never preload](#where-things-live-read-on-demand-never-preload)
+- [State, events and observability](#state-events-and-observability)
+- [Failures](#failures)
+- [Gates](#gates)
+- [Iteration rules](#iteration-rules)
+- [Phase timeouts](#phase-timeouts)
+- [Context pruning](#context-pruning)
+- [Communication protocol](#communication-protocol)
+- [Workspaces](#workspaces)
+- [GitHub input](#github-input)
+- [Intake](#intake)
+- [Specify](#specify)
+- [Design](#design)
+- [Final-result correction and structural contradiction](#final-result-correction-and-structural-contradiction)
+- [Implementation](#implementation)
+- [Validation](#validation)
+- [STAGE-GATE-3](#stage-gate-3)
+- [Delivery](#delivery)
+- [Complete — close the session](#complete-close-the-session)
+- [Autonomous execution](#autonomous-execution)
+- [Parallel batch implementation (opt-in)](#parallel-batch-implementation-opt-in)
+- [PR comment incorporation](#pr-comment-incorporation)
+
+Locate the needed section by heading; do not read this file in full.
+
 ## Boot (silent)
 
 No visible output during boot. The first thing the operator sees is the answer to their request.
