@@ -15,13 +15,14 @@
 - [x] 1.5 Implement `--prior-anchor` in `package`: supplying it refuses full scope, names the prior anchor, and emits a delta-scoped package bounded to the range since that anchor.
 - [x] 1.6 Create `tests/test_review_fan.mjs` covering the dirty-tree refusal, the uncommitted-range refusal, derived changed surface, ambiguous-classification-is-sensitive, forced floor lenses, and the second-full-scope refusal.
 
-## 2. Ship Decision and Closure Loop
+## 2. Ship Decision and Finding Classification
 
 - [x] 2.1 Add a `gate` subcommand to `skills/verify/scripts/review-fan.mjs` that reads lens returns and resolves ready or not-ready, treating an absent required return as not-ready and never as a pass.
 - [x] 2.2 Make `gate` name the missing or blocking lens in its not-ready output, and refuse to resolve ready while any required floor lens is absent or carries a blocker.
-- [x] 2.3 Make `gate` classify a finding whose file set lies outside a delta-scoped package's range as a pull-request concern rather than a blocker, so a closure pass cannot escalate into a new round.
-- [x] 2.4 Extend `tests/test_review_fan.mjs` with gate cases: absent required return, blocking floor lens, out-of-range finding demoted to concern, and the ready case.
-- [x] 2.5 Rewrite the Review step and the no-re-audit sentence of `skills/spec/SKILL.md` into one consistent statement of the closure loop, documenting the producer's behaviour and pointing at the script rather than restating its rules.
+- [x] 2.3 Make `gate` classify every blocking finding against the bound written-intent criteria, reporting `covered` when a criterion anticipated it and `spec_defects` when none did.
+- [x] 2.4 Make `gate` demote a finding whose file set lies outside a bounded package's range to a pull-request concern, so a requested closure look cannot escalate into a new round.
+- [x] 2.5 Extend `tests/test_review_fan.mjs` with gate cases: absent required return, blocking floor lens, covered classification, spec-defect classification, out-of-range demotion, and the ready case.
+- [x] 2.6 Rewrite the review step of `skills/spec/SKILL.md` as validation that confirms rather than iterates: a covered finding closes by executing its criterion's scenario, an uncovered finding above the floor returns to the authored change, an uncovered finding below the floor rides as a concern, and a reviewed closure pass runs only on explicit live request.
 
 ## 3. Written Intent and Lens Count
 

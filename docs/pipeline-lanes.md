@@ -114,8 +114,9 @@ live posture guidance offers it — a passing predicate is the reason to offer, 
 prompt; when the predicate fails, the guidance names the condition that removed it. The lane
 creates no workspace, `00-state.md`, execution events, pipeline summary, snapshot, overlay,
 traceability artifact, or gate ceremony, and dispatches no specialist by default. Verification is
-one full-scope review on live operator request, then exactly one delta-scoped closure pass per
-applied fix; full scope never runs twice, and closure passes do not accumulate into rounds. A
+one full-scope review on live operator request; full scope never runs twice. A fix closes by
+executing the oracle its criterion already carries, not by another review, and a finding no
+criterion anticipated is a defect in the authored change rather than a new round. A
 lane-authored change uses the same `openspec/changes/` directory, schema, naming, and archive path
 as a pipeline-authored change. Full flow: `skills/spec/SKILL.md`.
 

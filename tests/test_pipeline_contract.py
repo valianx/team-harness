@@ -1346,7 +1346,18 @@ def check_routing_predicate_carriers() -> None:
     lane = " ".join(read("skills/spec/SKILL.md").split())
     require("1 — raise the bar in-lane" in lane, "the spec lane does not present the in-lane security option")
     require("review-fan.mjs gate" in lane, "the spec lane does not bind publication to the ship join")
-    require("never opens a correction or re-audit loop" not in lane, "the spec lane still forbids its own closure loop")
+    require("Validation confirms the change; it does not iterate" in lane, "the spec lane does not state that validation confirms rather than iterates")
+    for token, description in (
+        ("**covered**", "the covered disposition"),
+        ("**uncovered, above the floor**", "the spec-defect disposition"),
+        ("**uncovered, below the floor**", "the concern disposition"),
+    ):
+        require(token in lane, f"the spec lane does not state {description}")
+    require("Never answer it with another review" in lane, "the spec lane does not forbid answering a spec defect with a review")
+
+    producer = read("skills/verify/scripts/review-fan.mjs")
+    require("spec_defects" in producer, "the producer does not report spec defects")
+    require("classifyCoverage" in producer, "the producer does not classify finding coverage")
 
 
 def check_section_citations_resolve() -> None:

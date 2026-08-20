@@ -341,11 +341,29 @@ export function partitionFindings(pkg, findings) {
   return { blockers, concerns };
 }
 
+/**
+ * A finding the authored criteria anticipated closes by executing that criterion's oracle.
+ * One the criteria did not anticipate is a defect in the spec, never another review pass.
+ */
+export function classifyCoverage(pkg, finding) {
+  const criteria = Array.isArray(pkg.criteria) ? pkg.criteria : [];
+  const declared = typeof finding?.criterion === "string" ? finding.criterion.toLowerCase() : null;
+  const match = criteria.find((entry) => {
+    const text = String(entry?.text ?? "").toLowerCase();
+    if (text.length === 0) return false;
+    return declared !== null ? text === declared || text.includes(declared) || declared.includes(text) : false;
+  });
+  if (match) return { coverage: "covered", criterion: match.text, source: match.source ?? null };
+  return { coverage: "uncovered", criterion: null, source: null };
+}
+
 /** Fail-closed join: an absent required return is never a pass. */
 export function gateDecision(pkg, returns) {
   const reasons = [];
   const byLens = new Map(returns.map((entry) => [entry.lens, entry]));
   const concerns = [];
+  const covered = [];
+  const specDefects = [];
   for (const lens of pkg.required_lenses) {
     const entry = byLens.get(lens);
     if (entry === undefined) {
@@ -354,10 +372,14 @@ export function gateDecision(pkg, returns) {
     }
     const split = partitionFindings(pkg, entry.findings ?? []);
     concerns.push(...split.concerns);
+    for (const blocker of split.blockers) {
+      const classified = { ...classifyCoverage(pkg, blocker), lens, finding: blocker };
+      (classified.coverage === "covered" ? covered : specDefects).push(classified);
+    }
     if (entry.verdict !== "pass") reasons.push(`required lens ${lens} returned ${entry.verdict}`);
     else if (split.blockers.length > 0) reasons.push(`required lens ${lens} returned ${split.blockers.length} blocker(s)`);
   }
-  return { ready: reasons.length === 0, reasons, concerns };
+  return { ready: reasons.length === 0, reasons, concerns, covered, spec_defects: specDefects };
 }
 
 async function readJson(target, code) {

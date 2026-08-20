@@ -20,25 +20,37 @@ The anchored review package SHALL be constructed by an executable that derives t
 - **WHEN** the change is verified
 - **THEN** every requirement here resolves to a producer that constructs the governed artifact or to a deterministic check that fails when the rule is broken
 
-### Requirement: Full scope runs once, each fix earns one delta-scoped closure pass
+### Requirement: Validation runs once and a fix closes by executing its oracle
 
-The guided lane SHALL run at most one full-scope review of a branch, and MUST bound every subsequent verification to the closure of one applied fix — the reopening construction the finding named and the files that fix touched. A closure pass MUST NOT reopen the full surface, and the lane MUST NOT run a second full-scope review.
+The guided lane SHALL run at most one full-scope review of a branch. A fix applied to a finding MUST be closed by executing the falsifiable oracle the finding's criterion already carries — its scenario — and MUST NOT be closed by dispatching another review. The lane MUST NOT run a second full-scope review, and a closure MUST NOT be counted as an iteration round.
 
-#### Scenario: A fix is applied after the full-scope review
-- **WHEN** the operator applies a fix for a finding returned by the lane's full-scope review
-- **THEN** exactly one closure pass runs over the new commit, scoped to that fix's reopening construction and changed files, and returns a closure verdict without re-reviewing the unchanged surface
+#### Scenario: A fix is applied for a covered finding
+- **WHEN** the operator applies a fix for a finding that a bound written-intent criterion anticipated
+- **THEN** closure is the execution of that criterion's scenario together with the deterministic suites, and no reviewer is dispatched
 
-#### Scenario: A closure pass finds something outside its scope
-- **WHEN** a closure pass observes a candidate defect outside the fix's own surface
-- **THEN** it is recorded as a pull-request concern and does not open a further verification pass
+#### Scenario: A second full-scope review is requested
+- **WHEN** a full-scope package is requested for a branch that already has a review anchor
+- **THEN** the producer refuses and names the prior anchor
 
-#### Scenario: Two fixes are applied in sequence
-- **WHEN** a second fix is applied after the first fix's closure pass has returned
-- **THEN** the second fix earns its own single closure pass, and neither pass escalates into a full-scope re-review
+#### Scenario: The operator explicitly asks for a reviewer to look at a fix
+- **WHEN** a live operator request asks for a reviewed closure pass over an applied fix
+- **THEN** a delta-scoped package bounded to the range since the prior anchor is emitted, as an explicitly requested exception rather than a default step
 
-#### Scenario: A second full-scope package is requested
-- **WHEN** the producer is invoked for full scope on a branch for which a prior review anchor is supplied
-- **THEN** it refuses, names the prior anchor, and emits a delta-scoped package bounded to the range since that anchor
+### Requirement: A finding is classified by whether the spec anticipated it
+
+The ship decision SHALL classify every finding as covered or uncovered by comparing it against the bound written-intent criteria, and MUST report that classification rather than leaving it to judgement. An uncovered finding above the floor is a defect in the authored change and MUST return there for an operator-approved revision; an uncovered finding below the floor rides as a pull-request concern. Neither MAY become another review pass.
+
+#### Scenario: A finding matches a bound criterion
+- **WHEN** the ship decision evaluates a finding whose criterion is present in the package
+- **THEN** it is reported as covered, and closing it requires only that criterion's oracle to pass
+
+#### Scenario: A finding matches no bound criterion and sits above the floor
+- **WHEN** the ship decision evaluates such a finding
+- **THEN** it is reported as uncovered and named as a defect in the authored change, so the spec is revised and re-approved rather than a further review being run
+
+#### Scenario: A finding matches no bound criterion and sits below the floor
+- **WHEN** the ship decision evaluates such a finding
+- **THEN** it is reported as a pull-request concern and does not hold the ship
 
 ### Requirement: A security dimension stops for a live three-way choice
 

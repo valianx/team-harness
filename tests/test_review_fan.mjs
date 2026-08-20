@@ -184,6 +184,40 @@ await check("binds nothing when the change carries no spec deltas", async () => 
   assert.deepEqual(await readSpecRequirements(path.join(root, "absent")), []);
 }));
 
+await check("reports a finding the authored criteria anticipated as covered", () => {
+  const anticipated = pkg({ criteria: [{ text: "Derivation is all-or-nothing", provenance: "written-intent", source: "specs/a/spec.md" }] });
+  const decision = gateDecision(anticipated, [
+    { lens: "qa", verdict: "fail", findings: [{ file: "src/a.js", criterion: "Derivation is all-or-nothing" }] },
+  ]);
+  assert.equal(decision.covered.length, 1);
+  assert.equal(decision.spec_defects.length, 0);
+  assert.equal(decision.covered[0].source, "specs/a/spec.md");
+});
+
+await check("reports a finding no criterion anticipated as a spec defect", () => {
+  const anticipated = pkg({ criteria: [{ text: "Derivation is all-or-nothing", provenance: "written-intent" }] });
+  const decision = gateDecision(anticipated, [
+    { lens: "qa", verdict: "fail", findings: [{ file: "src/a.js", criterion: "Decoding never fails open" }] },
+  ]);
+  assert.equal(decision.spec_defects.length, 1);
+  assert.equal(decision.spec_defects[0].coverage, "uncovered");
+  assert.equal(decision.covered.length, 0);
+});
+
+await check("treats a finding naming no criterion at all as uncovered", () => {
+  const decision = gateDecision(pkg({ criteria: [{ text: "Anything", provenance: "written-intent" }] }), [
+    { lens: "qa", verdict: "fail", findings: [{ file: "src/a.js" }] },
+  ]);
+  assert.equal(decision.spec_defects.length, 1);
+});
+
+await check("classifies nothing when a package bound no written intent", () => {
+  const decision = gateDecision(pkg(), [{ lens: "qa", verdict: "pass", findings: [] }]);
+  assert.deepEqual(decision.covered, []);
+  assert.deepEqual(decision.spec_defects, []);
+  assert.equal(decision.ready, true);
+});
+
 await check("keeps an absent required return from resolving ready", () => {
   const decision = gateDecision(pkg({ required_lenses: ["qa", "security"] }), [{ lens: "qa", verdict: "pass" }]);
   assert.equal(decision.ready, false);
@@ -200,7 +234,7 @@ await check("resolves ready only when every required lens passes without a block
     { lens: "qa", verdict: "pass", findings: [] },
     { lens: "tester", verdict: "pass", findings: [] },
   ]);
-  assert.deepEqual(decision, { ready: true, reasons: [], concerns: [] });
+  assert.deepEqual(decision, { ready: true, reasons: [], concerns: [], covered: [], spec_defects: [] });
 });
 
 await check("treats a pass carrying blockers as not ready", () => {

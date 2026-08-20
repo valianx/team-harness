@@ -25,15 +25,20 @@ push, or delivery record. It never publishes.
 3. **Decide.** Collect the lens returns and run `review-fan.mjs gate` over them. It resolves
    `ready` only when every required lens returned a pass with no blocker; an absent required return
    is never a pass. Report the reasons verbatim when it resolves not-ready.
-4. **Report.** Present the decision, the blocking reasons, and the concerns. Concerns are for the
-   pull-request body; they never open another verification pass.
+4. **Report.** Present the decision, the blocking reasons, and the classification. `gate` splits
+   blocking findings into `covered` — a bound written-intent criterion anticipated it — and
+   `spec_defects` — none did. A covered finding is fixed and closed by executing that criterion's
+   scenario plus the deterministic suites. A spec defect above the floor returns to the authored
+   change for an operator-approved revision. Concerns go in the pull-request body. None of the
+   three opens another verification pass.
 
 ## Scope
 
-- `--scope full` is the first pass over a range.
-- `--prior-anchor <sha>` closes one applied fix: the script refuses full scope and bounds the
-  package to the range since that anchor. A finding whose files fall outside that range is
-  demoted to a concern rather than blocking, so a closure pass cannot escalate into a new round.
+- `--scope full` is the first pass over a range, and the only review the flow runs by default.
+- `--prior-anchor <sha>` bounds a package to the range since that anchor. This exists for a
+  reviewed look at a fix that the operator explicitly asks for; it is not a step the flow falls
+  into. The script refuses full scope once an anchor exists, and a finding whose files fall
+  outside the bounded range is demoted to a concern.
 
 ## Security floor
 

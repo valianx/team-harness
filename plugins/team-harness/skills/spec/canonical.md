@@ -31,13 +31,21 @@ dispatches no specialist by default.
    no second gate.
 4. **Implement.** Work inline on a feature branch, checking off each `tasks.md` item as it lands,
    monotonically. No workspace, state file, or event trace is created.
-5. **Review.** On an explicit live operator request, run one full-scope review of the branch
+5. **Validate.** On an explicit live operator request, run one full-scope review of the branch
    through `/th:verify`, which builds the package with `skills/verify/scripts/review-fan.mjs` and
-   binds this change's validated requirements as `written-intent` criteria. Each fix applied to a
-   finding then earns exactly one closure pass over the new commit, requested with the prior
-   review anchor: the script refuses a second full scope and bounds the pass to the fix. A finding
-   outside that bound, and any sub-floor finding, rides as a pull-request concern. Closure passes
-   do not accumulate into rounds, and the lane opens no further full-scope review.
+   binds this change's validated requirements as `written-intent` criteria. Validation confirms
+   the change; it does not iterate. `review-fan.mjs gate` classifies every blocking finding:
+
+   - **covered** — a bound criterion anticipated it. Fix it, then close by executing that
+     criterion's scenario and the deterministic suites. No reviewer is dispatched, and nothing is
+     counted as a round.
+   - **uncovered, above the floor** — the authored change failed to anticipate it, which is a
+     defect in the change rather than a new finding. Revise `openspec/changes/<change>/`, revalidate,
+     and take the operator's approval on the revision. Never answer it with another review.
+   - **uncovered, below the floor** — record it as a pull-request concern.
+
+   A reviewed closure pass over a fix runs only on an explicit live operator request, with the
+   prior review anchor; the script refuses a second full scope. The lane opens no other review.
 6. **Publish.** Open the pull request under the repository's existing conventions (branch naming,
    commit style, outward-action approval).
 7. **Archive.** Check the pull request state once. When it reports merged, offer
