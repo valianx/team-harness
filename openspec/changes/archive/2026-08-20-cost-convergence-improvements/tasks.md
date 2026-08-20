@@ -34,7 +34,7 @@
 ## 5. Archive Lifecycle
 
 - [x] 5.1 Wire `openspec archive <change>` behind a one-line Y/n at the confirmed-merge point of both flows: the terminal-close section of `agents/_shared/orchestrator-state.md` plus the matching `complete` prose in `agents/ref-pipeline.md`, and the spec lane's post-merge step. Publish-only delivery ends at a draft PR, so terminal close offers the archive only when the merge is already confirmed there and otherwise records a pending, re-offerable entry in the close record. Never silent; a declined or deferred offer never blocks close.
-- [ ] 5.2 Backfill-archive `integrate-openspec-design` and `pipeline-audit-improvements` to create the initial `openspec/specs/` base (one-time chore, operator-confirmed). The archive mutation ships on its own branch and pull request under the repository's ordinary conventions, never on the run's own PR and never as a direct default-branch push.
+- [x] 5.2 Backfill-archive `integrate-openspec-design` and `pipeline-audit-improvements` to create the initial `openspec/specs/` base (one-time chore, operator-confirmed). The archive mutation ships on its own branch and pull request under the repository's ordinary conventions, never on the run's own PR and never as a direct default-branch push.
 
 ## 6. Verification and Release
 
