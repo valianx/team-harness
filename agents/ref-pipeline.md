@@ -1421,7 +1421,7 @@ Freeze. QA remains an independent auditor of the frozen result.
 
 ### Implementation close — mandatory checks before validation
 
-All three run before `validation`. Two share `docs/pipeline-lanes.md § 2a` as their pattern source but produce different consequences on different scopes; none duplicates another's authority.
+All three run before `validation`. Two share `docs/pipeline-lanes.md` § "2a. What counts as a sensitive path (type-agnostic)" as their pattern source but produce different consequences on different scopes; none duplicates another's authority.
 
 **1. Scope check (`fix`/`hotfix` only).** `git diff --name-only`; every changed non-test file appears in `01-root-cause.md § Scope of Fix` or carries a `[SCOPE-DRIFT]` annotation. Otherwise return to the implementer for a bounded correction (max-3), or present a semantic scope decision to the operator; never auto-dispatch `architect`.
 
@@ -1429,9 +1429,9 @@ All three run before `validation`. Two share `docs/pipeline-lanes.md § 2a` as t
 
 **3. `security_sensitive` backstop — every type.** Deterministic, code-level, and **independent of the upstream classification**: it exists to catch what that classification missed, and neither substitutes for the other.
 
-*Path-pattern check.* `git diff --name-only --no-renames "${verification_base_ref}"...HEAD`, using the state field resolved at Phase-2 entry, matched against the § 2a list — never re-derived here. `--no-renames` keeps a file renamed out of a sensitive path from hiding behind its new name.
+*Path-pattern check.* `git diff --name-only --no-renames "${verification_base_ref}"...HEAD`, using the state field resolved at Phase-2 entry, matched against that sensitivity list — never re-derived here. `--no-renames` keeps a file renamed out of a sensitive path from hiding behind its new name.
 
-*Content-trigger check.* A name-only diff cannot evaluate § 2a's content triggers at a benign-named path. **Scans added AND removed lines** — removing an auth check is exactly as relevant as adding one, and an additions-only scan fails open on control removal.
+*Content-trigger check.* A name-only diff cannot evaluate that section's content triggers at a benign-named path. **Scans added AND removed lines** — removing an auth check is exactly as relevant as adding one, and an additions-only scan fails open on control removal.
 
 *Header exclusion is positional, never content-based.* A removed `--`-style comment and a real `--- a/path` header can be byte-identical in isolation; no single-line regex separates them, and each more-specific pattern only narrows the collision. The `awk` state machine tracks position instead: `--- `/`+++ ` count as headers only between a `diff --git` line and that file's first `@@`. After a `@@`, every `+`/`-` line is unconditionally content. This closes the disguise class structurally — a file's own text becomes hunk lines, never format-control lines, which git generates itself.
 
@@ -1550,7 +1550,13 @@ do not revalidate a chain of intermediate task commits.
 
 *Knowledge read on a build/lint failure only:* 1–3 semantic queries from the failure context, results passed to the correcting agent as a `## KG prior-art` block, or `n/a`. Best-effort: on error log `operation.failed` and continue with `n/a`.
 
-**3 — Frozen review diff.** Write `{docs_root}/inputs/00-frozen.diff` from `git diff --binary "${verification_base_ref}"...HEAD -- . ':!workspaces'`. This exact artifact is the immutable review surface for read-only lenses, especially `adversary`, which has no Bash. A command failure blocks Freeze; an empty artifact when changes were expected blocks rather than impersonating a clean diff. Overwrite it on every Freeze rebuild.
+**3 — Frozen review diff.** Run `node skills/pipeline/scripts/review-surface.mjs --range "${verification_base_ref}...HEAD"` and record its result as suite evidence for this tree anchor. It executes the covering parity checkers locally — continuous integration runs after the push, so a CI-green claim does not exist yet at Freeze — and returns the pathspec of changed paths it proves byte-identical to their canonical sources. A failed or skipped checker returns an empty exclusion set naming the checker that withheld it; a skip is never a pass. Eligibility never carries across a rebuild: rerun it at every new Freeze anchor.
+
+Write `{docs_root}/inputs/00-frozen.diff` from `git diff --binary "${verification_base_ref}"...HEAD -- . ':!workspaces'` followed by the producer's `pathspec` entries **as separate literal arguments**, one argument per entry, never as an interpolated string. Each entry is already `:(literal,exclude)<path>`; splitting one on whitespace or letting a shell expand it would exclude paths no checker proved. Only a path a green checker proved carries no information its canonical source does not; every derived artifact, every hand-authored generator input, and every path no checker proves stays in the artifact. This exact artifact is the immutable review surface for read-only lenses, especially `adversary`, which has no Bash. Record the excluded file count, line count, and covering checkers in the verification packet so a reviewer can see what left the surface and why.
+
+A command failure blocks Freeze. An empty artifact blocks rather than impersonating a clean diff, **except** when `review-surface.mjs` reports `fully_verified: true` — every changed path proven by a green checker — which is reported as a fully checker-verified surface naming those checkers. Overwrite the artifact on every Freeze rebuild.
+
+The exclusion lives here and nowhere else. It is never carried as dispatch prose and never written into a verifier's contract as a review-scope clause: `agents/_shared/dispatch-contract.md` § "The two halves" forbids the dispatcher from bounding review scope, and a verifier with no bound reviews everything it is given.
 
 **4 — Verification packet.** Write `00-verify-packet.md`, the shared entry point every verifier reads
 first. Schema and cap: `docs/verification-packet.md`. Include header (feature, task, timestamp,

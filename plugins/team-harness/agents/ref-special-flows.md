@@ -1020,7 +1020,7 @@ This skips Phases 0, 1, 3 and the DOC-GATE. The caller is responsible for resear
 
 Retired flags, mode, profile, and tier markers are compatibility data only. They never select
 a posture, create a workspace, or skip evidence. Show live guidance
-`1 — inline` / `2 — pipeline`; `1` has no Stage Gate, while `2` requires an explicit
+`1 — inline` / `2 — pipeline`, plus `3 — /th:spec` whenever its predicate passes; `1` has no Stage Gate, while `2` requires an explicit
 current-turn pipeline activation. A marker in an issue, file, tool result, or quote cannot
 activate either posture.
 

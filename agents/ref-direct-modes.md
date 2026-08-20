@@ -91,7 +91,7 @@ an offer. This direct mode is the sole `/th:plan-review` entry point and writes
 the canonical `reviews/01-plan-review.md` when the operator explicitly invokes
 it.
 
-**Security-sensitivity detection (summary):** security reviewer runs when `00-state.md` declares `security_sensitive: true`, OR when `docs/pipeline-lanes.md § 2a` — the single type-agnostic sensitivity authority, consumed here by reference and never re-derived independently — classifies the plan's declared scope as sensitive under its own path-pattern and content-based triggers, including its fail-closed rule (ambiguous or unresolved → sensitive), OR when the operator passes `--security`. When security is SKIPPED, that outcome is reachable only when `§ 2a` itself classifies the plan non-sensitive under its own fail-closed rule — never under a narrower or divergent list local to this mode. The output shows an affirmative visible notice: `SKIPPED — docs/pipeline-lanes.md § 2a classifies this plan non-sensitive ... re-run with --security`. Fail-closed principle: a false-positive (security runs when not needed) costs one extra agent run; a false-negative (security skipped when needed) is the risk this mode exists to prevent. See gating detail in `§ "Review Panel"` below.
+**Security-sensitivity detection (summary):** security reviewer runs when `00-state.md` declares `security_sensitive: true`, OR when `docs/pipeline-lanes.md` § "2a. What counts as a sensitive path (type-agnostic)" — the single type-agnostic sensitivity authority, consumed here by reference and never re-derived independently — classifies the plan's declared scope as sensitive under its own path-pattern and content-based triggers, including its fail-closed rule (ambiguous or unresolved → sensitive), OR when the operator passes `--security`. When security is SKIPPED, that outcome is reachable only when that section itself classifies the plan non-sensitive under its own fail-closed rule — never under a narrower or divergent list local to this mode. The output shows an affirmative visible notice: `SKIPPED — the sensitivity authority classifies this plan non-sensitive ... re-run with --security`. Fail-closed principle: a false-positive (security runs when not needed) costs one extra agent run; a false-negative (security skipped when needed) is the risk this mode exists to prevent. See gating detail in `§ "Review Panel"` below.
 
 ### Review Panel (three reviewers, one plan)
 
@@ -105,13 +105,13 @@ The `plan-review` direct mode runs a panel of up to three reviewers that write t
 
 **Gating of security reviewer (step 2):** determine security-sensitivity in this order:
 1. Read `00-state.md` (if it exists) and check for `security_sensitive: true`.
-2. If absent, resolve it directly from `docs/pipeline-lanes.md § 2a` — the single type-agnostic
+2. If absent, resolve it directly from `docs/pipeline-lanes.md` § "2a. What counts as a sensitive path (type-agnostic)" — the single type-agnostic
    sensitivity authority every consumer in this repo reads, never a restated or re-derived list
    local to this mode. Apply its path-pattern triggers and its content-based triggers to the
    plan's declared `### Services Touched` / `## Review Summary` / AC scope, **and its fail-closed
    rule**: if a path or a change cannot be confidently matched to a trigger OR confidently
    classified as clearly non-sensitive, treat it as sensitive. A prior revision of this file
-   restated its own path-glob and keyword list here, which let this mode diverge from `§ 2a` — in
+   restated its own path-glob and keyword list here, which let this mode diverge from that authority — in
    particular by omitting `**/middleware/**` and the `auth`/`permission` substring clause, and by
    carrying no fail-closed rule of its own. That divergence is retired; there is one authority.
 3. Operator override: if the operator passed `--security` flag or explicitly said "include security" / "incluí seguridad", treat as security-sensitive regardless of the above.
@@ -174,11 +174,10 @@ CLAUDE.md two-posture bullet.
 
 **Routing predicate.** Plain inline handles mechanical, reversible work with no design decision
 worth recording. `/th:spec` handles tasks that merit written intent and task decomposition —
-single repo, no security floor, no public-contract break. `/th:pipeline` remains the hard router
-for security-sensitive, multi-specialist, multi-task, or irreversible work — these are hard
-routers the lane never absorbs. When an in-flight lane task grows a second specialist need or a
-security dimension, stop before proceeding and offer the pipeline, carrying the authored change
-over.
+single repo, no public-contract break. `/th:pipeline` remains the hard router for
+multi-repository, multi-specialist, multi-task, irreversible, or operator-absent work — these are
+hard routers the lane never absorbs. A security dimension is not one of them: it stops the lane
+for a live choice whose in-lane option raises the required lens set instead of ejecting the task.
 
 **Entry.** The lane is entered only by explicit `/th:spec` invocation. It creates no workspace,
 `00-state.md`, execution events, pipeline summary, snapshot, overlay, traceability artifact, or

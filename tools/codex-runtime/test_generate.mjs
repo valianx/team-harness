@@ -4,25 +4,12 @@ import { cp, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "n
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { generate, render } from "./generate.mjs";
-import { syncSharedPipelineAssets } from "./sync-skills.mjs";
+import { sharedPipelineScripts, syncSharedPipelineAssets } from "./sync-skills.mjs";
 
 const root = new URL("../..", import.meta.url).pathname;
-const pipelineScripts = [
-  "bounded-command.mjs",
-  "commit-integrity.mjs",
-  "plan-contract.mjs",
-  "plan-contract-repair.mjs",
-  "quality-lib.mjs",
-  "quality-runner.mjs",
-  "test-transition.mjs",
-  "worktree-dependencies.mjs",
-  "workspace-preflight.mjs",
-  "openspec-adapter.mjs",
-  "openspec-snapshot.mjs",
-  "openspec-overlay.mjs",
-  "openspec-recovery.mjs",
-  "openspec-events.mjs",
-];
+// The roster is imported rather than restated: a second copy is how a fixture starts
+// passing against a list the shipped code no longer has.
+const pipelineScripts = sharedPipelineScripts;
 
 async function makePipelineFixture() {
   const fixture = await mkdtemp(join(tmpdir(), "codex-pipeline-sync-"));

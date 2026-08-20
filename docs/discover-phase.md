@@ -41,7 +41,7 @@ checkpoint. Retired route markers are migration data only; they never bypass the
 
 4. **Legacy marker → migration guidance.** `--fast`, `[TIER: N]`, Simple-Mode wording, and similar
    values are retired data. They do not bypass Discover or select a posture; if a live operator
-   needs a route choice, show `1 — inline` / `2 — pipeline` and require the live choice.
+   needs a route choice, show `1 — inline` / `2 — pipeline`, plus `3 — /th:spec` whenever its predicate passes and require the live choice.
 
 5. **Advance response received → intake metadata (§5) → Classify.** The metadata captures only
    attributable context, then the coordinator proceeds → Phase 0b (Specify) → Phase 1 (Design).
@@ -90,6 +90,7 @@ When a live operator must choose after encountering legacy wording, present exac
 ```text
 1 — inline
 2 — pipeline
+3 — /th:spec   (shown whenever the spec-lane predicate passes)
 ```
 
 Choice `1` stays in direct inline mode with no pipeline state. Choice `2` is the explicit pipeline

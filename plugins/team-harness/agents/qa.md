@@ -140,9 +140,10 @@ impact for contradictions).
      treat the packet as stale, escalate to the full read, report
      `packet_integrity: stale|mismatch`.
    - **Git-anchored scan list:** resolve AC evidence targets from
-     `git diff --name-only` against the packet's `Base ref` — never the
-     packet's table alone; a git-listed path missing from the table sets
-     `packet_integrity: mismatch`.
+     `git diff --name-only` against the packet's `Base ref`, applying the
+     packet's recorded exclusion pathspec when it carries one — never the
+     packet's table alone; a git-listed path missing from the table, and not
+     covered by that pathspec, sets `packet_integrity: mismatch`.
    - Open a full workspace document only when an AC needs context the packet
      lacks, evidence requires it, or the spot-check fails. Packet absent or
      non-validate mode → full manifest read; report `packet_used: absent`.

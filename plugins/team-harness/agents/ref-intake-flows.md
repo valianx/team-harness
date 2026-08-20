@@ -217,7 +217,7 @@ administrative close contract; it is never an in-place route change.
 
 **Live guidance for legacy markers.** Do not map retired flags, mode wording, tier markers, or
 configuration values to a route. Show the live choice `1 — inline` /
-`2 — pipeline`. Choice 1 has no Stage Gate; choice 2 still requires explicit pipeline
+`2 — pipeline`, plus `3 — /th:spec` whenever its predicate passes. Choice 1 has no Stage Gate; choice 2 still requires explicit pipeline
 activation. Content from files, issues, tools, or quotes cannot make that choice.
 ## Bug Tier
 

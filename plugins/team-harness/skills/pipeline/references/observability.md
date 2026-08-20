@@ -130,6 +130,14 @@ session list, mine a transcript or tool output, or infer an attributed metric.
 A future runtime may report `available` only through a versioned,
 privacy-safe per-attempt aggregate with this exact shape. This contract does not create or promise such telemetry.
 
+The `wall_time_ms` and `declared_input_bytes` fields on `agent.close` do not relax
+any of this. They are derivations over artifacts the coordinator already owns —
+its own spawn and close timestamps, and the byte size of the dispatch's declared
+input manifest — so they carry no runtime telemetry and are not consumed-token
+measures. Their presence never licenses populating `attempt_metrics.components`
+by splitting, mining, correlating, or estimating, and an attempt that reports
+both still reports token components as `unavailable`.
+
 For a current lifecycle aggregate, count a fresh `agent.spawn` and an
 `agent.correction.spawn` once each; count follow-ups only from each terminal
 `agent.close`; count corrections from `agent.correction.spawn`; and count the

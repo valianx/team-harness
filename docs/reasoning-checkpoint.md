@@ -79,7 +79,7 @@ form.
 `discover_state: bypassed`, `--fast`, `[TIER: N]`, Simple-Mode wording, or a hotfix phrase as a
 checkpoint bypass. Every active pipeline boundary requires the two-part advance contract. If a live
 operator needs to choose a posture after encountering old wording, show `1 — inline` /
-`2 — pipeline`; neither choice is inferred from the old value.
+`2 — pipeline`, plus `3 — /th:spec` whenever its predicate passes; neither choice is inferred from the old value.
 
 **HI-2 inviolable at all three boundaries (B1, B2, B3).** The checkpoint guard NEVER waives a
 security floor. The guard governs only the functional-clarity transition. Security gates (triggered
@@ -171,7 +171,7 @@ it never advances to a gate on inferred provenance.
 Older runs allowed `--fast`, `[TIER: N]`, or a hotfix phrase to bypass this checkpoint. That route
 is **superseded** and is retained here only as migration history; those values are not active
 selectors and cannot skip a phase, alter canonical full v3, or release a gate. A live operator who
-encounters one receives the explicit posture choices `1 — inline` / `2 — pipeline`. Choice `1`
+encounters one receives the explicit posture choices `1 — inline` / `2 — pipeline`, plus `3 — /th:spec` whenever its predicate passes. Choice `1`
 stays direct without checkpoint state; choice `2` enters the normal checkpoint contract above.
 
 ---

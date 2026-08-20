@@ -18,6 +18,7 @@ const QUALITY = new Set(["pass", "concerns", "fail", "n-a"]);
 const CONTEXT = new Set(["fresh", "continued"]);
 const ERROR_CODES = new Set([
   "ARGUMENT_INVALID", "EVENTS_FENCE_INVALID", "EVENTS_FILE_INVALID", "EVENT_COUNT_INVALID",
+  "DERIVED_MEASURES_MISSING",
 ]);
 const ROLE_TASK = new Map([
   ["architect", "design"],
@@ -50,6 +51,26 @@ function finding(code, line = null) {
 
 function validTimestamp(value) {
   return typeof value === "string" && TIMESTAMP.test(value) && !Number.isNaN(Date.parse(value));
+}
+
+function nonNegativeInteger(value) {
+  return Number.isSafeInteger(value) && value >= 0;
+}
+
+const WALL_TIME_TOLERANCE_MS = 1000;
+
+/**
+ * Both measures are derivable from artifacts the coordinator already owns, so both are required.
+ * Wall time is checked against this attempt's own spawn and close timestamps: an unchecked number
+ * is a number the producer could have invented, which is the opposite of a derived measure.
+ */
+function validDerivedMeasures(event, spawnTimestamp) {
+  if (!nonNegativeInteger(event.wall_time_ms) || !nonNegativeInteger(event.declared_input_bytes)) return false;
+  if (typeof spawnTimestamp !== "string") return false;
+  const opened = Date.parse(spawnTimestamp);
+  const closed = Date.parse(event.ts);
+  if (Number.isNaN(opened) || Number.isNaN(closed) || closed < opened) return false;
+  return Math.abs(event.wall_time_ms - (closed - opened)) <= WALL_TIME_TOLERANCE_MS;
 }
 
 function validAttemptMetrics(value) {
@@ -99,19 +120,21 @@ function validateLifecycle(event, line, open, findings) {
       findings.push(finding("CORRECTION_SPAWN_INVALID", line));
     }
     if (open.has(key)) findings.push(finding("ATTEMPT_ALREADY_OPEN", line));
-    else open.set(key, line);
+    else open.set(key, { line, ts: event.ts });
     return;
   }
   if (event.event === "agent.sla") {
     if (!open.has(key)) findings.push(finding("SLA_WITHOUT_OPEN_ATTEMPT", line));
     return;
   }
-  if (!open.has(key)) findings.push(finding("CLOSE_WITHOUT_OPEN_ATTEMPT", line));
+  const opened = open.get(key);
+  if (opened === undefined) findings.push(finding("CLOSE_WITHOUT_OPEN_ATTEMPT", line));
   else open.delete(key);
   if (!CONTEXT.has(event.context_strategy)) findings.push(finding("CONTEXT_STRATEGY_INVALID", line));
   if (!STATUS.has(event.status)) findings.push(finding("STATUS_INVALID", line));
   if (!QUALITY.has(event.quality_verdict)) findings.push(finding("QUALITY_VERDICT_INVALID", line));
   if (!validAttemptMetrics(event.attempt_metrics)) findings.push(finding("ATTEMPT_METRICS_INVALID", line));
+  if (!validDerivedMeasures(event, opened?.ts)) findings.push(finding("DERIVED_MEASURES_MISSING", line));
 }
 
 export async function validateOpenSpecEvents({ workspace, events, feature } = {}) {

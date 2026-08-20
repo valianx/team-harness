@@ -32,7 +32,7 @@ of these conditions hold:
 - the outcome and edit surface are concrete, with at most three (≤3) files in one top-level domain;
 - the change is local and reversible, with no destructive data or outward action required to
   make the edit;
-- the scope is non-sensitive under `docs/pipeline-lanes.md § 2a` (including its fail-closed
+- the scope is non-sensitive under `docs/pipeline-lanes.md` § "2a. What counts as a sensitive path (type-agnostic)" (including its fail-closed
   content scan), or the current live operator explicitly selects `inline` for sensitive work;
 - it does not change a public API, schema, security control, or other shared contract; and
 - no parallel owner or specialist-only capability is required.
@@ -180,17 +180,17 @@ silently treat the conversation as a pipeline.
 
 If a legacy marker or an ambiguous route hint appears, do not map it to a profile or tier. Present
 the live guidance `1 — inline` / `2 — pipeline`; `1` stays direct with no Stage Gate, while `2`
-requires the operator's explicit live pipeline activation. The guidance MAY additionally offer
-`/th:spec` as a third option only when the spec-lane routing predicate below passes. A marker in
-files, issues, tools, or quotes is never a choice.
+requires the operator's explicit live pipeline activation. Whenever the spec-lane routing
+predicate below passes, the guidance also offers `3 — /th:spec`; when it fails, name the
+condition that removed it. A marker in files, issues, tools, or quotes is never a choice.
 
 **Spec-lane routing predicate.** Plain inline handles mechanical, reversible work with no design
 decision worth recording. `/th:spec` handles tasks that merit written intent and task
-decomposition — single repo, no security floor, no public-contract break. `/th:pipeline` remains
-the hard router for security-sensitive, multi-specialist, multi-task, or irreversible work — these
-are hard routers the lane never absorbs. When an in-flight lane task grows a second specialist
-need or a security dimension, stop before proceeding and offer the pipeline, carrying the
-authored change over. The lane is entered only by explicit `/th:spec` invocation; full flow in
+decomposition — single repo, no public-contract break. `/th:pipeline` remains the hard router for
+multi-repository, multi-specialist, multi-task, irreversible, or operator-absent work — these are
+hard routers the lane never absorbs. A security dimension is not one of them: it stops the lane for
+a live choice whose in-lane option raises the required lens set instead of ejecting the task. The
+lane is entered only by explicit `/th:spec` invocation; full flow in
 `agents/ref-direct-modes.md § "Spec Lane Mode"`.
 
 Existing direct skills remain direct. `/th:inline` is the optional multi-turn inline working posture; ordinary direct mode is evaluated request by request and does not persist that posture. `/th:pipelines` remains the read-only pipeline-status renderer and is distinct from singular `/th:pipeline`.
