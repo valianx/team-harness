@@ -358,7 +358,19 @@ function findingFiles(entry) {
   return files.filter((file) => typeof file === "string" && file.length > 0);
 }
 
-/** A finding whose files all fall outside a delta package's range is a concern, never a blocker. */
+/**
+ * The floor over the shared contract's severity vocabulary. `blocker` and `high` hold the ship;
+ * the rest ride as concerns. An absent or unrecognized severity holds the ship, so a malformed
+ * return cannot demote itself below the floor.
+ */
+const BLOCKING_SEVERITIES = new Set(["blocker", "high"]);
+const SUB_FLOOR_SEVERITIES = new Set(["medium", "low", "info"]);
+
+export function belowFloor(entry) {
+  return typeof entry?.severity === "string" && SUB_FLOOR_SEVERITIES.has(entry.severity);
+}
+
+/** A finding below the floor, or outside a delta package's range, is a concern, never a blocker. */
 export function partitionFindings(pkg, findings) {
   const inScope = new Set(pkg.scope.paths);
   const blockers = [];
@@ -366,10 +378,10 @@ export function partitionFindings(pkg, findings) {
   for (const entry of findings) {
     const files = findingFiles(entry);
     const outside = pkg.scope.kind === "delta" && files.length > 0 && files.every((file) => !inScope.has(file));
-    if (outside || entry?.severity === "concern") concerns.push(entry);
+    if (outside || belowFloor(entry)) concerns.push(entry);
     else blockers.push(entry);
   }
-  return { blockers, concerns };
+  return { blockers, concerns, blocking_severities: [...BLOCKING_SEVERITIES] };
 }
 
 /**

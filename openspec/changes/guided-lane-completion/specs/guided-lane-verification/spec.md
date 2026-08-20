@@ -1,6 +1,6 @@
 ## Purpose
 
-Give the guided lane a terminating verification loop that audits its own fixes, raises the bar on a security dimension instead of ejecting the task, checks the diff against written intent, and can be invoked explicitly.
+Give the guided lane validation that confirms rather than iterates, raises the bar on a security dimension instead of ejecting the task, checks the diff against written intent, and can be invoked explicitly.
 
 ## ADDED Requirements
 
@@ -68,7 +68,7 @@ When work in the guided lane is found to touch a category in the security floor'
 - **WHEN** the ship decision is computed with a required floor lens absent or returning a blocker
 - **THEN** it resolves to not-ready and names the missing or blocking lens, never defaulting an absent return to a pass
 
-#### Scenario: The work is multi-repository, irreversible, multi-task, or operator-absent
+#### Scenario: The work is multi-repository, multi-specialist, irreversible, multi-task, or operator-absent
 - **WHEN** any of those conditions holds alongside the security dimension
 - **THEN** the pipeline remains a hard router and the in-lane option is not offered
 

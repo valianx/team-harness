@@ -106,10 +106,26 @@ await check("rejects an attempt that discards every derivable measure", async ()
   assert.ok(result.findings.some(item => item.code === "DERIVED_MEASURES_MISSING"));
 }));
 
-await check("accepts wall time alone when no input manifest was declared", async () => withFixture(async ({ workspace }) => {
+await check("rejects an attempt that omits the declared-input budget", async () => withFixture(async ({ workspace }) => {
   const events = canonicalEvents();
-  const close = events.find(event => event.event === "agent.close");
-  delete close.declared_input_bytes;
+  delete events.find(event => event.event === "agent.close").declared_input_bytes;
+  await writeJsonl(workspace, events);
+  const result = await validateOpenSpecEvents({ workspace, events: "00-execution-events.jsonl", feature });
+  assert.ok(result.findings.some(item => item.code === "DERIVED_MEASURES_MISSING"));
+}));
+
+await check("rejects a wall time that does not match the attempt's own spawn and close", async () => withFixture(async ({ workspace }) => {
+  const events = canonicalEvents();
+  events.find(event => event.event === "agent.close").wall_time_ms = 5;
+  await writeJsonl(workspace, events);
+  const result = await validateOpenSpecEvents({ workspace, events: "00-execution-events.jsonl", feature });
+  assert.equal(result.verdict, "fail");
+  assert.ok(result.findings.some(item => item.code === "DERIVED_MEASURES_MISSING"));
+}));
+
+await check("accepts a wall time within tolerance of the derived delta", async () => withFixture(async ({ workspace }) => {
+  const events = canonicalEvents();
+  events.find(event => event.event === "agent.close").wall_time_ms = 59400;
   await writeJsonl(workspace, events);
   const result = await validateOpenSpecEvents({ workspace, events: "00-execution-events.jsonl", feature });
   assert.equal(result.verdict, "pass");

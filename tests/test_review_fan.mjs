@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { classifyFloor, gateDecision, partitionFindings, readSpecRequirements, runReviewFan } from "../skills/verify/scripts/review-fan.mjs";
+import { belowFloor, classifyFloor, gateDecision, partitionFindings, readSpecRequirements, runReviewFan } from "../skills/verify/scripts/review-fan.mjs";
 
 const run = promisify(execFile);
 const failures = [];
@@ -250,6 +250,38 @@ await check("demotes a finding outside a delta range to a concern", () => {
   const decision = gateDecision(delta, [{ lens: "qa", verdict: "pass", findings: [{ file: "src/unrelated.js" }] }]);
   assert.equal(decision.ready, true);
   assert.equal(decision.concerns.length, 1);
+});
+
+await check("holds the ship on blocker and high severities", () => {
+  for (const severity of ["blocker", "high"]) {
+    const split = partitionFindings(pkg(), [{ file: "src/a.js", severity }]);
+    assert.equal(split.blockers.length, 1, severity);
+  }
+});
+
+await check("lets medium, low and info ride as concerns below the floor", () => {
+  for (const severity of ["medium", "low", "info"]) {
+    const split = partitionFindings(pkg(), [{ file: "src/a.js", severity }]);
+    assert.equal(split.concerns.length, 1, severity);
+    assert.equal(split.blockers.length, 0, severity);
+  }
+});
+
+await check("holds the ship when a severity is absent or unrecognized", () => {
+  for (const entry of [{ file: "src/a.js" }, { file: "src/a.js", severity: "urgent" }, { file: "src/a.js", severity: 7 }]) {
+    assert.equal(partitionFindings(pkg(), [entry]).blockers.length, 1, JSON.stringify(entry));
+    assert.equal(belowFloor(entry), false);
+  }
+});
+
+await check("routes a sub-floor uncovered finding to concerns rather than spec defects", () => {
+  const anticipated = pkg({ criteria: [{ text: "Some property", provenance: "written-intent" }] });
+  const decision = gateDecision(anticipated, [
+    { lens: "qa", verdict: "pass", findings: [{ file: "src/a.js", severity: "low", criterion: "Unrelated" }] },
+  ]);
+  assert.equal(decision.ready, true);
+  assert.equal(decision.concerns.length, 1);
+  assert.equal(decision.spec_defects.length, 0);
 });
 
 await check("never demotes a finding inside a full-scope package", () => {

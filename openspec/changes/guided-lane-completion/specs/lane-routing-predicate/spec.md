@@ -25,7 +25,7 @@ Live posture guidance SHALL offer the spec lane as an option whenever its routin
 - **THEN** the spec lane appears as an offered option alongside inline and pipeline
 
 #### Scenario: A request fails the spec-lane predicate
-- **WHEN** the request is multi-repository, irreversible, or multi-task
+- **WHEN** the request is multi-repository, multi-specialist, irreversible, multi-task, or operator-absent
 - **THEN** the guidance renders without the spec-lane option and names the condition that removed it
 
 ### Requirement: Every carrier of the routing predicate states it consistently

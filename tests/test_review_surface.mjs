@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { CHECKERS, canonicalSourceFor, computeReviewSurface } from "../skills/pipeline/scripts/review-surface.mjs";
+import { CHECKERS, canonicalSourceFor, computeReviewSurface, mirrorFor } from "../skills/pipeline/scripts/review-surface.mjs";
 
 const run = promisify(execFile);
 const failures = [];
@@ -126,6 +126,21 @@ await check("keeps a drifted mirror in the review surface", async () => {
     ]);
     assert.ok(projection.equals(source), `${entry.path} was excluded without matching its source`);
   }
+});
+
+await check("emits literal exclude pathspecs so a metacharacter cannot widen the exclusion", async () => {
+  const result = await computeReviewSurface({ repoRoot: REPO_ROOT, range: "HEAD~1..HEAD" });
+  for (const entry of result.pathspec) {
+    assert.ok(entry.startsWith(":(literal,exclude)"), `non-literal pathspec: ${entry}`);
+    assert.equal(entry.slice(":(literal,exclude)".length).length > 0, true);
+  }
+  assert.equal(result.pathspec.length, result.excluded.length);
+});
+
+await check("attributes each exclusion to the checker that proves it", () => {
+  assert.equal(mirrorFor("plugins/team-harness/hooks/dist/policy-block.cjs").checker, "sync-hooks");
+  assert.equal(mirrorFor("plugins/team-harness/agents/qa.md").checker, "sync-skills");
+  assert.equal(mirrorFor("runtime/codex/instructions/qa.md"), null);
 });
 
 if (failures.length > 0) {

@@ -37,12 +37,13 @@ export const CHECKERS = [
  * so it stays in review even though a checker regenerates it.
  */
 const MIRRORS = [
-  [/^plugins\/team-harness\/(agents\/.+)$/, (m) => m[1]],
-  [/^plugins\/team-harness\/(hooks\/.+)$/, (m) => m[1]],
-  [/^plugins\/team-harness\/(docs\/.+)$/, (m) => m[1]],
-  [/^plugins\/team-harness\/(\.claude-plugin\/.+)$/, (m) => m[1]],
-  [/^plugins\/team-harness\/skills\/([^/]+)\/(scripts\/.+)$/, (m) => `skills/${m[1]}/${m[2]}`],
-  [/^installer-assets\/opencode-skills\/([^/]+)\/(scripts\/.+)$/, (m) => `skills/${m[1]}/${m[2]}`],
+  [/^plugins\/team-harness\/hooks\/dist\/.+$/, (m) => m[0].slice("plugins/team-harness/".length), "sync-hooks"],
+  [/^plugins\/team-harness\/(agents\/.+)$/, (m) => m[1], "sync-skills"],
+  [/^plugins\/team-harness\/(hooks\/.+)$/, (m) => m[1], "sync-skills"],
+  [/^plugins\/team-harness\/(docs\/.+)$/, (m) => m[1], "sync-skills"],
+  [/^plugins\/team-harness\/(\.claude-plugin\/.+)$/, (m) => m[1], "sync-skills"],
+  [/^plugins\/team-harness\/skills\/([^/]+)\/(scripts\/.+)$/, (m) => `skills/${m[1]}/${m[2]}`, "sync-skills"],
+  [/^installer-assets\/opencode-skills\/([^/]+)\/(scripts\/.+)$/, (m) => `skills/${m[1]}/${m[2]}`, "sync-skills"],
 ];
 
 function fail(code) {
@@ -51,9 +52,14 @@ function fail(code) {
 
 /** The canonical source a projection path mirrors, or null when the path is not a mirror. */
 export function canonicalSourceFor(projectionPath) {
-  for (const [pattern, resolve] of MIRRORS) {
+  return mirrorFor(projectionPath)?.source ?? null;
+}
+
+/** The canonical source and the checker that proves it, or null when the path is not a mirror. */
+export function mirrorFor(projectionPath) {
+  for (const [pattern, resolve, checker] of MIRRORS) {
     const match = pattern.exec(projectionPath);
-    if (match) return resolve(match);
+    if (match) return { source: resolve(match), checker };
   }
   return null;
 }
@@ -124,9 +130,9 @@ async function countedLines(root, range, paths) {
 async function provenMirrors(root, paths) {
   const proven = [];
   for (const candidate of paths) {
-    const source = canonicalSourceFor(candidate);
-    if (source === null) continue;
-    if (await bytesEqual(root, candidate, source)) proven.push({ path: candidate, source });
+    const mirror = mirrorFor(candidate);
+    if (mirror === null) continue;
+    if (await bytesEqual(root, candidate, mirror.source)) proven.push({ path: candidate, ...mirror });
   }
   return proven;
 }
@@ -163,8 +169,10 @@ export async function computeReviewSurface(input) {
       verdict: "pass",
       error_code: null,
       checkers: results,
-      excluded: proven.map((entry) => ({ ...entry, checker: "sync-skills", provenance: "byte-identical-mirror" })),
-      pathspec: excludedPaths.map((value) => `:(exclude)${value}`),
+      excluded: proven.map((entry) => ({ ...entry, provenance: "byte-identical-mirror" })),
+      // `literal` disables glob and magic-character interpretation, so a path containing a
+      // metacharacter excludes itself and nothing else.
+      pathspec: excludedPaths.map((value) => `:(literal,exclude)${value}`),
       excluded_line_count: await countedLines(root, input.range, excludedPaths),
       changed_path_count: paths.length,
       fully_verified: paths.length > 0 && excludedPaths.length === paths.length,
