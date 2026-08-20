@@ -44,15 +44,15 @@
 
 ## 5. Review Surface Economy
 
-- [ ] 5.1 Create `skills/pipeline/scripts/review-surface.mjs` that executes each covering parity checker over the current tree and derives the eligible prefix set from each checker's own expected file set.
-- [ ] 5.2 Make `review-surface.mjs` emit an empty exclusion set naming the withholding checker whenever any covering checker fails or skips, so a skipped runtime cannot silently grant eligibility.
-- [ ] 5.3 Make `review-surface.mjs` exclude any prefix whose checker cannot detect an unexpected extra file, and exclude hand-authored generator inputs, deriving both from the checkers rather than from a maintained list.
-- [ ] 5.4 Make `review-surface.mjs` emit both the pathspec for artifact construction and the enumeration of excluded prefixes with file and line counts and covering checker.
-- [ ] 5.5 Rewrite the frozen review diff construction step in `agents/ref-pipeline.md` to consume `review-surface.mjs` output for its pathspec, and to re-establish eligibility at every new freeze anchor.
-- [ ] 5.6 Update the empty-artifact rule in `agents/ref-pipeline.md` so a diff empty solely through exclusion reports as fully checker-verified with its covering checkers named, distinguishing it from the existing blocking condition.
-- [ ] 5.7 Update `docs/verification-packet.md` so the packet records the emitted enumeration, and update the git-anchored scan-list derivation in `agents/qa.md` to apply the same pathspec, preventing an excluded path from registering as a packet integrity mismatch.
-- [ ] 5.8 Create `tests/test_review_surface.mjs` covering checker-failure and checker-skip withholding, extra-file-blind prefix exclusion, generator-input exclusion, and the emitted pathspec and enumeration shape.
-- [ ] 5.9 Add a deterministic check to `tests/test_pipeline_contract.py` asserting that `agents/_shared/dispatch-contract.md`, `agents/adversary.md`, and `agents/qa.md` carry no review-scope clause, so the exclusion cannot migrate into a verifier contract.
+- [x] 5.1 Create `skills/pipeline/scripts/review-surface.mjs` that executes each covering parity checker over the current tree and derives the eligible prefix set from each checker's own expected file set.
+- [x] 5.2 Make `review-surface.mjs` emit an empty exclusion set naming the withholding checker whenever any covering checker fails or skips, so a skipped runtime cannot silently grant eligibility.
+- [x] 5.3 Make `review-surface.mjs` exclude any prefix whose checker cannot detect an unexpected extra file, and exclude hand-authored generator inputs, deriving both from the checkers rather than from a maintained list.
+- [x] 5.4 Make `review-surface.mjs` emit both the pathspec for artifact construction and the enumeration of excluded prefixes with file and line counts and covering checker.
+- [x] 5.5 Rewrite the frozen review diff construction step in `agents/ref-pipeline.md` to consume `review-surface.mjs` output for its pathspec, and to re-establish eligibility at every new freeze anchor.
+- [x] 5.6 Update the empty-artifact rule in `agents/ref-pipeline.md` so a diff empty solely through exclusion reports as fully checker-verified with its covering checkers named, distinguishing it from the existing blocking condition.
+- [x] 5.7 Update `docs/verification-packet.md` so the packet records the emitted enumeration, and update the git-anchored scan-list derivation in `agents/qa.md` to apply the same pathspec, preventing an excluded path from registering as a packet integrity mismatch.
+- [x] 5.8 Create `tests/test_review_surface.mjs` covering checker-failure and checker-skip withholding, extra-file-blind prefix exclusion, generator-input exclusion, and the emitted pathspec and enumeration shape.
+- [x] 5.9 Add a deterministic check to `tests/test_pipeline_contract.py` asserting that `agents/_shared/dispatch-contract.md`, `agents/adversary.md`, and `agents/qa.md` carry no review-scope clause, so the exclusion cannot migrate into a verifier contract.
 
 ## 6. Routing Predicate
 

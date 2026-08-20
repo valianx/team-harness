@@ -144,6 +144,34 @@ async function readChangedSurface(root, range) {
   return surface;
 }
 
+/**
+ * A path a green checker proves byte-identical to its canonical source carries no information the
+ * source does not, so reviewing it twice buys nothing. Withheld eligibility keeps everything.
+ */
+async function readVerifiedExclusions(root, range) {
+  const script = path.join(root, "skills", "pipeline", "scripts", "review-surface.mjs");
+  try {
+    const { stdout } = await run("node", [script, "--repo-root", root, "--range", range], {
+      cwd: root,
+      maxBuffer: MAX_DIFF_BYTES,
+      windowsHide: true,
+    });
+    const result = JSON.parse(stdout);
+    if (result?.verdict !== "pass") return { paths: new Set(), surface: null };
+    return {
+      paths: new Set(result.excluded.map((entry) => entry.path)),
+      surface: {
+        excluded_file_count: result.excluded.length,
+        excluded_line_count: result.excluded_line_count,
+        checkers: result.checkers,
+        withheld_by: result.withheld_by,
+      },
+    };
+  } catch {
+    return { paths: new Set(), surface: null };
+  }
+}
+
 /** Added lines per file, so a content signal is attributed to the file that carries it. */
 export async function readAddedByFile(root, range) {
   const diff = await git(root, ["diff", "--unified=0", "--no-color", range]);
@@ -294,9 +322,11 @@ async function buildPackage(input) {
   const scope = resolveScope(input.priorAnchor, input.scope);
   const range = scope.kind === "delta" ? `${scope.prior_anchor}..${splitRange(input.range)[1]}` : input.range;
   const coordinates = await resolveCommitted(root, range);
-  const changedSurface = await readChangedSurface(root, range);
+  const allChanged = await readChangedSurface(root, range);
+  const verified = await readVerifiedExclusions(root, range);
+  const changedSurface = allChanged.filter((entry) => !verified.paths.has(entry.path));
   const floor = classifyFloor(
-    changedSurface,
+    allChanged,
     await readAddedByFile(root, range),
     await readUnscannablePaths(root, range),
   );
@@ -311,6 +341,7 @@ async function buildPackage(input) {
     requested_lenses: requested,
     required_lenses: resolveRequiredLenses(requested, floor.applies),
     security_floor: floor,
+    review_surface: verified.surface,
     read_only: true,
   };
 }

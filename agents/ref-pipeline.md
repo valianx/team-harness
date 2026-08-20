@@ -1550,7 +1550,13 @@ do not revalidate a chain of intermediate task commits.
 
 *Knowledge read on a build/lint failure only:* 1–3 semantic queries from the failure context, results passed to the correcting agent as a `## KG prior-art` block, or `n/a`. Best-effort: on error log `operation.failed` and continue with `n/a`.
 
-**3 — Frozen review diff.** Write `{docs_root}/inputs/00-frozen.diff` from `git diff --binary "${verification_base_ref}"...HEAD -- . ':!workspaces'`. This exact artifact is the immutable review surface for read-only lenses, especially `adversary`, which has no Bash. A command failure blocks Freeze; an empty artifact when changes were expected blocks rather than impersonating a clean diff. Overwrite it on every Freeze rebuild.
+**3 — Frozen review diff.** Run `node skills/pipeline/scripts/review-surface.mjs --range "${verification_base_ref}...HEAD"` and record its result as suite evidence for this tree anchor. It executes the covering parity checkers locally — continuous integration runs after the push, so a CI-green claim does not exist yet at Freeze — and returns the pathspec of changed paths it proves byte-identical to their canonical sources. A failed or skipped checker returns an empty exclusion set naming the checker that withheld it; a skip is never a pass. Eligibility never carries across a rebuild: rerun it at every new Freeze anchor.
+
+Write `{docs_root}/inputs/00-frozen.diff` from `git diff --binary "${verification_base_ref}"...HEAD -- . ':!workspaces' ${exclusion_pathspec}`, appending the returned pathspec verbatim. Only a path a green checker proved carries no information its canonical source does not; every derived artifact, every hand-authored generator input, and every path no checker proves stays in the artifact. This exact artifact is the immutable review surface for read-only lenses, especially `adversary`, which has no Bash. Record the excluded file count, line count, and covering checkers in the verification packet so a reviewer can see what left the surface and why.
+
+A command failure blocks Freeze. An empty artifact blocks rather than impersonating a clean diff, **except** when `review-surface.mjs` reports `fully_verified: true` — every changed path proven by a green checker — which is reported as a fully checker-verified surface naming those checkers. Overwrite the artifact on every Freeze rebuild.
+
+The exclusion lives here and nowhere else. It is never carried as dispatch prose and never written into a verifier's contract as a review-scope clause: `agents/_shared/dispatch-contract.md` § "The two halves" forbids the dispatcher from bounding review scope, and a verifier with no bound reviews everything it is given.
 
 **4 — Verification packet.** Write `00-verify-packet.md`, the shared entry point every verifier reads
 first. Schema and cap: `docs/verification-packet.md`. Include header (feature, task, timestamp,

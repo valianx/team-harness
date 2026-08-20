@@ -138,6 +138,17 @@ type: {feature|fix|hotfix|refactor|enhancement} | bug_tier: {1-4|n-a} (metadata 
 | {path} | new\|modify | {one-line} |
 {git diff --stat output}
 
+### Excluded from the review surface
+| Group | Files | Lines | Proven by |
+|-------|-------|-------|-----------|
+| {projection family} | {N} | {N} | {checker} |
+
+Present only when `review-surface.mjs` returned a non-empty exclusion at this tree anchor, and
+omitted entirely otherwise. Each excluded path is byte-identical to the canonical source named in
+the tool result; the table exists so a reviewer can see what left the surface and which locally
+executed checker proved it. When a checker withheld eligibility, record the withholding checker
+here instead and carry the full surface.
+
 ## Implementation Summary
 {implementer status-block summary}
 **Deviations from Architecture:** {verbatim, or "none"}

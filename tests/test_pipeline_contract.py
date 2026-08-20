@@ -1360,6 +1360,38 @@ def check_routing_predicate_carriers() -> None:
     require("classifyCoverage" in producer, "the producer does not classify finding coverage")
 
 
+def check_review_surface_exclusion_stays_in_construction() -> None:
+    """The exclusion lives where the artifact is built, never in a verifier's own contract."""
+    producer = ROOT / "skills/pipeline/scripts/review-surface.mjs"
+    require(producer.is_file(), "review surface producer is missing")
+    canonical = producer.read_bytes()
+    for label, relative in (
+        ("Codex", "plugins/team-harness/skills/pipeline/scripts/review-surface.mjs"),
+        ("opencode", "installer-assets/opencode-skills/pipeline/scripts/review-surface.mjs"),
+    ):
+        projection = ROOT / relative
+        require(projection.is_file() and projection.read_bytes() == canonical, f"{label} review surface drifted")
+
+    source = canonical.decode("utf-8")
+    require("--check" in source, "the producer does not run the checkers in check mode")
+    require("byte-identical-mirror" in source, "the producer no longer labels what it proves")
+
+    for relative in ("agents/_shared/dispatch-contract.md", "agents/adversary.md", "agents/qa.md"):
+        text = " ".join(read(relative).split())
+        require(
+            "review-surface.mjs" not in text,
+            f"{relative} references the exclusion producer, which puts review scope in a verifier contract",
+        )
+        require(
+            "checker-verified" not in text and "byte-identical-mirror" not in text,
+            f"{relative} gained a review-scope exemption clause",
+        )
+
+    freeze = " ".join(read("agents/ref-pipeline.md").split())
+    require("review-surface.mjs" in freeze, "the Freeze step does not consume the exclusion producer")
+    require("fully_verified: true" in freeze, "the Freeze step does not distinguish a fully verified surface from an empty one")
+
+
 def check_security_waiver_is_not_widened() -> None:
     """The security lens is waived by one positive classification, in every runtime copy."""
     copies = (
@@ -3905,6 +3937,7 @@ def main() -> None:
         ("section citations resolve", check_section_citations_resolve),
         ("routing predicate carriers", check_routing_predicate_carriers),
         ("security waiver not widened", check_security_waiver_is_not_widened),
+        ("review surface exclusion placement", check_review_surface_exclusion_stays_in_construction),
         ("authoritative post-Gate-1 transitions", check_authoritative_post_gate1_transitions),
         ("direct predicate", check_direct_predicate),
         ("single writer", check_single_writer),
