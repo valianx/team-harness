@@ -76,13 +76,13 @@
 
 ## 8. Verification and Release
 
-- [ ] 8.1 Run `node tools/codex-runtime/generate.mjs --check && node tools/codex-runtime/test_generate.mjs && python3 tests/test_codex_runtime.py` and record the result as suite evidence.
-- [ ] 8.2 Run `node tools/codex-runtime/sync-skills.mjs --check` and `node tools/codex-runtime/sync-hooks.mjs --check` and record both results.
-- [ ] 8.3 Run `node tests/test_review_fan.mjs`, `node tests/test_review_surface.mjs`, `node tests/test_openspec_events.mjs`, and `python3 tests/test_pipeline_contract.py` and record every result.
-- [ ] 8.4 Run `bash tests/run-all.sh` and `bash tests/run-behavioral.sh` and record both results.
-- [ ] 8.5 Run `npx --yes @fission-ai/openspec@1.9.0 validate guided-lane-completion --strict` and confirm it passes.
-- [ ] 8.6 Run `/th:lint` and resolve any structure, frontmatter, or size finding it reports for the changed and new files.
-- [ ] 8.7 Bump the four internal distribution version sites and add the `changelog.d/` fragment describing the guided-lane completion, the review-surface economy, the routing change, and the observability additions.
+- [x] 8.1 Run `node tools/codex-runtime/generate.mjs --check && node tools/codex-runtime/test_generate.mjs && python3 tests/test_codex_runtime.py` and record the result as suite evidence.
+- [x] 8.2 Run `node tools/codex-runtime/sync-skills.mjs --check` and `node tools/codex-runtime/sync-hooks.mjs --check` and record both results.
+- [x] 8.3 Run `node tests/test_review_fan.mjs`, `node tests/test_review_surface.mjs`, `node tests/test_openspec_events.mjs`, and `python3 tests/test_pipeline_contract.py` and record every result.
+- [x] 8.4 Run `bash tests/run-all.sh` and `bash tests/run-behavioral.sh` and record both results.
+- [x] 8.5 Run `npx --yes @fission-ai/openspec@1.9.0 validate guided-lane-completion --strict` and confirm it passes.
+- [x] 8.6 Run `/th:lint` and resolve any structure, frontmatter, or size finding it reports for the changed and new files.
+- [x] 8.7 Bump the four internal distribution version sites and add the `changelog.d/` fragment describing the guided-lane completion, the review-surface economy, the routing change, and the observability additions.
 
 ## 9. Security Classification Floor
 
