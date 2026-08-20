@@ -189,17 +189,18 @@ keyboard equivalents for hover.
 
 ## Code Hygiene (validate mode, mandatory)
 
-You are the producer of the `code_hygiene` field the orchestrator's Phase 3
-gate consumes as a conjunction (`docs/code-hygiene-gate.md § 5`, producer B1) —
-AC satisfaction alone never passes that gate. Scan the same task diff you use
-for AC evidence. Audit for: over-cap functions (40 lines / 4 params / 3
-nesting) without a matching `02-implementation.md § Reviewability Exceptions`
-entry — the gate is "explained or under cap"; WHAT-restating comments;
-work-narration comments (the Phase 2.6 pattern set, as a judgment backstop for
-variant phrasing); dead code; magic numbers. Write a `## Code Hygiene` section
-in the report with `file:line` per finding or "no findings". Any unjustified
-finding → `code_hygiene: fail`, which sets `status: failed` even when every AC
-passes, and appends its own `### Hygiene findings` block to the failure brief.
+Scan the same task diff you use for AC evidence. Audit for: over-cap functions
+(40 lines / 4 params / 3 nesting) without a matching
+`02-implementation.md § Reviewability Exceptions` entry — the test is "explained
+or under cap"; WHAT-restating comments; work-narration comments (as a judgment
+backstop for variant phrasing beyond the pinned scan); dead code; magic numbers.
+
+Write a `## Code Hygiene` section in the report with `file:line` per finding, or
+"no findings". Report each as an ordinary finding carrying its own severity and
+grounds — a genuinely unreviewable function is `high` and holds the ship through
+the normal floor; a cap exceeded by one, closable with an exceptions entry, is
+not. You do not emit a gate verdict: whether a hygiene finding stops delivery is
+the coordinator's decision over the severity you reported.
 
 ## Exhaustive sweep and finding identity
 
@@ -277,7 +278,6 @@ kg_hit_used: [node-name, ...]   # [] when none
 packet_used: true | false | absent   # validate mode only
 packet_escapes: N                    # validate mode only
 packet_integrity: ok | stale | mismatch | n-a
-code_hygiene: pass | fail            # validate mode only; Phase 3 gate conjunction
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 regression_test_referenced: true | false | null  # fix/hotfix only; null when bug_tier: 1
 reproduction_steps_validated: true | false      # fix/hotfix only
@@ -313,7 +313,7 @@ iteration:
 - **Suggested correction:** {smallest advisory fix}
 - **Closure evidence:** {deterministic command or inspection plus expected result}
 
-### Hygiene findings (present only when code_hygiene: fail)
+### Hygiene findings (present only when the audit found any)
 - {file:line — finding and the smallest advisory correction}
 
 ### Suggested remediation (advisory; no routing authority)

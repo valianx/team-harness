@@ -208,7 +208,7 @@ Two columns only, because two facts are all you need: when to call it, and what 
 | `implementer` | `implementation`, after Gate 1 is released | `02-implementation.md` |
 | `tester` | `implementation` evidence checkpoint; bug-fix regression setup first | `03-testing.md` |
 | `cleaner` | once after green evidence and before Freeze, when the manifest declares `test` + `test_contract.path_rules` | cleanup commit or evidenced no-op |
-| `qa` | `validation`, over the frozen tree | `reviews/04-validation.md` + `code_hygiene: pass\|fail` |
+| `qa` | `validation`, over the frozen tree | `reviews/04-validation.md` |
 | `adversary` | `validation` when the derived security floor applies | `reviews/04-adversary.md` + `broke-it \| could-not-break` |
 | `security` | explicit operator-requested standalone design review only; never automatic pipeline planning | `reviews/01-plan-review.md § Security Design-Review` |
 | `qa-plan` | explicit `/th:plan-review` only | `reviews/01-plan-review.md § Plan Ratification` + `pass\|concerns\|fail` |
@@ -306,7 +306,6 @@ One taxonomy for everything that can go wrong, so the budget question is answere
 | `verification-negative` | A verifying lens returned `fail`/`concerns` over real work — the pipeline produced a defect | operator correction decision | only `gate1-autonomous` authority consumes the **max-3 autonomous** budget; explicit operator-live rounds are unbounded | pause with the consolidated failure and always retain live choice `1`; autonomous exhaustion never removes operator authority |
 | `correction-incomplete` | An authorized correction returned without every package closure check passing | implementer | no Freeze and no validation fan; the consumed single-use authorization remains consumed | consolidate the failed closure evidence as the next correction package; eligible autonomy may continue within max-3, while a fresh operator-live decision remains available without a maximum |
 | `build-or-lint` | A build or lint command exited non-zero at the implementation Freeze checkpoint | implementer | **max 2** attempts, a budget separate from max-3 | `status: blocked` with the full output |
-| `hygiene-fail` | `qa` returned `code_hygiene: fail` | operator correction decision | shares the **max-3 autonomous** limit only under `gate1-autonomous`; operator-live remains unbounded | as `verification-negative` |
 | `contradiction` | The finding cannot be resolved without a decision that is not yours | **operator** | no budget — never becomes a correction round | escalate in the same presentation as any fixable items |
 | `reclassification-needed` | The task is not the type or tier it was dispatched as | **operator** | no budget | STOP with `recommended_type`/`recommended_tier` and the evidence; never auto-route |
 
@@ -444,7 +443,7 @@ coordinator-owned transcription continues at implementation. A new design artifa
 Gate 1 exist only when the live operator separately and explicitly requests architect
 work after Gate 1.
 
-**`code_hygiene: fail` is an implementation correction**, never a plan/criteria edit — a hygiene finding is never "the AC needs revision."
+**A hygiene finding is an implementation correction**, never a plan/criteria edit — a hygiene finding is never "the AC needs revision."
 
 ### Authorized correction round
 
@@ -1725,7 +1724,7 @@ concern. It is never silently treated as a clean audit.
 condition is an explicit fail-closed exception to the QA severity floor: a changed control
 that was broken or not substantively covered cannot proceed as a concern.
 
-**Advance requires both conjuncts:** `phase3_combined ∈ {pass, concerns}` AND `qa.code_hygiene == pass`, **with no correctable security finding** (the fenced fail-closed conditions above are excluded from `concerns` by construction and never satisfy this clause). A `concerns` outcome the ratchet below records as a `reviews/findings-ledger.md` residual auto-ships citing the Gate-1 record; every other `concerns` outcome — a non-correctable structural contradiction, or a round the ratchet has not yet evaluated — remains an exception pause, never an auto-ship. Any failing condition completes the required validation set and mandatory triage. An eligible package records one new bounded correction decision; an ineligible one pauses.
+**Advance requires:** `phase3_combined ∈ {pass, concerns}` **with no correctable security finding** (the fenced fail-closed conditions above are excluded from `concerns` by construction and never satisfy this clause). A `concerns` outcome the ratchet below records as a `reviews/findings-ledger.md` residual auto-ships citing the Gate-1 record; every other `concerns` outcome — a non-correctable structural contradiction, or a round the ratchet has not yet evaluated — remains an exception pause, never an auto-ship. Any failing condition completes the required validation set and mandatory triage. An eligible package records one new bounded correction decision; an ineligible one pauses.
 
 Validation advance → `waiting_gate3`. Fail on either conjunct → read all required bounded
 result artifacts and consolidate once; then either record the eligible autonomous decision or
@@ -1766,7 +1765,7 @@ The residual set excludes both fenced fail-closed conditions above by constructi
 `broke-it` and `incomplete_on_changed_control: true` on a sensitive pipeline are never sub-floor,
 never converge, and can never become a ledger residual at any severity label or classification.
 The ratchet never weakens the `fail` predicate, the Gate-3 closed exception list
-(`agents/_shared/gate-contract.md`), or the `code_hygiene` re-assertion below, which stays a gate
+(`agents/_shared/gate-contract.md`), which stays a gate
 conjunction on its own terms.
 
 ### Validation acceptance check
@@ -1781,8 +1780,7 @@ the artifacts. The combined verdict never replaces Gate 3.
 5. **UX gate (`frontend_scope` only):** any `critical` (WCAG A) finding in `reviews/04-ux-validation.md` fails the gate → Case A. `high`/`medium`/`suggestion` never block.
 6. **Regression still passing (`fix`/`hotfix`, Tier 2–4):** confirm `regression_test_path` shows PASS, not `skip`/`xfail` — then **read the actual assertion body** and confirm it matches the authored pattern. A weakened or replaced assertion fails the gate even with the test name and PASS status intact.
 7. **Test-change integrity:** when tests changed or were deleted, require the exact reason and surviving behavioral evidence. A deletion or weakened assertion whose purpose is to hide a failure joins the consolidated correction-decision package; test counts never gate acceptance.
-8. **`code_hygiene` re-assertion.** Re-read the value `qa` recorded. `fail` closes this check regardless of AC, security, build, or ratchet-convergence outcome. This is a re-check, not a new evaluation — it exists so a hygiene fail cannot slip through if validation wording is ever loosened.
-
+8. **Hygiene findings.** Carry any `## Code Hygiene` finding into the disposition pass with the severity `qa` gave it; it holds the ship only through the ordinary floor.
 Security findings are checked here: a correctable `broke-it` or incomplete sensitive-coverage
 finding is a validation failure and, after explicit authorization, must have passed through
 implementation, closure, stale-row tester refresh, Freeze, fresh QA, and a fresh security audit before this check can pass. Only explicitly non-correctable concerns remain for

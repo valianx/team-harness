@@ -334,7 +334,6 @@ cleaner_evidence: {status: pending|baseline|pass|cleaner-failed|cleaner-blocked|
 cleaner_repo_evidence: [{repository, repo_root, worktree, evidence: cleaner_evidence}]|[]
 plan_review_status: not-requested|requested|pass|concerns|fail|null  # only explicit /th:plan-review
 audit_status: pending|done|unavailable|null  # set in validation: pending on dispatch, done on report, unavailable after a second audit failure. STAGE-GATE-3 states it in the block; it is not a machine-checked precondition — the tree anchor is the only one (agents/ref-pipeline.md § STAGE-GATE-3)
-code_hygiene: pass|fail|null                # docs/code-hygiene-gate.md
 verification_base_source_ref: origin/main|{dep-branch}|{commit}  # selected base ref; re-resolved at Freeze to detect movement
 verification_base_ref: {full commit object ID}             # immutable Phase-2 baseline; copied into the verification packet
 freeze_commit_sha: {full commit object ID}|null             # complete clean candidate before validation
