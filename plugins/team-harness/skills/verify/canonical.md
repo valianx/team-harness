@@ -10,8 +10,19 @@ push, or delivery record. It never publishes.
 
 ## Flow
 
-1. **Build the package.** Run `skills/verify/scripts/review-fan.mjs package` with the committed
-   range, the operator's lens set, and — when the work has an authored change — its change id.
+1. **Build the package.** Run `review-fan.mjs package` with the committed range, the operator's
+   lens set, and — when the work has an authored change — its change id. Resolve the script in
+   order, taking the first that exists:
+
+   1. latest `~/.claude/plugins/cache/team-harness-marketplace/th/*/skills/verify/scripts/review-fan.mjs`
+   2. `~/.claude/skills/verify/scripts/review-fan.mjs`
+   3. the opencode skill install:
+      `${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/skills/verify/scripts/review-fan.mjs`
+      (Windows: `%APPDATA%\opencode\skills\verify\scripts\review-fan.mjs`; a project-scope
+      install uses `<repo>/.opencode/skills/verify/scripts/review-fan.mjs`)
+   4. `scripts/review-fan.mjs` resolved against this skill's own directory (the directory
+      containing this document) — the packaged copy on Codex and opencode installs
+   5. `./skills/verify/scripts/review-fan.mjs`
    The script resolves the repository, refuses a dirty index or worktree, refuses a range whose
    endpoints are not commits, derives the changed surface from the repository, binds the change's
    validated requirements as `written-intent` criteria, classifies the security floor, and resolves

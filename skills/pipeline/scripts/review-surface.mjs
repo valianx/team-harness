@@ -36,7 +36,7 @@ export const CHECKERS = [
  * so it stays in review even though a checker regenerates it.
  */
 const MIRRORS = [
-  [/^plugins\/team-harness\/hooks\/dist\/.+$/, (m) => m[0].slice("plugins/team-harness/".length), "sync-hooks"],
+  [/^plugins\/team-harness\/hooks\/dist\/(policy-block|gcp-guard|gate-guard)\.cjs$/, (m) => `hooks/ts/dist/${m[1]}.cjs`, "sync-hooks"],
   [/^plugins\/team-harness\/(agents\/.+)$/, (m) => m[1], "sync-skills"],
   [/^plugins\/team-harness\/(hooks\/.+)$/, (m) => m[1], "sync-skills"],
   [/^plugins\/team-harness\/(docs\/.+)$/, (m) => m[1], "sync-skills"],

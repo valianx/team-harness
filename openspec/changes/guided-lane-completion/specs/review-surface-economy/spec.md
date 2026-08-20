@@ -1,16 +1,20 @@
 ## Purpose
 
-Let the frozen review surface exclude path prefixes that a deterministic checker has proven byte-equal or regenerable at the reviewed tree, without weakening what any verifier is allowed to look at.
+Let the review surface exclude the exact changed paths a deterministic checker proves byte-identical to their canonical source at the reviewed tree, without weakening what any verifier is allowed to look at.
 
 ## ADDED Requirements
 
 ### Requirement: Eligibility is computed by an executable that runs the checkers
 
-The eligible exclusion set SHALL be computed by an executable that invokes each covering deterministic checker over the reviewed tree and derives eligibility from that checker's own expected file set. Eligibility MUST NOT be asserted by prose, by recall, or by a maintained list kept in a document.
+The eligible exclusion set SHALL be computed by an executable that invokes each covering deterministic checker over the reviewed tree and admits a path only when that checker returned green and the path's bytes equal its canonical source's bytes **in the reviewed tree**. Eligibility MUST NOT be asserted by prose, by recall, or by a list kept in a document, and MUST NOT be proven against the working checkout.
 
 #### Scenario: The exclusion set is needed for a freeze
 - **WHEN** the review artifact is being constructed
-- **THEN** the executable runs the covering checkers, derives the excluded file set from their expected file sets and results, and emits both the pathspec and the enumeration the packet records
+- **THEN** the executable runs the covering checkers, admits only paths whose reviewed-tree bytes equal their source's, and emits both the pathspec and the enumeration the packet records
+
+#### Scenario: The checkout is not the reviewed head
+- **WHEN** eligibility is computed while a different commit is checked out
+- **THEN** every byte comparison is taken from the reviewed head, so a projection that drifted at that head is not excluded
 
 #### Scenario: A checker fails or skips
 - **WHEN** any covering checker returns a failure or a skip

@@ -165,6 +165,10 @@ async function readVerifiedExclusions(root, range) {
       surface: {
         excluded_file_count: result.excluded.length,
         excluded_line_count: result.excluded_line_count,
+        excluded: result.excluded,
+        pathspec: result.pathspec,
+        fully_verified: result.fully_verified,
+        reviewed_head: result.reviewed_head ?? null,
         checkers: result.checkers,
         withheld_by: result.withheld_by,
       },
@@ -179,12 +183,14 @@ export async function readAddedByFile(root, range) {
   const diff = await git(root, ["diff", "--unified=0", "--no-color", range]);
   const added = new Map();
   let current = null;
+  let previous = "";
   for (const line of diff.split("\n")) {
-    if (line.startsWith("+++ b/")) current = line.slice("+++ b/".length).trim();
-    else if (line.startsWith("+++ ")) current = null;
+    const isHeader = line.startsWith("+++ ") && (previous.startsWith("--- ") || previous.startsWith("diff --git "));
+    if (isHeader) current = line.startsWith("+++ b/") ? line.slice("+++ b/".length).trim() : null;
     else if (current !== null && line.startsWith("+")) {
       added.set(current, `${added.get(current) ?? ""}\n${line}`);
     }
+    previous = line;
   }
   return added;
 }
@@ -334,7 +340,13 @@ function resolveRequiredLenses(requested, floorApplies) {
 }
 
 function resolveScope(priorAnchor, requestedScope) {
-  if (priorAnchor === undefined) return { kind: "full", prior_anchor: null };
+  if (requestedScope !== undefined && !["full", "delta"].includes(requestedScope)) fail("ARGUMENT_INVALID");
+  if (priorAnchor === undefined) {
+    // A delta needs an anchor to bound it; honouring the word alone would emit a full package
+    // under a delta label, which is the opposite of what the caller asked for.
+    if (requestedScope === "delta") fail("ARGUMENT_INVALID");
+    return { kind: "full", prior_anchor: null };
+  }
   if (!SHA.test(priorAnchor)) fail("ARGUMENT_INVALID");
   if (requestedScope === "full") fail("SCOPE_FULL_REFUSED");
   return { kind: "delta", prior_anchor: priorAnchor };
@@ -375,7 +387,14 @@ async function buildPackage(input) {
     mode: "inline-review",
     repository_root: root,
     coordinates: coordinateBlock,
-    scope: { kind: scope.kind, prior_anchor: scope.prior_anchor, paths: changedSurface.map((entry) => entry.path) },
+    scope: {
+      kind: scope.kind,
+      prior_anchor: scope.prior_anchor,
+      paths: changedSurface.map((entry) => entry.path),
+      // Every path the range touched, exclusions included: a blocker naming an excluded path is
+      // still inside the reviewed range and must not be demoted for being off the review surface.
+      range_paths: allChanged.map((entry) => entry.path),
+    },
     criteria: await bindWrittenIntent(root, coordinates.head, input.change),
     changed_surface: changedSurface,
     requested_lenses: requested,
@@ -426,7 +445,7 @@ export function belowFloor(entry) {
 
 /** A finding below the floor, or outside a delta package's range, is a concern, never a blocker. */
 export function partitionFindings(pkg, findings) {
-  const inScope = new Set(pkg.scope.paths);
+  const inScope = new Set(pkg.scope.range_paths ?? pkg.scope.paths);
   const blockers = [];
   const concerns = [];
   for (const entry of findings) {
@@ -445,13 +464,17 @@ export function partitionFindings(pkg, findings) {
 export function classifyCoverage(pkg, finding) {
   const criteria = Array.isArray(pkg.criteria) ? pkg.criteria : [];
   const declared = typeof finding?.criterion === "string" ? finding.criterion.toLowerCase() : null;
-  const match = criteria.find((entry) => {
-    const text = String(entry?.text ?? "").toLowerCase();
-    if (text.length === 0) return false;
-    return declared !== null ? text === declared || text.includes(declared) || declared.includes(text) : false;
-  });
-  if (match) return { coverage: "covered", criterion: match.text, source: match.source ?? null };
-  return { coverage: "uncovered", criterion: null, source: null };
+  if (declared === null) return { coverage: "uncovered", criterion: null, source: null };
+  const texts = criteria.map((entry) => ({ entry, text: String(entry?.text ?? "").toLowerCase() })).filter((item) => item.text.length > 0);
+  const exact = texts.filter((item) => item.text === declared);
+  // Containment is a fallback, and only when it picks out exactly one criterion: binding a
+  // finding to the first criterion that happens to share a substring names the wrong requirement.
+  const candidates = exact.length > 0
+    ? exact
+    : texts.filter((item) => item.text.includes(declared) || declared.includes(item.text));
+  if (candidates.length !== 1) return { coverage: "uncovered", criterion: null, source: null };
+  const match = candidates[0].entry;
+  return { coverage: "covered", criterion: match.text, source: match.source ?? null };
 }
 
 /** Every identity field a return must reproduce exactly to fill its own slot. */

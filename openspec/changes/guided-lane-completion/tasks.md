@@ -99,9 +99,16 @@
 - [x] 10.2 Replace the lens-keyed return map in `gate` with the shared contract's exact keyed join: one slot per required `(lens, dispatch_id, target_id, coordinates)`, exactly one return per slot after exact equality of all four, and replay, duplicate, substitution, and identity mismatch rejected as untrusted.
 - [x] 10.3 Require `lens_status: complete` on an accepted return before its verdict can count as a pass, and keep every non-terminal status as a non-pass outcome.
 - [x] 10.4 Read written-intent criteria from the reviewed head tree rather than the working checkout, refusing when the change is absent from that tree instead of falling back.
-- [ ] 10.5 Derive the exclusion set in `skills/pipeline/scripts/review-surface.mjs` from each checker's own expected paths rather than a hand-maintained mirror table, or record why that is infeasible and narrow the shipped requirement to match the implementation.
-- [ ] 10.6 Reference the packaged script from `skills/verify/SKILL.md` so both generated `canonical.md` projections resolve their own packaged copy rather than a repository-relative path.
+- [x] 10.5 Derive the exclusion set in `skills/pipeline/scripts/review-surface.mjs` from each checker's own expected paths rather than a hand-maintained mirror table, or record why that is infeasible and narrow the shipped requirement to match the implementation.
+- [x] 10.6 Reference the packaged script from `skills/verify/SKILL.md` so both generated `canonical.md` projections resolve their own packaged copy rather than a repository-relative path.
 - [x] 10.7 Extend `tests/test_review_fan.mjs` with slot-join cases: duplicate rejected, substituted lens rejected, mismatched identity rejected, non-complete status non-pass, and the all-slots-complete ready case.
 - [x] 10.8 Extend `tests/test_review_fan.mjs` with a case proving criteria come from the reviewed head when the checkout carries different change content.
 - [ ] 10.9 Run every suite and both parity checkers, and record the results.
 - [x] 10.10 Prove mirror byte-equality against the reviewed head tree rather than the working checkout, and replace the tautological drift test with an oracle that fails against the defect.
+- [x] 10.11 Leave an ambiguous criterion match uncovered instead of binding the finding to the first criterion that shares a substring.
+- [x] 10.12 Recognize a diff file header only when it follows a `--- ` or `diff --git ` line, so an added content line cannot re-attribute the lines after it.
+- [x] 10.13 Refuse a `--scope delta` with no anchor and any unrecognized scope value, instead of silently emitting a full package.
+- [x] 10.14 Test delta containment against every path the reviewed range touched, so a blocker on an excluded path is not demoted for being off the review surface.
+- [x] 10.15 Carry the exclusion rows, pathspec, reviewed head, and fully-verified flag into the package so the packet can enumerate them.
+- [x] 10.16 Narrow the citation resolver's prefix tolerance to the direction that can be legitimate, and repair the dangling citation it was masking.
+- [x] 10.17 Resolve the hooks dist mirror to the source `sync-hooks` actually copies, bounded to the names that checker covers.

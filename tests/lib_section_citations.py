@@ -48,6 +48,9 @@ def scan(root: pathlib.Path, sources) -> list:
                 dangling.append(f"{source.relative_to(root)} -> {relative} (file)")
                 continue
             found = headings(target, cache)
-            if found is None or not any(item == heading or item.startswith(heading) or heading.startswith(item) for item in found):
+            # A citation may name a heading's prefix (`§ "Freeze"` for `## Freeze — step 3`), but a
+            # citation LONGER than every real heading names something that does not exist; accepting
+            # it because a heading is its prefix is how a dangling anchor stays hidden.
+            if found is None or not any(item == heading or item.startswith(heading) for item in found):
                 dangling.append(f"{source.relative_to(root)} -> {relative} § {heading}")
     return sorted(set(dangling))

@@ -360,6 +360,64 @@ await check("never demotes a finding inside a full-scope package", () => {
   assert.equal(split.concerns.length, 0);
 });
 
+await check("leaves an ambiguous criterion match uncovered rather than binding the wrong one", () => {
+  const ambiguous = pkg({ criteria: [
+    { text: "Only a successful benign classification may waive the security lens", provenance: "written-intent" },
+    { text: "Only a successful benign classification may waive the review lens", provenance: "written-intent" },
+  ] });
+  const decision = gateDecision(ambiguous, [ret("qa", { verdict: "fail", findings: [{ file: "src/a.js", criterion: "Only a successful benign classification" }] })]);
+  assert.equal(decision.covered.length, 0, "an ambiguous match was bound to one arbitrary criterion");
+  assert.equal(decision.spec_defects.length, 1);
+});
+
+await check("binds an exact criterion match even when another criterion contains it", () => {
+  const overlapping = pkg({ criteria: [
+    { text: "Validation runs once", provenance: "written-intent" },
+    { text: "Validation runs once and a fix closes by executing its oracle", provenance: "written-intent" },
+  ] });
+  const decision = gateDecision(overlapping, [ret("qa", { verdict: "fail", findings: [{ file: "src/a.js", criterion: "Validation runs once" }] })]);
+  assert.equal(decision.covered.length, 1);
+  assert.equal(decision.covered[0].criterion, "Validation runs once");
+});
+
+await check("does not read a content line beginning with +++ b/ as a file header", async () => {
+  const diff = [
+    "diff --git a/src/handler.js b/src/handler.js",
+    "--- a/src/handler.js",
+    "+++ b/src/handler.js",
+    "+const doc = `+++ b/docs/notes.md`;",
+    "+const apiKey = process.env.API_KEY;",
+  ].join("\n");
+  const added = new Map();
+  let current = null;
+  let previous = "";
+  for (const line of diff.split("\n")) {
+    const isHeader = line.startsWith("+++ ") && (previous.startsWith("--- ") || previous.startsWith("diff --git "));
+    if (isHeader) current = line.startsWith("+++ b/") ? line.slice("+++ b/".length).trim() : null;
+    else if (current !== null && line.startsWith("+")) added.set(current, `${added.get(current) ?? ""}\n${line}`);
+    previous = line;
+  }
+  assert.deepEqual([...added.keys()], ["src/handler.js"], "an added content line was mistaken for a file header");
+  const floor = classifyFloor([{ path: "src/handler.js", change: "m" }], added);
+  assert.equal(floor.categories.includes("credentials or secrets"), true, "the credential signal was attributed to a prose file and dropped");
+});
+
+await check("refuses a delta scope with no anchor to bound it", async () => withRepository(async (root) => {
+  await commit(root, { "src/a.js": "export const a = 1;\n" }, "add");
+  const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa", scope: "delta" });
+  assert.equal(result.error_code, "ARGUMENT_INVALID");
+  const unknown = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa", scope: "partial" });
+  assert.equal(unknown.error_code, "ARGUMENT_INVALID");
+}));
+
+await check("keeps a blocker on an excluded path from being demoted in a delta package", () => {
+  const delta = pkg({ scope: { kind: "delta", prior_anchor: "abcdef1", paths: ["src/a.js"], range_paths: ["src/a.js", "plugins/mirror.md"] } });
+  const split = partitionFindings(delta, [{ file: "plugins/mirror.md", severity: "blocker" }]);
+  assert.equal(split.blockers.length, 1, "a blocker inside the reviewed range was demoted for being off the review surface");
+  const outside = partitionFindings(delta, [{ file: "src/unrelated.js", severity: "blocker" }]);
+  assert.equal(outside.concerns.length, 1);
+});
+
 await check("rejects a malformed returns document", async () => withRepository(async (root) => {
   const packagePath = path.join(root, "package.json5");
   await writeFile(packagePath, JSON.stringify(pkg()));
