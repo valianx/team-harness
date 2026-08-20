@@ -2,7 +2,6 @@
 /** Build the anchored inline review package from repository state, and decide its ship join. */
 
 import { execFile } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
@@ -352,20 +351,6 @@ function resolveScope(priorAnchor, requestedScope) {
   return { kind: "delta", prior_anchor: priorAnchor };
 }
 
-/** Stable identity over everything a return must reproduce; the join binds on this digest. */
-function targetId(draft) {
-  const identity = {
-    repository_root: draft.repository_root,
-    coordinates: draft.coordinates,
-    scope: draft.scope,
-    criteria: draft.criteria,
-    changed_surface: draft.changed_surface,
-    requested_lenses: draft.requested_lenses,
-    required_lenses: draft.required_lenses,
-  };
-  return createHash("sha256").update(JSON.stringify(identity)).digest("hex");
-}
-
 async function buildPackage(input) {
   const root = await resolveRepositoryRoot(input.repoRoot);
   await assertCleanTree(root);
@@ -405,25 +390,26 @@ async function buildPackage(input) {
   };
   return {
     ...draft,
-    target_id: targetId(draft),
-    dispatch_ids: Object.fromEntries(required.map((lens) => [lens, randomUUID()])),
+    // Every changed path proven by a green checker: a real state, not an empty change set, and
+    // not a surface to dispatch lenses over.
+    fully_verified: allChanged.length > 0 && changedSurface.length === 0,
   };
 }
 
 /** The verdict vocabulary is the shared contract's, not a local one. */
 const VERDICTS = ["pass", "concerns", "fail", "not-run"];
-const LENS_STATUSES = ["complete", "incomplete", "failed", "unavailable", "untrusted"];
 
+/**
+ * A return needs only what carries the lens's judgment: which lens, what it concluded, and
+ * whether it finished. Nothing here correlates the return to a dispatch — that is the
+ * coordinator's own bookkeeping, and requiring an agent to echo it back would let a missing
+ * identifier discard findings the lens actually produced.
+ */
 function validReturn(value) {
   return object(value) &&
     LENSES.includes(value.lens) &&
     VERDICTS.includes(value.verdict) &&
-    LENS_STATUSES.includes(value.lens_status) &&
-    typeof value.dispatch_id === "string" && value.dispatch_id.length > 0 &&
-    typeof value.target_id === "string" && value.target_id.length > 0 &&
-    typeof value.commit_or_range === "string" && value.commit_or_range.length > 0 &&
-    (value.findings === undefined || Array.isArray(value.findings)) &&
-    (value.disagreements === undefined || Array.isArray(value.disagreements));
+    (value.findings === undefined || Array.isArray(value.findings));
 }
 
 function findingFiles(entry) {
@@ -477,54 +463,37 @@ export function classifyCoverage(pkg, finding) {
   return { coverage: "covered", criterion: match.text, source: match.source ?? null };
 }
 
-/** Every identity field a return must reproduce exactly to fill its own slot. */
-function slotIdentity(pkg, lens) {
-  return {
-    lens,
-    dispatch_id: pkg.dispatch_ids?.[lens],
-    target_id: pkg.target_id,
-    commit_or_range: pkg.coordinates?.commit_or_range,
-  };
-}
-
-function identityMatches(slot, entry) {
-  return entry.lens === slot.lens &&
-    entry.dispatch_id === slot.dispatch_id &&
-    entry.target_id === slot.target_id &&
-    entry.commit_or_range === slot.commit_or_range;
-}
-
-function blockingDisagreement(entry) {
-  return (entry.disagreements ?? []).some((item) => item?.blocking === true);
-}
-
 /**
- * The shared contract's exact keyed join, not a phrase check: one outstanding slot per required
- * `(lens, dispatch_id, target_id, coordinates)`, exactly one return accepted into its own slot.
- * A return with no slot, a filled slot, another slot's lens, or a mismatched identity field is
- * untrusted and can never replace one already accepted — which is what keying by lens alone let
- * a later duplicate do to an earlier failure.
+ * Two returns for one lens do not contend: the worse outcome wins. A later benign return can
+ * therefore never bury an earlier failure, and no return is ever discarded to achieve that —
+ * which is what keying on identity would have cost.
  */
+function worseOf(left, right) {
+  if (left === null) return right;
+  const rank = (entry) => {
+    if (entry.lens_status !== undefined && entry.lens_status !== "complete") return 3;
+    if (entry.verdict !== "pass") return 2;
+    return (entry.findings ?? []).length > 0 ? 1 : 0;
+  };
+  return rank(right) > rank(left) ? right : left;
+}
+
+/** Fail-closed join: an absent required return is never a pass. */
 export function gateDecision(pkg, returns) {
   const reasons = [];
-  const untrusted = [];
-  const slots = new Map(pkg.required_lenses.map((lens) => [lens, { identity: slotIdentity(pkg, lens), entry: null }]));
-
+  const byLens = new Map();
+  const extra = [];
   for (const entry of returns) {
-    const slot = slots.get(entry.lens);
-    if (slot === undefined) { untrusted.push({ reason: "no slot", lens: entry.lens }); continue; }
-    if (slot.entry !== null) { untrusted.push({ reason: "duplicate", lens: entry.lens }); continue; }
-    if (!identityMatches(slot.identity, entry)) { untrusted.push({ reason: "identity mismatch", lens: entry.lens }); continue; }
-    slot.entry = entry;
+    if (!pkg.required_lenses.includes(entry.lens)) { extra.push(entry); continue; }
+    byLens.set(entry.lens, worseOf(byLens.get(entry.lens) ?? null, entry));
   }
-  for (const item of untrusted) reasons.push(`untrusted return for ${item.lens}: ${item.reason}`);
 
   const concerns = [];
   const covered = [];
   const specDefects = [];
-  for (const [lens, slot] of slots) {
-    const entry = slot.entry;
-    if (entry === null) {
+  for (const lens of pkg.required_lenses) {
+    const entry = byLens.get(lens);
+    if (entry === undefined) {
       reasons.push(`required lens ${lens} returned nothing`);
       continue;
     }
@@ -534,12 +503,15 @@ export function gateDecision(pkg, returns) {
       const classified = { ...classifyCoverage(pkg, blocker), lens, finding: blocker };
       (classified.coverage === "covered" ? covered : specDefects).push(classified);
     }
-    if (entry.lens_status !== "complete") reasons.push(`required lens ${lens} returned lens_status ${entry.lens_status}`);
+    // A lens that did not finish says so, and an unfinished pass is not a pass. That is the
+    // lens's own knowledge about its work, not a correlation field.
+    if (entry.lens_status !== undefined && entry.lens_status !== "complete") {
+      reasons.push(`required lens ${lens} did not finish (${entry.lens_status})`);
+    }
     if (entry.verdict !== "pass") reasons.push(`required lens ${lens} returned ${entry.verdict}`);
     if (split.blockers.length > 0) reasons.push(`required lens ${lens} returned ${split.blockers.length} blocker(s)`);
-    if (blockingDisagreement(entry)) reasons.push(`required lens ${lens} carries an unresolved blocking disagreement`);
   }
-  return { ready: reasons.length === 0, reasons, concerns, covered, spec_defects: specDefects, untrusted };
+  return { ready: reasons.length === 0, reasons, concerns, covered, spec_defects: specDefects, unrequested: extra };
 }
 
 async function readJson(target, code) {

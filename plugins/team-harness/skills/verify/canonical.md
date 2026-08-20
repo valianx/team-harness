@@ -29,6 +29,9 @@ push, or delivery record. It never publishes.
    the required lens set. Every refusal comes from the script; none of it is operator discipline.
 2. **Dispatch.** Dispatch one `inline-reviewer` instance per lens in `required_lenses`, each
    carrying the emitted package. Several lenses are one review, not several specialists.
+   When the package reports `fully_verified: true`, every changed path was proven by a green
+   checker: report the surface as fully checker-verified, naming those checkers, and dispatch
+   no lens rather than reviewing an empty surface.
 3. **Decide.** Collect the lens returns and run `review-fan.mjs gate` over them. It resolves
    `ready` only when every required lens returned a pass with no blocker; an absent required return
    is never a pass. Report the reasons verbatim when it resolves not-ready.

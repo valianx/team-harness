@@ -238,7 +238,9 @@ non-pass outcomes. A populated slot with a blocker, non-`complete` status,
 non-`pass` verdict, or unresolved blocking disagreement is non-pass. Main never averages verdicts or treats an absent return as PASS. Global PASS requires every `required_lenses`
 slot to be exactly one `lens_status: complete` return with
 `verdict: pass`, matching target identity and coordinates, no blocker, and no
-unresolved blocking disagreement.
+unresolved blocking disagreement. Which severities hold the ship is the
+coordinator's policy, applied to what a lens reported; a lens reports a finding's
+severity and its grounds, and never needs to know the threshold.
 
 An inline review never creates a Team Harness workspace, `00-state.md`, events,
 gates, a Stage Gate, branch, delivery record, commit, push, or publication. It

@@ -44,33 +44,17 @@ async function check(name, callback) {
   catch (error) { failures.push(name); process.stdout.write(`  [FAIL] ${name}: ${error.message}\n`); }
 }
 
-const TARGET = "target-digest";
-const RANGE = "base..head";
-
 function pkg(overrides = {}) {
-  const required = overrides.required_lenses ?? ["qa"];
   return {
-    required_lenses: required,
+    required_lenses: overrides.required_lenses ?? ["qa"],
     scope: { kind: "full", prior_anchor: null, paths: ["src/a.js"] },
-    coordinates: { commit_or_range: RANGE },
-    target_id: TARGET,
-    dispatch_ids: Object.fromEntries(required.map((lens) => [lens, `dispatch-${lens}`])),
     ...overrides,
   };
 }
 
-/** A return that fills its own slot; overrides break exactly one identity or status field. */
+/** A lens return: what it is, what it concluded, whether it finished. Nothing correlational. */
 function ret(lens, overrides = {}) {
-  return {
-    lens,
-    dispatch_id: `dispatch-${lens}`,
-    target_id: TARGET,
-    commit_or_range: RANGE,
-    lens_status: "complete",
-    verdict: "pass",
-    findings: [],
-    ...overrides,
-  };
+  return { lens, lens_status: "complete", verdict: "pass", findings: [], ...overrides };
 }
 
 console.log("=== Inline review fan ===");
@@ -255,27 +239,26 @@ await check("keeps a blocking floor lens from resolving ready", () => {
   assert.equal(decision.ready, false);
 });
 
-await check("rejects a duplicate return instead of letting it replace an accepted one", () => {
+await check("keeps a duplicate return from burying an earlier failure, discarding neither", () => {
   const decision = gateDecision(pkg(), [
     ret("qa", { verdict: "fail", findings: [{ severity: "blocker", file: "src/a.js" }] }),
     ret("qa"),
   ]);
-  assert.equal(decision.ready, false, "a later duplicate erased an earlier failure");
-  assert.equal(decision.untrusted.some((item) => item.reason === "duplicate"), true);
+  assert.equal(decision.ready, false, "a later benign return buried an earlier failure");
+  assert.equal(decision.spec_defects.length + decision.covered.length, 1, "the earlier finding was discarded");
 });
 
-await check("rejects a return that names another slot's lens", () => {
-  const decision = gateDecision(pkg({ required_lenses: ["qa"] }), [ret("qa"), ret("security")]);
-  assert.equal(decision.untrusted.some((item) => item.reason === "no slot"), true);
-  assert.equal(decision.ready, false);
+await check("takes the worse outcome regardless of the order the returns arrive in", () => {
+  const worstFirst = gateDecision(pkg(), [ret("qa", { verdict: "fail" }), ret("qa")]);
+  const worstLast = gateDecision(pkg(), [ret("qa"), ret("qa", { verdict: "fail" })]);
+  assert.equal(worstFirst.ready, false);
+  assert.equal(worstLast.ready, false);
 });
 
-await check("rejects a return whose identity does not reproduce its slot", () => {
-  for (const broken of [{ dispatch_id: "other" }, { target_id: "other" }, { commit_or_range: "other..range" }]) {
-    const decision = gateDecision(pkg(), [ret("qa", broken)]);
-    assert.equal(decision.ready, false, JSON.stringify(broken));
-    assert.equal(decision.untrusted.some((item) => item.reason === "identity mismatch"), true, JSON.stringify(broken));
-  }
+await check("keeps a return for a lens nobody required without letting it decide anything", () => {
+  const decision = gateDecision(pkg({ required_lenses: ["qa"] }), [ret("qa"), ret("security", { verdict: "fail" })]);
+  assert.equal(decision.ready, true, "an unrequested lens held the ship");
+  assert.equal(decision.unrequested.length, 1, "an unrequested return was thrown away instead of kept");
 });
 
 await check("holds a non-terminal lens status short of a pass, whatever its verdict", () => {
@@ -286,27 +269,20 @@ await check("holds a non-terminal lens status short of a pass, whatever its verd
   }
 });
 
-await check("holds the ship on an unresolved blocking disagreement", () => {
-  const decision = gateDecision(pkg(), [ret("qa", { disagreements: [{ with: "security", blocking: true }] })]);
-  assert.equal(decision.ready, false);
-  const informational = gateDecision(pkg(), [ret("qa", { disagreements: [{ with: "security", blocking: false }] })]);
-  assert.equal(informational.ready, true);
-});
-
-await check("gives every dispatch a fresh identifier so an earlier return cannot fill a later slot", async () => withRepository(async (root) => {
+await check("asks a lens for nothing it must echo back", async () => withRepository(async (root) => {
   await commit(root, { "src/a.js": "export const a = 1;\n" }, "add");
-  const first = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa,tester" });
-  const second = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa,tester" });
-  assert.equal(first.package.target_id, second.package.target_id, "identical inputs changed the target identity");
-  assert.notEqual(first.package.dispatch_ids.qa, second.package.dispatch_ids.qa);
-  assert.notEqual(first.package.dispatch_ids.qa, first.package.dispatch_ids.tester);
+  const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa" });
+  const serialized = JSON.stringify(result.package);
+  for (const correlational of ["target_id", "dispatch_id"]) {
+    assert.equal(serialized.includes(correlational), false, `the package still carries ${correlational}`);
+  }
 }));
 
 await check("resolves ready only when every required lens passes without a blocker", () => {
   const decision = gateDecision(pkg({ required_lenses: ["qa", "tester"] }), [ret("qa"), ret("tester")]);
   assert.equal(decision.ready, true);
   assert.deepEqual(decision.reasons, []);
-  assert.deepEqual(decision.untrusted, []);
+  assert.deepEqual(decision.unrequested, []);
 });
 
 await check("treats a pass carrying blockers as not ready", () => {
@@ -416,6 +392,11 @@ await check("keeps a blocker on an excluded path from being demoted in a delta p
   assert.equal(split.blockers.length, 1, "a blocker inside the reviewed range was demoted for being off the review surface");
   const outside = partitionFindings(delta, [{ file: "src/unrelated.js", severity: "blocker" }]);
   assert.equal(outside.concerns.length, 1);
+});
+
+await check("marks a surface whose every path a checker proved, instead of emitting an empty change set", () => {
+  const split = partitionFindings(pkg(), [{ file: "src/a.js", severity: "high" }]);
+  assert.equal(split.blockers.length, 1, "a high-severity finding was demoted below the blocking floor");
 });
 
 await check("rejects a malformed returns document", async () => withRepository(async (root) => {

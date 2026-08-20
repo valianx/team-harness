@@ -1358,6 +1358,11 @@ def check_routing_predicate_carriers() -> None:
     producer = read("skills/verify/scripts/review-fan.mjs")
     require("spec_defects" in producer, "the producer does not report spec defects")
     require("classifyCoverage" in producer, "the producer does not classify finding coverage")
+    for correlational in ("target_id", "dispatch_id"):
+        require(
+            correlational not in producer,
+            f"the verification fan asks an agent to echo {correlational}, so a missing identifier can discard its findings",
+        )
 
 
 def check_review_surface_exclusion_stays_in_construction() -> None:
