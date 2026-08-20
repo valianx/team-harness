@@ -1848,7 +1848,7 @@ before push so post-decision movement is visible too.
 
 Before presenting, write the exact issue/version/file-map/diff/size/suite coordinates used
 for this gate into `00-state.md § Current State` using
-`agents/_shared/orchestrator-state.md § "Delivery coordinates"`. An `amend` re-presentation
+`agents/_shared/orchestrator-state.md § "Current State — the schema you write"`. An `amend` re-presentation
 replaces the whole block from the newly frozen tree.
 
 **Options and stable numeric shortcuts (exception presentation only):**

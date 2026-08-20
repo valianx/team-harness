@@ -288,13 +288,13 @@ the one-JSON-object-per-line invariant, and it never removes an event —
 every `phase.*`/`gate.*` event this schema requires still fires unchanged,
 regardless of how compact its optional free-text fields are. Inline direct work is
 outside the pipeline observability floor; activated pipeline events remain mandatory.
-Canonical source: `agents/ref-pipeline.md § "Free-text bound"`; the two
+Canonical source: `agents/ref-pipeline.md`; the two
 sites must not diverge.
 
 **Named exception — the `checkpoint.confirmed` confirmatory-text field, additive only.**
 The general clause above governs every OTHER free-text field unchanged. The field
 carrying the operator's own words in the `checkpoint.confirmed` event (the
-functional-clarity confirmation, `agents/ref-pipeline.md § "Checkpoint-trust-transfer"`)
+functional-clarity confirmation, `agents/ref-pipeline.md § "Gates"`)
 is a single named exception, additive to — never a replacement of — the general clause:
 ≤280 chars (one confirmatory turn, not the surrounding conversation); quotes and
 `\n\r\t` are ESCAPED as JSON string escapes, never stripped, so the operator's exact
@@ -308,7 +308,7 @@ marked visibly with `…[truncated]`; the secret prohibition (§ "Secret prohibi
 unaffected — a confirmation carrying a credential records `provenance` and
 `withheld — secret prohibition` in place of the text. `provenance` itself is a closed
 enum, not free text, and is never subject to this bound. Without this reconciliation
-written at both sites — here and `agents/ref-pipeline.md § "Free-text bound"`,
+written at both sites — here and `agents/ref-pipeline.md`,
 which must not diverge — the field is not added. This exception is scoped to exactly
 this one field: the general `≤120 chars`/`never multi-sentence narrative prose` clause
 above is byte-preserved for every other free-text field.
@@ -689,8 +689,7 @@ narrative for a given round lives exclusively in `failure-brief.md`.
 `phase.*`/`gate.*` emission (inline direct work is outside that machine) and it does not change what `00-pipeline-summary.md`
 derives from the trace.
 
-Canonical source: `agents/ref-pipeline.md § "Transition protocol — atomic, all three steps, never
-partial"` (the upsert mechanic) and `§ "Agent Results"` (the schema template — the narrative "Hot
+Canonical source: `agents/ref-pipeline.md` (the upsert mechanic) and `§ "Agent Results"` (the schema template — the narrative "Hot
 Context" section this upsert once also maintained is retired, per that same section's own note);
 the two sites must not diverge.
 

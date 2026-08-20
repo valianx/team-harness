@@ -219,6 +219,7 @@ jobs:
           node tools/codex-runtime/validate-marketplace.mjs
           python3 tests/test_codex_runtime.py
           python3 tests/test_no_prose_assertions.py
+          python3 tests/test_reference_resolution.py
       - name: Verify Codex hooks
         run: |
           node tools/codex-runtime/sync-hooks.mjs --check

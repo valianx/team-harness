@@ -103,6 +103,20 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 3f: every document pointer resolves"
+echo "############################################################"
+if [ -n "$PY" ] && $PY "$TESTS_DIR/test_reference_resolution.py"; then
+    echo "reference-resolution: PASS"
+elif [ -z "$PY" ]; then
+    echo "reference-resolution: FAIL (Python 3 not found)"
+    FAILED=$((FAILED + 1))
+else
+    echo "reference-resolution: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 echo "# Suite 3e: hardened immutable Git environment (behaviour)"
 echo "############################################################"
 if [ -n "$PY" ] && $PY "$TESTS_DIR/test_inline_git_hardening.py"; then

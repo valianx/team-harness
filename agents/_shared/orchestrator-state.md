@@ -355,7 +355,7 @@ fresh attempt with attempt-qualified evidence paths. Only
 `/th:recover`, any entry with no matching `disposition` row in
 `00-decision-ledger.md` surfaces as an unresolved carry-over before the next
 gate. Written only by the orchestrator, only when a finding lands as a task AC
-or `agents/ref-pipeline.md § "Finding disposition"` records it as
+or `agents/ref-pipeline.md § "Pre-decision consolidation over a failed validation fan"` records it as
 accepted-without-AC — never speculatively, never as transport for an
 undispositioned finding.
 

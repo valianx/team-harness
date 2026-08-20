@@ -262,7 +262,7 @@ examples accepts a legacy marker as activation or routing.
 Do not create a state file or workspace merely to record a tier.
 ## Root-Cause Provenance Tiers
 
-Triggered from `agents/ref-pipeline.md § "Phase 1 — Design"`, only for a `type: fix` dispatch at
+Triggered from `agents/ref-pipeline.md § "Design"`, only for a `type: fix` dispatch at
 Tier 2-4 (a `root-cause` architect mode dispatch in the pipeline) where a candidate
 root-cause artifact already exists — prior `/th:research-code` output from this run, a spec-seed
 prior citing `file:line`, or a linked investigation from an issue/comment.

@@ -200,7 +200,7 @@ independent of any gate.
 At each STAGE-GATE the orchestrator renders the STOP block directly to the operator
 inline, pausing for an explicit reply in that same conversation. The shape below is a
 GENERIC template: the orchestrator's own gate-data contract
-(`agents/ref-pipeline.md § "STAGE-GATE-1"`/`"STAGE-GATE-3"`)
+(`agents/ref-pipeline.md § "Design"`/`"STAGE-GATE-3"`)
 supplies the REAL option set of each presentation, including its conditionality.
 Substituting the real option set with this generic placeholder — rendering the bare
 `ship`/`amend`/`abort` shape shown below when the actual presentation's set is narrower or

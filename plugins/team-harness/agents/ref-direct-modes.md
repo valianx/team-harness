@@ -840,7 +840,7 @@ When invoked with `Direct Mode Task: apply-review`:
 
 This is the explicit, on-demand entry point into the coordinator's author-side
 apply-review handling. It is a COMPLEMENT to the automatic, lifecycle-bound trigger
-in `orchestrator.md § "PR Comment Incorporation — Apply-Review Disposition"`, not a
+in `orchestrator.md`, not a
 replacement. Both paths load the same shared disposition snippet
 (`agents/_shared/apply-review-disposition.md`) and behave identically per comment.
 

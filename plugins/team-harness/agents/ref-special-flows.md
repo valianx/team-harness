@@ -354,7 +354,7 @@ another coordinator, including another copy of itself
 analysis (`agents/ref-pipeline.md § "14–17"`) identifies genuinely independent tasks up front; the
 architect writes them as `01-plan.md § Task List` rows ordered by their `Depends on:` DAG, and
 Phase 2 is **exactly one `implementer` dispatch covering every task** — never one per task
-(`agents/ref-pipeline.md § "Scheduler — one dispatch, DAG order inside it"`). Intra-task file-level
+(`agents/ref-pipeline.md § "Scheduler — never one dispatch per task"`). Intra-task file-level
 parallelism, when a single task's own scope is large enough, uses
 `agents/ref-pipeline.md § "Intra-task lane decomposition"` — implementer lanes sharing ONE worktree
 and branch, consolidated by the coordinator as sole committer. One plan, one pipeline run, one PR

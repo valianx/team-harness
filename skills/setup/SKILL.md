@@ -217,7 +217,7 @@ The obsidian vault sits outside the current project's working tree, so every sub
      Bash(gh auth switch:*), mcp__memory__*
    ```
 
-This sub-step never adds a rule for an outward action (`git push`, `gh pr *`, any GitHub/ClickUp API write, any form of `gh api`) — the read-only allowlist set is disjoint from dev-guard's outward-action catalogue by construction (`docs/permission-provisioning.md § "Read-only allowlist — disjointness invariant"`, enforced by `tests/test_permission_disjointness.py`); the `Edit`/`Write`/`additionalDirectories` rules stay scoped strictly to the obsidian workspace base resolved in Step 3. Outward actions stay gated exclusively by `dev-guard` (CLAUDE.md § "Outward-action gate").
+This sub-step never adds a rule for an outward action (`git push`, `gh pr *`, any GitHub/ClickUp API write, any form of `gh api`) — the read-only allowlist set is disjoint from dev-guard's outward-action catalogue by construction (`docs/permission-provisioning.md § "Read-only allowlist — disjointness invariant"`, enforced by `tests/test_permission_disjointness.py`); the `Edit`/`Write`/`additionalDirectories` rules stay scoped strictly to the obsidian workspace base resolved in Step 3. Outward actions stay gated exclusively by `dev-guard` (CLAUDE.md).
 
 **Existing-install coverage.** This is a KEYS-once offer — an operator who already ran `/th:setup` before this sub-step existed, or who declined it here, is covered by a second, recurring offer at the orchestrator's own Intake (site B — detects a missing rule on every pipeline start in obsidian mode and re-offers it there). See `docs/permission-provisioning.md § Provisioning sites`.
 
