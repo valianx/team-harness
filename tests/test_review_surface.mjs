@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { CHECKERS, canonicalSourceFor, computeReviewSurface, mirrorFor } from "../skills/pipeline/scripts/review-surface.mjs";
+import { CHECKERS, canonicalSourceFor, computeReviewSurface, mirrorFor, provenMirrors } from "../skills/pipeline/scripts/review-surface.mjs";
 
 const run = promisify(execFile);
 const failures = [];
@@ -115,18 +115,35 @@ await check("excludes only byte-identical mirrors on the real repository", async
   }
 });
 
-await check("keeps a drifted mirror in the review surface", async () => {
-  const result = await computeReviewSurface({ repoRoot: REPO_ROOT, range: "HEAD~1..HEAD" });
-  if (result.withheld_by.length > 0) return;
-  const { readFile } = await import("node:fs/promises");
-  for (const entry of result.excluded.slice(0, 3)) {
-    const [projection, source] = await Promise.all([
-      readFile(path.join(REPO_ROOT, entry.path)),
-      readFile(path.join(REPO_ROOT, entry.source)),
-    ]);
-    assert.ok(projection.equals(source), `${entry.path} was excluded without matching its source`);
-  }
-});
+await check("proves mirror equality at the reviewed head, not at whatever is checked out", async () => withRepository(async (root) => {
+  // The projection is identical to its source at the first commit and drifts at the second.
+  await write(root, "agents/a.md", "canonical v1\n");
+  await write(root, "plugins/team-harness/agents/a.md", "canonical v1\n");
+  await git(root, ["add", "-A"]);
+  await git(root, ["commit", "-q", "-m", "identical"]);
+  const identical = (await run("git", ["-C", root, "rev-parse", "HEAD"])).stdout.trim();
+
+  await write(root, "agents/a.md", "canonical v2\n");
+  await write(root, "plugins/team-harness/agents/a.md", "STALE MIRROR\n");
+  await git(root, ["add", "-A"]);
+  await git(root, ["commit", "-q", "-m", "drifted"]);
+  const drifted = (await run("git", ["-C", root, "rev-parse", "HEAD"])).stdout.trim();
+
+  // Check out the identical commit, then ask about the drifted one. Reading the working tree
+  // would report the mirror as byte-identical; reading the reviewed head must not.
+  await git(root, ["checkout", "-q", identical]);
+  const paths = ["plugins/team-harness/agents/a.md"];
+  assert.deepEqual(
+    (await provenMirrors(root, drifted, paths)).map((entry) => entry.path),
+    [],
+    "a mirror that drifted at the reviewed head was excluded from the review surface",
+  );
+  assert.deepEqual(
+    (await provenMirrors(root, identical, paths)).map((entry) => entry.path),
+    paths,
+    "a mirror identical at the reviewed head was not excluded",
+  );
+}));
 
 await check("emits literal exclude pathspecs so a metacharacter cannot widen the exclusion", async () => {
   const result = await computeReviewSurface({ repoRoot: REPO_ROOT, range: "HEAD~1..HEAD" });

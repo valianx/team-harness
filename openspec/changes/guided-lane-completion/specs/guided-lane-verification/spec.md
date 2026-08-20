@@ -36,6 +36,50 @@ The guided lane SHALL run at most one full-scope review of a branch. A fix appli
 - **WHEN** a live operator request asks for a reviewed closure pass over an applied fix
 - **THEN** a delta-scoped package bounded to the range since the prior anchor is emitted, as an explicitly requested exception rather than a default step
 
+### Requirement: The package carries the identity the shared contract joins on
+
+The emitted package SHALL carry a `target_id` over its resolved root, coordinates, range, scope, criteria, changed surface, and lens lists, and a fresh `dispatch_id` per required lens. A package that omits either leaves the ship decision with nothing to bind a return to, and MUST NOT be emitted.
+
+#### Scenario: A package is emitted for several lenses
+- **WHEN** the producer emits a package whose required lens set has more than one member
+- **THEN** it carries one `target_id` and one distinct `dispatch_id` per required lens
+
+#### Scenario: The same range is packaged twice
+- **WHEN** the producer emits a package for a range it packaged before
+- **THEN** each `dispatch_id` is fresh, so a return from the earlier package cannot fill a slot in the later one
+
+### Requirement: The ship decision performs the shared contract's exact keyed join
+
+The ship decision SHALL implement the consolidation join defined in `agents/_shared/inline-review-contract.md`: one outstanding slot per required `(lens, dispatch_id, target_id, coordinates)`, exactly one return accepted into its own slot after exact equality of all four fields, and a return with no slot, a filled slot, another slot's lens, or a mismatched identity field rejected as untrusted. A pass MUST additionally require `lens_status: complete`. The decision MUST NOT key returns by lens alone.
+
+#### Scenario: A duplicate return arrives for a filled slot
+- **WHEN** a second return names a slot that already holds one
+- **THEN** it is rejected as untrusted and cannot replace the return already accepted, whatever verdict it carries
+
+#### Scenario: A return carries a stale or foreign identity
+- **WHEN** a return's `dispatch_id`, `target_id`, or coordinates do not equal its slot's
+- **THEN** it is rejected as untrusted and its slot stays unfilled
+
+#### Scenario: A return is not terminally complete
+- **WHEN** an accepted return carries a `lens_status` other than `complete`
+- **THEN** the slot resolves non-pass regardless of its verdict
+
+#### Scenario: Every required slot holds one complete passing return
+- **WHEN** all identity fields match, no blocker is present, and no blocking disagreement is unresolved
+- **THEN** the decision resolves ready
+
+### Requirement: Criteria are read from the reviewed tree, never the working checkout
+
+Written-intent criteria SHALL be read from the tree the reviewed range resolves to, so a package cannot bind criteria that are absent from its own immutable target. The producer MUST refuse rather than fall back to the working checkout when it cannot read the change from that tree.
+
+#### Scenario: The working checkout carries a newer or untracked change directory
+- **WHEN** the reviewed range's head does not contain the change content present in the checkout
+- **THEN** the criteria come from the reviewed head, and the checkout-only content is not bound
+
+#### Scenario: The named change is absent from the reviewed head
+- **WHEN** the reviewed head has no such change directory
+- **THEN** the producer refuses with that precondition named and emits no package
+
 ### Requirement: A finding is classified by whether the spec anticipated it
 
 The ship decision SHALL classify every finding as covered or uncovered by comparing it against the bound written-intent criteria, and MUST report that classification rather than leaving it to judgement. An uncovered finding above the floor is a defect in the authored change and MUST return there for an operator-approved revision; an uncovered finding below the floor rides as a pull-request concern. Neither MAY become another review pass.

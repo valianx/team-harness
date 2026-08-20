@@ -2,7 +2,6 @@
 /** Derive which changed paths a green deterministic checker already proves, and exclude only those. */
 
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { promisify } from "node:util";
@@ -102,16 +101,27 @@ async function changedPaths(root, range) {
   }
 }
 
-async function bytesEqual(root, left, right) {
+/**
+ * Read a blob out of the reviewed tree, never the working checkout. Proving mirror equality
+ * against whatever happens to be checked out would let a drifted projection pass whenever the
+ * checkout is not the reviewed head — the exact case the exclusion must not get wrong.
+ */
+async function blobAt(root, head, relative) {
   try {
-    const [a, b] = await Promise.all([
-      readFile(path.join(root, left)),
-      readFile(path.join(root, right)),
-    ]);
-    return a.equals(b);
+    const { stdout } = await run("git", ["-C", root, "show", `${head}:${relative}`], {
+      maxBuffer: MAX_BUFFER,
+      windowsHide: true,
+      encoding: "buffer",
+    });
+    return stdout;
   } catch {
-    return false;
+    return null;
   }
+}
+
+async function bytesEqualAt(root, head, left, right) {
+  const [a, b] = await Promise.all([blobAt(root, head, left), blobAt(root, head, right)]);
+  return a !== null && b !== null && a.equals(b);
 }
 
 async function countedLines(root, range, paths) {
@@ -126,15 +136,27 @@ async function countedLines(root, range, paths) {
   return total;
 }
 
-/** A changed path is excludable only when it is byte-identical to the source it mirrors. */
-async function provenMirrors(root, paths) {
+/** A changed path is excludable only when it is byte-identical, in the reviewed tree, to its source. */
+export async function provenMirrors(root, head, paths) {
   const proven = [];
   for (const candidate of paths) {
     const mirror = mirrorFor(candidate);
     if (mirror === null) continue;
-    if (await bytesEqual(root, candidate, mirror.source)) proven.push({ path: candidate, ...mirror });
+    if (await bytesEqualAt(root, head, candidate, mirror.source)) proven.push({ path: candidate, ...mirror });
   }
   return proven;
+}
+
+/** The reviewed head is the right endpoint of the range; every proof is taken against it. */
+async function resolveHead(root, range) {
+  const separator = range.lastIndexOf("..");
+  const right = separator === -1 ? range : range.slice(separator + 2);
+  const endpoint = right.length > 0 ? right : "HEAD";
+  try {
+    return (await git(root, ["rev-parse", "--verify", `${endpoint}^{commit}`])).trim();
+  } catch {
+    return fail("RANGE_NOT_COMMITTED");
+  }
 }
 
 export async function computeReviewSurface(input) {
@@ -144,6 +166,7 @@ export async function computeReviewSurface(input) {
     const results = await Promise.all(CHECKERS.map((checker) => runChecker(root, checker)));
     const withholding = results.filter((result) => result.status !== "pass");
     const paths = await changedPaths(root, input.range);
+    const head = await resolveHead(root, input.range);
 
     if (withholding.length > 0) {
       return {
@@ -161,7 +184,7 @@ export async function computeReviewSurface(input) {
       };
     }
 
-    const proven = await provenMirrors(root, paths);
+    const proven = await provenMirrors(root, head, paths);
     const excludedPaths = proven.map((entry) => entry.path);
     return {
       schema_version: REVIEW_SURFACE_SCHEMA_VERSION,
@@ -169,6 +192,7 @@ export async function computeReviewSurface(input) {
       verdict: "pass",
       error_code: null,
       checkers: results,
+      reviewed_head: head,
       excluded: proven.map((entry) => ({ ...entry, provenance: "byte-identical-mirror" })),
       // `literal` disables glob and magic-character interpretation, so a path containing a
       // metacharacter excludes itself and nothing else.
