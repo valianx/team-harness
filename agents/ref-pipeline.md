@@ -339,7 +339,7 @@ exactly that one authorization.
 
 You present every STAGE-GATE to the operator inline and record its release. Contract: `agents/_shared/gate-contract.md` — dual record, STOP-block templates, ambiguous-reply rule. This file implements it and never re-derives it.
 
-1. **Prepare.** Produce the gate's artifacts, generate a fresh single-use `gate_nonce` — on every presentation, including a re-ask or a `redo`/`edit`/`amend` re-fire — and write it to `00-state.md` beside the pending gate.
+1. **Prepare.** Produce the gate's artifacts — on every presentation, including a re-ask or a `redo`/`edit`/`amend` re-fire — and write it to `00-state.md` beside the pending gate.
 2. **Present** the gate inline: name, what is being approved, the workspace path, the options.
 3. **Interpret** the reply against the gate's closed allowlist and attribute it to the currently-pending presentation in coordinator state. The operator never types or returns the nonce. A reply that predates the pending presentation, or answers a presentation superseded by a later nonce, is ambiguous: re-present and record neither half.
 4. **Record both halves atomically** — the `gateN_release` field and the `stage.gate.release` event, in the same phase-transition write, consuming the nonce.
@@ -1841,7 +1841,7 @@ pass and the delivery coordinates are persisted, evaluate the closed exception l
 | `accumulated_cost` | `~{N}K tokens (~${X})` |
 | `security_audit` | verdict (`could-not-break` / `broke-it` / `not run (security_floor_applies: false)` / `unavailable`), `open_breaks: [{finding, file:line, impact}]`, `audit_coverage`, `incomplete_on_changed_control` |
 | `bump_override` | `{level} — <reason>`, present **only** when the computed version sits above the mechanical SemVer floor for the diff |
-| `options`, `gate_nonce` | the closed allowlist; fresh nonce |
+| `options` | the closed allowlist |
 
 **Present `audit_coverage` adjacent to the diff composition.** Coverage is an auditor self-declaration; the composition you computed independently. Side by side, an implausible `full` claim against a large substantive diff is visible rather than taken on faith. **Surface `incomplete_on_changed_control` explicitly** — never infer it from `open_breaks` being empty. The flag means material evidence or coverage was unavailable, not merely that a changed control resisted the attack.
 

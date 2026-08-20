@@ -52,7 +52,6 @@ correction_dispositions: [{id, disposition: resolve|design-consistent|decision-r
 correction_decision: authorize|pause|abort|null
 correction_decision_nonce: {consumed token or null}
 correction_authority: operator-live|gate1-autonomous|null
-correction_authority_gate_nonce: {consumed Gate-1 token or null}
 autonomous_correction_count: N      # integer 0..3; the only correction budget
 operator_correction_count: N        # non-negative integer; deliberately unbounded
 last_completed: design|waiting_gate1|implementation|validation|waiting_gate3|delivery|complete|null
@@ -364,11 +363,10 @@ or `agents/ref-pipeline.md § "Pre-decision consolidation over a failed validati
 accepted-without-AC — never speculatively, never as transport for an
 undispositioned finding.
 
-**Gate fields — bare literals, never repaired.** Contract: `agents/_shared/gate-contract.md § "The dual-record release"` and its no-gate-field-repair invariant. The seven gate fields are `gate_pending`, `gate1_release`, `gate3_release`, `release_policy`, `gate_nonce`, `working_branch`, and `worktree` — every one a bare literal in the real file, with no second space-delimited token ever trailing a value. `checkpoint_boundary` is a separate derived checkpoint cache, not a gate field or release. A release is valid only as a dual record: the matching state field and `stage.gate.release` event must agree on decision and nonce. Recovery and delivery fail closed when either half is absent or mismatched; neither side may be repaired or inferred from phase/status text. An administrative close for a live inline request sets no gate release and consumes no nonce.
+**Gate fields — bare literals, never repaired.** Contract: `agents/_shared/gate-contract.md § "The dual-record release"` and its no-gate-field-repair invariant. The seven gate fields are `gate_pending`, `gate1_release`, `gate3_release`, `release_policy`, `working_branch`, and `worktree` — every one a bare literal in the real file, with no second space-delimited token ever trailing a value. `checkpoint_boundary` is a separate derived checkpoint cache, not a gate field or release. A release is valid only as a dual record: the matching state field and `stage.gate.release` event must agree on decision and nonce. Recovery and delivery fail closed when either half is absent or mismatched; neither side may be repaired or inferred from phase/status text. An administrative close for a live inline request sets no gate release and consumes no nonce.
 ```
 gate1_release: approved|approved-autonomous|rejected|edit|null
 gate3_release: ship|auto-ship|amend|abort|null
-gate_nonce: {token}|null                    # fresh per presentation, consumed on release
 ```
 
 **Branch and worktree topology.**
@@ -489,7 +487,7 @@ reason (`operator selected inline`, without copying the direct request), then at
 sets `phase: aborted`, `status: aborted`, clears `gate_pending`, and sets
 `next_action: none — pipeline administratively closed`. This is a close, not
 a Gate 3 `abort` release: leave `gate1_release`/`gate3_release` unchanged, do not
-consume `gate_nonce`, and do not infer authorization from any stored or external
+do not infer authorization from any stored or external
 content. The subsequent direct run has no workspace, state, events, or posture value.
 
 ### Schema
@@ -511,7 +509,7 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | `wall_time_ms`, `declared_input_bytes` | conditional | `agent.close` carries both, as non-negative integers, enforced by `skills/pipeline/scripts/openspec-events.mjs`. `wall_time_ms` is derived from this attempt's own `agent.spawn` and `agent.close` timestamps — including an attempt closed after a stall, whose consumed time is recorded and marked as returning no result. `declared_input_bytes` is the byte size of the dispatch's declared input manifest. `wall_time_ms` is checked against this attempt's own spawn and close timestamps, because an unchecked number is one the producer could have invented. Both are derivations over artifacts the coordinator already owns; neither is a consumed-token measure, and neither may be substituted for one |
 | `correction_cause` | conditional | required for `agent.correction.spawn`; literal `verification` only |
 | `correction_nonce`, `correction_anchor`, `correction_findings`, `correction_scope`, `correction_requirements`, `correction_closure`, `correction_dispositions` | conditional | required for `correction.decision` and every authorized `iteration.start`/`agent.correction.spawn`; the complete seven-field package must be byte-for-byte identical across all three events, not merely share a nonce; exact bounded identity, never inferred; closure has one deterministic check/expected result per finding |
-| `correction_authority`, `correction_authority_gate_nonce` | conditional | required and byte-identical across `correction.decision`, `iteration.start`, and `agent.correction.spawn`; `operator-live` uses a null Gate nonce and is unbounded, while `gate1-autonomous` requires the exact nonce from the valid Gate-1 approval release and `autonomous_correction_count < 3` |
+| `correction_authority` | conditional | required and byte-identical across `correction.decision`, `iteration.start`, and `agent.correction.spawn`; `operator-live` is unbounded, while `gate1-autonomous` requires a recorded Gate-1 approval release for this pipeline and `autonomous_correction_count < 3` |
 | `convergence_counts` | conditional | required on every `iteration.start` following a correction fan; one object with exactly the three non-negative integer keys `new_in_delta`, `pre_existing_missed`, `reopened` counting that round's findings by the ratchet's classification vocabulary (`agents/ref-pipeline.md § "The ratchet"`); present with all-zero values when the triggering round produced no reasoning-lens findings — never omitted |
 | `verdict` | conditional | `pass`/`concerns`/`fail`/`partial-fail` |
 | `decision` | conditional | required for `stage.gate.release` and `correction.decision`; correction value is `authorize\|pause\|abort` |
