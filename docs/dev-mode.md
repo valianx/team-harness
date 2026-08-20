@@ -277,7 +277,7 @@ phase or gate as skipped without an explicit current contract rule is a violatio
 
 In OpenCode, only the Layer-2 self-check (orchestrator's own contract discipline) enforces the reasoning checkpoint at boundaries B1/B2/B3. OpenCode does not install `checkpoint-guard`; `Task` availability follows the operator's native permission policy.
 
-On the CC foreground path (top-level, `Task` available), the Layer-1 hook fires on every leaf dispatch. B1/B2/B3 are enforced by a harness-level deterministic floor, not just the orchestrator's own discipline. This is a strengthening of the checkpoint. Security floors remain independent of the checkpoint state in both modes (see `docs/reasoning-checkpoint.md § Enforcement`).
+On Claude Code the position is the same: `checkpoint-guard` has been unregistered since v2.139.0 and its script no longer exists, so no harness-level floor enforces B1/B2/B3 on either runtime. The coordinator's own contract discipline is the only layer, and its worst case is a skipped pedagogical pause rather than a bypassed control.
 
 ---
 

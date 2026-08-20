@@ -87,7 +87,7 @@ authority and the plan is the human-facing mirror.
 - spans_multiple_services: true|false
 ```
 
-The verifier reads these with strict line-token parsing (same as `checkpoint-guard.sh:97-102`).
+The verifier reads these with strict line-token parsing (exact line tokens, no fuzzy matching).
 `00-state.md` is the **verifier's authority**. `01-plan.md § Review Summary → ### Classification
 block` is the **human-facing mirror** — it repeats the same values so the operator sees them at
 STAGE-GATE-1. Only the coordinator writes the state block; a specialist finding a mismatch
@@ -204,7 +204,7 @@ It is an orchestrator-invoked gate script (like the TS-based `notify-stage` hook
 run via `hooks/run-ts-hook.sh notify-stage`), NOT a `PreToolUse` event hook. Do NOT
 add it to `.claude-plugin/hooks.json`.
 
-**Fail-OPEN:** the verifier fails safe-allow (same pattern as `checkpoint-guard.sh:20-22`).
+**Fail-OPEN:** the verifier fails safe-allow (an unreadable or absent input allows rather than blocks).
 This is a completeness check, not a security gate. The coordinator and the operator at
 STAGE-GATE-1 are the backstops. A missing sketch surfaces as a `concerns`-level finding the
 operator sees — never a hard block that strands the pipeline on a parsing edge case.
