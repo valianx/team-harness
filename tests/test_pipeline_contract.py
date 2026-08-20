@@ -1360,6 +1360,32 @@ def check_routing_predicate_carriers() -> None:
     require("classifyCoverage" in producer, "the producer does not classify finding coverage")
 
 
+def check_security_waiver_is_not_widened() -> None:
+    """The security lens is waived by one positive classification, in every runtime copy."""
+    copies = (
+        "skills/review-pr/scripts/review_context.py",
+        "plugins/team-harness/skills/review-pr/scripts/review_context.py",
+        "installer-assets/opencode-skills/review-pr/scripts/review_context.py",
+    )
+    canonical = (ROOT / copies[0]).read_bytes()
+    for relative in copies[1:]:
+        require((ROOT / relative).read_bytes() == canonical, f"review context drifted: {relative}")
+
+    source = read(copies[0])
+    require(
+        'REASONS_WAIVING_SECURITY = {"known-non-executable"}' in source,
+        "the security waiver set is not exactly the one positive benign classification",
+    )
+    require(
+        "reason not in REASONS_WAIVING_SECURITY" in source,
+        "security resolution no longer keys on the waiver set",
+    )
+    require(
+        "REASONS_REQUIRING_SECURITY" not in source,
+        "security resolution still enumerates reasons that require the lens, so a new reason escapes the floor",
+    )
+
+
 def check_section_citations_resolve() -> None:
     """A cited section anchor resolves, and the recorded pre-existing debt cannot grow."""
     sys.path.insert(0, str(ROOT / "tests"))
@@ -3878,6 +3904,7 @@ def main() -> None:
         ("verification fan producer", check_verification_fan_producer),
         ("section citations resolve", check_section_citations_resolve),
         ("routing predicate carriers", check_routing_predicate_carriers),
+        ("security waiver not widened", check_security_waiver_is_not_widened),
         ("authoritative post-Gate-1 transitions", check_authoritative_post_gate1_transitions),
         ("direct predicate", check_direct_predicate),
         ("single writer", check_single_writer),

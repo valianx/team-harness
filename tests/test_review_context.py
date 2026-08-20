@@ -374,7 +374,7 @@ class ReviewContextTests(unittest.TestCase):
             ("docs/guide.md\n", "+clarify review behavior\n", "known-non-executable", False),
             ("config/app.json\n", '+{"flag": true}\n', "known-non-executable", False),
             ("src/plugin.future\n", "+run new handler\n", "unmatched-executable", True),
-            ("", "", "indeterminate", False),
+            ("", "", "indeterminate", True),
         ]
         for changed_files, diff, reason, required in cases:
             with self.subTest(reason=reason):
@@ -554,6 +554,33 @@ class ReviewContextTests(unittest.TestCase):
         reason = MODULE.classify_security_change(changed_files, diff)
         self.assertEqual(reason, "known-sensitive")
         self.assertTrue(MODULE.resolve_security_required(reason, []))
+
+    def test_only_a_positive_benign_classification_waives_the_security_lens(self):
+        """The property, not the inputs: every reason but one requires the lens."""
+        waived = MODULE.REASONS_WAIVING_SECURITY
+        self.assertEqual(waived, {"known-non-executable"})
+        for reason in ("known-sensitive", "unmatched-executable", "indeterminate"):
+            with self.subTest(reason=reason):
+                self.assertTrue(MODULE.resolve_security_required(reason, []))
+        self.assertFalse(MODULE.resolve_security_required("known-non-executable", []))
+
+    def test_every_indeterminate_producer_requires_the_security_lens(self):
+        """Each distinct way classification can fail must reach the same fail-closed answer."""
+        producers = {
+            "empty changed-file list": ("", "+something\n"),
+            "empty diff": ("src/app.py\n", ""),
+            "null byte in the changed-file list": ("src/\x00app.py\n", "+something\n"),
+            "null byte in the diff": ("src/app.py\n", "+some\x00thing\n"),
+        }
+        for label, (changed_files, diff) in producers.items():
+            with self.subTest(producer=label):
+                reason = MODULE.classify_security_change(changed_files, diff)
+                self.assertEqual(reason, "indeterminate")
+                self.assertTrue(MODULE.resolve_security_required(reason, []))
+
+    def test_an_unknown_future_reason_requires_the_security_lens(self):
+        """A reason nobody enumerated inherits the floor rather than escaping it."""
+        self.assertTrue(MODULE.resolve_security_required("some-reason-added-later", []))
 
     def test_binary_marker_in_readable_content_does_not_suppress_the_section(self):
         changed_files = "skills/review-pr/scripts/review_context.py\n"

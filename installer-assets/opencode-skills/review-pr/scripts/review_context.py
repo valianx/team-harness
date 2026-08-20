@@ -1293,17 +1293,20 @@ def command_same_author(args: argparse.Namespace) -> int:
     return 0
 
 
-REASONS_REQUIRING_SECURITY = {"known-sensitive", "unmatched-executable"}
+# The waiver is keyed to the one positive benign classification, never to a list of
+# failure modes: a reason that means "could not classify" is not evidence of safety, and
+# a later indeterminate producer inherits the floor without being enumerated here.
+REASONS_WAIVING_SECURITY = {"known-non-executable"}
 
 
 def resolve_security_required(reason: str, triggers: list[str]) -> bool:
     """Pure function of the resolved reason and trigger list.
 
-    An explicit or tier-4 trigger always forces the lens; otherwise only a
-    known-sensitive or unmatched-executable reason does. `indeterminate` no
-    longer defaults to required.
+    An explicit or tier-4 trigger always forces the lens. Otherwise the lens is
+    waived only by a positive benign classification; every other reason,
+    including a classification that could not be reached, requires it.
     """
-    return bool(triggers) or reason in REASONS_REQUIRING_SECURITY
+    return bool(triggers) or reason not in REASONS_WAIVING_SECURITY
 
 
 def command_select_security(args: argparse.Namespace) -> int:

@@ -83,3 +83,12 @@
 - [ ] 8.5 Run `npx --yes @fission-ai/openspec@1.9.0 validate guided-lane-completion --strict` and confirm it passes.
 - [ ] 8.6 Run `/th:lint` and resolve any structure, frontmatter, or size finding it reports for the changed and new files.
 - [ ] 8.7 Bump the four internal distribution version sites and add the `changelog.d/` fragment describing the guided-lane completion, the review-surface economy, the routing change, and the observability additions.
+
+## 9. Security Classification Floor
+
+- [x] 9.1 Replace the enumerated `REASONS_REQUIRING_SECURITY` set in `skills/review-pr/scripts/review_context.py` with a `REASONS_WAIVING_SECURITY` set holding only the positive benign classification, so a reason nobody enumerated inherits the floor instead of escaping it.
+- [x] 9.2 Mirror the change to both runtime copies of `review_context.py` and confirm byte parity.
+- [x] 9.3 Correct the case in `tests/test_review_context.py` that asserted an indeterminate classification does not require the lens, which encoded the defect as expected behaviour.
+- [x] 9.4 Add a property test asserting the waiver set holds exactly one member and every other reason, including an unknown future one, requires the lens.
+- [x] 9.5 Add a test enumerating every current producer of an indeterminate classification — empty changed-file list, empty diff, null byte in either — and asserting each requires the lens.
+- [x] 9.6 Add a deterministic check to `tests/test_pipeline_contract.py` that fails when the waiver set is widened or when resolution reverts to enumerating the reasons that require the lens.
