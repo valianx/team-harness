@@ -156,7 +156,7 @@ For a non-PR inline review, `Main` records `requested_lenses` and
 repository root, requires a clean index/worktree, and binds the review to a
 committed immutable commit or range; uncommitted inline review is unsupported. It
 dispatches one native `inline-reviewer` instance per lens with the same target,
-scope, intent, criteria, changed surface, and `target_id`. The reviewer reads
+scope, criteria, and changed surface. The reviewer reads
 the project directly through `sandbox_mode = "read-only"`; it cannot write
 files, create Team Harness workspace/state/events/gates, make a branch or
 commit, perform delivery or publication, mutate external state, use network
@@ -172,9 +172,7 @@ profile and records `profile_session` solely as that lifecycle marker, never as
 an in-memory byte attestation. Any install, setup, agent sync, mismatch, or
 scope change requires an explicit restart before inline dispatch; otherwise the
 lens is unavailable. Shipped Codex hooks cannot attest session start or loaded
-agent bytes. Each lens package and return carry a fresh `dispatch_id` and
-matching `expected_lens`; replay, duplicate, substitution, or identity mismatch
-is untrusted. Main resolves each range endpoint separately with hardened globals
+agent bytes. Main resolves each range endpoint separately with hardened globals
 and `rev-parse --verify --end-of-options <rev>^{commit}`, accepting one full
 commit OID only, binds `<oid>^{tree}`, and uses only those IDs. It rejects
 dash-prefixed/control/range-as-endpoint/abbreviated/multi-output input. Codex
@@ -201,10 +199,10 @@ executable-code, or security-policy/audit controls; ambiguity is sensitive. A
 lens reports its status,
 verdict, findings, coverage, limits, and disagreements. Main verifies the root
 and commit/range before dispatch and again before consolidation; a moved target
-is stale and cannot produce PASS. Consolidation is an exact one-return keyed
-join on `(lens, dispatch_id, target_id, coordinates)`: missing, failed,
-blocking, replayed, duplicate, substituted, unavailable, stale, or untrusted
-slots remain explicit non-pass outcomes. Global PASS requires every required
+is stale and cannot produce PASS. Consolidation groups returns by lens and keeps
+the worse outcome where a lens returns more than once: missing, failed,
+blocking, unavailable, stale, and untrusted remain explicit non-pass outcomes.
+Global PASS requires every required
 lens to be complete with `verdict: pass`, no blocker, and no unresolved blocking
 disagreement. Any PR intent, number, or URL has exclusive `review-pr`
 precedence and retains that flow's snapshot, lens selection, consolidation,

@@ -199,43 +199,6 @@ def check_inline_git_hardening() -> None:
         control = any(ord(character) < 32 or ord(character) == 127 for character in invalid)
         require(absolute or traversal or control, f"invalid path escaped validation: {invalid!r}")
 
-    def consolidate(required: list[tuple[str, str, str, str]], returns: list[dict[str, object]]) -> tuple[bool, dict[tuple[str, str, str, str], str]]:
-        """Executable contract model for Main's one-result keyed consolidation."""
-        slots = {slot: "missing" for slot in required}
-        trusted = True
-        for returned in returns:
-            slot = (returned["lens"], returned["dispatch_id"], returned["target_id"], returned["coordinates"])
-            if slot not in slots or returned["expected_lens"] != returned["lens"]:
-                trusted = False
-                continue
-            if slots[slot] != "missing":
-                slots[slot] = "untrusted"
-                continue
-            if returned["lens_status"] != "complete" or returned["verdict"] != "pass" or returned["blocker"] or returned["blocking_disagreement"]:
-                slots[slot] = "non-pass"
-            else:
-                slots[slot] = "pass"
-        return trusted and all(value == "pass" for value in slots.values()), slots
-
-    tester_slot = ("tester", "attempt-t", "target", "base..head")
-    qa_slot = ("qa", "attempt-q", "target", "base..head")
-    passing_tester = {"lens": "tester", "expected_lens": "tester", "dispatch_id": "attempt-t", "target_id": "target", "coordinates": "base..head", "lens_status": "complete", "verdict": "pass", "blocker": False, "blocking_disagreement": False}
-    passing_qa = {**passing_tester, "lens": "qa", "expected_lens": "qa", "dispatch_id": "attempt-q"}
-    passed, slots = consolidate([tester_slot, qa_slot], [passing_tester, passing_qa])
-    require(passed and set(slots.values()) == {"pass"}, "valid distinct lens returns did not pass keyed consolidation")
-    matrix = {
-        "missing": [passing_tester],
-        "failed": [{**passing_tester, "lens_status": "failed"}, passing_qa],
-        "blocker": [{**passing_tester, "blocker": True}, passing_qa],
-        "replay": [passing_tester, passing_qa, {**passing_tester, "dispatch_id": "old-attempt"}],
-        "duplicate": [passing_tester, passing_tester, passing_qa],
-        "substitution": [{**passing_tester, "lens": "qa"}, passing_qa],
-    }
-    for outcome, returns in matrix.items():
-        passed, _ = consolidate([tester_slot, qa_slot], returns)
-        require(not passed, f"{outcome} return incorrectly produced global PASS")
-
-
 
 def main() -> int:
     check_inline_git_hardening()

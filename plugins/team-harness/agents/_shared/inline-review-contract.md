@@ -12,32 +12,34 @@ not a PR-review implementation.
 review to an immutable commit or range. The package is the same factual target
 for every independent reviewer instance; only `lens` changes.
 
+The package is emitted by `skills/verify/scripts/review-fan.mjs package`; this is
+its shape, not a second specification of it:
+
 ```yaml
 mode: inline-review
 repository_root: /canonical/project/root
-coordinates: {repository, ref, commit_or_range, source}
-target: {kind: local-project, id}
-scope: {paths, symbols, constraints}
-intent: {text, provenance: live-operator}
-criteria: [{text, provenance: live-operator|trusted-policy|inferred-scope|written-intent, source}]
+coordinates: {commit_or_range, base, head, source}
+scope: {kind: full|delta, prior_anchor, paths, range_paths}
+criteria: [{text, provenance: live-operator|trusted-policy|written-intent, source}]
 changed_surface: [{path, change}]
 requested_lenses: [tester, qa, security]
 required_lenses: [tester, qa, security]
-lens: tester|qa|security|adversary
-expected_lens: tester|qa|security|adversary
-dispatch_id: <fresh opaque identifier for this one lens attempt>
-security_floor: {applies: true|false, reason: <trusted classification>}
+security_floor: {applies: true|false, reason, categories, unscannable_paths}
+review_surface: {excluded, pathspec, checkers}
+fully_verified: true|false
 read_only: true
-target_id: <stable identity of root, coordinates, range, scope, intent, criteria, changed surface and lens lists>
-profile_session: {kind: fresh-managed-profile, verified_definition_sha256: <digest>, started_after_verification: true}
+lens: tester|qa|security|adversary
 ```
 
-`repository_root`, `coordinates`, `scope`, `intent`, `criteria`, and
-`changed_surface` retain provenance. `Main` canonicalizes the repository root,
-requires a clean index and worktree, resolves the requested committed immutable
-commit or range, and records the target identity before dispatch; selecting a
-lens does not change that target identity. Uncommitted inline review is
-explicitly unsupported. Reviewers
+Every field but `lens` is identical across the instances dispatched for one
+review; `lens` is what the coordinator varies per instance. The package carries
+no correlation identifier, and a lens is never asked to echo one back.
+
+`repository_root`, `coordinates`, `scope`, `criteria`, and `changed_surface`
+retain provenance. The script canonicalizes the repository root, refuses a dirty
+index or worktree, and refuses a range whose endpoints are not commits, so
+uncommitted inline review is unsupported by the producer rather than by
+discipline. Reviewers
 inspect that anchored project directly; they do not create
 or consume a Team Harness workspace, state, event, gate, branch, or delivery
 record. There is no captured-content manifest or evidence-only protocol in
@@ -66,11 +68,9 @@ also requires that lens even when `applies` is false.
 
 ## Dispatch and native read-only boundary
 
-`Main` dispatches one independent `inline-reviewer` instance per requested
-lens, passing the package above plus the repository root, immutable commit or
-range, scope, intent, and criteria. `expected_lens` equals `lens`, and
-`dispatch_id` is fresh for that one attempt. The runtime enforces the project's
-native read-only sandbox. It may not:
+`Main` dispatches one independent `inline-reviewer` instance per required lens,
+each carrying the package above with its own `lens`. The runtime enforces the
+project's native read-only sandbox. It may not:
 
 - edit or write source, tests, configuration, or coordination artifacts;
 - create a workspace, state, events, gates, branch, commit, delivery record,
@@ -173,12 +173,9 @@ lens. It returns a compact structured result:
 
 ```yaml
 lens: tester|qa|security|adversary
-expected_lens: tester|qa|security|adversary
-dispatch_id: <exact package dispatch_id>
 lens_status: complete|incomplete|failed|unavailable|untrusted
 repository_root: /canonical/project/root
 commit_or_range: <exact requested target>
-target_id: <exact package target_id>
 verdict: pass|concerns|fail|not-run
 output: null
 findings:
@@ -226,18 +223,17 @@ and historical files—must come only from the recorded bound blob IDs via
 `cat-file blob`, never the mutable worktree.
 
 `Main` preserves one terminal status per required lens, all findings, coverage
-limits, and disagreements. Consolidation is an exact keyed join, not a phrase
-check: create one outstanding slot for each required `(lens, dispatch_id,
-target_id, coordinates)` package; accept exactly one return only into its own
-slot after exact equality of all four fields and `expected_lens == lens`.
-Reject and retain as `untrusted` any return that has no slot (replay), fills an
-already-filled slot (duplicate), names another slot's lens (substitution), or
-mismatches any identity field. A required slot with no return is `missing`;
-`failed`, `incomplete`, `unavailable`, `stale`, and `untrusted` remain terminal
-non-pass outcomes. A populated slot with a blocker, non-`complete` status,
-non-`pass` verdict, or unresolved blocking disagreement is non-pass. Main never averages verdicts or treats an absent return as PASS. Global PASS requires every `required_lenses`
-slot to be exactly one `lens_status: complete` return with
-`verdict: pass`, matching target identity and coordinates, no blocker, and no
+limits, and disagreements. Consolidation is `review-fan.mjs gate`, and its rule
+is worst-outcome-wins: returns are grouped by `lens`, and where a lens has more
+than one, the worse outcome is kept. A later benign return therefore cannot bury
+an earlier failure, and no return is discarded to achieve that — which is what
+keying on a correlation identifier would have cost. A required lens with no
+return is never a pass; `failed`, `incomplete`, `unavailable`, and `untrusted`
+are terminal non-pass outcomes, as is a return carrying a blocker or a non-`pass`
+verdict. A return naming a lens outside `required_lenses` is reported as
+unrequested rather than silently absorbed. Main never averages verdicts or
+treats an absent return as PASS. Global PASS requires every `required_lenses`
+entry to have a `lens_status: complete` return with `verdict: pass`, no blocker, and no
 unresolved blocking disagreement. Which severities hold the ship is the
 coordinator's policy, applied to what a lens reported; a lens reports a finding's
 severity and its grounds, and never needs to know the threshold.

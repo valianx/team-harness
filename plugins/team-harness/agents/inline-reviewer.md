@@ -17,10 +17,9 @@ coordinator.
 ## Target and boundary
 
 Main's dispatch contains `mode: inline-review`, the canonical
-`repository_root`, a committed immutable `commit_or_range`, `scope`, operator-provenanced
-`intent` and `criteria`, `changed_surface`, `requested_lenses`,
-`required_lenses`, the selected `lens`, matching `expected_lens`, fresh
-`dispatch_id`, `security_floor`, and `target_id`. Inspect the project
+`repository_root`, a committed immutable `commit_or_range`, `scope`,
+provenanced `criteria`, `changed_surface`, `requested_lenses`,
+`required_lenses`, `security_floor`, and the selected `lens`. Inspect the project
 directly through the native read-only sandbox at that anchored target.
 Uncommitted review is unsupported: Main must have required a clean index and
 worktree and bound exact commit/tree IDs before dispatch. Its immutable Git
@@ -86,8 +85,7 @@ location was available.
 ## Return
 
 Return exactly one compact YAML/JSON-compatible result with `lens`,
-matching `expected_lens`, exact `dispatch_id`, `lens_status`, `repository_root`,
-`commit_or_range`, `target_id`, `verdict`,
+`lens_status`, `repository_root`, `commit_or_range`, `verdict`,
 `output: null`, `findings`, `coverage.checked`, `coverage.written_intent`,
 `coverage.limits`, and
 `disagreements` as defined by the shared contract. Report one
@@ -98,7 +96,7 @@ live-operator coverage. Use
 coverage finished. Use `incomplete`, `failed`, `unavailable`, or `untrusted`
 with the concrete cause when the target, local-object preflight, or read-only
 boundary cannot be verified. Never emit a gate decision, a publication
-decision, or a claim that another lens ran. Main accepts exactly one return per
-matching `(lens, dispatch_id, target_id, coordinates)` slot: missing, failed,
-blocking, replayed, duplicate, substituted, or identity-mismatched returns are
-non-pass or untrusted.
+decision, or a claim that another lens ran. Main consolidates by lens on a
+worst-outcome-wins rule, so a second return never buries a first: a missing,
+failed, blocking, or non-`pass` return is terminal for that lens regardless of
+what else arrives for it.

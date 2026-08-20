@@ -41,7 +41,7 @@ def check_inline_reviewer_native() -> None:
     for marker in (
         "tester", "qa", "security", "adversary", "repository_root", "commit_or_range",
         "sandbox_mode = \"read-only\"", "lens_status", "coverage", "disagreements",
-        "review-pr", "target currentness", "output: null", "expected_lens", "dispatch_id",
+        "review-pr", "target currentness", "output: null",
         "git diff", "filesystem-root confinement",
     ):
         if marker not in adapter:
@@ -84,7 +84,7 @@ def check_inline_reviewer_native() -> None:
     if (ROOT / "plugins/team-harness/skills/init/scripts/test_run_inline_review.mjs").exists():
         fail("retired inline runner behavioral test remains")
     init = re.sub(r"\s+", " ", (ROOT / "plugins/team-harness/skills/init/SKILL.md").read_text().lower())
-    for marker in ("inline-reviewer", "project root", "commit/range", "sandbox_mode = \"read-only\"", "adversary", "security floor", "dispatch_id", "expected_lens", "regular non-symlink", "sha-256", "before consolidation", "stale", "fresh codex session", "explicit restart", "in-memory byte attestation"):
+    for marker in ("inline-reviewer", "project root", "commit/range", "sandbox_mode = \"read-only\"", "adversary", "security floor", "regular non-symlink", "sha-256", "before consolidation", "stale", "fresh codex session", "explicit restart", "in-memory byte attestation"):
         if marker not in init:
             fail(f"Codex init native inline route missing {marker!r}")
     for retired in ("run_inline_review.mjs", "evidence_manifest", "manifest_digest", "stdin-only", "deny-root"):
@@ -1704,7 +1704,7 @@ def main() -> None:
     for marker in (
         "tester", "qa", "security", "adversary", "repository_root", "commit_or_range",
         "sandbox_mode = \"read-only\"", "lens_status", "coverage", "disagreements",
-        "target currentness", "review-pr", "output: null", "expected_lens", "dispatch_id",
+        "target currentness", "review-pr", "output: null",
         "git diff", "filesystem-root confinement", "git --no-pager --no-replace-objects --literal-pathspecs -c core.fsmonitor=false -c core.untrackedcache=false -c maintenance.auto=false -c gc.auto=0 -c log.showsignature=false -c <canonical-root>",
         "--no-ext-diff", "--no-textconv", "resolved object ids", "project-derived command string",
         "profile_session", "fresh session", "in-memory byte attestation",
@@ -1718,7 +1718,7 @@ def main() -> None:
     for marker in (
         "inline-reviewer", "requested_lenses",
         "required_lenses", "project root", "commit/range", "sandbox_mode = \"read-only\"",
-        "adversary", "security floor", "expected_lens", "dispatch_id", "regular non-symlink",
+        "adversary", "security floor", "regular non-symlink",
         "sha-256", "review-pr", "exclusive", "stale", "fresh codex session", "explicit restart",
         "in-memory byte attestation",
     ):
@@ -1729,8 +1729,8 @@ def main() -> None:
             fail(f"Codex init retains retired inline marker {retired!r}")
     for marker in (
         "mode: inline-review", "repository_root", "commit_or_range", "requested_lenses",
-        "required_lenses", "lens: tester|qa|security|adversary", "expected_lens",
-        "dispatch_id", "security_floor", "read_only: true", "target_id",
+        "required_lenses", "lens: tester|qa|security|adversary",
+        "security_floor", "read_only: true",
         "native read-only sandbox", "security floor", "stale",
         "complete|incomplete|failed|unavailable|untrusted", "never averages verdicts",
         "absent return as PASS", "verdict: pass", "review-pr",
