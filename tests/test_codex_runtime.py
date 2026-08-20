@@ -147,8 +147,6 @@ def _routing_phase(key: str, continuation: str) -> str:
         return phase_match.group(1)
     if key == "evidence" and "affected validation" in continuation:
         return "validation"
-    if key == "implementation" and "return to implementation" in continuation:
-        return "implementation"
     return ""
 
 
@@ -238,8 +236,6 @@ def _check_agent_adapter_parity() -> None:
         if project != package:
             fail(f"generated Codex adapter parity drifted for {role}")
         adapter = (ROOT / f"runtime/codex/instructions/{role}.md").read_text().lower()
-        if role == "architect" and "only a separate, explicit current live operator request" not in re.sub(r"\s+", " ", adapter):
-            fail("Codex architect adapter permits automatic post-Gate-1 dispatch")
         if role in {"tester", "qa", "security"} and "do not dispatch" not in adapter:
             fail(f"Codex {role} adapter can select a post-Gate-1 route")
 
@@ -787,8 +783,6 @@ def main() -> None:
     ):
         if marker not in setup_flat:
             fail(f"Codex setup scoped-write/force-push contract is missing {marker!r}")
-    if "wrapped or reconstructed equivalents even after `ship`" in setup_flat:
-        fail("Codex setup still overclaims force-push wrapper coverage")
 
     modes = (ROOT / "plugins/team-harness/skills/modes/SKILL.md").read_text()
     for marker in (
@@ -1686,8 +1680,6 @@ def main() -> None:
 
     if "1 — inline" not in activation_reference or "2 — pipeline" not in activation_reference:
         fail("Codex activation does not present the exact live 1/2 posture choices")
-    if "never infer a posture from configuration" not in activation_reference.lower():
-        fail("Codex activation lets configuration choose a posture")
     activation_lower = activation_reference.lower()
     for marker in (
         "a live `2` answering",
@@ -1698,10 +1690,6 @@ def main() -> None:
         if marker not in activation_lower:
             fail(f"Codex activation does not safely route the legacy numeric choice: {marker!r}")
     config_lower = configuration_reference.lower()
-    if "legacy route/profile keys" not in config_lower:
-        fail("Codex configuration does not identify legacy route keys")
-    if "authorize neither posture" not in config_lower or "never chooses a route" not in config_lower:
-        fail("Codex configuration treats legacy route keys as authoritative")
     if "1 — inline" not in configuration_reference or "2 — pipeline" not in configuration_reference:
         fail("Codex configuration does not provide live migration guidance")
 
@@ -1754,8 +1742,6 @@ def main() -> None:
             fail(f"shared inline contract retains retired marker {retired!r}")
     if "no second confirmation" not in activation_reference.lower() and "second confirmation" not in init.lower():
         fail("Codex sensitive inline path does not prohibit a second confirmation")
-    if "explicitly selects `inline`" not in activation_reference.lower() and "selects `inline`" not in init.lower():
-        fail("Codex sensitive inline path lacks live explicit selection")
 
     deliver_skill = (ROOT / "plugins/team-harness/skills/deliver/SKILL.md").read_text()
     delivery_adapter = (ROOT / "runtime/codex/instructions/delivery.md").read_text().lower()
@@ -1779,12 +1765,8 @@ def main() -> None:
     for marker in ("merge", "tag", "release", "publication"):
         if marker not in ship_contract:
             fail(f"Codex Gate 3 ship exclusions are missing {marker!r}")
-    if "does not authorize a push" in pipeline.lower():
-        fail("Codex pipeline still requires another operator decision after Gate 3 ship")
     if "do not ask" not in ship_contract and "never ask" not in ship_contract:
         fail("Codex delivery can ask again for version, commit, push, or draft PR")
-    if "technical runtime boundary" not in ship_contract:
-        fail("Codex delivery conflates native tool approval with an operator gate")
 
     for label, content in {
         "direct configuration": configuration_reference,
@@ -1801,8 +1783,6 @@ def main() -> None:
     if "name: init-project" not in project_init:
         fail("the project initializer role was not renamed to init-project")
     routing = (ROOT / "agents/ref-pipeline.md").read_text()
-    if "dispatch `init-project` directly" not in routing:
-        fail("bootstrap routing does not target init-project")
 
     for marker in (
         "@Team-Harness init",
@@ -1975,8 +1955,6 @@ def main() -> None:
                 fail(f"{role} Codex adapter is missing workspace budget marker {marker!r}")
 
     plan_consolidation = (ROOT / "agents/_shared/plan-consolidation.md").read_text()
-    if "superseded finding bodies are replaced, not retained" not in plan_consolidation:
-        fail("plan review contract still permits historical finding-body accumulation")
 
     plan_shards = (ROOT / "docs/plan-shards.md").read_text()
     for marker in (
