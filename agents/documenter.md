@@ -182,7 +182,7 @@ Inventing a fact to complete a page is a silent documentation error: it produces
 
 ## Language
 
-Write all documentation in the language specified by the orchestrator in the task context. Default is English. If `language: es` (or another code), write all prose in that language. Structural elements (YAML keys, Mermaid syntax, code blocks) remain in English regardless.
+Vault pages are operator-facing: write their prose in the language the orchestrator specifies in the task context, defaulting to English. Structural elements (YAML keys, Mermaid syntax, code blocks) stay English regardless. This covers the vault output only — committed repository content stays English under `agents/_shared/operational-rules.md § "Language register"`, and nothing here relaxes that.
 
 ---
 

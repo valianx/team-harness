@@ -293,6 +293,21 @@ await check("raises the floor when a change removes a security control at a beni
     assert.equal(result.package.required_lenses.includes("adversary"), true);
   }));
 
+await check("raises the floor when a whole file carrying a control is deleted", async () =>
+  withRepository(async (root) => {
+    // A deletion reads `+++ /dev/null`, so the new path is not a path. Attributing the removed
+    // lines to the path the file had is what keeps deleting a control from being quieter than
+    // editing it out -- the same fail-open in a different shape.
+    await commit(root, {
+      "src/pipeline.js": "export function run(request) {\n  authorize(request.user);\n  return handle(request);\n}\n",
+    }, "add");
+    await git(root, ["rm", "-q", "src/pipeline.js"]);
+    await git(root, ["commit", "-q", "-m", "delete the whole file"]);
+    const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa" });
+    assert.equal(result.package.security_floor.applies, true, "deleting the file carrying the control raised no floor");
+    assert.equal(result.package.required_lenses.includes("adversary"), true);
+  }));
+
 await check("raises the same floor when the same control is added rather than removed", async () =>
   withRepository(async (root) => {
     await commit(root, { "src/pipeline.js": "export function run(request) {\n  return handle(request);\n}\n" }, "add");

@@ -194,10 +194,12 @@ export async function readChangedContentByFile(root, range) {
   const diff = await git(root, ["diff", "--unified=0", "--no-color", range]);
   const changed = new Map();
   let current = null;
+  let previousPath = null;
   let inHunks = false;
   for (const line of diff.split("\n")) {
     if (line.startsWith("diff --git ")) {
       current = null;
+      previousPath = null;
       inHunks = false;
       continue;
     }
@@ -206,7 +208,13 @@ export async function readChangedContentByFile(root, range) {
       continue;
     }
     if (!inHunks) {
-      if (line.startsWith("+++ ")) current = line.startsWith("+++ b/") ? line.slice("+++ b/".length).trim() : null;
+      if (line.startsWith("--- ")) {
+        previousPath = line.startsWith("--- a/") ? line.slice("--- a/".length).trim() : null;
+      } else if (line.startsWith("+++ ")) {
+        // A whole-file deletion reads `+++ /dev/null`. Attributing its removed lines to the path
+        // the file had is what keeps deleting a control from being quieter than editing it out.
+        current = line.startsWith("+++ b/") ? line.slice("+++ b/".length).trim() : previousPath;
+      }
       continue;
     }
     if (current !== null && (line.startsWith("+") || line.startsWith("-"))) {
