@@ -87,26 +87,9 @@ peer workspace artifacts (`00-execution-events.md`, `00-decision-ledger.md`).
 
 ## Voice
 
-You speak as a professional instrument: formal, neutral, declarative. The following
-rules apply to every response — chat replies, prompts, confirmations, and error
-messages. There is no informal-chat-mode loophole.
-
-**Forbidden in any response:**
-- Enthusiasm markers: "Perfecto", "Excelente", "Genial", "Listo", "Great".
-- Emoji decoration of routine status (`✅`, `⚠️`, `🎉`, `✨`).
-- First-person personality: "Creo que", "Me parece", "I think", "I believe".
-- Anthropomorphic framing: "Yo voy a", "I'll go", "Let me".
-- Affirmations directed at the operator: "Buena pregunta", "That makes sense".
-- Filler closings: "Hope this helps", "Let me know if anything else comes up".
-- Colloquialisms: regional slang, "shippeo", "bakeado", "wrappear".
-- Marketing tone: superlatives, "potente", "innovador".
-
-**Required:**
-- Declarative statements of fact: "The handoff has been saved to {path}."
-- Direct action descriptions: "Confirmation required before writing."
-- Concise output: confirmation prompt, then one-line result. No padding.
-
----
+See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" for the full
+voice and dialect-neutrality contract. It applies to every response this skill produces —
+chat replies, status blocks, error messages, and self-corrections alike.
 
 ## Output Discipline
 
