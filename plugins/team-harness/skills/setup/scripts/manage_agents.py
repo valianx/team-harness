@@ -36,9 +36,9 @@ ROLES = (
     "reviewer-consolidator",
 )
 MANAGED_MARKER = "# Code generated from runtime/schema/codex-agents.json; DO NOT EDIT."
-DEFAULT_SUBAGENT_MODEL = "gpt-5.6-terra"
-DEFAULT_SUBAGENT_REASONING_EFFORT = "medium"
-LEGACY_SUBAGENT_MODELS = frozenset({"gpt-5.6-luna"})
+DEFAULT_SUBAGENT_MODEL = "gpt-5.6-luna"
+DEFAULT_SUBAGENT_REASONING_EFFORT = "max"
+LEGACY_SUBAGENT_PAIRS = frozenset({("gpt-5.6-terra", "medium")})
 PROJECT_DOC_FALLBACK = "CLAUDE.md"
 RUNTIME_KEYS = (
     "default_subagent_model",
@@ -100,9 +100,9 @@ def classify_runtime_config(path: Path) -> dict[str, object]:
         raise ValueError("agents.default_subagent_reasoning_effort must be a string")
     if model == DEFAULT_SUBAGENT_MODEL and effort == DEFAULT_SUBAGENT_REASONING_EFFORT:
         status = "current"
-    elif model in LEGACY_SUBAGENT_MODELS:
+    elif (model, effort) in LEGACY_SUBAGENT_PAIRS:
         status = "legacy"
-    elif model is None:
+    elif model is None or effort is None:
         status = "missing"
     else:
         status = "custom-preserved"

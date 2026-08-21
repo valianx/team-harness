@@ -17,9 +17,9 @@ follows:
 | Canonical source | Codex model | Codex effort |
 |---|---|---|
 | `opus` + any allowed effort | `gpt-5.6-sol` | `xhigh` |
-| `sonnet` + `high` or `xhigh` | `gpt-5.6-terra` | `high` |
-| `sonnet` + `medium` | `gpt-5.6-terra` | `medium` |
-| `haiku` + any allowed effort | `gpt-5.6-terra` | `low` |
+| `sonnet` + `high` or `xhigh` | `gpt-5.6-luna` | `max` |
+| `sonnet` + `medium` | `gpt-5.6-luna` | `max` |
+| `haiku` + any allowed effort | `gpt-5.6-luna` | `max` |
 
 Every role must match exactly one data-driven tier. The generator rejects an
 unmapped or multiply mapped role, invalid role/source/output paths,
@@ -37,7 +37,7 @@ logical role adapters while leaving model and effort unset for explicit live
 dispatch. These files are committed so a trusted checkout works
 without a build step. Do not edit generated files directly.
 
-The generated project config uses `gpt-5.6-terra` at `medium` as its generic
+The generated project config uses `gpt-5.6-luna` at `max` as its generic
 subagent fallback without overriding Main's selected model, adds `CLAUDE.md` as
 an ordered project-instruction fallback when `AGENTS.md` is absent, enables both
 `multi_agent` and `multi_agent_v2`, and uses

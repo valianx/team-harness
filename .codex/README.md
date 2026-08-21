@@ -27,33 +27,33 @@ Generated with the `team-harness` profile. This table includes every canonical T
 
 | Agent | Canonical Claude model | Canonical source effort | Codex model | Codex effort | Codex availability |
 |---|---|---|---|---|---|
-| `adversary` | `sonnet` | `xhigh` | `gpt-5.6-terra` | `high` | not shipped in Codex beta |
+| `adversary` | `sonnet` | `xhigh` | `gpt-5.6-luna` | `max` | not shipped in Codex beta |
 | `agent-builder` | `opus` | `xhigh` | `gpt-5.6-sol` | `xhigh` | not shipped in Codex beta |
 | `architect` | `opus` | `xhigh` | `gpt-5.6-sol` | `xhigh` | installed custom agent |
-| `cleaner` | `sonnet` | `medium` | `gpt-5.6-terra` | `medium` | installed custom agent |
-| `code-researcher` | `sonnet` | `medium` | `gpt-5.6-terra` | `medium` | not shipped in Codex beta |
-| `d2-diagrammer` | `sonnet` | `medium` | `gpt-5.6-terra` | `medium` | not shipped in Codex beta |
-| `delivery` | `sonnet` | `medium` | `gpt-5.6-terra` | `medium` | installed custom agent |
-| `diagrammer` | `sonnet` | `medium` | `gpt-5.6-terra` | `medium` | not shipped in Codex beta |
-| `documenter` | `sonnet` | `high` | `gpt-5.6-terra` | `high` | not shipped in Codex beta |
+| `cleaner` | `sonnet` | `medium` | `gpt-5.6-luna` | `max` | installed custom agent |
+| `code-researcher` | `sonnet` | `medium` | `gpt-5.6-luna` | `max` | not shipped in Codex beta |
+| `d2-diagrammer` | `sonnet` | `medium` | `gpt-5.6-luna` | `max` | not shipped in Codex beta |
+| `delivery` | `sonnet` | `medium` | `gpt-5.6-luna` | `max` | installed custom agent |
+| `diagrammer` | `sonnet` | `medium` | `gpt-5.6-luna` | `max` | not shipped in Codex beta |
+| `documenter` | `sonnet` | `high` | `gpt-5.6-luna` | `max` | not shipped in Codex beta |
 | `gcp-cost-analyzer` | `opus` | `high` | `gpt-5.6-sol` | `xhigh` | not shipped in Codex beta |
 | `gcp-infra` | `opus` | `xhigh` | `gpt-5.6-sol` | `xhigh` | not shipped in Codex beta |
-| `implementer` | `sonnet` | `high` | `gpt-5.6-terra` | `high` | installed custom agent |
-| `init-project` | `haiku` | `medium` | `gpt-5.6-terra` | `low` | not shipped in Codex beta |
-| `inline-reviewer` | `sonnet` | `high` | `gpt-5.6-terra` | `high` | installed custom agent |
-| `likec4-diagrammer` | `sonnet` | `medium` | `gpt-5.6-terra` | `medium` | not shipped in Codex beta |
+| `implementer` | `sonnet` | `high` | `gpt-5.6-luna` | `max` | installed custom agent |
+| `init-project` | `haiku` | `medium` | `gpt-5.6-luna` | `max` | not shipped in Codex beta |
+| `inline-reviewer` | `sonnet` | `high` | `gpt-5.6-luna` | `max` | installed custom agent |
+| `likec4-diagrammer` | `sonnet` | `medium` | `gpt-5.6-luna` | `max` | not shipped in Codex beta |
 | `mentor` | `opus` | `high` | `gpt-5.6-sol` | `xhigh` | not shipped in Codex beta |
 | `orchestrator` | `opus` | `high` | `gpt-5.6-sol` | `xhigh` | Main via `init` / `pipeline` skills |
-| `plan-reviewer` | `sonnet` | `medium` | `gpt-5.6-terra` | `medium` | not shipped in Codex beta |
-| `pr-review-qa` | `sonnet` | `high` | `gpt-5.6-terra` | `high` | installed custom agent |
-| `pr-review-security` | `sonnet` | `high` | `gpt-5.6-terra` | `high` | installed custom agent |
-| `qa-plan` | `sonnet` | `high` | `gpt-5.6-terra` | `high` | not shipped in Codex beta |
+| `plan-reviewer` | `sonnet` | `medium` | `gpt-5.6-luna` | `max` | not shipped in Codex beta |
+| `pr-review-qa` | `sonnet` | `high` | `gpt-5.6-luna` | `max` | installed custom agent |
+| `pr-review-security` | `sonnet` | `high` | `gpt-5.6-luna` | `max` | installed custom agent |
+| `qa-plan` | `sonnet` | `high` | `gpt-5.6-luna` | `max` | not shipped in Codex beta |
 | `qa` | `opus` | `xhigh` | `gpt-5.6-sol` | `xhigh` | installed custom agent |
-| `research-consolidator` | `sonnet` | `high` | `gpt-5.6-terra` | `high` | not shipped in Codex beta |
-| `researcher` | `haiku` | `medium` | `gpt-5.6-terra` | `low` | not shipped in Codex beta |
-| `reviewer-consolidator` | `sonnet` | `medium` | `gpt-5.6-terra` | `medium` | installed custom agent |
-| `reviewer` | `sonnet` | `high` | `gpt-5.6-terra` | `high` | installed custom agent |
+| `research-consolidator` | `sonnet` | `high` | `gpt-5.6-luna` | `max` | not shipped in Codex beta |
+| `researcher` | `haiku` | `medium` | `gpt-5.6-luna` | `max` | not shipped in Codex beta |
+| `reviewer-consolidator` | `sonnet` | `medium` | `gpt-5.6-luna` | `max` | installed custom agent |
+| `reviewer` | `sonnet` | `high` | `gpt-5.6-luna` | `max` | installed custom agent |
 | `security` | `opus` | `xhigh` | `gpt-5.6-sol` | `xhigh` | installed custom agent |
-| `tester` | `sonnet` | `high` | `gpt-5.6-terra` | `high` | installed custom agent |
-| `translator` | `sonnet` | `medium` | `gpt-5.6-terra` | `medium` | not shipped in Codex beta |
+| `tester` | `sonnet` | `high` | `gpt-5.6-luna` | `max` | installed custom agent |
+| `translator` | `sonnet` | `medium` | `gpt-5.6-luna` | `max` | not shipped in Codex beta |
 | `ux-reviewer` | `opus` | `high` | `gpt-5.6-sol` | `xhigh` | not shipped in Codex beta |

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.20.1] - 2026-08-21
+
+### Changed
+
+- Codex specialist profiles now use Luna/max instead of Terra, while Sol/xhigh roles and custom fallback pairs remain unchanged.
+
 ## [3.15.4] - 2026-08-18
 
 ### Fixed
