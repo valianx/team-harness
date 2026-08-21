@@ -16,6 +16,7 @@
 - [decision] Stage-1 approach checkpoints, deterministic plan-structure loops, automatic ratification/plan-review panels, selective panel re-firing, and post-approval review offers are retired. `/th:plan-review` remains an explicit direct mode only.
 - [decision] Final validation is the correction source: in-scope code/test/docs findings return to the implementation executor; evidence gaps return to tester; correctable security findings receive a delta audit; structural contradictions require an operator decision and a new Gate 1 if design reopens.
 - [decision] Gate 1 uses `1 approve`, `2 approve autonomous`, `3 edit`, `4 reject`; Gate 3 uses `1 ship`, `2 amend`, `3 abort`. A numeric shortcut never bypasses a fresh nonce, dual record, or live operator approval.
+- [decision] Codex standard non-Sol projections and the generic fallback use `gpt-5.6-luna` / `max`; Sol projections remain `gpt-5.6-sol` / `xhigh`. Setup/update migrate only the exact managed `gpt-5.6-terra` / `medium` pair and preserve every other complete custom pair.
 
 Historical entries below are retained for provenance. A historical entry does not override the
 v3 sources above; references to retired phases, panels, controls, or route markers are not current

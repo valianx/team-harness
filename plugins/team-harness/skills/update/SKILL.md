@@ -194,9 +194,10 @@ because it changes the persistent execution profile.
    ```
 
    Install missing agents and replace only stale Team Harness-generated files.
-   The same sync installs a missing generic fallback or migrates the obsolete
-   `gpt-5.6-luna` fallback to `gpt-5.6-terra` / `medium`; any other explicit
-   operator-selected fallback is preserved and reported as `custom-preserved`.
+   The same sync installs a missing generic fallback or migrates the exact
+   formerly managed `gpt-5.6-terra` / `medium` pair to `gpt-5.6-luna` / `max`;
+   any other complete operator-selected pair is preserved and reported as
+   `custom-preserved`.
    It also preserves the ordered `project_doc_fallback_filenames` array and
    appends `CLAUDE.md` once when absent, so `AGENTS.md` retains precedence.
    Named roles keep their exact generated model/effort mappings. Stop on an

@@ -143,8 +143,8 @@ read-only exposure that Main must report honestly, not stronger enforcement.
 For Codex, before dispatching, Main verifies the exact `inline-reviewer`
 definition selected by the runtime in its selected project *or* global scope;
 it does not mix scopes or substitute another local definition. The selected file
-must be a regular non-symlink, have exactly `model = "gpt-5.6-terra"`,
-`model_reasoning_effort = "high"`, and `sandbox_mode = "read-only"`, and have
+must be a regular non-symlink, have exactly `model = "gpt-5.6-luna"`,
+`model_reasoning_effort = "max"`, and `sandbox_mode = "read-only"`, and have
 an exact SHA-256 byte digest match with the trusted packaged
 `inline-reviewer.toml` supplied by the loaded plugin. Any missing, symlinked,
 field-mismatched, or digest-mismatched definition fails closed as `untrusted`

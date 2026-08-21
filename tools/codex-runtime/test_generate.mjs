@@ -72,12 +72,13 @@ assert.deepEqual([...first.files], [...second.files], "identical inputs must ren
 
 const agentOutputs = [...first.files].filter(([path]) => path.includes("/.codex/agents/"));
 assert.equal(agentOutputs.length, 19);
-for (const [, content] of agentOutputs) {
+for (const [path, content] of agentOutputs) {
   assert.match(content, /^name = /m);
   assert.match(content, /^description = /m);
   assert.match(content, /^developer_instructions = /m);
   assert.match(content, /^# Semantic source: agents\//m);
   assert.match(content, /^# Projection tier: /m);
+  assert.doesNotMatch(content, /gpt-5\.6-terra/, `${path} retains Terra in a current projection`);
   assert.doesNotMatch(content, /^\[capabilities\]$/m, "Codex 0.146 role-schema parser rejects capability tables");
 }
 
@@ -109,8 +110,9 @@ assert.match(projectConfig, /^multi_agent_v2 = true$/m);
 assert.match(projectConfig, /^\[sandbox_workspace_write\]$/m);
 assert.match(projectConfig, /^network_access = true$/m);
 assert.doesNotMatch(projectConfig, /^writable_roots\s*=/m, "global setup owns user-specific writable roots");
-assert.match(projectConfig, /^default_subagent_model = "gpt-5\.6-terra"$/m);
-assert.match(projectConfig, /^default_subagent_reasoning_effort = "medium"$/m);
+assert.match(projectConfig, /^default_subagent_model = "gpt-5\.6-luna"$/m);
+assert.match(projectConfig, /^default_subagent_reasoning_effort = "max"$/m);
+assert.doesNotMatch(projectConfig, /gpt-5\.6-terra/, "project fallback retains Terra");
 assert.doesNotMatch(projectConfig, /^\[shell_environment_policy\]$/m);
 
 for (const name of ["architect", "qa", "security"]) {
@@ -121,30 +123,27 @@ for (const name of ["architect", "qa", "security"]) {
 for (const name of [
   "implementer",
   "tester",
+  "cleaner",
   "inline-reviewer",
   "reviewer",
   "pr-review-qa",
-  "pr-review-security"
+  "pr-review-security",
+  "delivery",
+  "reviewer-consolidator",
 ]) {
   const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
-  assert.match(content, /^model = "gpt-5\.6-terra"$/m);
-  assert.match(content, /^model_reasoning_effort = "high"$/m);
+  assert.match(content, /^model = "gpt-5\.6-luna"$/m);
+  assert.match(content, /^model_reasoning_effort = "max"$/m);
 }
 const inlineReviewer = first.files.get(join(root, ".codex/agents/inline-reviewer.toml"));
-assert.match(inlineReviewer, /^model = "gpt-5\.6-terra"$/m);
-assert.match(inlineReviewer, /^model_reasoning_effort = "high"$/m);
+assert.match(inlineReviewer, /^model = "gpt-5\.6-luna"$/m);
+assert.match(inlineReviewer, /^model_reasoning_effort = "max"$/m);
 assert.match(inlineReviewer, /^sandbox_mode = "read-only"$/m);
 assert.doesNotMatch(inlineReviewer, /^\[capabilities\]$/m);
 
-for (const name of ["delivery", "reviewer-consolidator"]) {
-  const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
-  assert.match(content, /^model = "gpt-5\.6-terra"$/m);
-  assert.match(content, /^model_reasoning_effort = "medium"$/m);
-}
-
 const cleaner = first.files.get(join(root, ".codex/agents/cleaner.toml"));
-assert.match(cleaner, /^model = "gpt-5\.6-terra"$/m);
-assert.match(cleaner, /^model_reasoning_effort = "medium"$/m);
+assert.match(cleaner, /^model = "gpt-5\.6-luna"$/m);
+assert.match(cleaner, /^model_reasoning_effort = "max"$/m);
 assert.match(cleaner, /^sandbox_mode = "workspace-write"$/m);
 
 const pipelineRoleMap = {
@@ -191,6 +190,19 @@ const pipelineIdentityDocs = await Promise.all([
   readFile(join(root, "plugins/team-harness/skills/pipeline/SKILL.md"), "utf8"),
   readFile(join(root, "plugins/team-harness/skills/pipeline/references/activation.md"), "utf8"),
 ]);
+const standardPipelineMatrix = {
+  architect: ["pipeline-architect", "gpt-5.6-sol", "xhigh"],
+  implementer: ["pipeline-implementer", "gpt-5.6-luna", "max"],
+  tester: ["pipeline-tester", "gpt-5.6-luna", "max"],
+  cleaner: ["pipeline-cleaner", "gpt-5.6-luna", "max"],
+  qa: ["pipeline-qa", "gpt-5.6-sol", "xhigh"],
+  security: ["pipeline-security", "gpt-5.6-sol", "xhigh"],
+  delivery: ["pipeline-delivery", "gpt-5.6-luna", "max"],
+};
+for (const [role, [agentType, model, effort]] of Object.entries(standardPipelineMatrix)) {
+  const row = `| \`${role}\` | \`${agentType}\` | \`${model}\` | \`${effort}\` |`;
+  assert.ok(pipelineIdentityDocs[0].includes(row), `${role} standard pipeline projection is stale`);
+}
 for (const name of Object.keys(pipelineRoleMap)) {
   const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
   const normalized = content.replace(/\r\n?/g, "\n");
@@ -202,6 +214,7 @@ for (const name of Object.keys(pipelineRoleMap)) {
 }
 
 const roster = first.files.get(join(root, ".codex/README.md"));
+assert.doesNotMatch(roster, /gpt-5\.6-terra/, "current generated roster retains Terra");
 assert.match(roster, /^# Team Harness Codex agents$/m);
 assert.match(roster, /^## Improve Team Harness from Codex$/m);
 assert.match(roster, /@Team-Harness init <request>/);
@@ -210,15 +223,15 @@ assert.match(roster, /\$sync-codex-agents/);
 assert.match(roster, /\| Agent \| Canonical Claude model \| Canonical source effort \| Codex model \| Codex effort \| Codex availability \|/);
 assert.match(roster, /\| `architect` \| `opus` \| `xhigh` \| `gpt-5\.6-sol` \| `xhigh` \| installed custom agent \|/);
 assert.match(roster, /\| `qa` \| `opus` \| `xhigh` \| `gpt-5\.6-sol` \| `xhigh` \| installed custom agent \|/);
-assert.match(roster, /\| `adversary` \| `sonnet` \| `xhigh` \| `gpt-5\.6-terra` \| `high` \| not shipped in Codex beta \|/);
-assert.match(roster, /\| `implementer` \| `sonnet` \| `high` \| `gpt-5\.6-terra` \| `high` \| installed custom agent \|/);
-assert.match(roster, /\| `cleaner` \| `sonnet` \| `medium` \| `gpt-5\.6-terra` \| `medium` \| installed custom agent \|/);
-assert.match(roster, /\| `inline-reviewer` \| `sonnet` \| `high` \| `gpt-5\.6-terra` \| `high` \| installed custom agent \|/);
-assert.match(roster, /\| `reviewer` \| `sonnet` \| `high` \| `gpt-5\.6-terra` \| `high` \| installed custom agent \|/);
-assert.match(roster, /\| `pr-review-qa` \| `sonnet` \| `high` \| `gpt-5\.6-terra` \| `high` \| installed custom agent \|/);
-assert.match(roster, /\| `pr-review-security` \| `sonnet` \| `high` \| `gpt-5\.6-terra` \| `high` \| installed custom agent \|/);
-assert.match(roster, /\| `reviewer-consolidator` \| `sonnet` \| `medium` \| `gpt-5\.6-terra` \| `medium` \| installed custom agent \|/);
-assert.match(roster, /\| `researcher` \| `haiku` \| `medium` \| `gpt-5\.6-terra` \| `low` \| not shipped in Codex beta \|/);
+assert.match(roster, /\| `adversary` \| `sonnet` \| `xhigh` \| `gpt-5\.6-luna` \| `max` \| not shipped in Codex beta \|/);
+assert.match(roster, /\| `implementer` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `cleaner` \| `sonnet` \| `medium` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `inline-reviewer` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `reviewer` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `pr-review-qa` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `pr-review-security` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `reviewer-consolidator` \| `sonnet` \| `medium` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `researcher` \| `haiku` \| `medium` \| `gpt-5\.6-luna` \| `max` \| not shipped in Codex beta \|/);
 assert.match(roster, /\| `orchestrator` \| `opus` \| `high` \| `gpt-5\.6-sol` \| `xhigh` \| Main via `init` \/ `pipeline` skills \|/);
 assert.match(roster, /\| `agent-builder` \| `opus` \| `xhigh` \| `gpt-5\.6-sol` \| `xhigh` \| not shipped in Codex beta \|/);
 
@@ -242,7 +255,7 @@ try {
   await writeFile(source, content.replace("model: haiku\neffort: medium", "model: haiku\neffort: xhigh"));
   const projected = await render({ rootDir: haikuFixture });
   const roster = projected.files.get(join(haikuFixture, ".codex/README.md"));
-  assert.match(roster, /\| `init-project` \| `haiku` \| `xhigh` \| `gpt-5\.6-terra` \| `low` \| not shipped in Codex beta \|/);
+  assert.match(roster, /\| `init-project` \| `haiku` \| `xhigh` \| `gpt-5\.6-luna` \| `max` \| not shipped in Codex beta \|/);
 } finally {
   await rm(haikuFixture, { recursive: true, force: true });
 }

@@ -135,12 +135,12 @@ both values explicitly. With no accepted override, use this canonical matrix:
 | Logical role | Agent type | Model | Reasoning effort |
 |---|---|---|---|
 | `architect` | `pipeline-architect` | `gpt-5.6-sol` | `xhigh` |
-| `implementer` | `pipeline-implementer` | `gpt-5.6-terra` | `high` |
-| `tester` | `pipeline-tester` | `gpt-5.6-terra` | `high` |
-| `cleaner` | `pipeline-cleaner` | `gpt-5.6-terra` | `medium` |
+| `implementer` | `pipeline-implementer` | `gpt-5.6-luna` | `max` |
+| `tester` | `pipeline-tester` | `gpt-5.6-luna` | `max` |
+| `cleaner` | `pipeline-cleaner` | `gpt-5.6-luna` | `max` |
 | `qa` | `pipeline-qa` | `gpt-5.6-sol` | `xhigh` |
 | `security` | `pipeline-security` | `gpt-5.6-sol` | `xhigh` |
-| `delivery` | `pipeline-delivery` | `gpt-5.6-terra` | `medium` |
+| `delivery` | `pipeline-delivery` | `gpt-5.6-luna` | `max` |
 
 With an accepted override, replace both right-hand values in every row with the
 one normalized pair. The logical role name remains the role recorded in

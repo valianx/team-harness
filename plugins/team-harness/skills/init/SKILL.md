@@ -37,7 +37,7 @@ state/events, gates, Stage Gate, branch, or delivery record.
 Before dispatch, determine the exact project-or-global `inline-reviewer`
 definition selected by Codex; never mix scopes or substitute another local
 file. Fail closed if it is not a regular non-symlink or if its
-`model = "gpt-5.6-terra"`, `model_reasoning_effort = "high"`,
+`model = "gpt-5.6-luna"`, `model_reasoning_effort = "max"`,
 `sandbox_mode = "read-only"`, or SHA-256 raw-byte digest differs from the
 trusted packaged `inline-reviewer.toml` provided by this loaded plugin. Record
 the selected scope/path and digest only in the in-memory review package. The

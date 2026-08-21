@@ -217,9 +217,9 @@ standard installed specialists:
 | Claude role metadata | Codex model | Effort |
 |---|---|---|
 | `opus` | `gpt-5.6-sol` | `xhigh` |
-| `sonnet` + `high` or `xhigh` | `gpt-5.6-terra` | `high` |
-| `sonnet` + `medium` | `gpt-5.6-terra` | `medium` |
-| `haiku` | `gpt-5.6-terra` | `low` |
+| `sonnet` + `high` or `xhigh` | `gpt-5.6-luna` | `max` |
+| `sonnet` + `medium` | `gpt-5.6-luna` | `max` |
+| `haiku` | `gpt-5.6-luna` | `max` |
 
 For the active pipeline only, an unambiguous live request such as “pipeline en
 Luna max” selects one ephemeral model/effort pair. Main asks the operator to use
@@ -231,9 +231,10 @@ the live Main thread ends. Without an override, explicit dispatch recreates the
 standard per-role projection in the table above.
 
 The role table is independent from the generic fallback. Global setup and
-update install a missing fallback and atomically migrate the known obsolete
-`gpt-5.6-luna` value to `gpt-5.6-terra` / `medium`, with a backup. Any other
-explicit operator-selected fallback is preserved as `custom-preserved`. A
+update install a missing fallback and atomically migrate the exact formerly
+managed `gpt-5.6-terra` / `medium` pair to `gpt-5.6-luna` / `max`, with a
+backup. Any other complete operator-selected pair is preserved as
+`custom-preserved`. A
 fallback or named-role change reports `restartRequired: true`; the active Codex
 thread must be replaced because it does not hot-reload its agent registry.
 
@@ -279,7 +280,7 @@ untracked working-tree content over that baseline. The benchmark must neither
 fetch, pull, merge, rebase, nor otherwise synchronize `main` while it runs.
 
 Both sides use the same resolved `codex` executable and version, the same
-`gpt-5.6-terra` model and explicitly selected reasoning effort, the same sealed
+`gpt-5.6-luna` model and explicitly selected `max` reasoning effort, the same sealed
 prompt digest, and the same live gate decisions. The raw prompt, operator
 messages, session/thread IDs, rollout paths, raw JSONL, command transcript,
 and diff are private measurement inputs: they are not copied into the evidence

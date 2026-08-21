@@ -101,8 +101,8 @@ def check_inline_reviewer_native() -> None:
         if not path.is_file():
             fail(f"missing generated inline-reviewer output: {relative}")
         data = tomllib.loads(path.read_text())
-        if data.get("model") != "gpt-5.6-terra" or data.get("model_reasoning_effort") != "high":
-            fail(f"{relative}: inline-reviewer projection must be gpt-5.6-terra/high")
+        if data.get("model") != "gpt-5.6-luna" or data.get("model_reasoning_effort") != "max":
+            fail(f"{relative}: inline-reviewer projection must be gpt-5.6-luna/max")
         if data.get("sandbox_mode") != "read-only":
             fail(f"{relative}: inline-reviewer must use read-only sandbox")
         if "capabilities" in data:
@@ -463,8 +463,8 @@ def main() -> None:
         fail("Codex project must explicitly enable multi_agent")
     if config.get("features", {}).get("multi_agent_v2") is not True:
         fail("Codex project must explicitly enable multi_agent_v2")
-    if config["agents"].get("default_subagent_model") != "gpt-5.6-terra" or config["agents"].get("default_subagent_reasoning_effort") != "medium":
-        fail("Codex project must declare the generic Terra/medium subagent fallback")
+    if config["agents"].get("default_subagent_model") != "gpt-5.6-luna" or config["agents"].get("default_subagent_reasoning_effort") != "max":
+        fail("Codex project must declare the generic Luna/max subagent fallback")
     if config.get("project_doc_fallback_filenames") != ["CLAUDE.md"]:
         fail("Codex project must use CLAUDE.md only when AGENTS.md is absent")
     if config.get("sandbox_mode") != "workspace-write":
@@ -506,8 +506,8 @@ def main() -> None:
         expected_identity[f"pipeline-{role}"] = (role, source_marker, tier, True)
     expected_projection = {
         "opus": ("gpt-5.6-sol", "xhigh"),
-        "sonnet-high": ("gpt-5.6-terra", "high"),
-        "sonnet-medium": ("gpt-5.6-terra", "medium"),
+        "sonnet-high": ("gpt-5.6-luna", "max"),
+        "sonnet-medium": ("gpt-5.6-luna", "max"),
     }
     for path in (ROOT / ".codex/agents").glob("*.toml"):
         if path.is_symlink():
@@ -1360,10 +1360,10 @@ def main() -> None:
             fail("Codex bundled-agent sync did not install the complete role set")
         runtime_config = temp / "codex-home/config.toml"
         runtime_doc = tomllib.loads(runtime_config.read_text())
-        if runtime_doc.get("agents", {}).get("default_subagent_model") != "gpt-5.6-terra":
-            fail("Codex bundled-agent sync did not install the Terra fallback")
-        if runtime_doc.get("agents", {}).get("default_subagent_reasoning_effort") != "medium":
-            fail("Codex bundled-agent sync did not install the medium fallback effort")
+        if runtime_doc.get("agents", {}).get("default_subagent_model") != "gpt-5.6-luna":
+            fail("Codex bundled-agent sync did not install the Luna fallback")
+        if runtime_doc.get("agents", {}).get("default_subagent_reasoning_effort") != "max":
+            fail("Codex bundled-agent sync did not install the max fallback effort")
         if runtime_doc.get("project_doc_fallback_filenames") != ["CLAUDE.md"]:
             fail("Codex bundled-agent sync did not install the CLAUDE.md fallback")
         if sync_result.get("runtimeConfig", {}).get("status") != "current":
@@ -1398,8 +1398,8 @@ def main() -> None:
             'model = "operator-main"\n'
             'operator_key = "preserve-me"\n\n'
             '[agents]\n'
-            'default_subagent_model = "gpt-5.6-luna" # managed legacy\n'
-            'default_subagent_reasoning_effort = "max"\n'
+            'default_subagent_model = "gpt-5.6-terra" # managed legacy\n'
+            'default_subagent_reasoning_effort = "medium"\n'
             'max_threads = 9\n\n'
             '[projects."/tmp/example"]\n'
             'trust_level = "trusted"\n'
@@ -1417,9 +1417,9 @@ def main() -> None:
         migrated_result = json.loads(migrated.stdout)
         migrated_text = runtime_config.read_text()
         migrated_doc = tomllib.loads(migrated_text)
-        if migrated_doc["agents"].get("default_subagent_model") != "gpt-5.6-terra":
-            fail("Codex agent sync retained the obsolete Luna fallback")
-        if migrated_doc["agents"].get("default_subagent_reasoning_effort") != "medium":
+        if migrated_doc["agents"].get("default_subagent_model") != "gpt-5.6-luna":
+            fail("Codex agent sync retained the obsolete Terra fallback")
+        if migrated_doc["agents"].get("default_subagent_reasoning_effort") != "max":
             fail("Codex agent sync retained the obsolete fallback effort")
         for marker in ('model = "operator-main"', 'operator_key = "preserve-me"', 'max_threads = 9', '[projects."/tmp/example"]'):
             if marker not in migrated_text:
@@ -1432,7 +1432,7 @@ def main() -> None:
         custom_runtime = (
             'project_doc_fallback_filenames = ["CLAUDE.md"]\n'
             '[agents]\n'
-            'default_subagent_model = "operator/custom-model"\n'
+            'default_subagent_model = "gpt-5.6-terra"\n'
             'default_subagent_reasoning_effort = "high"\n'
         )
         runtime_config.write_text(custom_runtime)
@@ -1447,7 +1447,7 @@ def main() -> None:
             fail(f"Codex custom fallback preservation failed: {custom.stdout}{custom.stderr}")
         custom_result = json.loads(custom.stdout)
         if runtime_config.read_text() != custom_runtime:
-            fail("Codex agent sync overwrote an operator-selected fallback")
+            fail("Codex agent sync overwrote the operator-selected Terra/high fallback")
         if custom_result.get("runtimeConfig", {}).get("status") != "custom-preserved":
             fail("Codex agent sync did not report the preserved custom fallback")
         if custom_result.get("runtimeConfigChanged") is not False or custom_result.get("restartRequired") is not False:
@@ -1478,10 +1478,10 @@ def main() -> None:
         additive_doc = tomllib.loads(additive_text)
         if additive_doc.get("project_doc_fallback_filenames") != ["TEAM]GUIDE.md", ".agents.md", "CLAUDE.md"]:
             fail("Codex fallback reconciliation did not preserve ordered operator fallbacks")
-        if additive_doc.get("agents", {}).get("default_subagent_model") != "operator/custom-model":
-            fail("Codex CLAUDE.md reconciliation changed the operator-selected model fallback")
-        if "default_subagent_reasoning_effort" in additive_doc.get("agents", {}):
-            fail("Codex CLAUDE.md reconciliation added an operator-omitted reasoning fallback")
+        if additive_doc.get("agents", {}).get("default_subagent_model") != "gpt-5.6-luna":
+            fail("Codex reconciliation did not normalize an incomplete model fallback")
+        if additive_doc.get("agents", {}).get("default_subagent_reasoning_effort") != "max":
+            fail("Codex reconciliation did not install the missing reasoning fallback")
         for marker in ('model = "operator-main"', 'max_threads = 7'):
             if marker not in additive_text:
                 fail(f"Codex CLAUDE.md reconciliation dropped operator config {marker!r}")
