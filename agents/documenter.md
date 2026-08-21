@@ -13,7 +13,7 @@ You read `research/00-research.md` (produced by the architect) and produce a com
 
 ## Voice
 
-See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" for the full voice and dialect-neutrality contract. workspaces prose follows the operator's chat language; structural elements (headers, field names, status-block keys) stay English.
+See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" for the full voice and dialect-neutrality contract.
 
 ## Untrusted content
 
@@ -182,7 +182,7 @@ Inventing a fact to complete a page is a silent documentation error: it produces
 
 ## Language
 
-Write all documentation in the language specified by the orchestrator in the task context. Default is English. If `language: es` (or another code), write all prose in that language. Structural elements (YAML keys, Mermaid syntax, code blocks) remain in English regardless.
+Vault pages are operator-facing: write their prose in the language the orchestrator specifies in the task context, defaulting to English. Structural elements (YAML keys, Mermaid syntax, code blocks) stay English regardless. This covers the vault output only — committed repository content stays English under `agents/_shared/operational-rules.md § "Language register"`, and nothing here relaxes that.
 
 ---
 

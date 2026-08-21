@@ -96,8 +96,9 @@ be scanned — a binary or otherwise undecodable path — leaves the classificat
 therefore sensitive; it never resolves as an absence of signal.
 
 The executable form of this list is the floor classifier in
-`skills/verify/scripts/review-fan.mjs`, which derives the categories from changed paths and added
-content and reports the matching category as its reason. The identical category list governs the
+`skills/verify/scripts/review-fan.mjs`, which derives the categories from changed paths and from
+every line the change touches — removals included, because removing a control changes the security
+posture exactly as adding one does — and reports the matching category as its reason. The identical category list governs the
 inline review contract's floor (`agents/_shared/inline-review-contract.md`).
 
 ## The direct spec lane

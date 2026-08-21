@@ -256,8 +256,7 @@ it is NEVER written to `security_sensitive`, `security_gate_status`, or any gate
 The following security mechanisms run **input-independent** and are NOT waivable:
 
 - **HI-2 (discover-phase.md §3):** the security floor non-waivability invariant. No disposition signal can bypass the security gate. The gate fires whenever `security_sensitive: true` is set, regardless of session state.
-- **Path-pattern auto-escalation (`agents/ref-pipeline.md § "13 — Classify"`, deriving from `agents/ref-intake-flows.md § "Lane Classification"`):** sets `security_sensitive: true` based on file paths touched by the PR. This runs on the diff, not on the session state.
-- **Bug-fix forcing rule:** for `type: fix` and `type: hotfix`, `security_sensitive: true` is forced. Planning remains architect-only. On a sensitive task the non-waivable specialist floor is the final `adversary` audit within Phase 3, using the architect's security assessment and security-relevant TCs as claims to invert; code-level audit is delegated to PR review, referred to generically (not dependent on any specific configured tool).
+- **Derived security floor (`docs/pipeline-lanes.md § "2a. What counts as a sensitive path (type-agnostic)"`):** sets `security_sensitive: true` from the paths a change touches and the security-relevant content it adds or removes. It runs on the diff, not on session state, and it is type-agnostic — a bug fix gets no floor a feature would not get, and vice versa. On a sensitive task the non-waivable specialist floor is the final `adversary` audit within Phase 3, using the architect's security assessment and security-relevant TCs as claims to invert; code-level audit is delegated to PR review, referred to generically (not dependent on any specific configured tool).
 
 ---
 

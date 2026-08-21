@@ -62,7 +62,7 @@ const FLOOR_PATHS = [
   [/(^|\/)(Dockerfile|entrypoint\.sh)$/i, "executable-code handling"],
 ];
 
-/** Content signals: matched against added diff lines only. */
+/** Content signals: matched against every line the change touches, added and removed alike. */
 const FLOOR_CONTENT = [
   [signal(["authenticate", "authoriz\\w*", "permission", "rbac", `access${SEP}control`]), "authentication, authorization or permissions"],
   [signal(["session", "jwt", "bearer", `cookie${SEP}secret`]), "identity or session handling"],
@@ -177,21 +177,51 @@ async function readVerifiedExclusions(root, range) {
   }
 }
 
-/** Added lines per file, so a content signal is attributed to the file that carries it. */
-export async function readAddedByFile(root, range) {
+/**
+ * Every line a change touches, per file, so a content signal is attributed to its own file.
+ *
+ * Removals count as much as additions: removing an authentication check changes the security
+ * posture exactly as adding one does, and a scan that reads only `+` lines fails open on
+ * control removal — the case a benign-looking path would otherwise hide entirely.
+ *
+ * Header recognition is positional, never a match on the line's text. A removed line whose own
+ * content is a `--`-style comment produces the diff line `--- foo`, byte-identical to a real
+ * `--- a/path` header; no single-line pattern separates them. Tracking position instead closes
+ * that collision structurally: `---`/`+++` count as headers only between a `diff --git` line and
+ * that file's first `@@`, and after the first `@@` every `+`/`-` line is content.
+ */
+export async function readChangedContentByFile(root, range) {
   const diff = await git(root, ["diff", "--unified=0", "--no-color", range]);
-  const added = new Map();
+  const changed = new Map();
   let current = null;
-  let previous = "";
+  let previousPath = null;
+  let inHunks = false;
   for (const line of diff.split("\n")) {
-    const isHeader = line.startsWith("+++ ") && (previous.startsWith("--- ") || previous.startsWith("diff --git "));
-    if (isHeader) current = line.startsWith("+++ b/") ? line.slice("+++ b/".length).trim() : null;
-    else if (current !== null && line.startsWith("+")) {
-      added.set(current, `${added.get(current) ?? ""}\n${line}`);
+    if (line.startsWith("diff --git ")) {
+      current = null;
+      previousPath = null;
+      inHunks = false;
+      continue;
     }
-    previous = line;
+    if (line.startsWith("@@")) {
+      inHunks = true;
+      continue;
+    }
+    if (!inHunks) {
+      if (line.startsWith("--- ")) {
+        previousPath = line.startsWith("--- a/") ? line.slice("--- a/".length).trim() : null;
+      } else if (line.startsWith("+++ ")) {
+        // A whole-file deletion reads `+++ /dev/null`. Attributing its removed lines to the path
+        // the file had is what keeps deleting a control from being quieter than editing it out.
+        current = line.startsWith("+++ b/") ? line.slice("+++ b/".length).trim() : previousPath;
+      }
+      continue;
+    }
+    if (current !== null && (line.startsWith("+") || line.startsWith("-"))) {
+      changed.set(current, `${changed.get(current) ?? ""}\n${line}`);
+    }
   }
-  return added;
+  return changed;
 }
 
 /**
@@ -362,7 +392,7 @@ async function buildPackage(input) {
   const changedSurface = allChanged.filter((entry) => !verified.paths.has(entry.path));
   const floor = classifyFloor(
     allChanged,
-    await readAddedByFile(root, range),
+    await readChangedContentByFile(root, range),
     await readUnscannablePaths(root, range),
   );
   const requested = normalizeLenses(input.lens);

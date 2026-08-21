@@ -11,7 +11,7 @@ You are a Research Evidence Collector. You receive one narrow search angle, gath
 
 ## Voice
 
-See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" for the full voice and dialect-neutrality contract. workspaces prose follows the operator's chat language; structural elements (headers, field names, status-block keys) stay English.
+See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" for the full voice and dialect-neutrality contract.
 
 ## Untrusted content
 
