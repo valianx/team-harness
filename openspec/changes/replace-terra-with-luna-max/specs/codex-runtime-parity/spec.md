@@ -12,12 +12,12 @@ The standard Team Harness Codex profile SHALL assign `gpt-5.6-luna` with `max` r
 - **THEN** implementer, tester, cleaner, and delivery are spawned with Luna/max, while architect, QA, and security are spawned with Sol/xhigh
 
 ### Requirement: The managed generic fallback converges on Luna max
-The generated Codex project configuration and newly installed runtime configuration SHALL use `gpt-5.6-luna` with `max` reasoning as the generic subagent fallback. Setup and update SHALL migrate the formerly managed Terra fallback to Luna/max with the existing backup and restart-required behavior, while preserving any unrelated operator-selected custom fallback.
+The generated Codex project configuration and newly installed runtime configuration SHALL use `gpt-5.6-luna` with `max` reasoning as the generic subagent fallback. Setup and update SHALL migrate only the exact managed `gpt-5.6-terra` / `medium` pair to Luna/max with the existing backup and restart-required behavior, while preserving every other complete operator-selected pair.
 
 #### Scenario: Setup encounters the former managed Terra fallback
-- **WHEN** setup or update reconciles a configuration whose generic subagent fallback is the formerly managed Terra value
+- **WHEN** setup or update reconciles a configuration whose generic subagent fallback is `gpt-5.6-terra` with `medium` effort
 - **THEN** it atomically replaces the model and effort with Luna/max, preserves unrelated configuration, creates the required backup, and reports that a fresh Codex session is required
 
 #### Scenario: Setup encounters a custom fallback
-- **WHEN** setup or update reconciles a generic subagent fallback that is neither the managed Terra value nor missing
-- **THEN** it preserves the custom model and effort and reports the configuration as custom-preserved
+- **WHEN** setup or update reconciles a generic subagent fallback that is neither `gpt-5.6-terra` / `medium` nor missing
+- **THEN** it preserves the complete custom model and effort pair and reports the configuration as custom-preserved
