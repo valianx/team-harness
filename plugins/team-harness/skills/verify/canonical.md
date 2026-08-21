@@ -54,5 +54,7 @@ push, or delivery record. It never publishes.
 
 When the script reports `security_floor.applies`, `security` and `adversary` are already in
 `required_lenses` — the floor is derived from the diff, not from recall, and an unscannable path
-leaves the classification ambiguous, which resolves sensitive. A floor lens that is absent or
-returns a blocker holds the range at not-ready.
+leaves the classification ambiguous, which resolves sensitive. The derivation reads every line the
+change touches: removing a security control raises the same floor as adding one, because a scan
+that reads additions only fails open on exactly the change a security review exists to catch. A
+floor lens that is absent or returns a blocker holds the range at not-ready.

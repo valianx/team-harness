@@ -278,6 +278,49 @@ await check("asks a lens for nothing it must echo back", async () => withReposit
   }
 }));
 
+await check("raises the floor when a change removes a security control at a benign path", async () =>
+  withRepository(async (root) => {
+    // src/pipeline.js matches no path signal: the removal is only visible through content.
+    await commit(root, {
+      "src/pipeline.js": "export function run(request) {\n  authorize(request.user);\n  return handle(request);\n}\n",
+    }, "add");
+    await commit(root, {
+      "src/pipeline.js": "export function run(request) {\n  return handle(request);\n}\n",
+    }, "drop the check");
+    const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa" });
+    assert.equal(result.package.security_floor.applies, true, "removing a control raised no floor");
+    assert.equal(result.package.required_lenses.includes("security"), true);
+    assert.equal(result.package.required_lenses.includes("adversary"), true);
+  }));
+
+await check("raises the same floor when the same control is added rather than removed", async () =>
+  withRepository(async (root) => {
+    await commit(root, { "src/pipeline.js": "export function run(request) {\n  return handle(request);\n}\n" }, "add");
+    await commit(root, {
+      "src/pipeline.js": "export function run(request) {\n  authorize(request.user);\n  return handle(request);\n}\n",
+    }, "add the check");
+    const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa" });
+    assert.equal(result.package.security_floor.applies, true, "the floor depends on the direction of the edit");
+  }));
+
+await check("reads a removed line disguised as a --- file header as content, not a header", async () =>
+  withRepository(async (root) => {
+    // The diff line for this removal is `--- authorize(user) here`, byte-identical in shape to a
+    // real `--- a/path` header. A text-matching header rule would stop collecting at it.
+    await commit(root, { "src/notes.js": "const a = 1;\n-- authorize(user) here\nconst b = 2;\n" }, "add");
+    await commit(root, { "src/notes.js": "const a = 1;\nconst b = 2;\n" }, "drop the line");
+    const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa" });
+    assert.equal(result.package.security_floor.applies, true, "the disguised removal was read as a file header");
+  }));
+
+await check("leaves the floor down when neither direction touches a security control", async () =>
+  withRepository(async (root) => {
+    await commit(root, { "src/format.js": "export const pad = (n) => String(n).padStart(2, \"0\");\n" }, "add");
+    await commit(root, { "src/format.js": "export const pad = (n) => `${n}`.padStart(2, \"0\");\n" }, "rewrite");
+    const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa" });
+    assert.equal(result.package.security_floor.applies, false, "widening to removals made an ordinary change sensitive");
+  }));
+
 await check("resolves ready only when every required lens passes without a blocker", () => {
   const decision = gateDecision(pkg({ required_lenses: ["qa", "tester"] }), [ret("qa"), ret("tester")]);
   assert.equal(decision.ready, true);

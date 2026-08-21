@@ -73,9 +73,11 @@ A security dimension is a stop, not an ejection. When `review-fan.mjs` reports
 3 — narrow scope
 ```
 
-Choice `1` keeps the work here with `security` and `adversary` in the required lens set; the pull
-request does not open until `review-fan.mjs gate` resolves ready. Choice `2` carries the authored
-change into the pipeline. Never absorb the dimension without asking, and never eject without
+Choice `1` keeps the work here with `security` and `adversary` in the required lens set, and the
+coordinator holds publication until `review-fan.mjs gate` resolves ready. No hook covers
+`gh pr create`, so that hold is coordinator discipline rather than an enforced gate — the enforced
+part is the classification, which the script derives from the diff and cannot be talked out of.
+Choice `2` carries the authored change into the pipeline. Never absorb the dimension without asking, and never eject without
 offering `1`. When any of the hard routers above also holds, option `1` is not offered.
 
 ## Canonical surface

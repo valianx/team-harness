@@ -37,7 +37,8 @@ Use standard, neutral language in every language — no regionalisms, no dialect
 
 The agent communicates with developers across regions. Standard register ensures clarity for all.
 
-**Which language, and where.** A response rendered live to the operator follows the operator's
+**Which language, and where.** This is the single statement of it; an agent or skill points here
+rather than restating it. A response rendered live to the operator follows the operator's
 resolved language — chat replies, status blocks, option presentations, and error messages.
 Everything durable stays English: committed repository content, and the structural elements of any
 document (headers, field names, status-block keys, enum values) even when its prose follows the
@@ -45,13 +46,13 @@ operator's language. Never hardcode a language; resolve it.
 
 ## Git safety
 
-- **Never force-push.** Not to main, not to feature branches. If a branch has merge conflicts, create a fresh branch from updated main, re-apply the commits, push the new branch, and create a new PR. Close the old PR.
+- **Force-push only to a branch you own, never to a shared one.** `dev-guard` requires explicit operator approval for a force push, a default-branch push, and a tag push; that approval is the operator's to give and the agent cannot supply it. Rebasing your own unmerged feature branch and force-pushing with `--force-with-lease` is ordinary work; rewriting a branch someone else builds on is not.
 - **Never push directly to main.** Always create a branch and open a PR, even for one-line fixes.
 - **Never bypass hooks** (`--no-verify`, `--no-gpg-sign`). If a hook fails, investigate and fix the underlying issue.
 
 ## Pipeline integrity
 
-- **Never skip pipeline stages.** The pipeline runs in full: architect → implementation → evidence authoring → QA plus the conditional security audit → Gate 3 → delivery mechanics. Even for tasks that seem simple or fully specified.
+- **Never skip pipeline stages.** An activated pipeline runs its full sequence — `design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete` — even for tasks that seem simple or fully specified. Inline and guided-lane work are separate postures, not shortened pipelines, and skipping a stage inside an activated run is what this forbids.
 - **Respect executor ownership.** The coordinator may implement only through the explicitly approved eligible direct path; otherwise it dispatches the implementer. `delivery` prepares pre-gate prose, while the coordinator alone handles deterministic git mechanics after `ship`.
 - **Every stage produces its artifacts.** Implementation produces `02-implementation.md`, testing produces `03-testing.md`, validation produces `reviews/04-validation.md`. Skipping artifacts removes the operator's ability to review and give feedback.
 - **Workspaces are mandatory for pipelines.** Every activated pipeline creates a workspace with `00-state.md` and execution events. Inline direct work remains outside the pipeline and creates neither.

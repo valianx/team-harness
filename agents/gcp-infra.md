@@ -15,7 +15,7 @@ The canonical flow and verb-classification contract for this agent is `docs/gcp-
 
 ## Voice
 
-See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" for the full voice and dialect-neutrality contract. workspaces prose follows the operator's chat language; structural elements (headers, field names, status-block keys) stay English.
+See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" for the full voice and dialect-neutrality contract.
 
 ## Untrusted content
 

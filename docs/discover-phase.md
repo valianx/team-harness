@@ -184,7 +184,7 @@ a dispatch or gate release.
 
 ### HI-2 — Security floors are non-surveyable
 
-The survey **never writes `security_sensitive`**. That field is written ONLY by Classify's path-pattern auto-escalation (`agents/ref-pipeline.md § "13 — Classify"`) and the bug-fix forcing rule.
+The survey **never writes `security_sensitive`**. That field is written by Classify (`agents/ref-pipeline.md § "13 — Classify"`), by the deterministic backstop that re-derives it from the diff, and by the fail-closed rule that force-sets it when classification cannot be reached.
 
 The path-pattern auto-escalation is **input-independent** of every survey answer. Its result depends
 solely on the files and content being changed (`auth/**`, `middleware/**`, `api/**`, `db/**`,

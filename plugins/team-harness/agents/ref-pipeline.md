@@ -762,8 +762,8 @@ checkpoint and never change the security floor.
 
 **`security_sensitive` resolves from the direct/pipeline classification in
 `agents/ref-intake-flows.md`** and is applied uniformly regardless of `type`; it is never
-derived from bug tiers or historical markers. That reference owns the two-posture predicate
-and the risk-metadata table. A live explicit `inline` choice may authorize sensitive direct
+derived from bug tiers or historical markers. That reference owns the two-posture predicate;
+the sensitive-path list itself lives in `docs/pipeline-lanes.md § "2a. What counts as a sensitive path (type-agnostic)"`. A live explicit `inline` choice may authorize sensitive direct
 work when every other direct predicate passes; no second confirmation, default-N, veto, or
 forced pipeline applies. A warning or audit note is informational, while runtime/native,
 destructive-action, and outward-action approvals remain unchanged. An explicit live
