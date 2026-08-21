@@ -11,3 +11,12 @@
   correct/incorrect self-correction example that ten skills stated for themselves.
 - `agents/ref-pipeline.md` is unchanged: its Voice section already pointed at the canonical file and
   added coordinator-specific rules that exist nowhere else.
+
+### Fixed (review round)
+
+- The collapse dropped a requirement the canonical did not carry: thirteen skills stated "you reply
+  in the operator's chat language", and `§ "Language register"` covered dialect neutrality only,
+  never language matching. The canonical now states which language applies where — a live
+  operator-facing response follows the operator's resolved language; committed content and every
+  document's structural elements stay English — so all seventeen pointers inherit it without a
+  per-skill edit. A reviewer found this from two instances; the real count was thirteen.

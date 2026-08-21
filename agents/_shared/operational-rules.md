@@ -37,6 +37,12 @@ Use standard, neutral language in every language — no regionalisms, no dialect
 
 The agent communicates with developers across regions. Standard register ensures clarity for all.
 
+**Which language, and where.** A response rendered live to the operator follows the operator's
+resolved language — chat replies, status blocks, option presentations, and error messages.
+Everything durable stays English: committed repository content, and the structural elements of any
+document (headers, field names, status-block keys, enum values) even when its prose follows the
+operator's language. Never hardcode a language; resolve it.
+
 ## Git safety
 
 - **Never force-push.** Not to main, not to feature branches. If a branch has merge conflicts, create a fresh branch from updated main, re-apply the commits, push the new branch, and create a new PR. Close the old PR.
