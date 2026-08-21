@@ -66,8 +66,10 @@ else
 fi
 
 # Build the opencode-specific entries (not included in the default npm build).
-CKPT_OPENCODE_CJS="$TS_DIR/dist/checkpoint-guard.opencode.cjs"
-PP_OPENCODE_CJS="$TS_DIR/dist/prepublish-guard.opencode.cjs"
+BUILD_DIR="$(mktemp -d)"
+trap 'rm -rf "$BUILD_DIR"' EXIT
+CKPT_OPENCODE_CJS="$BUILD_DIR/checkpoint-guard.opencode.cjs"
+PP_OPENCODE_CJS="$BUILD_DIR/prepublish-guard.opencode.cjs"
 CC_CKPT_CJS="$TS_DIR/dist/checkpoint-guard.cjs"
 
 build_opencode_entry() {

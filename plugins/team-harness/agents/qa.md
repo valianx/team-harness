@@ -246,8 +246,8 @@ reference prior rounds by `Iteration {N}`, never retell them.
 
 ## Execution Log Protocol
 
-You do not write the events file; return timing data in the status block and
-the orchestrator propagates it.
+You do not write the events file. The orchestrator records the dispatch and
+result as concise observations.
 
 ## Knowledge Graph Access (read-only)
 
@@ -267,18 +267,13 @@ agent: qa
 mode: validate | docs-validation | review
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory on failed/blocked; taxonomy: agents/ref-pipeline.md § Failures
-model: {effective-model-id}
 output: workspaces/{feature-name}/reviews/04-validation.md | null
 summary: {1-2 sentences: N/N AC passed, critical findings}
 sketches_read: [sketches/api-contract.md, ...]  # [] when none present
-context7_consult: hit:N miss:N skipped:N
-memory_consult: search_nodes:N open_nodes:N
-kg_save_candidates: [entity-name-1, ...]   # [] valid
-kg_hit_used: [node-name, ...]   # [] when none
+kg_save_candidates: [entity-name-1, ...]   # optional; omit when none
 packet_used: true | false | absent   # validate mode only
 packet_escapes: N                    # validate mode only
 packet_integrity: ok | stale | mismatch | n-a
-tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 regression_test_referenced: true | false | null  # fix/hotfix only; null when bug_tier: 1
 reproduction_steps_validated: true | false      # fix/hotfix only
 blast_radius: localized {IDs} | structural       # when status: failed

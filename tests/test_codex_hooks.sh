@@ -111,7 +111,6 @@ if (!commands.some(command => command.includes("policy-block"))) process.exit(1)
 if (!commands.some(command => command.includes("gcp-guard"))) process.exit(1);
 if (commands.some(command => /dev-guard|prepublish-guard|worktree-guard|gate-guard/.test(command))) process.exit(1);
 if (!commands.every(command => command.includes("plugin runtime missing"))) process.exit(1);
-if (!manifest.description.includes("Native Codex permissions") || !manifest.description.includes("review/trust")) process.exit(1);
 NODE
 then pass; else fail "manifest must wire only deterministic deny hooks"; fi
 

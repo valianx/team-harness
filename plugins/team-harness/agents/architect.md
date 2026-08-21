@@ -204,21 +204,6 @@ coordinates — a script projection, never a second architect dispatch. A valida
 that assembled plan re-enters this same `openspec-planning` mode with the failure; there is no
 standing `openspec-overlay` dispatch mode to repair a mapping.
 
-**Codex progress transport.** When the packet includes `dispatch_id`,
-`progress_recipient`, and `progress_interval_seconds: 120`, use native
-`send_message` to that exact recipient: one line beginning `TH_PROGRESS`, one
-space, then JSON with exactly `schema_version` (1), `dispatch_id`, `role`,
-`mode`, `milestone`, `completed_units`, `total_units`, `artifact_pointers`
-(workspace-relative regular outputs already written), and `blocked_code`
-(`null`, `AMBIGUITY`, `INPUT_MISSING`, or `WRITE_FAILED`). Milestones:
-`started` (before lengthy reasoning), `inputs-validated`,
-`artifacts-writing`, `validation-ready`; repeat the current truthful milestone
-whenever 120 seconds pass while you retain execution. Never put prose,
-outside paths, source content, or secrets in progress; a heartbeat proves
-nothing and authorizes no phase or gate; never write progress into
-coordinator-owned state. On `TH_PROGRESS_REQUEST`, send the current snapshot
-at the next message boundary without restarting analysis.
-
 ### Root-Cause Analysis Mode (`type: fix`, Tier 2-4)
 
 Replaces Design Mode for bug fixes; never dispatched for `type: hotfix` or
@@ -318,8 +303,8 @@ embedded copy.
 
 ## Execution Log Protocol
 
-You do not write the events file; return timing data in the status block and
-the orchestrator propagates it.
+You do not write the events file. The orchestrator records the dispatch and
+result as concise observations.
 
 ## Knowledge Graph Access (read-only)
 
@@ -341,7 +326,6 @@ mode: design | research | audit | planning | root-cause | consolidation
 sub_mode: light-root-cause | full-root-cause | null   # root-cause only
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory on failed/blocked; taxonomy: agents/ref-pipeline.md § Failures
-model: {effective-model-id}
 outputs:                               # every artifact produced, one entry each
   - path: workspaces/{feature-name}/{01-plan|01-root-cause|00-research|00-audit|01-planning}.md
     kind: plan|root-cause|research|audit|planning
@@ -350,16 +334,13 @@ outputs:                               # every artifact produced, one entry each
   - path: workspaces/{feature-name}/sketches/{type}.md
     kind: sketch                         # one entry per triggered sketch
 summary: {1-2 sentences}
-classification: {touches_http_api: b, touches_ui: b, touches_data_model: b, touches_cli: b, touches_public_lib_api: b, touches_async_messaging: b, destructive: b, spans_multiple_services: b, changes_security_control: b}   # design/root-cause, all nine, bare true|false
+classification: {known design-surface hints} | omitted   # optional; never gate evidence
 request_shape: adaptation | new-capability | fix | refactor   # design mode
 realized_scope: aligned | expanded                           # design mode
 expansion_reason: {required when expanded; omit when aligned}
 acceptance_criteria_count: N                                 # functional AC-N only
 technical_constraint_count: N                               # TC-N only
 implementation_references_in_ac: 0                           # mandatory; non-zero blocks success
-confidence: N        # design mode: 1-10 single-pass; mirrors ### Confidence Score
-size_reason: required-items | null   # design mode: required above the ordinary target; never a blocker itself
-spec_seed_dissent: true | false      # design mode
 recommended_type: feature | null      # root-cause: bug is a feature gap; pair with failure_kind: reclassification-needed
 recommended_tier: 2 | 3 | 4 | null    # root-cause: scope wider than dispatched tier; same pairing; mutually exclusive with recommended_type
 rationale: {1-line}                   # mandatory when either recommended_* is non-null
@@ -367,18 +348,13 @@ evidence: [{file:line} — {what it shows}, ...]   # mandatory when either recom
 regression_test_kind: unit | integration | e2e | null   # root-cause: from ## Regression Test Approach; regression test is mandatory always, no manual fallback
 root_cause_provenance_tier: T1 | T2 | T3 | null   # root-cause: echoed from the dispatch payload; null when no artifact
 provenance_verification: freshness-only | plausibility-blast-radius-pass | independent-derivation-fallback | n/a
-context7_consult: hit:N miss:N skipped:M   # always present, even all-zero
-memory_consult: search_nodes:N open_nodes:N
-kg_save_candidates: [entity-name-1, ...]   # [] valid
-kg_hit_used: [node-name, ...]   # KG nodes that influenced a decision; [] when none
-tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
+kg_save_candidates: [entity-name-1, ...]   # optional; omit when none
 issues: {list of blockers, or "none"}
 ```
 
 The retired `type_reclassify`/`tier_promote`/`tier_promote_rationale` fields
-are never emitted. The orchestrator propagates the tool fields into
-`phase.end` events and the pipeline summary and gates phases on this block
-without re-reading your output.
+are never emitted. The orchestrator gates phases on this block without
+re-reading your output.
 
 **Language.** `01-plan.md` and `01-root-cause.md` are operator-facing: body
 prose follows the operator's resolved language; structural elements stay

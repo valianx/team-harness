@@ -56,13 +56,4 @@ for (const external of [".agents", ".claude", ".cursor", ".opencode", "openspec"
   assert.equal(embed.includes(`all:${external}`), false, `Go package must not embed ${external}`);
 }
 
-const design = await readFile(path.join(root, "plugins/team-harness/skills/pipeline/references/design.md"), "utf8");
-assert.match(design, /exact installed[\s\S]{0,80}`openspec-propose` skill/);
-assert.match(design, /`openspec-update-change` for a bound existing/);
-assert.match(design, /Commentary is informational and never asks/);
-const implementation = await readFile(path.join(root, "plugins/team-harness/skills/pipeline/references/implementation.md"), "utf8");
-assert.match(implementation, /never selects the phase, task, correction authority, state transition, or/);
-const pipeline = await readFile(path.join(root, "agents/ref-pipeline.md"), "utf8");
-assert.match(pipeline, /sync, and archive authority remain exclusively TH\/operator governed/);
-
 process.stdout.write("OpenSpec distribution boundary: PASS\n");

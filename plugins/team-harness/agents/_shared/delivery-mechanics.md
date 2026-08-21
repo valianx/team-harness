@@ -177,13 +177,10 @@ snapshot_error: {sanitized one-line error}
 The failed read does not wait, poll, reopen delivery, or prevent terminal
 completion when the accepted Freeze commit is published and the PR already exists.
 
-**One-way vault export.** When `obsidian_sync: armed`, export the workspace
-after draft-PR creation: copy the complete workspace atomically into a fresh
-directory under the recorded `obsidian_export_target` and set
-`obsidian_sync: exported`. The vault copy is a non-authoritative view — never
-read for recovery, never synced back. An export failure records
-`obsidian_sync: pending` with one sanitized reason line and never blocks or
-delays delivery; a later explicit operator request may retry.
+**Legacy vault export.** New Obsidian workspaces already live in the vault.
+Only a recovered pre-change snapshot with `obsidian_sync: armed` performs its
+recorded one-way export; preserve that compatibility behavior without applying
+it to new runs.
 
 ## Terminal boundary
 

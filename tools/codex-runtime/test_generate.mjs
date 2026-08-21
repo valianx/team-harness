@@ -190,6 +190,10 @@ const pipelineIdentityDocs = await Promise.all([
   readFile(join(root, "plugins/team-harness/skills/pipeline/SKILL.md"), "utf8"),
   readFile(join(root, "plugins/team-harness/skills/pipeline/references/activation.md"), "utf8"),
 ]);
+assert.match(pipelineIdentityDocs[1], /`obsidian`: `\{logs-path\}\/\{logs-subfolder\}\/\{repo-name\}\/\{feature\}\//,
+  "Codex pipeline does not select the configured Obsidian vault as canonical workspace");
+assert.doesNotMatch(pipelineIdentityDocs[1], /obsidian-direct/,
+  "Codex pipeline retains the retired obsidian-direct mode");
 const standardPipelineMatrix = {
   architect: ["pipeline-architect", "gpt-5.6-sol", "xhigh"],
   implementer: ["pipeline-implementer", "gpt-5.6-luna", "max"],

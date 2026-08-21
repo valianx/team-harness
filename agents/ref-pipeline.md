@@ -63,24 +63,18 @@ Locate the needed section by heading; do not read this file in full.
 
 No visible output during boot. The first thing the operator sees is the answer to their request.
 
-1. **Config** — read `~/.claude/.team-harness.json`. `base_path = workspaces` and `events_file = 00-execution-events.jsonl` always: the canonical workspace is repository-local regardless of `logs-mode`. `logs-mode: obsidian` only arms the one-way vault export — validate `{logs-path}/{logs-subfolder}/{repo_name}` (absolute, accessible, non-root, not the user home; subfolder normalized-relative without `.`/`..`/glob/empty segments; combined target strictly below the base after symlink resolution), record it as `obsidian_export_target` with `obsidian_sync: armed`, and on validation failure disarm with a one-line report — never block. No posture/profile selector is read from config.
+1. **Config** — read the active runtime's native `.team-harness.json`. Resolve one canonical `base_path`: `workspaces` for `logs-mode: local`, or `{logs-path}/{logs-subfolder}/{repo_name}` for `logs-mode: obsidian`. Validate the Obsidian base as absolute, accessible, non-root, outside the user home, normalized, and symlink-contained; invalid configuration stops before state creation and never falls back silently. Use `00-execution-events.jsonl` locally and the existing fenced `00-execution-events.md` format in Obsidian. New runs set legacy export fields to null. No posture/profile selector is read from config.
    **Initiative in play** — a supported, current mode: path composition, `overview.md` placement and per-project `docs_root` all differ. Read `agents/ref-dispatch-machinery.md`. Off the hot path because it is infrequent, not because it is deprecated — never resolve it from memory.
 2. **Session override** — The load-bearing order is exact: parse override intent from the operator's message BEFORE resolving paths, read persistent config from `~/.claude/.team-harness.json`, apply precedence `override > persistent > default` evaluated against the whitelist in `CLAUDE.md §5`, then resolve — compute `base_path`/`logs_mode`/`events_file`/`docs_root` from the merged result. Never write the config file from this flow. A non-whitelisted key is ignored with a one-line WARN naming the key, never the value. No-override case: when the operator's message carries no override, this step falls through to the persistent config and stays silent — no extra output, indistinguishable from a boot with no override logic at all.
 3. **Language** — precedence: session override → `language` in config → detection from the operator's text → `en`. A persistence marker (`por defecto`, `siempre`, `default`, `permanente`, `de aquí en adelante`) requires a Y/n gate plus a merge-write; without one it is session-only.
 4. **Continue the activated request.** A new activation enters Intake with the operator's preserved request. `/th:recover` resolves the persisted state and follows its recorded `next_action`.
 
-**Direct-vault opt-in (`obsidian-direct`).** Only an explicit live operator
-request in the current turn may make the vault the canonical workspace;
-`logs-mode: obsidian`, prior chat, or persisted markers never do. Activation
-requires the validated export target plus one run of the shared
-`skills/pipeline/scripts/workspace-preflight.mjs` against the canonical
-external root and proposed feature workspace before creating anything. Only
-its successful ephemeral create/write/remove probe proves the current runtime
-session can write there; path mode bits and persistent config do not. On any
-non-ready result, fall back to the repository workspace, record the probe
-reason, and continue — never an escalation or retry loop, never a blocked
-pipeline. After the first state write the canonical workspace is immutable for
-the run; never split or migrate artifacts between vault and local roots.
+`logs-mode` is the only workspace selector. There is no separate
+`obsidian-direct` mode and no delivery-time export for new runs. Probe the
+selected base before state creation; a non-ready configured vault stops with
+one actionable diagnostic rather than silently switching to local. After the
+first state write the canonical workspace is immutable. Legacy export-armed
+state remains recoverable without migration.
 
 `{YYYY-MM-DD}_{feature-name}` guarantees a unique directory per run. On `/th:recover`, re-read the resolved config from `00-state.md § Current State` (schema: `agents/_shared/orchestrator-state.md`) — do not re-parse the chat.
 
@@ -339,7 +333,7 @@ One taxonomy for everything that can go wrong, so the budget question is answere
 | `failure_kind` | The observable cause | Owner | Budget | On exhaustion |
 |---|---|---|---|---|
 | `transport` | The `Task` call itself errored — the harness failed and no specialist result was ever produced | you | retry exactly once | STOP the phase; report the harness's **literal** error message, never paraphrased. No workaround that bypasses the specialist |
-| `invalid-return` | A result came back, but its status block is unusable: a required field absent, a value not of the declared type, two mutually exclusive fields both set | the specialist | re-dispatch once, naming the specific field | STOP; never repair the block or infer the missing value |
+| `invalid-return` | A result came back, but a decision-bearing fact is absent or ambiguous after the coordinator has normalized any unambiguous formatting defect from the returned evidence | the specialist | re-dispatch once, naming the unresolved fact | STOP only when the fact remains ambiguous; never invent evidence or a result |
 | `stale-context` | A snapshot-bound result names a missing or different reviewed head/context identity than its dispatch | review coordinator | no retry against the old snapshot; recapture and re-dispatch under the owning freshness barrier | STOP without publishing if a fresh snapshot cannot be established |
 | `artifact-missing` | A required output **file** is absent, empty, or unparseable while the dispatch reported success | the owning specialist | re-dispatch once | STOP; never author the missing artifact yourself |
 | `execution-failed` | The specialist ran, hit an internal error it cannot classify further, and says so | the specialist | re-dispatch once, carrying the literal error plus its `summary` and `issues` | STOP with those surfaced verbatim |
@@ -365,7 +359,14 @@ produce the missing decision. (c) Every correction round, autonomous or
 operator-live, begins only after one fresh package-bound decision and consumes
 exactly that one authorization.
 
-**Every specialist reports its kind.** A status block with `status: failed` or `status: blocked` carries `failure_kind: <one of the above>`. A returned failure with no kind is `invalid-return` — the missing thing is a field, not a file. Re-dispatch once naming the field, and never guess the kind on the specialist's behalf: the whole point is that the agent that hit the failure is the one that knows which it was.
+**Every specialist should report its kind.** A status block with `status: failed`
+or `status: blocked` normally carries `failure_kind: <one of the above>`. A
+missing field is not itself a pipeline failure when the returned prose and
+evidence state the cause unambiguously: Main records the normalized value in
+its own state and appends an observation naming the normalization. If the cause
+or status remains ambiguous, classify the return as `invalid-return` and
+re-dispatch once naming the unresolved fact. Main never invents evidence,
+specialist success, or a decision-bearing cause.
 
 ## Gates
 
@@ -396,7 +397,8 @@ eligibility conjunct passes and `autonomous_correction_count < 3`; when any conj
 never create an automatic design-perfection loop.
 
 **Max 3 limits autonomy, never the operator.** `autonomous_correction_count`
-is bounded to `0..3` and mirrored by legacy `iteration: N/3`.
+is bounded to `0..3`. Legacy `iteration: N/3` remains readable, but new runs
+derive any display from the counter instead of persisting another authority field.
 `operator_correction_count` is monotonic and deliberately unbounded. At `3/3`,
 or after any number of operator rounds, Main still pauses with the ordinary
 three choices and a fresh nonce. Each current live choice `1` authorizes one
@@ -407,9 +409,11 @@ There is no exceptional label, waiver, or one-time overflow allowance.
 ### `cause` and the severity floor
 
 **New `iteration.start` events are authorized-correction-only.** They require a preceding
-unused `correction.decision: authorize` bound to the same nonce, failed Freeze anchor,
-complete finding IDs, dispositions, file scope, and `correction_authority`. Autonomous
-authority additionally binds the exact consumed Gate-1 approval nonce. A lens verdict alone emits no iteration. A
+unused `correction.decision: authorize`; the consumed nonce becomes its
+`decision_ref`, and the decision is the sole record carrying the complete
+package and `correction_authority`. The downstream event carries only that ref
+plus ordinary observations. Autonomous authority additionally binds the exact
+consumed Gate-1 approval nonce on the decision. A lens verdict alone emits no iteration. A
 mechanical plan repair, operator ruling/transcription, and explicit architect work do not
 increment `iteration`; historical `cause: operator` remains readable but is not produced.
 
@@ -439,7 +443,7 @@ intent/scope/AC contradiction to resolve first—never as a silent waiver.
 2. **Contradiction → resolve before authorization.** Present the conflicting requirements and costs. Only the operator may resolve them; architect work still requires a separate explicit request.
 3. **Mechanical and enumerated → include together.** Do not split them into micro-rounds; one authorization covers the complete named `resolve` package and scope.
 4. **Mixed set → preserve all findings.** Resolve decision-bearing items first, then present one correction decision over the resulting complete package. Never dispatch a mechanical subset while another finding remains undecided.
-5. **Persist and authorize.** After every disposition is explicit, set the mandatory correction fields from the final `resolve` set and generate a fresh nonce. When every finding is an unambiguous in-scope `resolve`, the package is complete, no decision-bearing or ambiguous item remains, and `autonomous_correction_count < 3`, Main records one package-bound `gate1-autonomous` authorization without a live presentation and consumes that single decision through the same correction route. When any eligibility conjunct fails, show exactly the following choices and stop:
+5. **Persist and authorize.** After every disposition is explicit, persist one `correction_package` for the final `resolve` set and generate a fresh nonce. When every finding is an unambiguous in-scope `resolve`, the package is complete, no decision-bearing or ambiguous item remains, and `autonomous_correction_count < 3`, Main records one package-bound `gate1-autonomous` authorization without a live presentation and consumes that single decision through the same correction route. When any eligibility conjunct fails, show exactly the following choices and stop:
 
 ```text
 1 — authorize one correction round
@@ -488,10 +492,12 @@ work after Gate 1.
 ### Authorized correction round
 
 Live choice `1`, or one eligible autonomous decision, records both the state decision and
-one `correction.decision` event before dispatch. The correction packet contains every authorized finding ID and only the union
-scope; the decision and its one authorized event pair carry the same
-`correction_authority` and authority Gate nonce. Autonomous authority carries the
-exact consumed Gate-1 nonce; operator-live carries null. It may not narrow to one finding, widen scope, or reuse an old nonce. After the
+one `correction.decision` event before dispatch. The consumed nonce becomes its
+`decision_ref`; this sole authority record carries the complete correction
+package, `correction_authority`, and authority Gate nonce. The one
+`iteration.start` and one `agent.correction.spawn` carry only that ref plus
+ordinary observations. Autonomous authority carries the exact consumed Gate-1
+nonce; operator-live carries null. It may not narrow to one finding, widen scope, or reuse an old nonce. After the
 bounded implementation/evidence work, require a recorded PASS for every package closure check
 before any tester refresh or Freeze. Missing or failed closure evidence is `correction-incomplete`:
 do not dispatch tester, create a Freeze, or spend a final validation fan. After successful closure,
@@ -526,30 +532,11 @@ time:
 | validation | security | 10 min |
 | delivery | delivery | 5 min |
 
-For a Codex `openspec-planning` architect, the dispatch packet carries a
-coordinator-generated `dispatch_id`, exact `progress_recipient`, and
-`progress_interval_seconds: 120`. The specialist uses native `send_message` to
-emit transient `TH_PROGRESS` JSON at `started`, `inputs-validated`,
-`artifacts-writing`, and `validation-ready`, repeating the
-current milestone when 120 seconds pass. Main validates the known dispatch,
-role/mode, counters, workspace-contained artifact pointers, and closed blocked
-code. These messages are progress evidence only: they never write coordination
-state, prove correctness or terminality, or reset the SLA.
-
-On SLA exceed, **escalate to the operator and keep the specialist alive —
-never kill silently.** First inspect `list_agents` once, send one
-non-interrupting `TH_PROGRESS_REQUEST`, and probe only metadata for expected
-artifacts. Emit one structured `TH_SLA` diagnostic and one coordinator-owned
-`agent.sla` event with elapsed time, live status, last milestone/heartbeat age,
-`terminal_result: false`, `artifact_state: none|partial|complete`, and
-`action: continue-waiting`. No valid heartbeat plus no artifact means only
-`no-material-progress-observed`, never failure or blockage. Continue a directed wait that can return either the
-agent result or live operator input. Only a current live operator cancellation
-of that active attempt authorizes `interrupt_agent`. A replacement requires a
-demonstrated terminal unsuccessful result plus the normal phase/correction
-authority; elapsed time or a wait timeout alone authorizes neither. A project's
-own `## Pipeline Timeouts` overrides only these SLA values, never the wait
-semantics or interruption authority.
+On SLA exceed, tell the operator once that the specialist is still running and
+append one `agent.sla` event with the universal envelope plus a concise
+`observation`. Do not request heartbeats, inspect partial artifacts, or require
+attempt counters and metrics. Elapsed time is not failure or replacement
+authority; keep waiting unless the live operator cancels the active work.
 
 ## Context pruning
 
@@ -625,7 +612,7 @@ You create the folder and own its structure and every coordination file in it. E
 
 `reviews/` and `sketches/` are created implicitly on first write — no `mkdir` step.
 
-**Frontmatter injection, only when the vault export is armed or the run is `obsidian-direct`.** After a specialist returns, read the file it wrote; if it does not start with `---`, prepend the standard block (`repo`, `repo_path`, `feature`, `pipeline_type`, `date`, `agent`, `tags`), deriving `file_role` from the basename. **Excluded:** the events file, `*.excalidraw`, `*.html`, and `session.json`.
+**Frontmatter injection in Obsidian mode.** After a specialist returns, read the file it wrote; if it does not start with `---`, prepend the standard block (`repo`, `repo_path`, `feature`, `pipeline_type`, `date`, `agent`, `tags`), deriving `file_role` from the basename. **Excluded:** the events file, `*.excalidraw`, `*.html`, and `session.json`.
 
 **No specialist you dispatch writes outside `{docs_root}`** except the code and tests the implementer and tester produce in the work tree.
 
@@ -903,12 +890,14 @@ normal design correction described above — no second dispatch mode.
 Before presenting Gate 1, Main also runs the packaged `openspec-events.mjs`
 with the complete configured events path and bound feature. Only
 `kind: team_harness_openspec_execution_events_validation`, `verdict: pass`
-permits the gate. The validator rejects missing universal `ts`/`feature`, a
-dispatch mode serialized as lifecycle `task` instead of the closed `design`
-value, non-canonical status, missing `attempt_metrics`, open attempts, or an
-incomplete Design transaction (a missing planning dispatch or a missing
-derivation result). The append-only trace is never repaired during gate
-presentation.
+permits the gate. A malformed event, missing universal `ts`/`feature`, wrong
+agent task, non-canonical status, or missing observation is a warning and does
+not count as Design evidence; it does not poison otherwise complete evidence.
+If required Design evidence is consequently absent, Main may append a
+canonical replacement event for a dispatch or result it directly observed and
+rerun the validator. It never rewrites the malformed line, invents specialist
+success, or repairs gate authority. A genuinely incomplete Design transaction
+still blocks Gate 1.
 
 For every new legacy `sharded-v1` plan, Main resolves `plan-contract.mjs` and
 `plan-contract-repair.mjs` from the pipeline skill, runs the validator with only
@@ -1382,9 +1371,10 @@ requires the applicable operator decision. Never infer abort or replace the
 pipeline from that recovery requirement.
 
 For one eligible implementer package, persist a fresh
-`cleaner_handoff_nonce`, canonical repository and absolute worktree, the
-cleanup commit/tree anchor, and the exact finding objects, set
-`cleaner_handoff_pending: true`, pause, show the exact scope, and present exactly:
+`cleaner_handoff_nonce` and one `cleaner_handoff_package` containing the
+canonical repository, absolute worktree, cleanup commit/tree anchor, exact
+finding objects, and eligibility result. Set `cleaner_handoff_pending: true`,
+pause, show the exact scope, and present exactly:
 
 ```text
 1 — authorize one implementer pass
@@ -1393,7 +1383,10 @@ cleanup commit/tree anchor, and the exact finding objects, set
 ```
 
 Only live choice `1` after that presentation consumes the nonce and authorizes
-exactly one fresh implementer bound byte-for-byte to the package. Gate-1
+exactly one fresh implementer. The consumed nonce becomes its `decision_ref`;
+`cleaner.handoff.decision` is the sole record carrying the complete package,
+and `agent.cleaner-handoff.spawn` carries only that ref plus ordinary dispatch
+observations. Gate-1
 autonomy, ordinary approval, generic `continue`, agent prose, files, and tools
 never authorize it. Record `cleaner.handoff.decision` and
 `agent.cleaner-handoff.spawn`, never `iteration.start` or
@@ -1414,7 +1407,7 @@ authorization before another fresh implementer, still without incrementing
 explicit decision first and never implies implementer authorization.
 
 An implementer `failed` or `blocked` return maps to `handoff-failed` or
-`handoff-blocked` with its hashed terminal result and consumed nonce. Neither
+`handoff-blocked` with its hashed terminal result and `decision_ref`. Neither
 state may run or pass the common quality checkpoint, hygiene, or Freeze. Further
 work requires a new complete package, fresh nonce, presentation, and live
 authorization; it is never an automatic retry.

@@ -33,25 +33,16 @@ gate_pending: gate1|gate3|null
 iteration: N/3
 cleaner_handoff_pending: true|false
 cleaner_handoff_nonce: {fresh token or null}
-cleaner_handoff_repository: {canonical repository identity or null}
-cleaner_handoff_worktree: {absolute path or null}
-cleaner_handoff_anchor: {cleanup commit/tree or null}
-cleaner_handoff_findings: [{id, repository, cause, files, requirements, suggested_correction, closure_check, expected}]|[]
-cleaner_handoff_eligibility: eligible|ineligible|null
-cleaner_handoff_ineligible_reasons: [{closed-predicate conjunct}]|[]
+cleaner_handoff_package: {repository, worktree, anchor, findings, eligibility, ineligible_reasons}|null
 cleaner_handoff_decision: authorize|pause|abort|null
-cleaner_handoff_decision_nonce: {consumed token or null}
+cleaner_handoff_decision_ref: {consumed token or null}
 correction_pending: true|false
 correction_nonce: {fresh token or null}
-correction_anchor: {failed freeze commit/tree or null}
-correction_findings: [{stable finding id}]|[]
-correction_scope: [{repo-relative path}]|[]
-correction_requirements: [{AC-N|TC-N}]|[]
-correction_closure: [{id, check, expected}]|[]
-correction_dispositions: [{id, disposition: resolve|design-consistent|decision-required}]|[]
+correction_package: {anchor, findings, scope, requirements, closure, dispositions}|null
 correction_decision: authorize|pause|abort|null
-correction_decision_nonce: {consumed token or null}
+correction_decision_ref: {consumed token or null}
 correction_authority: operator-live|gate1-autonomous|null
+correction_authority_gate_nonce: {consumed Gate-1 token or null}
 autonomous_correction_count: N      # integer 0..3; the only correction budget
 operator_correction_count: N        # non-negative integer; deliberately unbounded
 last_completed: design|waiting_gate1|implementation|validation|waiting_gate3|delivery|complete|null
@@ -66,9 +57,10 @@ coordinator-owned operational state and never a product diff entry. Persist its
 exact file SHA-256 after each authorized manifest change; recovery revalidates
 both fields before any quality invocation.
 
-`iteration: N/3` is a legacy display mirror of `autonomous_correction_count`,
-not a total-round counter and never authority. New writers keep both values
-equal and increment them only for `gate1-autonomous` correction decisions. An
+`iteration: N/3` is a legacy-readable display mirror, not a required new-run
+field, total-round counter, or authority. New writers derive it for display
+when needed and increment only `autonomous_correction_count` for
+`gate1-autonomous` correction decisions. An
 `operator-live` authorization increments only `operator_correction_count` and
 may do so without limit, including while `iteration: 3/3` and after any prior
 operator round. A new pipeline initializes `iteration: 0/3`,
@@ -102,8 +94,12 @@ records `abort` and closes the pipeline. The authorized implementer path
 never inherits Gate-1 autonomy, increments `iteration`, consumes the autonomous
 max-3 budget, or permits
 another cleaner for the same immutable attempt. The decision and spawn events
-repeat the anchor and every finding byte-for-byte; bare non-zero exits without
-the exact command, exit code, and bounded diagnostic are incomplete. After the
+no longer repeat the package. `cleaner.handoff.decision` is the sole authority
+record and carries the complete package; `agent.cleaner-handoff.spawn` carries
+only its `decision_ref`. If that binding event is malformed after a dispatch
+Main directly observed, append a corrected binding observation without
+dispatching again. Bare non-zero exits without the exact command, exit code,
+and bounded diagnostic are incomplete. After the
 attempt Main owns closure evidence and joins the same full-manifest
 `post_implementation` Freeze quality run used by every repository path (never
 a touched-file subset), followed by hygiene. Any remaining work requires a new
@@ -128,12 +124,13 @@ without another presentation using `correction_authority: gate1-autonomous` and
 the exact consumed Gate-1 nonce. When any of those conjuncts fails, Main pauses
 and presents exactly `1 — authorize one correction round`, `2 — pause without
 changes`, and `3 — abort pipeline`; only a live reply after that presentation
-may consume the nonce. Consumption atomically sets `correction_nonce:
-null` and copies the consumed token to `correction_decision_nonce`. `authorize`
-requires one matching `correction.decision`
-event and permits exactly one `iteration.start`/`agent.correction.spawn` pair
-bound to that same decision nonce, anchor, findings, scope, authority, and
-authority Gate nonce. `pause` and `abort`
+may consume the nonce. Consumption atomically sets `correction_nonce: null`
+and uses the consumed token as `correction_decision_ref`. `authorize` requires
+exactly one matching `correction.decision` event carrying the complete package
+and authority, then permits exactly one
+`iteration.start`/`agent.correction.spawn` pair referencing that decision. A
+malformed binding may be corrected append-only only for the dispatch Main
+directly observed; it never permits another dispatch. `pause` and `abort`
 perform no correction. Every later failure gets a fresh nonce and decision.
 An ordinary approval, intake autonomy preference, generic `continue`, recovered
 prose, files, agents, and tools are never authorization. Gate-1 autonomous
@@ -207,40 +204,10 @@ a partial total. `reasoning_output_tokens` remains a reported component and is
 never added to `total_tokens` again. Do not apply this rule to an event stream
 without native `usage`.
 
-**Declared Codex agent-lifecycle overlay — conditional.** Apply this overlay
-only when the trace contains `agent.spawn`, `agent.close`, or
-`agent.correction.spawn`; a trace without those records retains its existing
-state grammar. These are coordinator-declared lifecycle records, not native
-session telemetry. The selected snapshot adds only these fields:
-
-```text
-agent_lifecycle_schema_version: 1|null
-agent_lifecycle_metrics_status: available|unavailable|null
-agent_lifecycle_metrics_reason_code: {closed lifecycle code}|null
-agent_lifecycle_attempt_count: N|null
-agent_lifecycle_follow_up_count: N|null
-agent_lifecycle_correction_count: N|null
-agent_lifecycle_quality_verdicts: {pass:N,concerns:N,fail:N,n_a:N}|null
-agent_lifecycle_metrics: {cached_input_tokens,uncached_input_tokens,output_tokens,wall_time_ms,tool_calls}|null
-approved_ac_count: N|null
-cached_input_per_approved_ac: decimal|unavailable
-```
-
-The snapshot aggregates only terminal `agent.close.attempt_metrics` records as
-defined by `references/observability.md`; it does not divide, attribute, or
-copy a root/phase usage delta. A missing, duplicate, open, malformed,
-unavailable, or conflicting attempt makes `agent_lifecycle_metrics_status:
-unavailable`, clears `agent_lifecycle_metrics`, and renders
-`cached_input_per_approved_ac: unavailable`. The derived measures are separate
-and stay reportable when token components do not: the cost report carries a
-per-role total of `declared_input_bytes`, so a fixed cost paid once per dispatch
-of the same role is visible, and states the difference between the run total and
-the sum of its attributed parts as unattributed coordinator overhead — never
-distributing that difference across attributed items. Count follow-ups from final
-closes, corrections from correction spawns, and quality verdicts from their
-closed enum only. `approved_ac_count` is a current approved-plan count with no
-AC text or identifier. Never write a native ID, alias, rollout path,
-transcript, prompt, tool output, or free-form task label into this overlay.
+Agent execution is recorded in the append-only trace, not duplicated into a
+lifecycle overlay in state. New agent events use the minimal envelope and an
+`observation`; historical lifecycle fields remain readable but are never
+aggregated into control state.
 
 **Intake classification** — the orchestrator produces the initial values at intake. `security_sensitive` is monotonic: the named plan and Phase-2-close backstops may escalate `false → true`, but no downstream step may change `true → false`. The other fields are never re-derived downstream.
 ```
@@ -250,7 +217,10 @@ bug_tier: 1|2|3|4|null
 bug_tier_source: auto|operator|architect-promote|null
 ```
 
-**Design classification** — `architect` produces these at Design time; the orchestrator transcribes them (next block). They do not exist at intake and the orchestrator never authors a value for them.
+**Design classification** — these are optional sketch-routing hints derived by
+Main from the accepted plan surface. They do not authorize work or validation.
+When a value is uncertain, Main uses conservative `true` and records that
+choice as an observation; it never re-dispatches an architect for this block.
 ```
 touches_http_api: true|false
 touches_ui: true|false
@@ -263,7 +233,9 @@ spans_multiple_services: true|false
 changes_security_control: true|false   # informational; NOT a dispatch predicate
 ```
 
-Every field belongs to exactly one of these two blocks, with one producer and one production state. `changes_security_control` sits in the second: it is a property of the designed change, so it cannot be known at intake. Before Design closes it is simply **absent** — never `null` standing in for "not yet decided", because an absent field and a decided-`false` field must not look alike to a reader. `security_floor_applies` derives from `security_sensitive` alone (`agents/ref-pipeline.md § Validation`), so nothing gated is waiting on the second block.
+`changes_security_control` is informational. `security_floor_applies` derives
+from monotonic `security_sensitive` alone (`agents/ref-pipeline.md §
+Validation`), so nothing gated waits on the design-classification block.
 
 **Classification block — sketch triggers.** The eight booleans are also
 transcribed dash-prefixed, one per line, read verbatim by
@@ -284,21 +256,14 @@ every run is what keeps that path unexercised.
 - spans_multiple_services: true|false
 ```
 
-`architect` returns the values as a structured `classification:` status-block
-field mirrored in `01-plan.md § Review Summary § Classification block`; it
-does NOT write `00-state.md`. Validate before transcribing: all nine fields
-(the eight above plus `changes_security_control`) present as bare booleans and
-matching the plan mirror — any gap or mismatch is `status: failed` for that
-dispatch; re-dispatch `architect`, never fill a value with your own judgement
-or transcribe a partially-valid block. Transcribe the nine values literally.
-When `architect` returned no classification and the phase required one, treat
-it as `changes_security_control: true` for scoping and re-dispatch — never as
-all-false.
+Main may reuse values present in the plan, but a gap or mismatch is an
+observation rather than an invalid agent result. It derives only the sketch
+hints it needs, chooses `true` under uncertainty, and never treats missing
+classification as all-false.
 
-**Resolved config** — from `agents/ref-pipeline.md § Boot`. The canonical
-`docs_root` is repository-local on every run; `logs_mode: obsidian` arms the
-one-way vault export tracked by `obsidian_sync`, and a vault `docs_root`
-appears only under a live `obsidian-direct` opt-in.
+**Resolved config** — from `agents/ref-pipeline.md § Boot`. `logs_mode`
+directly selects the canonical `docs_root`: repository-local for `local`, and
+the configured vault for `obsidian`.
 ```
 logs_mode: local|obsidian
 obsidian_sync: armed|exported|pending|null
@@ -309,6 +274,8 @@ operator_language: en|es|pt|...
 initiative: {slug}|null
 project: {project-slug}|null                # agents/ref-dispatch-machinery.md
 ```
+New runs set both legacy export fields to `null`; they remain only to recover
+older export-armed workspaces.
 
 **Autonomy and rounds.**
 ```
@@ -494,7 +461,7 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | Field | Required | Notes |
 |---|---|---|
 | `ts` | yes | ISO-8601 with timezone |
-| `event` | yes | `phase.start`, `phase.end`, `agent.spawn`, `agent.sla`, `agent.close`, `agent.correction.spawn`, `correction.decision`, `gate`, `gate.pass`, `gate.fail`, `iteration.start`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`, `stage2.hygiene`, `stage2.lane.*`, `plan_structure`, `plan_review.deferred`, `plan_review.offered`, `plan_review.offer_declined`, `plan_review_integrity`, `kg_write`, `artifact.missing`, `operation.started/success/failed`, `pipeline.start`, `pipeline.complete`, `pipeline.incomplete`, `pipeline.end`, `checkpoint.confirmed`, `compaction.trigger` |
+| `event` | yes | `phase.start`, `phase.end`, `agent.spawn`, `agent.sla`, `agent.close`, `agent.correction.spawn`, `agent.cleaner-handoff.spawn`, `correction.decision`, `cleaner.handoff.decision`, `gate`, `gate.pass`, `gate.fail`, `iteration.start`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`, `stage2.hygiene`, `stage2.lane.*`, `plan_structure`, `plan_review.deferred`, `plan_review.offered`, `plan_review.offer_declined`, `plan_review_integrity`, `kg_write`, `artifact.missing`, `operation.started/success/failed`, `pipeline.start`, `pipeline.complete`, `pipeline.incomplete`, `pipeline.end`, `checkpoint.confirmed`, `compaction.trigger` |
 | `feature` | yes | kebab-case, matches the workspace folder |
 | `phase`, `stage` | conditional | `stage` required for `stage.gate*` |
 | `agent` | conditional | required for `phase.*` |
@@ -503,18 +470,18 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | `usage_scope`, `usage_checkpoint` | conditional | native Codex branch only: safe root-reachable scope plus a `codex_usage_checkpoint`; never an identifier or path |
 | `usage` | conditional | native Codex branch only: a `codex_usage_delta`, measured or unavailable; no estimate or partial subtotal |
 | `pricing_identity`, `cost` | conditional | native Codex branch only: exact provider/model and complete quote provenance |
-| `agent_role`, `task`, `attempt_ordinal`, `context_strategy`, `follow_up_count` | conditional | required for `agent.*`; finite lifecycle enums and local ordinal only, never an ID, alias, or free-form label |
-| `attempt_metrics`, `quality_verdict` | conditional | required for `agent.close`; metrics are complete or closed-code unavailable, verdict is `pass`/`concerns`/`fail`/`n-a` |
-| `wall_time_ms`, `declared_input_bytes` | conditional | `agent.close` carries both, as non-negative integers, enforced by `skills/pipeline/scripts/openspec-events.mjs`. `wall_time_ms` is derived from this attempt's own `agent.spawn` and `agent.close` timestamps — including an attempt closed after a stall, whose consumed time is recorded and marked as returning no result. `declared_input_bytes` is the byte size of the dispatch's declared input manifest. `wall_time_ms` is checked against this attempt's own spawn and close timestamps, because an unchecked number is one the producer could have invented. Both are derivations over artifacts the coordinator already owns; neither is a consumed-token measure, and neither may be substituted for one |
-| `correction_cause` | conditional | required for `agent.correction.spawn`; literal `verification` only |
-| `correction_nonce`, `correction_anchor`, `correction_findings`, `correction_scope`, `correction_requirements`, `correction_closure`, `correction_dispositions` | conditional | required for `correction.decision` and every authorized `iteration.start`/`agent.correction.spawn`; the complete seven-field package must be byte-for-byte identical across all three events, not merely share a nonce; exact bounded identity, never inferred; closure has one deterministic check/expected result per finding |
-| `correction_authority` | conditional | required and byte-identical across `correction.decision`, `iteration.start`, and `agent.correction.spawn`; `operator-live` is unbounded, while `gate1-autonomous` requires a recorded Gate-1 approval release for this pipeline and `autonomous_correction_count < 3` |
-| `convergence_counts` | conditional | required on every `iteration.start` following a correction fan; one object with exactly the three non-negative integer keys `new_in_delta`, `pre_existing_missed`, `reopened` counting that round's findings by the ratchet's classification vocabulary (`agents/ref-pipeline.md § "The ratchet"`); present with all-zero values when the triggering round produced no reasoning-lens findings — never omitted |
+| `observation` | conditional | required for `agent.*`; concise fact about what started, remains running, or returned |
+| `agent_role`, `task` | optional | diagnostic labels; only the exact architect/design pair is interpreted as OpenSpec Gate-1 evidence |
+| `decision_ref` | conditional | consumed single-use nonce; required on correction/cleaner decisions and their later binding events |
+| `correction_package` | conditional | required only on `correction.decision`; contains anchor, findings, scope, requirements, closure, and dispositions |
+| `cleaner_package` | conditional | required only on `cleaner.handoff.decision`; contains repository, worktree, anchor, findings, and eligibility evidence |
+| `correction_authority` | conditional | required only on `correction.decision`; `operator-live` is unbounded, while `gate1-autonomous` requires a recorded Gate-1 approval release and `autonomous_correction_count < 3` |
+| `convergence_counts` | optional | diagnostic counts derivable from the findings ledger; omission never blocks a correction round |
 | `verdict` | conditional | `pass`/`concerns`/`fail`/`partial-fail` |
 | `decision` | conditional | required for `stage.gate.release` and `correction.decision`; correction value is `authorize\|pause\|abort` |
 | `cause` | conditional | `verification` for new `iteration.start` correction rounds; historical `operator` values remain readable |
 | `provenance` | conditional | required for `checkpoint.confirmed`; a **closed enum, never free text**, and never subject to the bound below |
-| `tools`, `model`, `effort` | optional | propagated verbatim from the returning status block |
+| `tools`, `model`, `effort` | optional | coordinator-known diagnostic context; never required from the agent and never gate evidence |
 | `extra` | optional | event-specific |
 
 **Never pretty-print** — one JSON object per line, append-only. In obsidian mode the same JSONL lives inside a ```` ```jsonl ```` fence; extract with `sed -n '/^```jsonl$/,/^```$/{/^```/d;p}'` before piping to `jq`.
@@ -523,17 +490,23 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 
 Every free-text field — `operation.*`'s `detail`/`error`/`suggestion`, `kg_write.writes[].detail`, `plan_structure.extra.detail`, and the notification `{summary}` — is **one compact clause, ≤120 chars**, never multi-sentence narrative, stripped of `\n\r\t` and quote characters. **Format only:** it never reduces one-object-per-line and never substitutes for an event.
 
-**One named exception, additive: the `checkpoint.confirmed` confirmatory text.** ≤280 chars (one confirmatory turn, not the surrounding conversation). Quotes and `\n\r\t` are **escaped as JSON string escapes, never stripped**, so the operator's exact characters survive. Every backtick is escaped at the byte level with its unicode escape (U+0060) rather than left literal — this protects the JSONL fence obsidian mode wraps the trace in, which the quote escape alone does not. Truncation past the bound is marked visibly with `…[truncated]`. The secret prohibition is unaffected: a confirmation carrying a credential records `provenance` and `withheld — secret prohibition` in place of the text. Altering the recorded characters inside the bound is exactly the stripping this exception exists to avoid.
+`agent.*.observation` is deliberately outside that prose bound: it is the
+general-purpose record of what Main observed, not a closed mini-schema. The
+coordinator must serialize the complete event with a JSON encoder and append
+exactly one encoded object per physical line; it must never interpolate raw
+agent output into JSONL. JSON escaping preserves quotes and control characters,
+and a backtick run inside the encoded JSON string remains on that event line,
+so it cannot become the Markdown variant's line-anchored closing fence. The
+overall events-file and event-count bounds remain the storage limits.
 
-### `tools` propagation
+**One named exception, additive: the `checkpoint.confirmed` confirmatory text.** ≤280 chars (one confirmatory turn, not the surrounding conversation). Quotes and `\n\r\t` are **escaped as JSON string escapes, never stripped**, so the operator's exact characters survive. Every backtick is escaped at the byte level with its unicode escape (U+0060) rather than left literal as additional defense for exact operator-supplied text in an Obsidian trace. Truncation past the bound is marked visibly with `…[truncated]`. The secret prohibition is unaffected: a confirmation carrying a credential records `provenance` and `withheld — secret prohibition` in place of the text. Altering the recorded characters inside the bound is exactly the stripping this exception exists to avoid.
 
-| Status-block line | `tools` sub-object |
-|---|---|
-| `context7_consult: hit:N miss:N skipped:M` | `"context7": {"hit", "miss", "skipped"}` |
-| `memory_consult: search_nodes:N open_nodes:N` | `"memory": {"search_nodes", "open_nodes"}` |
-| `kg_save_candidates: [a, b]` | `"kg_save_candidates": [...]` |
+### Optional runtime telemetry
 
-Omit sub-objects not reported; omit `tools` entirely if none.
+When the runtime exposes tool usage directly, Main may add a compact `tools`
+object. Leaf-agent counters are not required or parsed into gate evidence.
+Omit `tools` entirely when unavailable. `kg_save_candidates` is a result hint,
+not telemetry, and follows the separate write policy.
 
 ### `kg_write`
 
@@ -561,16 +534,16 @@ estimate, use zero, or preserve a partial native subtotal.
 
 ## Findings ledger
 
-`reviews/findings-ledger.md` — append-only, coordinator-sole-writer, distinct from the decision
-ledger and from `open_findings`. One row per finding `id`, carrying `class`, `severity`, and a
-`disposition` from the closed set `fixed | accepted-residual | open | rejected-with-rationale`,
-plus any operator ruling including a waiver rationale — transcribed from a lens's or the
-implementer's status block, never inferred. Verifiers read it and never edit it. A disposition
-change is recorded by appending the new disposition and round to the finding's existing row —
-never by deleting prior row material and never by opening a second row for the same id.
+`reviews/findings-ledger.md` — append-only, coordinator-sole-writer, distinct
+from the decision ledger and from `open_findings`. Each row is a finding event
+carrying `id`, round, `class`, `severity`, and a `disposition` from the closed
+set `fixed | accepted-residual | open | rejected-with-rationale`, plus any
+operator ruling including a waiver rationale. A disposition change appends a
+new row with the same `id`; readers use the latest valid row. Never edit or
+delete historical rows.
 
 `id` is the exact identity a reasoning lens (`qa`, `adversary`, `security`) reports and the
-implementer echoes in `finding_resolutions.finding_id` (I-4); `correction_findings` and
+implementer echoes in `finding_resolutions.finding_id` (I-4); `correction_package.findings` and
 `open_findings` above resolve to this same identity, never a second vocabulary. A row suppressed
 as `accepted-residual` or by an operator ruling stays suppressed only for the same root cause —
 evidence of a different root cause opens a fresh row rather than reopening the old one.
@@ -583,7 +556,7 @@ dispatch context, so the lens classifies each reported finding as `new_in_delta`
 
 `{docs_root}/00-pipeline-summary.md` — rewritten **in full, never appended**, at four mandatory checkpoints: the STAGE-GATE-1 emission, Freeze, every `iteration.start`, and pipeline end. Rewriting at other transitions is best-effort.
 
-Sections: `## TL;DR`, `## Phase Timeline`, `## Dispatch Issues`, `## Tool Effectiveness`, `## Verification Packet`, `## Cost`, `## Lifecycle Efficiency` (only for a selected declared lifecycle trace), `## Iterations`, `## Files Changed`. Field-by-field derivation: `docs/observability.md § Pipeline Summary Protocol` and `§ Cost rollup`.
+Sections: `## TL;DR`, `## Phase Timeline`, `## Dispatch Issues`, `## Tool Effectiveness`, `## Verification Packet`, `## Cost`, `## Iterations`, `## Files Changed`. Field-by-field derivation: `docs/observability.md § Pipeline Summary Protocol` and `§ Cost rollup`.
 
 **Every number derives from the trace — never re-invented by walking workspaces.** The summary is a render of the trace, not an independent source of truth. `## Iterations` references each round **by ID only** and never re-tells what happened in it; the narrative lives only in `failure-brief.md`.
 
@@ -593,21 +566,15 @@ Sections: `## TL;DR`, `## Phase Timeline`, `## Dispatch Issues`, `## Tool Effect
 renders `Cost: unavailable`. A summary with no such object retains the legacy
 token and price rendering unchanged.
 
-**OpenSpec Gate-1 trace preflight.** Before Gate 1, once the Design architect
-attempt closes (one pair required), validate the configured events
-file and bound feature with the packaged `openspec-events.mjs`. Missing `ts` or
-`feature`, a dispatch mode serialized as lifecycle `task`, a non-canonical
-status, missing `attempt_metrics`, or any open attempt fails closed. Do not
-repair the append-only trace as part of gate presentation.
-
-**Declared lifecycle summary branch.** Only when an `agent.*` lifecycle event
-exists, render `## Lifecycle Efficiency` from the conditional lifecycle
-overlay: declared attempts, final follow-ups, corrections, closed quality
-verdict counts, cached input, uncached input, output, wall time, tool calls,
-approved-AC count, and cached-input-per-approved-AC. If the attempt aggregate
-or denominator fails closed, render every affected metric as `unavailable`;
-never attribute phase usage to an attempt or retain a partial total. This
-additive section does not select or alter either cost branch.
+**OpenSpec Gate-1 trace preflight.** Before Gate 1, validate the configured
+events file and bound feature with the packaged `openspec-events.mjs`. It checks
+only the universal event envelope, the architect role/task/status needed for
+Design, and a complete Design phase. It does not police agent attempt counters,
+heartbeats, metrics, or open/closed ordinals. Malformed telemetry is reported
+as a warning and ignored as Design evidence. If that leaves required evidence
+missing, Main may append a canonical replacement event only for a dispatch or
+result it directly observed, then rerun the validator. Never rewrite history,
+infer specialist success, or use telemetry repair to release a gate.
 
 **Failures:** a failed write logs and retries at the next transition. Counts disagreeing with the trace → the trace wins. Trace missing → render `(no trace recorded)` placeholders, never crash.
 
@@ -656,7 +623,7 @@ After every phase transition, update `00-state.md`. This is the orchestrator's p
 **Marking a checklist item `[x]` and appending its `phase.end` are ONE inseparable step** — never write one without the other in the same pass.
 
 1. **Append the event first.** `phase.start` before dispatch, `phase.end` after
-   the agent returns (with `tokens`, `duration_ms`, `tools`, `model`, `effort`),
+   the agent returns (with its status and any runtime-known diagnostics),
    `gate` when a gate is reached. **First, because events are append-only and
    must reflect real time** — backfilling later loses timestamp accuracy.
    **Legacy Claude branch — no native `usage` object.** **Token tracking is
@@ -674,14 +641,9 @@ After every phase transition, update `00-state.md`. This is the orchestrator's p
    branches; aliases and partial totals are additionally forbidden in this
    native branch.
 
-   **Declared specialist lifecycle.** Immediately before a deliberate
-   specialist dispatch or continuation, append the matching allowlisted
-   `agent.spawn`; on a terminal return append exactly one `agent.close` before
-   the enclosing `phase.end`. A verification correction emits a fresh
-   `agent.correction.spawn`, never a continuation of a terminal ordinal. These
-   coordinator declarations use only the finite fields in
-   `references/observability.md`; they are not a request to recover native
-   lifecycle telemetry or attribute phase usage to an attempt.
+   **Specialist observations.** Record dispatch, SLA, return, and corrective
+   work with the compact agent events in `references/observability.md`; do not
+   duplicate them into state or derive per-agent usage from them.
 2. **Update `00-state.md`** — the `§ Current State` fields, the completed state `[x]`, and the `§ Agent Results` row **upserted by `(agent, phase)` key**: overwrite in place on a same-key re-run across iterations, never append a duplicate. A new row appears only for a genuinely new key, so `qa` and `adversary` in validation each keep their own current verdict and are never collapsed to one last-writer-wins value.
    *Narrative sections are gone.* There is no TL;DR to rewrite, no Hot Context to overwrite, and no prose recovery section: the events file carries the narrative and the `next_action` field carries the recovery instruction.
 3. **Only then dispatch.**
@@ -750,11 +712,9 @@ explicit request. Archive never runs silently.
 Then append `## Final state — ready for handoff` (branch, version, PR, AC count, iterations,
 outcome, archive disposition) and surface the `/compact`-or-`/clear` prompt.
 
-When `obsidian_sync: armed` and the terminal close, pause, or abort did not
-already export at draft-PR creation, run the same one-way export described in
-`agents/_shared/delivery-mechanics.md § 5` before ending the turn: atomic copy
-to the recorded target, `obsidian_sync: exported` on success, `pending` with
-one sanitized reason on failure, never a block.
+New Obsidian runs require no terminal export because their canonical workspace
+already lives in the vault. Preserve the old export behavior only when a
+recovered legacy snapshot explicitly records `obsidian_sync: armed`.
 
 ### Process reflection
 

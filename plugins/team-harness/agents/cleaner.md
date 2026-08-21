@@ -104,13 +104,10 @@ Return only this compact block:
 agent: cleaner
 status: success | failed | blocked
 failure_kind: {required on failed/blocked}
-model: {effective-model-id}
 summary: {one sentence}
 files_changed: [{repo-relative paths}]
 cleanup:
   formatting: {changed|already-clean|not-applicable}
-  comments_removed: N
-  dead_code_removed: N
   reuse_or_duplication: {one line|none}
   complexity: {one line|none}
 behavior_preserved: true | false
@@ -126,7 +123,6 @@ implementer_findings:
     closure_check: {exact deterministic command or inspection}
     expected: {exact passing result}
 issues: {cleaner blocker or none}
-tools: read:N write:N edit:N bash:N grep:N glob:N
 ```
 
 `success` requires `behavior_preserved: true` and

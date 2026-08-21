@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.20.2] - 2026-08-21
+
+### Changed
+
+- Agent execution telemetry now uses concise append-only observations instead
+  of mandatory heartbeat, attempt-counter, and per-attempt metric contracts.
+- Agent result handling no longer requires unverified model/effort self-reports,
+  and the coordinator may normalize unambiguous status-block formatting while
+  recording what it changed as an observation.
+- Agent role/task labels and tool/KG/counter telemetry are no longer a closed
+  return contract; only architect/design is interpreted as Gate-1 evidence.
+- Design classification is now an optional conservative sketch hint rather
+  than a duplicated agent-return gate, and findings dispositions use true
+  append-only latest-valid-wins rows.
+- Correction and cleaner-handoff authority now lives in one decision event;
+  subsequent iteration/spawn observations reference it by `decision_ref`
+  instead of repeating a rigid package across several records.
+- Authoring size limits are advisory, release bump-floor checks run only in
+  release mode, recovery tests assert stable action codes instead of prose,
+  and RED/GREEN validation now executes the committed test rather than merely
+  checking that a test file exists.
+
+### Fixed
+
+- `logs-mode: obsidian` now selects the vault as the canonical live workspace
+  across Codex, Claude Code, and opencode; new runs no longer maintain a local
+  source plus a delivery-time export copy.
+- OpenSpec Gate-1 validation accepts observation-only `agent.sla` records, so
+  historical append-only ledgers without `follow_up_count` remain valid.
+- Malformed lifecycle telemetry now produces non-blocking warnings. The
+  orchestrator may append a canonical replacement for directly observed facts,
+  while incomplete Design evidence and all gate authority remain fail-closed.
+- Obsidian execution ledgers accept multiple ordered `jsonl` continuation
+  fences, so append-only correction does not require editing a historical block.
+
 ## [3.20.1] - 2026-08-21
 
 ### Changed

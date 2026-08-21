@@ -48,18 +48,20 @@ async function fileSha256(filePath) {
   return createHash("sha256").update(await readFile(filePath)).digest("hex");
 }
 
+const functionalTest = [
+  "const assert = require('node:assert/strict');",
+  "const fs = require('node:fs');",
+  "assert.equal(fs.readFileSync('feature.txt', 'utf8').trim(), 'implemented');",
+].join("\n") + "\n";
+
 function qualityManifest(sourceOverride = null) {
-  const source = sourceOverride ?? [
-    "const fs = require('node:fs');",
-    "const hasTest = fs.existsSync('tests/feature.test.js');",
-    "const implemented = fs.readFileSync('feature.txt', 'utf8').trim() === 'implemented';",
-    "process.exit(hasTest && implemented ? 0 : 1);",
-  ].join(" ");
   return {
     schema_version: 1,
     commands: {
       test: {
-        argv: [node, "-e", source],
+        argv: sourceOverride === null
+          ? [node, "tests/feature.test.js"]
+          : [node, "-e", sourceOverride],
         working_directory: ".",
         timeout_ms: 10_000,
         version_argv: [node, "--version"],
@@ -108,7 +110,7 @@ async function repository(callback, { initialFeature = "missing\n", redFiles, ma
     git(repo, "add", ".");
     git(repo, "commit", "-q", "-m", "baseline");
     const base = git(repo, "rev-parse", "HEAD");
-    await commitFiles(repo, "tests first", redFiles ?? { "tests/feature.test.js": "feature contract\n" });
+    await commitFiles(repo, "tests first", redFiles ?? { "tests/feature.test.js": functionalTest });
     const contractPath = path.join(workspace, "evidence", "th-test-contract.json");
     await writeJson(contractPath, contract(Object.keys(redFiles ?? { "tests/feature.test.js": "" })));
     await callback({ workspace, repo, manifestPath, base, contractPath });
@@ -254,7 +256,7 @@ await check("tester contract self-validation checks the candidate diff and manif
     },
     {
       redFiles: {
-        "tests/feature.test.js": "feature contract\n",
+        "tests/feature.test.js": functionalTest,
         "scripts/feature/__fixtures__/feature.js": "fixture\n",
       },
     },
@@ -478,6 +480,18 @@ await check("an already-green test does not count as pre-implementation red", as
   );
 });
 
+await check("a no-op test file cannot satisfy the red transition", async () => {
+  await repository(
+    async (context) => {
+      const result = await runTestTransition(redOptions(context.repo, context.base, context.contractPath));
+      assertClosedResult(result);
+      assert.equal(result.verdict, "fail");
+      assert.equal(result.error_code, "RED_NOT_OBSERVED");
+    },
+    { redFiles: { "tests/feature.test.js": "process.exit(0);\n" } },
+  );
+});
+
 await check("red evidence rejects production changes and paths outside declared test rules", async () => {
   await repository(
     async (context) => {
@@ -488,7 +502,7 @@ await check("red evidence rejects production changes and paths outside declared 
     },
     {
       redFiles: {
-        "tests/feature.test.js": "feature contract\n",
+        "tests/feature.test.js": functionalTest,
         "feature.txt": "still missing\n",
       },
     },
@@ -503,7 +517,7 @@ await check("green fails closed when test content changes after red", async () =
     const contractSha256 = await fileSha256(context.contractPath);
     await commitFiles(context.repo, "rewrite test and implement", {
       "feature.txt": "implemented\n",
-      "tests/feature.test.js": "weakened contract\n",
+      "tests/feature.test.js": "process.exit(0);\n",
     });
     const green = await runTestTransition(greenOptions(context, evidence, contractSha256));
     assertClosedResult(green);
@@ -541,7 +555,7 @@ await check("green rejects same-tree evidence from a non-ancestor red candidate"
 
     git(context.repo, "checkout", "-q", "--detach", context.base);
     const siblingCandidate = await commitFiles(context.repo, "independent tests first", {
-      "tests/feature.test.js": "feature contract\n",
+      "tests/feature.test.js": functionalTest,
     });
     assert.notEqual(siblingCandidate, redCandidate);
     assert.equal(git(context.repo, "rev-parse", "HEAD^{tree}"), redTree);

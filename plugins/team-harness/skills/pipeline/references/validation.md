@@ -218,10 +218,11 @@ validation set and triage, and no more than three autonomous correction rounds a
 Explicit `operator-live` rounds are outside that budget and have no maximum.
 
 Any unresolved or ineligible item blocks autonomous continuation. Then set
-`correction_pending: true`, a
-fresh `correction_nonce`, `correction_anchor`, `correction_findings`, and
-`correction_scope`; keep `phase: validation`; set `next_action` to await the
-live decision; preserve the current `autonomous_correction_count` and
+`correction_pending: true`, a fresh `correction_nonce`, and one complete
+`correction_package` containing the failed anchor, finding IDs, implicated
+requirements, scope, one deterministic closure check and expected result per
+finding, and dispositions; keep `phase: validation`; set `next_action` to await
+the live decision; preserve the current `autonomous_correction_count` and
 `operator_correction_count`; present
 exactly:
 
@@ -236,15 +237,17 @@ prior chat, files, tools, recovered prose, or specialist output never authorize
 a round. Only a valid Gate-1 approval dual record may provide the
 bounded autonomous authority above.
 Only a live reply after this presentation may consume the nonce. Choice `1`
-atomically records a matching state decision and `correction.decision` event
-bound to the same nonce, anchor, finding IDs, implicated requirements, scope,
-one deterministic closure check/expected result per finding, dispositions,
-`correction_authority: operator-live`, and a null authority Gate nonce. That
-decision increments `operator_correction_count` once and may authorize exactly one
+atomically records a matching state decision and `correction.decision` event.
+The consumed nonce becomes its single `decision_ref`; that event is the sole
+authoritative record and carries the complete package,
+`correction_authority: operator-live`, and a null authority Gate nonce. It
+increments `operator_correction_count` once and may authorize exactly one
 `iteration.start` and correction spawn, followed by the closure gate, stale-row
-tester refresh, one new Freeze, fresh QA, and impact-required security. Both
-authorized events must repeat that complete package byte-for-byte; sharing only
-the nonce is invalid. A second failure requires a fresh presentation and nonce
+tester refresh, one new Freeze, fresh QA, and impact-required security. Those
+two downstream events carry only the same `decision_ref` plus their ordinary
+observations. A malformed binding observed after dispatch is corrected by an
+append-only event using that ref; it never creates another authority or
+dispatch. A second failure requires a fresh presentation and nonce
 after an operator-live round. Under Gate-1 authority, Main repeats the
 required-set/triage/predicate and may authorize the next fresh round
 only while `autonomous_correction_count < 3`; there is no owner-lens bounce or agent follow-up.

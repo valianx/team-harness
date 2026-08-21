@@ -361,7 +361,6 @@ Your FINAL message is this compact status block only:
 agent: plan-reviewer
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory on failed/blocked; taxonomy: agents/ref-pipeline.md § Failures
-model: {effective-model-id}
 verdict: pass | concerns | fail
 output: workspaces/{feature-name}/reviews/01-plan-review.md § Plan Review
 summary: {1-2 sentences: verdict + most relevant finding, or "plan-shape OK"}
@@ -383,8 +382,6 @@ human_entry_points:
   tldr: {true|false}
   decisions_for_human_review: {true|false}
   task_list_summary: {true|false}
-context7_consult: hit:N miss:N skipped:N
-tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {failing rule labels with the failing task or file, or "none"}
 ```
 

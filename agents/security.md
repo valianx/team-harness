@@ -364,8 +364,8 @@ score, prioritized plan, and documented limitations.
 
 ## Execution Log Protocol
 
-You do not write the events file; return timing data in the status block and
-the orchestrator propagates it.
+You do not write the events file. The orchestrator records the dispatch and
+result as concise observations.
 
 ## Knowledge Graph Access (read-only)
 
@@ -390,18 +390,13 @@ agent: security
 mode: audit | focused | pipeline | design-review
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory on failed/blocked; taxonomy: agents/ref-pipeline.md § Failures
-model: {effective-model-id}
 security_design_verdict: clean | risks-found   # design-review mode only
 output: workspaces/{feature-name}/reviews/04-security.md | reviews/01-plan-review.md | null
 summary: {1-2 sentences: N findings (X critical, Y high, Z medium), risk score, most critical issue}
-context7_consult: hit:N miss:N skipped:M   # required for the Phase 0 version check
-memory_consult: search_nodes:N open_nodes:N
-kg_save_candidates: [entity-name-1, ...]   # [] valid; omit in design-review mode
-kg_hit_used: [node-name, ...]   # [] when none
+kg_save_candidates: [entity-name-1, ...]   # optional; omit when none or in design-review mode
 packet_used: true | false | absent   # pipeline mode only
 packet_escapes: N                    # pipeline mode only
 packet_integrity: ok | stale | mismatch | n-a
-tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 blast_radius: localized {IDs} | structural   # when status: failed
 issues: {critical and high finding titles, or "none"}
 finding_summary: [{id, severity, class, classification, cause, files, requirement, suggested_correction, closure_evidence}] | none

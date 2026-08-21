@@ -392,12 +392,10 @@ agent: tester
 mode: pre-implementation-contract | pre-fix-regression | authoring | verify-run | review | coverage-config | test-infra | module-test
 status: success | failed | blocked
 failure_kind: {required only on failed/blocked}
-model: {effective-model-id}
 output: {canonical path or null}
 summary: {one sentence}
 evidence: {passed}/{total}
 warranted_types: [{selected types}]
-tests_count: {executed test count; telemetry only}
 tests_authored: {N}
 tests_changed: {N}
 tests_deleted: {N}
@@ -412,13 +410,12 @@ sketches_read: [{paths}]
 packet_used: true | false | absent
 packet_escapes: N
 packet_integrity: ok | stale | mismatch | n-a
-tools: read:N write:N edit:N bash:N grep:N glob:N
 issues: {actionable blockers or none}
 finding_summary: [{cause, files, requirement, suggested_correction, closure_evidence}] | none
 ```
 
-Omit mode-specific fields when they do not apply. `tests_count` is observational
-and must never be interpreted as a quota or ratchet.
+Omit mode-specific fields when they do not apply. Tool and execution counters
+are telemetry and do not belong in the result contract.
 
 ## Output discipline
 

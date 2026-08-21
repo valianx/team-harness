@@ -102,22 +102,27 @@ report to preserve it.
 
 <!-- Consumed by: every leaf agent's Return Protocol status-block template. -->
 
-Every leaf agent's final status block declares its effective model on the line immediately after `status:`:
+Every leaf agent's final status block starts with the outcome:
 
 ```
 agent: {name}
 status: success | failed | blocked
-failure_kind: {kind}               # mandatory when status is failed or blocked; omit on success
-model: {effective-model-id}
-effort: {effective-effort-level}   # optional — include when known
+failure_kind: {kind}               # expected when status is failed or blocked; omit on success
 ...
 ```
 
-- **`failure_kind:`** — mandatory whenever `status:` is `failed` or `blocked`, omitted entirely on `success`. Name the **observable cause**, not the symptom: `status: failed` already says a dispatch did not succeed, and this field is the only thing that says which budget applies. Pick one from the taxonomy in `agents/ref-pipeline.md § Failures`: `invalid-return`, `artifact-missing`, `execution-failed`, `verification-negative`, `build-or-lint`, `hygiene-fail`, `contradiction`, `reclassification-needed`. (`transport` is never yours — it describes a dispatch that never reached you.) `execution-failed` is the residual, not the default: returning it for something the taxonomy already names is itself under-classification. When the blocker is a decision that is not yours to make, `contradiction` and `reclassification-needed` say so, and neither carries a retry budget — that is the point of naming them. You are the only party that knows which cause it was; state it rather than leaving the coordinator to infer it, because a coordinator that infers a kind is guessing at a budget.
-- **`model:`** — mandatory. The literal model ID the agent ran under for this dispatch (e.g. `claude-opus-4-6`, `claude-sonnet-5`), not the frontmatter default. This is a self-report: the agent is best-positioned to state it, particularly under a session model override (see `docs/observability.md` § "Session model override"), but the value is unverified — nothing cross-checks it against the actual invocation. Treat it as consultative context for cost/trace analysis, not a verified fact; a structural, verified successor is tracked under #524.
-- **`effort:`** — optional. Include the line when the agent's effective reasoning-effort level is known (e.g. from its own frontmatter or an explicit override); omit the line entirely otherwise. Do not emit `effort: unknown` — omission is the "unknown" signal.
-
-The orchestrator propagates both fields verbatim onto the corresponding `phase.end` event, following the same mechanism already used for the `tools` field (see `agents/ref-pipeline.md` events schema). Downstream cost classification (`docs/observability.md`, `skills/trace/SKILL.md`) prefers `event.model` over frontmatter-derived inference when the field is present.
+- **`failure_kind:`** — expected whenever `status:` is `failed` or `blocked`,
+  omitted on `success`. Name the observable cause from the taxonomy in
+  `agents/ref-pipeline.md § Failures`. If the field is omitted but the returned
+  prose and evidence make the cause unambiguous, Main may normalize it in
+  coordinator-owned state and append an observation explaining that choice.
+  Ambiguous status, cause, evidence, or decision remains `invalid-return` and
+  requires a fresh specialist result; Main never invents those facts.
+- Model and effort are dispatch configuration and optional telemetry, not agent
+  return fields. Their absence never invalidates useful work.
+- Tool, Context7, memory/KG-read, token, duration, and execution-count fields
+  are also optional telemetry and do not belong in a required status block.
+  Record load-bearing evidence in the result or artifact instead.
 
 ## How to reference this file
 

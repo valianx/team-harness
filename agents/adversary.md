@@ -214,8 +214,6 @@ Return only:
 agent: adversary
 status: success | failed | blocked
 failure_kind: {kind}                 # failed/blocked only
-model: {effective-model-id}
-effort: {effective-effort-level}
 mode: pipeline-adversary
 output: {report path}
 audit_run: initial | amend-N | correction-N
@@ -225,11 +223,10 @@ incomplete_on_changed_control: true | false
 break_count: N
 audit_coverage: full | sampled {surface}
 summary: {1-2 sentences; a negative result states that it is not proof of safety}
-kg_save_candidates: [{entity names}]
+kg_save_candidates: [{entity names}]   # optional; omit when none
 packet_used: true | absent
 packet_escapes: N
 packet_integrity: ok | stale | mismatch | n-a
-tools: read:N write:N edit:N grep:N glob:N
 issues: {break titles, coverage gap, or "none"}
 finding_summary: [{id, severity, class, classification, cause, files, requirement, suggested_correction, closure_evidence}] | none
 ```

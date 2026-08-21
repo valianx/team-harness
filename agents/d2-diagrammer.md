@@ -292,7 +292,6 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: d2-diagrammer
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
-model: {effective-model-id}
 output: workspaces/{feature}/diagram.d2
 svg: workspaces/{feature}/diagram.svg
 render: done | skipped   # obsidian mode only; omit in local mode
@@ -300,8 +299,6 @@ diagram_type: {architecture|sequence|ER|class|flowchart}
 node_count: {N}
 validation_cycles: {N}/3
 summary: {1-2 sentences: diagram type, pattern used, what's shown}
-context7_consult: hit:N miss:N skipped:N
-tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {blocking issues if failed/blocked, or "none"}
 ```
 

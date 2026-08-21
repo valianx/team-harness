@@ -519,11 +519,8 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: init-project
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
-model: {effective-model-id}
 output: workspaces/{feature-name}/00-init.md, CLAUDE.md, CHANGELOG.md
 summary: {1-2 sentences: project type, tech stack, what was created/updated}
-context7_consult: hit:N miss:N skipped:N
-tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {list of TBD items, or "none"}
 ```
 

@@ -67,13 +67,9 @@ Main advances through these actions without requiring another operator command a
    from the exact predecessor/task event; every other stale condition remains
    fail-closed.
 
-The planning dispatch includes a 120-second structured `TH_PROGRESS` transport.
-Main observes input validation and artifact-writing milestones without
-reading partial output. Crossing the 10-minute architect SLA produces one
-`TH_SLA` diagnostic with live status, last heartbeat, and `artifact_state`, plus
-one `agent.sla` event. An empty heartbeat/artifact observation is reported as
-`no-material-progress-observed`; it never stops or replaces the still-live
-architect.
+Crossing the architect SLA produces one concise operator update and one
+`agent.sla` observation. Main does not request heartbeats or inspect partial
+artifacts, and elapsed time never stops or replaces the still-live architect.
 
 Progress commentary is informational. Main pauses only for a mandatory TH gate, a material choice
 not resolved by canonical artifacts, separately authorized external mutation, or a real blocker.

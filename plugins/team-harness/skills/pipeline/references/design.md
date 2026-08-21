@@ -38,8 +38,7 @@ Run the transaction continuously:
    change. The architect follows the upstream skill and writes only
    proposal/specs/design/tasks under that change root, carrying every judgment call (routing,
    scope decomposition, invariants) into it; it writes no TH plan or coordination state. Include
-   the pipeline skill's exact `dispatch_id`, `progress_recipient`, and
-   `progress_interval_seconds: 120` contract in this packet.
+   only the bounded task and artifact coordinates it needs.
 3. Run CLI-reported status and strict validation through `openspec-snapshot.mjs capture`; it
    writes the sole `inputs/openspec-snapshot.json`. A binding, path, coordinate, validation, or
    hash failure remains recoverably in Design.
@@ -82,21 +81,11 @@ step that follows. Give the architect a bounded prompt containing the workspace 
 repository root, and the approved request; it returns the OpenSpec change and never edits
 coordination state or duplicates canonical requirements, scenarios, decisions, or task prose.
 
-Wait for that architect attempt to complete. A `wait_agent` timeout is
-only the wait heartbeat and immediately resumes the directed wait without
-recap, replacement, or `interrupt_agent`; it is not the architect's 10-minute
-SLA and proves no failure. Accept only valid `TH_PROGRESS` messages for this
-dispatch. The architect emits `started`, `inputs-validated`,
-`artifacts-writing`, and `validation-ready` milestones plus a heartbeat at most
-120 seconds apart; none is terminal authority or resets the SLA. Track the SLA
-from dispatch. On SLA exceed, inspect live status, request one non-interrupting
-`TH_PROGRESS_REQUEST`, and probe only metadata for the bound OpenSpec change.
-Emit the pipeline skill's `TH_SLA` diagnostic and append one `agent.sla` event.
-When both are absent, report `no-material-progress-observed`, not a failure or
-blocker. Continue waiting for either its result or live operator input while
-leaving the architect alive. Only a live cancellation of that active attempt
-authorizes interruption; replacement requires a demonstrated terminal
-unsuccessful result and the normal design authority.
+Wait for the architect to complete. A `wait_agent` timeout only returns control
+and proves no failure. On SLA exceed, append one concise `agent.sla`
+observation, tell the operator once that work is still running, and continue
+waiting. Do not request heartbeats, inspect partial artifacts, interrupt, or
+replace the architect because of elapsed time.
 
 The plan must lead with problem/outcome, actors/flows, business rules/examples,
 alternate/error behavior, unchanged behavior, non-goals, and human decisions.
@@ -130,10 +119,13 @@ falls through to the legacy functional-plan contract or invokes
 Then invoke `openspec-events.mjs` with `--workspace`, the state's exact
 `--events` path, and `--feature`. It must return
 `kind: team_harness_openspec_execution_events_validation` and `verdict: pass`
-before Gate 1. Any malformed event, missing `ts`/`feature`, non-canonical
-architect `task`, non-`success|failed|blocked|skipped` status, missing
-`attempt_metrics`, open attempt, or an incomplete Design transaction (a missing
-planning dispatch or a missing derivation result) fails closed.
+before Gate 1. Malformed telemetry, missing `ts`/`feature`, a non-canonical
+architect `task` or status, and a missing observation are warnings: ignore
+those records as evidence but do not fail an otherwise complete Design. When
+the ignored record leaves required evidence absent, Main may append one
+canonical replacement event for a dispatch or result it directly observed and
+rerun the validator. Never rewrite an old line, infer specialist success, or
+repair gate authority. An actually incomplete Design transaction fails closed.
 
 For a legacy `sharded-v1` run, also resolve
 `scripts/plan-contract-repair.mjs`, invoke `plan-contract.mjs` with only the

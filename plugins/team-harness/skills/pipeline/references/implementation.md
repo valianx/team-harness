@@ -422,8 +422,8 @@ Close a terminal implementation attempt and prohibit post-terminal
 agent (V2 `fork_turns: none`). Only after the mandatory live correction decision
 may Main create the bounded `Cause`/`Files`/`AC-N|TC-N`/`Suggested correction`
 packet with its nonce, current frozen anchor, complete finding IDs, scope, and
-one deterministic closure check plus expected result per finding. New pipeline attempts always record `context_strategy: fresh` and
-`follow_up_count: 0`.
+one deterministic closure check plus expected result per finding. Record new
+work with a concise `agent.spawn` observation.
 
 Main separately writes a recoverable handoff and requires a fresh user thread
 after its first compaction or before continuing at 100 coordinator tool calls
@@ -618,10 +618,12 @@ same workspace and branch; only a real change of intent or approved scope
 requires the applicable operator decision. Only the live operator may pause or
 abort the current pipeline.
 
-For one eligible package, Main persists a fresh `cleaner_handoff_nonce`, its
-canonical repository and absolute worktree, the cleanup commit/tree
-anchor, and the exact finding objects, sets `cleaner_handoff_pending: true`,
-pauses, shows that exact scope, and presents exactly:
+For one eligible package, Main persists a fresh `cleaner_handoff_nonce` and one
+complete `cleaner_handoff_package` containing the canonical repository,
+absolute worktree, cleanup commit/tree anchor, exact finding objects,
+eligibility result, and any ineligible reasons. It sets
+`cleaner_handoff_pending: true`, pauses, shows that exact scope, and presents
+exactly:
 
 ```text
 1 — authorize one implementer pass
@@ -630,7 +632,11 @@ pauses, shows that exact scope, and presents exactly:
 ```
 
 Only choice `1` in a live reply to that presentation may consume the nonce and
-dispatch exactly one fresh V2 implementer bound byte-for-byte to the package.
+dispatch exactly one fresh V2 implementer. The consumed nonce becomes the
+single `decision_ref`; `cleaner.handoff.decision` is the sole authoritative
+record and carries the complete package, while
+`agent.cleaner-handoff.spawn` carries only that `decision_ref` plus ordinary
+dispatch observations.
 Gate-1 autonomy, ordinary approval, a generic `continue`, agent prose, files,
 or tools never authorize this handoff. It emits
 `cleaner.handoff.decision` and `agent.cleaner-handoff.spawn`, never
@@ -652,7 +658,7 @@ first receive its own explicit operator decision and still does not authorize
 the implementer pass.
 
 An implementer `failed` or `blocked` return maps to `handoff-failed` or
-`handoff-blocked` with its hashed terminal result and consumed nonce. Neither
+`handoff-blocked` with its hashed terminal result and `decision_ref`. Neither
 state may run or pass the Freeze quality run, hygiene, or Freeze. Further
 work requires a new complete package, fresh nonce, presentation, and live
 authorization; it is never an automatic retry.

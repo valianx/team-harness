@@ -288,8 +288,6 @@ missing or contradictory, stop and name the exact artifact or field. Do not:
 agent: delivery
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory on failed/blocked; omit on success
-model: {effective-model-id}
-effort: {effective-effort-level}
 output: {docs_root}/inputs/pr-body-draft.md
 summary: {one sentence}
 pr_title: {title}
