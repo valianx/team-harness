@@ -20,6 +20,36 @@ def fail(message: str) -> None:
     raise AssertionError(message)
 
 
+def check_retired_correlation_ids_absent() -> None:
+    """The review correlation ids are retired; every review surface must stay clear of them.
+
+    The producer stopped emitting target_id and dispatch_id and tests/test_review_fan.mjs
+    asserts their absence there. These surfaces are where the vocabulary regrew last time,
+    so absence is checked here rather than left to review. dispatch_id survives only in the
+    Codex progress transport, which is a different mechanism and is excluded by name.
+    """
+    review_surfaces = (
+        "agents/_shared/inline-review-contract.md",
+        "agents/inline-reviewer.md",
+        "agents/orchestrator.md",
+        "agents/ref-direct-modes.md",
+        "runtime/codex/instructions/inline-reviewer.md",
+        "plugins/team-harness/agents/_shared/inline-review-contract.md",
+        "plugins/team-harness/agents/inline-reviewer.md",
+        "docs/codex-runtime.md",
+        "docs/pipeline-lanes.md",
+    )
+    for rel in review_surfaces:
+        path = ROOT / rel
+        if not path.exists():
+            fail(f"retired-id check names a missing surface: {rel}")
+            continue
+        body = path.read_text()
+        for retired in ("target_id", "dispatch_id", "expected_lens"):
+            if retired in body:
+                fail(f"{rel} carries retired review correlation id {retired!r}")
+
+
 def check_inline_reviewer_native() -> None:
     """The generated inline reviewer is direct-project, read-only, and four-lens."""
     registry = json.loads((ROOT / "runtime/schema/codex-agents.json").read_text())
@@ -407,6 +437,7 @@ def check_post_gate1_projection() -> None:
 
 
 def main() -> None:
+    check_retired_correlation_ids_absent()
     check_inline_reviewer_native()
     contract = json.loads((ROOT / "runtime/schema/codex-agents.json").read_text())
     agents = contract["agents"]

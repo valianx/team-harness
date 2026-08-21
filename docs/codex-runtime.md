@@ -201,7 +201,9 @@ verdict, findings, coverage, limits, and disagreements. Main verifies the root
 and commit/range before dispatch and again before consolidation; a moved target
 is stale and cannot produce PASS. Consolidation groups returns by lens and keeps
 the worse outcome where a lens returns more than once: missing, failed,
-blocking, unavailable, stale, and untrusted remain explicit non-pass outcomes.
+blocking, unavailable, and untrusted remain explicit non-pass outcomes; a stale
+target binding is rejected or recaptured by Main before consolidation, so it prevents
+consolidation rather than arriving as a lens outcome.
 Global PASS requires every required
 lens to be complete with `verdict: pass`, no blocker, and no unresolved blocking
 disagreement. Any PR intent, number, or URL has exclusive `review-pr`

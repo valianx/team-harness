@@ -24,3 +24,24 @@
   join: a `consolidate()` function the test defined and then verified against its own definition,
   proving nothing about shipped code while pinning the stale documentation alive through
   `test_codex_runtime.py`'s marker lists. Removed.
+
+### Fixed (review round)
+
+- The generated contents blocks used a slug that collapsed whitespace, so every anchor for a
+  heading containing an em-dash pointed at nothing — five broken anchors across three files.
+  `test_authoring_budgets.py` now validates every contents entry against the fragments its own
+  file exposes, so the class cannot regrow.
+- `has_toc()` accepted any list in the opening lines. It now locates a `Contents` heading and reads
+  only the block under it, so an unrelated list no longer satisfies the requirement.
+- The budget suite covers `skills/*/references/*`, the second reference home the standard names.
+  Thirteen files over 100 lines without a contents block are recorded in `TOC_EXEMPT` under the
+  same shrink-only ratchet as `EXEMPT`.
+- `runtime/codex/instructions/inline-reviewer.md` still carried the retired correlation ids and the
+  keyed-join slot rule. It is a hand-maintained adapter that `generate.mjs` reads as its instruction
+  source, so the id removal had landed on the Claude surface only and left Codex contradicting the
+  canonical contract. `check_retired_correlation_ids_absent` now guards all nine review surfaces.
+- `gateDecision` treated a return that omits `lens_status` as complete, so a lens that did not
+  finish and simply left the field out produced a PASS. A missing status is now unfinished.
+- `disagreements` was never read, although the contract makes an unresolved blocking disagreement a
+  non-pass condition. The gate now enforces it, and a disagreement the lens did not mark blocking
+  still passes.

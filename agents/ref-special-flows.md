@@ -32,7 +32,7 @@ This file is read on-demand by `th:orchestrator` when executing a special flow. 
 - [Documentation Flow](#documentation-flow)
 - [Legacy route markers](#legacy-route-markers)
 - [Artifact Verification in Special Flows](#artifact-verification-in-special-flows)
-- [Plan Sketches — Per-Type Applicability](#plan-sketches-per-type-applicability)
+- [Plan Sketches — Per-Type Applicability](#plan-sketches--per-type-applicability)
 - [Learn (Teaching) Flow](#learn-teaching-flow)
 
 Locate the needed section by heading; do not read this file in full.

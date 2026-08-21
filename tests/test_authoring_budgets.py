@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Measure every agent file against the size budgets docs/agent-authoring.md declares.
+"""Measure every agent and reference file against what docs/agent-authoring.md declares.
 
 The standard states word budgets, a 500-line hard cap, and a table-of-contents
 requirement for reference files over 100 lines. Until now nothing measured any of
@@ -51,13 +51,35 @@ EXEMPT = {
     "agents/_shared/plan-consolidation.md": {"words"},
 }
 
+# Reference files over 100 lines that have no contents block today. Same ratchet as
+# EXEMPT: the suite fails when one gains a contents block and its entry is left behind.
+TOC_EXEMPT = {
+    "skills/likec4-diagram/references/patterns.md",
+    "skills/likec4-diagram/references/dsl-reference.md",
+    "skills/d2-diagram/references/patterns.md",
+    "skills/d2-diagram/references/dsl-reference.md",
+    "skills/json-canvas/references/EXAMPLES.md",
+    "skills/todo/references/task-format.md",
+    "skills/interactive-presentation/references/gsap-patterns.md",
+    "skills/interactive-presentation/references/radix-patterns.md",
+    "skills/interactive-presentation/references/svg-patterns.md",
+    "skills/interactive-presentation/references/react-flow-patterns.md",
+    "skills/interactive-presentation/references/project-structure.md",
+    "skills/excalidraw-diagram/references/element-templates.md",
+    "skills/obsidian-bases/references/FUNCTIONS_REFERENCE.md",
+}
+
 HEADING = re.compile(r"^#{2,6}\s+(.*?)\s*$")
 LIST_ITEM = re.compile(r"^\s*(?:[-*+]|\d+\.)\s+(.*?)\s*$")
 LINK_TEXT = re.compile(r"\[([^\]]+)\]\([^)]*\)")
+TOC_LINK = re.compile(r"\[[^\]]+\]\(#([^)]+)\)")
 
 
 def classify(path: Path) -> str | None:
     rel = path.relative_to(ROOT).as_posix()
+    # The standard names two reference homes: agents/ref-*.md and skill references/.
+    if rel.startswith("skills/") and "/references/" in rel:
+        return "reference"
     if rel.startswith("agents/_shared/"):
         return "shared"
     if not rel.startswith("agents/") or "/" in rel[len("agents/") :]:
@@ -68,8 +90,9 @@ def classify(path: Path) -> str | None:
     return "reference" if name.startswith("ref-") else "specialist"
 
 
-def headings(lines: list[str]) -> set[str]:
-    found = set()
+def headings(lines: list[str], raw: bool = False):
+    """This file's own heading texts — normalized for comparison, raw for slugging."""
+    found = [] if raw else set()
     fenced = False
     for line in lines:
         if line.lstrip().startswith("```"):
@@ -79,7 +102,10 @@ def headings(lines: list[str]) -> set[str]:
             continue
         match = HEADING.match(line)
         if match:
-            found.add(normalize(match.group(1)))
+            if raw:
+                found.append(match.group(1))
+            else:
+                found.add(normalize(match.group(1)))
     return found
 
 
@@ -89,21 +115,62 @@ def normalize(text: str) -> str:
     return " ".join(text.split()).strip().lower().rstrip(":")
 
 
-def has_toc(lines: list[str]) -> bool:
-    """A table of contents is a list near the top whose items name this file's own headings.
+def slug(text: str) -> str:
+    """GitHub's heading-anchor rule: strip punctuation, then one hyphen per surviving space.
 
-    Comparing the list against the real headings is what makes this an oracle: a
-    file cannot satisfy it by containing a sentence that says it has a contents block.
+    The spaces are not collapsed first. A heading with an em-dash therefore yields a
+    double hyphen, which is the case a naive slugger silently gets wrong.
     """
-    own = headings(lines)
-    if not own:
+    text = LINK_TEXT.sub(r"\1", text).replace("`", "").lower()
+    text = re.sub(r"[^a-z0-9 \-_]", "", text)
+    return text.strip().replace(" ", "-")
+
+
+def anchors(lines: list[str]) -> set[str]:
+    """Every fragment this file's own headings actually expose, duplicates suffixed."""
+    seen: dict[str, int] = {}
+    out = set()
+    for heading in headings(lines, raw=True):
+        base = slug(heading)
+        seen[base] = seen.get(base, 0) + 1
+        out.add(base if seen[base] == 1 else f"{base}-{seen[base] - 1}")
+    return out
+
+
+def toc_block(lines: list[str]) -> list[str] | None:
+    """The list under a Contents heading, or None. Bounded by the next heading."""
+    for index, line in enumerate(lines[:TOC_SCAN_LINES]):
+        match = HEADING.match(line)
+        if match and normalize(match.group(1)) in ("contents", "table of contents"):
+            end = index + 1
+            while end < len(lines) and not HEADING.match(lines[end]):
+                end += 1
+            return lines[index + 1 : end]
+    return None
+
+
+def has_toc(lines: list[str]) -> bool:
+    """A contents block is a list under a Contents heading naming this file's own headings.
+
+    Comparing the list against the real headings is what makes this an oracle: a file
+    cannot satisfy it by containing a sentence that says it has a contents block. The
+    block must sit under its own heading, so an unrelated list near the top does not count.
+    """
+    block = toc_block(lines)
+    if block is None:
         return False
-    hits = 0
-    for line in lines[:TOC_SCAN_LINES]:
-        match = LIST_ITEM.match(line)
-        if match and normalize(match.group(1)) in own:
-            hits += 1
+    own = headings(lines)
+    hits = sum(1 for line in block if (m := LIST_ITEM.match(line)) and normalize(m.group(1)) in own)
     return hits >= TOC_MIN_ITEMS
+
+
+def broken_anchors(lines: list[str]) -> list[str]:
+    """Contents entries whose #fragment names no heading this file exposes."""
+    block = toc_block(lines)
+    if block is None:
+        return []
+    real = anchors(lines)
+    return [m.group(1) for line in block if (m := TOC_LINK.search(line)) and m.group(1) not in real]
 
 
 def main() -> int:
@@ -111,7 +178,7 @@ def main() -> int:
     stale_exemptions: list[str] = []
     seen: set[str] = set()
 
-    for path in sorted(ROOT.glob("agents/**/*.md")):
+    for path in sorted([*ROOT.glob("agents/**/*.md"), *ROOT.glob("skills/**/references/**/*.md")]):
         kind = classify(path)
         if kind is None:
             continue
@@ -125,10 +192,18 @@ def main() -> int:
 
         if kind == "reference":
             if line_count > TOC_REQUIRED_OVER and not has_toc(lines):
+                if rel not in TOC_EXEMPT:
+                    failures.append(
+                        f"{rel}: {line_count} lines and no table of contents — a reference over "
+                        f"{TOC_REQUIRED_OVER} lines must open with a list of its own headings so a "
+                        f"section can be loaded without reading the file in full"
+                    )
+            elif rel in TOC_EXEMPT:
+                stale_exemptions.append(f"{rel}: now has a contents block — drop its TOC_EXEMPT entry")
+            for fragment in broken_anchors(lines):
                 failures.append(
-                    f"{rel}: {line_count} lines and no table of contents — a reference over "
-                    f"{TOC_REQUIRED_OVER} lines must open with a list of its own headings so a "
-                    f"section can be loaded without reading the file in full"
+                    f"{rel}: contents entry links #{fragment}, which names no heading in this file — "
+                    f"a contents block that does not navigate is worse than none"
                 )
             continue
 
@@ -152,9 +227,9 @@ def main() -> int:
 
     if failures or stale_exemptions:
         for line in failures:
-            print(f"OVER BUDGET  {line}", file=sys.stderr)
+            print(f"FAIL  {line}", file=sys.stderr)
         for line in stale_exemptions:
-            print(f"STALE EXEMPT {line}", file=sys.stderr)
+            print(f"STALE {line}", file=sys.stderr)
         return 1
 
     print("authoring budgets: all agent files within budget or explicitly exempt")
