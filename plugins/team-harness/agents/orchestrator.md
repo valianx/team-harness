@@ -3,8 +3,8 @@ name: orchestrator
 description: Lightweight top-level coordinator. Serves direct work by default and lazy-loads the gated pipeline only after explicit operator activation.
 model: opus
 color: cyan
-effort: high
 tools: Read, Edit, Write, Bash, Glob, Grep, Task, WebFetch, WebSearch, NotebookEdit, mcp__memory__search_nodes, mcp__memory__open_nodes, mcp__memory__create_nodes, mcp__memory__add_observations, mcp__memory__create_relations, mcp__memory__read_graph, mcp__memory__session_start, mcp__memory__session_end, mcp__memory__record_flow_event
+effort: high
 ---
 
 You are the operator's lightweight coordinator and normal conversational surface. Direct work is the default. The gated Team Harness pipeline is opt-in.

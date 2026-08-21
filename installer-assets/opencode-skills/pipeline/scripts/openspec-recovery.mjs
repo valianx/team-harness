@@ -31,63 +31,72 @@ async function readWorkspaceFile(workspace, relative) {
   return readFile(canonical);
 }
 
-function result(verdict, nextAction, errorCode = null) {
-  return { schema_version: 1, kind: "team_harness_openspec_recovery", verdict, error_code: errorCode, next_action: nextAction };
+function result(verdict, actionCode, nextAction = null, errorCode = null) {
+  return {
+    schema_version: 2,
+    kind: "team_harness_openspec_recovery",
+    verdict,
+    error_code: errorCode,
+    action_code: actionCode,
+    requires_agent_dispatch: false,
+    next_action: nextAction,
+  };
 }
 
 export async function recoverOpenSpecDesign({ state, workspace, snapshotVerifier = verifySnapshot } = {}) {
   if (!state || typeof state !== "object" || !CHANGE.test(state.openspec_change ?? "")
     || !safeString(state.openspec_repository_root) || !PREFLIGHT.has(state.openspec_preflight)
     || !PASSES.has(state.openspec_design_pass) || !safeString(workspace)) {
-    return result("blocked", null, "STATE_INVALID");
+    return result("blocked", null, null, "STATE_INVALID");
   }
   let root;
   try {
     root = await realpath(path.resolve(workspace));
     if (!(await lstat(root)).isDirectory()) throw new Error("workspace");
-  } catch { return result("blocked", null, "WORKSPACE_INVALID"); }
+  } catch { return result("blocked", null, null, "WORKSPACE_INVALID"); }
 
   if (state.openspec_preflight === "blocked-prerequisite" || state.openspec_preflight === "invalid-project") {
-    return result("blocked", "resolve OpenSpec preflight blocker", "PREFLIGHT_BLOCKED");
+    return result("blocked", "RESOLVE_PREFLIGHT", "resolve OpenSpec preflight blocker", "PREFLIGHT_BLOCKED");
   }
-  if (state.openspec_design_pass === "preflight") return result("resume", "run OpenSpec preflight");
+  if (state.openspec_design_pass === "preflight") return result("resume", "RUN_PREFLIGHT", "run OpenSpec preflight");
   if (state.openspec_design_pass === "provisioning") {
     return state.openspec_preflight === "provisionable"
-      ? result("resume", "resume approved OpenSpec provisioning")
-      : result("blocked", null, "STATE_INVALID");
+      ? result("resume", "RESUME_PROVISIONING", "resume approved OpenSpec provisioning")
+      : result("blocked", null, null, "STATE_INVALID");
   }
-  if (state.openspec_preflight !== "ready") return result("blocked", null, "STATE_INVALID");
-  if (state.openspec_design_pass === "planning") return result("resume", "resume upstream OpenSpec planning");
-  if (state.openspec_design_pass === "snapshot") return result("resume", "capture strict OpenSpec snapshot");
+  if (state.openspec_preflight !== "ready") return result("blocked", null, null, "STATE_INVALID");
+  if (state.openspec_design_pass === "planning") return result("resume", "RESUME_PLANNING", "resume upstream OpenSpec planning");
+  if (state.openspec_design_pass === "snapshot") return result("resume", "CAPTURE_SNAPSHOT", "capture strict OpenSpec snapshot");
 
   const snapshotPath = state.openspec_snapshot_path;
   if (snapshotPath !== "inputs/openspec-snapshot.json" || !SHA256.test(state.openspec_snapshot_sha256 ?? "")) {
-    return result("blocked", null, "SNAPSHOT_STATE_INVALID");
+    return result("blocked", null, null, "SNAPSHOT_STATE_INVALID");
   }
   let snapshotBytes;
   try { snapshotBytes = await readWorkspaceFile(root, snapshotPath); }
-  catch { return result("resume", "capture strict OpenSpec snapshot", "SNAPSHOT_MISSING"); }
-  if (hash(snapshotBytes) !== state.openspec_snapshot_sha256) return result("blocked", "reconcile changed OpenSpec source", "SNAPSHOT_STALE");
+  catch { return result("resume", "CAPTURE_SNAPSHOT", "capture strict OpenSpec snapshot", "SNAPSHOT_MISSING"); }
+  if (hash(snapshotBytes) !== state.openspec_snapshot_sha256) return result("blocked", "RECONCILE_SOURCE", "reconcile changed OpenSpec source", "SNAPSHOT_STALE");
   const freshness = await snapshotVerifier({ snapshotPath: path.join(root, snapshotPath), phase: "pre-gate1" });
-  if (freshness?.verdict !== "pass") return result("blocked", "reconcile changed OpenSpec source", "CANONICAL_SOURCE_CHANGED");
+  if (freshness?.verdict !== "pass") return result("blocked", "RECONCILE_SOURCE", "reconcile changed OpenSpec source", "CANONICAL_SOURCE_CHANGED");
 
   if (state.openspec_design_pass === "overlay") {
-    return result("resume", "rerun the mechanical OpenSpec overlay derivation with overwrite authorized for this recovery event — no architect dispatch");
+    return result("resume", "DERIVE_OVERLAY", "rerun the mechanical OpenSpec overlay derivation with overwrite authorized for this recovery event — no architect dispatch");
   }
   if (state.openspec_overlay_path !== "plan/openspec-traceability.json" || !SHA256.test(state.openspec_overlay_sha256 ?? "")) {
-    return result("blocked", null, "OVERLAY_STATE_INVALID");
+    return result("blocked", null, null, "OVERLAY_STATE_INVALID");
   }
   let overlayBytes;
   try { overlayBytes = await readWorkspaceFile(root, state.openspec_overlay_path); }
   catch {
     return result(
       "resume",
+      "DERIVE_OVERLAY",
       "rerun the mechanical OpenSpec overlay derivation with overwrite authorized for this recovery event — no architect dispatch",
       "OVERLAY_MISSING",
     );
   }
-  if (hash(overlayBytes) !== state.openspec_overlay_sha256) return result("blocked", "revalidate OpenSpec execution overlay", "OVERLAY_STALE");
-  return result("resume", "present STAGE-GATE-1");
+  if (hash(overlayBytes) !== state.openspec_overlay_sha256) return result("blocked", "REVALIDATE_OVERLAY", "revalidate OpenSpec execution overlay", "OVERLAY_STALE");
+  return result("resume", "PRESENT_GATE_1", "present STAGE-GATE-1");
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -180,11 +180,9 @@ agent: qa-plan
 mode: define-ac | ratify-plan | review
 status: success | failed | blocked
 failure_kind: {required only on failed/blocked}
-model: {effective-model-id}
 verdict: pass | concerns | fail
 output: {canonical path or none}
 summary: {one sentence; on pass use counts only}
-tools: read:N write:N edit:N grep:N glob:N
 issues: {actionable gaps or none}
 ```
 

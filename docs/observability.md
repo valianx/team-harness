@@ -83,10 +83,8 @@ The root thread identifier, session identifiers, rollout paths, raw rollouts,
 and collector session list are never native event fields. A legacy Claude trace
 without `usage` retains its existing envelope.
 
-The declared Codex `agent.*` lifecycle extension is separate from that usage
-selection. It records only coordinator-declared, allowlisted specialist
-lifecycle facts and never selects the Native Codex cost branch. A trace without
-`agent.*` retains its existing lifecycle and cost behavior.
+Agent events are concise execution observations and never select or alter the
+Native Codex cost branch.
 
 Core event names are:
 
@@ -94,10 +92,11 @@ Core event names are:
 |---|---|
 | `pipeline.start`, `pipeline.complete`, `pipeline.incomplete`, `pipeline.end` | Run lifecycle |
 | `phase.start`, `phase.end` | Named-state dispatch and completion; `phase` is one of the v3 states or a trace detail owned by that state |
-| `agent.spawn`, `agent.close`, `agent.correction.spawn` | Declared specialist lifecycle; finite role/task, local ordinal, context strategy, final follow-up count, and closed aggregate result only |
+| `agent.spawn`, `agent.close`, `agent.correction.spawn`, `agent.cleaner-handoff.spawn`, `agent.sla` | Specialist execution observations; all carry a concise observation and close records status; role/task labels are optional diagnostics |
+| `correction.decision`, `cleaner.handoff.decision` | The single authority record for a correction or cleaner handoff. It carries the complete package once and assigns `decision_ref`; downstream lifecycle observations carry only that reference |
 | `stage.gate`, `stage.gate.release` | Gate presentation and dual-record release |
 | `gate`, `gate.pass`, `gate.fail` | Human-checkpoint marker or an internal verdict; never a release by itself |
-| `iteration.start` | Implementation/validation correction round; new producers use `cause: verification` only and carry `convergence_counts` (`new_in_delta`/`pre_existing_missed`/`reopened` integer counts, present with zeros rather than omitted when the round found nothing). Historical `cause: operator` events remain readable but are not emitted for plan repairs, operator decisions, or explicit design work |
+| `iteration.start` | Implementation/validation correction observation linked by `decision_ref`; new producers use `cause: verification` only. `convergence_counts` may be derived from the findings ledger for diagnostics but is not required. Historical `cause: operator` events remain readable but are not emitted for plan repairs, operator decisions, or explicit design work |
 | `artifact.missing`, `operation.started/success/failed` | Artifact and operation observability |
 | `checkpoint.confirmed` | Discover reasoning checkpoint evidence, not a gate |
 | `stage2.hygiene` | Implementation hygiene scan result |
@@ -117,54 +116,13 @@ only for a dispatch, continuation, terminal return, or verification correction
 it directly observes. It does not mine rollouts, callbacks, transcripts,
 prompts, tool output, or native IDs to fill the schema.
 
-`agent_role` and `task` are paired closed enums:
-
-| `agent_role` | `task` |
-|---|---|
-| `architect` | `design` |
-| `implementer` | `implementation` |
-| `tester` | `test_evidence` |
-| `qa` | `quality_review` |
-| `security` | `security_review` |
-| `delivery` | `delivery` |
-
-Every `agent.*` event carries that pair, a positive `attempt_ordinal`,
-`context_strategy: fresh|continued`, and `follow_up_count`. The ordinal is a
-local ordering pseudonym scoped to the pair—not a session ID or alias. A fresh
-`agent.spawn` begins an ordinal with count zero; a continued `agent.spawn`
-reuses its one open ordinal and increments the count. Exactly one `agent.close`
-terminates it and reports the final count. `agent.correction.spawn` has literal
-`correction_cause: verification`, is always `fresh` with count zero, and uses a
-new ordinal after its prior related attempt closed. No standalone follow-up
-event or free-form task label is allowed.
-
-`agent.close` also carries a closed `quality_verdict`
-(`pass|concerns|fail|n-a`) and an `attempt_metrics` object with only
-`cached_input_tokens`, `uncached_input_tokens`, `output_tokens`,
-`wall_time_ms`, and `tool_calls`. All components must be complete together, or
-the object is closed-code unavailable with `components: null`. The current
-collector is root/phase scoped and cannot make that attribution, so current
-producers record `PER_ATTEMPT_METRICS_UNAVAILABLE`; they never split a phase
-delta or make an estimate. This is deliberate unavailable reporting, not a
-claim that runtime telemetry exists.
-
-`agent.close` separately carries at least one derived measure — `wall_time_ms`
-from this attempt's own spawn and close timestamps, and `declared_input_bytes`
-from the byte size of its declared input manifest — validated by
-`skills/pipeline/scripts/openspec-events.mjs`. These are derivations over
-artifacts the coordinator already owns, not telemetry and not consumed tokens,
-and their presence never licenses populating the token components. A stalled
-attempt records its consumed wall time and reports returning no result, so time
-spent without output is visible rather than absorbed.
-
-The current snapshot aggregates complete closed attempts only. A duplicate,
-missing, open, malformed, unavailable, or conflicting attempt makes all
-aggregate attempt metrics unavailable, never partial. It separately counts
-fresh attempts, final follow-ups, correction spawns, and closed quality
-verdicts. After Gate 1 approval, `approved_ac_count` is just the current
-positive count of approved AC rows—never their IDs or text. The summary and
-trace render `cached_input_per_approved_ac` only when that denominator and the
-complete lifecycle metric aggregate are available.
+Agent telemetry uses the universal `ts`, `event`, and `feature` envelope plus
+one concise `observation`. Role and task labels are optional diagnostics; only
+the exact architect/design pair is interpreted by the OpenSpec Gate-1
+preflight. Close records `status`. SLA observations do not require attempt
+ordinals, context strategies, follow-up counters, heartbeat fields, artifact
+probes, quality verdicts, or per-attempt metrics. Older events may retain those
+fields and remain readable without migration.
 
 ## Flow Telemetry Emission
 
@@ -288,8 +246,9 @@ secrets removed. The `checkpoint.confirmed` confirmatory text is the named addit
 paths, or untrusted instructions. Critical/High finding headlines and remediation pointers are
 retained even when the live response is concise.
 
-`tools`, `model`, and `effort` are propagated from specialist status blocks when present. Missing
-telemetry never changes the gate outcome; estimated token counts are marked
+`tools`, `model`, and `effort` may be recorded when the runtime exposes them.
+They are never required from specialist status blocks, and missing telemetry
+never changes the gate outcome; estimated token counts are marked
 `tokens_estimated: true` on the legacy Claude branch. When a `phase.end`
 contains `usage.kind: codex_usage_delta`, select the Native Codex branch instead:
 that branch records a closed unavailable usage result rather than an estimate.
@@ -831,45 +790,6 @@ rates, convert currency, price aggregate `total_tokens`, or double-count a
 component. These prohibitions apply only to the selected Native Codex branch;
 they do not change the legacy Claude rules above.
 
-### Declared lifecycle efficiency render
-
-This is additive and is selected only when the trace contains an `agent.spawn`,
-`agent.close`, or `agent.correction.spawn` event. It does **not** select the
-Native Codex cost branch: that predicate remains exactly
-`phase.end.usage.kind: codex_usage_delta`. With no `agent.*` record, retain the
-legacy summary and `/th:trace` output unchanged.
-
-When selected, insert this summary section after `## Cost` and before
-`## Iterations`:
-
-```markdown
-## Lifecycle Efficiency
-Declared attempts: {N}
-Follow-ups: {N|unavailable}
-Corrections: {N}
-Quality verdicts: pass:{N}, concerns:{N}, fail:{N}, n-a:{N}
-Metrics: {measured|unavailable (REASON_CODE)}
-Cached input: {N|unavailable}
-Uncached input: {N|unavailable}
-Output: {N|unavailable}
-Wall time: {N ms|unavailable}
-Tool calls: {N|unavailable}
-Approved ACs: {N|unavailable}
-Cached-input per approved AC: {decimal|unavailable}
-```
-
-Read the values only from the allowlisted declared lifecycle records and the
-current `approved_ac_count` snapshot. Sum a component once per closed ordinal;
-continued declarations never create another attempt. Any missing close,
-unavailable or malformed `attempt_metrics`, invalid ordinal sequence, or absent
-positive approved-AC count yields the affected `unavailable` value. Never use
-a root/session identifier, alias, rollout path, raw rollout, transcript,
-prompt, tool output, AC text, or a free-form task label to repair the result.
-The current collector does not provide per-attempt attribution, so today's
-normal lifecycle metric output is unavailable rather than an estimate.
-
----
-
 ## Relationship to the Output Discipline contract
 
 The `operation.*` schema is the diagnostic log target for the output discipline:
@@ -893,7 +813,9 @@ Skipping event appends to save tokens deletes the only signal available to diagn
 - `00-execution-events.jsonl` (local mode) — append-only event trace, machine-readable, queryable with `jq`
 - `00-execution-events.md` (obsidian mode) — same trace wrapped in YAML frontmatter + `# Execution Events` heading + ` ```jsonl ` code fence
 
-Both are written exclusively by the orchestrator. Agents return tool-usage counts in their status blocks; the orchestrator propagates them into the `tools` field of `phase.end` events and aggregates them into `00-pipeline-summary.md` (human-readable rollup, rewritten in full at every phase transition).
+Both are written exclusively by the orchestrator. Runtime-provided tool usage
+may be included in `phase.end`; leaf-agent counter fields are not required.
+`00-pipeline-summary.md` renders only the telemetry actually available.
 
 ### tokens field on phase.end
 
@@ -912,9 +834,12 @@ the legacy `tokens` field as an accounting source are forbidden.
 
 ### model / effort fields on phase.end
 
-Every leaf agent's status block declares its effective model on a `model:` line (mandatory) and, when known, its effective effort level on an `effort:` line (optional) — see `agents/_shared/output-template.md` § "Status block — common fields". The orchestrator propagates both verbatim onto the corresponding `phase.end` event's `model` / `effort` fields, using the same propagation mechanism already used for `tools` (see `agents/ref-pipeline.md` § "Populating the `model`/`effort` fields on `phase.end`"). Both fields are optional at the schema level — legacy events and events from agents that have not yet reported the fields simply omit them, and classification falls through to frontmatter/static-list inference (see § Derivation rule below).
-
-This is the field that makes a session model override (`agents/ref-pipeline.md` § "Session model override") observable in the trace: the frontmatter `model:` in `agents/{agent}.md` is only the agent's *default*; `event.model` on a given `phase.end` is what that specific dispatch actually ran under.
+`model` and `effort` are optional diagnostic context. Main may record them when
+the runtime exposes the effective dispatch configuration; agents do not need to
+self-report them and their absence never invalidates a result. When absent,
+classification falls through to frontmatter/static-list inference (see §
+Derivation rule below). A runtime-known session override may therefore be
+recorded on the event, while an unknown override remains honestly absent.
 
 For a selected Native Codex branch, `model` and `effort` remain operational
 context only. Native cost requires the exact `pricing_identity` and active

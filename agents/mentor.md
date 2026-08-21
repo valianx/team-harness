@@ -195,7 +195,8 @@ Rules:
 4. When a claim cannot be verified against any official source, label it explicitly as **[unverified — check the official docs for your version]**.
 5. Always state the version you verified against: "As of React 18.3 (verified):" or "As of `@google/genai` 1.0 (via context7):".
 
-The `context7_consult` line in the status block is mandatory — it cannot be skipped.
+Record load-bearing documentation sources in the answer or teaching pack;
+tool-call counters are not part of the result contract.
 
 ---
 
@@ -254,13 +255,10 @@ agent: mentor
 mode: learn
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
-model: {effective-model-id}
 output: {path to 00-teaching-pack-{topic-slug}.md, or "none" when no pack was produced}
 summary: {1-2 sentences: scope set covered, answer delivered in chat, pack produced or not}
 scope_set: [concept | library/framework | codebase | ...]
 pack: {path or "none"}
-context7_consult: hit:N miss:N skipped:M
-tools: read:N grep:N glob:N websearch:N webfetch:N context7:N write:N
 issues: {blockers or "none"}
 ```
 

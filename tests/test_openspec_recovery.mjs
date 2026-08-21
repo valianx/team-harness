@@ -42,20 +42,22 @@ console.log("=== OpenSpec Design recovery ===");
 await use(async ({ workspace, state }) => {
   state.openspec_design_pass = "provisioning";
   state.openspec_preflight = "provisionable";
-  assert.equal((await recoverOpenSpecDesign({ state, workspace, snapshotVerifier: pass })).next_action, "resume approved OpenSpec provisioning");
+  const resumed = await recoverOpenSpecDesign({ state, workspace, snapshotVerifier: pass });
+  assert.equal(resumed.action_code, "RESUME_PROVISIONING");
+  assert.equal(resumed.requires_agent_dispatch, false);
   console.log("  [PASS] interruption before provisioning");
 });
 
 await use(async ({ workspace, state }) => {
-  assert.equal((await recoverOpenSpecDesign({ state, workspace, snapshotVerifier: pass })).next_action, "resume upstream OpenSpec planning");
+  assert.equal((await recoverOpenSpecDesign({ state, workspace, snapshotVerifier: pass })).action_code, "RESUME_PLANNING");
   console.log("  [PASS] interruption during upstream planning");
 });
 
 await use(async ({ workspace, state }) => {
   state.openspec_design_pass = "overlay";
   const resumed = await recoverOpenSpecDesign({ state, workspace, snapshotVerifier: pass });
-  assert.equal(resumed.next_action, "rerun the mechanical OpenSpec overlay derivation with overwrite authorized for this recovery event — no architect dispatch");
-  assert.doesNotMatch(resumed.next_action, /resume OpenSpec execution-overlay generation/);
+  assert.equal(resumed.action_code, "DERIVE_OVERLAY");
+  assert.equal(resumed.requires_agent_dispatch, false);
   console.log("  [PASS] interruption after snapshot reruns the mechanical derivation, not an architect dispatch");
 });
 
@@ -63,7 +65,7 @@ await use(async ({ workspace, state }) => {
   state.openspec_design_pass = "gate1-ready";
   await rm(path.join(workspace, "plan/openspec-traceability.json"));
   const resumed = await recoverOpenSpecDesign({ state, workspace, snapshotVerifier: pass });
-  assert.equal(resumed.next_action, "rerun the mechanical OpenSpec overlay derivation with overwrite authorized for this recovery event — no architect dispatch");
+  assert.equal(resumed.action_code, "DERIVE_OVERLAY");
   console.log("  [PASS] interruption during overlay derivation reruns mechanically");
 });
 
@@ -73,12 +75,12 @@ await use(async ({ workspace, state }) => {
     state, workspace, snapshotVerifier: async () => ({ verdict: "fail", error_code: "SOURCE_CHANGED" }),
   });
   assert.equal(changed.error_code, "CANONICAL_SOURCE_CHANGED");
-  assert.equal(changed.next_action, "reconcile changed OpenSpec source");
+  assert.equal(changed.action_code, "RECONCILE_SOURCE");
   console.log("  [PASS] canonical intent change after snapshot");
 });
 
 await use(async ({ workspace, state }) => {
   state.openspec_design_pass = "gate1-ready";
-  assert.equal((await recoverOpenSpecDesign({ state, workspace, snapshotVerifier: pass })).next_action, "present STAGE-GATE-1");
+  assert.equal((await recoverOpenSpecDesign({ state, workspace, snapshotVerifier: pass })).action_code, "PRESENT_GATE_1");
   console.log("  [PASS] complete Design resumes at the unchanged gate");
 });

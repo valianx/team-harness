@@ -60,8 +60,10 @@ echo ""
 # Mirror the build_opencode_entry() pattern from Suite 19.
 # ---------------------------------------------------------------------------
 
-SESSION_OPENCODE_CJS="$TS_DIR/dist/session-enforcement.opencode.cjs"
-PLUGIN_MAIN_CJS="$TS_DIR/dist/opencode-plugin.cjs"
+BUILD_DIR="$(mktemp -d)"
+trap 'rm -rf "$BUILD_DIR"' EXIT
+SESSION_OPENCODE_CJS="$BUILD_DIR/session-enforcement.opencode.cjs"
+PLUGIN_MAIN_CJS="$BUILD_DIR/opencode-plugin.cjs"
 
 build_opencode_entry() {
     local entry="$1" out="$2"

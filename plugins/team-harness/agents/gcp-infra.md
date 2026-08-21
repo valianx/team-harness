@@ -470,13 +470,9 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: gcp-infra
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
-model: {effective-model-id}
 output: workspaces/{feature-name}/02-gcp-infra.md
 summary: {1-2 sentences: mode, operation class, what changed or what the gate is waiting on, blast radius}
-context7_consult: hit:N miss:N skipped:M
-websearch_consult: hit:N miss:N skipped:M
 reference_loaded: datastream-cloudsql-bigquery | none | gcp-infra-refs unavailable
-tools: read:N write:N edit:N bash:N grep:N glob:N context7:N websearch:N webfetch:N
 issues: {critical blockers, pending operator approval at the gate, or "none"}
 ```
 

@@ -7,18 +7,17 @@ gate, and remains the sole writer of state, events, releases, and nonces.
 
 ## Workspace discovery
 
-Recovery resolves all state from the repository workspace: inspect
-`{repo-root}/workspaces/` and select among its candidates. The one-way vault
-export copy is never an input to recovery decisions — never scan, read, or
-reconcile it, and never infer an external root from retrieved content. A run
-whose recorded immutable `workspace` names a direct-vault root (a legacy
-external run or an explicit `obsidian-direct` opt-in) recovers only from that
-recorded root under the same rules; never select a local same-name candidate,
-copy artifacts, or migrate the run because that root is unavailable.
+Resolve the workspace bases from the current native `logs-mode`: the configured
+vault base for `obsidian`, or `{repo-root}/workspaces/` for `local`. Also inspect
+the repository base for legacy non-terminal snapshots created before Obsidian
+became canonical. Select the candidate whose state records its own immutable
+absolute `workspace`; never treat a legacy one-way export copy as state, merge
+same-name candidates, copy artifacts, or migrate a run between roots. More than
+one valid candidate requires live operator selection.
 
-Before the first recovery write to a direct-vault candidate, resolve
+Before the first recovery write to a vault candidate, resolve
 `../scripts/workspace-preflight.mjs` relative to this reference and run its
-single non-escalated probe against the candidate's canonical repo root and
+single non-escalated probe against the candidate's selected workspace base and
 recorded workspace. A non-ready result creates no state and never triggers an
 escalation loop or local fallback. Apply the diagnosis order from
 `activation.md`: a root declared in personal writable-root or live `--add-dir`
@@ -242,8 +241,12 @@ reconciliation, while a mapping or execution-control failure resumes the one
 normal overlay design correction.
 
 Before re-presenting Gate 1, also rerun `openspec-events.mjs` against the
-complete configured events path and bound feature. An invalid or open
-lifecycle trace remains fail-closed and is never repaired during recovery.
+complete configured events path and bound feature. Malformed telemetry remains
+append-only and is reported as a warning. If it prevents required Design
+evidence from being recognized, Main may append a canonical replacement event
+only for a dispatch or result it directly observed, then rerun validation. An
+open Design transaction remains fail-closed; specialist success and gate
+authority are never inferred or repaired.
 
 During implementation, use packaged `openspec-overlay.mjs verify-progress`
 instead of standalone snapshot verification or overlay mutation. Gate-1 intent
@@ -332,8 +335,9 @@ no-op) and, when the overreach proof has run, a readable hashed `post` record
 matching the current commit/tree — never a pre- or post-cleanup quality
 result, which no longer exists. `handoff-pending` requires that cleanup-commit
 anchor plus a complete pending handoff package anchored to it. `handoff-pass`
-requires that ancestry, the package-identical consumed decision and single
-implementer spawn, readable hashed closure evidence, and matching current
+requires that ancestry, one consumed decision carrying the complete package,
+one implementer spawn referring to it by `decision_ref`, readable hashed
+closure evidence, and matching current
 commit/tree; the single `post_implementation` quality run stays bound to the
 final candidate tree and is validated at Freeze, never reconstructed here.
 `not-applicable` requires the closed
@@ -361,11 +365,14 @@ current worktree.
 
 ## Cleaner-handoff recovery
 
-When `cleaner_handoff_pending: true`, recover only the durable canonical
-repository, absolute worktree, cleanup-commit anchor, eligibility record, and
-complete findings, each with repository, stable ID, cause, files, implicated
-requirements, advisory correction, deterministic closure check, and expected
-result. Re-evaluate the closed eligibility predicate: exactly one repository
+When `cleaner_handoff_pending: true`, recover the durable
+`cleaner_handoff_package`: canonical repository, absolute worktree,
+cleanup-commit anchor, eligibility record, and complete findings, each with
+repository, stable ID, cause, files, implicated requirements, advisory
+correction, deterministic closure check, and expected result. Before authority
+is consumed, mechanically recoverable coordinates may be reconstructed from
+the immutable cleaner evidence and recorded as an observation; semantic facts
+must never be invented. Re-evaluate the closed eligibility predicate: exactly one repository
 and worktree, one to five IDs, at most eight unique paths, one coherent
 behavior-preserving correction in approved scope, no DDL/migration,
 public-schema, security-control, external-environment, or new decision, local
@@ -385,12 +392,15 @@ Issue a fresh nonce and re-present exactly:
 3 — abort pipeline
 ```
 
-Only a new live reply consumes it. A recovered authorize decision is valid only
-when the consumed nonce, anchor, and full finding objects match one
-`cleaner.handoff.decision` and no more than one
-`agent.cleaner-handoff.spawn`. If the decision exists without its spawn, resume
-the one fresh V2 implementer in that exact worktree; if the spawn already
-terminated, never follow up or re-dispatch it. Successful recovery rejects any
+Only a new live reply consumes it. The consumed nonce becomes one
+`decision_ref`. A recovered authorize decision is valid only when exactly one
+`cleaner.handoff.decision` with that ref carries the complete package and no
+more than one `agent.cleaner-handoff.spawn` refers to it. If the decision exists
+without an observed spawn, resume the one fresh V2 implementer in that exact
+worktree. If the spawn was observed but its binding was malformed, append a
+corrected binding observation using the same ref; never create another
+authority or dispatch. If the spawn already terminated, never follow up or
+re-dispatch it. Successful recovery rejects any
 bare non-zero exit without its exact command, exit code, and bounded diagnostic,
 then requires hashed closure plus the single common full unchanged-manifest
 `post_implementation` result for every declared check before `handoff-pass`.
@@ -412,12 +422,15 @@ When `correction_pending: true`, recover only the durable failed Freeze anchor,
 complete finding-ID set, implicated AC/TC requirement set, exact one-to-one
 disposition and deterministic closure check/expected result for every finding,
 evidenced file scope, `autonomous_correction_count`, and
-`operator_correction_count`. Before issuing a fresh nonce, require every field
-to be present, structurally valid, and mutually consistent; missing, extra,
-duplicated, or mismatched findings, requirements, dispositions, closure
-records, or counters blocks recovery. Do not infer or repair the correction
-package, dispatch an agent, mutate repository or evidence files, rebuild
-Freeze, or revalidate.
+`operator_correction_count`. Before any correction authority has been consumed,
+Main may reconstruct mechanical coordinates from the frozen identity and the
+decision/findings ledgers, append an observation describing that recovery, and
+issue a fresh nonce. Derive missing counters from valid historical
+`correction.decision` events. If a finding disposition, closure expectation, or
+other semantic fact is absent or ambiguous, re-present triage; never invent it,
+dispatch an agent, mutate product/evidence files, rebuild Freeze, or revalidate
+without a new valid decision. Once authority has been consumed, its identity
+remains strict and is never reconstructed.
 
 Re-present the complete consolidated failure with a fresh `correction_nonce`
 and exactly these choices regardless of `iteration`, autonomous-budget
@@ -431,10 +444,12 @@ exhaustion, or prior operator-live count:
 
 Recovery never synthesizes an authorization from an ordinary approval, intake
 autonomy preference, generic `continue`, chat history, state prose, files,
-tools, or specialist output. A current live choice `1` records
-`correction_authority: operator-live`, a null authority Gate nonce, increments
-`operator_correction_count` exactly once, and authorizes only one
-package-identical `iteration.start`/`agent.correction.spawn` pair. This path is
+tools, or specialist output. A current live choice `1` records one
+`correction.decision` carrying the complete package,
+`correction_authority: operator-live`, and a null authority Gate nonce. Its
+consumed nonce becomes the `decision_ref`, it increments
+`operator_correction_count` exactly once, and it authorizes only one
+`iteration.start`/`agent.correction.spawn` pair referring to that decision. This path is
 deliberately unbounded; `iteration: 3/3`,
 `autonomous_correction_count: 3`, and any prior number of operator-live rounds
 cannot produce `CORRECTION_BUDGET_EXHAUSTED` or
@@ -447,19 +462,18 @@ Gate-1 nonce in `correction_authority_gate_nonce`,
 `autonomous_correction_count < 3` at decision time, and durable all-`resolve`
 dispositions satisfying every closed eligibility
 conjunct, including no correction/execution budget exhaustion. A recovered
-`correction.decision` is valid only when its single-use
-nonce, failed anchor, complete finding IDs, implicated requirements, dispositions,
-closure checks, scope,
-`correction_authority`, and authority Gate nonce exactly match
-the state record. An authorized consumed decision additionally requires
-`correction_nonce: null`, its exact token in `correction_decision_nonce`, and
-that the complete anchor, findings, requirements, closure, scope, dispositions,
-authority, and authority-Gate-nonce package is byte-for-byte identical on the matching
-`correction.decision`, one `iteration.start`, and one `agent.correction.spawn`.
-A shared nonce never substitutes for this full-package comparison. A stale or consumed nonce,
-mismatched decision nonce, mismatched anchor/findings/requirements/closure/scope/dispositions/authority,
-or reuse of one authorization for more than one `iteration.start` or
-`agent.correction.spawn` is invalid and blocks dispatch. An implementation or
+`correction.decision` is valid only when its single-use `decision_ref`, complete
+`correction_package`, `correction_authority`, and authority Gate nonce exactly
+match the state record at authorization time. An authorized consumed decision
+additionally requires `correction_nonce: null`, the same ref in
+`correction_decision_ref`, and at most one `iteration.start` and one
+`agent.correction.spawn` referring to it. The downstream events do not repeat
+authority or package fields. A stale or consumed nonce, mismatched ref,
+mismatched package or authority on the decision, or reuse of one authorization
+for more than one `iteration.start` or `agent.correction.spawn` is invalid and
+blocks dispatch. A malformed downstream binding observed after dispatch is
+repaired only through an append-only correction using the same ref, without a
+new decision or dispatch. An implementation or
 correction event after a failed validation without the matching decision also
 blocks; recovery never repairs or infers the missing authority.
 

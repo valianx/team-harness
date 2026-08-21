@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail when a test asserts the wording of a Markdown file.
+"""Fail when a Python, JavaScript, or shell test asserts Markdown wording.
 
 README.md § "What gets a test" bans this class absolutely, and a ~46,000-line corpus of it
 was deleted once already (#553) for inverting authority — a failing literal search makes
@@ -29,6 +29,10 @@ MIN_WORDS = 4
 def is_prose(value: str) -> bool:
     return len(value) >= MIN_CHARS and len(value.split()) >= MIN_WORDS and "\n" not in value
 MARKDOWN_READ = re.compile(r"""\.md["']|read\(["'][^"']+\.md""")
+JS_MARKDOWN_READ = re.compile(r"readFile(?:Sync)?\([^\n)]*(?:docs|agents|skills)/[^\n)]*\.md")
+JS_PROSE_ASSERTION = re.compile(r"assert\.(?:match|doesNotMatch)\([^\n]+/[A-Za-z][^/\n]{20,}/")
+SHELL_DOC_PATH = re.compile(r"^[A-Z][A-Z0-9_]*=.*(?:docs|agents|skills)/[^\s'\"]+\.md", re.MULTILINE)
+SHELL_LITERAL_ASSERTION = re.compile(r"grep\s+-[^\n]*['\"]([^'\"]{24,})['\"]")
 
 # Suites predating this guard that still carry the pattern; each line is debt to remove.
 # A new entry may not be added: the point of the guard is that the set only shrinks.
@@ -68,6 +72,19 @@ def offenders() -> list[str]:
         phrases = membership_phrases(tree)
         if len(phrases) >= 3:
             found.append(f"{path.relative_to(ROOT)} ({len(phrases)} wording assertions)")
+
+    for path in sorted([*ROOT.glob("tests/test_*.mjs"), *ROOT.glob("tests/test_*.js")]):
+        source = path.read_text(encoding="utf-8")
+        if JS_MARKDOWN_READ.search(source) and JS_PROSE_ASSERTION.search(source):
+            found.append(f"{path.relative_to(ROOT)} (JavaScript Markdown wording assertion)")
+
+    for path in sorted(ROOT.glob("tests/test_*.sh")):
+        source = path.read_text(encoding="utf-8")
+        if not SHELL_DOC_PATH.search(source):
+            continue
+        phrases = [match.group(1) for match in SHELL_LITERAL_ASSERTION.finditer(source)]
+        if any(is_prose(phrase) for phrase in phrases):
+            found.append(f"{path.relative_to(ROOT)} (shell Markdown wording assertion)")
     return [item for item in found if item.split(" ")[0] not in GRANDFATHERED]
 
 

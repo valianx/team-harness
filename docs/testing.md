@@ -45,7 +45,8 @@ Everything below has inputs, outputs, and exit codes.
 | `test_session_start.sh` | SessionStart config read and language-directive injection |
 | `test_language_user_prompt.sh` | UserPromptSubmit language handling |
 | `test_subagent_start.sh` | The deterministic PreToolUse breadcrumb |
-| `test_checkpoint_guard.sh`, `test_prepublish_guard.sh`, `test_prepublish_bump_floor.sh`, `test_worktree_guard.sh` | Retained body-level regression suites; unwired from Claude Code and not installed in OpenCode |
+| `test_checkpoint_guard.sh`, `test_prepublish_guard.sh`, `test_worktree_guard.sh` | Retained body-level regression suites; unwired from Claude Code and not installed in OpenCode |
+| `test_prepublish_bump_floor.sh` | Release-only version-coordination checks; run by `TH_RELEASE_TESTS=1 bash tests/run-all.sh`, not by ordinary development verification |
 | `test_gate_guard.sh` | Unwired; code retained |
 | `test_isolated_hook_env.sh` | The isolated-environment harness itself (principle ii) |
 | `test_hook_gates_hardening.sh` | Runtime execution of the hardening findings, including the ClickUp MCP matcher (F-008) |
@@ -64,14 +65,13 @@ Everything below has inputs, outputs, and exit codes.
 | `test_permission_disjointness.py` | The permission-allowlist disjointness invariant (#18312 floor) |
 | `test_flow_event_schema_sync.py` | Cross-repo flow-event schema sync |
 | `test_lane_marker_identity.py` | Lane-marker byte identity |
-| `test_authoring_budgets.py` | The size budgets `docs/agent-authoring.md` declares — word budgets per file class, the 500-line hard cap, and the table-of-contents requirement for reference files over 100 lines. A reference file's contents block is checked against that file's own headings, so a list of invented entries fails. Files already over budget are named in an `EXEMPT` map that the suite forces to shrink: it fails when an exempt file becomes compliant and its entry is left behind |
+| `test_authoring_budgets.py` | Advisory word/line/contents health signals. Only a contents link pointing to no real heading fails, because that is broken machine-checkable navigation rather than an editorial preference |
 
 **Installer, runtime, and tooling.**
 
 | Suite | Covers |
 |---|---|
 | `go test ./cmd/install/` | The Go installer — preservation, mode transform, import candidates, platform behaviour |
-| `test_installer_preservation.py` | Installer preservation rules |
 | `test_opencode_config_resolver.sh` | opencode config-path resolution (SEC-OC-R3) |
 | `test_th_update_block_sync.sh` | The `/th:update` managed-block sync matrix |
 | `test_update_opencode_sh.sh` | `update-opencode.sh` non-interactive pre-check |
@@ -79,7 +79,7 @@ Everything below has inputs, outputs, and exit codes.
 | `test_github_identity_routes.py` | Cross-runtime GitHub route validation, longest-prefix resolution, isolated/account-switch strategies, config preservation, secret rejection, and generated-helper byte/mode identity |
 | `tools/harness-migrate/test_harness_migrate.mjs`, `test_transform_conformance.mjs` | The bidirectional transform and its cross-language conformance |
 
-**Runners.** `tests/run-all.sh` runs the suites above and exits non-zero if any fail; `TH_REQUIRE_RUNTIMES=1` (set in CI) converts a missing-runtime SKIP into a FAIL, so a green run means verified and never unchecked. `tests/run-behavioral.sh` runs the slower end-to-end tests that need environment the default run cannot guarantee.
+**Runners.** `tests/run-all.sh` runs ordinary development verification and exits non-zero if any behavioral or structural check fails; `TH_REQUIRE_RUNTIMES=1` (set in CI) converts a missing-runtime SKIP into a FAIL. `TH_RELEASE_TESTS=1` adds release-only version coordination. `tests/run-behavioral.sh` runs slower end-to-end tests that need environment the default run cannot guarantee.
 
 ## When to add a test
 

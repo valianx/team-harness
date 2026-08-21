@@ -32,9 +32,11 @@ never supplies a token value by implication.
 
 For an OpenSpec-bound Design, Main must run the packaged
 `openspec-events.mjs` against the complete configured events file and bound
-feature after both architect attempts close and before writing
-`phase: waiting_gate1`. Only `verdict: pass` permits Gate 1; do not repair or
-normalize invalid lifecycle records while presenting the gate.
+feature after the required architect work closes and before writing
+`phase: waiting_gate1`. Only `verdict: pass` permits Gate 1. Malformed telemetry
+is a warning and does not poison otherwise complete evidence. Main may append a
+canonical replacement event for directly observed facts when needed, but must
+not rewrite history, infer a result, or repair gate authority.
 
 ## Ownership and snapshot
 
@@ -45,14 +47,13 @@ report artifacts; they never write state, releases, nonces, or gate events and
 never speak for the operator. Write `next_action` before every dispatch and
 record its result before advancing. Preserve unrelated changes.
 
-The absolute `workspace` — repository-local by default, a vault root only
-under an explicit live `obsidian-direct` opt-in — and the effective
-`logs_mode` become immutable identity at the first state write. Every
+The absolute `workspace` selected directly by `logs_mode` and the effective
+mode become immutable identity at the first state write. Every
 artifact and event for that run stays below that one canonical root. A
 permission failure, restart, recovery, or configured-root change never
 migrates or splits an existing pipeline; only an explicit abort followed by a
-separate activation may choose another root. `logs_mode: obsidian` arms the
-one-way vault export (`obsidian_sync`); it never selects the live workspace.
+separate activation may choose another root. `logs_mode: obsidian` means the
+canonical workspace is in the configured vault.
 
 Keep a replaceable snapshot with these stable fields (narrative belongs in the
 events file):
@@ -92,24 +93,14 @@ next_action: {single recoverable action}
 iteration: N/3
 cleaner_handoff_pending: true|false
 cleaner_handoff_nonce: {fresh token or null}
-cleaner_handoff_repository: {canonical repository identity or null}
-cleaner_handoff_worktree: {absolute path or null}
-cleaner_handoff_anchor: {cleanup commit/tree or null}
-cleaner_handoff_findings: [{id, repository, cause, files, requirements, suggested_correction, closure_check, expected}]|[]
-cleaner_handoff_eligibility: eligible|ineligible|null
-cleaner_handoff_ineligible_reasons: [{closed-predicate conjunct}]|[]
+cleaner_handoff_package: {repository, worktree, anchor, findings, eligibility, ineligible_reasons}|null
 cleaner_handoff_decision: authorize|pause|abort|null
-cleaner_handoff_decision_nonce: {consumed token or null}
+cleaner_handoff_decision_ref: {consumed token or null}
 correction_pending: true|false
 correction_nonce: {fresh token or null}
-correction_anchor: {failed freeze commit/tree or null}
-correction_findings: [{stable finding id}]|[]
-correction_scope: [{repo-relative path}]|[]
-correction_requirements: [{AC-N|TC-N}]|[]
-correction_closure: [{id, check, expected}]|[]
-correction_dispositions: [{id, disposition: resolve|design-consistent|decision-required}]|[]
+correction_package: {anchor, findings, scope, requirements, closure, dispositions}|null
 correction_decision: authorize|pause|abort|null
-correction_decision_nonce: {consumed token or null}
+correction_decision_ref: {consumed token or null}
 correction_authority: operator-live|gate1-autonomous|null
 correction_authority_gate_nonce: {consumed Gate-1 token or null}
 autonomous_correction_count: N
@@ -122,16 +113,6 @@ total_tokens: N|unavailable
 cost_status: available|unavailable
 cost_reason_code: {closed pricing code}|null
 cost_usd: decimal|null
-agent_lifecycle_schema_version: 1|null
-agent_lifecycle_metrics_status: available|unavailable|null
-agent_lifecycle_metrics_reason_code: {closed lifecycle code}|null
-agent_lifecycle_attempt_count: N|null
-agent_lifecycle_follow_up_count: N|null
-agent_lifecycle_correction_count: N|null
-agent_lifecycle_quality_verdicts: {pass:N,concerns:N,fail:N,n_a:N}|null
-agent_lifecycle_metrics: {cached_input_tokens,uncached_input_tokens,output_tokens,wall_time_ms,tool_calls}|null
-approved_ac_count: N|null
-cached_input_per_approved_ac: decimal|unavailable
 autonomous: true|false
 autonomous_granted_at: STAGE-GATE-1|null
 gate_pending: gate1|gate3|null
@@ -170,6 +151,10 @@ delivery_base_status: {base_ref, freeze_base_sha, remote_base_sha: {full SHA}|nu
 delivery_preview: {pr title, workspace paths, and SHA-256 digests bound to Gate 3}|null
 ```
 
+New runs always set `obsidian_sync: null` and `obsidian_export_target: null`.
+The two fields remain only so recovery can honor legacy export-armed snapshots
+without rewriting their state schema.
+
 When non-null, `quality_manifest_path` must be a regular non-symlink below
 `workspace`. If that workspace is below a participating repository, the
 manifest must also be ignored and untracked. It is operational state, never a
@@ -179,10 +164,9 @@ during recovery before running quality.
 
 `autonomous_correction_count` is an integer from `0` through `3` and is the
 only correction budget. `operator_correction_count` is a non-negative,
-monotonic, deliberately unbounded integer. `iteration: N/3` is retained as a
-legacy display mirror of the autonomous counter; it never limits or authorizes
-an `operator-live` round. Initialize new runs with `iteration: 0/3` and both
-counters at `0`.
+monotonic, deliberately unbounded integer. `iteration: N/3` is a
+legacy-readable display mirror only; new runs may omit it and derive it for
+presentation. Initialize both counters at `0`.
 
 `cleaner_repo_evidence` is complete only when its canonical identity set equals
 `participating_repositories` exactly, with neither missing, extra, nor duplicate
@@ -291,8 +275,9 @@ decision; that requirement never authorizes or aborts anything.
 For a non-empty complete package, atomically set `phase: implementation`,
 `status: paused`, `cleaner_evidence.status: handoff-pending`, a fresh
 `cleaner_handoff_nonce`, `cleaner_handoff_pending: true`, eligibility,
-repository, absolute worktree, the exact cleanup-commit anchor and finding
-objects, with both decision fields null. While pending, do
+and one `cleaner_handoff_package` containing repository, absolute worktree,
+the exact cleanup-commit anchor, findings, and eligibility evidence, with both
+decision fields null. While pending, do
 not mutate repository/evidence artifacts, dispatch a specialist, run another
 cleaner, or open Freeze. Present exactly:
 
@@ -304,11 +289,13 @@ cleaner, or open Freeze. Present exactly:
 
 Only a live reply after this presentation may consume the nonce. Choice `1`
 atomically records `cleaner_handoff_pending: false`, moves the token to
-`cleaner_handoff_decision_nonce`, records `cleaner_handoff_decision: authorize`
-and one package-identical `cleaner.handoff.decision` event, and authorizes one
-fresh V2 implementer plus one package-identical
-`agent.cleaner-handoff.spawn`. Gate-1 autonomous approval never applies. The
-nonce may appear on one decision and one spawn only. This path never increments
+`cleaner_handoff_decision_ref`, clears the pending package, records
+`cleaner_handoff_decision: authorize`, and appends one
+`cleaner.handoff.decision` event containing `decision_ref` and the complete
+package. It authorizes one fresh V2 implementer; the subsequent
+`agent.cleaner-handoff.spawn` carries only that `decision_ref` and an
+observation. Gate-1 autonomous approval never applies. The reference may bind
+one observed dispatch only. This path never increments
 `iteration`, consumes the autonomous max-3 budget, emits `iteration.start`, or emits
 `agent.correction.spawn`.
 
@@ -357,19 +344,16 @@ the autonomous path is prohibited and Main uses the live path below.
 
 When every conjunct is true, Main creates and immediately consumes a fresh
 `correction_nonce`, then atomically records `correction_nonce: null`, the
-consumed token in `correction_decision_nonce`, `correction_pending: false`,
+consumed token in `correction_decision_ref`, `correction_pending: false`,
 `correction_decision: authorize`, `correction_authority: gate1-autonomous`, the
 exact consumed Gate-1 release nonce in `correction_authority_gate_nonce`, and
-the incremented `autonomous_correction_count` plus matching incremented
-`iteration: N/3`, plus one matching
-`correction.decision` event
-bound to that same consumed correction nonce, complete dispositions, resolve
-IDs, anchor, scope, implicated requirements, and one deterministic closure
-check/expected result per finding. The one subsequent `iteration.start` and
-`agent.correction.spawn` must carry the byte-for-byte identical nonce, anchor,
-findings, scope, requirements, closure, dispositions,
-`correction_authority: gate1-autonomous`, and the exact authority Gate nonce.
-Matching the nonce alone never authorizes either event. This single record
+the incremented `autonomous_correction_count`, plus one
+`correction.decision` event carrying that `decision_ref`, the complete
+`correction_package`, `correction_authority: gate1-autonomous`, and the exact
+authority Gate nonce. Clear `correction_package` from state after appending the
+decision. The one subsequent `iteration.start` and `agent.correction.spawn`
+carry only the same `decision_ref` plus their normal observation fields. This
+single decision record
 authorizes exactly one fresh implementer, a mandatory correction-closure gate,
 stale-row tester refresh, new Freeze, fresh QA, and impact-required security. Each later failed set repeats the triage and predicate; the
 third authorized correction exhausts autonomy and any later failure pauses.
@@ -382,14 +366,9 @@ status: paused
 next_action: await explicit correction decision
 correction_pending: true
 correction_nonce: {fresh single-use token}
-correction_anchor: {failed freeze commit/tree}
-correction_findings: [{all exact finding IDs}]
-correction_scope: [{union of evidenced repo-relative paths}]
-correction_requirements: [{all exact implicated AC-N|TC-N IDs}]
-correction_closure: [{one deterministic check and expected result per finding ID}]
-correction_dispositions: [{id, disposition}]
+correction_package: {anchor, findings, scope, requirements, closure, dispositions}
 correction_decision: null
-correction_decision_nonce: null
+correction_decision_ref: null
 correction_authority: null
 correction_authority_gate_nonce: null
 autonomous_correction_count: {integer 0..3}
@@ -412,20 +391,25 @@ Present the complete consolidated failure and exactly these choices:
 
 Only a live reply after this presentation may consume the nonce. Choice `1`
 atomically records `correction_decision: authorize`, the consumed nonce in
-`correction_decision_nonce`, `correction_authority: operator-live`,
+`correction_decision_ref`, `correction_authority: operator-live`,
 `correction_authority_gate_nonce: null`, `correction_pending: false`, and one matching
-`correction.decision` event bound to the anchor, all finding IDs, and file
-scope, implicated requirements, one deterministic closure check/expected result
-per finding, and dispositions. It increments `operator_correction_count`
+`correction.decision` event carrying that `decision_ref`, the complete
+`correction_package`, and authority. Clear `correction_package` from state
+after appending the decision. It increments `operator_correction_count`
 exactly once, leaves `autonomous_correction_count` and `iteration` unchanged,
 and authorizes exactly one bounded correction over that complete package;
-the subsequent `iteration.start` and `agent.correction.spawn` must repeat every
-package field plus `correction_authority: operator-live` and the null authority
-Gate nonce byte-for-byte, and a nonce-only match is invalid. Its authorization includes the
+the subsequent `iteration.start` and `agent.correction.spawn` carry only the
+same `decision_ref` plus their normal observation fields. Its authorization includes the
 closure gate, stale-row tester refresh, one new Freeze, fresh QA, and impact-required
 security; its nonce may appear on exactly
 one subsequent `iteration.start` and `agent.correction.spawn`. A second failure
 creates a fresh nonce and pauses again.
+
+If an `iteration.start`, `agent.correction.spawn`, or
+`agent.cleaner-handoff.spawn` binding is malformed after Main directly observed
+the corresponding dispatch, Main appends one canonical binding observation
+with the existing `decision_ref` and reruns recovery checks. It never rewrites
+the malformed line, emits another authority decision, or dispatches again.
 
 Choice `2` consumes the presented nonce into a `pause` decision with
 `correction_authority: operator-live`, performs no

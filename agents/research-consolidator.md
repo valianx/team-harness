@@ -191,7 +191,6 @@ Write the consolidated findings to `output_file` using the format above.
 agent: research-consolidator
 status: success | failed
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
-model: {effective-model-id}
 output: {output_file path}
 summary: {1-2 sentences: N lanes consolidated (W web + C code), M findings, K conflicts}
 lanes_consolidated: {N}

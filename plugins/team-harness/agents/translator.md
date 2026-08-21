@@ -582,15 +582,13 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: translator
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
-model: {effective-model-id}
 output: workspaces/{feature-name}/00-translation.md
 summary: {1-2 sentences: N strings translated across N files, i18n library used, glossary with N terms}
-context7_consult: hit:N miss:N skipped:M
-tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {any strings that couldn't be translated or build failures, or "none"}
 glossary: docs/glossary.md
 ```
 
-The `context7_consult` field is mandatory per `docs/context7-usage.md` §5 — even when all counts are zero, its presence signals the agent considered documentation freshness for the i18n library.
+Record load-bearing documentation sources in the workspace artifact;
+tool-call counters are not part of the result contract.
 
 Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orchestrator uses this status block to decide next steps.

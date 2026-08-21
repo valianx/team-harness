@@ -85,24 +85,17 @@ Score the response before using it:
 - {Library}@{version}: context7 unavailable — used training knowledge as of model cutoff.
 ```
 
-If the decision is load-bearing (the API you're using might have changed between training cutoff and now), surface it in your status block via the `context7_consult` counter (see §5) so the orchestrator can decide whether to escalate.
+If the decision is load-bearing (the API may have changed since the training
+cutoff), cite the consulted source in the result or workspace artifact so the
+orchestrator can evaluate it.
 
 ---
 
-## 5. Mandatory status block field
+## 5. Result evidence
 
-Every agent invocation that ran the mandatory trigger (architect / implementer / tester / security / translator) MUST include this field in its final status block:
-
-```
-context7_consult: hit:N miss:N skipped:M
-```
-
-Semantics:
-- `hit` — counted query that returned a usable answer for the detected version.
-- `miss` — counted query that returned empty / generic / wrong-version content (after at most one retry).
-- `skipped` — libraries the agent decided not to verify (purely internal code, no library invocation).
-
-Zero counts are written as `hit:0 miss:0 skipped:0`. The line is mandatory even when all three are zero — its presence is the signal that the agent thought about freshness.
+Tool-call counters are optional telemetry and never a status-block contract.
+When documentation freshness affects the implementation or verdict, record the
+library, version, source, and conclusion in the result or workspace artifact.
 
 After 5-10 pipelines this telemetry tells us whether agents are exercising context7 or treating it as decorative. High `skipped` in agents where it should fire = drift to correct. High `miss` = the query patterns in §3 need tightening.
 

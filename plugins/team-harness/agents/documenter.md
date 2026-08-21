@@ -243,7 +243,6 @@ End every run with a status block:
 agent: documenter
 status: success | blocked | failed
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
-model: {effective-model-id}
 output: workspaces/{feature-name}/02-documentation.md
 vault_path: {vault path used}
 folder: {folder name}
@@ -252,6 +251,4 @@ diagrams_inline: {Mermaid count}
 diagrams_external: {Excalidraw + Canvas count flagged for dispatch}
 language: {en|es|...}
 summary: {1-2 sentences}
-context7_consult: hit:N miss:N skipped:N
-tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 ```

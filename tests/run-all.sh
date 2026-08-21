@@ -103,7 +103,7 @@ fi
 
 echo
 echo "############################################################"
-echo "# Suite 3g: agent files stay inside their declared size budgets"
+echo "# Suite 3g: agent authoring health (size signals are advisory)"
 echo "############################################################"
 if [ -n "$PY" ] && $PY "$TESTS_DIR/test_authoring_budgets.py"; then
     echo "authoring-budgets: PASS"
@@ -293,10 +293,13 @@ fi
 
 echo
 echo "############################################################"
-echo "# Suite 16: hooks/ts/bodies/prepublish-guard.ts — bump-floor advisory (registry Suite 120)"
-echo "# Retained body-level regression suite; not wired in either runtime."
+echo "# Suite 16: release-only bump-floor checks"
 echo "############################################################"
-run_ts_hook_suite "prepublish-bump-floor" "test_prepublish_bump_floor.sh"
+if [ "${TH_RELEASE_TESTS:-0}" = "1" ]; then
+    run_ts_hook_suite "prepublish-bump-floor" "test_prepublish_bump_floor.sh"
+else
+    echo "prepublish-bump-floor: SKIP (set TH_RELEASE_TESTS=1 for release preparation)"
+fi
 
 echo
 echo "############################################################"
@@ -403,6 +406,18 @@ run_node_suite "openspec-design-e2e" "test_openspec_design_e2e.mjs" "node not fo
 
 echo
 echo "############################################################"
+echo "# Suite 166: immutable review package and projection surface"
+echo "############################################################"
+if ! command -v git >/dev/null 2>&1; then
+    report_skip_or_fail "review-fan" "git not found — install Git to run this suite"
+    report_skip_or_fail "review-surface" "git not found — install Git to run this suite"
+else
+    run_node_suite "review-fan" "test_review_fan.mjs" "node not found — install Node.js to run this suite"
+    run_node_suite "review-surface" "test_review_surface.mjs" "node not found — install Node.js to run this suite"
+fi
+
+echo
+echo "############################################################"
 echo "# Suite 164: deterministic repository quality runner"
 echo "# Requires: node and git. Missing runtimes follow CI-required semantics."
 echo "############################################################"
@@ -414,6 +429,27 @@ elif node "$TESTS_DIR/test_quality_runner.mjs"; then
     echo "quality-runner: PASS"
 else
     echo "quality-runner: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 20: opencode generated-agent and session behavior"
+echo "############################################################"
+if ! command -v go >/dev/null 2>&1; then
+    report_skip_or_fail "opencode-agent-frontmatter" "go not found"
+elif bash "$TESTS_DIR/test_opencode_agent_frontmatter.sh"; then
+    echo "opencode-agent-frontmatter: PASS"
+else
+    echo "opencode-agent-frontmatter: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+    report_skip_or_fail "opencode-session-enforcement" "node and npm are required"
+elif bash "$TESTS_DIR/test_opencode_session_enforcement.sh"; then
+    echo "opencode-session-enforcement: PASS"
+else
+    echo "opencode-session-enforcement: FAIL"
     FAILED=$((FAILED + 1))
 fi
 

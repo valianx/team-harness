@@ -21,6 +21,9 @@ Agent and skill prose is not on that list, and that is deliberate. A corpus of ~
 # Everything that runs without paid API calls
 bash tests/run-all.sh
 
+# Add release-only version-coordination checks
+TH_RELEASE_TESTS=1 bash tests/run-all.sh
+
 # The slower end-to-end tests (own prerequisites, skip cleanly when absent)
 bash tests/run-behavioral.sh
 

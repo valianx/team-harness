@@ -191,7 +191,6 @@ agent: ux-reviewer
 mode: enrich | validate
 status: success | blocked | failed
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
-model: {effective-model-id}
 output: workspaces/{feature-name}/{01-ux-review|04-ux-validation}.md
 findings: {critical: N, high: N, medium: N, suggestion: N}
 ac_added: {count of AC added, enrich mode only}
@@ -200,6 +199,4 @@ packet_used: true | false | absent   # validate mode only; whether 00-verify-pac
 packet_escapes: N                    # validate mode only; count of full docs opened beyond the packet
 packet_integrity: ok | stale | mismatch | n-a   # validate mode only; n-a when packet_used: absent
 summary: {1-2 sentences}
-context7_consult: hit:N miss:N skipped:N
-tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 ```

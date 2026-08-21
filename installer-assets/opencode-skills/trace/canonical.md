@@ -533,61 +533,6 @@ every child trace. Any unavailable child delta makes the native initiative
 total unavailable; absent exact quotes render `Cost: unavailable`. Never form
 a plausible partial subtotal.
 
-### Declared Codex lifecycle efficiency — selected only by `agent.*`
-
-This is an additive reader-only view. It is selected only when an
-`agent.spawn`, `agent.close`, or `agent.correction.spawn` record exists; it
-does not select the Native Codex usage/cost branch, and a trace without
-`agent.*` retains the legacy output above unchanged.
-
-Read only the lifecycle record's finite role/task enums, local ordinal,
-`fresh|continued` context strategy, follow-up count, closed quality verdict,
-and `agent.close.attempt_metrics`, plus the current state snapshot's
-`approved_ac_count`. Do not read rollouts, native IDs, aliases, paths,
-transcripts, prompts, tool output, or free-form labels. Do not print the local
-ordinal; it is a privacy-safe ordering pseudonym, not a diagnostic handle.
-The aggregate key `n_a` represents only the closed event enum `n-a`; it is not
-an additional verdict value.
-
-Count a fresh `agent.spawn` and an `agent.correction.spawn` once as a declared
-attempt. A continued spawn contributes only its final close's follow-up count.
-For metric aggregation, require exactly one valid close per fresh ordinal and
-one complete available `attempt_metrics` object for every closed attempt. Any
-open, duplicate, missing, malformed, unavailable, or conflicting record makes
-all attempt components unavailable. The current collector has no trustworthy
-per-attempt attribution, so `PER_ATTEMPT_METRICS_UNAVAILABLE` is the normal
-current outcome; never split a phase/root delta, estimate, substitute zero, or
-retain a partial subtotal.
-
-When selected, append this block to `--cost` output (the default mode gets the
-same section from `00-pipeline-summary.md`):
-
-```text
-Lifecycle Efficiency
-====================
-Declared attempts: {N}
-Follow-ups: {N|unavailable}
-Corrections: {N}
-Quality verdicts: pass:{N}, concerns:{N}, fail:{N}, n-a:{N}
-Metrics: {measured|unavailable (REASON_CODE)}
-Cached input: {N|unavailable}
-Uncached input: {N|unavailable}
-Output: {N|unavailable}
-Wall time: {N ms|unavailable}
-Tool calls: {N|unavailable}
-Approved ACs: {N|unavailable}
-Cached-input per approved AC: {decimal|unavailable}
-```
-
-`Cached-input per approved AC` is available only when the complete closed
-attempt aggregate and the positive current `approved_ac_count` are available.
-It contains no AC identifier or text. Corrections and quality verdicts are
-closed-enum counts only. The renderer never turns an unavailable lifecycle
-aggregate into a plausible number and never changes the legacy Claude cost
-route or the strict Native Codex cost semantics.
-
----
-
 ## Initiative region rendering (serial multi-project sequencing)
 
 **When rendered:** in default mode (no flag), after the `00-pipeline-summary.md` printout, when the feature's `00-state.md` declares `initiative: {name}` and an initiative-level `00-execution-events` file exists (`docs/observability.md § "Initiative-level trace (serial multi-project sequencing)"`). No new flag — this is additive output on the existing default-mode invocation.

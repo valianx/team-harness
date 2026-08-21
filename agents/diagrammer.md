@@ -346,15 +346,12 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: diagrammer
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
-model: {effective-model-id}
 output: workspaces/{feature}/diagram.excalidraw
 elements: {total element count}
 arrows: {arrow count}
 sections_completed: {N}/{total planned}
 render_rounds: {N}/5
 summary: {1-2 sentences: diagram type, visual patterns used, what's shown}
-context7_consult: hit:N miss:N skipped:N
-tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {blocking issues if failed/blocked, or "none"}
 ```
 

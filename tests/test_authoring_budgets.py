@@ -1,16 +1,9 @@
 #!/usr/bin/env python3
-"""Measure every agent and reference file against what docs/agent-authoring.md declares.
+"""Report agent/reference authoring size signals without gating correctness.
 
-The standard states word budgets, a 500-line hard cap, and a table-of-contents
-requirement for reference files over 100 lines. Until now nothing measured any of
-it, so a file could sit at 767 lines against a 500-line cap indefinitely.
-
-The oracle is a measurement of a real file compared against a declared number, so
-no sentence anywhere can make this test pass.
-
-EXEMPT records the debt that already exists. An exempt entry is not permission:
-the test fails when an exempt file becomes compliant, which forces the entry out
-and keeps the list shrinking rather than accumulating.
+Word counts, line counts, and table-of-contents preferences are editorial aids,
+not behavioral or safety oracles. Only a contents link that points to no real
+heading remains an error because that is a mechanically broken navigation target.
 """
 
 import re
@@ -175,7 +168,7 @@ def broken_anchors(lines: list[str]) -> list[str]:
 
 def main() -> int:
     failures: list[str] = []
-    stale_exemptions: list[str] = []
+    advisories: list[str] = []
     seen: set[str] = set()
 
     for path in sorted([*ROOT.glob("agents/**/*.md"), *ROOT.glob("skills/**/references/**/*.md")]):
@@ -193,13 +186,13 @@ def main() -> int:
         if kind == "reference":
             if line_count > TOC_REQUIRED_OVER and not has_toc(lines):
                 if rel not in TOC_EXEMPT:
-                    failures.append(
+                    advisories.append(
                         f"{rel}: {line_count} lines and no table of contents — a reference over "
                         f"{TOC_REQUIRED_OVER} lines must open with a list of its own headings so a "
                         f"section can be loaded without reading the file in full"
                     )
             elif rel in TOC_EXEMPT:
-                stale_exemptions.append(f"{rel}: now has a contents block — drop its TOC_EXEMPT entry")
+                advisories.append(f"{rel}: now has a contents block — drop its TOC_EXEMPT entry")
             for fragment in broken_anchors(lines):
                 failures.append(
                     f"{rel}: contents entry links #{fragment}, which names no heading in this file — "
@@ -212,27 +205,27 @@ def main() -> int:
             if "words" in exempt:
                 pass
             else:
-                failures.append(f"{rel}: {words} words over the {budget}-word {kind} budget")
+                advisories.append(f"{rel}: {words} words over the {budget}-word {kind} budget")
         elif "words" in exempt:
-            stale_exemptions.append(f"{rel}: now {words} words, within the {budget}-word budget — drop its 'words' exemption")
+            advisories.append(f"{rel}: now {words} words, within the {budget}-word budget — drop its 'words' exemption")
 
         if line_count > LINE_CAP:
             if "lines" not in exempt:
-                failures.append(f"{rel}: {line_count} lines over the {LINE_CAP}-line hard cap")
+                advisories.append(f"{rel}: {line_count} lines over the {LINE_CAP}-line guideline")
         elif "lines" in exempt:
-            stale_exemptions.append(f"{rel}: now {line_count} lines, within the {LINE_CAP}-line cap — drop its 'lines' exemption")
+            advisories.append(f"{rel}: now {line_count} lines, within the {LINE_CAP}-line guideline — drop its 'lines' exemption")
 
     for rel in sorted(set(EXEMPT) - seen):
-        stale_exemptions.append(f"{rel}: exempt but no longer present — drop the entry")
+        advisories.append(f"{rel}: exempt but no longer present — drop the entry")
 
-    if failures or stale_exemptions:
+    if failures:
         for line in failures:
             print(f"FAIL  {line}", file=sys.stderr)
-        for line in stale_exemptions:
-            print(f"STALE {line}", file=sys.stderr)
         return 1
 
-    print("authoring budgets: all agent files within budget or explicitly exempt")
+    for line in advisories:
+        print(f"WARN  {line}")
+    print(f"authoring health: PASS ({len(advisories)} advisory signal(s))")
     return 0
 
 

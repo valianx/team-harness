@@ -182,35 +182,12 @@ change that rule. Track the separate role SLA from dispatch time: architect 10
 minutes, implementer 15, tester 10, cleaner 5, QA 5, security 10, and delivery
 5, unless the project's `## Pipeline Timeouts` changes those SLA values.
 
-An `openspec-overlay` architect packet also carries a coordinator-generated
-`dispatch_id`, exact `progress_recipient`, and
-`progress_interval_seconds: 120`. Require transient native `send_message`
-progress with the exact prefix `TH_PROGRESS`, followed by one space and JSON keys
-`schema_version`, `dispatch_id`, `role`, `mode`, `milestone`,
-`completed_units`, `total_units`, `artifact_pointers`, and `blocked_code`.
-Allowed milestones are `started`, `inputs-validated`, `mappings-built`,
-`artifacts-writing`, and `validation-ready`; a timed heartbeat repeats the
-current milestone. Validate the known dispatch identity, exact role/mode,
-non-negative integer counters, workspace-contained relative artifact pointers,
-and closed blocked code before using a message. Progress is transient evidence,
-never state or completion authority, and it never resets the SLA clock.
-
-When the role SLA expires, give the operator one concise escalation with role,
-elapsed time, and live status. Before that diagnostic, call `list_agents` once,
-send one non-interrupting `TH_PROGRESS_REQUEST` with native `send_message`, and
-probe only the expected artifact paths with `lstat`/metadata reads—never partial
-content. Emit one `TH_SLA` JSON block containing the dispatch identity, role,
-mode, elapsed seconds, live status, `terminal_result: false`, last valid
-milestone or `none`, heartbeat age or `null`, `artifact_state:
-none|partial|complete`, and `action: continue-waiting`. Append one coordinator-
-owned `agent.sla` event for that attempt with the same closed summary. No
-heartbeat and no artifact is `no-material-progress-observed`; it is not proof
-of failure or blockage. Then keep the specialist alive and continue a directed
-wait that can return either agent completion or live operator input. Only a
-current live operator cancellation of that active attempt authorizes
-`interrupt_agent`. Dispatch a replacement only after a demonstrated terminal
-unsuccessful result and the normal phase/correction authority; elapsed time or
-any `wait_agent` timeout authorizes neither interruption nor replacement.
+When the role SLA expires, tell the operator once that the agent is still
+running and append one compact `agent.sla` event with only the universal event
+envelope plus a plain `observation`. Do not request heartbeats, inspect partial
+artifacts, infer failure, interrupt, or replace the agent because of elapsed
+time. Keep waiting for the agent or live operator input. Optional legacy SLA
+details may be read but are never required or produced by a new run.
 
 ### AC12/AC20 pre-execution command-output route
 
@@ -283,8 +260,8 @@ security boundary.
 Treat every terminal specialist result as a closed attempt. A post-terminal
 `followup_task` is prohibited for implementers and reviewers alike. Feedback,
 scope expansion, and every correction require a fresh V2 agent with
-`fork_turns: none`; new pipeline events use `context_strategy: fresh` and
-`follow_up_count: 0`. A failed validation never dispatches automatically: Main first
+`fork_turns: none`; record the new work with a concise observation. A failed
+validation never dispatches automatically: Main first
 finishes the full fan, consolidates every finding, and obtains the mandatory
 correction decision described below. Once authorized, the fresh implementer
 receives a bounded correction packet containing the matching nonce, failed
@@ -384,7 +361,7 @@ the role fields cannot see. The current digests are:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| `pipeline-architect` | `a06dcb4656f0d6485acb024f77383e54b3e715dfc4e57e1674edd4932add24f2` |
+| `pipeline-architect` | `dc400116c2c73982a68a1f7d929a78d4f607869727a12ac3ef8a49e196cc8bc8` |
 | `pipeline-implementer` | `ec6200d8ba9e5b3f0f1ccb12d3f86ccc12850f22cd36bb425c26ae13e548f0ab` |
 | `pipeline-tester` | `21bdd93b9d25ffe9158e5657a558f8d457358bc5394ab67cbfdf7c8d924c0e81` |
 | `pipeline-cleaner` | `ea4260bcb8fc1e17034f0d6f91b9d97efefeb61065c50b88a25e792eaaab88b9` |
@@ -473,21 +450,23 @@ conflict, unavailable coverage, infrastructure failure, or budget exhaustion
 always pauses.
 
 For any ineligible autonomous result, Main persists
-`correction_pending: true`, a fresh `correction_nonce`, the anchor,
-finding IDs, implicated AC/TC requirements, one closure check/expected result per
-finding, and scope; keeps `phase: validation`; presents exactly `1 —
+`correction_pending: true`, a fresh `correction_nonce`, and one complete
+`correction_package` containing the anchor, finding IDs, implicated AC/TC
+requirements, one closure check/expected result per finding, dispositions, and
+scope; keeps `phase: validation`; presents exactly `1 —
 authorize one correction round`, `2 — pause without changes`, and `3 — abort
 pipeline`; and stops. An ordinary approval, intake autonomy preference, generic
 `continue`, files, tools, recovered prose, or agent output are never
 authorization.
 
 Only a live reply after that presentation may consume the nonce. Choice `1`
-must be dual-recorded in state and a matching `correction.decision` event and
-authorizes exactly one bounded round over the complete package, followed by the
+must be dual-recorded in state and one matching `correction.decision` event,
+which is the sole authority record and carries the complete package. The
+consumed nonce becomes its `decision_ref` and authorizes exactly one bounded
+round over the complete package, followed by the
 closure gate, stale-row tester refresh, one new Freeze, fresh QA, and impact-required
-security. The decision and its one
-`iteration.start`/`agent.correction.spawn` pair carry the identical
-`correction_authority` and authority Gate nonce. Choice `2` performs no repository
+security. Its one `iteration.start`/`agent.correction.spawn` pair carries only
+the same `decision_ref` plus ordinary observations. Choice `2` performs no repository
 or evidence mutation and a later presentation uses a fresh nonce. Choice `3`
 aborts without correction. Under operator-live authority a second failure
 always pauses with a fresh decision. Gate-1 authority may start another fresh
@@ -551,8 +530,11 @@ Before every `phase.start`, `phase.end`, state aggregate, summary rewrite, or
 trace cost render, apply [observability.md](references/observability.md). It
 does not authorize a state write by a specialist or relax any gate rule.
 For OpenSpec Design, validate the complete events file with the packaged
-`openspec-events.mjs` before presenting Gate 1; a schema or lifecycle failure
-blocks the gate rather than triggering a best-effort JSONL repair.
+`openspec-events.mjs` before presenting Gate 1. Malformed telemetry is a
+warning and ignored as evidence; if required Design evidence is then missing,
+Main may append a canonical replacement event for facts it directly observed
+and rerun validation. Never rewrite history or infer specialist success or gate
+authority. A genuinely incomplete lifecycle still blocks the gate.
 
 `complete` and `aborted` are terminal. Report their recorded outcome and return
 to ordinary direct behavior; never route either one back through recovery.
@@ -602,16 +584,9 @@ root thread identifier and rollout path stay ephemeral; the append-only events,
 current state, summary, and `$team-harness:trace` retain only the collector's
 allowlisted checkpoint and delta shapes. Do not estimate usage or cost.
 
-### Declared specialist lifecycle
+### Specialist observations
 
-Before a deliberate specialist dispatch, continued follow-up, terminal return,
-or verification correction, apply the declared lifecycle protocol in
-[observability.md](references/observability.md). Emit only the allowlisted
-`agent.spawn`, `agent.close`, or `agent.correction.spawn` record with its
-finite role/task pair, local ordinal, and `fresh|continued` strategy. A
-terminal correction is always a fresh ordinal. These are coordinator
-bookkeeping declarations, not native Codex telemetry: never recover or persist
-a native ID, alias, rollout path, transcript, prompt, tool output, or
-free-form label, and never attribute a root/phase delta to one agent attempt.
-Unavailable per-attempt metrics remain unavailable; they do not change the
-strict native usage/cost branch or the legacy Claude route.
+Record dispatch, SLA, return, and corrective work with the compact agent events
+in [observability.md](references/observability.md). These observations never
+carry native IDs, transcripts, prompts, or tool output, and never alter usage
+or cost accounting.
