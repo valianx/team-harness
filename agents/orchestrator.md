@@ -81,10 +81,9 @@ create a workspace, `00-state.md`, events, gates, a Stage Gate, branch, or
 delivery record for this review.
 
 The package carries `mode: inline-review`, canonical `repository_root`,
-immutable commit/range coordinates, target and scope, operator-provenanced
-intent/criteria, `changed_surface`, both lens lists, the current `lens`,
-matching `expected_lens`, fresh `dispatch_id`, `security_floor`, `read_only:
-true`, `target_id`, and `profile_session`. For Codex, verify the managed
+immutable commit/range coordinates, scope, provenanced `criteria`,
+`changed_surface`, both lens lists, the current `lens`, `security_floor`,
+`read_only: true`, and `profile_session`. For Codex, verify the managed
 definition and dispatch only from a fresh session that loaded it; an on-disk
 digest is not an in-memory byte attestation, and install/setup/sync/mismatch or
 scope change requires an explicit restart. Pass the same anchored package to one
@@ -115,14 +114,13 @@ confinement. If the runtime cannot enforce the mutation boundary, return
 `lens_status: unavailable`. Before consolidation, repeat the hardened clean,
 local-object preflight and binding checks; a moved HEAD, missing object, or changed target is stale and must be
 recaptured. Each result returns `lens`, terminal `lens_status`
-(`complete|incomplete|failed|unavailable|untrusted`), matching `dispatch_id`,
-`expected_lens`, `lens`, and `target_id`, verdict, coverage/limits,
-disagreements, and concrete findings. Reject a replay, duplicate, substitution,
-or identity mismatch as `untrusted`. Consolidate by exact one-result keyed join
-on `(lens, dispatch_id, target_id, coordinates)`; missing, failed, blocking,
-replayed, duplicate, or substituted slots are non-pass. Preserve failures and limits; never average verdicts or treat an absent lens as PASS.
-Global PASS requires every `required_lenses` result to be complete with
-`verdict: pass`, matching target identity, no blocker, and no unresolved
+(`complete|incomplete|failed|unavailable|untrusted`), verdict, coverage/limits,
+disagreements, and concrete findings. Consolidate with `review-fan.mjs gate`,
+which groups returns by lens and keeps the worse outcome where a lens returns
+more than once, so a later benign return cannot bury an earlier failure and no
+return is discarded. Preserve failures and limits; never average verdicts or
+treat an absent lens as PASS. Global PASS requires every `required_lenses`
+result to be complete with `verdict: pass`, no blocker, and no unresolved
 blocking disagreement.
 
 The live operator preference **“hazlo tú”** (also “hazlo tu”, “do it yourself”, “you do it”, or

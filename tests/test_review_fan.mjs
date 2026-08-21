@@ -285,6 +285,28 @@ await check("resolves ready only when every required lens passes without a block
   assert.deepEqual(decision.unrequested, []);
 });
 
+await check("treats a return that omits lens_status as unfinished, not complete", () => {
+  // A lens that did not finish and simply left the field out must not read as a completed pass.
+  const decision = gateDecision(pkg({ required_lenses: ["qa"] }), [{ lens: "qa", verdict: "pass", findings: [] }]);
+  assert.equal(decision.ready, false);
+  assert.equal(decision.reasons.some((reason) => reason.includes("no lens_status")), true);
+});
+
+await check("holds the range when a lens leaves a blocking disagreement unresolved", () => {
+  const decision = gateDecision(pkg({ required_lenses: ["qa"] }), [
+    ret("qa", { disagreements: [{ with: "tester", claim: "coverage is not sufficient", blocking: true }] }),
+  ]);
+  assert.equal(decision.ready, false);
+  assert.equal(decision.reasons.some((reason) => reason.includes("blocking disagreement")), true);
+});
+
+await check("a disagreement the lens did not mark blocking does not hold the range", () => {
+  const decision = gateDecision(pkg({ required_lenses: ["qa"] }), [
+    ret("qa", { disagreements: [{ with: "tester", claim: "style", blocking: false }] }),
+  ]);
+  assert.equal(decision.ready, true);
+});
+
 await check("treats a pass carrying blockers as not ready", () => {
   const decision = gateDecision(pkg(), [ret("qa", { findings: [{ file: "src/a.js" }] })]);
   assert.equal(decision.ready, false);

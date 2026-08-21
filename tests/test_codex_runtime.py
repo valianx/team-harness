@@ -20,6 +20,36 @@ def fail(message: str) -> None:
     raise AssertionError(message)
 
 
+def check_retired_correlation_ids_absent() -> None:
+    """The review correlation ids are retired; every review surface must stay clear of them.
+
+    The producer stopped emitting target_id and dispatch_id and tests/test_review_fan.mjs
+    asserts their absence there. These surfaces are where the vocabulary regrew last time,
+    so absence is checked here rather than left to review. dispatch_id survives only in the
+    Codex progress transport, which is a different mechanism and is excluded by name.
+    """
+    review_surfaces = (
+        "agents/_shared/inline-review-contract.md",
+        "agents/inline-reviewer.md",
+        "agents/orchestrator.md",
+        "agents/ref-direct-modes.md",
+        "runtime/codex/instructions/inline-reviewer.md",
+        "plugins/team-harness/agents/_shared/inline-review-contract.md",
+        "plugins/team-harness/agents/inline-reviewer.md",
+        "docs/codex-runtime.md",
+        "docs/pipeline-lanes.md",
+    )
+    for rel in review_surfaces:
+        path = ROOT / rel
+        if not path.exists():
+            fail(f"retired-id check names a missing surface: {rel}")
+            continue
+        body = path.read_text()
+        for retired in ("target_id", "dispatch_id", "expected_lens"):
+            if retired in body:
+                fail(f"{rel} carries retired review correlation id {retired!r}")
+
+
 def check_inline_reviewer_native() -> None:
     """The generated inline reviewer is direct-project, read-only, and four-lens."""
     registry = json.loads((ROOT / "runtime/schema/codex-agents.json").read_text())
@@ -41,7 +71,7 @@ def check_inline_reviewer_native() -> None:
     for marker in (
         "tester", "qa", "security", "adversary", "repository_root", "commit_or_range",
         "sandbox_mode = \"read-only\"", "lens_status", "coverage", "disagreements",
-        "review-pr", "target currentness", "output: null", "expected_lens", "dispatch_id",
+        "review-pr", "target currentness", "output: null",
         "git diff", "filesystem-root confinement",
     ):
         if marker not in adapter:
@@ -84,7 +114,7 @@ def check_inline_reviewer_native() -> None:
     if (ROOT / "plugins/team-harness/skills/init/scripts/test_run_inline_review.mjs").exists():
         fail("retired inline runner behavioral test remains")
     init = re.sub(r"\s+", " ", (ROOT / "plugins/team-harness/skills/init/SKILL.md").read_text().lower())
-    for marker in ("inline-reviewer", "project root", "commit/range", "sandbox_mode = \"read-only\"", "adversary", "security floor", "dispatch_id", "expected_lens", "regular non-symlink", "sha-256", "before consolidation", "stale", "fresh codex session", "explicit restart", "in-memory byte attestation"):
+    for marker in ("inline-reviewer", "project root", "commit/range", "sandbox_mode = \"read-only\"", "adversary", "security floor", "regular non-symlink", "sha-256", "before consolidation", "stale", "fresh codex session", "explicit restart", "in-memory byte attestation"):
         if marker not in init:
             fail(f"Codex init native inline route missing {marker!r}")
     for retired in ("run_inline_review.mjs", "evidence_manifest", "manifest_digest", "stdin-only", "deny-root"):
@@ -407,6 +437,7 @@ def check_post_gate1_projection() -> None:
 
 
 def main() -> None:
+    check_retired_correlation_ids_absent()
     check_inline_reviewer_native()
     contract = json.loads((ROOT / "runtime/schema/codex-agents.json").read_text())
     agents = contract["agents"]
@@ -1704,7 +1735,7 @@ def main() -> None:
     for marker in (
         "tester", "qa", "security", "adversary", "repository_root", "commit_or_range",
         "sandbox_mode = \"read-only\"", "lens_status", "coverage", "disagreements",
-        "target currentness", "review-pr", "output: null", "expected_lens", "dispatch_id",
+        "target currentness", "review-pr", "output: null",
         "git diff", "filesystem-root confinement", "git --no-pager --no-replace-objects --literal-pathspecs -c core.fsmonitor=false -c core.untrackedcache=false -c maintenance.auto=false -c gc.auto=0 -c log.showsignature=false -c <canonical-root>",
         "--no-ext-diff", "--no-textconv", "resolved object ids", "project-derived command string",
         "profile_session", "fresh session", "in-memory byte attestation",
@@ -1718,7 +1749,7 @@ def main() -> None:
     for marker in (
         "inline-reviewer", "requested_lenses",
         "required_lenses", "project root", "commit/range", "sandbox_mode = \"read-only\"",
-        "adversary", "security floor", "expected_lens", "dispatch_id", "regular non-symlink",
+        "adversary", "security floor", "regular non-symlink",
         "sha-256", "review-pr", "exclusive", "stale", "fresh codex session", "explicit restart",
         "in-memory byte attestation",
     ):
@@ -1729,8 +1760,8 @@ def main() -> None:
             fail(f"Codex init retains retired inline marker {retired!r}")
     for marker in (
         "mode: inline-review", "repository_root", "commit_or_range", "requested_lenses",
-        "required_lenses", "lens: tester|qa|security|adversary", "expected_lens",
-        "dispatch_id", "security_floor", "read_only: true", "target_id",
+        "required_lenses", "lens: tester|qa|security|adversary",
+        "security_floor", "read_only: true",
         "native read-only sandbox", "security floor", "stale",
         "complete|incomplete|failed|unavailable|untrusted", "never averages verdicts",
         "absent return as PASS", "verdict: pass", "review-pr",

@@ -463,6 +463,11 @@ export function classifyCoverage(pkg, finding) {
   return { coverage: "covered", criterion: match.text, source: match.source ?? null };
 }
 
+/** Disagreements a lens marked blocking. The contract makes an unresolved one non-pass. */
+function blockingDisagreements(entry) {
+  return (entry.disagreements ?? []).filter((item) => item?.blocking === true);
+}
+
 /**
  * Two returns for one lens do not contend: the worse outcome wins. A later benign return can
  * therefore never bury an earlier failure, and no return is ever discarded to achieve that —
@@ -471,8 +476,11 @@ export function classifyCoverage(pkg, finding) {
 function worseOf(left, right) {
   if (left === null) return right;
   const rank = (entry) => {
-    if (entry.lens_status !== undefined && entry.lens_status !== "complete") return 3;
+    // An omitted lens_status is not a completed one: a lens that did not finish and simply
+    // left the field out must not outrank a lens that said so.
+    if (entry.lens_status !== "complete") return 3;
     if (entry.verdict !== "pass") return 2;
+    if (blockingDisagreements(entry).length > 0) return 2;
     return (entry.findings ?? []).length > 0 ? 1 : 0;
   };
   return rank(right) > rank(left) ? right : left;
@@ -504,9 +512,14 @@ export function gateDecision(pkg, returns) {
       (classified.coverage === "covered" ? covered : specDefects).push(classified);
     }
     // A lens that did not finish says so, and an unfinished pass is not a pass. That is the
-    // lens's own knowledge about its work, not a correlation field.
-    if (entry.lens_status !== undefined && entry.lens_status !== "complete") {
-      reasons.push(`required lens ${lens} did not finish (${entry.lens_status})`);
+    // lens's own knowledge about its work, not a correlation field. An absent status is
+    // treated as unfinished, because a missing answer is not a completed one.
+    if (entry.lens_status !== "complete") {
+      reasons.push(`required lens ${lens} did not finish (${entry.lens_status ?? "no lens_status"})`);
+    }
+    const disputed = blockingDisagreements(entry);
+    if (disputed.length > 0) {
+      reasons.push(`required lens ${lens} left ${disputed.length} blocking disagreement(s) unresolved`);
     }
     if (entry.verdict !== "pass") reasons.push(`required lens ${lens} returned ${entry.verdict}`);
     if (split.blockers.length > 0) reasons.push(`required lens ${lens} returned ${split.blockers.length} blocker(s)`);

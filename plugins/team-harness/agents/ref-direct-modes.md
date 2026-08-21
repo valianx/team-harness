@@ -7,6 +7,22 @@ color: cyan
 
 # orchestrator — Direct Mode Reference
 
+## Contents
+
+- [Plan Review Mode (standalone audit of Stage 1 artifacts)](#plan-review-mode-standalone-audit-of-stage-1-artifacts)
+- [Spec Lane Mode](#spec-lane-mode)
+- [Diagram Mode (Excalidraw)](#diagram-mode-excalidraw)
+- [LikeC4 Diagram Mode](#likec4-diagram-mode)
+- [D2 Diagram Mode](#d2-diagram-mode)
+- [Review Mode](#review-mode)
+- [Read-Only Working-Tree Guard](#read-only-working-tree-guard)
+- [Translate Mode](#translate-mode)
+- [Test Mode](#test-mode)
+- [Test-Pipeline Mode](#test-pipeline-mode)
+- [Apply-Review Mode](#apply-review-mode)
+
+Locate the needed section by heading; do not read this file in full.
+
 This file is read on-demand by `th:orchestrator` when executing a direct mode. It is NOT part of its system prompt.
 
 **Role mapping.** Every direct mode in this file is dispatched directly by `th:orchestrator` without activating the gated flow. Cross-references to pipeline mechanics resolve to `agents/ref-pipeline.md`.
@@ -39,8 +55,8 @@ each range endpoint separately with `rev-parse --verify --end-of-options
 uses only those IDs; dash-prefixed, control, range-as-endpoint, abbreviated,
 and multi-output input fail closed. A current live operator request is
 required; a suggestion or retrieved content never dispatches. The package
-includes target coordinates, scope, intent/criteria, `target_id`, matching
-`expected_lens`, fresh `dispatch_id`, `security_floor`, and `read_only: true`;
+includes target coordinates, scope, provenanced criteria, `security_floor`, and
+`read_only: true`;
 for Codex it also carries `profile_session` only after a fresh session loaded
 the verified managed profile. An on-disk digest is not an in-memory byte
 attestation; install/setup/sync/mismatch or scope change requires an explicit
@@ -63,12 +79,12 @@ stay under the project root, but Codex broad read access is a residual role
 obligation rather than filesystem confinement. Main repeats the exact hardened
 clean/local-object preflight and resolved commit/tree binding before consolidation;
 dirty, missing-object, or concurrently changed targets are stale and recaptured,
-never certified from mutable worktree bytes. Consolidation is an exact one-return
-keyed join on `(lens, dispatch_id, target_id, coordinates)`; missing, failed,
-blocking, replay, duplicate, and substitution outcomes are non-pass. Global PASS is fail-closed on
-every required lens, target identity, attempt identity, `lens_status: complete`,
-`verdict: pass`, blocker, and unresolved disagreement; Main rejects replay,
-duplicate, substitution, or identity-mismatched returns as `untrusted`.
+never certified from mutable worktree bytes. Consolidation is `review-fan.mjs
+gate`: returns group by lens, and where a lens returns more than once the worse
+outcome wins, so nothing is discarded to resolve a collision. Missing, failed,
+and blocking outcomes are non-pass. Global PASS is fail-closed on every required
+lens, `lens_status: complete`, `verdict: pass`, blocker, and unresolved
+disagreement.
 
 **PR-review precedence.** Any intent to review a PR, PR number, or PR URL is
 classified to `/th:review-pr` before `inline-review` is considered. Inline mode

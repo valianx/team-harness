@@ -13,6 +13,19 @@ This file is read on-demand by `th:orchestrator` during Intake and Classify. It 
 
 ---
 
+## Contents
+
+- [Milestone Continuity](#milestone-continuity)
+- [Initiative Create-or-Join](#initiative-create-or-join)
+- [Initiative Detection and Confirm](#initiative-detection-and-confirm)
+- [Language and English-Learning Intent Handling](#language-and-english-learning-intent-handling)
+- [ClickUp Conversational Intents](#clickup-conversational-intents)
+- [Lane Classification](#lane-classification)
+- [Bug Tier](#bug-tier)
+- [Root-Cause Provenance Tiers](#root-cause-provenance-tiers)
+
+Locate the needed section by heading; do not read this file in full.
+
 ## Milestone Continuity
 
 Triggered from `agents/ref-pipeline.md § Intake` (the workspace-folder step), before composing a fresh `docs_root`.

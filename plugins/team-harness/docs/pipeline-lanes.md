@@ -43,9 +43,9 @@ when the security floor applies or the operator requests it, not for an ordinary
 review. The floor applies to changed authentication, authorization/permissions,
 identity/session, credentials/secrets, cryptography/transport, untrusted-input,
 file-upload, data-access/export, executable-code, or security-policy/audit
-controls; ambiguity is sensitive. Every lens receives a fresh `dispatch_id` and
-matching `expected_lens`; replayed, duplicated, substituted, or mismatched
-returns are untrusted. Codex historical inspection uses only the shared
+controls; ambiguity is sensitive. Returns consolidate by lens on a
+worst-outcome-wins rule, so a second return for a lens never buries the first.
+Codex historical inspection uses only the shared
 contract's exact `git --no-pager` argv templates with `--no-replace-objects`,
 `--literal-pathspecs`, `--no-ext-diff`, `--no-textconv`, resolved object IDs,
 and `--` path separation; Claude has no Bash, so Main MUST use those same
