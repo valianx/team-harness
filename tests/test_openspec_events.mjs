@@ -130,6 +130,21 @@ await check("accepts append-only Obsidian continuation fences", async () => with
   assert.equal(result.event_count, 4);
 }));
 
+await check("round-trips free-form observations as one JSONL line inside an Obsidian fence", async () => withFixture(async ({ workspace }) => {
+  const events = canonicalEvents();
+  const observation = 'architect returned "two findings"\nkeep ``` literal\tand \\ paths';
+  events[2].observation = observation;
+  const lines = events.map(event => JSON.stringify(event));
+  assert.equal(lines.length, events.length);
+  assert.equal(lines.some(line => line === "```"), false);
+  assert.equal(JSON.parse(lines[2]).observation, observation);
+  await writeFile(path.join(workspace, "00-execution-events.md"),
+    `# Events\n\n\`\`\`jsonl\n${lines.join("\n")}\n\`\`\`\n`);
+  const result = await validateOpenSpecEvents({ workspace, events: "00-execution-events.md", feature });
+  assert.equal(result.verdict, "pass");
+  assert.equal(result.event_count, events.length);
+}));
+
 await check("warns on malformed records and excludes them from required evidence", async () => withFixture(async ({ workspace }) => {
   const events = canonicalEvents();
   delete events[0].ts;

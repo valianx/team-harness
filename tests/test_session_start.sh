@@ -551,6 +551,14 @@ for LANG in absent en es; do
     rm -rf "$ENABLED" "$BASELINE"
 done
 
+# Keep only the two user-visible content contracts that materially change the
+# mode's behavior. The rest of this section deliberately avoids pinning prompt
+# prose so harmless instruction rewrites do not break the suite.
+TMP=$(make_tmp_home '{"english_learning":true}')
+assert_output_contains "el-contract-ascii-signal: correct English requests the literal ASCII signal" "$TMP" "plain-ASCII emoticon :)"
+assert_output_contains "el-contract-non-english-exemption: non-English messages receive no learning signal" "$TMP" "do not emit a :) for a non-English message"
+rm -rf "$TMP"
+
 echo
 echo "=== English-learning: non-boolean values do not activate or reflect input ==="
 TMP=$(make_tmp_home '{"english_learning":"yes"}')

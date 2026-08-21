@@ -51,6 +51,11 @@ transcripts, prompts, tool output, or a native identifier.
 diagnostic labels when Main knows them, but they are not a closed global enum.
 Only OpenSpec Gate-1 evidence interprets the exact pair
 `agent_role: architect`, `task: design`; other labels never affect a gate.
+Observations have no separate prose schema or per-field length cap. Main must
+serialize the complete event with a JSON encoder and append the encoded object
+as one physical line rather than concatenate raw specialist output. This keeps
+quotes, control characters, and backtick runs data inside the JSON string and
+preserves the line-anchored fence of an established Markdown trace.
 
 | Event | Required lifecycle fields | Coordinator rule |
 |---|---|---|

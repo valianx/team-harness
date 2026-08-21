@@ -490,7 +490,16 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 
 Every free-text field — `operation.*`'s `detail`/`error`/`suggestion`, `kg_write.writes[].detail`, `plan_structure.extra.detail`, and the notification `{summary}` — is **one compact clause, ≤120 chars**, never multi-sentence narrative, stripped of `\n\r\t` and quote characters. **Format only:** it never reduces one-object-per-line and never substitutes for an event.
 
-**One named exception, additive: the `checkpoint.confirmed` confirmatory text.** ≤280 chars (one confirmatory turn, not the surrounding conversation). Quotes and `\n\r\t` are **escaped as JSON string escapes, never stripped**, so the operator's exact characters survive. Every backtick is escaped at the byte level with its unicode escape (U+0060) rather than left literal — this protects the JSONL fence obsidian mode wraps the trace in, which the quote escape alone does not. Truncation past the bound is marked visibly with `…[truncated]`. The secret prohibition is unaffected: a confirmation carrying a credential records `provenance` and `withheld — secret prohibition` in place of the text. Altering the recorded characters inside the bound is exactly the stripping this exception exists to avoid.
+`agent.*.observation` is deliberately outside that prose bound: it is the
+general-purpose record of what Main observed, not a closed mini-schema. The
+coordinator must serialize the complete event with a JSON encoder and append
+exactly one encoded object per physical line; it must never interpolate raw
+agent output into JSONL. JSON escaping preserves quotes and control characters,
+and a backtick run inside the encoded JSON string remains on that event line,
+so it cannot become the Markdown variant's line-anchored closing fence. The
+overall events-file and event-count bounds remain the storage limits.
+
+**One named exception, additive: the `checkpoint.confirmed` confirmatory text.** ≤280 chars (one confirmatory turn, not the surrounding conversation). Quotes and `\n\r\t` are **escaped as JSON string escapes, never stripped**, so the operator's exact characters survive. Every backtick is escaped at the byte level with its unicode escape (U+0060) rather than left literal as additional defense for exact operator-supplied text in an Obsidian trace. Truncation past the bound is marked visibly with `…[truncated]`. The secret prohibition is unaffected: a confirmation carrying a credential records `provenance` and `withheld — secret prohibition` in place of the text. Altering the recorded characters inside the bound is exactly the stripping this exception exists to avoid.
 
 ### Optional runtime telemetry
 
