@@ -621,8 +621,7 @@ reference material only; they are not emitted, dispatched, or gate-releasing.
 event contains an object whose `usage.kind` is `codex_usage_delta`. A
 `phase.start` checkpoint, route, model, agent, or any other field never
 selects it. When no such `phase.end` exists, retain the complete legacy Claude
-contract below unchanged, including `tokens`, `tokens_in`/`tokens_out`,
-`tokens_estimated`, `~/.claude/.team-harness.json` pricing, the
+contract below unchanged, including `tokens`, `tokens_estimated`, `~/.claude/.team-harness.json` pricing, the
 event/frontmatter/static fallbacks, and the established rendering.
 
 This section defines the cost-visibility surface introduced in Phase B of the

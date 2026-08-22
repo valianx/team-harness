@@ -435,10 +435,8 @@ usage is unavailable, not a fallback to legacy pricing.
      — do not edit one without the other.
    - **No "all others → sonnet" default.** When none of the three paths
      resolve, classify as `sonnet` and mark the row with `(?)`.
-   - When `tokens_in` / `tokens_out` are available in the event, use
-     `(tokens_in × input + tokens_out × output) / 1_000_000`.
-   - When only `tokens` total is available, use
-     `tokens × (input + output) / 2 / 1_000_000` and mark with `(~)`.
+   - Cost derives from the `tokens` total at the blended rate:
+     `tokens × (input + output) / 2 / 1_000_000`, always marked `(~)` in the Cost column.
 
 5. Render output:
 
