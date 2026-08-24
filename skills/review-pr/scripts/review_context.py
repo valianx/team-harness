@@ -1297,6 +1297,13 @@ def command_same_author(args: argparse.Namespace) -> int:
 # failure modes: a reason that means "could not classify" is not evidence of safety, and
 # a later indeterminate producer inherits the floor without being enumerated here.
 REASONS_WAIVING_SECURITY = {"known-non-executable"}
+AGENT_CONTRACT_SIGNALS = {
+    "missing-coordinate",
+    "missing-return-field",
+    "agent-persistence-path",
+    "missing-read-tools",
+    "unverified-path-read",
+}
 
 
 def resolve_security_required(reason: str, triggers: list[str]) -> bool:
@@ -1331,6 +1338,217 @@ def command_select_security(args: argparse.Namespace) -> int:
         "triggers": triggers,
     }))
     return 0
+
+
+def _contained_by(path: Path, roots: tuple[Path, ...]) -> bool:
+    return any(path == root or root in path.parents for root in roots)
+
+
+def _classify_contract_result(role: str, attempt: int, reason: str) -> dict[str, Any]:
+    if attempt == 1:
+        return {
+            "decision": "retry-contract",
+            "failure_kind": "agent-contract-invalid",
+            "reason": reason,
+            "preserve_snapshot": True,
+            "operator_decision_required": False,
+        }
+    if role == "specialist":
+        return {
+            "decision": "continue-comment",
+            "failure_kind": "agent-contract-invalid",
+            "reason": reason,
+            "lens_outcome": "absent after retry (agent contract)",
+            "forced_event": "COMMENT",
+            "preserve_snapshot": True,
+            "operator_decision_required": False,
+        }
+    return {
+        "decision": "fail-closed",
+        "failure_kind": "canonical-draft-unavailable",
+        "reason": reason,
+        "preserve_snapshot": True,
+        "operator_decision_required": False,
+    }
+
+
+def classify_agent_failure(
+    *,
+    artifact_root: Path,
+    worktree: Path,
+    required_artifacts: list[Path],
+    required_directories: list[Path],
+    failed_path: Path | None,
+    contract_signal: str,
+    reviewed_sha_status: str,
+    context_hash_status: str,
+    snapshot_status: str,
+    freshness_status: str,
+    role: str,
+    attempt: int,
+) -> dict[str, Any]:
+    """Classify reviewer failures without converting TH contract defects into operator gates."""
+    if attempt not in {1, 2} or role not in {"general", "specialist", "consolidator"}:
+        raise ContextError("invalid agent-failure recovery coordinates")
+    if contract_signal != "none" and contract_signal not in AGENT_CONTRACT_SIGNALS:
+        raise ContextError("unknown agent contract signal")
+
+    for status in (reviewed_sha_status, context_hash_status):
+        if status not in {"match", "missing", "mismatch"}:
+            raise ContextError("invalid agent identity status")
+    if snapshot_status not in {"match", "mismatch"} or freshness_status not in {"current", "failed"}:
+        raise ContextError("invalid snapshot recovery status")
+
+    if "mismatch" in {reviewed_sha_status, context_hash_status}:
+        return {
+            "decision": "fail-closed",
+            "failure_kind": "snapshot-identity-failed",
+            "reason": "agent returned a different immutable snapshot identity",
+            "preserve_snapshot": True,
+            "operator_decision_required": False,
+        }
+    if snapshot_status != "match" or freshness_status != "current":
+        return {
+            "decision": "fail-closed",
+            "failure_kind": "snapshot-integrity-failed",
+            "reason": "snapshot bytes or freshness no longer match",
+            "preserve_snapshot": True,
+            "operator_decision_required": False,
+        }
+
+    try:
+        artifact_root_resolved, artifact_root_fd = _open_directory(artifact_root)
+        os.close(artifact_root_fd)
+        worktree_resolved, worktree_fd = _open_directory(worktree)
+        os.close(worktree_fd)
+    except (ContextError, OSError):
+        return {
+            "decision": "fail-closed",
+            "failure_kind": "required-read-failed",
+            "reason": "review artifact root or frozen worktree is unreadable",
+            "preserve_snapshot": True,
+            "operator_decision_required": False,
+        }
+
+    roots = (artifact_root_resolved, worktree_resolved)
+    required_resolved: set[Path] = set()
+    for artifact in required_artifacts:
+        candidate = artifact.resolve(strict=False)
+        if not _contained_by(candidate, roots):
+            return {
+                "decision": "fail-closed",
+                "failure_kind": "required-read-failed",
+                "reason": "required artifact escapes the supplied review roots",
+                "preserve_snapshot": True,
+                "operator_decision_required": False,
+            }
+        try:
+            metadata = artifact.lstat()
+            if artifact.is_symlink() or not stat.S_ISREG(metadata.st_mode):
+                raise OSError("not a regular non-symlink file")
+            descriptor = os.open(candidate, os.O_RDONLY | NOFOLLOW)
+            try:
+                os.read(descriptor, 1)
+            finally:
+                os.close(descriptor)
+        except OSError:
+            return {
+                "decision": "fail-closed",
+                "failure_kind": "required-read-failed",
+                "reason": "required supplied artifact is unreadable",
+                "preserve_snapshot": True,
+                "operator_decision_required": False,
+            }
+        required_resolved.add(candidate)
+
+    for directory in required_directories:
+        candidate = directory.resolve(strict=False)
+        if not _contained_by(candidate, roots):
+            return {
+                "decision": "fail-closed",
+                "failure_kind": "required-read-failed",
+                "reason": "required directory escapes the supplied review roots",
+                "preserve_snapshot": True,
+                "operator_decision_required": False,
+            }
+        try:
+            resolved, descriptor = _open_directory(directory)
+            os.close(descriptor)
+        except (ContextError, OSError):
+            return {
+                "decision": "fail-closed",
+                "failure_kind": "required-read-failed",
+                "reason": "required supplied directory is unreadable",
+                "preserve_snapshot": True,
+                "operator_decision_required": False,
+            }
+        required_resolved.add(resolved)
+
+    path_scope_mistake = False
+    if failed_path is not None:
+        candidate = failed_path.resolve(strict=False)
+        if candidate in required_resolved or candidate == worktree_resolved:
+            return {
+                "decision": "fail-closed",
+                "failure_kind": "required-read-failed",
+                "reason": "required supplied coordinate could not be read",
+                "preserve_snapshot": True,
+                "operator_decision_required": False,
+            }
+        if not _contained_by(candidate, (worktree_resolved,)):
+            return {
+                "decision": "fail-closed",
+                "failure_kind": "unclassified-agent-failure",
+                "reason": "failed path is outside the supplied review coordinates",
+                "preserve_snapshot": True,
+                "operator_decision_required": False,
+            }
+        if candidate.exists() or candidate.is_symlink():
+            return {
+                "decision": "fail-closed",
+                "failure_kind": "required-read-failed",
+                "reason": "verified existing worktree path could not be read",
+                "preserve_snapshot": True,
+                "operator_decision_required": False,
+            }
+        path_scope_mistake = True
+
+    missing_identity = "missing" in {reviewed_sha_status, context_hash_status}
+    if missing_identity or contract_signal != "none" or path_scope_mistake:
+        if missing_identity:
+            reason = "agent omitted a supplied identity echo"
+        elif path_scope_mistake:
+            reason = "agent attempted a nonexistent unsupplied and unverified worktree path"
+        else:
+            reason = f"agent violated contract: {contract_signal}"
+        return _classify_contract_result(role, attempt, reason)
+
+    return {
+        "decision": "fail-closed",
+        "failure_kind": "unclassified-agent-failure",
+        "reason": "agent failure did not identify an exact path or contract signal",
+        "preserve_snapshot": True,
+        "operator_decision_required": False,
+    }
+
+
+def command_classify_agent_failure(args: argparse.Namespace) -> int:
+    result = classify_agent_failure(
+        artifact_root=args.artifact_root,
+        worktree=args.worktree,
+        required_artifacts=args.required_artifact,
+        required_directories=args.required_directory,
+        failed_path=args.failed_path,
+        contract_signal=args.contract_signal,
+        reviewed_sha_status=args.reviewed_sha_status,
+        context_hash_status=args.context_hash_status,
+        snapshot_status=args.snapshot_status,
+        freshness_status=args.freshness_status,
+        role=args.role,
+        attempt=args.attempt,
+    )
+    print(json.dumps(result, sort_keys=True))
+    return 0 if result["decision"] != "fail-closed" else 30
 
 
 def command_ensure_workspaces_ignore(args: argparse.Namespace) -> int:
@@ -1402,6 +1620,39 @@ def build_parser() -> argparse.ArgumentParser:
     security_parser.add_argument("--explicit-security", action="store_true")
     security_parser.add_argument("--tier", type=int)
     security_parser.set_defaults(func=command_select_security)
+
+    recovery_parser = subparsers.add_parser("classify-agent-failure")
+    recovery_parser.add_argument("--artifact-root", required=True, type=Path)
+    recovery_parser.add_argument("--worktree", required=True, type=Path)
+    recovery_parser.add_argument(
+        "--required-artifact", action="append", required=True, type=Path
+    )
+    recovery_parser.add_argument(
+        "--required-directory", action="append", default=[], type=Path
+    )
+    recovery_parser.add_argument("--failed-path", type=Path)
+    recovery_parser.add_argument(
+        "--contract-signal",
+        choices=["none", *sorted(AGENT_CONTRACT_SIGNALS)],
+        default="none",
+    )
+    recovery_parser.add_argument(
+        "--reviewed-sha-status", choices=["match", "missing", "mismatch"], default="match"
+    )
+    recovery_parser.add_argument(
+        "--context-hash-status", choices=["match", "missing", "mismatch"], default="match"
+    )
+    recovery_parser.add_argument(
+        "--snapshot-status", choices=["match", "mismatch"], default="match"
+    )
+    recovery_parser.add_argument(
+        "--freshness-status", choices=["current", "failed"], default="current"
+    )
+    recovery_parser.add_argument(
+        "--role", choices=["general", "specialist", "consolidator"], required=True
+    )
+    recovery_parser.add_argument("--attempt", choices=[1, 2], type=int, required=True)
+    recovery_parser.set_defaults(func=command_classify_agent_failure)
 
     ignore_parser = subparsers.add_parser("ensure-workspaces-ignore")
     ignore_parser.add_argument("--repo-root", required=True, type=Path)

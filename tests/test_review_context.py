@@ -45,6 +45,304 @@ def context(**overrides):
 
 
 class ReviewContextTests(unittest.TestCase):
+    def agent_failure_fixture(self, root: Path):
+        artifacts = root / "artifacts"
+        worktree = artifacts / "pr-review-worktree"
+        artifacts.mkdir()
+        worktree.mkdir()
+        required = artifacts / "pr-review-diff.patch"
+        required.write_text("diff\n", encoding="utf-8")
+        return artifacts, worktree, required
+
+    def classify_agent_failure(self, root: Path, **overrides):
+        artifacts, worktree, required = self.agent_failure_fixture(root)
+        values = {
+            "artifact_root": artifacts,
+            "worktree": worktree,
+            "required_artifacts": [required],
+            "required_directories": [],
+            "failed_path": None,
+            "contract_signal": "none",
+            "reviewed_sha_status": "match",
+            "context_hash_status": "match",
+            "snapshot_status": "match",
+            "freshness_status": "current",
+            "role": "specialist",
+            "attempt": 1,
+        }
+        values.update(overrides)
+        return MODULE.classify_agent_failure(**values), worktree, required
+
+    def test_nonexistent_unsupplied_path_retries_without_operator_decision(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifacts, worktree, required = self.agent_failure_fixture(root)
+            result = MODULE.classify_agent_failure(
+                artifact_root=artifacts,
+                worktree=worktree,
+                required_artifacts=[required],
+                required_directories=[],
+                failed_path=(
+                    worktree
+                    / "src"
+                    / "observability"
+                    / "filters"
+                    / "exception.filter.ts"
+                ),
+                contract_signal="none",
+                reviewed_sha_status="match",
+                context_hash_status="match",
+                snapshot_status="match",
+                freshness_status="current",
+                role="specialist",
+                attempt=1,
+            )
+        self.assertEqual(result["decision"], "retry-contract")
+        self.assertEqual(result["failure_kind"], "agent-contract-invalid")
+        self.assertFalse(result["operator_decision_required"])
+        self.assertTrue(result["preserve_snapshot"])
+
+    def test_failed_path_outside_frozen_worktree_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifacts, worktree, required = self.agent_failure_fixture(root)
+            result = MODULE.classify_agent_failure(
+                artifact_root=artifacts,
+                worktree=worktree,
+                required_artifacts=[required],
+                required_directories=[],
+                failed_path=root / "agents" / "pr-review-security.md",
+                contract_signal="unverified-path-read",
+                reviewed_sha_status="match",
+                context_hash_status="match",
+                snapshot_status="match",
+                freshness_status="current",
+                role="specialist",
+                attempt=1,
+            )
+        self.assertEqual(result["decision"], "fail-closed")
+        self.assertEqual(result["failure_kind"], "unclassified-agent-failure")
+
+    def test_agent_failure_classifier_cli_emits_the_recovery_decision(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifacts, worktree, required = self.agent_failure_fixture(root)
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "classify-agent-failure",
+                    "--artifact-root",
+                    str(artifacts),
+                    "--worktree",
+                    str(worktree),
+                    "--required-artifact",
+                    str(required),
+                    "--failed-path",
+                    str(worktree / "agents" / "pr-review-security.md"),
+                    "--role",
+                    "specialist",
+                    "--attempt",
+                    "1",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        result = json.loads(completed.stdout)
+        self.assertEqual(result["decision"], "retry-contract")
+        self.assertFalse(result["operator_decision_required"])
+
+    def test_malformed_classifier_cli_cannot_authorize_recovery(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifacts, worktree, required = self.agent_failure_fixture(root)
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "classify-agent-failure",
+                    "--artifact-root",
+                    str(artifacts),
+                    "--worktree",
+                    str(worktree),
+                    "--required-artifact",
+                    str(required),
+                    "--role",
+                    "specialist",
+                    "--attempt",
+                    "3",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertNotIn("retry-contract", completed.stdout)
+
+    def test_repeated_specialist_contract_defect_forces_comment_and_continues(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifacts, worktree, required = self.agent_failure_fixture(root)
+            result = MODULE.classify_agent_failure(
+                artifact_root=artifacts,
+                worktree=worktree,
+                required_artifacts=[required],
+                required_directories=[],
+                failed_path=worktree / "agents" / "pr-review-security.md",
+                contract_signal="unverified-path-read",
+                reviewed_sha_status="match",
+                context_hash_status="match",
+                snapshot_status="match",
+                freshness_status="current",
+                role="specialist",
+                attempt=2,
+            )
+        self.assertEqual(result["decision"], "continue-comment")
+        self.assertEqual(result["forced_event"], "COMMENT")
+        self.assertIn("absent after retry", result["lens_outcome"])
+        self.assertFalse(result["operator_decision_required"])
+
+    def test_missing_supplied_identity_echo_is_auto_corrected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result, _, _ = self.classify_agent_failure(
+                Path(directory), reviewed_sha_status="missing"
+            )
+        self.assertEqual(result["decision"], "retry-contract")
+        self.assertEqual(result["failure_kind"], "agent-contract-invalid")
+
+    def test_mismatched_identity_and_failed_freshness_fail_closed(self):
+        for field, value, expected_kind in (
+            ("reviewed_sha_status", "mismatch", "snapshot-identity-failed"),
+            ("freshness_status", "failed", "snapshot-integrity-failed"),
+            ("snapshot_status", "mismatch", "snapshot-integrity-failed"),
+        ):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as directory:
+                result, _, _ = self.classify_agent_failure(
+                    Path(directory), **{field: value}
+                )
+                self.assertEqual(result["decision"], "fail-closed")
+                self.assertEqual(result["failure_kind"], expected_kind)
+
+    def test_required_artifact_and_existing_worktree_read_failures_fail_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifacts, worktree, required = self.agent_failure_fixture(root)
+            missing_required = artifacts / "pr-review-files.txt"
+            result = MODULE.classify_agent_failure(
+                artifact_root=artifacts,
+                worktree=worktree,
+                required_artifacts=[required, missing_required],
+                required_directories=[],
+                failed_path=worktree / "optional.ts",
+                contract_signal="none",
+                reviewed_sha_status="match",
+                context_hash_status="match",
+                snapshot_status="match",
+                freshness_status="current",
+                role="specialist",
+                attempt=1,
+            )
+            self.assertEqual(result["failure_kind"], "required-read-failed")
+
+            result = MODULE.classify_agent_failure(
+                artifact_root=artifacts,
+                worktree=worktree,
+                required_artifacts=[required],
+                required_directories=[],
+                failed_path=required,
+                contract_signal="unverified-path-read",
+                reviewed_sha_status="match",
+                context_hash_status="match",
+                snapshot_status="match",
+                freshness_status="current",
+                role="specialist",
+                attempt=1,
+            )
+            self.assertEqual(result["decision"], "fail-closed")
+            self.assertEqual(result["failure_kind"], "required-read-failed")
+
+            existing = worktree / "src" / "service.ts"
+            existing.parent.mkdir()
+            existing.write_text("export {};\n", encoding="utf-8")
+            result = MODULE.classify_agent_failure(
+                artifact_root=artifacts,
+                worktree=worktree,
+                required_artifacts=[required],
+                required_directories=[],
+                failed_path=existing,
+                contract_signal="none",
+                reviewed_sha_status="match",
+                context_hash_status="match",
+                snapshot_status="match",
+                freshness_status="current",
+                role="specialist",
+                attempt=1,
+            )
+        self.assertEqual(result["decision"], "fail-closed")
+        self.assertEqual(result["failure_kind"], "required-read-failed")
+
+    def test_missing_worktree_and_required_directory_fail_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifacts, worktree, required = self.agent_failure_fixture(root)
+            worktree.rmdir()
+            result = MODULE.classify_agent_failure(
+                artifact_root=artifacts,
+                worktree=worktree,
+                required_artifacts=[required],
+                required_directories=[],
+                failed_path=None,
+                contract_signal="missing-return-field",
+                reviewed_sha_status="match",
+                context_hash_status="match",
+                snapshot_status="match",
+                freshness_status="current",
+                role="specialist",
+                attempt=1,
+            )
+            self.assertEqual(result["decision"], "fail-closed")
+            self.assertEqual(result["failure_kind"], "required-read-failed")
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifacts, worktree, required = self.agent_failure_fixture(root)
+            result = MODULE.classify_agent_failure(
+                artifact_root=artifacts,
+                worktree=worktree,
+                required_artifacts=[required],
+                required_directories=[artifacts / "missing-workspace"],
+                failed_path=None,
+                contract_signal="missing-return-field",
+                reviewed_sha_status="match",
+                context_hash_status="match",
+                snapshot_status="match",
+                freshness_status="current",
+                role="specialist",
+                attempt=1,
+            )
+        self.assertEqual(result["decision"], "fail-closed")
+        self.assertEqual(result["failure_kind"], "required-read-failed")
+
+    def test_failure_without_path_or_contract_signal_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result, _, _ = self.classify_agent_failure(Path(directory))
+        self.assertEqual(result["decision"], "fail-closed")
+        self.assertEqual(result["failure_kind"], "unclassified-agent-failure")
+
+    def test_repeated_primary_contract_defect_does_not_fabricate_a_draft(self):
+        for role in ("general", "consolidator"):
+            with self.subTest(role=role), tempfile.TemporaryDirectory() as directory:
+                result, _, _ = self.classify_agent_failure(
+                    Path(directory),
+                    contract_signal="missing-return-field",
+                    role=role,
+                    attempt=2,
+                )
+                self.assertEqual(result["decision"], "fail-closed")
+                self.assertEqual(result["failure_kind"], "canonical-draft-unavailable")
+                self.assertFalse(result["operator_decision_required"])
+
     def test_snapshot_repo_avoids_writes_to_read_only_source_git_dir(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
