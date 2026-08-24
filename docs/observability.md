@@ -382,8 +382,8 @@ Written by `hooks/ts/dist/precompact-snapshot.cjs` (PreCompact event, matcher
 `manual|auto`). Appended to when the hook successfully snapshots `00-state.md`
 before context compaction. The file sits in the same directory as the snapshot:
 
-- **local mode:** `workspaces/{feature}/00-precompact.jsonl`
-- **obsidian mode:** `{logs-path}/{logs-subfolder}/{date}_{feature}/00-precompact.jsonl`
+- **local mode:** `{persisted workspace_identity.coordinator_root}/00-precompact.jsonl`
+- **obsidian mode:** `{persisted workspace_identity.coordinator_root}/00-precompact.jsonl`
 
 Line schema:
 ```json
@@ -424,6 +424,7 @@ maintains a parent-level `overview.md` at the initiative root. This file is
 **not an events file** and does not contain pipeline observability data. It is
 a living index — one row per project, updated by the coordinator at intake and
 again after its own Phase-4 mechanics resolve branch, version, PR, and status.
+It shares the one coordinator root with `00-state.md` and the lifecycle stream.
 
 **What it is:**
 - A snapshot of the current state of the initiative (project rows with branch /
@@ -433,8 +434,8 @@ again after its own Phase-4 mechanics resolve branch, version, PR, and status.
 
 **What it is NOT:**
 - Not an execution-events file. No JSONL. No `phase.*` or `operation.*` events.
-- Not a replacement for `00-state.md` or `00-execution-events.*`. Those per-project
-  files remain the per-project observability record.
+- Not a replacement for coordinator-root `00-state.md` or
+  `00-execution-events.*`. Service folders hold evidence, not competing state.
 - Not subject to the mandatory observability invariant (CLAUDE.md §5 "Pipeline
   observability is mandatory") — that invariant governs `00-execution-events.*`
   only. `overview.md` writes are **best-effort** and a write failure never
@@ -446,7 +447,7 @@ again after its own Phase-4 mechanics resolve branch, version, PR, and status.
 
 Full template and section-ownership map: `agents/ref-dispatch-machinery.md § "overview.md — you are the sole writer"`.
 
-## Initiative-level trace (serial multi-project sequencing)
+## Initiative-level trace (serial multi-service sequencing)
 
 **No parallel coordinator fan-out exists.** The coordinator fusion retires the multi-task
 fan-out with its consolidator and the parallel multi-project dispatch that spawned one
@@ -458,9 +459,8 @@ inside the same agent before the next one starts. The `00-leader-roster.md` file
 event family, and the two-tier `leader-recover`/`orchestrator-recover` split below all lose their
 subject with that retirement — nothing replaces them.
 
-When `initiative` is set, an **initiative-level** `00-execution-events` file is written in
-addition to each project's per-project trace, so `/trace` and `/th:pipelines` can render the
-grouping:
+When `initiative` is set, its coordinator-root `00-execution-events` file is
+the sole lifecycle stream so `/trace` and `/th:pipelines` can render grouping:
 
 **Location:**
 - Obsidian: `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/00-execution-events.md`
@@ -470,16 +470,21 @@ grouping:
 
 | Event | Fields | When emitted |
 |-------|--------|--------------|
-| `initiative.start` | `initiative`, `eligible_projects[]` | Before the first project's Stage 1 begins |
-| `project.start` | `project`, `initiative` | When a project's own pipeline begins |
-| `project.end` | `project`, `initiative`, `status` (success/failed/iterating) | When a project's pipeline completes or is blocked |
-| `initiative.converge` | `initiative`, `projects[]` (project + status per project) | When every eligible project has run |
+| `initiative.start` | `initiative`, `eligible_services[]` | Before the first service's Stage 1 begins |
+| `service.start` | `service`, `initiative` | When a service's own pipeline begins |
+| `service.end` | `service`, `initiative`, `status` (success/failed/iterating) | When a service's pipeline completes or is blocked |
+| `initiative.converge` | `initiative`, `services[]` (service + status per service) | When every eligible service has run |
 
-Each event carries a `project` key so `/trace` can group events by project.
+Each service-scoped event carries a `service` key so `/trace` can group events by service.
 
-**Per-project traces are unchanged.** Each project continues writing its own `{project}/00-execution-events.*` file with its per-phase `phase.start` / `phase.end` / `gate.*` events exactly as today. The initiative-level file is additive — it carries only initiative lifecycle events, not per-phase detail.
+Service-scoped `phase.*` and agent events carry a `service` key in this same
+stream. Service directories may contain validation evidence but never a second
+gate stream. One consolidated Gate-1 event binds the ordered OpenSpec aggregate.
 
-**`/th:pipelines` and `/trace` rendering.** Both read the coordinator's own `00-state.md § Current State` per project (there is no separate roster to read) plus the initiative-level lifecycle events above, and render the initiative as a parent row with each project as a child row (`Stage` / `Phase` / `Status`). Because execution is serial, at most one project is ever "running" at a time — there is no parallel-region rendering to reconcile.
+**`/th:pipelines` and `/trace` rendering.** Both read the one coordinator
+`00-state.md § Current State`, its persisted workspace identity and ordered
+bindings, plus the lifecycle events above. They render the initiative as a
+parent with service children. Execution is serial, so at most one service runs.
 
 **Mandatory + additive, not mandatory for single-project runs.** The initiative-level `00-execution-events` file is only written when `initiative` is set. Single-project runs (`initiative: null`) do not produce this file.
 

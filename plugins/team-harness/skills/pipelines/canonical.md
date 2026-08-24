@@ -6,9 +6,10 @@ field, or changes `00-state.md`. The coordinator is the sole writer of coordinat
 
 ## Scan
 
-1. Resolve the configured local or Obsidian logs root.
-2. Find `*/00-state.md` files, including active worktrees when available.
-3. Parse the literal v3 fields `pipeline_version`, `phase`, `status`, `gate_pending`,
+1. Resolve candidate roots with packaged `workspace-identity.mjs`; use persisted
+   identities and never synthesize today's path or merge local/Obsidian copies.
+2. Find coordinator-root `00-state.md` files, including active worktrees when available.
+3. Parse the literal v4 fields `pipeline_version`, `workspace_identity`, `phase`, `status`, `gate_pending`,
    `iteration`, `next_action`, and the last-updated coordinate. There is no lane or profile
    field. Read gate release fields directly; never infer a release.
 4. Read `git worktree list --porcelain` and, when available, `tmux list-sessions` to classify
@@ -18,7 +19,7 @@ field, or changes `00-state.md`. The coordinator is the sole writer of coordinat
 
 ## Named machine
 
-Every pipeline follows exactly this v3 sequence; there is no alternate depth profile:
+Every new pipeline follows exactly this v4 sequence; v3 remains read-only compatible:
 
 ```text
 design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete
@@ -102,13 +103,15 @@ pipeline`; never reinterpret a historical value as a new state, posture, or rele
 
 ## Direct-mode and initiative handling
 
-Direct modes do not create a pipeline state and are absent from this table. An initiative may
-have an additive parent event file, but each project row comes from that project's own
-`00-state.md`. Projects are serialized; there is no parallel coordinator roster to render.
+Direct modes do not create pipeline state and are absent from this table. An
+initiative has one coordinator-root state and event file. Render its ordered
+service bindings as children from `openspec_bindings`; do not search service
+folders for competing state. Services execute serially and there is no parallel
+coordinator roster.
 
 ## Empty and malformed input
 
 - No state files: `No active pipelines.`
 - Folder without state: omit it or report `untracked direct artifact` when its mode is known.
-- Missing required v3 fields: report `state incomplete` with the path; do not repair it.
+- Missing required v4 fields (or historical v3 fields): report `state incomplete` with the path; do not repair it.
 - Unparseable events: report the state row and identify the trace as unavailable; do not rewrite it.

@@ -18,20 +18,22 @@ chat replies, status blocks, error messages, and self-corrections alike.
 ```
 
 Parse `$ARGUMENTS`:
-- Positional: feature name (kebab-case, matches the `workspaces/{feature}/` folder).
+- Positional: feature or initiative name (kebab-case, matched against persisted workspace identity).
 - Optional flag: one of `--jsonl`, `--tools`, `--fails`, `--tokens` (`--cost` is accepted
   as a legacy alias for `--tokens`).
 
 If `$ARGUMENTS` is empty or just whitespace, print the usage block above and exit cleanly.
 
-**Step 0 — Resolve workspaces path.** For the legacy Claude branch, read
-`~/.claude/.team-harness.json`. If it exists and `logs-mode` is `"obsidian"`,
-use `{logs-path}/{logs-subfolder}/{repo-name}` as the base path (where
-`repo-name` is the basename of the current working directory). If `logs-mode`
-is `"local"` or the file is missing, use `workspaces/` (relative to cwd).
-Replace all `workspaces/{feature-name}` references below with
-`{resolved-path}/{feature-name}`. A selected Native Codex branch follows its
-runtime adapter's native configuration rule without changing this legacy path.
+**Step 0 — Resolve the persisted workspace identity.** Read the active runtime's
+Team Harness config and use packaged `workspace-identity.mjs` discovery. Match
+direct children by the literal `feature`/`initiative` identity in
+`inputs/workspace-identity.json`, not by appending an unchecked name or assuming
+today's date. Local single runs are below `{repo}/workspaces`; Obsidian single
+runs are below `{logs-path}/{logs-subfolder}/{repo-name}`; initiative roots use
+the exact canonical formula stored in the identity. If more than one candidate
+matches, report ambiguity without choosing by mtime. Replace all
+`workspaces/{feature-name}` examples below with the discovered absolute
+workspace. Never create, migrate, or fall back between local and Obsidian roots.
 
 ## File locations
 
@@ -450,14 +452,14 @@ unavailable, not a fallback to the legacy token count.
    `00-execution-events` trace at the initiative root — detect the `.md` variant
    first (Glob), then `.jsonl`, applying the same fence-extraction used by every
    other mode (source paths and derivation in "Initiative region rendering
-   (serial multi-project sequencing)" below). Filter to `initiative.start` /
-   `project.start` / `project.end` / `initiative.converge` events; when an
-   `initiative.start` is present, sum token counts across all projects' own
-   `{project}/00-execution-events.*` files (each project keeps its full
-   per-phase trace) to produce one initiative-level token figure, appended below
+   (serial multi-service sequencing)" below). Filter to `initiative.start` /
+   `service.start` / `service.end` / `initiative.converge` plus service-scoped
+   `phase.end` events; when an `initiative.start` is present, sum non-overlapping
+   usage from the one coordinator stream, grouped by its required `service`
+   field, to produce one initiative-level token figure, appended below
    the per-feature token table with the header
-   `Initiative token rollup — {initiative}`. This is a pure read of each
-   project's OWN events file — it never writes to any project's events file or
+   `Initiative token rollup — {initiative}`. This is a pure read of the
+   coordinator stream — it never writes service evidence, events, or
    `00-state.md` and never touches the gate seam.
    **Fail-soft:** no `initiative` field, no initiative-level events file, or a
    read/parse error → omit the rollup silently; the per-feature token output is
@@ -502,13 +504,13 @@ or convert currency. These restrictions apply only to this selected Native
 Codex branch.
 
 **Native initiative rollup (reader-only).** Apply the same native branch to
-every child trace. Any unavailable child delta makes the native initiative
-total unavailable; absent exact quotes render `Cost: unavailable`. Never form
-a plausible partial subtotal.
+every service-scoped delta in the coordinator stream. Any unavailable service
+delta makes the native initiative total unavailable; absent exact quotes render
+`Cost: unavailable`. Never form a plausible partial subtotal.
 
-## Initiative region rendering (serial multi-project sequencing)
+## Initiative region rendering (serial multi-service sequencing)
 
-**When rendered:** in default mode (no flag), after the `00-pipeline-summary.md` printout, when the feature's `00-state.md` declares `initiative: {name}` and an initiative-level `00-execution-events` file exists (`docs/observability.md § "Initiative-level trace (serial multi-project sequencing)"`). No new flag — this is additive output on the existing default-mode invocation.
+**When rendered:** in default mode (no flag), after the `00-pipeline-summary.md` printout, when the feature's `00-state.md` declares `initiative: {name}` and an initiative-level `00-execution-events` file exists (`docs/observability.md § "Initiative-level trace (serial multi-service sequencing)"`). No new flag — this is additive output on the existing default-mode invocation.
 
 **Source:** the initiative-level file lives at the initiative root, not inside `workspaces/{feature-name}/`:
 ```text
@@ -517,33 +519,34 @@ a plausible partial subtotal.
 ```
 Detect the `.md` variant first (Glob), then `.jsonl`, applying the same fence-extraction as every other mode above.
 
-The initiative-level lifecycle events are written by the **orchestrator** — the same coordinator that runs every project's own pipeline, one project at a time, to completion (`agents/ref-dispatch-machinery.md § Multi-project sequencing`; `docs/observability.md § "Initiative-level trace (serial multi-project sequencing)"`). There is no separate roster and no parallel fan-out to enumerate.
+The initiative-level lifecycle events are written by the **orchestrator** — the same coordinator that runs every bound service, one service at a time, to completion (`agents/ref-dispatch-machinery.md § Multi-project sequencing`; `docs/observability.md § "Initiative-level trace (serial multi-service sequencing)"`). There is no separate roster, child event stream, or parallel fan-out to enumerate.
 
-**Derivation.** Filter to `initiative.start` / `project.start` / `project.end` / `initiative.converge` events. `initiative.start` carries `eligible_projects[]`. A `project.start` with no matching `project.end` for the same `project` is the currently running project — because execution is serial, at most one project is ever running at a time. A paired `project.start`/`project.end` is closed, with `project.end.status` (`success`/`failed`/`iterating`) as its outcome. `initiative.converge` marks that every eligible project has run, with its `projects[]` array as the authoritative per-project final status.
+**Derivation.** Filter to `initiative.start` / `service.start` / `service.end` / `initiative.converge` events. `initiative.start` carries `eligible_services[]`. A `service.start` with no matching `service.end` for the same `service` is the currently running service — because execution is serial, at most one service is ever running at a time. A paired `service.start`/`service.end` is closed, with `service.end.status` (`success`/`failed`/`iterating`) as its outcome. `initiative.converge` marks that every eligible service has run, with its `services[]` array as the authoritative per-service final status.
 
-**Gate values are read directly from each project's own `00-state.md`,** never from a roster or any advisory field: `gate1_release` / `gate3_release` come straight from that project's own state file.
+**Gate values are read directly from the coordinator `00-state.md`,** never from a service folder, roster, or advisory field. Gate 1 is consolidated and has no child release; Gate 3 remains the single coordinator release.
 
 **Render:**
 ```text
-Initiative — {initiative}  (serial — at most one project running at a time)
+Initiative — {initiative}  (serial — at most one service running at a time)
 =============================
-initiative.start  {ts}  eligible: {eligible_projects joined by ", "}
+initiative.start  {ts}  eligible: {eligible_services joined by ", "}
+gate: {gate1_release|gate3_release|—}
 
-  {project-a}   {ts_start} → {ts_end | "running"}   {status}   gate: {gate1_release|gate3_release|—}
-  {project-b}   {ts_start} → {ts_end | "not started"}   —   gate: —
+  {service-a}   {ts_start} → {ts_end | "running"}   {status}
+  {service-b}   {ts_start} → {ts_end | "not started"}   —
 
-initiative.converge  {ts | "(not yet — projects still pending)"}
+initiative.converge  {ts | "(not yet — services still pending)"}
 ```
 
-Projects render in `eligible_projects[]` order (not start-time order), so the same project always occupies the same row across repeated invocations while the initiative is in progress.
+Services render in `eligible_services[]` order (not start-time order), so the same service always occupies the same row across repeated invocations while the initiative is in progress.
 
-**Legacy Claude selection.** When no child trace has a selected native `usage` object, retain this existing rollup unchanged.
+**Legacy Claude selection.** When no service-scoped coordinator event has a selected native `usage` object, retain this existing rollup unchanged.
 
-**`--tokens` interaction (reader-only rollup).** Executed by `--tokens` mode step 4 above — the initiative-level trace is resolved during `--tokens` execution, not only default-mode rendering. When an `initiative.start` is present, `--tokens` sums token counts across all projects' own `{project}/00-execution-events.*` files (each project keeps its full per-phase trace) to produce one initiative-level token figure, appended below the per-feature token table with the header `Initiative token rollup — {initiative}`. This is a pure read of each project's OWN events file — it never writes to any project's events file or `00-state.md` and never touches the gate seam.
+**`--tokens` interaction (reader-only rollup).** Executed by `--tokens` mode step 4 above — the initiative-level trace is resolved during `--tokens` execution, not only default-mode rendering. When an `initiative.start` is present, `--tokens` sums non-overlapping service-scoped `phase.end` usage in the one coordinator stream to produce one initiative-level token figure, appended below the per-feature token table with the header `Initiative token rollup — {initiative}`. It never reads or writes a child event stream, service evidence, or gate state.
 
-**Native selection.** If any child trace is selected by a `phase.end` object
+**Native selection.** If any service-scoped coordinator `phase.end` is selected by an object
 with `usage.kind: codex_usage_delta`, apply the Native Codex branch to every
-child instead. A missing/unavailable native delta makes initiative tokens
+service instead. A missing/unavailable native delta makes initiative tokens
 unavailable, and absent exact current USD provenance renders
 `Cost: unavailable`; never emit a plausible partial subtotal.
 

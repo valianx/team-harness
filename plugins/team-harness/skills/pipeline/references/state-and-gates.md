@@ -2,15 +2,15 @@
 
 ## One machine
 
-New pipelines write `pipeline_version: 3` and use exactly this sequence:
+New pipelines write `pipeline_version: 4` and use exactly this sequence:
 
 ```text
 design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete
 ```
 
-The durable snapshot records `pipeline_version: 3` and `plan_format: sharded-v1`.
+The durable snapshot records `pipeline_version: 4` and `plan_format: sharded-v1`.
 
-Every activated run uses this canonical v3 machine; there is no alternate depth
+Every activated run uses this canonical v4 machine; there is no alternate depth
 profile or route selector. The only postures are inline and pipeline. Direct
 inline work never enters this machine and
 never writes pipeline state. A live operator-requested tester, QA, security, or
@@ -47,7 +47,8 @@ report artifacts; they never write state, releases, nonces, or gate events and
 never speak for the operator. Write `next_action` before every dispatch and
 record its result before advancing. Preserve unrelated changes.
 
-The absolute `workspace` selected directly by `logs_mode` and the effective
+The absolute `workspace_identity.coordinator_root` selected directly by
+`workspace_identity.logs_mode` and the effective
 mode become immutable identity at the first state write. Every
 artifact and event for that run stays below that one canonical root. A
 permission failure, restart, recovery, or configured-root change never
@@ -59,16 +60,16 @@ Keep a replaceable snapshot with these stable fields (narrative belongs in the
 events file):
 
 ```text
-pipeline_version: 3
+pipeline_version: 4
 plan_format: sharded-v1
-openspec_change: {kebab-case change|null}
-openspec_repository_root: {absolute repository root|null}
 openspec_preflight: pending|ready|provisionable|blocked-prerequisite|invalid-project|null
 openspec_design_pass: preflight|provisioning|planning|snapshot|overlay|gate1-ready|null
-openspec_snapshot_path: inputs/openspec-snapshot.json|null
-openspec_snapshot_sha256: {SHA-256|null}
-openspec_overlay_path: plan/openspec-traceability.json|null
-openspec_overlay_sha256: {SHA-256|null}
+workspace_identity: {schema_version, kind, workspace_kind, logs_mode, coordinator_root, repo_base, date, feature, initiative, services, evidence_repositories}
+openspec_bindings: [{service, role, repository_root, repository_identity, change_name, planning_root, schema, cli_version, generated_skill_identity, task_intent_sha256, strict_validation, preflight, design_pass, snapshot_path, snapshot_sha256, overlay_path, overlay_sha256}]
+evidence_repositories: [{service, role: evidence-only, repository_root, repository_identity, purpose}]
+openspec_aggregate_path: inputs/openspec-bindings.json|null
+openspec_aggregate_sha256: {SHA-256|null}
+herdr_deliveries: [{message_id, target, pane_id, status, reason_code, staged, submitted, verified}]
 activation: explicit
 type: feature|fix|refactor|hotfix|enhancement
 feature: {kebab-case slug}

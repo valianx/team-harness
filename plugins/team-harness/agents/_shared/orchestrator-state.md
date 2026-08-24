@@ -13,16 +13,16 @@ Everything in this file is written by the orchestrator and by nothing else. No s
 Where a field's semantics are defined elsewhere, this schema names the home and stops. It does not restate the rule.
 
 ```
-pipeline_version: 3
+pipeline_version: 4
 plan_format: sharded-v1             # lifecycle metadata; not a posture or route selector
-openspec_change: {kebab-case change|null}
-openspec_repository_root: {absolute repository root|null}
 openspec_preflight: pending|ready|provisionable|blocked-prerequisite|invalid-project|null
 openspec_design_pass: preflight|provisioning|planning|snapshot|overlay|gate1-ready|null
-openspec_snapshot_path: inputs/openspec-snapshot.json|null
-openspec_snapshot_sha256: {SHA-256|null}
-openspec_overlay_path: plan/openspec-traceability.json|null
-openspec_overlay_sha256: {SHA-256|null}
+workspace_identity: {schema_version, kind, workspace_kind, logs_mode, coordinator_root, repo_base, date, feature, initiative, services, evidence_repositories}
+openspec_bindings: [{service, role, repository_root, repository_identity, change_name, planning_root, schema, cli_version, generated_skill_identity, task_intent_sha256, strict_validation, preflight, design_pass, snapshot_path, snapshot_sha256, overlay_path, overlay_sha256}]
+evidence_repositories: [{service, role: evidence-only, repository_root, repository_identity, purpose}]
+openspec_aggregate_path: inputs/openspec-bindings.json|null
+openspec_aggregate_sha256: {SHA-256|null}
+herdr_deliveries: [{message_id, target, pane_id, status, reason_code, staged, submitted, verified}]
 quality_manifest_path: {absolute workspace-local path|null}
 quality_manifest_sha256: {SHA-256|null}
 type: feature|fix|refactor|hotfix|enhancement
@@ -152,9 +152,9 @@ even when it differs from the derived autonomous counter; it is
 non-authoritative. Legacy fields never reject or limit a fresh operator-live
 presentation.
 
-The seven named states above are the only legal v3 pipeline sequence. `inline` is a
-pre-activation direct-mode outcome and is never a v3 state or field value. Every activated
-pipeline uses this same v3 machine and both gates; there is no depth profile. An activated
+The seven named states above are the only legal v4 pipeline sequence. `inline` is a
+pre-activation direct-mode outcome and is never a v4 state or field value. Every activated
+pipeline uses this same v4 machine and both gates; there is no depth profile. An activated
 pipeline cannot execute direct work in place. A current live explicit `inline` request
 closes the run administratively by setting `phase: aborted` and `status: aborted`, clearing
 any pending gate, and writing no gate release; only then may the new direct request run,
@@ -165,11 +165,18 @@ setup, reconciliation, hygiene, evidence and Freeze) are trace
 details inside `implementation`; acceptance is a trace detail inside `validation`. They
 must never be persisted as additional machine phases.
 
+`herdr_deliveries` is coordinator-owned durable transaction state. Persist each
+adapter result, including its `message_id` and status, before recovery or retry.
+`pending-busy`, `staged-not-submitted`, and `submitted-unverified` remain pending
+and never authorize a resend. Retry the same logical message only after a bounded
+`herdr agent read` proves that the prior `message_id` was not submitted; otherwise
+inspect or continue waiting without duplicating delivery.
+
 **Compatibility note.** A legacy snapshot (including v2 numeric/named phases, a legacy
 `lane: express|full` field, profile flags, fast/simple markers, or tier markers) is not
 mapped silently. Recovery stops and presents the live choices `1 — inline` or `2 — pipeline`.
 `inline` closes the old run administratively and continues outside this machine. `pipeline`
-allows the orchestrator's first legitimate write to migrate the snapshot to v3, atomically
+allows the orchestrator's first legitimate write to migrate the snapshot to v4, atomically
 writing the schema/version marker and mapped phase with `state.migrated`. That write
 preserves every valid dual-record gate field, release decision, pending or consumed nonce,
 checklist mark, and historical event; it never synthesizes a gate release or repairs a malformed or

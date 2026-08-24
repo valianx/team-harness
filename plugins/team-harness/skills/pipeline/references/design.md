@@ -6,22 +6,27 @@ The active pipeline uses one named machine:
 design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete
 ```
 
-Every activated run uses this full v3 machine. There is no alternate depth profile, fast/simple
+Every activated run uses this full v4 machine. There is no alternate depth profile, fast/simple
 route, or lane selector; direct inline work remains outside the machine and creates no pipeline
 workspace, state, events, gates, validation, or delivery record.
 
 ## Canonical OpenSpec Design transaction
 
-Every newly activated workspace binds one kebab-case OpenSpec change in the target repository;
-existing approved or frozen legacy workspaces continue their recorded contract and are never
-silently migrated. Resolve `scripts/openspec-adapter.mjs` and
-`scripts/openspec-snapshot.mjs` relative to this loaded pipeline skill. They are the only
+Every writable owning service in a newly activated workspace binds one kebab-case
+OpenSpec change in that service's repository. A single-repository run has one
+binding; an initiative has an ordered binding set. The coordinator repository
+is never a synthetic specification owner, and evidence-only repositories have
+a typed disposition but no change, writable scope, or acceptance coordinates.
+Existing approved or frozen legacy workspaces continue their recorded contract
+without migration. Resolve `scripts/openspec-adapter.mjs`,
+`scripts/openspec-snapshot.mjs`, and `scripts/openspec-bindings.mjs` relative to
+this loaded pipeline skill. They are the only
 deterministic OpenSpec helpers; OpenSpec's installed generated skills remain the planning
 workflow authority.
 
 Run the transaction continuously:
 
-1. Invoke adapter `preflight` for the repository and active runtime. `ready` continues without
+1. Invoke adapter `preflight` for every writable owning repository and active runtime. `ready` continues without
    operator interaction. `PROJECT_UNINITIALIZED` invokes adapter `initialize` automatically;
    repository initialization is an in-scope pipeline operation, not an operator gate. When that
    operation returns `INIT_SANDBOX_DENIED`, retry the exact fixed `openspec init --tools
@@ -32,19 +37,20 @@ Run the transaction continuously:
    diagnostic must be surfaced. Other `provisionable` states present one exact pinned CLI
    install/update-or-abort decision; `blocked-prerequisite` gives exact Node/npm guidance;
    `invalid-project` blocks. Never fall back to legacy planning.
-2. Persist the repository planning root and change binding. Dispatch a fresh architect in
-   `openspec-planning` mode (the single reasoning pass) with the approved request and the exact installed
+2. Persist the ordered service/repository/change bindings. Dispatch bounded architect work in
+   `openspec-planning` mode per writable service with the approved request, cross-service
+   dependencies, and the exact installed
    `openspec-propose` skill for a new change or `openspec-update-change` for a bound existing
    change. The architect follows the upstream skill and writes only
-   proposal/specs/design/tasks under that change root, carrying every judgment call (routing,
+   proposal/specs/design/tasks under that service's change root, carrying every judgment call (routing,
    scope decomposition, invariants) into it; it writes no TH plan or coordination state. Include
    only the bounded task and artifact coordinates it needs.
 3. Run CLI-reported status and strict validation through `openspec-snapshot.mjs capture`; it
-   writes the sole `inputs/openspec-snapshot.json`. A binding, path, coordinate, validation, or
+   writes `inputs/openspec/<service>/snapshot.json` per binding. A binding, path, coordinate, validation, or
    hash failure remains recoverably in Design.
-4. Once that snapshot validates, run `scripts/openspec-overlay.mjs derive` directly with the
+4. Once every snapshot validates, run `scripts/openspec-overlay.mjs derive` per service with its
    snapshot and pinned OpenSpec coordinates — a mechanical projection, never a second architect
-   dispatch. It writes only the compact Gate-1 index, operational execution shards, and
+   dispatch. It writes the service's compact Gate-1 index, operational execution shards, and
    bidirectional traceability. It must not paraphrase or replace OpenSpec intent. Pass the
    effective absolute `writable_roots`; require every planned worktree to be contained by one.
    Each task shard's literal `required_invariants`, `required_evidence_anchors`, and
@@ -59,8 +65,12 @@ Run the transaction continuously:
    the first dispatch. The resulting self-contained installation must remain below that worktree; a
    `node_modules` symlink to another checkout is not dependency readiness and must not be proposed
    as setup.
-5. Validate snapshot freshness, overlay traceability, and applicable operational plan fields,
-   then present the unchanged Stage Gate 1.
+5. Build `inputs/openspec-bindings.json` with verified repository identities,
+   ordered writable bindings, evidence-only dispositions, dependencies,
+   execution order, and child hashes. Validate every child plus aggregate
+   freshness, then present one consolidated Stage Gate 1. An unreadable supplied
+   artifact, stale child, identity mismatch, or membership/role/order/dependency
+   drift blocks the aggregate. Optional uninvented context is never opened.
 
 Success at any internal step, including initialization and its single protected-path retry,
 advances automatically. Commentary is informational and never asks
@@ -68,11 +78,12 @@ the operator to invoke another TH or OpenSpec command. Pause only for the mandat
 explicit provisioning choice, a material unresolved decision, separate external-write authority,
 or a real blocker that cannot be resolved safely within scope.
 
-OpenSpec proposal, specs, design, and tasks always remain under the bound repository planning
-root. The snapshot, overlay, decisions, reviews, and evidence always remain under the configured
+OpenSpec proposal, specs, design, and tasks always remain under each owning service's repository planning
+root. Snapshots, overlays, the aggregate, decisions, reviews, and evidence always remain under the configured
 TH workspace root. For `logs_mode: obsidian`, snapshot metadata records `workspace.mode:
 obsidian`, the vault workspace root, and `navigation_kind: repository-relative-coordinates`;
-artifact paths, line coordinates, and captured hashes navigate to the repository originals. Never
+artifact paths, line coordinates, and captured hashes navigate to the repository originals. In
+Obsidian mode this is the only TH coordination workspace; no local duplicate exists. Never
 copy canonical OpenSpec Markdown into the vault or create an editable second source root there.
 
 Read `plan-shards.md` before the planning dispatch. Read the live operator request, repository
@@ -100,11 +111,11 @@ and record `size_reason: required-items`; never omit scope or request a split so
 primary thread does not set `next_action: present Stage Gate 1` until the
 deterministic plan evidence below passes.
 
-Before the gate, resolve `scripts/plan-contract.mjs` and
+Before the gate, resolve `scripts/plan-contract.mjs`, `scripts/openspec-bindings.mjs`, and
 `scripts/openspec-events.mjs` relative to the loaded
-pipeline skill. For an OpenSpec-bound run invoke `scripts/plan-contract.mjs` with `--workspace`,
-`--plan 01-plan.md`, `--snapshot inputs/openspec-snapshot.json`, and
-`--traceability plan/openspec-traceability.json`, plus one exact
+pipeline skill. For every OpenSpec binding invoke `scripts/plan-contract.mjs` with `--workspace`,
+the service plan, `--snapshot inputs/openspec/<service>/snapshot.json`, and
+`--traceability plan/openspec/<service>/traceability.json`, plus one exact
 `--writable-root` argument per effective sandbox root. Persist the complete JSON, its
 SHA-256, and the returned `kind: team_harness_openspec_overlay_validation`,
 `snapshot_sha256`, `overlay_sha256`, and `change_name` as
@@ -117,7 +128,7 @@ falls through to the legacy functional-plan contract or invokes
 `scripts/plan-contract-repair.mjs`.
 
 Then invoke `openspec-events.mjs` with `--workspace`, the state's exact
-`--events` path, and `--feature`. It must return
+`--events` path, `--feature`, and explicit `--service` for each binding. It must return
 `kind: team_harness_openspec_execution_events_validation` and `verdict: pass`
 before Gate 1. Malformed telemetry, missing `ts`/`feature`, a non-canonical
 architect `task` or status, and a missing observation are warnings: ignore
@@ -186,7 +197,7 @@ implementation entry.
 
 ## STAGE-GATE-1
 
-Present the gate from the validated functional contract rather than copying
+Present the gate from the validated aggregate functional contract rather than copying
 workspace prose. In at most 12 non-empty lines before required exceptions,
 state the observable delta, principal actor/flow, representative rule/example,
 alternate/error behavior, unchanged behavior, non-goals, open decisions,
@@ -201,6 +212,10 @@ do not infer approval from the task source.
 
 On success, set `phase: waiting_gate1`, `status: waiting_for_gate`, a fresh `gate_nonce`, and
 `next_action: record Gate 1 decision`. Record the result/event and remain the sole state writer.
+The presentation and release event bind the nonce to the exact
+`openspec_aggregate_sha256` and ordered service identities. One approval
+authorizes the recorded serial service order; service children cannot present
+or consume a second Gate-1 nonce.
 Show stable numeric options:
 
 ```text

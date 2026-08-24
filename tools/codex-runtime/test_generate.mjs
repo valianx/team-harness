@@ -212,8 +212,31 @@ const pipelineIdentityDocs = await Promise.all([
   readFile(join(root, "plugins/team-harness/skills/pipeline/SKILL.md"), "utf8"),
   readFile(join(root, "plugins/team-harness/skills/pipeline/references/activation.md"), "utf8"),
 ]);
-assert.match(pipelineIdentityDocs[1], /`obsidian`: `\{logs-path\}\/\{logs-subfolder\}\/\{repo-name\}\/\{feature\}\//,
+assert.match(pipelineIdentityDocs[1], /`obsidian`, single repository: `\{logs-path\}\/\{logs-subfolder\}\/\{repo-name\}\/\{YYYY-MM-DD\}_\{feature\}`/,
   "Codex pipeline does not select the configured Obsidian vault as canonical workspace");
+assert.match(pipelineIdentityDocs[1], /`obsidian`, initiative: `\{logs-path\}\/\{logs-subfolder\}\/\{repo_base\}\/\{YYYY-MM-DD\}_\{initiative\}`/,
+  "Codex pipeline does not use the canonical dated initiative identity");
+assert.match(pipelineIdentityDocs[1], /do not create, copy, export, or reconcile\s+a local `workspaces\/` duplicate/,
+  "Codex pipeline does not prohibit an Obsidian/local duplicate");
+assert.match(await readFile(join(root, "plugins/team-harness/skills/pipeline/references/state-and-gates.md"), "utf8"),
+  /pipeline_version: 4[\s\S]*openspec_bindings:[\s\S]*openspec_aggregate_sha256:/,
+  "Codex pipeline new-run state is not the v4 aggregate contract");
+for (const script of ["workspace-identity.mjs", "openspec-bindings.mjs", "herdr-message.mjs"]) {
+  const source = await readFile(join(root, "skills/pipeline/scripts", script), "utf8");
+  const projected = await readFile(join(root, "plugins/team-harness/skills/pipeline/scripts", script), "utf8");
+  assert.equal(projected, source, `${script} generated projection is stale`);
+}
+const herdrReference = await readFile(join(root, "plugins/team-harness/agents/_shared/herdr-agent-messaging.md"), "utf8");
+for (const marker of ["herdr agent list", "herdr agent send", "herdr pane send-keys", "herdr agent read", "submitted-unverified"]) {
+  assert.ok(herdrReference.includes(marker), `HerdR projection misses ${marker}`);
+}
+for (const workflow of ["tmux", "background"]) {
+  const canonical = await readFile(join(root, `plugins/team-harness/skills/${workflow}/canonical.md`), "utf8");
+  assert.match(canonical, /herdr-agent-messaging\.md/,
+    `${workflow} does not route HerdR messaging through the shared contract`);
+  assert.match(canonical, /submitted-unverified/,
+    `${workflow} permits an unverifiable HerdR submission to disappear`);
+}
 assert.doesNotMatch(pipelineIdentityDocs[1], /obsidian-direct/,
   "Codex pipeline retains the retired obsidian-direct mode");
 const standardPipelineMatrix = {
