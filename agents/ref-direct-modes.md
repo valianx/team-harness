@@ -527,9 +527,12 @@ SHA/hash values in every inline return. After strict worktree and artifact-root 
 coordinator persists each return at the skill's fixed path; agents never choose paths.
 
 Every non-`none` supplied artifact is required for its invocation. Agent instruction-source and
-semantic-source markers are metadata, not project paths. A reviewer may open another project leaf
-only after an exact existence check proves it is a regular repo-contained file in the frozen
-worktree; nonexistent inferred, conventional, unresolved-import, or optional paths are skipped.
+semantic-source markers are metadata, not project paths. Changed-files membership only nominates a
+candidate: before any project content read, prove that the exact repo-relative path exists as a
+non-symlink regular file and that its resolved path remains inside the frozen worktree. A deleted
+changed-file path is evidence from `Diff Path` only and is never read from the head worktree. Apply
+the same proof to directly affected and cited paths; if it cannot be established, skip the path.
+Nonexistent inferred, conventional, unresolved-import, or optional paths are also skipped.
 Classify a failed read from its exact path: a supplied artifact, the worktree coordinate, or a
 verified-existing but unreadable project leaf is `required-read-failed` and fails closed; a
 nonexistent path that was neither supplied nor verified is an agent path-scope mistake, not a
@@ -544,8 +547,9 @@ freshness check remains an integrity failure, never a correctable contract defec
 
 Invoke the packaged `review_context.py classify-agent-failure` subcommand for each such return,
 after computing the strict snapshot comparison and current freshness. Pass every non-`none` file
-coordinate as `--required-artifact`, the workspace directory as `--required-directory`, the exact
-failed path when known, identity, actual snapshot/freshness status, role class, and attempt number.
+coordinate as `--required-artifact`; include the workspace as `--required-directory` only when
+`Workspace Path` is not `none`. Pass the exact failed path when known, identity, actual
+snapshot/freshness status, role class, and attempt number.
 Follow only its `retry-contract`,
 `continue-comment`, or `fail-closed` decision. A missing helper, omitted required artifact,
 malformed invocation, or helper error fails closed; never replace the executable classification

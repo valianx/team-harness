@@ -65,13 +65,15 @@ Bash or query a moving branch. Treat `Reviewed Head SHA` as the only code identi
 unchanged.
 
 The supplied artifact coordinates are a closed read allowlist and every non-`none` coordinate is
-required. For project code, begin with paths named by the supplied changed-files artifact. Before
-opening any other directly affected worktree path, first prove that the exact repo-relative path
-is a regular existing leaf under the supplied worktree using `Glob` or an exact file-list search;
-only then may you read it. Framework conventions, memory, instruction-source/semantic-source
-markers in this prompt, and unresolved imports are not path coordinates. Never issue `Read`,
-`sed`, or another content read for such a candidate. An absent optional or inferred path is
-skipped, not a transport failure.
+required. For project code, paths named by the supplied changed-files artifact are candidates, not
+authorization to read. Before opening any changed, directly affected, or cited worktree path,
+prove that the exact repo-relative path exists as a non-symlink regular file and that its resolved
+path remains inside the supplied frozen worktree; only then may you read it. Use `Diff Path` for a
+deleted changed file and never attempt to read that deleted path from the head worktree. If the
+available read transport cannot establish the full proof, skip the candidate. Framework
+conventions, memory, instruction-source/semantic-source markers in this prompt, and unresolved
+imports are not path coordinates. Never issue `Read`, `sed`, or another content read for such a
+candidate. An absent optional or inferred path is skipped, not a transport failure.
 
 If a required supplied artifact, the worktree coordinate, or a verified existing worktree leaf
 cannot actually be read, return `failure_kind: required-read-failed` and `failed_read_path` with

@@ -140,6 +140,14 @@ class ReviewContextTests(unittest.TestCase):
                     str(required),
                     "--failed-path",
                     str(worktree / "agents" / "pr-review-security.md"),
+                    "--reviewed-sha-status",
+                    "match",
+                    "--context-hash-status",
+                    "match",
+                    "--snapshot-status",
+                    "match",
+                    "--freshness-status",
+                    "current",
                     "--role",
                     "specialist",
                     "--attempt",
@@ -152,6 +160,64 @@ class ReviewContextTests(unittest.TestCase):
         result = json.loads(completed.stdout)
         self.assertEqual(result["decision"], "retry-contract")
         self.assertFalse(result["operator_decision_required"])
+
+    def test_agent_failure_classifier_cli_requires_every_snapshot_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifacts, worktree, required = self.agent_failure_fixture(root)
+            status_arguments = {
+                "--reviewed-sha-status": "match",
+                "--context-hash-status": "match",
+                "--snapshot-status": "match",
+                "--freshness-status": "current",
+            }
+            for omitted in status_arguments:
+                with self.subTest(omitted=omitted):
+                    command = [
+                        sys.executable,
+                        str(SCRIPT),
+                        "classify-agent-failure",
+                        "--artifact-root",
+                        str(artifacts),
+                        "--worktree",
+                        str(worktree),
+                        "--required-artifact",
+                        str(required),
+                        "--contract-signal",
+                        "unverified-path-read",
+                        "--role",
+                        "specialist",
+                        "--attempt",
+                        "1",
+                    ]
+                    for flag, value in status_arguments.items():
+                        if flag != omitted:
+                            command.extend([flag, value])
+                    completed = subprocess.run(
+                        command,
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(completed.returncode, 0)
+                    self.assertNotIn("retry-contract", completed.stdout)
+
+    def test_reviewer_contracts_preserve_deleted_symlink_and_optional_workspace_rules(self):
+        ref = (ROOT / "agents" / "ref-direct-modes.md").read_text(encoding="utf-8")
+        self.assertIn("workspace as `--required-directory` only when", ref)
+        self.assertIn("A deleted\nchanged-file path is evidence from `Diff Path` only", ref)
+
+        for relative in (
+            "agents/reviewer.md",
+            "agents/pr-review-qa.md",
+            "agents/pr-review-security.md",
+        ):
+            with self.subTest(relative=relative):
+                contract = (ROOT / relative).read_text(encoding="utf-8")
+                self.assertIn("non-symlink regular file", contract)
+                self.assertRegex(contract, r"resolved\s+path remains inside")
+                self.assertIn("deleted", contract)
+                self.assertIn("head worktree", contract)
 
     def test_malformed_classifier_cli_cannot_authorize_recovery(self):
         with tempfile.TemporaryDirectory() as directory:

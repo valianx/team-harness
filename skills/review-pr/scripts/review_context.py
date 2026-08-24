@@ -1637,16 +1637,16 @@ def build_parser() -> argparse.ArgumentParser:
         default="none",
     )
     recovery_parser.add_argument(
-        "--reviewed-sha-status", choices=["match", "missing", "mismatch"], default="match"
+        "--reviewed-sha-status", choices=["match", "missing", "mismatch"], required=True
     )
     recovery_parser.add_argument(
-        "--context-hash-status", choices=["match", "missing", "mismatch"], default="match"
+        "--context-hash-status", choices=["match", "missing", "mismatch"], required=True
     )
     recovery_parser.add_argument(
-        "--snapshot-status", choices=["match", "mismatch"], default="match"
+        "--snapshot-status", choices=["match", "mismatch"], required=True
     )
     recovery_parser.add_argument(
-        "--freshness-status", choices=["current", "failed"], default="current"
+        "--freshness-status", choices=["current", "failed"], required=True
     )
     recovery_parser.add_argument(
         "--role", choices=["general", "specialist", "consolidator"], required=True
