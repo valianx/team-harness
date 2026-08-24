@@ -291,7 +291,7 @@ Ask the operator for the default language for agent responses and workspace pros
 - Show the current configured value from `~/.claude/.team-harness.json` `language` field (if present) as the default hint.
 - Accept any two-letter ISO 639-1 code (`[a-z]{2}`). Validate: if the input is not exactly 2 lowercase letters, warn and ask again.
 - If the operator presses Enter without input, keep the existing value; if none is set, omit the `language` key entirely (absence of the key means detection-based behavior, per Step 5).
-- Persist the chosen value as the `language` key in `~/.claude/.team-harness.json` via **merge-write of the complete document**: read the full JSON, replace or add only the `language` key, write the whole document back. Never emit a partial payload — this preserves `logs-mode`, `logs-path`, `logs-subfolder`, `files`, `clickup`, `pricing`, and all other existing keys.
+- Persist the chosen value as the `language` key in `~/.claude/.team-harness.json` via **merge-write of the complete document**: read the full JSON, replace or add only the `language` key, write the whole document back. Never emit a partial payload — this preserves `logs-mode`, `logs-path`, `logs-subfolder`, `files`, `clickup`, and all other existing keys.
 
 ### 3.6. Configure english-learning correction mode
 
@@ -300,7 +300,7 @@ Ask the operator whether to enable the english-learning correction mode. This mo
 - **Prompt:** `Enable english-learning correction mode? [y/N]` (default: N — off)
 - Show the current configured value from `~/.claude/.team-harness.json` `english_learning` field (if present) as the default hint.
 - Accept `y` (enable) or `n`/Enter (disable / keep off).
-- On `y`: persist `english_learning: true` to `~/.claude/.team-harness.json` via **merge-write-whole-document** — read the full JSON, replace or add only the `english_learning` key (set to `true`), write the whole document back. Never emit a partial payload — this preserves `logs-mode`, `logs-path`, `logs-subfolder`, `files`, `clickup`, `pricing`, and all other existing keys. Then ask a separate immersion question: `Also set English as the response language for immersion? [y/N]` (default: N). On `y`, additionally set `language: en` in the same merge-write. On `n`/Enter, leave `language` unchanged.
+- On `y`: persist `english_learning: true` to `~/.claude/.team-harness.json` via **merge-write-whole-document** — read the full JSON, replace or add only the `english_learning` key (set to `true`), write the whole document back. Never emit a partial payload — this preserves `logs-mode`, `logs-path`, `logs-subfolder`, `files`, `clickup`, and all other existing keys. Then ask a separate immersion question: `Also set English as the response language for immersion? [y/N]` (default: N). On `y`, additionally set `language: en` in the same merge-write. On `n`/Enter, leave `language` unchanged.
 - On `n`/Enter (declining the correction mode): if no prior `english_learning` key existed, omit the key entirely (absence of the key means mode OFF — matching the `language` omit-when-blank rule). If a prior value of `true` existed and the operator declines, write `english_learning: false` to clear it. Do NOT modify the `language` key on disable.
 
 ### 3.7. Provision the subagent-nesting-depth prerequisite (gated)
@@ -412,7 +412,7 @@ Write `~/.claude/.team-harness.json` with:
 }
 ```
 
-Preserve ALL existing unrelated fields (like `files`, `clickup`, `pricing`, `github`, `nested_lane_capability`, and `nested_spawn_depth`) if the manifest already exists. Legacy route/profile selectors are not active settings: report `1 — inline` / `2 — pipeline` when present and remove only those legacy keys during this legitimate manifest write. Use the **merge-write-whole-document** contract: read the full JSON, replace or add only the keys this step owns (`format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, and optionally `language`, and optionally `english_learning`, and optionally `flow_telemetry.enabled`), write the whole document back. NEVER emit a partial payload — that would destroy unrelated operator-configured keys.
+Preserve ALL existing unrelated fields (like `files`, `clickup`, `github`, `nested_lane_capability`, and `nested_spawn_depth`) if the manifest already exists. Legacy route/profile selectors are not active settings: report `1 — inline` / `2 — pipeline` when present and remove only those legacy keys during this legitimate manifest write. Use the **merge-write-whole-document** contract: read the full JSON, replace or add only the keys this step owns (`format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, and optionally `language`, and optionally `english_learning`, and optionally `flow_telemetry.enabled`), write the whole document back. NEVER emit a partial payload — that would destroy unrelated operator-configured keys.
 
 The `language` key is written only when the operator provided a value in Step 3.5; if they left it blank and no prior value existed, omit the key entirely (absence of the key means detection-based behavior, which is the default).
 
@@ -533,7 +533,7 @@ Configure the ClickUp workspace ID used by th:orchestrator (intake and delivery)
 1. Read `~/.claude/.team-harness.json`. Show the current `clickup.workspace_id` value (if present) as the default hint.
 2. Prompt: `ClickUp workspace ID (press Enter to keep current value or leave blank to clear):`
 3. Accept the operator's input.
-4. Persist via **merge-write-whole-document**: read the full JSON, replace or add only the `clickup.workspace_id` key nested under the `clickup` object, write the whole document back. All other keys (`format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, `language`, `english_learning`, `files`, `pricing`, and any others) are preserved.
+4. Persist via **merge-write-whole-document**: read the full JSON, replace or add only the `clickup.workspace_id` key nested under the `clickup` object, write the whole document back. All other keys (`format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, `language`, `english_learning`, `files`, and any others) are preserved.
 5. Note: `clickup.workspace_id` is a session-override whitelist member — it may also be set per-session via `00-state.md` without modifying this file.
 6. Print a one-line targeted summary:
    ```

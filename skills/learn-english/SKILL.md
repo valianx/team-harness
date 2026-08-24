@@ -41,7 +41,7 @@ Normalize `$ARGUMENTS` (trim, lowercase). Branch:
 
 ## Merge-write contract (used by Enable and Disable branches)
 
-Every write uses **merge-write-whole-document**: read the full `~/.claude/.team-harness.json`, replace or add only the owned key(s), write the whole document back. Never emit a partial payload — this preserves `format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, `files`, `clickup`, `pricing`, and every other existing key. This is identical to the contract in `skills/setup/SKILL.md` Step 3.6 and Step 5.
+Every write uses **merge-write-whole-document**: read the full `~/.claude/.team-harness.json`, replace or add only the owned key(s), write the whole document back. Never emit a partial payload — this preserves `format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, `files`, `clickup`, and every other existing key. This is identical to the contract in `skills/setup/SKILL.md` Step 3.6 and Step 5.
 
 Resolve the config path as `~/.claude/.team-harness.json` (expand `~` to the OS home directory: `$HOME` on Unix/macOS, `$env:USERPROFILE` or `$HOME` on Windows).
 

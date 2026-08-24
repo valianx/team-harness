@@ -1862,7 +1862,7 @@ pass and the delivery coordinates are persisted, evaluate the closed exception l
 | `feature` | — |
 | `delivery_summary` | branch, validated commit/tree, committed version, version axis/rationale, files touched, **diff composition**, base status |
 | `delivery_preview` | exact PR title plus PR-body and acceptance-matrix workspace paths with SHA-256 digests |
-| `accumulated_cost` | `~{N}K tokens (~${X})` |
+| `accumulated_tokens` | `~{N}K tokens`, or `not reported` when no phase reported a count |
 | `security_audit` | verdict (`could-not-break` / `broke-it` / `not run (security_floor_applies: false)` / `unavailable`), `open_breaks: [{finding, file:line, impact}]`, `audit_coverage`, `incomplete_on_changed_control` |
 | `bump_override` | `{level} — <reason>`, present **only** when the computed version sits above the mechanical SemVer floor for the diff |
 | `options` | the closed allowlist |

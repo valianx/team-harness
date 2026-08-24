@@ -63,7 +63,7 @@ Field semantics:
 
 **Read/write rule — preserve the rest of the file.** `~/.claude/.team-harness.json` holds
 keys this skill must never overwrite: `format_version`, `installed_version`, `updated_at`,
-`logs-mode`, `logs-path`, `logs-subfolder`, `clickup`, `language`, `pricing`, and the
+`logs-mode`, `logs-path`, `logs-subfolder`, `clickup`, `language`, and the
 installer `files` manifest. Every write is a merge: read the full JSON, replace only the
 `obsidian_tasks` sub-object, and write the whole document back as pretty-printed JSON.
 Never overwrite the file with an `obsidian_tasks`-only payload — that destroys every other

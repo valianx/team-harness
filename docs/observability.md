@@ -248,10 +248,10 @@ retained even when the live response is concise.
 
 `tools`, `model`, and `effort` may be recorded when the runtime exposes them.
 They are never required from specialist status blocks, and missing telemetry
-never changes the gate outcome; estimated token counts are marked
-`tokens_estimated: true` on the legacy Claude branch. When a `phase.end`
-contains `usage.kind: codex_usage_delta`, select the Native Codex branch instead:
-that branch records a closed unavailable usage result rather than an estimate.
+never changes the gate outcome. On the legacy Claude branch an unreported
+token count is left absent rather than estimated. When a `phase.end` contains
+`usage.kind: codex_usage_delta`, select the Native Codex branch instead: that
+branch records a closed unavailable usage result rather than an estimate.
 
 ## 4. Gate observability
 
@@ -621,21 +621,22 @@ reference material only; they are not emitted, dispatched, or gate-releasing.
 event contains an object whose `usage.kind` is `codex_usage_delta`. A
 `phase.start` checkpoint, route, model, agent, or any other field never
 selects it. When no such `phase.end` exists, retain the complete legacy Claude
-contract below unchanged, including `tokens`, `tokens_estimated`, `~/.claude/.team-harness.json` pricing, the
-event/frontmatter/static fallbacks, and the established rendering.
+contract below unchanged, including the optional `tokens` field and the
+established token rendering.
 
-This section defines the cost-visibility surface introduced in Phase B of the
-pipeline-collaboration-cost-redesign programme. It covers: (a) the price table
-key format in `~/.claude/.team-harness.json`; (b) the schema of the `## Cost`
-section in `00-pipeline-summary.md`; and (c) the derivation rule shared by the
-orchestrator summary writer and the `/th:trace --cost` skill.
+This section defines the token-visibility surface for the legacy/Claude branch.
+It covers the schema of the `## Cost` section in `00-pipeline-summary.md` and
+the derivation rule shared by the orchestrator summary writer and the
+`/th:trace --tokens` skill.
 
-### Price in USD — not derived
+### Reported in tokens — no USD on this branch
 
-Cost is reported in tokens. No `pricing` key has ever been present in
-`~/.claude/.team-harness.json`, no run has produced a dollar figure, and a price table stated
-here would be a contract with no producer. Deriving USD needs a real price source and belongs to
-whoever wants the figure.
+The legacy branch reports tokens and nothing else. There is no `pricing` key in
+`~/.claude/.team-harness.json`, no price table, and no model-tier classification: none of them
+ever had a producer, so every surface that read them was removed rather than left as a contract
+nothing satisfies. Deriving USD needs a real price source and belongs to whoever wants the
+figure. The native Codex branch below is unaffected — its `cost_usd` comes from the collector's
+own quote, not from a table stated here.
 
 ### `## Cost` section schema for `00-pipeline-summary.md`
 
@@ -653,8 +654,7 @@ Sanity Check, step 6).
 
 ```markdown
 ## Cost
-**Total tokens:** {N} ({measured|estimated} — {M} phases with tokens_estimated:true)
-**Total cost:** ~${X.XX}  (or: price table not configured — showing tokens only)
+**Total tokens:** {N} (summed over the {M} of {T} phases that reported a count)
 **Architect runs:** {N}x ({N} phases with agent: architect — signal for multi-run cost)
 
 | Agent | Phases | Tokens | % |
@@ -664,22 +664,20 @@ Sanity Check, step 6).
 | ... | ... | ... | ... |
 | **Total** | | **{N}** | 100% |
 
-| Phase | Agent | Tokens | Cost |
-|-------|-------|--------|------|
-| 1-design | architect | {N} | ~${X.XX} |
-| 2-implement | implementer | {N} | ~${X.XX} |
-| ... | ... | ... | ... |
+| Phase | Agent | Tokens |
+|-------|-------|--------|
+| 1-design | architect | {N} |
+| 2-implement | implementer | {N} |
+| ... | ... | ... |
 ```
 
 **Rendering rules:**
 
 - `## Cost` is placed after `## Tool Effectiveness` and before `## Iterations` in
   the schema order.
-- `tokens_estimated: true` on a `phase.end` event marks that phase's row with `(~)`.
-  The section header reports the total count of estimated phases so the reader can
-  assess reliability.
-- When the price table is not configured, omit the `Cost` column from both tables
-  and replace `~${X.XX}` with `—`.
+- A `phase.end` with no `tokens` field renders `—` in the Tokens column and is
+  excluded from the total. The section header reports how many phases reported a
+  count so the reader can see what the total covers.
 - The "Architect runs" line is a cost-awareness signal: a feature where the architect
   ran 3 times spent 3× architect-tier tokens in Stage 1. It is not a quality judgment.
 - In obsidian mode, extract the JSONL fence from `00-execution-events.md` before
@@ -689,34 +687,9 @@ Sanity Check, step 6).
 ### Derivation rule
 
 1. Read all `phase.end` events from `{docs_root}/{events_file}`.
-2. For each event, extract `agent`, `phase`, `tokens`, and `tokens_estimated`.
-3. Classify the agent's model tier using the following priority order:
-   - **Primary path — `event.model` field.** When the `phase.end` event itself carries a
-     `model` field (propagated verbatim from the agent's status block — see
-     `agents/ref-pipeline.md` § "Populating the `model`/`effort` fields on `phase.end`"),
-     classify directly from it: `opus` when `model` starts with `claude-opus` or equals
-     `opus`; `sonnet` otherwise. This is the authoritative source once populated — it
-     reflects what the agent actually ran under, including under a session model override
-     (`agents/ref-pipeline.md` § "Session model override"), which frontmatter cannot express.
-   - **Fallback path — read frontmatter `model:` field.** When `event.model` is absent (the
-     event predates this field, or the agent instance had not yet adopted it), locate
-     `agents/{agent}.md` and read its YAML frontmatter `model:` field. Classify as `opus`
-     when `model` starts with `claude-opus` or equals `opus`; classify as `sonnet` otherwise.
-   - **Static opus-agent fallback** (used only when BOTH `event.model` is absent AND
-     frontmatter is unreadable — file absent, not parseable, or `model:` key missing): treat
-     these agents as `opus` regardless of any other assumption:
-     `architect`, `security`, `adversary`, `qa-plan`, `ux-reviewer`, `reviewer`,
-     `reviewer-consolidator`, `agent-builder`, `mentor`, `gcp-infra`, `gcp-cost-analyzer`,
-     `orchestrator`. This is the canonical static list — `skills/trace/SKILL.md` reads the
-     same enumeration and MUST NOT diverge from it.
-   - **No "all others → sonnet" default.** When none of the three paths above resolve a
-     classification, classify as `sonnet` and mark the row with `(?)` to signal that the
-     classification is uncertain.
-4. Compute cost per phase using the price table (see above). Sum to get total.
-5. Build the per-agent and per-phase tables.
-6. Count phases where `tokens_estimated == true` for the header annotation.
-7. If the price table is absent or malformed, skip the cost columns and emit the
-   degradation line instead.
+2. For each event, extract `agent`, `phase`, and `tokens` when present.
+3. Build the per-agent and per-phase tables.
+4. Count phases that reported a `tokens` value for the header annotation.
 
 ### Calibration rule — every stated cost figure carries a source tag
 
@@ -730,11 +703,9 @@ figure drifted over 10× from its documented "~3-5K tokens" before the June
 every figure at the time it is written, and re-tag it when a new measurement
 supersedes the old one.
 
-**Exempt from this rule:** normative schema/config definitions (the `pricing.*`
-field table above, the `## Cost` section schema and its `{N}`/`~${X.XX}`
-template placeholders), and formula constants that are inherently estimates by
-definition (the `duration_min × 1500` / `× 800` fallback multiplier, already
-carrying `tokens_estimated: true`). These are structural literals, not claims
+**Exempt from this rule:** normative schema/config definitions (the `## Cost`
+section schema and its `{N}` template placeholders). These are structural
+literals, not claims
 about what a run costs, and tagging them would not add information.
 
 
@@ -818,7 +789,7 @@ may be included in `phase.end`; leaf-agent counter fields are not required.
 
 ### tokens field on phase.end
 
-**Legacy Claude branch — no native `usage` object.** Every `phase.end` event MUST include a `tokens` field (integer). When `Agent()`/`Task()` metadata is absent, estimate via `duration_min × 1500` (opus) / `× 800` (sonnet) and mark `tokens_estimated: true`. **Zero is forbidden** — a zero token count is indistinguishable from a missing field and breaks the cost rollup.
+**Legacy Claude branch — no native `usage` object.** `tokens` (integer) is recorded on a `phase.end` when the runtime reports one and omitted when it does not. It is observability, never gate evidence, so an absent count blocks nothing. **Never estimate it and never write `0`** — a fabricated or zeroed number is indistinguishable from a measurement and misreads the run.
 
 
 ### Native Codex usage on `phase.end`

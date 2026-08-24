@@ -27,13 +27,13 @@ The selection below is informed by a survey of guardrail and review practices ac
 
 ## Shipped — the starting point
 
-### Cost visibility in tokens and USD
+### Spend visibility in tokens
 
-**What it is.** A per-pipeline `## Cost` rollup, a `/th:trace --cost` surface, and a `pricing` key in `~/.claude/.team-harness.json` that turns token counts into dollar figures. Cost is derived at render-time from `phase.end` token counts multiplied by the pricing table, rather than persisted as a dollar field — so when prices change, the figure recalculates correctly instead of going stale.
+**What it is.** A per-pipeline `## Cost` rollup and a `/th:trace --tokens` surface, both derived at render-time from `phase.end` token counts rather than persisted as a stored figure. The USD half — a `pricing` key in `~/.claude/.team-harness.json` and the model-tier classification that selected a rate from it — was retired in 3.20.3: no producer ever wrote the key, so it priced nothing. USD remains available on the native Codex branch, where the collector supplies its own quote.
 
 **Why (protects the collaboration).** Knowing what a pipeline costs is part of the developer deciding the scope and weight of a change with full information rather than guessing blind. Cost visibility is the precondition for the cost-sensitive decisions further down this roadmap to be made deliberately.
 
-**Form.** Shipped in v2.43.0. The only remaining step is operator-side: populate `pricing.opus` / `pricing.sonnet` / `pricing.updated`. Without it, every cost surface degrades gracefully to tokens-only with a note. Connecting estimated cost into the Discover phase — so the developer sets scope while *seeing* the cost — is a natural future enhancement, not outstanding debt.
+**Form.** Shipped in v2.43.0, narrowed to tokens in 3.20.3. Connecting spend into the Discover phase — so the developer sets scope while *seeing* what it costs — is a natural future enhancement, not outstanding debt; a USD figure there would need a real price source first.
 
 ---
 

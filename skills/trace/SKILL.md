@@ -18,12 +18,13 @@ chat replies, status blocks, error messages, and self-corrections alike.
 /th:trace <feature-name> --jsonl   Tail the last 30 events (auto-detects .md or .jsonl format)
 /th:trace <feature-name> --tools   Aggregate tool usage across the pipeline
 /th:trace <feature-name> --fails   Filter to failures, dispatch issues, iterations
-/th:trace <feature-name> --cost    Show cost breakdown by agent and phase
+/th:trace <feature-name> --tokens  Show token breakdown by agent and phase
 ```
 
 Parse `$ARGUMENTS`:
 - Positional: feature name (kebab-case, matches the `workspaces/{feature}/` folder).
-- Optional flag: one of `--jsonl`, `--tools`, `--fails`, `--cost`.
+- Optional flag: one of `--jsonl`, `--tools`, `--fails`, `--tokens` (`--cost` is accepted
+  as a legacy alias for `--tokens`).
 
 If `$ARGUMENTS` is empty or just whitespace, print the usage block above and exit cleanly.
 
@@ -71,7 +72,7 @@ These are written by the **orchestrator** during pipeline runs (see `agents/ref-
    ---
    For raw events: /th:trace {feature-name} --jsonl
    For tool effectiveness: /th:trace {feature-name} --tools
-   For cost breakdown:     /th:trace {feature-name} --cost
+   For token breakdown:    /th:trace {feature-name} --tokens
    For failures only:      /th:trace {feature-name} --fails
    ```
 
@@ -322,7 +323,7 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
 
 ---
 
-## `--cost` mode — cost breakdown by agent and phase
+## `--tokens` mode — token breakdown by agent and phase
 
 1. Detect the events file: check for `00-execution-events.md` first (Glob), then
    `00-execution-events.jsonl`. If neither exists, report and exit cleanly.
@@ -333,17 +334,10 @@ an object with `usage.kind == "codex_usage_delta"`, execute legacy steps 2–6
 below unchanged. Select the Native Codex branch only when a `phase.end`
 contains that exact object; a `phase.start` checkpoint, route, model, agent,
 or other field cannot select it. A selected native trace never mixes its
-accounting with legacy `tokens` fields or pricing; malformed/mixed native
-usage is unavailable, not a fallback to legacy pricing.
+accounting with the legacy `tokens` fields; malformed/mixed native usage is
+unavailable, not a fallback to the legacy token count.
 
-2. Read the price table from `~/.claude/.team-harness.json` (key `pricing`). If
-   the key is absent, malformed, or any required sub-field is missing, set
-   `has_pricing = false` — the mode continues but shows tokens only with the line:
-   ```
-   price table not configured — showing tokens only
-   ```
-
-3. Aggregate `phase.end` events to produce per-agent and per-phase token sums.
+2. Aggregate `phase.end` events to produce per-agent and per-phase token sums.
 
    **If `jq` is available:**
 
@@ -356,8 +350,9 @@ usage is unavailable, not a fallback to legacy pricing.
        map({
          agent:     .[0].agent,
          phases:    [.[] | .phase],
-         tokens:    [.[] | .tokens // 0] | add,
-         estimated: ([.[] | select(.tokens_estimated == true)] | length),
+         tokens:    [.[] | .tokens // empty] | add,
+         reported:  ([.[] | select(.tokens != null)] | length),
+         phase_n:   ([.[]] | length),
          models:    [.[] | .model // empty] | unique
        })
      '
@@ -371,14 +366,18 @@ usage is unavailable, not a fallback to legacy pricing.
      map({
        agent:     .[0].agent,
        phases:    [.[] | .phase],
-       tokens:    [.[] | .tokens // 0] | add,
-       estimated: ([.[] | select(.tokens_estimated == true)] | length),
+       tokens:    [.[] | .tokens // empty] | add,
+       reported:  ([.[] | select(.tokens != null)] | length),
+       phase_n:   ([.[]] | length),
        models:    [.[] | .model // empty] | unique
      })
    ' workspaces/{feature-name}/00-execution-events.jsonl
    ```
 
-   `models` is the deduplicated list of `event.model` values reported across that agent's phases (empty entries dropped). An empty `models` array means no event in this trace reported `model` — classification falls through to frontmatter/static-list (step 4).
+   `tokens` sums only the phases that reported a count; `reported` of `phase_n` says how
+   many did, so a partial total is never read as a complete one. `models` is the
+   deduplicated list of `event.model` values across that agent's phases (empty entries
+   dropped); an empty array means no event in this trace reported one.
 
    **If `jq` is not available, fall back to `python3`:**
 
@@ -386,7 +385,7 @@ usage is unavailable, not a fallback to legacy pricing.
    # Works for both .jsonl (read direct) and .md (extract fence first with sed -n)
    python3 -c "
    import json, sys, collections
-   by_agent = collections.defaultdict(lambda: {'tokens': 0, 'phases': [], 'estimated': 0, 'models': set()})
+   by_agent = collections.defaultdict(lambda: {'tokens': 0, 'phases': [], 'reported': 0, 'phase_n': 0, 'models': set()})
    by_phase = []
    for line in sys.stdin:
        try:
@@ -397,83 +396,59 @@ usage is unavailable, not a fallback to legacy pricing.
            continue
        agent = e.get('agent', 'unknown')
        phase = e.get('phase', '?')
-       tokens = e.get('tokens') or 0
-       est = 1 if e.get('tokens_estimated') else 0
+       tokens = e.get('tokens')
        model = e.get('model')
-       by_agent[agent]['tokens'] += tokens
+       by_agent[agent]['tokens'] += tokens or 0
        by_agent[agent]['phases'].append(phase)
-       by_agent[agent]['estimated'] += est
+       by_agent[agent]['phase_n'] += 1
+       if tokens is not None:
+           by_agent[agent]['reported'] += 1
        if model:
            by_agent[agent]['models'].add(model)
-       by_phase.append({'phase': phase, 'agent': agent, 'tokens': tokens, 'estimated': est, 'model': model})
+       by_phase.append({'phase': phase, 'agent': agent, 'tokens': tokens, 'model': model})
    total = sum(v['tokens'] for v in by_agent.values())
-   est_phases = sum(v['estimated'] for v in by_agent.values())
-   print(json.dumps({'by_agent': [{'agent': k, 'phases': v['phases'], 'tokens': v['tokens'], 'estimated': v['estimated'], 'models': sorted(v['models'])} for k, v in sorted(by_agent.items())], 'by_phase': by_phase, 'total': total, 'est_phases': est_phases}))
+   reported = sum(v['reported'] for v in by_agent.values())
+   phase_n = sum(v['phase_n'] for v in by_agent.values())
+   print(json.dumps({'by_agent': [{'agent': k, 'phases': v['phases'], 'tokens': v['tokens'], 'reported': v['reported'], 'phase_n': v['phase_n'], 'models': sorted(v['models'])} for k, v in sorted(by_agent.items())], 'by_phase': by_phase, 'total': total, 'reported': reported, 'phase_n': phase_n}))
    "
    ```
 
-4. Compute cost if `has_pricing == true`. Model classification uses the same
-   priority order as `docs/observability.md § Derivation rule` — this skill
-   MUST NOT diverge from that document:
-   - **Primary path — `event.model` / the per-agent `models` list.** When a
-     phase (by-phase table) or an agent's `models` list (by-agent table)
-     carries a non-empty `model` value, classify from it directly: `opus`
-     when the value starts with `claude-opus` or equals `opus`; `sonnet`
-     otherwise. If an agent's `models` list has more than one distinct value
-     (a session model override applied to some but not all of that agent's
-     dispatches), classify each phase row individually from its own
-     `event.model` and fall back to the next path only for phases with no
-     `model` reported.
-   - **Fallback path — frontmatter `model:` field.** When `model` is absent
-     for that phase/agent, read `agents/{agent}.md` YAML frontmatter. `opus`
-     when it starts with `claude-opus` or equals `opus`; `sonnet` otherwise.
-   - **Static opus-agent fallback** (only when both paths above are
-     unavailable): `architect`, `security`, `adversary`, `qa-plan`,
-     `ux-reviewer`, `reviewer`, `reviewer-consolidator`, `agent-builder`,
-     `mentor`, `gcp-infra`, `gcp-cost-analyzer`, `orchestrator` → `opus`.
-     This list MUST match `docs/observability.md § Derivation rule` verbatim
-     — do not edit one without the other.
-   - **No "all others → sonnet" default.** When none of the three paths
-     resolve, classify as `sonnet` and mark the row with `(?)`.
-   - Cost derives from the `tokens` total at the blended rate:
-     `tokens × (input + output) / 2 / 1_000_000`, always marked `(~)` in the Cost column.
-
-5. Render output:
+3. Render output:
 
    ```
-   Cost Breakdown — {feature-name}
+   Token Breakdown — {feature-name}
    ================================
-   Total tokens: {N}  (measured — {or: N phases estimated})
-   Total cost:   ~${X.XX}   (or: price table not configured — showing tokens only)
+   Total tokens: {N}  (summed over {reported} of {phase_n} phases that reported a count)
    Architect runs: {N}x
 
    By agent:
-   | Agent       | Phases        | Tokens | Cost    |  % |
-   |-------------|---------------|--------|---------|----|
-   | architect   | 1-design      | {N}    | ~${X}   | P% |
-   | implementer | 2-implement   | {N}    | ~${X}   | P% |
-   | ...         | ...           | ...    | ...     | .. |
-   | Total       |               | {N}    | ~${X}   |100%|
+   | Agent       | Phases        | Model(s)      | Tokens |  % |
+   |-------------|---------------|---------------|--------|----|
+   | architect   | 1-design      | {models}      | {N}    | P% |
+   | implementer | 2-implement   | {models}      | {N}    | P% |
+   | ...         | ...           | ...           | ...    | .. |
+   | Total       |               |               | {N}    |100%|
 
    By phase:
-   | Phase         | Agent       | Tokens | Cost    |
-   |---------------|-------------|--------|---------|
-   | 1-design      | architect   | {N}    | ~${X}   |
-   | 2-implement   | implementer | {N}    | ~${X}   |
-   | ...           | ...         | ...    | ...     |
+   | Phase         | Agent       | Tokens |
+   |---------------|-------------|--------|
+   | 1-design      | architect   | {N}    |
+   | 2-implement   | implementer | {N}    |
+   | ...           | ...         | ...    |
    ```
 
-   - Mark estimated phases with `(~)` in the Tokens column.
-   - When `has_pricing == false`, omit the `Cost` columns and append the
-     degradation line after the totals row.
+   - A phase with no reported count renders `—` in the Tokens column and adds nothing
+     to the total. Never substitute `0` or an estimate for it.
+   - `Model(s)` renders the aggregated `models` list for that agent, or `—` when no
+     `phase.end` reported one. It is diagnostic context, never gate evidence.
    - If neither `jq` nor `python3` is available, print:
      ```
-     Cost summary: install jq or python3 to compute the breakdown
+     Token summary: install jq or python3 to compute the breakdown
      ```
      and fall back to printing the `## Cost` section of `00-pipeline-summary.md`
      (if it exists).
 
-6. **Initiative-level cost rollup (reader-only) — reachable during `--cost`.**
+4. **Initiative-level token rollup (reader-only) — reachable during `--tokens`.**
    After rendering the per-feature table, read the feature's `00-state.md`. When
    it declares `initiative: {name}`, resolve the initiative-level
    `00-execution-events` trace at the initiative root — detect the `.md` variant
@@ -483,13 +458,13 @@ usage is unavailable, not a fallback to legacy pricing.
    `project.start` / `project.end` / `initiative.converge` events; when an
    `initiative.start` is present, sum token counts across all projects' own
    `{project}/00-execution-events.*` files (each project keeps its full
-   per-phase trace) to produce one initiative-level cost figure, appended below
-   the per-feature cost table with the header
-   `Initiative cost rollup — {initiative}`. This is a pure read of each
+   per-phase trace) to produce one initiative-level token figure, appended below
+   the per-feature token table with the header
+   `Initiative token rollup — {initiative}`. This is a pure read of each
    project's OWN events file — it never writes to any project's events file or
    `00-state.md` and never touches the gate seam.
    **Fail-soft:** no `initiative` field, no initiative-level events file, or a
-   read/parse error → omit the rollup silently; the per-feature cost output is
+   read/parse error → omit the rollup silently; the per-feature token output is
    unaffected.
 
 
@@ -568,7 +543,7 @@ Projects render in `eligible_projects[]` order (not start-time order), so the sa
 
 **Legacy Claude selection.** When no child trace has a selected native `usage` object, retain this existing rollup unchanged.
 
-**`--cost` interaction (reader-only rollup).** Executed by `--cost` mode step 6 above — the initiative-level trace is resolved during `--cost` execution, not only default-mode rendering. When an `initiative.start` is present, `--cost` sums token counts across all projects' own `{project}/00-execution-events.*` files (each project keeps its full per-phase trace) to produce one initiative-level cost figure, appended below the per-feature cost table with the header `Initiative cost rollup — {initiative}`. This is a pure read of each project's OWN events file — it never writes to any project's events file or `00-state.md` and never touches the gate seam.
+**`--tokens` interaction (reader-only rollup).** Executed by `--tokens` mode step 4 above — the initiative-level trace is resolved during `--tokens` execution, not only default-mode rendering. When an `initiative.start` is present, `--tokens` sums token counts across all projects' own `{project}/00-execution-events.*` files (each project keeps its full per-phase trace) to produce one initiative-level token figure, appended below the per-feature token table with the header `Initiative token rollup — {initiative}`. This is a pure read of each project's OWN events file — it never writes to any project's events file or `00-state.md` and never touches the gate seam.
 
 **Native selection.** If any child trace is selected by a `phase.end` object
 with `usage.kind: codex_usage_delta`, apply the Native Codex branch to every
@@ -607,7 +582,7 @@ unavailable, and absent exact current USD provenance renders
 | "Detailed narrative state for one feature" | `/th:pipelines <feature>` — narrative renderer with TL;DR + Hot Context + Timeline from JSONL |
 | "Did this pipeline work? Quick summary." | `/th:trace <feature>` — the canonical 30-second answer |
 | "How effective were the tools in this pipeline?" | `/th:trace <feature> --tools` |
-| "What did this pipeline cost in tokens and dollars?" | `/th:trace <feature> --cost` |
+| "How many tokens did this pipeline spend?" | `/th:trace <feature> --tokens` |
 | "What failed and why?" | `/th:trace <feature> --fails` |
 | "Show me the raw event log." | `/th:trace <feature> --jsonl` |
 
