@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -11,7 +11,7 @@ import {
   resolveWorkspaceIdentity,
 } from "../skills/pipeline/scripts/workspace-identity.mjs";
 
-const root = await mkdtemp(path.join(tmpdir(), "th-workspace-identity-"));
+const root = await realpath(await mkdtemp(path.join(tmpdir(), "th-workspace-identity-")));
 try {
   const repos = path.join(root, "zippy");
   const merchant = path.join(repos, "merchant-bridge");
@@ -39,11 +39,13 @@ try {
   ]);
   assert.deepEqual(identity.evidence_repositories.map(entry => entry.service), ["payment-gateway"]);
   assert.equal(isWorkspaceIdentity(identity), true);
+  assert.equal(isWorkspaceIdentity({ ...identity, services: identity.services.slice(0, 1) }), false);
 
   const single = await resolveWorkspaceIdentity({
     logsMode: "local", repositories: [bindings[0]], feature: "refund-fix", date: "2026-08-24",
   });
   assert.equal(single.coordinator_root, path.join(merchant, "workspaces", "2026-08-24_refund-fix"));
+  assert.equal(isWorkspaceIdentity({ ...single, services: [] }), false);
 
   const preserved = await resolveWorkspaceIdentity({ persistedIdentity: identity });
   assert.deepEqual(preserved, identity);

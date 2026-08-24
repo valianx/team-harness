@@ -147,6 +147,11 @@ await check("rejects invalid strict validation and incomplete status", async () 
   assert.equal((await capture(fixture)).error_code, "ARTIFACT_INVALID");
 }));
 
+await check("classifies an invalid snapshot path as an argument error", async () => withFixture(async fixture => {
+  const result = await capture(fixture, { snapshotPath: "../outside/snapshot.json" });
+  assert.equal(result.error_code, "ARGUMENT_INVALID");
+}));
+
 await check("rejects unbound change collisions and invented artifact paths", async () => withFixture(async fixture => {
   fixture.status.changeName = "different-change";
   assert.equal((await capture(fixture)).error_code, "BINDING_INVALID");

@@ -306,9 +306,11 @@ export async function captureSnapshot({
   projectRoot, workspaceRoot, workspaceMode = "local", changeName, toolchain,
   snapshotPath = "inputs/openspec-snapshot.json", jsonRunner = runBoundedJson, commandRunner,
 } = {}) {
+  if (!(snapshotPath === "inputs/openspec-snapshot.json" || /^inputs\/openspec\/[a-z0-9]+(?:-[a-z0-9]+)*\/snapshot\.json$/.test(snapshotPath))) {
+    return action("capture", "fail", "ARGUMENT_INVALID");
+  }
   if (!CHANGE_NAME.test(changeName ?? "") || !["local", "obsidian"].includes(workspaceMode)
-    || !isOpenSpecAdapterResult(toolchain) || toolchain.outcome !== "ready"
-    || !(snapshotPath === "inputs/openspec-snapshot.json" || /^inputs\/openspec\/[a-z0-9]+(?:-[a-z0-9]+)*\/snapshot\.json$/.test(snapshotPath))) {
+    || !isOpenSpecAdapterResult(toolchain) || toolchain.outcome !== "ready") {
     return action("capture", "fail", "TOOLCHAIN_NOT_READY");
   }
   let repository;

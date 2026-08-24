@@ -177,6 +177,14 @@ await check("blocks stale snapshot identity and duplicate items", async () => wi
   assert.ok(result.findings.some(item => item.code === "ITEM_DUPLICATE"));
 }));
 
+await check("binds task shards to the service traceability root", async () => withFixture(async value => {
+  makeDirect(value.overlay);
+  value.overlay.execution_items[0].shard_path = "plan/openspec/payments-orchestrator/tasks/Task-1.md";
+  await value.writeOverlay(value.overlay);
+  const result = await validateOverlay(value);
+  assert.ok(result.findings.some(item => item.code === "EXECUTION_CONTROL_INVALID" && item.target === "Task-1"));
+}));
+
 await check("never mechanically rebinds a stale immutable Gate-1 snapshot", async () => withFixture(async value => {
   makeDirect(value.overlay);
   value.overlay.snapshot.sha256 = "0".repeat(64);

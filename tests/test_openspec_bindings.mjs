@@ -96,6 +96,8 @@ await use(async value => {
   assert.deepEqual(created.manifest.bindings.map(item => item.service), value.services);
   assert.deepEqual(created.manifest.evidence_repositories.map(item => item.service), ["payment-gateway"]);
   assert.equal(created.manifest.evidence_repositories[0].role, "evidence-only");
+  assert.equal(created.manifest.bindings[0].task_intent_sha256, "b".repeat(64));
+  assert.equal(created.manifest.bindings[0].strict_validation, "pass");
   assert.match(created.aggregate_sha256, /^[a-f0-9]{64}$/);
   console.log("  [PASS] three writable owners and one evidence-only repository");
 });
@@ -159,8 +161,10 @@ await use(async value => {
   assert.deepEqual(gate.binding_services, value.executionOrder);
   assert.equal(Object.hasOwn(gate, "child_gate"), false);
   assert.equal(verifyConsolidatedGate1({ gate, manifest: created.manifest, aggregateSha256: created.aggregate_sha256, nonce: "gate-1-nonce" }).verdict, "pass");
-  const reordered = { ...created.manifest, execution_order: created.manifest.execution_order.slice().reverse() };
-  assert.equal(verifyConsolidatedGate1({ gate, manifest: reordered, aggregateSha256: hash(canonicalJsonBytes(reordered)), nonce: "gate-1-nonce" }).error_code, "GATE1_IDENTITY_STALE");
+  const dependencyFree = { ...created.manifest, dependencies: [] };
+  const dependencyFreeGate = bindConsolidatedGate1({ manifest: dependencyFree, aggregateSha256: hash(canonicalJsonBytes(dependencyFree)), nonce: "gate-1-nonce" });
+  const reordered = { ...dependencyFree, execution_order: dependencyFree.execution_order.slice().reverse() };
+  assert.equal(verifyConsolidatedGate1({ gate: dependencyFreeGate, manifest: reordered, aggregateSha256: hash(canonicalJsonBytes(reordered)), nonce: "gate-1-nonce" }).error_code, "GATE1_IDENTITY_STALE");
   console.log("  [PASS] one consolidated Gate 1 binds membership, order, hash, and nonce");
 });
 
@@ -186,6 +190,21 @@ await use(async value => {
   assert.equal(created.verdict, "fail");
   assert.equal(created.error_code, "BINDING_INVALID");
   console.log("  [PASS] execution order must satisfy declared dependencies");
+});
+
+await use(async value => {
+  value.evidenceRepositories[0].repository_root = null;
+  const created = await createOpenSpecBindingsManifest(value);
+  assert.equal(created.error_code, "BINDING_INVALID");
+  console.log("  [PASS] missing evidence root never resolves to the process cwd");
+});
+
+await use(async value => {
+  await writeFile(path.join(value.workspace, "inputs", "openspec", "merchant-bridge", "snapshot.json"), "{not-json\n");
+  const created = await createOpenSpecBindingsManifest(value);
+  assert.equal(created.error_code, "ARTIFACT_INVALID");
+  assert.doesNotMatch(created.error_code, /Unexpected|position/i);
+  console.log("  [PASS] parser failures map to a bounded error code");
 });
 
 console.log("OpenSpec multi-service bindings: PASS");

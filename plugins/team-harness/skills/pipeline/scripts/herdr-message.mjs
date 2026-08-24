@@ -10,6 +10,7 @@ const MAX_OUTPUT_BYTES = 1024 * 1024;
 const MAX_MESSAGE_BYTES = 16 * 1024;
 const STATES = new Set(["idle", "working", "blocked", "unknown"]);
 const SECRET_LIKE = /(?:-----BEGIN [A-Z ]*PRIVATE KEY-----|\bgh[pousr]_[A-Za-z0-9_]{20,}\b|\bAKIA[0-9A-Z]{16}\b|\bBearer\s+[A-Za-z0-9._~+/-]{20,}=*|\b(?:password|passwd|secret|token)\s*[:=]\s*\S+)/i;
+const sleep = delayMs => new Promise(resolve => setTimeout(resolve, delayMs));
 
 const safeString = (value, maximum = 4096) => typeof value === "string" && value.length > 0
   && !value.includes("\0") && Buffer.byteLength(value, "utf8") <= maximum;
@@ -129,16 +130,22 @@ export async function sendHerdrMessage({
   message,
   timeoutMs = 30_000,
   verificationAttempts = 3,
+  verificationDelayMs = 100,
   herdr = "herdr",
   messageId = randomUUID(),
   runner = runHerdrCommand,
+  sleeper = sleep,
 } = {}) {
   if (![target, senderRole, repository, workspace, purpose, message, herdr, messageId].every(value => safeString(value, MAX_MESSAGE_BYTES))
     || (initiative === null) === (feature === null) || (initiative !== null && !safeString(initiative, 256))
     || (feature !== null && !safeString(feature, 256)) || typeof responseRequired !== "boolean"
     || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 300_000
     || !Number.isSafeInteger(verificationAttempts) || verificationAttempts < 1 || verificationAttempts > 10
-    || SECRET_LIKE.test(message)) return result("failed", { reason_code: "ARGUMENT_INVALID", target: target ?? null });
+    || !Number.isSafeInteger(verificationDelayMs) || verificationDelayMs < 1 || verificationDelayMs > 2_000
+    || typeof sleeper !== "function") return result("failed", { reason_code: "ARGUMENT_INVALID", target: target ?? null });
+  const text = envelope({ senderRole, initiative, feature, repository, workspace, purpose, responseRequired, message, messageId });
+  if (SECRET_LIKE.test(text)) return result("failed", { reason_code: "ARGUMENT_INVALID", target });
+  if (Buffer.byteLength(text, "utf8") > MAX_MESSAGE_BYTES) return result("failed", { reason_code: "MESSAGE_TOO_LARGE", target, message_id: messageId });
   if (!(await capabilities(herdr, runner))) return result("unavailable", { reason_code: "CAPABILITY_UNAVAILABLE", target });
   let discovered = await discover(herdr, target, runner);
   if (!discovered.ok) return result("failed", { reason_code: discovered.reason_code, target });
@@ -151,8 +158,6 @@ export async function sendHerdrMessage({
     }
   }
   const paneId = discovered.agent.pane_id;
-  const text = envelope({ senderRole, initiative, feature, repository, workspace, purpose, responseRequired, message, messageId });
-  if (Buffer.byteLength(text, "utf8") > MAX_MESSAGE_BYTES) return result("failed", { reason_code: "MESSAGE_TOO_LARGE", target, pane_id: paneId, message_id: messageId });
   const staged = await runner([herdr, "agent", "send", target, text]);
   if (staged?.code !== 0) return result("failed", { reason_code: staged?.error ?? "STAGE_FAILED", target, pane_id: paneId, message_id: messageId });
   const revalidated = await discover(herdr, target, runner);
@@ -169,6 +174,7 @@ export async function sendHerdrMessage({
     if (read?.code === 0 && transcriptText(read.stdout).includes(`message_id: ${messageId}`)) {
       return result("received", { target, pane_id: paneId, message_id: messageId, staged: true, submitted: true });
     }
+    if (attempt + 1 < verificationAttempts) await sleeper(Math.min(verificationDelayMs * (2 ** attempt), 2_000));
   }
   return result("submitted-unverified", { reason_code: "RECEIPT_UNVERIFIED", target, pane_id: paneId, message_id: messageId, staged: true, submitted: true });
 }

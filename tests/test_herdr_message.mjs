@@ -67,7 +67,8 @@ for (const status of ["working", "blocked", "unknown"]) {
 {
   const value = fake({ initialStatus: "working", afterWaitStatus: "idle" });
   assert.equal((await sendHerdrMessage({ ...base, runner: value.runner })).status, "received");
-  assert.ok(value.calls.some(argv => argv.slice(1, 3).join(" ") === "agent wait"));
+  const wait = value.calls.find(argv => argv.slice(1, 3).join(" ") === "agent wait");
+  assert.deepEqual(wait.slice(1, 7), ["agent", "wait", target, "--status", "idle", "--timeout"]);
 }
 
 {
@@ -86,10 +87,15 @@ for (const status of ["working", "blocked", "unknown"]) {
 
 {
   const value = fake({ receipt: false });
-  const result = await sendHerdrMessage({ ...base, runner: value.runner, verificationAttempts: 2 });
+  const delays = [];
+  const result = await sendHerdrMessage({
+    ...base, runner: value.runner, verificationAttempts: 2,
+    sleeper: async delayMs => { delays.push(delayMs); },
+  });
   assert.equal(result.status, "submitted-unverified");
   assert.equal(value.calls.filter(argv => argv.slice(1, 3).join(" ") === "agent send").length, 1, "unverified receipt must not resend");
   assert.equal(value.calls.filter(argv => argv.slice(1, 3).join(" ") === "agent read").length, 2);
+  assert.deepEqual(delays, [100]);
 }
 
 {
@@ -107,6 +113,13 @@ for (const status of ["working", "blocked", "unknown"]) {
 {
   const value = fake();
   const result = await sendHerdrMessage({ ...base, message: "token=super-secret-value-1234567890", runner: value.runner });
+  assert.equal(result.reason_code, "ARGUMENT_INVALID");
+  assert.equal(value.calls.length, 0);
+}
+
+{
+  const value = fake();
+  const result = await sendHerdrMessage({ ...base, purpose: "token=super-secret-value-1234567890", runner: value.runner });
   assert.equal(result.reason_code, "ARGUMENT_INVALID");
   assert.equal(value.calls.length, 0);
 }

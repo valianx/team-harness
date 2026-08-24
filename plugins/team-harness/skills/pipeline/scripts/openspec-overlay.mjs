@@ -129,7 +129,7 @@ async function readRegular(root, relative) {
   return { bytes, canonical };
 }
 
-function validMapping(item, expectedPrefix, sourceIds, qualityIds, findings) {
+function validMapping(item, expectedPrefix, expectedShardRoot, sourceIds, qualityIds, findings) {
   const baseKeys = expectedPrefix === "AC"
     ? ["id", "sources", "classification", "rationale", "evidence_anchor"]
     : ["id", "sources", "classification", "rationale", "owner", "specialist", "shard_path", "files", "dependencies", "required_invariants", "technical_constraints", "quality_command_ids", "pre_implementation_test", "required_evidence_anchors", "cross_runtime_preservation", "rollback", "delivery_group"];
@@ -153,6 +153,7 @@ function validMapping(item, expectedPrefix, sourceIds, qualityIds, findings) {
   }
   if (![item.owner, item.specialist, item.rollback, item.delivery_group].every(value => safeString(value, 512))
     || !safeRelative(item.shard_path) || !SHARD_PATH.test(item.shard_path)
+    || !item.shard_path.startsWith(`${expectedShardRoot}/`)
     || !Array.isArray(item.files) || item.files.length === 0 || new Set(item.files).size !== item.files.length || !item.files.every(safeRelative)
     || !Array.isArray(item.dependencies) || new Set(item.dependencies).size !== item.dependencies.length || !item.dependencies.every(id => ITEM_ID.test(id) && id.startsWith("Task-"))
     || !Array.isArray(item.required_invariants) || new Set(item.required_invariants).size !== item.required_invariants.length || !item.required_invariants.every(value => ANCHOR_ID.test(value))
@@ -224,9 +225,12 @@ export async function validateOpenSpecOverlay({ workspace, snapshot = "inputs/op
         const qualityIds = new Set(Array.isArray(overlay.quality_commands) ? overlay.quality_commands.map(command => command.id) : []);
         const acceptance = Array.isArray(overlay.acceptance_items) ? overlay.acceptance_items : [];
         const execution = Array.isArray(overlay.execution_items) ? overlay.execution_items : [];
+        const expectedShardRoot = traceability === "plan/openspec-traceability.json"
+          ? "plan/tasks"
+          : `${path.posix.dirname(traceability)}/tasks`;
         if (acceptance.length + execution.length === 0 || acceptance.length + execution.length > MAX_ITEMS) findings.push(finding("ITEM_SCHEMA_INVALID", "items"));
-        for (const item of acceptance) validMapping(item, "AC", sourceIds, qualityIds, findings);
-        for (const item of execution) validMapping(item, "Task", sourceIds, qualityIds, findings);
+        for (const item of acceptance) validMapping(item, "AC", expectedShardRoot, sourceIds, qualityIds, findings);
+        for (const item of execution) validMapping(item, "Task", expectedShardRoot, sourceIds, qualityIds, findings);
         const allItems = [...acceptance, ...execution];
         const itemIds = allItems.map(item => item?.id);
         if (new Set(itemIds).size !== itemIds.length) findings.push(finding("ITEM_DUPLICATE", "items"));

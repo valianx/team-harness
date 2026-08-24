@@ -39,7 +39,7 @@ Bump the new-run state schema to `pipeline_version: 4`. The initiative root owns
 - `openspec_aggregate_path` and `openspec_aggregate_sha256`: the ordered binding set, roles, dependencies, execution order, and child hashes;
 - initiative-level Gate-1 evidence bound to the aggregate hash.
 
-Single-repository v4 runs use zero or one binding, avoiding a second schema. Recovery reads v3 singular fields through a compatibility adapter that produces an in-memory one-element binding without moving its workspace or silently rewriting historical gate identity. New writes use v4 only.
+Single-repository v4 runs use exactly one binding, avoiding a second schema and preserving the fail-closed ownership requirement. Recovery reads v3 singular fields through a compatibility adapter that produces an in-memory one-element binding without moving its workspace or silently rewriting historical gate identity. New writes use v4 only.
 
 Alternative considered: retain one `00-state.md` per service and add an overview index. Rejected because it leaves gate authority and binding freshness distributed across several mutable state files—the defect the coordinator workspace is intended to remove.
 

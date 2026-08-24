@@ -79,7 +79,7 @@ writable changes aggregate identity and invalidates an unconsumed presentation.
 **Safety floors.** Security runs exactly as configured within each project — initiative mode never waives, batches, or weakens a security gate. With `initiative: null` the pipeline is byte-identical to the single-project path.
 
 **Observability.** The coordinator root owns the lifecycle stream with
-`initiative.start` / `project.start` / `project.end` / `initiative.converge`.
+`initiative.start` / `service.start` / `service.end` / `initiative.converge`.
 Service-scoped events carry the service binding explicitly; service folders may
 hold evidence but never a competing coordinator state or gate stream.
 

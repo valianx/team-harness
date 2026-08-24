@@ -15,6 +15,12 @@ export const CONSOLIDATED_GATE1_SCHEMA_VERSION = 1;
 const MAX_BYTES = 1024 * 1024;
 const SHA256 = /^[a-f0-9]{64}$/;
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const ERROR_CODES = new Set([
+  "WORKSPACE_INVALID", "ARTIFACT_INVALID", "ARGUMENT_INVALID", "BINDING_INVALID", "BINDING_STALE",
+  "AGGREGATE_STALE", "AGGREGATE_INVALID", "OVERLAY_INVALID", "REPOSITORY_IDENTITY_MISMATCH",
+  "REPOSITORY_IDENTITY_UNREADABLE", "SNAPSHOT_INVALID", "SOURCE_CHANGED", "TASK_INTENT_CHANGED",
+  "TASK_PROGRESS_INVALID", "PROGRESS_INVALID", "ATOMIC_TRANSITION_REQUIRED",
+]);
 
 const safeString = (value, maximum = 4096) => typeof value === "string" && value.length > 0
   && !value.includes("\0") && Buffer.byteLength(value, "utf8") <= maximum;
@@ -25,6 +31,7 @@ const contained = (root, target) => {
   return relative === "" || (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
 };
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
+const errorCode = (error, fallback) => ERROR_CODES.has(error?.message) ? error.message : fallback;
 
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
@@ -84,6 +91,7 @@ function validBindingShape(binding) {
     && safeString(binding.planning_root) && path.isAbsolute(binding.planning_root)
     && safeString(binding.schema, 128) && safeString(binding.cli_version, 128)
     && safeString(binding.generated_skill_identity, 2048)
+    && SHA256.test(binding.task_intent_sha256 ?? "") && binding.strict_validation === "pass"
     && binding.snapshot_path === expectedSnapshotPath(binding.service) && SHA256.test(binding.snapshot_sha256 ?? "")
     && binding.overlay_path === expectedOverlayPath(binding.service) && SHA256.test(binding.overlay_sha256 ?? "");
 }
@@ -158,8 +166,9 @@ export async function createOpenSpecBindingsManifest({
   target = "inputs/openspec-bindings.json",
 } = {}) {
   let root;
-  try { root = await workspaceRoot(workspace); } catch (error) { return result("create", "fail", error.message); }
-  if (!Array.isArray(bindings) || bindings.length === 0 || !Array.isArray(executionOrder)) return result("create", "fail", "ARGUMENT_INVALID");
+  try { root = await workspaceRoot(workspace); } catch (error) { return result("create", "fail", errorCode(error, "WORKSPACE_INVALID")); }
+  if (!Array.isArray(bindings) || bindings.length === 0 || !Array.isArray(evidenceRepositories)
+    || !Array.isArray(dependencies) || !Array.isArray(executionOrder)) return result("create", "fail", "ARGUMENT_INVALID");
   const normalized = [];
   for (const supplied of bindings) {
     const service = supplied?.service;
@@ -170,6 +179,7 @@ export async function createOpenSpecBindingsManifest({
       const snapshotFile = await readWorkspaceFile(root, snapshotPath);
       const overlayFile = await readWorkspaceFile(root, overlayPath);
       const snapshot = JSON.parse(snapshotFile.bytes.toString("utf8"));
+      const taskArtifact = snapshot?.artifacts?.find(item => item.artifact_id === "tasks");
       if (!isOpenSpecSnapshot(snapshot) || path.resolve(snapshot.repository.root) !== path.resolve(supplied.repository_root)
         || snapshot.change.name !== supplied.change_name || path.resolve(snapshot.change.root) !== path.resolve(supplied.planning_root)
         || snapshot.change.schema !== supplied.schema || snapshot.toolchain.openspec_version !== supplied.cli_version) {
@@ -192,16 +202,21 @@ export async function createOpenSpecBindingsManifest({
         schema: supplied.schema,
         cli_version: supplied.cli_version,
         generated_skill_identity: supplied.generated_skill_identity,
+        task_intent_sha256: taskArtifact.intent_sha256,
+        strict_validation: "pass",
         snapshot_path: snapshotPath,
         snapshot_sha256: digest(snapshotFile.bytes),
         overlay_path: overlayPath,
         overlay_sha256: digest(overlayFile.bytes),
       });
     } catch (error) {
-      return result("create", "fail", error.message || "ARTIFACT_INVALID", { failed_binding: service });
+      return result("create", "fail", errorCode(error, "ARTIFACT_INVALID"), { failed_binding: service });
     }
   }
-  const evidence = evidenceRepositories.map(value => ({ ...value, repository_root: path.resolve(value.repository_root ?? "") }));
+  if (evidenceRepositories.some(value => !safeString(value?.repository_root) || !path.isAbsolute(value.repository_root))) {
+    return result("create", "fail", "BINDING_INVALID");
+  }
+  const evidence = evidenceRepositories.map(value => ({ ...value, repository_root: path.resolve(value.repository_root) }));
   const manifest = { schema_version: OPENSPEC_BINDINGS_SCHEMA_VERSION, kind: "team_harness_openspec_bindings", bindings: normalized, evidence_repositories: evidence, dependencies, execution_order: executionOrder };
   if (!isOpenSpecBindingsManifest(manifest)) return result("create", "fail", "BINDING_INVALID");
   const bytes = canonicalJsonBytes(manifest);
@@ -223,7 +238,7 @@ export async function verifyOpenSpecBindingsManifest({
   overlayValidator = validateOpenSpecOverlay,
 } = {}) {
   let root;
-  try { root = await workspaceRoot(workspace); } catch (error) { return result("verify", "fail", error.message); }
+  try { root = await workspaceRoot(workspace); } catch (error) { return result("verify", "fail", errorCode(error, "WORKSPACE_INVALID")); }
   let aggregateFile;
   let manifest;
   try {
@@ -231,7 +246,7 @@ export async function verifyOpenSpecBindingsManifest({
     if (!SHA256.test(aggregateSha256 ?? "") || digest(aggregateFile.bytes) !== aggregateSha256) throw new Error("AGGREGATE_STALE");
     manifest = JSON.parse(aggregateFile.bytes.toString("utf8"));
     if (!isOpenSpecBindingsManifest(manifest) || !canonicalJsonBytes(manifest).equals(aggregateFile.bytes)) throw new Error("AGGREGATE_INVALID");
-  } catch (error) { return result("verify", "fail", error.message || "AGGREGATE_INVALID"); }
+  } catch (error) { return result("verify", "fail", errorCode(error, "AGGREGATE_INVALID")); }
   for (const binding of manifest.bindings) {
     try {
       if (await repositoryIdentityReader(binding.repository_root) !== binding.repository_identity) throw new Error("REPOSITORY_IDENTITY_MISMATCH");
@@ -250,7 +265,7 @@ export async function verifyOpenSpecBindingsManifest({
       });
       if (overlayResult?.verdict !== "pass") throw new Error(overlayResult?.error_code ?? "OVERLAY_INVALID");
     } catch (error) {
-      return result("verify", "fail", error.message || "BINDING_INVALID", {
+      return result("verify", "fail", errorCode(error, "BINDING_INVALID"), {
         aggregate_path: aggregateFile.path, aggregate_sha256: digest(aggregateFile.bytes), failed_binding: binding.service,
       });
     }

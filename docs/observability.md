@@ -382,8 +382,8 @@ Written by `hooks/ts/dist/precompact-snapshot.cjs` (PreCompact event, matcher
 `manual|auto`). Appended to when the hook successfully snapshots `00-state.md`
 before context compaction. The file sits in the same directory as the snapshot:
 
-- **local mode:** `{persisted workspace_identity.workspace}/00-precompact.jsonl`
-- **obsidian mode:** `{persisted workspace_identity.workspace}/00-precompact.jsonl`
+- **local mode:** `{persisted workspace_identity.coordinator_root}/00-precompact.jsonl`
+- **obsidian mode:** `{persisted workspace_identity.coordinator_root}/00-precompact.jsonl`
 
 Line schema:
 ```json
@@ -447,7 +447,7 @@ It shares the one coordinator root with `00-state.md` and the lifecycle stream.
 
 Full template and section-ownership map: `agents/ref-dispatch-machinery.md § "overview.md — you are the sole writer"`.
 
-## Initiative-level trace (serial multi-project sequencing)
+## Initiative-level trace (serial multi-service sequencing)
 
 **No parallel coordinator fan-out exists.** The coordinator fusion retires the multi-task
 fan-out with its consolidator and the parallel multi-project dispatch that spawned one
@@ -470,12 +470,12 @@ the sole lifecycle stream so `/trace` and `/th:pipelines` can render grouping:
 
 | Event | Fields | When emitted |
 |-------|--------|--------------|
-| `initiative.start` | `initiative`, `eligible_projects[]` | Before the first project's Stage 1 begins |
-| `project.start` | `project`, `initiative` | When a project's own pipeline begins |
-| `project.end` | `project`, `initiative`, `status` (success/failed/iterating) | When a project's pipeline completes or is blocked |
-| `initiative.converge` | `initiative`, `projects[]` (project + status per project) | When every eligible project has run |
+| `initiative.start` | `initiative`, `eligible_services[]` | Before the first service's Stage 1 begins |
+| `service.start` | `service`, `initiative` | When a service's own pipeline begins |
+| `service.end` | `service`, `initiative`, `status` (success/failed/iterating) | When a service's pipeline completes or is blocked |
+| `initiative.converge` | `initiative`, `services[]` (service + status per service) | When every eligible service has run |
 
-Each event carries a `project` key so `/trace` can group events by project.
+Each service-scoped event carries a `service` key so `/trace` can group events by service.
 
 Service-scoped `phase.*` and agent events carry a `service` key in this same
 stream. Service directories may contain validation evidence but never a second

@@ -110,6 +110,11 @@ complete discovery/send/submit/verify transaction. `unavailable` permits the
 normal native dispatch path. A busy or unverifiable result is durable pending
 state and never evidence of receipt or authority for a blind resend. Native
 permission gates and the coordinator's sole state ownership remain unchanged.
+Persist the adapter's complete result in `herdr_deliveries` before any recovery
+or retry. For a pending or failed transaction, first read the same target and
+prove that the recorded `message_id` is absent from committed input. Busy,
+unverifiable, and pending results never count as receipt and never permit a
+blind resend; without absence proof, keep the transaction pending and inspect.
 
 ## Voice
 
@@ -762,7 +767,7 @@ the sensitive-path list itself lives in `docs/pipeline-lanes.md § "2a. What cou
 work when every other direct predicate passes; no second confirmation, default-N, veto, or
 forced pipeline applies. A warning or audit note is informational, while runtime/native,
 destructive-action, and outward-action approvals remain unchanged. An explicit live
-pipeline activation creates the v3 state machine. Legacy markers never select either
+pipeline activation creates the v4 state machine. Legacy markers never select either
 posture.
 
 ### 14–17

@@ -5,7 +5,7 @@ Defines a safe and verifiable Team Harness protocol for communicating with agent
 ## ADDED Requirements
 
 ### Requirement: HerdR messaging is capability-detected and optional
-Team Harness SHALL use HerdR coordination only after confirming that the `herdr` CLI and the required `agent list`, `agent send`, `agent read`, and `pane send-keys` operations are available. Absence or incompatibility MUST produce an explicit unavailable disposition and SHALL NOT weaken normal native-agent, tmux, background, gate, permission, or workspace contracts.
+Team Harness SHALL use HerdR coordination only after confirming that the `herdr` CLI and the required `agent list`, `agent wait`, `agent send`, `agent read`, and `pane send-keys` operations are available. Absence or incompatibility MUST produce an explicit unavailable disposition and SHALL NOT weaken normal native-agent, tmux, background, gate, permission, or workspace contracts.
 
 #### Scenario: HerdR is unavailable
 - **WHEN** an agent attempts to use the shared HerdR protocol and the required CLI operations are unavailable
@@ -53,6 +53,8 @@ Every TH-originated HerdR message SHALL identify the sending agent role, initiat
 
 ### Requirement: Receipt is verified from the target transcript
 After submission, Team Harness SHALL run `herdr agent read` for the same verified target and determine whether the submitted message appears as committed input rather than an editable prompt buffer. It SHALL report one of `received`, `submitted-unverified`, `staged-not-submitted`, `pending-busy`, or `failed`; only transcript evidence of committed input permits `received`. Verification MAY use bounded retries but MUST NOT duplicate the message unless it proves the prior submission did not occur.
+
+The coordinator SHALL persist the returned `message_id` and status before any recovery or retry. A retry MUST first prove through a bounded read of the same verified target that the prior submission is absent. Busy, pending, or inconclusive evidence MUST preserve pending state and MUST NOT authorize a blind resend.
 
 #### Scenario: Transcript confirms committed input
 - **WHEN** the post-submit read shows the bounded message committed in the target transcript

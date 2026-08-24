@@ -36,7 +36,6 @@ async function canonicalDirectory(value, label) {
   const stat = await lstat(requested);
   if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error(`${label} must be a non-symlink directory`);
   const canonical = await realpath(requested);
-  if (canonical !== requested) throw new Error(`${label} must be canonical`);
   return canonical;
 }
 
@@ -75,6 +74,7 @@ export function isWorkspaceIdentity(value) {
     || (value.initiative !== null && !SLUG.test(value.initiative))
     || !Array.isArray(value.services) || !Array.isArray(value.evidence_repositories)) return false;
   if (value.workspace_kind === "single" ? value.feature === null || value.initiative !== null : value.initiative === null || value.feature !== null) return false;
+  if (value.workspace_kind === "single" ? value.services.length !== 1 : value.services.length < 2) return false;
   const entries = [...value.services, ...value.evidence_repositories];
   if (entries.some(entry => !entry || !SLUG.test(entry.service ?? "") || !safeString(entry.root)
     || !path.isAbsolute(entry.root) || !safeString(entry.identity, 1024)
@@ -162,8 +162,11 @@ export async function discoverWorkspaceIdentity({ searchRoot, slug, repositoryId
   let root;
   try { root = await canonicalDirectory(searchRoot, "search root"); }
   catch { return { status: "invalid", identity: null, candidates: [] }; }
+  let dirents;
+  try { dirents = await readdir(root, { withFileTypes: true }); }
+  catch { return { status: "invalid", identity: null, candidates: [] }; }
   const matches = [];
-  for (const entry of await readdir(root, { withFileTypes: true })) {
+  for (const entry of dirents) {
     if (!entry.isDirectory() || !new RegExp(`^\\d{4}-\\d{2}-\\d{2}_${slug}$`).test(entry.name)) continue;
     const candidateRoot = path.join(root, entry.name);
     const identityPath = path.join(candidateRoot, "inputs", "workspace-identity.json");

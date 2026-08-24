@@ -47,7 +47,8 @@ report artifacts; they never write state, releases, nonces, or gate events and
 never speak for the operator. Write `next_action` before every dispatch and
 record its result before advancing. Preserve unrelated changes.
 
-The absolute `workspace` selected directly by `logs_mode` and the effective
+The absolute `workspace_identity.coordinator_root` selected directly by
+`workspace_identity.logs_mode` and the effective
 mode become immutable identity at the first state write. Every
 artifact and event for that run stays below that one canonical root. A
 permission failure, restart, recovery, or configured-root change never
@@ -63,11 +64,12 @@ pipeline_version: 4
 plan_format: sharded-v1
 openspec_preflight: pending|ready|provisionable|blocked-prerequisite|invalid-project|null
 openspec_design_pass: preflight|provisioning|planning|snapshot|overlay|gate1-ready|null
-workspace_identity: {schema_version, mode, kind, workspace, initiative, repo_base, date, services, evidence_repositories}
-openspec_bindings: [{service, repository_root, repository_identity, change, snapshot_path, snapshot_sha256, overlay_path, overlay_sha256}]
-evidence_repositories: [{service, repository_root, repository_identity, disposition}]
+workspace_identity: {schema_version, kind, workspace_kind, logs_mode, coordinator_root, repo_base, date, feature, initiative, services, evidence_repositories}
+openspec_bindings: [{service, role, repository_root, repository_identity, change_name, planning_root, schema, cli_version, generated_skill_identity, task_intent_sha256, strict_validation, preflight, design_pass, snapshot_path, snapshot_sha256, overlay_path, overlay_sha256}]
+evidence_repositories: [{service, role: evidence-only, repository_root, repository_identity, purpose}]
 openspec_aggregate_path: inputs/openspec-bindings.json|null
 openspec_aggregate_sha256: {SHA-256|null}
+herdr_deliveries: [{message_id, target, pane_id, status, reason_code, staged, submitted, verified}]
 activation: explicit
 type: feature|fix|refactor|hotfix|enhancement
 feature: {kebab-case slug}

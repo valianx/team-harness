@@ -8,16 +8,22 @@ Use the packaged `skills/pipeline/scripts/herdr-message.mjs` adapter. Do not rep
 
 The adapter owns this exact sequence:
 
-1. Confirm the required HerdR agent and pane operations exist.
+1. Confirm the required HerdR `agent list`, `agent wait`, `agent send`, `agent read`, and `pane send-keys` operations exist.
 2. Run `herdr agent list`; resolve one exact agent name and its pane. Never infer from a partial name, cwd, unlabeled terminal, or old transcript.
 3. Treat `working`, `blocked`, and `unknown` as busy. Wait boundedly for `idle`, then list and revalidate. On timeout return `pending-busy` without staging text.
 4. Identify the sender role, initiative or feature, repository, workspace, purpose, response expectation, and non-secret message id in the bounded message envelope.
 5. Stage literal text with `herdr agent send <target> <text>`.
 6. Re-list and require the same idle target-to-pane mapping.
 7. Submit with `herdr pane send-keys <pane> enter`.
-8. Verify committed input with `herdr agent read` for the same target.
+8. Verify committed input with bounded, delayed `herdr agent read` attempts for the same target.
 
 Only a verified committed transcript entry is `received`. A successful stage followed by a failed Enter is `staged-not-submitted`; a successful Enter without conclusive read evidence is `submitted-unverified`. Neither status authorizes blind resend. Never ask the operator to press Enter to repair an agent contract mistake; return the bounded status and retry only when the prior submission is proven absent.
+
+The coordinator persists the complete adapter result and `message_id` before
+recovery or retry. A retry first reads the same verified target and requires
+proof that committed input does not contain that prior `message_id`. Busy,
+pending, or inconclusive evidence leaves the transaction pending; it never
+authorizes another send.
 
 ## Safety
 

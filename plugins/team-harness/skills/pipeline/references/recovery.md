@@ -8,7 +8,7 @@ gate, and remains the sole writer of state, events, releases, and nonces.
 ## Workspace discovery
 
 Discover candidates with `../scripts/workspace-identity.mjs`. A v4 candidate is
-valid only when its persisted `workspace_identity.workspace` equals its canonical
+valid only when its persisted `workspace_identity.coordinator_root` equals its canonical
 directory and the identity remains internally consistent. Never recompute its
 date or move it after configuration changes. For v3 compatibility, select the
 candidate whose state records its immutable absolute `workspace`; map singular
@@ -75,7 +75,7 @@ When legacy state is found, stop and present exactly these live choices:
 
 ```text
 1 — inline    → administrative close, then direct work outside the machine
-2 — pipeline  → explicit migration to the v3 pipeline
+2 — pipeline  → explicit migration to the v4 pipeline
 ```
 
 The choice must come from the current operator reply. No state field, marker,

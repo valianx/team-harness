@@ -39,3 +39,10 @@
 - [x] 6.2 Run `node tools/codex-runtime/generate.mjs --check`, `node tools/codex-runtime/test_generate.mjs`, skill synchronization checks, Team Harness lint, and the relevant shared-runtime test suite.
 - [x] 6.3 Run `openspec validate harden-multi-repo-coordination-contract --strict` and reconcile any planning/implementation drift before completion.
 - [x] 6.4 After behavioral validation passes, update the patch-version release sites and changelog together, rerun release/version validation, and leave publication or push behind its separate live approval.
+
+## 7. Review hardening
+
+- [x] 7.1 Align the documented v4 workspace, binding, evidence, service-event, and HerdR persistence schemas with their canonical adapters.
+- [x] 7.2 Fail closed on workspace/binding membership drift, missing aggregate identity, missing evidence roots, and unbounded adapter exception codes.
+- [x] 7.3 Record task-intent and strict-validation results in each binding and bind per-service shard ownership to its traceability path.
+- [x] 7.4 Verify the installed HerdR wait contract, add full-envelope secret checks and bounded verification backoff, and cover review regressions in focused tests.

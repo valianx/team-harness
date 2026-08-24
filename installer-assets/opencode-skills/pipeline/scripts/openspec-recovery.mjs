@@ -47,10 +47,18 @@ function result(verdict, actionCode, nextAction = null, errorCode = null) {
 
 function validV4Binding(value) {
   return value && typeof value === "object" && !Array.isArray(value) && CHANGE.test(value.service ?? "")
-    && value.role === "writable-owner" && safeString(value.repository_root) && safeString(value.repository_identity)
-    && CHANGE.test(value.change_name ?? "") && safeString(value.planning_root) && PREFLIGHT.has(value.preflight)
+    && value.role === "writable-owner" && safeString(value.repository_root) && path.isAbsolute(value.repository_root)
+    && safeString(value.repository_identity) && CHANGE.test(value.change_name ?? "")
+    && safeString(value.planning_root) && path.isAbsolute(value.planning_root) && PREFLIGHT.has(value.preflight)
     && PASSES.has(value.design_pass) && safeRelative(value.snapshot_path) && SHA256.test(value.snapshot_sha256 ?? "")
-    && safeRelative(value.overlay_path) && SHA256.test(value.overlay_sha256 ?? "");
+    && safeRelative(value.overlay_path) && SHA256.test(value.overlay_sha256 ?? "")
+    && SHA256.test(value.task_intent_sha256 ?? "") && value.strict_validation === "pass";
+}
+
+function sameServices(left, right) {
+  if (left.length !== right.length) return false;
+  const expected = right.slice().sort();
+  return left.slice().sort().every((value, index) => value === expected[index]);
 }
 
 /** Normalize historical singular state in memory without mutating or relocating its workspace. */
@@ -62,9 +70,20 @@ export function normalizeOpenSpecRecoveryState(state) {
       || new Set(state.openspec_bindings.map(binding => binding.service)).size !== state.openspec_bindings.length
       || !Array.isArray(state.evidence_repositories)
       || state.evidence_repositories.some(value => !value || value.role !== "evidence-only" || !CHANGE.test(value.service ?? "")
-        || !safeString(value.repository_root) || !safeString(value.repository_identity) || !safeString(value.purpose))
+        || !safeString(value.repository_root) || !path.isAbsolute(value.repository_root)
+        || !safeString(value.repository_identity) || !safeString(value.purpose))
       || new Set([...state.openspec_bindings, ...state.evidence_repositories].map(value => value.service)).size
         !== state.openspec_bindings.length + state.evidence_repositories.length
+      || !sameServices(state.openspec_bindings.map(value => value.service), state.workspace_identity.services.map(value => value.service))
+      || !sameServices(state.evidence_repositories.map(value => value.service), state.workspace_identity.evidence_repositories.map(value => value.service))
+      || state.openspec_bindings.some(value => {
+        const identity = state.workspace_identity.services.find(entry => entry.service === value.service);
+        return path.resolve(value.repository_root) !== path.resolve(identity.root) || value.repository_identity !== identity.identity;
+      })
+      || state.evidence_repositories.some(value => {
+        const identity = state.workspace_identity.evidence_repositories.find(entry => entry.service === value.service);
+        return path.resolve(value.repository_root) !== path.resolve(identity.root) || value.repository_identity !== identity.identity;
+      })
       || state.openspec_aggregate_path !== "inputs/openspec-bindings.json"
       || !SHA256.test(state.openspec_aggregate_sha256 ?? "") || !PASSES.has(state.openspec_design_pass)) return null;
     return {
@@ -101,7 +120,10 @@ export function normalizeOpenSpecRecoveryState(state) {
 }
 
 async function recoverV4({ normalized, workspace, bindingsVerifier }) {
-  if (path.resolve(normalized.workspace_identity.coordinator_root) !== path.resolve(workspace)) {
+  let coordinatorRoot;
+  try { coordinatorRoot = await realpath(path.resolve(normalized.workspace_identity.coordinator_root)); }
+  catch { return result("blocked", null, null, "WORKSPACE_IDENTITY_MISMATCH"); }
+  if (coordinatorRoot !== workspace) {
     return result("blocked", null, null, "WORKSPACE_IDENTITY_MISMATCH");
   }
   const blockedBinding = normalized.bindings.find(binding => ["blocked-prerequisite", "invalid-project"].includes(binding.preflight));
@@ -131,7 +153,9 @@ async function recoverV4({ normalized, workspace, bindingsVerifier }) {
     const suffix = verified?.failed_binding ? ` for ${verified.failed_binding}` : "";
     return result("blocked", "RECONCILE_BINDINGS", `reconcile changed OpenSpec bindings${suffix}`, verified?.error_code ?? "BINDING_INVALID");
   }
-  if (path.resolve(verified.aggregate_path ?? aggregatePath) !== path.resolve(aggregatePath)) return result("blocked", null, null, "AGGREGATE_IDENTITY_MISMATCH");
+  if (!safeString(verified.aggregate_path) || path.resolve(verified.aggregate_path) !== path.resolve(aggregatePath)) {
+    return result("blocked", null, null, "AGGREGATE_IDENTITY_MISMATCH");
+  }
   return result("resume", "PRESENT_CONSOLIDATED_GATE_1", "present consolidated STAGE-GATE-1");
 }
 
