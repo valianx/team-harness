@@ -94,6 +94,28 @@ for (const [path, content] of agentOutputs) {
   );
 }
 
+for (const name of ["reviewer", "pr-review-qa", "pr-review-security", "reviewer-consolidator"]) {
+  const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
+  assert.match(content, /metadata, not project paths to open/, `${name} may infer its source marker as project context`);
+  assert.match(content, /run that verification before `sed` or any content read/, `${name} may read before path verification`);
+  assert.match(content, /required-read-failed/, `${name} does not distinguish required-read failure`);
+  assert.match(content, /failed_read_path/, `${name} cannot report the failed coordinate`);
+  assert.doesNotMatch(content, /If a bounded read actually fails, return the exact read failure to Main/,
+    `${name} still promotes every failed inferred read to fatal transport failure`);
+}
+
+for (const name of ["reviewer", "pr-review-qa", "pr-review-security"]) {
+  const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
+  assert.match(content, /Changed-files membership only nominates a project candidate/,
+    `${name} treats changed-files membership as sufficient read authorization`);
+  assert.match(content, /non-symlink regular file/,
+    `${name} may follow a symlink while reading frozen worktree content`);
+  assert.match(content, /resolved path remains inside the detached worktree/,
+    `${name} does not constrain resolved content paths to the frozen worktree`);
+  assert.match(content, /Read deleted-file evidence from the supplied diff only/,
+    `${name} may attempt to read a deleted path from the head worktree`);
+}
+
 const projectConfig = first.files.get(join(root, ".codex/config.toml"));
 assert.doesNotMatch(projectConfig, /^model = /m, "project fallback must not override Main's model");
 assert.doesNotMatch(projectConfig, /^model_reasoning_effort = /m, "project fallback must not override Main's effort");

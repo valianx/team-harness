@@ -27,6 +27,19 @@ the frozen worktree. Missing optional drafts mean the lens did not run. Every su
 must contain a `Reviewed:` SHA matching the supplied SHA. A missing or different SHA — or a
 missing worktree coordinate — returns `status: failed`, `failure_kind: stale-context`.
 
+The supplied draft coordinates are a closed read allowlist. Never infer a draft from an agent
+name, an instruction-source/semantic-source marker, or a conventional filename; `none` and an
+unsupplied optional draft are not read targets. Before opening code to adjudicate a cited finding,
+first prove that its exact repo-relative path is a regular existing leaf under the supplied frozen
+worktree using `Glob` or an exact file-list search. Never issue `Read`, `sed`, or another content
+read for an unverified candidate. An absent inferred path is skipped, not a transport failure.
+
+If a supplied draft, the worktree coordinate, or a verified existing cited worktree leaf cannot
+actually be read, return `failure_kind: required-read-failed` and `failed_read_path` with the exact
+coordinate. If you accidentally attempt an unverified path and it is absent, recover inside this
+run and continue from the supplied drafts. Never convert that mistake into
+`required-read-failed` or a generic filesystem transport failure.
+
 ## Language contract
 
 The consolidated review body follows the same language contract as `agents/reviewer.md`:
@@ -139,6 +152,7 @@ exceed that budget; remove optional prose first.
 agent: reviewer-consolidator
 status: success | failed | blocked
 failure_kind: kind
+failed_read_path: exact path # required only for required-read-failed
 model: effective-model-id
 output: inline
 reviewed_head_sha: exact supplied SHA

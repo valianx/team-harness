@@ -399,8 +399,91 @@ Diff Path: {DIFF}
 Changed Files Path: {FILES}
 ```
 
-Every lens returns its draft inline with the exact reviewed SHA and context hash. Reject a missing
-or mismatched value. After the strict post-dispatch snapshots pass, the coordinator alone persists
+### Read scope and failed-read recovery
+
+Treat every non-`none` artifact coordinate in a dispatch as required for that invocation. Before
+dispatch, verify each is a regular non-symlink leaf inside `$ARTIFACTS` or `$WORKTREE` as
+appropriate and verify that the frozen worktree coordinate is still the expected readable
+directory. Agent instruction-source and semantic-source markers are identity metadata, never
+project read coordinates.
+
+Reviewer agents start project reads from the supplied changed-files list. They may open another
+repo-relative worktree leaf only after an exact existence check proves it is a regular file under
+the frozen worktree. A conventional filename, remembered layout, unresolved import, or optional
+path whose coordinate is `none` is not evidence of existence. Do not open it. Deleted paths are
+read from the supplied diff, not guessed at the head worktree.
+
+This is coordinator-owned contract enforcement. A reviewer return or observed invocation is
+`agent-contract-invalid` when the dispatch contained a required coordinate but the agent claims it
+was missing, omits a required return field, proposes/uses an agent-chosen persistence path, treats
+missing standalone read tools as unavailable despite the runtime adapter, reads an unverified
+inferred path, or otherwise violates the declared read/return schema. These are TH execution
+defects, not operator decisions. The coordinator MUST diagnose and correct them automatically;
+never ask the operator whether or how to repair an agent contract.
+
+Classify a reviewer read failure from its exact failed path before deciding whether the review
+transport failed:
+
+- A non-`none` supplied artifact, the frozen worktree coordinate, or a project leaf independently
+  verified as existing but unreadable is `required-read-failed`: fail closed and do not preview or
+  publish.
+- A missing echoed reviewed SHA/context hash in an otherwise supplied packet is
+  `agent-contract-invalid` for the automatic correction below. A different echoed value, a
+  non-identical post-dispatch snapshot, or a failed identity/freshness comparison is an integrity
+  failure: fail closed. Never relabel actual identity drift as an agent mistake.
+- A nonexistent path that was neither supplied nor verified is an agent path-scope mistake, not a
+  filesystem transport failure. Reject that failed result, preserve the current artifacts and
+  worktree, and do not tell the operator to repair filesystem access.
+- A failure without the exact path or enough evidence to distinguish those cases fails closed.
+
+For every failed/blocked reviewer return, observed failed read, or mechanically invalid return,
+first compute the strict post-dispatch snapshot comparison and current freshness status, then run
+the packaged helper before taking a recovery action. Pass those actual statuses and every
+non-`none` artifact used by that dispatch as a repeated `--required-artifact`; never omit one to
+obtain a retry result:
+
+```bash
+python3 "$REVIEW_CONTEXT_HELPER" classify-agent-failure \
+  --artifact-root "$ARTIFACTS" --worktree "$WORKTREE" \
+  --required-artifact "$CONTEXT" --required-artifact "$DIFF" \
+  --required-artifact "$FILES" \
+  {--required-directory "$WORKSPACE" when Workspace Path is non-none} \
+  {--failed-path "<exact failed path>" when known} \
+  --contract-signal {none|missing-coordinate|missing-return-field|agent-persistence-path|missing-read-tools|unverified-path-read} \
+  --reviewed-sha-status {match|missing|mismatch} \
+  --context-hash-status {match|missing|mismatch} \
+  --snapshot-status {match|mismatch} --freshness-status {current|failed} \
+  --role {general|specialist|consolidator} --attempt {1|2}
+```
+
+Add the other required file paths for the role (conversation, checks, policy, linked issue, or
+supplied drafts) with `--required-artifact`; pass a non-`none` workspace path with
+`--required-directory`. The helper revalidates those coordinates and the frozen worktree and
+returns exactly one `decision`: `retry-contract`, `continue-comment`, or `fail-closed`. Its
+decision is authoritative; do not replace it with model judgment. A missing helper, malformed
+invocation, or helper error fails closed.
+
+When the helper returns `retry-contract`, its accepted snapshot/freshness inputs and coordinate
+preflight authorize only this correction: the coordinator mechanically rebuilds the packet from
+the already captured coordinates, names the exact violated contract rule and expected field/read
+scope, and dispatches one automatic correction using a fresh instance of the same agent identity
+against the same `head_oid`, `context_hash`, worktree, and supplied artifact coordinates. For a
+path mistake, also name the exact absent path as unavailable optional/inferred context that MUST
+NOT be opened. This correction needs no preview, approval, gate, or operator reply. Do not clean
+up, rebuild, or recapture the snapshot before it.
+
+Accept the replacement only when its identity matches and the strict post-dispatch snapshots pass.
+If a selected specialist returns another contract-invalid result, mark that specialist `absent
+after retry (agent contract)` and continue with every successful draft; never treat it as a clean
+lens. Any selected-lens absence forces the recommendation and body verdict to `COMMENT`, so an
+incomplete review cannot auto-approve while the normal preview/approval gate remains intact. Do
+not pause for operator guidance about that internal defect. A failed general-review draft or
+consolidation that leaves no trustworthy canonical draft still fails closed with the violated rule
+reported; the coordinator never fabricates findings or drops an unaccounted blocker.
+
+Every lens returns its draft inline with the exact reviewed SHA and context hash. A missing echo is
+`agent-contract-invalid` and follows the automatic classifier; reject a mismatched value as an
+identity failure. After the strict post-dispatch snapshots pass, the coordinator alone persists
 returns using this fixed mapping: reviewer body → `$ARTIFACTS/pr-review-draft.md`, reviewer findings →
 `$ARTIFACTS/pr-review-draft-inline.json`, QA → `$ARTIFACTS/pr-review-qa.md`, security →
 `$ARTIFACTS/pr-review-security.md`, consolidator body → `$ARTIFACTS/pr-review-final.md`, and consolidator
@@ -427,8 +510,8 @@ a failed consolidation, never a silent pass-through.
 `Checks:` naming each selected lens and its outcome — `ran`, `limited ({reason})`, or
 `absent after retry` — for example `Lenses: reviewer ran, qa limited (no operator oracle),
 security ran`. This line is coordinator-owned mechanical metadata; agents never write it. An
-absent selected lens must appear here, so a published APPROVE can never hide a lens that did not
-run.
+absent selected lens must appear here and forces `COMMENT`, so a published APPROVE can never hide
+a lens that did not run.
 
 While agents run, keep raw dispatch coordinates and identity validation silent. If a progress
 update is warranted, name the active agents and summarize their distinct review responsibilities

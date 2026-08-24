@@ -526,6 +526,47 @@ context hash, detached worktree, context path, diff path, and changed-files path
 SHA/hash values in every inline return. After strict worktree and artifact-root comparison, the
 coordinator persists each return at the skill's fixed path; agents never choose paths.
 
+Every non-`none` supplied artifact is required for its invocation. Agent instruction-source and
+semantic-source markers are metadata, not project paths. Changed-files membership only nominates a
+candidate: before any project content read, prove that the exact repo-relative path exists as a
+non-symlink regular file and that its resolved path remains inside the frozen worktree. A deleted
+changed-file path is evidence from `Diff Path` only and is never read from the head worktree. Apply
+the same proof to directly affected and cited paths; if it cannot be established, skip the path.
+Nonexistent inferred, conventional, unresolved-import, or optional paths are also skipped.
+Classify a failed read from its exact path: a supplied artifact, the worktree coordinate, or a
+verified-existing but unreadable project leaf is `required-read-failed` and fails closed; a
+nonexistent path that was neither supplied nor verified is an agent path-scope mistake, not a
+filesystem transport failure. A failure without an exact classifiable path also fails closed.
+
+The same automatic contract correction applies when an agent claims a supplied coordinate was
+missing, omits required return fields, proposes/uses its own persistence path, treats missing
+standalone read tools as unavailable despite its runtime adapter, or otherwise violates its
+read/return schema. Classify that return as `agent-contract-invalid`; it is a TH execution defect,
+not an operator decision. A different echoed SHA/hash, actual snapshot mutation, or failed
+freshness check remains an integrity failure, never a correctable contract defect.
+
+Invoke the packaged `review_context.py classify-agent-failure` subcommand for each such return,
+after computing the strict snapshot comparison and current freshness. Pass every non-`none` file
+coordinate as `--required-artifact`; include the workspace as `--required-directory` only when
+`Workspace Path` is not `none`. Pass the exact failed path when known, identity, actual
+snapshot/freshness status, role class, and attempt number.
+Follow only its `retry-contract`,
+`continue-comment`, or `fail-closed` decision. A missing helper, omitted required artifact,
+malformed invocation, or helper error fails closed; never replace the executable classification
+with coordinator judgment.
+
+On `agent-contract-invalid`, require byte-identical worktree/artifact snapshots and a passing
+freshness comparison, mechanically rebuild the packet from captured coordinates, name the exact
+violated rule, and automatically invoke one fresh replacement of the same role against the same
+reviewed SHA, context hash, worktree, and artifacts. For a path mistake, explicitly forbid the
+absent optional/inferred path. This internal correction never waits for an operator reply or opens
+a gate, and it never rebuilds or recaptures the snapshot. Accept only an identity-matched return
+after strict snapshots pass. If the selected specialist repeats a contract violation, continue
+with it marked `absent after retry (agent contract)` and force the body/recommendation to
+`COMMENT`; never infer a clean result or publish an approval. A mismatched identity,
+snapshot/freshness failure, a truly unreadable required coordinate, or no remaining trustworthy
+canonical draft still fails closed. The preview and live publish-approval gate remain mandatory.
+
 ### Step 2b — Invoke reviewer (Update Body)
 
 Invoke `reviewer` in **update-body mode** via Task tool. Pass the changed-files list only — omit the full diff (the reviewer updates the existing body based on what files changed, not by re-reading the full diff):

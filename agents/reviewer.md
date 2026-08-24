@@ -64,6 +64,23 @@ Read artifacts from their supplied paths. Read changed source files from `Worktr
 Bash or query a moving branch. Treat `Reviewed Head SHA` as the only code identity and return it
 unchanged.
 
+The supplied artifact coordinates are a closed read allowlist and every non-`none` coordinate is
+required. For project code, paths named by the supplied changed-files artifact are candidates, not
+authorization to read. Before opening any changed, directly affected, or cited worktree path,
+prove that the exact repo-relative path exists as a non-symlink regular file and that its resolved
+path remains inside the supplied frozen worktree; only then may you read it. Use `Diff Path` for a
+deleted changed file and never attempt to read that deleted path from the head worktree. If the
+available read transport cannot establish the full proof, skip the candidate. Framework
+conventions, memory, instruction-source/semantic-source markers in this prompt, and unresolved
+imports are not path coordinates. Never issue `Read`, `sed`, or another content read for such a
+candidate. An absent optional or inferred path is skipped, not a transport failure.
+
+If a required supplied artifact, the worktree coordinate, or a verified existing worktree leaf
+cannot actually be read, return `failure_kind: required-read-failed` and `failed_read_path` with
+the exact coordinate. If you accidentally attempt an unverified path and it is absent, recover
+inside this run: discard that candidate and continue from supplied artifacts. Never convert that
+mistake into `required-read-failed` or a generic filesystem transport failure.
+
 Use the diff to choose relevant files; do not mechanically load every file in a large PR.
 Inspect complete file context for every candidate finding before reporting it.
 
@@ -251,6 +268,7 @@ Fresh mode:
 agent: reviewer
 status: success | failed | blocked
 failure_kind: kind
+failed_read_path: exact path # required only for required-read-failed
 model: effective-model-id
 mode: fresh
 output: inline
@@ -294,6 +312,7 @@ Update-body mode:
 agent: reviewer
 status: success | failed | blocked
 failure_kind: kind
+failed_read_path: exact path # required only for required-read-failed
 model: effective-model-id
 mode: update-body
 output: inline
@@ -311,6 +330,7 @@ Reply mode:
 agent: reviewer
 status: success | failed | blocked
 failure_kind: kind
+failed_read_path: exact path # required only for required-read-failed
 model: effective-model-id
 mode: reply
 output: inline

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.20.3] - 2026-08-24
+
+### Fixed
+
+- PR review now automatically retries reviewer contract path mistakes without weakening immutable snapshot or publication safety.
+
 ## [3.20.2] - 2026-08-21
 
 ### Changed
