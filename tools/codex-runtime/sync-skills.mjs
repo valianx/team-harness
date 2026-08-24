@@ -98,10 +98,13 @@ export const sharedPipelineScripts = [
   "test-transition.mjs",
   "worktree-dependencies.mjs",
   "workspace-preflight.mjs",
+  "workspace-identity.mjs",
+  "herdr-message.mjs",
   "openspec-adapter.mjs",
   "openspec-snapshot.mjs",
   "openspec-overlay.mjs",
   "openspec-recovery.mjs",
+  "openspec-bindings.mjs",
   "openspec-events.mjs",
   "review-surface.mjs",
 ];

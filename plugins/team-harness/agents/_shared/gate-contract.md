@@ -335,13 +335,12 @@ that implies layer 1's property survived the fusion, is a contract violation.
 
 ## Shared event scoping (SEC-DR-H)
 
-When multiple projects share a single `events_file` (an initiative-level or otherwise
-shared events file), the "dual" in dual-record must still hold per project, not merely
-per file. Every `stage.gate.release` event carries the `project` key. The event-side half
-of the recover check (condition (a) above) must match the **same** project as the
-field-side half (condition (b), read from that project's own `00-state.md`) — never the
-nearest release line regardless of which project wrote it. A release event from project A
-can never satisfy condition (a) for project B, even when both lines live in one trace.
+An initiative has one coordinator state and event stream. Its consolidated
+Gate-1 presentation and release carry the aggregate SHA-256 plus the exact
+ordered service identities; the dual record must match those values and the
+consumed nonce. A service event or historical per-project release can never
+clear the initiative Gate 1. Gate 3 and outward writes retain their existing
+immutable-candidate and runtime-approval floors.
 
 ## Posture boundary and migration
 

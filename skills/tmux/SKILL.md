@@ -14,6 +14,15 @@ chat replies, status blocks, error messages, and self-corrections alike.
 
 ## Environment Detection (MANDATORY FIRST STEP)
 
+Before using raw tmux for an agent registered by HerdR, read
+`agents/_shared/herdr-agent-messaging.md` and prefer the packaged
+`skills/pipeline/scripts/herdr-message.mjs` adapter. Its discovery → bounded
+idle wait → literal send → explicit pane Enter → read/verify transaction avoids
+text that is staged but never submitted. HerdR is optional: an unavailable
+capability returns `unavailable` and this skill may continue with the ordinary
+tmux actions below. Never mix the two transports for the same message or retry
+`submitted-unverified` blindly.
+
 Before executing ANY tmux command, detect the runtime environment:
 
 ```bash
@@ -78,7 +87,9 @@ Display results as a formatted table.
 
 ### `send <session_name> <command>` — Send text command
 
-1. Verify session exists (if not, auto-start it)
+1. If the exact target is HerdR-registered, use the shared HerdR adapter and
+   report its closed status. Otherwise verify the tmux session exists (if not,
+   auto-start it).
 2. Send the command:
    ```bash
    $TMUX send-keys -t {session_name}:0 "{command}" C-m
@@ -153,7 +164,8 @@ name: tmux
 ## Important
 
 - Session names must NOT contain spaces (use underscores)
-- Always use `read` to check worker progress before sending new commands
+- Always use `read` to check worker progress before sending new commands; for
+  HerdR use `herdr agent read` through the shared adapter after explicit Enter.
 - Use `keys C-c` to interrupt a stuck session
 - Each session runs its own independent Claude Code instance with its own context
 - This skill does NOT route through the orchestrator

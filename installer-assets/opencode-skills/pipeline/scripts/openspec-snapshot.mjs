@@ -303,10 +303,12 @@ export function isOpenSpecSnapshot(value) {
 }
 
 export async function captureSnapshot({
-  projectRoot, workspaceRoot, workspaceMode = "local", changeName, toolchain, jsonRunner = runBoundedJson, commandRunner,
+  projectRoot, workspaceRoot, workspaceMode = "local", changeName, toolchain,
+  snapshotPath = "inputs/openspec-snapshot.json", jsonRunner = runBoundedJson, commandRunner,
 } = {}) {
   if (!CHANGE_NAME.test(changeName ?? "") || !["local", "obsidian"].includes(workspaceMode)
-    || !isOpenSpecAdapterResult(toolchain) || toolchain.outcome !== "ready") {
+    || !isOpenSpecAdapterResult(toolchain) || toolchain.outcome !== "ready"
+    || !(snapshotPath === "inputs/openspec-snapshot.json" || /^inputs\/openspec\/[a-z0-9]+(?:-[a-z0-9]+)*\/snapshot\.json$/.test(snapshotPath))) {
     return action("capture", "fail", "TOOLCHAIN_NOT_READY");
   }
   let repository;
@@ -366,7 +368,8 @@ export async function captureSnapshot({
     artifact_set_sha256: hash(Buffer.from(artifacts.map(item => `${item.path}\0${item.content_sha256}`).join("\n"))),
   };
   if (!isOpenSpecSnapshot(snapshot)) return action("capture", "fail", "SNAPSHOT_INVALID");
-  const target = path.join(workspace, "inputs/openspec-snapshot.json");
+  const target = path.resolve(workspace, snapshotPath);
+  if (!contained(workspace, target)) return action("capture", "fail", "ARGUMENT_INVALID");
   const progressTarget = progressPath(target);
   const progress = {
     schema_version: OPENSPEC_PROGRESS_SCHEMA_VERSION,

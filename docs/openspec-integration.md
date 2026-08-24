@@ -14,9 +14,17 @@ layout; archive treats a change from either origin identically.
 
 OpenSpec owns the repository-local change under `openspec/changes/<change>/`: `proposal.md`,
 `specs/**/spec.md`, `design.md`, and `tasks.md`. TH never copies or paraphrases those artifacts
-into a second editable specification. It stores a hash-bound snapshot at
-`<workspace>/inputs/openspec-snapshot.json` and a minimal operational overlay at
-`<workspace>/plan/openspec-traceability.json`.
+into a second editable specification. A single-service run uses the same
+service-keyed layout as an initiative:
+`<workspace>/inputs/openspec/<service>/snapshot.json` and
+`<workspace>/plan/openspec/<service>/traceability.json`. The ordered aggregate
+lives at `<workspace>/inputs/openspec-bindings.json`.
+
+Every writable service owns its OpenSpec change in its repository. The aggregate
+hashes verified repository identities, child artifacts, roles, dependencies,
+execution order, and evidence-only dispositions. Evidence-only repositories are
+readable context only and cannot supply acceptance coordinates or become writable
+implicitly.
 
 Every TH acceptance or execution item references stable OpenSpec coordinates. Every applicable
 OpenSpec requirement, scenario, design decision, and task maps back to a TH item or carries an
@@ -56,10 +64,12 @@ Main advances through these actions without requiring another operator command a
    corrected snapshot, invoking it with `overwrite: true` authorized by that recorded correction
    event since the prior derivation's targets already exist; there is no standing second dispatch
    mode.
-5. Validate snapshot freshness, bidirectional traceability, exact agreement between every
+5. Validate every snapshot's freshness, bidirectional traceability, exact agreement between every
    shard's `required_invariants`, `required_evidence_anchors`, and
    `cross_runtime_preservation` declarations and its execution item, writable execution
-   topology, and the canonical event trace; then present Gate 1.
+   topology, service-bound event traces, and aggregate hash; then present one
+   consolidated Gate 1 whose nonce binds the ordered set. After approval,
+   execute services serially in aggregate dependency order without child Gate 1.
 6. During implementation, `openspec-overlay.mjs verify-and-rebind` performs
    every authorized monotonic task-checkbox transition and mechanical overlay
    binding update as one idempotent recoverable operation. It restores the old
@@ -116,12 +126,14 @@ decisions, reviews, and evidence stay in the configured TH workspace:
 ```text
 repository/openspec/changes/<change>/...       canonical source
 workspace/.team-harness/quality.json           operational quality policy
-workspace/inputs/openspec-snapshot.json        pinned identity and navigation
-workspace/plan/openspec-traceability.json      TH execution overlay
+workspace/inputs/openspec/<service>/snapshot.json       pinned identity and navigation
+workspace/plan/openspec/<service>/traceability.json     TH execution overlay
+workspace/inputs/openspec-bindings.json                  aggregate identity
 workspace/reviews/...                          TH validation evidence
 ```
 
-When `logs_mode: obsidian`, `workspace` is the configured vault path. Snapshot metadata records the
+When `logs_mode: obsidian`, `workspace` is the configured vault path and no
+local TH workspace duplicate is created. Snapshot metadata records the
 vault root, `mode: obsidian`, repository-relative artifact paths, coordinates, line numbers, and
 content hashes. Obsidian is therefore the audit/navigation surface, not a second OpenSpec source.
 
@@ -136,10 +148,12 @@ product path.
 
 ## Recovery and finalization
 
-Durable state records the bound change, repository root, preflight result, current Design pass,
-snapshot/overlay paths and hashes, and one next action. Recovery resumes preflight, an already
+Durable v4 state records the persisted workspace identity, ordered service
+bindings, evidence repositories, aggregate path/hash, preflight result, current
+Design pass, and one next action. Recovery resumes preflight, an already
 approved provisioning operation, upstream planning, snapshot capture, or overlay generation at the
-recorded boundary. It does not ask the operator to re-enter a workflow command. Source drift routes
+recorded boundary. Historical v3 singular fields map to one in-memory binding
+without moving or rewriting the run. It does not ask the operator to re-enter a workflow command. Source drift routes
 to reconciliation; a valid completed Design resumes at Gate 1.
 
 OpenSpec `sync` and `archive` remain outside implementation authority. They are offered only after

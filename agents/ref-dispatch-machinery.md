@@ -29,10 +29,15 @@ Relocated here from the boot sequence: it is infrequent and does not belong on t
 
 | Mode | `initiative == null` | `initiative` set |
 |---|---|---|
-| Local | `base_path = workspaces` | `base_path = workspaces` — per-project path unchanged; overview at the common parent of sibling repos |
-| Obsidian | `base_path = {logs-path}/{logs-subfolder}/{repo_name}` | `base_path = {logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}`; overview at `{base_path}/overview.md`; per-project `docs_root = {base_path}/{project}` |
+| Local | `{repo-root}/workspaces/{YYYY-MM-DD}_{feature}` | `{common-repository-parent}/{YYYY-MM-DD}_{initiative}` |
+| Obsidian | `{logs-path}/{logs-subfolder}/{repo-name}/{YYYY-MM-DD}_{feature}` | `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}` |
 
-`events_file` is unchanged by initiative mode: `00-execution-events.md` in obsidian, `.jsonl` in local. Each project keeps its own inside its own `docs_root`.
+Resolve both rows with `skills/pipeline/scripts/workspace-identity.mjs`, then persist
+the returned identity in coordinator state. Never recompute a historical identity
+from the current date or configuration. An initiative has exactly one coordinator
+root and one `00-state.md`; service artifacts live at `{workspace}/{service}/`.
+In Obsidian mode no local `workspaces/` counterpart is created. `events_file` is
+`00-execution-events.md` in Obsidian and `.jsonl` locally, at the coordinator root.
 
 ---
 
@@ -51,17 +56,32 @@ Projects are separate only when both signals are **pairwise-distinct** across al
 
 ## Multi-project sequencing
 
-**One project at a time.** Each project runs its own Stage 1 → Stage 3 to completion inside this same agent, in sequence. You never spawn a copy of yourself to run a lane — `agents/ref-pipeline.md § "Dispatch invariants"` #2 forbids it without exception, and that invariant is absolute here too: no case in this section constructs a dispatch of another coordinator, including another copy of yourself. Serial execution is the **derived consequence** of that absolute invariant, not an independent policy stated a second time — reopening parallelism means changing the invariant itself, in a plan, never a local exception carved out of this section.
+**One coordinator, one Design join, serial execution.** The coordinator gathers
+Design evidence for every writable service before Gate 1, then executes approved
+service work in dependency order. You never spawn a copy of yourself to run a lane.
 
 **Eligibility.** Read `overview.md § Projects` for status and `§ Big-Picture Plan` for A-blocks-B sequencing and shared-contract-in-flux exclusions. Exclude `deferred`, `blocked`, `delivered`. Never proceed across an in-flux shared contract.
 
 **Order confirm.** With ≥2 eligible projects, show the operator the project list, the exclusions with their reason, and the order you propose. Wait for confirmation. This is a sequencing decision, not a gate release — it carries no nonce.
 
-**Gates stay per project.** STAGE-GATE-1 and STAGE-GATE-3 are prepared, presented and recorded per project, against that project's own `00-state.md`. There is no cross-project batched gate. One project's failure or iteration never blocks a sibling.
+**Gate 1 is consolidated.** Writable services own separate OpenSpec changes in
+their own repositories. `inputs/openspec-bindings.json` orders those bindings,
+records repository identities, dependency order, child snapshot/overlay hashes,
+and evidence-only dispositions. One Gate-1 nonce binds the exact aggregate hash
+and ordered binding set. A service child never presents another Gate 1. After
+approval, execution is serial in the recorded order. Gate 3 and all publication
+safety remain fail-closed against the resulting immutable candidates.
+
+Evidence-only repositories are readable inputs, never OpenSpec owners, writable
+scope, acceptance coordinates, or implicit execution targets. Promoting one to
+writable changes aggregate identity and invalidates an unconsumed presentation.
 
 **Safety floors.** Security runs exactly as configured within each project — initiative mode never waives, batches, or weakens a security gate. With `initiative: null` the pipeline is byte-identical to the single-project path.
 
-**Observability.** Each project keeps its own `{project}/{events_file}`. Additionally write an initiative-level `{initiative-root}/{events_file}` with `initiative.start` / `project.start` / `project.end` / `initiative.converge`, so `/th:trace` and `/th:pipelines` can render the grouping.
+**Observability.** The coordinator root owns the lifecycle stream with
+`initiative.start` / `project.start` / `project.end` / `initiative.converge`.
+Service-scoped events carry the service binding explicitly; service folders may
+hold evidence but never a competing coordinator state or gate stream.
 
 ---
 

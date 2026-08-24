@@ -13,6 +13,7 @@ const MAX_EVENTS = 4096;
 const MAX_FINDINGS = 128;
 const MAX_WARNINGS = 128;
 const FEATURE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const SERVICE = FEATURE;
 const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
 const STATUS = new Set(["success", "failed", "blocked", "skipped"]);
 const ERROR_CODES = new Set([
@@ -92,7 +93,7 @@ function validateAgentEvent(event, line, warnings) {
   return valid;
 }
 
-export async function validateOpenSpecEvents({ workspace, events, feature } = {}) {
+export async function validateOpenSpecEvents({ workspace, events, feature, service = null } = {}) {
   const started = process.hrtime.bigint();
   const findings = [];
   const warnings = [];
@@ -102,7 +103,8 @@ export async function validateOpenSpecEvents({ workspace, events, feature } = {}
   let designStarts = 0;
   let designEnds = 0;
   try {
-    if (typeof workspace !== "string" || !path.isAbsolute(workspace) || !safeRelative(events) || !FEATURE.test(feature ?? "")) {
+    if (typeof workspace !== "string" || !path.isAbsolute(workspace) || !safeRelative(events) ||
+      !FEATURE.test(feature ?? "") || (service !== null && !SERVICE.test(service))) {
       throw new Error("ARGUMENT_INVALID");
     }
     const root = await realpath(path.resolve(workspace));
@@ -124,6 +126,10 @@ export async function validateOpenSpecEvents({ workspace, events, feature } = {}
       }
       if (event.feature !== feature) {
         warnings.push(finding("FEATURE_INVALID", line));
+        validEnvelope = false;
+      }
+      if (service !== null && event.service !== service) {
+        warnings.push(finding("SERVICE_INVALID", line));
         validEnvelope = false;
       }
       if (typeof event.event !== "string" || event.event.length === 0) {
@@ -171,6 +177,7 @@ export async function validateOpenSpecEvents({ workspace, events, feature } = {}
     error_code: bounded.length === 0 ? null : bounded[0].code,
     duration_ms: Number((process.hrtime.bigint() - started) / 1_000_000n),
     feature: FEATURE.test(feature ?? "") ? feature : null,
+    service: service === null || SERVICE.test(service) ? service : null,
     event_count: eventCount,
     design_phase_pairs: Math.min(designStarts, designEnds),
     architect_attempt_count: architectAttempts,
@@ -180,10 +187,10 @@ export async function validateOpenSpecEvents({ workspace, events, feature } = {}
 }
 
 function parseCli(argv) {
-  if (argv.length !== 6) return null;
+  if (argv.length !== 6 && argv.length !== 8) return null;
   const result = {};
   for (let index = 0; index < argv.length; index += 2) {
-    const key = ({ "--workspace": "workspace", "--events": "events", "--feature": "feature" })[argv[index]];
+    const key = ({ "--workspace": "workspace", "--events": "events", "--feature": "feature", "--service": "service" })[argv[index]];
     if (!key || Object.hasOwn(result, key) || !argv[index + 1]) return null;
     result[key] = argv[index + 1];
   }

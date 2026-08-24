@@ -47,6 +47,26 @@ await check("accepts the complete canonical single-pass Design lifecycle", async
   assert.equal(result.architect_attempt_count, 1);
 }));
 
+await check("binds Design evidence to one explicit service", async () => withFixture(async ({ workspace }) => {
+  const events = canonicalEvents().map(event => ({ ...event, service: "transactions" }));
+  await writeJsonl(workspace, events);
+  const result = await validateOpenSpecEvents({
+    workspace, events: "00-execution-events.jsonl", feature, service: "transactions",
+  });
+  assert.equal(result.verdict, "pass");
+  assert.equal(result.service, "transactions");
+}));
+
+await check("does not borrow another service's Design evidence", async () => withFixture(async ({ workspace }) => {
+  const events = canonicalEvents().map(event => ({ ...event, service: "payments-orchestrator" }));
+  await writeJsonl(workspace, events);
+  const result = await validateOpenSpecEvents({
+    workspace, events: "00-execution-events.jsonl", feature, service: "transactions",
+  });
+  assert.equal(result.verdict, "fail");
+  assert.ok(result.warnings.some(item => item.code === "SERVICE_INVALID"));
+}));
+
 await check("accepts an observation-only SLA event and legacy optional details", async () => withFixture(async ({ workspace }) => {
   const events = canonicalEvents();
   events.splice(2, 0, {

@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.20.4] - 2026-08-24
+
+### Added
+
+- Optional HerdR agent messaging now has one shared, bounded
+  discovery/send/Enter/read transaction with exact target verification and
+  recoverable busy or unverified outcomes.
+
+### Changed
+
+- Multi-repository initiatives now use one persisted coordinator workspace
+  identity and one v4 state. Obsidian mode keeps all Team Harness operational
+  artifacts in the canonical vault workspace without a local duplicate.
+- Writable services retain repository-owned OpenSpec changes, service-keyed
+  snapshots and overlays, and one hash-bound aggregate. Gate 1 is consolidated
+  across the ordered set, after which service execution remains serial.
+
+### Fixed
+
+- Workspace recovery no longer recomputes date/location or centralizes several
+  service specs in a reference repository. Historical v3 singular OpenSpec
+  state remains readable without migration, while required artifact,
+  repository identity, freshness, and immutable gate checks still fail closed.
+
 ## [3.20.3] - 2026-08-24
 
 ### Fixed

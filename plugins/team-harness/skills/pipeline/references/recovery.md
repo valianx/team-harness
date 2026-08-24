@@ -7,13 +7,15 @@ gate, and remains the sole writer of state, events, releases, and nonces.
 
 ## Workspace discovery
 
-Resolve the workspace bases from the current native `logs-mode`: the configured
-vault base for `obsidian`, or `{repo-root}/workspaces/` for `local`. Also inspect
-the repository base for legacy non-terminal snapshots created before Obsidian
-became canonical. Select the candidate whose state records its own immutable
-absolute `workspace`; never treat a legacy one-way export copy as state, merge
-same-name candidates, copy artifacts, or migrate a run between roots. More than
-one valid candidate requires live operator selection.
+Discover candidates with `../scripts/workspace-identity.mjs`. A v4 candidate is
+valid only when its persisted `workspace_identity.workspace` equals its canonical
+directory and the identity remains internally consistent. Never recompute its
+date or move it after configuration changes. For v3 compatibility, select the
+candidate whose state records its immutable absolute `workspace`; map singular
+OpenSpec fields to one in-memory binding only. Never rewrite that historical
+identity, copy artifacts, merge same-name candidates, or migrate between roots.
+In Obsidian mode a local counterpart is a conflicting duplicate, not fallback
+state. More than one valid candidate requires live operator selection.
 
 Before the first recovery write to a vault candidate, resolve
 `../scripts/workspace-preflight.mjs` relative to this reference and run its
@@ -49,15 +51,20 @@ section locator without migrating the plan. Do not preload the full plan set,
 event stream, implementation, and validation history, and do not reconstruct
 progress from chat memory alone.
 
-## v3 and lossless v2 migration
+## v4, v3 compatibility, and lossless v2 migration
 
-New state uses one canonical machine and no posture/profile field:
+New v4 state uses one canonical machine and no posture/profile field:
 
 ```text
 design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete
 ```
 
-A current `pipeline_version: 3` snapshot is valid only when it has this schema
+A current `pipeline_version: 4` snapshot is valid only when its workspace
+identity, ordered OpenSpec bindings, evidence repository roles, aggregate path,
+and aggregate SHA-256 validate together. A `pipeline_version: 3` snapshot remains
+recoverable without mutation: its singular OpenSpec coordinates become one
+in-memory binding and retain their original workspace and Gate-1 identity.
+A v3 snapshot is valid only when it has its historical schema
 and no legacy `lane`, profile, fast/simple, or Tier-0 routing field. A legacy
 snapshot is never silently mapped. Numeric or named v2 phases, `lane:
 express|full`, `--fast`, `[TIER: N]`, Simple-Mode/profile markers, and similar
@@ -210,8 +217,16 @@ pipeline skill and derive the next action from the bounded OpenSpec state fields
 overlay or Gate 1, require the recorded snapshot bytes/hash and live pre-Gate-1 freshness; source
 drift routes to explicit OpenSpec reconciliation. Before Gate 1 also require the recorded overlay
 bytes/hash and its deterministic validation. A local and an Obsidian workspace use the same rules;
-all paths are resolved below the recorded workspace while canonical source remains below
-`openspec_repository_root`.
+all operational paths resolve below the recorded coordinator workspace while
+canonical source remains below each binding's verified `repository_root`.
+
+For v4, `openspec-recovery.mjs` verifies every child snapshot and overlay plus
+`inputs/openspec-bindings.json`. Missing/unreadable supplied artifacts, child
+identity or freshness drift, changed membership/role/order/dependency data, or
+aggregate hash mismatch remain fail-closed and invalidate Gate-1 presentation.
+Only a fully valid aggregate can resume `PRESENT_CONSOLIDATED_GATE_1`; its nonce
+binds the aggregate hash and ordered binding identities, so recovery never
+replays service-level Gate 1 ceremonies.
 
 Recovery never substitutes one artifact domain for the other. Validate
 `quality_manifest_path` as an absolute regular non-symlink below the recorded

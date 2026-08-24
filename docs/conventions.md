@@ -6,7 +6,10 @@
 
 ## Workspaces as the shared board
 
-A workspace is the shared working directory for a single pipeline session. Each pipeline run creates its own isolated workspace at `workspaces/{feature-name}/`. Agents communicate through files — each reads prior agents' output and writes its own. The operator uses the workspace as a review surface. Values are never passed through return values. `workspaces/` is always git-ignored and never committed.
+A workspace is the shared working directory for a single pipeline session. Its
+persisted workspace identity is the sole location authority. Agents communicate
+through files and the operator uses the workspace as a review surface. Local
+`workspaces/` is always git-ignored; Obsidian mode creates no local duplicate.
 
 Beyond the root-tier docs (`00-state.md`, `01-plan.md`, `02-implementation.md`, `03-testing.md`, etc.), a workspace groups related artifacts under subfolders created implicitly on first `Write`: `plan/` for architecture, delivery, conditional invariants, and per-task shards; `sketches/` for plan-stage sketches; `research/` for research-family artifacts; and `reviews/` for review-family reports. Basenames never change merely because of grouping except where `docs/plan-shards.md` defines the plan layout.
 
@@ -50,9 +53,15 @@ This rule is mirrored in `docs/voice-guide.md § Operator-Supplied Content Bound
 coordinator resolves it once, forwards it to every subagent, and recovery reads
 that recorded path without copying or reconciling roots.
 
-- **local** (default) — `./workspaces/{date}_{feature}/` in the repository.
-- **obsidian** — `{logs-path}/{logs-subfolder}/{repo-name}/{date}_{feature}/`
-  in the configured vault. Markdown artifacts receive YAML frontmatter.
+- **local**, single repo — `{repo-root}/workspaces/{YYYY-MM-DD}_{feature}`.
+- **obsidian**, single repo — `{logs-path}/{logs-subfolder}/{repo-name}/{YYYY-MM-DD}_{feature}`.
+- **local**, initiative — `{common-repository-parent}/{YYYY-MM-DD}_{initiative}`.
+- **obsidian**, initiative — `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}`.
+
+Initiatives have one coordinator root and one `00-state.md`; service artifacts
+live below it. Writable product files and editable service-owned OpenSpec remain
+inside their repositories. Evidence-only repositories never become writable or
+spec owners by path inference.
 
 There is no separate `obsidian-direct` mode and no one-way export for new
 runs. Legacy state that already records `obsidian_sync: armed|pending|exported`

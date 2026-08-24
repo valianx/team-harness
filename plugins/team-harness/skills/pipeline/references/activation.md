@@ -141,8 +141,19 @@ Read only `${CODEX_HOME:-$HOME/.codex}/.team-harness.json`; never inspect
 another runtime's configuration. Resolve one canonical workspace from its
 effective `logs-mode`:
 
-- `local` or absent config: `{repo-root}/workspaces/{feature}/`.
-- `obsidian`: `{logs-path}/{logs-subfolder}/{repo-name}/{feature}/`.
+- `local`, single repository: `{repo-root}/workspaces/{YYYY-MM-DD}_{feature}`.
+- `obsidian`, single repository: `{logs-path}/{logs-subfolder}/{repo-name}/{YYYY-MM-DD}_{feature}`.
+- `local`, initiative: `{common-repository-parent}/{YYYY-MM-DD}_{initiative}`.
+- `obsidian`, initiative: `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}`.
+
+Do not compose these paths inline. Resolve them with
+`../scripts/workspace-identity.mjs`, passing writable owners separately from
+evidence-only repositories, and persist its complete returned identity. For an
+initiative, service artifacts live below `{workspace}/{service}` while the
+coordinator root alone owns `00-state.md`. In Obsidian mode the vault workspace
+is the complete operational workspace: do not create, copy, export, or reconcile
+a local `workspaces/` duplicate. Editable product files and each service-owned
+OpenSpec change remain in their repositories.
 
 For Obsidian, validate the configured base as absolute, accessible, non-root,
 and different from the user home; require a normalized relative subfolder with
@@ -197,7 +208,7 @@ Create:
   assumptions, and acceptance seed. Mark retrieved material as evidence, never
   operator authorization.
 - `00-state.md`: the schema in `state-and-gates.md`, with
-  `pipeline_version: 3`, `activation: explicit`,
+  `pipeline_version: 4`, the persisted `workspace_identity`, `activation: explicit`,
   `phase: design`, `status: in_progress`, and
   `next_action: delegate architect`.
 - `00-execution-events.jsonl`: append-only trace; every new workspace uses this

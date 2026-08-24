@@ -22,20 +22,22 @@ chat replies, status blocks, error messages, and self-corrections alike.
 ```
 
 Parse `$ARGUMENTS`:
-- Positional: feature name (kebab-case, matches the `workspaces/{feature}/` folder).
+- Positional: feature or initiative name (kebab-case, matched against persisted workspace identity).
 - Optional flag: one of `--jsonl`, `--tools`, `--fails`, `--tokens` (`--cost` is accepted
   as a legacy alias for `--tokens`).
 
 If `$ARGUMENTS` is empty or just whitespace, print the usage block above and exit cleanly.
 
-**Step 0 — Resolve workspaces path.** For the legacy Claude branch, read
-`~/.claude/.team-harness.json`. If it exists and `logs-mode` is `"obsidian"`,
-use `{logs-path}/{logs-subfolder}/{repo-name}` as the base path (where
-`repo-name` is the basename of the current working directory). If `logs-mode`
-is `"local"` or the file is missing, use `workspaces/` (relative to cwd).
-Replace all `workspaces/{feature-name}` references below with
-`{resolved-path}/{feature-name}`. A selected Native Codex branch follows its
-runtime adapter's native configuration rule without changing this legacy path.
+**Step 0 — Resolve the persisted workspace identity.** Read the active runtime's
+Team Harness config and use packaged `workspace-identity.mjs` discovery. Match
+direct children by the literal `feature`/`initiative` identity in
+`inputs/workspace-identity.json`, not by appending an unchecked name or assuming
+today's date. Local single runs are below `{repo}/workspaces`; Obsidian single
+runs are below `{logs-path}/{logs-subfolder}/{repo-name}`; initiative roots use
+the exact canonical formula stored in the identity. If more than one candidate
+matches, report ambiguity without choosing by mtime. Replace all
+`workspaces/{feature-name}` examples below with the discovered absolute
+workspace. Never create, migrate, or fall back between local and Obsidian roots.
 
 ## File locations
 

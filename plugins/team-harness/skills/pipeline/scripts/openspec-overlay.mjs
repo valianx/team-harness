@@ -27,6 +27,10 @@ const SOURCE_KINDS = new Set(["requirement", "scenario", "design-decision", "tas
 const FORBIDDEN_NORMATIVE_KEYS = new Set([
   "title", "description", "text", "source_text", "normative_text", "requirement", "scenario", "given", "when", "then",
 ]);
+const SNAPSHOT_PATH = /^(?:inputs\/openspec-snapshot\.json|inputs\/openspec\/[a-z0-9]+(?:-[a-z0-9]+)*\/snapshot\.json)$/;
+const TRACEABILITY_PATH = /^(?:plan\/openspec-traceability\.json|plan\/openspec\/[a-z0-9]+(?:-[a-z0-9]+)*\/traceability\.json)$/;
+const PLAN_PATH = /^(?:01-plan\.md|services\/[a-z0-9]+(?:-[a-z0-9]+)*\/01-plan\.md)$/;
+const SHARD_PATH = /^(?:plan\/tasks|plan\/openspec\/[a-z0-9]+(?:-[a-z0-9]+)*\/tasks)\/Task-[1-9][0-9]*\.md$/;
 
 function hash(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 function own(value, key) { return Object.hasOwn(value, key); }
@@ -148,7 +152,7 @@ function validMapping(item, expectedPrefix, sourceIds, qualityIds, findings) {
     return;
   }
   if (![item.owner, item.specialist, item.rollback, item.delivery_group].every(value => safeString(value, 512))
-    || !safeRelative(item.shard_path) || !/^plan\/tasks\/Task-[1-9][0-9]*\.md$/.test(item.shard_path)
+    || !safeRelative(item.shard_path) || !SHARD_PATH.test(item.shard_path)
     || !Array.isArray(item.files) || item.files.length === 0 || new Set(item.files).size !== item.files.length || !item.files.every(safeRelative)
     || !Array.isArray(item.dependencies) || new Set(item.dependencies).size !== item.dependencies.length || !item.dependencies.every(id => ITEM_ID.test(id) && id.startsWith("Task-"))
     || !Array.isArray(item.required_invariants) || new Set(item.required_invariants).size !== item.required_invariants.length || !item.required_invariants.every(value => ANCHOR_ID.test(value))
@@ -162,7 +166,7 @@ function validMapping(item, expectedPrefix, sourceIds, qualityIds, findings) {
   }
 }
 
-function validateShape(overlay, snapshot, snapshotBytes, findings) {
+function validateShape(overlay, snapshot, snapshotBytes, expectedSnapshotPath, findings) {
   const keys = ["schema_version", "kind", "plan_format", "snapshot", "repository", "quality_commands", "freeze", "acceptance_items", "execution_items", "source_dispositions", "operator_disclosures"];
   if (!exact(overlay, keys) || overlay.schema_version !== OPENSPEC_OVERLAY_SCHEMA_VERSION
     || overlay.kind !== "team_harness_openspec_execution_overlay" || overlay.plan_format !== "sharded-v1") {
@@ -171,7 +175,7 @@ function validateShape(overlay, snapshot, snapshotBytes, findings) {
   }
   if (hasForbiddenKeys(overlay)) findings.push(finding("NORMATIVE_TEXT_DUPLICATED", "overlay"));
   if (!exact(overlay.snapshot, ["path", "sha256", "artifact_set_sha256", "change_name"])
-    || overlay.snapshot.path !== "inputs/openspec-snapshot.json"
+    || overlay.snapshot.path !== expectedSnapshotPath
     || overlay.snapshot.sha256 !== hash(snapshotBytes) || overlay.snapshot.artifact_set_sha256 !== snapshot.artifact_set_sha256
     || overlay.snapshot.change_name !== snapshot.change.name) findings.push(finding("SNAPSHOT_STALE", "snapshot"));
   if (!exact(overlay.repository, ["root", "ownership"]) || overlay.repository.root !== snapshot.repository.root
@@ -198,7 +202,7 @@ export async function validateOpenSpecOverlay({ workspace, snapshot = "inputs/op
   let snapshotDigest = null;
   let overlayDigest = null;
   try {
-    if (!safeString(workspace) || snapshot !== "inputs/openspec-snapshot.json" || traceability !== "plan/openspec-traceability.json") throw new Error("arguments");
+    if (!safeString(workspace) || !SNAPSHOT_PATH.test(snapshot) || !TRACEABILITY_PATH.test(traceability)) throw new Error("arguments");
     const roots = normalizeWritableRoots(writableRoots);
     if (roots === null) throw new Error("arguments");
     const root = await realpath(path.resolve(workspace));
@@ -212,7 +216,7 @@ export async function validateOpenSpecOverlay({ workspace, snapshot = "inputs/op
     overlayDigest = hash(overlayFile.bytes);
     if (!isOpenSpecSnapshot(snapshotValue)) findings.push(finding("SNAPSHOT_INVALID", snapshot));
     else {
-      validateShape(overlay, snapshotValue, snapshotFile.bytes, findings);
+      validateShape(overlay, snapshotValue, snapshotFile.bytes, snapshot, findings);
       if (object(overlay)) {
         const coordinates = snapshotValue.artifacts.flatMap(artifact => artifact.coordinates)
           .filter(coordinate => SOURCE_KINDS.has(coordinate.kind));
@@ -331,7 +335,7 @@ function derivationResult(verdict, errorCode, details = {}) {
   };
 }
 
-function buildDerivationOverlay(snapshotValue, snapshotFile, snapshot) {
+function buildDerivationOverlay(snapshotValue, snapshotFile, snapshot, traceability) {
   const coordinates = snapshotValue.artifacts
     .flatMap(artifact => artifact.coordinates.map(coordinate => ({ ...coordinate, artifactPath: artifact.path })))
     .filter(coordinate => SOURCE_KINDS.has(coordinate.kind));
@@ -344,9 +348,12 @@ function buildDerivationOverlay(snapshotValue, snapshotFile, snapshot) {
     id: `AC-${index + 1}`, sources: [coordinate.id], classification: "direct", rationale: null,
     evidence_anchor: "plan/architecture.md",
   }));
+  const taskRoot = traceability === "plan/openspec-traceability.json"
+    ? "plan/tasks"
+    : `${path.posix.dirname(traceability)}/tasks`;
   const executionItems = taskCoordinates.map((coordinate, index) => ({
     id: `Task-${index + 1}`, sources: [coordinate.id], classification: "direct", rationale: null,
-    owner: DERIVATION_OWNER, specialist: DERIVATION_OWNER, shard_path: `plan/tasks/Task-${index + 1}.md`,
+    owner: DERIVATION_OWNER, specialist: DERIVATION_OWNER, shard_path: `${taskRoot}/Task-${index + 1}.md`,
     files: [coordinate.artifactPath], dependencies: [], required_invariants: [], technical_constraints: [],
     quality_command_ids: [], pre_implementation_test: "not-applicable", required_evidence_anchors: [snapshot],
     cross_runtime_preservation: DERIVATION_PRESERVATION, rollback: DERIVATION_ROLLBACK, delivery_group: "default",
@@ -382,6 +389,7 @@ async function writeDerivationOutputs(root, traceability, plan, planText, overla
       written.push(shardPath);
     }
     const planPath = path.resolve(root, plan);
+    await mkdir(path.dirname(planPath), { recursive: true });
     await writeFile(planPath, planText);
     written.push(planPath);
     const overlayBytes = Buffer.from(`${JSON.stringify(overlay)}\n`);
@@ -434,7 +442,7 @@ async function resolveDerivationTargets(root, traceability, plan, executionItems
  */
 export async function deriveOpenSpecOverlay({ workspace, snapshot = "inputs/openspec-snapshot.json", traceability = "plan/openspec-traceability.json", plan = "01-plan.md", writableRoots, overwrite = false } = {}) {
   try {
-    if (!safeString(workspace) || snapshot !== "inputs/openspec-snapshot.json" || traceability !== "plan/openspec-traceability.json" || plan !== "01-plan.md") return derivationResult("fail", "ARGUMENT_INVALID");
+    if (!safeString(workspace) || !SNAPSHOT_PATH.test(snapshot) || !TRACEABILITY_PATH.test(traceability) || !PLAN_PATH.test(plan)) return derivationResult("fail", "ARGUMENT_INVALID");
     const roots = normalizeWritableRoots(writableRoots);
     if (roots === null) return derivationResult("fail", "ARGUMENT_INVALID");
     const root = await realpath(path.resolve(workspace));
@@ -446,7 +454,7 @@ export async function deriveOpenSpecOverlay({ workspace, snapshot = "inputs/open
     if (!roots.some(writableRoot => contained(writableRoot, path.resolve(snapshotValue.repository.root)))) return derivationResult("fail", "REPOSITORY_ROOT_NOT_WRITABLE");
     if (!roots.some(writableRoot => contained(writableRoot, root))) return derivationResult("fail", "WORKSPACE_ROOT_NOT_WRITABLE");
 
-    const built = buildDerivationOverlay(snapshotValue, snapshotFile, snapshot);
+    const built = buildDerivationOverlay(snapshotValue, snapshotFile, snapshot, traceability);
     if (built === null) return derivationResult("fail", "SOURCE_COVERAGE_INCOMPLETE");
     const { overlay, acceptanceItems, executionItems } = built;
 
@@ -534,7 +542,8 @@ export async function verifyOpenSpecProgress({
     const root = await realpath(path.resolve(workspace));
     const snapshotFile = await readRegular(root, snapshot);
     const overlayFile = await readRegular(root, traceability);
-    const progressFile = await readRegular(root, "inputs/openspec-progress.json");
+    const progress = `${path.posix.dirname(snapshot)}/openspec-progress.json`;
+    const progressFile = await readRegular(root, progress);
     const verified = await verifySnapshot({
       snapshotPath: snapshotFile.canonical,
       phase: "implementation",
@@ -547,7 +556,7 @@ export async function verifyOpenSpecProgress({
         overlay_sha256: hash(overlayFile.bytes),
       });
     }
-    const updatedProgress = await readRegular(root, "inputs/openspec-progress.json");
+    const updatedProgress = await readRegular(root, progress);
     const postValidation = await validateOpenSpecOverlay({ workspace, snapshot, traceability, writableRoots });
     if (postValidation.verdict !== "pass" || verified.snapshot_sha256 !== hash(snapshotFile.bytes)) {
       return progressResult("fail", "PRECONDITION_INVALID", {
@@ -590,7 +599,7 @@ function parseCli(argv, progress = false) {
       result.overwrite = argv[index + 1] === "true";
       continue;
     }
-    const key = ({ "--workspace": "workspace", "--snapshot": "snapshot", "--traceability": "traceability" })[argv[index]];
+    const key = ({ "--workspace": "workspace", "--snapshot": "snapshot", "--traceability": "traceability", "--plan": "plan" })[argv[index]];
     if (!key || own(result, key)) return null;
     result[key] = argv[index + 1];
   }

@@ -13,16 +13,15 @@ Everything in this file is written by the orchestrator and by nothing else. No s
 Where a field's semantics are defined elsewhere, this schema names the home and stops. It does not restate the rule.
 
 ```
-pipeline_version: 3
+pipeline_version: 4
 plan_format: sharded-v1             # lifecycle metadata; not a posture or route selector
-openspec_change: {kebab-case change|null}
-openspec_repository_root: {absolute repository root|null}
 openspec_preflight: pending|ready|provisionable|blocked-prerequisite|invalid-project|null
 openspec_design_pass: preflight|provisioning|planning|snapshot|overlay|gate1-ready|null
-openspec_snapshot_path: inputs/openspec-snapshot.json|null
-openspec_snapshot_sha256: {SHA-256|null}
-openspec_overlay_path: plan/openspec-traceability.json|null
-openspec_overlay_sha256: {SHA-256|null}
+workspace_identity: {schema_version, mode, kind, workspace, initiative, repo_base, date, services, evidence_repositories}
+openspec_bindings: [{service, repository_root, repository_identity, change, snapshot_path, snapshot_sha256, overlay_path, overlay_sha256}]
+evidence_repositories: [{service, repository_root, repository_identity, disposition}]
+openspec_aggregate_path: inputs/openspec-bindings.json|null
+openspec_aggregate_sha256: {SHA-256|null}
 quality_manifest_path: {absolute workspace-local path|null}
 quality_manifest_sha256: {SHA-256|null}
 type: feature|fix|refactor|hotfix|enhancement
@@ -152,9 +151,9 @@ even when it differs from the derived autonomous counter; it is
 non-authoritative. Legacy fields never reject or limit a fresh operator-live
 presentation.
 
-The seven named states above are the only legal v3 pipeline sequence. `inline` is a
-pre-activation direct-mode outcome and is never a v3 state or field value. Every activated
-pipeline uses this same v3 machine and both gates; there is no depth profile. An activated
+The seven named states above are the only legal v4 pipeline sequence. `inline` is a
+pre-activation direct-mode outcome and is never a v4 state or field value. Every activated
+pipeline uses this same v4 machine and both gates; there is no depth profile. An activated
 pipeline cannot execute direct work in place. A current live explicit `inline` request
 closes the run administratively by setting `phase: aborted` and `status: aborted`, clearing
 any pending gate, and writing no gate release; only then may the new direct request run,

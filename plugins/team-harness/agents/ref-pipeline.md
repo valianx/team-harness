@@ -63,7 +63,7 @@ Locate the needed section by heading; do not read this file in full.
 
 No visible output during boot. The first thing the operator sees is the answer to their request.
 
-1. **Config** — read the active runtime's native `.team-harness.json`. Resolve one canonical `base_path`: `workspaces` for `logs-mode: local`, or `{logs-path}/{logs-subfolder}/{repo_name}` for `logs-mode: obsidian`. Validate the Obsidian base as absolute, accessible, non-root, outside the user home, normalized, and symlink-contained; invalid configuration stops before state creation and never falls back silently. Use `00-execution-events.jsonl` locally and the existing fenced `00-execution-events.md` format in Obsidian. New runs set legacy export fields to null. No posture/profile selector is read from config.
+1. **Config** — read the active runtime's native `.team-harness.json`, then resolve the one canonical identity with `skills/pipeline/scripts/workspace-identity.mjs`. Local single-repository runs use `{repo-root}/workspaces/{YYYY-MM-DD}_{feature}`; Obsidian single-repository runs use `{logs-path}/{logs-subfolder}/{repo_name}/{YYYY-MM-DD}_{feature}`. Initiative composition is defined only in `agents/ref-dispatch-machinery.md`. Validate the selected root before state creation; invalid configuration stops and never falls back or creates a duplicate. Use `00-execution-events.jsonl` locally and the fenced `00-execution-events.md` format in Obsidian. No posture/profile selector is read from config.
    **Initiative in play** — a supported, current mode: path composition, `overview.md` placement and per-project `docs_root` all differ. Read `agents/ref-dispatch-machinery.md`. Off the hot path because it is infrequent, not because it is deprecated — never resolve it from memory.
 2. **Session override** — The load-bearing order is exact: parse override intent from the operator's message BEFORE resolving paths, read persistent config from `~/.claude/.team-harness.json`, apply precedence `override > persistent > default` evaluated against the whitelist in `CLAUDE.md §5`, then resolve — compute `base_path`/`logs_mode`/`events_file`/`docs_root` from the merged result. Never write the config file from this flow. A non-whitelisted key is ignored with a one-line WARN naming the key, never the value. No-override case: when the operator's message carries no override, this step falls through to the persistent config and stays silent — no extra output, indistinguishable from a boot with no override logic at all.
 3. **Language** — precedence: session override → `language` in config → detection from the operator's text → `en`. A persistence marker (`por defecto`, `siempre`, `default`, `permanente`, `de aquí en adelante`) requires a Y/n gate plus a merge-write; without one it is session-only.
@@ -78,7 +78,7 @@ state remains recoverable without migration.
 
 `{YYYY-MM-DD}_{feature-name}` guarantees a unique directory per run. On `/th:recover`, re-read the resolved config from `00-state.md § Current State` (schema: `agents/_shared/orchestrator-state.md`) — do not re-parse the chat.
 
-**First state write — at the Intake → Design boundary, not at boot.** Write `{docs_root}/00-state.md` with `pipeline_version: 3`, `status: in_progress`, `phase: design`, `stage: 1`, the resolved config, and the classification block Intake produced. Write the canonical named-state checklist with every row unchecked. Append `{"event":"pipeline.start"}` to `{events_file}`. You are the sole writer of this file from here on.
+**First state write — at the Intake → Design boundary, not at boot.** Write `{docs_root}/00-state.md` with `pipeline_version: 4`, the complete persisted `workspace_identity`, `status: in_progress`, `phase: design`, `stage: 1`, the resolved config, and the classification block Intake produced. Write the canonical named-state checklist with every row unchecked. Append `{"event":"pipeline.start"}` to `{events_file}`. You are the sole writer of this file from here on.
 
 When design selects a worktree, its absolute `worktree`, `worktree_branch`, and
 immutable `worktree_base` are declared before Gate 1. They are intent, not
@@ -102,6 +102,14 @@ provisioner.
 ## No capability-check fallback
 
 There is no monolith fallback and there is no split to verify: one coordinator runs this file end to end, and there is no boot check for a hand-off that cannot occur. If a phase appears to require dispatching another coordinator, that is a contract violation: stop and report `status: blocked` (§ "Dispatch invariants" #2).
+
+HerdR is an optional external agent transport, not a coordinator fallback. When
+the operator or environment selects a HerdR-registered target, read
+`agents/_shared/herdr-agent-messaging.md` and use the packaged adapter for the
+complete discovery/send/submit/verify transaction. `unavailable` permits the
+normal native dispatch path. A busy or unverifiable result is durable pending
+state and never evidence of receipt or authority for a blind resend. Native
+permission gates and the coordinator's sole state ownership remain unchanged.
 
 ## Voice
 
@@ -649,7 +657,7 @@ Canonical reference: `docs/discover-phase.md` — the default disposition, the t
 1a. **Preflight worktree sweep**, once per repo this session touches. `git worktree list`, then apply the safety predicate in `docs/worktree-discipline.md § Rule 7` **by reference** — never re-derive its four conditions, allow-list, or action table. Exclude the main tree and this session's own worktree via Rule 7's two-signal exclusion: a canonical-path comparison against the resolved cwd (independent of any state file, so it applies before one exists), **added to** — never replaced by — this feature's own `worktree:` field when it exists. Remove what clears all four conditions, report what does not, using Rule 7's exact `worktree_swept:` lines — **never a silent skip**. Acquire that worktree's directory lock per Rule 7's protocol before the final re-check and removal, hold it through `git worktree remove`, release on both paths. Repeat per repo when a later one is first touched — never across repos. `git worktree remove` is local and is not an outward action.
 2. **Start the knowledge session.** `session_start(project, working_dir)`; write `session.json` once the workspace exists. Unavailable → log and continue.
 3. **Resolve operator language** if a fresh chat-scoped override just landed; otherwise it is already resolved at boot.
-4. **Create the workspace folder immediately after pipeline activation, before any deep investigation.** `docs_root = {base_path}/{YYYY-MM-DD}_{feature-name}`. Initialize `{events_file}` with `session.start`. The direct-execution predicate is resolved by the coordinator before this reference is activated; an inline candidate therefore never enters this workspace or state machine.
+4. **Create the resolved canonical workspace immediately after pipeline activation, before any deep investigation.** Use the exact `workspace` returned by `workspace-identity.mjs`; do not append another date/feature component. Persist that identity and initialize `{events_file}` with `session.start`. In Obsidian mode create no local mirror. The direct-execution predicate is resolved before this reference is activated; an inline candidate never enters this workspace or state machine.
 5. **Milestone continuity** (multi-milestone `type: plan` only) — resume the existing workspace instead of minting a sibling. `agents/ref-special-flows.md`.
 6. **Query the knowledge graph** — 2–3 semantic queries, results written to `00-knowledge-context.md`. Every downstream specialist reads that file.
 7. **Gated permission provisioning (conditional).** It provisions permissions, so it is **always an explicit Y/n, never silent when a rule is missing**, and it **never grants or weakens outward-action permissions** — push, `gh pr *`, and any API write still require the active runtime's approval. Before any gate, the resolved path must pass the validation floor: reject with one operator-facing line, and write nothing, when the value is empty, `/`, the user home, a filesystem top-level directory (depth < 2), or contains `..` or a glob metacharacter. Full contract, the read-only allowlist and its disjointness invariant: `docs/permission-provisioning.md`.
