@@ -19,5 +19,5 @@
 ## 4. Pull Request Disposition
 
 - [x] 4.1 Record an evidence-backed `APPLIED` disposition for each valid CodeRabbit comment after its correction passes validation.
-- [ ] 4.2 Commit and push the corrective changes to PR #623 without including unrelated local OpenSpec changes.
-- [ ] 4.3 Preview the batched GitHub thread replies, then reply and resolve only the fully addressed threads after operator approval; verify final PR checks.
+- [x] 4.2 Commit and push the corrective changes to PR #623 without including unrelated local OpenSpec changes.
+- [x] 4.3 Preview the batched GitHub thread replies, then reply and resolve only the fully addressed threads after operator approval; verify final PR checks.
