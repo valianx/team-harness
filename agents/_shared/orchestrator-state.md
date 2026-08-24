@@ -180,9 +180,9 @@ and blocks recovery; phase names or legacy status alone never release a gate.
 
 **Native Codex accounting overlay — conditional.** Apply this overlay only when
 a `phase.end` contains `usage.kind: codex_usage_delta`; a trace without that
-object remains on the legacy/Claude `total_tokens: N` and pricing contract
-above. The selected Codex snapshot changes the value grammar and adds only
-these fields:
+object remains on the legacy/Claude `total_tokens: N` contract above, which
+reports tokens and no USD. The selected Codex snapshot changes the value
+grammar and adds only these fields:
 
 ```text
 usage_schema_version: 1|null
@@ -466,7 +466,7 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | `phase`, `stage` | conditional | `stage` required for `stage.gate*` |
 | `agent` | conditional | required for `phase.*` |
 | `status` | conditional | `success`/`failed`/`blocked`/`skipped` |
-| `duration_ms`, `tokens`, `tokens_in`, `tokens_out`, `tokens_estimated` | conditional | per the token-tracking rule (legacy/Claude branch when no native `usage` is selected) |
+| `duration_ms`, `tokens` | optional | observability only: record what the runtime reported, leave absent when it reported nothing; never estimated, never gate evidence |
 | `usage_scope`, `usage_checkpoint` | conditional | native Codex branch only: safe root-reachable scope plus a `codex_usage_checkpoint`; never an identifier or path |
 | `usage` | conditional | native Codex branch only: a `codex_usage_delta`, measured or unavailable; no estimate or partial subtotal |
 | `pricing_identity`, `cost` | conditional | native Codex branch only: exact provider/model and complete quote provenance |
@@ -516,7 +516,7 @@ One event per write batch, stamping the literal `site`. With capture off the aut
 
 ### Reconciliation backstop
 
-At every gate emission, before the block: count `[x]` checklist rows against `phase.end` events and backfill any gap with `tokens_estimated: true` + `backfilled: true`, deriving `duration_ms` from trace breadcrumbs when available, else the heuristic. **Never overwrite a measured event.**
+At every gate emission, before the block: count `[x]` checklist rows against `phase.end` events and backfill any gap with `backfilled: true`, deriving `duration_ms` from trace breadcrumbs when available. A backfilled event carries no `tokens` — the count is unknown, not reconstructible. **Never overwrite a measured event.**
 
 **Native Codex exception, selected only by `phase.end.usage`.** When the trace
 contains `usage.kind: codex_usage_delta`, do not use the legacy heuristic for
@@ -626,11 +626,11 @@ After every phase transition, update `00-state.md`. This is the orchestrator's p
    the agent returns (with its status and any runtime-known diagnostics),
    `gate` when a gate is reached. **First, because events are append-only and
    must reflect real time** — backfilling later loses timestamp accuracy.
-   **Legacy Claude branch — no native `usage` object.** **Token tracking is
-   mandatory.** Every `phase.end` carries `tokens`: from the call result
-   metadata when available, otherwise estimated (`duration_min × 1500`
-   opus-heavy, `× 800` sonnet-heavy) with `tokens_estimated: true`.
-   **`"tokens": 0` is forbidden.**
+   **Legacy Claude branch — no native `usage` object.** `tokens` is
+   observability, not a gate input: carry the count from the call result
+   metadata when the runtime reports one, and leave the field absent when it
+   does not. Never estimate a count and never write `"tokens": 0` — an
+   invented or zeroed number reads as measurement.
 
    **Native Codex branch, selected only by `phase.end.usage.kind`.** For a
    native `codex_usage_delta`, append the safe `usage` object and checkpoint

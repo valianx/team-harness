@@ -157,6 +157,7 @@ Write to:
 
 - initial audit: `{docs_root}/reviews/04-adversary.md`
 - amend audit `N`: `{docs_root}/reviews/04-adversary-amend-{N}.md`
+- correction audit `N`: `{docs_root}/reviews/04-adversary-correction-{N}.md`
 
 Before the first write, check the target path:
 

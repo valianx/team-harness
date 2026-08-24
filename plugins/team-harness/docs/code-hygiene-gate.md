@@ -50,7 +50,8 @@ they require judgment a fixed pattern set cannot express.
 
 The set the implementer contract already forbids (`agents/implementer.md § Comments`):
 references to `workspaces/` paths, pipeline phase/stage/step tokens used as narration, task- or
-issue-ID narration, and session-context phrasing.
+issue-ID narration, session-context phrasing, and plan-artifact identifier tags (`AC-{n}`,
+`TC-{n}`, `SEC-{n}`).
 
 ### 3.1 Fixed scan command (pinned, copy verbatim)
 
@@ -88,7 +89,10 @@ code_hygiene_scan() {
     -e 'task-[0-9]' \
     -e 'per operator instruction' \
     -e 'in this run' \
-    -e 'workspace note'
+    -e 'workspace note' \
+    -e '[^A-Za-z]AC-[0-9]' \
+    -e '[^A-Za-z]TC-[0-9]' \
+    -e '[^A-Za-z]SEC-[0-9]'
   pipeline_status=("${PIPESTATUS[@]}")
   rm -f "${diff_file}"
   for status in "${pipeline_status[@]}"; do
@@ -173,11 +177,11 @@ exclusion in § 2 covers committed `.md` files under `docs/`/`agents/`/`skills/`
    change.
 5. **Magic numbers** — unexplained numeric/string literals that should be named constants.
 
-**Reported as findings.** Each unjustified item is a finding with severity, location and grounds; `qa` emits no separate verdict field. Whether one holds the ship is decided by the ordinary severity floor, not by a conjunction of its own. Origin: finding
-exists in categories 1-5 above. On `fail`, `qa` appends the hygiene findings to
-`failure-brief.md` as their own block, separate from failing-AC findings, with a
-`Blast radius: localized {file:line}` or `structural` declaration per the existing failure-brief
-contract.
+**Reported as findings.** Each unjustified item is a finding with severity, location and
+grounds; `qa` emits no separate verdict field. Whether one holds the ship is decided by the
+ordinary severity floor, not by a conjunction of its own. A hygiene finding that does hold
+the ship reaches `failure-brief.md` through the same path as every other held finding, with
+the same `Blast radius: localized {file:line}` or `structural` declaration.
 
 ---
 
