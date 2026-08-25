@@ -28,13 +28,13 @@ narration. Do not tell the operator that activation was explicit, enumerate the
 seven profiles, or preview internal checks. Surface only an actionable failure,
 a requested result, or the next real operator decision.
 
-## Canonical v3 workflow
+## Canonical v4 workflow
 
 Two postures only exist: `inline` and `pipeline`. Inline direct Main work is
 the default; a pipeline starts only from a current live operator activation or
 recovery of an existing run. There is no selectable depth profile, fast/simple
 alias, tier-based route, or configuration-selected lane. Every explicitly
-activated pipeline writes `pipeline_version: 3` and follows one named state
+activated pipeline writes `pipeline_version: 4` and follows one named state
 machine.
 
 ```text
@@ -361,13 +361,13 @@ the role fields cannot see. The current digests are:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| `pipeline-architect` | `dc400116c2c73982a68a1f7d929a78d4f607869727a12ac3ef8a49e196cc8bc8` |
-| `pipeline-implementer` | `ec6200d8ba9e5b3f0f1ccb12d3f86ccc12850f22cd36bb425c26ae13e548f0ab` |
-| `pipeline-tester` | `21bdd93b9d25ffe9158e5657a558f8d457358bc5394ab67cbfdf7c8d924c0e81` |
-| `pipeline-cleaner` | `ea4260bcb8fc1e17034f0d6f91b9d97efefeb61065c50b88a25e792eaaab88b9` |
-| `pipeline-qa` | `95320bb295a510e45cf405ac72811bdc2920e2aa03dff4d3f9026c06bb1002aa` |
-| `pipeline-security` | `9df5adab4075e4e66ec9cf7d45ba798037dd25af4b38a851fac90b13951a6530` |
-| `pipeline-delivery` | `c9a8a42ca62798cca1a57b65b89fbd044356433ac11fe7eff24ba3685f91aafa` |
+| `pipeline-architect` | `01c3366215ac8e4eddd1cffa7e92f0b8793a8c9ced0411ab2e6d612cdccaa69f` |
+| `pipeline-implementer` | `874b20898439b6cd944fd83d33a4e4663e5d3fc76d4e09f23c9b178152e6d6bd` |
+| `pipeline-tester` | `615998d614df6fa81874a527b3c89d7cf63f4eedf12516e2f174fc200b5d9a3f` |
+| `pipeline-cleaner` | `8e17564f9835653b016b278324773d101b9c6158cda6d9826549e1af02026a9e` |
+| `pipeline-qa` | `85fa7bb2c471f6a70914965ae7980ad961e912908cc17492aa1dfcdc2346b655` |
+| `pipeline-security` | `cd15f37113ef88b9cfff744e97ff0ff51c31f1bf6817d2c9240957f27c4b7883` |
+| `pipeline-delivery` | `934583fe9cfcfba24ef1eea9a09ece3af4e6441a81be34087c9bcb428aee9ba1` |
 
 Do not accept a file solely because its comments or `name` field match. A
 digest mismatch is a stale or unrelated shadow; stop before workspace

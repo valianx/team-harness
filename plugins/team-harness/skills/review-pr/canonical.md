@@ -218,7 +218,8 @@ python3 "$REVIEW_CONTEXT_HELPER" materialize \
   --diff-name "${DIFF_TMP##*/}" --files-name "${FILES_TMP##*/}" \
   --checks-name "${CHECKS_TMP##*/}" --worktree "$WORKTREE" \
   --deadline-epoch "$GATHER_DEADLINE"
-# Register the EXIT trap here, immediately after materialize returns and before promotion.
+# Return from this command after promotion. Never bind review cleanup to this
+# shell's EXIT lifecycle; the coordinator owns cleanup after every specialist joins.
 python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
   --temporary-name "${DIFF_TMP##*/}" --final-name "${DIFF##*/}"
 python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
@@ -234,17 +235,29 @@ If the PR body links an issue with `Closes`, `Fixes`, or `Resolves`, fetch its n
 body, and labels once into `$ARTIFACTS/pr-review-issue.json`. Treat failure as
 `linked issue: unavailable`, not as a reason to weaken snapshot checks.
 
-### 4. Create the frozen worktree and cleanup trap
+### 4. Create the frozen worktree and coordinator-owned cleanup
 
 `materialize` creates the detached worktree within the shared deadline and attempts to remove a
 partially created worktree using only the remaining budget if it fails. If no time remains or
 cleanup cannot finish in that budget, it fails closed and reports the exact residual paths for
-operator cleanup. Register an EXIT trap immediately after `materialize` succeeds. It
-removes the worktree, all
-artifacts inside the exact `$ARTIFACTS` directory (including the private bare repository and its
-temporary refs), and that now-empty directory. Remove the worktree through `$SNAPSHOT_GIT` before
-removing the snapshot repository. Never remove any sibling workspace or force-remove an unexpected
-dirty worktree; surface it.
+operator cleanup.
+
+The coordinator owns the successful snapshot lifecycle. Never register an `EXIT`,
+PTY, exec-session, subshell, or background-process cleanup hook in the command that
+captures, materializes, promotes, or announces readiness. Those command processes may
+end after a bounded tool yield while reviewers still need the files. `$ARTIFACTS`,
+`$SNAPSHOT_GIT`, and `$WORKTREE` MUST outlive every specialist dispatch, retry,
+join, consolidation read, and post-dispatch integrity comparison regardless of how
+many tool yields occur or whether any one yield exceeds 30 seconds.
+
+Run cleanup explicitly from the coordinator only after every dispatched reviewer has
+reached a terminal result and all integrity/freshness checks that consume the snapshot
+have completed. Remove the worktree through `$SNAPSHOT_GIT` before removing the
+snapshot repository, then remove artifacts inside the exact `$ARTIFACTS` directory and
+that now-empty directory. Never remove any sibling workspace or force-remove an
+unexpected dirty worktree; surface it. If the coordinator process is lost before this
+terminal point, preserve the workspace for deterministic resume or explicit cancel;
+premature deletion is worse than a reported residual workspace.
 
 Capture `git status --untracked-files=all` and `git diff HEAD` for the frozen worktree. Separately
 capture the regular review-artifact leaves under `$ARTIFACTS`, excluding the exact
@@ -627,8 +640,9 @@ mergeability, context hash, and snapshot/worktree details hidden by default; pro
 explicit request or when an integrity/freshness problem requires operator action.
 
 `defer` copies the canonical body to `$ARTIFACTS/pr-review-final.md`, preserves that file, inline
-JSON, and context for `--resume-from-draft`, removes the worktree/nonessential artifacts, and
-disables the EXIT trap before returning. `cancel` removes all artifacts. Operator edits require
+JSON, and context for `--resume-from-draft`, then explicitly removes the worktree and
+nonessential artifacts after every reviewer has joined. `cancel` explicitly removes all artifacts
+at the same terminal boundary. Operator edits require
 another complete preview.
 
 **`--auto-publish` path.** No menu is shown and no approval exists: the published event is
@@ -679,7 +693,9 @@ jq -n \
 ```
 
 Never split the body and inline comments across API calls. Check the exit status, report the
-exact error on failure, and run cleanup on every terminal path.
+exact error on failure, and run explicit coordinator-owned cleanup on every terminal path after
+all reviewer processes have joined. Never attach cleanup to the lifetime of a capture or
+materialization shell.
 
 Final response:
 

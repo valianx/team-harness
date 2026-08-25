@@ -33,19 +33,34 @@ async function scenario(workspaceMode) {
   try {
     run(["git", "init", "-q", "-b", "main"], repository);
     run(["openspec", "init", "--tools", "codex", "--no-animation", "--no-copilot-cloud", repository], repository);
+    run(["git", "add", "."], repository);
+    run(["git", "-c", "user.name=TH E2E", "-c", "user.email=th-e2e@example.invalid", "commit", "-q", "-m", "baseline"], repository);
+    const baseSha = run(["git", "rev-parse", "HEAD"], repository).trim();
     run(["openspec", "new", "change", "canonical-e2e", "--schema", "spec-driven", "--json"], repository);
     const change = path.join(repository, "openspec/changes/canonical-e2e");
     await mkdir(path.join(change, "specs/example"), { recursive: true });
     await writeFile(path.join(change, "proposal.md"), `## Why\n\nUsers need deterministic output.\n\n## What Changes\n\n- Add deterministic output.\n\n## Capabilities\n\n### New Capabilities\n- \`example\`: Produce deterministic output.\n\n### Modified Capabilities\n- None.\n\n## Impact\n\n- Test-only fixture.\n`);
     await writeFile(path.join(change, "specs/example/spec.md"), `## ADDED Requirements\n\n### Requirement: Deterministic output\nThe system SHALL produce a stable result for valid input.\n\n#### Scenario: Valid input succeeds\n- **WHEN** a valid input is supplied\n- **THEN** the stable result is returned\n`);
     await writeFile(path.join(change, "design.md"), `## Context\n\nTemporary E2E fixture.\n\n## Goals / Non-Goals\n\n**Goals:**\n- Exercise the canonical transaction.\n\n**Non-Goals:**\n- Ship production code.\n\n## Decisions\n\n### Use repository-local canonical intent\nThe fixture keeps OpenSpec artifacts in the repository.\n\n## Risks / Trade-offs\n\n- Temporary filesystem cost only.\n\n## Migration Plan\n\nNo migration.\n`);
-    await writeFile(path.join(change, "tasks.md"), `## 1. Fixture\n\n- [ ] 1.1 Produce the deterministic fixture output\n`);
+    const qualityManifest = { schema_version: 1, commands: { test: { argv: ["node", "-e", "process.exit(0)"] } } };
+    const executionContract = {
+      schema_version: 1,
+      kind: "team_harness_openspec_execution_contract",
+      worktree: { path: repository, branch: "feat/canonical-e2e", base_sha: baseSha },
+      quality_manifest: qualityManifest,
+      tasks: [{
+        source_id: "task:1.1", owner: "implementer", specialist: "implementer", files: ["src/deterministic-output.mjs"],
+        dependencies: [], required_invariants: ["I-deterministic-output"], technical_constraints: ["Preserve stable output ordering."],
+        quality_command_ids: ["test"], observable_runtime_behavior: false, pre_implementation_test: "not-applicable",
+        required_evidence_anchors: ["02-implementation.md"], cross_runtime_preservation: "Preserve deterministic output in every supported runtime.",
+        rollback: "Revert the bounded implementation commit.", delivery_group: "default",
+        discovery_scope: { directories: ["src"], globs: ["**/*.mjs"] }, required_seams: [],
+      }],
+    };
+    await writeFile(path.join(change, "tasks.md"), `## 1. Fixture\n\n- [ ] 1.1 Produce the deterministic fixture output\n\n## Team Harness Execution Contract\n\n\`\`\`json\n${JSON.stringify(executionContract, null, 2)}\n\`\`\`\n`);
     run(["openspec", "instructions", "proposal", "--change", "canonical-e2e", "--json"], repository);
     run(["openspec", "status", "--change", "canonical-e2e", "--json"], repository);
     run(["openspec", "validate", "canonical-e2e", "--strict", "--json", "--no-interactive"], repository);
-    run(["git", "add", "."], repository);
-    run(["git", "-c", "user.name=TH E2E", "-c", "user.email=th-e2e@example.invalid", "commit", "-q", "-m", "fixture"], repository);
-
     const toolchain = await preflight({ projectRoot: repository, runtime: "codex" });
     assert.equal(toolchain.outcome, "ready");
     const captured = await captureSnapshot({ projectRoot: repository, workspaceRoot: workspace, workspaceMode, changeName: "canonical-e2e", toolchain });
@@ -71,23 +86,23 @@ async function scenario(workspaceMode) {
     const execution = (id, source) => ({
       id, sources: [source], classification: "direct", rationale: null, owner: "implementer", specialist: "implementer",
       shard_path: `plan/tasks/${id}.md`, files: [`src/${id}.mjs`], dependencies: [], required_invariants: ["I-gate-authority"],
-      technical_constraints: [], quality_command_ids: ["test"], pre_implementation_test: "required",
+      technical_constraints: ["Preserve deterministic output ordering."], quality_command_ids: ["test"], observable_runtime_behavior: false, pre_implementation_test: "not-applicable",
       required_evidence_anchors: ["02-implementation.md"], cross_runtime_preservation: "Preserve equivalent behavior in every supported runtime.",
-      rollback: "Revert the task commit.", delivery_group: "default",
+      rollback: "Revert the task commit.", delivery_group: "default", discovery_scope: { directories: ["src"], globs: ["**/*.mjs"] }, required_seams: [],
     });
     const pairs = [["AC-1", requirement], ["AC-2", scenarioId], ["Task-1", decision], ["Task-2", task]];
     const overlay = {
-      schema_version: 1, kind: "team_harness_openspec_execution_overlay", plan_format: "sharded-v1",
+      schema_version: 2, kind: "team_harness_openspec_execution_overlay", plan_format: "sharded-v1",
       snapshot: { path: "inputs/openspec-snapshot.json", sha256: digest(snapshotBytes), artifact_set_sha256: snapshot.artifact_set_sha256, change_name: "canonical-e2e" },
-      repository: { root: repository, ownership: [{ path: "src", owner: "implementer" }] }, quality_commands: [{ id: "test" }],
-      freeze: { baseline_sha256: "b".repeat(64), state_anchor: "00-state.md", evidence_root: "reviews" },
+      repository: { root: repository, ownership: [{ path: "src", owner: "implementer" }], worktree: { path: repository, branch: "feat/canonical-e2e", base_sha: baseSha } }, quality_commands: [{ id: "test" }],
+      freeze: { baseline_sha256: "b".repeat(64), state_anchor: "00-state.md", evidence_root: "reviews", quality_manifest_path: ".team-harness/quality.json", quality_manifest_sha256: digest(Buffer.from(`${JSON.stringify(qualityManifest, null, 2)}\n`)) },
       acceptance_items: [acceptance("AC-1", requirement), acceptance("AC-2", scenarioId)],
       execution_items: [execution("Task-1", decision), execution("Task-2", task)],
       source_dispositions: pairs.map(([id, source]) => ({ source_id: source, item_ids: [id], classification: "direct", rationale: null })),
       operator_disclosures: [],
     };
     for (const item of overlay.execution_items) {
-      await writeFile(path.join(workspace, item.shard_path), `# ${item.id}\n\n- **Worktree:** null — branch null, base null\n\n## Dispatch anchors\n\nrequired_invariants: [${item.required_invariants.join(", ")}]\nrequired_evidence_anchors: [${item.required_evidence_anchors.join(", ")}]\ncross_runtime_preservation: ${item.cross_runtime_preservation}\n`);
+      await writeFile(path.join(workspace, item.shard_path), `# ${item.id}\n\n- **Worktree:** ${repository} — branch feat/canonical-e2e, base ${baseSha}\n\n## Dispatch anchors\n\nrequired_invariants: [${item.required_invariants.join(", ")}]\nrequired_evidence_anchors: [${item.required_evidence_anchors.join(", ")}]\ncross_runtime_preservation: ${item.cross_runtime_preservation}\n`);
     }
     await writeFile(path.join(workspace, "plan/openspec-traceability.json"), `${JSON.stringify(overlay)}\n`);
     const gateOneEvidence = await validatePlanContract({

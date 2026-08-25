@@ -62,8 +62,10 @@ design → waiting_gate1 → implementation → validation → waiting_gate3 →
 A current `pipeline_version: 4` snapshot is valid only when its workspace
 identity, ordered OpenSpec bindings, evidence repository roles, aggregate path,
 and aggregate SHA-256 validate together. A `pipeline_version: 3` snapshot remains
-recoverable without mutation: its singular OpenSpec coordinates become one
-in-memory binding and retain their original workspace and Gate-1 identity.
+readable without mutation until the live recovery choice: its singular OpenSpec
+coordinates become one in-memory binding and retain their original workspace and
+Gate-1 identity. The first legitimate pipeline write then migrates it atomically
+to v4; it never persists another writable v3 state.
 A v3 snapshot is valid only when it has its historical schema
 and no legacy `lane`, profile, fast/simple, or Tier-0 routing field. A legacy
 snapshot is never silently mapped. Numeric or named v2 phases, `lane:
@@ -99,7 +101,7 @@ nonce is invalid; it remains uncleared and is never repaired or inferred.
 
 The prerequisite matrix is fixed:
 
-| v3 target | Required valid prerequisite records |
+| v4 target | Required valid prerequisite records |
 |---|---|
 | `design`, `waiting_gate1` | none |
 | `implementation`, `validation`, `waiting_gate3` | Gate 1 |
@@ -114,7 +116,7 @@ presence alone is insufficient. The three numeric `1`–`1.8` rows are mutually
 exclusive in their listed order. Malformed, conflicting, or unvalidated plan
 evidence maps to `blocked`.
 
-| v2 snapshot position | v3 recovery state and evidence |
+| v2 snapshot position | v4 recovery state and evidence |
 |---|---|
 | numeric `1`–`1.8` without `01-plan.md` | `design` |
 | numeric `1`–`1.8` with Gate 1 uncleared | `waiting_gate1` |
@@ -138,13 +140,13 @@ Before removing any recognized legacy route field from active state, include
 its exact key and a bounded scalar value (maximum 128 UTF-8 bytes, secrets
 redacted) in the `state.migrated` evidence. Non-scalar or oversized values are
 recorded by key and type only. The first legitimate coordinator write is one atomic transition: persist
-`pipeline_version: 3` **and** the mapped `phase` together and append
-`state.migrated` in that same transition with `source_version: 2` (or the
-detected legacy version), the mapped state, and that bounded legacy-field archive;
-remove every archived route field from the active v3 snapshot atomically. Preserve valid dual records and
+`pipeline_version: 4` **and** the mapped `phase` together and append
+`state.migrated` in that same transition with the detected prior
+`source_version`, the mapped state, and that bounded legacy-field archive;
+remove every archived route field from the active v4 snapshot atomically. Preserve valid dual records and
 nonces; never synthesize a release or repair a malformed one. If the coupled
 write or required evidence is impossible, route to `blocked` without writing a
-v3 migration.
+v4 migration.
 
 ## Protected Git topology recovery
 
@@ -174,6 +176,18 @@ A current live operator approval permits one resubmission of the identical
 escalation, while the sandbox still decides whether the command executes.
 
 ## Gate and resume safety
+
+When a legacy `sharded-v1` OpenSpec workspace has an immutable Gate 1 whose
+aggregate differs from the current repaired aggregate, require
+`inputs/gate1-v1-migration.json` and run `openspec-bindings.mjs
+verify-v1-migration` over the original gate, current aggregate, repair evidence,
+event log, incident ID, and certificate path. Treat the original Gate plus the
+passing continuation certificate as the Gate-1 scope binding. Never rewrite the
+Gate, synthesize the certificate, accept prose evidence, or continue on a hash,
+chronology, source-intent, repository-identity, overlay, or progress mismatch.
+If the certificate is absent but the exact operator-live decision and completed
+repair evidence already exist, `migrate-v1` dry-run then apply is the only
+adoption write and does not require a new Gate 1.
 
 Before resuming `next_action`, require the structural dual-record:
 
@@ -274,6 +288,46 @@ concurrent mutation remains fail-closed. Checkbox progress never changes the
 snapshot or overlay binding and therefore never requires `SNAPSHOT_STALE`
 tolerance, rebinding, or manual hash edits. Rerun `plan-contract` after every
 successful progress transition.
+
+Aggregate recovery in `phase: implementation` validates each binding at its
+own durable position. A service with no progress event uses pre-Gate freshness;
+a service with prior progress replays only its own latest event idempotently;
+and only a service named in the current authorization receives new task IDs.
+Never send an empty implementation transition to untouched siblings or reuse
+another binding's authorization to make the aggregate pass.
+
+If recovery finds a nonterminal implementation-or-later specialist attempt,
+reconstruct its attempt number, token, dispatch time, probe/ACK timestamps, and
+declared owned/evidence paths before waiting or replacing it. Feed that state to
+`scripts/specialist-liveness.mjs`; never reset the lease because Main restarted.
+An expired attempt is interrupted before a read-only declared-path audit. Only
+a clean first attempt permits one fresh same-role replacement; partial progress
+or exhausted attempt `2` remains blocked, and Main never supplies a local role
+fallback.
+
+At recovery into implementation, a missing/corrupt OpenSpec-derived plan
+index, shard, quality manifest, or overlay is eligible for the single
+`openspec-bindings.mjs repair-derived` path only before the affected binding's first specialist
+dispatch or progress event. Verify the existing aggregate and consolidated
+Gate-1 record first, pass their exact approved snapshot, overlay, aggregate,
+and gate record to the binding helper, and accept only byte-identical overlay
+regeneration from a complete unchanged canonical execution contract. After a
+pass, rerun plan-contract, aggregate, and gate verification and preserve the
+current implementation phase and Gate-1 record. Persist the helper's
+commit-last evidence plus the post-check results. Missing canonical judgment,
+source drift, changed regenerated identity, prior implementation activity, or
+rollback failure returns `DERIVED_REPAIR_INELIGIBLE` and changes nothing. It
+never silently routes to architect or opens a gate; a live operator must
+explicitly request any Design reopening.
+
+If `inputs/openspec/<service>/dispatch-binding.json` exists, recovery treats
+that service as permanently sealed: run `openspec-bindings.mjs verify-dispatch`
+against the current aggregate, Gate, and optional migration continuation before
+any fresh dispatch. A missing, malformed, or stale seal blocks and never routes
+to repair or digest rebinding. If no seal exists and repair is no longer
+needed, run `seal-dispatch` before constructing the packet; `DERIVED_SET_BUSY`
+means another serialized repair/seal operation still owns the service and no
+packet may be published.
 
 An implementation/tester return blocked only because an exact scoped Git write
 hit protected `.git/worktrees/.../index.lock` is a technical

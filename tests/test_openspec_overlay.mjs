@@ -6,7 +6,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { deriveOpenSpecOverlay, rebindOpenSpecOverlay, validateOpenSpecOverlay, verifyOpenSpecProgress } from "../plugins/team-harness/skills/pipeline/scripts/openspec-overlay.mjs";
+import { deriveOpenSpecOverlay, repairDerivedOpenSpecArtifacts, rebindOpenSpecOverlay, validateOpenSpecOverlay, verifyOpenSpecProgress } from "../plugins/team-harness/skills/pipeline/scripts/openspec-overlay.mjs";
 import { verifySnapshot } from "../plugins/team-harness/skills/pipeline/scripts/openspec-snapshot.mjs";
 import { validatePlanContract } from "../plugins/team-harness/skills/pipeline/scripts/plan-contract.mjs";
 
@@ -20,6 +20,42 @@ async function check(name, callback) {
 
 function coordinate(kind, id) { return { kind, id, title: id, line: 1 }; }
 
+function qualityManifest() {
+  return { schema_version: 1, commands: { test: { argv: ["node", "-e", "process.exit(0)"] } } };
+}
+
+function executionContract(repository, sourceIds = ["task:1.1"]) {
+  return {
+    schema_version: 1,
+    kind: "team_harness_openspec_execution_contract",
+    worktree: { path: repository, branch: "feat/example", base_sha: "a".repeat(40) },
+    quality_manifest: qualityManifest(),
+    tasks: sourceIds.map((sourceId, index) => ({
+      source_id: sourceId,
+      owner: "implementer",
+      specialist: "implementer",
+      files: [`src/task-${index + 1}.mjs`],
+      dependencies: index === 0 ? [] : [sourceIds[index - 1]],
+      required_invariants: ["I-gate-authority"],
+      technical_constraints: ["Preserve the bounded execution authority."],
+      quality_command_ids: ["test"],
+      observable_runtime_behavior: false,
+      pre_implementation_test: "not-applicable",
+      required_evidence_anchors: ["02-implementation.md"],
+      cross_runtime_preservation: "Preserve equivalent behavior in every supported runtime.",
+      rollback: "Revert the bounded task commit.",
+      delivery_group: "default",
+      discovery_scope: { directories: ["src"], globs: ["**/*.mjs"] },
+      required_seams: [],
+    })),
+  };
+}
+
+function tasksSource(repository, sourceIds = ["task:1.1"]) {
+  const tasks = sourceIds.map((sourceId, index) => `- [ ] ${sourceId.slice(5)} Work ${index + 1}`).join("\n");
+  return `${tasks}\n\n## Team Harness Execution Contract\n\n\`\`\`json\n${JSON.stringify(executionContract(repository, sourceIds), null, 2)}\n\`\`\`\n`;
+}
+
 async function fixture() {
   const root = await mkdtemp(path.join(tmpdir(), "th-openspec-overlay-"));
   const repository = path.join(root, "repository");
@@ -32,7 +68,7 @@ async function fixture() {
     metadata: Buffer.from("schema: spec-driven\n"),
     specs: Buffer.from("### Requirement: Behavior\nThe system SHALL work.\n\n#### Scenario: Works\n- **WHEN** ready\n- **THEN** done\n"),
     design: Buffer.from("### Boundary\nUse a boundary.\n"),
-    tasks: Buffer.from("- [ ] 1.1 Work\n"),
+    tasks: Buffer.from(tasksSource(repository)),
   };
   await writeFile(path.join(changeRoot, ".openspec.yaml"), sourceBytes.metadata);
   await writeFile(path.join(changeRoot, "specs/example/spec.md"), sourceBytes.specs);
@@ -65,21 +101,24 @@ async function fixture() {
     completed: [],
     events: [],
   }, null, 2)}\n`);
+  await mkdir(path.join(workspace, ".team-harness"), { recursive: true });
+  const qualityBytes = Buffer.from(`${JSON.stringify(qualityManifest(), null, 2)}\n`);
+  await writeFile(path.join(workspace, ".team-harness/quality.json"), qualityBytes);
   const acceptance = id => ({ id, sources: [], classification: "th-extension", rationale: "TH-only acceptance control.", evidence_anchor: "reviews/04-validation.md" });
   const execution = id => ({
     id, sources: [], classification: "th-extension", rationale: "TH-only execution control.", owner: "implementer", specialist: "implementer",
     shard_path: `plan/tasks/${id}.md`, files: [`src/${id}.mjs`], dependencies: [], required_invariants: ["I-gate-authority"],
-    technical_constraints: [], quality_command_ids: ["test"], pre_implementation_test: "required",
+    technical_constraints: ["Preserve the bounded execution authority."], quality_command_ids: ["test"], observable_runtime_behavior: false, pre_implementation_test: "not-applicable",
     required_evidence_anchors: ["02-implementation.md"], cross_runtime_preservation: "Preserve equivalent behavior in every supported runtime.",
-    rollback: "Revert the bounded task commit.", delivery_group: "default",
+    rollback: "Revert the bounded task commit.", delivery_group: "default", discovery_scope: { directories: ["src"], globs: ["**/*.mjs"] }, required_seams: [],
   });
-  const shard = item => `# ${item.id}\n\n- **Worktree:** null — branch null, base null\n\n## Dispatch anchors\n\nrequired_invariants: [${item.required_invariants.join(", ")}]\nrequired_evidence_anchors: [${item.required_evidence_anchors.join(", ")}]\ncross_runtime_preservation: ${item.cross_runtime_preservation}\n`;
+  const shard = item => `# ${item.id}\n\n- **Worktree:** ${repository} — branch feat/example, base ${"a".repeat(40)}\n\n## Dispatch anchors\n\nrequired_invariants: [${item.required_invariants.join(", ")}]\nrequired_evidence_anchors: [${item.required_evidence_anchors.join(", ")}]\ncross_runtime_preservation: ${item.cross_runtime_preservation}\n`;
   const overlay = {
-    schema_version: 1, kind: "team_harness_openspec_execution_overlay", plan_format: "sharded-v1",
+    schema_version: 2, kind: "team_harness_openspec_execution_overlay", plan_format: "sharded-v1",
     snapshot: { path: "inputs/openspec-snapshot.json", sha256: digest(snapshotBytes), artifact_set_sha256: snapshot.artifact_set_sha256, change_name: "example" },
-    repository: { root: repository, ownership: [{ path: "src", owner: "implementer" }] },
+    repository: { root: repository, ownership: [{ path: "src", owner: "implementer" }], worktree: { path: repository, branch: "feat/example", base_sha: "a".repeat(40) } },
       quality_commands: [{ id: "test" }],
-    freeze: { baseline_sha256: "b".repeat(64), state_anchor: "00-state.json", evidence_root: "reviews" },
+    freeze: { baseline_sha256: "b".repeat(64), state_anchor: "00-state.json", evidence_root: "reviews", quality_manifest_path: ".team-harness/quality.json", quality_manifest_sha256: digest(qualityBytes) },
     acceptance_items: [acceptance("AC-1"), acceptance("AC-2")],
     execution_items: [execution("Task-1"), execution("Task-2")],
     source_dispositions: [], operator_disclosures: [],
@@ -94,6 +133,34 @@ async function fixture() {
 async function withFixture(callback) {
   const value = await fixture();
   try { await callback(value); } finally { await rm(value.root, { recursive: true, force: true }); }
+}
+
+async function replaceSnapshotTasks(value, sourceIds) {
+  const tasksPath = path.join(value.repository, "openspec/changes/example/tasks.md");
+  const bytes = Buffer.from(tasksSource(value.repository, sourceIds));
+  await writeFile(tasksPath, bytes);
+  const snapshotPath = path.join(value.workspace, "inputs/openspec-snapshot.json");
+  const snapshot = JSON.parse(await readFile(snapshotPath, "utf8"));
+  const artifact = snapshot.artifacts.find(item => item.artifact_id === "tasks");
+  artifact.content_sha256 = digest(bytes);
+  artifact.intent_sha256 = digest(bytes);
+  artifact.coordinates = sourceIds.map((id, index) => ({ ...coordinate("task", id), line: index + 1, complete: false }));
+  snapshot.artifact_set_sha256 = digest(Buffer.from(snapshot.artifacts.map(item => `${item.path}\0${item.content_sha256}`).join("\n")));
+  await writeFile(snapshotPath, `${JSON.stringify(snapshot)}\n`);
+}
+
+async function approvedRepairInput(value) {
+  const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository, value.root], overwrite: true });
+  assert.equal(derived.verdict, "pass", JSON.stringify(derived));
+  return {
+    workspace: value.workspace,
+    writableRoots: [value.repository, value.root],
+    approvedSnapshotSha256: derived.snapshot_sha256,
+    approvedOverlaySha256: derived.overlay_sha256,
+    approvedAggregateSha256: "c".repeat(64),
+    approvedGateIdentitySha256: "d".repeat(64),
+    implementationStarted: false,
+  };
 }
 
 function makeDirect(overlay) {
@@ -206,7 +273,8 @@ await check("verifies authorized task progress without changing snapshot or over
   const snapshotBefore = await readFile(snapshotPath);
   const overlayBefore = await readFile(overlayPath);
   const tasksPath = path.join(value.repository, "openspec/changes/example/tasks.md");
-  await writeFile(tasksPath, "- [x] 1.1 Work\n");
+  const tasksText = await readFile(tasksPath, "utf8");
+  await writeFile(tasksPath, tasksText.replace("- [ ] 1.1 Work 1", "- [x] 1.1 Work 1"));
   const advanced = await verifyOpenSpecProgress({
     workspace: value.workspace,
     writableRoots: [value.repository],
@@ -232,7 +300,9 @@ await check("accepts an already-recorded exact progress event without recovery o
   makeDirect(value.overlay);
   await value.writeOverlay(value.overlay);
   const snapshotPath = path.join(value.workspace, "inputs/openspec-snapshot.json");
-  await writeFile(path.join(value.repository, "openspec/changes/example/tasks.md"), "- [x] 1.1 Work\n");
+  const tasksPath = path.join(value.repository, "openspec/changes/example/tasks.md");
+  const tasksText = await readFile(tasksPath, "utf8");
+  await writeFile(tasksPath, tasksText.replace("- [ ] 1.1 Work 1", "- [x] 1.1 Work 1"));
   const verified = await verifySnapshot({ snapshotPath, phase: "implementation", authorizedTaskIds: ["task:1.1"] });
   assert.equal(verified.verdict, "pass");
   assert.equal((await validateOverlay(value)).verdict, "pass");
@@ -292,7 +362,7 @@ await check("blocks an execution worktree outside the effective writable roots",
   makeDirect(value.overlay);
   const taskPath = path.join(value.workspace, "plan/tasks/Task-1.md");
   const shard = await readFile(taskPath, "utf8");
-  await writeFile(taskPath, shard.replace("- **Worktree:** null", "- **Worktree:** /outside/sandbox/worktree"));
+  await writeFile(taskPath, shard.replace(`- **Worktree:** ${value.repository}`, "- **Worktree:** /outside/sandbox/worktree"));
   await value.writeOverlay(value.overlay);
   const result = await validateOverlay(value);
   assert.ok(result.findings.some(item => item.code === "EXECUTION_ROOT_NOT_WRITABLE"));
@@ -305,9 +375,9 @@ await check("requires the live writable-root set for OpenSpec Gate-1 validation"
   assert.equal(result.error_code, "ARGUMENT_INVALID");
 }));
 
-await check("derives an overlay skeleton that validates without manual repair", async () => withFixture(async value => {
+await check("derives an implementable overlay only from the architect-authored execution contract", async () => withFixture(async value => {
   const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository, value.root], overwrite: true });
-  assert.equal(derived.verdict, "pass");
+  assert.equal(derived.verdict, "pass", JSON.stringify(derived));
   assert.equal(derived.kind, "team_harness_openspec_overlay_derivation");
   assert.equal(derived.acceptance_item_count, 1);
   assert.equal(derived.execution_item_count, 1);
@@ -318,6 +388,58 @@ await check("derives an overlay skeleton that validates without manual repair", 
   assert.ok(planText.includes("**Plan format:** sharded-v1"));
   assert.ok(planText.includes("## Plan Manifest"));
   assert.ok(planText.includes("### Task Index"));
+  const shardText = await readFile(path.join(value.workspace, "plan/tasks/Task-1.md"), "utf8");
+  assert.match(shardText, /- \*\*Files:\*\*\n  - `src\/task-1\.mjs`/);
+  assert.match(shardText, /- \*\*Discovery directories:\*\* \[src\]/);
+  assert.match(shardText, /#### Verification/);
+  assert.doesNotMatch(shardText, /Derivation scaffold|planning pass authors|Worktree:\*\* null/);
+  assert.equal(JSON.parse(await readFile(path.join(value.workspace, ".team-harness/quality.json"), "utf8")).schema_version, 1);
+}));
+
+await check("rejects missing or placeholder execution judgment before writing Gate-1 artifacts", async () => withFixture(async value => {
+  const tasksPath = path.join(value.repository, "openspec/changes/example/tasks.md");
+  const invalid = executionContract(value.repository);
+  invalid.tasks[0].cross_runtime_preservation = "Derivation scaffold — planning pass authors this later.";
+  const text = `- [ ] 1.1 Work 1\n\n## Team Harness Execution Contract\n\n\`\`\`json\n${JSON.stringify(invalid, null, 2)}\n\`\`\`\n`;
+  const bytes = Buffer.from(text);
+  await writeFile(tasksPath, bytes);
+  const snapshotPath = path.join(value.workspace, "inputs/openspec-snapshot.json");
+  const snapshot = JSON.parse(await readFile(snapshotPath, "utf8"));
+  const artifact = snapshot.artifacts.find(item => item.artifact_id === "tasks");
+  artifact.content_sha256 = digest(bytes);
+  artifact.intent_sha256 = digest(bytes);
+  snapshot.artifact_set_sha256 = digest(Buffer.from(snapshot.artifacts.map(item => `${item.path}\0${item.content_sha256}`).join("\n")));
+  await writeFile(snapshotPath, `${JSON.stringify(snapshot)}\n`);
+  const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository, value.root], overwrite: true });
+  assert.equal(derived.verdict, "fail");
+  assert.equal(derived.error_code, "EXECUTION_CONTRACT_INVALID");
+}));
+
+await check("requires the hash-bound workspace quality manifest at Gate 1", async () => withFixture(async value => {
+  makeDirect(value.overlay);
+  await value.writeOverlay(value.overlay);
+  await rm(path.join(value.workspace, ".team-harness/quality.json"));
+  const result = await validateOverlay(value);
+  assert.ok(result.findings.some(item => item.code === "QUALITY_MANIFEST_INVALID"));
+}));
+
+await check("plan-contract rejects a placeholder preservation statement even when shard and overlay agree", async () => withFixture(async value => {
+  makeDirect(value.overlay);
+  const placeholder = "Derivation scaffold — the planning pass authors the real statement before Gate 1.";
+  value.overlay.execution_items[0].cross_runtime_preservation = placeholder;
+  const shardPath = path.join(value.workspace, "plan/tasks/Task-1.md");
+  const shard = await readFile(shardPath, "utf8");
+  await writeFile(shardPath, shard.replace("Preserve equivalent behavior in every supported runtime.", placeholder));
+  await value.writeOverlay(value.overlay);
+  const result = await validatePlanContract({
+    workspace: value.workspace,
+    plan: "01-plan.md",
+    snapshot: "inputs/openspec-snapshot.json",
+    traceability: "plan/openspec-traceability.json",
+    writableRoots: [value.repository],
+  });
+  assert.equal(result.verdict, "fail");
+  assert.ok(result.findings.some(item => item.code === "EXECUTION_CONTROL_INVALID"));
 }));
 
 await check("fails closed when the change has no scenario or task coordinates", async () => withFixture(async value => {
@@ -358,11 +480,7 @@ await check("overwrites existing targets only with explicit authorization", asyn
 }));
 
 await check("removes every shard already written before returning fail on a mid-derivation write failure", async () => withFixture(async value => {
-  const snapshotPath = path.join(value.workspace, "inputs/openspec-snapshot.json");
-  const snapshot = JSON.parse(await readFile(snapshotPath, "utf8"));
-  const tasksArtifact = snapshot.artifacts.find(item => item.artifact_id === "tasks");
-  tasksArtifact.coordinates.push({ kind: "task", id: "task:1.2", title: "Second task", line: 2, complete: false });
-  await writeFile(snapshotPath, `${JSON.stringify(snapshot)}\n`);
+  await replaceSnapshotTasks(value, ["task:1.1", "task:1.2"]);
   const firstShardPath = path.join(value.workspace, "plan/tasks/Task-1.md");
   const secondShardPath = path.join(value.workspace, "plan/tasks/Task-2.md");
   const traceabilityPath = path.join(value.workspace, "plan/openspec-traceability.json");
@@ -380,11 +498,7 @@ await check("removes every shard already written before returning fail on a mid-
 await check("Design re-entry reruns derivation with overwrite authorized and binds to the corrected snapshot", async () => withFixture(async value => {
   const first = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository, value.root], overwrite: true });
   assert.equal(first.verdict, "pass");
-  const snapshotPath = path.join(value.workspace, "inputs/openspec-snapshot.json");
-  const snapshot = JSON.parse(await readFile(snapshotPath, "utf8"));
-  const tasksArtifact = snapshot.artifacts.find(item => item.artifact_id === "tasks");
-  tasksArtifact.coordinates.push({ kind: "task", id: "task:1.2", title: "Second task", line: 2, complete: false });
-  await writeFile(snapshotPath, `${JSON.stringify(snapshot)}\n`);
+  await replaceSnapshotTasks(value, ["task:1.1", "task:1.2"]);
   const second = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository, value.root], overwrite: true });
   assert.equal(second.verdict, "pass");
   assert.notEqual(second.snapshot_sha256, first.snapshot_sha256);
@@ -397,6 +511,7 @@ await check("derives normally on a clean target directory with no explicit overw
   await rm(path.join(value.workspace, "plan/tasks/Task-1.md"));
   await rm(path.join(value.workspace, "plan/tasks/Task-2.md"));
   await rm(path.join(value.workspace, "plan/tasks/Task-3.md"));
+  await rm(path.join(value.workspace, ".team-harness/quality.json"));
   const derived = await deriveOpenSpecOverlay({ workspace: value.workspace, writableRoots: [value.repository, value.root] });
   assert.equal(derived.verdict, "pass");
   const result = await validateOverlay(value);
@@ -425,6 +540,84 @@ await check("refuses to derive when the workspace write root is a sibling of eve
   assert.equal(derived.error_code, "WORKSPACE_ROOT_NOT_WRITABLE");
   await assert.rejects(readFile(traceabilityPath), { code: "ENOENT" });
   await assert.rejects(readFile(path.join(value.workspace, "plan/tasks/Task-1.md")), { code: "ENOENT" });
+}));
+
+await check("repairs only missing or damaged derived artifacts while preserving approved hashes", async () => withFixture(async value => {
+  const input = await approvedRepairInput(value);
+  await writeFile(path.join(value.workspace, "plan/tasks/Task-1.md"), "# damaged shard\n");
+  await rm(path.join(value.workspace, ".team-harness/quality.json"));
+  const repaired = await repairDerivedOpenSpecArtifacts(input);
+  assert.equal(repaired.verdict, "pass", JSON.stringify(repaired));
+  assert.equal(repaired.changed, true);
+  assert.equal(repaired.regenerated_overlay_sha256, input.approvedOverlaySha256);
+  const validation = await validateOverlay(value);
+  assert.equal(validation.verdict, "pass", JSON.stringify(validation));
+  const evidence = JSON.parse(await readFile(path.join(value.workspace, repaired.evidence_path), "utf8"));
+  assert.equal(evidence.gate_preserved, true);
+  assert.equal(evidence.approved.aggregate_sha256, input.approvedAggregateSha256);
+  assert.ok(evidence.artifacts.some(item => item.path === ".team-harness/quality.json" && item.before_sha256 === null));
+}));
+
+await check("refuses post-Gate repair when canonical execution judgment is absent", async () => withFixture(async value => {
+  const input = await approvedRepairInput(value);
+  const tasksPath = path.join(value.repository, "openspec/changes/example/tasks.md");
+  const bytes = Buffer.from("- [ ] 1.1 Work 1\n");
+  await writeFile(tasksPath, bytes);
+  const snapshotPath = path.join(value.workspace, "inputs/openspec-snapshot.json");
+  const snapshot = JSON.parse(await readFile(snapshotPath, "utf8"));
+  const taskArtifact = snapshot.artifacts.find(item => item.artifact_id === "tasks");
+  taskArtifact.content_sha256 = digest(bytes);
+  taskArtifact.intent_sha256 = digest(bytes);
+  snapshot.artifact_set_sha256 = digest(Buffer.from(snapshot.artifacts.map(item => `${item.path}\0${item.content_sha256}`).join("\n")));
+  const snapshotBytes = Buffer.from(`${JSON.stringify(snapshot)}\n`);
+  await writeFile(snapshotPath, snapshotBytes);
+  const progressPath = path.join(value.workspace, "inputs/openspec-progress.json");
+  const progress = JSON.parse(await readFile(progressPath, "utf8"));
+  progress.task_intent_sha256 = taskArtifact.intent_sha256;
+  await writeFile(progressPath, `${JSON.stringify(progress, null, 2)}\n`);
+  const repaired = await repairDerivedOpenSpecArtifacts({ ...input, approvedSnapshotSha256: digest(snapshotBytes) });
+  assert.equal(repaired.verdict, "fail");
+  assert.equal(repaired.error_code, "DERIVED_REPAIR_INELIGIBLE");
+  assert.equal(repaired.derivation_error_code, "EXECUTION_CONTRACT_INVALID");
+}));
+
+await check("refuses post-Gate repair when regeneration changes the approved overlay hash", async () => withFixture(async value => {
+  const input = await approvedRepairInput(value);
+  await writeFile(path.join(value.workspace, "plan/tasks/Task-1.md"), "# damaged shard\n");
+  const repaired = await repairDerivedOpenSpecArtifacts({ ...input, approvedOverlaySha256: "e".repeat(64) });
+  assert.equal(repaired.verdict, "fail");
+  assert.equal(repaired.error_code, "APPROVED_OVERLAY_MISMATCH");
+  assert.equal(await readFile(path.join(value.workspace, "plan/tasks/Task-1.md"), "utf8"), "# damaged shard\n");
+}));
+
+await check("refuses derived repair after implementation has started", async () => withFixture(async value => {
+  const input = await approvedRepairInput(value);
+  const before = await readFile(path.join(value.workspace, "plan/tasks/Task-1.md"));
+  const repaired = await repairDerivedOpenSpecArtifacts({ ...input, implementationStarted: true });
+  assert.equal(repaired.verdict, "fail");
+  assert.equal(repaired.error_code, "DERIVED_REPAIR_INELIGIBLE");
+  assert.deepEqual(await readFile(path.join(value.workspace, "plan/tasks/Task-1.md")), before);
+}));
+
+await check("rolls back the derived set when replacement fails partway", async () => withFixture(async value => {
+  const input = await approvedRepairInput(value);
+  const shardPath = path.join(value.workspace, "plan/tasks/Task-1.md");
+  await writeFile(shardPath, "# damaged before repair\n");
+  const beforePlan = await readFile(path.join(value.workspace, "01-plan.md"));
+  const beforeShard = await readFile(shardPath);
+  let writes = 0;
+  const repaired = await repairDerivedOpenSpecArtifacts({
+    ...input,
+    artifactWriter: async (target, bytes) => {
+      writes += 1;
+      if (writes === 2) throw new Error("injected replacement failure");
+      await writeFile(target, bytes);
+    },
+  });
+  assert.equal(repaired.verdict, "fail");
+  assert.equal(repaired.error_code, "DERIVED_REPAIR_WRITE_FAILED");
+  assert.deepEqual(await readFile(path.join(value.workspace, "01-plan.md")), beforePlan);
+  assert.deepEqual(await readFile(shardPath), beforeShard);
 }));
 
 if (failures.length) {

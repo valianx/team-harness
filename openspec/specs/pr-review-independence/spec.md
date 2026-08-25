@@ -23,6 +23,21 @@ The consolidator's status block SHALL enumerate findings received per lens and t
 - **WHEN** a selected lens is absent after its bounded retry
 - **THEN** the published body discloses the absent lens; an APPROVE with silent lens absence is impossible
 
+### Requirement: Frozen review artifacts outlive every specialist
+The coordinator SHALL own the successful snapshot lifecycle independently of
+the shell or PTY process that captures and materializes it. Capture,
+materialization, promotion, and readiness commands MUST NOT register cleanup on
+`EXIT` or another process-lifetime hook. The frozen worktree and required
+artifacts SHALL remain available through every specialist terminal result,
+retry, consolidation read, and post-dispatch integrity comparison. Cleanup
+SHALL run explicitly only after all dispatched reviewers have joined or after
+an explicit terminal cancel; unexpected coordinator loss SHALL preserve the
+workspace for recovery rather than delete evidence still in use.
+
+#### Scenario: Materialization shell ends before reviewers
+- **WHEN** the command process that materialized the snapshot exits or yields for longer than 30 seconds while a reviewer is still reading
+- **THEN** the review workspace remains intact and cleanup does not run until that reviewer and every other dispatched lens reaches a terminal result
+
 ### Requirement: Reviewer path mistakes recover without weakening snapshot safety
 Reviewer agents SHALL read only coordinator-supplied artifacts and project leaves proven to exist inside the frozen worktree before content access. Instruction-source markers, semantic-source markers, conventional filenames, unresolved imports, and optional coordinates set to `none` SHALL NOT be opened as project context. A nonexistent path outside the supplied and verified set SHALL be classified as an agent path-scope mistake rather than a filesystem transport failure.
 

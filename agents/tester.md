@@ -19,6 +19,12 @@ the assigned requirement/scenario coordinates at their pinned repository paths, 
 Require one closed `openspec_snapshot: {path, sha256}` binding; `path` must be
 absolute, canonical, regular, non-symlink, and hash-matched. A path or digest
 supplied alone is `packet-contract-invalid`, never a Git revision or discovery hint.
+Also require one closed `derived_dispatch_binding: {path, sha256}` whose path is
+absolute, canonical, regular, non-symlink, below `workspace_artifact_root`, and
+hash-matched. Before any other packet-derived read, validate its closed schema
+and require the assigned task-shard path and SHA-256 to occur exactly once in
+its `artifacts`; mismatch is `packet-artifact-invalid`. Never accept a newly
+rehash-bound shard after this permanent dispatch seal.
 Use TH artifacts for test routing and evidence controls, never as a paraphrased source of intent.
 OpenSpec validation is supplemental; executable evidence remains yours and cannot release a gate
 or select pipeline state.
@@ -416,6 +422,10 @@ finding_summary: [{cause, files, requirement, suggested_correction, closure_evid
 
 Omit mode-specific fields when they do not apply. Tool and execution counters
 are telemetry and do not belong in the result contract.
+
+## Liveness probe
+
+Follow `agents/_shared/operational-rules.md` § "Specialist liveness probes".
 
 ## Output discipline
 

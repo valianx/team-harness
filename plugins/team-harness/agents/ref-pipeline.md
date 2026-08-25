@@ -11,7 +11,7 @@ This file is read by `th:orchestrator` only after a live operator activates `/th
 
 **LAZY-LOAD DIRECTIVE.** Never read this file in full. Locate headings with `Grep`, then read only the sections needed for the current transition. At activation, read `Boot`, `Phase index`, `Where things live`, `Intake`, and `Specify`; load support sections only when their trigger occurs. Before the first specialist dispatch, read `Dispatch invariants`, `Your Team`, and the current phase. Before each later phase, read only that phase's section up to the next `##` heading. On recovery, read `Compact Instructions`, the state file, and only the current phase.
 
-Once activated, you run one named state machine — `design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete` — dispatch specialists where the active state requires them, present the two STAGE-GATEs inline, and remain the sole writer of `00-state.md`. Every pipeline uses this same v3 machine and both gates; there is no depth profile. An active run cannot execute direct work in place. A current live operator request that explicitly selects `inline` first closes the run administratively (`phase: aborted`, `status: aborted`, pending gate cleared, no gate release), then returns to direct work with no new workspace or state. Inline ad-hoc tester/QA/security/other review remains outside the machine and creates no state, gates, delivery record, or pipeline workspace.
+Once activated, you run one named state machine — `design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete` — dispatch specialists where the active state requires them, present the two STAGE-GATEs inline, and remain the sole writer of `00-state.md`. Every pipeline uses this same v4 machine and both gates; there is no depth profile. An active run cannot execute direct work in place. A current live operator request that explicitly selects `inline` first closes the run administratively (`phase: aborted`, `status: aborted`, pending gate cleared, no gate release), then returns to direct work with no new workspace or state. Inline ad-hoc tester/QA/security/other review remains outside the machine and creates no state, gates, delivery record, or pipeline workspace.
 
 **Model and effort — where each applies, without asking.** On Claude Code you run as the top-level session agent, never dispatched via `Task`; your effective model and effort are therefore whatever the session itself is running. On `opencode` the `primary` tier is granted by the installer's role-override layer keyed on `agents/orchestrator.md`, not this lazy reference.
 
@@ -107,14 +107,15 @@ HerdR is an optional external agent transport, not a coordinator fallback. When
 the operator or environment selects a HerdR-registered target, read
 `agents/_shared/herdr-agent-messaging.md` and use the packaged adapter for the
 complete discovery/send/submit/verify transaction. `unavailable` permits the
-normal native dispatch path. A busy or unverifiable result is durable pending
-state and never evidence of receipt or authority for a blind resend. Native
+normal native dispatch path. A successful submission to a working agent is
+`queued` until receipt can be verified; it is durable pending state and never
+authority for a blind resend. Native
 permission gates and the coordinator's sole state ownership remain unchanged.
 Persist the adapter's complete result in `herdr_deliveries` before any recovery
-or retry. For a pending or failed transaction, first read the same target and
-prove that the recorded `message_id` is absent from committed input. Busy,
-unverifiable, and pending results never count as receipt and never permit a
-blind resend; without absence proof, keep the transaction pending and inspect.
+or retry. Queued input may not yet appear in committed transcript output, so
+absence is not evidence that submission failed. Pending results never count as
+receipt and never permit a blind resend; retry only after positive evidence
+that the prior submission did not occur.
 
 ## Voice
 
@@ -225,7 +226,7 @@ request for architect work permits `design` and a new Gate 1 (`route: architect-
 
 Every pipeline uses this exact sequence and the same two gates. `inline` remains a
 pre-activation direct-mode posture, never enters this machine, and is never a legal value
-in an active v3 state. A live ad-hoc specialist review requested during inline remains
+in an active v4 state. A live ad-hoc specialist review requested during inline remains
 inline and creates no state, gate, delivery record, or pipeline workspace.
 
 ## Phase index
@@ -346,6 +347,7 @@ One taxonomy for everything that can go wrong, so the budget question is answere
 | `failure_kind` | The observable cause | Owner | Budget | On exhaustion |
 |---|---|---|---|---|
 | `transport` | The `Task` call itself errored — the harness failed and no specialist result was ever produced | you | retry exactly once | STOP the phase; report the harness's **literal** error message, never paraphrased. No workaround that bypasses the specialist |
+| `specialist-unresponsive` | An implementation-or-later specialist exceeded its role SLA and then returned neither a matching checkpoint ACK nor a terminal result before the deterministic liveness lease expired | native attempt | interrupt, audit only declared owned/evidence paths, then at most one fresh same-role replacement when the audit is clean | `status: blocked` as `specialist-interrupted-with-progress` when any declared path changed, or `specialist-retry-exhausted` after a clean second attempt; Main never performs the specialist work |
 | `invalid-return` | A result came back, but a decision-bearing fact is absent or ambiguous after the coordinator has normalized any unambiguous formatting defect from the returned evidence | the specialist | re-dispatch once, naming the unresolved fact | STOP only when the fact remains ambiguous; never invent evidence or a result |
 | `stale-context` | A snapshot-bound result names a missing or different reviewed head/context identity than its dispatch | review coordinator | no retry against the old snapshot; recapture and re-dispatch under the owning freshness barrier | STOP without publishing if a fresh snapshot cannot be established |
 | `artifact-missing` | A required output **file** is absent, empty, or unparseable while the dispatch reported success | the owning specialist | re-dispatch once | STOP; never author the missing artifact yourself |
@@ -522,13 +524,12 @@ agent follow-up, or second dispatch is authorized by the prior decision.
 
 ## Phase timeouts
 
-### Wait heartbeat and phase SLA
+### Wait heartbeat and bounded specialist liveness lease
 
-A runtime wait timeout is only a coordinator heartbeat: it returns control to
-Main and does not fail, stop, or otherwise change the specialist. In Codex, a
-`wait_agent` timeout proves neither failure nor terminal state. Immediately
-resume `wait_agent` without recap, fresh analysis, `interrupt_agent`, or a
-replacement dispatch. Never infer failure from silence during one or more wait
+A runtime wait timeout before the role SLA is only a coordinator heartbeat: it
+returns control to Main and does not fail, stop, or otherwise change the
+specialist. In Codex, a `wait_agent` timeout proves neither failure nor terminal
+state. Resume the directed wait without inferring failure from one or more wait
 intervals.
 
 Track the phase SLA independently from the wait heartbeat and from dispatch
@@ -545,11 +546,35 @@ time:
 | validation | security | 10 min |
 | delivery | delivery | 5 min |
 
-On SLA exceed, tell the operator once that the specialist is still running and
-append one `agent.sla` event with the universal envelope plus a concise
-`observation`. Do not request heartbeats, inspect partial artifacts, or require
-attempt counters and metrics. Elapsed time is not failure or replacement
-authority; keep waiting unless the live operator cancels the active work.
+The architect Design attempt keeps its existing operator-owned timeout: on SLA
+exceed, report once, append `agent.sla`, and keep waiting unless the live
+operator cancels it. For implementation, tester, cleaner, QA, security, and
+delivery attempts, evaluate the exact input with
+`skills/pipeline/scripts/specialist-liveness.mjs` (or its packaged projection).
+That helper is the only silence-to-action classifier:
+
+1. At the first role-SLA exceed, append `agent.sla`, send one native
+   `TH-LIVENESS-PROBE` carrying the attempt token, and grant exactly two minutes
+   for the matching `TH-LIVENESS-ACK` checkpoint. The event's `extra` records
+   `attempt`, `attempt_token`, `liveness_action`, and `deadline_at`; a matching
+   ACK appends another `agent.sla` with the same identity and renewed deadline.
+2. A matching bounded checkpoint renews the attempt lease exactly once for the
+   role SLA. A stale or mismatched token grants nothing. No second probe or
+   renewal exists.
+3. On an `interrupt` decision, call the native interrupt operation and confirm
+   terminal interruption. Only then inspect the role packet's declared owned
+   file paths and expected evidence paths read-only; do not inspect arbitrary
+   partial artifacts or dispatch a concurrent writer.
+4. Changed work or evidence blocks as
+   `specialist-interrupted-with-progress`. A clean first attempt permits one
+   fresh same-role replacement with `fork_turns: none` and attempt `2`. A clean
+   second attempt blocks as `specialist-retry-exhausted`.
+
+The coordinator never implements, tests, cleans, validates, or prepares
+delivery as a local fallback. There are at most two attempts total, so silence
+cannot create an indefinite relaunch loop. Persist the helper decision and the
+post-interrupt path audit in the closing `agent.close.extra` before replacement
+or block; record only declared path names and booleans, never partial contents.
 
 ## Context pruning
 
@@ -828,15 +853,20 @@ without legacy fallback.
 Dispatch a fresh `architect` in `openspec-planning` mode with the installed upstream
 `openspec-propose` skill for a new change or `openspec-update-change` for the already bound
 change. This is the single reasoning pass: it writes the OpenSpec proposal, specs, design, and
-tasks, carrying every judgment call — routing, scope decomposition, invariants — into that one
-change. Main then runs CLI-reported status plus strict validation and captures the sole
+tasks. Canonical `tasks.md` ends with the closed execution-contract JSON from
+the loaded plan-shards reference, carrying every judgment call — real
+worktree/base, files, routing, scope decomposition, invariants, evidence,
+discovery, seams, quality argv, test-first applicability, preservation, and
+rollback — into that one change. Main then runs CLI-reported status plus strict validation and captures the sole
 `inputs/openspec-snapshot.json`. Main then runs `openspec-overlay.mjs derive` directly over the
-validated snapshot and the effective absolute `writable_roots` — a mechanical projection, never a
-second agent dispatch. It writes only the compact Gate-1 index, operational execution shard
-scaffolds, and bidirectional traceability against pinned coordinates, and never rewrites
+validated snapshot, its execution contract, and the effective absolute
+`writable_roots` — a mechanical projection, never a second agent dispatch. It writes only the compact Gate-1 index, operational execution shards,
+the hash-bound workspace quality manifest, and bidirectional traceability against pinned coordinates, and never rewrites
 canonical source intent. Each shard's literal `required_invariants`, `required_evidence_anchors`,
 and `cross_runtime_preservation` declarations mirror exactly into its traceability
-`execution_items` entry by construction. A validator failure on the assembled plan re-enters the same
+`execution_items` entry by construction. Missing, malformed, stale,
+placeholder, or out-of-root execution judgment returns
+`EXECUTION_CONTRACT_INVALID` and blocks Gate 1. A validator failure on the assembled plan re-enters the same
 `openspec-planning` flow with the failure and Main reruns the derivation over the corrected
 snapshot, invoking it with `overwrite: true` since the prior derivation already wrote the
 traceability file and shards — that authorization is bound to the recorded correction event, not
@@ -1161,6 +1191,32 @@ only assigned pending-to-complete task coordinates may advance through the packa
 bytes, snapshot SHA-256, artifact-set SHA-256, and the approved overlay remain unchanged.
 `plan-contract` accepts this authorized monotonic progress without rebinding. Never edit overlay
 hashes, manually rebind, or dispatch an architect for checkbox-only progress.
+Before the first specialist dispatch for a binding, a preflight failure limited
+to missing or damaged derived plan/shard/quality/overlay artifacts takes one
+coordinator-owned `openspec-bindings.mjs repair-derived` attempt before any
+design route. Eligibility requires a freshly verified released consolidated
+Gate 1, byte-identical aggregate/binding/snapshot identities, no dispatch or
+progress event, and a complete unchanged canonical execution contract. The
+binding helper verifies aggregate and gate identity before and after; its
+overlay repair derives in isolation and may replace the closed derived set only when
+the regenerated overlay SHA-256 exactly equals the approved binding hash. Main
+then reruns overlay, plan-contract, aggregate, and Gate-1 verification, records
+the deterministic repair evidence, and continues in `implementation` without
+a new gate. Missing canonical judgment, any identity drift, prior work, or a
+failed/rolled-back repair is `DERIVED_REPAIR_INELIGIBLE`; do not infer fields or
+auto-dispatch architect. Only a separate explicit live operator request can
+reopen Design.
+After repair and before constructing the first specialist packet for a service,
+Main runs `openspec-bindings.mjs seal-dispatch`. Repair and sealing share one
+create-only per-service lock: `DERIVED_SET_BUSY` publishes no packet, while a
+successful permanent `inputs/openspec/<service>/dispatch-binding.json` makes
+all later repair ineligible. The seal binds the aggregate, Gate, optional
+migration continuation, snapshot, overlay, plan, workspace quality manifest,
+and every overlay-declared shard. Every fresh initial/correction dispatch runs
+`verify-dispatch`, carries the absolute/hash-matched
+`derived_dispatch_binding: {path, sha256}`, and proves its shard appears exactly
+once with the supplied artifact hash. Any post-seal mismatch is
+`DISPATCH_BINDING_STALE`; never rehash, rebind, or resend against changed bytes.
 When Design and implementation use different checkouts, Main first materializes
 the exact snapshot-bound canonical source set below the implementation
 repository and verifies its hashes. Every created or changed

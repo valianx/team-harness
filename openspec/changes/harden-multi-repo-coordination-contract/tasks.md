@@ -22,10 +22,10 @@
 
 ## 4. Shared HerdR operations
 
-- [x] 4.1 Add the canonical shared HerdR agent-messaging reference with capability detection, exact target/pane discovery, state normalization, explicit sender envelope, bounded waiting, and closed result statuses.
-- [x] 4.2 Implement the bounded HerdR adapter using literal argument arrays for `agent list`, `agent wait`, `agent send`, `pane send-keys <pane> enter`, and `agent read`, with target revalidation between staging and submission.
+- [x] 4.1 Add the canonical shared HerdR agent-messaging reference with capability detection, exact target/pane discovery, queue-aware state handling, explicit sender envelope, and closed result statuses.
+- [x] 4.2 Implement the bounded HerdR adapter using literal argument arrays for `agent list`, `agent send`, `pane send-keys <pane> enter`, and `agent read`, with target revalidation between staging and submission.
 - [x] 4.3 Integrate the shared contract into pipeline coordination, tmux, and background without changing native permission gates or making HerdR a required dependency.
-- [x] 4.4 Ensure failed or unverifiable submissions remain recoverable (`pending-busy`, `staged-not-submitted`, or `submitted-unverified`) and cannot be reported as `received` or retried blindly.
+- [x] 4.4 Ensure queued or failed submissions remain recoverable (`queued` or `staged-not-submitted`) and cannot be reported as `received` or retried blindly.
 
 ## 5. Projection and contract freshness
 
@@ -45,4 +45,52 @@
 - [x] 7.1 Align the documented v4 workspace, binding, evidence, service-event, and HerdR persistence schemas with their canonical adapters.
 - [x] 7.2 Fail closed on workspace/binding membership drift, missing aggregate identity, missing evidence roots, and unbounded adapter exception codes.
 - [x] 7.3 Record task-intent and strict-validation results in each binding and bind per-service shard ownership to its traceability path.
-- [x] 7.4 Verify the installed HerdR wait contract, add full-envelope secret checks and bounded verification backoff, and cover review regressions in focused tests.
+- [x] 7.4 Verify the installed HerdR queue contract, add full-envelope secret checks and bounded verification backoff, and cover review regressions in focused tests.
+
+## 8. HerdR queue semantics correction
+
+- [x] 8.1 Remove the incorrect idle wait and submit messages through HerdR's terminal input queue for every recognized agent state.
+- [x] 8.2 Replace busy/unverified outcomes with durable `queued` semantics while preserving explicit Enter, receipt verification, and no-blind-resend safety.
+- [x] 8.3 Discover the current HerdR sender identity, include stable terminal/pane correlation and a current-session response channel, and define receiver handling in the shared operational contract.
+- [x] 8.4 Regenerate every packaged projection and run the focused adapter, generation, lint, and strict OpenSpec checks.
+
+## 9. OpenSpec execution-contract correction
+
+- [x] 9.1 Add a closed architect-authored execution-contract block with real worktree/base, files, dependencies, invariants, evidence, discovery scope, seams, quality commands, runtime-behavior classification, pre-test routing, preservation, and rollback.
+- [x] 9.2 Make `openspec-overlay.mjs derive` reject missing or placeholder judgment, materialize complete shards and the workspace quality manifest, and bind both in overlay v2.
+- [x] 9.3 Make the Gate-1 validator reject placeholder controls, non-product file scope, absent quality manifests, pre-test mismatch, and unwritable execution roots before aggregate binding.
+- [x] 9.4 Regenerate every projection and run focused OpenSpec overlay, binding, generation, strict OpenSpec, and full repository suites.
+
+## 10. Identity-preserving post-Gate derived repair
+
+- [x] 10.1 Add repair fixtures for missing/corrupt shards and quality manifests, unchanged approved identities, absent canonical execution judgment, overlay hash drift, prior implementation progress, and transactional rollback.
+- [x] 10.2 Implement the bounded `repair-derived` classifier and staged replacement with deterministic pre/post evidence, preserving the approved snapshot and overlay hashes.
+- [x] 10.3 Integrate implementation-entry and recovery guidance so eligible derived damage is repaired once before any architect/design route, while canonical judgment or identity drift remains fail-closed.
+- [x] 10.4 Regenerate projections and run focused overlay/binding/generation checks, strict OpenSpec validation, and the full repository suite.
+
+## 11. Legacy-v1 approved-placeholder migration
+
+- [x] 11.1 Add fixtures for original-gate preservation, operator-decision chronology, normative-prefix equality, current aggregate validation, existing-repair adoption, and stale/missing evidence rejection.
+- [x] 11.2 Implement `migrate-v1` and migrated-Gate verification with a commit-last continuation certificate that never rewrites the original Gate or current derived artifacts.
+- [x] 11.3 Document the exact `payin-orchestration-services` paths, dry-run/apply/verify commands, expected hashes, unchanged Gate/state fields, and recovery consumption rule.
+- [x] 11.4 Regenerate projections and run focused migration/overlay/binding/generation checks, strict OpenSpec validation, and the full repository suite.
+
+## 12. Per-binding aggregate implementation freshness
+
+- [x] 12.1 Add regression fixtures for one active service, untouched sibling bindings, and a sibling with previously recorded progress.
+- [x] 12.2 Make aggregate verification select pre-Gate, active-transition, or idempotent recorded-progress validation independently per binding without cross-service authorization.
+- [x] 12.3 Reproduce the `payin-orchestration-services` aggregate call, regenerate projections, and run focused, strict OpenSpec, generation, and full repository validation.
+
+## 13. Bounded specialist liveness recovery
+
+- [x] 13.1 Add a pure specialist-liveness classifier and regression fixtures for pre-SLA waits, one token-bound probe, ACK grace, one renewal, stale tokens, clean replacement, partial progress, and exhausted retry.
+- [x] 13.2 Replace indefinite implementation-or-later waiting with interrupt-first declared-path audit and at most one fresh same-role replacement; keep architect timeout operator-owned and prohibit Main/local fallback.
+- [x] 13.3 Project the helper and specialist ACK contract into shipped Codex/Claude assets and add generation freshness assertions.
+- [x] 13.4 Run focused liveness, generation, strict OpenSpec, and full repository validation.
+
+## 14. Immutable derived dispatch binding
+
+- [x] 14.1 Add regressions for idempotent sealing, post-seal shard mutation, repair-after-seal refusal, and a concurrent repair/seal attempt.
+- [x] 14.2 Add the atomic per-service derived-set lock plus permanent `seal-dispatch` and `verify-dispatch` bindings over every dispatchable derived artifact.
+- [x] 14.3 Require Main and implementer/tester packets to verify the dispatch binding and prohibit post-seal repair, rehash, or rebind recovery.
+- [x] 14.4 Regenerate projections and run focused binding, strict OpenSpec, generation, and full repository validation.

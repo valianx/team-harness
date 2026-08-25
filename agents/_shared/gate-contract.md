@@ -355,7 +355,7 @@ an administrative close (`phase: aborted`, `status: aborted`, pending gate clear
 then returns to direct work. It writes no synthetic gate release and consumes no pending
 nonce. A legacy snapshot is never silently mapped: the operator must choose `1 — inline`
 or `2 — pipeline`. Only an explicit `2 — pipeline` permits the first legitimate write to
-set `pipeline_version: 3`, map the phase, and append `state.migrated`; valid dual-record
+set `pipeline_version: 4`, map the phase, and append `state.migrated`; valid dual-record
 gate fields, decisions, pending or consumed nonces, checklist marks, and historical events are
 preserved, while malformed or missing records remain uncleared. No migration write may
 synthesize a release or repair a gate.

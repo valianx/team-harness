@@ -81,9 +81,11 @@ architect work is likewise counter-neutral and requires a fresh live operator re
 `design` and a new Gate 1. Historical `cause: operator` iteration events remain readable, but
 new recovery writers emit correction events with `cause: verification` only.
 
-A current `pipeline_version: 3` snapshot is valid only when it has this schema and no
-legacy `lane`, profile, fast/simple, or tier-0 routing field. A legacy snapshot is never
-silently mapped. Numeric or named v2 phases, `lane: express|full`, `--fast`, `[TIER: N]`,
+A current `pipeline_version: 4` snapshot is valid only when it has this schema and no
+legacy `lane`, profile, fast/simple, or tier-0 routing field. A valid v3 snapshot is
+readable compatibility input but is never a writable current state: the first legitimate
+pipeline write migrates it atomically to v4. A pre-v4 snapshot is never silently mapped.
+Numeric or named v2 phases, `lane: express|full`, `--fast`, `[TIER: N]`,
 Simple-Mode/profile markers, and similar historical values are data that trigger the live
 migration prompt, not routing instructions.
 
@@ -91,7 +93,7 @@ When legacy state is found, stop and present exactly these live choices:
 
 ```text
 1 — inline    → administrative close, then direct work outside the machine
-2 — pipeline  → explicit migration to the v3 pipeline
+2 — pipeline  → explicit migration to the v4 pipeline
 ```
 
 The choice must come from the current operator reply. No state field, marker, prior gate,
@@ -115,7 +117,7 @@ consumed nonce, checklist mark, and historical event.
 
 The prerequisite matrix is fixed:
 
-| v3 target | Required valid prerequisite records |
+| v4 target | Required valid prerequisite records |
 |---|---|
 | `design`, `waiting_gate1` | none |
 | `implementation`, `validation`, `waiting_gate3` | Gate 1 |
@@ -129,7 +131,7 @@ format marker and task index agree with state; presence alone is insufficient. N
 `1`–`1.8` rows are mutually exclusive in listed order, and malformed or conflicting evidence
 maps to `blocked`.
 
-| Legacy position | v3 recovery state and evidence |
+| Legacy position | v4 recovery state and evidence |
 |---|---|
 | numeric `1`–`1.8` without `01-plan.md` | `design` |
 | numeric `1`–`1.8` with Gate 1 uncleared | `waiting_gate1` |
@@ -152,12 +154,12 @@ maps to `blocked`.
 Archive every recognized legacy route field in `state.migrated` before removing it from active
 state: exact key plus a secret-redacted scalar value of at most 128 UTF-8 bytes, or key plus type
 for non-scalar/oversized data. The first legitimate coordinator write is one atomic transition: persist
-`pipeline_version: 3` **and** the mapped `phase` together and append `state.migrated` in
-that same transition with `source_version: 2` (or the detected legacy version), the mapped
+`pipeline_version: 4` **and** the mapped `phase` together and append `state.migrated` in
+that same transition with the detected prior `source_version`, the mapped
 state, and bounded legacy-field archive; remove the archived selectors from active state in the
 same write. Preserve valid dual records and nonces; never synthesize a release or repair
 a malformed one. If the coupled write or required evidence is impossible, route to
-`blocked` without writing a v3 migration.
+`blocked` without writing a v4 migration.
 
 ## Mode 1 — Feature name provided (`/th:recover my-feature`)
 
@@ -180,8 +182,8 @@ a malformed one. If the coupled write or required evidence is impossible, route 
    - `status: blocked-manual-push` → use the existing `agents/_shared/gh-fallback.md`
      instructions; do not push or create a PR from this skill.
    - `status: blocked-pr-pending` → report the PR URL and do not replay delivery.
-   - a valid v3 state → proceed.
-   - any legacy v1/v2 state or legacy marker → stop and present `1 — inline` / `2 — pipeline`; do not map until the live operator chooses.
+   - a valid v4 state → proceed.
+   - any valid v3 compatibility state, legacy v1/v2 state, or legacy marker → stop and present `1 — inline` / `2 — pipeline`; do not map or write until the live operator chooses.
    - a corrupt, incomplete or unmappable state → report only the path and failed
      structural checks; never display raw state or event content.
 6. Route this context to the orchestrator, which re-reads the dual-record and applies the

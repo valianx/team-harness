@@ -1,27 +1,30 @@
 #!/usr/bin/env node
-/** Validate the minimal Team Harness execution overlay over a pinned OpenSpec snapshot. */
+/** Derive and validate an implementable Team Harness execution overlay over a pinned OpenSpec snapshot. */
 
 import { createHash } from "node:crypto";
-import { lstat, mkdir, readFile, realpath, unlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, realpath, rename, rm, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { isOpenSpecSnapshot, normalizeOpenSpecTaskIds, verifySnapshot } from "./openspec-snapshot.mjs";
-import { isQualityCommandId } from "./quality-runner.mjs";
+import { isQualityCommandId, validateQualityManifest } from "./quality-runner.mjs";
 
-export const OPENSPEC_OVERLAY_SCHEMA_VERSION = 1;
+export const OPENSPEC_OVERLAY_SCHEMA_VERSION = 2;
 export const OPENSPEC_OVERLAY_REBIND_SCHEMA_VERSION = 1;
 export const OPENSPEC_PROGRESS_TRANSITION_SCHEMA_VERSION = 2;
-export const OPENSPEC_OVERLAY_DERIVATION_SCHEMA_VERSION = 1;
-const DERIVATION_OWNER = "architect";
-const DERIVATION_PRESERVATION = "Derivation scaffold — the planning pass authors the real cross-runtime preservation statement before Gate 1.";
-const DERIVATION_ROLLBACK = "Derivation scaffold — the planning pass authors the real rollback statement before Gate 1.";
-const DERIVATION_EXCLUSION_RATIONALE = "Derivation scaffold: this coordinate has no standalone acceptance or execution shape; its child scenario or task items carry the work. The planning pass reclassifies it if that changes.";
+export const OPENSPEC_OVERLAY_DERIVATION_SCHEMA_VERSION = 2;
+export const OPENSPEC_EXECUTION_CONTRACT_SCHEMA_VERSION = 1;
+export const OPENSPEC_DERIVED_REPAIR_SCHEMA_VERSION = 1;
+const EXECUTION_CONTRACT_HEADING = "## Team Harness Execution Contract";
+const DERIVATION_EXCLUSION_RATIONALE = "The child scenario or task coordinates carry the independently testable or executable work.";
 const MAX_BYTES = 1024 * 1024;
 const MAX_ITEMS = 4096;
 const SHA256 = /^[a-f0-9]{64}$/;
+const GIT_SHA = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const ITEM_ID = /^(?:AC|Task)-[1-9][0-9]*$/;
 const ANCHOR_ID = /^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$/;
+const BRANCH = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,254}$/;
+const PLACEHOLDER = /(?:derivation scaffold|planning pass authors|\b(?:todo|tbd)\b|\{[^}\n]+\}|<[^>\n]+>)/i;
 const CLASSIFICATIONS = new Set(["direct", "split", "merged", "th-extension", "excluded", "ambiguous"]);
 const SOURCE_KINDS = new Set(["requirement", "scenario", "design-decision", "task"]);
 const FORBIDDEN_NORMATIVE_KEYS = new Set([
@@ -45,6 +48,22 @@ function safeRelative(value) {
   if (!safeString(value, 1024) || path.isAbsolute(value)) return false;
   const normalized = value.replaceAll("\\", "/");
   return !normalized.startsWith("/") && !normalized.split("/").includes("..");
+}
+function safeArray(value, validator, { nonempty = false } = {}) {
+  return Array.isArray(value) && (!nonempty || value.length > 0) && value.length <= MAX_ITEMS
+    && new Set(value.map(item => JSON.stringify(item))).size === value.length && value.every(validator);
+}
+function substantive(value, maximum = 1024) {
+  return safeString(value, maximum) && !PLACEHOLDER.test(value);
+}
+function validDiscoveryScope(value) {
+  return exact(value, ["directories", "globs"])
+    && safeArray(value.directories, safeRelative, { nonempty: true })
+    && safeArray(value.globs, item => safeRelative(item) && /[*?[]/.test(item), { nonempty: true });
+}
+function validRequiredSeam(value) {
+  return exact(value, ["path", "anchor"]) && safeRelative(value.path)
+    && (value.anchor === null || substantive(value.anchor, 512));
 }
 function contained(root, target) {
   const relative = path.relative(root, target);
@@ -116,6 +135,55 @@ function hasForbiddenKeys(value) {
   return Object.entries(value).some(([key, child]) => FORBIDDEN_NORMATIVE_KEYS.has(key.toLowerCase()) || hasForbiddenKeys(child));
 }
 
+export function extractExecutionContract(text) {
+  const normalized = text.replaceAll("\r\n", "\n");
+  const headings = normalized.split("\n").filter(line => line === EXECUTION_CONTRACT_HEADING);
+  if (headings.length !== 1) return null;
+  const start = normalized.indexOf(`${EXECUTION_CONTRACT_HEADING}\n`);
+  const tail = normalized.slice(start + EXECUTION_CONTRACT_HEADING.length + 1);
+  const nextHeading = tail.search(/^##\s/m);
+  const section = nextHeading < 0 ? tail : tail.slice(0, nextHeading);
+  const matches = [...section.matchAll(/```json\n([\s\S]*?)\n```/g)];
+  if (matches.length !== 1) return null;
+  try { return JSON.parse(matches[0][1]); } catch { return null; }
+}
+
+export function validateExecutionContract(contract, snapshot, taskCoordinates, roots) {
+  if (!exact(contract, ["schema_version", "kind", "worktree", "quality_manifest", "tasks"])
+    || contract.schema_version !== OPENSPEC_EXECUTION_CONTRACT_SCHEMA_VERSION
+    || contract.kind !== "team_harness_openspec_execution_contract"
+    || !exact(contract.worktree, ["path", "branch", "base_sha"])
+    || !safeString(contract.worktree.path) || !path.isAbsolute(contract.worktree.path)
+    || !BRANCH.test(contract.worktree.branch ?? "") || !GIT_SHA.test(contract.worktree.base_sha ?? "")
+    || contract.worktree.base_sha !== snapshot.repository.head_sha
+    || !roots.some(root => contained(root, path.resolve(contract.worktree.path)))
+    || !Array.isArray(contract.tasks) || contract.tasks.length !== taskCoordinates.length) return null;
+  let qualityManifest;
+  try { qualityManifest = validateQualityManifest(contract.quality_manifest); } catch { return null; }
+  const qualityIds = new Set(Object.keys(qualityManifest.commands));
+  const taskIds = new Set(taskCoordinates.map(item => item.id));
+  if (new Set(contract.tasks.map(item => item?.source_id)).size !== taskCoordinates.length) return null;
+  for (const task of contract.tasks) {
+    if (!exact(task, ["source_id", "owner", "specialist", "files", "dependencies", "required_invariants", "technical_constraints", "quality_command_ids", "observable_runtime_behavior", "pre_implementation_test", "required_evidence_anchors", "cross_runtime_preservation", "rollback", "delivery_group", "discovery_scope", "required_seams"])
+      || !taskIds.has(task.source_id) || !substantive(task.owner, 512) || !substantive(task.specialist, 512)
+      || !safeArray(task.files, value => safeRelative(value) && !value.startsWith("openspec/"), { nonempty: true })
+      || !safeArray(task.dependencies, value => taskIds.has(value) && value !== task.source_id)
+      || !safeArray(task.required_invariants, value => ANCHOR_ID.test(value))
+      || !safeArray(task.technical_constraints, value => substantive(value), { nonempty: true })
+      || !safeArray(task.quality_command_ids, value => qualityIds.has(value), { nonempty: true })
+      || typeof task.observable_runtime_behavior !== "boolean"
+      || !["required", "not-applicable"].includes(task.pre_implementation_test)
+      || !safeArray(task.required_evidence_anchors, safeRelative, { nonempty: true })
+      || !substantive(task.cross_runtime_preservation) || !substantive(task.rollback)
+      || !substantive(task.delivery_group, 512) || !validDiscoveryScope(task.discovery_scope)
+      || !safeArray(task.required_seams, validRequiredSeam)) return null;
+    const testRequired = task.observable_runtime_behavior
+      && Object.hasOwn(qualityManifest.commands, "test") && qualityManifest.test_contract !== null;
+    if ((task.pre_implementation_test === "required") !== testRequired) return null;
+  }
+  return { contract, qualityManifest };
+}
+
 async function readRegular(root, relative) {
   if (!safeRelative(relative)) throw new Error("unsafe-path");
   const requested = path.resolve(root, relative);
@@ -132,7 +200,7 @@ async function readRegular(root, relative) {
 function validMapping(item, expectedPrefix, expectedShardRoot, sourceIds, qualityIds, findings) {
   const baseKeys = expectedPrefix === "AC"
     ? ["id", "sources", "classification", "rationale", "evidence_anchor"]
-    : ["id", "sources", "classification", "rationale", "owner", "specialist", "shard_path", "files", "dependencies", "required_invariants", "technical_constraints", "quality_command_ids", "pre_implementation_test", "required_evidence_anchors", "cross_runtime_preservation", "rollback", "delivery_group"];
+    : ["id", "sources", "classification", "rationale", "owner", "specialist", "shard_path", "files", "dependencies", "required_invariants", "technical_constraints", "quality_command_ids", "observable_runtime_behavior", "pre_implementation_test", "required_evidence_anchors", "cross_runtime_preservation", "rollback", "delivery_group", "discovery_scope", "required_seams"];
   if (!exact(item, baseKeys) || !ITEM_ID.test(item.id ?? "") || !item.id.startsWith(`${expectedPrefix}-`)) {
     findings.push(finding("ITEM_SCHEMA_INVALID", item?.id ?? expectedPrefix));
     return;
@@ -154,15 +222,19 @@ function validMapping(item, expectedPrefix, expectedShardRoot, sourceIds, qualit
   if (![item.owner, item.specialist, item.rollback, item.delivery_group].every(value => safeString(value, 512))
     || !safeRelative(item.shard_path) || !SHARD_PATH.test(item.shard_path)
     || !item.shard_path.startsWith(`${expectedShardRoot}/`)
-    || !Array.isArray(item.files) || item.files.length === 0 || new Set(item.files).size !== item.files.length || !item.files.every(safeRelative)
+    || !Array.isArray(item.files) || item.files.length === 0 || new Set(item.files).size !== item.files.length
+    || !item.files.every(value => safeRelative(value) && !value.startsWith("openspec/"))
     || !Array.isArray(item.dependencies) || new Set(item.dependencies).size !== item.dependencies.length || !item.dependencies.every(id => ITEM_ID.test(id) && id.startsWith("Task-"))
     || !Array.isArray(item.required_invariants) || new Set(item.required_invariants).size !== item.required_invariants.length || !item.required_invariants.every(value => ANCHOR_ID.test(value))
     || !Array.isArray(item.technical_constraints) || !item.technical_constraints.every(value => safeString(value, 1024))
-    || !Array.isArray(item.quality_command_ids) || new Set(item.quality_command_ids).size !== item.quality_command_ids.length
+    || !Array.isArray(item.quality_command_ids) || item.quality_command_ids.length === 0 || new Set(item.quality_command_ids).size !== item.quality_command_ids.length
     || !item.quality_command_ids.every(id => qualityIds.has(id))
+    || typeof item.observable_runtime_behavior !== "boolean"
     || !["required", "not-applicable"].includes(item.pre_implementation_test)
-    || !Array.isArray(item.required_evidence_anchors) || new Set(item.required_evidence_anchors).size !== item.required_evidence_anchors.length || !item.required_evidence_anchors.every(safeRelative)
-    || !safeString(item.cross_runtime_preservation, 1024)) {
+    || !Array.isArray(item.required_evidence_anchors) || item.required_evidence_anchors.length === 0
+    || new Set(item.required_evidence_anchors).size !== item.required_evidence_anchors.length || !item.required_evidence_anchors.every(safeRelative)
+    || !substantive(item.cross_runtime_preservation, 1024) || !substantive(item.rollback, 512)
+    || !validDiscoveryScope(item.discovery_scope) || !safeArray(item.required_seams, validRequiredSeam)) {
     findings.push(finding("EXECUTION_CONTROL_INVALID", item.id));
   }
 }
@@ -179,9 +251,12 @@ function validateShape(overlay, snapshot, snapshotBytes, expectedSnapshotPath, f
     || overlay.snapshot.path !== expectedSnapshotPath
     || overlay.snapshot.sha256 !== hash(snapshotBytes) || overlay.snapshot.artifact_set_sha256 !== snapshot.artifact_set_sha256
     || overlay.snapshot.change_name !== snapshot.change.name) findings.push(finding("SNAPSHOT_STALE", "snapshot"));
-  if (!exact(overlay.repository, ["root", "ownership"]) || overlay.repository.root !== snapshot.repository.root
+  if (!exact(overlay.repository, ["root", "ownership", "worktree"]) || overlay.repository.root !== snapshot.repository.root
     || !Array.isArray(overlay.repository.ownership) || overlay.repository.ownership.length === 0
-    || overlay.repository.ownership.some(entry => !exact(entry, ["path", "owner"]) || !safeRelative(entry.path) || !safeString(entry.owner, 512))) {
+    || overlay.repository.ownership.some(entry => !exact(entry, ["path", "owner"]) || !safeRelative(entry.path) || !substantive(entry.owner, 512))
+    || !exact(overlay.repository.worktree, ["path", "branch", "base_sha"])
+    || !safeString(overlay.repository.worktree.path) || !path.isAbsolute(overlay.repository.worktree.path)
+    || !BRANCH.test(overlay.repository.worktree.branch ?? "") || overlay.repository.worktree.base_sha !== snapshot.repository.head_sha) {
     findings.push(finding("OWNERSHIP_INVALID", "repository"));
   }
   if (!Array.isArray(overlay.quality_commands) || overlay.quality_commands.length === 0
@@ -189,8 +264,9 @@ function validateShape(overlay, snapshot, snapshotBytes, expectedSnapshotPath, f
     || new Set(overlay.quality_commands.map(entry => entry.id)).size !== overlay.quality_commands.length) {
     findings.push(finding("QUALITY_COMMAND_INVALID", "quality_commands"));
   }
-  if (!exact(overlay.freeze, ["baseline_sha256", "state_anchor", "evidence_root"])
-    || !SHA256.test(overlay.freeze.baseline_sha256) || !safeRelative(overlay.freeze.state_anchor) || !safeRelative(overlay.freeze.evidence_root)) {
+  if (!exact(overlay.freeze, ["baseline_sha256", "state_anchor", "evidence_root", "quality_manifest_path", "quality_manifest_sha256"])
+    || !SHA256.test(overlay.freeze.baseline_sha256) || !safeRelative(overlay.freeze.state_anchor) || !safeRelative(overlay.freeze.evidence_root)
+    || overlay.freeze.quality_manifest_path !== ".team-harness/quality.json" || !SHA256.test(overlay.freeze.quality_manifest_sha256 ?? "")) {
     findings.push(finding("FREEZE_CONTROL_INVALID", "freeze"));
   }
 }
@@ -219,6 +295,19 @@ export async function validateOpenSpecOverlay({ workspace, snapshot = "inputs/op
     else {
       validateShape(overlay, snapshotValue, snapshotFile.bytes, snapshot, findings);
       if (object(overlay)) {
+        let qualityManifest = null;
+        try {
+          const manifestFile = await readRegular(root, overlay.freeze?.quality_manifest_path);
+          if (hash(manifestFile.bytes) !== overlay.freeze?.quality_manifest_sha256) throw new Error("stale");
+          qualityManifest = validateQualityManifest(JSON.parse(manifestFile.bytes.toString("utf8")));
+          const declared = Array.isArray(overlay.quality_commands) ? overlay.quality_commands.map(item => item?.id).sort() : [];
+          const actual = Object.keys(qualityManifest.commands).sort();
+          if (JSON.stringify(declared) !== JSON.stringify(actual)) throw new Error("mismatch");
+        } catch { findings.push(finding("QUALITY_MANIFEST_INVALID", ".team-harness/quality.json")); }
+        const worktree = path.resolve(overlay.repository?.worktree?.path ?? path.parse(root).root);
+        if (!roots.some(writableRoot => contained(writableRoot, worktree))) {
+          findings.push(finding("EXECUTION_ROOT_NOT_WRITABLE", "repository"));
+        }
         const coordinates = snapshotValue.artifacts.flatMap(artifact => artifact.coordinates)
           .filter(coordinate => SOURCE_KINDS.has(coordinate.kind));
         const sourceIds = new Set(coordinates.map(coordinate => coordinate.id));
@@ -231,6 +320,13 @@ export async function validateOpenSpecOverlay({ workspace, snapshot = "inputs/op
         if (acceptance.length + execution.length === 0 || acceptance.length + execution.length > MAX_ITEMS) findings.push(finding("ITEM_SCHEMA_INVALID", "items"));
         for (const item of acceptance) validMapping(item, "AC", expectedShardRoot, sourceIds, qualityIds, findings);
         for (const item of execution) validMapping(item, "Task", expectedShardRoot, sourceIds, qualityIds, findings);
+        if (qualityManifest !== null) for (const item of execution) {
+          const testRequired = item.observable_runtime_behavior === true
+            && Object.hasOwn(qualityManifest.commands, "test") && qualityManifest.test_contract !== null;
+          if ((item.pre_implementation_test === "required") !== testRequired) {
+            findings.push(finding("PRE_IMPLEMENTATION_TEST_INVALID", item.id ?? "Task"));
+          }
+        }
         const allItems = [...acceptance, ...execution];
         const itemIds = allItems.map(item => item?.id);
         if (new Set(itemIds).size !== itemIds.length) findings.push(finding("ITEM_DUPLICATE", "items"));
@@ -285,7 +381,8 @@ export async function validateOpenSpecOverlay({ workspace, snapshot = "inputs/op
               findings.push(finding("DISPATCH_ANCHOR_MISMATCH", item.id ?? "Task"));
             }
             const target = taskExecutionTarget(shardText, snapshotValue.repository.root);
-            if (target === null || !roots.some(writableRoot => contained(writableRoot, target))) {
+            if (target === null || target !== path.resolve(overlay.repository?.worktree?.path ?? "")
+              || !roots.some(writableRoot => contained(writableRoot, target))) {
               findings.push(finding("EXECUTION_ROOT_NOT_WRITABLE", item.id ?? "Task"));
             }
           } catch { findings.push(finding("SHARD_INVALID", item.id ?? "Task")); }
@@ -309,8 +406,11 @@ export async function validateOpenSpecOverlay({ workspace, snapshot = "inputs/op
   };
 }
 
-function shardScaffold(item) {
-  return `# ${item.id}\n\n- **Worktree:** null — branch null, base null\n\n## Dispatch anchors\n\nrequired_invariants: [${item.required_invariants.join(", ")}]\nrequired_evidence_anchors: [${item.required_evidence_anchors.join(", ")}]\ncross_runtime_preservation: ${item.cross_runtime_preservation}\n`;
+function shardScaffold(item, worktree) {
+  const files = item.files.map(value => `  - \`${value}\``).join("\n");
+  const constraints = item.technical_constraints.map((value, index) => `- **TC-${index + 1}:** ${value}`).join("\n");
+  const seams = item.required_seams.length === 0 ? "[]" : JSON.stringify(item.required_seams);
+  return `# ${item.id}\n\n- **OpenSpec source:** \`${item.sources[0]}\`\n- **Owner:** ${item.owner}\n- **Specialist:** ${item.specialist}\n- **Worktree:** ${worktree.path} — branch ${worktree.branch}, base ${worktree.base_sha}\n- **Files:**\n${files}\n- **Depends on:** ${item.dependencies.length === 0 ? "none" : item.dependencies.join(", ")}\n- **Discovery directories:** [${item.discovery_scope.directories.join(", ")}]\n- **Discovery globs:** [${item.discovery_scope.globs.join(", ")}]\n- **Required seams:** ${seams}\n\n## Dispatch anchors\n\nrequired_invariants: [${item.required_invariants.join(", ")}]\nrequired_evidence_anchors: [${item.required_evidence_anchors.join(", ")}]\ncross_runtime_preservation: ${item.cross_runtime_preservation}\n\n#### Technical Constraints\n\n${constraints}\n\n#### Verification\n\n- **Pre-implementation test:** ${item.pre_implementation_test}\n- **Required quality checks:** ${item.quality_command_ids.join(", ")}\n- Run the declared quality commands and bind their receipts to the required evidence anchors.\n- **Rollback:** ${item.rollback}\n`;
 }
 
 /** Compact Gate-1 index scaffold: mechanical Plan Manifest and Task Index binding the traceability and shard paths this same derivation writes. Judgment content stays in the pinned OpenSpec coordinates each item's traceability entry sources; nothing is authored here. */
@@ -320,7 +420,7 @@ function planScaffold(changeName, traceability, executionItems) {
     ...executionItems.map(item => `| task | ${item.id} | \`${item.shard_path}\` | dispatch anchors |`),
   ].join("\n");
   const indexRows = executionItems
-    .map(item => `| ${item.id} | ${DERIVATION_OWNER} | pending | 1 | ${item.technical_constraints.length} | \`${item.shard_path}\` |`)
+    .map(item => `| ${item.id} | ${item.owner} | pending | 1 | ${item.technical_constraints.length} | \`${item.shard_path}\` |`)
     .join("\n");
   return `# Plan: ${changeName}\n**Plan format:** sharded-v1\n**Reviews:** pending\n\n## Plan Manifest\n\n| Kind | ID | Path | Anchors |\n|------|----|------|---------|\n${manifestRows}\n\n### Task Index\n\n| Task | Service | Status | AC count | TC count | Path |\n|------|---------|--------|----------|----------|------|\n${indexRows}\n`;
 }
@@ -339,7 +439,52 @@ function derivationResult(verdict, errorCode, details = {}) {
   };
 }
 
-function buildDerivationOverlay(snapshotValue, snapshotFile, snapshot, traceability) {
+function repairResult(verdict, errorCode, details = {}) {
+  return {
+    schema_version: OPENSPEC_DERIVED_REPAIR_SCHEMA_VERSION,
+    kind: "team_harness_openspec_derived_repair",
+    verdict,
+    error_code: errorCode,
+    changed: details.changed ?? false,
+    classification: details.classification ?? null,
+    snapshot_sha256: details.snapshot_sha256 ?? null,
+    approved_overlay_sha256: details.approved_overlay_sha256 ?? null,
+    regenerated_overlay_sha256: details.regenerated_overlay_sha256 ?? null,
+    evidence_path: details.evidence_path ?? null,
+    evidence_sha256: details.evidence_sha256 ?? null,
+    derivation_error_code: details.derivation_error_code ?? null,
+  };
+}
+
+async function optionalArtifact(root, relative) {
+  try { return await readRegular(root, relative); }
+  catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+let atomicSequence = 0;
+async function atomicReplace(target, bytes) {
+  await mkdir(path.dirname(target), { recursive: true });
+  const temporary = `${target}.repair-${process.pid}-${atomicSequence += 1}`;
+  try {
+    await writeFile(temporary, bytes, { flag: "wx" });
+    await rename(temporary, target);
+  } catch (error) {
+    await unlink(temporary).catch(() => {});
+    throw error;
+  }
+}
+
+function repairEvidencePath(traceability) {
+  const directory = path.posix.dirname(traceability);
+  return traceability === "plan/openspec-traceability.json"
+    ? "plan/openspec-derived-repair.json"
+    : `${directory}/derived-repair.json`;
+}
+
+function buildDerivationOverlay(snapshotValue, snapshotFile, snapshot, traceability, executionContract, qualityManifestBytes) {
   const coordinates = snapshotValue.artifacts
     .flatMap(artifact => artifact.coordinates.map(coordinate => ({ ...coordinate, artifactPath: artifact.path })))
     .filter(coordinate => SOURCE_KINDS.has(coordinate.kind));
@@ -355,13 +500,22 @@ function buildDerivationOverlay(snapshotValue, snapshotFile, snapshot, traceabil
   const taskRoot = traceability === "plan/openspec-traceability.json"
     ? "plan/tasks"
     : `${path.posix.dirname(traceability)}/tasks`;
-  const executionItems = taskCoordinates.map((coordinate, index) => ({
-    id: `Task-${index + 1}`, sources: [coordinate.id], classification: "direct", rationale: null,
-    owner: DERIVATION_OWNER, specialist: DERIVATION_OWNER, shard_path: `${taskRoot}/Task-${index + 1}.md`,
-    files: [coordinate.artifactPath], dependencies: [], required_invariants: [], technical_constraints: [],
-    quality_command_ids: [], pre_implementation_test: "not-applicable", required_evidence_anchors: [snapshot],
-    cross_runtime_preservation: DERIVATION_PRESERVATION, rollback: DERIVATION_ROLLBACK, delivery_group: "default",
-  }));
+  const contractBySource = new Map(executionContract.tasks.map(task => [task.source_id, task]));
+  const taskIdBySource = new Map(taskCoordinates.map((coordinate, index) => [coordinate.id, `Task-${index + 1}`]));
+  const executionItems = taskCoordinates.map((coordinate, index) => {
+    const contractTask = contractBySource.get(coordinate.id);
+    return {
+      id: `Task-${index + 1}`, sources: [coordinate.id], classification: "direct", rationale: null,
+      owner: contractTask.owner, specialist: contractTask.specialist, shard_path: `${taskRoot}/Task-${index + 1}.md`,
+      files: contractTask.files, dependencies: contractTask.dependencies.map(source => taskIdBySource.get(source)),
+      required_invariants: contractTask.required_invariants, technical_constraints: contractTask.technical_constraints,
+      quality_command_ids: contractTask.quality_command_ids, observable_runtime_behavior: contractTask.observable_runtime_behavior,
+      pre_implementation_test: contractTask.pre_implementation_test, required_evidence_anchors: contractTask.required_evidence_anchors,
+      cross_runtime_preservation: contractTask.cross_runtime_preservation, rollback: contractTask.rollback,
+      delivery_group: contractTask.delivery_group, discovery_scope: contractTask.discovery_scope,
+      required_seams: contractTask.required_seams,
+    };
+  });
   const sourceDispositions = [
     ...scenarioCoordinates.map((coordinate, index) => ({ source_id: coordinate.id, item_ids: [acceptanceItems[index].id], classification: "direct", rationale: null })),
     ...taskCoordinates.map((coordinate, index) => ({ source_id: coordinate.id, item_ids: [executionItems[index].id], classification: "direct", rationale: null })),
@@ -373,23 +527,34 @@ function buildDerivationOverlay(snapshotValue, snapshotFile, snapshot, traceabil
   const overlay = {
     schema_version: OPENSPEC_OVERLAY_SCHEMA_VERSION, kind: "team_harness_openspec_execution_overlay", plan_format: "sharded-v1",
     snapshot: { path: snapshot, sha256: hash(snapshotFile.bytes), artifact_set_sha256: snapshotValue.artifact_set_sha256, change_name: snapshotValue.change.name },
-    repository: { root: snapshotValue.repository.root, ownership: [{ path: ".", owner: DERIVATION_OWNER }] },
-    quality_commands: [{ id: "verify" }],
-    freeze: { baseline_sha256: hash(snapshotFile.bytes), state_anchor: "00-state.md", evidence_root: "reviews" },
+    repository: {
+      root: snapshotValue.repository.root,
+      ownership: executionItems.map(item => ({ path: item.files[0], owner: item.owner })),
+      worktree: executionContract.worktree,
+    },
+    quality_commands: Object.keys(executionContract.quality_manifest.commands).sort().map(id => ({ id })),
+    freeze: {
+      baseline_sha256: hash(snapshotFile.bytes), state_anchor: "00-state.md", evidence_root: "reviews",
+      quality_manifest_path: ".team-harness/quality.json", quality_manifest_sha256: hash(qualityManifestBytes),
+    },
     acceptance_items: acceptanceItems, execution_items: executionItems,
     source_dispositions: sourceDispositions, operator_disclosures: operatorDisclosures,
   };
   return { overlay, acceptanceItems, executionItems };
 }
 
-/** Write every shard, the Gate-1 index scaffold, and the traceability file; on any write failure, remove every shard and index scaffold already written in this call before rethrowing. */
-async function writeDerivationOutputs(root, traceability, plan, planText, overlay, executionItems) {
+/** Write the quality manifest, every complete shard, the Gate-1 index, and traceability; remove outputs written by a failed call. */
+async function writeDerivationOutputs(root, traceability, plan, planText, overlay, executionItems, qualityManifestBytes) {
   const written = [];
   try {
+    const manifestPath = path.resolve(root, ".team-harness/quality.json");
+    await mkdir(path.dirname(manifestPath), { recursive: true });
+    await writeFile(manifestPath, qualityManifestBytes);
+    written.push(manifestPath);
     for (const item of executionItems) {
       const shardPath = path.resolve(root, item.shard_path);
       await mkdir(path.dirname(shardPath), { recursive: true });
-      await writeFile(shardPath, shardScaffold(item));
+      await writeFile(shardPath, shardScaffold(item, overlay.repository.worktree));
       written.push(shardPath);
     }
     const planPath = path.resolve(root, plan);
@@ -406,7 +571,7 @@ async function writeDerivationOutputs(root, traceability, plan, planText, overla
 }
 
 async function resolveDerivationTargets(root, traceability, plan, executionItems, overwrite) {
-  const targets = [traceability, plan, ...executionItems.map(item => item.shard_path)];
+  const targets = [traceability, plan, ".team-harness/quality.json", ...executionItems.map(item => item.shard_path)];
   const targetPaths = [];
   for (const target of targets) {
     if (!safeRelative(target)) return { ok: false, code: "ARGUMENT_INVALID" };
@@ -427,20 +592,19 @@ async function resolveDerivationTargets(root, traceability, plan, executionItems
 }
 
 /**
- * Derive the overlay skeleton mechanically from a validated OpenSpec change and its pinned
- * snapshot: every `scenario` coordinate becomes one acceptance item, every `task` coordinate
- * becomes one execution item with a written shard scaffold, and every `requirement` or
+ * Derive overlay v2 mechanically from a validated OpenSpec change, its pinned snapshot, and the
+ * closed execution contract inside canonical tasks.md. Every `scenario` coordinate becomes one
+ * acceptance item, every `task` coordinate becomes one implementable execution item and shard,
+ * and every `requirement` or
  * `design-decision` coordinate — carrying no standalone testable or executable shape — is
- * dispositioned `excluded` with a disclosed rationale. A pure function of the snapshot: no model
- * call, no operator input, and no write outside the overlay, its Gate-1 index scaffold, and the
- * shard scaffolds it emits. The judgment content already authored by the single `openspec-planning`
- * pass stays in the pinned OpenSpec coordinates each item's traceability entry sources, never
- * restated here; the result already satisfies `validateOpenSpecOverlay` by construction.
+ * dispositioned `excluded` with a disclosed rationale. There is no model call or operator input:
+ * files, commands, worktree topology, discovery, seams, evidence, preservation, and rollback are
+ * validated judgment authored by the single planning pass, never guessed from task titles.
  * All-or-nothing: refuses and writes nothing unless BOTH the snapshot's own repository root AND
  * the resolved `workspace` write root are each independently contained by a writable root, and
- * the traceability file, the Gate-1 index, and every target shard path either do not yet exist or
+ * the traceability file, quality manifest, Gate-1 index, and every target shard path either do not yet exist or
  * `overwrite: true` was passed explicitly. If a write fails partway through, every shard and index
- * scaffold already written in this call is removed before the failure result is returned; the
+ * output already written in this call is removed before the failure result is returned; the
  * traceability file is written last, so its presence is the commit record of a successful
  * derivation.
  */
@@ -457,8 +621,24 @@ export async function deriveOpenSpecOverlay({ workspace, snapshot = "inputs/open
     if (!isOpenSpecSnapshot(snapshotValue)) return derivationResult("fail", "SNAPSHOT_INVALID");
     if (!roots.some(writableRoot => contained(writableRoot, path.resolve(snapshotValue.repository.root)))) return derivationResult("fail", "REPOSITORY_ROOT_NOT_WRITABLE");
     if (!roots.some(writableRoot => contained(writableRoot, root))) return derivationResult("fail", "WORKSPACE_ROOT_NOT_WRITABLE");
+    const allCoordinates = snapshotValue.artifacts.flatMap(artifact => artifact.coordinates);
+    if (!allCoordinates.some(coordinate => coordinate.kind === "scenario")
+      || !allCoordinates.some(coordinate => coordinate.kind === "task")) {
+      return derivationResult("fail", "SOURCE_COVERAGE_INCOMPLETE");
+    }
 
-    const built = buildDerivationOverlay(snapshotValue, snapshotFile, snapshot, traceability);
+    const taskArtifact = snapshotValue.artifacts.find(artifact => artifact.artifact_id === "tasks");
+    if (!taskArtifact) return derivationResult("fail", "EXECUTION_CONTRACT_INVALID");
+    const taskFile = await readRegular(path.resolve(snapshotValue.repository.root), taskArtifact.path);
+    if (hash(taskFile.bytes) !== taskArtifact.content_sha256) return derivationResult("fail", "SOURCE_CHANGED");
+    const taskCoordinates = taskArtifact.coordinates.filter(coordinate => coordinate.kind === "task");
+    const parsedContract = extractExecutionContract(taskFile.bytes.toString("utf8"));
+    if (validateExecutionContract(parsedContract, snapshotValue, taskCoordinates, roots) === null) {
+      return derivationResult("fail", "EXECUTION_CONTRACT_INVALID");
+    }
+    const qualityManifestBytes = Buffer.from(`${JSON.stringify(parsedContract.quality_manifest, null, 2)}\n`, "utf8");
+
+    const built = buildDerivationOverlay(snapshotValue, snapshotFile, snapshot, traceability, parsedContract, qualityManifestBytes);
     if (built === null) return derivationResult("fail", "SOURCE_COVERAGE_INCOMPLETE");
     const { overlay, acceptanceItems, executionItems } = built;
 
@@ -466,7 +646,7 @@ export async function deriveOpenSpecOverlay({ workspace, snapshot = "inputs/open
     if (!resolved.ok) return derivationResult("fail", resolved.code);
 
     const planText = planScaffold(snapshotValue.change.name, traceability, executionItems);
-    const overlayBytes = await writeDerivationOutputs(root, traceability, plan, planText, overlay, executionItems);
+    const overlayBytes = await writeDerivationOutputs(root, traceability, plan, planText, overlay, executionItems, qualityManifestBytes);
 
     return derivationResult("pass", null, {
       snapshot_sha256: hash(snapshotFile.bytes),
@@ -477,6 +657,211 @@ export async function deriveOpenSpecOverlay({ workspace, snapshot = "inputs/open
     });
   } catch (error) {
     return derivationResult("fail", error.message === "arguments" ? "ARGUMENT_INVALID" : "ARTIFACT_INVALID");
+  }
+}
+
+/**
+ * Restore only Gate-1-approved derived bytes before the first implementation dispatch.
+ * The caller supplies identities from a freshly verified aggregate/gate record. This helper
+ * independently proves immutable canonical source, derives and validates in isolation, and
+ * refuses replacement unless the regenerated overlay is byte-identical to the approved hash.
+ */
+export async function repairDerivedOpenSpecArtifacts({
+  workspace,
+  snapshot = "inputs/openspec-snapshot.json",
+  traceability = "plan/openspec-traceability.json",
+  plan = "01-plan.md",
+  writableRoots,
+  approvedSnapshotSha256,
+  approvedOverlaySha256,
+  approvedAggregateSha256,
+  approvedGateIdentitySha256,
+  implementationStarted,
+  artifactWriter = atomicReplace,
+} = {}) {
+  const common = {
+    classification: "derived-artifact-damage",
+    snapshot_sha256: SHA256.test(approvedSnapshotSha256 ?? "") ? approvedSnapshotSha256 : null,
+    approved_overlay_sha256: SHA256.test(approvedOverlaySha256 ?? "") ? approvedOverlaySha256 : null,
+  };
+  if (implementationStarted !== false || !SHA256.test(approvedSnapshotSha256 ?? "")
+    || !SHA256.test(approvedOverlaySha256 ?? "") || !SHA256.test(approvedAggregateSha256 ?? "")
+    || !SHA256.test(approvedGateIdentitySha256 ?? "") || !safeString(workspace)
+    || !SNAPSHOT_PATH.test(snapshot) || !TRACEABILITY_PATH.test(traceability) || !PLAN_PATH.test(plan)) {
+    return repairResult("fail", "DERIVED_REPAIR_INELIGIBLE", common);
+  }
+  const roots = normalizeWritableRoots(writableRoots);
+  if (roots === null) return repairResult("fail", "ARGUMENT_INVALID", common);
+
+  let root;
+  let stage = null;
+  try {
+    root = await realpath(path.resolve(workspace));
+    if (!(await lstat(root)).isDirectory() || !roots.some(writableRoot => contained(writableRoot, root))) {
+      return repairResult("fail", "DERIVED_REPAIR_INELIGIBLE", common);
+    }
+    const snapshotFile = await readRegular(root, snapshot);
+    if (hash(snapshotFile.bytes) !== approvedSnapshotSha256) {
+      return repairResult("fail", "APPROVED_SNAPSHOT_MISMATCH", common);
+    }
+    const sourceVerification = await verifySnapshot({ snapshotPath: snapshotFile.canonical, phase: "pre-gate1" });
+    if (sourceVerification.verdict !== "pass" || sourceVerification.snapshot_sha256 !== approvedSnapshotSha256) {
+      return repairResult("fail", "DERIVED_REPAIR_INELIGIBLE", {
+        ...common, derivation_error_code: sourceVerification.error_code,
+      });
+    }
+
+    const current = await validateOpenSpecOverlay({ workspace: root, snapshot, traceability, writableRoots: roots });
+    if (current.verdict === "pass" && current.overlay_sha256 === approvedOverlaySha256) {
+      return repairResult("pass", null, { ...common, regenerated_overlay_sha256: current.overlay_sha256 });
+    }
+
+    const stageParent = path.resolve(root, ".team-harness");
+    await mkdir(stageParent, { recursive: true });
+    stage = await mkdtemp(path.join(stageParent, "derived-repair-"));
+    const stagedSnapshot = path.resolve(stage, snapshot);
+    await mkdir(path.dirname(stagedSnapshot), { recursive: true });
+    await writeFile(stagedSnapshot, snapshotFile.bytes);
+    const derived = await deriveOpenSpecOverlay({
+      workspace: stage,
+      snapshot,
+      traceability,
+      plan,
+      writableRoots: [...roots, stage],
+    });
+    if (derived.verdict !== "pass") {
+      return repairResult("fail", "DERIVED_REPAIR_INELIGIBLE", {
+        ...common, derivation_error_code: derived.error_code,
+      });
+    }
+    if (derived.overlay_sha256 !== approvedOverlaySha256) {
+      return repairResult("fail", "APPROVED_OVERLAY_MISMATCH", {
+        ...common, regenerated_overlay_sha256: derived.overlay_sha256,
+      });
+    }
+    const stagedValidation = await validateOpenSpecOverlay({
+      workspace: stage, snapshot, traceability, writableRoots: [...roots, stage],
+    });
+    if (stagedValidation.verdict !== "pass" || stagedValidation.overlay_sha256 !== approvedOverlaySha256) {
+      return repairResult("fail", "DERIVED_REPAIR_INELIGIBLE", {
+        ...common, regenerated_overlay_sha256: stagedValidation.overlay_sha256,
+        derivation_error_code: stagedValidation.error_code,
+      });
+    }
+
+    const stagedOverlay = JSON.parse((await readRegular(stage, traceability)).bytes.toString("utf8"));
+    const targets = [
+      plan,
+      ".team-harness/quality.json",
+      ...stagedOverlay.execution_items.map(item => item.shard_path),
+      traceability,
+    ];
+    if (new Set(targets).size !== targets.length) {
+      return repairResult("fail", "DERIVED_REPAIR_INELIGIBLE", common);
+    }
+    const records = [];
+    for (const relative of targets) {
+      const stagedFile = await readRegular(stage, relative);
+      const liveFile = await optionalArtifact(root, relative);
+      records.push({
+        path: relative,
+        before: liveFile?.bytes ?? null,
+        after: stagedFile.bytes,
+        before_sha256: liveFile === null ? null : hash(liveFile.bytes),
+        after_sha256: hash(stagedFile.bytes),
+      });
+    }
+
+    const replaced = [];
+    try {
+      for (const record of records) {
+        await artifactWriter(path.resolve(root, record.path), record.after);
+        replaced.push(record);
+      }
+    } catch {
+      let rollbackFailed = false;
+      for (const record of replaced.reverse()) {
+        try {
+          const target = path.resolve(root, record.path);
+          if (record.before === null) await unlink(target).catch(error => { if (error.code !== "ENOENT") throw error; });
+          else await atomicReplace(target, record.before);
+        } catch { rollbackFailed = true; }
+      }
+      return repairResult("fail", rollbackFailed ? "DERIVED_REPAIR_ROLLBACK_FAILED" : "DERIVED_REPAIR_WRITE_FAILED", common);
+    }
+
+    const liveValidation = await validateOpenSpecOverlay({ workspace: root, snapshot, traceability, writableRoots: roots });
+    if (liveValidation.verdict !== "pass" || liveValidation.overlay_sha256 !== approvedOverlaySha256) {
+      let rollbackFailed = false;
+      for (const record of records.slice().reverse()) {
+        try {
+          const target = path.resolve(root, record.path);
+          if (record.before === null) await unlink(target).catch(error => { if (error.code !== "ENOENT") throw error; });
+          else await atomicReplace(target, record.before);
+        } catch { rollbackFailed = true; }
+      }
+      return repairResult("fail", rollbackFailed ? "DERIVED_REPAIR_ROLLBACK_FAILED" : "DERIVED_REPAIR_POST_VALIDATION_FAILED", {
+        ...common, regenerated_overlay_sha256: liveValidation.overlay_sha256,
+        derivation_error_code: liveValidation.error_code,
+      });
+    }
+
+    const evidenceRelative = repairEvidencePath(traceability);
+    if (await optionalArtifact(root, evidenceRelative) !== null) {
+      for (const record of records.slice().reverse()) {
+        const target = path.resolve(root, record.path);
+        if (record.before === null) await unlink(target).catch(error => { if (error.code !== "ENOENT") throw error; });
+        else await atomicReplace(target, record.before);
+      }
+      return repairResult("fail", "DERIVED_REPAIR_ALREADY_RECORDED", common);
+    }
+    const evidence = {
+      schema_version: OPENSPEC_DERIVED_REPAIR_SCHEMA_VERSION,
+      kind: "team_harness_openspec_derived_repair_evidence",
+      classification: "derived-artifact-damage",
+      implementation_started: false,
+      gate_preserved: true,
+      approved: {
+        snapshot_sha256: approvedSnapshotSha256,
+        overlay_sha256: approvedOverlaySha256,
+        aggregate_sha256: approvedAggregateSha256,
+        gate_identity_sha256: approvedGateIdentitySha256,
+      },
+      regenerated_overlay_sha256: liveValidation.overlay_sha256,
+      artifacts: records.map(({ path: artifactPath, before_sha256, after_sha256 }) => ({
+        path: artifactPath, before_sha256, after_sha256,
+      })),
+      validations: {
+        canonical_snapshot: "pass",
+        staged_overlay: "pass",
+        live_overlay: "pass",
+        aggregate_and_gate: "required-before-and-after-by-coordinator",
+      },
+    };
+    const evidenceBytes = Buffer.from(`${JSON.stringify(evidence, null, 2)}\n`);
+    try { await atomicReplace(path.resolve(root, evidenceRelative), evidenceBytes); }
+    catch {
+      let rollbackFailed = false;
+      for (const record of records.slice().reverse()) {
+        try {
+          const target = path.resolve(root, record.path);
+          if (record.before === null) await unlink(target).catch(error => { if (error.code !== "ENOENT") throw error; });
+          else await atomicReplace(target, record.before);
+        } catch { rollbackFailed = true; }
+      }
+      return repairResult("fail", rollbackFailed ? "DERIVED_REPAIR_ROLLBACK_FAILED" : "DERIVED_REPAIR_EVIDENCE_FAILED", common);
+    }
+    return repairResult("pass", null, {
+      ...common,
+      changed: true,
+      regenerated_overlay_sha256: liveValidation.overlay_sha256,
+      evidence_path: evidenceRelative,
+      evidence_sha256: hash(evidenceBytes),
+    });
+  } catch {
+    return repairResult("fail", "DERIVED_REPAIR_INELIGIBLE", common);
+  } finally {
+    if (stage !== null) await rm(stage, { recursive: true, force: true }).catch(() => {});
   }
 }
 
@@ -603,7 +988,21 @@ function parseCli(argv, progress = false) {
       result.overwrite = argv[index + 1] === "true";
       continue;
     }
-    const key = ({ "--workspace": "workspace", "--snapshot": "snapshot", "--traceability": "traceability", "--plan": "plan" })[argv[index]];
+    if (argv[index] === "--implementation-started") {
+      if (own(result, "implementationStarted") || !["true", "false"].includes(argv[index + 1])) return null;
+      result.implementationStarted = argv[index + 1] === "true";
+      continue;
+    }
+    const key = ({
+      "--workspace": "workspace",
+      "--snapshot": "snapshot",
+      "--traceability": "traceability",
+      "--plan": "plan",
+      "--approved-snapshot-sha256": "approvedSnapshotSha256",
+      "--approved-overlay-sha256": "approvedOverlaySha256",
+      "--approved-aggregate-sha256": "approvedAggregateSha256",
+      "--approved-gate-identity-sha256": "approvedGateIdentitySha256",
+    })[argv[index]];
     if (!key || own(result, key)) return null;
     result[key] = argv[index + 1];
   }
@@ -613,13 +1012,15 @@ function parseCli(argv, progress = false) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const argv = process.argv.slice(2);
-  const operation = ["rebind", "verify-progress", "verify-and-rebind", "derive"].includes(argv[0]) ? argv[0] : "validate";
+  const operation = ["rebind", "verify-progress", "verify-and-rebind", "derive", "repair-derived"].includes(argv[0]) ? argv[0] : "validate";
   const progressOperation = ["verify-progress", "verify-and-rebind"].includes(operation);
   const parsed = parseCli(operation === "validate" ? argv : argv.slice(1), progressOperation) ?? {};
   const result = operation === "rebind"
     ? await rebindOpenSpecOverlay(parsed)
     : operation === "derive"
       ? await deriveOpenSpecOverlay(parsed)
+      : operation === "repair-derived"
+        ? await repairDerivedOpenSpecArtifacts(parsed)
       : progressOperation
         ? await verifyOpenSpecProgress(parsed)
         : await validateOpenSpecOverlay(parsed);

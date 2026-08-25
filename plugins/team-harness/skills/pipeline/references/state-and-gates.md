@@ -156,6 +156,14 @@ New runs always set `obsidian_sync: null` and `obsidian_export_target: null`.
 The two fields remain only so recovery can honor legacy export-armed snapshots
 without rewriting their state schema.
 
+Specialist liveness remains append-only event state rather than a mutable
+coordinator-state field. `agent.sla.extra` records `{attempt, attempt_token,
+liveness_action, deadline_at}`; after interruption, `agent.close.extra` repeats
+the identity and records `owned_paths_changed`, `evidence_changed`, and the
+closed liveness `failure_kind`. Persist declared path names and booleans only,
+never partial file contents. Recovery uses those timestamps and cannot reset an
+expired lease.
+
 When non-null, `quality_manifest_path` must be a regular non-symlink below
 `workspace`. If that workspace is below a participating repository, the
 manifest must also be ignored and untracked. It is operational state, never a
@@ -446,9 +454,11 @@ architect work; only that request may set `phase: design` and require a new Gate
 
 ## Recovery migration contract
 
-New state has no posture/profile field. A current `pipeline_version: 3` snapshot
+New state has no posture/profile field. A current `pipeline_version: 4` snapshot
 is valid only with the schema above and no legacy `lane`, profile, fast/simple,
-or Tier-0 routing field. A legacy snapshot is never silently mapped. Numeric or
+or Tier-0 routing field. A valid v3 snapshot is readable compatibility input but
+is never a writable current state: the first legitimate pipeline write migrates
+it atomically to v4. A pre-v4 snapshot is never silently mapped. Numeric or
 named v2 phases, `lane: express|full`, `--fast`, `[TIER: N]`, Simple-Mode/profile
 markers, and similar historical values are data that trigger the live migration
 prompt, not routing instructions.
@@ -457,7 +467,7 @@ When legacy state is found, stop and present exactly these live choices:
 
 ```text
 1 — inline    → administrative close, then direct work outside the machine
-2 — pipeline  → explicit migration to the v3 pipeline
+2 — pipeline  → explicit migration to the v4 pipeline
 ```
 
 The choice must come from the current operator reply. No state field, marker,
@@ -480,7 +490,7 @@ nonce is invalid; it remains uncleared and is never repaired or inferred.
 
 The prerequisite matrix is fixed:
 
-| v3 target | Required valid prerequisite records |
+| v4 target | Required valid prerequisite records |
 |---|---|
 | `design`, `waiting_gate1` | none |
 | `implementation`, `validation`, `waiting_gate3` | Gate 1 |
@@ -494,7 +504,7 @@ manifest whose format marker and task index agree with state; presence alone is
 not evidence. The numeric `1`–`1.8` rows are mutually exclusive in listed order,
 and malformed or conflicting plan evidence maps to `blocked`.
 
-| Legacy position | v3 recovery state and evidence |
+| Legacy position | v4 recovery state and evidence |
 |---|---|
 | numeric `1`–`1.8` without `01-plan.md` | `design` |
 | numeric `1`–`1.8` with Gate 1 uncleared | `waiting_gate1` |
@@ -517,13 +527,13 @@ and malformed or conflicting plan evidence maps to `blocked`.
 Archive every recognized legacy route field in the `state.migrated` event before
 removing it from active state: keep its exact key and a redacted scalar value of
 at most 128 UTF-8 bytes, or key plus type for non-scalar/oversized values. The first legitimate coordinator write is one atomic transition: persist
-`pipeline_version: 3` **and** the mapped `phase` together and append
-`state.migrated` in that same transition with `source_version: 2` (or the
-detected legacy version), mapped state, and bounded legacy-field archive; remove
-the archived selectors from the active v3 snapshot atomically. Preserve valid dual records and
+`pipeline_version: 4` **and** the mapped `phase` together and append
+`state.migrated` in that same transition with the detected prior
+`source_version`, mapped state, and bounded legacy-field archive; remove
+the archived selectors from the active v4 snapshot atomically. Preserve valid dual records and
 nonces; never synthesize a release or repair a malformed one. If the coupled
 write or required evidence is impossible, route to `blocked` without writing a
-v3 migration.
+v4 migration.
 
 ## Gate release rule
 

@@ -185,6 +185,12 @@ for (const [name, role] of Object.entries(pipelineRoleMap)) {
   assert.match(content, new RegExp(`^# Instruction source: runtime/codex/instructions/${role}\\.md$`, "m"));
   assert.match(content, new RegExp(`^# Semantic source: agents/${role}\\.md`, "m"));
 }
+for (const role of ["implementer", "tester", "cleaner", "qa", "security", "delivery"]) {
+  const content = first.files.get(join(root, `.codex/agents/pipeline-${role}.toml`));
+  for (const marker of ["TH-LIVENESS-PROBE", "TH-LIVENESS-ACK", "single fresh same-role replacement"]) {
+    assert.ok(content.includes(marker), `pipeline-${role} adapter misses ${marker}`);
+  }
+}
 
 const architect = first.files.get(join(root, ".codex/agents/architect.toml"));
 for (const marker of [
@@ -212,6 +218,24 @@ const pipelineIdentityDocs = await Promise.all([
   readFile(join(root, "plugins/team-harness/skills/pipeline/SKILL.md"), "utf8"),
   readFile(join(root, "plugins/team-harness/skills/pipeline/references/activation.md"), "utf8"),
 ]);
+const pipelineVersionContracts = await Promise.all([
+  readFile(join(root, "plugins/team-harness/skills/pipeline/SKILL.md"), "utf8"),
+  readFile(join(root, "plugins/team-harness/skills/pipeline/references/state-and-gates.md"), "utf8"),
+  readFile(join(root, "plugins/team-harness/skills/pipeline/references/recovery.md"), "utf8"),
+  readFile(join(root, "skills/recover/SKILL.md"), "utf8"),
+  readFile(join(root, "agents/_shared/gate-contract.md"), "utf8"),
+  readFile(join(root, "agents/delivery.md"), "utf8"),
+]);
+for (const contract of pipelineVersionContracts) {
+  assert.doesNotMatch(contract, /migration to the v3 pipeline|canonical (?:full )?v3|active v3 state|(?:write|writes|persist|set) `pipeline_version: 3`/i,
+    "pipeline contract can persist or activate the retired writable v3 schema");
+}
+assert.match(pipelineVersionContracts[0], /Canonical v4 workflow[\s\S]*writes `pipeline_version: 4`/,
+  "Codex pipeline activation is not pinned to the canonical v4 state");
+assert.match(pipelineVersionContracts[3], /migration to the v4 pipeline/,
+  "recovery does not target a v4 migration");
+assert.match(pipelineVersionContracts[3], /valid v3 compatibility state/,
+  "recovery does not recognize v3 as compatibility input");
 assert.match(pipelineIdentityDocs[1], /`obsidian`, single repository: `\{logs-path\}\/\{logs-subfolder\}\/\{repo-name\}\/\{YYYY-MM-DD\}_\{feature\}`/,
   "Codex pipeline does not select the configured Obsidian vault as canonical workspace");
 assert.match(pipelineIdentityDocs[1], /`obsidian`, initiative: `\{logs-path\}\/\{logs-subfolder\}\/\{repo_base\}\/\{YYYY-MM-DD\}_\{initiative\}`/,
@@ -221,21 +245,85 @@ assert.match(pipelineIdentityDocs[1], /do not create, copy, export, or reconcile
 assert.match(await readFile(join(root, "plugins/team-harness/skills/pipeline/references/state-and-gates.md"), "utf8"),
   /pipeline_version: 4[\s\S]*openspec_bindings:[\s\S]*openspec_aggregate_sha256:/,
   "Codex pipeline new-run state is not the v4 aggregate contract");
-for (const script of ["workspace-identity.mjs", "openspec-bindings.mjs", "herdr-message.mjs"]) {
+for (const script of ["workspace-identity.mjs", "openspec-bindings.mjs", "openspec-overlay.mjs", "herdr-message.mjs", "specialist-liveness.mjs"]) {
   const source = await readFile(join(root, "skills/pipeline/scripts", script), "utf8");
   const projected = await readFile(join(root, "plugins/team-harness/skills/pipeline/scripts", script), "utf8");
   assert.equal(projected, source, `${script} generated projection is stale`);
 }
+const overlayScript = await readFile(join(root, "skills/pipeline/scripts/openspec-overlay.mjs"), "utf8");
+const bindingsScript = await readFile(join(root, "skills/pipeline/scripts/openspec-bindings.mjs"), "utf8");
+const livenessScript = await readFile(join(root, "skills/pipeline/scripts/specialist-liveness.mjs"), "utf8");
+const overlayPlanContract = await readFile(join(root, "plugins/team-harness/skills/pipeline/references/plan-shards.md"), "utf8");
+const architectAdapter = await readFile(join(root, "runtime/codex/instructions/architect.md"), "utf8");
+for (const marker of ["SPECIALIST_LIVENESS_GRACE_MS = 120_000", "SPECIALIST_LIVENESS_MAX_ATTEMPTS = 2", "specialist-interrupted-with-progress", "specialist-retry-exhausted"]) {
+  assert.ok(livenessScript.includes(marker), `specialist liveness implementation misses ${marker}`);
+}
+assert.match(overlayScript, /OPENSPEC_OVERLAY_SCHEMA_VERSION = 2/,
+  "OpenSpec overlay is not pinned to the executable v2 contract");
+for (const marker of ["Team Harness Execution Contract", "EXECUTION_CONTRACT_INVALID", "quality_manifest_sha256", "discovery_scope", "required_seams", "observable_runtime_behavior"]) {
+  assert.ok(overlayScript.includes(marker), `OpenSpec overlay implementation misses ${marker}`);
+}
+for (const marker of ["repair-derived", "team_harness_openspec_derived_repair", "APPROVED_OVERLAY_MISMATCH", "DERIVED_REPAIR_INELIGIBLE", "implementationStarted"]) {
+  assert.ok(overlayScript.includes(marker), `OpenSpec derived-repair implementation misses ${marker}`);
+}
+for (const marker of ["repairOpenSpecBindingDerivedArtifacts", "team_harness_openspec_binding_derived_repair", "derived-repair-verification.json", "GATE1_IDENTITY_STALE"]) {
+  assert.ok(bindingsScript.includes(marker), `OpenSpec binding repair implementation misses ${marker}`);
+}
+for (const marker of ["sealOpenSpecBindingDispatch", "verifyOpenSpecBindingDispatch", "team_harness_openspec_dispatch_binding", "DERIVED_SET_BUSY", "DISPATCH_BINDING_STALE", "flag: \"wx\""]) {
+  assert.ok(bindingsScript.includes(marker), `OpenSpec dispatch-binding implementation misses ${marker}`);
+}
+for (const marker of ["migrate-v1", "verify-v1-migration", "team_harness_legacy_v1_gate_migration", "continuation_identity_sha256", "verifyLegacyV1CurrentBindings"]) {
+  assert.ok(bindingsScript.includes(marker), `OpenSpec legacy-v1 migration implementation misses ${marker}`);
+}
+const implementationContract = await readFile(join(root, "plugins/team-harness/skills/pipeline/references/implementation.md"), "utf8");
+for (const marker of ["specialist-liveness.mjs", "fixed two-minute ACK grace", "specialist-interrupted-with-progress", "specialist-retry-exhausted", "local fallback"]) {
+  assert.ok(implementationContract.includes(marker), `specialist liveness pipeline contract misses ${marker}`);
+}
+for (const marker of ["derived-artifact-damage", "repair-derived", "DERIVED_REPAIR_INELIGIBLE", "existing `implementation` phase"]) {
+  assert.ok(implementationContract.includes(marker), `OpenSpec implementation repair contract misses ${marker}`);
+}
+for (const marker of ["seal-dispatch", "verify-dispatch", "derived_dispatch_binding", "DERIVED_SET_BUSY", "DISPATCH_BINDING_STALE", "never repair, rehash all bindings"]) {
+  assert.ok(implementationContract.includes(marker), `OpenSpec immutable dispatch contract misses ${marker}`);
+}
+for (const marker of ["migrate-v1", "gate1-v1-migration.json", "original Gate plus migration continuation identity"]) {
+  assert.ok(implementationContract.includes(marker), `OpenSpec legacy-v1 implementation contract misses ${marker}`);
+}
+for (const marker of ["freshness is binding-local", "empty service authorization", "task IDs from one service never satisfy another"]) {
+  assert.ok(implementationContract.includes(marker), `OpenSpec per-binding implementation freshness contract misses ${marker}`);
+}
+const recoveryContract = await readFile(join(root, "plugins/team-harness/skills/pipeline/references/recovery.md"), "utf8");
+for (const marker of ["verify-v1-migration", "gate1-v1-migration.json", "passing continuation certificate as the Gate-1 scope binding"]) {
+  assert.ok(recoveryContract.includes(marker), `OpenSpec legacy-v1 recovery contract misses ${marker}`);
+}
+for (const marker of ["dispatch-binding.json", "verify-dispatch", "DERIVED_SET_BUSY"]) {
+  assert.ok(recoveryContract.includes(marker), `OpenSpec dispatch-binding recovery contract misses ${marker}`);
+}
+for (const role of ["implementer", "tester"]) {
+  const adapter = await readFile(join(root, `runtime/codex/instructions/${role}.md`), "utf8");
+  for (const marker of ["derived_dispatch_binding", "assigned shard path and SHA-256", "rebound shard"]) {
+    assert.ok(adapter.includes(marker), `${role} adapter misses immutable dispatch marker ${marker}`);
+  }
+}
+for (const marker of ["Team Harness Execution Contract", "EXECUTION_CONTRACT_INVALID", "discovery_scope", "required_seams", "observable_runtime_behavior"]) {
+  assert.ok(overlayPlanContract.includes(marker), `OpenSpec planning contract misses ${marker}`);
+}
+for (const marker of ["plan-shards.md", "Team Harness Execution Contract", "overlay v2", "discovery_scope", "required_seams", "observable_runtime_behavior"]) {
+  assert.ok(architectAdapter.includes(marker), `Codex architect adapter misses ${marker}`);
+}
+assert.doesNotMatch(overlayScript, /Derivation scaffold|planning pass authors the real/,
+  "OpenSpec derivation still contains an approvable placeholder scaffold");
 const herdrReference = await readFile(join(root, "plugins/team-harness/agents/_shared/herdr-agent-messaging.md"), "utf8");
-for (const marker of ["herdr agent list", "herdr agent send", "herdr pane send-keys", "herdr agent read", "submitted-unverified"]) {
+for (const marker of ["herdr agent list", "herdr pane current", "herdr agent send", "herdr pane send-keys", "herdr agent read", "current-session-output", "queued"]) {
   assert.ok(herdrReference.includes(marker), `HerdR projection misses ${marker}`);
 }
+assert.doesNotMatch(herdrReference, /herdr agent wait|wait boundedly for `idle`/,
+  "HerdR projection still delays queued messages until idle");
 for (const workflow of ["tmux", "background"]) {
   const canonical = await readFile(join(root, `plugins/team-harness/skills/${workflow}/canonical.md`), "utf8");
   assert.match(canonical, /herdr-agent-messaging\.md/,
     `${workflow} does not route HerdR messaging through the shared contract`);
-  assert.match(canonical, /submitted-unverified/,
-    `${workflow} permits an unverifiable HerdR submission to disappear`);
+  assert.match(canonical, /`queued`/,
+    `${workflow} permits queued HerdR input to disappear`);
 }
 assert.doesNotMatch(pipelineIdentityDocs[1], /obsidian-direct/,
   "Codex pipeline retains the retired obsidian-direct mode");

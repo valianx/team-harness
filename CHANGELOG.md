@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- OpenSpec derived artifacts now acquire one permanent per-service dispatch
+  binding under the same atomic lock used by repair. Every fresh specialist
+  dispatch verifies the exact plan, quality-manifest, and shard hashes;
+  concurrent repair returns busy, post-seal repair is ineligible, and stale
+  packets cannot be normalized by silently rehashing and resending them.
+- Implementation-or-later specialist silence now closes through a deterministic
+  liveness lease: one token-bound probe, one possible renewal, interrupt-first
+  declared-path audit, and at most one clean fresh same-role replacement.
+  Partial progress and a second silent attempt block without concurrent writers
+  or a local coordinator fallback.
+- OpenSpec implementation entry can now repair missing or damaged derived
+  plan/shard/quality/overlay artifacts without reopening Design when isolated
+  regeneration from unchanged canonical intent reproduces the exact approved
+  overlay hash. The repair is transactional, records reproducible evidence,
+  preserves the consolidated Gate-1 identity, and remains fail-closed for
+  absent execution judgment, identity drift, or prior implementation work.
+- HerdR messages now submit immediately to the terminal input queue for agents
+  in every reported state instead of waiting for `idle`; accepted input without
+  immediate transcript evidence is reported as `queued` and is never resent
+  blindly. Envelopes also include the verified current HerdR agent, terminal,
+  and pane identity plus a current-session response channel.
+- PR-review snapshots now outlive capture/materialization shell and PTY yields;
+  cleanup is coordinator-owned and runs only after every reviewer joins and the
+  post-dispatch integrity checks complete.
+- `resume-session` now resolves logical feature names to one dated canonical
+  workspace, fails closed on ambiguity and symlinks, and no longer recommends a
+  save that could create an undated parallel workspace.
+- Pipeline activation, delivery, and recovery now agree on writable
+  `pipeline_version: 4`; v3 remains read-only compatibility input and migrates
+  atomically on the first authorized pipeline write.
+- OpenSpec overlay derivation no longer certifies placeholder shards. The
+  planning pass supplies one closed execution contract with real scope and
+  verification controls; overlay v2 projects complete shards and a hash-bound
+  workspace quality manifest, while derivation and `plan-contract` reject
+  missing, placeholder, stale, or unwritable execution judgment before Gate 1.
+
 ## [3.20.4] - 2026-08-24
 
 ### Added

@@ -81,13 +81,31 @@ function transcriptText(output) {
   return output;
 }
 
+function parseCurrentPane(output) {
+  try {
+    const pane = JSON.parse(output)?.result?.pane;
+    if (!pane || typeof pane !== "object") return null;
+    const name = typeof pane.label === "string" && pane.label.length > 0 ? pane.label : null;
+    if (!safeString(pane.agent, 256) || !safeString(pane.pane_id, 256) || !safeString(pane.terminal_id, 256)
+      || (name !== null && !safeString(name, 256))) return null;
+    return { agent: pane.agent, name, pane_id: pane.pane_id, terminal_id: pane.terminal_id };
+  } catch { return null; }
+}
+
 async function capabilities(herdr, runner) {
   const agent = await runner([herdr, "agent"]);
   const pane = await runner([herdr, "pane"]);
   const agentUsage = `${agent?.stdout ?? ""}\n${agent?.stderr ?? ""}`;
   const paneUsage = `${pane?.stdout ?? ""}\n${pane?.stderr ?? ""}`;
   return /agent list/.test(agentUsage) && /agent send/.test(agentUsage) && /agent read/.test(agentUsage)
-    && /agent wait/.test(agentUsage) && /pane send-keys/.test(paneUsage);
+    && /pane current/.test(paneUsage) && /pane send-keys/.test(paneUsage);
+}
+
+async function discoverSender(herdr, runner) {
+  const current = await runner([herdr, "pane", "current", "--current"]);
+  if (current?.code !== 0) return { ok: false, reason_code: current?.error ?? "SENDER_LOOKUP_FAILED" };
+  const sender = parseCurrentPane(current.stdout);
+  return sender ? { ok: true, sender } : { ok: false, reason_code: "SENDER_INVALID" };
 }
 
 async function discover(herdr, target, runner) {
@@ -102,16 +120,21 @@ async function discover(herdr, target, runner) {
   return { ok: true, agent };
 }
 
-function envelope({ senderRole, initiative, feature, repository, workspace, purpose, responseRequired, message, messageId }) {
+function envelope({ senderRole, sender, initiative, feature, repository, workspace, purpose, responseRequired, message, messageId }) {
   return [
     "[Team Harness agent message]",
     `sender_role: ${senderRole}`,
+    `sender_agent: ${sender.agent}`,
+    `sender_name: ${sender.name ?? "null"}`,
+    `sender_terminal_id: ${sender.terminal_id}`,
+    `sender_pane_id: ${sender.pane_id}`,
     `initiative: ${initiative ?? "null"}`,
     `feature: ${feature ?? "null"}`,
     `repository: ${repository}`,
     `workspace: ${workspace}`,
     `purpose: ${purpose}`,
     `response_required: ${responseRequired ? "yes" : "no"}`,
+    `response_channel: ${responseRequired ? "current-session-output" : "none"}`,
     `message_id: ${messageId}`,
     "",
     message,
@@ -143,25 +166,21 @@ export async function sendHerdrMessage({
     || !Number.isSafeInteger(verificationAttempts) || verificationAttempts < 1 || verificationAttempts > 10
     || !Number.isSafeInteger(verificationDelayMs) || verificationDelayMs < 1 || verificationDelayMs > 2_000
     || typeof sleeper !== "function") return result("failed", { reason_code: "ARGUMENT_INVALID", target: target ?? null });
-  const text = envelope({ senderRole, initiative, feature, repository, workspace, purpose, responseRequired, message, messageId });
+  const providedText = [senderRole, initiative, feature, repository, workspace, purpose, message, messageId].filter(value => value !== null).join("\n");
+  if (SECRET_LIKE.test(providedText)) return result("failed", { reason_code: "ARGUMENT_INVALID", target });
+  if (!(await capabilities(herdr, runner))) return result("unavailable", { reason_code: "CAPABILITY_UNAVAILABLE", target });
+  const discoveredSender = await discoverSender(herdr, runner);
+  if (!discoveredSender.ok) return result("failed", { reason_code: discoveredSender.reason_code, target, message_id: messageId });
+  const text = envelope({ senderRole, sender: discoveredSender.sender, initiative, feature, repository, workspace, purpose, responseRequired, message, messageId });
   if (SECRET_LIKE.test(text)) return result("failed", { reason_code: "ARGUMENT_INVALID", target });
   if (Buffer.byteLength(text, "utf8") > MAX_MESSAGE_BYTES) return result("failed", { reason_code: "MESSAGE_TOO_LARGE", target, message_id: messageId });
-  if (!(await capabilities(herdr, runner))) return result("unavailable", { reason_code: "CAPABILITY_UNAVAILABLE", target });
-  let discovered = await discover(herdr, target, runner);
+  const discovered = await discover(herdr, target, runner);
   if (!discovered.ok) return result("failed", { reason_code: discovered.reason_code, target });
-  if (discovered.agent.agent_status !== "idle") {
-    const waited = await runner([herdr, "agent", "wait", target, "--status", "idle", "--timeout", String(timeoutMs)], { timeoutMs: timeoutMs + 1000 });
-    if (waited?.code !== 0) return result("pending-busy", { reason_code: "BUSY_TIMEOUT", target, pane_id: discovered.agent.pane_id, message_id: messageId });
-    discovered = await discover(herdr, target, runner);
-    if (!discovered.ok || discovered.agent.agent_status !== "idle") {
-      return result("pending-busy", { reason_code: discovered.reason_code ?? "TARGET_NOT_IDLE", target, pane_id: discovered.agent?.pane_id ?? null, message_id: messageId });
-    }
-  }
   const paneId = discovered.agent.pane_id;
   const staged = await runner([herdr, "agent", "send", target, text]);
   if (staged?.code !== 0) return result("failed", { reason_code: staged?.error ?? "STAGE_FAILED", target, pane_id: paneId, message_id: messageId });
   const revalidated = await discover(herdr, target, runner);
-  if (!revalidated.ok || revalidated.agent.pane_id !== paneId || revalidated.agent.agent_status !== "idle") {
+  if (!revalidated.ok || revalidated.agent.pane_id !== paneId) {
     return result("staged-not-submitted", { reason_code: "TARGET_DRIFT", target, pane_id: paneId, message_id: messageId, staged: true });
   }
   const submitted = await runner([herdr, "pane", "send-keys", paneId, "enter"]);
@@ -176,7 +195,7 @@ export async function sendHerdrMessage({
     }
     if (attempt + 1 < verificationAttempts) await sleeper(Math.min(verificationDelayMs * (2 ** attempt), 2_000));
   }
-  return result("submitted-unverified", { reason_code: "RECEIPT_UNVERIFIED", target, pane_id: paneId, message_id: messageId, staged: true, submitted: true });
+  return result("queued", { reason_code: "RECEIPT_PENDING", target, pane_id: paneId, message_id: messageId, staged: true, submitted: true });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

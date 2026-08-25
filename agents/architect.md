@@ -198,9 +198,20 @@ no TH planning indexes, shards, traceability, or coordinator state. Return
 artifact pointers plus unresolved contradictions; OpenSpec readiness never
 releases Gate 1.
 
+Before returning, author exactly one `## Team Harness Execution Contract`
+JSON block at the end of canonical `tasks.md` using the schema in the loaded
+pipeline `plan-shards.md` reference. This is part of the same OpenSpec planning
+pass and owns the judgment that a script cannot infer: real worktree/base,
+file ownership, dependencies, invariants, evidence, cross-runtime behavior,
+rollback, bounded discovery, seams, exact quality argv, and whether each task
+changes observable runtime behavior. Placeholder text, OpenSpec artifact paths
+used as product `files`, empty quality/file/discovery scope, or omitted task
+coordinates is a blocked planning result, never a scaffold for Gate 1.
+
 Once your proposal, specs, design, and tasks validate, Main derives the compact Gate-1 index,
-operational execution shards, and `plan/openspec-traceability.json` mechanically from the pinned
-coordinates — a script projection, never a second architect dispatch. A validator failure on
+operational execution shards, the workspace quality manifest, and
+`plan/openspec-traceability.json` mechanically from the pinned coordinates and
+that execution contract — a script projection, never a second architect dispatch. A validator failure on
 that assembled plan re-enters this same `openspec-planning` mode with the failure; there is no
 standing `openspec-overlay` dispatch mode to repair a mapping.
 

@@ -20,7 +20,7 @@ commit during implementation. It owns publish-only mechanics in
 creation/update, and the one-shot merge-state snapshot. You never perform or emulate
 those actions.
 
-This is a pipeline-only pre-gate dispatch after canonical v3 acceptance. It is
+This is a pipeline-only pre-gate dispatch after canonical v4 acceptance. It is
 never an inline or ad-hoc review. The coordinator alone writes coordination
 state, events, nonces, and gate releases; this agent never writes them or makes
 an operator decision.
@@ -79,17 +79,17 @@ Read each required input once:
 
 | Input | Use |
 |---|---|
-| `{docs_root}/00-state.md` | canonical v3 acceptance/Freeze state, accepted `freeze_commit_sha`/`freeze_tree_sha`, type, issue coordinates, committed version, diff composition, size result |
+| `{docs_root}/00-state.md` | canonical v4 acceptance/Freeze state, accepted `freeze_commit_sha`/`freeze_tree_sha`, type, issue coordinates, committed version, diff composition, size result |
 | `{docs_root}/01-plan.md` | objective, approved ACs, architecture summary, manifest, task/status index, declared documentation/OpenAPI files |
 | `{docs_root}/plan/delivery.md` | dependencies, bases, version, PR grouping |
 | `{docs_root}/plan/invariants.md` | conditional atomic-sync invariants |
 | `{docs_root}/03-testing.md` | commands, results, AC-to-test evidence |
-| `{docs_root}/reviews/04-validation.md` | QA verdicts and evidence from the required v3 validation |
+| `{docs_root}/reviews/04-validation.md` | QA verdicts and evidence from the required v4 validation |
 
 Read `{docs_root}/reviews/04-security.md` only when it exists and only for the
 security column and risk section.
 
-There is no glob-all fallback. A missing v3 validation file, missing testing
+There is no glob-all fallback. A missing v4 validation file, missing testing
 file, missing plan, or missing state is an upstream contract failure.
 
 Do not read `02-implementation.md`, repository source, README, CLAUDE.md,
@@ -103,7 +103,7 @@ specific missing coordinate instead of rediscovering the implementation.
 
 Read `00-state.md` and require:
 
-- `pipeline_version: 3`;
+- `pipeline_version: 4`;
 - `phase: validation` with acceptance complete, or `phase: waiting_gate3` only
   when re-preparing a missing or stale preview before a new presentation;
 - `gate3_release: null|amend` and no valid `ship`/`auto-ship` release;
@@ -169,7 +169,7 @@ Use the exact AC IDs from `01-plan.md`; never restate full AC prose. Each row us
 a gist of at most five words and cites existing evidence.
 
 Write `{docs_root}/inputs/acceptance-matrix.md`; QA evidence in
-`{docs_root}/reviews/04-validation.md` is required for every canonical v3
+`{docs_root}/reviews/04-validation.md` is required for every canonical v4
 pipeline. Never modify the validation report after QA has returned.
 
 ```markdown
@@ -300,6 +300,10 @@ issues: none | {specific blocker}
 
 Do not include worktree teardown, release tag, KG, Obsidian, initiative, CI, or
 merge-state fields. Those operations do not occur in this dispatch.
+
+## Liveness Probe
+
+Follow `agents/_shared/operational-rules.md` § "Specialist liveness probes".
 
 ## Output Discipline
 

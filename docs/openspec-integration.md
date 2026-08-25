@@ -32,7 +32,7 @@ explicit exclusion. Non-direct mappings are disclosed as `split`, `merged`, `th-
 `excluded` with a rationale. `ambiguous`, missing reverse coverage, stale hashes, dangling
 coordinates, or copied normative text block Gate 1.
 
-The overlay v1 arrays are `acceptance_items` and `execution_items`; it has no
+The overlay v2 arrays are `acceptance_items` and `execution_items`; it has no
 top-level `tasks`. Task `Task-N` sources live at the unique matching
 `.execution_items[]` entry, and specialist packets bind that entry by JSON
 Pointer plus content hash.
@@ -52,30 +52,53 @@ Main advances through these actions without requiring another operator command a
    automatically; this is not an operator checkpoint.
 2. Dispatch a fresh architect in `openspec-planning` mode — the single reasoning pass. It follows
    the installed upstream `openspec-propose` or `openspec-update-change` skill and writes only the
-   bound OpenSpec change, carrying every judgment call (routing, scope decomposition, invariants)
-   into it.
+   bound OpenSpec change. Its canonical `tasks.md` ends with the closed Team
+   Harness execution-contract JSON block, carrying every judgment call that a
+   script cannot infer: worktree/base, file scope, routing, dependencies,
+   invariants, evidence, seams, discovery scope, quality argv, test-first
+   applicability, preservation, and rollback.
 3. Run OpenSpec status and strict validation, extract stable coordinates, and capture the snapshot.
 4. Run `openspec-overlay.mjs derive` directly over the validated snapshot and the live writable
-   roots — a mechanical projection, never a second agent dispatch. It writes the compact Gate-1
+   roots — a mechanical projection of that validated execution contract, never a second agent dispatch. It writes the compact Gate-1
    index, repository ownership, specialist routing, file scope, constraints, quality IDs,
    Freeze/evidence controls, rollback, delivery grouping, and each shard's explicit dispatch
-   anchors. Every proposed worktree must remain inside one of the writable roots. A validator
+   anchors plus the hash-bound workspace `.team-harness/quality.json`. Every proposed worktree must remain inside one of the writable roots. Missing or
+   placeholder judgment returns `EXECUTION_CONTRACT_INVALID`; a validator
    failure re-enters the same `openspec-planning` flow and reruns the derivation over the
    corrected snapshot, invoking it with `overwrite: true` authorized by that recorded correction
    event since the prior derivation's targets already exist; there is no standing second dispatch
    mode.
-5. Validate every snapshot's freshness, bidirectional traceability, exact agreement between every
+5. Validate every snapshot's freshness, the hash-bound quality manifest, bidirectional traceability, exact agreement between every
    shard's `required_invariants`, `required_evidence_anchors`, and
    `cross_runtime_preservation` declarations and its execution item, writable execution
    topology, service-bound event traces, and aggregate hash; then present one
    consolidated Gate 1 whose nonce binds the ordered set. After approval,
    execute services serially in aggregate dependency order without child Gate 1.
-6. During implementation, `openspec-overlay.mjs verify-and-rebind` performs
-   every authorized monotonic task-checkbox transition and mechanical overlay
-   binding update as one idempotent recoverable operation. It restores the old
-   snapshot on a safe rebind failure and resumes an interrupted transition only
-   from the exact predecessor/task event; every other stale condition remains
-   fail-closed.
+6. At implementation entry, a failure limited to missing or damaged derived
+   plan/shard/quality/overlay artifacts may run `openspec-bindings.mjs
+   repair-derived` once. It requires the released gate's approved snapshot,
+   overlay, aggregate, and gate-identity hashes, no prior dispatch/progress,
+   unchanged canonical execution judgment, isolated staged validation, and an
+   exact regenerated-overlay hash match. It replaces the derived set
+   transactionally, records deterministic evidence, and preserves Gate 1;
+   missing canonical judgment or any identity drift remains fail-closed.
+7. A legacy v1 workspace whose approved overlay was a placeholder and whose
+   live operator already authorized a semantic execution-contract repair uses
+   `openspec-bindings.mjs migrate-v1`. It preserves the original Gate bytes and
+   writes a supplemental continuation certificate only after proving event
+   chronology, unchanged normative task prefixes, current derived hashes, and
+   recorded monotonic checkbox progress. See
+   [Approved OpenSpec v1 workspace repair](openspec-v1-gate-migration.md).
+8. During implementation, `openspec-overlay.mjs verify-progress` records every
+   authorized monotonic task-checkbox transition in
+   `inputs/openspec-progress.json` as one idempotent recoverable operation. It
+   never rewrites the immutable snapshot or approved overlay; every other stale
+   condition remains fail-closed.
+9. Aggregate implementation freshness is evaluated independently per service:
+   the active binding consumes its supplied authorized IDs, untouched bindings
+   use pre-Gate freshness, and previously progressed bindings revalidate only
+   their latest durable progress event. Empty sibling authorization is never
+   treated as a task transition.
 
 Crossing the architect SLA produces one concise operator update and one
 `agent.sla` observation. Main does not request heartbeats or inspect partial

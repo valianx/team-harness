@@ -81,6 +81,53 @@ needed to accept the task, including applicable `build`, `typecheck`,
 exact set to the final quality run; a missing manifest command or unselected
 required check fails closed.
 
+## OpenSpec execution contract
+
+In `openspec-planning` mode, canonical `tasks.md` ends with exactly one
+`## Team Harness Execution Contract` heading and one fenced `json` object. The
+object is judgment authored in the same architect pass; `derive` only validates
+and projects it. Its closed v1 shape is:
+
+```json
+{
+  "schema_version": 1,
+  "kind": "team_harness_openspec_execution_contract",
+  "worktree": { "path": "/absolute/writable/path", "branch": "feat/name", "base_sha": "full-git-sha" },
+  "quality_manifest": { "schema_version": 1, "commands": { "test": { "argv": ["tool", "test"] } } },
+  "tasks": [{
+    "source_id": "task:1.1",
+    "owner": "service-or-role",
+    "specialist": "implementer",
+    "files": ["repository/relative/file"],
+    "dependencies": [],
+    "required_invariants": ["I-identifier"],
+    "technical_constraints": ["Concrete mandatory mechanism."],
+    "quality_command_ids": ["test"],
+    "observable_runtime_behavior": true,
+    "pre_implementation_test": "required",
+    "required_evidence_anchors": ["02-implementation.md"],
+    "cross_runtime_preservation": "Concrete behavior preserved across supported runtimes.",
+    "rollback": "Concrete bounded rollback action.",
+    "delivery_group": "default",
+    "discovery_scope": { "directories": ["src"], "globs": ["**/*.ts"] },
+    "required_seams": [{ "path": "src/public-entry.ts", "anchor": "exported entry point" }]
+  }]
+}
+```
+
+There is exactly one task object per OpenSpec `N.N` checkbox coordinate, using
+`source_id: task:N.N`; dependencies use those source IDs. `files` are real
+product paths and never the OpenSpec planning artifact itself. Commands are
+literal argv arrays accepted by the quality-manifest contract. Use
+`pre_implementation_test: required` exactly when
+`observable_runtime_behavior` is true and the manifest declares both `test`
+and `test_contract`; otherwise use `not-applicable`. Empty invariants or seams
+are allowed only when none apply. Files, evidence, quality IDs, technical
+constraints, discovery directories/globs, cross-runtime preservation, and
+rollback are never placeholders. Missing, malformed, stale, placeholder, or
+out-of-root execution contracts make `derive` return
+`EXECUTION_CONTRACT_INVALID` without producing an approvable overlay.
+
 ## Read routing
 
 Read `01-plan.md` once to resolve paths, then open only the artifact and heading

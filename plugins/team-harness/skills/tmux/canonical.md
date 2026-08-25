@@ -12,12 +12,12 @@ chat replies, status blocks, error messages, and self-corrections alike.
 
 Before using raw tmux for an agent registered by HerdR, read
 `agents/_shared/herdr-agent-messaging.md` and prefer the packaged
-`skills/pipeline/scripts/herdr-message.mjs` adapter. Its discovery → bounded
-idle wait → literal send → explicit pane Enter → read/verify transaction avoids
-text that is staged but never submitted. HerdR is optional: an unavailable
+`skills/pipeline/scripts/herdr-message.mjs` adapter. Its discovery → literal
+queued send → explicit pane Enter → read/verify transaction avoids text that
+is staged but never submitted and does not wait for an agent to become idle. HerdR is optional: an unavailable
 capability returns `unavailable` and this skill may continue with the ordinary
 tmux actions below. Never mix the two transports for the same message or retry
-`submitted-unverified` blindly.
+`queued` blindly.
 
 Before executing ANY tmux command, detect the runtime environment:
 
