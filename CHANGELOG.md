@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.20.5] - 2026-08-25
+
 ### Fixed
 
 - OpenSpec derived artifacts now acquire one permanent per-service dispatch
@@ -3277,7 +3279,8 @@ Initial release of the `claude-dev-team` agent system distribution.
 - `gh` — GitHub CLI (used by several skills).
 - **context7 API key** — for library docs retrieval.
 
-[Unreleased]: https://github.com/valianx/team-harness/compare/v3.10.0...HEAD
+[Unreleased]: https://github.com/valianx/team-harness/compare/v3.20.5...HEAD
+[3.20.5]: https://github.com/valianx/team-harness/compare/v3.20.4...v3.20.5
 [3.10.0]: https://github.com/valianx/team-harness/compare/v3.9.0...v3.10.0
 [2.138.0]: https://github.com/valianx/team-harness/compare/v2.137.0...v2.138.0
 [2.131.0]: https://github.com/valianx/team-harness/compare/v2.130.1...v2.131.0
