@@ -94,3 +94,10 @@
 - [x] 14.2 Add the atomic per-service derived-set lock plus permanent `seal-dispatch` and `verify-dispatch` bindings over every dispatchable derived artifact.
 - [x] 14.3 Require Main and implementer/tester packets to verify the dispatch binding and prohibit post-seal repair, rehash, or rebind recovery.
 - [x] 14.4 Regenerate projections and run focused binding, strict OpenSpec, generation, and full repository validation.
+
+## 15. Executable recovery receipts and shard-local RED
+
+- [x] 15.1 Add bounded-command regressions proving canonical output syntax executes, legacy positional syntax fails before execution, and every wrapper or child failure exits non-zero while retaining closed JSON.
+- [x] 15.2 Require persisted/recovered commands to preserve canonical `--output` syntax and validate receipt outcome, error code, and child exit before claiming evidence.
+- [x] 15.3 Harden the tester/Main RED contract with upstream-input validation, target failure-stage classification, and current-or-completed shard dependency checks, including invalid UUID fixtures and future-method helper coupling.
+- [x] 15.4 Regenerate projections and run focused bounded-command, generation, strict OpenSpec, and full repository validation.

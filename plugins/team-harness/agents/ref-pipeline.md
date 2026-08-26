@@ -1144,13 +1144,21 @@ checks schema, ancestry, exact candidate diff, and manifest path rules without
 running tests. An object-valued requirement, unchanged preservation path,
 non-test fixture, or other scope mismatch returns `contract-invalid`; the
 tester never runs the red transition. It then returns
-`failure_matches_contract: true|false`. Main verifies commit integrity and no
+`failure_matches_contract: true|false`, `failure_stage`,
+`upstream_constraints_checked`, and `pending_shard_dependencies`. Main verifies commit integrity and no
 production changes, runs `test-transition.mjs --transition red --output
 <coordinator-evidence-path>`, verifies the receipt-bound complete JSON and
 SHA-256, and advances only on
-machine `verdict: pass` plus semantic `failure_matches_contract: true`. A syntax,
-fixture, dependency, infrastructure, unrelated-suite, or already-green failure
-blocks; agent prose cannot override the machine result.
+machine `verdict: pass` plus semantic `failure_matches_contract: true`,
+`failure_stage: target-behavior`, a non-empty checked-constraint list or the
+literal no-validator value, and `pending_shard_dependencies: []`. Main checks
+that fixtures passed every existing validator and durable identity format named
+by the current task anchors/product seam, and that every method/helper/mock/API
+seam needed to enter the test belongs to this shard or a completed declared
+dependency. A shared helper coupled to a future shard is split while preserving
+that future RED. Syntax, fixture, upstream-validation, pending-dependency,
+infrastructure, unrelated-suite, or already-green failure blocks; agent prose
+cannot override the machine result or justify weakening production validation.
 
 Before RED and the first implementer dispatch, Main runs every task-required
 non-test quality control separately as a non-authoritative readiness diagnostic

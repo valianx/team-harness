@@ -245,7 +245,12 @@ the complete bounded envelope, and emits only a fixed
 `team_harness_bounded_command_receipt` containing outcome, stream counters,
 path, byte size, and SHA-256—never argv or tails. `--success-diagnostic` may
 precede `--output`. Treat either the receipt or the hash-verified persisted
-envelope as the terminal result. If `functions.wait` or another transport loses
+envelope as the terminal result only after validating `outcome: completed`,
+`error_code: null`, and `exit_code: 0`; the CLI process status must also be zero.
+Any other wrapper or child result is failure even when closed JSON was written.
+Persist and recover only this exact `--output <absolute_result_path> --` grammar;
+a positional output path is `ARGUMENT_INVALID`, never evidence, and recovery
+repairs the command syntax before a single rerun. If `functions.wait` or another transport loses
 the receipt, inspect that exact predeclared artifact, compute and record its
 hash, and continue from it without rerunning the command. Missing, unsafe,
 invalid, or hash-mismatched output blocks fail closed.
@@ -363,7 +368,7 @@ the role fields cannot see. The current digests are:
 |---|---|
 | `pipeline-architect` | `01c3366215ac8e4eddd1cffa7e92f0b8793a8c9ced0411ab2e6d612cdccaa69f` |
 | `pipeline-implementer` | `874b20898439b6cd944fd83d33a4e4663e5d3fc76d4e09f23c9b178152e6d6bd` |
-| `pipeline-tester` | `615998d614df6fa81874a527b3c89d7cf63f4eedf12516e2f174fc200b5d9a3f` |
+| `pipeline-tester` | `76ac91d1e162900f39a21531c7b99f53ebd13827b27e688aaea469f0cb4ff77b` |
 | `pipeline-cleaner` | `8e17564f9835653b016b278324773d101b9c6158cda6d9826549e1af02026a9e` |
 | `pipeline-qa` | `85fa7bb2c471f6a70914965ae7980ad961e912908cc17492aa1dfcdc2346b655` |
 | `pipeline-security` | `cd15f37113ef88b9cfff744e97ff0ff51c31f1bf6817d2c9240957f27c4b7883` |

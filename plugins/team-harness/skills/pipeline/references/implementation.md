@@ -420,11 +420,20 @@ SHA-256, byte count, and a fixed diagnostic summary. On failure the summary
 identifies the transition stage, quality error, command outcome, and stream
 availability without replaying raw output. Main verifies that receipt against the exact file and
 requires both the persisted machine `verdict: pass` and tester
-`failure_matches_contract: true`. Machine pass here means the exact manifest
+`failure_matches_contract: true`, `failure_stage: target-behavior`, a
+non-empty `upstream_constraints_checked` list or the literal no-validator
+value, and `pending_shard_dependencies: []`. Before accepting those fields,
+Main verifies that fixtures passed every existing validator and durable
+identity contract named by the task anchors/current product seam, and that
+every method/helper/mock/API seam needed to enter the test belongs to the
+current task or a completed declared dependency. A shared helper coupled to a
+future shard is split while preserving that later shard's RED. Machine pass here means the exact manifest
 test command completed nonzero, every changed path is a declared test path that
 matches manifest rules, and test blob identities were recorded. Syntax,
-fixture, dependency, infrastructure, unrelated-suite, already-green, or
-semantic mismatch blocks before any implementer runs.
+fixture, upstream-validation, pending-dependency, infrastructure,
+unrelated-suite, already-green, or semantic mismatch blocks before any
+implementer runs; neither tester prose nor production-validation weakening can
+override this boundary.
 
 The equivalent `red '<JSON object>'` CLI form is supported for parity with the
 OpenSpec helpers. Main chooses one form before invocation and never retries the
@@ -579,9 +588,14 @@ unsafe, writes the complete envelope atomically, and renders only a fixed
 SHA-256; it never renders argv or diagnostic tails in that receipt. If
 `functions.wait` loses the receipt, inspect the exact predeclared artifact,
 validate it as a bounded-command envelope, compute and record its SHA-256, and
-continue without replay. A missing, invalid, or hash-mismatched artifact blocks
-fail closed. Specialists use output mode only when Main supplied that exact
-coordinate in the packet; they never invent an evidence path.
+continue without replay. Accept evidence only when the CLI process status is
+zero and the receipt or envelope says `outcome: completed`, `error_code: null`,
+and `exit_code: 0`. Persisted recovery commands retain the exact `--output
+<absolute_result_path> --` grammar; a positional output path is
+`ARGUMENT_INVALID`, proves no child execution, and may be corrected once before
+execution. A missing, invalid, non-successful, or hash-mismatched artifact
+blocks fail closed. Specialists use output mode only when Main supplied that
+exact coordinate in the packet; they never invent an evidence path.
 
 The helper captures stdout and stderr independently to a 64 KiB maximum buffer
 per stream while separately counting all received bytes. Render its envelope

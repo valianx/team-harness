@@ -245,16 +245,24 @@ assert.match(pipelineIdentityDocs[1], /do not create, copy, export, or reconcile
 assert.match(await readFile(join(root, "plugins/team-harness/skills/pipeline/references/state-and-gates.md"), "utf8"),
   /pipeline_version: 4[\s\S]*openspec_bindings:[\s\S]*openspec_aggregate_sha256:/,
   "Codex pipeline new-run state is not the v4 aggregate contract");
-for (const script of ["workspace-identity.mjs", "openspec-bindings.mjs", "openspec-overlay.mjs", "herdr-message.mjs", "specialist-liveness.mjs"]) {
+for (const script of ["bounded-command.mjs", "workspace-identity.mjs", "openspec-bindings.mjs", "openspec-overlay.mjs", "herdr-message.mjs", "specialist-liveness.mjs"]) {
   const source = await readFile(join(root, "skills/pipeline/scripts", script), "utf8");
   const projected = await readFile(join(root, "plugins/team-harness/skills/pipeline/scripts", script), "utf8");
   assert.equal(projected, source, `${script} generated projection is stale`);
 }
 const overlayScript = await readFile(join(root, "skills/pipeline/scripts/openspec-overlay.mjs"), "utf8");
+const boundedCommandScript = await readFile(join(root, "skills/pipeline/scripts/bounded-command.mjs"), "utf8");
 const bindingsScript = await readFile(join(root, "skills/pipeline/scripts/openspec-bindings.mjs"), "utf8");
 const livenessScript = await readFile(join(root, "skills/pipeline/scripts/specialist-liveness.mjs"), "utf8");
 const overlayPlanContract = await readFile(join(root, "plugins/team-harness/skills/pipeline/references/plan-shards.md"), "utf8");
 const architectAdapter = await readFile(join(root, "runtime/codex/instructions/architect.md"), "utf8");
+const testerAdapter = await readFile(join(root, "runtime/codex/instructions/tester.md"), "utf8");
+for (const marker of ["boundedCommandProcessStatus", "result.outcome === \"completed\"", "result.exit_code === 0"]) {
+  assert.ok(boundedCommandScript.includes(marker), `bounded-command process-status guard misses ${marker}`);
+}
+for (const marker of ["failure_stage", "upstream_constraints_checked", "pending_shard_dependencies", "deterministic valid UUID", "future shard seam"]) {
+  assert.ok(testerAdapter.includes(marker), `Codex tester adapter misses shard-local RED marker ${marker}`);
+}
 for (const marker of ["SPECIALIST_LIVENESS_GRACE_MS = 120_000", "SPECIALIST_LIVENESS_MAX_ATTEMPTS = 2", "specialist-interrupted-with-progress", "specialist-retry-exhausted"]) {
   assert.ok(livenessScript.includes(marker), `specialist liveness implementation misses ${marker}`);
 }
@@ -290,6 +298,9 @@ for (const marker of ["migrate-v1", "gate1-v1-migration.json", "original Gate pl
 }
 for (const marker of ["freshness is binding-local", "empty service authorization", "task IDs from one service never satisfy another"]) {
   assert.ok(implementationContract.includes(marker), `OpenSpec per-binding implementation freshness contract misses ${marker}`);
+}
+for (const marker of ["failure_stage: target-behavior", "upstream_constraints_checked", "pending_shard_dependencies: []", "fixtures passed every existing validator", "future shard"]) {
+  assert.ok(implementationContract.includes(marker), `pre-implementation RED boundary misses ${marker}`);
 }
 const recoveryContract = await readFile(join(root, "plugins/team-harness/skills/pipeline/references/recovery.md"), "utf8");
 for (const marker of ["verify-v1-migration", "gate1-v1-migration.json", "passing continuation certificate as the Gate-1 scope binding"]) {

@@ -121,6 +121,21 @@ Before building the first implementation-role packet for a writable service, Tea
 - **WHEN** Main repeats sealing or verifies a fresh correction dispatch against byte-identical bound artifacts
 - **THEN** it receives the same dispatch-binding SHA-256 with `changed: false`
 
+### Requirement: Recovery commands and pre-implementation tests preserve executable boundaries
+Every persisted or returned bounded-command invocation SHALL use the canonical `--output <absolute-path> -- <argv...>` form when it names an evidence coordinate, and its consumer SHALL validate both the closed envelope or receipt and the child outcome. The bounded-command CLI SHALL return a non-zero process status for an invalid invocation, transport/runtime failure, timeout, or non-zero child result. A pre-implementation tester SHALL prove that its fixtures satisfy all already-approved upstream input constraints and that every required helper/API seam belongs to the current execution item or one of its completed dependencies. Main SHALL reject RED evidence that stops in fixture or upstream validation, or that requires behavior owned by a pending/future shard.
+
+#### Scenario: A recovered handoff uses a positional output path
+- **WHEN** a persisted command says `bounded-command.mjs OUTPUT -- CMD` or otherwise omits the canonical `--output` flag
+- **THEN** recovery treats the command as invalid before child execution, observes a non-zero wrapper status, and repairs only the invocation syntax to `bounded-command.mjs --output OUTPUT -- CMD` without claiming prior evidence
+
+#### Scenario: A fixture violates an approved durable identity contract
+- **WHEN** a pre-implementation test uses a non-UUID attempt identifier although the pinned upstream contract requires UUID
+- **THEN** the tester classifies the result as fixture/upstream-validation failure, corrects only the fixture to a deterministic valid value, reruns RED, and cannot report `failure_matches_contract: true` until the target behavior is reached
+
+#### Scenario: A current shard helper requires a future shard method
+- **WHEN** a current claim test cannot compile or execute unless its helper also exposes a result method owned by a future task
+- **THEN** the tester splits the helper at the shard boundary, preserves the later task's RED coverage, and reports the current RED only when it depends on current or completed seams
+
 ## MODIFIED Requirements
 
 ### Requirement: Planning inputs are pinned for Gate 1

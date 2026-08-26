@@ -132,6 +132,14 @@ Before Main builds the first specialist packet for a service, it acquires the sa
 
 Alternative considered: reread the event log immediately before replacement or simply rehash every binding after a mismatch. Rejected because a dispatch can still begin between the final read and the write, while rebinding stale packets normalizes unauthorized concurrent mutation instead of detecting it.
 
+### 13. Recovery validates bounded receipts and RED at the behavioral seam
+
+Persisted commands use one canonical bounded-command grammar. An evidence-bearing invocation always spells `--output <absolute-path>` before the `--` separator; recovery may repair that syntax as operational metadata but never treat the earlier `ARGUMENT_INVALID` envelope as execution evidence. The CLI maps every non-successful wrapper or child result to a non-zero process status while still printing or persisting its closed JSON, giving both shell-level and envelope-level consumers a fail-closed signal. Callers still validate `outcome`, `error_code`, and `exit_code`; process status is an additional guard, not a replacement for the receipt.
+
+Pre-implementation RED remains semantic tester judgment, but that judgment becomes closed enough for Main to audit. The tester reports the reached failure stage, the upstream input constraints it checked, and any pending-shard dependencies. It may return `failure_matches_contract: true` only when the observed failure reaches the current requirement's target behavior, all existing validators accept its fixtures, and every helper/API member is owned by the current execution item or a completed dependency. Invalid identifiers are repaired in test data; shared helpers are split rather than forcing a current task to implement a later shard. Main rejects missing classifications, upstream/fixture failures, or non-empty pending dependencies before dispatching an implementer.
+
+Alternative considered: accept any deterministic non-zero test result because `test-transition.mjs` proves RED mechanically. Rejected because mechanical RED cannot distinguish a missing target behavior from an invalid UUID fixture or a helper type that imports an unimplemented future method.
+
 ## Risks / Trade-offs
 
 - [The v4 state and consolidated Gate 1 change initiative recovery semantics] → Keep a read-only v3 compatibility adapter, fixtures for interrupted v3 runs, and no automatic workspace migration.
@@ -147,6 +155,8 @@ Alternative considered: reread the event log immediately before replacement or s
 - [An interrupted specialist may have produced unreported work] → Confirm interruption, audit only declared owned/evidence paths, and block rather than replace whenever either surface changed.
 - [A liveness ACK could renew the wrong attempt indefinitely] → Bind it to one attempt token, cap it at 512 bytes, allow exactly one role-SLA renewal, and cap the role at two total attempts.
 - [A repair could rewrite shards between Main's preflight and specialist read] → Serialize repair and dispatch sealing with one create-only per-service lock, persist the exact derived-set hashes, and make post-seal repair or hash rebinding fail closed.
+- [A wrapper's JSON error can be mistaken for command evidence when its process exits zero] → Preserve the closed result while returning non-zero for every wrapper or child failure and require receipt-field validation on recovery.
+- [A mechanically red test can fail before the intended seam] → Require upstream-input and shard-dependency classification before Main accepts semantic RED.
 
 ## Migration Plan
 
