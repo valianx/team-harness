@@ -778,7 +778,14 @@ async function main(argv) {
   return output === undefined ? envelope : persistEnvelope(output, envelope);
 }
 
+/** Shell-level guard for callers that have not yet parsed the closed JSON. */
+export function boundedCommandProcessStatus(result) {
+  const valid = isBoundedCommandEnvelope(result) || isBoundedCommandReceipt(result);
+  return valid && result.outcome === "completed" && result.error_code === null && result.exit_code === 0 ? 0 : 1;
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const envelope = await main(process.argv.slice(2));
   process.stdout.write(`${JSON.stringify(envelope)}\n`);
+  process.exitCode = boundedCommandProcessStatus(envelope);
 }

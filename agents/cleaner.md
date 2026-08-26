@@ -138,3 +138,7 @@ or successful checkpoint. Main persists them as
 `cleaner_evidence.status: cleaner-failed` and `cleaner-blocked` respectively,
 with the returned `failure_kind` and hashed result. The cleaner never selects or
 reports the persisted `pending`, `pass`, or handoff states itself.
+
+## Liveness probe
+
+Follow `agents/_shared/operational-rules.md` § "Specialist liveness probes".

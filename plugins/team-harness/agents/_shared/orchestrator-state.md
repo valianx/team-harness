@@ -167,10 +167,11 @@ must never be persisted as additional machine phases.
 
 `herdr_deliveries` is coordinator-owned durable transaction state. Persist each
 adapter result, including its `message_id` and status, before recovery or retry.
-`pending-busy`, `staged-not-submitted`, and `submitted-unverified` remain pending
-and never authorize a resend. Retry the same logical message only after a bounded
-`herdr agent read` proves that the prior `message_id` was not submitted; otherwise
-inspect or continue waiting without duplicating delivery.
+`queued` and `staged-not-submitted` remain pending and never authorize a resend.
+HerdR may hold a queued message outside the committed transcript while the target
+is working, so transcript absence is not proof that submission failed. Inspect or
+continue waiting without duplicating delivery; retry only when submission failure
+is positively established.
 
 **Compatibility note.** A legacy snapshot (including v2 numeric/named phases, a legacy
 `lane: express|full` field, profile flags, fast/simple markers, or tier markers) is not
@@ -490,6 +491,14 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | `provenance` | conditional | required for `checkpoint.confirmed`; a **closed enum, never free text**, and never subject to the bound below |
 | `tools`, `model`, `effort` | optional | coordinator-known diagnostic context; never required from the agent and never gate evidence |
 | `extra` | optional | event-specific |
+
+For implementation-or-later specialist liveness, `agent.sla.extra` is the
+durable lease identity `{attempt, attempt_token, liveness_action, deadline_at}`.
+A post-interrupt `agent.close.extra` repeats `attempt` and `attempt_token` and
+adds `owned_paths_changed`, `evidence_changed`, and the helper's closed
+`failure_kind`. Record declared relative path names only; never store partial
+file contents. Recovery consumes these fields and never restarts a lease from
+the recovery time.
 
 **Never pretty-print** — one JSON object per line, append-only. In obsidian mode the same JSONL lives inside a ```` ```jsonl ```` fence; extract with `sed -n '/^```jsonl$/,/^```$/{/^```/d;p}'` before piping to `jq`.
 

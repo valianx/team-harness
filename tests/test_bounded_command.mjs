@@ -15,6 +15,7 @@ import {
   DEFAULT_EXECUTION_TIMEOUT_MS,
   MAX_CAPTURE_BYTES_PER_STREAM,
   MAX_RENDERED_TAIL_BYTES_PER_STREAM,
+  boundedCommandProcessStatus,
   isBoundedCommandEnvelope,
   isBoundedCommandReceipt,
   runBoundedCommand,
@@ -48,13 +49,16 @@ function nodeCommand(source, ...args) {
   return { argv: [node, "-e", source, ...args] };
 }
 
-function runCli(...args) {
+function runCliWithStatus(expectedStatus, ...args) {
   const child = spawnSync(node, [boundedCommandPath, ...args], { encoding: "utf8" });
   assert.equal(child.error, undefined);
-  assert.equal(child.status, 0);
+  assert.equal(child.status, expectedStatus);
   assert.equal(child.stderr, "");
   return JSON.parse(child.stdout);
 }
+
+const runCli = (...args) => runCliWithStatus(0, ...args);
+const runCliFailure = (...args) => runCliWithStatus(1, ...args);
 
 async function eventually(callback, { timeoutMs = 1_000, intervalMs = 10 } = {}) {
   const deadline = Date.now() + timeoutMs;
@@ -217,7 +221,7 @@ await check("the success-diagnostic CLI flag must appear before the separator", 
     ["--", "--output", secret],
     ["--unexpected", "--", node, "-e", `process.stdout.write(${JSON.stringify(secret)});`],
   ]) {
-    const invalid = runCli(...invalidArgs);
+    const invalid = runCliFailure(...invalidArgs);
     assertClosedEnvelope(invalid);
     assert.equal(invalid.outcome, "argument_invalid");
     assert.equal(invalid.error_code, "ARGUMENT_INVALID");
@@ -263,7 +267,7 @@ await check("output mode atomically preserves the full envelope and emits only a
 await check("an unsafe output coordinate fails before executing the child", async () => {
   await temporaryRoot(async (root) => {
     const marker = path.join(root, "must-not-exist");
-    const invalid = runCli(
+    const invalid = runCliFailure(
       "--output",
       "relative-result.json",
       "--",
@@ -279,7 +283,7 @@ await check("an unsafe output coordinate fails before executing the child", asyn
     if (process.platform !== "win32") {
       const linkedParent = path.join(root, "linked-parent");
       await symlink(root, linkedParent, "dir");
-      const symlinkInvalid = runCli(
+      const symlinkInvalid = runCliFailure(
         "--output",
         path.join(linkedParent, "result.json"),
         "--",
@@ -315,6 +319,46 @@ await check("failure tails strip ANSI and safely render binary/control bytes per
   assert.equal(result.stderr.tail, "A\\x00\\x0AB");
   assert.equal(result.stdout.tail.includes("\u001b"), false);
   assert.equal(result.stderr.tail.includes("\u001b"), false);
+});
+
+await check("the CLI returns non-zero for child and wrapper failures while preserving closed JSON", async () => {
+  const childFailure = runCliFailure("--", node, "-e", "process.exitCode = 7;");
+  assertClosedEnvelope(childFailure);
+  assert.equal(childFailure.outcome, "completed");
+  assert.equal(childFailure.exit_code, 7);
+  assert.equal(boundedCommandProcessStatus(childFailure), 1);
+
+  const marker = "POSITIONAL-OUTPUT-MUST-NOT-EXECUTE";
+  await temporaryRoot(async (root) => {
+    const failedOutput = path.join(root, "failed-child.json");
+    const failedReceipt = runCliFailure(
+      "--output",
+      failedOutput,
+      "--",
+      node,
+      "-e",
+      "process.exitCode = 9;",
+    );
+    assertClosedReceipt(failedReceipt);
+    assert.equal(failedReceipt.outcome, "completed");
+    assert.equal(failedReceipt.exit_code, 9);
+    assert.equal(boundedCommandProcessStatus(failedReceipt), 1);
+    assertClosedEnvelope(JSON.parse(await readFile(failedOutput, "utf8")));
+
+    const positionalOutput = path.join(root, "legacy-result.json");
+    const invalid = runCliFailure(
+      positionalOutput,
+      "--",
+      node,
+      "-e",
+      `process.stdout.write(${JSON.stringify(marker)});`,
+    );
+    assertClosedEnvelope(invalid);
+    assert.equal(invalid.outcome, "argument_invalid");
+    assert.equal(invalid.error_code, "ARGUMENT_INVALID");
+    assert.equal(JSON.stringify(invalid).includes(marker), false);
+    await assert.rejects(readFile(positionalOutput), { code: "ENOENT" });
+  });
 });
 
 await check("UTF-8 continuation bytes cannot enter raw C1 control states", async () => {

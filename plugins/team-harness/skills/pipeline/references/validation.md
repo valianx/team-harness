@@ -144,7 +144,12 @@ only a fixed `team_harness_bounded_command_receipt` with outcome, counters,
 path, bytes, and SHA-256—not argv or diagnostic tails. If `functions.wait`
 loses that receipt, validate the exact predeclared artifact as a bounded-command
 envelope, compute and record its SHA-256, and continue without rerunning the
-command. Missing, invalid, or hash-mismatched evidence blocks fail closed.
+command. Accept it only when the CLI process status is zero and the receipt or
+envelope says `outcome: completed`, `error_code: null`, and `exit_code: 0`.
+Persisted recovery commands always retain the exact `--output
+<absolute_result_path> --` grammar; a positional path is `ARGUMENT_INVALID` and
+does not prove child execution. Missing, invalid, non-successful, or
+hash-mismatched evidence blocks fail closed.
 Specialists use output mode only for an exact coordinate supplied by Main.
 
 The helper captures each command's stdout and stderr separately with a maximum

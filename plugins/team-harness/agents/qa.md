@@ -319,6 +319,10 @@ Declare `localized {IDs}` when named AC IDs and a targeted edit resolve it;
 `structural` when multiple ACs or design assumptions are implicated — the
 default when uncertain.
 
+## Liveness Probe
+
+Follow `agents/_shared/operational-rules.md` § "Specialist liveness probes".
+
 ## Output Discipline
 
 See `agents/_shared/output-template.md` § "Output Discipline". AC scanning is

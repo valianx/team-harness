@@ -89,6 +89,25 @@ await check("requires only an observation on diagnostic SLA events", async () =>
   assert.ok(result.warnings.some(item => item.code === "OBSERVATION_INVALID"));
 }));
 
+await check("accepts durable bounded specialist liveness lease coordinates", async () => withFixture(async ({ workspace }) => {
+  const events = canonicalEvents();
+  events.splice(2, 0, {
+    ts: "2026-01-01T00:00:30Z", event: "agent.sla", feature,
+    agent_role: "tester", task: "Task-2",
+    observation: "tester exceeded its role SLA; one bounded liveness probe was sent",
+    extra: {
+      attempt: 1,
+      attempt_token: "tester-task-2-attempt-1",
+      liveness_action: "probe",
+      deadline_at: "2026-01-01T00:02:30Z",
+    },
+  });
+  await writeJsonl(workspace, events);
+  const result = await validateOpenSpecEvents({ workspace, events: "00-execution-events.jsonl", feature });
+  assert.equal(result.verdict, "pass");
+  assert.equal(result.warnings.some(item => item.code === "OBSERVATION_INVALID"), false);
+}));
+
 await check("treats malformed diagnostic records as warnings when Design evidence is complete", async () => withFixture(async ({ workspace }) => {
   const events = canonicalEvents();
   events.splice(2, 0, "not-json");

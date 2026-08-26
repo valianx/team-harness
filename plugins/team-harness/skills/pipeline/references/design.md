@@ -42,20 +42,25 @@ Run the transaction continuously:
    dependencies, and the exact installed
    `openspec-propose` skill for a new change or `openspec-update-change` for a bound existing
    change. The architect follows the upstream skill and writes only
-   proposal/specs/design/tasks under that service's change root, carrying every judgment call (routing,
-   scope decomposition, invariants) into it; it writes no TH plan or coordination state. Include
+   proposal/specs/design/tasks under that service's change root. At the end of canonical
+   `tasks.md`, it authors the exact `Team Harness Execution Contract` JSON from
+   `plan-shards.md`, carrying every judgment call (real worktree/base, files,
+   routing, scope decomposition, invariants, evidence, discovery, seams,
+   quality argv, test-first applicability, preservation, rollback) into the
+   same pass; it writes no TH plan or coordination state. Include
    only the bounded task and artifact coordinates it needs.
 3. Run CLI-reported status and strict validation through `openspec-snapshot.mjs capture`; it
    writes `inputs/openspec/<service>/snapshot.json` per binding. A binding, path, coordinate, validation, or
    hash failure remains recoverably in Design.
 4. Once every snapshot validates, run `scripts/openspec-overlay.mjs derive` per service with its
-   snapshot and pinned OpenSpec coordinates — a mechanical projection, never a second architect
+   snapshot, pinned OpenSpec coordinates, and validated execution contract — a mechanical projection, never a second architect
    dispatch. It writes the service's compact Gate-1 index, operational execution shards, and
-   bidirectional traceability. It must not paraphrase or replace OpenSpec intent. Pass the
+   bidirectional traceability plus the hash-bound workspace quality manifest. It must not paraphrase or replace OpenSpec intent. Pass the
    effective absolute `writable_roots`; require every planned worktree to be contained by one.
    Each task shard's literal `required_invariants`, `required_evidence_anchors`, and
    `cross_runtime_preservation` declarations mirror into the matching traceability execution
-   item by construction. A validator failure on the assembled plan re-enters step 2 with the
+   item by construction. Missing, malformed, placeholder, stale, or out-of-root
+   judgment returns `EXECUTION_CONTRACT_INVALID` and blocks Gate 1. Any validator failure on the assembled plan re-enters step 2 with the
    failure and reruns this derivation over the corrected snapshot; there is no standing second
    dispatch mode. Prefer branch-in-place when the current checkout is clean,
    writable, and already owns the dependency installation needed by the approved quality
@@ -121,7 +126,8 @@ SHA-256, and the returned `kind: team_harness_openspec_overlay_validation`,
 `snapshot_sha256`, `overlay_sha256`, and `change_name` as
 `plan_contract_evidence`. A pass is valid only when those hashes and the change
 name match the current pinned artifacts and bound change. This route validates
-the compact execution overlay, each task shard's dispatch anchors, and the
+the compact execution overlay v2, hash-bound quality manifest, each task
+shard's files/discovery/verification controls and dispatch anchors, and the
 planned execution path against canonical OpenSpec coordinates and live writable
 roots; it never
 falls through to the legacy functional-plan contract or invokes

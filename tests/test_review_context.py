@@ -19,6 +19,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "skills" / "review-pr" / "scripts" / "review_context.py"
+SKILL = ROOT / "skills" / "review-pr" / "SKILL.md"
 SPEC = importlib.util.spec_from_file_location("review_context", SCRIPT)
 assert SPEC and SPEC.loader
 MODULE = importlib.util.module_from_spec(SPEC)
@@ -45,6 +46,18 @@ def context(**overrides):
 
 
 class ReviewContextTests(unittest.TestCase):
+    def test_review_snapshot_lifecycle_outlives_exec_yields(self):
+        contract = SKILL.read_text(encoding="utf-8")
+        self.assertNotIn("Register the EXIT trap", contract)
+        self.assertNotRegex(contract, r"(?m)^\s*trap\b.*\bEXIT\b")
+        self.assertIn("MUST outlive every specialist dispatch", contract)
+        self.assertIn("whether any one yield exceeds 30 seconds", contract)
+        self.assertIn("only after every dispatched reviewer has", contract)
+        self.assertLess(
+            contract.index("MUST outlive every specialist dispatch"),
+            contract.index("Run cleanup explicitly from the coordinator only after"),
+        )
+
     def agent_failure_fixture(self, root: Path):
         artifacts = root / "artifacts"
         worktree = artifacts / "pr-review-worktree"

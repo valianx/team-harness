@@ -162,6 +162,75 @@ that regular-file and SHA-256 preflight immediately before every fresh dispatch;
 specialists never interpret a snapshot digest as a Git object or discover a
 missing coordinate.
 
+Before the first implementation specialist dispatch for an OpenSpec binding,
+run the normal overlay and plan-contract preflight. If it fails only because
+the compact plan index, task shards, workspace quality manifest, or
+traceability overlay is missing or damaged, classify it as candidate
+`derived-artifact-damage`; do not route directly to architect or Design. First
+verify the released consolidated Gate 1, its nonce and gate identity, the exact
+aggregate bytes/hash, binding membership/order, and the binding's approved
+snapshot and overlay hashes. Also require no recorded implementation dispatch
+and no progress event for that binding. Then invoke `openspec-bindings.mjs
+repair-derived` exactly once with one bounded JSON argument carrying the
+workspace, aggregate path/hash, service, complete consolidated gate record,
+nonce, and `implementationStarted: false`. The binding helper verifies the
+aggregate/gate, supplies the four approved SHA-256 values and live roots to the
+overlay repair, and verifies the same aggregate/gate again afterward.
+
+The repair is valid only when it returns the closed
+`team_harness_openspec_derived_repair` pass result, stages and validates a
+complete derivation from unchanged canonical source, reproduces the approved
+overlay SHA-256 exactly, and persists matching commit-last repair evidence.
+Immediately rerun overlay, plan-contract, aggregate-manifest, and consolidated
+Gate-1 verification and bind those post-check results to the evidence before
+continuing in the existing `implementation` phase. The snapshot, overlay,
+aggregate, nonce, and gate identity must remain byte-identical; never rewrite
+their approved hashes or ask for another Gate 1 for a successful repair.
+
+`DERIVED_REPAIR_INELIGIBLE`, absent canonical execution judgment, source or
+task-intent drift, a regenerated overlay mismatch, prior dispatch/progress,
+unsafe paths, or failed rollback is not a derived repair. Mutate nothing and
+surface the exact blocker. Never infer missing `Files`, quality commands,
+evidence, discovery, seams, preservation, or rollback from task titles or
+placeholder shards, and never auto-dispatch architect after Gate 1; only a
+separate explicit live operator request may reopen Design under the normal
+fresh-Gate contract.
+
+After any eligible repair closes—and before Main hashes or constructs the first
+specialist packet for that service—invoke `openspec-bindings.mjs seal-dispatch`
+with the same workspace, aggregate path/hash, service, complete Gate record,
+nonce, and any verified legacy continuation identity. `seal-dispatch` and
+`repair-derived` share one create-only per-service lock. `DERIVED_SET_BUSY`
+means no packet may be built; retry sealing only after the active operation
+closes. A successful seal writes
+`inputs/openspec/<service>/dispatch-binding.json` over the exact plan index,
+workspace quality manifest, and every overlay-declared shard. Its existence
+makes all later repair ineligible.
+
+Every initial or correction packet carries
+`derived_dispatch_binding: {path, sha256}` using the absolute canonical seal
+path and its exact digest. Immediately before every fresh dispatch, run
+`verify-dispatch`, require the same digest, then prove the assigned task-shard
+coordinate and hash occur exactly once in the seal. The specialist repeats the
+seal file/hash and assigned-shard membership check before any packet-derived
+read. `DISPATCH_BINDING_STALE`, a missing/changed seal, or a post-seal artifact
+mismatch blocks; never repair, rehash all bindings, substitute a new shard
+digest, or resend the packet against the changed bytes.
+
+For an already repaired legacy `sharded-v1` workspace whose original approved
+aggregate contained placeholder overlays, never overwrite the original Gate or
+pretend the new aggregate bytes were approved. Require the existing
+operator-live repair decision, incident report, repair evidence, and success
+event; then run `openspec-bindings.mjs migrate-v1` in `dry-run` mode followed by
+`apply`. The helper writes only `inputs/gate1-v1-migration.json` and binds the
+original Gate identity/aggregate to the repaired aggregate through the exact
+authority-event and evidence hashes. Before dispatch or recovery, run
+`verify-v1-migration` with the same coordinates. A missing or invalid chain,
+normative-prefix drift, unrecorded checkbox advance, or implementation dispatch
+that predates repair fails closed. A passing chain preserves Gate 1 and resumes
+the existing implementation phase under the original Gate plus migration continuation identity,
+without architect dispatch or a new gate.
+
 The packet declares `discovery_scope: {directories: [...], globs: [...]}` with
 only repository-relative task-owned search roots. Before dispatch, Main checks
 `required_seams`: every API, export, mutation adapter, public entry point,
@@ -248,6 +317,14 @@ a compatibility alias for `verify-progress` but performs no rebinding.
 The standalone `openspec-snapshot.mjs verify` CLI rejects `phase:
 implementation` with `ATOMIC_TRANSITION_REQUIRED` before mutating progress;
 only the in-process verifier owned by `verify-progress` may advance it.
+
+When rerunning the aggregate binding verifier in `phase: implementation`, pass
+newly authorized task IDs only under their owning service key. Aggregate
+freshness is binding-local: that service verifies the supplied transition, a
+binding with no progress events verifies unchanged pre-Gate source, and a
+binding with earlier durable progress performs an idempotent implementation
+check against only its own latest event. An empty service authorization is not
+a synthetic transition, and task IDs from one service never satisfy another.
 
 ## Pre-implementation behavioral test contract
 
@@ -343,11 +420,20 @@ SHA-256, byte count, and a fixed diagnostic summary. On failure the summary
 identifies the transition stage, quality error, command outcome, and stream
 availability without replaying raw output. Main verifies that receipt against the exact file and
 requires both the persisted machine `verdict: pass` and tester
-`failure_matches_contract: true`. Machine pass here means the exact manifest
+`failure_matches_contract: true`, `failure_stage: target-behavior`, a
+non-empty `upstream_constraints_checked` list or the literal no-validator
+value, and `pending_shard_dependencies: []`. Before accepting those fields,
+Main verifies that fixtures passed every existing validator and durable
+identity contract named by the task anchors/current product seam, and that
+every method/helper/mock/API seam needed to enter the test belongs to the
+current task or a completed declared dependency. A shared helper coupled to a
+future shard is split while preserving that later shard's RED. Machine pass here means the exact manifest
 test command completed nonzero, every changed path is a declared test path that
 matches manifest rules, and test blob identities were recorded. Syntax,
-fixture, dependency, infrastructure, unrelated-suite, already-green, or
-semantic mismatch blocks before any implementer runs.
+fixture, upstream-validation, pending-dependency, infrastructure,
+unrelated-suite, already-green, or semantic mismatch blocks before any
+implementer runs; neither tester prose nor production-validation weakening can
+override this boundary.
 
 The equivalent `red '<JSON object>'` CLI form is supported for parity with the
 OpenSpec helpers. Main chooses one form before invocation and never retries the
@@ -395,14 +481,19 @@ of per-task test commits, owns the accepted suite identity.
 Wait for a specialist completion or live operator input rather than polling. A
 heartbeat may run at most once every 60 seconds; call `list_agents` only for a
 live status request, an actual phase-SLA timeout, or recovery. A normal
-`wait_agent` timeout only returns control and immediately continues the directed
-wait without recap, new analysis, `interrupt_agent`, or a new/replacement
-dispatch; it proves neither failure nor terminal state. Track each role's phase
-SLA independently from dispatch time. On SLA exceed, escalate once to the
-operator, keep the specialist alive, and continue waiting for its result or
-live operator input. Only live cancellation of that attempt authorizes
-interruption; replacement requires a demonstrated terminal unsuccessful result
-and the normal correction authority. The normalized benchmark counts only waits and queries that are
+`wait_agent` timeout before the role SLA only returns control and immediately
+continues the directed wait; it proves neither failure nor terminal state.
+Track each role's phase SLA independently from dispatch time. At the SLA,
+evaluate `scripts/specialist-liveness.mjs`: send its single token-bound probe,
+allow the fixed two-minute ACK grace, and permit at most one matching-checkpoint
+lease renewal. When it returns `interrupt`, interrupt first and then audit only
+the packet's declared owned paths and evidence paths. A clean first attempt may
+be replaced once by a fresh same-role V2 specialist; changed paths block as
+`specialist-interrupted-with-progress`, and a clean second timeout blocks as
+`specialist-retry-exhausted`. Never run a concurrent replacement, retry
+indefinitely, or let Main perform the role as a local fallback. Persist the
+classifier result in `agent.sla.extra` and the declared-path audit in
+`agent.close.extra` before replacement or block. The normalized benchmark counts only waits and queries that are
 not caused by completion, input, a real timeout, or recovery; the current
 policy must keep that count at no more than 30% of the normalized baseline
 (at least a 70% reduction) while retaining immediate operator interruption.
@@ -497,9 +588,14 @@ unsafe, writes the complete envelope atomically, and renders only a fixed
 SHA-256; it never renders argv or diagnostic tails in that receipt. If
 `functions.wait` loses the receipt, inspect the exact predeclared artifact,
 validate it as a bounded-command envelope, compute and record its SHA-256, and
-continue without replay. A missing, invalid, or hash-mismatched artifact blocks
-fail closed. Specialists use output mode only when Main supplied that exact
-coordinate in the packet; they never invent an evidence path.
+continue without replay. Accept evidence only when the CLI process status is
+zero and the receipt or envelope says `outcome: completed`, `error_code: null`,
+and `exit_code: 0`. Persisted recovery commands retain the exact `--output
+<absolute_result_path> --` grammar; a positional output path is
+`ARGUMENT_INVALID`, proves no child execution, and may be corrected once before
+execution. A missing, invalid, non-successful, or hash-mismatched artifact
+blocks fail closed. Specialists use output mode only when Main supplied that
+exact coordinate in the packet; they never invent an evidence path.
 
 The helper captures stdout and stderr independently to a 64 KiB maximum buffer
 per stream while separately counting all received bytes. Render its envelope

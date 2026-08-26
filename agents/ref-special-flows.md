@@ -530,7 +530,7 @@ approvals remain independent.
 When `type: refactor`:
 
 1. **Specify** — ACs focus on `VERIFY:` format (same API, same behavior, improved structure)
-2. **Design** — architect focuses on target structure, not new features. The single-file output contract applies: `01-plan.md` (pipeline v3). Per-task ACs in refactor mode use the `VERIFY:` format predominantly rather than Given/When/Then.
+2. **Design** — architect focuses on target structure, not new features. The single-file output contract applies: `01-plan.md` (pipeline v4). Per-task ACs in refactor mode use the `VERIFY:` format predominantly rather than Given/When/Then.
 3. **Implement** — implementer receives: "This is a refactor. Do NOT change behavior. Existing tests are your contract. Only change structure/organization. Per-task scope from `01-plan.md` (§ Task List) `Files:` field still applies."
 4. **Verify** — tester runs **existing tests first** before writing new ones. If existing tests fail → the refactor broke something. New tests only for structural improvements (e.g., new module boundaries).
 5. **Delivery** — as normal, gated by STAGE-GATE-3.

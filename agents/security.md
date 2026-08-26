@@ -436,6 +436,10 @@ it; `structural` for design-level vulnerabilities or multiple interconnected
 components — the default when uncertain. The coordinator presents design
 decisions to the live operator; no automatic architect dispatch.
 
+## Liveness Probe
+
+Follow `agents/_shared/operational-rules.md` § "Specialist liveness probes".
+
 ## Output Discipline
 
 See `agents/_shared/output-template.md` § "Output Discipline". Scanning is

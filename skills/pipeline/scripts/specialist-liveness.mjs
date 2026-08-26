@@ -1,0 +1,222 @@
+#!/usr/bin/env node
+
+import { pathToFileURL } from "node:url";
+
+export const SPECIALIST_LIVENESS_SCHEMA_VERSION = 1;
+export const SPECIALIST_LIVENESS_GRACE_MS = 120_000;
+export const SPECIALIST_LIVENESS_MAX_ATTEMPTS = 2;
+
+export const SPECIALIST_SLA_MS = Object.freeze({
+  implementer: 15 * 60_000,
+  tester: 10 * 60_000,
+  cleaner: 5 * 60_000,
+  qa: 5 * 60_000,
+  security: 10 * 60_000,
+  delivery: 5 * 60_000,
+});
+
+const TOKEN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const STATUSES = new Set(["running", "completed", "failed", "blocked", "interrupted"]);
+const INPUT_KEYS = new Set([
+  "role", "attempt", "attempt_token", "dispatched_at", "now", "agent_status",
+  "probe_sent_at", "heartbeat", "owned_paths_changed", "evidence_changed",
+]);
+const HEARTBEAT_KEYS = new Set(["attempt_token", "received_at", "checkpoint"]);
+
+function hasOnlyKeys(value, keys) {
+  return Object.keys(value).every(key => keys.has(key));
+}
+
+function timestamp(value) {
+  if (typeof value !== "string" || value.length > 64) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) && /(?:Z|[+-]\d{2}:\d{2})$/.test(value) ? parsed : null;
+}
+
+function decision({
+  verdict = "pass",
+  errorCode = null,
+  action,
+  deadlineAt = null,
+  attempt = null,
+  replacementAttempt = null,
+  failureKind = null,
+  observation,
+}) {
+  return {
+    schema_version: SPECIALIST_LIVENESS_SCHEMA_VERSION,
+    kind: "team_harness_specialist_liveness_decision",
+    verdict,
+    error_code: errorCode,
+    action,
+    deadline_at: deadlineAt,
+    attempt,
+    replacement_attempt: replacementAttempt,
+    failure_kind: failureKind,
+    observation,
+  };
+}
+
+function invalid(attempt = null) {
+  return decision({
+    verdict: "fail",
+    errorCode: "ARGUMENT_INVALID",
+    action: "block",
+    attempt,
+    failureKind: "specialist-liveness-invalid",
+    observation: "The specialist liveness input is invalid; do not interrupt or replace the active attempt.",
+  });
+}
+
+function iso(milliseconds) {
+  return new Date(milliseconds).toISOString();
+}
+
+/**
+ * Decide the next coordinator action for one implementation-or-later specialist.
+ * The helper is pure: native status, interruption, path audit, and dispatch remain
+ * coordinator operations.
+ */
+export function evaluateSpecialistLiveness(input = {}) {
+  if (!input || typeof input !== "object" || Array.isArray(input) || !hasOnlyKeys(input, INPUT_KEYS)) return invalid();
+  const {
+    role,
+    attempt,
+    attempt_token: attemptToken,
+    dispatched_at: dispatchedAtValue,
+    now: nowValue,
+    agent_status: agentStatus,
+    probe_sent_at: probeSentAtValue = null,
+    heartbeat = null,
+    owned_paths_changed: ownedPathsChanged,
+    evidence_changed: evidenceChanged,
+  } = input;
+  const dispatchedAt = timestamp(dispatchedAtValue);
+  const now = timestamp(nowValue);
+  const probeSentAt = probeSentAtValue === null ? null : timestamp(probeSentAtValue);
+  const sla = SPECIALIST_SLA_MS[role];
+  if (!Number.isInteger(sla) || ![1, 2].includes(attempt) || !TOKEN.test(attemptToken ?? "")
+    || dispatchedAt === null || now === null || now < dispatchedAt || !STATUSES.has(agentStatus)
+    || typeof ownedPathsChanged !== "boolean" || typeof evidenceChanged !== "boolean"
+    || (probeSentAtValue !== null && (probeSentAt === null || probeSentAt < dispatchedAt || probeSentAt > now))) {
+    return invalid(Number.isInteger(attempt) ? attempt : null);
+  }
+
+  if (["completed", "failed", "blocked"].includes(agentStatus)) {
+    return decision({
+      action: "collect",
+      attempt,
+      observation: `The ${role} attempt is terminal; collect and classify its returned result.`,
+    });
+  }
+
+  if (agentStatus === "interrupted") {
+    if (ownedPathsChanged || evidenceChanged) {
+      return decision({
+        verdict: "fail",
+        errorCode: "SPECIALIST_INTERRUPTED_WITH_PROGRESS",
+        action: "block",
+        attempt,
+        failureKind: "specialist-interrupted-with-progress",
+        observation: "The interrupted specialist left declared work or evidence; preserve it and block before any replacement.",
+      });
+    }
+    if (attempt < SPECIALIST_LIVENESS_MAX_ATTEMPTS) {
+      return decision({
+        action: "replace",
+        attempt,
+        replacementAttempt: attempt + 1,
+        observation: "The first interrupted attempt left no declared work or evidence; dispatch one fresh same-role replacement.",
+      });
+    }
+    return decision({
+      verdict: "fail",
+      errorCode: "SPECIALIST_RETRY_EXHAUSTED",
+      action: "block",
+      attempt,
+      failureKind: "specialist-retry-exhausted",
+      observation: "The one allowed fresh same-role replacement also ended unresponsive without progress.",
+    });
+  }
+
+  const initialDeadline = dispatchedAt + sla;
+  if (probeSentAt === null) {
+    if (now < initialDeadline) {
+      return decision({
+        action: "wait",
+        deadlineAt: iso(initialDeadline),
+        attempt,
+        observation: `The ${role} attempt remains within its phase SLA.`,
+      });
+    }
+    return decision({
+      action: "probe",
+      deadlineAt: iso(now + SPECIALIST_LIVENESS_GRACE_MS),
+      attempt,
+      observation: "Send one token-bound liveness probe and allow the fixed two-minute acknowledgement grace.",
+    });
+  }
+  if (probeSentAt < initialDeadline) return invalid(attempt);
+
+  let validHeartbeatAt = null;
+  if (heartbeat !== null) {
+    if (!heartbeat || typeof heartbeat !== "object" || Array.isArray(heartbeat)
+      || !hasOnlyKeys(heartbeat, HEARTBEAT_KEYS)) return invalid(attempt);
+    const receivedAt = timestamp(heartbeat.received_at);
+    const checkpoint = heartbeat.checkpoint;
+    if (receivedAt === null || receivedAt < probeSentAt || receivedAt > now
+      || typeof checkpoint !== "string" || checkpoint.trim() !== checkpoint
+      || checkpoint.length === 0 || Buffer.byteLength(checkpoint, "utf8") > 512) return invalid(attempt);
+    if (heartbeat.attempt_token === attemptToken) validHeartbeatAt = receivedAt;
+  }
+
+  if (validHeartbeatAt !== null) {
+    const renewedDeadline = validHeartbeatAt + sla;
+    if (now < renewedDeadline) {
+      return decision({
+        action: "wait",
+        deadlineAt: iso(renewedDeadline),
+        attempt,
+        observation: "A matching checkpoint renewed this attempt's lease exactly once.",
+      });
+    }
+    return decision({
+      action: "interrupt",
+      attempt,
+      failureKind: "specialist-unresponsive",
+      observation: "The single renewed lease expired; interrupt the attempt before auditing its declared paths.",
+    });
+  }
+
+  const graceDeadline = probeSentAt + SPECIALIST_LIVENESS_GRACE_MS;
+  if (now < graceDeadline) {
+    return decision({
+      action: "wait",
+      deadlineAt: iso(graceDeadline),
+      attempt,
+      observation: "The token-bound liveness acknowledgement grace remains open.",
+    });
+  }
+  return decision({
+    action: "interrupt",
+    attempt,
+    failureKind: "specialist-unresponsive",
+    observation: "No matching acknowledgement arrived within the fixed grace; interrupt before auditing declared paths.",
+  });
+}
+
+function parseCli(argv) {
+  if (argv.length !== 1 || typeof argv[0] !== "string" || Buffer.byteLength(argv[0], "utf8") > 64 * 1024) return null;
+  try {
+    const value = JSON.parse(argv[0]);
+    return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const result = evaluateSpecialistLiveness(parseCli(process.argv.slice(2)) ?? null);
+  process.stdout.write(`${JSON.stringify(result)}\n`);
+  if (result.verdict !== "pass") process.exitCode = 1;
+}

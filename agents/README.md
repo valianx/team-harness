@@ -31,14 +31,14 @@ color: cyan
 
 The combination of `model` + `effort` + `tools` below is the canonical matrix for this repo. `/th:lint` enforces `model` and `effort` (Check 7) and the tool allowlist surface (Check 4) — any drift between an agent's frontmatter and this table fails the check.
 
-One agent owns coordination. **`orchestrator`** is the top-level session agent and the operator's single point of contact. Its startup kernel serves direct work by default; `/th:pipeline` explicitly activates the lazy-loaded v3 contract in `ref-pipeline.md`. During an active pipeline it owns Intake, Discover/framing, Specify, spec+AC co-authoring, config/language resolution, initiative state, both STAGE-GATEs, and every write to `00-state.md`, events, the decision ledger, and the pipeline summary. It never dispatches another coordinator.
+One agent owns coordination. **`orchestrator`** is the top-level session agent and the operator's single point of contact. Its startup kernel serves direct work by default; `/th:pipeline` explicitly activates the lazy-loaded v4 contract in `ref-pipeline.md`. During an active pipeline it owns Intake, Discover/framing, Specify, spec+AC co-authoring, config/language resolution, initiative state, both STAGE-GATEs, and every write to `00-state.md`, events, the decision ledger, and the pipeline summary. It never dispatches another coordinator.
 
 The active pipeline machine is `design → waiting_gate1 → implementation → validation →
 waiting_gate3 → delivery → complete`. Team Harness has exactly two postures: `inline` and
 `pipeline`. Inline is the direct default and remains outside the machine; a current live operator
 may explicitly select sensitive inline work or request a bounded tester, QA, or security review,
 and those ad hoc reviews create no workspace, state, events, gates, or delivery action. Pipeline
-entry requires explicit live activation or recovery and always uses the canonical full v3 machine.
+entry requires explicit live activation or recovery and always uses the canonical full v4 machine.
 Retired route markers are migration data only and never select a posture or release a gate. A
 failed direct predicate is reported to the operator rather than hidden behind a dispatch.
 

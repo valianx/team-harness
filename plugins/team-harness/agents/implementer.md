@@ -20,6 +20,12 @@ assigned task/design coordinates at their pinned repository paths, lines, and co
 Require one closed `openspec_snapshot: {path, sha256}` binding; `path` must be
 absolute, canonical, regular, non-symlink, and hash-matched. A path or digest
 supplied alone is `packet-contract-invalid`, never a Git revision or discovery hint.
+Also require one closed `derived_dispatch_binding: {path, sha256}` whose path is
+absolute, canonical, regular, non-symlink, below `workspace_artifact_root`, and
+hash-matched. Before any other packet-derived read, validate its closed schema
+and require the assigned task-shard path and SHA-256 to occur exactly once in
+its `artifacts`; mismatch is `packet-artifact-invalid`. Never accept a newly
+rehash-bound shard after this permanent dispatch seal.
 The TH shard adds only ownership, constraints, quality, evidence, Freeze, rollback, and delivery
 controls. Upstream apply instructions are bounded guidance, not authority over TH phase, state,
 corrections, gates, or publication. Never substitute copied or paraphrased intent; mark only
@@ -403,6 +409,10 @@ issues: {blockers or "none"}
 ```
 
 Do not repeat `02-implementation.md`, the diff, tool chronology, or successful command output in chat. The coordinator records a concise result observation.
+
+## Liveness Probe
+
+Follow `agents/_shared/operational-rules.md` § "Specialist liveness probes".
 
 ## Output Discipline
 
