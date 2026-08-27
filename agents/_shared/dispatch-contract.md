@@ -1,8 +1,8 @@
 # Dispatch contract
 <!-- Single source of truth for what a dispatch prompt may and must not carry,
-     and for the two-halves scope rule (review scope vs. write scope).
-     Consumed by: agents/orchestrator.md (pointer only, never
-     restated) — see agents/README.md § "Adding or modifying an agent" and
+     the pipeline specialist reference handshake, and the two-halves scope
+     rule (review scope vs. write scope). Consumed by coordinators and leaf
+     specialists by pointer — see agents/README.md § "Adding or modifying an agent" and
      agents/agent-builder.md § "Mandatory Sections Checklist" for where new
      agents pick this up.
      Edit here; consumer files reference this file by section. -->
@@ -10,11 +10,10 @@
 ## Ownership — single source, never copied
 
 This file is the ONE canonical description of what a dispatch prompt may contain, what it
-must never contain, and the two-halves scope rule that governs review scope and write
-scope. `agents/orchestrator.md` — the sole agent in this tree that writes dispatch prompts
-to other agents — references this file by section and never restates its prose. A second
-copy would diverge from this one the first time either is edited, and the no-relocation
-check (Suite 174) exists precisely to catch that kind of duplication across
+must never contain, the pipeline specialist handshake, and the two-halves scope rule that
+governs review scope and write scope. Coordinators and leaf specialists reference this file
+by section and never restate its prose. A second copy would diverge from this one the first
+time either is edited, and the no-relocation check (Suite 174) exists precisely to catch that kind of duplication across
 `agents/ref-*.md` and `agents/_shared/*.md` files.
 
 ## What a dispatch carries
@@ -28,6 +27,47 @@ None of this is verifiable after the fact. A dispatch prompt is a tool argument 
 persisted: the one hook that sees it records only its byte length, and nothing reads that value.
 So this section is a discipline for the dispatcher, not a control — the rule that does carry
 weight is below, because its write half is enforced by the recipient's own tool grants.
+
+## Pipeline specialist reference
+
+The canonical `team_harness_dispatch_reference` has exactly this shape:
+
+```text
+{schema_version: 1, kind: "team_harness_dispatch_reference", path, sha256,
+ scope_identity_sha256}
+```
+
+An OpenSpec-bound implementer or tester prompt carries only that
+`dispatch_reference` plus `attempt_token` and `decision_ref`. Roots, ownership,
+hashes, source pointers, helpers, seals, evidence, discovery scope, commands,
+and workspace writes exist only in the referenced immutable
+`team_harness_dispatch_capsule`; prompt-level copies are invalid.
+
+Before any repository or workspace read, the specialist verifies that the
+reference is an absolute canonical regular non-symlink workspace path, verifies
+its SHA-256 and canonical capsule bytes, recomputes the scope identity, and
+validates the bounded correlation values. It then sends the token-bound
+`dispatch-ready` acknowledgement with the exact `attempt_token` and
+`decision_ref`; Main accepts readiness only when both equal the dispatched
+values and the decision ref matches the durable authority event, then records
+its timestamp as `agent.sla.extra.dispatch_ready_at`. Only that ACK
+starts and counts the attempt. A missing, stale, malformed, or mismatched
+reference/correlation closes as `dispatch-reference-invalid-before-ready` with
+no repository work, attempt, replacement-budget use, or fresh authority. Main
+may mechanically re-certify only when semantic scope identity is unchanged.
+
+Silence before readiness is `specialist-start-unconfirmed`, not a specialist
+attempt. At the normal role SLA Main uses the single liveness probe and grace,
+then interrupts and audits declared paths. A clean audit preserves the same
+decision/reference and pauses without advancing attempt or replacement counts;
+progress before readiness is a contract violation. Repeated clean starts never
+become `specialist-retry-exhausted` and never authorize an unbounded redispatch
+loop.
+
+After readiness the specialist takes every operational coordinate from the
+capsule, stays inside its role-specific ownership, authorizes each workspace
+write mechanically, and returns exact writes/evidence to Main. Main alone owns
+state, events, reports, correction authority, Freeze, gates, and publication.
 
 ## Two-halves rule
 

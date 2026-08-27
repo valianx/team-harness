@@ -155,31 +155,13 @@ a gate. Gate releases remain dual-recorded and live-operator decisions.
 
 Every new specialist attempt, correction, and revalidation starts a fresh
 native V2 agent with `fork_turns: none`; no specialist attempt is continued for
-feedback or correction. Send only its exact role packet: the role
-instruction, assigned task shard, that shard's named invariants and evidence
-anchors, its `cross_runtime_preservation` obligation, the current frozen
-identity when one exists, and the minimal role-specific environment or facts.
-Never compensate for a missing packet fact with Main's transcript, an
-implementer's narrative, sibling shards, the full plan, historical tool output,
-or a prompt recap.
-
-For implementer and tester packets, also resolve the packaged
-`scripts/specialist-write-scope.mjs` and include its verified absolute path plus
-closed `workspace_write_coordinates`. The implementer validates that scope and
-authorizes every workspace write mechanically. The normal coordinate set is
-empty for implementers: the role returns structured evidence and Main alone consolidates
-`02-implementation.md`. A report, result, or evidence artifact is writable only
-when its exact absolute coordinate, purpose, and operation are assigned; the
-workspace root itself never grants write ownership.
-
-Before a dispatch that uses a task shard, preflight the exact shard and fail
-closed unless it declares usable `required_invariants`,
-`required_evidence_anchors`, and `cross_runtime_preservation` values for the
-applicable work. Resolve only those named anchors into the packet; do not
-delegate until each applicable obligation is present. A transcript, full plan,
-or sibling shard is never a substitute for a missing declaration. This
-preflight preserves the existing Claude and other-runtime contracts; it changes
-neither their models, gates, permissions, nor lifecycle routes.
+feedback or correction. Implementer and tester dispatches use only the
+content-addressed `dispatch_reference` defined in
+[implementation.md](references/implementation.md); that reference is the sole
+owner of task scope, evidence, helpers, roots, hashes, and workspace writes.
+Other roles receive only their minimal role-specific facts. Never compensate
+for a missing reference or role fact with Main's transcript, specialist prose,
+the full plan, historical tool output, or prompt-level copies of derived data.
 
 ### Wait heartbeat and phase SLA
 
@@ -197,22 +179,23 @@ packaged `scripts/specialist-liveness.mjs` contract: send one token-bound probe,
 record native message acceptance as delivery `unconfirmed` unless an explicit
 receipt proves otherwise, allow its fixed grace, then interrupt before auditing
 only declared paths. An unconfirmed-delivery interruption with progress permits
-one same-thread, same-token continuation of the unchanged packet without new
+one same-thread, same-token continuation of the unchanged dispatch reference without new
 correction authority. Confirmed-delivery progress, a second continuation
-failure, clean replacement exhaustion, or operator cancellation blocks with
-the helper's exact cause. Never infer delivery from a successful send call or
-use Main as the specialist fallback.
+failure, or operator cancellation blocks with the helper's exact cause. A clean
+replacement budget exists only after the canonical `dispatch-ready` ACK;
+pre-ready silence uses `agents/_shared/dispatch-contract.md` and never becomes
+retry exhaustion. Never infer delivery from a successful send call or use Main
+as the specialist fallback.
 
 ### AC12/AC20 pre-execution command-output route
 
-Only while this pipeline is explicitly activated, pipeline preflight resolves
-the helper's absolute path relative to the loaded pipeline skill/reference
-(`scripts/bounded-command.mjs` from the skill directory or
-`../scripts/bounded-command.mjs` from a reference), never from the workspace
-or current directory; fail closed if it cannot be resolved. Include the helper
-in each role packet only as `bounded_command_path` with that absolute path. It
-is transient: never persist `bounded_command_path` in state, events, reports,
-summaries, or workspace artifacts.
+Only while this pipeline is explicitly activated, materialize the immutable
+workspace helper bundle before specialist dispatch or correction authority.
+Apply the canonical dispatch resolver and bounded-command contracts from
+[implementation.md](references/implementation.md), including its fail-closed
+pre-authority order. Use
+[recovery.md](references/recovery.md) for legacy or missing-bundle recovery;
+never reconstruct those contracts from this routing file.
 
 Evidence-bearing reads are sequential transport operations even when their
 files are independent. Never batch, fan out, or issue multiple reads/searches/
@@ -283,22 +266,17 @@ scope expansion, and every correction require a fresh V2 agent with
 validation never dispatches automatically: Main first
 finishes the full fan, consolidates every finding, and obtains the mandatory
 correction decision described below. Once authorized, the fresh implementer
-receives a bounded correction packet containing the matching nonce, failed
-anchor, complete finding IDs, union scope, `Cause`, `Files`, implicated
-`AC-N|TC-N`, advisory `Suggested correction`, and deterministic closure evidence
-with its expected result.
-Before the initial implementation dispatch and before every correction
-decision, Main also completes every selected readiness/closure diagnostic to a
-terminal result, even after one has failed. It persists each bounded result,
-groups symptoms by root cause, and forms one comprehensive package. Dispatching
-from the first visible failure, or while another declared diagnostic is pending,
-is prohibited; a later round is for genuinely new evidence, not a finding that
-the prior fan omitted.
+receives only the canonical dispatch reference and correlation. The durable
+correction package and every derived field are bound inside the capsule by the
+resolver. Apply [implementation.md](references/implementation.md) §§
+"Pre-implementation behavioral test contract" and "Authorized dirty-progress
+recovery" for the single readiness route; do not restate it here.
 
 Initial tester, QA, and security attempts start fresh with V2 `fork_turns: none`
-on their assigned current identity. Their packets contain executable ACs/TCs or
-the review surface plus verifiable facts and evidence, never the implementer's
-success narrative. After correction closure passes, tester refreshes only evidence
+on their assigned current identity. An OpenSpec tester also receives only the
+canonical dispatch reference and correlation; QA and security receive their
+minimal role-specific review surface and verifiable facts, never the
+implementer's success narrative. After correction closure passes, tester refreshes only evidence
 rows whose requirement text, exact command/arguments, or complete declared dependency
 path/blob set changed, then Main rebuilds Freeze. QA is
 always fresh on that new Freeze; security is
@@ -381,8 +359,8 @@ the role fields cannot see. The current digests are:
 | Role | SHA-256 of normalized TOML |
 |---|---|
 | `pipeline-architect` | `01c3366215ac8e4eddd1cffa7e92f0b8793a8c9ced0411ab2e6d612cdccaa69f` |
-| `pipeline-implementer` | `fe09a0dc3322d083c09e844f5d5720253d8caa983068a3047939ab5eac04cbad` |
-| `pipeline-tester` | `4be2fcf6a9b76521a7309512882c018082354bfff8d40a370276cf2e9f63bbca` |
+| `pipeline-implementer` | `6307d99d06f8fb3d016f09f3e19ca21ef1dde06c9f9e735495b9f8a137308554` |
+| `pipeline-tester` | `6f283b0f6f1cbaf31c35a9e05e252e752f5ccfb3b1d510dbbdfebed71b7694b7` |
 | `pipeline-cleaner` | `8e17564f9835653b016b278324773d101b9c6158cda6d9826549e1af02026a9e` |
 | `pipeline-qa` | `85fa7bb2c471f6a70914965ae7980ad961e912908cc17492aa1dfcdc2346b655` |
 | `pipeline-security` | `cd15f37113ef88b9cfff744e97ff0ff51c31f1bf6817d2c9240957f27c4b7883` |

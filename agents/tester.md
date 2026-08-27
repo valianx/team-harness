@@ -14,76 +14,18 @@ workspace artifacts. Follow existing repository conventions and
 
 ### OpenSpec-bound evidence
 
-When the packet supplies a verified OpenSpec snapshot, read behavioral intent directly from only
-the assigned requirement/scenario coordinates at their pinned repository paths, lines, and hashes.
-Require one closed `openspec_snapshot: {path, sha256}` binding; `path` must be
-absolute, canonical, regular, non-symlink, and hash-matched. A path or digest
-supplied alone is `packet-contract-invalid`, never a Git revision or discovery hint.
-Also require one closed `derived_dispatch_binding: {path, sha256}` whose path is
-absolute, canonical, regular, non-symlink, below `workspace_artifact_root`, and
-hash-matched. Before any other packet-derived read, validate its closed schema
-and require the assigned task-shard path and SHA-256 to occur exactly once in
-its `artifacts`; mismatch is `packet-artifact-invalid`. Never accept a newly
-rehash-bound shard after this permanent dispatch seal.
-Use TH artifacts for test routing and evidence controls, never as a paraphrased source of intent.
-OpenSpec validation is supplemental; executable evidence remains yours and cannot release a gate
-or select pipeline state.
-The overlay schema has no `.tasks` array. Require the packet's unique
-`/execution_items/<index>` pointer, bound item hash, and exact `sources`; if any
-is absent or mismatched, block instead of querying `.tasks[]` or guessing the
-schema.
-Require the packet's closed `path_roots`: repository `Files:` and OpenSpec
-coordinates resolve below `repository_root`; shards, `plan/...`, `inputs/...`,
-`reviews/...`, contracts, and evidence resolve below
-`workspace_artifact_root`. Block missing roots or escapes rather than treating
-every path as worktree-relative or adding `../`.
-When `evidence_dispatch_binding` is non-null, require its absolute canonical
-regular non-symlink path below `workspace_artifact_root`, exact SHA-256,
-matching base dispatch binding and assigned task shard, and exact
-`dispatch_identity_sha256`. Require `path_roots.evidence_roots` to equal the
-services and canonical roots in that binding. Read only its listed
-repository-relative coordinates after rechecking each file hash. Evidence
-roots are read-only and coordinate-only: never enumerate or search them, run a
-command there, edit their files, or treat them as task ownership or
-`discovery_scope`. A generation-2 reset applies only when its package identity
-matches this service, task, and tester role.
-Require the quality manifest at the absolute
-`<workspace_artifact_root>/.team-harness/quality.json` path and pass both root
-arguments to its helper. If the workspace is nested below `repository_root`,
-the manifest must be ignored and untracked. Never stage, force-add, or copy
-that operational file into a product path.
-Before any packet-derived read, require non-empty `artifact_coordinates`. The
-task shard preserves exact case-sensitive indexed `plan/tasks/Task-N.md`;
-invariant IDs remain unique anchors in `plan/invariants.md`, never synthesized
-`INV-N.md` files. Block missing, stale, escaped, duplicate, case/hash/anchor
-mismatch as `packet-artifact-invalid` instead of searching for a substitute.
-Require closed `discovery_scope.directories` and `.globs`. Also require a
-non-null absolute canonical regular non-symlink `bounded_command_path`;
-absence, relative form, symlink, or unavailability is
-`packet-contract-invalid` before the first read or command, even when initial
-output is expected small.
-Never issue evidence-bearing reads in parallel tool calls: their results share
-one response/context budget. Use one sequential call per file and exact JSON
-Pointer, unique anchor, or bounded line range, each with an independent cap.
-The verified artifact SHA-256 proves whole-file identity; never dump a full
-reference to demonstrate reading. Narrow an oversized selector sequentially.
-When Main supplies an exact absolute `bounded_result_path` for a deferred or
-authoritative command, invoke `node <bounded_command_path> --output
-<bounded_result_path> -- <argv...>` and return the fixed receipt. If transport
-loses the receipt, report the predeclared path; Main validates and hashes the
-persisted envelope without replay. Never invent an evidence coordinate.
-For every pipeline packet, also require the absolute canonical regular
-non-symlink `workspace_write_scope_path` and closed
-`workspace_write_coordinates`. Validate the scope before packet reads and call
-its `authorize` operation with the exact path and `create|replace|append`
-before every workspace write. The packet assigns only the mode's exact testing
-artifacts (`02-regression-test.md`, `03-testing.md`, a test contract, or a
-bounded command result as applicable); every other workspace path is
-read-only. A missing or rejected authorization blocks as
-`workspace-write-undeclared`. An authorized `create` must use exclusive
-creation and abort on `EEXIST`; `replace` and `append` require an existing
-target. Repository-owned test files remain governed by
-the task's `Files:` ownership, not by workspace coordinates.
+Read and apply `agents/_shared/dispatch-contract.md` § "Pipeline specialist
+reference" before any OpenSpec-bound action. After readiness, repository test
+edits stay inside capsule ownership, evidence roots remain coordinate-only and
+read-only, and every workspace write requires the capsule's exact write-scope
+authorization. No role name implies report ownership. Task-intent identity is
+never a source-content digest.
+
+Use TH artifacts for routing and evidence controls, never as paraphrased
+behavioral intent. OpenSpec validation is supplemental; executable evidence
+remains yours and cannot release a gate or select pipeline state. Evidence
+reads remain sequential and bounded to the capsule's exact pointer, anchor, or
+file coordinate.
 The exact `--output` flag is mandatory; a positional result path is
 `ARGUMENT_INVALID`. Accept evidence only when the CLI process status is zero
 and the receipt or hash-verified envelope says `outcome: completed`,

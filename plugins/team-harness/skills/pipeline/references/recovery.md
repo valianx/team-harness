@@ -298,17 +298,21 @@ another binding's authorization to make the aggregate pass.
 
 If recovery finds a nonterminal implementation-or-later specialist attempt,
 reconstruct its attempt number, token, dispatch time, probe/ACK timestamps, and
-probe delivery state, continuation count, and declared owned/evidence paths
+`dispatch_ready_at`, probe delivery state, continuation count, and declared owned/evidence paths
 before waiting or replacing it. Feed that state to
 `scripts/specialist-liveness.mjs`; never reset the lease because Main restarted.
 Native send acceptance without an explicit receipt is `unconfirmed`; legacy
 v3.20.5 probe events lacking delivery state project to `unconfirmed`, never to
 `confirmed`. An expired attempt is interrupted before a read-only declared-path
 audit. When the helper returns `resume`, continue the same thread and token once
-with the unchanged packet and authority. Only a clean first attempt permits one
-fresh same-role replacement; a second continuation failure, confirmed-delivery
-partial progress, operator cancellation, or exhausted attempt `2` remains
-blocked, and Main never supplies a local role fallback.
+with the unchanged dispatch input and authority. When no `dispatch-ready` event
+exists, apply only `agents/_shared/dispatch-contract.md` § "Pipeline specialist
+reference": the start consumed no attempt/replacement budget, a clean audit
+pauses the same decision/reference, and recovery never loops redispatches. After
+readiness, only a clean first counted attempt permits one fresh same-role
+replacement; a second continuation failure, confirmed-delivery partial
+progress, operator cancellation, or exhausted attempt `2` remains blocked, and
+Main never supplies a local role fallback.
 
 At recovery into implementation, a missing/corrupt OpenSpec-derived plan
 index, shard, quality manifest, or overlay is eligible for the single
@@ -394,11 +398,29 @@ recovery event and updating `next_action`, load only the reference for the
 mapped phase. Findings and any tree change after Freeze follow the normal
 implementation → re-Freeze → validation route; recovery must not skip it.
 
-When `phase: implementation`, first validate that `test_contract_evidence`
+When `phase: implementation`, first validate `helper_bundle` through the
+workspace-local `helper-bundle.mjs verify`; after initial materialization no
+operation depends on the plugin cache remaining installed. If a legacy run has
+no bundle and the loaded package source still exists, materialize one before
+any nonce, decision, or dispatch. If the old cache vanished after an already
+consumed correction decision, a current package with the same
+`compatibility_epoch` may perform one atomic `helper.bundle.handoff` only when
+no specialist spawn/write followed that decision and re-certification proves
+the exact aggregate, task set, live source hashes, index, and evidence bytes
+unchanged. Preserve the decision reference and reversible state; this tooling
+handoff consumes no correction authority and changes no Gate-1 or product
+identity. Any changed semantic input, incompatible epoch, prior specialist
+progress, or failed verification blocks explicitly as
+`HELPER_BUNDLE_HANDOFF_INELIGIBLE`.
+
+Then validate that `test_contract_evidence`
 points to a bounded regular non-symlink `evidence/test-contracts.json`, that its
 SHA-256 matches `index_sha256`, and that its closed schema, task count, aggregate
-status, and four status counts match the state summary. Then validate each task
-entry before resuming the named task. `pending` resumes at the fresh tester
+status, four status counts, and required coverage counts match the state
+summary. Derive the required set from every accepted writable overlay and
+mechanically add only absent required rows as `pending`; never retain a legacy
+`pending: 0` summary as proof of coverage. Then validate each task entry before
+resuming the named task. `pending` resumes at the fresh tester
 dispatch; `red` requires readable contract and red-result files whose
 `contract_sha256` and `red_evidence_sha256` match the index before any
 implementer dispatch; `green` additionally requires matching
@@ -512,6 +534,12 @@ complete finding-ID set, implicated AC/TC requirement set, exact one-to-one
 disposition and deterministic closure check/expected result for every finding,
 evidenced file scope, `autonomous_correction_count`, and
 `operator_correction_count`. Before any correction authority has been consumed,
+invoke the bundled `openspec-recovery.mjs correction-wait-state` with the exact
+pending/nonce/decision/status/next-action fields and the observed active
+specialist count. A live nonce with no decision and zero active specialists
+must project `status: paused`; `in_progress` is repaired mechanically only to
+`paused`, preserving the nonce, package, authority, repositories, and evidence.
+Any other mismatch blocks with the helper's explicit code.
 Main may reconstruct mechanical coordinates from the frozen identity and the
 decision/findings ledgers, append an observation describing that recovery, and
 issue a fresh nonce. Before any budget decision, run the packaged recovery

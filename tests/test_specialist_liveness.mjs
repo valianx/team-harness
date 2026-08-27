@@ -26,6 +26,7 @@ function input(overrides = {}) {
     dispatched_at: start,
     now: at(0),
     agent_status: "running",
+    dispatch_ready_at: start,
     probe_sent_at: null,
     heartbeat: null,
     owned_paths_changed: false,
@@ -56,6 +57,23 @@ const silent = evaluateSpecialistLiveness(input({
 }));
 assert.equal(silent.action, "interrupt");
 assert.equal(silent.failure_kind, "specialist-probe-delivery-unconfirmed");
+
+const preReadySilent = evaluateSpecialistLiveness(input({
+  dispatch_ready_at: null,
+  now: at(12 * 60_000),
+  probe_sent_at: at(10 * 60_000),
+}));
+assert.equal(preReadySilent.action, "interrupt");
+assert.equal(preReadySilent.failure_kind, "specialist-start-unconfirmed");
+
+const preReadyHeartbeat = evaluateSpecialistLiveness(input({
+  dispatch_ready_at: null,
+  now: at(11 * 60_000),
+  probe_sent_at: at(10 * 60_000),
+  heartbeat: { attempt_token: token, received_at: at(11 * 60_000), checkpoint: "Still starting." },
+}));
+assert.equal(preReadyHeartbeat.action, "interrupt");
+assert.equal(preReadyHeartbeat.failure_kind, "specialist-start-unconfirmed");
 
 const deliveredSilent = evaluateSpecialistLiveness(input({
   now: at(12 * 60_000),
@@ -104,6 +122,30 @@ for (const status of ["completed", "failed", "blocked"]) {
 const replace = evaluateSpecialistLiveness(input({ agent_status: "interrupted" }));
 assert.equal(replace.action, "replace");
 assert.equal(replace.replacement_attempt, 2);
+
+const preReadyClean = evaluateSpecialistLiveness(input({
+  agent_status: "interrupted",
+  dispatch_ready_at: null,
+}));
+assert.equal(preReadyClean.action, "pause");
+assert.equal(preReadyClean.failure_kind, "specialist-start-unconfirmed");
+assert.equal(preReadyClean.replacement_attempt, null);
+
+const preReadySecondStart = evaluateSpecialistLiveness(input({
+  agent_status: "interrupted",
+  attempt: 2,
+  dispatch_ready_at: null,
+}));
+assert.equal(preReadySecondStart.action, "pause");
+assert.notEqual(preReadySecondStart.error_code, "SPECIALIST_RETRY_EXHAUSTED");
+
+const preReadyDirty = evaluateSpecialistLiveness(input({
+  agent_status: "interrupted",
+  dispatch_ready_at: null,
+  owned_paths_changed: true,
+}));
+assert.equal(preReadyDirty.action, "block");
+assert.equal(preReadyDirty.error_code, "SPECIALIST_PROGRESS_BEFORE_READY");
 
 const dirty = evaluateSpecialistLiveness(input({ agent_status: "interrupted", owned_paths_changed: true }));
 assert.equal(dirty.action, "block");
@@ -162,6 +204,7 @@ assert.equal(evaluateSpecialistLiveness(input({
   probe_delivered_at: at(10 * 60_000),
 })).error_code, "ARGUMENT_INVALID");
 assert.equal(evaluateSpecialistLiveness(input({ unexpected: true })).error_code, "ARGUMENT_INVALID");
+assert.equal(evaluateSpecialistLiveness(input({ dispatch_ready_at: at(1) })).error_code, "ARGUMENT_INVALID");
 assert.equal(evaluateSpecialistLiveness(input({
   agent_status: "interrupted",
   owned_paths_changed: true,

@@ -108,11 +108,11 @@ still consumes one single-use authorization. Only a `gate1-autonomous` decision
 consumes the max-3 autonomous budget; an `operator-live` decision increments
 the separate unbounded operator counter.
 
-Only in this explicitly activated pipeline, preflight resolves the helper's
-absolute path relative to the loaded pipeline skill/reference and fails closed
-if unavailable; include it in each validation role packet only as
-`bounded_command_path`. Never persist that value in state, events, reports,
-summaries, or workspace artifacts. Before execution, Main, tester, QA, and
+Only in this explicitly activated pipeline, preflight verifies `helper_bundle`
+and resolves the helper's absolute path from that immutable workspace copy;
+include it in each validation role packet only as `bounded_command_path`.
+Persist only the bundle manifest coordinate/identity, never the resolved path,
+in state, events, reports, or summaries. Before execution, Main, tester, QA, and
 security classify expected output volume from the known command scope and
 output mode. Routine commands with expected small, bounded results run
 directly, including targeted reads/searches, concise status checks, and focused

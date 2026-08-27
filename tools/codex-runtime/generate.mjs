@@ -35,6 +35,19 @@ function assertUniqueStringArray(value, label, { nonEmpty = false } = {}) {
   return seen;
 }
 
+function markdownSection(document, heading, label) {
+  const marker = `## ${heading}\n`;
+  const start = document.indexOf(marker);
+  if (start < 0 || document.indexOf(marker, start + marker.length) >= 0) {
+    fail(`${label} must contain exactly one ${marker.trim()} section`);
+  }
+  const bodyStart = start + marker.length;
+  const next = document.indexOf("\n## ", bodyStart);
+  const body = document.slice(bodyStart, next < 0 ? document.length : next).trim();
+  if (body === "") fail(`${label} section ${heading} is empty`);
+  return body;
+}
+
 function repositoryPath(rootDir, path, label) {
   assertNonEmptyString(path, label);
   if (isAbsolute(path) || path.includes("\\")) fail(`${label} must be a repository-relative POSIX path`);
@@ -292,6 +305,12 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
 
   const selectedProfileName = profileName ?? contract.default_profile;
   const profile = validateProfile(contract, selectedProfileName, usedProjectionTiers, allowedRuntimeReasoningEfforts);
+  const dispatchContractSource = "agents/_shared/dispatch-contract.md";
+  const specialistDispatch = markdownSection(
+    await readFile(repositoryPath(rootDir, dispatchContractSource, "specialist dispatch contract"), "utf8"),
+    "Pipeline specialist reference",
+    dispatchContractSource,
+  );
   const files = new Map();
   for (const agent of validatedAgents) {
     const sourcePath = repositoryPath(rootDir, agent.instruction_source, `${agent.name}.instruction_source`);
@@ -302,6 +321,13 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
       fail(`${agent.name}: cannot read instruction source: ${error.message}`);
     }
     if (instructions === "") fail(`${agent.name}: instruction source is empty`);
+    if (["implementer", "tester"].includes(agent.role)) {
+      instructions = [
+        "## Canonical pipeline specialist reference",
+        specialistDispatch,
+        instructions,
+      ].join("\n\n");
+    }
 
     const generated = [
       "# Code generated from runtime/schema/codex-agents.json; DO NOT EDIT.",

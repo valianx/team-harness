@@ -347,7 +347,8 @@ One taxonomy for everything that can go wrong, so the budget question is answere
 | `failure_kind` | The observable cause | Owner | Budget | On exhaustion |
 |---|---|---|---|---|
 | `transport` | The `Task` call itself errored — the harness failed and no specialist result was ever produced | you | retry exactly once | STOP the phase; report the harness's **literal** error message, never paraphrased. No workaround that bypasses the specialist |
-| `specialist-unresponsive` | An implementation-or-later specialist exceeded its role SLA and then returned neither a matching checkpoint ACK nor a terminal result before the deterministic liveness lease expired | native attempt | interrupt, audit only declared owned/evidence paths, then at most one fresh same-role replacement when the audit is clean | `status: blocked` as `specialist-interrupted-with-progress` when any declared path changed, or `specialist-retry-exhausted` after a clean second attempt; Main never performs the specialist work |
+| `specialist-start-unconfirmed` | An implementer/tester never returned `dispatch-ready` before its liveness lease expired | dispatch transport | apply only `agents/_shared/dispatch-contract.md` § "Pipeline specialist reference"; no attempt or replacement budget exists yet | clean audit pauses the same decision/reference without automatic redispatch; progress is a contract violation |
+| `specialist-unresponsive` | After `dispatch-ready`, an implementation-or-later specialist exceeded its role SLA and then returned neither a matching checkpoint ACK nor a terminal result before the deterministic liveness lease expired | counted native attempt | interrupt, audit only declared owned/evidence paths, then at most one fresh same-role replacement when the audit is clean | `status: blocked` as `specialist-interrupted-with-progress` when any declared path changed, or `specialist-retry-exhausted` after a clean second counted attempt; Main never performs the specialist work |
 | `invalid-return` | A result came back, but a decision-bearing fact is absent or ambiguous after the coordinator has normalized any unambiguous formatting defect from the returned evidence | the specialist | re-dispatch once, naming the unresolved fact | STOP only when the fact remains ambiguous; never invent evidence or a result |
 | `stale-context` | A snapshot-bound result names a missing or different reviewed head/context identity than its dispatch | review coordinator | no retry against the old snapshot; recapture and re-dispatch under the owning freshness barrier | STOP without publishing if a fresh snapshot cannot be established |
 | `artifact-missing` | A required output **file** is absent, empty, or unparseable while the dispatch reported success | the owning specialist | re-dispatch once | STOP; never author the missing artifact yourself |
@@ -458,7 +459,20 @@ intent/scope/AC contradiction to resolve first—never as a silent waiver.
 2. **Contradiction → resolve before authorization.** Present the conflicting requirements and costs. Only the operator may resolve them; architect work still requires a separate explicit request.
 3. **Mechanical and enumerated → include together.** Do not split them into micro-rounds; one authorization covers the complete named `resolve` package and scope.
 4. **Mixed set → preserve all findings.** Resolve decision-bearing items first, then present one correction decision over the resulting complete package. Never dispatch a mechanical subset while another finding remains undecided.
-5. **Persist and authorize.** After every disposition is explicit, persist one `correction_package` for the final `resolve` set and generate a fresh nonce. When every finding is an unambiguous in-scope `resolve`, the package is complete, no decision-bearing or ambiguous item remains, and `autonomous_correction_count < 3`, Main records one package-bound `gate1-autonomous` authorization without a live presentation and consumes that single decision through the same correction route. When any eligibility conjunct fails, show exactly the following choices and stop:
+5. **Resolve before authority.** Give the bundled
+   `correction-packet-preflight.mjs certify` only the exact aggregate, service,
+   selected task set, role/mode, correction target paths, immutable
+   helper/evidence references, and declared workspace writes. The resolver
+   derives each target path's unique owner task and validates every root,
+   source, seal, live hash, test artifact, quality command, helper, and scope,
+   then returns one immutable content-addressed `dispatch_reference`. Main does
+   not serialize those derived fields into the specialist prompt. `repair-index`
+   adds only missing `pending` rows; Main recomputes coverage and closes every
+   required RED/GREEN row before retrying. Persist the passing reference in
+   `correction_dispatch_reference`; failure creates no nonce and consumes no
+   authority. Re-certify immediately before spawn and require the same
+   `scope_identity_sha256`.
+6. **Persist and authorize.** After every disposition is explicit and certification passes, persist one `correction_package` for the final `resolve` set and generate a fresh nonce. When every finding is an unambiguous in-scope `resolve`, the package is complete, no decision-bearing or ambiguous item remains, and `autonomous_correction_count < 3`, Main records one package-bound `gate1-autonomous` authorization without a live presentation and consumes that single decision through the same correction route. When any eligibility conjunct fails, show exactly the following choices and stop:
 
 ```text
 1 — authorize one correction round
@@ -509,10 +523,14 @@ work after Gate 1.
 Live choice `1`, or one eligible autonomous decision, records both the state decision and
 one `correction.decision` event before dispatch. The consumed nonce becomes its
 `decision_ref`; this sole authority record carries the complete correction
-package, `correction_authority`, and authority Gate nonce. The one
-`iteration.start` and one `agent.correction.spawn` carry only that ref plus
-ordinary observations. Autonomous authority carries the exact consumed Gate-1
-nonce; operator-live carries null. It may not narrow to one finding, widen scope, or reuse an old nonce. After the
+package, `correction_authority`, authority Gate nonce, and exact
+canonical `team_harness_dispatch_reference` defined in
+`agents/_shared/dispatch-contract.md`. The specialist prompt carries only that
+reference plus ordinary correlation. Read and apply
+`agents/_shared/dispatch-contract.md` § "Pipeline specialist reference" for
+readiness, attempt start, and pre-ready recovery. Autonomous
+authority carries the exact consumed Gate-1 nonce; operator-live carries null.
+It may not narrow to one finding, widen scope, or reuse an old nonce. After the
 bounded implementation/evidence work, require a recorded PASS for every package closure check
 before any tester refresh or Freeze. Missing or failed closure evidence is `correction-incomplete`:
 do not dispatch tester, create a Freeze, or spend a final validation fan. After successful closure,
@@ -566,16 +584,18 @@ That helper is the only silence-to-action classifier:
    role SLA. A stale or mismatched token grants nothing. No second probe or
    renewal exists.
 3. On an `interrupt` decision, call the native interrupt operation and confirm
-   terminal interruption. Only then inspect the role packet's declared owned
+   terminal interruption. Only then inspect the capsule's declared owned
    file paths and expected evidence paths read-only; do not inspect arbitrary
    partial artifacts or dispatch a concurrent writer.
 4. Preserve the helper's `interruption_cause`. When delivery was unconfirmed
    and the declared audit finds work or evidence, send exactly one
    `TH-LIVENESS-RESUME` to the same thread and attempt token with the unchanged
-   packet and decision reference; this does not consume new correction
+   dispatch reference and decision reference; this does not consume new correction
    authority. A second such interruption, progress after confirmed delivery,
    or operator cancellation blocks as `specialist-interrupted-with-progress`.
-   A clean first attempt permits one fresh same-role replacement with
+   If no `dispatch-ready` was recorded, stop here and apply only
+   `agents/_shared/dispatch-contract.md` § "Pipeline specialist reference". After
+   readiness, a clean first counted attempt permits one fresh same-role replacement with
    `fork_turns: none` and attempt `2`; a clean second attempt blocks as
    `specialist-retry-exhausted`.
 
@@ -1130,8 +1150,11 @@ This checkpoint is task-gated and creates no phase or gate. A task with
 `Pre-implementation test: required` must have a workspace quality manifest
 whose `commands.test` is an exact argv array and whose
 `test_contract.path_rules` declares test-only paths. Main resolves
-`quality-runner.mjs` and `test-transition.mjs` relative to the loaded pipeline
-skill/reference and fails closed if the manifest or either helper is absent.
+`helper-bundle.mjs` relative to the loaded pipeline skill/reference, materializes
+the closed helper set below the workspace, persists its manifest identity, and
+then resolves `quality-runner.mjs` and `test-transition.mjs` only from that
+verified immutable bundle. Plugin-cache paths are bootstrap-only; a missing or
+stale bundle fails closed before authority or dispatch.
 The manifest path is absolute
 `<workspace>/.team-harness/quality.json`, a regular non-symlink below the
 workspace. Every helper call passes the absolute `--workspace` and
@@ -1171,13 +1194,11 @@ that future RED. Syntax, fixture, upstream-validation, pending-dependency,
 infrastructure, unrelated-suite, or already-green failure blocks; agent prose
 cannot override the machine result or justify weakening production validation.
 
-Before RED and the first implementer dispatch, Main runs every task-required
-non-test quality control separately as a non-authoritative readiness diagnostic
-and lets every selected invocation reach a terminal result after failures. It
-persists all results, clusters duplicate symptoms by root cause, and creates one
-complete initial package with closure checks. Missing infrastructure blocks;
-expected not-yet-implemented behavior stays in that package. No dispatch is
-legal from the first visible failure or while a declared diagnostic is pending.
+Before RED and implementer dispatch, apply the single readiness and authorized
+dirty-progress recovery contract in
+`skills/pipeline/references/implementation.md` §§ "Pre-implementation
+behavioral test contract" and "Authorized dirty-progress recovery". Do not
+restate or specialize those routes here.
 
 The implementer receives the contract/red evidence pointers and hashes and may
 not edit or delete their test paths. After implementation, Main runs the same
@@ -1192,19 +1213,13 @@ and aggregate status in `test_contract_evidence` state. `not-applicable` is
 valid only when the task shard already carries its plan-time reason;
 implementation never infers or rewrites that decision.
 
-A manifest change limited to non-test controls preserves an identical RED/GREEN
-test binding but invalidates the affected readiness and final full-manifest
-quality evidence. A test-binding or other frozen-input change requires a new
-RED. Before any later correction, complete every selected closure/readiness
-diagnostic and consolidate all newly observed findings into one package.
-
 **OpenSpec-bound dispatch.** Before every implementer or tester dispatch, verify the immutable
 Gate-1 `inputs/openspec-snapshot.json`, `plan/openspec-traceability.json`, and separate
 `inputs/openspec-progress.json`; any unapproved source-intent drift blocks. Resolve bounded
 `openspec instructions apply --change <bound-change> --json` guidance for the implementer without
-granting it lifecycle authority. The packet carries the inseparable absolute
-`openspec_snapshot: {path, sha256}` binding, the assigned TH execution item/shard, and only its
-pinned task/design coordinates with source path, line, and captured content hash. After success,
+granting it lifecycle authority. The immutable capsule owns the snapshot,
+assigned TH execution item/shard, and pinned task/design coordinates; the
+specialist prompt carries only its reference and correlation. After success,
 only assigned pending-to-complete task coordinates may advance through the packaged atomic
 `verify-progress` operation. That operation changes only `inputs/openspec-progress.json`; snapshot
 bytes, snapshot SHA-256, artifact-set SHA-256, and the approved overlay remain unchanged.
@@ -1225,17 +1240,17 @@ a new gate. Missing canonical judgment, any identity drift, prior work, or a
 failed/rolled-back repair is `DERIVED_REPAIR_INELIGIBLE`; do not infer fields or
 auto-dispatch architect. Only a separate explicit live operator request can
 reopen Design.
-After repair and before constructing the first specialist packet for a service,
+After repair and before certifying the first specialist capsule for a service,
 Main runs `openspec-bindings.mjs seal-dispatch`. Repair and sealing share one
 create-only per-service lock: `DERIVED_SET_BUSY` publishes no packet, while a
 successful permanent `inputs/openspec/<service>/dispatch-binding.json` makes
 all later repair ineligible. The seal binds the aggregate, Gate, optional
 migration continuation, snapshot, overlay, plan, workspace quality manifest,
-and every overlay-declared shard. Every fresh initial/correction dispatch runs
-`verify-dispatch`, carries the absolute/hash-matched
-`derived_dispatch_binding: {path, sha256}`, and proves its shard appears exactly
-once with the supplied artifact hash. Any post-seal mismatch is
-`DISPATCH_BINDING_STALE`; never rehash, rebind, or resend against changed bytes.
+and every overlay-declared shard. For every fresh initial/correction dispatch,
+the canonical resolver verifies the permanent seal and embeds the selected
+shard coordinates in the immutable capsule. The specialist prompt carries only
+the capsule reference. Any post-seal mismatch is `DISPATCH_BINDING_STALE`;
+never rehash, rebind, or dispatch against changed bytes.
 When Design and implementation use different checkouts, Main first materializes
 the exact snapshot-bound canonical source set below the implementation
 repository and verifies its hashes. Every created or changed
@@ -1855,7 +1870,7 @@ that was broken or not substantively covered cannot proceed as a concern.
 
 Validation advance → `waiting_gate3`. Fail on either conjunct → read all required bounded
 result artifacts and consolidate once; then either record the eligible autonomous decision or
-persist `correction_pending: true` with the exact finding IDs, requirements, closure checks,
+persist `correction_pending: true` and `status: paused` with the exact finding IDs, requirements, closure checks,
 expected results, and union scope, present the fresh live decision, and stop.
 
 ### Iteration

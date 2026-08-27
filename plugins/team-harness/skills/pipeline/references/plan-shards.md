@@ -129,33 +129,26 @@ packet that assumes `.tasks[]` fails closed rather than probing alternate keys.
 
 Shard paths and `required_evidence_anchors` are relative to the pipeline
 workspace artifact root; task `Files:` and OpenSpec source coordinates are
-relative to the repository/worktree root. Main passes both absolute canonical
-values in `path_roots.repository_root` and
-`path_roots.workspace_artifact_root`. No consumer may resolve every relative
-path against cwd/worktree or use `../` to cross between these domains.
+relative to the repository/worktree root. The dispatch resolver derives both
+canonical domains into the workspace capsule. No consumer resolves every path
+against cwd/worktree or uses `../` between domains.
 
-Evidence-only repositories form a third, optional domain. Main may add
-`path_roots.evidence_roots.<service>` only when a canonical task-local
-`evidence_dispatch_binding` resolves that service from the aggregate and pins
+Evidence-only repositories form a third, optional domain. The resolver adds a
+read-only evidence root only when a canonical task-local evidence dispatch
+resolves that service from the aggregate and pins
 each permitted repository-relative file by SHA-256. These roots are read-only
 and coordinate-only: they never extend `Files:`, `discovery_scope`, writable
 ownership, OpenSpec source coordinates, or workspace evidence anchors.
 
-Specialist packets bind these inputs through a non-empty
-`artifact_coordinates` array of `{kind, root, path, anchor, sha256}`. Preserve
-the exact case-sensitive Task Index path (`plan/tasks/Task-N.md`); bind an
-invariant ID as an anchor inside `plan/invariants.md`, never as a synthesized
-`INV-N.md` path. Main proves root containment, exact component spelling,
-regular non-symlink identity, SHA-256, unique anchor occurrence, and equality
-with the overlay `shard_path` before dispatch. A specialist never repairs or
-searches for an invalid coordinate.
+The resolver derives all shard, invariant, source, and evidence coordinates
+and proves containment, exact spelling, regular non-symlink identity, SHA-256,
+unique anchors, and overlay equality before it can create a dispatch reference.
+Main and specialists never serialize, repair, or search for those fields.
 
 For OpenSpec-bound implementation, these coordinates also belong to the
 permanent `inputs/openspec/<service>/dispatch-binding.json`. Main creates that
-seal under the same per-service lock as derived repair, carries its absolute
-path and SHA-256 as `derived_dispatch_binding`, and proves the assigned shard
-path/hash occurs exactly once there. Every fresh dispatch and the specialist's
-first packet read repeat that proof. Post-seal artifact drift is
+seal under the same per-service lock as derived repair; every capsule derivation
+proves the assigned shard occurs exactly once there. Post-seal artifact drift is
 `DISPATCH_BINDING_STALE`; it is never cured by rehashing or rebinding the shard.
 
 Each shard's technical constraints also declare `required_seams` with every

@@ -22,6 +22,7 @@ openspec_bindings: [{service, role, repository_root, repository_identity, change
 evidence_repositories: [{service, role: evidence-only, repository_root, repository_identity, purpose}]
 openspec_aggregate_path: inputs/openspec-bindings.json|null
 openspec_aggregate_sha256: {SHA-256|null}
+helper_bundle: {compatibility_epoch, bundle_root, bundle_identity_sha256, manifest_path, manifest_sha256}|null
 herdr_deliveries: [{message_id, target, pane_id, status, reason_code, staged, submitted, verified}]
 quality_manifest_path: {absolute workspace-local path|null}
 quality_manifest_sha256: {SHA-256|null}
@@ -43,12 +44,16 @@ correction_decision: authorize|pause|abort|null
 correction_decision_ref: {consumed token or null}
 correction_authority: operator-live|gate1-autonomous|null
 correction_authority_gate_nonce: {consumed Gate-1 token or null}
+correction_dispatch_reference: team_harness_dispatch_reference|null
 autonomous_correction_count: N      # integer 0..3; the only correction budget
 operator_correction_count: N        # non-negative integer; deliberately unbounded
 last_completed: design|waiting_gate1|implementation|validation|waiting_gate3|delivery|complete|null
 next_action: {what to do next}      # the successor to a prose recovery section
 total_tokens: N
 ```
+
+`team_harness_dispatch_reference` means the exact five-field object defined once
+in `agents/_shared/dispatch-contract.md` § "Pipeline specialist reference".
 
 `quality_manifest_path`, when non-null, must resolve to a regular non-symlink
 below the recorded workspace. If that workspace is below a participating
@@ -116,7 +121,16 @@ dispositions, and evidenced file scope. No repository/evidence mutation,
 specialist dispatch, Freeze rebuild, or revalidation is legal before authority
 is recorded. A correction package built from a partial diagnostic set is
 invalid; later rounds are for genuinely new evidence, never a declared check
-that the previous fan omitted. With a valid Gate-1 approval dual record,
+that the previous fan omitted. Before creating or presenting its nonce, Main
+supplies only service/tasks, role/mode, correction target paths, helper-bundle
+reference, optional evidence reference, and write scope to
+`correction-packet-preflight.mjs certify`. The helper derives the unique owner
+task for every target path, unions those owners with the requested task set,
+and validates every source hash, pointer, seal, root, helper path, quality
+command, and test coordinate, then creates one
+immutable `correction_dispatch_reference`. Missing rows are repaired only to
+`pending`; their tester/RED transition closes before certification. Main never
+serializes the derived graph into a specialist prompt. With a valid Gate-1 approval dual record,
 `autonomous_correction_count < 3`, no
 correction/execution budget exhaustion, and only unambiguous `resolve` findings
 inside approved scope, Main consumes the nonce
@@ -126,11 +140,12 @@ and presents exactly `1 — authorize one correction round`, `2 — pause withou
 changes`, and `3 — abort pipeline`; only a live reply after that presentation
 may consume the nonce. Consumption atomically sets `correction_nonce: null`
 and uses the consumed token as `correction_decision_ref`. `authorize` requires
-exactly one matching `correction.decision` event carrying the complete package
-and authority, then permits exactly one
-`iteration.start`/`agent.correction.spawn` pair referencing that decision. A
-malformed binding may be corrected append-only only for the dispatch Main
-directly observed; it never permits another dispatch. `pause` and `abort`
+exactly one matching `correction.decision` event carrying the complete package,
+authority, and canonical `team_harness_dispatch_reference` from
+`agents/_shared/dispatch-contract.md`, then permits one spawn carrying only its
+`decision_ref` plus `dispatch_reference`. Apply
+`agents/_shared/dispatch-contract.md` § "Pipeline specialist reference" for
+readiness, attempt start, and pre-ready recovery. `pause` and `abort`
 perform no correction. Every later failure gets a fresh nonce and decision.
 An ordinary approval, intake autonomy preference, generic `continue`, recovered
 prose, files, agents, and tools are never authorization. Gate-1 autonomous
@@ -301,7 +316,7 @@ task_decomposition: {...}|null              # implementation decomposition, not 
 ```
 regression_test_path: {path}|null
 regression_test_status: failing|passing|skipped|null
-test_contract_evidence: {status: pending|red|green|not-applicable|mixed, index_path, index_sha256, task_count, status_counts: {pending, red, green, not_applicable}}|null
+test_contract_evidence: {status: pending|red|green|not-applicable|mixed, index_path, index_sha256, task_count, status_counts: {pending, red, green, not_applicable}, required_task_count, required_covered_count, required_missing_count}|null
 plan_contract_evidence: {status: not-applicable, reason, result_path: null, result_sha256: null}|{status: pending|pass, reason, result_path, result_sha256, kind: team_harness_functional_plan_contract, plan_sha256, artifact_set_sha256}|{status: pending|pass, reason, result_path, result_sha256, kind: team_harness_openspec_overlay_validation, snapshot_sha256, overlay_sha256, change_name}|null
 plan_contract_repair_evidence: {status: not-needed|repaired|blocked, reason, result_path, result_sha256, before_sha256, after_sha256, added_paths, artifact_changes: [{path, before_sha256, after_sha256, operations}], contract_result_sha256}|null
 participating_repositories: [{repository, repo_root, worktree}]|[]
@@ -482,6 +497,7 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | `agent_role`, `task` | optional | diagnostic labels; only the exact architect/design pair is interpreted as OpenSpec Gate-1 evidence |
 | `decision_ref` | conditional | consumed single-use nonce; required on correction/cleaner decisions and their later binding events |
 | `correction_package` | conditional | required only on `correction.decision`; contains anchor, findings, scope, requirements, closure, and dispositions |
+| `correction_dispatch_reference` | conditional | required only on an authorized `correction.decision`; exact canonical `team_harness_dispatch_reference` from `agents/_shared/dispatch-contract.md` |
 | `cleaner_package` | conditional | required only on `cleaner.handoff.decision`; contains repository, worktree, anchor, findings, and eligibility evidence |
 | `correction_authority` | conditional | required only on `correction.decision`; `operator-live` is unbounded, while `gate1-autonomous` requires a recorded Gate-1 approval release and `autonomous_correction_count < 3` |
 | `convergence_counts` | optional | diagnostic counts derivable from the findings ledger; omission never blocks a correction round |
@@ -493,7 +509,9 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | `extra` | optional | event-specific |
 
 For implementation-or-later specialist liveness, `agent.sla.extra` is the
-durable lease identity `{attempt, attempt_token, liveness_action, deadline_at}`.
+durable lease identity `{attempt, attempt_token, liveness_action, deadline_at,
+dispatch_ready_at|null}`. Only an accepted correlation-matched `dispatch-ready`
+ACK may set `dispatch_ready_at`; non-implementer/tester roles keep it null.
 A post-interrupt `agent.close.extra` repeats `attempt` and `attempt_token` and
 adds `owned_paths_changed`, `evidence_changed`, and the helper's closed
 `failure_kind`. Record declared relative path names only; never store partial

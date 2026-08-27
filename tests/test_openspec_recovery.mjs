@@ -9,6 +9,7 @@ import path from "node:path";
 import {
   normalizeOpenSpecRecoveryState,
   reconcileCorrectionCounters,
+  reconcileCorrectionWaitState,
   recoverOpenSpecDesign,
 } from "../skills/pipeline/scripts/openspec-recovery.mjs";
 
@@ -166,6 +167,29 @@ await use(async ({ workspace }) => {
   assert.equal(verified.verdict, "pass");
   console.log("  [PASS] recovery projects correction budgets exactly from durable authority decisions");
 });
+
+{
+  const liveChoice = {
+    correction_pending: true,
+    correction_nonce: "90580e70623f731fd448824e2955607e",
+    correction_decision: null,
+    correction_decision_ref: null,
+    status: "in_progress",
+    next_action: "await live choice",
+    active_specialist_count: 0,
+  };
+  const repaired = reconcileCorrectionWaitState(liveChoice);
+  assert.equal(repaired.verdict, "repair");
+  assert.equal(repaired.error_code, "CORRECTION_WAIT_STATUS_MISMATCH");
+  assert.deepEqual(repaired.state_patch, { status: "paused" });
+  const verified = reconcileCorrectionWaitState({ ...liveChoice, ...repaired.state_patch });
+  assert.equal(verified.verdict, "pass");
+  assert.equal(verified.state_patch, null);
+  const active = reconcileCorrectionWaitState({ ...liveChoice, active_specialist_count: 1 });
+  assert.equal(active.verdict, "blocked");
+  assert.equal(active.error_code, "CORRECTION_WAIT_SPECIALIST_ACTIVE");
+  console.log("  [PASS] recovery repairs only status for a live unconsumed correction choice");
+}
 
 await use(async ({ workspace }) => {
   const decisions = Array.from({ length: 4 }, (_, index) => ({

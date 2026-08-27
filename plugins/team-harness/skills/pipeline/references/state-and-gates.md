@@ -70,6 +70,7 @@ evidence_repositories: [{service, role: evidence-only, repository_root, reposito
 evidence_dispatch_bindings: [{service, task_shard_path, role: implementer|tester|null, generation: 1|2, path, sha256, dispatch_identity_sha256}]
 openspec_aggregate_path: inputs/openspec-bindings.json|null
 openspec_aggregate_sha256: {SHA-256|null}
+helper_bundle: {compatibility_epoch, bundle_root, bundle_identity_sha256, manifest_path, manifest_sha256}|null
 herdr_deliveries: [{message_id, target, pane_id, status, reason_code, staged, submitted, verified}]
 activation: explicit
 type: feature|fix|refactor|hotfix|enhancement
@@ -105,6 +106,7 @@ correction_decision: authorize|pause|abort|null
 correction_decision_ref: {consumed token or null}
 correction_authority: operator-live|gate1-autonomous|null
 correction_authority_gate_nonce: {consumed Gate-1 token or null}
+correction_dispatch_reference: team_harness_dispatch_reference|null
 autonomous_correction_count: N
 operator_correction_count: N
 usage_schema_version: 1|null
@@ -124,7 +126,7 @@ release_policy: auto-ship|null
 gate3_release: ship|auto-ship|amend|abort|null
 regression_test_path: {path}|null
 regression_test_status: failing|passing|skipped|null
-test_contract_evidence: {status: pending|red|green|not-applicable|mixed, index_path, index_sha256, task_count, status_counts: {pending, red, green, not_applicable}}|null
+test_contract_evidence: {status: pending|red|green|not-applicable|mixed, index_path, index_sha256, task_count, status_counts: {pending, red, green, not_applicable}, required_task_count, required_covered_count, required_missing_count}|null
 plan_contract_evidence: {status: not-applicable, reason, result_path: null, result_sha256: null}|{status: pending|pass, reason, result_path, result_sha256, kind: team_harness_functional_plan_contract, plan_sha256, artifact_set_sha256}|{status: pending|pass, reason, result_path, result_sha256, kind: team_harness_openspec_overlay_validation, snapshot_sha256, overlay_sha256, change_name}|null
 plan_contract_repair_evidence: {status: not-needed|repaired|blocked, reason, result_path, result_sha256, before_sha256, after_sha256, added_paths, artifact_changes: [{path, before_sha256, after_sha256, operations}], contract_result_sha256}|null
 participating_repositories: [{repository, repo_root, worktree}]|[]
@@ -153,14 +155,19 @@ delivery_base_status: {base_ref, freeze_base_sha, remote_base_sha: {full SHA}|nu
 delivery_preview: {pr title, workspace paths, and SHA-256 digests bound to Gate 3}|null
 ```
 
+`team_harness_dispatch_reference` means the exact five-field object defined once
+in `agents/_shared/dispatch-contract.md` § "Pipeline specialist reference".
+
 New runs always set `obsidian_sync: null` and `obsidian_export_target: null`.
 The two fields remain only so recovery can honor legacy export-armed snapshots
 without rewriting their state schema.
 
 Specialist liveness remains append-only event state rather than a mutable
 coordinator-state field. `agent.sla.extra` records `{attempt, attempt_token,
-liveness_action, deadline_at, probe_delivery_state,
-probe_delivered_at|null, continuation_count}`. A successful native message call
+liveness_action, deadline_at, dispatch_ready_at|null, probe_delivery_state,
+probe_delivered_at|null, continuation_count}`. Only an accepted
+correlation-matched implementer/tester readiness ACK sets `dispatch_ready_at`;
+other roles keep it null. A successful native message call
 without an explicit delivery/read receipt records `unconfirmed`; a matching ACK
 itself proves delivery. After interruption, `agent.close.extra` repeats the
 identity and records `owned_paths_changed`, `evidence_changed`,
@@ -212,6 +219,13 @@ only the latest result per role. The complete file must stay ≤160 lines and
 ≤16 KB. Update existing fields in place; do not grow narrative inside the
 snapshot.
 
+`helper_bundle` binds the immutable workspace-local copy produced by
+`helper-bundle.mjs materialize`. `bundle_root` and `manifest_path` are
+workspace-relative; the other fields bind exact bytes and the compatibility
+epoch. Resolve operational helper paths only from a fresh `verify` pass over
+this manifest. Plugin-cache paths are bootstrap inputs only and are never
+durable operational coordinates.
+
 `test_contract_evidence` is always a bounded pointer and summary, never an
 inline per-task array. `index_path` names the workspace-owned
 `evidence/test-contracts.json` artifact and `index_sha256` binds its exact
@@ -220,8 +234,12 @@ with `task_id`, status, `not_applicable_reason`, `contract_path`,
 `contract_sha256`, `red_evidence_path`, `red_evidence_sha256`,
 `red_commit_sha`, `red_tree_sha`, `green_evidence_path`, and
 `green_evidence_sha256`. Main atomically replaces the artifact and recomputes
-the digest, task count, overall status, and four status counts after every task
-transition. This keeps the snapshot below 16 KB even at the maximum task count.
+the digest, task count, overall status, four status counts, and
+`required_task_count|required_covered_count|required_missing_count` after
+every task transition. The required set comes from every writable binding's
+accepted traceability overlay; `pending: 0` never proves complete coverage when
+a required row is absent. This keeps the snapshot below 16 KB even at the
+maximum task count.
 
 `worktree`, `worktree_branch`, and `worktree_base` are declared topology, not
 proof of creation. A worktree plan records all three before Gate 1 and keeps
@@ -358,6 +376,21 @@ below. Main's recommendation otherwise is never a decision;
 dispositions are durable does Main record the exact failed Freeze anchor,
 final `resolve` IDs and file scope.
 
+Before either autonomous consumption or a live correction presentation, Main
+must materialize/verify `helper_bundle`, invoke its
+`correction-packet-preflight.mjs certify`, and persist its single
+`correction_dispatch_reference`. Main supplies no derived hashes, pointers,
+seals, roots, or helper paths: the resolver computes and validates them with
+complete required-test coverage before content-addressing the capsule. It also
+derives the unique owner task for every correction target path and unions those
+owners with the requested set; missing or ambiguous ownership blocks here.
+`repair-index` may add only missing required rows as `pending`; close them
+before retrying. No correction nonce or authority exists until the resolver
+returns `dispatch-ready-before-authority`. Immediately before spawn, re-certify
+the same identity. Apply `agents/_shared/dispatch-contract.md` § "Pipeline
+specialist reference" for the sole readiness and pre-ready recovery contract;
+do not reproduce it in state transitions.
+
 The closed autonomous predicate requires every conjunct: a valid Gate-1
 approval dual record (`approved`; legacy `approved-autonomous` stays legible);
 `autonomous_correction_count < 3`; every blocking finding is `resolve`; every correction is
@@ -376,7 +409,8 @@ exact consumed Gate-1 release nonce in `correction_authority_gate_nonce`, and
 the incremented `autonomous_correction_count`, plus one
 `correction.decision` event carrying that `decision_ref`, the complete
 `correction_package`, `correction_authority: gate1-autonomous`, and the exact
-authority Gate nonce. Clear `correction_package` from state after appending the
+authority Gate nonce plus canonical `correction_dispatch_reference`. Clear
+`correction_package` from state after appending the
 decision. The one subsequent `iteration.start` and `agent.correction.spawn`
 carry only the same `decision_ref` plus their normal observation fields. This
 single decision record
@@ -397,6 +431,7 @@ correction_decision: null
 correction_decision_ref: null
 correction_authority: null
 correction_authority_gate_nonce: null
+correction_dispatch_reference: team_harness_dispatch_reference
 autonomous_correction_count: {integer 0..3}
 operator_correction_count: {non-negative integer, no maximum}
 ```
@@ -420,7 +455,8 @@ atomically records `correction_decision: authorize`, the consumed nonce in
 `correction_decision_ref`, `correction_authority: operator-live`,
 `correction_authority_gate_nonce: null`, `correction_pending: false`, and one matching
 `correction.decision` event carrying that `decision_ref`, the complete
-`correction_package`, and authority. Clear `correction_package` from state
+`correction_package`, authority, and canonical `correction_dispatch_reference`.
+Clear `correction_package` from state
 after appending the decision. It increments `operator_correction_count`
 exactly once, leaves `autonomous_correction_count` and `iteration` unchanged,
 and authorizes exactly one bounded correction over that complete package;

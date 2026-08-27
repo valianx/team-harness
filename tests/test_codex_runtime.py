@@ -19,6 +19,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 REGISTRY = ROOT / "runtime/schema/codex-agents.json"
 PROJECT_AGENTS = ROOT / ".codex/agents"
 PACKAGED_AGENTS = ROOT / "plugins/team-harness/skills/setup/assets/agents"
+DISPATCH_CONTRACT = ROOT / "agents/_shared/dispatch-contract.md"
 
 
 def require(condition: bool, message: str) -> None:
@@ -45,6 +46,14 @@ def run_check(argv: list[str]) -> None:
     )
 
 
+def markdown_section(document: str, heading: str) -> str:
+    marker = f"## {heading}\n"
+    require(document.count(marker) == 1, f"dispatch contract must contain one {heading} section")
+    body = document.split(marker, 1)[1].split("\n## ", 1)[0].strip()
+    require(bool(body), f"dispatch contract section {heading} is empty")
+    return body
+
+
 def check_registry_and_projections() -> None:
     contract = json.loads(REGISTRY.read_text(encoding="utf-8"))
     agents = contract.get("agents")
@@ -54,6 +63,10 @@ def check_registry_and_projections() -> None:
     require(len(names) == len(set(names)), "Codex agent registry contains duplicate names")
 
     declared_outputs: set[str] = set()
+    specialist_reference = markdown_section(
+        DISPATCH_CONTRACT.read_text(encoding="utf-8"),
+        "Pipeline specialist reference",
+    )
     for agent in agents:
         name = agent["name"]
         for key in ("description", "semantic_source", "instruction_source", "output_path", "sandbox_mode"):
@@ -76,10 +89,20 @@ def check_registry_and_projections() -> None:
         require(normalized == packaged_normalized, f"{name}: project/package projection drift")
         parsed = tomllib.loads(normalized.decode("utf-8"))
         require(parsed.get("sandbox_mode") == agent["sandbox_mode"], f"{name}: sandbox mode drift")
-        require(
-            parsed.get("developer_instructions") == instruction.read_text(encoding="utf-8").strip(),
-            f"{name}: generated instructions drift",
-        )
+        generated_instructions = parsed.get("developer_instructions")
+        adapter = instruction.read_text(encoding="utf-8").strip()
+        logical_role = agent.get("role", name)
+        if logical_role in {"implementer", "tester"}:
+            expected = (
+                "## Canonical pipeline specialist reference\n\n"
+                f"{specialist_reference}\n\n{adapter}"
+            )
+            require(
+                generated_instructions == expected,
+                f"{name}: generated shared dispatch instructions drift",
+            )
+        else:
+            require(generated_instructions == adapter, f"{name}: generated instructions drift")
         if agent.get("model_policy") == "spawn":
             require("model" not in parsed, f"{name}: spawn-selected role hardcodes a model")
             require("model_reasoning_effort" not in parsed, f"{name}: spawn-selected role hardcodes effort")

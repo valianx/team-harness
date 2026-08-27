@@ -2,7 +2,7 @@
 
 import { pathToFileURL } from "node:url";
 
-export const SPECIALIST_LIVENESS_SCHEMA_VERSION = 2;
+export const SPECIALIST_LIVENESS_SCHEMA_VERSION = 3;
 export const SPECIALIST_LIVENESS_GRACE_MS = 120_000;
 export const SPECIALIST_LIVENESS_MAX_ATTEMPTS = 2;
 
@@ -25,6 +25,7 @@ const INTERRUPTION_CAUSES = new Set([
 ]);
 const INPUT_KEYS = new Set([
   "role", "attempt", "attempt_token", "dispatched_at", "now", "agent_status",
+  "dispatch_ready_at",
   "probe_sent_at", "probe_delivery_state", "probe_delivered_at", "heartbeat",
   "owned_paths_changed", "evidence_changed", "interruption_cause", "continuation_count",
 ]);
@@ -95,6 +96,7 @@ export function evaluateSpecialistLiveness(input = {}) {
     dispatched_at: dispatchedAtValue,
     now: nowValue,
     agent_status: agentStatus,
+    dispatch_ready_at: dispatchReadyAtValue = null,
     probe_sent_at: probeSentAtValue = null,
     probe_delivery_state: probeDeliveryStateValue = null,
     probe_delivered_at: probeDeliveredAtValue = null,
@@ -106,6 +108,8 @@ export function evaluateSpecialistLiveness(input = {}) {
   } = input;
   const dispatchedAt = timestamp(dispatchedAtValue);
   const now = timestamp(nowValue);
+  const dispatchReadyAt = dispatchReadyAtValue === null ? null : timestamp(dispatchReadyAtValue);
+  const readinessRequired = role === "implementer" || role === "tester";
   const probeSentAt = probeSentAtValue === null ? null : timestamp(probeSentAtValue);
   const probeDeliveredAt = probeDeliveredAtValue === null ? null : timestamp(probeDeliveredAtValue);
   const probeDeliveryState = probeSentAt === null
@@ -114,6 +118,9 @@ export function evaluateSpecialistLiveness(input = {}) {
   const sla = SPECIALIST_SLA_MS[role];
   if (!Number.isInteger(sla) || ![1, 2].includes(attempt) || !TOKEN.test(attemptToken ?? "")
     || dispatchedAt === null || now === null || now < dispatchedAt || !STATUSES.has(agentStatus)
+    || (readinessRequired && dispatchReadyAtValue !== null
+      && (dispatchReadyAt === null || dispatchReadyAt < dispatchedAt || dispatchReadyAt > now))
+    || (!readinessRequired && dispatchReadyAtValue !== null)
     || typeof ownedPathsChanged !== "boolean" || typeof evidenceChanged !== "boolean"
     || !Number.isInteger(continuationCount) || continuationCount < 0 || continuationCount > 1
     || (interruptionCause !== null && !INTERRUPTION_CAUSES.has(interruptionCause))
@@ -137,6 +144,24 @@ export function evaluateSpecialistLiveness(input = {}) {
   }
 
   if (agentStatus === "interrupted") {
+    if (readinessRequired && dispatchReadyAt === null) {
+      if (ownedPathsChanged || evidenceChanged) {
+        return decision({
+          verdict: "fail",
+          errorCode: "SPECIALIST_PROGRESS_BEFORE_READY",
+          action: "block",
+          attempt,
+          failureKind: "specialist-progress-before-ready",
+          observation: "The specialist changed a declared path before dispatch readiness; preserve the evidence and block this contract violation.",
+        });
+      }
+      return decision({
+        action: "pause",
+        attempt,
+        failureKind: "specialist-start-unconfirmed",
+        observation: "The interrupted specialist never acknowledged dispatch readiness and left no declared progress; preserve the same decision/reference without counting or replacing an attempt.",
+      });
+    }
     if (ownedPathsChanged || evidenceChanged) {
       if (interruptionCause === "specialist-probe-delivery-unconfirmed" && continuationCount === 0) {
         return decision({
@@ -206,6 +231,14 @@ export function evaluateSpecialistLiveness(input = {}) {
   }
 
   if (validHeartbeatAt !== null) {
+    if (readinessRequired && dispatchReadyAt === null) {
+      return decision({
+        action: "interrupt",
+        attempt,
+        failureKind: "specialist-start-unconfirmed",
+        observation: "A liveness checkpoint did not substitute for the missing dispatch readiness acknowledgement; interrupt and audit without counting an attempt.",
+      });
+    }
     const renewedDeadline = validHeartbeatAt + sla;
     if (now < renewedDeadline) {
       return decision({
@@ -236,12 +269,16 @@ export function evaluateSpecialistLiveness(input = {}) {
   return decision({
     action: "interrupt",
     attempt,
-    failureKind: probeDeliveryState === "confirmed"
-      ? "specialist-unresponsive"
-      : "specialist-probe-delivery-unconfirmed",
-    observation: probeDeliveryState === "confirmed"
-      ? "No matching acknowledgement arrived after confirmed probe delivery; interrupt before auditing declared paths."
-      : "The runtime accepted the probe but exposed no delivery receipt or matching acknowledgement; interrupt before auditing declared paths and preserve this transport cause.",
+    failureKind: readinessRequired && dispatchReadyAt === null
+      ? "specialist-start-unconfirmed"
+      : probeDeliveryState === "confirmed"
+        ? "specialist-unresponsive"
+        : "specialist-probe-delivery-unconfirmed",
+    observation: readinessRequired && dispatchReadyAt === null
+      ? "No dispatch readiness acknowledgement arrived before the lease expired; interrupt and audit declared paths without counting an attempt."
+      : probeDeliveryState === "confirmed"
+        ? "No matching acknowledgement arrived after confirmed probe delivery; interrupt before auditing declared paths."
+        : "The runtime accepted the probe but exposed no delivery receipt or matching acknowledgement; interrupt before auditing declared paths and preserve this transport cause.",
   });
 }
 

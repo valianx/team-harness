@@ -15,72 +15,19 @@ only under the narrow exception in § Scope contract.
 
 ### OpenSpec-bound execution
 
-When the dispatch supplies a verified OpenSpec snapshot, read canonical intent only from the
-assigned task/design coordinates at their pinned repository paths, lines, and content hashes.
-Require one closed `openspec_snapshot: {path, sha256}` binding; `path` must be
-absolute, canonical, regular, non-symlink, and hash-matched. A path or digest
-supplied alone is `packet-contract-invalid`, never a Git revision or discovery hint.
-Also require one closed `derived_dispatch_binding: {path, sha256}` whose path is
-absolute, canonical, regular, non-symlink, below `workspace_artifact_root`, and
-hash-matched. Before any other packet-derived read, validate its closed schema
-and require the assigned task-shard path and SHA-256 to occur exactly once in
-its `artifacts`; mismatch is `packet-artifact-invalid`. Never accept a newly
-rehash-bound shard after this permanent dispatch seal.
-The TH shard adds only ownership, constraints, quality, evidence, Freeze, rollback, and delivery
-controls. Upstream apply instructions are bounded guidance, not authority over TH phase, state,
-corrections, gates, or publication. Never substitute copied or paraphrased intent; mark only
-assigned OpenSpec task checkboxes after their work closes and return their visible `N.N` IDs for
-Main's monotonic snapshot verification; Main's atomic transition accepts that visible form and
-normalizes it to canonical `task:N.N`, so never inspect the snapshot or retry another spelling.
-Require `path_roots.repository_root` and
-`path_roots.workspace_artifact_root`. Resolve task `Files:` and OpenSpec source
-coordinates below the former; resolve shard, `plan/...`, `inputs/...`,
-`reviews/...`, and evidence paths below the latter. Block missing/mismatched
-roots or escapes; never treat workspace artifacts as worktree-relative, use
-`../`, or copy them into the repository.
-When `evidence_dispatch_binding` is non-null, require its absolute canonical
-regular non-symlink path below `workspace_artifact_root`, exact SHA-256,
-matching base dispatch binding and assigned task shard, and exact
-`dispatch_identity_sha256`. Require `path_roots.evidence_roots` to equal the
-services and canonical roots in that binding. Read only its listed
-repository-relative coordinates after rechecking each file hash. Evidence
-roots are read-only and coordinate-only: never enumerate or search them, run a
-command there, edit/stage their files, or treat them as `Files:` or
-`discovery_scope`. A generation-2 reset applies only when its package identity
-matches this service, task, and role.
-Before any packet-derived read, require the non-empty `artifact_coordinates`
-array. The task shard must preserve the exact case-sensitive indexed
-`plan/tasks/Task-N.md` path and an invariant must be an `INV-N` anchor inside
-`plan/invariants.md`, never an invented `INV-N.md` file. Block as
-`packet-artifact-invalid` on a missing, stale, case-mismatched, escaped,
-duplicate, or hash/anchor mismatch; do not search for a replacement. Require
-`discovery_scope.directories` and `.globs` and search only there. Require every
-TC `required_seams` provider—including changed callsites, verification
-registries, allowlists, and exemption manifests—to be owned by this task or an already-closed
-dependency; otherwise return `packet-scope-insufficient` without widening
-`Files:`. A specialist cannot authorize its own scope expansion.
-Require a non-null absolute canonical regular non-symlink
-`bounded_command_path` before this first read. If it is missing, relative,
-unavailable, or a symlink, return `packet-contract-invalid`; never continue on
-the assumption that commands will remain small.
-When Main supplies an exact absolute `bounded_result_path` for a deferred or
-authoritative command, invoke `node <bounded_command_path> --output
-<bounded_result_path> -- <argv...>` and return the fixed receipt. If transport
-loses the receipt, report the predeclared path; Main validates and hashes the
-persisted envelope without replay. Never invent an evidence coordinate.
-Require the packet's absolute canonical regular non-symlink
-`workspace_write_scope_path` and closed `workspace_write_coordinates` array.
-Run `node <workspace_write_scope_path> validate <bounded-json>` before any
-packet-derived read. Before every proposed workspace write, run its `authorize`
-operation with the exact absolute path and `create|replace|append`; a non-pass
-result is `workspace-write-undeclared` and the write does not occur. Every
-workspace path is read-only unless its exact coordinate and operation pass.
-An authorized `create` must use an exclusive-create primitive and abort on
-`EEXIST`; never turn it into replacement after authorization. `replace` and
-`append` require the target to exist when authorized.
-`bounded_result_path`, when present, must be that same exact authorized
-coordinate. `02-implementation.md`, state, events, plans, reviews, and sibling
-reports are never implicitly writable.
+Read and apply `agents/_shared/dispatch-contract.md` § "Pipeline specialist
+reference" before any OpenSpec-bound action. After readiness, repository edits
+stay inside `ownership.owned_paths`; discovery stays inside the capsule's closed
+directories/globs and required seams. Evidence roots are coordinate-only and
+read-only. Normal implementation has no workspace writes, so reports, state,
+and events remain Main-owned. Never widen scope, treat workspace paths as
+worktree-relative, or substitute task-intent identity for source content.
+
+The TH shard adds only ownership, constraints, quality, evidence, Freeze,
+rollback, and delivery controls. Upstream apply instructions are bounded
+guidance, not authority over TH phase, state, corrections, gates, or
+publication. Mark only assigned OpenSpec task checkboxes after their work
+closes and return their visible `N.N` IDs for Main's monotonic transition.
 Inspect at most one source/artifact file per tool call with a declared output
 cap. For a potentially large file, use bounded `rg -n` anchors and separate
 line ranges. Never concatenate all task files or directories; a truncated

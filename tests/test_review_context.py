@@ -46,6 +46,118 @@ def context(**overrides):
 
 
 class ReviewContextTests(unittest.TestCase):
+    def test_review_runs_are_isolated_and_cleanup_is_owner_bound(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            legacy = repo / "workspaces" / "pr-review-34"
+            legacy.mkdir(parents=True)
+            (legacy / "pr-review-snapshot.git").mkdir()
+            (legacy / "tmp-pr-review-context.empty").write_bytes(b"")
+            first = MODULE.create_review_run(repo, 34)
+            second = MODULE.create_review_run(repo, 34)
+            first_root = Path(first["artifact_root"])
+            second_root = Path(second["artifact_root"])
+            self.assertNotEqual(first_root, second_root)
+            (first_root / "tmp-pr-review-context.empty").write_bytes(b"")
+            (first_root / "pr-review-snapshot.git").mkdir()
+
+            with self.assertRaisesRegex(MODULE.ContextError, "owner token"):
+                MODULE.cleanup_review_run(repo, first_root, second["owner_token"])
+            self.assertTrue(first_root.is_dir())
+            self.assertTrue(second_root.is_dir())
+
+            MODULE.cleanup_review_run(repo, first_root, first["owner_token"])
+            self.assertFalse(first_root.exists())
+            self.assertTrue(second_root.is_dir())
+            MODULE.cleanup_review_run(repo, second_root, second["owner_token"])
+
+    def test_resume_selects_only_complete_isolated_run(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            incomplete = MODULE.create_review_run(repo, 34)
+            complete = MODULE.create_review_run(repo, 34)
+            complete_root = Path(complete["artifact_root"])
+            (complete_root / "pr-review-context.json").write_text("{}\n", encoding="utf-8")
+            (complete_root / "pr-review-final.md").write_text("draft\n", encoding="utf-8")
+            (complete_root / "pr-review-inline.json").write_text("[]\n", encoding="utf-8")
+
+            resumed = MODULE.find_resumable_review_run(repo, 34)
+            self.assertEqual(resumed, complete)
+
+            MODULE.cleanup_review_run(repo, Path(incomplete["artifact_root"]), incomplete["owner_token"])
+            MODULE.cleanup_review_run(repo, complete_root, complete["owner_token"])
+
+    def test_prepare_run_owns_capture_materialization_and_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            subprocess.run(["git", "init", "-q", str(repo_root)], check=True)
+            captured = context()
+
+            def fake_capture(**values):
+                values["snapshot_dir"].mkdir()
+                MODULE.write_json(values["output"], captured)
+                return captured
+
+            def fake_materialize(**values):
+                root = values["artifact_root_value"]
+                for name in (values["diff_name"], values["files_name"], values["checks_name"]):
+                    (root / name).write_text("evidence\n", encoding="utf-8")
+                values["worktree"].mkdir()
+
+            with (
+                patch.object(MODULE, "capture_to_path", side_effect=fake_capture),
+                patch.object(MODULE, "materialize_review_artifacts", side_effect=fake_materialize),
+                patch.object(MODULE, "render_context", return_value="conversation\n"),
+            ):
+                prepared = MODULE.prepare_review_run(repo_root, "owner/repo", 34)
+
+            self.assertEqual(prepared["status"], "prepared")
+            self.assertEqual(prepared["context_hash"], captured["context_hash"])
+            for key in ("context", "conversation", "snapshot", "diff", "files", "checks", "worktree"):
+                self.assertTrue(Path(prepared[key]).exists(), key)
+            self.assertNotIn("tmp-pr-review", "\n".join(path.name for path in Path(prepared["artifact_root"]).iterdir()))
+
+    def test_prepare_run_cleans_its_owned_partial_run_on_capture_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            subprocess.run(["git", "init", "-q", str(repo_root)], check=True)
+            with patch.object(
+                MODULE,
+                "capture_to_path",
+                side_effect=MODULE.ContextError("capture failed"),
+            ):
+                with self.assertRaisesRegex(MODULE.ContextError, "capture failed"):
+                    MODULE.prepare_review_run(repo_root, "owner/repo", 34)
+
+            parent = repo_root / "workspaces" / "pr-review-34"
+            self.assertEqual(list(parent.glob("run-*")), [])
+
+    def test_prepare_run_cleans_its_owned_partial_run_on_materialize_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            subprocess.run(["git", "init", "-q", str(repo_root)], check=True)
+            captured = context()
+
+            def fake_capture(**values):
+                values["snapshot_dir"].mkdir()
+                MODULE.write_json(values["output"], captured)
+                return captured
+
+            with (
+                patch.object(MODULE, "capture_to_path", side_effect=fake_capture),
+                patch.object(MODULE, "render_context", return_value="conversation\n"),
+                patch.object(
+                    MODULE,
+                    "materialize_review_artifacts",
+                    side_effect=MODULE.ContextError("materialize failed"),
+                ),
+            ):
+                with self.assertRaisesRegex(MODULE.ContextError, "materialize failed"):
+                    MODULE.prepare_review_run(repo_root, "owner/repo", 34)
+
+            parent = repo_root / "workspaces" / "pr-review-34"
+            self.assertEqual(list(parent.glob("run-*")), [])
+
     def test_review_snapshot_lifecycle_outlives_exec_yields(self):
         contract = SKILL.read_text(encoding="utf-8")
         self.assertNotIn("Register the EXIT trap", contract)
@@ -55,7 +167,7 @@ class ReviewContextTests(unittest.TestCase):
         self.assertIn("only after every dispatched reviewer has", contract)
         self.assertLess(
             contract.index("MUST outlive every specialist dispatch"),
-            contract.index("Run cleanup explicitly from the coordinator only after"),
+            contract.index("Run `cleanup-run` explicitly from the coordinator only after"),
         )
 
     def agent_failure_fixture(self, root: Path):

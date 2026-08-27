@@ -3,13 +3,17 @@ import { createHash } from "node:crypto";
 import { cp, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 import { generate, render } from "./generate.mjs";
 import { sharedPipelineScripts, syncSharedPipelineAssets } from "./sync-skills.mjs";
+import { PIPELINE_HELPERS } from "../../skills/pipeline/scripts/helper-bundle.mjs";
 
-const root = new URL("../..", import.meta.url).pathname;
+const root = fileURLToPath(new URL("../..", import.meta.url));
 // The roster is imported rather than restated: a second copy is how a fixture starts
 // passing against a list the shipped code no longer has.
 const pipelineScripts = sharedPipelineScripts;
+assert.deepEqual([...PIPELINE_HELPERS].sort(), [...sharedPipelineScripts].sort(),
+  "workspace helper bundle roster diverges from packaged pipeline scripts");
 
 async function makePipelineFixture() {
   const fixture = await mkdtemp(join(tmpdir(), "codex-pipeline-sync-"));
@@ -25,7 +29,7 @@ async function makeFixture() {
   const fixture = await mkdtemp(join(tmpdir(), "codex-runtime-"));
   await mkdir(join(fixture, "runtime/schema"), { recursive: true });
   await mkdir(join(fixture, "runtime/codex"), { recursive: true });
-  await mkdir(join(fixture, "agents"), { recursive: true });
+  await mkdir(join(fixture, "agents/_shared"), { recursive: true });
   await cp(join(root, "runtime/schema/codex-agents.json"), join(fixture, "runtime/schema/codex-agents.json"));
   await cp(join(root, "runtime/codex/instructions"), join(fixture, "runtime/codex/instructions"), { recursive: true });
   const semanticAgents = (await readdir(join(root, "agents"), { withFileTypes: true }))
@@ -36,6 +40,10 @@ async function makeFixture() {
   for (const entry of semanticAgents) {
     await cp(join(root, "agents", entry.name), join(fixture, "agents", entry.name));
   }
+  await cp(
+    join(root, "agents/_shared/dispatch-contract.md"),
+    join(fixture, "agents/_shared/dispatch-contract.md"),
+  );
   return fixture;
 }
 
@@ -245,7 +253,7 @@ assert.match(pipelineIdentityDocs[1], /do not create, copy, export, or reconcile
 assert.match(await readFile(join(root, "plugins/team-harness/skills/pipeline/references/state-and-gates.md"), "utf8"),
   /pipeline_version: 4[\s\S]*openspec_bindings:[\s\S]*openspec_aggregate_sha256:/,
   "Codex pipeline new-run state is not the v4 aggregate contract");
-for (const script of ["bounded-command.mjs", "workspace-identity.mjs", "openspec-bindings.mjs", "openspec-overlay.mjs", "herdr-message.mjs", "specialist-liveness.mjs", "specialist-write-scope.mjs"]) {
+for (const script of ["bounded-command.mjs", "correction-packet-preflight.mjs", "helper-bundle.mjs", "workspace-identity.mjs", "openspec-bindings.mjs", "openspec-overlay.mjs", "herdr-message.mjs", "specialist-liveness.mjs", "specialist-write-scope.mjs"]) {
   const source = await readFile(join(root, "skills/pipeline/scripts", script), "utf8");
   const projected = await readFile(join(root, "plugins/team-harness/skills/pipeline/scripts", script), "utf8");
   assert.equal(projected, source, `${script} generated projection is stale`);
@@ -255,9 +263,12 @@ const boundedCommandScript = await readFile(join(root, "skills/pipeline/scripts/
 const bindingsScript = await readFile(join(root, "skills/pipeline/scripts/openspec-bindings.mjs"), "utf8");
 const livenessScript = await readFile(join(root, "skills/pipeline/scripts/specialist-liveness.mjs"), "utf8");
 const specialistWriteScopeScript = await readFile(join(root, "skills/pipeline/scripts/specialist-write-scope.mjs"), "utf8");
+const correctionPacketPreflightScript = await readFile(join(root, "skills/pipeline/scripts/correction-packet-preflight.mjs"), "utf8");
+const helperBundleScript = await readFile(join(root, "skills/pipeline/scripts/helper-bundle.mjs"), "utf8");
 const overlayPlanContract = await readFile(join(root, "plugins/team-harness/skills/pipeline/references/plan-shards.md"), "utf8");
 const architectAdapter = await readFile(join(root, "runtime/codex/instructions/architect.md"), "utf8");
-const testerAdapter = await readFile(join(root, "runtime/codex/instructions/tester.md"), "utf8");
+const testerSemantic = await readFile(join(root, "agents/tester.md"), "utf8");
+const dispatchContract = await readFile(join(root, "agents/_shared/dispatch-contract.md"), "utf8");
 const orchestratorStateContract = await readFile(join(root, "agents/_shared/orchestrator-state.md"), "utf8");
 for (const marker of ["boundedCommandProcessStatus", "result.outcome === \"completed\"", "result.exit_code === 0"]) {
   assert.ok(boundedCommandScript.includes(marker), `bounded-command process-status guard misses ${marker}`);
@@ -265,12 +276,19 @@ for (const marker of ["boundedCommandProcessStatus", "result.outcome === \"compl
 for (const marker of ["WORKSPACE_WRITE_UNDECLARED", "WORKSPACE_WRITE_OPERATION_DENIED", "WORKSPACE_WRITE_TARGET_EXISTS", "WORKSPACE_WRITE_TARGET_MISSING", "workspace_write_coordinates", "authorizeSpecialistWorkspaceWrite"]) {
   assert.ok(specialistWriteScopeScript.includes(marker), `specialist workspace-write scope misses ${marker}`);
 }
-for (const marker of ["failure_stage", "upstream_constraints_checked", "pending_shard_dependencies", "deterministic valid UUID", "future shard seam"]) {
-  assert.ok(testerAdapter.includes(marker), `Codex tester adapter misses shard-local RED marker ${marker}`);
+for (const marker of ["task_intent_sha256", "source_coordinates", "content_sha256", "TEST_CONTRACT_COVERAGE_INCOMPLETE", "repair-index-before-presentation", "team_harness_dispatch_reference", "scope_identity_sha256", "ack-dispatch-ready", "dispatch-reference-invalid-before-ready"]) {
+  assert.ok(correctionPacketPreflightScript.includes(marker), `correction packet preflight misses ${marker}`);
 }
-for (const marker of ["workspace_write_scope_path", "workspace_write_coordinates", "exclusive creation", "workspace_writes"]) {
-  assert.ok(testerAdapter.includes(marker), `Codex tester adapter misses workspace ownership marker ${marker}`);
+for (const marker of ["HELPER_COMPATIBILITY_EPOCH", "helper-bundles", "bundle_identity_sha256", "use-workspace-helper-bundle"]) {
+  assert.ok(helperBundleScript.includes(marker), `pipeline helper bundle misses ${marker}`);
 }
+for (const marker of ["failure_stage", "upstream_constraints_checked", "pending_shard_dependencies", "deterministic valid identifiers", "pending/future shard's seam"]) {
+  assert.ok(testerSemantic.includes(marker), `tester semantic contract misses shard-local RED marker ${marker}`);
+}
+for (const marker of ["team_harness_dispatch_capsule", "dispatch-ready", "specialist-start-unconfirmed", "workspace write"]) {
+  assert.ok(dispatchContract.includes(marker), `shared dispatch contract misses specialist marker ${marker}`);
+}
+assert.ok(testerSemantic.includes("agents/_shared/dispatch-contract.md"), "tester does not consume the shared dispatch contract");
 for (const marker of ["exact `## {name}` heading", "inputs/acceptance-matrix.md § Acceptance Matrix", "exactly-once, non-empty-body check"]) {
   assert.ok(orchestratorStateContract.includes(marker), `orchestrator artifact verification misses section marker ${marker}`);
 }
@@ -301,16 +319,16 @@ const implementationContract = await readFile(join(root, "plugins/team-harness/s
 for (const marker of ["specialist-liveness.mjs", "fixed two-minute ACK grace", "probe_delivery_state: unconfirmed", "TH-LIVENESS-RESUME", "specialist-interrupted-with-progress", "specialist-retry-exhausted", "local fallback"]) {
   assert.ok(implementationContract.includes(marker), `specialist liveness pipeline contract misses ${marker}`);
 }
-for (const marker of ["specialist-write-scope.mjs", "workspace_write_coordinates", "Main alone writes or replaces", "workspace-write-undeclared"]) {
+for (const marker of ["Canonical dispatch reference", "correction-packet-preflight.mjs", "agents/_shared/dispatch-contract.md", "workspace writes", "Main alone writes or replaces"]) {
   assert.ok(implementationContract.includes(marker), `specialist workspace ownership contract misses ${marker}`);
 }
 for (const marker of ["derived-artifact-damage", "repair-derived", "DERIVED_REPAIR_INELIGIBLE", "existing `implementation` phase"]) {
   assert.ok(implementationContract.includes(marker), `OpenSpec implementation repair contract misses ${marker}`);
 }
-for (const marker of ["seal-dispatch", "verify-dispatch", "derived_dispatch_binding", "DERIVED_SET_BUSY", "DISPATCH_BINDING_STALE", "never repair, rehash all bindings"]) {
+for (const marker of ["seal-dispatch", "permanent seal", "DERIVED_SET_BUSY", "DISPATCH_BINDING_STALE", "Never audit only the currently requested service"]) {
   assert.ok(implementationContract.includes(marker), `OpenSpec immutable dispatch contract misses ${marker}`);
 }
-for (const marker of ["audit-dispatches", "evidence_dispatch_binding", "path_roots.evidence_roots", "team_harness_packet_scope_insufficient", "verify-evidence-dispatch"]) {
+for (const marker of ["audit-dispatches", "evidence dispatch", "Evidence roots", "team_harness_packet_scope_insufficient", "verify-evidence-dispatch"]) {
   assert.ok(implementationContract.includes(marker), `OpenSpec cross-repository evidence contract misses ${marker}`);
 }
 for (const marker of ["migrate-v1", "gate1-v1-migration.json", "original Gate plus migration continuation identity"]) {
@@ -329,16 +347,19 @@ for (const marker of ["verify-v1-migration", "gate1-v1-migration.json", "passing
 for (const marker of ["dispatch-binding.json", "verify-dispatch", "DERIVED_SET_BUSY"]) {
   assert.ok(recoveryContract.includes(marker), `OpenSpec dispatch-binding recovery contract misses ${marker}`);
 }
-for (const marker of ["audit-dispatches", "REPAIR_CORRECTION_COUNTERS", "CORRECTION_COUNTER_MISMATCH", "verify-evidence-dispatch"]) {
+for (const marker of ["audit-dispatches", "REPAIR_CORRECTION_COUNTERS", "CORRECTION_COUNTER_MISMATCH", "correction-wait-state", "status: paused", "verify-evidence-dispatch"]) {
   assert.ok(recoveryContract.includes(marker), `OpenSpec exhaustive recovery contract misses ${marker}`);
 }
 for (const role of ["implementer", "tester"]) {
   const adapter = await readFile(join(root, `runtime/codex/instructions/${role}.md`), "utf8");
-  for (const marker of ["derived_dispatch_binding", "assigned shard path and SHA-256", "rebound shard"]) {
-    assert.ok(adapter.includes(marker), `${role} adapter misses immutable dispatch marker ${marker}`);
+  const generatedAgent = await readFile(join(root, `.codex/agents/${role}.toml`), "utf8");
+  assert.doesNotMatch(adapter, /For OpenSpec (?:implementation|testing), accept only/,
+    `${role} adapter duplicates the shared dispatch handshake`);
+  for (const marker of ["dispatch_reference", "team_harness_dispatch_capsule", "scope_identity_sha256", "dispatch-ready"]) {
+    assert.ok(generatedAgent.includes(marker), `${role} generated agent misses canonical dispatch marker ${marker}`);
   }
-  for (const marker of ["evidence_dispatch_binding", "evidence_roots", "Generation-2"]) {
-    assert.ok(adapter.includes(marker), `${role} adapter misses evidence dispatch marker ${marker}`);
+  for (const marker of ["Evidence", "workspace write", "prompt-level copies"] ) {
+    assert.ok(generatedAgent.includes(marker), `${role} generated agent misses capsule ownership marker ${marker}`);
   }
 }
 for (const marker of ["Team Harness Execution Contract", "EXECUTION_CONTRACT_INVALID", "discovery_scope", "required_seams", "observable_runtime_behavior"]) {
