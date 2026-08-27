@@ -528,15 +528,23 @@ live status request, an actual phase-SLA timeout, or recovery. A normal
 continues the directed wait; it proves neither failure nor terminal state.
 Track each role's phase SLA independently from dispatch time. At the SLA,
 evaluate `scripts/specialist-liveness.mjs`: send its single token-bound probe,
-allow the fixed two-minute ACK grace, and permit at most one matching-checkpoint
-lease renewal. When it returns `interrupt`, interrupt first and then audit only
-the packet's declared owned paths and evidence paths. A clean first attempt may
-be replaced once by a fresh same-role V2 specialist; changed paths block as
-`specialist-interrupted-with-progress`, and a clean second timeout blocks as
+record native acceptance as `probe_delivery_state: unconfirmed` unless an
+explicit delivery/read receipt proves `confirmed`, allow the fixed two-minute ACK grace,
+and permit at most one matching-checkpoint lease renewal. A matching
+ACK itself proves delivery. When the helper returns `interrupt`, interrupt
+first and then audit only the packet's declared owned paths and evidence paths.
+If delivery was unconfirmed and that audit finds progress, send exactly one
+`TH-LIVENESS-RESUME` to the same thread and token with the unchanged packet and
+decision reference; it consumes no new correction authority. Confirmed-delivery
+progress, a second continuation failure, or operator cancellation blocks as
+`specialist-interrupted-with-progress`. A clean first attempt may be replaced
+once by a fresh same-role V2 specialist, and a clean second timeout blocks as
 `specialist-retry-exhausted`. Never run a concurrent replacement, retry
-indefinitely, or let Main perform the role as a local fallback. Persist the
-classifier result in `agent.sla.extra` and the declared-path audit in
-`agent.close.extra` before replacement or block. The normalized benchmark counts only waits and queries that are
+indefinitely, infer delivery from a successful send call, or let Main perform
+the role as a local fallback. Persist the classifier result and delivery state
+in `agent.sla.extra`, then the interruption cause, continuation count, and
+declared-path audit in `agent.close.extra` before resume, replacement, or block.
+The normalized benchmark counts only waits and queries that are
 not caused by completion, input, a real timeout, or recovery; the current
 policy must keep that count at no more than 30% of the normalized baseline
 (at least a 70% reduction) while retaining immediate operator interruption.

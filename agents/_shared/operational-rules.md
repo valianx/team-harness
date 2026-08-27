@@ -71,6 +71,15 @@ request for more scope. If the attempt is blocked or terminal, return the
 normal final status block instead of an ACK. Do not emit periodic or unsolicited
 heartbeats, and never answer a probe carrying a different attempt token.
 
+Native acceptance of a coordinator message is not proof that it reached this
+turn: delivery may wait for a sampling boundary or a pending tool call to
+finish. When Main interrupts an unacknowledged probe whose delivery was not
+confirmed and the declared-path audit finds progress, it may send exactly one
+`TH-LIVENESS-RESUME {attempt_token}` to this same thread. That message resumes
+the unchanged packet and authority; acknowledge it with the current checkpoint
+and finish or return the normal terminal status. It is not feedback, a new
+correction, or permission to widen scope, and a second resume is forbidden.
+
 ## Git safety
 
 - **An activated pipeline never force-pushes.** Not with `-f`, `--force`, `--force-with-lease`, or a `+`-prefixed refspec, and a `ship` decision cannot authorize one — `agents/_shared/gate-contract.md § "Outward-action release floor"` is operator-mandated and this rule does not relax it. In direct work, rebasing your own unmerged feature branch and force-pushing it with `--force-with-lease` is ordinary; rewriting a branch someone else builds on is not. Either way `dev-guard` requires explicit operator approval for a force push, a default-branch push, and a tag push, and the agent cannot supply that approval.

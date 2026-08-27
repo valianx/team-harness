@@ -2,7 +2,7 @@
 
 import { pathToFileURL } from "node:url";
 
-export const SPECIALIST_LIVENESS_SCHEMA_VERSION = 1;
+export const SPECIALIST_LIVENESS_SCHEMA_VERSION = 2;
 export const SPECIALIST_LIVENESS_GRACE_MS = 120_000;
 export const SPECIALIST_LIVENESS_MAX_ATTEMPTS = 2;
 
@@ -17,9 +17,16 @@ export const SPECIALIST_SLA_MS = Object.freeze({
 
 const TOKEN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const STATUSES = new Set(["running", "completed", "failed", "blocked", "interrupted"]);
+const PROBE_DELIVERY_STATES = new Set(["unconfirmed", "confirmed"]);
+const INTERRUPTION_CAUSES = new Set([
+  "specialist-unresponsive",
+  "specialist-probe-delivery-unconfirmed",
+  "operator-cancelled",
+]);
 const INPUT_KEYS = new Set([
   "role", "attempt", "attempt_token", "dispatched_at", "now", "agent_status",
-  "probe_sent_at", "heartbeat", "owned_paths_changed", "evidence_changed",
+  "probe_sent_at", "probe_delivery_state", "probe_delivered_at", "heartbeat",
+  "owned_paths_changed", "evidence_changed", "interruption_cause", "continuation_count",
 ]);
 const HEARTBEAT_KEYS = new Set(["attempt_token", "received_at", "checkpoint"]);
 
@@ -40,6 +47,7 @@ function decision({
   deadlineAt = null,
   attempt = null,
   replacementAttempt = null,
+  continuationCount = null,
   failureKind = null,
   observation,
 }) {
@@ -52,6 +60,7 @@ function decision({
     deadline_at: deadlineAt,
     attempt,
     replacement_attempt: replacementAttempt,
+    continuation_count: continuationCount,
     failure_kind: failureKind,
     observation,
   };
@@ -87,18 +96,33 @@ export function evaluateSpecialistLiveness(input = {}) {
     now: nowValue,
     agent_status: agentStatus,
     probe_sent_at: probeSentAtValue = null,
+    probe_delivery_state: probeDeliveryStateValue = null,
+    probe_delivered_at: probeDeliveredAtValue = null,
     heartbeat = null,
     owned_paths_changed: ownedPathsChanged,
     evidence_changed: evidenceChanged,
+    interruption_cause: interruptionCause = null,
+    continuation_count: continuationCount = 0,
   } = input;
   const dispatchedAt = timestamp(dispatchedAtValue);
   const now = timestamp(nowValue);
   const probeSentAt = probeSentAtValue === null ? null : timestamp(probeSentAtValue);
+  const probeDeliveredAt = probeDeliveredAtValue === null ? null : timestamp(probeDeliveredAtValue);
+  const probeDeliveryState = probeSentAt === null
+    ? null
+    : (probeDeliveryStateValue ?? "unconfirmed");
   const sla = SPECIALIST_SLA_MS[role];
   if (!Number.isInteger(sla) || ![1, 2].includes(attempt) || !TOKEN.test(attemptToken ?? "")
     || dispatchedAt === null || now === null || now < dispatchedAt || !STATUSES.has(agentStatus)
     || typeof ownedPathsChanged !== "boolean" || typeof evidenceChanged !== "boolean"
-    || (probeSentAtValue !== null && (probeSentAt === null || probeSentAt < dispatchedAt || probeSentAt > now))) {
+    || !Number.isInteger(continuationCount) || continuationCount < 0 || continuationCount > 1
+    || (interruptionCause !== null && !INTERRUPTION_CAUSES.has(interruptionCause))
+    || (probeSentAtValue !== null && (probeSentAt === null || probeSentAt < dispatchedAt || probeSentAt > now))
+    || (probeSentAt === null && (probeDeliveryStateValue !== null || probeDeliveredAtValue !== null))
+    || (probeSentAt !== null && !PROBE_DELIVERY_STATES.has(probeDeliveryState))
+    || (probeDeliveryState === "unconfirmed" && probeDeliveredAtValue !== null)
+    || (probeDeliveryState === "confirmed" && (probeDeliveredAt === null
+      || probeDeliveredAt < probeSentAt || probeDeliveredAt > now))) {
     return invalid(Number.isInteger(attempt) ? attempt : null);
   }
 
@@ -112,6 +136,15 @@ export function evaluateSpecialistLiveness(input = {}) {
 
   if (agentStatus === "interrupted") {
     if (ownedPathsChanged || evidenceChanged) {
+      if (interruptionCause === "specialist-probe-delivery-unconfirmed" && continuationCount === 0) {
+        return decision({
+          action: "resume",
+          attempt,
+          continuationCount: 1,
+          failureKind: interruptionCause,
+          observation: "The liveness probe had no delivery receipt and the interrupted specialist left declared progress; resume the same token-bound attempt once without consuming new correction authority.",
+        });
+      }
       return decision({
         verdict: "fail",
         errorCode: "SPECIALIST_INTERRUPTED_WITH_PROGRESS",
@@ -188,7 +221,8 @@ export function evaluateSpecialistLiveness(input = {}) {
     });
   }
 
-  const graceDeadline = probeSentAt + SPECIALIST_LIVENESS_GRACE_MS;
+  const graceStart = probeDeliveryState === "confirmed" ? probeDeliveredAt : probeSentAt;
+  const graceDeadline = graceStart + SPECIALIST_LIVENESS_GRACE_MS;
   if (now < graceDeadline) {
     return decision({
       action: "wait",
@@ -200,8 +234,12 @@ export function evaluateSpecialistLiveness(input = {}) {
   return decision({
     action: "interrupt",
     attempt,
-    failureKind: "specialist-unresponsive",
-    observation: "No matching acknowledgement arrived within the fixed grace; interrupt before auditing declared paths.",
+    failureKind: probeDeliveryState === "confirmed"
+      ? "specialist-unresponsive"
+      : "specialist-probe-delivery-unconfirmed",
+    observation: probeDeliveryState === "confirmed"
+      ? "No matching acknowledgement arrived after confirmed probe delivery; interrupt before auditing declared paths."
+      : "The runtime accepted the probe but exposed no delivery receipt or matching acknowledgement; interrupt before auditing declared paths and preserve this transport cause.",
   });
 }
 

@@ -159,11 +159,17 @@ without rewriting their state schema.
 
 Specialist liveness remains append-only event state rather than a mutable
 coordinator-state field. `agent.sla.extra` records `{attempt, attempt_token,
-liveness_action, deadline_at}`; after interruption, `agent.close.extra` repeats
-the identity and records `owned_paths_changed`, `evidence_changed`, and the
-closed liveness `failure_kind`. Persist declared path names and booleans only,
-never partial file contents. Recovery uses those timestamps and cannot reset an
-expired lease.
+liveness_action, deadline_at, probe_delivery_state,
+probe_delivered_at|null, continuation_count}`. A successful native message call
+without an explicit delivery/read receipt records `unconfirmed`; a matching ACK
+itself proves delivery. After interruption, `agent.close.extra` repeats the
+identity and records `owned_paths_changed`, `evidence_changed`,
+`interruption_cause`, `continuation_count`, and the closed liveness
+`failure_kind`. These are nested `extra` fields on canonical `agent.sla` and
+`agent.close` events, not new event names. Persist declared path names and
+booleans only, never partial file contents. Recovery uses those timestamps and
+cannot reset an expired lease; legacy v3.20.5 probes without delivery state are
+`unconfirmed`.
 
 When non-null, `quality_manifest_path` must be a regular non-symlink below
 `workspace`. If that workspace is below a participating repository, the

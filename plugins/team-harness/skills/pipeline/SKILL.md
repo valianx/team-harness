@@ -182,12 +182,17 @@ change that rule. Track the separate role SLA from dispatch time: architect 10
 minutes, implementer 15, tester 10, cleaner 5, QA 5, security 10, and delivery
 5, unless the project's `## Pipeline Timeouts` changes those SLA values.
 
-When the role SLA expires, tell the operator once that the agent is still
-running and append one compact `agent.sla` event with only the universal event
-envelope plus a plain `observation`. Do not request heartbeats, inspect partial
-artifacts, infer failure, interrupt, or replace the agent because of elapsed
-time. Keep waiting for the agent or live operator input. Optional legacy SLA
-details may be read but are never required or produced by a new run.
+The architect retains its operator-owned timeout. For every
+implementation-or-later specialist, when the role SLA expires evaluate the
+packaged `scripts/specialist-liveness.mjs` contract: send one token-bound probe,
+record native message acceptance as delivery `unconfirmed` unless an explicit
+receipt proves otherwise, allow its fixed grace, then interrupt before auditing
+only declared paths. An unconfirmed-delivery interruption with progress permits
+one same-thread, same-token continuation of the unchanged packet without new
+correction authority. Confirmed-delivery progress, a second continuation
+failure, clean replacement exhaustion, or operator cancellation blocks with
+the helper's exact cause. Never infer delivery from a successful send call or
+use Main as the specialist fallback.
 
 ### AC12/AC20 pre-execution command-output route
 

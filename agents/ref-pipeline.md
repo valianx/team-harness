@@ -555,9 +555,13 @@ That helper is the only silence-to-action classifier:
 
 1. At the first role-SLA exceed, append `agent.sla`, send one native
    `TH-LIVENESS-PROBE` carrying the attempt token, and grant exactly two minutes
-   for the matching `TH-LIVENESS-ACK` checkpoint. The event's `extra` records
-   `attempt`, `attempt_token`, `liveness_action`, and `deadline_at`; a matching
-   ACK appends another `agent.sla` with the same identity and renewed deadline.
+   for the matching `TH-LIVENESS-ACK` checkpoint. Native message acceptance is
+   `probe_delivery_state: unconfirmed` unless the tool exposes an explicit
+   delivery/read receipt; never promote acceptance to `confirmed`. The event's
+   `extra` records `attempt`, `attempt_token`, `liveness_action`, `deadline_at`,
+   `probe_delivery_state`, and an optional receipt-backed
+   `probe_delivered_at`; a matching ACK itself proves delivery and appends
+   another `agent.sla` with the same identity and renewed deadline.
 2. A matching bounded checkpoint renews the attempt lease exactly once for the
    role SLA. A stale or mismatched token grants nothing. No second probe or
    renewal exists.
@@ -565,16 +569,23 @@ That helper is the only silence-to-action classifier:
    terminal interruption. Only then inspect the role packet's declared owned
    file paths and expected evidence paths read-only; do not inspect arbitrary
    partial artifacts or dispatch a concurrent writer.
-4. Changed work or evidence blocks as
-   `specialist-interrupted-with-progress`. A clean first attempt permits one
-   fresh same-role replacement with `fork_turns: none` and attempt `2`. A clean
-   second attempt blocks as `specialist-retry-exhausted`.
+4. Preserve the helper's `interruption_cause`. When delivery was unconfirmed
+   and the declared audit finds work or evidence, send exactly one
+   `TH-LIVENESS-RESUME` to the same thread and attempt token with the unchanged
+   packet and decision reference; this does not consume new correction
+   authority. A second such interruption, progress after confirmed delivery,
+   or operator cancellation blocks as `specialist-interrupted-with-progress`.
+   A clean first attempt permits one fresh same-role replacement with
+   `fork_turns: none` and attempt `2`; a clean second attempt blocks as
+   `specialist-retry-exhausted`.
 
 The coordinator never implements, tests, cleans, validates, or prepares
-delivery as a local fallback. There are at most two attempts total, so silence
-cannot create an indefinite relaunch loop. Persist the helper decision and the
-post-interrupt path audit in the closing `agent.close.extra` before replacement
-or block; record only declared path names and booleans, never partial contents.
+delivery as a local fallback. There are at most two attempts total and one
+same-thread transport continuation per attempt, so silence cannot create an
+indefinite relaunch loop. Persist the helper decision, delivery state,
+interruption cause, continuation count, and post-interrupt path audit in
+`agent.close.extra` before resume, replacement, or block; record only declared
+path names and booleans, never partial contents.
 
 ## Context pruning
 

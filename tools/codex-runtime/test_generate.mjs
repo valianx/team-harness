@@ -287,7 +287,7 @@ for (const marker of ["migrate-v1", "verify-v1-migration", "team_harness_legacy_
   assert.ok(bindingsScript.includes(marker), `OpenSpec legacy-v1 migration implementation misses ${marker}`);
 }
 const implementationContract = await readFile(join(root, "plugins/team-harness/skills/pipeline/references/implementation.md"), "utf8");
-for (const marker of ["specialist-liveness.mjs", "fixed two-minute ACK grace", "specialist-interrupted-with-progress", "specialist-retry-exhausted", "local fallback"]) {
+for (const marker of ["specialist-liveness.mjs", "fixed two-minute ACK grace", "probe_delivery_state: unconfirmed", "TH-LIVENESS-RESUME", "specialist-interrupted-with-progress", "specialist-retry-exhausted", "local fallback"]) {
   assert.ok(implementationContract.includes(marker), `specialist liveness pipeline contract misses ${marker}`);
 }
 for (const marker of ["derived-artifact-damage", "repair-derived", "DERIVED_REPAIR_INELIGIBLE", "existing `implementation` phase"]) {
