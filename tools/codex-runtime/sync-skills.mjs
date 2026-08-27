@@ -90,6 +90,8 @@ const opencodeSpecialMappings = new Map([
 
 export const sharedPipelineScripts = [
   "bounded-command.mjs",
+  "cli-entrypoint.mjs",
+  "code-hygiene.mjs",
   "commit-integrity.mjs",
   "correction-packet-preflight.mjs",
   "helper-bundle.mjs",

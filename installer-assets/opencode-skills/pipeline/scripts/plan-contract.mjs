@@ -4,7 +4,7 @@
 import { createHash } from "node:crypto";
 import { lstat, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { isDirectExecution } from "./cli-entrypoint.mjs";
 
 import { validateOpenSpecOverlay } from "./openspec-overlay.mjs";
 import { validateQualityManifest } from "./quality-runner.mjs";
@@ -522,7 +522,7 @@ function parseCli(argv) {
   return values;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution(import.meta.url)) {
   const evidence = await validatePlanContract(parseCli(process.argv.slice(2)));
   process.stdout.write(`${JSON.stringify(evidence)}\n`);
   if (evidence.verdict !== "pass") process.exitCode = 1;

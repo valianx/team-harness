@@ -12,7 +12,7 @@ import { randomUUID } from "node:crypto";
 import { lstat, mkdtemp, open, realpath, rename, rm, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { isDirectExecution } from "./cli-entrypoint.mjs";
 
 import { isBoundedCommandEnvelope, runBoundedCommand } from "./bounded-command.mjs";
 import {
@@ -1514,7 +1514,7 @@ function parseCli(argv) {
   };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution(import.meta.url)) {
   const parsed = parseCli(process.argv.slice(2));
   const result = await runQualityChecks(parsed?.options ?? null);
   if (parsed?.output === null || parsed?.output === undefined) {

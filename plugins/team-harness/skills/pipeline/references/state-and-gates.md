@@ -134,7 +134,7 @@ cleaner_evidence: {status: pending|baseline|pass|cleaner-failed|cleaner-blocked|
 cleaner_repo_evidence: [{repository, repo_root, worktree, evidence: cleaner_evidence}]|[]
 plan_review_status: not-requested|requested|pass|concerns|fail|null
 audit_status: pending|done|unavailable|null
-code_hygiene: pass|fail|null
+code_hygiene: {status: pass|fail, result_path, result_sha256, base_sha, candidate_sha, pattern_version}|null
 verification_base_source_ref: origin/main|{dep-branch}|{commit}
 verification_base_ref: {immutable commit or null}
 freeze_anchor: {immutable tree anchor or null}
@@ -164,10 +164,10 @@ without rewriting their state schema.
 
 Specialist liveness remains append-only event state rather than a mutable
 coordinator-state field. `agent.sla.extra` records `{attempt, attempt_token,
-liveness_action, deadline_at, dispatch_ready_at|null, probe_delivery_state,
-probe_delivered_at|null, continuation_count}`. Only an accepted
-correlation-matched implementer/tester readiness ACK sets `dispatch_ready_at`;
-other roles keep it null. A successful native message call
+liveness_action, deadline_at, probe_delivery_state,
+probe_delivered_at|null, continuation_count}`. Successful pre-spawn reference
+verification starts the counted attempt; no intermediate readiness state
+exists. A successful native message call
 without an explicit delivery/read receipt records `unconfirmed`; a matching ACK
 itself proves delivery. After interruption, `agent.close.extra` repeats the
 identity and records `owned_paths_changed`, `evidence_changed`,
@@ -381,14 +381,14 @@ must materialize/verify `helper_bundle`, invoke its
 `correction-packet-preflight.mjs certify`, and persist its single
 `correction_dispatch_reference`. Main supplies no derived hashes, pointers,
 seals, roots, or helper paths: the resolver computes and validates them with
-complete required-test coverage before content-addressing the capsule. It also
+closed required-test coverage for the selected tasks before content-addressing the capsule. It also
 derives the unique owner task for every correction target path and unions those
 owners with the requested set; missing or ambiguous ownership blocks here.
-`repair-index` may add only missing required rows as `pending`; close them
-before retrying. No correction nonce or authority exists until the resolver
-returns `dispatch-ready-before-authority`. Immediately before spawn, re-certify
-the same identity. Apply `agents/_shared/dispatch-contract.md` § "Pipeline
-specialist reference" for the sole readiness and pre-ready recovery contract;
+`repair-index` may inventory missing global required rows as `pending`; only a
+selected pending row blocks this dispatch. No correction nonce or authority exists until the resolver
+returns `dispatch-reference-ready-before-authority`. Immediately before spawn,
+re-certify the same identity. Apply `agents/_shared/dispatch-contract.md` § "Pipeline
+specialist reference" for the sole pre-spawn and mechanical recovery contract;
 do not reproduce it in state transitions.
 
 The closed autonomous predicate requires every conjunct: a valid Gate-1

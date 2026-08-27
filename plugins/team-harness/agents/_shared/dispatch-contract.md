@@ -1,6 +1,6 @@
 # Dispatch contract
 <!-- Single source of truth for what a dispatch prompt may and must not carry,
-     the pipeline specialist reference handshake, and the two-halves scope
+     the pipeline specialist reference, and the two-halves scope
      rule (review scope vs. write scope). Consumed by coordinators and leaf
      specialists by pointer — see agents/README.md § "Adding or modifying an agent" and
      agents/agent-builder.md § "Mandatory Sections Checklist" for where new
@@ -10,7 +10,7 @@
 ## Ownership — single source, never copied
 
 This file is the ONE canonical description of what a dispatch prompt may contain, what it
-must never contain, the pipeline specialist handshake, and the two-halves scope rule that
+must never contain, the pipeline specialist reference, and the two-halves scope rule that
 governs review scope and write scope. Coordinators and leaf specialists reference this file
 by section and never restate its prose. A second copy would diverge from this one the first
 time either is edited, and the no-relocation check (Suite 174) exists precisely to catch that kind of duplication across
@@ -43,31 +43,30 @@ hashes, source pointers, helpers, seals, evidence, discovery scope, commands,
 and workspace writes exist only in the referenced immutable
 `team_harness_dispatch_capsule`; prompt-level copies are invalid.
 
-Before any repository or workspace read, the specialist verifies that the
-reference is an absolute canonical regular non-symlink workspace path, verifies
-its SHA-256 and canonical capsule bytes, recomputes the scope identity, and
-validates the bounded correlation values. It then sends the token-bound
-`dispatch-ready` acknowledgement with the exact `attempt_token` and
-`decision_ref`; Main accepts readiness only when both equal the dispatched
-values and the decision ref matches the durable authority event, then records
-its timestamp as `agent.sla.extra.dispatch_ready_at`. Only that ACK
-starts and counts the attempt. A missing, stale, malformed, or mismatched
-reference/correlation closes as `dispatch-reference-invalid-before-ready` with
-no repository work, attempt, replacement-budget use, or fresh authority. Main
-may mechanically re-certify only when semantic scope identity is unchanged.
+`decision_ref` is the single durable authority correlation, not a
+correction-only field. For an initial Gate-1 dispatch it is the consumed nonce
+on the matching `stage.gate.release`; for a correction it is the consumed nonce
+on `correction.decision`. Main verifies the appropriate durable event before
+spawn, so specialists use one correlation shape for both routes.
 
-Silence before readiness is `specialist-start-unconfirmed`, not a specialist
-attempt. At the normal role SLA Main uses the single liveness probe and grace,
-then interrupts and audits declared paths. A clean audit preserves the same
-decision/reference and pauses without advancing attempt or replacement counts;
-progress before readiness is a contract violation. Repeated clean starts never
-become `specialist-retry-exhausted` and never authorize an unbounded redispatch
-loop.
+Before spawn, Main verifies the exact reference, correlation tokens, capsule
+bytes, and durable authority event. The spawn starts the counted attempt; there
+is no intermediate readiness handshake. Before any repository read, the
+specialist independently verifies the reference path, SHA-256, canonical
+capsule bytes, scope identity, and bounded correlation values, then proceeds
+directly with the capsule work.
 
-After readiness the specialist takes every operational coordinate from the
-capsule, stays inside its role-specific ownership, authorizes each workspace
-write mechanically, and returns exact writes/evidence to Main. Main alone owns
-state, events, reports, correction authority, Freeze, gates, and publication.
+A missing, stale, malformed, or mismatched reference/correlation closes as
+`dispatch-reference-invalid` with no repository work. Because Main already
+preflighted the same bytes, this result is a mechanical dispatch defect: Main
+may re-certify and redispatch the unchanged semantic scope without fresh
+authority or replacement-budget use. Silence uses the ordinary counted
+specialist liveness lease and never creates a separate start state.
+
+The specialist takes every operational coordinate from the capsule, stays
+inside its role-specific ownership, authorizes each workspace write
+mechanically, and returns exact writes/evidence to Main. Main alone owns state,
+events, reports, correction authority, Freeze, gates, and publication.
 
 ## Two-halves rule
 

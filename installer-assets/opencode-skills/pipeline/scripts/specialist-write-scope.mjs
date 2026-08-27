@@ -5,7 +5,7 @@ import {
   realpathSync,
 } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
-import { pathToFileURL } from "node:url";
+import { isDirectExecution } from "./cli-entrypoint.mjs";
 
 export const SPECIALIST_WRITE_SCOPE_SCHEMA_VERSION = 1;
 
@@ -185,7 +185,7 @@ function parseJson(value) {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution(import.meta.url)) {
   const [operation, raw, ...rest] = process.argv.slice(2);
   const input = rest.length === 0 ? parseJson(raw) : null;
   const output = operation === "validate"

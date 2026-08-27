@@ -4,7 +4,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { lstat, mkdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { isDirectExecution } from "./cli-entrypoint.mjs";
 
 import { runBoundedCommand } from "./bounded-command.mjs";
 import { repairDerivedOpenSpecArtifacts, validateOpenSpecOverlay } from "./openspec-overlay.mjs";
@@ -1409,7 +1409,7 @@ export async function migrateLegacyV1ApprovedPlaceholderWorkspace({
   });
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution(import.meta.url)) {
   const [operation, raw] = process.argv.slice(2);
   if (!["repair-derived", "seal-dispatch", "verify-dispatch", "audit-dispatches", "bind-evidence-dispatch", "verify-evidence-dispatch", "migrate-v1", "verify-v1-migration"].includes(operation) || !safeString(raw, MAX_BYTES)) {
     process.stderr.write("openspec-bindings.mjs accepts repair-derived, seal-dispatch, verify-dispatch, audit-dispatches, bind-evidence-dispatch, verify-evidence-dispatch, migrate-v1, or verify-v1-migration with one bounded JSON argument; other operations are library helpers.\n");

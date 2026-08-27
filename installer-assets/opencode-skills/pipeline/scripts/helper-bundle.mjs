@@ -4,12 +4,15 @@
 import { createHash, randomUUID } from "node:crypto";
 import { chmod, lstat, mkdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
+import { isDirectExecution } from "./cli-entrypoint.mjs";
 
 export const HELPER_BUNDLE_SCHEMA_VERSION = 1;
-export const HELPER_COMPATIBILITY_EPOCH = "team-harness-pipeline-helper-api-v3";
+export const HELPER_COMPATIBILITY_EPOCH = "team-harness-pipeline-helper-api-v4";
 export const PIPELINE_HELPERS = Object.freeze([
   "bounded-command.mjs",
+  "cli-entrypoint.mjs",
+  "code-hygiene.mjs",
   "commit-integrity.mjs",
   "correction-packet-preflight.mjs",
   "helper-bundle.mjs",
@@ -84,6 +87,19 @@ async function canonicalDirectory(value, errorCode) {
   const resolved = await realpath(value);
   const stat = await lstat(resolved);
   if (resolved !== value || !stat.isDirectory() || stat.isSymbolicLink()) throw new Error(errorCode);
+  return resolved;
+}
+
+async function canonicalSourceDirectory(value) {
+  if (typeof value !== "string" || !path.isAbsolute(value) || path.resolve(value) !== value) {
+    throw new Error("SOURCE_ROOT_INVALID");
+  }
+  const resolved = await realpath(value);
+  const stat = await lstat(resolved);
+  const moduleDirectory = await realpath(path.dirname(fileURLToPath(import.meta.url)));
+  if (!stat.isDirectory() || stat.isSymbolicLink() || resolved !== moduleDirectory) {
+    throw new Error("SOURCE_ROOT_INVALID");
+  }
   return resolved;
 }
 
@@ -171,7 +187,7 @@ export async function materializeHelperBundle(input = {}) {
   try {
     if (!exactKeys(input, MATERIALIZE_KEYS)) throw new Error("ARGUMENT_INVALID");
     const workspace = await canonicalDirectory(input.workspace, "WORKSPACE_INVALID");
-    const sourceRoot = await canonicalDirectory(input.source_root, "SOURCE_ROOT_INVALID");
+    const sourceRoot = await canonicalSourceDirectory(input.source_root);
     const sourceFiles = [];
     for (const name of [...PIPELINE_HELPERS].sort()) {
       const value = await regularFile(sourceRoot, path.join(sourceRoot, name), "SOURCE_HELPER_INVALID");
@@ -246,7 +262,7 @@ function parseInput(raw) {
   } catch { return null; }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution(import.meta.url)) {
   const [operation, raw, ...rest] = process.argv.slice(2);
   const input = rest.length === 0 ? parseInput(raw) : null;
   const result = operation === "materialize" ? await materializeHelperBundle(input)

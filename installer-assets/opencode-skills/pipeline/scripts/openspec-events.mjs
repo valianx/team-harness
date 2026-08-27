@@ -4,7 +4,7 @@
 import { lstat, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { pathToFileURL } from "node:url";
+import { isDirectExecution } from "./cli-entrypoint.mjs";
 
 export const OPENSPEC_EVENTS_SCHEMA_VERSION = 1;
 
@@ -197,7 +197,7 @@ function parseCli(argv) {
   return result;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution(import.meta.url)) {
   const result = await validateOpenSpecEvents(parseCli(process.argv.slice(2)) ?? {});
   process.stdout.write(`${JSON.stringify(result)}\n`);
   if (result.verdict !== "pass") process.exitCode = 1;

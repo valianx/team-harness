@@ -1026,8 +1026,10 @@ await check("CLI output persists complete quality evidence and emits only a boun
   const manifest = baseManifest({ test: command("process.stdout.write('ok')") });
   await temporaryRepository({ manifest }, async ({ workspace, repo, manifestPath, base }) => {
     const output = path.join(repo, ".git", "quality-result.json");
+    const bridgedScripts = path.join(workspace, "bridged-helper-scripts");
+    await symlink(path.dirname(runnerPath), bridgedScripts, process.platform === "win32" ? "junction" : "dir");
     const processResult = spawnSync(node, [
-      runnerPath,
+      path.join(bridgedScripts, "quality-runner.mjs"),
       "--repo", repo,
       "--workspace", workspace,
       "--manifest", manifestPath,

@@ -15,7 +15,7 @@ workspace artifacts. Follow existing repository conventions and
 ### OpenSpec-bound evidence
 
 Read and apply `agents/_shared/dispatch-contract.md` § "Pipeline specialist
-reference" before any OpenSpec-bound action. After readiness, repository test
+reference" before any OpenSpec-bound action. After reference verification, repository test
 edits stay inside capsule ownership, evidence roots remain coordinate-only and
 read-only, and every workspace write requires the capsule's exact write-scope
 authorization. No role name implies report ownership. Task-intent identity is

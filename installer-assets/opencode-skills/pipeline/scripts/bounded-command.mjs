@@ -24,7 +24,7 @@ import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { lstat, open, realpath, rename, unlink } from "node:fs/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { isDirectExecution } from "./cli-entrypoint.mjs";
 
 export const BOUNDED_COMMAND_SCHEMA_VERSION = 1;
 export const BOUNDED_COMMAND_RECEIPT_SCHEMA_VERSION = 1;
@@ -784,7 +784,7 @@ export function boundedCommandProcessStatus(result) {
   return valid && result.outcome === "completed" && result.error_code === null && result.exit_code === 0 ? 0 : 1;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution(import.meta.url)) {
   const envelope = await main(process.argv.slice(2));
   process.stdout.write(`${JSON.stringify(envelope)}\n`);
   process.exitCode = boundedCommandProcessStatus(envelope);

@@ -135,10 +135,10 @@ each target path. A missing or ambiguous owner blocks before authority; Main
 never guesses or manually appends a shard/source/hash tuple. This derived owner
 does not widen scope because its path was already in the correction package.
 
-Prompt contents, reference verification, readiness, pre-ready failure, and
-silent-start handling are owned only by
+Prompt contents, reference verification, invalid-reference recovery, and
+attempt start are owned only by
 `agents/_shared/dispatch-contract.md` § "Pipeline specialist reference". Apply
-that contract here; never restate or specialize its handshake in this phase
+that contract here; never restate or specialize it in this phase
 reference.
 
 The capsule is the one canonical owner of roots, owned files, discovery,
@@ -223,7 +223,7 @@ service+task+role package to `next_attempt: 1`; other packages, correction
 budgets, progress, seals, and historical attempts remain untouched. A second
 generation-2 identity, non-clean prior attempt, different failure code, or
 coordinate drift fails closed. Every fresh capsule derivation reruns
-`verify-evidence-dispatch` before it can return `dispatch-ready`.
+`verify-evidence-dispatch` before it can return a verified dispatch reference.
 
 For an already repaired legacy `sharded-v1` workspace whose original approved
 aggregate contained placeholder overlays, never overwrite the original Gate or
@@ -494,9 +494,10 @@ authorizes an immediate dispatch while another selected diagnostic is pending.
 Before generating a correction nonce, presenting choices, or recording an
 autonomous decision, derive the canonical dispatch reference above. `repair-index`
 may add only missing `pending` rows; Main closes them before retrying. No
-`dispatch-ready-before-authority` result means no nonce or consumed authority.
-Before spawn, re-certify the same scope identity. A pre-ready transport/capsule
-repair with unchanged identity reuses the decision and consumes no attempt;
+`dispatch-reference-ready-before-authority` result means no nonce or consumed
+authority. Before spawn, re-certify the same scope identity. A mechanical
+transport/capsule repair with unchanged identity reuses the decision and
+consumes no replacement budget;
 identity drift requires a fresh consolidated package and decision.
 
 Test blobs are immutable only during their own active red-to-green transition.
@@ -525,9 +526,8 @@ If delivery was unconfirmed and that audit finds progress, send exactly one
 `TH-LIVENESS-RESUME` to the same thread and token with the unchanged dispatch
 reference and decision reference; it consumes no new correction authority. Confirmed-delivery
 progress, a second continuation failure, or operator cancellation blocks as
-`specialist-interrupted-with-progress`. Before readiness, apply only the shared
-dispatch contract; no attempt/replacement counter advances. After readiness, a
-clean first counted attempt may be replaced once by a fresh same-role V2 specialist, and a clean second timeout blocks as
+`specialist-interrupted-with-progress`. A clean first counted attempt may be
+replaced once by a fresh same-role V2 specialist, and a clean second timeout blocks as
 `specialist-retry-exhausted`. Never run a concurrent replacement, retry
 indefinitely, infer delivery from a successful send call, or let Main perform
 the role as a local fallback. Persist the classifier result and delivery state
@@ -809,6 +809,12 @@ authorization; it is never an automatic retry.
 With no implementer package, persist the overreach-proof result/hash, cleaner
 commit, candidate identity, and `cleaner_evidence.status: pass`.
 
+Task dispatch preflight blocks only a selected required task whose row is
+missing or pending; unrelated future rows remain diagnostic so dependency order
+can advance. Freeze is the global barrier: recompute the required set from all
+writable overlays and require `required_missing_count: 0` plus
+`status_counts.pending: 0` before quality or hygiene can pass.
+
 Whether the repository cleanup passed, was an empty no-op, was not applicable,
 or completed an authorized handoff, Main runs exactly one quality runner
 checkpoint named `post_implementation` per candidate tree, at Freeze, before
@@ -830,8 +836,10 @@ requires a fresh run bound to the new tree; an unchanged candidate tree never
 re-runs. The run remains mandatory when the cleanup is not
 applicable; focused implementation or cleaner evidence cannot substitute for
 it. Persist its closed result and SHA-256, evaluate the overreach proof above
-when a cleanup commit exists, then run the fixed code-hygiene scan before
-Freeze. The final base-to-candidate path proof must include every changed
+when a cleanup commit exists, then invoke the verified helper-bundle
+`code-hygiene.mjs` exactly per `docs/code-hygiene-gate.md § 3.1` and require its
+hash-matched receipt/result before Freeze. Coordinator prose never recreates
+the helper's patterns or argv. The final base-to-candidate path proof must include every changed
 snapshot-bound `openspec/` source and must exclude
 `.team-harness/quality.json`; either mismatch blocks Freeze. QA still audits
 the frozen result independently.

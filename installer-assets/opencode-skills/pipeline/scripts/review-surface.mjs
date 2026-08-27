@@ -5,7 +5,7 @@ import { execFile } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import { promisify } from "node:util";
-import { pathToFileURL } from "node:url";
+import { isDirectExecution } from "./cli-entrypoint.mjs";
 
 export const REVIEW_SURFACE_SCHEMA_VERSION = 1;
 
@@ -231,7 +231,7 @@ function parseCli(argv) {
   return parsed;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution(import.meta.url)) {
   const result = await computeReviewSurface(parseCli(process.argv.slice(2)) ?? {});
   process.stdout.write(`${JSON.stringify(result)}\n`);
   if (result.verdict !== "pass") process.exitCode = 1;
