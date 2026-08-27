@@ -670,20 +670,22 @@ After every phase transition, update `00-state.md`. This is the orchestrator's p
 
 ### Artifact verification
 
-After every dispatch returning `success`, verify the expected doc exists on disk before proceeding.
+After every dispatch returning `success`, validate its structured return and,
+for every non-`none` row below, verify the expected doc exists on disk before
+proceeding.
 
 | Agent | Phase | Expected |
 |---|---|---|
 | `architect` | `design` | `01-plan.md` + any triggered `sketches/*` |
 | `architect` | `design` root-cause | `01-root-cause.md` **and** `01-plan.md` |
-| `implementer` | `implementation` | `02-implementation.md` |
+| `implementer` | `implementation` | none — Main consolidates `02-implementation.md` from verified returns |
 | `tester` | `implementation` regression | `02-regression-test.md` |
 | `tester` | `implementation` evidence | `03-testing.md` |
 | `qa` | `validation` | `reviews/04-validation.md` |
 | `adversary` | `validation` | initial: `reviews/04-adversary.md`; operator amend `N`: `reviews/04-adversary-amend-{N}.md` |
 | `qa-plan` | explicit plan-review | `reviews/01-plan-review.md § Plan Ratification` |
 | `plan-reviewer` | explicit plan-review | `reviews/01-plan-review.md § Plan Review` |
-| `delivery` | `delivery` | `inputs/pr-body-draft.md` + the pipeline Acceptance Matrix |
+| `delivery` | `delivery` | `inputs/pr-body-draft.md § Acceptance Matrix` **and** `inputs/acceptance-matrix.md § Acceptance Matrix` |
 
 For `adversary`, resolve the expected path from the current dispatch/status
 block's exact `audit_run`: `initial` maps to `reviews/04-adversary.md` and
@@ -691,9 +693,24 @@ block's exact `audit_run`: `initial` maps to `reviews/04-adversary.md` and
 report or select the greatest suffix. If the exact current report is absent,
 verification fails even when an older amend report exists.
 
-Exists and non-empty → proceed. Otherwise append `artifact.missing` (`action: retry`) and re-dispatch **exactly once** with an explicit "your artifact was not found" instruction. A second failure → `artifact.missing` (`action: escalate`), `status: blocked`. This is the `artifact-missing` failure kind (`agents/ref-pipeline.md § Failures`).
+For a non-`none` row, every named file must exist and be non-empty. When the
+expected coordinate names a section, its exact `## {name}` heading must occur
+once and its body before the next `##` heading (or EOF) must contain nonblank
+content. A different section in the same shared file does not satisfy the row.
+Only after all applicable file and section checks pass → proceed. Otherwise append
+`artifact.missing` (`action: retry`) and re-dispatch **exactly once** with an
+explicit "your artifact was not found" instruction. A second failure →
+`artifact.missing` (`action: escalate`), `status: blocked`. This is the
+`artifact-missing` failure kind (`agents/ref-pipeline.md § Failures`).
 
-**No agent in the table above is exempt.** `qa-plan` in ratify mode writes `reviews/01-plan-review.md § Plan Ratification` per the panel contract (`agents/_shared/plan-consolidation.md § "Section-ownership map"`), so its row is verified like any other. An exemption would only apply to an agent producing no artifact at all, and the table lists none.
+The implementer row deliberately has no specialist-written artifact: Main
+first verifies its structured return and exact `workspace_writes`, records the
+result durably, then writes the single cross-repository
+`02-implementation.md`. Verify that coordinator-owned consolidation before
+opening validation. `qa-plan` in ratify mode still writes
+`reviews/01-plan-review.md § Plan Ratification` per the panel contract
+(`agents/_shared/plan-consolidation.md § "Section-ownership map"`), so every
+other non-`none` row is verified after return.
 
 ### Final sanity check
 
@@ -701,7 +718,8 @@ After delivery returns `success`, before the GitHub update substep:
 
 1. Enumerate the `status: success` rows in `§ Agent Results`.
 2. Resolve each expected artifact from the table above, excluding no-file rows.
-3. Verify each exists and is non-empty.
+3. Verify each file exists and is non-empty and every named section passes the
+   exact-heading, exactly-once, non-empty-body check above.
 4. Verify `00-pipeline-summary.md` exists, is non-empty, and contains `## Cost`.
 5. Verify the trace exists and `phase.end` count ≥ the count of `[x]` checklist rows.
 

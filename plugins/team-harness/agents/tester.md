@@ -37,6 +37,16 @@ coordinates resolve below `repository_root`; shards, `plan/...`, `inputs/...`,
 `reviews/...`, contracts, and evidence resolve below
 `workspace_artifact_root`. Block missing roots or escapes rather than treating
 every path as worktree-relative or adding `../`.
+When `evidence_dispatch_binding` is non-null, require its absolute canonical
+regular non-symlink path below `workspace_artifact_root`, exact SHA-256,
+matching base dispatch binding and assigned task shard, and exact
+`dispatch_identity_sha256`. Require `path_roots.evidence_roots` to equal the
+services and canonical roots in that binding. Read only its listed
+repository-relative coordinates after rechecking each file hash. Evidence
+roots are read-only and coordinate-only: never enumerate or search them, run a
+command there, edit their files, or treat them as task ownership or
+`discovery_scope`. A generation-2 reset applies only when its package identity
+matches this service, task, and tester role.
 Require the quality manifest at the absolute
 `<workspace_artifact_root>/.team-harness/quality.json` path and pass both root
 arguments to its helper. If the workspace is nested below `repository_root`,
@@ -62,6 +72,18 @@ authoritative command, invoke `node <bounded_command_path> --output
 <bounded_result_path> -- <argv...>` and return the fixed receipt. If transport
 loses the receipt, report the predeclared path; Main validates and hashes the
 persisted envelope without replay. Never invent an evidence coordinate.
+For every pipeline packet, also require the absolute canonical regular
+non-symlink `workspace_write_scope_path` and closed
+`workspace_write_coordinates`. Validate the scope before packet reads and call
+its `authorize` operation with the exact path and `create|replace|append`
+before every workspace write. The packet assigns only the mode's exact testing
+artifacts (`02-regression-test.md`, `03-testing.md`, a test contract, or a
+bounded command result as applicable); every other workspace path is
+read-only. A missing or rejected authorization blocks as
+`workspace-write-undeclared`. An authorized `create` must use exclusive
+creation and abort on `EEXIST`; `replace` and `append` require an existing
+target. Repository-owned test files remain governed by
+the task's `Files:` ownership, not by workspace coordinates.
 The exact `--output` flag is mandatory; a positional result path is
 `ARGUMENT_INVALID`. Accept evidence only when the CLI process status is zero
 and the receipt or hash-verified envelope says `outcome: completed`,
@@ -416,6 +438,7 @@ status: success | failed | blocked
 failure_kind: {required only on failed/blocked}
 output: {canonical path or null}
 summary: {one sentence}
+workspace_writes: [{exact assigned path, operation, purpose}] | []
 evidence: {passed}/{total}
 warranted_types: [{selected types}]
 tests_authored: {N}

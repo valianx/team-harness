@@ -107,6 +107,7 @@ export const sharedPipelineScripts = [
   "openspec-bindings.mjs",
   "openspec-events.mjs",
   "specialist-liveness.mjs",
+  "specialist-write-scope.mjs",
   "review-surface.mjs",
 ];
 

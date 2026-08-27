@@ -38,6 +38,16 @@ coordinates below the former; resolve shard, `plan/...`, `inputs/...`,
 `reviews/...`, and evidence paths below the latter. Block missing/mismatched
 roots or escapes; never treat workspace artifacts as worktree-relative, use
 `../`, or copy them into the repository.
+When `evidence_dispatch_binding` is non-null, require its absolute canonical
+regular non-symlink path below `workspace_artifact_root`, exact SHA-256,
+matching base dispatch binding and assigned task shard, and exact
+`dispatch_identity_sha256`. Require `path_roots.evidence_roots` to equal the
+services and canonical roots in that binding. Read only its listed
+repository-relative coordinates after rechecking each file hash. Evidence
+roots are read-only and coordinate-only: never enumerate or search them, run a
+command there, edit/stage their files, or treat them as `Files:` or
+`discovery_scope`. A generation-2 reset applies only when its package identity
+matches this service, task, and role.
 Before any packet-derived read, require the non-empty `artifact_coordinates`
 array. The task shard must preserve the exact case-sensitive indexed
 `plan/tasks/Task-N.md` path and an invariant must be an `INV-N` anchor inside
@@ -58,6 +68,19 @@ authoritative command, invoke `node <bounded_command_path> --output
 <bounded_result_path> -- <argv...>` and return the fixed receipt. If transport
 loses the receipt, report the predeclared path; Main validates and hashes the
 persisted envelope without replay. Never invent an evidence coordinate.
+Require the packet's absolute canonical regular non-symlink
+`workspace_write_scope_path` and closed `workspace_write_coordinates` array.
+Run `node <workspace_write_scope_path> validate <bounded-json>` before any
+packet-derived read. Before every proposed workspace write, run its `authorize`
+operation with the exact absolute path and `create|replace|append`; a non-pass
+result is `workspace-write-undeclared` and the write does not occur. Every
+workspace path is read-only unless its exact coordinate and operation pass.
+An authorized `create` must use an exclusive-create primitive and abort on
+`EEXIST`; never turn it into replacement after authorization. `replace` and
+`append` require the target to exist when authorized.
+`bounded_result_path`, when present, must be that same exact authorized
+coordinate. `02-implementation.md`, state, events, plans, reviews, and sibling
+reports are never implicitly writable.
 Inspect at most one source/artifact file per tool call with a declared output
 cap. For a potentially large file, use bounded `rg -n` anchors and separate
 line ranges. Never concatenate all task files or directories; a truncated
@@ -79,7 +102,7 @@ on absence/mismatch instead of querying `.tasks[]` or guessing alternate keys.
 
 ## Voice
 
-See `agents/_shared/operational-rules.md` § "Voice" and § "Language register". `02-implementation.md` is agentic-tier and stays English.
+See `agents/_shared/operational-rules.md` § "Voice" and § "Language register". The structured return stays English.
 
 ## Untrusted content
 
@@ -87,10 +110,7 @@ See `agents/_shared/untrusted-content.md`.
 
 ## Silent execution and token budget
 
-**Operate silently.** Invoke tools directly. Do not narrate searches, intended next steps, reads, edits, successful commands, or self-review. Prose has exactly two destinations:
-
-1. the bounded `02-implementation.md` artifact; and
-2. the final status block.
+**Operate silently.** Invoke tools directly. Do not narrate searches, intended next steps, reads, edits, successful commands, or self-review. Prose goes only in the final status block; Main owns implementation-report consolidation.
 
 On failure, return the compact error required by § Return Protocol. Do not stream raw logs or repeat tool output unless the exact error is necessary for the coordinator's next decision.
 
@@ -111,7 +131,7 @@ When `failure-brief.md` declares `Blast radius: localized {IDs}`:
 - edit only the named ACs, files, functions, or plan-step elements;
 - read the assigned task slice and the failure brief, not the whole workspace again;
 - leave every other implementation element unchanged; and
-- record the correction under `02-implementation.md § Outcome`.
+- return the correction under `finding_resolutions` in the final status.
 
 `Blast radius: structural` uses the standard task contract. A bounded patch never means zero context: the assigned AC and failure brief remain mandatory.
 
@@ -156,7 +176,7 @@ The assigned task's `Files:`, AC block, and TC block are authoritative. Modify o
 [SCOPE-DRIFT: file X required for AC-N]
 ```
 
-Record it under `02-implementation.md § Scope Drift` and surface it in the status block. Do not silently widen scope.
+Return it under `scope_drift` in the final status. Do not silently widen scope.
 
 **Documentation exception.** Edit a tracked README or `docs/**` file only when
 that exact path appears in the assigned task and an AC requires either the
@@ -199,7 +219,7 @@ The repository and approved architecture outrank generic style preferences.
 - Avoid new N+1 work, unbounded collections, or leaked resources on the changed path.
 - Never run broad destructive commands, rewrite shared history, or push with force.
 
-**Reviewability.** A changed function should stay within 40 lines, 4 parameters, and 3 nesting levels when that improves readability. Do not split coherent code merely to satisfy a number. When a changed function exceeds a cap deliberately, record `file:line` and the reason under `02-implementation.md § Reviewability Exceptions`.
+**Reviewability.** A changed function should stay within 40 lines, 4 parameters, and 3 nesting levels when that improves readability. Do not split coherent code merely to satisfy a number. When a changed function exceeds a cap deliberately, return `file:line` and the reason under `reviewability_exceptions`.
 
 ## Session Context Protocol
 
@@ -228,9 +248,13 @@ Read only this manifest:
 
 Missing optional evidence is skipped. Missing workspace, `01-plan.md`, or a bounded patch's `failure-brief.md` returns `status: blocked`, `failure_kind: artifact-missing`.
 
-`mode: inline` is the only planless route. Its dispatch must contain literal scope; otherwise block. Inline work does not invent pipeline artifacts, including `02-implementation.md`.
+`mode: inline` is the only planless route. Its dispatch must contain literal scope; otherwise block. Inline work does not invent pipeline artifacts.
 
-Never write `01-plan.md`, `plan/**`, workspace state, testing artifacts, validation reports, or a second/suffixed implementation document. Your only workspace write is `02-implementation.md`.
+Never write `02-implementation.md`, `01-plan.md`, `plan/**`, workspace state or
+events, testing artifacts, validation reports, or another report unless the
+exact path and operation appear in `workspace_write_coordinates` and the
+write-scope helper authorizes them. Normal implementation packets assign no
+report coordinate: return evidence to Main for consolidation instead.
 
 ## Phase 0 — Targeted verification
 
@@ -310,39 +334,16 @@ constraint_discovered:
 
 Use `status: blocked`, `failure_kind: contradiction`. Do not implement a substitute.
 
-When the AC remains true but an internal mechanical choice differs, continue and record a `technical` or `scope` constraint under `02-implementation.md § Deviations from Architecture`. A reasonable choice already permitted by the AC is not a constraint.
+When the AC remains true but an internal mechanical choice differs, continue and return a `technical` or `scope` entry under `deviations`. A reasonable choice already permitted by the AC is not a constraint.
 
-## Session Documentation
+## Session evidence
 
-For pipeline mode, write only information that cannot be reconstructed from the plan, state, status block, or Git. Omit empty sections. Include `Documentation Consulted` only when Context7 ran or required third-party verification fell back because Context7 was unavailable or the library could not be resolved. A normal artifact is 5–15 lines. Inline mode writes no artifact.
-
-```markdown
-# Implementation: {feature-name}
-
-## Outcome
-{One or two sentences covering the implemented behavior and any non-obvious choice.}
-
-## Deviations from Architecture
-{Only when present.}
-
-## Scope Drift
-{Only when present.}
-
-## Reviewability Exceptions
-{Only when present: file:line + reason.}
-
-## Known Limitations
-{Only when an AC-authorized limitation remains.}
-
-## Documentation Consulted
-- `{Library}@{version}` — `{API or behavior verified | Context7 unavailable or unresolved; used local pinned-version evidence}`
-
-## Checks Run
-- `{targeted command}` — pass | fail
-
-## Commit
-`{sha}` | `lane-deferred` | `none — no source change`
-```
+Return only information Main cannot reconstruct from the plan or Git. Omit
+empty fields. Include `documentation_consulted` only when Context7 ran or
+required third-party verification fell back because Context7 was unavailable
+or the library could not be resolved. Do not create a workspace report; Main
+durably records the bounded result and consolidates all repositories into the
+single implementation artifact.
 
 ## Commit Contract
 
@@ -396,8 +397,14 @@ The final message is this compact status block only:
 agent: implementer
 status: success | failed | blocked
 failure_kind: {kind}   # required on failed/blocked; omit on success
-output: workspaces/{feature-name}/02-implementation.md | none — inline
+output: none — Main consolidates
 summary: {1-2 sentences; N files changed, behavior delivered, deviation if any}
+workspace_writes: [{exact assigned path, operation, purpose}] | []
+deviations: [{kind: technical|scope, description}] | []
+scope_drift: [{path, ac, reason}] | []
+reviewability_exceptions: [{file_line, reason}] | []
+checks: [{command, result: pass|fail}]
+documentation_consulted: [{library_version, subject, evidence}] | []
 finding_resolutions:
   - {finding_id, cause, files, requirement: AC-N|TC-N, correction, closure_evidence, closure_result: pass|fail}
   # one entry for every finding in the assigned correction package; [] outside correction work
@@ -408,7 +415,7 @@ constraint_discovered: {ac, kind, description, proposed_resolution} | null
 issues: {blockers or "none"}
 ```
 
-Do not repeat `02-implementation.md`, the diff, tool chronology, or successful command output in chat. The coordinator records a concise result observation.
+Do not create or repeat `02-implementation.md`, the diff, tool chronology, or successful command output in chat. Main verifies `workspace_writes`, records a concise result event, and consolidates the report.
 
 ## Liveness Probe
 

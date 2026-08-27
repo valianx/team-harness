@@ -163,6 +163,15 @@ Never compensate for a missing packet fact with Main's transcript, an
 implementer's narrative, sibling shards, the full plan, historical tool output,
 or a prompt recap.
 
+For implementer and tester packets, also resolve the packaged
+`scripts/specialist-write-scope.mjs` and include its verified absolute path plus
+closed `workspace_write_coordinates`. The implementer validates that scope and
+authorizes every workspace write mechanically. The normal coordinate set is
+empty for implementers: the role returns structured evidence and Main alone consolidates
+`02-implementation.md`. A report, result, or evidence artifact is writable only
+when its exact absolute coordinate, purpose, and operation are assigned; the
+workspace root itself never grants write ownership.
+
 Before a dispatch that uses a task shard, preflight the exact shard and fail
 closed unless it declares usable `required_invariants`,
 `required_evidence_anchors`, and `cross_runtime_preservation` values for the
@@ -182,12 +191,17 @@ change that rule. Track the separate role SLA from dispatch time: architect 10
 minutes, implementer 15, tester 10, cleaner 5, QA 5, security 10, and delivery
 5, unless the project's `## Pipeline Timeouts` changes those SLA values.
 
-When the role SLA expires, tell the operator once that the agent is still
-running and append one compact `agent.sla` event with only the universal event
-envelope plus a plain `observation`. Do not request heartbeats, inspect partial
-artifacts, infer failure, interrupt, or replace the agent because of elapsed
-time. Keep waiting for the agent or live operator input. Optional legacy SLA
-details may be read but are never required or produced by a new run.
+The architect retains its operator-owned timeout. For every
+implementation-or-later specialist, when the role SLA expires evaluate the
+packaged `scripts/specialist-liveness.mjs` contract: send one token-bound probe,
+record native message acceptance as delivery `unconfirmed` unless an explicit
+receipt proves otherwise, allow its fixed grace, then interrupt before auditing
+only declared paths. An unconfirmed-delivery interruption with progress permits
+one same-thread, same-token continuation of the unchanged packet without new
+correction authority. Confirmed-delivery progress, a second continuation
+failure, clean replacement exhaustion, or operator cancellation blocks with
+the helper's exact cause. Never infer delivery from a successful send call or
+use Main as the specialist fallback.
 
 ### AC12/AC20 pre-execution command-output route
 
@@ -367,8 +381,8 @@ the role fields cannot see. The current digests are:
 | Role | SHA-256 of normalized TOML |
 |---|---|
 | `pipeline-architect` | `01c3366215ac8e4eddd1cffa7e92f0b8793a8c9ced0411ab2e6d612cdccaa69f` |
-| `pipeline-implementer` | `874b20898439b6cd944fd83d33a4e4663e5d3fc76d4e09f23c9b178152e6d6bd` |
-| `pipeline-tester` | `76ac91d1e162900f39a21531c7b99f53ebd13827b27e688aaea469f0cb4ff77b` |
+| `pipeline-implementer` | `fe09a0dc3322d083c09e844f5d5720253d8caa983068a3047939ab5eac04cbad` |
+| `pipeline-tester` | `4be2fcf6a9b76521a7309512882c018082354bfff8d40a370276cf2e9f63bbca` |
 | `pipeline-cleaner` | `8e17564f9835653b016b278324773d101b9c6158cda6d9826549e1af02026a9e` |
 | `pipeline-qa` | `85fa7bb2c471f6a70914965ae7980ad961e912908cc17492aa1dfcdc2346b655` |
 | `pipeline-security` | `cd15f37113ef88b9cfff744e97ff0ff51c31f1bf6817d2c9240957f27c4b7883` |

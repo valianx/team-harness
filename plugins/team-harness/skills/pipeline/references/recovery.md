@@ -298,12 +298,17 @@ another binding's authorization to make the aggregate pass.
 
 If recovery finds a nonterminal implementation-or-later specialist attempt,
 reconstruct its attempt number, token, dispatch time, probe/ACK timestamps, and
-declared owned/evidence paths before waiting or replacing it. Feed that state to
+probe delivery state, continuation count, and declared owned/evidence paths
+before waiting or replacing it. Feed that state to
 `scripts/specialist-liveness.mjs`; never reset the lease because Main restarted.
-An expired attempt is interrupted before a read-only declared-path audit. Only
-a clean first attempt permits one fresh same-role replacement; partial progress
-or exhausted attempt `2` remains blocked, and Main never supplies a local role
-fallback.
+Native send acceptance without an explicit receipt is `unconfirmed`; legacy
+v3.20.5 probe events lacking delivery state project to `unconfirmed`, never to
+`confirmed`. An expired attempt is interrupted before a read-only declared-path
+audit. When the helper returns `resume`, continue the same thread and token once
+with the unchanged packet and authority. Only a clean first attempt permits one
+fresh same-role replacement; a second continuation failure, confirmed-delivery
+partial progress, operator cancellation, or exhausted attempt `2` remains
+blocked, and Main never supplies a local role fallback.
 
 At recovery into implementation, a missing/corrupt OpenSpec-derived plan
 index, shard, quality manifest, or overlay is eligible for the single
@@ -320,14 +325,29 @@ rollback failure returns `DERIVED_REPAIR_INELIGIBLE` and changes nothing. It
 never silently routes to architect or opens a gate; a live operator must
 explicitly request any Design reopening.
 
-If `inputs/openspec/<service>/dispatch-binding.json` exists, recovery treats
-that service as permanently sealed: run `openspec-bindings.mjs verify-dispatch`
-against the current aggregate, Gate, and optional migration continuation before
-any fresh dispatch. A missing, malformed, or stale seal blocks and never routes
-to repair or digest rebinding. If no seal exists and repair is no longer
-needed, run `seal-dispatch` before constructing the packet; `DERIVED_SET_BUSY`
-means another serialized repair/seal operation still owns the service and no
-packet may be published.
+Before selecting any service, recovery runs `openspec-bindings.mjs
+audit-dispatches` over the complete ordered writable-binding set. Existing
+seals are verified against each binding's own durable progress position; every
+missing entry is repaired only by the existing create-only `seal-dispatch`,
+including a binding with historical progress. Rerun the complete audit after
+all missing entries are sealed and require `verdict: pass`; never resume merely
+because the currently requested service passes. A malformed or stale seal
+blocks and never routes to repair or digest rebinding. `DERIVED_SET_BUSY` means
+another serialized repair/seal operation still owns that service and no packet
+may be published. The audited canonical coordinate remains
+`inputs/openspec/<service>/dispatch-binding.json`, and every fresh packet still
+runs `verify-dispatch` against it.
+
+For a task whose only terminal blocker was absent cross-repository evidence,
+recovery may bind a generation-2 evidence dispatch only from a canonical
+`team_harness_packet_scope_insufficient` incident proving two clean exhausted
+attempts for that exact service, shard, and implementer/tester role. The helper
+verifies every evidence-only repository identity and file SHA-256, preserves
+the permanent base seal, creates a new task-local dispatch identity, and
+returns `next_attempt: 1`. Record the new pointer in state and reset no other
+attempt, progress record, correction counter, or binding. Recovery reruns
+`verify-evidence-dispatch` before each fresh packet; a stale source or second
+generation-2 request blocks.
 
 An implementation/tester return blocked only because an exact scoped Git write
 hit protected `.git/worktrees/.../index.lock` is a technical
@@ -494,8 +514,14 @@ evidenced file scope, `autonomous_correction_count`, and
 `operator_correction_count`. Before any correction authority has been consumed,
 Main may reconstruct mechanical coordinates from the frozen identity and the
 decision/findings ledgers, append an observation describing that recovery, and
-issue a fresh nonce. Derive missing counters from valid historical
-`correction.decision` events. If a finding disposition, closure expectation, or
+issue a fresh nonce. Before any budget decision, run the packaged recovery
+counter reconciler and derive both counters from valid historical authorize
+`correction.decision` events. The projection must equal state even when both
+fields are already present: atomically apply `REPAIR_CORRECTION_COUNTERS` on
+`CORRECTION_COUNTER_MISMATCH`, then rerun and require `pass`. Malformed,
+duplicate, or more than three autonomous authority events block with the
+helper's explicit code; never preserve, clamp, or trust an inflated snapshot
+value. If a finding disposition, closure expectation, or
 other semantic fact is absent or ambiguous, re-present triage; never invent it,
 dispatch an agent, mutate product/evidence files, rebuild Freeze, or revalidate
 without a new valid decision. Once authority has been consumed, its identity

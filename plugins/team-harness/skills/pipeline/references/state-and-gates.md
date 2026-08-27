@@ -67,6 +67,7 @@ openspec_design_pass: preflight|provisioning|planning|snapshot|overlay|gate1-rea
 workspace_identity: {schema_version, kind, workspace_kind, logs_mode, coordinator_root, repo_base, date, feature, initiative, services, evidence_repositories}
 openspec_bindings: [{service, role, repository_root, repository_identity, change_name, planning_root, schema, cli_version, generated_skill_identity, task_intent_sha256, strict_validation, preflight, design_pass, snapshot_path, snapshot_sha256, overlay_path, overlay_sha256}]
 evidence_repositories: [{service, role: evidence-only, repository_root, repository_identity, purpose}]
+evidence_dispatch_bindings: [{service, task_shard_path, role: implementer|tester|null, generation: 1|2, path, sha256, dispatch_identity_sha256}]
 openspec_aggregate_path: inputs/openspec-bindings.json|null
 openspec_aggregate_sha256: {SHA-256|null}
 herdr_deliveries: [{message_id, target, pane_id, status, reason_code, staged, submitted, verified}]
@@ -158,11 +159,17 @@ without rewriting their state schema.
 
 Specialist liveness remains append-only event state rather than a mutable
 coordinator-state field. `agent.sla.extra` records `{attempt, attempt_token,
-liveness_action, deadline_at}`; after interruption, `agent.close.extra` repeats
-the identity and records `owned_paths_changed`, `evidence_changed`, and the
-closed liveness `failure_kind`. Persist declared path names and booleans only,
-never partial file contents. Recovery uses those timestamps and cannot reset an
-expired lease.
+liveness_action, deadline_at, probe_delivery_state,
+probe_delivered_at|null, continuation_count}`. A successful native message call
+without an explicit delivery/read receipt records `unconfirmed`; a matching ACK
+itself proves delivery. After interruption, `agent.close.extra` repeats the
+identity and records `owned_paths_changed`, `evidence_changed`,
+`interruption_cause`, `continuation_count`, and the closed liveness
+`failure_kind`. These are nested `extra` fields on canonical `agent.sla` and
+`agent.close` events, not new event names. Persist declared path names and
+booleans only, never partial file contents. Recovery uses those timestamps and
+cannot reset an expired lease; legacy v3.20.5 probes without delivery state are
+`unconfirmed`.
 
 When non-null, `quality_manifest_path` must be a regular non-symlink below
 `workspace`. If that workspace is below a participating repository, the
@@ -173,9 +180,19 @@ during recovery before running quality.
 
 `autonomous_correction_count` is an integer from `0` through `3` and is the
 only correction budget. `operator_correction_count` is a non-negative,
-monotonic, deliberately unbounded integer. `iteration: N/3` is a
+monotonic, deliberately unbounded integer. Both are exact materialized
+projections of valid authorize `correction.decision` events for their matching
+authority; recovery verifies them even when present and mechanically repairs a
+mismatch before consulting either budget. `iteration: N/3` is a
 legacy-readable display mirror only; new runs may omit it and derive it for
 presentation. Initialize both counters at `0`.
+
+`evidence_dispatch_bindings` contains at most one active pointer per
+service/task pair. Generation 1 binds planned read-only evidence and has a null
+role. Generation 2 supersedes that pointer only for a certified
+`PACKET_SCOPE_INSUFFICIENT` recovery and names the exact implementer/tester role
+whose clean exhausted attempts restart; it never deletes or rewrites the prior
+workspace artifact.
 
 `cleaner_repo_evidence` is complete only when its canonical identity set equals
 `participating_repositories` exactly, with neither missing, extra, nor duplicate

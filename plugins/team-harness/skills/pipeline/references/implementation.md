@@ -118,13 +118,35 @@ Record that pause as `git-metadata-permission`.
 
 Every specialist packet carries the closed root map `path_roots: {
 repository_root: <absolute canonical worktree>, workspace_artifact_root:
-<absolute canonical workspace> }`. Resolve task `files` and OpenSpec source
+<absolute canonical workspace>, evidence_roots: {<evidence-service>:
+<absolute canonical read-only root>} }`; `evidence_roots` is empty unless a
+verified task evidence dispatch below requires it. Resolve task `files` and OpenSpec source
 coordinates only below `repository_root`; resolve `plan/...`, `inputs/...`,
 `reviews/...`, task shards, contracts, and `required_evidence_anchors` only
-below `workspace_artifact_root`. Validate containment before reading. Never
+below `workspace_artifact_root`. Resolve only exact hash-bound external
+coordinates below their named `evidence_roots` entry. Validate containment
+before reading. Never
 interpret a workspace artifact path relative to the repository, invent `../`
 traversal, or copy artifacts into the worktree. Missing root/domain or a path
 that escapes its declared root blocks the dispatch packet.
+
+Resolve the packaged `scripts/specialist-write-scope.mjs` beside the active
+pipeline skill before every implementer or tester dispatch. The packet carries that
+absolute canonical regular non-symlink path as `workspace_write_scope_path`
+plus a closed `workspace_write_coordinates` array of exact absolute paths,
+allowed `create|replace|append` operations, and purposes. The implementer runs
+the helper's `validate` operation before packet reads and its `authorize`
+operation before every workspace write. Normal implementation packets use an
+empty array: `02-implementation.md`, state, events, plans, inputs, evidence,
+reviews, and sibling reports remain coordinator-owned and read-only for the
+implementer. A tester packet assigns only the exact mode-specific
+`02-regression-test.md`, `03-testing.md`, test-contract, or bounded-result
+coordinates it needs. A
+`bounded_result_path` or exceptional assigned evidence/report path is writable
+only when the same exact coordinate and operation were predeclared. Missing,
+escaped, symlinked, duplicated, or undeclared writes fail closed as
+`workspace-write-undeclared`; never infer report ownership from the role name
+or `workspace_artifact_root`.
 
 The quality manifest is the one deliberate workspace artifact named by a
 runner invocation: require the absolute
@@ -152,6 +174,22 @@ equals the Task Index and overlay `shard_path`. Missing, duplicate, stale,
 case-mismatched, escaped, or invented coordinates are
 `packet-artifact-invalid`; do not dispatch or ask a specialist to discover a
 replacement path.
+
+When a task's acceptance depends on an `evidence-only` repository, first seal
+the normal service dispatch and then invoke `openspec-bindings.mjs
+bind-evidence-dispatch` with the exact task-shard path and a non-empty set of
+`{service, path, sha256}` coordinates taken from the accepted research/evidence
+manifest. The helper resolves each service only through the aggregate's typed
+`evidence_repositories`, re-verifies repository identity, containment,
+regular/non-symlink identity, and live SHA-256, and writes a canonical
+workspace-local generation-1 evidence dispatch. The packet carries
+`evidence_dispatch_binding: {path, sha256}`, its
+`dispatch_identity_sha256`, and only the matching `path_roots.evidence_roots`.
+The specialist verifies that file before any external read. Evidence roots are
+strictly coordinate-only and read-only: never search, enumerate, execute a
+command, edit, stage, or resolve `discovery_scope` below them. Missing,
+unlisted, stale, escaped, or identity-mismatched evidence is
+`packet-artifact-invalid`; it never widens task ownership.
 
 Every OpenSpec-bound initial or correction packet carries one inseparable
 `openspec_snapshot: {path, sha256}` binding. `path` is the absolute canonical
@@ -207,6 +245,15 @@ closes. A successful seal writes
 workspace quality manifest, and every overlay-declared shard. Its existence
 makes all later repair ineligible.
 
+At implementation recovery, invoke `openspec-bindings.mjs audit-dispatches`
+before selecting any service or correction. The audit enumerates every
+writable binding in aggregate order, verifies each binding at its own durable
+progress position, and reports every missing or stale seal. For every `missing`
+entry invoke the existing create-only `seal-dispatch`, including when that
+service already has durable progress, then rerun the complete audit and require
+`verdict: pass`. Never audit only the currently requested service or infer a
+seal from completed tasks, prior agent events, or another binding's seal.
+
 Every initial or correction packet carries
 `derived_dispatch_binding: {path, sha256}` using the absolute canonical seal
 path and its exact digest. Immediately before every fresh dispatch, run
@@ -216,6 +263,20 @@ seal file/hash and assigned-shard membership check before any packet-derived
 read. `DISPATCH_BINDING_STALE`, a missing/changed seal, or a post-seal artifact
 mismatch blocks; never repair, rehash all bindings, substitute a new shard
 digest, or resend the packet against the changed bytes.
+
+If an already sealed task exhausted exactly two clean implementer/tester
+attempts only because its packet lacked required external evidence, Main may
+create one generation-2 evidence dispatch without changing the base seal or
+Gate 1. First persist a canonical `team_harness_packet_scope_insufficient`
+incident for the exact service, task shard, role, two exhausted attempts, and
+unchanged owned/evidence paths. Then invoke `bind-evidence-dispatch` with that
+artifact's path/hash and the verified external coordinates. Only a pass result
+creates a new task-local dispatch identity and resets that exact
+service+task+role package to `next_attempt: 1`; other packages, correction
+budgets, progress, seals, and historical attempts remain untouched. A second
+generation-2 identity, non-clean prior attempt, different failure code, or
+coordinate drift fails closed. Every fresh packet and recovery reruns
+`verify-evidence-dispatch` before dispatch.
 
 For an already repaired legacy `sharded-v1` workspace whose original approved
 aggregate contained placeholder overlays, never overwrite the original Gate or
@@ -485,15 +546,23 @@ live status request, an actual phase-SLA timeout, or recovery. A normal
 continues the directed wait; it proves neither failure nor terminal state.
 Track each role's phase SLA independently from dispatch time. At the SLA,
 evaluate `scripts/specialist-liveness.mjs`: send its single token-bound probe,
-allow the fixed two-minute ACK grace, and permit at most one matching-checkpoint
-lease renewal. When it returns `interrupt`, interrupt first and then audit only
-the packet's declared owned paths and evidence paths. A clean first attempt may
-be replaced once by a fresh same-role V2 specialist; changed paths block as
-`specialist-interrupted-with-progress`, and a clean second timeout blocks as
+record native acceptance as `probe_delivery_state: unconfirmed` unless an
+explicit delivery/read receipt proves `confirmed`, allow the fixed two-minute ACK grace,
+and permit at most one matching-checkpoint lease renewal. A matching
+ACK itself proves delivery. When the helper returns `interrupt`, interrupt
+first and then audit only the packet's declared owned paths and evidence paths.
+If delivery was unconfirmed and that audit finds progress, send exactly one
+`TH-LIVENESS-RESUME` to the same thread and token with the unchanged packet and
+decision reference; it consumes no new correction authority. Confirmed-delivery
+progress, a second continuation failure, or operator cancellation blocks as
+`specialist-interrupted-with-progress`. A clean first attempt may be replaced
+once by a fresh same-role V2 specialist, and a clean second timeout blocks as
 `specialist-retry-exhausted`. Never run a concurrent replacement, retry
-indefinitely, or let Main perform the role as a local fallback. Persist the
-classifier result in `agent.sla.extra` and the declared-path audit in
-`agent.close.extra` before replacement or block. The normalized benchmark counts only waits and queries that are
+indefinitely, infer delivery from a successful send call, or let Main perform
+the role as a local fallback. Persist the classifier result and delivery state
+in `agent.sla.extra`, then the interruption cause, continuation count, and
+declared-path audit in `agent.close.extra` before resume, replacement, or block.
+The normalized benchmark counts only waits and queries that are
 not caused by completion, input, a real timeout, or recovery; the current
 policy must keep that count at no more than 30% of the normalized baseline
 (at least a 70% reduction) while retaining immediate operator interruption.
@@ -789,10 +858,15 @@ snapshot-bound `openspec/` source and must exclude
 `.team-harness/quality.json`; either mismatch blocks Freeze. QA still audits
 the frozen result independently.
 
-Do not silently widen the approved scope. When implementation is complete, write a 5–30 line,
-≤8 KB `02-implementation.md` containing only outcome, deviations, exceptions, one-line checks,
-commit, and unresolved issues. Git is the changed-file authority; do not paste the diff, raw logs,
-or chronology. Set `phase: validation` and `next_action: run approved acceptance validation`.
+Do not silently widen the approved scope. Each implementer returns a bounded
+structured status with its exact `workspace_writes`, outcome, deviations,
+exceptions, one-line checks, correction closure results, commit, and unresolved
+issues. Main rejects success if `workspace_writes` contains a path or operation
+not authorized by the packet. After all repository results in the round are
+durably recorded, Main alone writes or replaces the 5–30 line, ≤8 KB
+`02-implementation.md` consolidation. Git is the changed-file authority; do not
+paste the diff, raw logs, or chronology. Main then sets `phase: validation` and
+`next_action: run approved acceptance validation`.
 
 Implementation checkpoints (pre-implementation red/green evidence when required,
 constraint reconciliation, test/evidence authoring, cleanup, the Freeze quality
@@ -805,9 +879,10 @@ acceptance criterion merely to manufacture a pass.
 
 ## Correction closure before Freeze
 
-For an authorized correction, the implementer runs every package closure check and records the
-actual result in `02-implementation.md`. Main verifies that every finding ID has one successful
-result before any Freeze rebuild. Missing or failed closure evidence is
+For an authorized correction, the implementer runs every package closure check
+and returns the actual result in `finding_resolutions`. Main verifies that every
+finding ID has one successful result, records it durably, and consolidates it
+into `02-implementation.md` before any Freeze rebuild. Missing or failed closure evidence is
 `failure_kind: correction-incomplete`: the consumed correction round remains consumed, no Freeze
 opens, and no validator is dispatched. Main consolidates the failed checks as the next package;
 an operator-live correction pauses and retains a fresh unbounded operator-live choice,
@@ -837,13 +912,15 @@ and do not edit version sites. Block as `major-release-required`, name the contr
 a separate explicitly scoped operator-led release-planning task.
 Mechanical paths are only `CHANGELOG.md`, `changelog.d/*`, and exact resolved version sites;
 every other path is substantive. The 400-line/8-file caps require a bounded
-`02-implementation.md § Reviewability Exceptions` justification when exceeded. Persist the
+implementer `reviewability_exceptions` justification when exceeded; Main
+persists it in `02-implementation.md § Reviewability Exceptions`. Persist the
 unconditional composition, size result, and optional justification, then record full
 `freeze_commit_sha` and `freeze_tree_sha` together with the frozen diff/evidence anchor. Build, tests, QA, and security see that exact identity. Any later tree change
 reopens Freeze and the affected validation; nothing ships from stale findings. When acceptance
 passes, retain that same Freeze identity; do not create duplicate validated SHA fields.
 
 When all approved implementation work and evidence checkpoints are complete, set `phase: validation`,
-`status: in_progress`, and `next_action: run approved acceptance validation`. Record changed files,
-commands, evidence, and unresolved issues in `02-implementation.md` without creating a second
+`status: in_progress`, and `next_action: run approved acceptance validation`.
+Main records changed files, commands, evidence, and unresolved issues from all
+verified specialist returns in `02-implementation.md` without creating a second
 implementation phase or widening the approved plan.

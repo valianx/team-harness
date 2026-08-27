@@ -7,6 +7,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import {
+  auditOpenSpecBindingDispatches,
+  bindOpenSpecEvidenceDispatch,
   bindConsolidatedGate1,
   canonicalJsonBytes,
   createOpenSpecBindingsManifest,
@@ -16,6 +18,7 @@ import {
   verifyConsolidatedGate1,
   verifyLegacyV1CurrentBindings,
   verifyOpenSpecBindingDispatch,
+  verifyOpenSpecEvidenceDispatch,
   verifyOpenSpecBindingsManifest,
 } from "../skills/pipeline/scripts/openspec-bindings.mjs";
 
@@ -91,7 +94,10 @@ async function fixture() {
     });
   }
   const evidenceRepository = path.join(root, "zippy", "payment-gateway");
-  await mkdir(evidenceRepository, { recursive: true });
+  const evidenceRelativePath = "src/contracts/payment-request.ts";
+  const evidenceBytes = Buffer.from("export const paymentRequestVersion = 1;\n");
+  await mkdir(path.join(evidenceRepository, "src", "contracts"), { recursive: true });
+  await writeFile(path.join(evidenceRepository, evidenceRelativePath), evidenceBytes);
   const evidenceRepositories = [{
     service: "payment-gateway",
     role: "evidence-only",
@@ -106,7 +112,10 @@ async function fixture() {
   const executionOrder = services.slice();
   const repositoryIdentityReader = async repository => `identity:${path.basename(repository)}`;
   const overlayValidator = async () => ({ verdict: "pass" });
-  return { root, workspace, services, bindings, evidenceRepositories, dependencies, executionOrder, repositoryIdentityReader, overlayValidator };
+  return {
+    root, workspace, services, bindings, evidenceRepositories, dependencies, executionOrder,
+    repositoryIdentityReader, overlayValidator, evidenceRelativePath, evidenceSha256: hash(evidenceBytes),
+  };
 }
 
 async function use(callback) {
@@ -116,18 +125,19 @@ async function use(callback) {
 
 const executionContract = service => `# ${service}\n\n- [ ] 1.1 Implement service\n\n## Team Harness Execution Contract\n\n\`\`\`json\n{"service":"${service}"}\n\`\`\`\n`;
 
-async function prepareCurrentTaskFiles(value, advancedService = null) {
+async function prepareCurrentTaskFiles(value, advancedServices = []) {
+  const advanced = new Set(Array.isArray(advancedServices) ? advancedServices : [advancedServices]);
   for (const service of value.services) {
     const repository = path.join(value.root, "zippy", service);
     const taskPath = path.join(repository, "openspec", "changes", service, "tasks.md");
     const original = executionContract(service);
-    await writeFile(taskPath, service === advancedService ? original.replace("- [ ] 1.1", "- [x] 1.1") : original);
+    await writeFile(taskPath, advanced.has(service) ? original.replace("- [ ] 1.1", "- [x] 1.1") : original);
     const snapshotPath = path.join(value.workspace, "inputs", "openspec", service, "snapshot.json");
     const snapshotValue = JSON.parse(await readFile(snapshotPath, "utf8"));
     snapshotValue.artifacts[0].content_sha256 = hash(Buffer.from(original));
     snapshotValue.artifact_set_sha256 = hash(Buffer.from(`${snapshotValue.artifacts[0].path}\0${snapshotValue.artifacts[0].content_sha256}`));
     await writeFile(snapshotPath, `${JSON.stringify(snapshotValue)}\n`);
-    if (service === advancedService) {
+    if (advanced.has(service)) {
       const progressPath = path.join(path.dirname(snapshotPath), "openspec-progress.json");
       const progress = JSON.parse(await readFile(progressPath, "utf8"));
       progress.completed = ["task:1.1"];
@@ -394,6 +404,128 @@ await use(async value => {
   const stale = await verifyOpenSpecBindingDispatch(options);
   assert.equal(stale.error_code, "DISPATCH_BINDING_STALE");
   console.log("  [PASS] permanent dispatch seal is idempotent and detects post-preflight shard mutation");
+});
+
+await use(async value => {
+  const created = await createOpenSpecBindingsManifest(value);
+  const gate = bindConsolidatedGate1({ manifest: created.manifest, aggregateSha256: created.aggregate_sha256, nonce: "gate-1-nonce" });
+  const dispatch = {
+    workspace: value.workspace,
+    aggregateSha256: created.aggregate_sha256,
+    service: "transactions",
+    gate,
+    nonce: "gate-1-nonce",
+    overlayValidator: value.overlayValidator,
+  };
+  const sealed = await sealOpenSpecBindingDispatch(dispatch);
+  const sealBytes = await readFile(path.join(value.workspace, sealed.dispatch_binding_path));
+  const mixedCasePath = "src/contracts/Payment.ts";
+  const lowercasePath = "src/contracts/payment.ts";
+  const mixedCaseBytes = Buffer.from("export const upper = true;\n");
+  const lowercaseBytes = Buffer.from("export const lower = true;\n");
+  await writeFile(path.join(value.evidenceRepositories[0].repository_root, mixedCasePath), mixedCaseBytes);
+  await writeFile(path.join(value.evidenceRepositories[0].repository_root, lowercasePath), lowercaseBytes);
+  const coordinates = [
+    { service: "payment-gateway", path: lowercasePath, sha256: hash(lowercaseBytes) },
+    { service: "payment-gateway", path: value.evidenceRelativePath, sha256: value.evidenceSha256 },
+    { service: "payment-gateway", path: mixedCasePath, sha256: hash(mixedCaseBytes) },
+  ];
+  const initial = await bindOpenSpecEvidenceDispatch({
+    ...dispatch,
+    taskShardPath: "plan/openspec/transactions/tasks/Task-1.md",
+    evidenceCoordinates: coordinates,
+    repositoryIdentityReader: value.repositoryIdentityReader,
+  });
+  assert.equal(initial.verdict, "pass", JSON.stringify(initial));
+  assert.equal(initial.generation, 1);
+  assert.equal(initial.next_attempt, null);
+  const initialBinding = JSON.parse(await readFile(path.join(value.workspace, initial.evidence_dispatch_path), "utf8"));
+  assert.deepEqual(
+    initialBinding.evidence_sources[0].coordinates.map(item => item.path),
+    coordinates.map(item => item.path).sort((left, right) => (left < right ? -1 : left > right ? 1 : 0)),
+  );
+  const recoveryEvidencePath = "evidence/transactions/packet-scope-insufficient.json";
+  const recoveryEvidence = canonicalJsonBytes({
+    schema_version: 1,
+    kind: "team_harness_packet_scope_insufficient",
+    service: "transactions",
+    task_shard_path: "plan/openspec/transactions/tasks/Task-1.md",
+    role: "tester",
+    error_code: "PACKET_SCOPE_INSUFFICIENT",
+    exhausted_attempts: 2,
+    owned_paths_changed: false,
+    evidence_paths_changed: false,
+  });
+  await mkdir(path.dirname(path.join(value.workspace, recoveryEvidencePath)), { recursive: true });
+  await writeFile(path.join(value.workspace, recoveryEvidencePath), recoveryEvidence);
+  const bound = await bindOpenSpecEvidenceDispatch({
+    ...dispatch,
+    taskShardPath: "plan/openspec/transactions/tasks/Task-1.md",
+    evidenceCoordinates: coordinates,
+    recovery: {
+      role: "tester",
+      failure_code: "PACKET_SCOPE_INSUFFICIENT",
+      exhausted_attempts: 2,
+      evidence_path: recoveryEvidencePath,
+      evidence_sha256: hash(recoveryEvidence),
+    },
+    repositoryIdentityReader: value.repositoryIdentityReader,
+  });
+  assert.equal(bound.verdict, "pass", JSON.stringify(bound));
+  assert.equal(bound.generation, 2);
+  assert.equal(bound.next_attempt, 1);
+  assert.deepEqual(await readFile(path.join(value.workspace, sealed.dispatch_binding_path)), sealBytes);
+  const verified = await verifyOpenSpecEvidenceDispatch({
+    ...dispatch,
+    evidenceDispatchPath: bound.evidence_dispatch_path,
+    evidenceDispatchSha256: bound.evidence_dispatch_sha256,
+    repositoryIdentityReader: value.repositoryIdentityReader,
+  });
+  assert.equal(verified.verdict, "pass", JSON.stringify(verified));
+  const rollback = await bindOpenSpecEvidenceDispatch({
+    ...dispatch,
+    taskShardPath: "plan/openspec/transactions/tasks/Task-1.md",
+    evidenceCoordinates: coordinates,
+    repositoryIdentityReader: value.repositoryIdentityReader,
+  });
+  assert.equal(rollback.error_code, "EVIDENCE_DISPATCH_STALE");
+  await writeFile(path.join(value.evidenceRepositories[0].repository_root, value.evidenceRelativePath), "changed evidence\n");
+  const stale = await verifyOpenSpecEvidenceDispatch({
+    ...dispatch,
+    evidenceDispatchPath: bound.evidence_dispatch_path,
+    evidenceDispatchSha256: bound.evidence_dispatch_sha256,
+    repositoryIdentityReader: value.repositoryIdentityReader,
+  });
+  assert.equal(stale.error_code, "EVIDENCE_SOURCE_STALE");
+  console.log("  [PASS] task-local evidence recovery pins read-only sources and resets only the corrected package");
+});
+
+await use(async value => {
+  await prepareCurrentTaskFiles(value, ["payments-orchestrator", "transactions"]);
+  const created = await createOpenSpecBindingsManifest(value);
+  const gate = bindConsolidatedGate1({ manifest: created.manifest, aggregateSha256: created.aggregate_sha256, nonce: "gate-1-nonce" });
+  const options = {
+    workspace: value.workspace,
+    aggregateSha256: created.aggregate_sha256,
+    gate,
+    nonce: "gate-1-nonce",
+    repositoryIdentityReader: value.repositoryIdentityReader,
+    snapshotVerifier: async () => ({ verdict: "pass" }),
+    overlayValidator: value.overlayValidator,
+  };
+  const missing = await auditOpenSpecBindingDispatches(options);
+  assert.equal(missing.verdict, "repair", JSON.stringify(missing));
+  assert.equal(missing.error_code, "DISPATCH_BINDINGS_INCOMPLETE");
+  assert.deepEqual(missing.bindings.filter(item => item.progressed).map(item => item.service), ["payments-orchestrator", "transactions"]);
+  assert.deepEqual(missing.bindings.map(item => item.status), ["missing", "missing", "missing"]);
+  for (const binding of missing.bindings) {
+    const sealed = await sealOpenSpecBindingDispatch({ ...options, service: binding.service });
+    assert.equal(sealed.verdict, "pass", JSON.stringify(sealed));
+  }
+  const complete = await auditOpenSpecBindingDispatches(options);
+  assert.equal(complete.verdict, "pass", JSON.stringify(complete));
+  assert.deepEqual(complete.bindings.map(item => item.status), ["verified", "verified", "verified"]);
+  console.log("  [PASS] recovery audits and seals every writable binding, including services with durable progress");
 });
 
 await use(async value => {

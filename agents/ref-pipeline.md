@@ -253,7 +253,7 @@ Two columns only, because two facts are all you need: when to call it, and what 
 | Agent | When you call it | Return that advances the sequence |
 |---|---|---|
 | `architect` | `design`, or after an explicit live operator request for post-Gate-1 architect work | `01-plan.md` + classification |
-| `implementer` | `implementation`, after Gate 1 is released | `02-implementation.md` |
+| `implementer` | `implementation`, after Gate 1 is released | structured terminal result; Main consolidates `02-implementation.md` |
 | `tester` | `implementation` evidence checkpoint; bug-fix regression setup first | `03-testing.md` |
 | `cleaner` | once after green evidence and before Freeze, when the manifest declares `test` + `test_contract.path_rules` | cleanup commit or evidenced no-op |
 | `qa` | `validation`, over the frozen tree | `reviews/04-validation.md` |
@@ -555,9 +555,13 @@ That helper is the only silence-to-action classifier:
 
 1. At the first role-SLA exceed, append `agent.sla`, send one native
    `TH-LIVENESS-PROBE` carrying the attempt token, and grant exactly two minutes
-   for the matching `TH-LIVENESS-ACK` checkpoint. The event's `extra` records
-   `attempt`, `attempt_token`, `liveness_action`, and `deadline_at`; a matching
-   ACK appends another `agent.sla` with the same identity and renewed deadline.
+   for the matching `TH-LIVENESS-ACK` checkpoint. Native message acceptance is
+   `probe_delivery_state: unconfirmed` unless the tool exposes an explicit
+   delivery/read receipt; never promote acceptance to `confirmed`. The event's
+   `extra` records `attempt`, `attempt_token`, `liveness_action`, `deadline_at`,
+   `probe_delivery_state`, and an optional receipt-backed
+   `probe_delivered_at`; a matching ACK itself proves delivery and appends
+   another `agent.sla` with the same identity and renewed deadline.
 2. A matching bounded checkpoint renews the attempt lease exactly once for the
    role SLA. A stale or mismatched token grants nothing. No second probe or
    renewal exists.
@@ -565,16 +569,23 @@ That helper is the only silence-to-action classifier:
    terminal interruption. Only then inspect the role packet's declared owned
    file paths and expected evidence paths read-only; do not inspect arbitrary
    partial artifacts or dispatch a concurrent writer.
-4. Changed work or evidence blocks as
-   `specialist-interrupted-with-progress`. A clean first attempt permits one
-   fresh same-role replacement with `fork_turns: none` and attempt `2`. A clean
-   second attempt blocks as `specialist-retry-exhausted`.
+4. Preserve the helper's `interruption_cause`. When delivery was unconfirmed
+   and the declared audit finds work or evidence, send exactly one
+   `TH-LIVENESS-RESUME` to the same thread and attempt token with the unchanged
+   packet and decision reference; this does not consume new correction
+   authority. A second such interruption, progress after confirmed delivery,
+   or operator cancellation blocks as `specialist-interrupted-with-progress`.
+   A clean first attempt permits one fresh same-role replacement with
+   `fork_turns: none` and attempt `2`; a clean second attempt blocks as
+   `specialist-retry-exhausted`.
 
 The coordinator never implements, tests, cleans, validates, or prepares
-delivery as a local fallback. There are at most two attempts total, so silence
-cannot create an indefinite relaunch loop. Persist the helper decision and the
-post-interrupt path audit in the closing `agent.close.extra` before replacement
-or block; record only declared path names and booleans, never partial contents.
+delivery as a local fallback. There are at most two attempts total and one
+same-thread transport continuation per attempt, so silence cannot create an
+indefinite relaunch loop. Persist the helper decision, delivery state,
+interruption cause, continuation count, and post-interrupt path audit in
+`agent.close.extra` before resume, replacement, or block; record only declared
+path names and booleans, never partial contents.
 
 ## Context pruning
 
@@ -634,7 +645,7 @@ You create the folder and own its structure and every coordination file in it. E
   01-root-cause.md               ← architect, bug-fix flow
   reviews/01-closure-rubric.md   ← architect, panel input (not a panel outcome)
   sketches/*                     ← architect, conditional
-  02-implementation.md           ← implementer
+  02-implementation.md           ← Main, consolidated from verified implementer returns
   02-regression-test.md          ← tester, implementation checkpoint
   03-testing.md                  ← tester
   failure-brief.md                ← the failing agent appends
@@ -1322,7 +1333,13 @@ temporary branches. A missing lane SHA or consolidation SHA is `blocked`, never 
 
 Trace: `stage2.lane.dispatch`, `stage2.lane.result`, `stage2.lanes.consolidated`.
 
-**Advance:** `success` → the remaining implementation checkpoints, **and for `type: fix`/`hotfix` only when `regression_test_passes != false`** — `true` or `not-applicable` both advance (`not-applicable` is correct when `regression_test_path` is null). `false` iterates the implementer against max-3. `failed` → read `02-implementation.md`.
+**Advance:** `success` → verify the returned workspace-write set, durably record
+the result, consolidate `02-implementation.md`, then run the remaining
+implementation checkpoints. For `type: fix`/`hotfix`, advance only when
+`regression_test_passes != false` — `true` or `not-applicable` both advance
+(`not-applicable` is correct when `regression_test_path` is null). `false`
+iterates the implementer against max-3. `failed` → use the structured terminal
+result; never require or trust a specialist-written implementation report.
 
 ### Implementation checkpoint — constraint reconciliation
 
