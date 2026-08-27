@@ -122,7 +122,9 @@ that the previous fan omitted. Before creating or presenting its nonce, Main
 must bind a passing workspace-local `correction-packet-preflight.mjs certify`
 artifact. That certificate separates immutable task-intent identity from each
 live source file's exact content SHA-256 and proves complete required
-test-contract coverage. Missing rows are repaired only to `pending`; their
+test-contract coverage. It also binds the complete mechanically validated V2
+dispatch-packet skeleton and its SHA-256, including mandatory helpers and every
+independently verified artifact coordinate. Missing rows are repaired only to `pending`; their
 tester/RED transition must close and the state summary must be recomputed
 before certification. Store the exact certificate pointer in
 `correction_preflight` and carry it in the eventual decision and packet. With a valid Gate-1 approval dual record,

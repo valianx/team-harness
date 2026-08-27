@@ -530,6 +530,12 @@ complete finding-ID set, implicated AC/TC requirement set, exact one-to-one
 disposition and deterministic closure check/expected result for every finding,
 evidenced file scope, `autonomous_correction_count`, and
 `operator_correction_count`. Before any correction authority has been consumed,
+invoke the bundled `openspec-recovery.mjs correction-wait-state` with the exact
+pending/nonce/decision/status/next-action fields and the observed active
+specialist count. A live nonce with no decision and zero active specialists
+must project `status: paused`; `in_progress` is repaired mechanically only to
+`paused`, preserving the nonce, package, authority, repositories, and evidence.
+Any other mismatch blocks with the helper's explicit code.
 Main may reconstruct mechanical coordinates from the frozen identity and the
 decision/findings ledgers, append an observation describing that recovery, and
 issue a fresh nonce. Before any budget decision, run the packaged recovery

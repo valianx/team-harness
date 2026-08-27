@@ -463,13 +463,15 @@ intent/scope/AC contradiction to resolve first—never as a silent waiver.
    selected task set, and current test-contract index. Its workspace-local
    content-addressed certificate binds each live canonical source-file SHA-256
    separately from `task_intent_sha256`, the complete required-test set across
-   every writable overlay, every required RED/GREEN artifact, and the selected
-   packet evidence. `repair-index`
+   every writable overlay, every required RED/GREEN artifact, and the complete
+   mechanically validated V2 packet skeleton with its own SHA-256. Missing
+   helpers, fields, or independently rehashed artifact coordinates block here,
+   before authority. `repair-index`
    adds only missing `pending` rows; Main recomputes the extended coverage
    summary and closes every required RED/GREEN row before retrying. Persist the
    passing certificate in `correction_preflight`; failure creates no nonce and
    consumes no authority. Re-certify immediately before spawn and require the
-   same path/hash/identity.
+   same path/hash/identity/packet hash.
 6. **Persist and authorize.** After every disposition is explicit and certification passes, persist one `correction_package` for the final `resolve` set and generate a fresh nonce. When every finding is an unambiguous in-scope `resolve`, the package is complete, no decision-bearing or ambiguous item remains, and `autonomous_correction_count < 3`, Main records one package-bound `gate1-autonomous` authorization without a live presentation and consumes that single decision through the same correction route. When any eligibility conjunct fails, show exactly the following choices and stop:
 
 ```text
@@ -1873,7 +1875,7 @@ that was broken or not substantively covered cannot proceed as a concern.
 
 Validation advance → `waiting_gate3`. Fail on either conjunct → read all required bounded
 result artifacts and consolidate once; then either record the eligible autonomous decision or
-persist `correction_pending: true` with the exact finding IDs, requirements, closure checks,
+persist `correction_pending: true` and `status: paused` with the exact finding IDs, requirements, closure checks,
 expected results, and union scope, present the fresh live decision, and stop.
 
 ### Iteration

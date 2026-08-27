@@ -7,7 +7,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 export const HELPER_BUNDLE_SCHEMA_VERSION = 1;
-export const HELPER_COMPATIBILITY_EPOCH = "team-harness-pipeline-helper-api-v1";
+export const HELPER_COMPATIBILITY_EPOCH = "team-harness-pipeline-helper-api-v2";
 export const PIPELINE_HELPERS = Object.freeze([
   "bounded-command.mjs",
   "commit-integrity.mjs",

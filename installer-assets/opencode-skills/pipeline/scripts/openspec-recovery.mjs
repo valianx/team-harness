@@ -58,6 +58,45 @@ function correctionCounterResult(verdict, errorCode, details = {}) {
   };
 }
 
+function correctionWaitStateResult(verdict, errorCode, details = {}) {
+  return {
+    schema_version: 1,
+    kind: "team_harness_correction_wait_state_reconciliation",
+    verdict,
+    error_code: errorCode,
+    action_code: details.action_code ?? null,
+    state_patch: details.state_patch ?? null,
+  };
+}
+
+/** Keep a live unconsumed correction choice visibly paused without changing its authority fields. */
+export function reconcileCorrectionWaitState(input = {}) {
+  const keys = new Set([
+    "correction_pending", "correction_nonce", "correction_decision", "correction_decision_ref",
+    "status", "next_action", "active_specialist_count",
+  ]);
+  if (!input || typeof input !== "object" || Array.isArray(input)
+    || Object.keys(input).length !== keys.size || Object.keys(input).some(key => !keys.has(key))
+    || input.correction_pending !== true || !safeString(input.correction_nonce)
+    || input.correction_nonce.length > 256 || input.correction_decision !== null
+    || input.correction_decision_ref !== null || !safeString(input.next_action)
+    || input.next_action.length > 512 || !Number.isInteger(input.active_specialist_count)
+    || input.active_specialist_count < 0) {
+    return correctionWaitStateResult("blocked", "CORRECTION_WAIT_STATE_INVALID");
+  }
+  if (input.active_specialist_count !== 0) {
+    return correctionWaitStateResult("blocked", "CORRECTION_WAIT_SPECIALIST_ACTIVE");
+  }
+  if (input.status === "paused") return correctionWaitStateResult("pass", null);
+  if (input.status !== "in_progress") {
+    return correctionWaitStateResult("blocked", "CORRECTION_WAIT_STATE_INVALID");
+  }
+  return correctionWaitStateResult("repair", "CORRECTION_WAIT_STATUS_MISMATCH", {
+    action_code: "REPAIR_CORRECTION_WAIT_STATUS",
+    state_patch: { status: "paused" },
+  });
+}
+
 function parseExecutionEvents(bytes) {
   const events = [];
   let inFence = false;
@@ -303,14 +342,17 @@ export async function recoverOpenSpecDesign({ state, workspace, snapshotVerifier
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [operation, raw] = process.argv.slice(2);
-  if (operation !== "correction-counters" || !safeString(raw) || Buffer.byteLength(raw, "utf8") > 1024 * 1024) {
-    process.stderr.write("openspec-recovery.mjs accepts correction-counters with one bounded JSON argument; Design recovery remains a library helper.\n");
+  if (!["correction-counters", "correction-wait-state"].includes(operation)
+    || !safeString(raw) || Buffer.byteLength(raw, "utf8") > 1024 * 1024) {
+    process.stderr.write("openspec-recovery.mjs accepts correction-counters or correction-wait-state with one bounded JSON argument; Design recovery remains a library helper.\n");
     process.exitCode = 2;
   } else {
     let options;
     try { options = JSON.parse(raw); }
     catch { options = {}; }
-    const output = await reconcileCorrectionCounters(options);
+    const output = operation === "correction-counters"
+      ? await reconcileCorrectionCounters(options)
+      : reconcileCorrectionWaitState(options);
     process.stdout.write(`${JSON.stringify(output)}\n`);
     if (!["pass", "repair"].includes(output.verdict)) process.exitCode = 1;
   }

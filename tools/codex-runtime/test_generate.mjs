@@ -270,7 +270,7 @@ for (const marker of ["boundedCommandProcessStatus", "result.outcome === \"compl
 for (const marker of ["WORKSPACE_WRITE_UNDECLARED", "WORKSPACE_WRITE_OPERATION_DENIED", "WORKSPACE_WRITE_TARGET_EXISTS", "WORKSPACE_WRITE_TARGET_MISSING", "workspace_write_coordinates", "authorizeSpecialistWorkspaceWrite"]) {
   assert.ok(specialistWriteScopeScript.includes(marker), `specialist workspace-write scope misses ${marker}`);
 }
-for (const marker of ["task_intent_sha256", "source_coordinates", "content_sha256", "TEST_CONTRACT_COVERAGE_INCOMPLETE", "repair-index-before-presentation"]) {
+for (const marker of ["task_intent_sha256", "source_coordinates", "content_sha256", "TEST_CONTRACT_COVERAGE_INCOMPLETE", "repair-index-before-presentation", "dispatch_packet_sha256", "bounded_command_path", "artifact_coordinates", "PACKET_ARTIFACT_INVALID"]) {
   assert.ok(correctionPacketPreflightScript.includes(marker), `correction packet preflight misses ${marker}`);
 }
 for (const marker of ["HELPER_COMPATIBILITY_EPOCH", "helper-bundles", "bundle_identity_sha256", "use-workspace-helper-bundle"]) {
@@ -340,7 +340,7 @@ for (const marker of ["verify-v1-migration", "gate1-v1-migration.json", "passing
 for (const marker of ["dispatch-binding.json", "verify-dispatch", "DERIVED_SET_BUSY"]) {
   assert.ok(recoveryContract.includes(marker), `OpenSpec dispatch-binding recovery contract misses ${marker}`);
 }
-for (const marker of ["audit-dispatches", "REPAIR_CORRECTION_COUNTERS", "CORRECTION_COUNTER_MISMATCH", "verify-evidence-dispatch"]) {
+for (const marker of ["audit-dispatches", "REPAIR_CORRECTION_COUNTERS", "CORRECTION_COUNTER_MISMATCH", "correction-wait-state", "status: paused", "verify-evidence-dispatch"]) {
   assert.ok(recoveryContract.includes(marker), `OpenSpec exhaustive recovery contract misses ${marker}`);
 }
 for (const role of ["implementer", "tester"]) {

@@ -71,9 +71,11 @@ exact hash-matched entry in that immutable bundle before invoking it. A
 plugin-cache path or unmatched helper is `packet-contract-invalid`.
 For a correction packet, additionally require
 `correction_packet_preflight: {path, sha256,
-preflight_identity_sha256}`. Verify the content-addressed certificate and
+preflight_identity_sha256, dispatch_packet_sha256}`. Verify the content-addressed certificate and
 require its service, sorted task IDs, aggregate/index bindings, live source
-content hashes, and RED/GREEN evidence coordinates to equal the packet. Never
+content hashes, RED/GREEN evidence, and complete canonical V2 packet skeleton
+to equal the packet. Rehash every listed artifact against its own path; a hash
+copied from a sibling coordinate is invalid. Never
 substitute `task_intent_sha256` for a source file's `content_sha256`; missing or
 stale certification blocks before reads or writes.
 When Main supplies an exact absolute `bounded_result_path` for a deferred or

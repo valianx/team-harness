@@ -106,7 +106,7 @@ correction_decision: authorize|pause|abort|null
 correction_decision_ref: {consumed token or null}
 correction_authority: operator-live|gate1-autonomous|null
 correction_authority_gate_nonce: {consumed Gate-1 token or null}
-correction_preflight: {path, sha256, preflight_identity_sha256, service, task_ids}|null
+correction_preflight: {path, sha256, preflight_identity_sha256, dispatch_packet_sha256, service, task_ids}|null
 autonomous_correction_count: N
 operator_correction_count: N
 usage_schema_version: 1|null
@@ -380,10 +380,12 @@ intent identity and is never substituted for that file digest. It also derives
 the complete required pre-test set from all writable overlays and rejects a
 missing row even when the stored pending count is zero. `repair-index` may add
 only the missing required rows as `pending`; Main recomputes the extended state
-summary and closes every required RED/GREEN row before retrying certify.
+summary and closes every required RED/GREEN row before retrying certify. The
+same certificate binds the complete final V2 packet skeleton and rejects
+missing helpers, incomplete schema, or any stale/swapped artifact coordinate.
 No correction nonce exists and no authority is consumed until certification
 passes. Immediately before dispatch, rerun certify and require the same
-certificate path/hash/identity or invalidate the decision and return to a fresh
+certificate path/hash/identity/packet hash or invalidate the decision and return to a fresh
 preflight and nonce.
 
 The closed autonomous predicate requires every conjunct: a valid Gate-1

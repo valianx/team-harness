@@ -202,13 +202,24 @@ missing coordinate.
 
 Every correction packet additionally carries
 `correction_packet_preflight: {path, sha256,
-preflight_identity_sha256}`. The workspace-local certificate must match the
-decision's `correction_preflight`, the exact service and sorted task set, the
-aggregate/index identities, every live source content SHA-256, and every
-selected RED/GREEN evidence pointer. Main re-certifies immediately before
-spawn; the specialist verifies the certificate bytes and packet coordinates
-before any packet-derived read. Missing, stale, substituted task-intent hashes,
-or incomplete required-test coverage is `packet-contract-invalid`.
+preflight_identity_sha256, dispatch_packet_sha256}`. Before any correction
+nonce or decision, Main constructs the exact closed
+`team_harness_v2_dispatch_packet` skeleton that it will send. The skeleton
+contains role/mode, roots, every independently hashed `artifact_coordinates`
+entry, closed discovery scope, snapshot and execution-item bindings, derived
+and optional evidence dispatch bindings, quality manifest, helper bundle, the
+mandatory bounded-command/write-scope helpers, conditional test-transition
+helper, workspace writes/result, and Git metadata mode. `certify` rejects an
+absent field, a helper not present in the verified bundle, a missing or swapped
+per-file digest, stale snapshot/seal, invalid anchor, or unsafe scope before
+authority. The certificate binds the canonical skeleton and its SHA-256 along
+with the exact service/task set, aggregate/index identities, live source
+content SHA-256 values, and selected RED/GREEN evidence. Main adds only the
+certificate pointer to the certified skeleton, persists that same packet hash
+in the decision, and re-certifies byte-identically before spawn. The specialist
+verifies the certificate and exact skeleton before any other packet-derived
+read. Any omission or drift is `packet-contract-invalid` and cannot consume a
+dispatch or correction authority.
 
 Before the first implementation specialist dispatch for an OpenSpec binding,
 run the normal overlay and plan-contract preflight. If it fails only because
@@ -540,21 +551,14 @@ creates one comprehensive correction package. A single surfaced symptom never
 authorizes an immediate dispatch while another selected diagnostic is pending.
 
 Before generating a correction nonce, presenting choices, or recording an
-autonomous decision, invoke the bundled `correction-packet-preflight.mjs
-certify` with the exact aggregate path/hash, service, selected `Task-N` IDs,
-and current `test_contract_evidence`. The helper derives source coordinates
-from the approved snapshot but hashes the live canonical source files; its
-`task_intent_sha256` is deliberately separate from every
-`source_coordinates[].content_sha256`. It derives the complete required-test
-set across all writable overlays, so a missing row fails even when legacy
-state says `pending: 0`. `repair-index` may create only missing `pending` rows;
-Main must then recompute the extended state summary and close every required
-RED/GREEN row before retrying certification. Persist the content-addressed
-certificate and bind its path, SHA-256, identity, service, and task IDs in
-`correction_preflight` and the correction package. No pass means no nonce and
-no consumed authority. Immediately before the authorized dispatch, certify
-again and require byte-identical certificate coordinates; drift requires a
-fresh consolidated package and decision rather than reusing authority.
+autonomous decision, apply the correction packet certificate contract above
+with the exact aggregate, service/tasks, current test-contract state, and final
+V2 packet skeleton. Source identity, complete required-test coverage, packet
+schema, helpers, and every file coordinate must all pass in the same
+certificate. `repair-index` may add only missing `pending` rows; Main recomputes
+the extended summary and closes them before retrying. No pass means no nonce or
+consumed authority. Any pre-spawn drift requires a fresh consolidated packet
+and decision rather than reusing authority.
 
 Test blobs are immutable only during their own active red-to-green transition.
 After that task closes and before final Freeze, a fresh tester may make
