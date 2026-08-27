@@ -6,7 +6,9 @@ import { createHash } from "node:crypto";
 import { lstat, readFile, realpath, unlink } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
+
+import { isDirectExecution } from "./cli-entrypoint.mjs";
 import { promisify } from "node:util";
 
 export const WORKTREE_DEPENDENCIES_SCHEMA_VERSION = 1;
@@ -289,4 +291,4 @@ async function main() {
   if (!new Set(["ready", "provisioned"]).has(output.outcome)) process.exitCode = 2;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) await main();
+if (isDirectExecution(import.meta.url)) await main();

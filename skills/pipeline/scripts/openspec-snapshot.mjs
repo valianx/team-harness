@@ -8,6 +8,8 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { isDirectExecution } from "./cli-entrypoint.mjs";
+
 import { runBoundedCommand } from "./bounded-command.mjs";
 import { isOpenSpecAdapterResult } from "./openspec-adapter.mjs";
 
@@ -482,7 +484,7 @@ async function runCli() {
   return operation === "verify" ? verifySnapshot(options) : captureSnapshot(options);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+if (isDirectExecution(import.meta.url)) {
   const output = await runCli().catch(() => action("capture", "fail", "INTERNAL_ERROR"));
   process.stdout.write(`${JSON.stringify(output)}\n`);
   if (!isSnapshotAction(output) || output.verdict !== "pass") process.exitCode = 1;

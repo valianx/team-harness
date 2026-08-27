@@ -4,7 +4,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { lstat, mkdir, open, readFile, realpath, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { isDirectExecution } from "./cli-entrypoint.mjs";
 
 import {
   OPENSPEC_DISPATCH_BINDING_SCHEMA_VERSION,
@@ -340,7 +340,7 @@ function validRelativeList(value) {
 function anchorCount(bytes, anchor) {
   if (typeof anchor !== "string" || anchor.length === 0 || anchor.length > 128) return 0;
   const text = bytes.toString("utf8");
-  const tokenCharacter = /[A-Za-z0-9_.:\/-]/;
+  const tokenCharacter = /[A-Za-z0-9_.\/-]/;
   let count = 0;
   let offset = 0;
   while (offset <= text.length - anchor.length) {
@@ -373,7 +373,7 @@ function validDispatchItem(item) {
     && item.quality_command_ids.every(value => typeof value === "string" && value.length > 0);
 }
 
-async function deriveEvidenceDispatch(request, model, dispatchBinding, selectedShardPaths) {
+async function deriveEvidenceDispatch(request, model, service, dispatchBinding, selectedShardPaths) {
   const reference = request.evidence_dispatch_binding;
   if (reference === null) return { binding: null, roots: {}, sources: [] };
   if (!exactKeys(reference, EVIDENCE_BINDING_KEYS) || !SHA256.test(reference.sha256 ?? "")
@@ -383,7 +383,7 @@ async function deriveEvidenceDispatch(request, model, dispatchBinding, selectedS
   let value;
   try { value = JSON.parse(file.bytes.toString("utf8")); } catch { throw new Error("PACKET_ARTIFACT_INVALID"); }
   const { dispatch_identity_sha256: ignored, ...identity } = value ?? {};
-  if (value?.kind !== "team_harness_openspec_evidence_dispatch" || value.service !== dispatchBinding.service
+  if (value?.kind !== "team_harness_openspec_evidence_dispatch" || value.service !== service
     || value.dispatch_identity_sha256 !== reference.dispatch_identity_sha256
     || hash(canonicalBytes(identity)) !== reference.dispatch_identity_sha256
     || value.base_dispatch_binding?.path !== dispatchBinding.path
@@ -546,7 +546,7 @@ async function deriveDispatchCapsule(input, model, source, testContracts, depend
     item_sha256: hash(canonicalBytes(item)),
     sources: item.sources,
   }));
-  const evidence = await deriveEvidenceDispatch(request, model, dispatchBinding, taskShards.map(item => item.path));
+  const evidence = await deriveEvidenceDispatch(request, model, input.service, dispatchBinding, taskShards.map(item => item.path));
   const scope = validateSpecialistWorkspaceWriteScope({
     role: request.role,
     workspace_artifact_root: model.workspace,
@@ -679,28 +679,12 @@ export async function preflightCorrectionPacket(input = {}, dependencies = {}) {
       test_contract_summary: model.computedSummary,
       missing_required_tasks: missingRequiredTasks,
     };
-    if (missingRequiredTasks.length > 0) {
-      return result("repair", "TEST_CONTRACT_COVERAGE_INCOMPLETE", "repair-index-before-presentation", details);
-    }
     if (!equalJson(input.test_contract_evidence, model.computedSummary)) {
       return result("repair", "TEST_CONTRACT_STATE_STALE", "repair-state-summary-before-presentation", details);
     }
-    const pendingRequiredTasks = [];
-    const verifiedRequiredTasks = new Set();
-    for (const taskId of model.requiredTasks) {
-      const evidence = indexed.get(taskId);
-      if (!evidence || evidence.status === "pending") {
-        pendingRequiredTasks.push(taskId);
-        continue;
-      }
-      if (!["red", "green"].includes(evidence.status)) throw new Error("TEST_CONTRACT_EVIDENCE_INVALID");
-      await verifyEvidence(model.workspace, evidence);
-      verifiedRequiredTasks.add(taskId);
-    }
+    const pendingRequiredTasks = model.requiredTasks
+      .filter(taskId => !indexed.has(taskId) || indexed.get(taskId).status === "pending");
     details.pending_required_tasks = pendingRequiredTasks;
-    if (pendingRequiredTasks.length > 0 && !preImplementationTester) {
-      return result("repair", "TEST_CONTRACT_TASK_PENDING", "complete-required-test-contracts-before-presentation", details);
-    }
     const testContracts = [];
     const pendingSelectedTasks = [];
     for (const item of model.selected) {
@@ -727,7 +711,7 @@ export async function preflightCorrectionPacket(input = {}, dependencies = {}) {
         continue;
       }
       if (!["red", "green"].includes(evidence.status)) throw new Error("TEST_CONTRACT_EVIDENCE_INVALID");
-      if (!verifiedRequiredTasks.has(taskId)) await verifyEvidence(model.workspace, evidence);
+      await verifyEvidence(model.workspace, evidence);
       testContracts.push({
         task_id: taskId,
         status: evidence.status,
@@ -813,7 +797,7 @@ export async function certifyCorrectionPacket(input = {}, dependencies = {}) {
     };
     return {
       ...audited,
-      action: "dispatch-ready-before-authority",
+      action: "dispatch-reference-ready-before-authority",
       dispatch_reference: dispatchReference,
     };
   } catch (error) {
@@ -822,7 +806,7 @@ export async function certifyCorrectionPacket(input = {}, dependencies = {}) {
   }
 }
 
-/** Verify one minimal reference before Main counts an attempt or the specialist reads the repository. */
+/** Verify one minimal reference before Main spawns a counted attempt. */
 export async function verifyDispatchReference(input = {}) {
   try {
     if (!exactKeys(input, new Set(["workspace", "dispatch_reference", "attempt_token", "decision_ref"]))
@@ -848,7 +832,7 @@ export async function verifyDispatchReference(input = {}) {
     if (hash(canonicalBytes(capsuleScopeIdentity(capsule))) !== input.dispatch_reference.scope_identity_sha256) {
       throw new Error("PACKET_ARTIFACT_INVALID");
     }
-    return result("pass", null, "ack-dispatch-ready", {
+    return result("pass", null, "dispatch-reference-verified", {
       service: capsule.scope.service,
       task_ids: capsule.scope.task_ids,
       scope_identity_sha256: capsule.scope.scope_identity_sha256,
@@ -858,7 +842,7 @@ export async function verifyDispatchReference(input = {}) {
     });
   } catch (error) {
     const code = ERROR_CODES.has(error?.message) ? error.message : "INTERNAL_ERROR";
-    return failure(code, "dispatch-reference-invalid-before-ready");
+    return failure(code, "dispatch-reference-invalid");
   }
 }
 
@@ -925,7 +909,7 @@ function parseInput(raw) {
   } catch { return null; }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution(import.meta.url)) {
   const [operation, raw, ...rest] = process.argv.slice(2);
   const input = rest.length === 0 ? parseInput(raw) : null;
   const output = operation === "audit"

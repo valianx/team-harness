@@ -4,7 +4,7 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import process from "node:process";
-import { pathToFileURL } from "node:url";
+import { isDirectExecution } from "./cli-entrypoint.mjs";
 
 const MAX_OUTPUT_BYTES = 1024 * 1024;
 const MAX_MESSAGE_BYTES = 16 * 1024;
@@ -198,7 +198,7 @@ export async function sendHerdrMessage({
   return result("queued", { reason_code: "RECEIPT_PENDING", target, pane_id: paneId, message_id: messageId, staged: true, submitted: true });
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution(import.meta.url)) {
   process.stderr.write("herdr-message.mjs is a library helper; Team Harness supplies a bounded message envelope.\n");
   process.exitCode = 2;
 }

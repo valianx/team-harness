@@ -10,7 +10,7 @@
 import { randomUUID } from "node:crypto";
 import { lstat, open, realpath, rename, unlink } from "node:fs/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { isDirectExecution } from "./cli-entrypoint.mjs";
 
 import {
   isQualityResult,
@@ -808,7 +808,7 @@ function parseCli(argv) {
   return values;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution(import.meta.url)) {
   const argv = process.argv.slice(2);
   let result;
   if (argv[0] === "--validate-contract") {

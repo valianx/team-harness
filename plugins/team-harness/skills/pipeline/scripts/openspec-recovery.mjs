@@ -4,7 +4,7 @@
 import { createHash } from "node:crypto";
 import { lstat, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { isDirectExecution } from "./cli-entrypoint.mjs";
 
 import { verifySnapshot } from "./openspec-snapshot.mjs";
 import { verifyOpenSpecBindingsManifest } from "./openspec-bindings.mjs";
@@ -340,7 +340,7 @@ export async function recoverOpenSpecDesign({ state, workspace, snapshotVerifier
   return result("resume", "PRESENT_GATE_1", "present STAGE-GATE-1");
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution(import.meta.url)) {
   const [operation, raw] = process.argv.slice(2);
   if (!["correction-counters", "correction-wait-state"].includes(operation)
     || !safeString(raw) || Buffer.byteLength(raw, "utf8") > 1024 * 1024) {

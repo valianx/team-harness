@@ -4,7 +4,7 @@
 import { createHash } from "node:crypto";
 import { lstat, mkdir, mkdtemp, readFile, realpath, rename, rm, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { isDirectExecution } from "./cli-entrypoint.mjs";
 
 import { isOpenSpecSnapshot, normalizeOpenSpecTaskIds, verifySnapshot } from "./openspec-snapshot.mjs";
 import { isQualityCommandId, validateQualityManifest } from "./quality-runner.mjs";
@@ -1010,7 +1010,7 @@ function parseCli(argv, progress = false) {
     && (!progress || result.authorizedTaskIds.length > 0) ? result : null;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution(import.meta.url)) {
   const argv = process.argv.slice(2);
   const operation = ["rebind", "verify-progress", "verify-and-rebind", "derive", "repair-derived"].includes(argv[0]) ? argv[0] : "validate";
   const progressOperation = ["verify-progress", "verify-and-rebind"].includes(operation);

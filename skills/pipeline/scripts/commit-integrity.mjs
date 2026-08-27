@@ -6,7 +6,7 @@ import { spawn } from "node:child_process";
 import { lstat, open, realpath, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { pathToFileURL } from "node:url";
+import { isDirectExecution } from "./cli-entrypoint.mjs";
 
 export const COMMIT_INTEGRITY_SCHEMA_VERSION = 1;
 export const COMMIT_INTEGRITY_RECEIPT_SCHEMA_VERSION = 1;
@@ -336,7 +336,7 @@ function parseCli(argv) {
   return result;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution(import.meta.url)) {
   const parsed = parseCli(process.argv.slice(2));
   const output = parsed?.output;
   if (parsed && Object.hasOwn(parsed, "output")) delete parsed.output;
