@@ -320,9 +320,12 @@ for (const marker of ["migrate-v1", "verify-v1-migration", "team_harness_legacy_
   assert.ok(bindingsScript.includes(marker), `OpenSpec legacy-v1 migration implementation misses ${marker}`);
 }
 const implementationContract = await readFile(join(root, "plugins/team-harness/skills/pipeline/references/implementation.md"), "utf8");
+const coordinatorLivenessContract = await readFile(join(root, "agents/_shared/coordinator-liveness.md"), "utf8");
 for (const marker of ["specialist-liveness.mjs", "fixed two-minute ACK grace", "probe_delivery_state: unconfirmed", "TH-LIVENESS-RESUME", "specialist-interrupted-with-progress", "specialist-retry-exhausted", "local fallback"]) {
-  assert.ok(implementationContract.includes(marker), `specialist liveness pipeline contract misses ${marker}`);
+  assert.ok(coordinatorLivenessContract.includes(marker), `specialist liveness pipeline contract misses ${marker}`);
 }
+assert.ok(implementationContract.includes("agents/_shared/coordinator-liveness.md"),
+  "implementation contract does not route to canonical coordinator liveness");
 for (const marker of ["Canonical dispatch reference", "correction-packet-preflight.mjs", "agents/_shared/dispatch-contract.md", "workspace writes", "Main alone writes or replaces"]) {
   assert.ok(implementationContract.includes(marker), `specialist workspace ownership contract misses ${marker}`);
 }

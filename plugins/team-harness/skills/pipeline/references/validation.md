@@ -41,22 +41,8 @@ or delivery record and cannot release or infer one.
 
 ## Efficient verification evidence
 
-Wait for completion or live operator input, with a heartbeat no more frequent
-than 60 seconds. `list_agents` is permitted only for a live status request, an
-actual phase-SLA timeout, or recovery; a normal `wait_agent` timeout only
-returns control and immediately resumes the directed wait without recap, fresh
-analysis, `interrupt_agent`, or another/replacement dispatch. It proves neither
-failure nor terminal state. Track the role SLA independently from dispatch
-time. On SLA exceed, evaluate `scripts/specialist-liveness.mjs`; a successful
-native send is delivery `unconfirmed` unless an explicit receipt proves
-otherwise. Send one token-bound probe, allow its fixed grace, and interrupt
-only when the helper directs it before auditing declared evidence paths. An
-unconfirmed-delivery interruption that left evidence permits one same-thread,
-same-token continuation of the unchanged verification packet; confirmed
-delivery without ACK, a second continuation failure, or operator cancellation
-blocks. A clean first interruption permits the helper's one fresh same-role
-replacement, while a clean second interruption exhausts it. Neither route
-creates correction authority or permits Main to validate locally.
+Apply `agents/_shared/coordinator-liveness.md`; validation adds no local wait,
+SLA, probe, interruption, continuation, or replacement variant.
 The normalized verification
 benchmark counts waits and queries unrelated to completion, input, a real
 timeout, or recovery, and must remain at or below 30% of its normalized

@@ -543,66 +543,8 @@ agent follow-up, or second dispatch is authorized by the prior decision.
 
 ### Wait heartbeat and bounded specialist liveness lease
 
-A runtime wait timeout before the role SLA is only a coordinator heartbeat: it
-returns control to Main and does not fail, stop, or otherwise change the
-specialist. In Codex, a `wait_agent` timeout proves neither failure nor terminal
-state. Resume the directed wait without inferring failure from one or more wait
-intervals.
-
-Track the phase SLA independently from the wait heartbeat and from dispatch
-time:
-
-| Phase | Agent | SLA |
-|---|---|---|
-| design | architect | 10 min |
-| implementation | implementer | 15 min |
-| implementation | tester | 10 min |
-| implementation | cleaner | 5 min |
-| validation | tester | 10 min |
-| validation | qa | 5 min |
-| validation | security | 10 min |
-| delivery | delivery | 5 min |
-
-The architect Design attempt keeps its existing operator-owned timeout: on SLA
-exceed, report once, append `agent.sla`, and keep waiting unless the live
-operator cancels it. For implementation, tester, cleaner, QA, security, and
-delivery attempts, evaluate the exact input with
-`skills/pipeline/scripts/specialist-liveness.mjs` (or its packaged projection).
-That helper is the only silence-to-action classifier:
-
-1. At the first role-SLA exceed, append `agent.sla`, send one native
-   `TH-LIVENESS-PROBE` carrying the attempt token, and grant exactly two minutes
-   for the matching `TH-LIVENESS-ACK` checkpoint. Native message acceptance is
-   `probe_delivery_state: unconfirmed` unless the tool exposes an explicit
-   delivery/read receipt; never promote acceptance to `confirmed`. The event's
-   `extra` records `attempt`, `attempt_token`, `liveness_action`, `deadline_at`,
-   `probe_delivery_state`, and an optional receipt-backed
-   `probe_delivered_at`; a matching ACK itself proves delivery and appends
-   another `agent.sla` with the same identity and renewed deadline.
-2. A matching bounded checkpoint renews the attempt lease exactly once for the
-   role SLA. A stale or mismatched token grants nothing. No second probe or
-   renewal exists.
-3. On an `interrupt` decision, call the native interrupt operation and confirm
-   terminal interruption. Only then inspect the capsule's declared owned
-   file paths and expected evidence paths read-only; do not inspect arbitrary
-   partial artifacts or dispatch a concurrent writer.
-4. Preserve the helper's `interruption_cause`. When delivery was unconfirmed
-   and the declared audit finds work or evidence, send exactly one
-   `TH-LIVENESS-RESUME` to the same thread and attempt token with the unchanged
-   dispatch reference and decision reference; this does not consume new correction
-   authority. A second such interruption, progress after confirmed delivery,
-   or operator cancellation blocks as `specialist-interrupted-with-progress`.
-   A clean first counted attempt permits one fresh same-role replacement with
-   `fork_turns: none` and attempt `2`; a clean second attempt blocks as
-   `specialist-retry-exhausted`.
-
-The coordinator never implements, tests, cleans, validates, or prepares
-delivery as a local fallback. There are at most two attempts total and one
-same-thread transport continuation per attempt, so silence cannot create an
-indefinite relaunch loop. Persist the helper decision, delivery state,
-interruption cause, continuation count, and post-interrupt path audit in
-`agent.close.extra` before resume, replacement, or block; record only declared
-path names and booleans, never partial contents.
+Apply `agents/_shared/coordinator-liveness.md`. This reference owns no local
+wait, SLA, probe, interruption, continuation, or replacement variant.
 
 ## Context pruning
 

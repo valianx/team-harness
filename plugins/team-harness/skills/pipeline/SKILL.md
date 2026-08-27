@@ -165,26 +165,9 @@ the full plan, historical tool output, or prompt-level copies of derived data.
 
 ### Wait heartbeat and phase SLA
 
-Treat a `wait_agent` timeout only as a heartbeat that returns control to Main.
-It proves neither failure nor terminal state and does not stop the specialist.
-Immediately call `wait_agent` again without recap, fresh analysis,
-`interrupt_agent`, or a replacement dispatch; repeated wait timeouts never
-change that rule. Track the separate role SLA from dispatch time: architect 10
-minutes, implementer 15, tester 10, cleaner 5, QA 5, security 10, and delivery
-5, unless the project's `## Pipeline Timeouts` changes those SLA values.
-
-The architect retains its operator-owned timeout. For every
-implementation-or-later specialist, when the role SLA expires evaluate the
-packaged `scripts/specialist-liveness.mjs` contract: send one token-bound probe,
-record native message acceptance as delivery `unconfirmed` unless an explicit
-receipt proves otherwise, allow its fixed grace, then interrupt before auditing
-only declared paths. An unconfirmed-delivery interruption with progress permits
-one same-thread, same-token continuation of the unchanged dispatch reference without new
-correction authority. Confirmed-delivery progress, a second continuation
-failure, or operator cancellation blocks with the helper's exact cause. Apply
-the shared dispatch-reference contract for attempt start and mechanical
-reference recovery; do not reproduce it here. Never infer delivery from a
-successful send call or use Main as the specialist fallback.
+Read and apply `agents/_shared/coordinator-liveness.md` for every wait, SLA,
+probe, interruption, continuation, and replacement decision. It is the sole
+coordinator liveness contract; phase references add no local variant.
 
 ### AC12/AC20 pre-execution command-output route
 
