@@ -685,7 +685,7 @@ proceeding.
 | `adversary` | `validation` | initial: `reviews/04-adversary.md`; operator amend `N`: `reviews/04-adversary-amend-{N}.md` |
 | `qa-plan` | explicit plan-review | `reviews/01-plan-review.md § Plan Ratification` |
 | `plan-reviewer` | explicit plan-review | `reviews/01-plan-review.md § Plan Review` |
-| `delivery` | `delivery` | `inputs/pr-body-draft.md` + the pipeline Acceptance Matrix |
+| `delivery` | `delivery` | `inputs/pr-body-draft.md § Acceptance Matrix` **and** `inputs/acceptance-matrix.md § Acceptance Matrix` |
 
 For `adversary`, resolve the expected path from the current dispatch/status
 block's exact `audit_run`: `initial` maps to `reviews/04-adversary.md` and
@@ -693,7 +693,11 @@ block's exact `audit_run`: `initial` maps to `reviews/04-adversary.md` and
 report or select the greatest suffix. If the exact current report is absent,
 verification fails even when an older amend report exists.
 
-For a non-`none` row, exists and non-empty → proceed. Otherwise append
+For a non-`none` row, every named file must exist and be non-empty. When the
+expected coordinate names a section, its exact `## {name}` heading must occur
+once and its body before the next `##` heading (or EOF) must contain nonblank
+content. A different section in the same shared file does not satisfy the row.
+Only after all applicable file and section checks pass → proceed. Otherwise append
 `artifact.missing` (`action: retry`) and re-dispatch **exactly once** with an
 explicit "your artifact was not found" instruction. A second failure →
 `artifact.missing` (`action: escalate`), `status: blocked`. This is the
@@ -714,7 +718,8 @@ After delivery returns `success`, before the GitHub update substep:
 
 1. Enumerate the `status: success` rows in `§ Agent Results`.
 2. Resolve each expected artifact from the table above, excluding no-file rows.
-3. Verify each exists and is non-empty.
+3. Verify each file exists and is non-empty and every named section passes the
+   exact-heading, exactly-once, non-empty-body check above.
 4. Verify `00-pipeline-summary.md` exists, is non-empty, and contains `## Cost`.
 5. Verify the trace exists and `phase.end` count ≥ the count of `[x]` checklist rows.
 

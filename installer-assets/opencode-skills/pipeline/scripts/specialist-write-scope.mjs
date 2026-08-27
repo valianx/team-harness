@@ -61,10 +61,11 @@ function canonicalLeaf(root, path) {
   try {
     const stat = lstatSync(path);
     if (!stat.isFile() || stat.isSymbolicLink() || realpathSync(path) !== path) return null;
+    return { path, exists: true };
   } catch (error) {
     if (error?.code !== "ENOENT") return null;
+    return { path, exists: false };
   }
-  return path;
 }
 
 export function validateSpecialistWorkspaceWriteScope(input = {}) {
@@ -137,13 +138,40 @@ export function authorizeSpecialistWorkspaceWrite(input = {}) {
       input.requested_path,
     );
   }
+  const target = canonicalLeaf(input.workspace_artifact_root, input.requested_path);
+  if (target === null) {
+    return invalid(
+      "WORKSPACE_WRITE_COORDINATE_INVALID",
+      "The requested workspace target changed identity or became unsafe after scope validation.",
+      input.role,
+      input.requested_path,
+    );
+  }
+  if (input.requested_operation === "create" && target.exists) {
+    return invalid(
+      "WORKSPACE_WRITE_TARGET_EXISTS",
+      "Create cannot overwrite an existing workspace artifact.",
+      input.role,
+      input.requested_path,
+    );
+  }
+  if ((input.requested_operation === "replace" || input.requested_operation === "append") && !target.exists) {
+    return invalid(
+      "WORKSPACE_WRITE_TARGET_MISSING",
+      "Replace or append requires an existing workspace artifact.",
+      input.role,
+      input.requested_path,
+    );
+  }
   return result({
     verdict: "pass",
     action: "authorize-write",
     role: input.role,
     requestedPath: input.requested_path,
     coordinate,
-    observation: "The exact assigned workspace write is authorized; no sibling report or coordination artifact is writable.",
+    observation: input.requested_operation === "create"
+      ? "The exact assigned create is authorized for a missing target; the caller must use exclusive creation and fail on EEXIST."
+      : "The exact assigned existing workspace artifact and operation are authorized; no sibling report or coordination artifact is writable.",
   });
 }
 

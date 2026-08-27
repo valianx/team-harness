@@ -113,6 +113,9 @@ const transportInterruptedWithProgress = evaluateSpecialistLiveness(input({
   agent_status: "interrupted",
   owned_paths_changed: true,
   interruption_cause: "specialist-probe-delivery-unconfirmed",
+  now: at(12 * 60_000),
+  probe_sent_at: at(10 * 60_000),
+  probe_delivery_state: "unconfirmed",
 }));
 assert.equal(transportInterruptedWithProgress.action, "resume");
 assert.equal(transportInterruptedWithProgress.attempt, 1);
@@ -124,6 +127,9 @@ const resumedInterruptedWithProgress = evaluateSpecialistLiveness(input({
   owned_paths_changed: true,
   interruption_cause: "specialist-probe-delivery-unconfirmed",
   continuation_count: 1,
+  now: at(12 * 60_000),
+  probe_sent_at: at(10 * 60_000),
+  probe_delivery_state: "unconfirmed",
 }));
 assert.equal(resumedInterruptedWithProgress.action, "block");
 assert.equal(resumedInterruptedWithProgress.error_code, "SPECIALIST_INTERRUPTED_WITH_PROGRESS");
@@ -156,6 +162,11 @@ assert.equal(evaluateSpecialistLiveness(input({
   probe_delivered_at: at(10 * 60_000),
 })).error_code, "ARGUMENT_INVALID");
 assert.equal(evaluateSpecialistLiveness(input({ unexpected: true })).error_code, "ARGUMENT_INVALID");
+assert.equal(evaluateSpecialistLiveness(input({
+  agent_status: "interrupted",
+  owned_paths_changed: true,
+  interruption_cause: "specialist-probe-delivery-unconfirmed",
+})).error_code, "ARGUMENT_INVALID");
 
 const cli = spawnSync(process.execPath, [helper, "{}"], { cwd: repositoryRoot, encoding: "utf8" });
 assert.equal(cli.status, 1);

@@ -131,14 +131,17 @@ traversal, or copy artifacts into the worktree. Missing root/domain or a path
 that escapes its declared root blocks the dispatch packet.
 
 Resolve the packaged `scripts/specialist-write-scope.mjs` beside the active
-pipeline skill before every implementation dispatch. The packet carries that
+pipeline skill before every implementer or tester dispatch. The packet carries that
 absolute canonical regular non-symlink path as `workspace_write_scope_path`
 plus a closed `workspace_write_coordinates` array of exact absolute paths,
 allowed `create|replace|append` operations, and purposes. The implementer runs
 the helper's `validate` operation before packet reads and its `authorize`
 operation before every workspace write. Normal implementation packets use an
 empty array: `02-implementation.md`, state, events, plans, inputs, evidence,
-reviews, and sibling reports remain coordinator-owned and read-only. A
+reviews, and sibling reports remain coordinator-owned and read-only for the
+implementer. A tester packet assigns only the exact mode-specific
+`02-regression-test.md`, `03-testing.md`, test-contract, or bounded-result
+coordinates it needs. A
 `bounded_result_path` or exceptional assigned evidence/report path is writable
 only when the same exact coordinate and operation were predeclared. Missing,
 escaped, symlinked, duplicated, or undeclared writes fail closed as

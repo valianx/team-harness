@@ -88,6 +88,26 @@ assert.equal(authorizeSpecialistWorkspaceWrite({
   requested_path: resultPath,
   requested_operation: "replace",
 }).verdict, "pass");
+assert.equal(authorizeSpecialistWorkspaceWrite({
+  ...scope,
+  requested_path: resultPath,
+  requested_operation: "create",
+}).error_code, "WORKSPACE_WRITE_TARGET_EXISTS");
+
+const missingResult = join(evidence, "missing.json");
+const missingScope = {
+  ...scope,
+  workspace_write_coordinates: [{
+    path: missingResult,
+    operations: ["replace"],
+    purpose: "bounded-command-result",
+  }],
+};
+assert.equal(authorizeSpecialistWorkspaceWrite({
+  ...missingScope,
+  requested_path: missingResult,
+  requested_operation: "replace",
+}).error_code, "WORKSPACE_WRITE_TARGET_MISSING");
 
 assert.equal(validateSpecialistWorkspaceWriteScope({ unexpected: true }).error_code, "ARGUMENT_INVALID");
 assert.equal(resolve(root), root);

@@ -419,11 +419,17 @@ await use(async value => {
   };
   const sealed = await sealOpenSpecBindingDispatch(dispatch);
   const sealBytes = await readFile(path.join(value.workspace, sealed.dispatch_binding_path));
-  const coordinates = [{
-    service: "payment-gateway",
-    path: value.evidenceRelativePath,
-    sha256: value.evidenceSha256,
-  }];
+  const mixedCasePath = "src/contracts/Payment.ts";
+  const lowercasePath = "src/contracts/payment.ts";
+  const mixedCaseBytes = Buffer.from("export const upper = true;\n");
+  const lowercaseBytes = Buffer.from("export const lower = true;\n");
+  await writeFile(path.join(value.evidenceRepositories[0].repository_root, mixedCasePath), mixedCaseBytes);
+  await writeFile(path.join(value.evidenceRepositories[0].repository_root, lowercasePath), lowercaseBytes);
+  const coordinates = [
+    { service: "payment-gateway", path: lowercasePath, sha256: hash(lowercaseBytes) },
+    { service: "payment-gateway", path: value.evidenceRelativePath, sha256: value.evidenceSha256 },
+    { service: "payment-gateway", path: mixedCasePath, sha256: hash(mixedCaseBytes) },
+  ];
   const initial = await bindOpenSpecEvidenceDispatch({
     ...dispatch,
     taskShardPath: "plan/openspec/transactions/tasks/Task-1.md",
@@ -433,6 +439,11 @@ await use(async value => {
   assert.equal(initial.verdict, "pass", JSON.stringify(initial));
   assert.equal(initial.generation, 1);
   assert.equal(initial.next_attempt, null);
+  const initialBinding = JSON.parse(await readFile(path.join(value.workspace, initial.evidence_dispatch_path), "utf8"));
+  assert.deepEqual(
+    initialBinding.evidence_sources[0].coordinates.map(item => item.path),
+    coordinates.map(item => item.path).sort((left, right) => (left < right ? -1 : left > right ? 1 : 0)),
+  );
   const recoveryEvidencePath = "evidence/transactions/packet-scope-insufficient.json";
   const recoveryEvidence = canonicalJsonBytes({
     schema_version: 1,

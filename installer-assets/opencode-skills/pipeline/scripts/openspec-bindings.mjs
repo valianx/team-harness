@@ -735,7 +735,8 @@ async function expectedOpenSpecEvidenceDispatch({
       throw new Error("REPOSITORY_IDENTITY_MISMATCH");
     }
     const coordinates = evidenceCoordinates.filter(item => item.service === evidenceService)
-      .map(item => ({ path: item.path, sha256: item.sha256 })).sort((left, right) => left.path.localeCompare(right.path));
+      .map(item => ({ path: item.path, sha256: item.sha256 }))
+      .sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0));
     for (const coordinate of coordinates) {
       const file = await readRepositoryFile(repository.repository_root, coordinate.path);
       if (digest(file.bytes) !== coordinate.sha256) throw new Error("EVIDENCE_SOURCE_STALE");

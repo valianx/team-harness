@@ -75,6 +75,9 @@ packet-derived read. Before every proposed workspace write, run its `authorize`
 operation with the exact absolute path and `create|replace|append`; a non-pass
 result is `workspace-write-undeclared` and the write does not occur. Every
 workspace path is read-only unless its exact coordinate and operation pass.
+An authorized `create` must use an exclusive-create primitive and abort on
+`EEXIST`; never turn it into replacement after authorization. `replace` and
+`append` require the target to exist when authorized.
 `bounded_result_path`, when present, must be that same exact authorized
 coordinate. `02-implementation.md`, state, events, plans, reviews, and sibling
 reports are never implicitly writable.

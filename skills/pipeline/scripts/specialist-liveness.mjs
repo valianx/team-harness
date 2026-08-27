@@ -117,6 +117,8 @@ export function evaluateSpecialistLiveness(input = {}) {
     || typeof ownedPathsChanged !== "boolean" || typeof evidenceChanged !== "boolean"
     || !Number.isInteger(continuationCount) || continuationCount < 0 || continuationCount > 1
     || (interruptionCause !== null && !INTERRUPTION_CAUSES.has(interruptionCause))
+    || (interruptionCause === "specialist-probe-delivery-unconfirmed"
+      && (probeSentAt === null || probeDeliveryState !== "unconfirmed"))
     || (probeSentAtValue !== null && (probeSentAt === null || probeSentAt < dispatchedAt || probeSentAt > now))
     || (probeSentAt === null && (probeDeliveryStateValue !== null || probeDeliveredAtValue !== null))
     || (probeSentAt !== null && !PROBE_DELIVERY_STATES.has(probeDeliveryState))
